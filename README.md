@@ -1,5 +1,9 @@
 # WebMusic
 
+[![CI and Pages](https://github.com/koperative-lab/WebMusic/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/koperative-lab/WebMusic/actions/workflows/ci.yml)
+[![Documentation](https://img.shields.io/badge/docs-website-blue)](https://koperative-lab.github.io/WebMusic/)
+[![License](https://img.shields.io/github/license/koperative-lab/WebMusic)](LICENSE)
+
 Composable TypeScript building blocks for music software, interactive demos,
 and web-based musical installations.
 
@@ -17,11 +21,11 @@ Score Elements and visual renderers use its presenters.
 
 ## Packages
 
-| Package | Responsibility |
-|---|---|
-| [@webmusic/score](packages/score/README.md) | Symbolic music: Score data, MIDI/MusicXML/MXL/ABC, playback, analysis, and views |
-| [@webmusic/ui](packages/ui/README.md) | Domain-neutral presenters, accessible interaction, and public styling hooks |
-| [@webmusic/kernel](platform/kernel/README.md) | Domain-neutral timing, lifecycle, events, worker, and interoperability contracts |
+| Package | npm | Responsibility |
+|---|---|---|
+| [@webmusic/score](packages/score/README.md) | [![npm @webmusic/score](https://img.shields.io/npm/v/%40webmusic%2Fscore)](https://www.npmjs.com/package/@webmusic/score) | Symbolic music: Score data, MIDI/MusicXML/MXL/ABC, playback, analysis, and views |
+| [@webmusic/ui](packages/ui/README.md) | [![npm @webmusic/ui](https://img.shields.io/npm/v/%40webmusic%2Fui)](https://www.npmjs.com/package/@webmusic/ui) | Domain-neutral presenters, accessible interaction, and public styling hooks |
+| [@webmusic/kernel](platform/kernel/README.md) | [![npm @webmusic/kernel](https://img.shields.io/npm/v/%40webmusic%2Fkernel)](https://www.npmjs.com/package/@webmusic/kernel) | Domain-neutral timing, lifecycle, events, worker, and interoperability contracts |
 
 Score provides symbolic music, including sound playback. Kernel supplies neutral
 timing and lifecycle contracts, and UI Kit supplies presentation. Cross-domain
@@ -35,19 +39,25 @@ ship here.
 
 ## Use the toolkit
 
-The [documentation site sources](apps/doc/webmusic/src/content/docs/index.mdx)
-cover Score and all integration choices. Start with
-[Quick Start](apps/doc/webmusic/src/content/docs/quick-start.mdx), then
-[Score](apps/doc/webmusic/src/content/docs/score/index.mdx).
+Install the packages from npm:
+
+~~~bash
+npm install @webmusic/kernel @webmusic/ui @webmusic/score
+~~~
+
+The [documentation site](https://koperative-lab.github.io/WebMusic/)
+covers Score and all integration choices. Start with
+[Quick Start](https://koperative-lab.github.io/WebMusic/quick-start/), then
+[Score](https://koperative-lab.github.io/WebMusic/score/).
 The [Score component reference](apps/doc/webmusic/src/content/docs/score/element/index.mdx),
 [Headless reference](apps/doc/webmusic/src/content/docs/score/headless/index.mdx) and
 [UI presenter catalog](apps/doc/webmusic/src/content/docs/uikit/catalog.mdx)
 link to the owning public pages. Package manifests define the available entries.
 
-Registry and CDN examples require the requested package versions to be
-available. This repository supports local workspace development; consult
-[release instructions](CONTRIBUTING.md#releasing) before making claims
-about remote publication.
+The npm badges above show the published package versions. Some integrations
+require optional peers or external resources; follow the owning package's
+installation instructions. For contributing and publishing updates, see the
+[release instructions](CONTRIBUTING.md#releasing).
 
 ## Develop locally
 
