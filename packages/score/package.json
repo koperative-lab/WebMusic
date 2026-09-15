@@ -314,11 +314,11 @@
   "devDependencies": {
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.1.0",
-    "@types/react": "^18.3.18",
+    "@types/react": "^19.3.0",
     "@types/react-dom": "^18.3.7",
     "jsdom": "^24.1.3",
     "opensheetmusicdisplay": "^1.9.9",
-    "react": "^18.3.1",
+    "react": "^19.3.0",
     "react-dom": "^18.3.1",
     "spessasynth_lib": "^4.3.14",
     "tsup": "^8.5.0",
