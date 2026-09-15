@@ -284,7 +284,7 @@
     "@tonejs/midi": "^2.0.28",
     "fast-xml-parser": "^5.9.3",
     "fflate": "^0.8.2",
-    "vexflow": "4.2.5"
+    "vexflow": "5.0.0"
   },
   "peerDependencies": {
     "@webmusic/kernel": "^0.1.0",
