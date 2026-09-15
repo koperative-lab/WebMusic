@@ -1,0 +1,270 @@
+---
+title: '@webmusic/ui/note'
+description: 'Renders piano, grid, or chord surfaces and optionally owns pointer, chord, and QWERTY note-hold interaction.'
+sidebar:
+  label: 'note'
+  order: 1
+---
+
+import UiPresenterLiveDemo from '../../../../components/UiPresenterLiveDemo.astro';
+import UiPresenterRelated from '../../../../components/UiPresenterRelated.astro';
+
+`mountNoteSurface()` renders one of three caller-described musical surfaces: percentage-positioned
+piano keys, code-addressable grid cells, or chord buttons. It paints `NoteSurfaceState`; when the
+binding supplies `interaction`, the presenter also owns focus, pointer capture, drag glissando,
+QWERTY holds, chord holds, and guaranteed note-off cleanup.
+
+[`<note-input>`](/score/element/play/note-input/) already composes this presenter. Passive [`<pitch-view>`](/score/element/view/pitch-view/) uses the [pitch presenter](/uikit/views-analysis/pitch/) instead. Mount it
+directly when musical intent comes from a custom mapping or when the surface must share a layout
+with caller-owned controls.
+
+<UiPresenterLiveDemo presenter="note" />
+
+## Import
+
+```ts
+import {mountNoteSurface} from '@webmusic/ui/note';
+
+const handle = mountNoteSurface(host, {
+  snapshot: () => store.noteSurface,
+  interaction: {
+    setNote: (midi, on) => synth.setNote(midi, on),
+  },
+  subscribe: (notify) => store.subscribe(notify),
+});
+```
+
+## Performance interaction
+
+With `interaction`, piano and grid boards support concurrent pointers, pointer capture, and drag
+glissando. Hit testing and automatic pitch-node lookup stay inside the attached board, so multiple
+surfaces can share a document or shadow root. Dragging outside the board releases its current pitch
+without playing keys on a neighboring board. Holds are reference-counted by pitch and by DOM node,
+so overlapping pointers sound one note-on and the final release sounds one note-off. Pointer up or
+cancel releases the current pitch.
+Chord buttons hold every MIDI pitch in their record until pointer up, cancel, leave, Space/Enter
+keyup, or focus loss. Multiple holders may overlap the same chord and pitch.
+
+When `keyboard` is true, the root becomes focusable and the click-to-start overlay disappears on
+focus. Unmodified `KeyboardEvent.code` values resolve through `midiForKey`; repeats do not retrigger
+a held pitch. Escape blurs and releases QWERTY notes. Z and X release all holders before requesting
+an octave shift, except in a `grid` with `mapOnly: true`; `canShiftOctave` can veto either request.
+Blur releases QWERTY holders; `releaseAll()`, remount, and destroy release every presenter holder.
+Ordinary updates repaint external `activeMidis` and the octave label in place: held pointer,
+chord and QWERTY gestures, focus, scroll position, and DOM identity survive synchronous store
+notifications. A key stays visibly pressed while either the caller or a presenter holder keeps
+it active; releasing local input does not erase a caller-owned active pitch.
+
+Changes to layout, QWERTY/map-only mode, piano geometry, grid cells/columns, or chord descriptors
+rebuild the board and release every presenter holder first. The presenter compares descriptor
+values, so new arrays with identical contents do not rebuild, and edits made in place are still
+detected. Releases use the old copied pitch mapping. A mapping, snapshot, or note callback
+that replaces or destroys the mount cannot make the outgoing mount resume a gesture or append
+its old DOM. Re-entrant updates are bounded to 32 passes and failures go to `onError`.
+
+Exceptions from mapping and note commands go to `onError`. The interaction callback is
+synchronous by design; it does not accept promises. See the
+[shared presenter shape](/uikit/api/#the-shared-presenter-shape) for common ownership and
+same-host replacement behavior.
+
+## Geometry helpers
+
+`pianoKeyLayout(startMidi, endMidi, labels?)` includes both endpoints, orders a reversed range from
+low to high, divides the full width evenly among white keys, and places black keys across the next
+white-key boundary at 62% of a white key's width. A range whose first or last key is black reserves
+half a white key at that end, so the raised key — which is centred on the boundary — still lands on
+the board instead of half outside it. Positions are percentages, so CSS alone can size
+the finished keyboard. `PointerSurface` exposes the same multi-pointer, ref-counted hold lifecycle
+for another board whose nodes carry `data-midi` or `data-pitch`.
+
+<details class="component-section">
+<summary>API</summary>
+
+`mountNoteSurface(host, binding, options?)` accepts an `HTMLElement` or `ShadowRoot` and returns a
+`NoteSurfaceHandle`.
+
+**State**
+
+| Member | Kind | Description |
+|---|---|---|
+| `layout` | `'piano' \| 'grid' \| 'chords'` | Required layout discriminator selecting which geometry array is rendered. |
+| `activeMidis?` | `readonly number[]` | Externally held MIDI pitches. Matching piano keys or pitched grid cells receive `.down` and `aria-pressed="true"`; presenter-held input is combined with this state. |
+| `keyboard?` | `boolean` | Truthy state makes the root focusable and adds the QWERTY hint, octave label, and click-to-start overlay. |
+| `mapOnly?` | `boolean` | Strict `true` in grid layout removes Z / X from the visible hint and suppresses octave requests. |
+| `octaveLabel?` | `string` | Text shown on the right of the keyboard bar; absence paints an empty string. |
+| `piano?` | `readonly NotePianoKey[]` | Piano geometry. Absence builds an empty piano board. |
+| `grid?` | `readonly NoteGridCell[]` | Grid geometry and optional physical-key mapping. Absence builds an empty grid. |
+| `gridColumns?` | `number` | Value used in `repeat(<value>, 1fr)`; defaults to `7` when absent. |
+| `chords?` | `readonly NoteChordCell[]` | Chord labels, stable indices, and optional held pitches. Absence builds an empty chord row. |
+
+Geometry record shapes:
+
+| Record member | Kind | Description |
+|---|---|---|
+| `NotePianoKey.midi` | `number` | Pitch written to `data-midi`. |
+| `NotePianoKey.black?` | `boolean` | Truthy state selects raised-key geometry and styling. |
+| `NotePianoKey.left` | `number` | Percentage position assigned to inline `left`. |
+| `NotePianoKey.width` | `number` | Percentage width assigned inline. |
+| `NotePianoKey.label?` | `string` | Optional visible key label. |
+| `NoteGridCell.midi?` | `number` | Optional playable pitch. Absence creates an idle, noninteractive cell. |
+| `NoteGridCell.code?` | `string` | Optional physical `KeyboardEvent.code` written to `data-code`. |
+| `NoteGridCell.ref?` | `string` | Optional visible reference label written to `data-ref`. |
+| `NoteChordCell.label` | `string` | Visible chord-button text. |
+| `NoteChordCell.index` | `number` | Identifier written to `data-i` and used to resolve held chord data. |
+| `NoteChordCell.midis?` | `readonly number[]` | Pitches passed to `setNote` together while the chord is held. Non-finite entries are skipped. |
+
+**Binding**
+
+| Member | Kind | Description |
+|---|---|---|
+| `snapshot()` | `() => NoteSurfaceState` | Required pull port read at mount and update. A failed update reports the error and keeps the current root. |
+| `interaction?` | `NoteSurfaceInteractionBinding` | Optional command and mapping port. Without it, the presenter still builds and paints the surface but installs no performance listeners. |
+| `subscribe?(notify)` | `(notify: () => void) => () => void` | Optional subscription. Registration errors and disposer errors go to `onError`. |
+
+The interaction port has these members:
+
+| Member | Kind | Description |
+|---|---|---|
+| `setNote(midi, on)` | `(number, boolean) => void` | Required synchronous note-on/note-off command for pointer, chord, and QWERTY holders. |
+| `midiForKey?(code)` | `(string) => number \| null` | Resolves an unmodified physical key code. Missing, null, or non-finite results are ignored. |
+| `canShiftOctave?(delta)` | `(-1 \| 1) => boolean` | Optional guard for Z / X. Absence permits the shift. |
+| `requestOctaveShift?(delta)` | `(-1 \| 1) => void` | Optional shift command. Its presence enables Z / X outside map-only grids. |
+
+**Options**
+
+| Member | Kind | Default | Description |
+|---|---|---|---|
+| `onError` | `(error: unknown) => void` | — | Receives snapshot, interaction, subscription, and cleanup failures. Exceptions thrown by the error sink are swallowed. |
+| `stylesheet` | `boolean` | `true` | Installs the presenter's stylesheet unless explicitly `false`, for a light-DOM host that cannot inject CSS into its page. |
+
+**Handle**
+
+| Member | Kind | Description |
+|---|---|---|
+| `element` | `HTMLElement` | Getter returning the current `.wui-note` root; ordinary updates preserve it, while structural changes replace it. |
+| `board?` | `HTMLElement` | Getter returning the current piano, grid, or chord board. |
+| `releaseAll()` | `() => void` | Idempotently releases every pointer, chord, and QWERTY holder; externally active pitches remain visibly pressed. |
+| `update()` | `() => void` | Pulls state and repaints values in place. Only changed layout or descriptors rebuild the root and release held input. |
+| `destroy()` | `() => void` | Idempotently releases all notes, detaches listeners, unsubscribes, and removes the current root and installed style node. |
+
+**Utilities**
+
+| Member | Kind | Description |
+|---|---|---|
+| `isBlackKey(midi)` | `(number) => boolean` | Returns true for pitch classes 1, 3, 6, 8, and 10, including negative MIDI values. |
+| `pianoKeyLayout(start, end, labels?)` | `(number, number, ReadonlyMap<number, string>?) => NotePianoKey[]` | Produces inclusive percentage geometry as described above. |
+| `new PointerSurface(options)` | `PointerSurface` | Creates reusable multi-pointer pitch interaction over a caller-supplied root, selector, and synchronous `fire(pitch, on)` callback. |
+| `PointerSurface.attach(board)` | `(HTMLElement) => void` | Releases and detaches any previous board, then installs pointer listeners on the new board. |
+| `PointerSurface.detach()` | `() => void` | Removes pointer listeners without itself emitting releases; use `releaseAll()` first when holders may exist. |
+| `PointerSurface.press/release(pitch, element?)` | `(number, HTMLElement?) => void` | Reference-counts a programmatic holder and its optional visual node. |
+| `PointerSurface.setActiveMidis(midis?)` | `(readonly number[]) => void` | Paints caller-held pitches alongside local holders without firing notes. Omit the list to clear external active state. |
+| `PointerSurface.releaseAll()` | `() => void` | Clears pointer, pitch, and node holders and emits one final off for each sounding pitch. |
+| `PointerSurfaceOptions.root` | `() => Document \| ShadowRoot \| undefined` | Root used for hit testing; hits and automatic pitch-node lookup are restricted to the attached board. |
+| `PointerSurfaceOptions.keySelector` | `string` | Selector for nodes carrying `data-midi` or `data-pitch`. |
+| `PointerSurfaceOptions.fire` | `(pitch: number, on: boolean) => void` | Synchronous edge callback. |
+| `PointerSurfaceOptions.downClass?` | `string` | Pressed class; defaults to `'down'`. |
+| `PointerSurfaceHit` | `{pitch: number; element: HTMLElement}` | Public hit record used by the pointer lifecycle. |
+| `noteStyle` | `string` | Canonical stylesheet text installed by `mountNoteSurface()`. |
+
+**Accessibility.** With `keyboard`, the root enters the tab order and gains a visible focus
+outline; focus hides the pointer-oriented start overlay. Piano keys and pitched grid cells expose
+`aria-pressed`, but remain pointer/QWERTY surfaces rather than individual tab stops. Idle grid
+cells are noninteractive. Chords are native buttons with visible names and `aria-pressed`; Space
+and Enter use press-on-keydown/release-on-keyup semantics instead of click toggling. Escape and
+blur release held QWERTY notes, and focus loss releases a held chord. Left/Right scroll the
+piano or grid viewport while the QWERTY root has focus, without releasing held notes. Without
+QWERTY, that named viewport enters the tab order for native keyboard scrolling. The presenter
+does not rewrite caller-owned nodes elsewhere in the host.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+Use the shared [surface and palette tokens](/uikit/#theme-with-css-custom-properties) for
+background (including `transparent`), foreground, accent, outer border and corner radius.
+Presenter-specific tokens below take precedence within their documented roles.
+
+The installed `noteStyle` resolves presenter-specific tokens through the shared `--wm-*`
+fallbacks shown below and then literals. The mount installs `noteStyle` by default; set
+`stylesheet: false` to omit it and supply the exported stylesheet or your own CSS from the host.
+Note has no `classNames` or `parts` option; canonical classes, fixed compatibility classes, and the
+root and viewport parts are always installed.
+
+Piano and grid boards scroll horizontally inside the available host width instead of compressing
+their keys and labels. The piano keeps its percentage geometry with a minimum white-key width;
+the grid keeps the supplied column count with a minimum cell width. The keyboard hint wraps,
+and chord buttons wrap into rows with space for multiline labels. Container resizing does not
+rebuild the board or release held notes. Long custom piano labels are ellipsized inside their
+key, with the full label retained as its tooltip.
+
+White and black active-key labels use `--wm-note-label-active` → `--wm-accent-foreground`,
+independently from the background. The neutral active fill is `#444` with white text.
+Unpressed black-key labels use `--wm-note-label-alt` →
+`--wm-foreground-on-inverse` → `#fff`; their borders use `--wm-note-key-alt-border` →
+`--wm-border` → `#000`. Root text uses `--wm-note-foreground` →
+`--wm-foreground`. Keyboard input and held notes are unchanged by token updates.
+
+**Tokens**
+
+| Property | Falls back to | Default | Controls |
+|---|---|---|---|
+| `--wm-note-background` | `--wm-surface` | `#fff` | Root background; the grid itself is transparent to avoid duplicate alpha. |
+| `--wm-surface` | literal fallback | `#fff` | Shared root-background fallback. |
+| `--wm-note-focus` | `--wm-focus` | `#444` | Root keyboard focus outline. |
+| `--wm-focus` | literal fallback | `#444` | Shared focus fallback. |
+| `--wm-note-label` | `--wm-foreground-muted` → `--wm-foreground` | `#666` | Bar text, white-key labels, and grid references. |
+| `--wm-font` | `--wm-font-family` | `system-ui, sans-serif` | Legacy font override for the bar, start prompt, and chords. |
+| `--wm-font-family` | literal fallback | `system-ui, sans-serif` | Shared UI font when the legacy override is absent. |
+| `--wm-font-mono` | literal fallback | `ui-monospace, monospace` | Key and grid-reference labels. |
+| `--wm-note-overlay` | literal fallback | `rgba(255,255,255,.82)` | Click-to-start overlay. |
+| `--wm-note-radius` | `--wm-control-radius` | `0` | Start prompt, keys, cells, and chord corners. |
+| `--wm-note-accent` | `--wm-accent` | `#111` | Start-prompt background. |
+| `--wm-note-accent-foreground` | `--wm-accent-foreground` | `#fff` | Start-prompt text. |
+| `--wm-note-height` | `--wm-surface-md` | `144px` | Piano board height, on the shared drawing-surface scale. |
+| `--wm-note-key-min-width` | literal fallback | `2.25rem` | Minimum white-key width before the piano scrolls. |
+| `--wm-note-cell-min-width` | literal fallback | `2.5rem` | Minimum grid-cell width before the grid scrolls. |
+| `--wm-note-border` | `--wm-control-border` → `--wm-border` | `#d8d8d8` | White-key, grid-cell, and chord borders. |
+| `--wm-control-border` | `--wm-border` | `#d8d8d8` | Shared non-primary control border fallback. |
+| `--wm-note-key` | `--wm-surface` | `#fff` | White-key background. |
+| `--wm-note-key-alt` | `--wm-surface-inverse` | `#222` | Black-key and chord background. |
+| `--wm-note-active` | `--wm-accent` | `#444` | Pressed key, cell, and chord background. |
+| `--wm-note-gap` | literal fallback | `0.4rem` | Grid and chord gaps. |
+| `--wm-note-cell-height` | literal fallback | `42px` | Grid-cell minimum height and two-thirds of the chord minimum height. |
+| `--wm-note-surface` | `--wm-surface-muted` → `--wm-surface` | `#f3f3f3` | Idle grid-cell surface background. |
+| `--wm-note-label-active` | `--wm-accent-foreground` | `#fff` | Pressed grid reference and chord text. |
+
+Unpressed black-key borders and labels default to `#000` and `#fff`; the dedicated
+border and label tokens described above override them.
+
+**Classes**
+
+| Node | Canonical class | Present when | Fixed compatibility / state classes |
+|---|---|---|---|
+| Root | `.wui-note` | Always | `.wrap`; `.on` while focused with interaction |
+| Keyboard bar | `.wui-note__bar` | `keyboard` truthy | `.qwerty-bar` |
+| Hint | `.wui-note__hint` | `keyboard` truthy | `.hint` |
+| Octave text | `.wui-note__octave` | `keyboard` truthy | `.oct` |
+| Board host | `.wui-note__host` | Always | `.host` |
+| Scroll viewport | `.wui-note__viewport` | Piano and grid layouts | — |
+| Start overlay | `.wui-note__overlay` | `keyboard` truthy | `.overlay` |
+| Start prompt | `.wui-note__start` | `keyboard` truthy | `.start` |
+| Piano board | `.wui-note__piano` | Piano layout | `.board.kbd` |
+| Piano key | `.wui-note__key` | Per piano record | `.note.key`, plus `.wui-note__white.white` or `.wui-note__black.black`; `.down` while held |
+| Key label | `.wui-note__key-label` | Label supplied | `.keylab` |
+| Grid board | `.wui-note__grid` | Grid layout | `.board.grid.qwerty` |
+| Grid cell | `.wui-note__cell` | Per grid record | `.cell.note` when pitched or `.cell.idle` without MIDI; `.down` while held |
+| Grid reference | `.wui-note__reference` | Reference supplied | `.ref` |
+| Chord row | `.wui-note__chords` | Chords layout | `.board.chordrow` |
+| Chord button | `.wui-note__chord` | Per chord record | `.chord`; `.down` while held |
+
+**Parts**
+
+| Node | Canonical part | Present when |
+|---|---|---|
+| Root | `root` | Always |
+| Scroll viewport | `viewport` | Piano and grid layouts |
+
+</details>
+
+<UiPresenterRelated presenter="note" />

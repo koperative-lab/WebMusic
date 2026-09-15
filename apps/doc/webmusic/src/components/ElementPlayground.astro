@@ -1,0 +1,131 @@
+---
+// The demo card every Score element page uses: the house `wui-panel`
+// chrome (import entry + tag), the live element in the slot, and — below it —
+// one control per observed attribute, INCLUDING the ones the demo itself never
+// sets. Flip a control and it lands on the real element, so the page documents
+// the whole parameter surface by letting you drive it.
+//
+// The parameter list is data (src/lib/params), not markup, so it can be checked
+// against `static observedAttributes` instead of drifting page by page.
+import { ELEMENT_PARAMS } from '../lib/params';
+import type { ParamSpec } from '../lib/params/types';
+import ParamRows from './ParamRows.astro';
+import LiveDemoCanvas from './LiveDemoCanvas.astro';
+
+interface Props {
+  /** Catalog key — the custom element tag. */
+  tag: string;
+  /** Selector for the live element inside the stage. Defaults to `tag`. */
+  target?: string;
+  /**
+   * Selector for the root of the markup readout, when the composition on show
+   * is larger than the element this page documents — a desk nested inside the
+   * player that drives it is written as both, and copied as both. Defaults to
+   * `target`, which is what a page documenting one tag wants.
+   */
+  markup?: string;
+  /** Explicit sibling elements with their own external parameter controls. */
+  companions?: Array<{tag: string; target: string; visibility?: boolean; inert?: Record<string, string>}>;
+  /** Title override, e.g. `<score-view type="piano-roll">`. Defaults to `<tag>`. */
+  /** Render only these attributes (order preserved from the catalog). */
+  only?: string[];
+  /** Drop these attributes — use when a demo's wiring owns them. */
+  omit?: string[];
+  /** Mark attributes as "wired, but nothing visible changes here", with the reason. */
+  inert?: Record<string, string>;
+  /** Extra class on the panel, for demo-specific element styling. */
+  class?: string;
+}
+
+const {
+  tag,
+  target = tag,
+  markup,
+  companions = [],
+  only,
+  omit,
+  inert = {},
+  class: extraClass = '',
+} = Astro.props;
+
+const spec = ELEMENT_PARAMS[tag];
+if (!spec) throw new Error(`<ElementPlayground tag="${tag}"> has no entry in src/lib/params`);
+const hasSetup = Astro.slots.has('setup');
+
+let params: ParamSpec[] = [...spec.params];
+if (only) params = only.map((name) => {
+  const found = params.find((p) => p.name === name);
+  if (!found) throw new Error(`<ElementPlayground tag="${tag}" only> names unknown attribute "${name}"`);
+  return found;
+});
+if (omit) params = params.filter((p) => !omit.includes(p.name));
+
+---
+
+<div class={`wui-panel wui-panel--flow not-content wm-pg ${extraClass}`.trim()} data-wm-pg data-target={target} data-markup={markup}>
+  <div class="wui-panel__title">
+    <span>{spec.entry}</span>
+    <strong>{`<${tag}>`}</strong>
+  </div>
+
+  <LiveDemoCanvas>
+    <div class="wm-pg__stage" data-pg-stage>
+      <slot />
+    </div>
+  </LiveDemoCanvas>
+
+  <details class="wm-pg__params" open>
+    <summary>Parameters</summary>
+
+    {params.length === 0 && !Astro.slots.has('controls') ? (
+      <p class="wm-pg__empty">
+        No attributes: this element is driven entirely from JavaScript — see the API table below.
+      </p>
+    ) : null}
+
+    <div class="wm-pg__grid">
+      <ParamRows tag={tag} only={params.map((p) => p.name)} inert={inert} />
+      {/*
+        Collections and property editors follow the element's scalar
+        attributes on every demo. An element configured from JavaScript has no
+        observed attributes to generate a strip from, and an empty strip is
+        not the same statement as "there is nothing to drive here" — so the
+        demo contributes controls for its own properties after the shared rows.
+      */}
+      <slot name="controls" />
+    </div>
+
+    {companions.map((companion) => (
+      <details class="wm-pg__companion">
+        <summary>{`<${companion.tag}>`}</summary>
+        <div class="wm-pg__grid">
+          {companion.visibility && (
+            <label class="wm-pg__param" data-pg-scope={companion.target}>
+              <span class="wm-pg__name">Visible</span>
+              <input type="checkbox" data-pg-visible checked aria-label={`Show <${companion.tag}>`} />
+              <span class="wm-pg__note">Show this sibling using its native hidden attribute.</span>
+            </label>
+          )}
+          <ParamRows tag={companion.tag} scope={companion.target} inert={companion.inert} />
+        </div>
+      </details>
+    ))}
+
+    <div class="wm-pg__output">
+      <div class="wm-pg__code-stack" data-pg-code-stack>
+        {hasSetup ? <span class="wm-pg__code-label">HTML</span> : null}
+        <pre class="wm-pg__markup" data-pg-markup data-pg-copy-source>{`<${tag}></${tag}>`}</pre>
+        <slot name="setup" />
+      </div>
+      <div class="wm-pg__actions">
+        <button class="wui-btn" data-variant="ghost" type="button" data-pg-copy>Copy</button>
+        <button class="wui-btn" data-variant="ghost" type="button" data-pg-reset>Reset</button>
+      </div>
+    </div>
+  </details>
+</div>
+
+<script>
+  import { mountPlaygrounds } from './playground-client';
+  mountPlaygrounds();
+</script>

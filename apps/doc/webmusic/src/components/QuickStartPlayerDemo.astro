@@ -1,0 +1,49 @@
+---
+import LiveDemoCanvas from './LiveDemoCanvas.astro';
+const source = `${import.meta.env.BASE_URL}mxl/demo.mxl`;
+---
+
+<section class="quick-start-demo not-content" data-quick-start-player data-source={source}>
+  <LiveDemoCanvas label="Demo score player">
+    <div class="quick-start-demo__layout">
+      <score-player id="quick-start-player" time-control="full" aria-label="Demo score player"></score-player>
+      <p class="doc-status" data-quick-start-status role="status">Loading score…</p>
+      <score-view player="#quick-start-player" type="staff" aria-label="Demo score notation"></score-view>
+      <pitch-view player="#quick-start-player" type="keyboard" low="48" high="84" fit-to-width="true" white-key-height="128" black-key-height="80" aria-label="Currently sounding piano keys, C3 to C6"></pitch-view>
+    </div>
+    <noscript>Enable JavaScript to load and play this example.</noscript>
+  </LiveDemoCanvas>
+</section>
+
+<script>
+  import {defineScorePlayerElement, type ScorePlayerElement} from '@webmusic/score/play/element';
+  import {definePitchViewElement, defineScoreViewElement} from '@webmusic/score/view/element';
+  import {mountDemos} from './demo-lifecycle';
+  import {mountQuickStartStatus} from './quick-start-player-client';
+
+  defineScorePlayerElement();
+  defineScoreViewElement();
+  definePitchViewElement();
+
+  mountDemos('[data-quick-start-player]', (root, scope) => {
+    const player = root.querySelector<ScorePlayerElement>('score-player')!;
+    const status = root.querySelector<HTMLElement>('[data-quick-start-status]')!;
+    // Clearing the owned source also cancels pending loads and releases audio
+    // on pagehide; a restored page mounts a fresh source through this scope.
+    scope.add(() => player.removeAttribute('src'));
+    scope.add(mountQuickStartStatus(player, status));
+    player.setAttribute('src', root.dataset.source!);
+  });
+</script>
+
+<style>
+  .quick-start-demo { margin-block: 1.5rem; }
+  .quick-start-demo__layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+    min-width: 0;
+  }
+  .quick-start-demo__layout > * { min-width: 0; margin: 0; }
+  .quick-start-demo__layout > :not([hidden]) { display: block; }
+</style>

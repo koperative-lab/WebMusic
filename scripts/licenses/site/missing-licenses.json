@@ -1,0 +1,31 @@
+{
+  "@stitches/core@1.2.8": {
+    "license": "MIT",
+    "repository": "modulz/stitches",
+    "file": "stitches-core-1.2.8-MIT.txt",
+    "source": "https://github.com/stitchesjs/stitches/blob/c268db3938e2cf6bdbaa3d30f3ce7b67c0492a41/LICENSE.md",
+    "artifact": "dist/index.mjs",
+    "sha256": "ea48daa7b5303f761fa0219535ab95b5684e5a012c110cd0e1488950c6f848d0",
+    "artifactSha256": "ffc7bf9b894fa650f70fc059d13d86dd0778eb5f2d35101d882bfefb0d53fcca"
+  },
+  "static-browser-server@1.0.3": {
+    "license": "Apache-2.0",
+    "repository": "https://github.com/codesandbox/static-browser-server.git",
+    "file": "Apache-2.0.txt",
+    "source": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+    "artifact": "out/lib/main.js",
+    "notes": "The installed package and upstream repository designate Apache-2.0 in package.json but omit LICENSE. This is the unmodified ASF standard license. No copyright holder or year is invented.",
+    "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "artifactSha256": "d47b18f44a86055399dd90b9c33b815d068db351c7bcc45c5e9d45082afd2bf9"
+  },
+  "intersection-observer@0.10.0": {
+    "license": "W3C-20150513",
+    "repository": "git@github.com:w3c/IntersectionObserver.git",
+    "file": "intersection-observer-0.10.0-W3C.txt",
+    "source": "https://www.w3.org/copyright/software-license-2015/",
+    "artifact": "intersection-observer.js",
+    "notes": "Google copyright and W3C license URL are retained from the installed polyfill source header. Complete notice text is transcribed from that exact official 2015 license.",
+    "sha256": "fa6d1572e5179ed7eb6cfcf7271a029e675c49448cae9fbaa093b1923889f35d",
+    "artifactSha256": "43c4e5ad4850cd4d89aca8062ca82c1edb9ce56a2494e508c4f352414c70ea93"
+  }
+}

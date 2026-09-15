@@ -1,0 +1,97 @@
+---
+import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
+---
+<HeadlessDemoFrame
+  entry="@webmusic/score/play/headless"
+  name="Sound"
+  hint="Use the live controls to hear the result. Reset stops playback and restores the default parameters."
+  code={`// Configure Sound below.`}
+  rootAttrs={{'data-programmatic-sound': true}}
+>
+  <div class="wui-row"><button class="wui-btn" data-timbre="triangle" type="button">Triangle</button><button class="wui-btn" data-timbre="fm" type="button">FM</button><button class="wui-btn" data-timbre="wavetable" type="button">Wavetable</button><button class="wui-btn" data-timbre="noise" type="button">Noise</button><span class="wui-readout" data-readout>pick a timbre</span></div>
+  <div slot="parameters" class="wm-pg__grid">
+    <div class="wm-pg__param"><span class="wm-pg__name">midi</span><input class="wm-pg__input" type="number" data-midi value="60" min="0" max="127" step="1" aria-label="MIDI pitch" /><span class="wm-pg__note">MIDI note number.</span></div><div class="wm-pg__param"><span class="wm-pg__name">velocity</span><input class="wm-pg__input" type="number" data-velocity value="100" min="1" max="127" step="1" aria-label="MIDI velocity" /><span class="wm-pg__note">MIDI velocity, 1–127.</span></div><div class="wm-pg__param"><span class="wm-pg__name">duration</span><input class="wm-pg__input" type="number" data-duration value="0.6" min="0.05" max="3" step="0.05" aria-label="Duration in seconds" /><span class="wm-pg__note">Sound duration in seconds. Click a timbre to audition.</span></div>
+  </div>
+</HeadlessDemoFrame>
+
+<script>
+  import {mountProgrammaticDemo, programmaticCode} from './programmatic-demo-lifecycle';
+  import { Sound } from '@webmusic/score/play/headless';
+
+  mountProgrammaticDemo('[data-programmatic-sound]', (root, scope) => {
+
+    const readout = root.querySelector<HTMLElement>('[data-readout]');
+    const buttons = root.querySelectorAll<HTMLButtonElement>('[data-timbre]');
+    const midiInput = root.querySelector<HTMLInputElement>('[data-midi]');
+    const velocityInput = root.querySelector<HTMLInputElement>('[data-velocity]');
+    const durationInput = root.querySelector<HTMLInputElement>('[data-duration]');
+    const midi = () => Math.round(Math.max(0, Math.min(127, Number(midiInput?.value ?? 60))));
+    const velocity = () => Math.round(Math.max(1, Math.min(127, Number(velocityInput?.value ?? 100))));
+    const duration = () => Math.max(0.05, Math.min(3, Number(durationInput?.value) || 0.6));
+    let selected = 'triangle';
+    const factories: Record<string, string> = {
+      triangle: "Sound.oscillator({type: 'triangle', gain: 0.2, releaseSeconds: 0.05})",
+      fm: 'Sound.fm({ratio: 2, index: 200, attackSeconds: 0.005, releaseSeconds: 0.12})',
+      wavetable: 'Sound.wavetable({real: [0, 1, 0.5, 0.25, 0.12], attackSeconds: 0.008, releaseSeconds: 0.1})',
+      noise: 'Sound.noise({pitched: true, Q: 8, attackSeconds: 0.001, releaseSeconds: 0.12})',
+    };
+    const updateCode = () => programmaticCode(root, `import {Sound} from '@webmusic/score/play/headless';
+
+// In a user gesture; retain context and sound for subsequent notes.
+const context = new AudioContext();
+await context.resume();
+const sound = ${factories[selected]};
+sound.connect(context.destination);
+await sound.preload();
+sound.noteOn(${midi()}, ${velocity()}, context.currentTime, ${duration()});
+// On cleanup: sound.dispose(); await context.close();`);
+    for (const input of [midiInput, velocityInput, durationInput]) {
+      if (input) scope.listen(input, 'input', updateCode);
+    }
+    updateCode();
+
+    let ctx: AudioContext | null = null;
+    scope.add(() => ctx?.close());
+    const sounds = new Map<string, Sound>();
+    scope.add(() => sounds.clear());
+
+    const makeSound = (kind: string): Sound => {
+      switch (kind) {
+        case 'fm':
+          return Sound.fm({ ratio: 2, index: 200, attackSeconds: 0.005, releaseSeconds: 0.12 });
+        case 'wavetable':
+          return Sound.wavetable({ real: [0, 1, 0.5, 0.25, 0.12], attackSeconds: 0.008, releaseSeconds: 0.1 });
+        case 'noise':
+          return Sound.noise({ pitched: true, Q: 8, attackSeconds: 0.001, releaseSeconds: 0.12 });
+        case 'triangle':
+        default:
+          return Sound.oscillator({ type: 'triangle', gain: 0.2, releaseSeconds: 0.05 });
+      }
+    };
+
+    buttons.forEach((btn) => {
+      scope.listen(btn, 'click', async () => {
+        const kind = btn.dataset.timbre ?? 'triangle';
+        selected = kind;
+        updateCode();
+        if (!ctx) ctx = new AudioContext();
+        await ctx.resume();
+        if (!scope.active) return;
+
+        let sound = sounds.get(kind);
+        if (!sound) {
+          sound = makeSound(kind);
+          sounds.set(kind, sound);
+          const ownedSound = sound;
+          scope.add(() => ownedSound.dispose());
+          sound.connect(ctx.destination);
+        }
+        await sound.preload();
+        if (!scope.active) return;
+        sound.noteOn(midi(), velocity(), ctx.currentTime, duration());
+
+        if (readout) readout.textContent = `${btn.textContent} · noteOn(${midi()}, ${velocity()})`;
+      });
+    });
+  });
+</script>

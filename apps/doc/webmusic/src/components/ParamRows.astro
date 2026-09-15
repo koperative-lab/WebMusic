@@ -1,0 +1,90 @@
+---
+// One generated row per observed attribute of a tag — name, control, note.
+//
+// Extracted from `<ElementPlayground>` because a composed element needs the
+// same rows for something OTHER than the panel's own target: `<rack-control>`
+// documents a desk whose parts are nested in a `<score-player>`, and each
+// part deserves the strip its own page has rather than a hand-written subset.
+// `scope` is the selector the client resolves a control against; without one a
+// row drives the panel target, exactly as before.
+import { ELEMENT_PARAMS } from '../lib/params';
+import type { ParamSpec } from '../lib/params/types';
+import {defaultChoices} from '../lib/default-label';
+
+interface Props {
+  /** Catalog key — the custom element tag whose attributes to render. */
+  tag: string;
+  /** Selector, resolved inside the stage, for the element these rows drive. */
+  scope?: string;
+  only?: string[];
+  omit?: string[];
+  inert?: Record<string, string>;
+}
+
+const {tag, scope, only, omit, inert = {}} = Astro.props;
+
+const spec = ELEMENT_PARAMS[tag];
+if (!spec) throw new Error(`<ParamRows tag="${tag}"> has no entry in src/lib/params`);
+
+let params: ParamSpec[] = [...spec.params];
+if (only) params = only.map((name) => {
+  const found = params.find((p) => p.name === name);
+  if (!found) throw new Error(`<ParamRows tag="${tag}" only> names unknown attribute "${name}"`);
+  return found;
+});
+if (omit) params = params.filter((p) => !omit.includes(p.name));
+
+const choicesFor = (p: ParamSpec) =>
+  defaultChoices(
+    p.fallback,
+    p.kind === 'bool' ? ['on', 'off'] : (p.options ?? []),
+    p.kind === 'bool' ? 'unset' : '',
+  );
+const reasonFor = (p: ParamSpec) => inert[p.name] ?? p.inert;
+---
+
+{params.map((p) => (
+  <label
+    class="wm-pg__param"
+    data-pg-scope={scope}
+    data-pg-when={p.when ? JSON.stringify({...p.when, options: spec.params.find((entry) => entry.name === p.when?.attribute)?.options}) : undefined}
+  >
+    <span class="wm-pg__name">
+      {p.name}
+      {reasonFor(p) ? <em data-inert title={reasonFor(p)}>no visible change here</em> : null}
+    </span>
+
+    {p.kind === 'bool' ? (
+      <select class="wui-select" data-pg-attr={p.name} data-pg-kind="bool">
+        {choicesFor(p).map((c) => (
+          <option value={c.value} selected={c.selected}>{c.label}</option>
+        ))}
+      </select>
+    ) : p.kind === 'enum' ? (
+      <select class="wui-select" data-pg-attr={p.name}>
+        {choicesFor(p).map((c) => (
+          <option value={c.value} selected={c.selected}>{c.label}</option>
+        ))}
+      </select>
+    ) : p.kind === 'number' ? (
+      <input
+        class="wm-pg__input"
+        type="number"
+        data-pg-attr={p.name}
+        min={p.min}
+        max={p.max}
+        step={p.step ?? 'any'}
+        placeholder={p.placeholder ?? p.fallback ?? ''}
+      />
+    ) : (
+      <input
+        class="wm-pg__input"
+        type="text"
+        data-pg-attr={p.name}
+        placeholder={p.placeholder ?? p.fallback ?? ''}
+      />
+    )}
+
+    <span class="wm-pg__note">{p.note}</span>
+  </label>
+))}

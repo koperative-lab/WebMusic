@@ -1,0 +1,157 @@
+---
+title: '@webmusic/ui/track-list'
+description: 'An accessible selectable index with roving focus and one current row.'
+sidebar:
+  label: 'track-list'
+  order: 5
+---
+
+import UiPresenterLiveDemo from '../../../../components/UiPresenterLiveDemo.astro';
+import UiPresenterRelated from '../../../../components/UiPresenterRelated.astro';
+
+`mountTrackList()` renders an accessible index of caller-owned named rows. It paints labels,
+preformatted detail text, optional swatches, active and disabled state, then routes selection back
+through the required `TrackListBinding.select()` command.
+
+Use it as the semantic counterpart to a graphical lane or canvas: the list owns list and button
+semantics, roving focus, and keyboard movement while the caller continues to own track identity
+and selection.
+
+<UiPresenterLiveDemo presenter="track-list" />
+
+## Import
+
+```ts
+import {mountTrackList} from '@webmusic/ui/track-list';
+
+const handle = mountTrackList(host, {
+  snapshot: () => store.trackList,
+  select: (id) => store.selectTrack(id),
+  subscribe: (notify) => store.subscribe(notify),
+});
+```
+
+## Selection and focus
+
+`select(id)` may be synchronous or return a promise. The binding remains authoritative: a command
+does not make a row active unless the next `snapshot()` does. Rows are patched in place while the
+list identity stays stable, preserving focus during frequent playback or selection notifications.
+
+Only one enabled row is in the page Tab order. Arrow keys move among enabled rows, Home and End
+jump to the bounds, and Enter or Space selects the focused row. See the
+[shared presenter shape](/uikit/api/#the-shared-presenter-shape) for host and cleanup rules.
+
+<details class="component-section">
+<summary>API</summary>
+
+**State**
+
+| Member | Kind | Description |
+|---|---|---|
+| `items` | `readonly TrackListItem[]` | Ordered row data painted by the presenter. |
+| `disabled?` | `boolean` | Strict `true` disables every row without removing it. |
+
+Each `TrackListItem` has required string `id` and `label`, plus optional preformatted `detail`, CSS
+`color`, `active`, and `disabled`. Duplicate ids cannot produce two stable controls and should not
+be supplied.
+
+**Binding**
+
+| Member | Kind | Description |
+|---|---|---|
+| `snapshot()` | `() => TrackListState` | Required authoritative list and selection state. |
+| `select(id)` | `(string) => void \| Promise<void>` | Required command invoked for pointer, Enter, or Space selection. |
+| `subscribe?(notify)` | `(notify: () => void) => () => void` | Publishes State changes; its disposer runs during destruction. |
+
+**Options**
+
+| Member | Kind | Default | Description |
+|---|---|---|---|
+| `label` | `string` | `'Tracks'` | Accessible name applied to the semantic list. |
+| `ordered` | `boolean` | `false` | Renders an `<ol>` instead of `<ul>` when order is meaningful. |
+| `emptyLabel` | `string` | `'No items'` | Visible text replacing the rows when `items` is empty. |
+| `stylesheet` | `boolean` | `true` | Installs the exported track-list stylesheet unless explicitly `false`. |
+| `classNames` | `TrackListClassNames` | `{}` | Adds compatibility classes for every named node. |
+| `parts` | `TrackListParts` | `{}` | Adds part tokens for every named node. |
+| `onError` | `(error: unknown) => void` | — | Receives command, snapshot, subscription, and cleanup failures. |
+
+`TrackListClassNames` and `TrackListParts` both expose `root`, `list`, `item`, `row`, `swatch`,
+`label`, `detail`, and `empty` keys.
+
+**Handle**
+
+| Member | Kind | Description |
+|---|---|---|
+| `element` | `HTMLElement` | Presenter-owned `.wui-track-list` root. |
+| `controls.list` | `HTMLElement` | Current `<ul>` or `<ol>`. |
+| `controls.item(id)` | `(string) => HTMLLIElement \| undefined` | Looks up the rendered list item for an id. |
+| `controls.row(id)` | `(string) => HTMLButtonElement \| undefined` | Looks up its activatable button. |
+| `controls.focus(id)` | `(string) => boolean` | Moves DOM focus to an enabled rendered row and reports success. |
+| `update()` | `() => void` | Re-reads State and patches list structure, labels, current state, disabled state, and focus. |
+| `destroy()` | `() => void` | Releases listeners and subscription, then removes owned DOM and installed style. |
+
+**Accessibility.** The named `<ul>` or `<ol>` contains real list items and buttons. Active rows
+use `aria-current="true"`; disabled item and global state use native button disabling. Roving
+`tabindex` keeps one enabled row in the Tab order and skips disabled rows during Arrow, Home, and
+End movement. An empty list retains its accessible name and displays explicit fallback text.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+Use the shared [surface and palette tokens](/uikit/#theme-with-css-custom-properties) for
+background (including `transparent`), foreground, accent, outer border and corner radius.
+Presenter-specific tokens below take precedence within their documented roles.
+
+**Tokens**
+
+| Property | Falls back to | Default | Controls |
+|---|---|---|---|
+| `--wm-track-list-padding` | literal | `.6rem` | Root-inset compatibility fallback. |
+| `--wm-track-list-border` | `--wm-border` → literal | `#d8d8d8` | Root border color. |
+| `--wm-track-list-radius` | `--wm-control-radius` → literal | `0` | Root and row corners. |
+| `--wm-track-list-background` | `--wm-surface` → literal | `#fff` | Root background. |
+| `--wm-track-list-text` | `--wm-foreground` → literal | `#444` | Root and row text. |
+| `--wm-track-list-active` | literal | `rgba(17,17,17,.08)` | Current-row background. |
+| `--wm-track-list-muted` | `--wm-foreground-muted` → literal | `#666` | Detail and empty text. |
+| `--wm-track-list-swatch` | literal | `currentColor` | Styles an externally unhidden swatch; normal rows hide the node without `item.color` and use inline color when present. |
+| `--wm-track-list-swatch-radius` | literal | `50%` | Swatch shape. |
+| `--wm-font-family` | `--wm-font` → literal | `system-ui, sans-serif` | List typeface. |
+| `--wm-focus` | literal | `currentColor` | Keyboard focus outline. |
+
+**Classes**
+
+| Node | Canonical class | `classNames` key |
+|---|---|---|
+| Root | `.wui-track-list` | `root` |
+| `<ul>` / `<ol>` | `.wui-track-list__items` | `list` |
+| List item | `.wui-track-list__item` | `item` |
+| Row button | `.wui-track-list__row` | `row` |
+| Active item compatibility state | `.on` on the list item | — |
+| Swatch | `.wui-track-list__swatch` | `swatch` |
+| Label | `.wui-track-list__label` | `label` |
+| Detail | `.wui-track-list__detail` | `detail` |
+| Empty message | `.wui-track-list__empty` | `empty` |
+
+Every empty state is a live region — `role="status"`, `aria-live="polite"` — so the message is announced when it appears, not only drawn.
+
+**Parts**
+
+| Node | Canonical part | `parts` key |
+|---|---|---|
+| Root | `root` | `root` |
+| `<ul>` / `<ol>` | `list` | `list` |
+| List item | `item` | `item` |
+| Row button | `row` | `row` |
+| Swatch | `swatch` | `swatch` |
+| Label | `label` | `label` |
+| Detail | `detail` | `detail` |
+| Empty message | `empty` | `empty` |
+
+Compatibility classes and part tokens are added alongside canonical hooks. With
+`stylesheet: false`, no style node is installed and the caller must style these hooks.
+
+</details>
+
+<UiPresenterRelated presenter="track-list" />

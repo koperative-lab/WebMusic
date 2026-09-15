@@ -1,0 +1,112 @@
+---
+// The three-level composition, written the way a reader would write it.
+//
+//   <score-player>               the only transport, for every part at once
+//     <rack-control>             the desk, and the rack's owner
+//       <rack-part>              one voice: a score and a sound, no player
+//
+// The editor below is structural rather than a one-off pair of Add/Remove
+// buttons: every child gets the same catalog-generated parameter controls as a
+// standalone playground, and a stable plumbing key keeps those controls bound
+// while the reader changes the public id that names the channel.
+import ElementPlayground from './ElementPlayground.astro';
+import EffectChainEditor from './EffectChainEditor.astro';
+import RackPartEditor from './RackPartEditor.astro';
+
+const PARTS = [
+  {id: 'lead', src: '/midi/demo.mid', sound: 'triangle'},
+  {id: 'bass', src: '/midi/demo.mid', sound: 'sawtooth'},
+  {id: 'pad', src: '/midi/demo.mid', sound: 'sine'},
+];
+
+const keyFor = (index: number) => `rack-part-${index + 1}`;
+---
+
+<ElementPlayground tag="rack-control" markup="[data-rc-master]" class="rc-demo">
+  <score-player data-rc-master>
+    <rack-control data-rc-desk>
+      {PARTS.map((part, index) => (
+        <rack-part
+          data-pg-child-key={keyFor(index)}
+          id={part.id}
+          src={part.src}
+          sound={part.sound}
+        ></rack-part>
+      ))}
+    </rack-control>
+  </score-player>
+
+  <div slot="controls" data-rc-controls>
+    <section class="wm-pg__collection" data-rc-collection aria-labelledby="rack-parts-title">
+      <div class="wm-pg__collection-header">
+        <div class="wm-pg__collection-heading">
+          <span class="wm-pg__collection-title" id="rack-parts-title">Rack parts</span>
+          <span class="wm-pg__collection-count" data-rc-count>{`${PARTS.length} parts`}</span>
+        </div>
+        <button
+          class="wui-btn"
+          type="button"
+          data-rc-add
+          aria-expanded="false"
+          aria-controls="rack-part-draft"
+        >
+          + Add part
+        </button>
+      </div>
+
+      <p class="wm-pg__collection-help">
+        Each nested <code>&lt;rack-part&gt;</code> declares one channel. Expand a part to edit its
+        name, score source, format and sound.
+      </p>
+
+      <RackPartEditor mode="draft" />
+
+      <div class="wm-pg__collection-list" data-rc-list>
+        {PARTS.map((part, index) => (
+          <RackPartEditor childKey={keyFor(index)} part={part} />
+        ))}
+      </div>
+
+      <p class="wm-pg__collection-empty" data-rc-empty hidden>
+        No rack parts yet. Add one to create a channel.
+      </p>
+      <p class="wm-pg__collection-status" data-rc-status aria-live="polite" aria-atomic="true"></p>
+
+      <template data-rc-part-template>
+        <RackPartEditor />
+      </template>
+    </section>
+
+    <EffectChainEditor
+      target="[data-rc-desk]"
+      setupSelector="rack-control"
+      setupIdentifier="rackControl"
+    />
+  </div>
+
+  <div class="wm-pg__code-extra" slot="setup" data-fx-code-block hidden>
+    <span class="wm-pg__code-label">JavaScript setup</span>
+    <pre class="wm-pg__markup" data-fx-code data-pg-copy-source></pre>
+  </div>
+</ElementPlayground>
+
+<script>
+  import {
+    defineRackControlElement,
+    defineRackPartElement,
+    defineScorePlayerElement,
+  } from '@webmusic/score/play/element';
+  import {mountEffectChainEditors} from './effect-chain-editor-client';
+  import {mountRackControlPlaygrounds} from './rack-control-playground-client';
+
+  defineScorePlayerElement();
+  defineRackControlElement();
+  defineRackPartElement();
+  mountRackControlPlaygrounds();
+  mountEffectChainEditors();
+</script>
+
+<style>
+  /* This gap belongs to the composition, not either component's own surface. */
+  .rc-demo :global(rack-control) { margin-top: 0.5rem; }
+</style>

@@ -1,0 +1,26 @@
+---
+import ElementPlayground from '../ElementPlayground.astro';
+const playerId = 'pg-pitch-view-player';
+const SRC = `${import.meta.env.BASE_URL}midi/demo.mid`;
+const companions = [{tag: 'score-player', target: 'score-player'}];
+---
+
+<ElementPlayground tag="pitch-view" markup="[data-pitch-composition]" companions={companions} class="pg-pitch-view">
+  <div data-pitch-composition data-pg-fragment>
+    <score-player id={playerId} src={SRC}></score-player>
+    <pitch-view player={`#${playerId}`}></pitch-view>
+  </div>
+</ElementPlayground>
+
+<script>
+  import {defineScorePlayerElement} from '@webmusic/score/play/element';
+  import {definePitchViewElement} from '@webmusic/score/view/element';
+  defineScorePlayerElement();
+  definePitchViewElement();
+</script>
+
+<style>
+  .pg-pitch-view :global([data-pitch-composition]) { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; min-width: 0; }
+  .pg-pitch-view :global([data-pitch-composition] > *) { min-width: 0; }
+  .pg-pitch-view :global(score-player) { --webscore-play-height: 2.1rem; }
+</style>

@@ -1,0 +1,148 @@
+---
+import {
+  EFFECT_DEFINITIONS,
+  type EffectFieldSpec,
+  type PlaygroundEffectKind,
+  type PlaygroundEffectDefinition,
+} from '../lib/effect-playground';
+
+interface FieldGroup {
+  label: string;
+  fields: EffectFieldSpec[];
+}
+
+interface Props {
+  /** Selector for the element whose effect property receives the result. */
+  target?: string;
+  /** Assign one composed `.effect` by default, or a flat `.effects` array. */
+  assignment?: 'effect' | 'effects';
+  /** Authored recipes loaded on mount and restored by Reset. */
+  initial?: readonly PlaygroundEffectKind[];
+  /** Public selector printed in the JavaScript setup example. */
+  setupSelector?: string;
+  /** Identifier printed in the JavaScript setup example. */
+  setupIdentifier?: string;
+  /** Optional element to stop before replacing the chain. Defaults to `target`. */
+  stopTarget?: string;
+}
+
+const {
+  target,
+  assignment = 'effect',
+  initial = [],
+  setupSelector,
+  setupIdentifier,
+  stopTarget,
+} = Astro.props;
+
+const fieldGroups = (definition: PlaygroundEffectDefinition): FieldGroup[] => {
+  const groups = new Map<string, EffectFieldSpec[]>();
+  for (const field of definition.fields) {
+    const label = field.group ?? 'Settings';
+    const fields = groups.get(label) ?? [];
+    fields.push(field);
+    groups.set(label, fields);
+  }
+  return Array.from(groups, ([label, fields]) => ({label, fields}));
+};
+---
+
+<section
+  class="wm-pg__collection wm-pg__effects"
+  data-effect-chain-editor
+  data-fx-target={target}
+  data-fx-assignment={assignment}
+  data-fx-initial={initial.join(',')}
+  data-fx-setup-selector={setupSelector}
+  data-fx-setup-identifier={setupIdentifier}
+  data-fx-stop-target={stopTarget}
+  aria-label="Effects"
+>
+  <div class="wm-pg__collection-header">
+    <div class="wm-pg__collection-heading">
+      <span class="wm-pg__collection-title">Effects</span>
+      <span class="wm-pg__collection-count" data-fx-count>0 effects</span>
+    </div>
+    <div class="wm-pg__collection-add">
+      <select
+        class="wui-select"
+        data-fx-kind
+        aria-label="Effect type"
+      >
+        {EFFECT_DEFINITIONS.map((definition) => (
+          <option value={definition.kind}>{definition.label}</option>
+        ))}
+      </select>
+      <button class="wui-btn" type="button" data-fx-add>+ Add</button>
+    </div>
+  </div>
+
+  <p class="wm-pg__collection-help">
+    Build the post-processing chain from top to bottom. Field edits apply on change so typing
+    never rebuilds the audio route one character at a time.
+  </p>
+
+  <div class="wm-pg__collection-list" data-fx-list></div>
+  <p class="wm-pg__collection-empty" data-fx-empty>
+    Dry output — no effects assigned.
+  </p>
+  <p class="wm-pg__collection-status" data-fx-status aria-live="polite" aria-atomic="true"></p>
+
+  {EFFECT_DEFINITIONS.map((definition) => (
+    <template data-fx-template={definition.kind}>
+      <details
+        class="wm-pg__collection-item wm-pg__effect-card"
+        data-fx-card
+        data-fx-key="__effect_key__"
+        data-fx-effect={definition.kind}
+      >
+        <summary class="wm-pg__collection-summary" data-fx-summary>
+          <code>{definition.factoryLabel}</code>
+          <strong>{definition.label}</strong>
+          <span data-fx-summary-meta></span>
+        </summary>
+
+        <p class="wm-pg__effect-description">{definition.description}</p>
+        <div class="wm-pg__effect-fields">
+          {fieldGroups(definition).map((group) => (
+            <fieldset class="wm-pg__effect-group">
+              <legend>{group.label}</legend>
+              {group.fields.map((field) => (
+                <label class="wm-pg__param">
+                  <span class="wm-pg__name">{field.label}</span>
+                  {field.kind === 'number' ? (
+                    <input
+                      class="wm-pg__input"
+                      type="number"
+                      data-fx-field={field.key}
+                      value={field.defaultValue}
+                      min={field.min}
+                      max={field.max}
+                      step={field.step}
+                      required
+                    />
+                  ) : (
+                    <select class="wui-select" data-fx-field={field.key} required>
+                      {field.options.map((option) => (
+                        <option value={option} selected={option === field.defaultValue}>{option}</option>
+                      ))}
+                    </select>
+                  )}
+                  <span class="wm-pg__note">
+                    {field.note}{field.kind === 'number' && field.unit ? ` (${field.unit})` : ''}
+                  </span>
+                </label>
+              ))}
+            </fieldset>
+          ))}
+        </div>
+
+        <div class="wm-pg__collection-item-actions">
+          <button class="wui-btn" data-variant="ghost" type="button" data-fx-up>Up</button>
+          <button class="wui-btn" data-variant="ghost" type="button" data-fx-down>Down</button>
+          <button class="wui-btn" data-variant="ghost" type="button" data-fx-remove>Remove</button>
+        </div>
+      </details>
+    </template>
+  ))}
+</section>

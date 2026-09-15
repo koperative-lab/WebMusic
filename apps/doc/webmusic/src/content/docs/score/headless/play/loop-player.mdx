@@ -1,0 +1,94 @@
+---
+title: 'LoopPlayer'
+description: 'A ready-made A–B loop over a score region.'
+sidebar:
+  order: 7
+---
+
+import ProgrammaticLoopPlayerDemo from '../../../../../components/programmatic/ProgrammaticLoopPlayerDemo.astro';
+
+`LoopPlayer` wraps a `ScorePlayer` with an A–B loop region: set the in/out points, optionally repeat a fixed number of times, then play through. Drag the handles and toggle the loop.
+
+<ProgrammaticLoopPlayerDemo />
+
+## Import
+
+```ts
+import {LoopPlayer} from '@webmusic/score/play/headless';
+
+const loop = new LoopPlayer(score, {loopIn: 0.25, loopOut: 0.75, loopCount: 4});
+const off = loop.player.on('timeupdate', ({progress}) => paint(progress));
+await loop.play();
+// Keep the wrapper for the interaction lifetime; call this on teardown.
+const dispose = () => { off(); loop.dispose(); };
+```
+
+`createLoopPlayer(score, options?)` returns the same wrapper. `play()` resolves
+when the underlying start operation completes, not when the score ends.
+
+## Time and ownership
+
+The wrapper owns a newly constructed
+[`ScorePlayer`](/score/headless/play/score-player/) and two subscriptions. It
+converts fractional region endpoints to the player's transport seconds. It
+does not create another session clock. Finite repeat counting observes backward
+progress jumps; it is not a separate sample-accurate loop-boundary notification.
+Explicit wrapper seeks and loop-region edits update the counting baseline;
+their playhead jumps do not consume a repeat.
+After the count is reached, the underlying loop is cleared and playback
+continues to the end. The wrapper's `loop` property remains the requested armed
+state, and the end handler seeks to zero and re-arms it for the next play.
+
+A supplied synth follows ScorePlayer's default borrowed ownership. This wrapper
+does not expose `synthOwnership`, context injection, or the complete
+ScorePlayer options; retain the supplied synth's cleanup path. Use ScorePlayer
+directly when those construction controls are required.
+
+<details class="component-section">
+<summary>API</summary>
+
+**Construction and LoopPlayerOptions**
+
+| Member | Default | Contract |
+| --- | --- | --- |
+| `new LoopPlayer(score, options?)` | — | Creates the owned player and arms the requested region. |
+| `createLoopPlayer(score, options?)` | — | Returns a `LoopPlayer`. |
+| `synth` | Default player synth | Borrowed backend passed to the player. |
+| `effect` | None | Effect recipe passed to the player. |
+| `loopIn` | `0.25` | Initial fractional start, clamped to 0–1. Supply ordered finite endpoints. |
+| `loopOut` | `0.75` | Initial fractional end, clamped to 0–1. |
+| `loop` | `true` | Requested loop-enabled state. |
+| `loopCount` | `Infinity` | Observed wraps before clearing the underlying loop. The wrapper does not validate this as a positive integer. |
+
+**Commands and state**
+
+| Member | Kind | Contract |
+| --- | --- | --- |
+| `play()` | `Promise<void>` | Starts/resumes the owned player, forwarding start rejection. |
+| `pause()` | `void` | Pauses the player. |
+| `seek(seconds)` | `void` | Delegates transport-seconds seek and suppresses the wrapper's wrap counter during the synchronous seek call. It does not return the player's seek Promise. |
+| `seekFraction(fraction)` | `void` | Clamps to 0–1 and seeks using the current duration. |
+| `setLoopRegion(inFraction, outFraction)` | `void` | Clamps and orders both endpoints, then applies the region. A resulting playhead jump does not count as a loop wrap. |
+| `player` | Readonly `ScorePlayer` | Underlying player for events and additional operations. |
+| `duration` | Readonly number | Player duration in transport seconds. |
+| `loopIn` / `loopOut` | Read/write number | Setting either uses `setLoopRegion`; reading returns the stored fraction. |
+| `loop` | Read/write boolean | Setting resets the repeat counter and applies or clears the loop. |
+| `loopCount` | Read/write number | Setting resets the counter. |
+| `dispose()` | `void` | Removes wrapper subscriptions and disposes the owned player; repeated cleanup is supported. |
+
+**Events and boundaries**
+
+LoopPlayer has no emitter or `on()` method of its own. Subscribe through
+`player` using the ScorePlayer event contract. It exposes no wrapper-level
+`stop()` or rate setter. Numeric clamping does not reject `NaN`; use finite
+fractional inputs and a positive repeat count or `Infinity`. There is no
+supported post-disposal playback lifetime.
+
+</details>
+
+## Related
+
+[ScorePlayer](/score/headless/play/score-player/) owns scheduling and the event
+contract. [Transport presenter](/uikit/transport-time/transport/) can display
+caller-bound state. The programmatic demo above composes the wrapper with UI;
+there is no current `<loop-player>` public tag.

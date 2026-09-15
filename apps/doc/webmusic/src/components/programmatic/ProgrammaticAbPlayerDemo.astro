@@ -1,0 +1,119 @@
+---
+import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
+---
+<HeadlessDemoFrame
+  entry="@webmusic/score/play/headless"
+  name="AbPlayer"
+  hint="Use the live controls to hear the result. Reset stops playback and restores the default parameters."
+  code={`// Configure AbPlayer below.`}
+  rootAttrs={{'data-programmatic-abplayer': true}}
+>
+  <div class="wui-row"><button class="wui-btn" data-play type="button">▶ Play</button><span class="wui-readout wui-readout--wide" data-readout>—</span></div>
+  <div slot="parameters" class="wm-pg__grid">
+    <div class="wm-pg__param"><span class="wm-pg__name">select</span><div class="wui-seg" data-takes><button class="wui-btn" data-variant="ghost" data-select="A" type="button" aria-pressed="true">A · major</button><button class="wui-btn" data-variant="ghost" data-select="B" type="button" aria-pressed="false">B · minor</button></div><span class="wm-pg__note">Switch between two Score takes through ab.select(id).</span></div>
+  </div>
+</HeadlessDemoFrame>
+
+<script>
+  import {mountProgrammaticDemo, programmaticCode} from './programmatic-demo-lifecycle';
+  import { Duration, MeasureId, PartId, Pitch, Rational, ScoreBuilder, VoiceId } from '@webmusic/score';
+  import { AbPlayer, Sound } from '@webmusic/score/play/headless';
+
+  // One score variant: 16 eighth notes over two 4/4 measures, given pitches.
+  function sampleScore(pitches: string[]) {
+    const b = new ScoreBuilder();
+    const partId = PartId('piano');
+    const voice = VoiceId('v1');
+    const timeSignature = { numerator: 4, denominator: 4 };
+    b.setMetadata({ title: 'Take' })
+      .addTempo({ atQuarters: Rational.ZERO, bpm: 100 })
+      .addMeter({ atQuarters: Rational.ZERO, measureNumber: 1, timeSignature });
+    b.addPart({ id: partId, name: 'Piano', staves: 1 });
+    pitches.forEach((name, i) => {
+      const measureNumber = Math.floor(i / 8) + 1;
+      if (i % 8 === 0) {
+        b.addMeasure({
+          id: MeasureId(`m${measureNumber}`),
+          number: measureNumber,
+          onsetQuarters: new Rational((measureNumber - 1) * 4, 1),
+          durationQuarters: new Rational(4, 1),
+          timeSignature,
+        });
+      }
+      b.addNote(partId, {
+        id: b.newNoteId(),
+        pitch: Pitch.parse(name),
+        onsetQuarters: new Rational(i, 2),
+        duration: Duration.eighth(),
+        voice,
+      });
+    });
+    return b.build();
+  }
+
+  // Two takes of the same phrase: a bright major reading vs. its minor inflection.
+  const majorTake = sampleScore(
+    ['C4','E4','G4','C5','B4','G4','E4','C4','D4','F4','A4','D5','C5','A4','F4','D4'],
+  );
+  const minorTake = sampleScore(
+    ['C4','Eb4','G4','C5','Bb4','G4','Eb4','C4','D4','F4','Ab4','D5','C5','Ab4','F4','D4'],
+  );
+
+  mountProgrammaticDemo('[data-programmatic-abplayer]', (root, scope) => {
+    const playBtn = root.querySelector('[data-play]') as HTMLButtonElement;
+    const selectBtns = Array.from(
+      root.querySelectorAll('[data-select]'),
+    ) as HTMLButtonElement[];
+    const readout = root.querySelector('[data-readout]') as HTMLElement;
+
+    const sound = Sound.oscillator({type: 'triangle', gain: 0.2, releaseSeconds: 0.05});
+    scope.add(() => sound.dispose()); // AbPlayer borrows the injected sound.
+    const ab = new AbPlayer(
+      { A: majorTake, B: minorTake },
+      {sound},
+    );
+    scope.add(() => ab.dispose());
+
+    const paintActive = () => {
+      programmaticCode(root, `import {AbPlayer, Sound} from '@webmusic/score/play/headless';
+
+const sound = Sound.oscillator({type: 'triangle', gain: 0.2, releaseSeconds: 0.05});
+const ab = new AbPlayer({A: majorTake, B: minorTake}, {sound});
+ab.select('${ab.active}');
+// In a play gesture: await ab.play();
+// On cleanup: ab.dispose(); sound.dispose();`);
+      for (const btn of selectBtns) {
+        btn.dataset.on = String(btn.dataset.select === ab.active);
+        btn.setAttribute('aria-pressed', String(btn.dataset.select === ab.active));
+      }
+    };
+
+    ab.player.on('beat', ({ beat, total }) => {
+      readout.textContent = `take ${ab.active} · beat ${beat + 1}/${total}`;
+    });
+
+    selectBtns.forEach((btn) => {
+      scope.listen(btn, 'click', () => {
+        ab.select(btn.dataset.select as string);
+        paintActive();
+        if (!ab.playing) readout.textContent = `take ${ab.active} · ready`;
+      });
+    });
+
+    let requestedPlaying = false;
+    scope.listen(playBtn, 'click', () => {
+      if (requestedPlaying) {
+        requestedPlaying = false;
+        ab.pause();
+        playBtn.textContent = '▶ Play';
+      } else {
+        requestedPlaying = true;
+        scope.run(ab.play(), () => { requestedPlaying = false; playBtn.textContent = '▶ Play'; });
+        playBtn.textContent = '⏸ Pause';
+      }
+    });
+
+    paintActive();
+    readout.textContent = `take ${ab.active} · ready`;
+  });
+</script>

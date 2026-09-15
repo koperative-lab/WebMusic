@@ -1,0 +1,126 @@
+---
+// CANONICAL programmatic-demo pattern. Each demo has a title bar and
+// a body whose UI is wired client-side to a programmatic API — no custom
+// element involved. Audio is built with Sound.oscillator (no soundfont files),
+// and players resume their own AudioContext inside the click handler.
+import LiveDemoCanvas from '../LiveDemoCanvas.astro';
+---
+<div class="wui-panel wui-panel--flow not-content" data-programmatic-bindplayer>
+  <div class="wui-panel__title">
+    <span>@webmusic/score/view/render</span>
+    <strong>bindPlayerToVisualizer</strong>
+  </div>
+  <LiveDemoCanvas size="tall">
+    <div class="wui-row">
+      <button class="wui-btn" data-play type="button">▶ Play</button>
+      <div class="wui-track"><div class="wui-track__fill" data-fill></div></div>
+      <span class="wui-readout" data-time>0.0s</span>
+      <div class="doc-stage programmatic-demo__surface" data-surface></div>
+    </div>
+  </LiveDemoCanvas>
+</div>
+
+<script>
+  import {mountDemos} from '../demo-lifecycle';
+  import { Duration, MeasureId, PartId, Pitch, Rational, ScoreBuilder, VoiceId, noteMidi, noteOnsetSeconds } from '@webmusic/score';
+  import { ScorePlayer, Sound } from '@webmusic/score/play/headless';
+  import { bindPlayerToVisualizer, renderPianoRollVisualizer } from '@webmusic/score/view/render';
+
+  function sampleScore() {
+    const b = new ScoreBuilder();
+    const partId = PartId('piano');
+    const voice = VoiceId('v1');
+    const timeSignature = { numerator: 4, denominator: 4 };
+    b.setMetadata({ title: 'Etude' })
+      .addTempo({ atQuarters: Rational.ZERO, bpm: 100 })
+      .addMeter({ atQuarters: Rational.ZERO, measureNumber: 1, timeSignature });
+    b.addPart({ id: partId, name: 'Piano', staves: 1 });
+    const pitches = ['C4','E4','G4','C5','B4','G4','E4','C4','D4','F4','A4','D5','C5','A4','F4','D4'];
+    pitches.forEach((name, i) => {
+      const measureNumber = Math.floor(i / 8) + 1;
+      if (i % 8 === 0) {
+        b.addMeasure({
+          id: MeasureId(`m${measureNumber}`),
+          number: measureNumber,
+          onsetQuarters: new Rational((measureNumber - 1) * 4, 1),
+          durationQuarters: new Rational(4, 1),
+          timeSignature,
+        });
+      }
+      b.addNote(partId, {
+        id: b.newNoteId(),
+        pitch: Pitch.parse(name),
+        onsetQuarters: new Rational(i, 2),
+        duration: Duration.eighth(),
+        voice,
+      });
+    });
+    return b.build();
+  }
+
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+
+  mountDemos('[data-programmatic-bindplayer]', (root, scope) => {
+    const btn = root.querySelector<HTMLButtonElement>('[data-play]')!;
+    const fill = root.querySelector<HTMLElement>('[data-fill]')!;
+    const time = root.querySelector<HTMLElement>('[data-time]')!;
+    const surface = root.querySelector<HTMLElement>('[data-surface]')!;
+
+    const score = sampleScore();
+
+    // Render a piano-roll into the surface (same wiring score-view.ts uses for
+    // its default 'piano-roll' type): an <svg> handed to renderPianoRollVisualizer.
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    svg.style.width = '100%';
+    surface.appendChild(svg);
+    scope.add(() => svg.remove());
+    const rendered = renderPianoRollVisualizer(score, svg, {
+      pixelsPerSecond: 40,
+      noteHeight: 8,
+    });
+    scope.add(() => rendered.dispose?.());
+
+    // Build a ScorePlayer over the SAME score.
+    const player = new ScorePlayer(score, {
+      synth: Sound.oscillator({ type: 'triangle', gain: 0.2, releaseSeconds: 0.05 }),
+      synthOwnership: 'owned',
+    });
+    scope.add(() => player.dispose());
+
+    // Wire player → visualizer: bindPlayerToVisualizer subscribes to the
+    // player's note events and drives rendered.redraw / clearActiveNotes. The
+    // subscribe adapter maps a ScorePlayer Note to noteOn(midi, startTimeSeconds)
+    // exactly as the <score-view> element does (noteMidi + noteOnsetSeconds).
+    const unbind = bindPlayerToVisualizer(rendered, ({ noteOn, end }) => {
+      const offNoteOn = player.on('noteOn', (note) => {
+        noteOn(noteMidi(note), noteOnsetSeconds(note, score));
+      });
+      const offEnd = player.on('end', () => end());
+      return () => { offNoteOn(); offEnd(); };
+    });
+    scope.add(unbind);
+
+    let playing = false;
+
+    const paint = () => {
+      const cur = player.currentTime.seconds;
+      const dur = player.durationSeconds || 1;
+      fill.style.width = `${Math.min(100, (cur / dur) * 100)}%`;
+      time.textContent = `${cur.toFixed(1)}s`;
+    };
+    player.on('cursor', paint);
+    player.on('end', () => { playing = false; btn.textContent = '▶ Play'; player.seek(0); paint(); });
+
+    scope.listen(btn, 'click', () => {
+      if (playing) { player.pause(); btn.textContent = '▶ Play'; }
+      else { scope.run(player.play(), () => { playing = false; btn.textContent = '▶ Play'; }); btn.textContent = '⏸ Pause'; }
+      playing = !playing;
+    });
+  });
+</script>
+
+<style>
+  /* The roll drops onto its own line under the controls, and the renderer
+     sizes the <svg> itself — so the window height is capped on the stage. */
+  .programmatic-demo__surface { flex: 1 1 100%; height: 140px; }
+</style>

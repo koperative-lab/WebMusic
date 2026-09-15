@@ -1,0 +1,36 @@
+---
+import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
+import './musical-stage.css';
+const code = "import {createAnalysisSession} from '@webmusic/score/analyze/headless';\nconst session = createAnalysisSession(score);\nconst result = session.result;";
+---
+
+<HeadlessDemoFrame entry="@webmusic/score/analyze/headless" name="createAnalysisSession" code={code}
+  hint="Change the score or its first note to compare real key and chord analysis. Chord-window changes create a new session."
+  rootAttrs={{'data-analysis-session-demo': ''}}>
+  <section class="wm-hl-music" aria-label="Score analysis">
+    <p class="wm-hl-music__summary" data-session-summary></p>
+    <div class="wm-hl-music__chips" data-session-notes aria-label="Score notes"></div>
+    <div class="wm-hl-music__chips" data-session-chords aria-label="Chord segments and Roman numerals"></div>
+    <p data-session-detail></p>
+  </section>
+  <div slot="parameters" class="wm-pg__grid">
+    <label class="wm-pg__param"><span class="wm-pg__name">score</span>
+      <select class="wui-select" data-session-score aria-label="Score"><option value="major">C major study</option><option value="minor">A minor study</option></select>
+      <span class="wm-pg__note">Replace the immutable score through session.update(score).</span>
+    </label>
+    <label class="wm-pg__param"><span class="wm-pg__name">first note</span>
+      <select class="wui-select" data-session-pitch aria-label="First note"><option>A3</option><option selected>C4</option><option>D4</option><option>F#4</option><option>B4</option></select>
+      <span class="wm-pg__note">Edit one note, preserving the session and its reusable caches.</span>
+    </label>
+    <label class="wm-pg__param"><span class="wm-pg__name">windowQuarters</span>
+      <select class="wui-select" data-session-window aria-label="Chord window in quarters"><option>1</option><option selected>2</option><option>4</option></select>
+      <span class="wm-pg__note">Maximum chord segment length in quarter notes.</span>
+    </label>
+  </div>
+</HeadlessDemoFrame>
+
+<script>
+  import {mountDemos} from '../demo-lifecycle';
+  import {mountAnalysisSessionDemo} from './analysis-view-playgrounds-client';
+  mountDemos('[data-analysis-session-demo]', (root, scope) => { mountAnalysisSessionDemo(root, scope); });
+</script>

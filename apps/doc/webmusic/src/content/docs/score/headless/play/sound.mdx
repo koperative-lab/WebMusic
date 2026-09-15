@@ -1,0 +1,457 @@
+---
+title: 'Sound'
+description: 'The timbre namespace — oscillator, FM, wavetable, noise, samplers and the optional SF2 and Tone backends behind one shape.'
+sidebar:
+  order: 3
+---
+
+import ProgrammaticSoundDemo from '../../../../../components/programmatic/ProgrammaticSoundDemo.astro';
+
+`Sound` wraps oscillator, FM, wavetable, noise, sample-map, SFZ, SoundFont, MIDI,
+and custom backends behind the `HeadlessSynth` contract. A factory creates a
+lazy timbre; connecting it creates its private gain bus and backend. Supply it
+as a [`ScorePlayer`](/score/headless/play/score-player/) synth or an
+[`InteractivePlayer`](/score/headless/play/interactive-player/) voice.
+
+The [synth backend reference](#synth-backends) below also covers direct synths,
+range samplers, modulation, metering and the synth-panel audio graph.
+
+
+<ProgrammaticSoundDemo />
+
+## Import
+
+```ts
+import {ScorePlayer, Sound} from '@webmusic/score/play/headless';
+
+const player = new ScorePlayer(score, {
+  synth: Sound.oscillator({type: 'triangle'}),
+  synthOwnership: 'owned',
+});
+await player.preload();
+await player.play(); // Starts playback; does not wait for the piece to finish.
+
+// Keep the player while playing; call this when its session is removed.
+const dispose = () => player.dispose();
+```
+
+## Routing, readiness, and ownership
+
+One `Sound` has one active route. A second `connect()` rejects while the first
+is active. Create separate Sounds for simultaneous players or voices;
+`Sound.layer()` also requires distinct child instances. The context comes from
+the destination and is borrowed, never closed by `Sound`.
+
+`connect()` starts asynchronous setup. Both `ready` and `preload()` reject
+before connection. After connection, `ready` observes the current load;
+`preload()` can retry a failed setup. Prefer the player's `preload()` when a
+player owns the route. Sample fetch/decode, unavailable peers, MIDI access, and
+worklet preparation can reject; constructing a recipe does not prove readiness.
+
+A player borrows an explicitly supplied synth by default. Use
+`synthOwnership: 'owned'` for a Sound created for that player's lifetime.
+`Sound.from()` and `Sound.custom()` do not introduce a separate borrowing
+option: explicit `Sound.dispose()` can call the supplied backend or instrument's
+global `dispose()`, and `disconnect()` can call its global `disconnect()`.
+Use a factory when independent backend instances are needed.
+
+The callback returned by `connect()` releases that route without invoking global
+backend disposal. For a custom backend that returns no route cleanup, a released
+Sound cannot reconnect until its backend has been globally disconnected or
+disposed. Built-in recipes can create fresh backends on a later connection;
+an adopted instance must itself remain reusable.
+
+## Time and environment
+
+`Sound` has no transport, cursor, or event emitter. A caller supplies MIDI pitch,
+velocity in 0–127, an absolute context time in seconds, and a duration in seconds.
+Scheduling and cancellation are backend capabilities, described under
+[Synth backends](/score/headless/play/sound/#synth-backends-synth-contract).
+
+Connecting requires compatible Web Audio nodes. Sample URLs require `fetch` and
+audio decoding. `soundfont2()` loads the optional `spessasynth_lib` 4.x peer when
+the sound connects; install it with `npm install spessasynth_lib@^4` so your
+bundler can resolve the lazy module. The AudioWorklet is a separate asset:
+provide `workletUrl` or `registerWorklet` in every environment, including Vite.
+`from()` accepts an already-created Tone-style instrument and does not
+import Tone. `midiOut()` needs an injected output or available Web MIDI access;
+it sends notes to that output rather than producing local audio.
+
+`midiOut()` returns an opaque handle per attack. Its automatic end and an
+explicit `noteOffById()` share one release, preventing duplicate note-offs;
+`retimeScheduledNote()` can extend or shorten that gate. Timers wait for the
+borrowed audio clock, while explicit releases at the current time still quiet
+hardware during suspension. Closing the clock or releasing the route retires
+pending sends and attempts every sounding release. MIDI 1.0 device behavior
+for overlapping equal pitches is device-dependent; the adapter preserves the
+matching message count but cannot assign a hardware voice id.
+
+<details class="component-section">
+<summary>API</summary>
+
+### Construction
+
+The constructor is private. All eleven factories return `Sound`.
+
+| Member | Options | Description |
+| --- | --- | --- |
+| `Sound.oscillator(options?, sound?)` | `OscillatorSynthOptions`, `SoundOptions` | Polyphonic oscillator with filter and envelope. Backend options are owned by the [oscillator reference](/score/headless/play/sound/#synth-backends-oscillators-and-exact-note-samples). |
+| `Sound.samples(map, options?, sound?)` | MIDI-keyed `SoundfontSample` map; remaining `SoundfontSynthOptions`; `SoundOptions` | Exact-note sample map, with the backend's fallback for missing samples. See [sample loading](/score/headless/play/sound/#synth-backends-oscillators-and-exact-note-samples). |
+| `Sound.sfz(url, options?)` | `SfzOptions` | Fetch an SFZ definition and resolve its sample regions into a ranged sampler. |
+| `Sound.soundfont2(source, options?)` | URL string or `ArrayBuffer`; `Soundfont2Options` | Prepare an SF2/SF3 worklet instrument. |
+| `Sound.from(instrument, sound?)` | `HeadlessSynth` or `ToneInstrumentLike`; `SoundOptions` | Wrap an existing instrument, including its global cleanup methods. |
+| `Sound.custom(implementation, sound?)` | `HeadlessSynth` or `(context: AudioContext) => HeadlessSynth`; `SoundOptions` | Supply a backend instance or create one for each connection. |
+| `Sound.layer(...sounds)` | Distinct `Sound` instances | Fan each note into the children. Repeated child identities throw. Global cleanup reaches all children. |
+| `Sound.fm(options?)` | `FmOptions` | Two-operator frequency modulation. |
+| `Sound.wavetable(options?)` | `WavetableOptions` | Web Audio `PeriodicWave` synthesis. |
+| `Sound.noise(options?)` | `NoiseOptions` | White noise, optionally band-pass filtered at the note pitch. |
+| `Sound.midiOut(options?)` | `MidiOutOptions` | Send MIDI note messages to a borrowed output. |
+
+### Options and supporting types
+
+| Type / member | Default | Description |
+| --- | --- | --- |
+| `SoundOptions.gain` | `1` | Initial linear bus gain, independent of a backend's gain option. |
+| `FmOptions` | `ratio: 2`, `index: 200`, both oscillator types `'sine'`, attack `0.005`, release `0.12` | `ratio` is modulator/carrier frequency ratio; `index` is frequency deviation in Hz. `carrierType`, `modulatorType`, `attackSeconds`, `releaseSeconds`, and inherited `gain` complete the options. |
+| `WavetableOptions` | `real: [0, 1, 0.5, 0.25, 0.12]`, zero-filled `imag`, attack `0.008`, release `0.1` | `real`/`imag` are cosine/sine partial arrays; also accepts `attackSeconds`, `releaseSeconds`, and `gain`. |
+| `NoiseOptions` | `pitched: true`, `Q: 8`, attack `0.001`, release `0.12` | Filter selection/resonance, `attackSeconds`, `releaseSeconds`, and `gain`. |
+| `Soundfont2Options` | `channel: 0`, `program: 0`, `gain: 1` | MIDI channel 0–15 and program 0–127; optional `workletUrl: string \| URL` or `registerWorklet(context)` callback, and `maxSoundFontBytes` (128 MiB). |
+| `MidiOutOptions` | `channel: 0`, first available output | `output?: MidiOutputLike`; otherwise requests Web MIDI access. Channel is masked to four bits. Inherited bus `gain` does not scale MIDI messages. |
+| `MidiOutputLike` | — | Structural `send(data: number[] \| Uint8Array, timestamp?)` output; the wrapper never closes it. |
+| `ToneInstrumentLike` | — | Optional `triggerAttack`, `triggerRelease`, `connect`, `disconnect`, and `dispose` methods. Attack receives a note name and normalized 0–1 velocity. |
+| `SfzOptions.attackSeconds` / `releaseSeconds` / `gain` | `0.004` / `0.12` / `1` | Sample envelope and Sound bus gain. |
+| `SfzOptions.maxSfzBytes` | `1_000_000` bytes | Definition response limit. |
+| `SfzOptions.maxZones` / `maxConcurrentLoads` | `512` / `4` | Maximum regions and concurrent sample fetch/decode jobs. |
+| `SfzOptions.maxSampleBytes` / `maxTotalSampleBytes` | 32 / 128 MiB | Per-sample and total unique source-byte limits. |
+| `SfzOptions.maxDecodedSampleBytes` / `maxTotalDecodedSampleBytes` | 64 / 256 MiB | Per-sample and total decoded PCM limits. |
+
+Resource limits must be positive safe integers. Limit violations throw
+`RangeError`; asynchronous load failures reject readiness. SFZ support is the
+implemented region/key/velocity subset, not every opcode in the format.
+[`SampleZone`](/score/headless/play/sound/#synth-backends-rangesampler) and its
+selection helpers are documented with `RangeSampler`.
+
+### Commands, state, and lifecycle
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `connect(destination)` | command | Creates the route and begins loading; returns its idempotent route cleanup callback. Synchronous graph failures throw. |
+| `preload(): Promise<void>` | command | Waits for connected setup/backend loading; retries after a previous load failure. |
+| `ready: Promise<void>` | state | Current loading result; rejects when unconnected or when the last setup failed. |
+| `setGain(value): this` | command | Sets the bus gain immediately, clamping negative values to zero; no upper clamp. |
+| `noteOn(midi, velocity, time, durationSeconds)` | command | Forwards the attack; exposes its handle only if the backend supports exact-handle release. Before connection it returns `undefined`. |
+| `noteOff(midi, time)` | command | Forwards pitch release when available. |
+| `noteOffById(handle, time)` | command | Forwards exact-voice release when available. |
+| `supportsScheduledCancellation` | state | True only when the connected backend opts in and supplies cancellation and exact release. False before connection. |
+| `cancelScheduledNote(handle, time)` | command | Forwards cancellation of a scheduled attack when supported. |
+| `retimeScheduledNote(handle, time)` | command | Forwards the new logical note-off time when supported. |
+| `disconnect()` | lifecycle | Releases the route and invokes backend-wide disconnection when provided. |
+| `dispose()` | lifecycle | Releases the route and calls backend `dispose()`, falling back to `disconnect()`. Custom cleanup errors can propagate. |
+
+The wrapper has no state subscription or transport events. Optional forwarding
+methods are inert when no backend is connected; they do not queue attacks for
+future readiness.
+
+### Synth backends
+
+Use these exports to own a synth graph directly. [`Sound`](/score/headless/play/sound/)
+provides the lazy wrapper; the concrete synth constructors below allocate against
+a context immediately. LFO, meter, and panel controllers solve separate graph
+and control tasks and do not create a transport or UI.
+
+#### Synth backends Import
+
+```ts
+import {createOscillatorSynth} from '@webmusic/score/play/headless';
+
+// context is supplied and resumed by the application.
+const synth = createOscillatorSynth(context, {type: 'sawtooth', cutoff: 8000});
+const detach = synth.connect(context.destination);
+const start = context.currentTime;
+const handle = synth.noteOn(60, 90, start, 0.5);
+synth.noteOffById(handle, start + 0.5);
+
+// Retain this cleanup until the voice/session is finished.
+const dispose = () => {
+  detach();
+  synth.dispose();
+};
+```
+
+#### Synth backends Synth contract
+
+`HeadlessSynth` is a structural interface; `SynthBackend` is its alias.
+`PreloadableHeadlessSynth` additionally permits `preload(notes?)`.
+`SynthOwnership` is `'borrowed' | 'owned'`, selected by the consuming player.
+A returned `SynthRouteCleanup` removes only the route made by one `connect()`;
+it does not replace global backend disposal.
+
+All note times below are absolute `AudioContext.currentTime` seconds, durations
+are seconds, pitches are MIDI note numbers, and velocities use 0–127. A synth
+has no playback cursor or score clock. Web Audio source backends can schedule
+against the context clock; MIDI/timer adapters need different dispatch behavior.
+
+#### Synth backends LfoController
+
+`LfoController` owns a repeating control-rate callback, not an AudioNode
+oscillator. It can drive any borrowed `LfoTarget` through `apply(value)`.
+Modulation is centered between the target's `min` and `max`, with amplitude
+scaled by depth; the compatibility `value` field does not set the center.
+
+```ts
+import {createLfoController} from '@webmusic/score/play/headless';
+
+const lfo = createLfoController({
+  rate: 2,
+  target: {min: 200, max: 4000, apply: (value) => { filter.frequency.value = value; }},
+});
+lfo.start();
+// Later, when the modulation owner is removed:
+const dispose = () => lfo.dispose();
+```
+
+#### Synth backends LevelMeterController
+
+`LevelMeterController` is the score-side meter over the kernel's analyser tap:
+give it a context and it builds a transparent `input → analyser → output`
+graph you splice anywhere; give it an existing `analyser` and it only borrows.
+It never runs a loop of its own — **you** call `readLevel()` from your own
+animation frame, which keeps the paint rate the UI's decision rather than the
+engine's.
+
+```ts
+import {createLevelMeterController} from '@webmusic/score/play/headless';
+
+const meter = createLevelMeterController({context});
+source.connect(meter.input!);
+meter.output!.connect(context.destination);
+
+let frame = 0;
+const paint = () => {
+  const {level, peak, peakHold} = meter.readLevel();
+  draw(level, peak, peakHold, meter.readSpectrum(28));
+  frame = requestAnimationFrame(paint);
+};
+paint();
+
+// Keep the cleanup with the owner of this graph and drawing loop.
+const dispose = () => {
+  cancelAnimationFrame(frame);
+  source.disconnect(meter.input!);
+  meter.dispose();
+};
+```
+
+#### Synth backends SynthPanelAudioGraph
+
+`SynthPanelAudioGraph` owns the audio graph
+[`<synth-panel>`](/score/element/play/synth-panel/) assembles: effect recipes and
+an optional EQ, wired between stable boundary gains. `rebuild()` constructs a
+replacement before retiring the previous graph. A failed construction preserves
+the previous graph; same-context rebuilds retain `input` and `output`, so caller
+connections remain valid. With no active effects/EQ, those boundaries carry a dry bypass.
+Construction or wiring failures release every completed candidate while preserving the prior
+route, including saved values on reused custom effect parameters. It does not itself create
+a meter, LFO, or instrument.
+It is exported for a caller building an equivalent panel; for a timbre, see
+[`Sound`](/score/headless/play/sound/).
+
+```ts
+import {DEFAULT_EQ_BANDS, SynthPanelAudioGraph} from '@webmusic/score/play/headless';
+
+const graph = new SynthPanelAudioGraph();
+graph.rebuild({context, effects: [], bands: DEFAULT_EQ_BANDS, sections: ['sound', 'eq'], effectValues: []});
+const input = graph.input!;
+source.connect(input);
+graph.output!.connect(context.destination);
+
+graph.rebuild({context, effects: [], bands: DEFAULT_EQ_BANDS, sections: ['sound'], effectValues: []});
+// Later, when the panel graph is removed:
+const dispose = () => {
+  source.disconnect(graph.input!);
+  graph.teardown();
+};
+```
+
+
+##### Synth backends Shared commands and lifecycle
+
+| Member | Contract |
+| --- | --- |
+| `noteOn(midi, velocity, time, durationSeconds): unknown` | Required attack operation; may return an opaque voice handle. |
+| `connect?(destination)` | Optional route creation; may return `SynthRouteCleanup`. |
+| `disconnect?()` | Optional backend-wide route disconnection. |
+| `noteOff?(midi, time)` | Optional pitch-based release. |
+| `noteOffById?(handle, time)` | Optional exact-voice release, needed when overlapping equal pitches must remain independent. |
+| `supportsScheduledCancellation?` | Explicit opt-in to player lookahead. True requires a unique, non-null attack handle, exact release, and cancellation that can silence an attack before it sounds. |
+| `cancelScheduledNote?(handle, time)` | Retracts a scheduled voice; stronger than allowing it to play a release tail after a future onset. |
+| `retimeScheduledNote?(handle, time)` | Moves an active voice's logical note-off; the backend accounts for its release tail. |
+| `preload?(notes?)` | Optional `PreloadableHeadlessSynth` readiness. Native/offline playback supplies sounding-pitch notes with original ids and other data; direct callers supply the pitches they intend to play. |
+| `dispose?()` | Optional backend-wide final cleanup. A player does not call it on a borrowed synth. |
+
+These interfaces define no events, subscriptions, or universal `ready` getter.
+See each concrete backend for the subset implemented.
+
+##### Synth backends Oscillators and exact-note samples
+
+| Construction / option | Default | Description |
+| --- | --- | --- |
+| `new OscillatorSynth(context, options?)` / `createOscillatorSynth(context, options?)` | — | Borrow a context; create a polyphonic oscillator output bus. |
+| `OscillatorSynthOptions.type` | `'triangle'` | Web Audio oscillator type. |
+| `attackSeconds` / `releaseSeconds` | `0.012` / `0.08` | Per-voice envelope timing. |
+| `gain` / `detune` | `0.16` / `0` | Voice gain and cents of detuning. |
+| `cutoff` / `resonance` | `20000` / `0.7` | Low-pass cutoff in Hz and Q. |
+| `setParam(key, value)` | — | Oscillator-only option update; changes subsequent attacks. |
+| `new SoundfontSynth(context, options?)` / `createSoundfontSynth(context, options?)` | — | Exact-MIDI samples with a fallback instrument. This is a sample map, not an SF2 loader. |
+| `SoundfontSynthOptions.samples` | No map | `Record<number \| string, SoundfontSample>`. A sample is a URL string, `ArrayBuffer`, or `AudioBuffer`. |
+| `resolveSample(midi)` | Absent | Returns a `SoundfontSample` or `undefined`; takes precedence over the map. |
+| `fallback` | New `OscillatorSynth` | Used when a pitch has no loaded sample. Its route is connected to the sample bus; the sample synth calls its `dispose()` during teardown. Do not supply a shared fallback unless that ownership is intended. |
+| `gain` / `attackSeconds` / `releaseSeconds` | `1` / `0.004` / `0.08` | Sample envelope settings. |
+| `maxConcurrentLoads` | `4` | Concurrent fetch/decode jobs. |
+| `maxSampleBytes` / `maxTotalSampleBytes` | 32 / 128 MiB | Per-sample and aggregate source-byte limits. |
+| `maxDecodedSampleBytes` / `maxTotalDecodedSampleBytes` | 64 / 256 MiB | Per-sample and retained PCM limits. |
+| `preload(notes?)` | All configured MIDI keys | Sample-only readiness. With notes, loads their distinct pitches; repeated pending requests for a pitch share work. |
+
+Loading limits must be positive safe integers. Fetch/decode and limits can
+reject preload. Missing/unloaded samples use the fallback; `noteOn()` itself
+does not wait for a fetch. A custom `resolveSample` without a map needs an
+explicit note list to preload pitches.
+
+Both classes implement `connect`, `disconnect`, `noteOn`, `noteOff`,
+`noteOffById`, `cancelScheduledNote`, `retimeScheduledNote`, and `dispose`.
+Oscillator cancellation is always supported; the sample synth advertises it
+only when its fallback also supports exact cancellation. Both own their voices
+and stop remaining sources on idempotent disposal; they never close the context.
+After disposal, connection/attack and sample preload reject or throw.
+
+##### Synth backends RangeSampler
+
+`new RangeSampler(context, options?)` borrows a context and accepts
+[`SfzOptions`](/score/headless/play/sound/#options-and-supporting-types).
+It uses the envelope and sample-load limits; `gain` and `maxSfzBytes` belong to
+the outer `Sound.sfz()` wrapper and definition-loading step.
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `loadZones(zones: SampleZone[], context): Promise<void>` | command | Fetches and decodes resolved sample URLs. Pass the sampler's context. Snapshots input descriptors; replaces the zone set only when the current load succeeds. |
+| `connect`, `disconnect` | routing | Output connection and exact route cleanup, or global output disconnection. |
+| `noteOn(midi, velocity, time, durationSeconds)` | command | Selects a region and pitch-shifts from its root key; returns a numeric handle or `undefined` when no key range covers the pitch. |
+| `noteOff`, `noteOffById`, `cancelScheduledNote`, `retimeScheduledNote` | command | Pitch/exact release, scheduled cancellation, and logical note-off retiming. |
+| `supportsScheduledCancellation` | state | Always `true`. |
+| `dispose()` | lifecycle | Idempotently aborts owned fetches, invalidates loading, stops owned voices, clears samples, and disconnects output. |
+| `SampleZone` | type | `sample` URL; inclusive `loKey`, `hiKey`, `loVel`, `hiVel`; `rootKey`; optional `tuneCents` and `volume` in dB. |
+| `chooseZone(zones, midi, velocity, roundRobin?)` | helper | Selects matching key/velocity ranges; falls back to key-only matches. Equally matching candidates rotate using the supplied `Map<string, number>`. Retain that map across calls for round-robin selection. |
+| `playbackRateFor(rootKey, midi, tuneCents = 0)` | helper | Pure ratio: `2 ** ((midi - rootKey) / 12) * 2 ** (tuneCents / 1200)`. |
+
+A newer load or disposal invalidates the previous load and aborts its fetches;
+superseded work cannot commit zones, and its promise may resolve without a
+replacement. A failure in the current generation rejects and cancels sibling
+fetches. There is no loading-state event or `ready` getter on `RangeSampler`.
+
+##### Synth backends SpessaSynthSynth
+
+`new SpessaSynthSynth(instance, channel = 0, context?)` wraps an already-created,
+already-routed spessasynth instance. It neither imports the optional peer nor
+constructs its worklet; use `Sound.soundfont2()` when starting from an SF2/SF3
+source. The supplied instance remains caller-owned.
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `noteOn(pitch, velocity, time)` | command | Schedules the instance's `noteOn(channel, pitch, velocity)` with a timer. |
+| `noteOff(pitch, time)` | command | Schedules its pitch release. Direct callers must supply note-offs; there is no duration-based release argument on this class. |
+| `dispose()` | lifecycle | Cancels owned timers and attempts matching note-offs for attacks already sent. Does not dispose the supplied instance or close its context. Repeated calls retry note-offs that failed. |
+
+Timing uses the explicit context, then the instance's `context` or
+`targetNode.context`; with no clock it dispatches on a zero-delay timer. It has
+no `connect`, route output, or exact scheduled-cancellation capability, so it
+cannot be used as a routable offline capture synth. Notes are ignored after
+disposal. When a context is available, timer callbacks wait until its time
+reaches the requested timestamp; suspension does not advance future notes.
+An explicit release at the current time still quiets the instrument while
+suspended. Timer wake-up and external-device latency remain unbounded by this adapter.
+
+##### Synth backends LfoController
+
+| Member | Kind | Default / contract |
+| --- | --- | --- |
+| `new LfoController(options?)` / `createLfoController(options?)` | construction | Creates a stopped controller. Options extend `LfoControllerConfig`. |
+| `shape` | option | `'sine'`; `LfoShape` is `'sine' \| 'triangle' \| 'square' \| 'saw'`. Invalid shapes retain the fallback. |
+| `rate` / `depth` / `phase` | option | `1` Hz / `0.6` / `0`. Rate clamps to 0.05–12; depth to 0–1; phase wraps to `[0, 1)`. Nonfinite values use the prior/default value. |
+| `target` | option | Optional borrowed `LfoTarget`: `min`, `max`, `apply(value)`, optional compatibility `value` and descriptive `unit`. |
+| `now` | option | Seconds; defaults to `Date.now() / 1000`. Supply a monotonic clock when required. |
+| `requestFrame` / `cancelFrame` | option | Injectable `LfoRequestFrame` / `LfoCancelFrame`; defaults to a 16 ms timer, not browser rAF. `LfoFrameCallback` receives a timestamp, but phase uses `now()`. |
+| `onError(error)` | option | Receives contained failures from the active frame/target run, including returned Promise rejections. |
+| `configure(config)` | command | Updates `LfoControllerConfig`: shape/rate/depth/phase/target. Does not apply the target immediately. An explicitly present `target: undefined` detaches it. |
+| `setTarget(target)` | command | Replace or detach the borrowed target. |
+| `start()` / `stop()` / `setRunning(boolean)` | command | Start or stop the reusable run. Stop retains phase/configuration and cancels the pending callback. Repeated calls in the same state do nothing. |
+| `snapshot()` | state | Fresh `LfoControllerState`: shape, rate, depth, phase, running. |
+| `subscribe(notify)` | subscription | Changes and frame updates; no initial notification. Returns an unsubscribe callback. |
+| `dispose()` / `destroy()` | lifecycle | Final, idempotent cleanup of callbacks/subscribers. Never destroys the target; subsequent commands are inert. |
+| `lfoWave(shape, phase)` / `LFO_SHAPES` | helper | Pure waveform value for phase in the conventional 0–1 cycle, and supported shapes. The helper itself does not wrap phase. |
+
+The frame advances phase, applies the target, publishes state, then schedules
+the next callback. It is a control-rate driver, not an audio-rate oscillator or
+beat-synchronized transport. Synchronous command/subscriber failures can throw;
+an active frame failure stops that run and reports through `onError`. There is
+no named event emitter.
+
+##### Synth backends LevelMeterController
+
+**Construction** — `new LevelMeterController(options?)` /
+`createLevelMeterController(options?)`: `context` (build an owned tap) or
+`analyser` (borrow one), plus `fftSize` (1024) and
+`smoothingTimeConstant` (0.8) for an owned analyser. Supplying both a context and
+an analyser throws `TypeError`. With neither, no graph is created and reads
+throw because there is no analyser. The context is always borrowed.
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `readLevel()` | command | One `LevelMeterFrame`, taken now: normalized `level`, `peak`, and decaying `peakHold`. Decay advances per read, so polling frequency affects it. |
+| `readSpectrum(bars?)` | command | Normalized `Float32Array` spectrum bands (default 28, minimum 4). |
+| `input` · `output` | state | The splice points of an owned tap; `undefined` when borrowing. |
+| `analyser` | state | The analyser itself, for a caller that wants raw bins. |
+| `dispose()` | lifecycle | Idempotent. Releases an owned tap; a borrowed analyser is never disconnected. |
+
+`LevelMeterControllerOptions` and `LevelMeterFrame` are the construction/read
+types above. It has no subscriptions or timer; stop the caller's polling before
+disposal. Reads after disposal throw. The controller suppresses cleanup errors
+from the underlying owned tap.
+
+##### Synth backends SynthPanelAudioGraph
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `new SynthPanelAudioGraph()` | construction | Creates an empty coordinator with no nodes. |
+| `rebuild(options)` | command | Atomically replaces the graph from `SynthPanelAudioOptions`. With no context, calls teardown. Nested rebuilds throw. |
+| `options.context` | input | Required field, `AudioContext \| undefined`; borrowed and never closed. A changed context replaces the boundary nodes, requiring caller reconnection. |
+| `options.effects` / `effectValues` | input | Required effect recipes and corresponding records of saved numeric parameter values. Built only when `sections` includes `'effects'`; matching `EffectNode.params` receive the values. |
+| `options.bands` | input | Required EQ band descriptors; used only with section `'eq'`. |
+| `options.sections` | input | Required `SynthPanelSection[]`: `'sound'`, `'effects'`, `'envelope'`, `'eq'`, `'lfo'`, `'macros'`. Only effects/EQ cause this graph owner to build processing nodes. |
+| `teardown()` | command | Releases the current graph. Idempotent, and safe before any build. |
+| `input` · `output` | state | Current boundary nodes; `undefined` before construction and after teardown. |
+| `effectNodes` · `equalizer` | state | Current effect bundles and [`EqController`](/score/headless/play/effect/#eqcontroller); initially `[]` and `undefined`. Treat these as owned by the graph. |
+
+Teardown releases all graph-owned nodes/effects/EQ and can surface a cleanup
+failure after attempting the remaining cleanup. It is reusable through another
+rebuild and has no `dispose()` alias or event subscription. Construction
+failures throw; failures retiring an already-replaced graph are reported through
+the playback-operation diagnostic path without undoing the replacement.
+
+
+#### Synth backends Related
+
+[`<synth-panel>`](/score/element/play/synth-panel/) controls supplied timbres and
+composes `LfoController` and `SynthPanelAudioGraph`;
+[`Sound`](/score/headless/play/sound/) composes the synth backends.
+[`Effect` and `EqController`](/score/headless/play/effect/) own post-processing
+and EQ contracts. A meter can be inserted into a caller-owned Web Audio route
+and polled by any UI without introducing another musical clock.
+
+</details>
+
+## Related
+
+[`ScorePlayer`](/score/headless/play/score-player/),
+[`InteractivePlayer`](/score/headless/play/interactive-player/), and
+[`<synth-panel>`](/score/element/play/synth-panel/).
+Use [`Effect`](/score/headless/play/effect/) for processing after the timbre.

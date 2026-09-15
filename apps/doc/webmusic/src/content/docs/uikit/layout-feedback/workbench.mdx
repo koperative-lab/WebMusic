@@ -1,0 +1,307 @@
+---
+title: '@webmusic/ui/workbench'
+description: 'The shell an analysis view sits in: an optional tablist, a stage, a rail of docks and a status bar, plus the one reading of the clock per frame that everything mounted inside it shares.'
+sidebar:
+  label: 'workbench'
+  order: 4
+---
+
+import UiPresenterLiveDemo from '../../../../components/UiPresenterLiveDemo.astro';
+import UiPresenterRelated from '../../../../components/UiPresenterRelated.astro';
+
+`@webmusic/ui/workbench` is one mount, `mountWorkbench`, and it draws no content at all. It draws a
+frame around content: a header, an optional tablist, a stage, a rail of docks, a strip under them and a status
+bar — and then hands the caller `handle.stage`, `handle.dock(id)` and `handle.index` as **hosts** and
+never looks inside any of them again. That is what lets one shell serve six unrelated views. A view
+is `{id, label}` and a dock is `{id, label, placement}`, so the word for what a dock *contains* does
+not appear anywhere in the module, and it could not: a shell that reached into
+[pitch](/uikit/views-analysis/pitch/) or [harmony](/uikit/views-analysis/harmony/) would make the
+whole kit one chunk.
+
+The shell also supplies a **presentation clock**. It subscribes to the shared frame loop used by
+participating harmony surfaces, calls `binding.now()` once per frame, and hands every subscriber
+the same `FrameTick` through `handle.clock`. The caller owns the authoritative playback position,
+rate and seek commands; this clock distributes that caller's reading and does not schedule audio
+or inject a shared transport into playback engines.
+
+The frame loop runs only while the shell has a clock subscriber, a `binding.now` implementation,
+a `playing` or `listening` phase, and resolved `continuous` motion. With `motion: 'auto'`, an
+ancestor's `data-motion` and then the reduced-motion preference determine the motion mode.
+Explicit modes override that resolution. Without a continuous loop, caller notifications and
+`tick()` still publish a reading to subscribers.
+
+The rule the module lives or dies by is that **`update()` is idempotent and never rebuilds a slot
+node**. Every dock holds a presenter that took that node, and rebuilding the node unmounts it
+silently. So the stage, the index and every dock body are created once and afterwards only ever have
+attributes written on them; tabs and dock sections are reconciled by id and reordered rather than
+replaced. Under a clock that rule gains a sharper meaning — an `update()` called per frame would
+unmount every child presenter sixty times a second — so the frame path and the snapshot path never
+meet: the clock only ever calls `tick()`.
+
+<UiPresenterLiveDemo presenter="workbench" />
+
+## Import
+
+```ts
+import {mountFlowLane} from '@webmusic/ui/harmony';
+import {mountKeyboard} from '@webmusic/ui/pitch';
+import {mountWorkbench} from '@webmusic/ui/workbench';
+
+const shell = mountWorkbench(
+  host,
+  {
+    // Content. Pulled on domain events — never per frame.
+    snapshot: () => ({
+      views: [
+        {id: 'chords', label: 'Chords', docks: ['keyboard']},
+        {id: 'key', label: 'Key', docks: []},
+      ],
+      activeViewId: store.view,
+      docks: [{id: 'keyboard', label: 'Keyboard', placement: 'rail'}],
+      dockVisibility: {keyboard: store.keyboardOpen},
+      title: 'Analysis',
+      density: 'comfortable',
+      phase: store.playing ? 'playing' : 'idle',
+      // `message` is the live region; `detail` deliberately is not.
+      status: {message: 'Following the performance.', detail: `bar ${store.bar}`},
+    }),
+    // THIS FRAME'S ONE POSITION, in the caller's own units, on an axis the
+    // shell has never been told the meaning of.
+    now: (frame) => store.positionAt(frame.time),
+    epoch: () => store.seekCount,
+    activateView: (id) => store.show(id),
+    toggleDock: (id, next) => store.fold(id, next),
+    subscribe: (notify) => store.subscribe(notify),
+  },
+  {
+    label: 'The analysis workbench',
+    // The shell can refuse to hand out a hidden slot; it cannot evict a tenant
+    // it does not own. This is where it tells you to.
+    onDockVisibility: (id, visible) => {
+      if (!visible) tenants.get(id)?.destroy();
+    },
+  },
+);
+
+// The stage is a HOST. The lane takes the shell's clock and becomes a
+// passenger on it rather than opening a second loop over the same axis.
+const lane = mountFlowLane(shell.stage, laneBinding, {clock: shell.clock, surface: 'none'});
+
+// `undefined` means folded away, not asked for by this view, or the shell is
+// destroyed. Do not mount: a presenter in a box nobody can see still runs, and
+// still holds the clock.
+const rail = shell.dock('keyboard');
+if (rail) tenants.set('keyboard', mountKeyboard(rail, keyboardBinding));
+
+shell.index.replaceChildren(...rows); // the caller's list. The shell never empties it.
+shell.clock.read().now; // this frame's reading, already taken
+shell.tick(); // drive one frame by hand
+shell.update(); // re-read the snapshot. The clock never calls this.
+shell.destroy();
+```
+
+<details class="component-section">
+<summary>API</summary>
+
+One mount, following the kit's shape: `mountWorkbench(host, binding, options?)`, a binding that
+answers `snapshot()` and may offer `subscribe()`, and a handle whose `destroy()` is idempotent.
+Mounting twice on one host replaces the first shell, and the replaced shell's slots go with it.
+
+| Export | Kind | Description |
+|---|---|---|
+| `mountWorkbench(host, binding, options?)` | `WorkbenchHandle` | The shell. |
+| `workbenchStyle` | `string` | The stylesheet it installs, as side-effect-free text. |
+
+`FrameClock`, `FrameTick` and `MotionMode` are re-exported here, so a caller wiring a slot to
+`handle.clock` needs no second import.
+
+**State**
+
+| `WorkbenchState` | Kind | Default | Description |
+|---|---|---|---|
+| `views` | `readonly WorkbenchView[]` | — | `{id, label, description?, docks?}`. `docks` is the ids this view wants; omit it and the view takes every declared dock. |
+| `activeViewId` | `string` | the first view | Which tab is selected. |
+| `docks` | `readonly WorkbenchDock[]` | — | `{id, label, placement?, toggleable?}`. Required — a `bare` caller passes `[]`. **Stable for the life of the mount:** a dock that leaves this array takes its slot node away, and with it whatever the caller mounted inside, so the shell reports that through `onError` rather than losing it in silence. `WorkbenchView.docks` is how a view offers fewer of them. |
+| `dockVisibility` | `Record<string, boolean>` | all visible | Which docks are folded open. `false` folds the body away and `dock(id)` stops answering at the same instant. |
+| `title` / `subtitle` | `string` | — | The identity block, hidden when both are absent. |
+| `density` | `'comfortable' \| 'compact'` | `'comfortable'` | Sets the shell's density and inheritable tokens. Pitch tenants with their own token roots need an explicit `density` option and remount when that option changes. |
+| `scheme` | `'light' \| 'dark'` | inherit | Declared rather than sniffed: a shell in a dark card on a light page is a fact its host knows and it does not. |
+| `phase` | `WorkbenchPhase` | `'idle'` | `'idle' \| 'listening' \| 'playing' \| 'empty' \| 'error'`. Published as `data-phase`, **and it gates the clock**. |
+| `status` | `{message?, detail?}` | — | `message` is a live region; `detail` is not. |
+
+`placement` is `'rail'` or `'strip'` — a position on the grid, not a kind of thing. `toggleable:
+false` (or a binding with no `toggleDock`) removes the switch and leaves the section open.
+
+**Phase gates the loop, and that is not a style preference.** Only `playing` and `listening` run a
+frame loop. Everything else is a still shell that still answers the pointer and the keyboard —
+parked is not blank, and a workbench you can drag through is more alive than one spinning a loop over
+nothing. `empty` and `error` additionally print `status.message` over the stage.
+
+| `WorkbenchBinding` | Description |
+|---|---|
+| `snapshot()` | Content. Pulled on domain events, **not** per frame. |
+| `now?(frame)` | This frame's one position, in the caller's own units. Omitting it means the shell runs no frame loop at all. It takes `{time, delta}` and returns a number, so interpolation between sparse samples stays with the only layer that knows the rate. |
+| `epoch?()` | A discontinuity counter, passed straight through to `FrameTick.epoch`. A presenter snaps when it changes and interpolates when it does not, which is what stops a backwards seek being tweened across material nobody heard. |
+| `activateView?(id)` | A tab was chosen. |
+| `toggleDock?(id, next)` | A dock's switch was thrown. Its presence is what makes the switches exist. |
+| `subscribe?(notify)` | |
+
+| `WorkbenchOptions` | Kind | Default | Description |
+|---|---|---|---|
+| `chrome` | `'full' \| 'bare'` | `'full'` | `bare` is the unframed stage alone — no default border or padding, no tabs, no docks, no status bar — which is how a sibling element wraps the card it already has and inherits this skin. `dock(id)` answers `undefined` for every id. |
+| `navigation` | `boolean` | `true` | Set `false` to omit view tabs in an application-owned layout; full-chrome dock controls and status remain available. The stage uses a named region instead of tab-panel semantics. |
+| `motion` | `MotionMode` | `'auto'` | `'auto'` follows `prefers-reduced-motion` **live**: an OS toggle lands at once, because no media query can stop a transform a frame loop is writing. |
+| `label` | `string` | — | Names the shell as a `role="group"` and names its tablist. |
+| `classNames` / `parts` | | — | `{root?, header?, tablist?, tab?, stage?, rail?, strip?, status?, index?}`. `parts` additionally accepts `frame?` for the painted box. |
+| `onDockVisibility` | `(id, visible) => void` | — | A dock started or stopped answering — `dock(id)` flipping between a node and `undefined`, whatever the reason. Reports only a **change**, and never before `mountWorkbench` has returned. |
+| `onError` | `(error) => void` | — | A faulty snapshot, a throwing `now()` or `epoch()`, a dock dropped with a presenter still in it, and anything a slot's own draw callback throws. |
+| `stylesheet` | `boolean` | `true` | Install the exported sheet, or paint the identical declarations onto the nodes. |
+
+**Handle**
+
+| `WorkbenchHandle` | Description |
+|---|---|
+| `element` | The shell's root. |
+| `stage` | The current view's mount point. **Never rebuilt.** |
+| `dock(id)` | A dock's mount point, or `undefined` for an unknown id, a dock this view did not ask for, one the viewer folded away, and every id under `bare` chrome. |
+| `index` | A visually hidden `<ol>`, a **direct child of the host and a sibling of the shell's frame**. Its children are the caller's, emptied by nobody. |
+| `statusMessage` | The live region's own node, for a caller that would rather write it than snapshot it — and `undefined` under `bare` chrome, which builds no status bar. A detached node would be worse than none: text written to it disappears with no error at all. |
+| `clock` | `{subscribe(draw), read()}` — the one clock every slot in this shell reads. |
+| `tick()` | Drive one frame by hand. The deterministic seam a test drives instead of waiting on a real rAF. |
+| `update()` | Re-read the snapshot and reconcile. **The clock never calls this.** |
+| `destroy()` | Idempotent. Leaves none of **its own** — no armed frame, no media listener, no node — and `dock(id)` answers `undefined` from then on. It cannot take down a tenant it does not own; that is what `onDockVisibility` and your own teardown are for. |
+
+**Why `dock(id)` refuses, and why that is only half of it.** A caller must not be able to mount into
+something nobody can see: the presenter would run, take a clock subscription and paint into a hidden
+box for the life of the page. But the refusal covers what has *not* been mounted yet — a tenant
+already in a dock that folds keeps its subscription and goes on drawing, and the shell does not own
+it, so it cannot evict it. That is what `onDockVisibility` is for: the shell says the slot closed,
+and the caller takes the tenant down. The demo above does exactly that — fold the keyboard and the
+keyboard presenter is destroyed; open it and a fresh one is mounted.
+
+What folds is the **body only**. The head and its switch stay, because hiding the switch along with
+the thing it switches leaves the viewer no way back — unless there was never a switch to begin with
+(`toggleable: false`, or a binding with no `toggleDock`), in which case the whole section goes,
+since a label over nothing with no control to open it is not a way back either.
+
+**Accessibility.** The tablist is `role="tablist"` with a roving tabindex and **manual** activation:
+arrows move focus and choose nothing, `Enter` and `Space` activate, `Home` and `End` go to the ends,
+and the strip wraps. Automatic activation would run one analysis projection per tab as a viewer
+sweeps across the strip — three of them between two key repeats, and choosing the view already on
+screen is not an activation at all. The stop follows the focused tab while the strip has focus and
+snaps back to the selected one the moment focus leaves, so tabbing in lands on the view actually
+there; a view arriving mid-sweep does not move the focus. Focus stays on the tab after an
+activation; the panel is reachable with `Tab` and carries a tab stop of its own, because a panel
+whose only content is a caller's presenter may have nothing focusable in it at all. Each dock's
+switch is `role="switch"` with `aria-checked`, named by its dock label — and where the binding has
+no `toggleDock` to receive the answer it is hidden **and** disabled, because a switch a reader can
+reach, is told is on, and throws to no effect is worse than no switch. The status message is the
+shell's **one** live region; `detail` carries none, because a caller is expected to put a position
+there and a polite region changing at that rate would read the piece out loud for as long as it
+lasts.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+Use the shared [surface and palette tokens](/uikit/#theme-with-css-custom-properties) for
+background (including `transparent`), foreground, accent, outer border and corner radius.
+Presenter-specific tokens below take precedence within their documented roles.
+
+The shell installs `workbenchStyle`, or paints the same declarations onto the nodes when
+`stylesheet: false`. Both paths are generated from one record. Every colour is a chain ending in a
+literal, never a bare `var()`: a bare custom property is invalid at computed-value time on a host
+carrying no tokens, which paints a control invisible — the one failure a colour system may not have.
+
+**The layout is container queries, never a media query.** This shell is routinely put in a 16rem-tall
+box on a documentation page; the viewport's width is not a fact about it, and asking the viewport
+gives a two-column shell inside a 300px column. The root is the query container (`container-name:
+wui-workbench`) and an inner `.wui-workbench__frame` carries the grid, because an element cannot
+answer a query about itself. Below 720px the rail drops under the stage and becomes a horizontal
+shelf — the same docks, the same order, laid along the other axis, and nothing dropped, because a
+control that vanishes when the box is small is a control the viewer cannot find. Below 440px the
+identity block goes and the status bar wraps.
+
+**720 and 440 are widths of the container's content box**, which is why the card's border and padding
+sit on the frame and not on the root. A padded query container fires every breakpoint late, and by an
+amount that moves whenever a host retunes `--wui-harmony-pad` — a breakpoint that depends on a
+spacing token is a breakpoint nobody can document.
+
+Those two queries are the **documented cost of `stylesheet: false`**, alongside pseudo-state and focus rules. A
+declaration record has one slot per property, so the collapsed grids are literal CSS. But
+`data-rail="false"` collapsing to one column is not a responsive rewrite — it is the shell saying
+what is *true* — so the inline path writes that grid itself, from the same tuple, rather than leaving
+a permanent empty rail column; with the sheet on, `data-rail` does it with no JavaScript touching a
+style at all. The token layer is painted on both paths too, for the shell and descendants that
+inherit those tokens.
+
+**The shell carries inheritable tokens.** Its sheet opens with the shared harmony token block.
+Pitch presenters also install a local token layer for standalone use: forward the shell's density
+to their mount options and remount those tenants when it changes. The demo does this for the
+keyboard and staff. Their default `scheme: 'inherit'` follows the containing shell.
+
+For motion, pitch and harmony surfaces with `motion: 'auto'` ask their nearest ancestor's
+`data-motion` first. Explicit child motion options can override that inherited choice.
+
+The public `frame` part (customizable with `parts.frame`) carries background, border, padding
+and radius through `--wm-workbench-surface-background`, `-border`, `-padding`, `-radius` and
+then the shared `--wm-component-*` quartet. Bare chrome has zero border/padding defaults but
+still accepts explicit surface tokens. Only the frame paints a background, so alpha is not doubled.
+Use `surface: 'none'` on nested Harmony/Pitch mounts when this frame owns their surface.
+
+New palettes use `--wm-harmony-foreground`, `--wm-harmony-muted`, `--wm-harmony-background`,
+`--wm-harmony-accent`, `--wm-harmony-on-accent`, `--wm-harmony-rule` and `--wm-harmony-track`,
+which reach the shared semantic palette. Accent text is independent from the background.
+
+**Control geometry**
+
+| Property | Falls back to | Default | Controls |
+|---|---|---|---|
+| `--wm-workbench-height` | `--wm-control-size` → `--wui-row-h` | `2rem` | Minimum tab height and dock-switch height. Switch width scales with its height. |
+| `--wm-workbench-radius` | `--wm-control-radius` | `0` | Tab and switch corners. |
+| `--wm-workbench-thumb-radius` | `--wm-control-radius` | `0` | Dock-switch thumb corners. |
+
+**Compatibility and state tokens**
+
+The older `--wui-*` names below remain supported where previously documented. They are
+implementation/state values; prefer the public surface and palette tokens for new themes.
+
+| Property | Default | Controls |
+|---|---|---|
+| `--wui-workbench-rail` | `clamp(228px, 28%, 312px)` | The rail's width. A percentage of the **shell**, which is why it is a `clamp` and not a breakpoint. |
+| `--wui-workbench-dock-min` | `240px` | The width a dock is never squeezed below once the rail has become a shelf. Below it the shelf scrolls, which is the honest answer to *these do not fit*. |
+| `--wui-harmony-accent` / `--wui-harmony-on-accent` | ink / independent contrast ink | The selected tab, the switches and the phase dot. |
+| `--wui-harmony-surface` / `--wui-harmony-line` / `--wui-harmony-track` | transparent / rule / bed | The shell's ground, its rules, and a switch's unlit track. |
+| `--wui-harmony-ink` / `--wui-harmony-ink-muted` | inherit / muted | Text, and the subtitle, dock labels and status detail. |
+| `--wui-harmony-font` / `--wui-harmony-font-mono` | inherit | Prose, and the fixed-width status detail. |
+| `--wui-harmony-size-title` / `-body` / `-label` / `-micro` | `1rem` … `.7rem` | The type ladder, resized as one by `density`. |
+| `--wui-harmony-space-1` / `-space-2` | `4px` / `8px` | The gaps. |
+| `--wui-harmony-radius` | `0` | Dock and decorative surface corners; tabs and switches use the control tokens above. |
+| `--wui-harmony-motion-ease` / `--wui-harmony-motion-chip` | `ease-out` / `120ms` | The tab and switch transitions. |
+| `--wui-harmony-flow-now` | accent | The line in the empty-stage skeleton, shared with the flow lane so the shell's placeholder and the surface that replaces it stand in the same place. |
+| `--wui-harmony-border` / `--wui-harmony-pad` | rule / `.75rem` | The card's box, declared on the frame rather than on the query container. |
+
+**Classes and state attributes**
+
+| Node | Class | Carries |
+|---|---|---|
+| Root / grid | `.wui-workbench`, `.wui-workbench__frame` | `data-chrome`, `data-motion`, `data-phase`, `data-density`, `data-scheme`, `data-view`, `data-rail` on the root. |
+| Header | `.wui-workbench__header`, `__identity`, `__title`, `__subtitle` | Hidden as a block when neither title nor subtitle is given. |
+| Tabs | `.wui-workbench__tablist`, `.wui-workbench__tab` | `data-view` and `aria-selected` on a tab. |
+| Panel and stage | `.wui-workbench__main`, `__stage`, `__note` | The note carries `data-phase` and appears only for `empty` and `error`. An `:empty` stage in `idle` or `listening` draws a faint ruler and a dimmed line where material will arrive — pure CSS, no node and no tick, gone the instant anything is mounted into it. A workbench that renders literally nothing is the one state a reader cannot tell from a mistake. |
+| Docks | `.wui-workbench__rail`, `__strip`, `__dock`, `__dock-head`, `__dock-label`, `__dock-toggle`, `__dock-knob`, `__dock-body` | `data-dock` and `data-visible` on a section; `aria-checked` on the switch. |
+| Status | `.wui-workbench__status`, `__dot`, `__message`, `__detail` | The dot's colour comes from the root's `data-phase`. |
+| Semantic twin | `.wui-workbench__index` | An `<ol>` outside the frame. Its children, and their `aria-current`, are the caller's. |
+
+The one animation in the shell is `wui-workbench-breathe`, a pulse on the dot while `phase` is
+`listening`. It is deliberate: listening is a state with no material to move, and a pulse is the only
+honest way to say *still waiting* without pretending to be a position. Every other transition here is
+a colour change measured in `--wui-harmony-motion-chip`.
+
+The `parts` option adds `part` tokens for a shadow-DOM host; `classNames` adds classes without
+replacing the structural ones. Neither is required.
+
+</details>
+
+<UiPresenterRelated presenter="workbench" />

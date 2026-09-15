@@ -1,0 +1,37 @@
+---
+title: Introduction
+description: Documentation for WebMusic Score, UI and Kernel — symbolic music, interactive presentation and shared runtime contracts.
+sidebar:
+  label: Introduction
+  order: 0
+---
+
+WebMusic is a toolkit for music software, interactive demos, and web-based
+musical installations. Use ready-made **Web Components**, drive **Headless
+objects** with your own interface, or compose **APIs and UI presenters**
+directly. These choices share data and runtime contracts so a prototype can
+grow without replacing every layer.
+
+Online music workstations and expressive installations are long-term
+application goals. Project models, undo, persistence, and collaboration remain
+application responsibilities to design on top of the toolkit.
+
+The first release focuses on symbolic music and its shared foundations:
+
+| Package | Role |
+| --- | --- |
+| [`@webmusic/score`](/score/) | Symbolic music — MIDI, MusicXML, MXL, ABC: playback, views, analysis. |
+| [`@webmusic/ui`](/uikit/) | Dependency-free DOM presenters and styling hooks for Score or application-owned behavior. |
+| [`@webmusic/kernel`](/kernel/) | Domain-neutral runtime contracts, lifecycle helpers and timing logic. |
+
+**Web Components** document the `/element` form, **Headless** documents
+`/headless`, **API** documents the package root and its capability subpaths,
+and **UI Kit** documents `@webmusic/ui`. Score works with notation and note
+events, including sound synthesis and offline WAV export.
+
+Audio-file processing and cross-domain Bridge development continue on the
+[`dev` branch](https://github.com/mrsteamedbun/WebMusic/tree/dev).
+
+Start with **[Quick Start](/quick-start/)** for one player and its controls.
+The [Score page](/score/) covers installation and registration, and
+routes to playback, analysis, views and custom interfaces.

@@ -1,0 +1,66 @@
+---
+title: Kernel
+description: Domain-neutral contracts and runtime utilities for Score and custom WebMusic integrations.
+---
+
+`@webmusic/kernel` supplies domain-neutral contracts and runtime logic for
+WebMusic players and custom integrations. It contains event emitters,
+custom-element and worker lifecycle helpers, AudioContext construction,
+playback and effect contracts, and transport math. It imports no Score model.
+
+## Install
+
+```sh
+npm install @webmusic/kernel
+```
+
+Kernel has no runtime or peer dependencies. Node.js 22 or later is supported;
+ES modules and CommonJS use the same public import paths. Browser-specific
+operations require the relevant Web APIs, while imports remain safe during SSR.
+
+## First-release packages
+
+The first release contains these packages. Kernel provides the shared runtime
+contracts used by Score:
+
+| Package | Role | Workspace peer dependencies |
+| --- | --- | --- |
+| `@webmusic/kernel` | Domain-neutral runtime contracts and pure logic | — |
+| [`@webmusic/ui`](/uikit/) | Dependency-free DOM presenters and styling hooks | — |
+| [`@webmusic/score`](/score/) | Symbolic music — MIDI, MusicXML, MXL, ABC | Kernel required; UI optional |
+
+Audio and Bridge development continue on the
+[`dev` branch](https://github.com/mrsteamedbun/WebMusic/tree/dev).
+
+## Shared contracts and explicit instances
+
+Score declares Kernel as a required peer so the application resolves a
+compatible runtime contract. UI is optional for code-only Score use and is
+required by Score Elements and UI-backed renderers.
+
+A compatible dependency version does not allocate or share an AudioContext,
+player or transport group. Applications explicitly create, pass and release
+those runtime instances according to the owning API. A custom player can
+implement `PlayerLike` structurally, and Element authors can reuse
+`WebMusicElement` for connected-lifetime cleanup.
+
+## The admission rule
+
+Code qualifies for the kernel only if:
+
+1. existing duplicated implementations demonstrate a reusable need, or
+2. it is a domain-neutral contract shared by compatible participants.
+
+Domain behavior stays with its owning package. The extraction ledger — what
+moved here, from where, and what stayed behind — lives in the repository's
+`platform/README.md`.
+
+## For third parties
+
+Implementing a WebMusic-compatible player, effect, or timeline mapping means
+depending on `@webmusic/kernel` directly and implementing its structural
+contracts — no domain package required. Element authors can subclass
+`WebMusicElement` for connected-lifetime cleanup with SSR-safe imports.
+
+See the [API reference](/kernel/api/) for the ten capability subpaths and their
+contracts.

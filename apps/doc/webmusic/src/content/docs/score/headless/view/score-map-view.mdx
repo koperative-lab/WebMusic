@@ -1,0 +1,132 @@
+---
+title: 'createScoreMapView'
+description: 'Whole-score map state and quarter-note navigation with optional borrowed playback.'
+sidebar:
+  order: 2
+---
+
+import PlaybackFollowersPlayground from '../../../../../components/headless/PlaybackFollowersPlayground.astro';
+
+`createScoreMapView(options?)` combines the plain
+[`createScoreMap`](/score/api/view/#whole-score-map-data) projection with a
+current position, source attachment and navigation outcomes. It owns derived
+map data and subscriptions, while the caller owns playback and presentation.
+It performs no analysis, engraving, file loading or audio scheduling.
+
+Use it for a navigator or density strip in a custom interface.
+[createScoreView](/score/headless/view/score-view/) instead maintains individual
+notes and visible time windows for score renderers.
+
+<PlaybackFollowersPlayground object="score-map-view" />
+
+## Import
+
+This example borrows a caller-supplied `Score` named `score` for local inspection.
+
+```ts
+import {createScoreMapView} from '@webmusic/score/view/headless';
+
+const view = createScoreMapView({score, maxCells: 32});
+const unsubscribe = view.subscribe((state) => {
+  console.log(state.map?.cells, state.quarters, state.pending);
+});
+const outcome = await view.seekQuarters(4);
+if (outcome.status === 'failed') console.error(outcome.error);
+
+const dispose = () => {
+  unsubscribe();
+  view.dispose();
+};
+```
+
+To follow playback and navigate its owner, construct with
+`{playback: player.playback}`. An explicit `score` takes precedence over borrowed
+data. Calling `setScore(undefined)` restores source following. If explicit and
+borrowed Score identities differ, `readiness` becomes `'mismatched'` and bound
+navigation fails without seeking that player.
+
+## Navigation and adapters
+
+The map’s cells and marks use quarter notes. `seekQuarters()` clamps a finite
+requested position to the score extent, converts it through the tempo map to
+nominal seconds and calls the native source’s `seekNominal` command. Rate-scaled
+transport conversion remains the playback owner’s responsibility.
+
+Without a native source, an optional `seekNominal` callback can adapt an
+application-owned command. Feed authoritative positions back through
+`setPosition(nominalSeconds)`. Without either command path, seeking changes only
+local map state. This allows static inspection without allocating a player.
+
+A command returns `Promise<ScoreMapSeekOutcome>`: `committed`, `superseded`, or
+`failed` with an `error`. Results also include current `nominalSeconds` and
+`quarters`. Source replacement, a newer request or disposal supersedes an old
+pending request. Newer source observations win over requested positions; a
+failed command does not overwrite the cursor with an optimistic position.
+
+<details class="component-section">
+<summary>API</summary>
+
+**Construction** — `createScoreMapView(options?: ScoreMapViewOptions): ScoreMapView`
+
+| Member | Kind | Default | Description |
+| --- | --- | --- | --- |
+| `score` | option | borrow source | Explicit immutable Score. |
+| `playback` | option | none | Borrowed `ScorePlaybackSource`, hydrated on attachment. |
+| `seekNominal` | option | none | `(seconds: number) => void \| Promise<void>` command adapter when no native source is attached. Native source commands take precedence. |
+| `part` | option | all parts | Part ID or name used to filter density counts; timeline coverage remains whole-score. |
+| `maxCells` | option | `64` | Finite cell budget, rounded and clamped to at least one. |
+| `maxMarks` | option | `24` | Finite ruler budget, rounded and clamped to at least one. Major landmarks survive thinning, so this is not a hard limit. |
+
+Nonfinite budgets throw `RangeError`, including construction before data arrives.
+The last three options are `ScoreMapOptions`; map fields and projection rules
+are owned by the [map data reference](/score/api/view/#whole-score-map-data).
+
+**Commands**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `setScore(score \| undefined)` | command | Replaces explicit data or restores source borrowing. Invalidates pending seeks and resets/reconciles position. |
+| `setPlayback(source \| undefined)` | command | Detaches prior observation, resets prior source state and hydrates the new source. Neither source is disposed. |
+| `configure(options)` | command | Replaces the `ScoreMapOptions` bag and recomputes map data. Omitted fields return to defaults; this does not replace the score or player. |
+| `setPosition(seconds)` | command | Applies an authoritative nominal position, clamped to the score extent. Nonfinite input throws `RangeError`. |
+| `seekQuarters(quarters)` | command | Returns a `ScoreMapSeekOutcome` promise. Nonfinite input, missing data, unavailable/mismatched source or absent native seek support produce `failed`. |
+
+**`ScoreMapViewState`**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `score` | state | Effective Score, or `undefined` without input. |
+| `map` | state | Read-only map with `durationQuarters`, `cells` and `marks`, or `undefined` without input. |
+| `nominalSeconds` | state | Current nominal score position; initially `0`. |
+| `quarters` | state | Current position converted through the effective score; initially `0`. |
+| `readiness` | state | `ScorePlaybackReadiness`, `'mismatched'`, or `'unbound'` with no native source. An unbound local map can still navigate. |
+| `pending` | state | Whether the current navigation request is awaiting completion. |
+
+Read these values through `view.state`.
+
+**Events and lifecycle**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `subscribe(listener)` | subscription | Immediately emits current state, then changes, through `ScoreMapViewListener`. Returns an unsubscribe function. Reentrant changes supersede older notifications. |
+| `dispose()` | lifecycle | Idempotently releases observation and listeners and supersedes pending commands. Never stops or disposes playback. |
+
+State setters, configuration and new subscriptions after disposal throw;
+`seekQuarters` instead returns a failed outcome. If releasing an old source
+throws during replacement, the map publishes cleared unbound state and propagates
+the error without attaching the new source; retry attachment explicitly. An
+initial subscription failure also clears borrowed state before propagating.
+Disposal completes locally before releasing the subscription, so a failing
+cleanup cannot restore a live view.
+Listener exceptions propagate to their caller; an initial subscription callback
+that throws is removed. No background event or animation loop is created.
+
+</details>
+
+## Related
+
+[`<score-view type="map">`](/score/element/view/score-view/) composes this state
+with a browser player adapter and timeline presenter.
+[createAnalysisFollower](/score/headless/analyze/analysis-follower/) adds score
+analysis to a borrowed timeline. [UI Kit timeline](/uikit/transport-time/timeline/)
+provides presentation independently of these musical contracts.

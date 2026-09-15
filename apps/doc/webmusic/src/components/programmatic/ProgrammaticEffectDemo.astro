@@ -1,0 +1,132 @@
+---
+import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
+---
+<HeadlessDemoFrame
+  entry="@webmusic/score/play/headless"
+  name="Effect"
+  hint="Use the live controls to hear the result. Reset stops playback and restores the default parameters."
+  code={`// Configure Effect below.`}
+  rootAttrs={{'data-programmatic-effect': true}}
+>
+  <div class="wui-row"><button class="wui-btn" data-play type="button">▶ Play</button><div class="wui-track"><div class="wui-track__fill" data-fill></div></div><span class="wui-readout" data-time>0.0s</span></div>
+  <div slot="parameters" class="wm-pg__grid">
+    <div class="wm-pg__param"><span class="wm-pg__name">effect</span><select class="wui-select" data-effect aria-label="Effect"><option value="dry">Dry</option><option value="reverb">Reverb</option><option value="delay">Delay</option></select><span class="wm-pg__note">Rebuild the player with the selected effect, preserving position and playback state.</span></div>
+  </div>
+</HeadlessDemoFrame>
+
+<script>
+  import {mountProgrammaticDemo, programmaticCode} from './programmatic-demo-lifecycle';
+  import { Duration, MeasureId, PartId, Pitch, Rational, ScoreBuilder, VoiceId } from '@webmusic/score';
+  import { Effect, ScorePlayer, Sound } from '@webmusic/score/play/headless';
+
+  function sampleScore() {
+    const b = new ScoreBuilder();
+    const partId = PartId('piano');
+    const voice = VoiceId('v1');
+    const timeSignature = { numerator: 4, denominator: 4 };
+    b.setMetadata({ title: 'Etude' })
+      .addTempo({ atQuarters: Rational.ZERO, bpm: 100 })
+      .addMeter({ atQuarters: Rational.ZERO, measureNumber: 1, timeSignature });
+    b.addPart({ id: partId, name: 'Piano', staves: 1 });
+    const pitches = ['C4','E4','G4','C5','B4','G4','E4','C4','D4','F4','A4','D5','C5','A4','F4','D4'];
+    pitches.forEach((name, i) => {
+      const measureNumber = Math.floor(i / 8) + 1;
+      if (i % 8 === 0) {
+        b.addMeasure({
+          id: MeasureId(`m${measureNumber}`),
+          number: measureNumber,
+          onsetQuarters: new Rational((measureNumber - 1) * 4, 1),
+          durationQuarters: new Rational(4, 1),
+          timeSignature,
+        });
+      }
+      b.addNote(partId, {
+        id: b.newNoteId(),
+        pitch: Pitch.parse(name),
+        onsetQuarters: new Rational(i, 2),
+        duration: Duration.eighth(),
+        voice,
+      });
+    });
+    return b.build();
+  }
+
+  mountProgrammaticDemo('[data-programmatic-effect]', (root, scope) => {
+    const btn = root.querySelector('[data-play]') as HTMLButtonElement;
+    const select = root.querySelector('[data-effect]') as HTMLSelectElement;
+    const fill = root.querySelector('[data-fill]') as HTMLElement;
+    const time = root.querySelector('[data-time]') as HTMLElement;
+
+    const score = sampleScore();
+    let playing = false;
+    let player: ScorePlayer;
+
+    const makeEffect = (kind: string): Effect | undefined => {
+      if (kind === 'reverb') return Effect.reverb({ wet: 0.4 });
+      if (kind === 'delay') return Effect.delay({ delaySeconds: 0.25, feedback: 0.35, wet: 0.4 });
+      return undefined;
+    };
+
+    const paint = () => {
+      const cur = player.currentTime.seconds;
+      const dur = player.durationSeconds || 1;
+      fill.style.width = `${Math.min(100, (cur / dur) * 100)}%`;
+      time.textContent = `${cur.toFixed(1)}s`;
+    };
+
+    const buildPlayer = (kind: string) => {
+      const effectCode = kind === 'reverb' ? 'Effect.reverb({wet: 0.4})'
+        : kind === 'delay' ? 'Effect.delay({delaySeconds: 0.25, feedback: 0.35, wet: 0.4})' : 'undefined';
+      programmaticCode(root, `import {Effect, ScorePlayer, Sound} from '@webmusic/score/play/headless';
+
+const player = new ScorePlayer(score, {
+  synth: Sound.oscillator({type: 'triangle', gain: 0.2, releaseSeconds: 0.05}),
+  synthOwnership: 'owned',
+  effect: ${effectCode},
+});
+// In a play gesture: await player.play();
+// On effect change: pause and dispose this player, then rebuild and seek.
+// On cleanup: player.dispose();`);
+      player = new ScorePlayer(score, {
+        synth: Sound.oscillator({ type: 'triangle', gain: 0.2, releaseSeconds: 0.05 }),
+        synthOwnership: 'owned',
+        effect: makeEffect(kind),
+      });
+      player.on('cursor', paint);
+      player.on('end', () => { playing = false; btn.textContent = '▶ Play'; player.seek(0); paint(); });
+    };
+
+    scope.add(() => player?.dispose());
+    buildPlayer(select.value);
+
+    let playGeneration = 0;
+    const startPlayer = () => {
+      const current = player;
+      const request = ++playGeneration;
+      scope.run(current.play(), () => {
+        if (current !== player || request !== playGeneration) return;
+        playing = false;
+        btn.textContent = '▶ Play';
+      });
+    };
+
+
+    scope.listen(btn, 'click', () => {
+      if (playing) { ++playGeneration; player.pause(); btn.textContent = '▶ Play'; }
+      else { startPlayer(); btn.textContent = '⏸ Pause'; }
+      playing = !playing;
+    });
+
+    scope.listen(select, 'change', () => {
+      // Rebuild around the chosen effect, preserving play position + state.
+      const wasPlaying = playing;
+      const at = player.currentTime.seconds;
+      player.pause();
+      player.dispose();
+      buildPlayer(select.value);
+      scope.run(player.seek(at));
+      if (wasPlaying) { startPlayer(); btn.textContent = '⏸ Pause'; playing = true; }
+      else { paint(); }
+    });
+  });
+</script>

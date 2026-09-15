@@ -1,0 +1,135 @@
+---
+title: '@webmusic/ui/status'
+description: 'Shared ready, loading, empty, and error feedback with live-region semantics.'
+sidebar:
+  label: 'status'
+  order: 3
+---
+
+import UiPresenterLiveDemo from '../../../../components/UiPresenterLiveDemo.astro';
+import UiPresenterRelated from '../../../../components/UiPresenterRelated.astro';
+
+`mountStatus()` paints caller-owned `StatusState` as a shared loading, empty, or failure surface.
+The `ready` state hides the surface, so a consumer can leave it mounted across the entire loading
+lifecycle without branching its DOM.
+
+Use it directly beside caller content, or supply the same State through
+[`CanvasStageBinding.status()`](/uikit/layout-feedback/stage/) when feedback must overlay a canvas.
+
+<UiPresenterLiveDemo presenter="status" />
+
+## Import
+
+```ts
+import {mountStatus} from '@webmusic/ui/status';
+
+const handle = mountStatus(host, {
+  snapshot: () => store.status,
+  subscribe: (notify) => store.subscribe(notify),
+});
+```
+
+## State ownership
+
+The binding stays authoritative: notification and `handle.update()` both re-read `snapshot()`.
+Changing `kind` changes visibility and live-region behavior; changing `message` only changes the
+painted copy. The rest of mounting and cleanup follows the
+[shared presenter shape](/uikit/api/#the-shared-presenter-shape).
+
+<details class="component-section">
+<summary>API</summary>
+
+**State**
+
+| Member | Kind | Description |
+|---|---|---|
+| `kind` | `'ready' \| 'loading' \| 'empty' \| 'error'` | Selects hidden ready, polite loading / empty, or assertive error behavior. Any other runtime value is treated as `ready`. |
+| `message?` | `string` | Overrides the built-in message for the selected kind. |
+
+Without `message`, loading says “Loading…”, empty says “Nothing to show.”, error says “Something
+went wrong.”, and ready has no text.
+
+**Binding**
+
+| Member | Kind | Description |
+|---|---|---|
+| `snapshot()` | `() => StatusState` | Required pull port read on mount, notification, and explicit update. |
+| `subscribe?(notify)` | `(notify: () => void) => () => void` | Optional publication source; its disposer runs during destruction. |
+
+**Options**
+
+| Member | Kind | Default | Description |
+|---|---|---|---|
+| `classNames` | `StatusClassNames` | `{}` | Adds compatibility classes for `root` and `message`. |
+| `parts` | `StatusParts` | `{}` | Adds part tokens for `root` and `message`. |
+| `onError` | `(error: unknown) => void` | — | Receives snapshot, subscription, and cleanup failures; errors thrown by the sink do not escape. |
+| `stylesheet` | `boolean` | `true` | Installs the presenter's stylesheet unless explicitly `false`, for a light-DOM host that cannot inject CSS into its page. |
+
+**Handle**
+
+| Member | Kind | Description |
+|---|---|---|
+| `element` | `HTMLElement` | Presenter-owned `.wui-status` root. |
+| `message` | `HTMLSpanElement` | Stable `.wui-status__message` text node. |
+| `update()` | `() => void` | Re-reads State and repaints visibility, semantics, and copy. |
+| `destroy()` | `() => void` | Idempotently releases the subscription and removes owned root and style nodes. |
+
+**Accessibility.** Loading and empty states use `role="status"` with polite announcements;
+loading additionally sets `aria-busy="true"`. Error uses `role="alert"` with assertive
+announcements. Ready removes live-region attributes and hides the root. The presenter never moves
+focus and does not mutate unrelated caller DOM.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+Use the shared [surface and palette tokens](/uikit/#theme-with-css-custom-properties) for
+background (including `transparent`), foreground, accent, outer border and corner radius.
+Presenter-specific tokens below take precedence within their documented roles.
+
+The root uses the shared [`--wm-component-*` surface](/uikit/#theme-with-css-custom-properties),
+or `--wm-status-surface-*` for a status-only override. The older status-specific box tokens below
+remain compatibility fallbacks when no shared surface token overrides them.
+
+When a stage mounts the presenter as its loading or empty overlay, it adds
+`.wui-status--embedded`: that variant fills the inner viewport but removes its own background,
+border, padding, and radius so the stage remains the only outer frame.
+
+Long messages wrap within the available width, including unbroken URLs and error identifiers.
+
+**Tokens**
+
+| Property | Falls back to | Default | Controls |
+|---|---|---|---|
+| `--wm-status-height` | literal | `3rem` | Minimum surface height. |
+| `--wm-status-padding` | literal | `.6rem` | Internal spacing compatibility fallback. |
+| `--wm-status-border` | literal | `1px solid #d8d8d8` | Normal border compatibility fallback. |
+| `--wm-status-radius` | `--wm-control-radius` → literal | `0` | Corners. |
+| `--wm-status-background` | `--wm-surface` → literal | `#fff` | Surface background compatibility fallback. |
+| `--wm-status-foreground` | `--wm-foreground-muted` → literal | `#777` | Loading and empty text. |
+| `--wm-status-error` | `--wm-danger` → literal | `#b42318` | Error text; error state changes the existing border to solid without replacing its color. |
+| `--wm-font-family` | literal | `system-ui, sans-serif` | Message typeface. |
+
+**Classes**
+
+| Node | Canonical class | `classNames` key |
+|---|---|---|
+| Root | `.wui-status` | `root` |
+| Embedded modifier | `.wui-status--embedded` | `root` |
+| Message | `.wui-status__message` | `message` |
+
+The root also carries `data-kind="ready|loading|empty|error"` for state-aware styling.
+
+**Parts**
+
+| Node | Canonical part | `parts` key |
+|---|---|---|
+| Root | `root` | `root` |
+| Message | `message` | `message` |
+
+`classNames` and `parts` append hooks beside these canonical names; they never replace them.
+
+</details>
+
+<UiPresenterRelated presenter="status" />

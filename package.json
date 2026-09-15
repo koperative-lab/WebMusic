@@ -1,0 +1,60 @@
+{
+  "name": "webmusic-workspace",
+  "private": true,
+  "workspaces": [
+    "platform/kernel",
+    "packages/ui",
+    "packages/score",
+    "apps/doc/webmusic"
+  ],
+  "scripts": {
+    "build": "npm run build:packages",
+    "build:packages": "npm run build -w @webmusic/kernel && npm run build -w @webmusic/ui && npm run build -w @webmusic/score",
+    "build:kernel": "npm run build -w @webmusic/kernel",
+    "predev": "npm run build:packages",
+    "dev": "npm run docs:dev",
+    "lint": "eslint .",
+    "check:format": "node scripts/check-format.mjs",
+    "check:lockfile": "node scripts/check-lockfile.mjs",
+    "check:licenses": "node scripts/license-gate.mjs",
+    "check:site-notices": "node --test scripts/site-notices.test.mjs",
+    "check:architecture": "node --test scripts/release-surface.test.mjs && node scripts/check-architecture.mjs",
+    "check:docs": "node --test scripts/headless-docs-policy.test.mjs && node --experimental-strip-types --no-warnings scripts/check-docs.mjs",
+    "check:dev-docs": "node --experimental-strip-types --no-warnings scripts/docs-catalog.mjs --check",
+    "docs:sync": "node --experimental-strip-types --no-warnings scripts/docs-catalog.mjs --write",
+    "check:doc-snippets": "node --test scripts/check-doc-snippets.test.mjs && node scripts/check-doc-snippets.mjs",
+    "audit:production": "npm audit --omit=dev --audit-level=high",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "typecheck:tests": "tsc -p tsconfig.test.json",
+    "test": "npm run test --workspaces --if-present",
+    "check:source": "npm run check:format && npm run check:lockfile && npm run lint && npm run check:architecture && npm run check:docs && npm run check:dev-docs && npm run check:site-notices && npm run build:packages && npm run check:assets && npm run check:doc-snippets && npm run typecheck && npm run typecheck:tests && npm test",
+    "check:packages": "node --test scripts/package-artifacts.test.mjs && node scripts/check-package-exports.mjs && node scripts/package-artifacts.mjs --all && node --test scripts/bundle-notices.test.mjs && node scripts/bundle-notices.mjs --check",
+    "check:external-install": "node scripts/check-external-install.mjs",
+    "check:release-manifests": "node --test scripts/release-version.test.mjs scripts/release-manifests.test.mjs && node scripts/release-manifests.mjs",
+    "check": "npm run check:source && npm run check:licenses && npm run check:packages && npm run check:release-manifests",
+    "release:prepare": "node scripts/release-manifests.mjs --write",
+    "docs:dev": "npm run dev -w webmusic-doc",
+    "docs:build": "npm run build:packages && npm run build -w webmusic-doc",
+    "pages:build": "npm run build:packages && DOCS_SITE=https://koperative-lab.github.io DOCS_BASE=/WebMusic/ npm run build -w webmusic-doc && node scripts/prefix-docs-base.mjs apps/doc/webmusic/dist /WebMusic && node scripts/site-notices.mjs --check",
+    "audit:dependencies": "npm audit --audit-level=high",
+    "check:assets": "node scripts/demo-assets.mjs --check && node --test scripts/demo-assets.test.mjs",
+    "assets:sync": "node scripts/demo-assets.mjs --write"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "eslint": "^9.39.1",
+    "eslint-plugin-astro": "^1.3.1",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "globals": "^16.5.0",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.46.4"
+  },
+  "overrides": {
+    "tsup": {
+      "esbuild": "^0.28.2"
+    }
+  }
+}

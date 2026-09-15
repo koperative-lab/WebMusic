@@ -1,0 +1,142 @@
+# WebMusic workspace ignores.
+# Single-name patterns (such as node_modules/) apply at every depth.
+# A leading slash anchors a pattern to this repository's root.
+# Keep source, tests, public assets, package.json, package-lock.json, and
+# TypeScript/Astro/tsup/ESLint configuration in version control.
+# Ignore rules do not remove files that Git already tracks.
+
+# AI instructions, local agent configuration, sessions, and worktrees.
+AGENT.md
+AGENTS.md
+AGENT.local.md
+AGENTS.local.md
+AGENTS.override.md
+CLAUDE.md
+CLAUDE.local.md
+GEMINI.md
+GEMINI.local.md
+.agent/
+.agents/
+.claude/
+.codex/
+.cursor/
+.cursorrules
+.cursorignore
+.windsurf/
+.windsurfrules
+.clinerules
+.roo/
+.roorules
+.continue/
+.aider*
+.mcp.json
+/.github/copilot-instructions.md
+/.github/instructions/
+/.github/prompts/
+/.github/agents/
+/.worktrees/
+
+# Existing local development notes and scratch material.
+/.dev/
+
+# Installed dependencies and package-manager caches (including nested packages).
+node_modules/
+.npm/
+.pnpm-store/
+.yarn/cache/
+.yarn/unplugged/
+.yarn/install-state.gz
+.yarn/build-state.yml
+.pnp.*
+
+# Generated package/site scaffolding, bundles, and incremental build metadata.
+# Do not ignore the packages/, platform/, apps/, or scripts/ source directories.
+dist/
+build/
+pages-dist/
+.astro/
+.vite/
+.vite-temp/
+*.tsbuildinfo
+
+# Tool caches.
+.cache/
+.parcel-cache/
+.turbo/
+.eslintcache
+.stylelintcache
+
+# Test coverage and browser-test output; keep test source and fixtures.
+coverage/
+.nyc_output/
+*.lcov
+playwright-report/
+playwright/.cache/
+test-results/
+blob-report/
+
+# npm pack output for this workspace; keep unrelated archives used as fixtures.
+webmusic-*.tgz
+/release-artifacts/
+
+# Local environment values; sanitized setup examples may be committed.
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+!.env.*.example
+!.env.*.sample
+!.env.*.template
+.envrc.local
+*.local
+
+# Runtime logs, process state, and diagnostic output.
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+*.pid
+*.pid.lock
+*.seed
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+*.cpuprofile
+*.heapprofile
+*.heapsnapshot
+
+# Temporary files and editor recovery files.
+tmp/
+temp/
+.tmp/
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.#*
+
+# Personal IDE state; allow useful shared VS Code configuration.
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/settings.json
+!.vscode/tasks.json
+*.sublime-workspace
+.history/
+
+# Operating-system metadata.
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100/
+.Trashes/
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/

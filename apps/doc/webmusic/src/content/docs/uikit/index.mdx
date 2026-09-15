@@ -1,0 +1,241 @@
+---
+title: UI Kit
+description: Independent, accessible DOM presenters for application-owned music state and WebMusic components.
+---
+
+`@webmusic/ui` supplies music controls, readouts and layout surfaces that you can
+mount into your own interface. A presenter reads a small binding to your state,
+routes interaction to your commands, and owns the DOM and cleanup for its view.
+
+The package has no runtime dependencies or required peers. It creates no audio
+resources, registers no Custom Elements and requires no framework or theme provider.
+Score's visual Elements compose these same presenters with their musical behavior.
+
+## Use UI Kit directly
+
+Install the npm package in your application:
+
+```bash
+npm install @webmusic/ui
+```
+
+Add a host to your HTML:
+
+```html
+<div id="level"></div>
+```
+
+In a TypeScript module processed by your application's bundler, mount a parameter
+control against a value your application owns:
+
+```ts
+import {mountParameterRack} from '@webmusic/ui/parameter';
+
+const host = document.querySelector<HTMLElement>('#level')!;
+let level = 50;
+
+const handle = mountParameterRack(host, {
+  snapshot: () => ({
+    parameters: [
+      {id: 'level', label: 'Level', value: level, min: 0, max: 100, step: 1, unit: '%'},
+    ],
+  }),
+  setValue: (_id, value) => {
+    level = value;
+  },
+});
+
+// When your route or component unmounts:
+// handle.destroy();
+```
+
+The control displays **Level 50 %** and supports pointer and keyboard input.
+`snapshot()` supplies the current value and bounds; `setValue()` updates the
+application state. The presenter reads the snapshot again after that command.
+The example changes a value only. To control sound, connect the command to an
+application-owned player, synth or other engine.
+
+When something else changes the value, call `handle.update()` or provide the
+binding's optional `subscribe(notify)` so the view can refresh. Call
+`handle.destroy()` when removing the view; it releases its DOM, listeners and
+subscription without disposing your state or engine. See
+[parameter](/uikit/parameters-gestures/parameter/) for the complete contract.
+
+## Choose an integration
+
+| Integration | Use it when | Start here |
+| --- | --- | --- |
+| Web Components | You want ready-made tags that combine musical behavior with UI. | [Quick Start](/quick-start/) and [Score setup](/score/) |
+| Headless | Your application supplies every visual and reuses WebMusic's musical behavior. | [Score Headless](/score/headless/) |
+| API + UI | You want independent presenters bound to a store, controller or your own model. | The example above and the [presenter Catalog](/uikit/catalog/) |
+
+These choices can coexist. Subclassing an exported Score Element is an advanced
+customization of the Web Component path; it is optional. Direct presenter mounts
+need no Element class, tag registration or `@webmusic/score` dependency.
+
+## Browse by function
+
+| Group | Use it for |
+| --- | --- |
+| [Transport and navigation](/uikit/catalog/#presenter-class-transport-time) | Playback, seeking, visible ranges, playlists and row selection. |
+| [Parameters and modulation](/uikit/catalog/#presenter-class-parameters-gestures) | Parameter racks, macros, envelopes, LFOs and EQ curves. |
+| [Mixing and capture](/uikit/catalog/#presenter-class-mixing-capture) | Mixer faders, level/spectrum meters and recording controls. |
+| [Note input](/uikit/notes/note/) | Playable piano, grid and chord surfaces. |
+| [Views and analysis](/uikit/catalog/#presenter-class-views-analysis) | Passive pitch and harmony readouts, reports and analysis output. |
+| [Layout and feedback](/uikit/catalog/#presenter-class-layout-feedback) | Panels, render hosts, workbench shells and loading/error feedback. |
+
+[note](/uikit/notes/note/) owns input and note-release behavior;
+[pitch](/uikit/views-analysis/pitch/) displays supplied pitches.
+[analysis](/uikit/views-analysis/analysis/) supplies report renderers;
+[harmony](/uikit/views-analysis/harmony/) supplies changing analytical readouts.
+Choose by interaction and lifetime even when two surfaces have a similar appearance.
+
+## Theme with CSS custom properties
+
+Applications theme presenters through inherited `--wm-*` custom properties:
+
+```css
+:root {
+  --wm-component-background: #fff;
+  --wm-component-border: 1px solid #d8d8d8;
+  --wm-component-radius: 0;
+  --wm-foreground: #171717;
+  --wm-foreground-muted: #666;
+  --wm-accent: #111;
+  --wm-accent-foreground: #fff;
+  --wm-font-family: system-ui, sans-serif;
+}
+```
+
+Changing a custom property does not remount a presenter, reset playback or
+rebuild an audio graph. No theme provider, registry or JavaScript runtime is required.
+
+Presenters expose a shared outer-surface contract. Most default to a neutral card; Harmony,
+Pitch and a bare Workbench default to an unframed transparent surface. These four inherited
+tokens customize either form without changing the binding or remounting:
+
+| Token | Typical fallback | Controls |
+| --- | --- | --- |
+| `--wm-component-background` | `--wm-surface`, then presenter default | Outer background; accepts `transparent`. |
+| `--wm-component-border` | `1px solid #d8d8d8`, or `0` for an unframed surface | Complete border shorthand, including `0` or `none`. |
+| `--wm-component-padding` | `.6rem`, or the presenter's existing inset | Space between the outer surface and its content. |
+| `--wm-component-radius` | `0` | Outer component corner radius. |
+
+Use the global names for a coherent application surface, or the corresponding
+`--wm-<presenter>-surface-background`, `-border`, `-padding`, and `-radius` names for one
+presenter (for example `--wm-transport-surface-background`). Older component variables such as
+`--wm-stage-background` and `--wm-meter-background` remain supported for their existing inner
+viewport or compatibility role. `--wm-surface`, `--wm-border`, and `--wm-control-radius` remain
+semantic palette fallbacks. `--wm-control-border` is the shared line color for non-primary inner
+controls; it falls back through `--wm-border` to `#d8d8d8`. Primary actions, active states, and
+focus rings keep their own stronger tokens instead of inheriting that soft line. The
+`--wm-component-*` quartet is the direct outer-surface API.
+
+Set `--wm-foreground` for text and drawing ink, `--wm-foreground-muted` for secondary text,
+`--wm-accent` for active fills and `--wm-accent-foreground` for their labels. Surface tokens
+never intentionally provide selected text colour. In particular, transparent Analyze backgrounds
+no longer make selected labels transparent; set the explicit accent foreground to customize them.
+Musical palettes (`--wm-degree-*`, `--wm-progression-tone-*`), inverse surfaces, note-key faces,
+and loading overlays retain their dedicated tokens so independent visual roles remain legible.
+Envelope, EQ and LFO graphs pair `--wm-surface-inverse` with
+`--wm-foreground-on-inverse`; generic surface and foreground values do not
+recolor their inverse plots. Set both inverse tokens when changing that palette.
+Use `--wm-font-family` for UI text and `--wm-font-mono` for fixed-width readouts;
+presenter-specific font overrides retain precedence.
+
+For one transparent outer frame, set `--wm-component-background: transparent`. To also clear
+ordinary inner surfaces, set `--wm-surface: transparent`; an explicitly configured inner or
+inverse surface still takes precedence. `--wm-border` is a **colour** for inner edges, while
+`--wm-component-border` is a complete outer-border declaration.
+
+When a Workbench or another presenter already owns the outer frame, pass `surface: 'none'`
+to nested Harmony or Pitch mounts. It suppresses only their outer background, border, padding
+and radius, on both stylesheet paths; their musical marks, controls and palette remain active.
+This prevents duplicate borders and translucent backgrounds being painted twice. Workbench's
+public `frame` part is the painted box; its root remains the unpainted query container.
+
+`stylesheet: false` always skips installation, including owned child presenters. Harmony, Pitch,
+Workbench and Transport retain inline declarations; other presenters expect the caller to supply
+the exported stylesheet or replacement CSS. Pseudo states, focus rules, native control pseudo
+elements and container queries require stylesheet rules even when inline geometry is supplied.
+Private `--wui-*` properties are implementation or data values; new themes should use `--wm-*`.
+
+### Control geometry
+
+Shared control tokens establish the default size and radius for row controls such
+as transport buttons and seek controls. Presenter-specific overrides and the
+control's function can require different geometry.
+
+| Token | Default | Controls |
+| --- | --- | --- |
+| `--wm-control-size` | `2rem` | Shared row-control height where the presenter supports it. |
+| `--wm-control-radius` | `0` | Shared control corner radius; square is the default. |
+
+A vertical fader's length sets its travel, a rotary dial retains its circular
+shape, and note keys preserve their musical layout. Consult the presenter's
+Styling section for its size overrides and minimum dimensions.
+
+A drawing surface is not a control either. An envelope, an EQ curve, an LFO waveform, a piano board
+and a timeline lane need room, and how much room is an editorial choice, so they share one scale
+instead of each carrying its own number:
+
+| Token | Default | Used by |
+| --- | --- | --- |
+| `--wm-surface-sm` | `72px` | LFO waveform, timeline lane. |
+| `--wm-surface-md` | `144px` | Envelope, EQ curve, piano board. |
+| `--wm-surface-lg` | `216px` | Available for a taller drawing; no presenter defaults to it. |
+
+Set a tier to re-proportion every drawing at once, or give one presenter any length you like
+through its own `--wm-<presenter>-height` — the tier is only the default behind it.
+
+## Customization depth
+
+Customization is progressive rather than all-or-nothing:
+
+| Need | Use |
+| --- | --- |
+| One coherent application theme | inherited semantic `--wm-*` custom properties |
+| Component-specific adjustment | `--wm-transport-*`, `--wm-parameter-*`, `--wm-envelope-*`, `--wm-lfo-*`, `--wm-meter-*`, `--wm-stage-*`, `--wm-status-*`, `--wm-minimap-*` properties |
+| Style internal Shadow DOM nodes | documented `::part(...)` hooks |
+| Preserve an existing product skin | legacy variables/classes remain compatibility aliases during migration |
+| Mount a presenter yourself | a `mount*()` function and a structural binding |
+| Change markup or interaction | compose different presenters, use Headless with your own UI, or customize an Element mount hook |
+| Change domain behavior/API | subclass the controller/binding hooks, or compose the Headless object directly |
+
+CSS custom properties cross open Shadow DOM boundaries. Stable `part` names expose selected
+internal nodes without treating all private markup as public. Arbitrary markup customization
+belongs in the subclass or Headless path instead of accumulating a large matrix of Element
+attributes.
+
+Each presenter's **Styling** section owns its tokens, parts and named handle
+accessors. Use those documented hooks when styling a specific control; private
+`wui-*__*` selectors and DOM order are implementation details.
+
+## Layer contract
+
+| Layer | Owns | Must not own |
+| --- | --- | --- |
+| **Headless** | clocks, players, mixers, analysis sessions, audio graphs, domain state and resource ownership | DOM nodes, CSS, Custom Element registration |
+| **UI presenter** | accessible markup, input/listener wiring, readout formatting, UI timers/RAF and deterministic cleanup | Domain resources, fetching, scheduling or analysis algorithms |
+| **Concrete Element** | public tag API, attribute/property/event mapping, direct composition, owned-versus-borrowed choice | duplicate domain state or a generic adapter hierarchy |
+| **Kernel lifecycle base** | one connected-lifetime cleanup scope and attribute helpers | Shadow DOM, theming, presenter or domain knowledge |
+| **Renderer** | domain drawings such as staff, piano roll, waveform, spectrogram and waterfall | generic transport state or package resource lifecycle |
+
+The direction stays one way: Headless never imports UI or Element code; UI never imports a domain;
+the concrete Element may import both.
+
+## What remains outside the Kit
+
+- MIDI/MusicXML parsing, scheduling, tempo maps and audio graphs stay in Core/Headless.
+- Piano-roll, staff, waveform, waterfall and spectrogram algorithms stay in domain renderers.
+- Canvas/WebGL performance policy and long-audio virtualization stay with View.
+- Framework packages own framework DOM; they may reuse Headless contracts and CSS variables.
+- Documentation chrome stays in `apps/doc` and is never imported by a published package.
+
+## Where the rest lives
+
+| You want | Page |
+| --- | --- |
+| To browse the twenty-one presenters, and see which Element composes which | [Catalog](/uikit/catalog/) |
+| The shape every presenter follows — host, mount, handle, `destroy()`, `onError`, SSR safety | [`@webmusic/ui`](/uikit/api/#the-shared-presenter-shape) |
+| One presenter's State, Binding, Options, Handle, tokens and parts | its page under the class it belongs to |

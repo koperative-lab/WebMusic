@@ -1,0 +1,83 @@
+---
+// One editor shell for every rack part, including the blank draft used by
+// “Add part”. The fields themselves still come from the same parameter catalog
+// as every ordinary <ElementPlayground>; this component only adds the
+// collection chrome around them.
+import ParamRows from './ParamRows.astro';
+
+interface RackPartRecipe {
+  id?: string;
+  src?: string;
+  format?: string;
+  sound?: string;
+}
+
+interface Props {
+  childKey?: string;
+  part?: RackPartRecipe;
+  mode?: 'part' | 'draft';
+}
+
+const {
+  childKey = '__rack_part_key__',
+  part = {},
+  mode = 'part',
+} = Astro.props;
+const scope = `[data-pg-child-key="${childKey}"]`;
+const source = part.src || 'No source';
+const sound = part.sound || 'default sound';
+---
+
+{mode === 'draft' ? (
+  <form
+    class="wm-pg__collection-item wm-pg__collection-draft"
+    id="rack-part-draft"
+    data-rc-draft
+    data-pg-draft
+    hidden
+    novalidate
+  >
+    <div class="wm-pg__collection-draft-title">
+      <strong>New rack part</strong>
+      <code>&lt;rack-part&gt;</code>
+    </div>
+    <p class="wm-pg__collection-draft-note">
+      Name the channel, then choose the score and voice it should contribute.
+    </p>
+    <div class="wm-pg__collection-fields">
+      <ParamRows tag="rack-part" />
+    </div>
+    <p class="wm-pg__collection-error" data-rc-name-error role="alert"></p>
+    <div class="wm-pg__collection-item-actions">
+      <button class="wui-btn" data-variant="ghost" type="button" data-rc-cancel>Cancel</button>
+      <button class="wui-btn" type="submit">Create part</button>
+    </div>
+  </form>
+) : (
+  <details
+    class="wm-pg__collection-item wm-pg__child"
+    data-rc-part-card
+    data-rc-key={childKey}
+  >
+    <summary class="wm-pg__collection-summary" data-rc-summary>
+      <code>&lt;rack-part&gt;</code>
+      <strong data-rc-summary-name>{part.id || 'Unnamed part'}</strong>
+      <span data-rc-summary-meta>{`${source} · ${sound}`}</span>
+    </summary>
+    <div class="wm-pg__collection-fields">
+      <ParamRows tag="rack-part" scope={scope} />
+    </div>
+    <p class="wm-pg__collection-error" data-rc-name-error role="alert"></p>
+    <div class="wm-pg__collection-item-actions">
+      <button
+        class="wui-btn"
+        data-variant="ghost"
+        type="button"
+        data-rc-remove
+        aria-label={`Remove ${part.id || 'this'} rack part`}
+      >
+        Remove part
+      </button>
+    </div>
+  </details>
+)}

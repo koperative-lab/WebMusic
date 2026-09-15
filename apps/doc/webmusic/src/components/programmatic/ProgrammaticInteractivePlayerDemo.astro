@@ -1,0 +1,94 @@
+---
+import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
+---
+<HeadlessDemoFrame
+  entry="@webmusic/score/play/headless"
+  name="InteractivePlayer"
+  hint="Use the live controls to hear the result. Reset stops playback and restores the default parameters."
+  code={`// Configure InteractivePlayer below.`}
+  rootAttrs={{'data-programmatic-interactiveplayer': true}}
+>
+  <div class="wui-row"><button class="wui-btn" data-advance type="button">Advance beat ▸</button><div class="wui-track"><div class="wui-track__fill" data-fill></div></div><span class="wui-readout" data-readout>beat 0 / 0</span></div>
+  <div slot="parameters" class="wm-pg__grid">
+    <div class="wm-pg__param"><span class="wm-pg__name">secondsPerBeat</span><input class="wm-pg__input" type="number" data-seconds-per-beat value="0.45" min="0.1" max="2" step="0.05" aria-label="Seconds per beat" /><span class="wm-pg__note">Duration of each pulled beat in seconds. Advance beat preloads and unlocks audio.</span></div>
+  </div>
+</HeadlessDemoFrame>
+
+<script>
+  import {mountProgrammaticDemo, programmaticCode} from './programmatic-demo-lifecycle';
+  import { Duration, MeasureId, PartId, Pitch, Rational, ScoreBuilder, VoiceId } from '@webmusic/score';
+  import { InteractivePlayer, Sound } from '@webmusic/score/play/headless';
+
+  function sampleScore() {
+    const b = new ScoreBuilder();
+    const partId = PartId('piano');
+    const voice = VoiceId('v1');
+    const timeSignature = { numerator: 4, denominator: 4 };
+    b.setMetadata({ title: 'Pull engine' })
+      .addTempo({ atQuarters: Rational.ZERO, bpm: 100 })
+      .addMeter({ atQuarters: Rational.ZERO, measureNumber: 1, timeSignature });
+    b.addPart({ id: partId, name: 'Piano', staves: 1 });
+    // One note per quarter so each advance() pulls exactly one beat.
+    const pitches = ['C4', 'E4', 'G4', 'C5', 'B4', 'G4', 'D5', 'G4'];
+    pitches.forEach((name, i) => {
+      const measureNumber = Math.floor(i / 4) + 1;
+      if (i % 4 === 0) {
+        b.addMeasure({
+          id: MeasureId(`m${measureNumber}`),
+          number: measureNumber,
+          onsetQuarters: new Rational((measureNumber - 1) * 4, 1),
+          durationQuarters: new Rational(4, 1),
+          timeSignature,
+        });
+      }
+      b.addNote(partId, {
+        id: b.newNoteId(),
+        pitch: Pitch.parse(name),
+        onsetQuarters: new Rational(i, 1),
+        duration: Duration.quarter(),
+        voice,
+      });
+    });
+    return b.build();
+  }
+
+  mountProgrammaticDemo('[data-programmatic-interactiveplayer]', (root, scope) => {
+    const btn = root.querySelector<HTMLButtonElement>('[data-advance]')!;
+    const fill = root.querySelector<HTMLElement>('[data-fill]')!;
+    const readout = root.querySelector<HTMLElement>('[data-readout]')!;
+
+    const secondsInput = root.querySelector<HTMLInputElement>('[data-seconds-per-beat]');
+    const secondsPerBeat = () => Math.max(0.1, Math.min(2, Number(secondsInput?.value) || 0.45));
+    const updateCode = () => programmaticCode(root, `import {InteractivePlayer, Sound} from '@webmusic/score/play/headless';
+
+const player = new InteractivePlayer();
+player.addVoice('main', Sound.oscillator({type: 'triangle', gain: 0.2, releaseSeconds: 0.05}), {synthOwnership: 'owned'});
+player.addSource('s', score); // Your Score instance
+// In an advance gesture:
+await player.preload();
+player.advance({secondsPerBeat: ${secondsPerBeat()}});
+// On cleanup: player.dispose();`);
+    if (secondsInput) scope.listen(secondsInput, 'input', updateCode);
+    updateCode();
+
+    const player = new InteractivePlayer();
+    scope.add(() => player.dispose());
+    player.addVoice('main', Sound.oscillator({ type: 'triangle', gain: 0.2, releaseSeconds: 0.05 }), {synthOwnership: 'owned'});
+    player.addSource('s', sampleScore());
+
+    player.on('beat', ({ beat, total }) => {
+      fill.style.width = `${total ? ((beat + 1) / total) * 100 : 0}%`;
+      readout.textContent = `beat ${beat + 1} / ${total}`;
+    });
+
+    scope.listen(btn, 'click', async () => {
+      btn.disabled = true;
+      try {
+        await player.preload();
+        if (scope.active) player.advance({secondsPerBeat: secondsPerBeat()});
+      } finally {
+        if (scope.active) btn.disabled = false;
+      }
+    });
+  });
+</script>

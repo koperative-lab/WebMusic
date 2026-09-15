@@ -1,0 +1,361 @@
+{
+  "name": "@webmusic/score",
+  "version": "0.1.0",
+  "description": "Symbolic music for the web: immutable score model, MIDI/MusicXML/MXL/ABC I/O, playback, analysis, views, Web Components and React bindings.",
+  "type": "module",
+  "sideEffects": [
+    "./src/io/worker.ts",
+    "./src/analyze/worker.ts",
+    "./src/play/element/auto.ts",
+    "./dist/worker.js",
+    "./dist/io/worker.js",
+    "./dist/io/worker.cjs",
+    "./dist/analyze/worker.js",
+    "./dist/analyze/worker.cjs",
+    "**/auto.js",
+    "**/auto.cjs",
+    "**/auto.global.js"
+  ],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./io": {
+      "import": {
+        "types": "./dist/io/index.d.ts",
+        "default": "./dist/io/index.js"
+      },
+      "require": {
+        "types": "./dist/io/index.d.cts",
+        "default": "./dist/io/index.cjs"
+      }
+    },
+    "./io/load": {
+      "import": {
+        "types": "./dist/io/load.d.ts",
+        "default": "./dist/io/load.js"
+      },
+      "require": {
+        "types": "./dist/io/load.d.cts",
+        "default": "./dist/io/load.cjs"
+      }
+    },
+    "./io/formats": {
+      "import": {
+        "types": "./dist/io/formats/index.d.ts",
+        "default": "./dist/io/formats/index.js"
+      },
+      "require": {
+        "types": "./dist/io/formats/index.d.cts",
+        "default": "./dist/io/formats/index.cjs"
+      }
+    },
+    "./io/worker-client": {
+      "import": {
+        "types": "./dist/io/worker-client.d.ts",
+        "default": "./dist/io/worker-client.js"
+      },
+      "require": {
+        "types": "./dist/io/worker-client.d.cts",
+        "default": "./dist/io/worker-client.cjs"
+      }
+    },
+    "./io/worker-protocol": {
+      "import": {
+        "types": "./dist/io/worker-protocol.d.ts",
+        "default": "./dist/io/worker-protocol.js"
+      },
+      "require": {
+        "types": "./dist/io/worker-protocol.d.cts",
+        "default": "./dist/io/worker-protocol.cjs"
+      }
+    },
+    "./io/worker": {
+      "import": {
+        "types": "./dist/io/worker.d.ts",
+        "default": "./dist/io/worker.js"
+      },
+      "require": {
+        "types": "./dist/io/worker.d.cts",
+        "default": "./dist/io/worker.cjs"
+      }
+    },
+    "./view": {
+      "import": {
+        "types": "./dist/view/index.d.ts",
+        "default": "./dist/view/index.js"
+      },
+      "require": {
+        "types": "./dist/view/index.d.cts",
+        "default": "./dist/view/index.cjs"
+      }
+    },
+    "./view/headless": {
+      "import": {
+        "types": "./dist/view/headless/index.d.ts",
+        "default": "./dist/view/headless/index.js"
+      },
+      "require": {
+        "types": "./dist/view/headless/index.d.cts",
+        "default": "./dist/view/headless/index.cjs"
+      }
+    },
+    "./view/render": {
+      "import": {
+        "types": "./dist/view/render/index.d.ts",
+        "default": "./dist/view/render/index.js"
+      },
+      "require": {
+        "types": "./dist/view/render/index.d.cts",
+        "default": "./dist/view/render/index.cjs"
+      }
+    },
+    "./view/element": {
+      "import": {
+        "types": "./dist/view/element/index.d.ts",
+        "default": "./dist/view/element/index.js"
+      },
+      "require": {
+        "types": "./dist/view/element/index.d.cts",
+        "default": "./dist/view/element/index.cjs"
+      }
+    },
+    "./play": {
+      "import": {
+        "types": "./dist/play/index.d.ts",
+        "default": "./dist/play/index.js"
+      },
+      "require": {
+        "types": "./dist/play/index.d.cts",
+        "default": "./dist/play/index.cjs"
+      }
+    },
+    "./play/headless": {
+      "import": {
+        "types": "./dist/play/headless/index.d.ts",
+        "default": "./dist/play/headless/index.js"
+      },
+      "require": {
+        "types": "./dist/play/headless/index.d.cts",
+        "default": "./dist/play/headless/index.cjs"
+      }
+    },
+    "./play/drivers": {
+      "import": {
+        "types": "./dist/play/drivers.d.ts",
+        "default": "./dist/play/drivers.js"
+      },
+      "require": {
+        "types": "./dist/play/drivers.d.cts",
+        "default": "./dist/play/drivers.cjs"
+      }
+    },
+    "./play/element": {
+      "import": {
+        "types": "./dist/play/element/index.d.ts",
+        "default": "./dist/play/element/index.js"
+      },
+      "require": {
+        "types": "./dist/play/element/index.d.cts",
+        "default": "./dist/play/element/index.cjs"
+      }
+    },
+    "./play/auto": {
+      "import": {
+        "types": "./dist/play/element/auto.d.ts",
+        "default": "./dist/play/element/auto.js"
+      },
+      "require": {
+        "types": "./dist/play/element/auto.d.cts",
+        "default": "./dist/play/element/auto.cjs"
+      }
+    },
+    "./play/demos": {
+      "import": {
+        "types": "./dist/play/demos/index.d.ts",
+        "default": "./dist/play/demos/index.js"
+      },
+      "require": {
+        "types": "./dist/play/demos/index.d.cts",
+        "default": "./dist/play/demos/index.cjs"
+      }
+    },
+    "./analyze": {
+      "import": {
+        "types": "./dist/analyze/index.d.ts",
+        "default": "./dist/analyze/index.js"
+      },
+      "require": {
+        "types": "./dist/analyze/index.d.cts",
+        "default": "./dist/analyze/index.cjs"
+      }
+    },
+    "./analyze/headless": {
+      "import": {
+        "types": "./dist/analyze/headless/index.d.ts",
+        "default": "./dist/analyze/headless/index.js"
+      },
+      "require": {
+        "types": "./dist/analyze/headless/index.d.cts",
+        "default": "./dist/analyze/headless/index.cjs"
+      }
+    },
+    "./analyze/element": {
+      "import": {
+        "types": "./dist/analyze/element/index.d.ts",
+        "default": "./dist/analyze/element/index.js"
+      },
+      "require": {
+        "types": "./dist/analyze/element/index.d.cts",
+        "default": "./dist/analyze/element/index.cjs"
+      }
+    },
+    "./analyze/worker-client": {
+      "import": {
+        "types": "./dist/analyze/worker-client.d.ts",
+        "default": "./dist/analyze/worker-client.js"
+      },
+      "require": {
+        "types": "./dist/analyze/worker-client.d.cts",
+        "default": "./dist/analyze/worker-client.cjs"
+      }
+    },
+    "./analyze/worker-protocol": {
+      "import": {
+        "types": "./dist/analyze/worker-protocol.d.ts",
+        "default": "./dist/analyze/worker-protocol.js"
+      },
+      "require": {
+        "types": "./dist/analyze/worker-protocol.d.cts",
+        "default": "./dist/analyze/worker-protocol.cjs"
+      }
+    },
+    "./analyze/worker": {
+      "import": {
+        "types": "./dist/analyze/worker.d.ts",
+        "default": "./dist/analyze/worker.js"
+      },
+      "require": {
+        "types": "./dist/analyze/worker.d.cts",
+        "default": "./dist/analyze/worker.cjs"
+      }
+    },
+    "./react": {
+      "import": {
+        "types": "./dist/react/index.d.ts",
+        "default": "./dist/react/index.js"
+      },
+      "require": {
+        "types": "./dist/react/index.d.cts",
+        "default": "./dist/react/index.cjs"
+      }
+    },
+    "./play/global": {
+      "types": "./dist/play/element/global.d.ts",
+      "default": "./dist/play/auto.global.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "node ../../scripts/clean-dist.mjs dist && tsup && node scripts/postbuild-worker-facade.mjs && node scripts/check-cjs-worker-client.mjs && node ../../scripts/bundle-notices.mjs && node ../../scripts/package-artifacts.mjs --write",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "prepack": "node ../../scripts/package-artifacts.mjs"
+  },
+  "dependencies": {
+    "@tonaljs/abc-notation": "^4.9.1",
+    "@tonaljs/chord": "^6.1.2",
+    "@tonaljs/chord-detect": "^4.9.1",
+    "@tonejs/midi": "^2.0.28",
+    "fast-xml-parser": "^5.9.3",
+    "fflate": "^0.8.2",
+    "vexflow": "4.2.5"
+  },
+  "peerDependencies": {
+    "@webmusic/kernel": "^0.1.0",
+    "@webmusic/ui": "^0.1.0",
+    "opensheetmusicdisplay": ">=1.8.0",
+    "react": ">=18",
+    "spessasynth_lib": "^4.0.0",
+    "tone": ">=14.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@webmusic/ui": {
+      "optional": true
+    },
+    "opensheetmusicdisplay": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    },
+    "spessasynth_lib": {
+      "optional": true
+    },
+    "tone": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.1.0",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.7",
+    "jsdom": "^24.1.3",
+    "opensheetmusicdisplay": "^1.9.9",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "spessasynth_lib": "^4.3.14",
+    "tsup": "^8.5.0",
+    "typescript": "^5.4.0",
+    "vitest": "^4.1.11"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/koperative-lab/WebMusic.git",
+    "directory": "packages/score"
+  },
+  "homepage": "https://github.com/koperative-lab/WebMusic/tree/main/packages/score#readme",
+  "bugs": {
+    "url": "https://github.com/koperative-lab/WebMusic/issues"
+  },
+  "keywords": [
+    "webmusic",
+    "music",
+    "score",
+    "music-notation",
+    "midi",
+    "musicxml",
+    "mxl",
+    "abc-notation",
+    "playback",
+    "synthesizer",
+    "music-analysis",
+    "piano-roll",
+    "web-components",
+    "react"
+  ],
+  "author": "mrsteamedbun",
+  "engines": {
+    "node": ">=22"
+  }
+}

@@ -1,0 +1,107 @@
+---
+import Default from '@astrojs/starlight/components/Sidebar.astro';
+
+/**
+ * The default sidebar, plus the one thing an MPA loses on every click.
+ *
+ * Each navigation is a full document load, so the sidebar is rebuilt scrolled
+ * to the top. The list is roughly three viewports tall, which means reading
+ * down to `<synth-panel>` and clicking it threw the reader back to
+ * "Introduction" and made them scroll to it again — every single time.
+ *
+ * The offset is kept in `sessionStorage`, so it lives as long as the tab and
+ * never leaks between them. On a first visit there is nothing to restore, and
+ * the honest answer is not "top of the list" either: the entry for the page
+ * being read is brought into view instead.
+ */
+
+// The legacy alias renders the homepage without a redirect. Keep its sidebar
+// selection on the canonical Introduction link, including subpath hosting.
+const introduction = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/introduction`;
+const isIntroductionAlias = Astro.url.pathname.replace(/\/+$/, '') === introduction;
+if (isIntroductionAlias) {
+  Astro.locals.starlightRoute.sidebar = Astro.locals.starlightRoute.sidebar.map((entry) => entry.type === 'link'
+    ? {...entry, isCurrent: entry.href.replace(/\/+$/, '') === import.meta.env.BASE_URL.replace(/\/+$/, '')}
+    : entry);
+}
+---
+
+<Default><slot /></Default>
+
+<script is:inline>
+  (() => {
+    const KEY = 'webmusic:sidebar-scroll';
+    const pane = document.getElementById('starlight__sidebar');
+    if (!pane) return;
+
+    const read = () => {
+      try {
+        const raw = sessionStorage.getItem(KEY);
+        return raw === null ? Number.NaN : Number(raw);
+      } catch {
+        // Private mode, or storage disabled. The sidebar still works.
+        return Number.NaN;
+      }
+    };
+    const write = (value) => {
+      try {
+        sessionStorage.setItem(KEY, String(value));
+      } catch {
+        /* nothing to do about it, and nothing worth breaking over */
+      }
+    };
+
+    const wanted = read();
+    const hasStored = Number.isFinite(wanted) && wanted > 0;
+
+    /** Centre the current page's entry without touching the document scroll. */
+    const revealCurrent = () => {
+      const current = pane.querySelector('[aria-current="page"]');
+      if (!current) return;
+      const offset = current.getBoundingClientRect().top - pane.getBoundingClientRect().top;
+      pane.scrollTop += offset - pane.clientHeight / 2 + current.offsetHeight / 2;
+    };
+
+    const apply = () => {
+      if (hasStored) pane.scrollTop = wanted;
+      else revealCurrent();
+    };
+
+    apply();
+
+    // This script runs while the document is still parsing, so the pane may not
+    // have its final height yet and the assignment above can be clamped to 0.
+    // One more pass once layout exists, and only while the reader has not
+    // already taken the scroll into their own hands.
+    let settled = false;
+    const settle = () => {
+      if (settled) return;
+      if (hasStored && pane.scrollTop === 0 && wanted > 0) pane.scrollTop = wanted;
+      else if (!hasStored && pane.scrollTop === 0) revealCurrent();
+      settled = true;
+      pane.addEventListener('scroll', onScroll, {passive: true});
+    };
+
+    let queued = false;
+    const onScroll = () => {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(() => {
+        queued = false;
+        write(pane.scrollTop);
+      });
+    };
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', settle, {once: true});
+    } else {
+      settle();
+    }
+
+    // A click navigates away before the next frame can fire, so the offset is
+    // written synchronously on the way out. `pagehide` covers the rest —
+    // back/forward, an address-bar jump, a closed tab.
+    pane.addEventListener('click', () => write(pane.scrollTop), {capture: true});
+    window.addEventListener('pagehide', () => write(pane.scrollTop));
+  })();
+</script>

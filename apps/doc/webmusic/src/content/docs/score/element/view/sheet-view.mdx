@@ -1,0 +1,86 @@
+---
+title: '<sheet-view>'
+description: 'Real engraved sheet music via the optional OpenSheetMusicDisplay peer — beams, ties, slurs and page layout, with an optional playback cursor.'
+sidebar:
+  order: 3
+---
+
+import SheetViewPlayground from '../../../../../components/elements/SheetViewPlayground.astro';
+
+Page-oriented engraving with multi-staff systems and responsive line breaks, drawn by the optional [`opensheetmusicdisplay`](https://opensheetmusicdisplay.org/) peer. [`<score-view type="staff">`](/score/element/view/score-view/#staff) provides continuous scrolling notation with beams, tuplets and playback highlighting.
+
+Any input format works — the element serializes the score to MusicXML itself — but **MusicXML in gives the best result**. A MIDI source has no staff assignment, no key signatures and a guessed clef, because MIDI never carried them.
+
+```html
+<script type="module">
+  import { defineScorePlayerElement } from '@webmusic/score/play/element';
+  import {defineSheetViewElement} from '@webmusic/score/view/element';
+  defineScorePlayerElement();
+  defineSheetViewElement();
+</script>
+
+<score-player id="p" src="song.musicxml"></score-player>
+<sheet-view src="song.musicxml" player="#p" follow-cursor></sheet-view>
+```
+
+The peer is optional and **not installed by default**:
+
+```sh
+npm install opensheetmusicdisplay
+```
+
+Browser bundlers can resolve the installed peer into a lazy chunk. Direct browser
+module use requires an import map for the package name, or an injected
+`.OpenSheetMusicDisplay` constructor. A dependency loading failure displays a
+message naming the package and the injection alternatives.
+
+<SheetViewPlayground />
+
+The demo contains one player and one sheet view, configured by external Parameters. SheetView still requires its own `src` or `.score`; `player` follows note events and does not borrow the player’s resolved score or native state snapshot. Copy includes both tags, and Reset restores their initial attributes.
+
+<details class="component-section">
+<summary>API</summary>
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `src` | attribute | URL of a MIDI / MusicXML / MXL / ABC file, loaded through the sibling `@webmusic/score/io` capability. |
+| `format` | attribute | Force a parser when the extension is missing or ambiguous. |
+| `player` | attribute | Selector for a player to follow; the OSMD cursor tracks the sounding note and a note released mid-chord leaves its siblings lit. |
+| `follow-cursor` | attribute | Scroll the cursor into view on each move. Defaults to on; set `follow-cursor="false"` to keep the page still. Changes apply to the existing cursor without rebuilding the engraving. |
+| `width` / `height` | attribute | Element size — a bare number is `px`, or any CSS length. A fixed `height` scrolls a long score inside the box. Size changes update layout without reloading the source or recreating OSMD. |
+| `.score` | property | Assign a pre-loaded `Score`; overrides `src`. |
+| `.OpenSheetMusicDisplay` | property | Inject the OSMD constructor instead of loading the peer (bundlers, tests, pinned builds). |
+| `.osmd` | property | Reuse an already-constructed OSMD instance. |
+
+No events. Swapping the score mid-render supersedes the older engraving instead of letting it paint over the newer one.
+
+For the same renderer without a custom element, call `renderOSMDStaffVisualizer(score, container, options)` from [`@webmusic/score/view/render`](/score/api/view/) — the element is that call plus attribute plumbing.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+The host fills its container and accepts application CSS or explicit `width` / `height` attributes. Removing a size attribute clears only the size set by the element; application inline styles and `hidden` remain usable.
+
+The engraving keeps a minimum layout width of `32rem` so narrow containers scroll horizontally instead of squeezing notes together. Override `--wm-sheet-min-width` when the score or application needs a different readable width. This changes the inner drawing, while the host continues to fit its container. The component composes [UIKit stage](/uikit/layout-feedback/stage/) for this scrolling surface and [status](/uikit/layout-feedback/status/) for engraving errors.
+
+The default remains black ink on white paper. Paper follows `--wm-sheet-background`, then `--wm-surface`, then white; ink follows `--wm-sheet-foreground`, then `--wm-foreground`, then black. Set the paper or shared surface to `transparent` and choose an ink color suitable for the application background. The actual SVG noteheads, stems, staff lines and labels consume the ink token. OSMD's drawing background stays transparent underneath the stage.
+
+The frame accepts `--wm-component-background`, `--wm-component-border` (complete shorthand) and `--wm-component-radius`, with the stage's `--wm-stage-surface-*` overrides taking precedence. These and the ink/paper CSS tokens update after host or ancestor class/style changes without reloading the score or replacing its cursor. Use ordinary light-DOM selectors for the exposed `[part~="root"]` and `[part~="surface"]` nodes. The native OSMD cursor retains its own drawing style.
+
+An explicitly adopted `.osmd` instance retains the caller's rendering options and ink; configure that instance through OSMD's own API. The lower-level OSMD renderer likewise retains application-owned styles and `osmdOptions` precedence. No global SVG recoloring overrides explicitly colored content.
+
+| Token | Default | Purpose |
+| --- | --- | --- |
+| `--wm-sheet-min-width` | `32rem` | Minimum readable engraving width inside the scrolling viewport. |
+| `--wm-sheet-background` | `var(--wm-surface, #fff)` | Paper behind the engraved notation; accepts `transparent`. |
+| `--wm-sheet-foreground` | `var(--wm-foreground, #000)` | Default SVG music and label ink for an Element-created OSMD instance. |
+
+```css
+sheet-view { --wm-sheet-min-width: 36rem; }
+```
+
+For an owned OSMD instance, the renderer reflows on container-width changes; height-only changes do not re-engrave the score. It uses `ResizeObserver`, falls back to window resize when unavailable, and releases observation and pending resize work on disposal. A borrowed `.osmd` instance keeps its existing lifecycle.
+
+</details>

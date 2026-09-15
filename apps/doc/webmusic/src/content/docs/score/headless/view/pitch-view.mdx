@@ -1,0 +1,209 @@
+---
+title: 'createPitchView'
+description: 'Held-pitch state with optional playback attachment for application-owned keyboard, staff and fretboard views.'
+sidebar:
+  order: 3
+---
+
+import PlaybackFollowersPlayground from '../../../../../components/headless/PlaybackFollowersPlayground.astro';
+
+`createPitchView(options?)` maintains current MIDI pitches, either from manual
+note events or a borrowed playback source. Its state can drive a keyboard,
+staff or fretboard without constructing a visual surface. It needs no Score
+for manual input and owns no audio resource or clock.
+
+It composes the counted-note behavior of
+[createActiveNoteTracker](/score/headless/view/pitch-view/#active-note-tracker) with
+source attachment and cleanup. [`<pitch-view>`](/score/element/view/pitch-view/)
+uses this model behind its browser adapter and UIKit presenter.
+
+<PlaybackFollowersPlayground object="pitch-view" />
+
+## Import
+
+```ts
+import {createPitchView} from '@webmusic/score/view/headless';
+import {currentStaffMarks, currentFretMarks} from '@webmusic/score/view';
+
+const view = createPitchView();
+const unsubscribe = view.subscribe(({activeMidis}) => {
+  console.log(currentStaffMarks(activeMidis, 'flat'));
+  console.log(currentFretMarks(activeMidis));
+});
+view.noteOn(60);
+view.noteOn(64);
+view.noteOff(60);
+
+const dispose = () => {
+  unsubscribe();
+  view.dispose();
+};
+```
+
+For native playback, pass `{playback: player.playback}` at construction or
+call `setPlayback(player.playback)`. The caller owns and releases the player.
+The source supplies the initial snapshot and subsequent updates, including
+paused held notes and overlapping equal pitches.
+
+## State ownership
+
+Manual notes are counted: two attacks at MIDI 60 need two releases before the
+pitch disappears. A native snapshot is a complete replacement of that manual
+state, deduplicated by occurrence identity before projecting its unique MIDI
+set. Non-ready, stopped and ended snapshots clear activity. Older revisions
+cannot resurrect released notes; source replacement clears the previous scope.
+
+`clear()` empties current notes while retaining the source subscription. A later
+source snapshot can populate notes again. To switch permanently to manual
+control, call `setPlayback(undefined)` first.
+
+<details class="component-section">
+<summary>API</summary>
+
+**Construction** — `createPitchView(options?: PitchViewOptions): PitchView`
+
+| Member | Kind | Default | Description |
+| --- | --- | --- | --- |
+| `playback` | option | none | Borrowed `ScorePlaybackSource`. Subscribed and hydrated at construction. |
+
+**Commands**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `noteOn(midi)` | command | Adds one held occurrence and returns current `PitchViewState`. MIDI must be an integer in `0…127`; invalid input throws `RangeError`. |
+| `noteOff(midi)` | command | Releases one occurrence and returns state; an unheld valid MIDI does not remove other pitches. Same validation as `noteOn`. |
+| `clear()` | command | Clears held notes, retains playback attachment and returns state. |
+| `setPlayback(source?)` | command | Releases the old subscription, clears prior activity and hydrates the new source. Omit to detach. Returns state. |
+| `updatePlayback(snapshot)` | command | Applies a `ScorePlaybackSnapshot` without attaching a source; suitable for a caller-owned adapter. Returns state. |
+
+**State**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `state` | state | Current `PitchViewState`. |
+| `state.activeMidis` | state | Read-only unique ascending held MIDI values. Initially empty without input. |
+| `state.playback` | state | Latest accepted `ScorePlaybackSnapshot`, or `undefined` without playback input. |
+
+**Events and lifecycle**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `subscribe(listener)` | subscription | Observes subsequent `PitchViewState` changes through `PitchViewListener`, without an initial callback. Read `state` when mounting; returns an unsubscribe function. |
+| `dispose()` | lifecycle | Idempotently releases the borrowed source subscription and listeners. Does not stop or dispose the source. |
+
+`updatePlayback` requires nonnegative safe-integer `revision` and
+`sourceRevision` values. Active occurrence IDs must be nonempty and identify one
+integer MIDI pitch; conflicting IDs or invalid notes throw `RangeError` before
+changing state. Repeated IDs for the same pitch count once. Listener failures
+propagate to the caller without rolling back committed state; a reentrant state
+change supersedes remaining older notifications.
+
+Mutations and new subscriptions after disposal throw. The caller must detach
+external manual-note input listeners when its view is released.
+
+### Active-note tracker
+
+`createActiveNoteTracker()` tracks which MIDI notes are held. That is all it
+does, and the narrowness is the point: it needs no `Score`, so a source that
+has no sequence to match against — a MIDI keyboard, `<note-input>`, a step
+sequencer — can drive it exactly like a player can.
+
+For automatic playback attachment and reusable staff/fretboard projections, use
+[createPitchView](/score/headless/view/pitch-view/). It owns the source
+subscription and composes this smaller tracker.
+
+That is the difference from
+[`createScoreView`](/score/headless/view/score-view/), whose `noteOn` matches
+an attack against a sequence onset and therefore only accepts events that
+carry one. Reach for the tracker when the source is live and for the view when
+the source is a score.
+
+It retains held-note counts and subscriptions, but owns no audio, score,
+timer, DOM element or input binding. There is no `dispose()` method; detach
+the caller's input listeners and call subscription cleanups before dropping
+the tracker.
+
+#### Tracker Import
+
+```ts
+import {createActiveNoteTracker} from '@webmusic/score/view/headless';
+
+const held = createActiveNoteTracker();
+
+const off = held.subscribe(({activeMidis}) => paintKeys(activeMidis));
+
+held.noteOn(60);
+held.noteOff(60);
+off();
+```
+
+#### Tracker State is immutable and sorted
+
+`activeMidis` is frozen and sorted ascending, so a renderer can diff two
+snapshots or index into them without copying first. Every command returns the
+new state as well as publishing it, so a caller that only wants the result of
+one call can skip `subscribe`.
+
+Out-of-range input throws rather than being ignored: a MIDI value must be a
+safe integer in 0…127. Notes are reference-counted: `noteOn` twice then
+`noteOff` once leaves that pitch active. Feed a matching release for every
+attack, and filter keyboard auto-repeat in the input adapter if it should not
+count as another voice.
+
+
+**Construction** — `createActiveNoteTracker()`, no options.
+
+**Commands**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `noteOn(midi)` | command | Increments the held count; returns new state. Throws `RangeError` unless MIDI is a safe integer in 0…127. |
+| `noteOff(midi)` | command | Decrements the count and removes the pitch at zero; returns new state. An unheld release leaves the set unchanged but still publishes. Validates the same MIDI range. |
+| `clear()` | command | Releases everything; returns the new state. |
+
+**State**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `state` | state | The current `ActiveNoteState`. |
+| `state.activeMidis` | state | Frozen, ascending array of held MIDI numbers. |
+
+**Events**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `subscribe(listener)` | subscription | Called synchronously with new state after every command, with no immediate initial callback. Returns an unsubscribe function. |
+
+
+The source contract is `createActiveNoteTracker`, `ActiveNoteTracker`,
+`ActiveNoteState` and `ActiveNoteListener` at
+`@webmusic/score/view/headless`. Read `state` when mounting, then subscribe
+to updates. Callback failures propagate to the command caller; there is no
+separate error event or background clock. `clear()` resets counts and emits
+empty state but does not detach subscribers.
+
+If a subscriber changes state synchronously, the newer publication supersedes
+the remaining callbacks from the older one. A subscriber removed before its turn
+is skipped. Commands return the latest state after callbacks finish; a thrown
+callback does not roll back the committed held-note counts.
+
+#### Tracker Related
+
+**Composed by.** [`<pitch-view>`](/score/element/view/pitch-view/) —
+Score / View, which is why that element lights up from playback and from live
+MIDI input alike.
+
+[createScoreView](/score/headless/view/score-view/) tracks actual sequence
+notes. [Live trackers](/score/headless/analyze/live-trackers/) add chord/key
+analysis to note input.
+
+</details>
+
+## Related
+
+[Current-pitch projections](/score/api/view/#current-pitch-projections) supply
+written staff marks and exact fret positions from this state; those helpers do
+not infer chords, choose fingerings or own state.
+[UIKit pitch presenters](/uikit/views-analysis/pitch/) own size, appearance and
+interaction. [createScoreView](/score/headless/view/score-view/) owns a score’s
+note sequence and timeline rather than current-pitch input alone.

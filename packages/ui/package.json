@@ -1,0 +1,275 @@
+{
+  "name": "@webmusic/ui",
+  "version": "0.1.0",
+  "description": "Accessible, domain-neutral presenters and visual primitives for WebMusic Headless Components and Web Components.",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./envelope": {
+      "import": {
+        "types": "./dist/envelope.d.ts",
+        "default": "./dist/envelope.js"
+      },
+      "require": {
+        "types": "./dist/envelope.d.cts",
+        "default": "./dist/envelope.cjs"
+      }
+    },
+    "./analysis": {
+      "import": {
+        "types": "./dist/analysis.d.ts",
+        "default": "./dist/analysis.js"
+      },
+      "require": {
+        "types": "./dist/analysis.d.cts",
+        "default": "./dist/analysis.cjs"
+      }
+    },
+    "./eq": {
+      "import": {
+        "types": "./dist/eq.d.ts",
+        "default": "./dist/eq.js"
+      },
+      "require": {
+        "types": "./dist/eq.d.cts",
+        "default": "./dist/eq.cjs"
+      }
+    },
+    "./lfo": {
+      "import": {
+        "types": "./dist/lfo.d.ts",
+        "default": "./dist/lfo.js"
+      },
+      "require": {
+        "types": "./dist/lfo.d.cts",
+        "default": "./dist/lfo.cjs"
+      }
+    },
+    "./macro": {
+      "import": {
+        "types": "./dist/macro.d.ts",
+        "default": "./dist/macro.js"
+      },
+      "require": {
+        "types": "./dist/macro.d.cts",
+        "default": "./dist/macro.cjs"
+      }
+    },
+    "./transport": {
+      "import": {
+        "types": "./dist/transport.d.ts",
+        "default": "./dist/transport.js"
+      },
+      "require": {
+        "types": "./dist/transport.d.cts",
+        "default": "./dist/transport.cjs"
+      }
+    },
+    "./playlist": {
+      "import": {
+        "types": "./dist/playlist.d.ts",
+        "default": "./dist/playlist.js"
+      },
+      "require": {
+        "types": "./dist/playlist.d.cts",
+        "default": "./dist/playlist.cjs"
+      }
+    },
+    "./recorder": {
+      "import": {
+        "types": "./dist/recorder.d.ts",
+        "default": "./dist/recorder.js"
+      },
+      "require": {
+        "types": "./dist/recorder.d.cts",
+        "default": "./dist/recorder.cjs"
+      }
+    },
+    "./stage": {
+      "import": {
+        "types": "./dist/stage.d.ts",
+        "default": "./dist/stage.js"
+      },
+      "require": {
+        "types": "./dist/stage.d.cts",
+        "default": "./dist/stage.cjs"
+      }
+    },
+    "./status": {
+      "import": {
+        "types": "./dist/status.d.ts",
+        "default": "./dist/status.js"
+      },
+      "require": {
+        "types": "./dist/status.d.cts",
+        "default": "./dist/status.cjs"
+      }
+    },
+    "./parameter": {
+      "import": {
+        "types": "./dist/parameter.d.ts",
+        "default": "./dist/parameter.js"
+      },
+      "require": {
+        "types": "./dist/parameter.d.cts",
+        "default": "./dist/parameter.cjs"
+      }
+    },
+    "./pitch": {
+      "import": {
+        "types": "./dist/pitch.d.ts",
+        "default": "./dist/pitch.js"
+      },
+      "require": {
+        "types": "./dist/pitch.d.cts",
+        "default": "./dist/pitch.cjs"
+      }
+    },
+    "./harmony": {
+      "import": {
+        "types": "./dist/harmony.d.ts",
+        "default": "./dist/harmony.js"
+      },
+      "require": {
+        "types": "./dist/harmony.d.cts",
+        "default": "./dist/harmony.cjs"
+      }
+    },
+    "./meter": {
+      "import": {
+        "types": "./dist/meter.d.ts",
+        "default": "./dist/meter.js"
+      },
+      "require": {
+        "types": "./dist/meter.d.cts",
+        "default": "./dist/meter.cjs"
+      }
+    },
+    "./mixer": {
+      "import": {
+        "types": "./dist/mixer.d.ts",
+        "default": "./dist/mixer.js"
+      },
+      "require": {
+        "types": "./dist/mixer.d.cts",
+        "default": "./dist/mixer.cjs"
+      }
+    },
+    "./minimap": {
+      "import": {
+        "types": "./dist/minimap.d.ts",
+        "default": "./dist/minimap.js"
+      },
+      "require": {
+        "types": "./dist/minimap.d.cts",
+        "default": "./dist/minimap.cjs"
+      }
+    },
+    "./note": {
+      "import": {
+        "types": "./dist/note.d.ts",
+        "default": "./dist/note.js"
+      },
+      "require": {
+        "types": "./dist/note.d.cts",
+        "default": "./dist/note.cjs"
+      }
+    },
+    "./panel": {
+      "import": {
+        "types": "./dist/panel.d.ts",
+        "default": "./dist/panel.js"
+      },
+      "require": {
+        "types": "./dist/panel.d.cts",
+        "default": "./dist/panel.cjs"
+      }
+    },
+    "./timeline": {
+      "import": {
+        "types": "./dist/timeline.d.ts",
+        "default": "./dist/timeline.js"
+      },
+      "require": {
+        "types": "./dist/timeline.d.cts",
+        "default": "./dist/timeline.cjs"
+      }
+    },
+    "./track-list": {
+      "import": {
+        "types": "./dist/track-list.d.ts",
+        "default": "./dist/track-list.js"
+      },
+      "require": {
+        "types": "./dist/track-list.d.cts",
+        "default": "./dist/track-list.cjs"
+      }
+    },
+    "./workbench": {
+      "import": {
+        "types": "./dist/workbench.d.ts",
+        "default": "./dist/workbench.js"
+      },
+      "require": {
+        "types": "./dist/workbench.d.cts",
+        "default": "./dist/workbench.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts src/analysis.ts src/envelope.ts src/eq.ts src/harmony.ts src/lfo.ts src/macro.ts src/meter.ts src/minimap.ts src/mixer.ts src/note.ts src/panel.ts src/parameter.ts src/pitch.ts src/playlist.ts src/recorder.ts src/stage.ts src/status.ts src/timeline.ts src/track-list.ts src/transport.ts src/workbench.ts --tsconfig tsconfig.build.json --format esm,cjs --dts --sourcemap --clean && node ../../scripts/package-artifacts.mjs --write",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "prepack": "node ../../scripts/package-artifacts.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "^24.1.3",
+    "tsup": "^8.5.0",
+    "typescript": "^5.4.0",
+    "vitest": "^4.1.11"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/koperative-lab/WebMusic.git",
+    "directory": "packages/ui"
+  },
+  "homepage": "https://github.com/koperative-lab/WebMusic/tree/main/packages/ui#readme",
+  "bugs": {
+    "url": "https://github.com/koperative-lab/WebMusic/issues"
+  },
+  "keywords": [
+    "webmusic",
+    "music",
+    "ui",
+    "web-components",
+    "headless",
+    "accessibility"
+  ],
+  "author": "mrsteamedbun",
+  "engines": {
+    "node": ">=22"
+  }
+}

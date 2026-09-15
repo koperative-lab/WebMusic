@@ -1,0 +1,233 @@
+---
+title: '@webmusic/ui/timeline'
+description: 'A domain-neutral ruler with ticks, regions, markers, loops, selection, playhead, and seeking.'
+sidebar:
+  label: 'timeline'
+  order: 2
+---
+
+import UiPresenterLiveDemo from '../../../../components/UiPresenterLiveDemo.astro';
+import UiPresenterRelated from '../../../../components/UiPresenterRelated.astro';
+
+`mountTimeline()` renders a ruler over a lane of ranged regions and point markers, with optional
+loop, selection, playhead, and seeking layers. It paints caller-owned `TimelineState`; the
+presenter owns only its DOM and forwards seek and region-selection intent through a structural
+`TimelineBinding`.
+
+Use [transport](/uikit/transport-time/transport/) for playback controls,
+[minimap](/uikit/transport-time/minimap/) for moving a viewport over a dense overview, or
+[playlist](/uikit/transport-time/playlist/) for ordered entries. The
+[`<score-view type="map">`](/score/element/view/score-view/#map) element
+composes this presenter; mount it directly when the time domain and region model belong to your
+own store.
+
+<UiPresenterLiveDemo presenter="timeline" />
+
+## Import
+
+```ts
+import {mountTimeline} from '@webmusic/ui/timeline';
+
+const handle = mountTimeline(host, {
+  snapshot: () => store.timeline,
+});
+```
+
+## Domain and geometry
+
+`duration` defines the complete non-negative domain. `viewport` narrows the visible interval;
+an absent, reversed, or empty viewport falls back to the full duration. Regions are clipped to
+that interval, while a point marker is rendered only when its `start` lies inside it. Duplicate
+or empty region and tick ids are ignored.
+
+Supplying `ticks` gives the ruler domain-authored positions and labels. Omitting it generates a
+numeric ruler from `majorStep`, or from a readable interval derived from the viewport. `loop`,
+`selection`, and `playhead` are display state rather than a second editable model: the binding
+must publish any changes it wants the presenter to retain.
+
+Ruler label density follows the available width and measured text size. Major endpoint labels
+have priority, then other major labels, then minor labels that fit. Visible labels remain inside
+the ruler with space between them; a label wider than the available ruler is hidden. All tick
+lines, original label text and tick titles remain present. A resize or font-size change restores
+labels when room becomes available. Labels share the top ruler line; minor tick rules occupy the
+lower half.
+
+Ranged regions keep their exact clipped proportions, including very short intervals. Their
+visual borders do not enlarge the button's hit box or cover a neighbor. Point markers retain a
+2px minimum width. Narrow regions keep complete accessible labels; the native playhead range
+remains available for precise keyboard navigation.
+
+## Binding and command settlement
+
+The binding remains authoritative. A subscription notification schedules at most one repaint
+per animation frame; explicit `update()` repaints immediately. See the
+[shared presenter shape](/uikit/api/#the-shared-presenter-shape) for common ownership and
+cleanup rules. Ruler size observation only repositions labels; it does not pull a new state,
+rebuild regions or change seek values. Browsers without `ResizeObserver` use a window resize
+listener; ordinary playhead paints do not measure labels.
+
+`seek()` and `selectRegion()` are optional and may return promises. When present, lane clicks and
+region buttons call them and repaint after settlement; a rejected command is routed to
+`onError`. Without `seek()`, the hidden range is removed from interaction. Without
+`selectRegion()`, every region button is disabled.
+
+<details class="component-section">
+<summary>API</summary>
+
+`mountTimeline(host, binding, options?)` accepts an `HTMLElement` or `ShadowRoot` and returns a
+`TimelineHandle`.
+
+**State**
+
+| Member | Kind | Description |
+|---|---|---|
+| `duration` | `number` | Complete domain. Non-finite values fall back to `1`; zero and negative values normalize to `Number.EPSILON`. |
+| `viewport?` | `TimelineRange` | Visible `{start, end}` interval, clamped to `0…duration`; it must have `end > start`, otherwise the full duration is used. |
+| `playhead?` | `number` | Position of the playhead and seek input. Non-finite values become `0`; the line is hidden outside the viewport. |
+| `ticks?` | `readonly TimelineTick[]` | Domain ticks. Empty/duplicate ids, non-finite positions, and ticks outside the viewport are skipped. Omission generates major ticks. |
+| `selection?` | `TimelineRange` | Display-only selected interval, clamped to the viewport and hidden unless `end > start`. |
+| `loop?` | `TimelineRange` | Display-only loop interval, clamped to the viewport and hidden unless `end > start`. |
+| `regions` | `readonly TimelineRegion[]` | Required ranged regions and point markers. An omitted `end` makes a marker; ranges are clipped to the viewport. |
+| `disabled?` | `boolean` | Strict `true` disables seeking and every region button without removing painted state. |
+
+`TimelineTick` contains required `id` and `position`, optional `label`, and optional
+`level: 'major' | 'minor'`. `TimelineRegion` contains required `id` and `start`, plus optional
+`end`, `label`, `color`, `selected`, and `disabled` fields. A region's strict `selected: true`
+sets its pressed state; strict `disabled: true` disables only that region.
+
+**Binding**
+
+| Member | Kind | Description |
+|---|---|---|
+| `snapshot()` | `() => TimelineState` | Required pull port, read on mount and every update. A thrown error reaches `onError` and leaves the current DOM unchanged. |
+| `seek?(position)` | `(number) => void \| Promise<void>` | Receives an absolute, viewport-clamped position from lane pointer input or the hidden range. |
+| `selectRegion?(id, options)` | `(string, TimelineSelectOptions) => void \| Promise<void>` | Receives the region id and `{additive}`, which is true for Ctrl/Command-click. |
+| `subscribe?(notify)` | `(notify: () => void) => () => void` | Optional change subscription. Its disposer is called by `destroy()` and on same-host remount. |
+
+**Options**
+
+| Member | Kind | Default | Description |
+|---|---|---|---|
+| `label` | `string` | `'Timeline'` | Accessible name of the root group and prefix for the hidden playhead range. |
+| `majorStep` | `number` | Derived readable interval | Fixed generated-tick interval. Non-positive or non-finite values use the derived interval. |
+| `keyboardStep` | `number` | `majorStep / 4` | Step of the hidden range. Non-positive or non-finite values use the default. |
+| `formatPosition` | `(position: number) => string` | Adaptive numeric formatter | Formats generated tick labels and seek `aria-valuetext`; supplied tick labels take precedence. |
+| `classNames` | `TimelineClassNames` | `{}` | Adds compatibility classes for `root`, `ruler`, `tick`, `tickLabel`, `lane`, `region`, `marker`, `label`, `selection`, `loop`, `playhead`, and `seek`. |
+| `parts` | `TimelineParts` | `{}` | Adds part tokens for the same twelve node roles. |
+| `onError` | `(error: unknown) => void` | — | Receives snapshot, command, subscription, and cleanup failures. |
+| `stylesheet` | `boolean` | `true` | Installs the presenter's stylesheet unless explicitly `false`, for a light-DOM host that cannot inject CSS into its page. |
+
+**Handle**
+
+| Member | Kind | Description |
+|---|---|---|
+| `element` | `HTMLElement` | Presenter-owned `.wui-timeline` root. |
+| `ruler` | `HTMLElement` | Always-present ruler node. |
+| `lane` | `HTMLElement` | Always-present region and overlay lane. |
+| `seek` | `HTMLInputElement` | Always-created visually hidden range; disabled and interaction-hidden when `seek` is absent. |
+| `regionElement(id)` | `(string) => HTMLButtonElement \| undefined` | Returns a currently rendered region or marker button by id. |
+| `update()` | `() => void` | Re-reads state immediately and repaints; becomes a no-op after destruction. |
+| `destroy()` | `() => void` | Idempotently cancels a pending frame, disposes the subscription and resize observation/listener, and removes presenter DOM and stylesheet. |
+
+**Accessibility.** The root is a labelled `role="group"`; the ruler and all display-only overlays
+are hidden from the accessibility tree. Regions are native buttons with an accessible label and
+`aria-pressed`, and disabled state uses the native `disabled` attribute. The playhead control is
+a visually hidden labelled range, so native Arrow, Page, Home, and End behavior uses
+`keyboardStep`; its formatted position is exposed through `aria-valuetext`. Lane pointer seeking
+has no separate keyboard gesture—the range is its keyboard equivalent. Focus outlines are
+painted on the lane or region without rewriting unrelated caller nodes.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+Use the shared [surface and palette tokens](/uikit/#theme-with-css-custom-properties) for
+background (including `transparent`), foreground, accent, outer border and corner radius.
+Presenter-specific tokens below take precedence within their documented roles.
+
+The installed stylesheet resolves presenter-specific `--wm-timeline-*` tokens through shared
+`--wm-*` values and then literals. A region's `color` is written to the internal
+`--wui-timeline-region-color`; it takes precedence over the theme's region fill and border
+source. Region borders use an inset shadow so they do not alter geometry. Forced-colors mode
+uses an inward outline, including a distinct selected/focus outline, because shadows may be suppressed. `--wm-timeline-marker-width` is read from each marker's inline width declaration.
+
+**Tokens**
+
+| Property | Falls back to | Default | Controls |
+|---|---|---|---|
+| `--wm-timeline-ruler-height` | Literal | `1.65rem` | Ruler grid-row height. |
+| `--wm-timeline-lane-height` | `--wm-surface-sm` | `72px` | Minimum lane grid-row height, on the shared drawing-surface scale. |
+| `--wm-timeline-foreground` | `--wm-foreground` | `#222` | Root text color. |
+| `--wm-font-family` | `--wm-font` | `system-ui, sans-serif` | Timeline UI font. |
+| `--wm-timeline-border` | `--wm-control-border` → `--wm-border` | `#d8d8d8` | Ruler and lane borders. |
+| `--wm-control-border` | `--wm-border` | `#d8d8d8` | Shared non-primary control border fallback. |
+| `--wm-timeline-radius` | `--wm-control-radius` | `0` | Outer ruler and lane corners. |
+| `--wm-timeline-ruler-background` | `--wm-surface-muted` | `#f3f3f3` | Ruler background. |
+| `--wm-timeline-muted` | `--wm-foreground-muted` → `--wm-foreground` | `#666` | Ruler label color. |
+| `--wm-grid-major` | Literal | `#c8c8c8` | Major tick rule. |
+| `--wm-grid-minor` | Literal | `#dedede` tick / translucent black lane grid | Minor tick and lane grid rules. |
+| `--wm-font-mono` | Literal | `ui-monospace, monospace` | Tick label font. |
+| `--wm-timeline-background` | `--wm-surface` | `#fff` | Lane background. |
+| `--wm-timeline-grid-size` | Literal | `2rem` | Horizontal repeat size of the lane grid. |
+| `--wm-focus` | `currentColor` | Current text color | Keyboard focus outlines. |
+| `--wm-timeline-region-border` | Region color → `--wm-accent` mixed 70% with black | Derived | Region and marker border. |
+| `--wm-timeline-region-radius` | `--wm-control-radius` | `0` | Region and marker corners. |
+| `--wm-timeline-region` | `--wm-accent` | `#4869d8` | Region fill when the state supplies no color. |
+| `--wm-timeline-region-foreground` | `--wm-accent-foreground` | `#fff` | Region label text. |
+| `--wm-selection` | `--wm-foreground` for pressed regions | `#4869d8` overlay / `#111` pressed ring | Selection boundaries and selected-region inset ring. |
+| `--wm-selection-fill` | Literal | `rgba(72, 105, 216, .18)` | Selection overlay fill. |
+| `--wm-loop` | Literal | `#2f8f5b` | Loop boundary and derived translucent fill. |
+| `--wm-timeline-playhead-width` | Literal | `2px` | Playhead line width. |
+| `--wm-playhead` | Literal | `#c0392b` | Playhead color. |
+| `--wm-timeline-marker-width` | Literal | `2px` | Point-marker width. |
+
+**Classes**
+
+`classNames` adds compatibility classes alongside these canonical names; marker hooks are added
+in addition to the region hook.
+
+| Node | Canonical class | `classNames` key |
+|---|---|---|
+| Root | `.wui-timeline` | `root` |
+| Ruler | `.wui-timeline__ruler` | `ruler` |
+| Tick | `.wui-timeline__tick` | `tick` |
+| Tick label | `.wui-timeline__tick-label` | `tickLabel` |
+| Lane | `.wui-timeline__lane` | `lane` |
+| Region button | `.wui-timeline__region` | `region` |
+| Point marker modifier | `.wui-timeline__marker` | `marker` |
+| Region label | `.wui-timeline__region-label` | `label` |
+| Selection overlay | `.wui-timeline__selection` | `selection` |
+| Loop overlay | `.wui-timeline__loop` | `loop` |
+| Playhead | `.wui-timeline__playhead` | `playhead` |
+| Hidden range | `.wui-timeline__seek` | `seek` |
+
+**Parts**
+
+`parts` adds tokens alongside canonical tokens and removes duplicates. A point marker carries
+both `region` and `marker`.
+
+| Node | Canonical part | `parts` key |
+|---|---|---|
+| Root | `root` | `root` |
+| Ruler | `ruler` | `ruler` |
+| Tick | `tick` | `tick` |
+| Tick label | `tick-label` | `tickLabel` |
+| Lane | `lane` | `lane` |
+| Region button | `region` | `region` |
+| Point marker | `region marker` | `region` and `marker` |
+| Region label | `label` | `label` |
+| Selection overlay | `selection` | `selection` |
+| Loop overlay | `loop` | `loop` |
+| Playhead | `playhead` | `playhead` |
+| Hidden range | `seek` | `seek` |
+
+Every mount installs `timelineStyle` by default. With `stylesheet: false`, install the exported
+stylesheet yourself or supply equivalent structural styling. Style these canonical classes and
+parts after the installed style when you need caller-owned overrides. Ticks publish
+`data-label-visible="true|false"`; hiding a visual ruler label never shortens region labels or
+seek `aria-valuetext`.
+
+</details>
+
+<UiPresenterRelated presenter="timeline" />

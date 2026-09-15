@@ -1,0 +1,192 @@
+---
+title: '@webmusic/ui/parameter'
+description: 'Renders a flat or grouped rotary parameter rack over caller-owned parameter state.'
+sidebar:
+  label: 'parameter'
+  order: 1
+---
+
+import UiPresenterLiveDemo from '../../../../components/UiPresenterLiveDemo.astro';
+import UiPresenterRelated from '../../../../components/UiPresenterRelated.astro';
+
+`mountParameterRack()` renders one accessible rotary range for every `ParameterRackItem` returned
+by the binding. The caller owns item identity, values, bounds, grouping and disabled state; the
+presenter owns the knob SVG, native inputs, formatted readouts and listener cleanup.
+
+Use [macro](/uikit/parameters-gestures/macro/) when one normalized control drives a list of
+read-only destinations, or [panel](/uikit/layout-feedback/panel/) when multiple specialized
+presenters need a shared section skeleton. [`<synth-panel>`](/score/element/play/synth-panel/)
+already composes parameter racks; mount this entry directly for a rack inside your own layout.
+
+<UiPresenterLiveDemo presenter="parameter" />
+
+## Import
+
+```ts
+import {mountParameterRack} from '@webmusic/ui/parameter';
+
+const handle = mountParameterRack(host, {
+  snapshot: () => store.parameters,
+  setValue: (id, value) => store.setParameter(id, value),
+  subscribe: (notify) => store.subscribe(notify),
+});
+```
+
+## Structure and updates
+
+`layout: 'flat'` borders each item independently. `layout: 'grouped'` collects items by their
+`group` string, preserves first-seen group order, and labels non-empty groups. A missing or empty
+group remains an unlabelled group. Duplicate normalized `id` values are rejected and reported.
+
+The presenter rebuilds its item DOM only when layout or structural item fields change: `id`,
+`label`, bounds, step, unit, group, or choices. Value and disabled changes repaint existing nodes.
+`setValue()` paints optimistically, then re-reads the authoritative snapshot after the command
+settles. See the [shared presenter shape](/uikit/api/#the-shared-presenter-shape) for host
+ownership and lifecycle rules.
+
+<details class="component-section">
+<summary>API</summary>
+
+`mountParameterRack(host, binding, options?)` accepts an `HTMLElement` or `ShadowRoot` and returns
+a `MountedParameterRackHandle`.
+
+**State**
+
+Finite numeric fields are normalized before painting. Bounds are swapped when `max < min`; values
+are clamped to the normalized range. A non-empty `options` list replaces numeric bounds with
+indices `0…options.length - 1` and forces `step: 1`.
+
+| Member | Kind | Description |
+|---|---|---|
+| `parameters` | `readonly ParameterRackItem[]` | Required ordered item list. A structural change rebuilds the presenter-owned item nodes. |
+| `disabled?` | `boolean` | Strict `true` disables every item input in addition to per-item disabled state. |
+| `parameters[].id` | `string` | Required stable identity used by `setValue()`, `itemElement()` and `inputElement()`; duplicates are invalid. |
+| `parameters[].label` | `string` | Visible label, tooltip and native range accessible name. |
+| `parameters[].value` | `number` | Current caller-owned value, clamped to the normalized bounds. |
+| `parameters[].min` | `number` | Lower numeric bound; defaults to `0` when non-finite. |
+| `parameters[].max` | `number` | Upper numeric bound; defaults to `1` when non-finite. |
+| `parameters[].step?` | `number` | Positive range step; absent, non-finite or non-positive values become `0.01`. |
+| `parameters[].unit?` | `string` | Appended by the built-in numeric formatter after a separating space. |
+| `parameters[].options?` | `readonly string[]` | Non-empty choice labels indexed by the control value. |
+| `parameters[].group?` | `string` | Group key and visible heading in grouped layout. |
+| `parameters[].disabled?` | `boolean` | Strict `true` disables this item without disabling its siblings. |
+
+**Binding**
+
+| Member | Kind | Description |
+|---|---|---|
+| `snapshot()` | `() => ParameterRackState` | Required pull port read on mount, notification, command settlement and `update()`; failures go to `onError`. |
+| `setValue(id, value)` | `(string, number) => void \| Promise<void>` | Required command receiving the stable id and normalized range value. |
+| `subscribe?(notify)` | `(notify: () => void) => () => void` | Optional external-state subscription; its disposer is released by `destroy()`. |
+
+**Options**
+
+| Member | Kind | Default | Description |
+|---|---|---|---|
+| `layout` | `'flat' \| 'grouped'` | `'flat'` | Chooses per-item borders or named group containers. |
+| `emptyLabel` | `string` | `'No parameters'` | Placeholder text when `parameters` is empty. |
+| `formatValue` | `(parameter, value) => string` | Built-in choice/numeric formatter | Formats the visible readout and `aria-valuetext`; thrown errors are reported before the built-in fallback is used. |
+| `classNames` | `ParameterRackClassNames` | `{}` | Adds compatibility classes for all thirteen presenter node kinds. |
+| `parts` | `ParameterRackParts` | `{}` | Adds part tokens for all thirteen presenter node kinds. |
+| `onError` | `(error: unknown) => void` | — | Receives snapshot, duplicate-id, formatter, command, subscription, stabilization and cleanup failures. |
+| `stylesheet` | `boolean` | `true` | Installs the presenter's stylesheet unless explicitly `false`, for a light-DOM host that cannot inject CSS into its page. |
+
+**Handle**
+
+| Member | Kind | Description |
+|---|---|---|
+| `element` | `HTMLElement` | Presenter-owned `.wui-parameter-rack` root. |
+| `itemElement(id)` | `(string) => HTMLElement \| undefined` | Returns the current item container for an id. |
+| `inputElement(id)` | `(string) => HTMLInputElement \| undefined` | Returns the current native range for an id. |
+| `emptyElement()` | `() => HTMLElement \| undefined` | Returns the placeholder only while the list is empty. |
+| `update()` | `() => void` | Re-reads and repaints the binding; re-entrant updates are bounded to 32 passes. |
+| `destroy()` | `() => void` | Idempotently removes item listeners, subscription, root and installed stylesheet. |
+
+**Accessibility.** Each knob contains a native `input[type="range"]` named by the item label and
+given formatted `aria-valuetext`. Native range keys provide the keyboard interaction. Named
+groups use `role="group"` and `aria-labelledby`; empty group names do not manufacture a label.
+Disabled state reaches the native inputs, and forced-colors rules preserve track, fill, pointer,
+focus and border contrast.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+Use the shared [surface and palette tokens](/uikit/#theme-with-css-custom-properties) for
+background (including `transparent`), foreground, accent, outer border and corner radius.
+Presenter-specific tokens below take precedence within their documented roles.
+
+The presenter installs `parameterRackStyle` unless `stylesheet: false`. Override its tokens,
+add compatibility classes/parts, or supply higher-priority CSS from the host. Groups and knobs
+wrap within the available container width. Group labels, parameter labels and formatted values
+can wrap without truncation; knob geometry keeps its configured size.
+Supply the exported stylesheet or your own CSS from the host when opting out.
+
+**Tokens**
+
+| Property | Falls back to | Default | Controls |
+|---|---|---|---|
+| `--wm-parameter-gap` | literal | `.6rem` | Gap between flat items or groups. |
+| `--wm-parameter-padding` | literal | `.6rem` | Root-inset compatibility fallback. |
+| `--wm-parameter-border` | `--wm-border` | `#d8d8d8` | Root and fallback item/group border color. |
+| `--wm-control-border` | `--wm-border` | `#d8d8d8` | Shared non-primary control border fallback. |
+| `--wm-border` | literal | `#d8d8d8` | Shared border fallback. |
+| `--wm-parameter-radius` | `--wm-control-radius` | `0` | Root radius and fallback item/group radius. |
+| `--wm-control-radius` | literal | `0` | Shared radius fallback. |
+| `--wm-parameter-background` | `--wm-surface` | `#fff` | Root and fallback item/group background. |
+| `--wm-surface` | literal | `#fff` | Shared surface fallback. |
+| `--wm-parameter-foreground` | `--wm-foreground` | `#444` | Root, heading and value fallback color. |
+| `--wm-foreground` | literal | `#444` root / `#111` pointer | Shared foreground fallback. |
+| `--wm-font-family` | literal | `system-ui, sans-serif` | Root UI font. |
+| `--wm-parameter-group-gap` | literal | `.4rem` | Heading-to-items gap. |
+| `--wm-parameter-item-border` | `--wm-parameter-border` → `--wm-control-border` → `--wm-border` | `#d8d8d8` | Flat item and group border. |
+| `--wm-parameter-item-radius` | `--wm-parameter-radius` → `--wm-control-radius` | `0` | Flat item and group radius. |
+| `--wm-parameter-item-background` | `--wm-parameter-background` → `--wm-surface` | `#fff` | Flat item and group surface. |
+| `--wm-parameter-heading` | `--wm-parameter-foreground` → `--wm-foreground` | `#444` | Group heading text. |
+| `--wm-parameter-item-gap` | literal | `.5rem` | Gap between items inside a group. |
+| `--wm-parameter-label-width` | literal | `5rem` | Maximum wrapping width of labels and values, bounded by the container. |
+| `--wm-parameter-label` | `--wm-foreground-muted` → `--wm-foreground` | `#666` (`#777` empty) | Item label and empty-state text. |
+| `--wm-foreground-muted` | literal | `#666` / `#777` | Shared muted-text fallback. |
+| `--wm-parameter-size` | literal | `46px` | Knob control width and height. |
+| `--wm-parameter-track` | literal | `#dcdcdc` | Knob background arc. |
+| `--wm-parameter-stroke` | literal | `5` | Track and fill SVG stroke width. |
+| `--wm-parameter-fill` | `--wm-accent` | `#999` | Filled value arc. |
+| `--wm-accent` | literal | `#999` | Shared fill fallback. |
+| `--wm-parameter-pointer` | `--wm-foreground` | `#111` | Radial pointer. |
+| `--wm-focus` | `--wm-focus-ring` | `currentColor` | Focus-within outline. |
+| `--wm-focus-ring` | literal | `currentColor` | Shared focus fallback. |
+| `--wm-parameter-value` | `--wm-parameter-foreground` → `--wm-foreground` | `#444` | Formatted value text. |
+
+**Classes**
+
+`classNames` adds compatibility classes alongside canonical names.
+
+| Node | Canonical class | `classNames` key |
+|---|---|---|
+| Root | `.wui-parameter-rack` | `root` |
+| Group | `.wui-parameter-rack__group` | `group` |
+| Group heading | `.wui-parameter-rack__group-label` | `groupLabel` |
+| Group item list | `.wui-parameter-rack__items` | `items` |
+| Item | `.wui-parameter-rack__item` | `item` |
+| Item label | `.wui-parameter-rack__label` | `label` |
+| Knob wrapper | `.wui-parameter-rack__control` | `control` |
+| Track path | `.wui-parameter-rack__track` | `track` |
+| Fill path | `.wui-parameter-rack__fill` | `fill` |
+| Pointer line | `.wui-parameter-rack__pointer` | `pointer` |
+| Native range | `.wui-parameter-rack__input` | `input` |
+| Value readout | `.wui-parameter-rack__value` | `value` |
+| Empty placeholder | `.wui-parameter-rack__empty` | `empty` |
+
+Every empty state is a live region — `role="status"`, `aria-live="polite"` — so the message is announced when it appears, not only drawn.
+
+**Parts**
+
+`parts` adds tokens beside the matching canonical names: `root`, `group`, `group-label`, `items`,
+`item`, `label`, `control`, `track`, `fill`, `pointer`, `input`, `value`, and `empty`. The camel-case
+keys are `root`, `group`, `groupLabel`, `items`, `item`, `label`, `control`, `track`, `fill`,
+`pointer`, `input`, `value`, and `empty`.
+
+</details>
+
+<UiPresenterRelated presenter="parameter" />

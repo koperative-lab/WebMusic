@@ -1,0 +1,130 @@
+---
+import {
+  UI_PRESENTER_CATALOG,
+  UI_PRESENTER_CLASSES,
+  uiPresenterHref,
+} from '../../../shared/ui-presenter-catalog';
+---
+
+<div class="presenter-catalog not-content">
+  {
+    UI_PRESENTER_CLASSES.map((presenterClass) => {
+      const presenters = UI_PRESENTER_CATALOG.filter(
+        (entry) => entry.classSlug === presenterClass.slug,
+      );
+
+      return (
+        <section
+          class="presenter-catalog__class"
+          id={`presenter-class-${presenterClass.slug}`}
+          aria-labelledby={`presenter-class-${presenterClass.slug}-heading`}
+        >
+          <header>
+            <div>
+              <h2 id={`presenter-class-${presenterClass.slug}-heading`}>
+                {presenterClass.label}
+              </h2>
+              <p>{presenterClass.summary}</p>
+            </div>
+            <strong aria-label={`${presenters.length} presenters`}>{presenters.length}</strong>
+          </header>
+
+          <div class="presenter-catalog__grid">
+            {presenters.map((entry) => (
+              <a class="presenter-catalog__card" href={uiPresenterHref(entry)}>
+                <span class="presenter-catalog__entry">@webmusic/ui/{entry.presenter}</span>
+                <strong>{entry.label}</strong>
+                <span>{entry.summary}</span>
+                <small>
+                  {entry.consumerTags.length > 0
+                    ? `Used by ${entry.consumerTags.length} Score ${entry.consumerTags.length === 1 ? 'element' : 'elements'}`
+                    : 'Mount with your own binding'}
+                </small>
+              </a>
+            ))}
+          </div>
+        </section>
+      );
+    })
+  }
+</div>
+
+<style>
+  .presenter-catalog {
+    display: grid;
+    gap: 1.5rem;
+    margin-block: 1rem 2rem;
+  }
+  .presenter-catalog__class {
+    display: grid;
+    gap: 0.8rem;
+    min-width: 0;
+  }
+  .presenter-catalog__class > header {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 1rem;
+    border-bottom: 1px solid var(--sl-color-gray-5);
+    padding-bottom: 0.65rem;
+  }
+  .presenter-catalog__class h2 {
+    margin: 0;
+    font-size: 1.1rem;
+  }
+  .presenter-catalog__class p {
+    max-width: 70ch;
+    margin: 0.3rem 0 0;
+    color: var(--sl-color-gray-3);
+    font-size: 0.8rem;
+    line-height: 1.55;
+  }
+  .presenter-catalog__class > header > strong {
+    color: var(--sl-color-gray-3);
+    font: 800 1.5rem/1 var(--wui-font-mono);
+  }
+  .presenter-catalog__grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.7rem;
+  }
+  .presenter-catalog__card {
+    display: grid;
+    gap: 0.35rem;
+    border: 1px solid var(--sl-color-gray-5);
+    background: var(--sl-color-bg-nav);
+    padding: 0.85rem;
+    color: var(--sl-color-text);
+    text-decoration: none;
+  }
+  .presenter-catalog__card:hover {
+    border-color: var(--sl-color-text-accent);
+  }
+  .presenter-catalog__card:focus-visible {
+    outline: 2px solid var(--sl-color-text-accent);
+    outline-offset: 2px;
+  }
+  .presenter-catalog__entry {
+    color: var(--sl-color-text-accent);
+    font: 700 0.78rem/1.4 var(--wui-font-mono);
+    overflow-wrap: anywhere;
+  }
+  .presenter-catalog__card > strong {
+    font-size: 0.9rem;
+  }
+  .presenter-catalog__card > span:not(.presenter-catalog__entry) {
+    color: var(--sl-color-gray-3);
+    font-size: 0.73rem;
+    line-height: 1.55;
+  }
+  .presenter-catalog__card > small {
+    margin-top: 0.3rem;
+    color: var(--sl-color-gray-3);
+    font: 600 0.65rem/1.4 var(--wui-font-mono);
+  }
+  @media (max-width: 720px) {
+    .presenter-catalog__grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

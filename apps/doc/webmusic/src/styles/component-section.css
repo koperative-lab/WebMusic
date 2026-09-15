@@ -1,0 +1,63 @@
+/* Canonical collapsible API and styling blocks shared by the public documentation.
+   These are documentation chrome, so they follow the theme-aware site tokens;
+   `--wui-panel` intentionally stays light for live-demo canvases. */
+.sl-markdown-content details.component-section {
+  margin: 0.5rem 0;
+  border: 1px solid var(--ws-line-strong);
+  border-radius: 0;
+  background: var(--ws-panel);
+}
+
+.sl-markdown-content details.component-section + details.component-section {
+  margin-top: 0.4rem;
+}
+
+.sl-markdown-content details.component-section > summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.75rem;
+  color: var(--ws-text-soft);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.sl-markdown-content details.component-section > summary::-webkit-details-marker {
+  display: none;
+}
+
+.sl-markdown-content details.component-section > summary::before {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  content: '';
+  opacity: 0.6;
+  transform: rotate(-45deg);
+  transition: transform 0.15s ease;
+}
+
+.sl-markdown-content details.component-section[open] > summary::before {
+  transform: rotate(45deg);
+}
+
+.sl-markdown-content details.component-section[open] > summary {
+  border-bottom: 1px solid var(--ws-line-strong);
+}
+
+.sl-markdown-content details.component-section > :not(summary) {
+  margin-inline: 0.75rem;
+  color: var(--ws-text-content);
+}
+
+.sl-markdown-content details.component-section > summary + * {
+  margin-top: 0.75rem;
+}
+
+.sl-markdown-content details.component-section > :last-child {
+  margin-bottom: 0.75rem;
+}

@@ -1,0 +1,401 @@
+---
+title: '@webmusic/ui/harmony'
+description: 'A conveyor, a nameplate, a ranked strip and a wheel: read-outs that show a harmonic analysis happening rather than listing what it concluded.'
+sidebar:
+  label: 'harmony'
+  order: 3
+---
+
+import UiPresenterLiveDemo from '../../../../components/UiPresenterLiveDemo.astro';
+import UiPresenterRelated from '../../../../components/UiPresenterRelated.astro';
+
+`@webmusic/ui/harmony` is four read-outs for material that is still arriving. `mountFlowLane` pins a
+now line a third of the way across a viewport and scrolls the **material** under it, so two thirds
+of what a reader sees is what has not happened yet. `mountNameplate` says the one word the reader is
+actually reading and pops when it changes. `mountChipStrip` ranks. `mountWheel` points, and admits
+how sure it is by how wide it points.
+
+The conveyor is the reason the set exists, and it is the opposite of a map. A map answers *"where am
+I in the piece"*; a conveyor answers *"what is happening, and what is about to"*. Both are correct
+and they are different instruments — [timeline](/uikit/transport-time/timeline/) is the map and
+stays one. Several tracks share **one** axis, **one** now line and **one** transform, not by
+convention but because they are children of a single reel: there is no arrangement of the code in
+which two rows drift apart.
+
+None of the four knows any music theory. A band is *"from 4.0 to 8.0, tone slot 7, labelled `Am7`,
+role `third`"*, and the axis is a number line whose unit the kit has never been told. Reach for
+[pitch](/uikit/views-analysis/pitch/) when the answer is a set of sounding notes rather than a name,
+and [analysis](/uikit/views-analysis/analysis/) for the static cards and tables a playhead walks.
+
+<UiPresenterLiveDemo presenter="harmony" />
+
+## Import
+
+```ts
+import {mountChipStrip, mountFlowLane, mountNameplate, mountWheel} from '@webmusic/ui/harmony';
+
+const lane = mountFlowLane(
+  laneHost,
+  {
+    snapshot: () => ({
+      bands: [
+        // `start`/`end` place the band; `stampStart`/`stampEnd` are the numbers
+        // a playhead is fed. Here the lane draws seconds and stamps quarters.
+        {id: 'b1', start: 0, end: 2, stampStart: 0, stampEnd: 4, primary: 'Dm7', tone: 2},
+        {id: 'b2', start: 2, end: 4, stampStart: 4, stampEnd: 8, primary: 'G7', tone: 7},
+      ],
+      tracks: [{id: 'chords', label: 'Chords'}],
+      span: {start: 0, end: 4},
+      now: transport.position(),
+    }),
+    // Pulled ONCE per frame. Everything else is pulled on a domain event.
+    position: (tick) => transport.positionAt(tick.at),
+    seek: (position, phase) => transport.seek(position, phase),
+    subscribe: (notify) => store.subscribe(notify),
+  },
+  {anchor: 0.33, visibleSpan: 8},
+);
+
+const nameplate = mountNameplate(nameplateHost, {
+  snapshot: () => ({
+    // `key` is opaque identity: the same symbol on a later bar is a new chord
+    // and pops, and the kit is never told why the string did not change.
+    primary: {symbol: 'Dm7', full: 'D minor seventh', key: 'bar-3'},
+    alternates: [{symbol: 'F6/D', note: 'inversion'}],
+    voicing: [{label: 'D3', role: 'root'}, {label: 'F3', role: 'third'}],
+    next: {symbol: 'G7', key: 'bar-4'},
+  }),
+  approach: (tick) => transport.nearnessOfNext(tick.at),
+  subscribe: (notify) => store.subscribe(notify),
+});
+
+const strip = mountChipStrip(stripHost, {
+  snapshot: () => ({
+    items: [{id: 'Cmaj7', start: 0, end: 8, primary: 'Cmaj7', roman: 'Imaj7', meter: 0.34}],
+    layout: 'flow',
+  }),
+});
+
+const wheel = mountWheel(wheelHost, {
+  snapshot: () => ({
+    outer: keyNames.map((label) => ({id: label, label})),
+    // A wedge, not a hair: an answer held at sixty per cent has to look unsure.
+    needle: {at: 'G', spread: 0.8},
+    centre: {primary: 'C major', secondary: '86% sure'},
+  }),
+});
+
+lane.band('b2')?.dataset.zone; // 'ahead', 'now' or 'wake'
+nameplate.pop('stress');
+strip.item('Cmaj7')?.dataset.chip;
+wheel.destroy();
+```
+
+<details class="component-section">
+<summary>API</summary>
+
+All four mount options accept `surface?: 'default' | 'none'` (default `'default'`).
+Use `'none'` when a containing presenter owns the outer frame; it retains musical data,
+palette, interaction and lifecycle while omitting the child's outer paint.
+
+Four mounts, one shared vocabulary. Every one follows the kit's shape: `mountX(host, binding,
+options?)`, a binding that answers `snapshot()` and may offer `subscribe()`, and a handle whose
+`destroy()` is idempotent. Mounting twice on one host replaces the first read-out; the four kinds
+are different read-outs, not alternative renderings of one, so they do not displace each other.
+
+**Mounts and handles**
+
+| Export | Kind | Description |
+|---|---|---|
+| `mountFlowLane(host, binding, options?)` | `FlowLaneHandle` | The conveyor. `{element, viewport, reel, nowLine, index, track(id), band(id), tick(), update(), destroy()}`. |
+| `mountNameplate(host, binding, options?)` | `NameplateHandle` | The one line the reader is reading. `{element, symbol, pop(intent?), tick(), update(), destroy()}`. |
+| `mountChipStrip(host, binding, options?)` | `ChipStripHandle` | A ranked or atemporal read-out. `{element, list, item(id), update(), destroy()}`. |
+| `mountWheel(host, binding, options?)` | `WheelHandle` | A ring of segments and a needle. `{element, svg, index, segment(id), update(), destroy()}`. |
+| `harmonyPresenterStyle` | `string` | The stylesheet all four install, as side-effect-free text. |
+
+`HarmonyVoice` is `{label?, mark?, role?}` and is structurally a subset of the pitch surfaces' own
+mark, so one array can be handed to a keyboard and to a nameplate and the two cannot disagree.
+`ToneRole` and `Severity` are re-exported here, as are `MotionMode`, `FrameTick` and `FrameClock`.
+
+**Two axes, and why**
+
+A band carries `start`/`end` on the **lane** axis and `stampStart`/`stampEnd` on the **stamping**
+axis. They are different rulers on purpose: a conveyor is a portrait of real time, so a ritardando
+has to be visibly wider, while a playhead is fed the score's own metrical position — drawing the
+metrical one would render rubato as a metronome. The kit never converts between them, because it
+cannot: only the caller knows the map. Omit the stamping pair and it defaults to the lane pair.
+
+**The flow lane**
+
+| `FlowLaneState` | Kind | Default | Description |
+|---|---|---|---|
+| `bands` | `readonly FlowBand[]` | — | The material. |
+| `tracks` | `readonly FlowTrack[]` | — | `{id, label?, sublabel?, muted?}` rows, drawn in order, sharing one reel. |
+| `primaryTrack` | `number` | the lowest track containing bands | Preferred row for the pinned readout and current band. Use it when an earlier row is a full-length header; if the preferred row has no band at the current position, the lane falls back to another sounding band. |
+| `flags` | `readonly FlowFlag[]` | — | `{id, at, track?, severity?, label?}`. Without a `track` a flag crosses every row: a fact about the moment, not about a line. |
+| `brackets` | `readonly FlowBracket[]` | — | `{id, start, end, from, to, severity?, label?}` spanning rows `from`…`to`. |
+| `ruler` | `readonly {at, label, major?}[]` | — | Ticks, in the caller's own words. |
+| `span` | `{start, end}` | the material's bounds | The extent the reel and every scrub clamp to. |
+| `now` | `number` | — | The position. With `binding.position` it seeds only the first frame. |
+| `playing` | `boolean` | `false` | Published as `data-playing`. |
+| `future` | `boolean` | `true` | `false` draws the space right of the now line as an empty field. |
+| `pinned` | `{primary?, secondary?}` | the sounding band's own | Override the current readout above the plot. |
+| `focusGroup` | `string` | — | Every band whose `group` matches lights with the sounding one. |
+| `disabled` / `emptyLabel` | | — | |
+
+`FlowBand` is `{id, start, end, stampStart?, stampEnd?, spans?, track?, primary?, secondary?,
+trailing?, glyph?, points?, tone?, role?, severity?, weight?, group?, disabled?}`. `tone` is `0…11`
+and fills the block; `role` paints a stripe down the leading edge, so colour never carries a fact
+alone; `severity` paints a bead and never the whole block. `weight` controls the centred fill's share of the row height (`0.1…1`, default `1`); the band's text and hit area retain the full row height. `glyph` is a caller-owned path and
+`points` a normalised contour — the kit frames a shape and never invents one. Given `spans`, the
+band stamps only the multi-occurrence form: a node carrying both forms reads back as one span too
+many. `spans` is judged on what SURVIVES, not on what was passed: the natural caller shape is
+`spans: motif.occurrences.map(...)`, and a list that comes back empty — or whose every entry is
+still unplaced — falls back to the band's own `start`/`end` rather than un-stamping a band that has
+a perfectly good pair of numbers and dropping it out of the playhead's reach for good.
+
+| `FlowLaneBinding` | Description |
+|---|---|
+| `snapshot()` | Content. Pulled on domain events, **not** per frame. |
+| `position?(tick)` | Position. Pulled once per frame. Given it, the mount is live. It takes the frame rather than returning one so the caller can interpolate between sparse samples itself — whether to interpolate depends on the rate, on what is playing and on whether a seek just happened, all of which is domain knowledge. |
+| `seek?(position, phase)` | `'drag'` while the pointer is down, `'commit'` on release, so a caller can preview cheaply and commit once. Its presence is what makes the viewport a slider. |
+| `selectBand?(id, band, {additive})` | A band was clicked. |
+| `focusBand?(id)` | Keyboard focus moved to a band, or off one. |
+| `subscribe?(notify)` | |
+
+| `FlowLaneOptions` | Kind | Default | Description |
+|---|---|---|---|
+| `anchor` | `number` | `.33` | Where the now line is pinned, `0…1`. |
+| `scale` | `number` | `44` | Pixels per axis unit before zoom; used when `visibleSpan` is absent or invalid. |
+| `visibleSpan` | `number` | — | Axis units visible across the measured plot before zoom. A finite positive value takes precedence over `scale`; resizing keeps this window and the current position. |
+| `fallbackWidth` | `number` | `640` | What the lane assumes it is wide when nothing can measure it. |
+| `animate` | `boolean` | whether `position` exists | Run a frame loop. A `clock` forces it `false`. |
+| `clock` | `FrameClock` | — | Somebody else's clock. Given one, the mount opens no loop and becomes a passenger. |
+| `spans` | `boolean` | `true` | Write the playhead's span contract onto every band. |
+| `keyboardStep` / `keyboardPage` | `number` | `1` / `4` | Arrow and shift-arrow movement, in axis units. |
+| `formatPosition` | `(position) => string` | the bare number | `aria-valuetext`, in the caller's own words. |
+| `label`, `motion`, `classNames`, `parts`, `onError`, `stylesheet` | | | `classNames` and `parts` name `{root?, viewport?, reel?}`. |
+
+`[` and `]` walk the **harmony**: they step to the next band edge rather than to a point four
+seconds later that may be in the middle of a chord. Arrows step, shift-arrows page, `Home` and `End`
+go to the ends, and `Ctrl`/`Cmd` with the wheel zooms — all of it only where `seek` exists, because
+a focusable node with no behaviour is a trap rather than an affordance.
+
+With `visibleSpan`, pixels per unit are `viewportWidth / visibleSpan × zoom`. The measured width
+excludes the label gutter. A resize preserves the chosen zoom and current position, using the same
+scale for painting and pointer seeks. Without a usable measurement, `fallbackWidth` supplies the
+width. No layout measurements run in the frame callback.
+
+The current readout wraps above the clipped plot. The label gutter has its own column, and ruler
+labels have their own line above the tracks. The viewport grows to fit all rows even when the flow
+height token is smaller; a third or fourth track is never clipped by the default two-row height.
+Labels inside short bands use ellipsis, with the complete text in the band title and semantic twin.
+Ticks, flags and brackets do not intercept a band click or drag. A contour occupies the remaining
+row height below its labels, and its stroke keeps the same pixel width when the time axis stretches
+or zooms.
+
+**The nameplate**
+
+`ChordNameCandidate` is `{symbol, full?, note?, weight?, key?}`. `key` is opaque identity: a change
+pops even when `symbol` is byte-identical, which is how *"C, G, C"* and *"the same chord struck
+again"* are told apart. The kit only ever compares it with `!==`.
+
+| `NameplateState` | Description |
+|---|---|
+| `primary` | The reading. `full` is announced instead of the symbol, and the symbol is then hidden from the reader so the pair is not read as an abbreviation and its expansion. |
+| `alternates` | Other readings. With `binding.selectAlternate` each is a real button; without it, plain text. |
+| `voicing` | `readonly HarmonyVoice[]`, printed as one line. |
+| `caption`, `history`, `confidence`, `emphasis`, `emptyLabel` | `emphasis` is `'display'` or `'hero'`. `history` is `aria-hidden`: a history that announced itself would read every chord twice. |
+| `next` | The naming that is coming. Drawn as a ghost, never announced. |
+
+`binding.approach(tick)` answers how near `next` is, `0…1`, once per frame — nearness depends on the
+rate, the metre and on what the caller thinks *near* means, so it is a number the caller returns
+rather than one the kit infers from a lane it cannot see. `NameplateOptions` adds `popDuration`
+(default `180`, `0` in any reduced mode), `animate` and `clock` to the shared six.
+
+**The chip strip**
+
+`ChipItem` is `{id, start, end, primary, secondary?, roman?, trailing?, meter?, meterGhost?,
+occurrences?, spans?, tone?, severity?}`. `meter` is the bar and `meterGhost` the whole-piece answer
+drawn as an outline behind it. `layout` is `'flow' | 'ribbon' | 'stack'` — all three are **order**,
+not time. A strip has no axis and no now line, which is exactly why it is not a lane: making it a
+degenerate mode of the conveyor would hide a frame loop and pointer capture inside a static list.
+
+**The wheel**
+
+`outer` is drawn clockwise **in the order given** — the order is the caller's answer, and twelve is
+not assumed. `needle.at` is a segment id or a fractional index, so *"between the third and the
+fourth"* is said without anyone writing a number of degrees; `spread` widens it into a wedge,
+because an answer held at forty per cent confidence should look unsure rather than point precisely
+at a guess. The needle's rotation is **accumulated**: segment 11 to segment 0 is plus one segment,
+not minus eleven. `trail` is recent positions, oldest first.
+
+**Motion**
+
+`MotionMode` is `'auto' | 'continuous' | 'stepped' | 'none'`. `'auto'` asks the nearest ancestor's
+`data-motion` **first**, because a shell answers that question once for a whole page and six
+surfaces must not disagree; with nothing declared above it, it asks `prefers-reduced-motion` itself,
+guarded. A reduced mode changes the **driver**, never the layout: a stepped lane holds the identical
+bands at identical offsets and re-anchors when the sounding band changes instead of on every frame.
+The screenshots are the same picture — which matters, because *"the next chord is approaching"* is a
+property of where things are, not of how they got there.
+
+The frame loop is one `requestAnimationFrame` per document, shared by every mount in it. With no
+subscribers there is no loop at all, and a lane nobody can see leaves it and rejoins in one frame,
+because the position is a pure function of the instant rather than an accumulation of the frames
+that were missed.
+
+**Accessibility.** Each root is a labelled `role="group"`. The lane publishes a visually hidden
+`<ol>` twin, item for item with the bands, with `aria-current="true"` on the sounding one; the reel
+itself is `aria-hidden`, like every other visual part of the viewport, so the twin is the single
+reading and no label is announced twice. The wheel publishes the same twin for its segments, each
+with its share of the ring — and with no share at all where the ring carries no weights, because
+twelve segments announcing `0%` is worse than saying nothing about strength. `aria-current` there is
+keyed on the ring as well as the id, so an outer `C` and an inner `C` are two answers rather than
+one. The nameplate has exactly one live region and the primary symbol lives inside it for its whole
+life, because a replaced node inside `aria-live` is a change nobody hears; it is `aria-atomic`
+because its two children are one fact said twice. The wheel's centre is deliberately **not**,
+because its two are different facts and a confidence ticking a percent must not re-announce the key.
+`next` and `history` stay outside the region. The viewport becomes a `role="slider"` only where
+`binding.seek` exists, and `aria-valuenow` is on the **lane** axis, never the stamping one.
+
+**Above roughly two thousand items the correct answer is to merge in the headless projection**, not
+to virtualise here. A lane that redraws a thousand bands nobody can tell apart is the same mistake
+as a list, drawn faster.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+Use the shared [surface and palette tokens](/uikit/#theme-with-css-custom-properties) for
+background (including `transparent`), foreground, accent, outer border and corner radius.
+Presenter-specific tokens below take precedence within their documented roles.
+
+All four install `harmonyPresenterStyle`, or paint the same declarations onto the nodes when
+`stylesheet: false`. Both paths are generated from one record, so the sheet and the inline form
+cannot describe two different read-outs. Every colour is a chain ending in a literal, never a bare
+`var()`: a bare custom property is invalid at computed-value time on a host carrying no tokens,
+which paints a band invisible — the one failure a colour system may not have.
+
+Nameplate symbols and alternate names wrap within the available width. Optional rows with no
+content collapse instead of reserving height, and revealing them restores their flex or block
+layout. The live-region nodes remain mounted throughout these changes.
+
+Numeric geometry is deliberately **not** tokenised where JavaScript has to read it back. `scale` is
+an option with a documented default rather than a custom property, because reading a length out of
+one means `getComputedStyle` and custom properties do not inherit in every environment this runs in.
+The nameplate's pop is the same case for the same reason — the Web Animations API takes a number and
+cannot take a `var()` — so its length is the `popDuration` option. Heights and colours stay CSS.
+
+The outer frame uses `--wm-harmony-surface-background`, `-border`, `-padding` and `-radius`
+through the shared component quartet. It defaults to transparent with no border or padding.
+The flow viewport is transparent inside that frame, so a translucent background paints once.
+`--wm-harmony-flow-tone` overrides per-band palette fills; clearing it restores each band's tone.
+Use `--wm-harmony-foreground`, `--wm-harmony-muted`, `--wm-harmony-background`,
+`--wm-harmony-accent`, `--wm-harmony-on-accent`, `--wm-harmony-rule` and
+`--wm-harmony-track` for the palette. Their shared semantic fallbacks also work on standalone
+mounts without an ancestor's private token record.
+
+Typography also works on standalone mounts: `--wm-harmony-font` falls back to
+`--wm-font-family`, then inherits the host's font. `--wm-harmony-font-display`
+falls back to that prose family, while `--wm-harmony-font-mono` falls back to
+`--wm-font-mono`, then `ui-monospace, monospace`. These chains apply with and
+without an installed stylesheet.
+
+The shared light/dark neutral defaults are `#111` / `#eee` for paint and accent,
+`#777` / `#aaa` for muted text, `#d8d8d8` / `#333` for rules, and `#eee` / `#222`
+for tracks. Accent text uses `#fff` / `#111`. Musical degree and progression
+colors keep their separate palettes; only the unclassified `other` role uses
+neutral `#777` / `#aaa`.
+
+Interactive alternate-name buttons use `--wm-harmony-height` →
+`--wm-control-size` → `--wui-row-h` for a `2rem` minimum height. Their corners
+use `--wm-harmony-radius` → `--wm-control-radius`, defaulting to `0`. Passive
+analytical marks retain their own drawing geometry.
+
+**Compatibility and state tokens**
+
+The older `--wui-*` names below retain compatibility where previously supported. They also
+include presenter-owned outputs; use the public `--wm-*` palette above for new themes.
+
+| Property | Default | Controls |
+|---|---|---|
+| `--wui-harmony-flow-height` | `96px` / `72px` | The viewport's preferred height, expanded when needed for the ruler and all tracks; the second value is `data-density="compact"`. |
+| `--wui-harmony-lane-height` | `48px` / `36px` | One row inside it. |
+| `--wui-harmony-flow-now` | the accent | The now line. |
+| `--wm-harmony-flow-tone` | per-band tone, or accent at 18% alpha | Public fill override for every band, ahead of the per-band internal value. |
+| `--wui-harmony-approach` | — | Published by the nameplate, `0…1`, for the ghost of `next`. |
+| `--wui-harmony-motion-turn` | `320ms` | How fast the needle turns. |
+| `--wui-harmony-motion-tone` / `--wui-harmony-motion-chip` | `90ms` / `120ms` | Colour changes, and a chip's own transitions. |
+| `--wui-harmony-motion-ease` | `ease-out` | The easing all four share. |
+| `--wui-harmony-accent` / `--wui-harmony-on-accent` | ink / independent contrast ink | The needle, the meters and the now line. |
+| `--wui-harmony-surface` / `--wui-harmony-line` / `--wui-harmony-track` | transparent / rule / bed | The viewport, the rules and a meter's bed. |
+| `--wui-harmony-info` / `--wui-harmony-warning` / `--wui-harmony-danger` | | Severity beads, flags and brackets. |
+| `--wui-harmony-ink` / `--wui-harmony-ink-muted` | inherit / muted | Text, and the gutter and empty states. |
+| `--wui-harmony-font` / `--wui-harmony-font-display` / `--wui-harmony-font-mono` | Public typography chains above | Prose, the big word, and the fixed-width names. |
+| `--wui-harmony-size-display` / `-title` / `-body` / `-label` / `-micro` | `2rem` … `.7rem` | The type ladder. |
+| `--wui-harmony-pad` / `--wui-harmony-space-1` … `-5` | | Chips and spacing. |
+
+Tone colour comes from the shared degree palette — `--wui-degree-root` and its siblings sit in front
+of the `--wm-degree-*` names a theme sets — and a band's block colour from the twelve-slot
+`--wui-progression-tone-*` ring the caller indexes with `tone`.
+
+**Classes and state attributes**
+
+| Node | Class | Carries |
+|---|---|---|
+| Lane root / body / viewport / reel | `.wui-harmony-flow`, `.wui-harmony-flow__body`, `.wui-harmony-flow__viewport`, `.wui-harmony-flow__reel` | `data-motion`, `data-playing`, `data-disabled` on the root; `data-lanes` on the viewport. |
+| One row / one band | `.wui-harmony-flow__lane`, `.wui-harmony-flow__band` | `data-track`, `data-lane`, `data-muted`; and on a band `data-band`, `data-zone`, `data-role`, `data-group`, `data-focus`. |
+| A band's parts | `.wui-harmony-flow__fill`, `__role`, `__label`, `__note`, `__bead`, `__glyph` | The fill carries the tone and the drain. |
+| Current readout / now line / gutter | `.wui-harmony-flow__pinned`, `__now`, `__gutter`, `__gutter-row`, `__gutter-label` | None rides the reel; the readout sits above the plot and the gutter beside it. |
+| Decorations / semantic twin | `.wui-harmony-flow__decorations`, `__tick`, `__tick-label`, `__flag`, `__bracket`, `__index` | The twin is an `<ol>`, `aria-current` on the sounding entry. |
+| Nameplate | `.wui-harmony-nameplate`, `__live`, `__symbol`, `__full`, `__next`, `__voicing`, `__alternates`, `__history`, `__chip` | `data-emphasis`, `data-confidence` on the root; `data-current` on a history chip. |
+| Chip strip | `.wui-harmony-chip`, `__list`, `__item`, `__primary`, `__secondary`, `__meter`, `__ghost`, `__fill`, `__trailing`, `__bead` | `data-layout` on the list; `data-chip`, `data-selectable` on an item. |
+| Wheel | `.wui-harmony-wheel`, `__svg`, `__sector`, `__needle`, `__trail`, `__mark`, `__centre`, `__index` | `data-segment`, `data-ring`, `data-current` on a sector. |
+
+Two rules that look like performance notes and are correctness rules.
+
+**A band's inline style is a pure function of its own fields, never of the position.**
+`createAnalysisPlayhead` replaces a lit node's whole `style.cssText` with the idle string stamped at
+render time, so a per-frame inline write on a band is erased at precisely the instant that band
+matters. Everything that moves lives on the reel's transform, or on a **child** of the band — a
+child's style is nobody else's business, which is where the drain that fills the sounding band only
+as far as the now line is written. `will-change: transform` is granted to the reel alone: three
+hundred promoted bands is a layer-tree explosion, and the bands never move relative to the reel.
+
+**An offscreen band is never removed.** The playhead discovers nodes with `querySelectorAll`, so a
+recycled band is a silently dead highlight — and the recycled ones would be exactly those near the
+now line. Offscreen cost is paid with `content-visibility`. A band leaves the DOM when the **data**
+no longer has it, and for no other reason.
+
+The viewport is clipped with `overflow: hidden; overflow: clip;`, in that order. An `overflow:
+hidden` box is a scroll container in the programmatic sense, and one `scrollIntoView` from a playhead
+inside a box whose reel is written every frame shoves the anchor permanently off. `clip` creates no
+scroll container, so **this box** never scrolls and the anchor is safe; the `hidden` before it is
+what an engine too old for `clip` keeps.
+
+It is not a no-op for the page, though. A clip box is *skipped* by `scrollIntoView`, which then goes
+on to the nearest real scrollport above it — and the node a playhead hands it is the first lit one in
+document order, which for a band that recurs need not be the occurrence under the line. So a root
+that holds a lane takes `createAnalysisPlayhead(root, {scroll: false})`. If the page starts scrolling
+sideways anyway, that is a diagnostic worth reading: it means the lane's axis and its
+`stampStart`/`stampEnd` are not the same ruler.
+
+The reel's width is **never transitioned**, and that is a correctness rule rather than a taste. A
+band's box is a percentage of the reel's width while the reel's offset is absolute pixels, so easing
+the width while writing the transform outright describes two different scales for the length of the
+ease — a zoom throws the material `(now − axis.start) × (newScale − oldScale)` px off the now line
+until the ease finishes, which is worse the further into the piece the listener has got. Both are
+written together, from one scale, in one placement.
+
+Nothing in a live state ever writes `outline`. That property belongs to the playhead, which is how
+six assertions elsewhere detect "is this node lit"; the sibling highlight paints with `background`
+instead.
+
+The `parts` option adds `part` tokens for a shadow-DOM host; `classNames` adds classes without
+replacing the structural ones. Neither is required.
+
+</details>
+
+<UiPresenterRelated presenter="harmony" />

@@ -1,0 +1,229 @@
+---
+title: 'createAnalysisSession'
+description: 'An analysis session over an immutable score, reusing identity-keyed caches across edits.'
+sidebar:
+  order: 1
+---
+
+import AnalysisSessionPlayground from '../../../../../components/headless/AnalysisSessionPlayground.astro';
+
+`createAnalysisSession(score, options?)` holds one analysis and keeps it
+current as the score changes. `update(next)` reuses identity-keyed analysis
+caches for unchanged immutable parts and recomputes affected analysis paths.
+Score-wide relationships can still require broader work. Its result has the
+same analytical meaning as the corresponding stateless analyses of `next`;
+the session adds cache reuse, not a different musical interpretation.
+
+Reach for the session when a score is being edited or streamed in. Use
+[createAnalysisFollower](/score/headless/analyze/analysis-follower/) when the
+result must follow a player’s loaded score, position and active notes. For a
+one-shot answer, the stateless functions on
+[`@webmusic/score/analyze`](/score/api/analyze/) are cheaper and need no
+object.
+
+It **borrows** the `Score` and owns only its caches. There is no `dispose()`:
+the caches are keyed on the immutable parts themselves, so an edited part
+arrives with empty caches and an untouched one keeps its analysis.
+There is no playback clock, event subscription or automatic edit listener;
+the caller supplies each new immutable score through `update()`.
+
+<AnalysisSessionPlayground />
+
+## Import
+
+```ts
+import {createAnalysisSession} from '@webmusic/score/analyze/headless';
+
+const session = createAnalysisSession(score);
+console.log(session.result.key, session.result.chords.length);
+
+const edited = score.edit((tx) => tx.updateNote(id, {dynamic: 'mf'}));
+const next = session.update(edited);   // reuses unchanged-part caches
+```
+
+## Why identity matters
+
+`Score.edit` and `Score.withPart` return a new `Score` whose **untouched parts
+are the same objects**. The session's caches are module-level `WeakMap`s keyed
+on those parts, which is what makes the incremental path safe rather than
+merely fast: a stale entry is impossible, because an edited part is a
+different object with no entry at all. Several sessions on one page share
+those caches.
+
+Calling `update` with the score it already holds is a no-op that returns the
+cached result, so a render loop can call it unconditionally.
+
+## Off the main thread
+
+[createAnalysisWorker](/score/headless/analyze/analysis-session/#analysis-worker) runs the same
+analysis session behind promises. Its reference covers worker ownership,
+fallback, update supersession, errors and cleanup.
+
+<details class="component-section">
+<summary>API</summary>
+
+**Construction** — `createAnalysisSession(score: Score, options?: AnalysisSessionOptions)`
+
+| Member | Kind | Default | Description |
+| --- | --- | --- | --- |
+| `windowQuarters` | option | `2` | Chord window length in quarter notes. |
+| `motifLength` | option | `4` | Notes per motif. |
+| `minOccurrences` | option | `2` | Minimum repeats before a motif counts. |
+
+**Commands**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `update(score)` | command | Re-analyses after an edit and returns the new result. A no-op when the score is unchanged. |
+
+**State**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `score` | state | The score the current `result` describes. |
+| `result` | state | The `AnalysisResult`. Stable reference until the next `update`. |
+| `result.key` | state | Krumhansl–Schmuckler key estimate, as `detectKey`. |
+| `result.chords` | state | Harmonic segmentation, as `segmentChords`. |
+| `result.roman` | state | Roman-numeral analysis of `chords` in `key`. |
+| `result.motifs` | state | Repeated melodic motifs, as `findMotifs`. |
+| `result.issues` | state | Voice-leading issues, as `voiceLeading`. |
+
+Every result is transitively frozen, so a consumer can hold one across an
+update without copying. Voice-leading issues retain raw `voices` identifiers and
+also supply `voiceParts`, paired by index, to distinguish equal voice names in
+different parts. Older worker results may omit that optional field; a voice
+projection does not assign an ambiguous legacy identifier to an arbitrary row.
+
+The options are fixed for a session's lifetime; create another session to
+change them. `AnalysisResult.key` is `KeyResult`, `chords` is a read-only
+`ChordSegment[]`, `roman` a read-only `RNAResult[]`, `motifs` a read-only
+`Motif[]`, and `issues` a read-only `VoiceLeadingIssue[]`. These result
+structures are described with their stateless producers on the
+[Analyze API](/score/api/analyze/). The session does not add rhythm-analysis
+or report-formatting fields to this result.
+
+### Worker client API
+
+The [Analysis worker](#analysis-worker) section below covers execution,
+cancellation and worker ownership.
+
+### Analysis worker
+
+`createAnalysisWorker(workerOrFactory?)` runs an
+[analysis session](/score/headless/analyze/analysis-session/) through a Promise
+API. Use it when score analysis would otherwise block interaction. It borrows
+a supplied worker or owns one created by its default path or a supplied factory.
+When the default worker is unavailable, analysis runs on the calling thread.
+
+#### Worker Import
+
+```ts
+import {createAnalysisWorker} from '@webmusic/score/analyze/headless';
+
+const client = createAnalysisWorker();
+try {
+  const result = await client.analyze(score, {windowQuarters: 2});
+  paintAnalysis(result);
+} finally {
+  client.dispose();
+}
+```
+
+
+The same client is also exported by `@webmusic/score/analyze/worker-client`.
+Its promise resolves with an analysis result, not with playback completion.
+
+
+The source contract is `AnalysisWorkerClient`, `AnalysisWorkerFactory`,
+`AnalysisWorkerLike` and `AnalysisWorkerEventLike`, re-exported from the
+Headless entry and from `@webmusic/score/analyze/worker-client`.
+
+| Member | Return / contract |
+| --- | --- |
+| `createAnalysisWorker(workerOrFactory?)` | `AnalysisWorkerClient`. A supplied ready-made worker is borrowed; a factory result or default worker is owned. |
+| `analyze(score, options?)` | `Promise<AnalysisResult>`; creates/replaces the worker's analysis session with the supplied options. Supersedes older pending updates as described below; each analysis promise retains its own result/error. |
+| `update(score)` | `Promise<AnalysisResult>`; updates the session. For overlapping worker-backed updates, pending promises settle with the newest queued result and superseded queued scores are skipped. |
+| `dispose()` | `void`; rejects pending calls and detaches listeners where `removeEventListener` is available. Terminates only owned workers. Repeated calls are safe. |
+
+For a worker-backed client, a new `analyze` replaces older queued updates and
+ignores their already-sent replies. Those update promises remain pending and
+settle with the new analysis result, or with the newest `update` called after
+it. Such later updates wait for the newest analysis to succeed before running
+with its options. An older overlapping `analyze` still settles its own promise,
+but cannot release that queue. If the newest analysis fails, all pending update
+promises reject with that analysis error and their queued input is dropped;
+the client does not silently apply it with the previous session's options.
+A caller can retry `analyze` with valid options. Disposal and terminal worker
+failures reject every pending call. This supersession does not cancel CPU work
+already executing in the Worker.
+
+When Workers are unavailable or the default worker cannot be constructed,
+the default factory uses an in-process implementation with the same Promise
+API. That fallback performs analysis on the calling thread; it does not move
+CPU work into a background task. A supplied factory's construction error is
+not hidden by fallback. Worker runtime/protocol failures can make a client
+terminal; future calls then reject and an application must replace the client.
+Completed results are transitively frozen in both execution modes. Score
+serialization failures reject the returned promise without leaving a pending
+request. If installing a supplied worker’s listeners fails, construction removes
+partially installed listeners where removal is supported and terminates only an
+owned worker before rethrowing the error.
+
+`AnalysisWorkerLike` requires `postMessage(message)`,
+`addEventListener('message' | 'error', listener)` and `terminate()`;
+`removeEventListener()` is optional. Its listener receives
+`AnalysisWorkerEventLike` with optional `data` and `message`. Supply listener
+removal for borrowed long-lived workers so client disposal can detach fully.
+
+| Error / protocol export | Contract |
+| --- | --- |
+| `AnalysisWorkerRemoteError` | `Error` subclass constructed from `AnalysisWorkerErrorDetails`; exposes `code`, `operation`, `retryable`, optional `causeCode`, and the inherited message. |
+| `AnalysisWorkerErrorDetails` | `version: 1`, `code`, `operation` (`'protocol'`, `'analyze'`, `'update'`), `message`, `retryable`, optional `causeCode`. |
+| `AnalysisWorkerErrorCode` | Known codes include `'unsupported-protocol'`, `'invalid-request'`, `'analysis-failed'`; other strings remain representable. |
+| `ANALYSIS_WORKER_PROTOCOL` | `'@webmusic/score/analyze/analysis-worker'`. |
+| `ANALYSIS_WORKER_PROTOCOL_VERSION` | `1`. |
+| `ScoreJSON` | Return type of `Score.toJSON()`; metadata must be structured-clone safe. |
+| `AnalyzeRequestMessage` · `UpdateRequestMessage` | Request envelope (`protocol`, `protocolVersion`, numeric `id`) plus `action` and `score`; only `'analyze'` adds optional analysis options. |
+| `AnalysisWorkerRequest` | Union of the two request message types. |
+| `AnalysisWorkerResponse` | Same identity/version/id plus either `ok: true, result`, or `ok: false, error, errorDetails`. |
+
+No worker method emits a UI or playback event. Handle request failures through
+the returned promises. `retryable` describes a remote operation failure; it
+does not promise that a separately failed/terminated client can be reused.
+
+
+
+#### Worker Transfer and cancellation
+
+Each request serializes the complete `Score` through `toJSON()` and the worker
+reconstructs it. Transfer and reconstruction cost scale with score size even
+when unchanged parts reuse incremental analysis caches. This API has no
+`AbortSignal`, timeout or cancel command. Supersession skips queued updates;
+it cannot interrupt CPU work already running.
+
+The [worker protocol](/score/api/analyze/#worker-protocol-v1) owns the wire
+message contract and bundler entry points. The React
+[`useScoreAnalysisAsync`](/score/api/react/) hook composes this client.
+
+#### Worker Related
+
+[createAnalysisSession](/score/headless/analyze/analysis-session/) provides the
+synchronous result. [createAnalysisFollower](/score/headless/analyze/analysis-follower/)
+combines synchronous analysis with borrowed playback state.
+
+</details>
+
+## Related
+
+**Composed by.** The score-based [live Analyze components](/score/element/#analyze).
+Its motif data also remains available to application-owned views without a dedicated Element.
+
+**Related.** Whole-score summaries, histograms and rhythmic-vocabulary reports
+use the [report workflow](/score/api/analyze/#reports). They are not
+fields on `AnalysisSession.result`.
+
+[Live trackers](/score/headless/analyze/live-trackers/) analyze note events
+without a score; [createScoreReport](/score/api/analyze/#reports)
+formats a one-shot card. Source symbols for the synchronous API are
+`createAnalysisSession`, `AnalysisSession`, `AnalysisSessionOptions` and
+`AnalysisResult` at `@webmusic/score/analyze/headless`.

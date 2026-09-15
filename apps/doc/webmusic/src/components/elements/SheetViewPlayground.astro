@@ -1,0 +1,38 @@
+---
+// <sheet-view> — the one view element with a peer dependency. OSMD is in this
+// doc app's devDependencies, so the demo shows the real engraving rather than
+// the install hint the element falls back to.
+//
+// The source is the .mxl on purpose: OSMD engraves what the file says, and a
+// MIDI source carries no clefs, no key signatures and no staff assignment.
+import ElementPlayground from '../ElementPlayground.astro';
+
+const SRC = `${import.meta.env.BASE_URL}mxl/demo.mxl`;
+const PLAYER_ID = 'pg-sheet-view-player';
+const companions = [{tag: 'score-player', target: 'score-player'}];
+---
+
+<ElementPlayground
+  tag="sheet-view"
+  class="pg-sheet"
+  markup="[data-sheet-composition]"
+  companions={companions}
+>
+  <div data-sheet-composition data-pg-fragment>
+  <score-player id={PLAYER_ID} src={SRC}></score-player>
+  <sheet-view src={SRC} player={`#${PLAYER_ID}`} follow-cursor height="360"></sheet-view>
+  </div>
+</ElementPlayground>
+
+<script>
+  import { defineScorePlayerElement } from '@webmusic/score/play/element';
+  import { defineSheetViewElement } from '@webmusic/score/view/element';
+  defineScorePlayerElement();
+  defineSheetViewElement();
+</script>
+
+<style>
+  .pg-sheet :global([data-sheet-composition]) { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; min-width: 0; }
+  .pg-sheet :global([data-sheet-composition] > *) { min-width: 0; }
+  .pg-sheet :global(score-player) { --webscore-play-height: 2.1rem; }
+</style>

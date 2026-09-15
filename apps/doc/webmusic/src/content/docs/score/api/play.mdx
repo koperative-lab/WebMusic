@@ -1,0 +1,518 @@
+---
+title: '@webmusic/score/play'
+description: Score playback — Web Components, push and pull engines, Sound timbres, effects, racks, offline WAV rendering, recording, and input drivers.
+---
+
+import ApiSandbox from '../../../../components/ApiSandbox.astro';
+import ProgrammaticTransportDriverDemo from '../../../../components/programmatic/ProgrammaticTransportDriverDemo.astro';
+
+export const scorePlayerCode = `import { Duration, MeasureId, PartId, Pitch, Rational, ScoreBuilder, VoiceId } from '@webmusic/score';
+import { ScorePlayer, Sound, Effect } from '@webmusic/score/play/headless';
+
+const b = new ScoreBuilder();
+const part = PartId('piano');
+const voice = VoiceId('v1');
+const ts = { numerator: 4, denominator: 4 };
+b.setMetadata({ title: 'Etude' })
+  .addTempo({ atQuarters: Rational.ZERO, bpm: 120 })
+  .addMeter({ atQuarters: Rational.ZERO, measureNumber: 1, timeSignature: ts });
+b.addPart({ id: part, name: 'Piano', staves: 1 });
+b.addMeasure({ id: MeasureId('m1'), number: 1, onsetQuarters: Rational.ZERO, durationQuarters: new Rational(4), timeSignature: ts });
+['C4', 'E4', 'G4', 'C5'].forEach((p, i) =>
+  b.addNote(part, { id: b.newNoteId(), pitch: Pitch.parse(p), onsetQuarters: new Rational(i), duration: Duration.quarter(), voice }));
+
+// <player · score · sound · effect>
+const player = new ScorePlayer(b.build(), {
+  synth: Sound.oscillator({ type: 'triangle' }),
+  effect: Effect.reverb({ wet: 0.25 }),
+});
+player.on('cursor', (pos) => console.log('beat', pos.beat.toFixed(2)));
+
+const play = document.createElement('button');
+play.textContent = 'Play';
+play.onclick = async () => {
+  try {
+    await player.play();
+  } catch (error) {
+    console.error('Playback failed', error);
+  }
+};
+document.body.append(play);`;
+
+export const interactiveCode = `import { Duration, MeasureId, PartId, Pitch, Rational, ScoreBuilder, VoiceId } from '@webmusic/score';
+import { InteractivePlayer, Sound, Effect } from '@webmusic/score/play/headless';
+
+const b = new ScoreBuilder();
+const part = PartId('lead');
+const voice = VoiceId('v1');
+const ts = { numerator: 4, denominator: 4 };
+b.setMetadata({ title: 'Tap' })
+  .addTempo({ atQuarters: Rational.ZERO, bpm: 100 })
+  .addMeter({ atQuarters: Rational.ZERO, measureNumber: 1, timeSignature: ts });
+b.addPart({ id: part, name: 'Lead', staves: 1 });
+b.addMeasure({ id: MeasureId('m1'), number: 1, onsetQuarters: Rational.ZERO, durationQuarters: new Rational(4), timeSignature: ts });
+['C4', 'E4', 'G4', 'C5'].forEach((p, i) =>
+  b.addNote(part, { id: b.newNoteId(), pitch: Pitch.parse(p), onsetQuarters: new Rational(i), duration: Duration.quarter(), voice }));
+
+const player = new InteractivePlayer({ effect: Effect.reverb({ wet: 0.3 }) });
+player.addVoice('lead', Sound.oscillator({ type: 'triangle' }));
+player.addSource('lead', b.build());
+player.on('beat', (e) => console.log('beat', e.beat + 1, 'of', e.total));
+
+// PULL: each tap fires one beat; the gap between taps sets the tempo.
+let last = 0;
+let ready: Promise<void> | undefined;
+const tap = document.createElement('button');
+tap.textContent = 'Tap a beat';
+tap.onclick = async () => {
+  try {
+    ready ??= player.preload();
+    await ready;
+
+    const now = performance.now() / 1000;
+    const dt = last ? now - last : 0;
+    last = now;
+    player.advance(dt ? { secondsPerBeat: dt } : {});
+  } catch (error) {
+    ready = undefined;
+    console.error('Playback preparation failed', error);
+  }
+};
+document.body.append(tap);`;
+
+export const liveInputCode = `import { InteractivePlayer, Sound, bindClock, bindMidiInput } from '@webmusic/score/play/headless';
+
+const player = new InteractivePlayer();
+player.addVoice('lead', Sound.oscillator({ type: 'triangle' }));
+// player.addSource('lead', score);
+
+// Drive the pull engine at a steady tempo:
+const stopClock = bindClock(player, { bpm: 110 });
+
+// …or let a MIDI keyboard advance beats (each key press = next beat):
+const stopMidi = bindMidiInput(player, { mode: 'note' });
+
+// …or a MIDI clock (24 pulses per beat) from a DAW:
+// bindMidiInput(player, { mode: 'clock' });
+
+// Send MIDI OUT to external hardware instead of making sound:
+// player.addVoice('hardware', Sound.midiOut({ channel: 1 }));
+
+// later: stopClock(); stopMidi();
+console.log('live inputs wired');`;
+
+export const recordCode = `import { InteractivePlayer, Sound } from '@webmusic/score/play/headless';
+import { serializeMIDI } from '@webmusic/score/io';
+
+const player = new InteractivePlayer();
+player.addVoice('lead', Sound.oscillator({ type: 'triangle' }));
+// player.addSource('lead', score);
+
+player.record(); // start capturing every note the player fires
+// …drive it live: player.advance() on each gesture / clock tick / key press…
+
+// When done, get the performance back as a Score (optionally quantized):
+const captured = player.stopRecording({ bpm: 110, quantizeGrid: 0.25 });
+const midiBytes = serializeMIDI(captured); // export the improvisation as MIDI
+console.log('recorded', captured.notes.length, 'notes →', midiBytes.length, 'bytes');`;
+
+export const soundCode = `import { Sound } from '@webmusic/score/play/headless';
+
+// Every factory returns a HeadlessSynth you hand to any player.
+const osc = Sound.oscillator({ type: 'sawtooth', gain: 0.2 }); // built-in synth
+const fm = Sound.fm({ ratio: 3, index: 220 });   // 2-op FM synthesis
+const wt = Sound.wavetable({ real: [0, 1, 0.5, 0.25] }); // harmonic partials
+const drum = Sound.noise({ pitched: true });     // filtered noise (percussion)
+const sampled = Sound.samples({ 60: '/c4.mp3', 72: '/c5.mp3' }); // one file per MIDI note
+const sfz = Sound.sfz('/piano.sfz');            // key ranges + pitch-shift + round-robin
+const sf2 = Sound.soundfont2('/strings.sf2');   // .sf2/.sf3 (needs spessasynth_lib)
+// Outside Vite, provide the URL your bundler or app serves for the worklet:
+const portableSf2 = Sound.soundfont2('/strings.sf2', {
+  workletUrl: '/assets/spessasynth_processor.min.js',
+});
+
+// Stack timbres into one voice (the Sound analog of Effect.chain):
+const pad = Sound.layer(Sound.oscillator({ type: 'triangle' }), Sound.fm({ ratio: 2 }));
+
+// The escape hatch: your own Web Audio graph.
+const custom = Sound.custom((ctx) => {
+  const out = ctx.createGain();
+  return {
+    connect(dest) {
+      out.connect(dest);
+      return () => out.disconnect(dest);
+    },
+    noteOn: (midi, vel, time, dur) => {
+      const o = ctx.createOscillator();
+      o.frequency.value = 440 * Math.pow(2, (midi - 69) / 12);
+      o.connect(out);
+      o.start(time);
+      o.stop(time + dur);
+    },
+  };
+});
+
+// new ScorePlayer(score, { synth: sfz });
+console.log('timbres ready', { osc, sampled, sfz, sf2, custom });`;
+
+export const effectCode = `import { Effect } from '@webmusic/score/play/headless';
+
+// A chain is built lazily and inserted between the player's output and the speakers.
+const room = Effect.chain(
+  Effect.filter({ type: 'lowpass', frequency: 6000 }),
+  Effect.bitcrusher({ bits: 8 }),
+  Effect.tremolo({ frequency: 5, depth: 0.4 }),
+  Effect.delay({ delaySeconds: 0.3, feedback: 0.35, wet: 0.25 }),
+  Effect.reverb({ wet: 0.3 }),
+  Effect.limiter({ threshold: -3 }),
+);
+
+// A visualization tap hands you a live AnalyserNode:
+let scope;
+const tap = Effect.analyser({ fftSize: 1024, onReady: (node) => (scope = node) });
+
+// Hand any of these to a player as the "effect" layer:
+// new ScorePlayer(score, { synth, effect: room });
+// new InteractivePlayer({ effect: room });
+console.log('effects ready', { room, tap });`;
+
+export const rackCode = `import { Duration, MeasureId, PartId, Pitch, Rational, ScoreBuilder, VoiceId } from '@webmusic/score';
+import { Rack, Sound, Effect } from '@webmusic/score/play/headless';
+
+const make = (name, pitches) => {
+  const b = new ScoreBuilder();
+  const part = PartId(name);
+  const voice = VoiceId(name + '-v');
+  const ts = { numerator: 4, denominator: 4 };
+  b.setMetadata({ title: name })
+    .addTempo({ atQuarters: Rational.ZERO, bpm: 100 })
+    .addMeter({ atQuarters: Rational.ZERO, measureNumber: 1, timeSignature: ts });
+  b.addPart({ id: part, name, staves: 1 });
+  b.addMeasure({ id: MeasureId('m1'), number: 1, onsetQuarters: Rational.ZERO, durationQuarters: new Rational(4), timeSignature: ts });
+  pitches.forEach((p, i) =>
+    b.addNote(part, { id: b.newNoteId(), pitch: Pitch.parse(p), onsetQuarters: new Rational(i), duration: Duration.quarter(), voice }));
+  return b.build();
+};
+
+// One instrument per player; group them in a Rack.
+const rack = new Rack({ effect: Effect.reverb({ wet: 0.25 }) });
+rack.add({ id: 'lead', score: make('lead', ['C5', 'E5', 'G5', 'C6']), sound: Sound.oscillator({ type: 'triangle' }) });
+rack.add({ id: 'bass', score: make('bass', ['C3', 'C3', 'G2', 'G2']), sound: Sound.oscillator({ type: 'sawtooth' }) });
+
+const play = document.createElement('button');
+play.textContent = 'Play ensemble';
+play.onclick = () => rack.play();
+const mute = document.createElement('button');
+mute.textContent = 'mute bass';
+mute.onclick = () => rack.mute('bass');
+document.body.append(play, mute);`;
+
+export const renderCode = `import { Duration, MeasureId, PartId, Pitch, Rational, ScoreBuilder, VoiceId } from '@webmusic/score';
+import { renderScoreToBuffer, bufferToWav } from '@webmusic/score/play';
+import { Sound, Effect } from '@webmusic/score/play/headless';
+
+const b = new ScoreBuilder();
+const part = PartId('piano');
+const voice = VoiceId('v1');
+const ts = { numerator: 4, denominator: 4 };
+b.setMetadata({ title: 'Render' })
+  .addTempo({ atQuarters: Rational.ZERO, bpm: 120 })
+  .addMeter({ atQuarters: Rational.ZERO, measureNumber: 1, timeSignature: ts });
+b.addPart({ id: part, name: 'Piano', staves: 1 });
+b.addMeasure({ id: MeasureId('m1'), number: 1, onsetQuarters: Rational.ZERO, durationQuarters: new Rational(4), timeSignature: ts });
+['C4', 'E4', 'G4', 'C5'].forEach((p, i) =>
+  b.addNote(part, { id: b.newNoteId(), pitch: Pitch.parse(p), onsetQuarters: new Rational(i), duration: Duration.quarter(), voice }));
+
+// Render the same score · sound · effect stack offline, then download a WAV.
+const btn = document.createElement('button');
+btn.textContent = 'Render and download WAV';
+btn.onclick = async () => {
+  const buffer = await renderScoreToBuffer(b.build(), {
+    synth: Sound.oscillator({ type: 'triangle' }),
+    effect: Effect.reverb({ wet: 0.3 }),
+  });
+  const url = URL.createObjectURL(bufferToWav(buffer));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'score.wav';
+  a.click();
+};
+document.body.append(btn);`;
+
+export const transportCode = `import { ScorePlayer } from '@webmusic/score/play/headless';
+import { bindPointer, bindScroll, bindValue, bindOrientation } from '@webmusic/score/play/drivers';
+
+// ScorePlayer IS the transport — rate, progress, fractional seeks, scrubbing
+// and a 'timeupdate' event live directly on the engine. Drivers bind any input.
+// const player = new ScorePlayer(score);
+// player.setRate(1.25);                       // or read player.rate
+// player.seekFraction(0.5);                   // jump to the middle
+// player.scrub(-5);                           // nudge back five seconds
+// player.on('timeupdate', ({ transportSeconds, transportDurationSeconds, progress }) => render(progress));
+// bindScroll(player, { mode: 'position' });                       // scroll -> playhead
+// bindPointer(player, document.querySelector('#scrub'), { axis: 'x' }); // drag -> scrub
+// bindOrientation(player, { mode: 'rate' });                      // device tilt -> tempo
+// bindValue(player, { getValue: () => slider.valueAsNumber });    // any number -> seek
+console.log('transport + drivers');`;
+
+export const ioCode = `import { detectFormat, loadScore, loadScoreFromUrl } from '@webmusic/score/io';
+import { createScorePlayerFromUrl } from '@webmusic/score/play/headless';
+
+// Players take a Score, not a file. Parse once, reuse everywhere.
+// const a = await loadScore(bytes);                 // auto-detect midi/musicxml/mxl/abc
+// const b = await loadScore(xml, { format: 'musicxml' });
+// const c = await loadScoreFromUrl('/etude.mid');   // fetch + infer from extension
+// detectFormat(bytes); // 'midi' | 'mxl' | 'musicxml' | 'abc'
+
+// One-line sugar (parsers load lazily):
+// const player = await createScorePlayerFromUrl('song.mxl');
+console.log('loaders ready');`;
+
+`@webmusic/score/play` is the **playback** capability of the `@webmusic/score` package. It owns the playback engines, audio graph, interaction drivers and playback UI. MIDI, MusicXML, MXL and ABC import/export live exclusively in [`@webmusic/score/io`](/score/api/io/).
+
+This page is the **reference** for that surface — the **push** (`ScorePlayer`) and **pull** (`InteractivePlayer`) engines, the `Sound` timbre wrapper, the `Effect` chain, the `Rack` ensemble, DOM-free `LfoController`, offline **WAV render**, live **recording** back to a Score, and **clock / Web MIDI** input drivers — with linked object references and editable examples for offline rendering and file input. For the same objects introduced through live running demos, see **[Headless Components › Play](/score/headless/#play)**; for the drop-in custom elements — `<score-player>`, `<rack-control>`, `<note-input>`, `<score-recorder>`, `<synth-panel>` — see **[Web Component › Play](/score/element/#play)**.
+
+It does not render notation, piano rolls, analysis, or framework views — those live in [`@webmusic/score/view`](/score/api/view/), [`@webmusic/score/analyze`](/score/api/analyze/), and [`@webmusic/score/react`](/score/api/react/).
+
+## Install
+
+`npm install @webmusic/score` — use an available published version or the local workspace; [Install](/score/#install) has the full setup.
+
+The root model, I/O, and playback capabilities ship in that one package. `tone` and
+`spessasynth_lib` are **optional** peers used by `TonePlayer` and SF2 playback.
+
+The `@webmusic/score/play` root is the **stateless playback API**. The stateful, DOM-free **Headless Components** — engines, `Sound`, `Rack`, synths and `Effect` — live on `/headless`; browser transport adapters live on `/drivers`; styled custom elements live on `/element`. The root therefore tree-shakes free of both engine and DOM code.
+
+`@webmusic/score/play/headless` is also the stable public boundary for audio playback. Internally, `ScorePlayer` is a thin API and audio-graph coordinator over a lazy immutable score timeline and a rolling clock scheduler. `InteractivePlayer` coordinates an immutable beat-source index, a lazy per-voice mixer, and an independent performance recorder. `Sound` is likewise a lifecycle facade over isolated oscillator, FM, wavetable, noise, Web MIDI, SFZ sampler, exact-MIDI sampler, Tone adapter, and optional SF2 modules. Consumers keep one unchanged import path while those responsibilities remain independently testable.
+
+---
+
+## The playback stack
+
+A player is one instrument, composed of three pluggable layers:
+
+```txt
+<player · score · sound · effect>
+          │        │       └ Effect — post-processing (reverb, delay, filter…)
+          │        └ Sound  — timbre (oscillator, samples, .sfz, .sf2, custom)
+          └ Score          — the notes (from a file or built in code)
+```
+
+For many instruments, give each its own player and group them in a **`Rack`**. Two engines sit at opposite ends, chosen by *who owns time*:
+
+| You want | Use |
+| --- | --- |
+| Autonomous timeline playback (pure Web Audio) | **`ScorePlayer`** (push) |
+| External-signal / beat-at-a-time interaction, live score swap | **`InteractivePlayer`** (pull) |
+| Many instruments, each its own score/sound/effect, played together | **`Rack`** |
+| A progress-bar / scrub / rate widget | **`ScorePlayer`**'s transport surface + the `bind*` drivers |
+
+> The examples below run in an **editable Sandpack environment**. The preview is disabled by default and must be enabled per embed after its package dependencies resolve. `@webmusic/score/play` is an import subpath of the `@webmusic/score` package; publication alone does not toggle the preview.
+
+## The engines and controllers
+
+Every stateful object this capability publishes lives on
+`@webmusic/score/play/headless` and is documented with its primary workflow under
+[Headless › Play](/score/headless/#play): the
+[push](/score/headless/play/score-player/) and
+[pull](/score/headless/play/interactive-player/) engines,
+[`Sound`](/score/headless/play/sound/),
+[`Effect`](/score/headless/play/effect/),
+[`Rack`](/score/headless/play/rack/),
+[`Metronome`](/score/headless/play/metronome/), the
+[ready-made transports](/score/headless/play/loop-player/),
+[`PlayerController`](/score/headless/play/player-controller/), the
+[synth backends](/score/headless/play/sound/#synth-backends) — `LfoController`,
+`EqController` and the meter controller among them — and the
+[Tone](/score/headless/play/score-player/#toneplayer) and
+[Web MIDI](/score/headless/play/interactive-player/#web-midi-input) adapters.
+
+[`SynthPanelAudioGraph`](/score/headless/play/sound/#synth-backends-synthpanelaudiograph)
+is the reusable effects/EQ graph coordinator behind `<synth-panel>`. It retains
+same-context routing ports across successful DSP replacements and keeps the old
+usable chain after a failed candidate build. Its Headless reference owns the
+options, dormant-port behavior and cleanup contract; the
+[Element reference](/score/element/play/synth-panel/#audio-routing-and-parameter-updates)
+owns section controls and asynchronous sound-parameter feedback.
+
+This page owns stateless functions and browser transport adapters. Headless
+objects and their supporting helpers link to the workflow that owns their
+construction and lifecycle contracts.
+
+## SFZ data and recording conversion
+
+`parseSfz(text, options?)` flattens supported `<global>`, `<group>` and
+`<region>` opcodes into `SfzRegion[]`. `parseSfzKey(value)` accepts numeric keys
+and note names (`c4` is MIDI 60); an unrecognized spelling returns `undefined`.
+This is a limited opcode parser, not a complete SFZ interpreter.
+
+`resolveSfzZones(regions, sfzUrl, options?)` resolves sample paths and produces
+`SampleZone[]`. Missing `lokey`, `hikey` and `pitch_keycenter` independently
+default to 0, 127 and 60. Setting a range boundary does not change the root
+pitch; the explicit `key` shorthand sets all three values. These defaults match
+the SFZ definitions for [key ranges](https://sfzformat.com/opcodes/lokey/),
+[the upper boundary](https://sfzformat.com/opcodes/hikey/) and
+[sample root](https://sfzformat.com/opcodes/pitch_keycenter/).
+
+`SfzParseOptions.maxInputCharacters` defaults to 1,000,000 and `maxRegions`
+defaults to 512, also exposed by the frozen `DEFAULT_SFZ_PARSE_LIMITS` object.
+Limits must be positive safe integers. Parsing rejects a non-string source with
+`TypeError`; invalid limits or exceeded budgets throw `RangeError`.
+Zone resolution accepts only the `maxRegions` option and omits regions without
+a sample. None of these functions fetches or decodes audio.
+
+`notesToScore(notes, options?)` accepts `RecordedNote` values with `midi`,
+`velocity`, `voice`, `onsetSec` and `durationSec`. It creates one part per voice,
+preserves performed seconds and velocity, and derives notated quarters at
+`bpm` (default 120). `ppq` is a positive safe integer tick resolution (default
+480); `title` defaults to `Recording`. A finite positive `quantizeGrid` snaps
+onsets and durations to that many quarters; zero, negative or omitted values
+disable snapping. Notated durations are at least one tick, including a captured
+zero-duration note. The generated measures use 4/4.
+
+Invalid tempo, PPQ, non-finite quantization, negative or non-finite captured
+timings, and derived timing beyond the supported measure range throw
+`RangeError` before allocating measures. Empty recordings still validate
+options and produce one empty measure. The conversion owns no recording device,
+player or clock.
+
+## Note-input mappings
+
+`qwertyMidi(code, baseC)` returns the mapped MIDI number or `null` for an
+unmapped physical-key code. Only the map's own key entries are considered;
+inherited object names do not map to notes. `gridKeyboardMidi` and
+`gridQwertyCellMidi` share that lookup and their existing explicit-pad fallback.
+
+`parseGridMap(text)` reads sparse `ref=midi` pairs separated by commas,
+semicolons or whitespace, using refs such as `a1` and `z10`. Empty, malformed
+or non-finite assignments are ignored without clearing an earlier mapping;
+numeric zero remains a valid value. Finite values are rounded, with the last
+valid assignment for a cell winning. This mapping helper does not clamp MIDI
+range; callers choose and validate the playable range for their input surface.
+
+## Export — render to audio (offline)
+
+`renderScoreToBuffer` plays the same `score · sound · effect` stack through an `OfflineAudioContext` — deterministically and faster than real time — and hands back an `AudioBuffer`. `bufferToWav` (or `renderScoreToWav`) encodes it as a downloadable 16-bit PCM WAV. This closes the loop alongside the notation/MIDI serializers: load/build → play → **export audio**.
+
+<ApiSandbox code={renderCode} />
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `synth` | oscillator | Timbre — a `Sound` or `HeadlessSynth` that implements `connect()`. |
+| `effect` / `reverb` | — | Effect chain (legacy reverb sugar). |
+| `tempo` | score tempo | Override BPM. |
+| `sampleRate` / `channels` | `44100` / `2` | Output format. |
+| `tailSeconds` | `1.5` w/ effect, else `0.15` | Extra silence for effect tails. |
+
+> Self-routing synths (Tone / Spessa) route to their own destination and aren't captured — use a `Sound` or a `HeadlessSynth` with `connect()` (oscillator / soundfont / sfz).
+
+## File input → Score
+
+Players take a `Score`, not a file. Conversion lives in one place, so the same parsed `Score` feeds a player, a [visualizer](/score/api/view/), and an [analyzer](/score/api/analyze/). Each format has a parser and serializer (`parseMIDI` / `serializeMIDI`, `parseMusicXML` / `serializeMusicXML`, `parseMXL` / `serializeMXL`, `parseABC` / `serializeABC`).
+
+<ApiSandbox code={ioCode} />
+
+| Format | Extensions | Notes |
+| --- | --- | --- |
+| MIDI | `.mid` `.midi` | Standard MIDI File |
+| MusicXML | `.xml` `.musicxml` | |
+| MXL | `.mxl` | zip-compressed MusicXML |
+| ABC | `.abc` | |
+
+### Parsing off the main thread
+
+Parsing large files blocks the main thread — measured ~160ms for a 20k-note MusicXML and ~360ms for a 100k-note MIDI. `createParserWorker()` moves the parse into a Web Worker: the worker posts back plain Score JSON and the main thread only pays the cheap `scoreFromJSON` rebuild (~50ms), so the UI stays responsive.
+
+```ts
+import {createParserWorker} from '@webmusic/score/io/worker-client';
+
+const parser = createParserWorker();
+
+// Bytes / text you already have — caller-owned buffers are never detached.
+const score = await parser.parse(buffer); // format sniffed; or parse(data, 'midi')
+
+// Fetch happens on the main thread (page cookies, relative URLs), parse in the worker.
+const fromUrl = await parser.loadFromUrl('/scores/sonata.mxl');
+
+parser.dispose(); // terminate the worker when done
+```
+
+After checking `maxInputBytes`, `parse*()` snapshots the caller's `ArrayBuffer`
+or exact `Uint8Array` range once. A real Worker receives that private snapshot
+by transfer; the fallback parses the same snapshot. URL loading may transfer
+its own bounded response buffer directly. Every route preserves caller
+ownership and never mutates or detaches the original.
+
+By default the worker is spawned with the bundler-friendly pattern `new Worker(new URL('./worker.js', import.meta.url), {type: 'module'})`, which Vite / webpack / Rollup detect and bundle automatically. If your bundler can't handle it, pass your own `Worker` instance or factory:
+
+```ts
+const parser = createParserWorker(
+  () => new Worker(new URL('@webmusic/score/io/worker', import.meta.url), {type: 'module'}),
+);
+```
+
+Where `Worker` doesn't exist (Node, SSR) — or constructing one throws — every call transparently falls back to in-process parsing behind the same Promise API, so the code is safe to run anywhere. The worker protocol itself (`ParseRequest` / `ParseResponse` and the pure `handleParseRequest`) is exported too, in case you want to host the handler in your own worker.
+
+---
+
+## Browser transport drivers
+
+The `@webmusic/score/play/drivers` entry maps continuous browser input to a
+borrowed transport. The live example uses `bindValue` to scrub a ScorePlayer
+from a numeric slider. These browser adapters are separate from
+[InteractivePlayer’s clock and MIDI helpers](/score/headless/play/interactive-player/#clock-input).
+
+<ProgrammaticTransportDriverDemo />
+
+### Browser adapter composition
+
+```ts
+// Each browser adapter returns a cleanup; retain every binding you install.
+import { bindScroll, bindPointer, bindOrientation } from '@webmusic/score/play/drivers';
+
+const offScroll = bindScroll(player, { mode: 'position' });
+const offPointer = bindPointer(player, surfaceEl, { axis: 'x' });
+const offOrientation = bindOrientation(player, { axis: 'gamma' });
+
+offScroll();
+offPointer();
+offOrientation();
+```
+
+Here `player` is a compatible continuous transport such as `ScorePlayer`,
+not the `InteractivePlayer` in the earlier independent example. These
+browser adapters own their installed event bindings; the transport and
+target elements remain caller-owned.
+
+## API Reference
+
+| API | Kind | Use it for |
+| --- | --- | --- |
+| `createScorePlayer` / `ScorePlayer` / `Player` | Engine | Autonomous push-clock timeline engine. |
+| `createScorePlayerFromUrl(url, opts?)` | Engine | Load a file and build a `ScorePlayer`. |
+| `playScore(score, opts?)` / `playScoreFromUrl(url, opts?)` | Headless action | Create, start and return a caller-controlled `ScorePlayer`; failed startup disposes owned resources. |
+| `InteractivePlayer` / `createInteractivePlayer` | Engine | Event-driven pull engine: voices, sources, mixing, live score swap. |
+| `Rack` / `createRack` | Ensemble | Compose single-instrument players into a synced, individually-mixed group; `.effect` / `setEffect()` replace the summed master-bus chain. |
+| `LoopPlayer` / `createLoopPlayer` | Transport | A–B loop region over a `ScorePlayer`, with finite-repeat counting. |
+| `AbPlayer` / `createAbPlayer` | Transport | Live zero-latency switching between named arrangements (built on `InteractivePlayer`). |
+| `LfoController` / `createLfoController`, `lfoWave` | Modulation | DOM-free LFO state, scheduling and borrowed-target modulation; pure waveform helper. |
+| `SynthPanelAudioGraph`, `SynthPanelAudioOptions`, `SynthPanelSection` | Headless class / types (`@webmusic/score/play/headless`) | [Effects/EQ graph with stable same-context ports](/score/headless/play/sound/#synth-backends-synthpanelaudiograph); separate from the stateless Play entry. |
+| `Sound` | Timbre | Uniform wrapper: `oscillator` / `samples` / `sfz` / `soundfont2` / `from` / `custom`. |
+| `OscillatorSynth`, `SoundfontSynth`, `RangeSampler` | Synth | Oscillator, per-note sampler, pitch-shifting range sampler. |
+| `SpessaSynthSynth` | Synth adapter | Adopt an existing spessasynth instance as a `HeadlessSynth`. |
+| `createReverbNode`, `chooseZone`, `playbackRateFor`, `parseSfz` | Audio helpers | Reverb node, zone selection, pitch math, `.sfz` parsing. |
+| `renderScoreToBuffer`, `renderScoreToWav`, `bufferToWav` | Export | Render a score offline to an `AudioBuffer` / downloadable WAV. |
+| `InteractivePlayer.record` / `.stopRecording`, `notesToScore` | Record | Capture a live performance back into a `Score`. |
+| `Effect` | Effect | `reverb` / `delay` / `filter` / `distortion` / `compressor` / `gain` / `chain` / `custom`. |
+| `insertEffect`, `resolveEffect` | Effect helpers | Wire an effect into a custom graph. |
+| `bindScroll`, `bindPointer`, `bindOrientation`, `bindValue` | Driver (`@webmusic/score/play/drivers`) | Bind scroll / pointer / orientation / value to a `PlaybackTransport` (e.g. a `ScorePlayer`). |
+| `Metronome`, `bindClock`, `bindMidiInput` | Live input | Drive the pull engine's `advance()` from a clock or Web MIDI. |
+| `defineScorePlayerElement`, `ScorePlayerElement` | Web Component | Register / the class behind `<score-player>`. |
+| `defineSimpleScorePlayerElement`, `SimpleScorePlayerElement` | Deprecated compatibility | Legacy names for `<simple-score-player>`; use the canonical score-player exports for new code. |
+| `defineRackControlElement`, `defineScoreRecorderElement` | Web Component | Register `<rack-control>` (Rack mixer with a master `.effect` proxy) / `<score-recorder>`. |
+| `defineNoteInputElement`, `defineSynthPanelElement` | Web Component | Register `<note-input>` / `<synth-panel>`. |
+| `defineAllElements` | Web Component | Register every element in the flat set at its default tag (the `/auto` entry calls this). |
+| `loadScore`, `loadScoreFromUrl`, `detectFormat` | IO (`@webmusic/score/io`) | Parse / fetch+parse / sniff format. |
+| `createParserWorker`, `handleParseRequest` | IO (`@webmusic/score/io/worker-client`, `/worker-protocol`) | Parse off the main thread in a Web Worker (with in-process fallback). |
+| `parseMIDI` / `serializeMIDI`, `parseMusicXML` / `serializeMusicXML`, `parseMXL` / `serializeMXL`, `parseABC` / `serializeABC` | IO (`@webmusic/score/io`) | Each format ⇄ `Score`. |
+| `HeadlessSynth`, `ScorePlayerOptions`, `PlayerTimeUpdate`, `PlaybackTransport`, `InteractivePlayerOptions`, `RackOptions`, `RackAddOptions`, `LfoControllerOptions`, `LfoControllerState`, `LfoTarget`, `LfoShape`, `SynthPanelLfoErrorDetail`, `RenderOptions`, `RecordedNote`, `RecordToScoreOptions`, `EffectNode`, `ReverbOptions` / `DelayOptions` / `FilterOptions` / `DistortionOptions` / `CompressorOptions` / `LimiterOptions` / `AnalyserOptions` / `BitcrusherOptions` / `TremoloOptions` / `ChorusOptions`, `FmOptions` / `WavetableOptions` / `NoiseOptions` / `MidiOutOptions`, `ClockOptions` / `MidiInputOptions`, `ScoreFormat`, … | Types | Option, event, and contract shapes. |

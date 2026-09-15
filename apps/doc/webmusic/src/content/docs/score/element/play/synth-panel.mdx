@@ -1,0 +1,232 @@
+---
+title: '<synth-panel>'
+description: 'One control panel for every knob and curve surface — the sections attribute picks sound, effects, envelope, eq, lfo and macros, in order.'
+sidebar:
+  order: 4
+---
+
+import SynthPanelDemo from '../../../../../components/SynthPanelDemo.astro';
+
+`<synth-panel>` is a composable control surface for one synth voice. It does not choose a synthesizer
+for you: assign small descriptors and callbacks for the controls you want, then connect its optional
+effects / EQ bus to the audio graph you already own. This keeps the panel reusable with
+`OscillatorSynth`, a worklet, a sampler, or an application-specific engine.
+
+The Element composes published UIKit section-panel, parameter-rack, envelope, EQ, LFO and
+macro presenters. Parameter descriptors, `LfoController`, `EqController` and the DOM-free
+[`SynthPanelAudioGraph`](/score/headless/play/sound/#synth-backends-synthpanelaudiograph) own the
+behavior behind those controls. The panel borrows its AudioContext and target callbacks;
+it creates no player or synth voice.
+
+The `sections` attribute is an ordered comma list. One element can show only the controls a view
+needs, or all six modules together:
+
+| Section | Assign | What appears |
+| --- | --- | --- |
+| `sound` | `.sound` / `.params` | Grouped rotary parameters whose `apply(value)` callbacks drive your synth. |
+| `effects` | `.context` + `.effects` | Live parameters from an ordered array of `Effect` recipes. |
+| `envelope` | `.envelope`, `.ranges`, `.apply` | An accessible draggable ADSR curve. |
+| `eq` | `.context` + `.bands` | A draggable frequency-response editor and three-band Web Audio graph. |
+| `lfo` | `.lfo` + `.target` | Shape, rate, depth, phase and run controls for a borrowed modulation target. |
+| `macros` | `.macros` | Knobs that map one normalized value onto several targets. |
+
+Changing `sections` re-renders the visible section presenters without disposing the panel's
+`LfoController`. Reordering sections or changing only `sound`, `envelope`, `lfo` or `macros`
+does not rebuild the audio chain. In particular, hiding `lfo` leaves an already-running controller active, so
+modulation continues; showing it again presents the same shape, rate, depth and phase. Disconnecting
+the whole panel disposes the controller and stops modulation. Reconnection restores those values
+into a fresh stopped controller.
+
+When both `effects` and `eq` are active their audio is spliced into one serial chain (effects → eq)
+behind the shared `.input` / `.output`. The demo pairs a piano `<note-input>` with the panel
+and exposes each property group through external Parameters.
+
+## Try every property
+
+The demo is a real `<note-input>` and `<synth-panel>` composition. Play the keyboard, then edit the
+property groups under **Parameters**:
+
+- **Sound parameters** replaces the actual `.sound` descriptor array and updates the oscillator.
+- **Envelope** assigns ADSR values and the three graph ranges; dragging the curve writes the values
+  back into the editor.
+- **Equalizer bands** rebuilds the real `.bands` graph from low, mid and high frequency / gain / Q.
+- **LFO and macros** configures shape, rate, depth, phase, run state, a cutoff target and two
+  multi-target macro descriptors.
+- **Effects** adds, edits, reorders and removes real `Effect[]` entries. The panel's own effects
+  section exposes their live parameters.
+
+Use the `sections` field to reorder or hide modules. **Copy** includes the composition plus the
+current Parameters and Effects editor setup; **Reset** restores every editor value, nested effect and
+section after ordinary edits or a browser back/forward-cache restore. The structured editors are the
+copy source of truth. Turning a Sound / Effect knob or dragging an EQ point directly on the panel is
+a live audition and does not silently rewrite a separate editor field.
+
+<SynthPanelDemo />
+
+## Audio routing
+
+Assigning `.context` creates stable `.input` and `.output` boundary nodes. Route a synth into the
+input once and the output to a destination once. Changing `.effects`, `.bands`, or `sections` only
+replaces the internal path; it does not invalidate those external connections. When neither effects
+nor EQ is active, the boundaries are connected by a dry bypass.
+
+```js
+panel.context = context;
+synth.connect(panel.input);
+panel.output.connect(context.destination);
+
+panel.effects = [Effect.reverb(), Effect.delay()];
+// The two external connections above are still valid.
+```
+
+Effects run before EQ. Hiding `effects` or `eq` removes that module from the signal path while
+retaining its configuration for a later render.
+
+## Section state and lifetime
+
+Changing `sections` re-renders the visible presenters while preserving sound values, ADSR, EQ bands,
+effect parameters and macro positions. A running LFO also remains active when its section is hidden;
+showing it again restores the same shape, rate, depth and phase. Disconnecting the whole element
+tears down its audio nodes and LFO loop. Reconnecting creates a fresh stopped controller with the
+retained modulation settings.
+
+The panel borrows `.context`, `.target`, descriptor callbacks and every object they close over. It
+never disposes your synth or target. It owns only the Web Audio nodes and UI presenters that it
+creates from those assignments.
+
+## Import
+
+```html
+<script type="module">
+  import { defineSynthPanelElement } from '@webmusic/score/play/element';
+  defineSynthPanelElement();
+</script>
+<synth-panel sections="sound,effects,envelope,eq,lfo,macros"></synth-panel>
+```
+
+## Audio routing and parameter updates
+
+Connect a source to `.input` and `.output` to your destination after configuring a context.
+These ports keep their identity within the same
+AudioContext as effects, EQ bands or their sections change. The panel builds and connects
+the candidate DSP before retiring the old chain; a construction or connection failure
+releases completed candidate resources and leaves the last usable chain in place.
+
+With no applicable effects/EQ, the same ports carry a dry bypass from input to output.
+Re-enabling DSP replaces that internal path and retains the external connections. Replacing or
+clearing `.context`, or disconnecting the panel, releases its ports; reconnect your routing
+after a new context or mounted lifetime. The panel never closes the borrowed context.
+
+Sound parameter callbacks may finish asynchronously. The control shows the requested value
+while `apply(value)` runs. A failed current request restores the preceding displayed value;
+an older failure cannot overwrite a newer request, replacement descriptors or a new mounted
+lifetime. Failures from a still-mounted control reach `webscore:error`; obsolete presenter
+rejections are contained after replacement or disconnect. The panel cannot undo side effects
+inside an application-supplied callback.
+
+<details class="component-section">
+<summary>API</summary>
+
+
+```ts
+const WAVES = ['sine', 'square', 'sawtooth', 'triangle'];
+const panel = document.querySelector('synth-panel');
+
+// "sound": one knob per descriptor; `group` clusters them in labelled blocks
+panel.sound = [
+  { group: 'osc', name: 'wave', value: 3, min: 0, max: 3, options: WAVES, apply: (i) => synth.setParam('type', WAVES[i]) },
+  { group: 'osc', name: 'tune', value: 0, min: -50, max: 50, step: 1, unit: '¢', apply: (v) => synth.setParam('detune', v) },
+  { group: 'filter', name: 'cutoff', value: 8000, min: 200, max: 12000, step: 10, unit: 'Hz', apply: (v) => synth.setParam('cutoff', v) },
+];
+
+// "effects" + "eq": build the chain on a context, splice .input/.output into the graph
+panel.context = ctx;
+panel.effects = [Effect.filter(), Effect.delay(), Effect.reverb()];
+panel.output.connect(ctx.destination);
+player.destination = panel.input;
+
+// "envelope": wire the ADSR editor to the synth
+panel.apply = (e) => {
+  synth.setParam('attackSeconds', e.attack);
+  synth.setParam('releaseSeconds', e.release);
+};
+
+// "lfo" + "macros"
+panel.lfo = { shape: 'sine', rate: 1, depth: 0.6, phase: 0, running: false };
+panel.target = { min: 300, max: 9000, unit: 'Hz', apply: (v) => synth.setParam('cutoff', v) };
+panel.macros = [{ label: 'OPEN', targets: [
+  { name: 'cutoff', min: 600, max: 11000, apply: (v) => synth.setParam('cutoff', v) },
+  { name: 'level', min: 0.06, max: 0.22, apply: (v) => synth.setParam('gain', v) },
+] }];
+```
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `sections` | attribute / property | Comma list of `sound` / `effects` / `envelope` / `eq` / `lfo` / `macros` (default `sound,effects`). Toggling re-renders; current values survive. |
+| `.sound` (alias `.params`) | property | `{ name, value, min, max, step?, unit?, options?, group?, apply }[]` — one knob each; `apply(value)` fires live and may return a promise. Failed current writes restore the prior displayed value without overwriting newer writes. |
+| `.context` | property | Borrowed `AudioContext` used to create the effects / EQ chain and stable boundary nodes. Replacing it releases the old graph. |
+| `.effects` (alias `.effect`) | property | `Effect[]` to chain and expose as knobs. |
+| `.input` / `.output` | property (get) | Stable entry / exit `AudioNode`s for the current `.context`. The internal effects → EQ path can rebuild without changing their identity; an empty path is dry. |
+| `.envelope` | property | Get / set the ADSR (`{ attack, decay, sustain, release }`). |
+| `.ranges` | property | Get / set per-stage envelope maxima in seconds (`{ attackMax, decayMax, releaseMax }`, default `2`). A live assignment repaints the graph. |
+| `.apply(env)` | property | Called on every envelope change. |
+| `.bands` | property | EQ bands `{ frequency, gain?, q? }[]` (default low / mid / high). |
+| `.lfo` | property | Get / set `{ shape, rate, depth, phase, running }`. Partial assignments update the mounted presenter; the getter returns current normalized state. |
+| `.target` | property | Borrowed LFO destination `{ min, max, value?, unit?, apply(value) }`. Assignment never applies eagerly; the panel never destroys it. |
+| `.macros` | property | `{ label?, value?, targets }[]` — each macro knob maps `0..1` into every target's range. |
+| `webscore:envelope` | event | `detail = { attack, decay, sustain, release }`. |
+| `webscore:macro` | event | `detail = { index, label, value }`. |
+| `webscore:lfo` | event | Full `.lfo` snapshot after a shape / rate / depth / running control change. Animation-frame phase changes and phase-only assignments do not emit an event. |
+| `webscore:error` | event | Bubbling, composed error boundary for presenter, sound-parameter callback, envelope and LFO failures. `SynthPanelEnvelopeErrorDetail` and `SynthPanelLfoErrorDetail` contain `{ operation: 'synth-panel', error }`. Direct audio-configuration property assignments can throw construction or connection errors. |
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+The host fills its container and can shrink inside flex/grid layouts; the native `hidden`
+attribute hides it. The shared section panel provides spacing without an additional outer frame.
+Parameter groups and macro readouts wrap; envelope and EQ values occupy rows below their plots.
+The plot-height tokens control the SVG only, so the component grows to include its readouts.
+
+Use `--wm-component-background: transparent` and `--wm-component-radius: 12px`
+for the panel/section surfaces, and `--wm-control-radius` for controls. Graph
+backgrounds are separate: set `--wm-envelope-background`, `--wm-eq-background`
+and `--wm-lfo-wave-background` (or their legacy `--synth-graph-bg` override)
+to `transparent`. Set `--wm-foreground-on-inverse` for readable graph ink on a
+custom dark surface. Graphs keep their inverse background and ink when only
+`--wm-surface` or `--wm-foreground` changes. Readouts below the plots use
+`--wm-foreground-muted`, then `--wm-foreground`, on the section surface.
+Specific presenter tokens and legacy overrides remain available for independent sections.
+
+```css
+synth-panel {
+  --synth-bg: var(--wm-surface, #fff);
+  --wm-parameter-size: 46px;
+  --wm-parameter-track: #dcdcdc; /* knob arc */
+  --wm-parameter-fill: #999;     /* active arc */
+  --wm-parameter-pointer: #111;  /* pointer */
+  --synth-graph-bg: #111;     /* envelope / EQ / LFO graphs */
+  --synth-graph: #fff;
+  --synth-accent: #c0392b;    /* LFO playhead */
+  --synth-radius: 0;
+}
+```
+
+The shared envelope and LFO sections expose the same stable parts as their standalone presenters.
+Envelope exposes `root`, `svg`, `grid`, `area`, `curve`, `handle`, `readout`, `inputs` and `input`;
+LFO exposes `root`, `row`, `run`, `shapes`, `shape`, `control`, `label`, `rate-control`,
+`depth-control`, `input`, `rate`, `depth`, `value`, `rate-value`, `depth-value`, `wave`, `curve` and
+`head`.
+
+For inner graphs and controls, explicit `--synth-*` values retain precedence
+where they map onto the shared presenters. Outer boxes first read their
+`--wm-*-surface-*` and `--wm-component-*` values, then their legacy fallback.
+The Element supplies no default legacy values: without an explicit override, the relevant
+`--wm-panel-*`, `--wm-envelope-*`, `--wm-eq-*` and `--wm-lfo-*` tokens apply, followed by
+their shared UIKit tokens and built-in fallbacks. Parameter and macro controls use their
+`--wm-parameter-*` and `--wm-macro-*` tokens directly. The panel and LFO section omit an
+extra frame by default; panel border and padding can be set with `--wm-panel-border` and
+`--wm-panel-padding`.
+
+</details>

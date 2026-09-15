@@ -1,0 +1,32 @@
+---
+import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
+import './musical-stage.css';
+const code = "import {createScoreView} from '@webmusic/score/view/headless';\nconst view = createScoreView(score, {viewport: {startTime: 0, endTime: 2}});";
+---
+
+<HeadlessDemoFrame entry="@webmusic/score/view/headless" name="createScoreView" code={code}
+  hint="This small application renderer draws the model's visible notes. Move the local position to select sounding notes, or change the visible time window."
+  rootAttrs={{'data-score-window-demo': ''}}>
+  <section class="wm-hl-music" aria-label="Visible score notes">
+    <p class="wm-hl-music__summary" data-window-summary></p>
+    <div class="wm-hl-music__lane" data-window-lane aria-hidden="true"></div>
+    <p data-window-time></p>
+    <div class="wm-hl-music__chips" data-window-active aria-label="Active pitches"></div>
+  </section>
+  <div slot="parameters" class="wm-pg__grid">
+    <label class="wm-pg__param"><span class="wm-pg__name">viewport</span>
+      <select class="wui-select" data-window-viewport aria-label="Visible time window"><option value="0">0–2 seconds</option><option value="2">2–4 seconds</option><option value="all">Full score</option></select>
+      <span class="wm-pg__note">setViewport(startTime, endTime), or clearViewport() for every note.</span>
+    </label>
+    <label class="wm-pg__param"><span class="wm-pg__name">seek(seconds)</span>
+      <input type="range" min="0" max="4" step="0.05" value="0" data-window-position aria-label="Local position in seconds" />
+      <span class="wm-pg__note">Nominal seconds. Updates this view's selection without controlling a player.</span>
+    </label>
+  </div>
+</HeadlessDemoFrame>
+
+<script>
+  import {mountDemos} from '../demo-lifecycle';
+  import {mountScoreWindowDemo} from './analysis-view-playgrounds-client';
+  mountDemos('[data-score-window-demo]', (root, scope) => { mountScoreWindowDemo(root, scope); });
+</script>

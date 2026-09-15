@@ -1,0 +1,210 @@
+---
+title: '@webmusic/ui/lfo'
+description: 'Renders run, shape, rate, depth and live-phase waveform controls over caller-owned LFO state.'
+sidebar:
+  label: 'lfo'
+  order: 4
+---
+
+import UiPresenterLiveDemo from '../../../../components/UiPresenterLiveDemo.astro';
+import UiPresenterRelated from '../../../../components/UiPresenterRelated.astro';
+
+`mountLfo()` renders a run toggle, four waveform buttons, rate and depth ranges, and a waveform
+with a phase head. The caller owns oscillator time, scheduling and modulation targets; the
+presenter paints `LfoState` and calls one structural command per control.
+
+Use [envelope](/uikit/parameters-gestures/envelope/) for one-shot ADSR shaping or
+[parameter](/uikit/parameters-gestures/parameter/) for independent values. The Live Demo advances
+`phase` in caller code only while `running`; [`<synth-panel>`](/score/element/play/synth-panel/)
+already provides the production composition.
+
+<UiPresenterLiveDemo presenter="lfo" />
+
+## Import
+
+```ts
+import {mountLfo} from '@webmusic/ui/lfo';
+
+const handle = mountLfo(host, {
+  snapshot: () => store.lfo,
+  setRunning: (running) => clock.setRunning(running),
+  setShape: (shape) => store.setShape(shape),
+  setRate: (rate) => store.setRate(rate),
+  setDepth: (depth) => store.setDepth(depth),
+  subscribe: (notify) => store.subscribe(notify),
+});
+```
+
+## Commands and phase ownership
+
+The presenter normalizes each snapshot, then overlays the latest unsettled command of each kind
+for optimistic paint. Running, shape, rate and depth use independent revision counters, so an old
+rate promise cannot clear a newer rate command and never blocks a simultaneous shape command.
+After the latest command settles, the presenter re-reads authoritative state.
+
+`phase` has no presenter command: an external clock, audio graph or animation owner advances it
+and calls the binding subscription. `update()` is re-entrancy-safe and bounded to 32 passes. See
+the [shared presenter shape](/uikit/api/#the-shared-presenter-shape) for the common lifecycle.
+
+<details class="component-section">
+<summary>API</summary>
+
+`mountLfo(host, binding, options?)` accepts an `HTMLElement` or `ShadowRoot` and returns a
+`MountedLfoHandle`.
+
+**State**
+
+| Member | Kind | Description |
+|---|---|---|
+| `shape` | `'sine' \| 'triangle' \| 'square' \| 'saw'` | Selects button state, chip glyph and generated waveform; unknown values normalize to `'sine'`. |
+| `rate` | `number` | Frequency in hertz, clamped to the native input's `0.05…12` range. |
+| `depth` | `number` | Normalized modulation depth clamped to `0…1`; scales waveform amplitude. |
+| `phase` | `number` | Normalized external cycle position clamped to `0…1`; sets the phase-head x coordinate. |
+| `running` | `boolean` | Strict `true` selects the stop glyph and accessible action. |
+| `disabled?` | `boolean` | Strict `true` disables every button and range input and dims the root. |
+
+**Binding**
+
+| Member | Kind | Description |
+|---|---|---|
+| `snapshot()` | `() => LfoState` | Required pull port read on mount, notification, command settlement and `update()`. |
+| `setRunning(running)` | `(boolean) => void \| Promise<void>` | Required run/stop command. |
+| `setShape(shape)` | `(LfoShape) => void \| Promise<void>` | Required waveform command. |
+| `setRate(rate)` | `(number) => void \| Promise<void>` | Required frequency command receiving the native range value. |
+| `setDepth(depth)` | `(number) => void \| Promise<void>` | Required normalized depth command. |
+| `subscribe?(notify)` | `(notify: () => void) => () => void` | Optional external-state subscription released by `destroy()`. |
+
+**Options**
+
+| Member | Kind | Default | Description |
+|---|---|---|---|
+| `label` | `string` | `'LFO'` | Accessible name of the root group. |
+| `runLabel` | `string` | `'Run'` | Run button accessible name while stopped. |
+| `stopLabel` | `string` | `'Stop'` | Run button accessible name while running. |
+| `classNames` | `LfoClassNames` | `{}` | Adds compatibility classes for root, controls, inputs, values and waveform nodes. |
+| `parts` | `LfoParts` | `{}` | Adds tokens beside all canonical LFO parts. |
+| `formatRate` | `(rate: number) => string` | `` `${rate.toFixed(2)}Hz` `` | Formats visible rate and `aria-valuetext`; thrown errors go to `onError`. |
+| `formatDepth` | `(depth: number) => string` | Integer percent | Formats visible depth and `aria-valuetext`; thrown errors go to `onError`. |
+| `onError` | `(error: unknown) => void` | — | Receives snapshot, formatter, command, subscription, stabilization and cleanup failures. |
+| `stylesheet` | `boolean` | `true` | Installs the presenter's stylesheet unless explicitly `false`, for a light-DOM host that cannot inject CSS into its page. |
+
+**Handle**
+
+| Member | Kind | Description |
+|---|---|---|
+| `element` | `HTMLElement` | Presenter-owned `.wui-lfo` root. |
+| `controls.run` | `HTMLButtonElement` | Run/stop toggle. |
+| `controls.shapes` | `HTMLElement` | Shape button group. |
+| `controls.rateInput` | `HTMLInputElement` | Native rate range. |
+| `controls.rateValue` | `HTMLElement` | Formatted, aria-hidden rate readout. |
+| `controls.depthInput` | `HTMLInputElement` | Native depth range. |
+| `controls.depthValue` | `HTMLElement` | Formatted, aria-hidden depth readout. |
+| `controls.wave` | `HTMLElement` | Waveform viewport. |
+| `controls.curve` | `SVGPolylineElement` | Generated waveform curve. |
+| `controls.head` | `SVGLineElement` | Current phase head. |
+| `update()` | `() => void` | Re-reads and repaints through the bounded update loop. |
+| `destroy()` | `() => void` | Idempotently invalidates pending commands and removes listeners, subscription, root and stylesheet. |
+
+**Accessibility.** The root and shape set are named groups. Run is a native button with a dynamic
+accessible name; every shape is a labelled toggle button with `aria-pressed`. Rate and depth are
+native labelled ranges whose custom formatted values are mirrored in `aria-valuetext`; visible
+readouts and all SVG glyphs are hidden from assistive technology. Disabled state reaches every
+interactive node, and `:focus-visible` outlines buttons and inputs.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+Use the shared [surface and palette tokens](/uikit/#theme-with-css-custom-properties) for
+background (including `transparent`), foreground, accent, outer border and corner radius.
+Presenter-specific tokens below take precedence within their documented roles.
+
+The presenter installs `lfoStyle` unless `stylesheet: false`. Controls and waveform buttons
+wrap according to their container width. Range inputs can shrink below their preferred width;
+long formatted values wrap onto additional lines while the waveform keeps its configured height.
+Supply the exported stylesheet or your own CSS from the host when opting out.
+
+The waveform pairs `--wm-surface-inverse` with `--wm-foreground-on-inverse`.
+Ordinary surface and foreground tokens leave that inverse plot unchanged; set
+both inverse tokens or the LFO-specific background/curve tokens to replace it.
+
+**Tokens**
+
+| Property | Falls back to | Default | Controls |
+|---|---|---|---|
+| `--wm-lfo-height` | `--wm-control-size` → `--wui-row-h` | `2rem` | Height of the run toggle, the shape chips, and both range rails. |
+| `--wm-lfo-handle-size` | literal | `.7rem` | Range thumb width. Its height follows the control size. |
+| `--wm-lfo-thumb-radius` | `--wm-control-radius` | `0` | Range thumb corners. |
+| `--wm-lfo-padding` | literal | `.6rem` | Root-inset compatibility fallback. |
+| `--wm-lfo-border` | `--wm-border` | `#d8d8d8` | Root border. |
+| `--wm-control-border` | `--wm-border` | `#d8d8d8` | Shared non-primary control border fallback. |
+| `--wm-border` | literal | `#d8d8d8` | Shared border fallback. |
+| `--wm-lfo-radius` | `--wm-control-radius` | `0` | Root, run and shape-button corners. |
+| `--wm-control-radius` | literal | `0` | Shared radius fallback. |
+| `--wm-lfo-background` | `--wm-surface` | `#fff` | Root background. |
+| `--wm-surface` | literal | `#fff` | Shared surface and button fallback. |
+| `--wm-lfo-foreground` | `--wm-foreground` | `#111` | Root current color. |
+| `--wm-foreground` | literal | `#111` (`#333` chip text) | Shared foreground fallback. |
+| `--wm-lfo-font` | `.8rem var(--wm-font-family)` | `.8rem system-ui, sans-serif` | Root font shorthand. |
+| `--wm-font-family` | literal | `system-ui, sans-serif` | Font-family fallback. |
+| `--wm-lfo-gap` | literal | `.5rem` | Control-row gap. |
+| `--wm-lfo-button-background` | `--wm-accent` → `--wm-foreground` | `#111` | Run background and border. |
+| `--wm-lfo-button-foreground` | `--wm-accent-foreground` | `#fff` | Run glyph. |
+| `--wm-lfo-shape-gap` | literal | `.25rem` | Gap between waveform buttons. |
+| `--wm-lfo-chip-border` | `--wm-control-border` → `--wm-border` | `#d8d8d8` | Inactive shape-button border. |
+| `--wm-lfo-chip-background` | `--wm-surface` | `#fff` | Inactive shape background. |
+| `--wm-lfo-chip-foreground` | `--wm-foreground` | `#333` | Inactive shape glyph. |
+| `--wm-lfo-chip-active-background` | `--wm-accent` → `--wm-foreground` | `#111` | Selected shape background. |
+| `--wm-lfo-chip-active-foreground` | `--wm-accent-foreground` | `#fff` | Selected shape glyph. |
+| `--wm-lfo-label` | `--wm-foreground-muted` → `--wm-foreground` | `#666` | Rate/depth labels. |
+| `--wm-foreground-muted` | literal | `#666` | Shared muted-label fallback. |
+| `--wm-lfo-input-width` | literal | `5.5rem` | Preferred range width, bounded by the available container width. |
+| `--wm-lfo-track` | `--wm-control-track` | `#f3f3f3` | Range tracks. |
+| `--wm-control-track` | literal | `#f3f3f3` | Shared range-track fallback. |
+| `--wm-lfo-thumb` | `--wm-control-thumb` | `#111` | Range thumbs. |
+| `--wm-control-thumb` | literal | `#111` | Shared range-thumb fallback. |
+| `--wm-lfo-value` | `currentColor` | Label current color | Formatted readouts. |
+| `--wm-lfo-wave-height` | `--wm-surface-sm` | `72px` | Waveform viewport height, on the shared drawing-surface scale. |
+| `--wm-lfo-wave-background` | `--wm-surface-inverse` | `#111` | Waveform viewport. |
+| `--wm-surface-inverse` | literal | `#111` | Shared inverse-surface fallback. |
+| `--wm-lfo-wave` | `--wm-foreground-on-inverse` | `#fff` | Waveform curve. |
+| `--wm-foreground-on-inverse` | literal | `#fff` | Shared inverse-foreground fallback. |
+| `--wm-lfo-head` | `--wm-accent` | `#c0392b` | Phase head. |
+| `--wm-accent` | literal | `#c0392b` | Shared phase-accent fallback. |
+| `--wm-focus` | `--wm-focus-ring` | `currentColor` | Button/range focus outline. |
+| `--wm-focus-ring` | literal | `currentColor` | Shared focus fallback. |
+
+**Classes**
+
+`classNames` is additive. Rate and depth nodes carry both their shared and specific classes.
+
+| Node | Canonical class(es) | `classNames` key(s) |
+|---|---|---|
+| Root | `.wui-lfo` | `root` |
+| Control row | `.wui-lfo__row` | `row` |
+| Run button | `.wui-lfo__run` | `run` |
+| Shape group | `.wui-lfo__shapes` | `shapes` |
+| Shape button | `.wui-lfo__shape` | `shape` |
+| Rate label/control | `.wui-lfo__control .wui-lfo__rate-control` | `control`, `label`, `rateControl` |
+| Depth label/control | `.wui-lfo__control .wui-lfo__depth-control` | `control`, `label`, `depthControl` |
+| Rate input | `.wui-lfo__input .wui-lfo__rate` | `input`, `rateInput` |
+| Depth input | `.wui-lfo__input .wui-lfo__depth` | `input`, `depthInput` |
+| Rate value | `.wui-lfo__value .wui-lfo__rate-value` | `value`, `rateValue` |
+| Depth value | `.wui-lfo__value .wui-lfo__depth-value` | `value`, `depthValue` |
+| Wave viewport | `.wui-lfo__wave` | `wave` |
+| Wave curve | `.wui-lfo__curve` | `curve` |
+| Phase head | `.wui-lfo__head` | `head` |
+
+Runtime state also adds `.is-disabled` to the root and `.is-active.on` to the selected shape.
+
+**Parts**
+
+Canonical tokens are `root`, `row`, `run`, `shapes`, `shape`, `wave`, `curve`, and `head`. Each
+rate/depth label has `control label rate-control` or `control label depth-control`; each range has
+`input rate` or `input depth`; each readout has `value rate-value` or `value depth-value`.
+`LfoParts` adds its matching generic and specific tokens alongside all of them.
+
+</details>
+
+<UiPresenterRelated presenter="lfo" />

@@ -1,0 +1,166 @@
+---
+title: '@webmusic/ui/macro'
+description: 'Renders one normalized macro control or a compound rack of macros over structural bindings.'
+sidebar:
+  label: 'macro'
+  order: 2
+---
+
+import UiPresenterLiveDemo from '../../../../components/UiPresenterLiveDemo.astro';
+import UiPresenterRelated from '../../../../components/UiPresenterRelated.astro';
+
+`mountMacro()` renders one normalized rotary control beside caller-owned destination readouts. Its
+`MacroBinding` owns the value, label, disabled state and every mapped target; the presenter only
+formats and paints them. The Live Demo mounts the compound rack so its first binding exposes this
+State while the strip also exercises every rack Option.
+
+Use [parameter](/uikit/parameters-gestures/parameter/) for unrelated controls with independent
+bounds, or `mountMacroRack()` when several macro bindings should be stacked as one compound
+presenter. [`<synth-panel>`](/score/element/play/synth-panel/) already composes the rack API.
+
+<UiPresenterLiveDemo presenter="macro" />
+
+## Import
+
+```ts
+import {mountMacroRack, type MacroBinding} from '@webmusic/ui/macro';
+
+const bindings: MacroBinding[] = stores.map((store) => ({
+  snapshot: () => store.macro,
+  setValue: (value) => store.setMacro(value),
+  subscribe: (notify) => store.subscribe(notify),
+}));
+
+const handle = mountMacroRack(host, bindings);
+```
+
+## Compound macro racks
+
+`mountMacroRack(host, bindings, options?)` creates and owns one item host per binding, then mounts
+`mountMacro()` into each. `handle.items` preserves binding order and `handle.item(index)` returns a
+child handle. Rack `update()` forwards to every child; rack `destroy()` destroys children before
+removing its own root and stylesheet.
+
+The rack is layout and lifecycle composition, not a shared state owner. Each child binding keeps
+its own snapshot, command and subscription. See the
+[shared presenter shape](/uikit/api/#the-shared-presenter-shape) for the common ownership
+contract.
+
+<details class="component-section">
+<summary>API</summary>
+
+The entry exports both `mountMacro()` and `mountMacroRack()`.
+
+**State**
+
+| Member | Kind | Description |
+|---|---|---|
+| `label` | `string` | Visible knob label; nullish input normalizes to `'MACRO'`. |
+| `value` | `number` | Normalized macro value clamped to `0…1` and painted as an integer percentage. |
+| `targets` | `readonly MacroTargetState[]` | Ordered, read-only destination rows. An empty list paints `Assign .targets`. |
+| `disabled?` | `boolean` | Strict `true` disables the nested parameter range. |
+| `targets[].label` | `string` | Destination label. |
+| `targets[].value` | `number` | Finite display value; non-finite values normalize to `0`. |
+| `targets[].unit?` | `string` | Suffix appended directly to the formatted target value. |
+
+**Binding**
+
+| Member | Kind | Description |
+|---|---|---|
+| `snapshot()` | `() => MacroState` | Required pull port read on mount and every update. |
+| `setValue(value)` | `(number) => void \| Promise<void>` | Required command delegated by the nested normalized parameter control. |
+| `subscribe?(notify)` | `(notify: () => void) => () => void` | Optional external-state subscription released on destruction. |
+
+**Options**
+
+| Member | Kind | Default | Description |
+|---|---|---|---|
+| `mountMacro: onError` | `(error: unknown) => void` | — | Receives macro read/update failures and errors forwarded by the nested parameter presenter. |
+| `mountMacroRack: onError` | `(error: unknown) => void` | — | Forwarded to every child macro. |
+| `mountMacroRack: classNames` | `MacroRackClassNames` | `{}` | Adds compatibility classes to rack `root` and each `item` host. |
+| `mountMacroRack: parts` | `MacroRackParts` | `{}` | Adds part tokens to rack `root` and each `item` host. |
+| `stylesheet` | `boolean` | `true` | Installs the presenter and nested macro/parameter stylesheets unless explicitly `false`. Applies to both mounts. |
+
+**Handle**
+
+| Member | Kind | Description |
+|---|---|---|
+| `element` | `HTMLElement` | `.wui-macro` for one macro or `.wui-macro-rack` for a compound rack. |
+| `update()` | `() => void` | Re-reads one binding; the rack variant forwards to all child handles. |
+| `destroy()` | `() => void` | Idempotently removes subscriptions, nested controls, roots and installed styles. |
+| `rack.items` | `readonly MacroHandle[]` | Stable child handle array in binding order. |
+| `rack.item(index)` | `(number) => MacroHandle \| undefined` | Returns the child at an index without exposing private wrappers. |
+
+**Accessibility.** The macro value is the accessible native range created by the nested parameter
+presenter and named by `MacroState.label`; its value text is an integer percentage. Destination
+rows are ordinary readable text, not controls. `disabled` reaches the native range. A macro rack
+adds no extra landmark or label, so callers should provide surrounding context when the list needs
+an accessible group name.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+Use the shared [surface and palette tokens](/uikit/#theme-with-css-custom-properties) for
+background (including `transparent`), foreground, accent, outer border and corner radius.
+Presenter-specific tokens below take precedence within their documented roles.
+
+Both mounts install their exported styles by default. `mountMacro()` also installs the nested
+[parameter presenter stylesheet](/uikit/parameters-gestures/parameter/) for its knob. Set
+`stylesheet: false` on either mount to omit every owned style node, including nested macro and
+parameter styles. The host must then supply `macroStyle`, `parameterRackStyle`, and, for a rack,
+`macroRackStyle`, or its own CSS for their classes and parts.
+
+The destination list moves below the knob when the container is narrow. Destination labels and
+formatted values wrap without truncation; the knob keeps its configured geometry.
+
+**Tokens**
+
+| Property | Falls back to | Default | Controls |
+|---|---|---|---|
+| `--wm-macro-padding` | literal | `.6rem` | Single-macro outer inset compatibility fallback. |
+| `--wm-macro-border` | `--wm-border` | `#d8d8d8` | Single macro border. |
+| `--wm-border` | literal | `#d8d8d8` | Shared border fallback. |
+| `--wm-macro-radius` | `--wm-control-radius` | `0` | Single macro corners. |
+| `--wm-control-radius` | literal | `0` | Shared radius fallback. |
+| `--wm-macro-background` | `--wm-surface` | `#fff` | Single macro background. |
+| `--wm-surface` | literal | `#fff` | Shared surface fallback. |
+| `--wm-font-family` | `--wm-font` | `system-ui, sans-serif` | Single macro font family; `--wm-font` remains a compatibility fallback. |
+| `--wm-macro-label` | `--wm-foreground-muted` → `--wm-foreground` | `#666` | Destination labels. |
+| `--wm-foreground-muted` | literal | `#666` (`#999` empty) | Shared label and empty-state fallback. |
+| `--wm-macro-foreground` | `--wm-foreground` | `#444` | Destination values. |
+| `--wm-foreground` | literal | `#444` | Shared value fallback. |
+| `--wm-macro-rack-gap` | literal | `.55rem` | Vertical gap between macro item hosts. |
+
+The inner knob additionally reads the parameter presenter's size, track, fill, pointer, focus,
+label and value tokens. Macro CSS removes that nested rack's border, padding and background.
+
+**Classes**
+
+| Node | Canonical class | Configurable key / compatibility class |
+|---|---|---|
+| Single root | `.wui-macro` | None on `mountMacro()` |
+| Knob host | `.wui-macro__control` | None |
+| Target list | `.wui-macro__targets` | None |
+| Target row | `.wui-macro__target` | Always also `.dest` |
+| Target label | `.wui-macro__target-label` | Always also `.dn` |
+| Target value | `.wui-macro__target-value` | Always also `.dv` |
+| Empty target state | `.wui-macro__empty` | Always also `.empty` |
+| Rack root | `.wui-macro-rack` | `classNames.root` |
+| Rack item host | `.wui-macro-rack__item` | `classNames.item` |
+
+Every empty state is a live region — `role="status"`, `aria-live="polite"` — so the message is announced when it appears, not only drawn.
+
+The nested parameter control also receives the compatibility classes `knobwrap`, `name`, `knob`,
+`track`, `arc`, `ptr`, and `pct` on its item, label, control, track, fill, pointer and value nodes.
+
+**Parts**
+
+`mountMacro()` exposes canonical `root`, `control`, and `targets` parts. Target and empty rows do
+not receive parts. The nested parameter presenter retains its canonical parts. `mountMacroRack()`
+exposes `root` and `item`; `MacroRackParts` adds tokens beside those two canonical names.
+
+</details>
+
+<UiPresenterRelated presenter="macro" />

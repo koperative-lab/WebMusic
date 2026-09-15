@@ -1,0 +1,153 @@
+---
+title: "Quick Start"
+description: "Use WebMusic's npm packages to build a score player with synchronized notation and a three-octave piano keyboard."
+sidebar:
+  label: "Quick Start"
+  order: 1
+---
+
+import {Code} from 'astro:components';
+import QuickStartPlayerDemo from '../../components/QuickStartPlayerDemo.astro';
+import statusCode from '../../components/quick-start-player-client.ts?raw';
+
+Build a player for `demo.mxl`, a compressed MusicXML score. One player loads the
+file; a staff view follows its position and a three-octave piano keyboard
+highlights sounding notes within its C3–C6 range. Playback uses the built-in
+oscillator, so no SoundFont is needed.
+
+<QuickStartPlayerDemo />
+
+Press **Play** to enable sound. Try pausing and seeking with the player's slider:
+both views follow the same player. The keyboard is a visual readout; for playable
+keys, see [`<note-input>`](/score/element/play/note-input/).
+
+## Install the packages
+
+In your browser application, install WebMusic's Score package and its Kernel
+and UI dependencies:
+
+```bash
+npm install @webmusic/score @webmusic/kernel @webmusic/ui
+```
+
+Score supplies the musical behavior and Web Components; Kernel supplies runtime
+primitives, and UI supplies their controls and views. The example below uses
+TypeScript and an ES-module bundler such as Vite to resolve the package imports.
+
+## Add the player and its views
+
+Download [demo.mxl](/mxl/demo.mxl) and save it as `public/demo.mxl` in your
+application. The player reads compressed MusicXML directly; no manual extraction
+is needed. The example assumes that your application serves this file at
+`/demo.mxl`; set `src` to your file's public URL.
+
+Put this markup in `index.html`. The player owns the file load, musical state
+and sound; the two `player="#piece"` selectors attach views to that same instance.
+
+```html
+<main id="music-demo">
+  <score-player id="piece" src="/demo.mxl" time-control="full"></score-player>
+  <score-view player="#piece" type="staff"></score-view>
+  <pitch-view player="#piece" type="keyboard" low="48" high="84" fit-to-width="true" white-key-height="128" black-key-height="80"></pitch-view>
+</main>
+<script type="module" src="/src/main.ts"></script>
+
+<style>
+  #music-demo { display: grid; gap: 1rem; max-width: 48rem; margin: 2rem auto; }
+  #music-demo > * { min-width: 0; margin: 0; }
+  #music-demo > :not([hidden]) { display: block; }
+</style>
+```
+
+## Register the components
+
+Add this to `src/main.ts`. Importing the `/element` entries gives you the
+registration functions; calling them makes the three tags available to the
+browser.
+
+```ts
+import {defineScorePlayerElement} from '@webmusic/score/play/element';
+import {definePitchViewElement, defineScoreViewElement} from '@webmusic/score/view/element';
+
+defineScorePlayerElement();
+defineScoreViewElement();
+definePitchViewElement();
+```
+
+## How it works
+
+| Code | What it does |
+| --- | --- |
+| `<score-player id="piece" src="…">` | Loads the MusicXML once and owns playback, sound and the current position. Its controls let you play, pause and seek. |
+| `time-control="full"` | Shows elapsed time and total duration beside the player controls. |
+| `<score-view player="#piece" type="staff">` | Borrows the loaded score and playback position to draw notation with a following playhead and active-note highlights. |
+| `<pitch-view player="#piece" type="keyboard">` | Borrows the same player's sounding notes and highlights their piano keys. |
+| `low="48" high="84"` | Sets the keyboard's MIDI endpoints to C3 and C6: a three-octave span with both end keys included, for 37 keys. |
+| `white-key-height="128" black-key-height="80"` | Sets white keys to 128 px tall and black keys to 80 px tall. |
+| `fit-to-width="true"` | Fits all three octaves to the container width without horizontal scrolling; key heights stay unchanged. |
+
+Keep `id="piece"` unique within the document. The `player="#piece"` selectors
+connect both views to that player, so pausing or seeking updates their display
+automatically. You do not need to load the score again or synchronize a second
+player. To use another piece, change the player's `src`; the views follow its
+replacement score and note state.
+
+The staff view provides lightweight notation. For detailed engraving, see
+[`<sheet-view>`](/score/element/view/sheet-view/).
+
+<details>
+<summary>Add loading and error feedback</summary>
+
+The bare player publishes readiness and load errors through `.playback`; it
+does not draw those messages itself. To add the same feedback as the demo,
+place a status element directly after `<score-player>` in `index.html`:
+
+```html
+<p id="player-status" role="status" hidden></p>
+```
+
+Add this helper to `src/main.ts` after the registration code. It shows loading
+or failure messages and hides the status element once the score is ready.
+
+<Code code={statusCode} lang="ts" />
+
+Then call it at the end of `src/main.ts`:
+
+```ts
+const player = document.querySelector<ScorePlayerElement>('#piece')!;
+const status = document.querySelector<HTMLElement>('#player-status')!;
+let detachStatus = mountQuickStartStatus(player, status);
+
+window.addEventListener('pagehide', () => {
+  detachStatus();
+  player.stop();
+});
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) detachStatus = mountQuickStartStatus(player, status);
+});
+```
+
+The Play click supplies the browser's user activation for sound. A missing or
+invalid file now produces a visible message. Check the requested URL in the
+browser's Network panel; replace `src` or reload the page to retry after fixing
+the file. A failed playback command also appears in the status text.
+
+For a framework component, call `detachStatus()` in its unmount cleanup.
+Removing the player from the DOM releases its owned playback resources;
+removing either view releases only that view's bindings and rendering resources.
+Use the [Score setup](/score/) for other formats, registration and integration options.
+
+</details>
+
+## Keep the behavior and change the interface
+
+- **Use your own buttons:** see the
+  [ScorePlayer engine and its commands](/score/headless/play/score-player/).
+- **Reuse controls with custom bindings:** see the
+  [Transport presenter](/uikit/transport-time/transport/).
+- **Add analysis:** attach companions through the
+  [shared playback source](/score/api/#shared-playback-observation).
+
+Full references: [Score player](/score/element/play/score-player/) ·
+[Score view](/score/element/view/score-view/) ·
+[Pitch view](/score/element/view/pitch-view/).

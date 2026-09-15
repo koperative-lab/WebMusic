@@ -1,0 +1,574 @@
+---
+title: '@webmusic/kernel'
+description: The ten kernel entries — events, element, worker, audio-context, player, effect, meter, transport, tick and sync — and the contracts each one carries.
+---
+
+Every entry is import-safe in Node, workers, and SSR. The root entry
+re-exports all of them; the subpaths exist so applications and bundlers can
+take exactly what they use. Install with `npm install @webmusic/kernel`; see
+[Kernel setup](/kernel/#install). Browser contract declarations use DOM types;
+the pure `/events` and `/transport` subpaths also work with an ES-only `lib`.
+
+## Entry map
+
+| Entry | Contract |
+| --- | --- |
+| [`/events`](#events--webmusickernelevents) | Hardened typed `EventEmitter` |
+| [`/element`](#element--webmusickernelelement) | `WebMusicElement` connected-lifetime cleanup plus SSR-safe attribute and registration helpers |
+| [`/worker`](#worker--webmusickernelworker) | `WorkerLike` + `RequestTracker` correlation plumbing |
+| [`/audio-context`](#audio-context--webmusickernelaudio-context) | SSR-safe AudioContext construction |
+| [`/player`](#player--webmusickernelplayer) | `PlayerLike` playback control contract |
+| [`/effect`](#effect--webmusickerneleffect) | `Effect`/`EffectNodes` over `BaseAudioContext` |
+| [`/meter`](#meter--webmusickernelmeter) | Shared analyser meter contract and implementation |
+| [`/transport`](#transport--webmusickerneltransport) | `TransportClock` affine anchor math + `TimelineMapping` |
+| [`/tick`](#tick--webmusickerneltick) | Throttling-resistant tick delivery for lookahead schedulers |
+| [`/sync`](#sync--webmusickernelsync) | Transport grouping, timeline mapping and drift coordination |
+
+## events — @webmusic/kernel/events
+
+`EventEmitter<TEvents>` is a typed emitter with two delivery modes: `emit`
+propagates listener throws to the caller, while `emitSafely` snapshots the
+listener list, keeps delivering after a faulty observer, and reports both
+synchronous throws and async rejections through a failure callback.
+
+```ts
+import {EventEmitter} from '@webmusic/kernel/events';
+
+const events = new EventEmitter<{tick: {beat: number}}>();
+const off = events.on('tick', ({beat}) => console.log(beat));
+events.emit('tick', {beat: 1});
+off();
+```
+
+Both families re-export this implementation as their public `EventEmitter`.
+
+| Member | Contract |
+| --- | --- |
+| `new EventEmitter<TEvents>()` | Starts with no listeners; event names are keys of `TEvents` and each listener receives that key's payload. |
+| `on(event, listener)` | Registers a listener and returns an unsubscribe function. Re-registering the same function for the same key does not duplicate it. |
+| `once(event, listener)` | Unsubscribes before calling the listener; nested dispatch cannot call it twice. Returns an unsubscribe function. |
+| `off(event, listener)` | Removes that subscription; missing subscriptions are harmless. |
+| `emit(event, data)` | Synchronously visits the dispatch-start snapshot. A listener throw stops delivery and propagates; returned promises are not observed. |
+| `emitSafely(event, data, onError)` | Visits the snapshot and returns its listener count. Reports failures with `EventListenerFailureMode` (`throw` or `rejection`), continuing delivery. It does not await listeners; observer throws/rejections are contained. |
+| `removeAllListeners(event?)` / `clear(event?)` | Removes one event's listeners, or all listeners when the argument is omitted. `clear` is an alias. |
+
+Listeners added during either dispatch wait until a later dispatch; removals do
+not rewrite the current snapshot. The emitter owns no timers or external
+resources. Release subscriptions or clear them when their owner is disposed.
+
+## element — @webmusic/kernel/element
+
+`WebMusicElement` is a minimal custom-element base owning one concern:
+connected-lifetime cleanup. `onMount()` runs per connection and may return a
+cleanup; `own()` registers additional cleanups that drain in LIFO order on
+disconnect, with rollback if mounting fails partway. It owns no Shadow DOM,
+no profile, no presenter, and no domain state.
+
+```ts
+import {WebMusicElement, defineOnce} from '@webmusic/kernel/element';
+
+class MyBadge extends WebMusicElement {
+  protected override onMount() {
+    const timer = setInterval(() => this.refresh(), 1000);
+    return () => clearInterval(timer);
+  }
+  refresh() {}
+}
+defineOnce('my-badge', MyBadge);
+```
+
+Also here: `upgradeProperty`/`upgradeProperties` for the
+set-before-upgrade pitfall, `numAttr`/`boolAttr`/`cssSizeAttr` attribute
+readers, and `defineOnce` idempotent registration. Importing this entry
+registers nothing and is SSR-safe; subclassing works in Node.
+
+| Export or member | Contract |
+| --- | --- |
+| `HTMLElementBase` | The native `HTMLElement` constructor when present, otherwise an import-safe class fallback. The fallback does not implement a DOM. |
+| `connectedCallback()` / `disconnectedCallback()` | Manage one cleanup scope per connection. Prefer the protected hooks instead of replacing these lifecycle entry points. Repeated calls in the same state are harmless. |
+| `onMount(): ElementCleanup \| void` | Protected, synchronous mount hook. Returned cleanup belongs to this connection, including when mounting synchronously disconnects/reconnects. |
+| `onUnmount(): void` | Protected hook called before the connection's owned cleanups drain. |
+| `own(cleanup)` | Protected registration returning the same cleanup. Runs once per registration, in reverse order. Throws outside a mounted lifetime or for a non-function; a stale mount's late registration is released immediately. |
+| `onLifecycleError(error)` | Protected reporting hook after rollback/cleanup. Every collected error is reported; the default throws. Reporting failures cannot prevent the remaining cleanup/error reports. |
+| `upgradeProperty(el, name)` / `upgradeProperties(el, names)` | Deletes and reassigns existing own properties so prototype setters can receive values assigned before custom-element upgrade. Getter, deletion and setter failures propagate. |
+| `numAttr(el, name, fallback, min?, max?)` | Missing, blank or non-finite numeric text uses the supplied fallback, then optional lower/upper bounds apply. Caller supplies valid fallback/bounds. |
+| `boolAttr(el, name, fallback = false)` | Missing uses fallback; trimmed `false`, `0`, `no`, `off` are false, case-insensitively. Other present values, including a bare attribute, are true. |
+| `cssSizeAttr(el, name)` | Missing/blank yields `undefined`; a plain signed integer/decimal becomes pixels; other trimmed CSS text passes through without validation. |
+| `defineOnce(tag, ctor)` | Registers only when the registry exists and the tag is free. Native registration errors still propagate; importing the entry registers nothing. |
+
+### Element target discovery
+
+`observeElementTarget(host, selector, listener)` is exported from
+`@webmusic/kernel/element`. It resolves one unique target within the host's current
+Document or ShadowRoot and calls `listener(target, state)` immediately. The exported
+`ElementTargetState` is `ready`, `missing`, `invalid` or `ambiguous`; unsuccessful
+resolution supplies `undefined`, never an arbitrary matching element.
+
+Discovery follows insertion, removal, relevant attribute changes, replacement and
+late custom-element definition while attached. A target changing a non-reflected
+source property can dispatch a bubbling `webmusic:sourcechange` event to request a
+fresh connection. The helper contains no musical models or playback policy.
+Only a source-change event from the selected target forces that refresh;
+unrelated elements and definitions of obsolete targets do not reset the binding.
+
+The returned idempotent cleanup stops observation and ignores pending upgrade
+callbacks. Call it on host disconnection, selector changes or moving the host to
+another root; create a new observation after reconnecting. An initial listener
+exception releases the observer before being rethrown. This helper never disposes
+the selected target or grants authority to its commands.
+
+## worker — @webmusic/kernel/worker
+
+`WorkerLike` is the minimal structural surface a worker must expose
+(`postMessage` with transfer, `terminate`, message and error listeners), so
+clients can accept a real `Worker`, a shim, or a test double.
+`createRequestTracker<T>()` returns a `RequestTracker<T>` that correlates
+request/response pairs by numeric ID. It creates no Worker and has no timers,
+abort listener or `dispose()` method. The caller owns timeout/cancellation
+policy and must reject its pending requests when releasing or replacing a worker.
+
+| Member | Contract |
+| --- | --- |
+| `add()` | Returns `{id, promise}` and adds one pending request; IDs start at zero and increase within that tracker. |
+| `resolve(id, value)` / `reject(id, error)` | Settle and remove a request; return false for an unknown or already settled ID. |
+| `rejectAll(error)` | Clears the current pending set and rejects each promise. Later requests can still be added. |
+| `size` | Number of currently pending requests. |
+
+`dedicatedWorkerScope(globals?)` returns a `DedicatedWorkerScope` only inside a
+dedicated worker with message-listener and posting support. It returns
+`undefined` on the main thread, during SSR and in Shared/Service workers.
+Use it before installing a worker handler; importing this helper registers none.
+`DedicatedWorkerScope` exposes `addEventListener('message', listener)`,
+`postMessage(message, transfer?)` and optional `onmessage`. The optional
+`globals` argument replaces the feature-detection scope, defaulting to
+`globalThis`; it is useful for runtime shims and tests.
+
+## audio-context — @webmusic/kernel/audio-context
+
+`createWebAudioContext(missingMessage, options?)` constructs an
+`AudioContext` where available and throws the caller's message where not
+(SSR, Node), keeping AudioContext construction out of import-time paths.
+`getAudioContextConstructor()` returns the constructor or `undefined` for
+feature-testing.
+
+The standard constructor takes precedence over `webkitAudioContext`. Omitted
+options are passed as zero constructor arguments; supplied `AudioContextOptions`
+are forwarded unchanged. Native construction failures propagate without retry.
+The caller owns the returned context, user-gesture/resume policy and eventual
+`close()`; these helpers create no shared singleton.
+
+## player — @webmusic/kernel/player
+
+`PlayerLike` is the lowest-common-denominator playback control contract both
+families' players satisfy:
+
+```ts
+interface PlayerLike {
+  play(): Promise<void> | void;
+  pause(): void;
+  stop(): void;
+  seek(seconds: number): void;
+  setRate?(rate: number): void;
+  setVolume?(volume: number): void;
+  readonly seconds?: number;
+  readonly duration?: number;
+  readonly playing?: boolean;
+  on(event: string, listener: (data: unknown) => void): () => void;
+  dispose?(): void;
+}
+```
+
+The optional members are deliberate: the base contract is the lowest common
+denominator compatible players can promise. The named **capability tiers**
+and their guards are the supported feature-testing protocol:
+
+| Capability interface | Adds | Guard |
+| --- | --- | --- |
+| `TimedPlayerLike` | `seconds`, `duration` | `isTimedPlayer()` |
+| `StatefulPlayerLike` | `playing` | `isStatefulPlayer()` |
+| `RateControlledPlayerLike` | `setRate()` | `isRateControlledPlayer()` |
+| `VolumeControlledPlayerLike` | `setVolume()` | `isVolumeControlledPlayer()` |
+| `DisposablePlayerLike` | `dispose()` | `isDisposablePlayer()` |
+
+A generic consumer narrows once with a guard and gets the non-optional
+members; a failed guard means the capability is absent, never an error.
+Implementers advertise a tier by making its members non-optional. Score pins
+its players against the tiers they advertise at the type level
+(`ScorePlayer`/`TonePlayer`: timed, rate-controlled, disposable), so drift fails
+`typecheck`.
+
+These guards accept an existing `PlayerLike` and test the named members' runtime
+types. They do not validate an arbitrary object, finite positions, accepted rate
+ranges, event names or playback success. Implementations own those policies and
+the meaning of their playback promises; the interface supplies no scheduler.
+
+```ts
+import {isTimedPlayer, type PlayerLike} from '@webmusic/kernel/player';
+
+function renderProgress(player: PlayerLike): number | undefined {
+  if (!isTimedPlayer(player)) return undefined;
+  const {seconds, duration} = player;
+  return Number.isFinite(seconds) && Number.isFinite(duration) && duration > 0
+    ? Math.max(0, Math.min(1, seconds / duration)) : undefined;
+}
+```
+
+## effect — @webmusic/kernel/effect
+
+`Effect` describes an audio post-processing unit over `BaseAudioContext`:
+`createAudioNodes(context)` returns an `EffectNodes` value — an
+`input`/`output` node pair, optionally live `params` (`AudioParam`s for
+real-time control) and a `dispose`. An optional `label` lets UIs caption
+controls. Both families' effect chains and the score synth panel speak this
+contract.
+
+`Effect` is an interface, with no Kernel effect-chain implementation. Each
+factory must return nodes belonging to the supplied context, which may be an
+`OfflineAudioContext`. The caller connects the returned `input`/`output` and
+invokes optional cleanup according to the effect's ownership contract; Kernel
+does not close the context, guarantee idempotent effect disposal or roll back a
+third-party factory's partial graph.
+
+## meter — @webmusic/kernel/meter
+
+`AnalyserMeter` owns the transparent `input → analyser → output` tap both
+families' level meters read, plus the byte-domain arithmetic over it: RMS,
+scaled `level`, instantaneous `peak` and a decaying `peakHold`. It decides
+nothing about *when* a frame is read — a presenter, canvas renderer or
+framework drives that — and it holds no score, clip or DOM.
+`aggregateSpectrumBars()` is the same maths for the frequency domain, folding
+FFT bins into a bar count. Both existed once per family and had begun to
+drift; only the mechanism moved here, while genuinely editorial differences
+(minimum bar count, the frame shape each family publishes) stayed with the
+families.
+
+`new AnalyserMeter(options?)` and `createAnalyserMeter(options?)` have the same
+`AnalyserMeterOptions` contract:
+
+| Option | Default | Contract |
+| --- | --- | --- |
+| `context` | absent | Borrow a `BaseAudioContext` and create an owned gain/analyser/gain tap. The context is never closed. |
+| `analyser` | absent | Borrow an existing node without configuring, connecting or disconnecting it. Supplying both modes throws `TypeError`; supplying neither creates an unreadable meter. |
+| `fftSize` | `1024` | Applied only to an owned analyser; native Web Audio constraints/errors apply. |
+| `smoothingTimeConstant` | `0.8` | Applied only to an owned analyser; native Web Audio constraints/errors apply. |
+| `levelScale` | `1.8` | Gain applied to display level/peak. Non-finite values use the default; finite negatives clamp to zero. |
+| `peakDecay` | `0.012` | Absolute hold decay per read, not per second. Same non-finite fallback and nonnegative clamp policy. |
+| `minimumBars` | `1` | Integer floor for spectrum bar count; floored and clamped to at least one. Non-finite values use one. |
+
+| Member | Contract |
+| --- | --- |
+| `analyser`, `input`, `output` | Current nodes; input/output are present only in owned-tap mode. All become `undefined` after disposal. |
+| `ownsGraph` | Whether this meter owns the tap, false after disposal. |
+| `readLevel(): AnalyserMeterFrame` | Reads byte waveform samples as `(byte - 128) / 128`. Returns raw `rms`, scaled/clamped `level`, scaled/clamped instantaneous `peak`, and `peakHold = max(level, previousHold - peakDecay)`. Display values are in `[0, 1]`. |
+| `readSpectrum(bars = 28): Float32Array` | Reads byte FFT data and aggregates it into normalized bars, honoring `minimumBars`. Buffers follow changes to the analyser's FFT size. |
+| `dispose()` | Clears references and attempts every owned node's disconnect before rethrowing the first failure. Borrowed nodes are untouched; repeated calls are harmless. |
+
+Reads throw when no analyser was supplied or after disposal. A construction
+failure disconnects already-created nodes before rethrowing the original error.
+The tap does not connect itself to a destination or start an animation loop.
+
+`aggregateSpectrumBars(spectrum: ArrayLike<number>, options?: SpectrumBarOptions)`
+returns a new `Float32Array`. Options are `bars` (default `28`), `minimumBars`
+(default `1`) and `normalizeBytes` (default `true`, dividing values by `255`).
+Counts are floored and clamped to at least one; non-finite counts use their
+defaults. Empty input yields an all-zero array of the requested count; non-finite bins
+are treated as zero, and each output mean is clamped to `[0, 1]`. Slices tile the
+input when bins outnumber bars; fewer bins are repeated across the display.
+
+For a caller-owned analyser, read a single frame and release the wrapper:
+
+```ts
+import {createAnalyserMeter} from '@webmusic/kernel/meter';
+
+function readFrame(analyser: AnalyserNode) {
+  const meter = createAnalyserMeter({analyser, levelScale: 1.4, peakDecay: 0.02});
+  try {
+    return meter.readLevel();
+  } finally {
+    meter.dispose(); // the borrowed analyser remains connected
+  }
+}
+```
+
+## transport — @webmusic/kernel/transport
+
+`TransportClock` is pure affine anchor math over an injectable clock: `start`
+/ `startAt` / `pause` / `seekTo` / `setRate` update the anchor, and
+`positionAt(t)` / `timeAt(position)` convert between host time and timeline
+position without accumulating drift. An armed-start hold covers pre-roll
+(`holding`), and `TransportClockReader` is the read-only view engines expose
+to consumers. Score schedulers use its anchor to convert between timeline
+positions and host time.
+
+`TimelineMapping` (`positionToSeconds`/`secondsToPosition`) is the structural
+contract for musical-position-to-seconds mappings; Score supplies the
+`timeMapMapping(TimeMap)` adapter for this shape.
+
+| Member | Contract |
+| --- | --- |
+| `new TransportClock(now?)` | Starts paused at position/time zero, rate `1`. The optional callback supplies the reference time for `position`; no timer is created. |
+| `state: TransportClockState` | Fresh anchor value `{originTime, originPosition, rate, paused}`; modifying that value cannot re-anchor the clock. |
+| `rate`, `paused`, `holding` | Read current scalar/state. `holding` records an armed `startAt`; it remains true after the scheduled time passes, until `start` or `pause`. Compare `state.originTime` to the reference time to detect current pre-roll. |
+| `position` | Uses injected `now()`; throws if no clock callback was provided. |
+| `positionAt(t)` | Returns held position while paused or before an armed start; otherwise `originPosition + (t - originTime) * rate`. |
+| `timeAt(position)` | Inverse mapping. Throws `RangeError` while paused or for a position before an armed origin. |
+| `start(t, position?)` | Re-anchors and starts immediately; omitted position preserves the position at `t`. Clears armed hold. |
+| `startAt(t, position)` | Arms an absolute reference time and holds position until it arrives. |
+| `pause(t)` | Captures the position at `t`, pauses and cancels armed hold. |
+| `seekTo(position, t)` | Re-anchors without changing paused/running state. A seek during pre-roll retains the scheduled time. |
+| `setRate(rate, t)` | Preserves position continuity; a pre-roll change retains its scheduled origin. Rate must be finite and positive. |
+
+Mutation inputs must be finite or a `RangeError` is thrown before application.
+Negative times/positions are otherwise allowed; duration clamping and loops are
+consumer policies. Reference time and position units must be consistent with
+the rate; no browser clock is assumed. `TransportClockReader` selects `state`,
+`rate`, `paused`, `holding`, `positionAt` and `timeAt`, excluding mutators at the
+type level. It is neither a runtime access-control boundary nor a subscription.
+
+`TimelineMapping` requires `positionToSeconds(position)` and
+`secondsToPosition(seconds)`. Implementations define the musical position unit
+and should be monotonic and total over real inputs. Clamping and quantization
+are permitted, so exact inverse round trips are not guaranteed. Kernel supplies
+the structural contract, not a tempo map implementation.
+
+## tick — @webmusic/kernel/tick
+
+`createTickSource(options)` reduces reliance on main-thread timers using
+an inline-Blob interval worker where the
+environment allows it (with the Blob URL revoked on both success and CSP
+failure), falling back to a main-thread interval otherwise. Lookahead
+schedulers and synchronization watchers run on it. Browser suspension and delayed
+message delivery can still delay ticks; this is not a real-time guarantee.
+
+| Option or member | Contract |
+| --- | --- |
+| `TickSourceOptions.intervalMs` | Default `25` milliseconds. Must be an integer in `[1, MAX_TIMER_DELAY_MS]`, otherwise construction throws `RangeError`. `MAX_TIMER_DELAY_MS` is `2_147_483_647`, the timer-safe ceiling. |
+| `TickSourceOptions.createWorker` | Optional factory returning `TickWorkerLike` or `null`. `null` forces main-thread fallback. The source owns the returned worker; custom factory errors propagate. |
+| `start(onTick)` | Starts one callback, replacing the previous callback if already running. No immediate tick. Throws after disposal. |
+| `stop()` | Stops delivery; restart is allowed. Failure to message the worker releases it and selects fallback for a later start. |
+| `running`, `workerBacked` | Report current delivery/worker availability. A stopped source may still own a worker; a failed or disposed worker reports false. |
+| `dispose()` | Stops delivery and terminates the owned worker. Attempts cleanup before rethrowing the first cleanup error; repeated calls are harmless. |
+
+`TickWorkerLike` requires `postMessage`, `terminate`, and `addEventListener`
+for `message` and `error`. Worker failures during delivery or start messaging
+select fallback; queued messages from a released worker are ignored. The tick
+callback itself is caller-owned synchronous work: its exceptions are not
+converted into worker failures, and its returned promises are not awaited.
+
+```ts
+import {createTickSource} from '@webmusic/kernel/tick';
+
+const ticks = createTickSource({intervalMs: 25});
+let passes = 0;
+ticks.start(() => {
+  passes += 1; // perform one scheduling pass here
+  if (passes === 4) ticks.dispose();
+});
+```
+
+## sync — @webmusic/kernel/sync
+
+`TransportGroup` drives one master transport and any number of followers on a
+shared lead-in, checking drift on a cadence and re-seeking a follower that has
+slipped past tolerance. `SyncMasterTransport` and `SyncFollowerTransport` are
+the structural ports it accepts, so anything exposing that surface can join
+without the Kernel importing a domain package. Commands are serialized, so a
+late async settlement cannot reorder state.
+
+`new TransportGroup(master, now, options?)` requires one shared reference-clock
+callback in seconds. `TransportGroupOptions` are:
+
+| Option | Default | Contract |
+| --- | --- | --- |
+| `leadInSeconds` | `0.06` | Finite nonnegative scheduling headroom on the reference clock. |
+| `driftToleranceSeconds` | `0.03` | Finite nonnegative tolerance on the master's position axis. |
+| `driftCheckIntervalMs` | `250` | Finite nonnegative cadence, rounded to a whole number of watcher ticks. Zero disables periodic drift checks; an enabled group loop still needs ticks. |
+| `loop` | `null` | Master-axis `SyncLoopRegion`, copied after validating ordered nonnegative finite bounds. |
+| `tick` | `{intervalMs: 25}` | `TickSourceOptions` for the owned watcher. The interval is validated when constructing the group. |
+| `onOperationError` | absent | Receives `(operation, error)` for background failures. Synchronous observer exceptions are contained. |
+
+Both participant ports require `play(when?)`, `pause()`, `stop()` and readable
+`position`; `setRate(rate)` and `dispose()` are optional. Their differences are:
+
+| Contract | Required or optional additions |
+| --- | --- |
+| `SyncMasterTransport` | Requires `clock: TransportClockReader` and `seekPosition(position, when?)`, which may return a promise. Optional `reconcile(now)` returns `ok` or `stalled`. A master may ignore the scheduled-start proposal; the group observes its clock to select the join time. |
+| `SyncFollowerTransport` | Requires synchronous `seek(position)`. Optional `clock` overrides sampled `position`/`running` during checks; optional `running` reports current playback. Precise joins require the implementation to honor future `play(when)` on the same reference axis. |
+| `ClocklessMasterTransport` | The master's command/position surface without `clock` or `reconcile`; used by `MirrorClockMaster`. |
+
+Participant promises indicate preparation or re-entry settlement, not the end
+of playback. Kernel cannot make an adapter's backend scheduling sample accurate.
+
+### Session commands and observation
+
+The group is one command authority on the master's **stable position axis**.
+`dispatch()` uses the same participant engines as the existing controls; it
+creates no second player or writable clock. Commands should go through the group
+while those participants form a session. Direct engine changes cannot receive a
+group revision until observed reconciliation detects them.
+
+| Member | Contract |
+| --- | --- |
+| `dispatch(command: TransportCommand)` | Returns `Promise<TransportCommit>`. Play, seek and rate wait for participant preparation/re-entry; pause/stop take effect immediately and await late-start reconciliation. Invalid commands throw before changing revision. Current-operation failure rejects, publishes `error`, and attempts to pause participants after partial application. Cleanup continues if an adapter throws; a superseded failure cannot override a newer command. |
+| `snapshot` | `TransportSnapshot` read at one reference instant: `revision`, `referenceTime`, stable `position`, `rate`, `paused`, pre-roll `holding`, `loop`, `pending`, `disposed`. This is a frozen value, not a ticking event source. |
+| `subscribe(listener)` | Registers before synchronously delivering `{type: 'snapshot', snapshot}`; returns an idempotent unsubscribe function. An initial listener failure removes its subscription; subsequent listener failures are contained. Detaching leaves playback alive. |
+| `TransportCommand` | `{type: 'play'}`, `{type: 'pause'}`, `{type: 'stop'}`, `{type: 'seek', position}`, `{type: 'rate', rate}`, or `{type: 'loop', loop}`. Positions/bounds use the master's content axis; rate is finite and positive. `loop` is `{startSeconds, endSeconds}` or `null`; bounds must be finite, nonnegative and ordered. |
+| `TransportCommit` | `{revision, command, status, snapshot}`. `status` is `committed` or `superseded`: a newer command, background reconciliation or disposal prevents old work claiming the current authority. Settlement describes the adapters' work, not proof of audible output. |
+| `TransportEvent` | Initial/disposal `snapshot`; `invalidate` before a command with its revision/command/snapshot; `commit` with its result/snapshot; `error` with revision/command/error/snapshot; background `reconcile` with operation, `invalidate` or `settled` phase and snapshot; `operation-error` with operation/error/snapshot. |
+
+`dispatch({type: 'rate', rate})` checks accepted rates where readers expose them;
+transports without observable rate state cannot prove they honored a request.
+A master that remains paused after a running seek is a rejected dispatch, even
+when its adapter resolves instead of throwing. Older `play`, `pause`, `stop`,
+`seek`, `setRate` and `setLoop` methods retain their signatures and compatibility
+behavior, including best-effort optional rate matching. Their changes also pass
+through the observation surface; use `dispatch` when command failure must be
+awaited. Background errors are visible through both `operation-error` events and
+the optional `onOperationError` construction callback.
+
+Strict play/seek/rate dispatch also rejects a follower that observably remains
+paused after its start settles, reading `clock.paused` first and otherwise
+`running`. A follower without either observation can only be checked for promise
+settlement. Removed members and superseded commands are skipped during re-entry.
+
+| Additional member | Contract |
+| --- | --- |
+| `clock`, `position` | Read through to the master's clock and current position. The group does not replace its timeline model. |
+| `play(): Promise<void>` / `seek(position): Promise<void>` | Compatibility commands awaiting participant preparation/re-entry. Seek position is finite and nonnegative on the master axis. |
+| `pause()` / `stop()` | Compatibility commands that immediately apply the intent, then reconcile any late async starts. Failures use the observation surface; these methods return no promise. |
+| `setRate(rate)` / `setLoop(loop)` | Compatibility setters, returning void. Invalid values throw before application; background failures use observation. `loop` getter returns a copy or `null`. |
+| `addFollower(transport, options?)` | Registers a follower; a running session schedules its join. Invalid options throw before registration. |
+| `removeFollower(transport): boolean` | Removes a registration, returning false if absent. Does not pause or dispose that transport. |
+| `followerCount` | Current registration count. |
+| `checkDrift(): number` | Synchronously reads drift and queues needed correction. Returns the signed drift with greatest absolute magnitude in master units, or zero while holding off/no followers. It does not await queued joins; direct read/reconciliation failures propagate. |
+| `dispose()` | Invalidates pending authority, stops/releases the watcher and calls optional disposers of remaining followers and master. All cleanup is attempted before the first failure is rethrown; repeated calls are harmless. |
+
+Three consecutive unsuccessful drift re-joins are attempted before further
+automatic corrections for that follower are suppressed and reported. Agreement
+or an explicit transport command re-arms correction. Commands, new subscriptions
+and drift checks require an active group; compatibility pause/stop and repeated
+disposal are harmless after disposal.
+
+An autonomous watcher exception pauses the current participants, stops the
+watcher and reports `transport monitor` through `operation-error` and
+`onOperationError`. A newer reentrant command retains its authority. Calling
+`checkDrift()` explicitly keeps its synchronous error behavior.
+
+Use `snapshot.position` or `clock.positionAt(referenceTime)` for moving display
+positions. Subscription events describe state transitions rather than animation
+frames. Invalidation precedes engine commands: engines cancel and re-arm through
+their existing methods. It is not a callback enabling unrelated engines to share
+a writable `TransportClock`. Disposal publishes a final snapshot, removes
+observers and invokes registered optional participant disposers; its snapshot
+retains the last readable position and is not a continuing playback observation.
+
+### Participant-local time and native loops
+
+`addFollower(transport, options?)` accepts `FollowerOptions`:
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `offsetSeconds` | `0` | Finite nonnegative local position at master zero. |
+| `positionScale` | `1` | Finite positive scale; local position is `offset + masterPosition × scale`, local rate is `masterRate × scale`. A non-unit scale requires `setRate`. |
+| `loop` | absent | `{startSeconds, endSeconds}` in the follower's local seconds, for a participant **already configured to loop natively**. This option maps phase; it does not enable a loop on the transport. |
+
+Before the local loop end, intro positions pass through. At/past the end, local
+positions fold into `[startSeconds, endSeconds)`. Scheduled joins and seeks use
+this mapped phase; drift reads normalize wrapped or unwrapped clocks and compare
+shortest circular phase error, converted back to master units for the tolerance.
+Several followers may have different periods while the master remains continuous.
+All mappings and loops are copied on registration; remove/re-add to change them.
+`removeFollower` leaves that participant's current playback/resources with its
+caller, while group disposal invokes the disposers of remaining members.
+
+These mappings support affine scaling and native-loop phase. They do not consume
+arbitrary nonlinear `TimelineMapping`, implement audio warping, or make tick-watched
+**group** loops sample accurate. A native-loop adapter must expose consistent
+local seconds, rate and scheduling behavior; incorrect metadata can produce
+incorrect alignment even when its shape is valid.
+
+`MirrorClockMaster` adapts a transport that has **no readable clock** into the
+master role: it dead-reckons a mirror `TransportClock` across the command
+surface and reconciles it against the transport's real position on every drift
+check — two identical samples while the mirror advanced mean the transport
+stopped on its own and the group is told `stalled`; a moving transport that
+diverged re-anchors the mirror. This is the one home of the sampled fallback
+the bridge used to interleave through its clocked path.
+
+Construct it as `new MirrorClockMaster(inner, now, options?)`; the optional
+`reconcileToleranceSeconds` defaults to `0.03` and must be finite/nonnegative.
+It exposes `clock` and `position`, forwards `play`, `pause`, `stop`,
+`seekPosition`, `setRate` and `dispose`, and updates its mirror around those
+commands. `reconcile(now)` returns `ok` or `stalled`; position disagreement
+re-anchors the mirror and measurable slope disagreement updates its rate.
+The adapter samples the inner transport and does not prove that it accepted a
+future start or requested rate. Its `dispose()` delegates to the inner transport;
+that implementation owns its resource cleanup and repeated-call policy.
+
+## API Reference
+
+The root `@webmusic/kernel` re-exports every value and type below. Each link
+identifies the owning sub-entry contract; types have no runtime export.
+
+| Export | Kind | Use it for |
+| --- | --- | --- |
+| `EventEmitter` | class | [Typed event delivery and subscription cleanup](#events--webmusickernelevents) |
+| `EventListenerFailureMode` | type | [Synchronous throw versus asynchronous rejection reports](#events--webmusickernelevents) |
+| `HTMLElementBase` | constant | [Import-safe native/fallback element base](#element--webmusickernelelement) |
+| `ElementCleanup` | type | [One synchronous connected-lifetime cleanup callback](#element--webmusickernelelement) |
+| `WebMusicElement` | class | [Connection-scoped mount, rollback and cleanup](#element--webmusickernelelement) |
+| `upgradeProperty` | function | [Replay one value assigned before element upgrade](#element--webmusickernelelement) |
+| `upgradeProperties` | function | [Replay a list of pre-upgrade properties](#element--webmusickernelelement) |
+| `numAttr` | function | [Numeric attribute fallback and optional clamping](#element--webmusickernelelement) |
+| `boolAttr` | function | [Tri-state boolean attribute parsing](#element--webmusickernelelement) |
+| `cssSizeAttr` | function | [Plain-number pixel sizes and CSS text](#element--webmusickernelelement) |
+| `defineOnce` | function | [Explicit idempotent custom-element registration](#element--webmusickernelelement) |
+| `ElementTargetState` | type | [Ready, missing, invalid or ambiguous resolution](#element--webmusickernelelement) |
+| `observeElementTarget` | function | [Unique target discovery and observer cleanup](#element--webmusickernelelement) |
+| `WorkerLike` | type | [Worker client posting, termination and event ports](#worker--webmusickernelworker) |
+| `RequestTracker` | type | [Pending request IDs, promises and settlement methods](#worker--webmusickernelworker) |
+| `createRequestTracker` | factory | [Create isolated request-correlation bookkeeping](#worker--webmusickernelworker) |
+| `DedicatedWorkerScope` | type | [Dedicated-worker handler registration surface](#worker--webmusickernelworker) |
+| `dedicatedWorkerScope` | function | [Detect a usable dedicated-worker global scope](#worker--webmusickernelworker) |
+| `getAudioContextConstructor` | function | [Feature-test standard or legacy Web Audio construction](#audio-context--webmusickernelaudio-context) |
+| `createWebAudioContext` | function | [Create a caller-owned context with explicit unavailable errors](#audio-context--webmusickernelaudio-context) |
+| `PlayerLike` | type | [Base structural playback and event contract](#player--webmusickernelplayer) |
+| `TimedPlayerLike` | type | [Required position/duration readers in seconds](#player--webmusickernelplayer) |
+| `StatefulPlayerLike` | type | [Required synchronous playing-state reader](#player--webmusickernelplayer) |
+| `RateControlledPlayerLike` | type | [Required playback-rate setter](#player--webmusickernelplayer) |
+| `VolumeControlledPlayerLike` | type | [Required volume setter](#player--webmusickernelplayer) |
+| `DisposablePlayerLike` | type | [Required resource-release method](#player--webmusickernelplayer) |
+| `isTimedPlayer` | function | [Narrow numeric timeline capability](#player--webmusickernelplayer) |
+| `isStatefulPlayer` | function | [Narrow boolean playing-state capability](#player--webmusickernelplayer) |
+| `isRateControlledPlayer` | function | [Narrow rate-control capability](#player--webmusickernelplayer) |
+| `isVolumeControlledPlayer` | function | [Narrow volume-control capability](#player--webmusickernelplayer) |
+| `isDisposablePlayer` | function | [Narrow disposal capability](#player--webmusickernelplayer) |
+| `Effect` | type | [Context-to-node-graph factory contract](#effect--webmusickerneleffect) |
+| `EffectNodes` | type | [Input/output nodes, optional live parameters and cleanup](#effect--webmusickerneleffect) |
+| `AnalyserMeterFrame` | type | [RMS, level, instantaneous peak and decaying hold](#meter--webmusickernelmeter) |
+| `SpectrumBarOptions` | type | [Aggregation count, minimum and byte normalization](#meter--webmusickernelmeter) |
+| `AnalyserMeterOptions` | type | [Node ownership and metering configuration](#meter--webmusickernelmeter) |
+| `aggregateSpectrumBars` | function | [Pure normalized FFT bar aggregation](#meter--webmusickernelmeter) |
+| `AnalyserMeter` | class | [Owned-tap or borrowed-analyser meter](#meter--webmusickernelmeter) |
+| `createAnalyserMeter` | factory | [Construct a meter using the same options](#meter--webmusickernelmeter) |
+| `TransportClockState` | type | [Read-only reference anchor snapshot](#transport--webmusickerneltransport) |
+| `TransportClock` | class | [Pure affine position/time mapping and scheduled hold](#transport--webmusickerneltransport) |
+| `TransportClockReader` | type | [Clock reads without mutation methods](#transport--webmusickerneltransport) |
+| `TimelineMapping` | type | [Musical-position and media-seconds conversion contract](#transport--webmusickerneltransport) |
+| `TickWorkerLike` | type | [Minimal worker port for a tick source](#tick--webmusickerneltick) |
+| `TickSourceOptions` | type | [Validated interval and optional worker factory](#tick--webmusickerneltick) |
+| `TickSource` | type | [Single-callback start/stop/dispose contract](#tick--webmusickerneltick) |
+| `MAX_TIMER_DELAY_MS` | constant | [Largest accepted timer interval in milliseconds](#tick--webmusickerneltick) |
+| `createTickSource` | factory | [Create a worker or interval wakeup source](#tick--webmusickerneltick) |
+| `SyncMasterTransport` | type | [Master clock, command and optional reconciliation ports](#sync--webmusickernelsync) |
+| `SyncFollowerTransport` | type | [Schedulable follower command and observation ports](#sync--webmusickernelsync) |
+| `FollowerOptions` | type | [Local offset, constant scale and native-loop phase](#sync--webmusickernelsync) |
+| `TransportGroupOptions` | type | [Shared lead-in, drift cadence, loop and error observer](#sync--webmusickernelsync) |
+| `SyncLoopRegion` | type | [Ordered start/end bounds on the applicable position axis](#sync--webmusickernelsync) |
+| `TransportCommand` | type | [Revisioned play, pause, stop, seek, rate and loop commands](#sync--webmusickernelsync) |
+| `TransportSnapshot` | type | [Coherent immutable session observation](#sync--webmusickernelsync) |
+| `TransportCommit` | type | [Committed/superseded command outcome and snapshot](#sync--webmusickernelsync) |
+| `TransportEvent` | type | [Invalidation, settlement and background error observation](#sync--webmusickernelsync) |
+| `TransportGroup` | class | [Master/follower scheduling and session command authority](#sync--webmusickernelsync) |
+| `ClocklessMasterTransport` | type | [Inner transport accepted by the mirror adapter](#sync--webmusickernelsync) |
+| `MirrorClockMaster` | adapter | [Sampled clock for an existing clockless master](#sync--webmusickernelsync) |

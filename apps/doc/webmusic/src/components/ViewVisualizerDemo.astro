@@ -1,0 +1,131 @@
+---
+import LiveDemoCanvas from './LiveDemoCanvas.astro';
+
+interface Props {
+  demo?: 'piano-roll' | 'staff' | 'waterfall';
+}
+
+// Default to the piano roll so a bare <ViewVisualizerDemo /> still renders —
+// an unset `demo` used to fall through every branch and show an empty panel.
+const { demo = 'piano-roll' } = Astro.props;
+---
+
+<div class="wui-panel wui-panel--flow not-content view-visualizer-demo" data-view-demo={demo}>
+  <div class="wui-panel__title">
+    <span>@webmusic/score/view</span>
+    <strong data-view-demo-title>Visualizer</strong>
+  </div>
+  <LiveDemoCanvas size="tall">
+    <div class="view-visualizer-demo__surface" data-view-demo-surface></div>
+  </LiveDemoCanvas>
+</div>
+
+<script>
+  import { Duration, MeasureId, PartId, Pitch, Rational, ScoreBuilder, VoiceId } from '@webmusic/score';
+  import { renderPianoRollVisualizer, renderStaffVisualizer, renderWaterfallVisualizer } from '@webmusic/score/view/render';
+
+  const q = (value: number) => new Rational(value, 1);
+
+  const createScore = () => {
+    const builder = new ScoreBuilder();
+    const timeSignature = { numerator: 4, denominator: 4 };
+    const partId = PartId('piano');
+    const voice = VoiceId('piano-v1');
+
+    builder
+      .setMetadata({ title: 'View API Study' })
+      .addTempo({ atQuarters: Rational.ZERO, bpm: 120 })
+      .addMeter({ atQuarters: Rational.ZERO, measureNumber: 1, timeSignature });
+
+    builder.addPart({ id: partId, name: 'Piano', staves: 2, midiProgram: 0 });
+    builder.addMeasure({
+      id: MeasureId('m1'),
+      number: 1,
+      onsetQuarters: Rational.ZERO,
+      durationQuarters: q(4),
+      timeSignature,
+      keySignature: { fifths: 0, mode: 'major' },
+    });
+
+    ['C4', 'E4', 'G4', 'C5', 'E3', 'G3', 'C4', 'E4'].forEach((name, index) => {
+      const pitch = Pitch.parse(name);
+      builder.addNote(partId, {
+        id: builder.newNoteId(),
+        pitch,
+        onsetQuarters: new Rational(index, 2),
+        duration: Duration.eighth(),
+        voice,
+        staff: pitch.midi < 60 ? 2 : 1,
+      });
+    });
+
+    return builder.build();
+  };
+
+  const renderDemo = (root: HTMLElement) => {
+    if (root.dataset.initialized) return;
+    root.dataset.initialized = 'true';
+    const surface = root.querySelector<HTMLDivElement>('[data-view-demo-surface]')!;
+    const title = root.querySelector<HTMLElement>('[data-view-demo-title]')!;
+    const score = createScore();
+    const demo = root.dataset.viewDemo;
+
+    if (demo === 'piano-roll') {
+      title.textContent = 'Piano roll visualizer';
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('role', 'img');
+      svg.setAttribute('aria-label', 'Piano roll rendered by @webmusic/score/view');
+      surface.appendChild(svg);
+      renderPianoRollVisualizer(score, svg, {
+        noteHeight: 12,
+        noteSpacing: 2,
+        pixelsPerSecond: 96,
+        noteRGB: '17, 17, 17',
+      });
+    }
+
+    if (demo === 'staff') {
+      title.textContent = 'Staff visualizer';
+      renderStaffVisualizer(score, surface, {
+        noteHeight: 7,
+        noteSpacing: 1,
+        pixelsPerSecond: 0,
+        noteRGB: '17, 17, 17',
+      });
+    }
+
+    if (demo === 'waterfall') {
+      title.textContent = 'Waterfall visualizer';
+      renderWaterfallVisualizer(score, surface, {
+        noteSpacing: 2,
+        pixelsPerSecond: 64,
+        whiteNoteWidth: 16,
+        showOnlyOctavesUsed: true,
+        noteRGB: '17, 17, 17',
+      });
+    }
+  };
+
+  document.querySelectorAll<HTMLElement>('[data-view-demo]').forEach(renderDemo);
+</script>
+
+<style>
+  .view-visualizer-demo__surface {
+    min-height: 220px;
+    overflow: auto;
+  }
+
+  [data-view-demo='staff'] .view-visualizer-demo__surface {
+    height: 280px;
+  }
+
+  [data-view-demo='waterfall'] .view-visualizer-demo__surface {
+    height: 320px;
+    overflow: hidden;
+  }
+
+  .view-visualizer-demo svg {
+    display: block;
+    width: 100%;
+  }
+</style>

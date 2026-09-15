@@ -1,0 +1,174 @@
+---
+title: '@webmusic/ui/envelope'
+description: 'Renders an ADSR curve with synchronized pointer and native-range interaction over a structural binding.'
+sidebar:
+  label: 'envelope'
+  order: 3
+---
+
+import UiPresenterLiveDemo from '../../../../components/UiPresenterLiveDemo.astro';
+import UiPresenterRelated from '../../../../components/UiPresenterRelated.astro';
+
+`mountEnvelope()` renders an ADSR curve, filled area, three draggable SVG handles, a visual
+readout and four native range inputs. It paints `EnvelopeSnapshot`; the caller owns envelope and
+range state and commits complete `EnvelopeState` objects through `setEnvelope()`.
+
+Use [LFO](/uikit/parameters-gestures/lfo/) for cyclic modulation or
+[parameter](/uikit/parameters-gestures/parameter/) for independent scalar controls.
+[`<synth-panel>`](/score/element/play/synth-panel/) already composes this presenter.
+
+<UiPresenterLiveDemo presenter="envelope" />
+
+## Import
+
+```ts
+import {mountEnvelope} from '@webmusic/ui/envelope';
+
+const handle = mountEnvelope(host, {
+  snapshot: () => store.envelope,
+  setEnvelope: (envelope) => store.setEnvelope(envelope),
+  subscribe: (notify) => store.subscribe(notify),
+});
+```
+
+## Geometry and command settlement
+
+The viewbox has four equal horizontal segments. Attack occupies the first segment, decay the
+second, sustain holds across the third, and release extends into the fourth. Each time stage is
+scaled against its positive `*Max` range; sustain is clamped to `0…1`. The combined decay/sustain
+handle edits both axes in one pointer gesture.
+
+Pointer and native-range input paints optimistically, calls `setEnvelope()` with a new complete
+object, then re-reads the binding after the latest command settles. Earlier command settlements
+cannot overwrite a newer gesture. Subscription and explicit updates use the same 32-pass bounded
+repaint path. See the [shared presenter shape](/uikit/api/#the-shared-presenter-shape) for the
+common lifecycle contract.
+
+<details class="component-section">
+<summary>API</summary>
+
+`mountEnvelope(host, binding, options?)` accepts an `HTMLElement` or `ShadowRoot` and returns an
+`EnvelopeHandle`.
+
+**State**
+
+Non-finite envelope values normalize to `0`. Non-positive or non-finite ranges use the defaults
+shown below; curve geometry clamps values to each visible range without mutating caller state.
+
+| Member | Kind | Description |
+|---|---|---|
+| `envelope` | `EnvelopeState` | Required ADSR value object painted and replaced as one command payload. |
+| `envelope.attack` | `number` | Attack seconds; visible geometry clamps to `0…attackMax`. |
+| `envelope.decay` | `number` | Decay seconds; visible geometry clamps to `0…decayMax`. |
+| `envelope.sustain` | `number` | Sustain level clamped to `0…1` for geometry and input. |
+| `envelope.release` | `number` | Release seconds; visible geometry clamps to `0…releaseMax`. |
+| `ranges` | `EnvelopeRanges` | Required positive range maxima for time-stage scaling. |
+| `ranges.attackMax` | `number` | Attack scale maximum; invalid values become `2`. |
+| `ranges.decayMax` | `number` | Decay scale maximum; invalid values become `2`. |
+| `ranges.releaseMax` | `number` | Release scale maximum; invalid values become `2`. |
+| `disabled?` | `boolean` | Strict `true` disables all range inputs and pointer editing. |
+
+**Binding**
+
+| Member | Kind | Description |
+|---|---|---|
+| `snapshot()` | `() => EnvelopeSnapshot` | Required pull port read on mount, notification, command settlement and `update()`; failures go to `onError`. |
+| `setEnvelope(envelope)` | `(EnvelopeState) => void \| Promise<void>` | Required command receiving a fresh complete ADSR object after pointer or range input. |
+| `subscribe?(notify)` | `(notify: () => void) => () => void` | Optional external-state subscription released by `destroy()`. |
+
+**Options**
+
+| Member | Kind | Default | Description |
+|---|---|---|---|
+| `label` | `string` | `'Envelope'` | Accessible name of the root group. |
+| `classNames` | `EnvelopeClassNames` | `{}` | Adds compatibility classes to root, SVG, grid, area, curve, handles, readout, inputs wrapper and inputs. |
+| `parts` | `EnvelopeParts` | `{}` | Adds tokens beside the canonical parts for the same node set. |
+| `onError` | `(error: unknown) => void` | — | Receives snapshot, command, subscription, stabilization and cleanup failures. |
+| `stylesheet` | `boolean` | `true` | Installs the presenter's stylesheet unless explicitly `false`, for a light-DOM host that cannot inject CSS into its page. |
+
+**Handle**
+
+| Member | Kind | Description |
+|---|---|---|
+| `element` | `HTMLElement` | Presenter-owned `.wui-envelope` root. |
+| `update()` | `() => void` | Re-reads and repaints the binding through the bounded update loop. |
+| `destroy()` | `() => void` | Idempotently ends pointer capture and removes listeners, subscription, root and installed stylesheet. |
+
+**Accessibility.** The root is a `role="group"` named by `label`. Four visually clipped native
+ranges are labelled Attack, Decay, Sustain and Release and expose formatted `aria-valuetext`;
+their native keys are the keyboard-equivalent editing path. SVG curve, handles and visual readout
+are `aria-hidden`, so they do not duplicate the ranges. Focus on a range highlights its related
+SVG handle. Disabled state reaches every native input, and forced-colors rules retain curve,
+handle and focus contrast.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+Use the shared [surface and palette tokens](/uikit/#theme-with-css-custom-properties) for
+background (including `transparent`), foreground, accent, outer border and corner radius.
+Presenter-specific tokens below take precedence within their documented roles.
+
+The presenter installs `envelopeStyle` unless `stylesheet: false`. The SVG fills its container
+width and keeps the height set by `--wm-envelope-height`. The wrapping ADSR readout occupies a
+separate row below the plot and adds to the total height. Drag coordinates use the SVG's current
+bounds, so wrapping text and container resizing do not change the time/level mapping.
+Supply the exported stylesheet or your own CSS from the host when opting out.
+
+The graph is an inverse surface: `--wm-surface-inverse` and
+`--wm-foreground-on-inverse` keep its background and marks paired. Ordinary
+`--wm-surface` and `--wm-foreground` do not recolor that inner graph. Set
+`--wm-envelope-background` and the documented graph-ink tokens together when
+replacing its palette; the readout below uses ordinary foreground tokens.
+
+**Tokens**
+
+| Property | Falls back to | Default | Controls |
+|---|---|---|---|
+| `--wm-envelope-border` | `--wm-control-border` → `--wm-border` | `#d8d8d8` | Inner graph border. |
+| `--wm-control-border` | `--wm-border` | `#d8d8d8` | Shared non-primary control border fallback. |
+| `--wm-border` | literal | `#d8d8d8` | Shared border fallback. |
+| `--wm-envelope-radius` | `--wm-control-radius` | `0` | Inner graph corners. |
+| `--wm-control-radius` | literal | `0` | Shared radius fallback. |
+| `--wm-envelope-background` | `--wm-surface-inverse` | `#111` | Inner graph surface; the outer root uses the shared `--wm-component-*` surface. |
+| `--wm-surface-inverse` | literal | `#111` | Shared inverse-surface fallback. |
+| `--wm-envelope-foreground` | `--wm-foreground-on-inverse` | `#fff` | Root current color and curve/handle fallback. |
+| `--wm-foreground-on-inverse` | literal | `#fff` | Shared inverse foreground fallback. |
+| `--wm-envelope-height` | `--wm-surface-md` | `144px` | SVG display height, on the shared drawing-surface scale. |
+| `--wm-envelope-grid` | literal | `rgba(255,255,255,.12)` | Vertical guide lines. |
+| `--wm-envelope-fill` | literal | `rgba(255,255,255,.12)` | Area under the curve. |
+| `--wm-envelope-curve` | `currentColor` | Root foreground | ADSR line. |
+| `--wm-envelope-handle` | `currentColor` | Root foreground | Handle fill. |
+| `--wm-envelope-handle-border` | `--wm-control-border` → `--wm-border` | `#d8d8d8` | Handle outline. |
+| `--wm-focus` | `--wm-focus-ring` | `Highlight` | Focused-handle outline. |
+| `--wm-focus-ring` | literal | `Highlight` | Shared focus fallback. |
+| `--wm-font-mono` | literal | `ui-monospace, monospace` | ADSR readout font family. |
+| `--wm-envelope-text` | `--wm-foreground-muted` → `--wm-foreground` | `#666` | Visual ADSR readout. |
+
+**Classes**
+
+`classNames` adds compatibility classes without replacing canonical names.
+
+| Node | Canonical class | `classNames` key |
+|---|---|---|
+| Root | `.wui-envelope` | `root` |
+| SVG | `.wui-envelope__svg` | `svg` |
+| Each guide | `.wui-envelope__grid` | `grid` |
+| Filled polygon | `.wui-envelope__area` | `area` |
+| Curve polyline | `.wui-envelope__curve` | `curve` |
+| Each handle | `.wui-envelope__handle` | `handle` |
+| Visual readout | `.wui-envelope__readout` | `readout` |
+| Clipped input wrapper | `.wui-envelope__inputs` | `inputs` |
+| Each native range | `.wui-envelope__input` | `input` |
+
+Runtime modifiers are `.is-disabled` on the root and `.is-dragging` / `.is-focused` on handles.
+
+**Parts**
+
+The canonical part tokens are `root`, `svg`, `grid`, `area`, `curve`, `handle`, `readout`, `inputs`
+and `input`; `EnvelopeParts` adds tokens beside each matching name and de-duplicates them.
+
+</details>
+
+<UiPresenterRelated presenter="envelope" />

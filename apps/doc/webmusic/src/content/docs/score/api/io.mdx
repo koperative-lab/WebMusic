@@ -1,0 +1,326 @@
+---
+title: '@webmusic/score/io'
+description: MIDI, MusicXML, MXL and ABC import/export for Score.
+---
+
+`@webmusic/score/io` is the score-format boundary for Score. It converts MIDI,
+MusicXML, compressed MusicXML and ABC data into immutable `Score` objects from
+`@webmusic/score`, and serializes scores back to those formats.
+
+The MusicXML implementation keeps one stable public parser/serializer boundary
+over separate preserve-order XML traversal, measure timing, Score construction,
+and multi-voice serialization modules. This prevents document-order concerns
+such as `<backup>` and `<forward>` from leaking into the public API.
+
+## Install
+
+`npm install @webmusic/score` — use an available published version or the local workspace; [Install](/score/#install) has the full setup.
+
+Every parser and serializer this entry exposes is bundled; nothing here needs an optional peer.
+
+See the [Score entry map](/score/api/#package-subpaths) for other capabilities. JSON
+model persistence belongs to `Score.toJSON()` / `scoreFromJSON()` in
+[`@webmusic/score`](/score/api/); JSON is not a format accepted by these
+file loaders.
+
+## Load and detect formats
+
+```ts
+import {detectFormat, loadScore, loadScoreFromUrl} from '@webmusic/score/io';
+
+const fromUrl = await loadScoreFromUrl('/scores/etude.mxl');
+const fromBytes = await loadScore(buffer); // format is sniffed
+const fromXml = await loadScore(xml, {format: 'musicxml'});
+
+detectFormat(buffer); // 'midi' | 'mxl' | 'musicxml' | 'abc'
+```
+
+URL and Worker operations accept `signal` and `timeoutMs` across download,
+bounded stream reading, and result activation:
+
+```ts
+const controller = new AbortController();
+const pending = loadScoreFromUrl('/scores/large.mxl', {
+  signal: controller.signal,
+  timeoutMs: 15_000,
+});
+
+controller.abort(); // pending rejects with AbortError
+```
+
+A timeout rejects with `ScoreLoadTimeoutError`. Synchronous parser computation
+cannot always be pre-empted, but its cancelled result is suppressed.
+
+`loadScoreDetailed(input, options)` and `loadScoreFromUrlDetailed(url, options)`
+return `{score, diagnostics}`. Their score-only counterparts return `Score`.
+Input is a string, `ArrayBuffer`, or the exact range of a `Uint8Array`; text
+bytes are decoded as UTF-8. `format` overrides detection. URL loading next uses
+the extension (ignoring query and fragment), then sniffs bytes. Detection checks
+MIDI/ZIP magic or a leading XML `<` after whitespace/BOM; remaining text is
+treated as ABC. It is not validation of the detected document.
+
+## Parse and serialize directly
+
+```ts
+import {
+  parseABC,
+  parseMIDI,
+  parseMusicXML,
+  parseMXL,
+  serializeABC,
+  serializeMIDI,
+  serializeMusicXML,
+  serializeMXL,
+} from '@webmusic/score/io';
+```
+
+### Representation and information loss
+
+| Format | Preserved behavior | Limits of the representation |
+| --- | --- | --- |
+| MIDI | Format 0/1 with positive quarter-note PPQ; exact source tick positions and performed seconds; tempo/meter streams, track names, channels and programs. Export uses sounding pitches, merges contiguous ties and projects performed seconds at the requested PPQ. | SMPTE time division and format 2 independent sequences reject. MIDI has no authored notation grid; import reports ignored key signatures, controls and pitch bends. Export omits rests and grace notes whose steal time has not been realized. Written spelling, ties and transposition are realized as performance events, not preserved as notation. |
+| MusicXML | Score-partwise document order, backup/forward, voices, chords, note/rest durations, written pitches, ties, staff assignments and part transposition. Written bases/dots/tuplet ratios and endpoints (including hidden numbers), numbered beams, stems, hidden notation, numbered slurs, tie placement, common articulations and rest positions are retained. Per-part/staff clefs include changes inside bars; words, rehearsal, dynamics, numeric metronome, pedal and wedge directions retain exact offsets. Left/right bar styles use the master grid. Export moves the document cursor for overlapping onsets and splits notes crossing bars into tied fragments. | Score-timewise rejects. The first part supplies the measure/tempo/meter/barline grid; differing secondary measures produce diagnostics. Mid-measure key/meter declarations and changing part transposition cannot be fully represented. Grace notes retain zero timing and export with an eighth-note type. Page credits, full layout, lyrics, uncommon articulations, articulation placement, unsupported direction families and performed overlays are not lossless. |
+| MXL | Bounded ZIP extraction of the container manifest and selected MusicXML entry; shares the MusicXML semantics above. | Reads the first manifest rootfile, with a filename fallback when no path is declared. Additional scores, images and archive metadata are not retained. Export writes a single score and manifest. |
+| ABC | Compact single-stream pitch/rest tokens, octave marks, rational length suffixes, numeric meter and explicit accidentals. Accidentals propagate by pitch letter across octaves until a barline or another accidental; export writes explicit naturals. | Key/tempo/voice declarations, repeat execution, chords, tuplets, grace groups, overlays, lyrics and decorations are not fully interpreted. Detailed parsing reports supported families of loss. Export uses only the first part, inserts gaps as rests, and reports skipped overlaps/zero-duration notes. |
+
+MIDI export accepts `{ppq?: number}` (default `480`, integer `1…32767`). A
+non-quarter metronome marking is converted to quarter BPM before encoding the
+tempo event. Sounding pitches outside the MIDI data range `0…127` reject rather
+than wrap. Tick rounding and MIDI's integer microsecond tempo remain format
+precision limits.
+
+MusicXML export accepts `{ppq?: number}` (default `480`, positive safe integer)
+as its divisions per quarter. MXL additionally accepts `scorePath` (default
+`score.musicxml`); an empty path or `META-INF/container.xml` rejects because it
+would replace or hide the score manifest.
+
+Written `<type>`, `<dot>` and `<time-modification>` values are checked against
+the exact rational `<duration>`. If they disagree, import keeps the encoded
+musical timing, derives a compatible duration base and reports
+`musicxml-notation-duration-mismatch`. Export uses the written base for
+`<type>` and retains tuplet ratios and authored endpoints. Programmatic
+`tupletId` groups without endpoints receive start/stop marks on export.
+Tuplet IDs represent group membership, not stable MusicXML identifiers.
+
+Per-part clefs and supported directions use the [timed notation model](/score/api/#timed-directions-and-barlines).
+The importer applies signed `<direction><offset>` values on the current document
+cursor and retains source staff, placement and numeric engraving offsets.
+Unsupported direction families (for example octave shifts, dashes and metric
+modulations) report `musicxml-direction-unsupported`; arbitrary XML child
+structures and typography are not a lossless schema round-trip. A metronome
+direction alone is visual metadata; `<sound tempo>` supplies playback tempo.
+Sound offsets use the active divisions and may be negative; a sound's own
+offset overrides its enclosing direction's offset. Export writes playback-only
+tempo events as measure-level `<sound>` elements, preserving their offsets
+without adding visual metronome markings or other directions.
+
+Export still rounds onsets and durations to the chosen PPQ: use a resolution
+divisible by the score's rhythmic denominators for an exact round-trip
+(`480` handles ordinary triplets; septuplets may require, for example, `3360`).
+When export splits a note across bars, its fragments receive new written
+durations and ties; the original beam/tuplet marks are not copied onto those
+different durations. Slur endpoints and articulations stay on the original
+onset fragment.
+
+ABC's omitted `L:` follows its meter: `1/8` for meters at least `3/4`, otherwise
+`1/16`. Earlier releases used `1/4` unconditionally; add `L:1/4` when that old
+timing was intended. The serializer always writes `L:1/4` explicitly. ABC key
+signatures and accidental-propagation directives remain outside the supported
+subset; the default propagation rule applies.
+
+Use `parseMIDIDetailed`, `parseMusicXMLDetailed`, `parseMXLDetailed`, or
+`parseABCDetailed` to retain recoverable diagnostics. The result is
+`{score, diagnostics}`; `serializeABCDetailed` returns `{data, diagnostics}`.
+Diagnostics contain `code`, `severity`, `format`, `message`, and an optional
+`location` (`partId`, `measureNumber`). An empty list does not certify a lossless
+conversion. Syntax, unsupported timing modes and resource-limit failures throw
+or reject; ordinary parser failures are not all instances of one error class.
+
+### Resource limits
+
+The defaults are exported as frozen constants. Resolution helpers validate
+overrides without parsing. Integer limits must be positive safe integers;
+`maxDurationQuarters` is positive and finite. Direct format parsers accept their
+format's partial limits as a second argument. Load options pass them under
+`midi`, `musicxml`, `mxl`, or `abc`, with the top-level input cap still applying.
+
+| Options / default constant | Defaults |
+| --- | --- |
+| `LoadScoreLimits` / `DEFAULT_LOAD_SCORE_LIMITS` | `maxInputBytes: 32 MiB` |
+| `MIDIParseLimits` / `DEFAULT_MIDI_PARSE_LIMITS` | `maxInputBytes: 32 MiB`, `maxTracks: 512`, `maxEvents: 1,000,000` |
+| `MusicXMLParseOptions` | `maxInputBytes: 32 MiB`, `maxElements: 250,000` (opening elements) |
+| `MXLParseLimits` / `DEFAULT_MXL_PARSE_LIMITS` | `maxArchiveBytes: 32 MiB`, `maxEntryBytes: 64 MiB`, `maxTotalExtractedBytes: 64 MiB`, `maxEntries: 4,096`, `maxPathLength: 1,024` characters |
+| `ABCParseLimits` / `DEFAULT_ABC_PARSE_LIMITS` | `maxInputBytes: 1,000,000`, `maxTokens: 100,000`, `maxMeasures: 4,096`, `maxDurationQuarters: 256` |
+
+ZIP limits are inspected before the selected entries inflate; XML disables
+custom DTD entity expansion and restores only predefined/numeric references.
+These are bounded resource checks, not complete format validators or latency
+guarantees. A fetch implementation without a readable stream is checked after
+its `arrayBuffer()` allocation; native streamed responses are counted and
+cancelled at the byte limit.
+
+## Parse in a Worker
+
+```ts
+import {
+  ParserWorkerRemoteError,
+  createParserWorker,
+} from '@webmusic/score/io/worker-client';
+
+const parser = createParserWorker();
+const score = await parser.parse(buffer);
+parser.dispose();
+```
+
+`parse()` and `parseDetailed()` keep binary ownership with the caller, so
+supplied memory is never mutated or detached. After checking `maxInputBytes`,
+the client snapshots an `ArrayBuffer` or the exact range of a `Uint8Array`
+once at call time. A real Worker receives that private snapshot by transfer;
+the fallback parses the same snapshot. URL loading can transfer its internally
+allocated response buffer directly. Views backed by `SharedArrayBuffer` are
+copied to a private transferable buffer rather than attempting to transfer
+shared memory.
+
+If you pass a Worker instance or return one from a factory, its lifecycle is
+transferred to this parser client; it is not borrowed and must not be shared.
+`parser.dispose()` and terminal protocol failures terminate the supplied
+Worker. Use a dedicated Worker for each parser client.
+
+The self-registering Worker entry is `@webmusic/score/io/worker`. In environments
+without Web Workers, the client transparently falls back to in-process parsing.
+Worker protocol v1 adds structured errors and a best-effort per-request cancel
+message; an explicit incompatible version retires the Worker rather than
+leaving a request pending.
+Both v1 headers and structured failure details are mandatory; only legacy v0
+may omit both headers. Partial headers, malformed diagnostics, and unknown
+response ids are terminal instead of being ignored. Known input-limit,
+ABC/MIDI/MusicXML/MXL format-limit, abort, and timeout failures preserve the same exported
+error classes used by the in-process path. Other remote failures reject with
+`ParserWorkerRemoteError`, which exposes stable `code`, `operation`, and
+`retryable` fields.
+
+A malformed diagnostic location also retires the Worker and rejects pending
+requests. If a custom factory disposes the client before returning its Worker,
+that late Worker is terminated and receives no request. A cancelled request
+cannot activate a later result; synchronous parser work may still finish in its
+Worker. `parse` / `parseDetailed` / `loadFromUrl` / `loadFromUrlDetailed` accept
+the same limits, signal and timeout options. `dispose()` is idempotent and
+rejects active work.
+
+The stateless capability root does not expose Worker state. Use
+`@webmusic/score/io/worker-client` for the client, `/worker-protocol` for custom
+hosts, and `/worker` for the self-registering runtime.
+
+## Finer-grained entries
+
+Two more subpaths carve the root into smaller imports for bundle-sensitive
+applications:
+
+- **`@webmusic/score/io/load`** — just the loading pipeline: `loadScore` /
+  `loadScoreDetailed`, the URL variants, `detectFormat`,
+  `formatFromExtension`, and the input-limit options and error classes.
+- **`@webmusic/score/io/formats`** — the per-format parsers behind it (MIDI,
+  MusicXML, MXL, ABC), for callers that already know the format and want to
+  skip detection.
+
+The root re-exports both, so importing from `@webmusic/score/io` is always
+correct — these entries only narrow what a bundler has to trace.
+
+The `/io/load` module additionally exports `readScoreResponse(response,
+maxInputBytes, label?, signal?)`, the bounded stream reader returning an
+`ArrayBuffer`, and `scoreInputByteLengthAtMost(input, limit)`, an allocation-free
+UTF-8 size preflight that may stop once the limit is exceeded. These two helpers
+are not re-exported by `/io`.
+
+## API Reference — @webmusic/score/io
+
+| Export | Kind | Use it for |
+| --- | --- | --- |
+| `detectFormat` | function | Sniff a supported input; see [loading](#load-and-detect-formats). |
+| `formatFromExtension` | function | Infer from a URL/path, returning `undefined` if unknown. |
+| `loadScore` | loader | Parse bytes/text to `Promise<Score>`. |
+| `loadScoreDetailed` | loader | Parse bytes/text with diagnostics. |
+| `loadScoreFromUrl` | loader | Fetch and parse to `Promise<Score>`. |
+| `loadScoreFromUrlDetailed` | loader | Fetch and parse with diagnostics. |
+| `resolveLoadScoreLimits` | function | Validate and fill top-level input limits. |
+| `assertScoreInputByteLength` | function | Reject an invalid/over-limit byte count before allocation. |
+| `DEFAULT_LOAD_SCORE_LIMITS` | constant | Default loader byte cap. |
+| `ScoreInputLimitError` | class | Top-level input-cap failure (`score-input-limit`). |
+| `ScoreLoadAbortError` | class | Cancellation without an Error reason (`score-load-aborted`, name `AbortError`). |
+| `ScoreLoadTimeoutError` | class | Deadline failure (`score-load-timeout`), with `timeoutMs`. |
+| `parseMIDI` | function | SMF `ArrayBuffer` to `Score`. |
+| `parseMIDIDetailed` | function | SMF import with normalization diagnostics. |
+| `serializeMIDI` | function | Score performance to SMF `Uint8Array`. |
+| `resolveMIDIParseLimits` | function | Validate/fill MIDI parser limits. |
+| `assertMIDIStructureLimits` | function | Preflight SMF bytes, tracks and event counts. |
+| `DEFAULT_MIDI_PARSE_LIMITS` | constant | Default MIDI resource caps. |
+| `MIDIParseLimitError` | class | MIDI resource failure (`midi-parse-limit`). |
+| `parseMusicXML` | function | XML string to `Score`. |
+| `parseMusicXMLDetailed` | function | XML import with normalization diagnostics. |
+| `serializeMusicXML` | function | Score notation to MusicXML string. |
+| `assertMusicXmlInputLimit` | function | Preflight an XML string against a byte cap. |
+| `assertMusicXmlElementLimit` | function | Preflight opening element count. |
+| `DEFAULT_MUSICXML_MAX_INPUT_BYTES` | constant | Default XML byte cap. |
+| `DEFAULT_MUSICXML_MAX_ELEMENTS` | constant | Default XML opening-element cap. |
+| `MusicXMLParseLimitError` | class | XML resource failure (`musicxml-parse-limit`). |
+| `parseMXL` | function | ZIP `ArrayBuffer` to `Promise<Score>`. |
+| `parseMXLDetailed` | function | MXL import with payload diagnostics. |
+| `serializeMXL` | function | Score notation to ZIP `Uint8Array`. |
+| `resolveMXLParseLimits` | function | Validate/fill archive limits. |
+| `DEFAULT_MXL_PARSE_LIMITS` | constant | Default archive/extraction caps. |
+| `MXLParseLimitError` | class | Archive resource failure (`mxl-parse-limit`). |
+| `parseABC` | function | ABC string to `Score`. |
+| `parseABCDetailed` | function | Compact ABC import with loss diagnostics. |
+| `serializeABC` | function | Score to compact ABC string. |
+| `serializeABCDetailed` | function | Compact ABC export with loss diagnostics. |
+| `resolveABCParseLimits` | function | Validate/fill ABC parser limits. |
+| `assertABCInputByteLength` | function | Reject an invalid/over-limit ABC byte count. |
+| `DEFAULT_ABC_PARSE_LIMITS` | constant | Default ABC resource caps. |
+| `ABCParseLimitError` | class | ABC resource failure (`abc-parse-limit`). |
+
+| Type export | Contract |
+| --- | --- |
+| `ScoreFormat` | `'midi' \| 'musicxml' \| 'mxl' \| 'abc'`. |
+| `LoadScoreOptions` | Format, signal, timeout, source cap and per-format overrides. |
+| `LoadScoreLimits` | Required loader resource limits. |
+| `MIDIParseLimits` | Required MIDI byte/track/event caps. |
+| `MIDIParseOptions` | Partial MIDI limits. |
+| `MusicXMLParseOptions` | Optional XML byte/element caps. |
+| `MXLParseLimits` | Required ZIP/entry/extraction/path caps. |
+| `MXLParseOptions` | Partial MXL limits. |
+| `ABCParseLimits` | Required ABC byte/token/measure/duration caps. |
+| `ABCParseOptions` | Partial ABC limits. |
+| `ScoreDiagnostic` | Recoverable normalization/loss record. |
+| `ScoreDiagnosticFormat` | The format that produced a diagnostic. |
+| `ScoreParseResult` | Score with read-only diagnostics. |
+| `ScoreSerializeResult<T>` | Serialized data with read-only diagnostics. |
+
+### Worker-only entries
+
+| Export — @webmusic/score/io/worker-client | Kind | Contract |
+| --- | --- | --- |
+| `createParserWorker` | factory | Owned dedicated Worker client or in-process fallback; see [Worker lifecycle](#parse-in-a-worker). |
+| `ParserWorkerRemoteError` | class | Structured remote failure with code/operation/retryable. |
+| `createRequestTracker` | function | Re-exported [Kernel correlation tracker](/kernel/api/). |
+| `ParserWorker` | type | Four parse/load methods and disposal. |
+| `ParserWorkerOptions` | type | Load options excluding the positional format hint. |
+| `RequestTracker` | type | Kernel request correlation interface. |
+| `WorkerLike` | type | Kernel structural Worker interface. |
+
+| Export — @webmusic/score/io/worker-protocol | Kind | Contract |
+| --- | --- | --- |
+| `PARSE_WORKER_PROTOCOL` | constant | `'@webmusic/score/io/parse-worker'`. |
+| `PARSE_WORKER_PROTOCOL_VERSION` | constant | Current version `1`. |
+| `handleParseRequest` | function | Request and optional signal to `Promise<ParseResponse>`; parse failures become failure responses. |
+| `ParseWorkerFormat` | type | Supported format or `'auto'`. |
+| `ParseRequest` | type | Parse/parse-detailed request with legacy v0 or complete v1 headers. |
+| `CancelParseRequest` | type | V1 best-effort cancellation by request ID. |
+| `ParseWorkerRequest` | type | Parse or cancellation message. |
+| `ScoreJSON` | type | Structured-clone-safe model payload; not a file format. |
+| `ParseWorkerErrorCode` | type | Stable protocol/load/parser failure codes. |
+| `ParseWorkerError` | type | Structured remote failure details. |
+| `ParseResponse` | type | Correlated success or failure envelope. |
+
+`@webmusic/score/io/worker` has no value exports. It installs its handler only
+inside a dedicated Worker; ordinary main-thread/Node import does not register
+an application message listener.

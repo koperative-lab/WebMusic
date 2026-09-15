@@ -1,0 +1,715 @@
+---
+title: '@webmusic/score/analyze'
+description: Score analysis — stateless algorithms, code-only sessions and live trackers, plus styled analysis Web Components.
+---
+
+import ScoreReportPlayground from '../../../../components/headless/ScoreReportPlayground.astro';
+
+
+`@webmusic/score/analyze` is the **analysis** capability of the `@webmusic/score` package. It reads `Score` objects from `@webmusic/score` and returns plain data — a score summary, chord timelines, key detection, chord segmentation, roman numerals, motif search, rhythm patterns, and voice-leading checks. Its interactive Web Components compose those results around a player; the [Analyze overview](/score/element/#analyze) selects the component for each task.
+
+The capability root and `/headless` entry have no DOM dependency, so they run in Node, workers, browsers, tests, import pipelines, and batch jobs. It does not play audio, render notation, or own a framework — those live in [`@webmusic/score/play`](/score/api/play/), [`@webmusic/score/view`](/score/api/view/), and [`@webmusic/score/react`](/score/api/react/).
+
+## Install
+
+`npm install @webmusic/score` — use an available published version or the local workspace; [Install](/score/#install) has the full setup.
+
+The root model and this capability ship in that one package. A Web Component that loads a file from `src` dynamically uses the sibling `@webmusic/score/io` capability. Chord naming is powered by the bundled `@tonaljs/chord-detect` and `@tonaljs/chord`.
+
+The analysis capability separates stateless analysis, stateful resources and UI:
+
+The `@webmusic/score/analyze` root is the canonical stateless surface. `/headless` contains stateful code-only analysis components — the incremental session, live note-event trackers and Worker client — without UI, DOM access or styles. `/element` contains the styled Web Components. The elements reuse the public live trackers and keep score loading, DOM player binding, playhead state and rendering private. Each public entry tree-shakes independently; only `/worker` self-registers a runtime listener.
+
+---
+
+## Web Components
+
+Five live surfaces are exported by `@webmusic/score/analyze/element`: chord progression, current chord, key changes, Roman harmony and voice leading. Each owning page under [Web Components › Analyze](/score/element/#analyze) explains its attributes, events, player binding and styling.
+
+Whole-score summaries, histograms and rhythm reports use the [report workflow](/score/api/analyze/#reports). Candidate rankings, tonal comparisons, pitch evidence and history can be composed in code through the [live trackers and projections](/score/headless/analyze/live-trackers/#key-diagnostics). Motif search and the other score algorithms remain available below.
+
+The score algorithms below take a `Score` (from an importer, or built with `@webmusic/score`) and return plain data. The following examples assume a `score` that holds a I–IV–V–I progression in C major.
+
+## Summarize a score
+
+`summarizeScore` returns metadata, counts, duration, tempo, meter, key, and pitch range — handy for logs, APIs, CLI tools, and background jobs.
+
+```ts
+import { summarizeScore } from '@webmusic/score/analyze';
+
+const summary = summarizeScore(score);
+
+console.log({
+  title: summary.title,
+  parts: summary.parts,
+  measures: summary.measures,
+  notes: summary.notes,
+  durationSeconds: summary.durationSeconds,
+  tempoBpm: summary.tempoBpm,
+  timeSignature: summary.timeSignature,
+  pitchRange: summary.pitchRange,
+});
+```
+
+| Field | Description |
+| --- | --- |
+| `title`, `composer` | Score metadata, when present. |
+| `parts`, `measures`, `notes` | Part/measure counts and sounding-note count; explicit rests are excluded from `notes`. |
+| `durationQuarters`, `durationSeconds` | Total length in quarters and seconds. |
+| `tempoBpm`, `timeSignature`, `keySignature` | First tempo, meter, and key. |
+| `pitchRange` | `{ low, high }` spelled pitches, when notes exist. |
+
+## Distributions
+
+`distributions(score): Distributions` returns three whole-score histograms. It is pure, accepts no options and retains no state. Each `DistributionBin` contains a display `label`, numeric `key` and numeric `value`.
+
+```ts
+import {distributions} from '@webmusic/score/analyze';
+
+const result = distributions(score);
+const totalWeight = result.pitchClasses.reduce((sum, bin) => sum + bin.value, 0);
+const pitchShares = result.pitchClasses.map((bin) => ({
+  pitchClass: bin.key,
+  label: bin.label,
+  share: totalWeight > 0 ? bin.value / totalWeight : 0,
+}));
+console.table(pitchShares);
+```
+
+| Result | Bin key | Bin value and order |
+| --- | --- | --- |
+| `pitchClasses` | Pitch class `0`–`11` | Pitched-note duration weights in integer ticks, in chromatic order. Always 12 bins; non-pitched notes are omitted. |
+| `intervals` | Signed melodic interval in semitones | Occurrence counts, sorted by interval. Each voice is scanned separately and notated rests break the chain. |
+| `durations` | Duration in quarter notes | Note counts, sorted by duration. Exact rational durations form bins before conversion to numeric keys. |
+
+Normalizing pitch-class weights uses their sum: total pitched-note duration weight, including overlapping voices. It is not the score’s elapsed length. Empty input has zero pitch weights and empty interval/duration lists. The [report demo](/score/api/analyze/#report-histograms) renders all three results.
+
+## Chord timeline scan
+
+`chordTimeline` groups every pitched note overlapping a fixed musical window,
+including notes that do not sound simultaneously, and names the combined set.
+It shares the Tonal-backed naming policy with [`segmentChords`](#segment-chords),
+but answers a coarser question. It also emits parsed `root` and `quality` when
+recognized, `N.C.` below the pitch-class threshold or when unnamed, and `rest`
+for a window with no pitched notes.
+
+`windowQuarters` defaults to `1` and clamps to at least `0.125`; `minNotes`
+counts distinct pitch classes, defaults to `2`, and clamps to at least `1`
+(a fractional threshold effectively rounds up). Non-finite values throw
+`RangeError`, including for an empty score. `mergeAdjacent` defaults to `true`:
+equal adjacent labels share one segment whose `notes` are the deduplicated
+union of contributing notes and whose `pitchClasses` cover the whole span.
+These notes are evidence across the span, not a claim that they all overlap.
+Set `mergeAdjacent: false` to retain each window's evidence separately.
+
+```ts
+import { chordTimeline } from '@webmusic/score/analyze';
+
+const chords = chordTimeline(score, { windowQuarters: 1, minNotes: 2 });
+
+console.table(
+  chords.map((segment) => ({
+    start: segment.startQuarters,
+    end: segment.endQuarters,
+    chord: segment.chord,
+  })),
+);
+```
+
+## Detect key
+
+`detectKey` estimates the tonal center and mode from pitch-class duration weights (a Krumhansl-style profile correlation). The result includes the best key, a confidence value, and the ranked candidate scores.
+
+```ts
+import { detectKey } from '@webmusic/score/analyze';
+
+const key = detectKey(score);
+
+const values = {
+  tonic: key.tonic,
+  mode: key.mode,
+  confidence: Number(key.confidence.toFixed(3)),
+  top3: key.scores.slice(0, 3).map((candidate) => `${candidate.tonic} ${candidate.mode}`),
+};
+```
+
+Output:
+
+```json
+{
+  "tonic": "C",
+  "mode": "major",
+  "confidence": 0.607,
+  "top3": ["C major", "G major", "E minor"]
+}
+```
+
+## Segment chords
+
+`segmentChords` places boundaries at note onsets and offsets and labels the
+pitched notes sounding over each half-open interval. `windowQuarters` defaults
+to `2` and clamps to at least `0.125`; it caps intermediate pieces before
+contiguous equal labels merge, so final segments may be longer. Non-finite
+windows throw `RangeError`. Silence separates equal chords rather than merging
+them across a gap. Its timing differs from the aggregate `chordTimeline` scan.
+
+```ts
+import { segmentChords } from '@webmusic/score/analyze';
+
+const segments = segmentChords(score, {
+  windowQuarters: 4,
+});
+
+const values = segments.map((segment) => ({
+  startQuarters: segment.startQuarters,
+  endQuarters: segment.endQuarters,
+  chord: segment.chord,
+  pitchClasses: segment.pitchClasses,
+}));
+```
+
+Output:
+
+```json
+[
+  { "startQuarters": 0, "endQuarters": 4, "chord": "CM", "pitchClasses": [0, 4, 7] },
+  { "startQuarters": 4, "endQuarters": 8, "chord": "FM", "pitchClasses": [0, 5, 9] },
+  { "startQuarters": 8, "endQuarters": 12, "chord": "GM", "pitchClasses": [2, 7, 11] },
+  { "startQuarters": 12, "endQuarters": 16, "chord": "CM", "pitchClasses": [0, 4, 7] }
+]
+```
+
+## Pitch basis and transposing instruments
+
+Score-based analysis currently reads stored `Note.pitch` values and does not
+automatically apply `Part.transpose`. This affects chord/key pitch evidence,
+pitch distributions and cross-part voice comparisons, including the incremental
+analysis session. A mixed score for concert-pitch and transposing instruments
+must not be interpreted as a reliable concert-pitch harmony analysis without
+first creating an explicit concert-pitch analysis input.
+
+For example, piano C/E plus B♭ clarinet written A actually sounds C/E/G, but
+the current Score path analyzes C/E/A. `soundingPitch(note, part)` from the root
+API can convert individual pitches for an application-owned analysis copy;
+clear the copy's part transposition to avoid applying it again in playback.
+Keep the original notated Score for notation. There is no exported whole-Score
+normalizer or pitch-basis option yet. Direct `identifyChord(notes)` has no Part
+context; `identifyChordFromMidi` and live trackers analyze the actual MIDI values
+supplied by the caller.
+
+## Identify a supplied chord
+
+`identifyChord(notes)` filters to pitched notes, orders them by MIDI bass, and
+retains their notated names. `identifyChordFromMidi(midis)` instead uses a fixed
+mixed sharp/flat spelling. Both deduplicate octave doublings and return `''`
+for an empty set, or a space-separated pitch-class list when unnamed.
+
+Both paths share the existing spelling projection's candidate policy: Tonal
+may assume a missing perfect fifth, parsed candidates must explain every
+supplied pitch class, and ordinary major inversions rank ahead of the
+ambiguous `minor augmented` interpretation. Thus E–G–C prefers `CM/E` rather
+than `Em#5`. This is a naming preference, not proof of the music's intended
+root. The direct functions return only the preferred label; the Headless
+spelling projection also exposes alternatives and optional rootless readings.
+No staff or fretboard projection is computed to obtain a label.
+
+## Roman numerals
+
+`romanNumerals` takes a key and expresses the chord progression relative to that key.
+`romanNumeralForChord(symbol, key)` applies the same rule to one symbol.
+`RomanNumeralOptions.segments` can reuse an existing chord segmentation instead
+of recomputing it; its bounds and labels are retained.
+
+Degrees use the major or natural-minor pitch-class scale, then prefer a lowered
+neighbor for chromatic roots. Case and suffix retain chord quality (`ii7`,
+`Imaj7`, `viiø7`, `III+`); slash basses do not add inversion figures. This is a
+coarse pitch-class-relative label, not contextual harmonic analysis: for
+example, B major in C minor produces `bI` under the flat-neighbor rule.
+Unparsable chord or key names return the original chord label. Secondary
+functions, modulation and figured-bass inference are outside this API.
+
+```ts
+import { romanNumerals } from '@webmusic/score/analyze';
+
+const roman = romanNumerals(score, { tonic: 'C', mode: 'major' }, {
+  windowQuarters: 4,
+});
+
+const values = roman.map((entry) => ({
+  chord: entry.chord,
+  roman: entry.roman,
+  startQuarters: entry.startQuarters,
+  endQuarters: entry.endQuarters,
+}));
+```
+
+Output:
+
+```json
+[
+  { "chord": "CM", "roman": "I", "startQuarters": 0, "endQuarters": 4 },
+  { "chord": "FM", "roman": "IV", "startQuarters": 4, "endQuarters": 8 },
+  { "chord": "GM", "roman": "V", "startQuarters": 8, "endQuarters": 12 },
+  { "chord": "CM", "roman": "I", "startQuarters": 12, "endQuarters": 16 }
+]
+```
+
+## Find motifs
+
+`findMotifs` searches each part's voices separately for repeated intervals and
+exact notated durations; a phrase and its transposition match. Same-onset chord
+members reduce to the highest pitch, and explicit rest/unpitched-only events
+break phrases. Silent gaps without an explicit rest are not inferred as phrase
+boundaries. At least two occurrences sharing no note are required, although
+returned occurrences include all matching overlapping windows. Repeated-pitch
+patterns (including length `1`) are omitted. IDs identify this scan's grouping;
+`partId` and `noteIndexes` identify each occurrence's source notes.
+
+This example assumes `melodyScore` contains `C D E G | C D E G` as quarter notes.
+
+```ts
+import { findMotifs } from '@webmusic/score/analyze';
+
+const motifs = findMotifs(melodyScore, {
+  length: 4,
+  minOccurrences: 2,
+});
+
+const values = motifs.map((motif) => ({
+  intervals: motif.intervals,
+  rhythm: motif.rhythm,
+  occurrences: motif.occurrences.map((occurrence) => occurrence.startQuarters),
+}));
+```
+
+Output (intervals in semitones, rhythm and positions in quarter notes):
+
+```json
+[
+  {
+    "intervals": [2, 2, 3],
+    "rhythm": [1, 1, 1, 1],
+    "occurrences": [0, 4]
+  }
+]
+```
+
+## Rhythm patterns
+
+`rhythmPatterns` counts adjacent duration patterns in each part's note order,
+including rests, simultaneous notes and overlapping windows. It is a rhythmic
+vocabulary rather than a per-voice motif search, and a pattern occurring once
+is still returned. Its `length` is a positive safe integer (default `4`);
+invalid values throw `RangeError` before scanning even an empty score.
+
+```ts
+import { rhythmPatterns } from '@webmusic/score/analyze';
+
+const patterns = rhythmPatterns(melodyScore, 4);
+
+const values = patterns.slice(0, 2).map((pattern) => ({
+  pattern: pattern.pattern,
+  count: pattern.count,
+  onsets: pattern.onsets,
+}));
+```
+
+Output:
+
+```json
+[
+  {
+    "pattern": [1, 1, 1, 1],
+    "count": 5,
+    "onsets": [0, 1, 2, 3, 4]
+  }
+]
+```
+
+## Voice leading
+
+`voiceLeading` finds basic voice-leading problems where enough voice data exists: large leaps inside one voice, and parallel fifths/octaves between voices with matching onsets.
+
+Issues preserve each raw identifier in `voices` and include `voiceParts`, an
+array of part IDs paired by index. Use both values to identify a lane: different
+parts may use the same voice ID. `voiceParts` is optional for compatibility with
+older results. `projectVoiceFlow` can locate a legacy raw ID only when it is
+unambiguous; it omits an ambiguous bracket rather than placing it on another
+voice. Session and Worker snapshots freeze the added array with the result.
+
+Onset matching uses exact Rational quarters, without a fixed MIDI-tick grid;
+nearby distinct onsets remain distinct. Within one same-onset voice chord,
+the first sounding member represents that melodic event. A notated rest breaks
+parallel-motion comparisons even when the next sounding onset is not shared by
+the other voice. These remain basic shared-onset checks:
+they do not perform complete counterpoint analysis or infer missing voice parts.
+
+This example assumes `counterpointScore` has two voices named `upper` and `lower`.
+
+```ts
+import { voiceLeading } from '@webmusic/score/analyze';
+
+const issues = voiceLeading(counterpointScore);
+
+const values = issues.map((issue) => ({
+  type: issue.type,
+  startQuarters: issue.startQuarters,
+  endQuarters: issue.endQuarters,
+  voices: issue.voices,
+  severity: issue.severity,
+}));
+```
+
+Output:
+
+```json
+[
+  {
+    "type": "large-leap",
+    "startQuarters": 2,
+    "endQuarters": 3,
+    "voices": ["upper"],
+    "severity": "warning"
+  }
+]
+```
+
+## Use in a pipeline
+
+Because every function returns plain data, analysis can run after loading a file and before rendering or exporting.
+
+```ts
+import { detectKey, findMotifs, romanNumerals, segmentChords, summarizeScore, voiceLeading } from '@webmusic/score/analyze';
+import { loadScoreFromUrl } from '@webmusic/score/io';
+
+const score = await loadScoreFromUrl('/scores/etude.mid');
+
+const report = {
+  summary: summarizeScore(score),
+  key: detectKey(score),
+  chords: segmentChords(score),
+  roman: romanNumerals(score, detectKey(score)),
+  motifs: findMotifs(score),
+  issues: voiceLeading(score),
+};
+```
+
+## Incremental analysis for live editing
+
+When a score is being edited interactively, re-running every analysis from scratch on each keystroke wastes work. `createAnalysisSession` keeps the previous result and, on `update(nextScore)`, recomputes only what the edit touched — it relies on the core model's structural sharing (`Score.edit` / `Score.withPart` keep untouched `Part` objects identical by reference) to skip unchanged parts entirely.
+
+```ts
+import { createAnalysisSession } from '@webmusic/score/analyze/headless';
+
+const session = createAnalysisSession(score, { windowQuarters: 2 });
+session.result; // { key, chords, roman, motifs, issues } — same values as the standalone functions
+
+const next = score.edit((tx) => tx.updateNote(noteId, { pitch }));
+const updated = session.update(next); // recomputes only around the edit
+```
+
+`update` is guaranteed to return a result deep-equal to a from-scratch analysis of the new score. What is truly incremental: key detection (cached per-part pitch-class histograms), chord segmentation and roman numerals (the sweep re-runs only over the edited time window and is spliced into the cached segments), voice leading (only voice pairs involving an edited part are re-checked), and motifs (only the edited part is rescanned, then merged). Adding, removing, or reordering parts falls back to a full chord re-segmentation. The React hook `useScoreAnalysis` uses a session internally, so live editing through `@webmusic/score/react` gets this for free.
+
+## Follow playback in code
+
+[createAnalysisFollower](/score/headless/analyze/analysis-follower/) borrows a
+`ScorePlaybackSource`, combines its current score and activity with an analysis
+session, and supports nominal-seconds or quarter-note seeks with explicit
+completion outcomes. It creates no player, DOM or presentation clock. Use its
+state with the [projections](#the-projections), or pass your own UI callbacks.
+
+## Analyze live note events in code
+
+The live trackers are also headless domain components. Feed note events into
+them directly; they publish chord or key results as plain data and never create
+or paint UI.
+
+```ts
+import {
+  createLiveChordTracker,
+  createLiveKeyTracker,
+} from '@webmusic/score/analyze/headless';
+
+const chords = createLiveChordTracker({
+  onUpdate: ({ chord, midis, history }) => {
+    console.log({ chord, midis, history });
+  },
+});
+const key = createLiveKeyTracker((result, heard) => {
+  console.log(result.tonic, result.mode, heard);
+});
+
+chords.noteOn(60);
+chords.noteOn(64);
+chords.noteOn(67); // publishes C major
+key.noteOn(60);
+key.noteOn(64);
+key.noteOn(67);
+```
+
+### Analysis in a Worker
+
+[createAnalysisWorker](/score/headless/analyze/analysis-session/#analysis-worker) runs a session
+behind promises and documents its complete options, ownership, fallback,
+supersession and error contract. Import it from
+`@webmusic/score/analyze/worker-client` or the Analyze Headless entry. A custom
+worker can use the `@webmusic/score/analyze/worker` module entry; the protocol
+below describes its wire boundary.
+
+### Worker protocol v1
+
+The current protocol uses the exported identity
+`ANALYSIS_WORKER_PROTOCOL === '@webmusic/score/analyze/analysis-worker'` and
+`ANALYSIS_WORKER_PROTOCOL_VERSION === 1`. Every request and response carries
+those fields plus a non-negative safe-integer request `id`. Requests use
+`action: 'analyze' | 'update'`. A successful response contains `result`; a
+failed response keeps an `error` display string and includes structured
+`errorDetails`:
+
+Import the identity constants and request/response types from
+`@webmusic/score/analyze/worker-protocol`. That entry is import-safe in main-thread,
+SSR, and Worker scopes; listener registration belongs exclusively to
+`@webmusic/score/analyze/worker`.
+
+```ts
+interface AnalysisWorkerErrorDetails {
+  version: 1;
+  code:
+    | 'unsupported-protocol'
+    | 'invalid-request'
+    | 'analysis-failed'
+    | (string & {}); // forward-compatible unknown code
+  operation: 'protocol' | 'analyze' | 'update';
+  message: string;
+  retryable: boolean;
+  causeCode?: string; // for example a ScoreJSONError code
+}
+```
+
+The client validates response identity/version, correlated id, the complete
+`AnalysisResult` wire shape, discriminant, and structured error fields before
+settling a call. A malformed, mis-correlated, or incompatible response is
+terminal: all pending promises reject, listeners are detached when the Worker
+supports `removeEventListener`, and an owned Worker is terminated.
+The error operation is a closed v1 set and `causeCode`, when present, must be a
+string; the error-code string is deliberately open for forward compatibility.
+A valid remote failure rejects with `AnalysisWorkerRemoteError`; treat unknown
+future `code` values generically even when handling known codes specially.
+
+Worker ownership follows construction. Passing an existing Worker borrows it,
+so `dispose()` does not terminate it. The default path and a supplied factory
+create an owned Worker, which `dispose()` does terminate. Custom borrowed
+`AnalysisWorkerLike` implementations should expose the optional
+`removeEventListener` method so disposal can release listener closures.
+
+:::caution[Cancellation boundary]
+Analysis protocol v1 has no `AbortSignal`, timeout, or `cancel` action.
+Latest-wins skips updates that are still queued; it does not interrupt analysis
+already running in the Worker. The fallback also computes synchronously on the
+calling thread and returns local errors rather than
+`AnalysisWorkerRemoteError`. Result supersession is therefore not computation
+cancellation.
+:::
+
+Session/Worker options are validated before analysis. `windowQuarters` must be
+finite; `motifLength` and `minOccurrences` must be positive safe integers.
+Invalid options reject consistently instead of producing a result containing
+`NaN` timeline fields.
+
+In React, `useScoreAnalysisAsync` from [`@webmusic/score/react`](/score/api/react/) wraps this client (including the fallback) and returns `{ result, pending }`.
+
+## Reports
+
+`createScoreReport(score)` returns formatted summary rows for a whole score. Pair it with the existing `distributions` and `rhythmPatterns` APIs when building a statistics report. These calculations return data; the application chooses when to recompute it and how to display it.
+
+Choose a report and sample score below. Histogram mode exposes all three distributions; rhythm mode exposes pattern length. Returned data shows the actual function result. The demo owns its controls and optional UI presenters; it creates no analysis Element or playback resources.
+
+<ScoreReportPlayground />
+
+### Report Import
+
+```ts
+import {createScoreReport} from '@webmusic/score/analyze/headless';
+
+const report = createScoreReport(score);
+console.table(report.rows);
+```
+
+### Report Summary report
+
+`createScoreReport` combines the summary, key estimate and chord segmentation into a title, composer and label/value rows. It is pure: the same `Score` produces the same report, with no retained state or disposal.
+
+Rows are already formatted: confidence becomes a percentage, tempo is rounded and suffixed with `bpm`, and meter is a fraction. For underlying numeric values, use [`summarizeScore`, `detectKey` and `segmentChords`](/score/api/analyze/). Missing title/composer remain `undefined`; a report can omit them. With no pitched-note duration evidence, the Key row says `Unknown` and Confidence is `0%`; the key algorithm’s compatibility placeholder is not presented as a detected key.
+
+### Report Histograms
+
+Histogram data comes from the existing stateless [`distributions`](/score/api/analyze/#distributions) API. It is separate from the formatted summary:
+
+```ts
+import {distributions} from '@webmusic/score/analyze';
+
+const histogram = distributions(score);
+console.table(histogram.pitchClasses);
+console.table(histogram.intervals);
+console.table(histogram.durations);
+```
+
+Pitch-class values are duration weights, while interval and duration values are counts. The demo displays pitch-class weights as percentages of total pitched-note duration weight and preserves the original values under Returned data. The API reference owns the units, bin shapes and voice/rest semantics.
+
+### Report Rhythm patterns
+
+Use [`rhythmPatterns`](/score/api/analyze/#rhythm-patterns) to count duration sequences independently of pitch:
+
+```ts
+import {rhythmPatterns} from '@webmusic/score/analyze';
+
+const patterns = rhythmPatterns(score, 4);
+console.table(patterns.map(({pattern, count, onsets}) => ({
+  pattern: pattern.join(', '), count, onsets: onsets.join(', '),
+})));
+```
+
+The second argument is notes per pattern, a positive safe integer; invalid values throw `RangeError`, including for an empty score. Durations and onset positions use quarter notes; overlapping occurrences count separately. The demo recomputes after a score or pattern-length change and displays every returned pattern.
+
+### Report Updating and presenting reports
+
+Call these functions again with the next immutable score when an editor or importer changes it. They describe the supplied score rather than the player's current position. [`createAnalysisSession`](/score/headless/analyze/analysis-session/) separately maintains key, chord, Roman, melodic-motif and voice-leading results across score edits; its `result` does not contain summary, histogram or rhythmic-vocabulary fields.
+
+For a custom visual report, pass these plain values to [`renderSummaryCard`, `renderHistogram` or `renderRhythmPatternList`](/uikit/views-analysis/analysis/). DOM ownership and presenter cleanup remain in the application or demo, outside the Headless calculation.
+
+<details class="component-section">
+<summary>API</summary>
+
+**Construction** — `createScoreReport(score: Score): ScoreReport`. No options, commands, events or disposal. It borrows the score for the call and returns plain data.
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `title` | result | Score title, or `undefined`. |
+| `composer` | result | Composer, or `undefined`. |
+| `rows` | result | Read-only `{label, value}` strings: Key, Confidence, Tempo, Meter, Parts, Measures, Notes, optional Range, and Chord segments. |
+
+</details>
+
+### Report Related
+
+Use the [Analyze API](/score/api/analyze/) for one-shot algorithms and [live Analyze Web Components](/score/element/#analyze) for performance-following surfaces. The [analysis UI presenters](/uikit/views-analysis/analysis/) can render reports without an Element wrapper.
+
+## API Reference
+
+| API | Kind | Use it for |
+| --- | --- | --- |
+| `defineAllAnalysisElements()` | Web Components | Register the live Analyze family from `@webmusic/score/analyze/element`; individual classes and helpers are owned by the [Element references](/score/element/#analyze). |
+| `summarizeScore(score)` | Summary | Metadata, counts, duration, tempo, meter, key, and pitch range. |
+| `distributions(score)` | Statistics | Duration-weighted pitch classes, melodic interval counts and note-duration counts. |
+| `chordTimeline(score, opts?)` | Harmony analysis | Zero-config chord labels over fixed musical windows (quarters). |
+| `detectKey(score)` | Key analysis | Estimate tonic, mode, confidence, and ranked candidate keys. |
+| `segmentChords(score, opts?)` | Harmony analysis | Label sounding pitch sets between note boundaries, with contiguous equal labels merged. |
+| `identifyChord(notes)`, `identifyChordFromMidi(midis)` | Harmony analysis | Name a supplied sounding set, retaining notated spelling or using the fixed MIDI spelling. |
+| `romanNumerals(score, key, opts?)`, `romanNumeralForChord(symbol, key)` | Harmony analysis | Convert chord segments or one symbol into coarse key-relative Roman labels. |
+| `findMotifs(score, opts?)` | Motif analysis | Find repeated interval/rhythm patterns in each part. |
+| `rhythmPatterns(score, length?)` | Rhythm analysis | Count repeated duration patterns and their onset positions. |
+| `voiceLeading(score)` | Voice-leading analysis | Report large leaps and simple parallel-motion issues. |
+| `createScoreReport(score)`, `ScoreReport` | Headless helper / type | [Whole-score formatted reports](#reports); exported from `@webmusic/score/analyze/headless`. |
+| `createAnalysisSession(score, opts?)` | Headless session | [Incremental analysis](/score/headless/analyze/analysis-session/), from `@webmusic/score/analyze/headless`. |
+| `createAnalysisFollower(options?)` | Headless follower | [Playback-connected analysis and navigation](/score/headless/analyze/analysis-follower/), from `/headless`. |
+| `createLiveChordTracker(callbacks)` | Live analysis | Track sounding MIDI notes and publish chord, note-set and recent-history state with no UI. |
+| `createLiveKeyTracker(onUpdate)` | Live analysis | Accumulate heard pitch classes and publish the current key estimate with no UI. |
+| `AnalysisSession`, `AnalysisResult`, `AnalysisSessionOptions` | Type | The session interface, its combined result, and its options. |
+| `LiveChordState` | Type | Plain chord, sounding-MIDI and history result published by `createLiveChordTracker` (type-only export from `@webmusic/score/analyze`). |
+| `createAnalysisWorker(workerOrFactory?)` | Worker client | [Promise-based analysis and worker ownership](/score/headless/analyze/analysis-session/#analysis-worker). |
+| `AnalysisWorkerClient`, `AnalysisWorkerLike`, `AnalysisWorkerFactory` | Type | The worker client and the worker/factory shapes it accepts, including borrowed-versus-owned disposal. |
+| `ANALYSIS_WORKER_PROTOCOL`, `ANALYSIS_WORKER_PROTOCOL_VERSION` | Constant | The required v1 wire identity and major protocol version. |
+| `AnalysisWorkerRemoteError` | Error | A structured remote failure with `code`, `operation`, `retryable`, and optional `causeCode`. |
+| `AnalysisWorkerRequest`, `AnalysisWorkerResponse`, `AnalysisWorkerErrorDetails`, `AnalysisWorkerErrorCode`, `ScoreJSON` | Type | The versioned message and error protocol of the `@webmusic/score/analyze/worker` entry. |
+| `ScoreSummary`, `ChordTimelineOptions`, `ChordTimelineSegment` | Type | Summary and chord-timeline result/option shapes. |
+| `Distributions`, `DistributionBin` | Type | Three histogram arrays and their label/key/value bins. |
+| `ChordWindowOptions` | Type | `{ windowQuarters? }` for `segmentChords` / `romanNumerals`. |
+| `RomanNumeralOptions` | Type | Chord window options plus optional precomputed `segments`. |
+| `MotifOptions` | Type | `{ length?, minOccurrences? }` for `findMotifs`. |
+| `Key`, `KeyResult` | Type | A `{ tonic, mode }` target, and a key result with confidence and candidates. |
+| `ChordSegment` | Type | A chord window (in quarters) with pitch classes and chord label. |
+| `RNAResult` | Type | A roman-numeral entry (in quarters) with chord and roman labels. |
+| `Motif` | Type | A repeated interval/rhythm pattern with occurrence positions (quarters). |
+| `RhythmPattern` | Type | A repeated rhythm pattern with count and onset positions (quarters). |
+| `VoiceLeadingIssue` | Type | A reported issue with type, quarter range, voices, and severity. |
+
+## The projections
+
+Import these projections from `@webmusic/score/analyze/headless`; they are not
+exports of the stateless capability root. They return data without mounting UI.
+
+The **projections** turn a result into the shapes a read-out draws: marks for a
+keyboard, columns for a stave, dots for a fretboard, bands for a scrolling lane,
+segments for a wheel. The five [live Analyze components](/score/element/#analyze)
+use only the projections needed by their musical surfaces. Diagnostic and motif
+projections remain available for application-owned markup without dedicated
+Element wrappers; see [key diagnostics and history](/score/headless/analyze/live-trackers/#key-diagnostics).
+
+A projection is a pure data operation, not another live object. Keep one
+analysis result and recompute its relevant projection when that input or its
+configuration changes; the owning UI chooses how and when to draw it.
+
+| Function | Inputs and result |
+| --- | --- |
+| `projectSounding(midis, context?)` | Returns `SoundingProjection`: `spelling`, pitch `marks`, `staff`, `fret`, `naming` and `description`. `SoundingContext` accepts `key`, `tuning`, `spelling`, preferred naming `prefer`, onset map `since` and current `now`. The timestamps share the caller’s axis. |
+| `projectNameplate(spelling)` | Converts one `ChordSpelling` to `NameplateView`, including its primary and alternate names and voicing labels. |
+| `soundingMidisAt(score, quarters, options?)` | Returns ascending unique sounding pitches. `windowQuarters` defaults to `0.25`, with a minimum `0.0625`; in a rest it can retain the most recent attack in the lookback window. It never reads a future attack as current. |
+| `projectProgression(result, score, mode, options?)` | Returns `FlowLaneView` for `'chords'` or `'roman'`; `FlowProjectionOptions.roll` defaults to `true` and applies to chord mode. |
+| `projectKeyFlow(score, options?)` | Returns a key `FlowLaneView`; `windowQuarters` defaults to `8`, with a minimum of `1`. |
+| `projectMotifFlow(result, score)` | Returns motif occurrence bands and contours; four leading motif tracks are shown individually and remaining motifs share a folded track. |
+| `projectVoiceFlow(result, score)` | Returns voice bands and issue brackets for up to six voice tracks; issues without unambiguous rendered voices have no bracket. Full results remain in `AnalysisResult.issues`. |
+| `projectTonality(key, options?)` | Returns `TonalityView` with outer/inner wheel segments, optional needle and centre labels. `key` may be `undefined`; options accept a reference `Key` and spelling preference. |
+| `projectKeyCandidates(key, options?)` | Returns ranked `ChipItemView[]`; `limit` defaults to `5`. Undefined key produces no chips. |
+| `projectPitchClassMeters(bins, options?)` | Returns `ChipItemView[]` normalized to the largest supplied/heard weight. Optional `heard` bins add comparison values without changing bin order. |
+| `keyPitchClasses(key)` | Returns the key’s pitch classes, or an empty array for `undefined`. |
+| `formatMetricalPosition(score, quarters)` | Formats a position through the score’s measure map, including pickups and irregular measures. Invalid/negative positions format from zero. |
+
+The public structural data types belong to these projection results:
+`PitchMarkView`, `StaffMarkView`, `StaffView`, `FretMarkView`,
+`FretboardBarreView`, `FretboardView`, `ChordNameView`, `HarmonyVoiceView`,
+`NameplateView`, `FlowBandView`, `FlowTrackView`, `FlowFlagView`,
+`FlowBracketView`, `FlowLaneView`, `ChipItemView`, `WheelSegmentView`,
+`WheelNeedleView` and `TonalityView`. They carry labels, music-derived marks
+and positions; they do not import UIKit or select pixel dimensions/styles.
+
+`projectSounding(midis, context)` computes the name, spelling, role of every
+pitch, stave column and chord shape together. It supports custom compositions
+that need those values; the fixed live components compute only their own surface.
+`soundingMidisAt(score, quarters)` reads the notes to feed it: real octaves, read out of the
+score, never pitch classes dressed up as pitches.
+
+`projectNameplate(spelling: ChordSpelling): NameplateView` converts an existing
+chord spelling into only nameplate data. Use it with `spellChord()` when a
+current-name display does not need staff, keyboard or fretboard projections.
+
+The lane projections — `projectProgression(result, score, mode, options?)`,
+`projectKeyFlow`, `projectMotifFlow`, `projectVoiceFlow` — return bands carrying
+**two rulers**: `start`/`end` in nominal seconds, which is what a conveyor is
+drawn on, and `stampStart`/`stampEnd` in quarters, which is what a playhead is
+fed. `projectTonality`, `projectKeyCandidates` and `projectPitchClassMeters`
+answer the read-outs that have no time axis at all, `keyPitchClasses(key)` gives
+the seven classes a key is built from — what a keyboard draws as ghosts behind
+the keys nobody is pressing — and `formatMetricalPosition(score, quarters)` says
+where a position sits in the written music — `bar 12 · beat 3`.
+
+`projectProgression` accepts `FlowProjectionOptions {roll?: boolean}`; `roll`
+defaults to `true` for existing API callers. Set it to `false` for chord bands
+alone and compose an independent note view; it affects chord mode only.
+
+Pass the same `Score` that produced the `AnalysisResult`. Motif bands use the
+referenced notes’ maximum actual offset, so gaps and overlaps do not turn summed
+note durations into an incorrect occurrence end. Voice bands likewise extend
+through the last sounding offset, including an earlier long note that overlaps
+later short notes. Fretboard projection caching distinguishes tuning labels,
+string pitches, inlays and neck length as well as the requested search window.
+
+They take the `Score` and not just the `AnalysisResult` on purpose: a
+`ChordSegment` carries pitch classes, and a stave needs octaves.
+
+## The transport clock
+
+[createTransportClock](/score/headless/analyze/analysis-follower/#presentation-clock) and
+`rateFromDurations` are exported by `@webmusic/score/analyze/headless`. The
+object reference owns samples, readings, scrubbing, defaults and time units.
+It predicts display motion between supplied timestamps and owns no playback
+clock or scheduler.

@@ -1,0 +1,254 @@
+---
+title: '@webmusic/ui/transport'
+description: 'Renders play, pause, seek, and elapsed-time UI over a structural transport binding.'
+sidebar:
+  label: 'transport'
+  order: 1
+---
+
+import UiPresenterLiveDemo from '../../../../components/UiPresenterLiveDemo.astro';
+import UiPresenterRelated from '../../../../components/UiPresenterRelated.astro';
+
+`mountTransport()` renders a compact play/pause button, progress track, optional seek control,
+and optional elapsed/total clock and volume slider. It paints `TransportState` supplied by the caller and routes
+playback commands back through a required structural `TransportBinding`.
+
+Controls wrap within their container when space is limited. The seek track keeps a usable
+width, while optional time and volume controls move to another line. This layout is shared by
+the stylesheet and inline rendering paths; no viewport breakpoint or extra player is needed.
+
+Use [timeline](/uikit/transport-time/timeline/) for labelled regions and a ruler,
+[minimap](/uikit/transport-time/minimap/) for overview-range navigation, or
+[playlist](/uikit/transport-time/playlist/) for an ordered queue. The
+[`<score-player>`](/score/element/play/score-player/) element composes this
+presenter; mount it directly when the transport must live inside your own layout or use your own
+state owner.
+
+<UiPresenterLiveDemo presenter="transport" />
+
+## Import
+
+```ts
+import {mountTransport} from '@webmusic/ui/transport';
+
+const handle = mountTransport(host, {
+  snapshot: () => store.transport,
+  play: () => player.play(),
+  pause: () => player.pause(),
+  seekFraction: (fraction) => player.seek(fraction * player.duration),
+  subscribe: (notify) => store.subscribe(notify),
+});
+```
+
+## Seeking modes
+
+The `surface` layout's pointer, keyboard and ARIA behaviour is the kit's own
+[`mountSurfaceSlider`](/uikit/layout-feedback/stage/), mounted over a `0…100` domain so
+`aria-valuemax` stays `100` and `aria-valuenow` stays a rounded percentage. It commits on release,
+so a scrub is one seek rather than one per pointer move, and `Shift` selects a coarser Arrow step.
+
+`seekControl` selects one of three presenter-owned layouts:
+
+- `'native'` (the default) places a real `input[type="range"]` inside the track. Its DOM range is
+  `0…1000`; the binding continues to receive a normalized `0…1` fraction.
+- `'surface'` turns the track into an ARIA slider, adds a presenter-owned fill, and supports
+  pointer capture plus keyboard seeking.
+- `false` leaves the track empty for caller-owned seeking UI. The presenter still paints its
+  progress properties on the track.
+
+The older `seek: false` option selects the third mode only when `seekControl` is not supplied.
+An explicit `seekControl` always wins.
+
+## Binding and command settlement
+
+The binding remains authoritative. `subscribe()` tells the presenter when to re-read
+`snapshot()`; it does not push a second copy of state into the UI. See the
+[shared presenter shape](/uikit/api/#the-shared-presenter-shape) for the common ownership and
+cleanup contract.
+
+`play()` and `seekFraction()` may return promises. The presenter repaints immediately and again
+after a command fulfills; `pause()` is synchronous. While a native thumb or surface is being
+dragged, subscription paints do not pull it away from the pointer. Transport does not assign
+command revisions, so an older promise that fulfills late still triggers a fresh authoritative
+paint.
+
+<details class="component-section">
+<summary>API</summary>
+
+`mountTransport(host, binding, options?)` accepts an `HTMLElement` or `ShadowRoot` and returns a
+`MountedTransportHandle`.
+
+**State**
+
+| Member | Kind | Description |
+|---|---|---|
+| `playing` | `boolean` | Strict `true` selects the pause action and icon; every other value selects play. |
+| `progress` | `number` | Normalized position. Paints the native range, surface fill, and progress custom properties after clamping to `0…1`. |
+| `seconds?` | `number` | Elapsed seconds. When absent or non-finite, falls back to `progress × duration`; negative values paint as `0`. |
+| `duration?` | `number` | Total seconds used by the clock and seek value text; absent, non-finite, or negative values paint as `0`. |
+| `disabled?` | `boolean` | Strict `true` disables play and seek. Surface mode also sets `aria-disabled` and removes the track from the tab order. |
+| `volume?` | `number` | Linear level painted on the volume slider, clamped to `0…1`; absent or non-finite paints as `1`. A slider being dragged keeps its own position until the drag ends. |
+
+**Binding**
+
+| Member | Kind | Description |
+|---|---|---|
+| `snapshot()` | `() => TransportState` | Required pull port read on mount, notification, command interaction, and explicit `update()`. If it throws, `onError` receives the error and that paint uses a stopped, zero-progress, disabled fallback state. |
+| `play()` | `() => void \| Promise<void>` | Required command called while stopped. |
+| `pause()` | `() => void` | Required synchronous command called while playing. |
+| `seekFraction(value)` | `(number) => void \| Promise<void>` | Required seek command. Receives a clamped `0…1` fraction from either seek mode. |
+| `setVolume(value)` | `(number) => void \| Promise<void>` | Optional volume command, receiving a clamped `0…1` level. A binding without it renders no volume slider, whatever `showVolume` says. |
+| `subscribe(notify)` | `(notify: () => void) => () => void` | Required subscription. Its disposer is called by `destroy()` and when the same presenter is remounted into the host. |
+
+**Options**
+
+| Member | Kind | Default | Description |
+|---|---|---|---|
+| `label` | `string` | `'Transport'` | Prefix for the native or surface seek control's accessible name: `<label> seek`. |
+| `showTime` | `boolean \| 'elapsed' \| 'full'` | `true` | Creates the clock when not `false`. `'full'` (and `true`) reads `elapsed / total`; `'elapsed'` drops the total. |
+| `showVolume` | `boolean \| 'fader' \| 'knob'` | `false` | Creates a volume control — `'fader'` (and `true`) the kit's horizontal fader, `'knob'` its rotary — but only when the binding implements `setVolume`. |
+| `volumeLabel` | `string` | `'Volume'` | Accessible name of the volume control. |
+| `seekControl` | `'native' \| 'surface' \| false` | `'native'` | Selects the native range, ARIA surface slider, or empty caller-owned track. |
+| `seek` | `boolean` | `true` | Compatibility option. `false` suppresses seek only when `seekControl` is absent. |
+| `stylesheet` | `boolean` | `true` | Installs the canonical transport stylesheet unless explicitly `false`. |
+| `playLabel` | `string` | `'Play'` | Accessible name and title while stopped. |
+| `pauseLabel` | `string` | `'Pause'` | Accessible name and title while playing. |
+| `icon` | `(playing: boolean) => Node` | `createTransportIcon` | Supplies the play/pause glyph. A thrown callback is reported and falls back to the built-in SVG. |
+| `classNames` | `TransportClassNames` | `{}` | Adds compatibility classes for `root`, `play`, `track`, `seek`, `fill`, `time`, and `volume` (which lands on the fader). |
+| `parts` | `TransportParts` | `{}` | Adds part tokens for `root`, `play`, `track`, `seek`, `fill`, `time`, and `volume`. |
+| `onError` | `(error: unknown) => void` | — | Receives snapshot, command, subscription, icon, and cleanup failures. |
+
+**Handle**
+
+| Member | Kind | Description |
+|---|---|---|
+| `element` | `HTMLElement` | Presenter-owned `.wui-transport` root. |
+| `controls.play` | `HTMLButtonElement` | Always-present play/pause toggle. |
+| `controls.track` | `HTMLDivElement` | Always-present progress track; empty and caller-fillable when seeking is suppressed. |
+| `controls.seek?` | `HTMLInputElement` | Native range, defined only for `seekControl: 'native'`. |
+| `controls.fill?` | `HTMLSpanElement` | Progress fill, defined only for `seekControl: 'surface'`. |
+| `controls.time?` | `HTMLSpanElement` | Clock, undefined when `showTime: false`. |
+| `controls.timeElapsed?` | `HTMLSpanElement` | The elapsed half of the clock. |
+| `controls.timeTotal?` | `HTMLSpanElement` | The ` / total` half. Hiding this node is all `showTime: 'elapsed'` does, so a caller can switch between the two without remounting. |
+| `controls.volume?` | `HTMLDivElement` | The volume control: an ARIA slider on a `0…1` scale, carrying `.wui-transport__volume`. Defined only when `showVolume` mounted one, and replaced by `setVolumeControl` — read it again rather than holding the node. |
+| `setVolumeControl(kind)` | `(false \| 'fader' \| 'knob') => void` | Swaps the volume control, or removes it with `false`, without rebuilding the rest of the row. A no-op when it is already that shape, or when the binding has no `setVolume`. |
+| `update()` | `() => void` | Re-reads the binding and repaints; becomes a no-op after destruction. |
+| `destroy()` | `() => void` | Idempotently removes presenter listeners, subscription, root, and installed stylesheet without destroying the binding or caller DOM. |
+
+**Exports**
+
+`stylesheet: false` keeps the presenter's geometry inline. The caller can install
+the full stylesheet or just `transportStateStyle` for focus and disabled feedback.
+The entry also exports the shared controls used by the volume slider.
+
+| Export | Kind | Description |
+|---|---|---|
+| `transportStyle` | `string` | The canonical transport stylesheet, including the fader and knob rules the volume control needs. |
+| `transportStateStyle` | `string` | Transport, fader and knob focus/disabled feedback, without host or layout rules. Included in `transportStyle`; useful alongside inline geometry. |
+| `createFader(document, options)` | `(Document, FaderOptions) => FaderHandle` | The kit's shared level control: a painted track, fill and handle on a `0…1` scale, in either orientation. Pointer, keyboard and ARIA come from `mountSurfaceSlider`. |
+| `faderStyle` | `string` | The fader's focus ring and disabled affordance — the two things its inline geometry cannot express. |
+| `createKnob(document, options)` | `(Document, KnobOptions) => KnobHandle` | The knob to the fader's fader: a painted arc and pointer on a `0…1` scale, read by angle. Same inline geometry, same `mountSurfaceSlider` behaviour. |
+| `knobStyle` | `string` | The knob's focus ring and disabled affordance. |
+
+**Utility**
+
+| Member | Kind | Description |
+|---|---|---|
+| `createTransportIcon(document, playing)` | `(Document, boolean) => SVGSVGElement` | Creates the canonical play triangle or pause bars. The SVG is decorative, `aria-hidden`, and not focusable. |
+
+**Accessibility.** The toggle is a native button with dynamic `aria-label`, `title`, and
+`aria-pressed`. Native seek is a labelled range; surface seek is a focusable `role="slider"` with
+`aria-valuemin="0"`, `aria-valuemax="100"`, and integer-percentage `aria-valuenow`. Both seek
+modes expose floored `m:ss of m:ss` `aria-valuetext` when duration is positive, or a rounded
+percentage when it is zero. Surface Arrow keys move 5 percentage points, Shift+Arrow moves 10,
+and Home/End move to the bounds. The clock uses `aria-live="off"` so playback does not flood a
+screen reader. Disabled state is reflected on every interactive node, and the presenter never
+rewrites unrelated caller nodes in the host.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+Use the shared [surface and palette tokens](/uikit/#theme-with-css-custom-properties) for
+background (including `transparent`), foreground, accent, outer border and corner radius.
+Presenter-specific tokens below take precedence within their documented roles.
+
+The installed stylesheet resolves compatibility values first, then presenter-specific semantic
+tokens, shared `--wm-*` tokens, internal `--wui-*` fallbacks, and finally literals. The
+compatibility mappings are `--cp-height`, `--cp-button-bg`, `--cp-button-color`,
+`--cp-button-border`, `--cp-track`, `--cp-fill`, `--cp-thumb`, `--cp-text`,
+`--cp-radius`, `--cp-thumb-radius`, and `--cp-seek-handle` before their matching
+`--wm-transport-*` properties. The presenter owns the runtime `--wui-progress` and
+`--cp-fill-pct` values; they are progress output, not theme inputs.
+
+**Tokens**
+
+| Property | Falls back to | Default | Controls |
+|---|---|---|---|
+| `--wm-transport-height` | `--wm-control-size` → `--wui-row-h` | `2rem` | Play button, track, and native thumb height. |
+| `--wm-control-size` | `--wui-row-h` | `2rem` | Shared control-size fallback for transport height. |
+| `--wm-transport-button-background` | `--wm-accent` → `--wui-ink` | `#111` | Play/pause button background. |
+| `--wm-accent` | Contextual `--wui-ink` or `--wui-fill` | `#111` button / `#999` fill | Shared fallback for button background and progress fill. |
+| `--wm-transport-button-foreground` | `--wm-accent-foreground` → `--wui-on-ink` | `#fff` | Play/pause glyph color. |
+| `--wm-accent-foreground` | `--wui-on-ink` | `#fff` | Shared button-foreground fallback. |
+| `--wm-transport-border` | `--wm-border` → `--wui-line-control` | `#111` | Primary play-button border. The progress and volume tracks have no border by default; their `--cp-*` overrides remain independent. |
+| `--wm-border` | `--wui-line-control` | `#111` | Shared border fallback. |
+| `--wm-transport-track` | `--wm-surface-muted` → `--wui-inset` | `#f3f3f3` | Track background. |
+| `--wm-surface-muted` | `--wui-inset` | `#f3f3f3` | Shared track-background fallback. |
+| `--wm-transport-fill` | `--wm-accent` → `--wui-fill` | `#999` | Native gradient and surface fill. |
+| `--wm-transport-thumb` | `--wm-foreground` → `--wui-pointer` | `#111` | Native range thumb. |
+| `--wm-foreground` | `--wui-pointer` | `#111` | Shared thumb-color fallback. |
+| `--wm-transport-foreground` | `--wm-foreground-muted` → `--wui-ink-soft` | `#444` | Root and clock text. |
+| `--wm-foreground-muted` | `--wui-ink-soft` | `#444` | Shared transport-text fallback. |
+| `--wm-transport-radius` | `--wm-control-radius` | `0` | Button and track corners. |
+| `--wm-control-radius` | literal fallback | `0` | Shared corner fallback for track, button, and thumb. |
+| `--wm-transport-thumb-radius` | `--wm-control-radius` | `0` | Native range thumb corners. |
+| `--wm-transport-handle-size` | literal fallback | `0.9rem` | Native range thumb width. |
+| `--wm-control-gap` | `--wui-gap` | `0.6rem` | Gap between button, track, and clock. |
+| `--wm-font-family` | literal fallback | `system-ui, sans-serif` | Root UI font. |
+| `--wm-focus` | `--wui-focus` → `--wui-ink` | `#111` | Visible keyboard focus outline. |
+| `--wm-font-mono` | `--wui-font-mono` | `ui-monospace, monospace` | Clock font. |
+
+**Classes**
+
+`classNames` adds compatibility classes alongside these canonical names; it never replaces them.
+In surface mode, the `seek` compatibility class is added to the track because the track is the
+seek control.
+
+| Node | Canonical class | Present when | `classNames` key |
+|---|---|---|---|
+| Root | `.wui-transport` | Always | `root` |
+| Toggle | `.wui-transport__play` | Always | `play` |
+| Track | `.wui-transport__track` | Always | `track` |
+| Surface modifier on track | `.wui-transport__surface` | `seekControl: 'surface'` | `seek` is added to the same node |
+| Surface fill | `.wui-transport__fill` | `seekControl: 'surface'` | `fill` |
+| Native range | `.wui-transport__seek` | `seekControl: 'native'` | `seek` |
+| Clock | `.wui-transport__time` | `showTime !== false` | `time` |
+| Volume fader | `.wui-fader .wui-fader--horizontal .wui-transport__volume` | `showVolume` and `binding.setVolume` | `volume` |
+| Volume fill / handle | `.wui-fader__fill`, `.wui-fader__thumb` | `showVolume` and `binding.setVolume` | — owned by the shared fader |
+
+**Parts**
+
+`parts` adds tokens alongside the canonical part names and removes duplicates.
+
+| Node | Canonical part | Present when | `parts` key |
+|---|---|---|---|
+| Root | `root` | Always | `root` |
+| Toggle | `play` | Always | `play` |
+| Track | `track` | Always | `track` |
+| Surface track | `track seek` | `seekControl: 'surface'` | Both `track` and `seek` are added |
+| Native range | `seek` | `seekControl: 'native'` | `seek` |
+| Surface fill | `fill` | `seekControl: 'surface'` | `fill` |
+| Clock | `time` | `showTime !== false` | `time` |
+| Volume fader | `fader volume` | `showVolume` and `binding.setVolume` | `volume` |
+| Volume fill / handle | `fader-fill`, `fader-thumb` | `showVolume` and `binding.setVolume` | — owned by the shared fader |
+
+With `stylesheet: false`, the presenter installs no style node. Geometry and theme
+tokens are painted inline; the caller supplies focus and disabled styling, for
+example by placing `transportStateStyle` in a caller-owned style node and removing
+it with the surrounding UI.
+
+</details>
+
+<UiPresenterRelated presenter="transport" />

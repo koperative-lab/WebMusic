@@ -1,0 +1,129 @@
+---
+import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
+---
+<HeadlessDemoFrame
+  entry="@webmusic/score/play/headless"
+  name="LoopPlayer"
+  hint="Use the live controls to hear the result. Reset stops playback and restores the default parameters."
+  code={`// Configure LoopPlayer below.`}
+  rootAttrs={{'data-programmatic-loopplayer': true}}
+>
+  <div class="wui-row"><button class="wui-btn" data-play type="button">▶ Play</button><div class="wui-track"><div class="wui-track__region" data-region></div><div class="wui-track__fill" data-fill></div></div><span class="wui-readout" data-time>0.0s</span></div>
+  <div slot="parameters" class="wm-pg__grid">
+    <div class="wm-pg__param"><span class="wm-pg__name">loop</span><button class="wui-btn" data-loop data-on="true" type="button" aria-pressed="true">Loop: on</button><span class="wm-pg__note">Enable or disable the loop region.</span></div><div class="wm-pg__param"><span class="wm-pg__name">loopIn</span><input class="wui-range" type="range" data-in value="25" min="0" max="100" aria-label="Loop start percentage" /><span class="wm-pg__note">Start as a percentage of the score duration.</span></div><div class="wm-pg__param"><span class="wm-pg__name">loopOut</span><input class="wui-range" type="range" data-out value="75" min="0" max="100" aria-label="Loop end percentage" /><span class="wm-pg__note"><span data-loopout>A 25% — B 75%</span></span></div>
+  </div>
+</HeadlessDemoFrame>
+
+<script>
+  import {mountProgrammaticDemo, programmaticCode} from './programmatic-demo-lifecycle';
+  import { Duration, MeasureId, PartId, Pitch, Rational, ScoreBuilder, VoiceId } from '@webmusic/score';
+  import { LoopPlayer, Sound } from '@webmusic/score/play/headless';
+
+  function sampleScore() {
+    const b = new ScoreBuilder();
+    const partId = PartId('piano');
+    const voice = VoiceId('v1');
+    const timeSignature = { numerator: 4, denominator: 4 };
+    b.setMetadata({ title: 'Loop Etude' })
+      .addTempo({ atQuarters: Rational.ZERO, bpm: 100 })
+      .addMeter({ atQuarters: Rational.ZERO, measureNumber: 1, timeSignature });
+    b.addPart({ id: partId, name: 'Piano', staves: 1 });
+    const pitches = ['C4','E4','G4','C5','B4','G4','E4','C4','D4','F4','A4','D5','C5','A4','F4','D4'];
+    pitches.forEach((name, i) => {
+      const measureNumber = Math.floor(i / 8) + 1;
+      if (i % 8 === 0) {
+        b.addMeasure({
+          id: MeasureId(`m${measureNumber}`),
+          number: measureNumber,
+          onsetQuarters: new Rational((measureNumber - 1) * 4, 1),
+          durationQuarters: new Rational(4, 1),
+          timeSignature,
+        });
+      }
+      b.addNote(partId, {
+        id: b.newNoteId(),
+        pitch: Pitch.parse(name),
+        onsetQuarters: new Rational(i, 2),
+        duration: Duration.eighth(),
+        voice,
+      });
+    });
+    return b.build();
+  }
+
+  mountProgrammaticDemo('[data-programmatic-loopplayer]', (root, scope) => {
+    const btn = root.querySelector<HTMLButtonElement>('[data-play]')!;
+    const loopBtn = root.querySelector<HTMLButtonElement>('[data-loop]')!;
+    const fill = root.querySelector<HTMLElement>('[data-fill]')!;
+    const region = root.querySelector<HTMLElement>('[data-region]')!;
+    const time = root.querySelector<HTMLElement>('[data-time]')!;
+    const inSlider = root.querySelector<HTMLInputElement>('[data-in]')!;
+    const outSlider = root.querySelector<HTMLInputElement>('[data-out]')!;
+    const loopReadout = root.querySelector<HTMLElement>('[data-loopout]')!;
+
+    const sound = Sound.oscillator({type: 'triangle', gain: 0.2, releaseSeconds: 0.05});
+    scope.add(() => sound.dispose()); // LoopPlayer borrows its supplied synth.
+    const lp = new LoopPlayer(sampleScore(), {
+      synth: sound,
+      loopIn: 0.25,
+      loopOut: 0.75,
+    });
+    scope.add(() => lp.dispose());
+    let playing = false;
+
+    const paintRegion = () => {
+      programmaticCode(root, `import {LoopPlayer, Sound} from '@webmusic/score/play/headless';
+
+const sound = Sound.oscillator({type: 'triangle', gain: 0.2, releaseSeconds: 0.05});
+const lp = new LoopPlayer(score, {synth: sound, loopIn: 0.25, loopOut: 0.75});
+lp.loop = ${lp.loop};
+lp.setLoopRegion(${lp.loopIn}, ${lp.loopOut});
+// In a play gesture: await lp.play();
+// On cleanup: lp.dispose(); sound.dispose();`);
+      const inPct = lp.loopIn * 100;
+      const outPct = lp.loopOut * 100;
+      region.style.left = `${inPct}%`;
+      region.style.width = `${Math.max(0, outPct - inPct)}%`;
+      region.style.opacity = lp.loop ? '1' : '0.25';
+      loopReadout.textContent = `A ${Math.round(inPct)}% — B ${Math.round(outPct)}%`;
+    };
+
+    const paintCursor = () => {
+      const cur = lp.player.currentTime.seconds;
+      const dur = lp.duration || 1;
+      fill.style.width = `${Math.min(100, (cur / dur) * 100)}%`;
+      time.textContent = `${cur.toFixed(1)}s`;
+    };
+
+    lp.player.on('cursor', paintCursor);
+    lp.player.on('end', () => { playing = false; btn.textContent = '▶ Play'; paintCursor(); });
+
+    scope.listen(btn, 'click', () => {
+      if (playing) { lp.pause(); btn.textContent = '▶ Play'; }
+      else { scope.run(lp.play(), () => { playing = false; btn.textContent = '▶ Play'; }); btn.textContent = '⏸ Pause'; }
+      playing = !playing;
+    });
+
+    scope.listen(loopBtn, 'click', () => {
+      lp.loop = !lp.loop;
+      loopBtn.dataset.on = String(lp.loop);
+      loopBtn.dataset.variant = lp.loop ? '' : 'ghost';
+      loopBtn.setAttribute('aria-pressed', String(lp.loop));
+      loopBtn.textContent = `Loop: ${lp.loop ? 'on' : 'off'}`;
+      paintRegion();
+    });
+
+    const applyRegion = () => {
+      lp.setLoopRegion(Number(inSlider.value) / 100, Number(outSlider.value) / 100);
+      // setLoopRegion keeps the points ordered — reflect back into the sliders.
+      inSlider.value = String(Math.round(lp.loopIn * 100));
+      outSlider.value = String(Math.round(lp.loopOut * 100));
+      paintRegion();
+    };
+    scope.listen(inSlider, 'input', applyRegion);
+    scope.listen(outSlider, 'input', applyRegion);
+
+    paintRegion();
+    paintCursor();
+  });
+</script>

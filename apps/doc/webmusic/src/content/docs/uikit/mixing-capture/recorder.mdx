@@ -1,0 +1,185 @@
+---
+title: '@webmusic/ui/recorder'
+description: 'Renders record, optional playback and export actions, input level, and take status from caller-owned capture state.'
+sidebar:
+  label: 'recorder'
+  order: 3
+---
+
+import UiPresenterLiveDemo from '../../../../components/UiPresenterLiveDemo.astro';
+import UiPresenterRelated from '../../../../components/UiPresenterRelated.astro';
+
+`mountRecorder()` renders a required record toggle, an optional playback toggle, optional
+format-specific export buttons, a compact input-level bar, and a status line. It paints
+`RecorderState`; the caller remains responsible for media permission, capture, playback, file
+creation, and persistence.
+
+Use [meter](/uikit/mixing-capture/meter/) for continuous level or spectrum monitoring without a
+capture workflow, or [mixer](/uikit/mixing-capture/mixer/) for channel gain and routing controls.
+The [`<score-recorder>`](/score/element/play/note-input/#score-recorder) element composes this
+presenter; mount it directly around a custom recorder state machine.
+
+<UiPresenterLiveDemo presenter="recorder" />
+
+## Import
+
+```ts
+import {mountRecorder} from '@webmusic/ui/recorder';
+
+const handle = mountRecorder(host, {
+  snapshot: () => store.recorder,
+  toggleRecording: () => recorder.toggle(),
+  subscribe: (notify) => store.subscribe(notify),
+});
+```
+
+## Async capture commands
+
+Every command may return a promise. The presenter invokes it without owning a competing state
+machine, then repaints after fulfillment; a synchronous throw or rejection goes to `onError`.
+Publish intermediate `busy`, `recording`, `playing`, level, and status snapshots through
+`subscribe()` when the UI must change while work is pending. The common binding ownership and
+same-host lifecycle are documented in the
+[shared presenter shape](/uikit/api/#the-shared-presenter-shape).
+
+`togglePlayback` controls whether the Play button exists. `exportFormats` controls which export
+buttons exist, while the optional `export(format)` binding supplies their behavior; provide both
+together for operative exports. `busy` disables only the record toggle. Playback and export
+availability are independently controlled by `canPlay` and `canExport`.
+
+<details class="component-section">
+<summary>API</summary>
+
+`mountRecorder(host, binding, options?)` accepts an `HTMLElement` or `ShadowRoot` and returns a
+`RecorderHandle`. The level is clamped to `0…1`; omitting it hides the visual meter.
+
+**State**
+
+| Member | Kind | Description |
+|---|---|---|
+| `recording` | `boolean` | Required. Selects Record versus Stop text, label, pressed state, and generated recording status. |
+| `busy?` | `boolean` | Strict `true` disables the record button and sets its `aria-busy` value to true. |
+| `playing?` | `boolean` | Strict `true` applies the playback modifier and pressed state; truthy state selects Stop text and generated playback status. |
+| `level?` | `number` | Normalized input level written to `--wui-recorder-level`. Omission hides the meter. |
+| `recordedCount?` | `number` | Count printed by the generated `● recording… <count>` status; defaults there to `0`. |
+| `takeCount?` | `number` | Count printed by generated captured/playback status. When explicit availability is absent, any defined value enables play and export, including `0`. |
+| `status?` | `string` | Overrides every generated status string. |
+| `canPlay?` | `boolean` | Explicit playback availability. When absent, falls back to whether `takeCount` is defined. |
+| `canExport?` | `boolean` | Explicit availability for every export button. When absent, falls back to whether `takeCount` is defined. |
+
+Without `status`, the fallback order is recording count, playing-take text, captured-take text
+when `takeCount` is defined, then `Ready`.
+
+**Binding**
+
+| Member | Kind | Description |
+|---|---|---|
+| `snapshot()` | `() => RecorderState` | Required pull port read on mount, notification, command fulfillment, and explicit `update()`. Errors are sent to `onError` and leave the last successful paint. |
+| `toggleRecording()` | `() => void \| Promise<void>` | Required command called by the record toggle in both directions. |
+| `togglePlayback?()` | `() => void \| Promise<void>` | Optional command. Its presence creates the playback toggle. |
+| `export?(format)` | `(string) => void \| Promise<void>` | Optional command receiving the clicked `exportFormats` id. |
+| `subscribe?(notify)` | `(notify: () => void) => () => void` | Optional subscription. Its disposer is called during destroy or same-host replacement. |
+
+**Options**
+
+| Member | Kind | Default | Description |
+|---|---|---|---|
+| `exportFormats` | `readonly {id: string; label: string}[]` | `[]` | Creates one export button per record. `id` is passed to `export()` and added as a class; `label` supplies visible and accessible text. |
+| `onError` | `(error: unknown) => void` | — | Receives snapshot and command errors. Subscription registration/disposal and DOM cleanup errors escape to the caller. |
+| `stylesheet` | `boolean` | `true` | Installs the presenter's stylesheet unless explicitly `false`, for a light-DOM host that cannot inject CSS into its page. |
+
+**Handle**
+
+| Member | Kind | Description |
+|---|---|---|
+| `element` | `HTMLElement` | Presenter-owned `.wui-recorder` root. |
+| `update()` | `() => void` | Re-reads state and repaints every control; becomes a no-op after destruction. |
+| `destroy()` | `() => void` | On its first call, marks the handle destroyed, calls the subscription disposer, then removes root and style; later calls are no-ops. A throwing disposer escapes before DOM removal. |
+
+**Accessibility.** Record is a native button whose dynamic `aria-label`, `aria-pressed`, and
+`aria-busy` mirror capture state. Playback is a native `Play take` button with dynamic
+`aria-pressed`; each export button is named `Download <label>`. Disabled state is reflected on
+the corresponding native controls. The compact level bar is visual only, and the status is
+ordinary text: this presenter does not install a `meter` role or live region, so applications that
+need announced progress should expose that separately.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+Use the shared [surface and palette tokens](/uikit/#theme-with-css-custom-properties) for
+background (including `transparent`), foreground, accent, outer border and corner radius.
+Presenter-specific tokens below take precedence within their documented roles.
+
+The installed stylesheet resolves presenter-specific properties through shared `--wm-*` tokens
+and then literals. `--wui-recorder-level` is presenter-owned output written on the level node, not
+a theme input. The mount installs `recorderStyle` by default; set `stylesheet: false` to omit it
+and supply the exported stylesheet or your own CSS from the host. Recorder has no `classNames`
+or `parts` option; canonical classes, fixed compatibility classes, and canonical parts are always
+installed.
+
+Controls and the export group wrap within the host width. Export buttons have independent
+spacing and retain their full labels; long labels and status text can break across lines.
+The optional level meter stays hidden when the binding supplies no level. Width changes use
+CSS and do not remount the recorder or alter recording/playback state.
+
+**Tokens**
+
+| Property | Falls back to | Default | Controls |
+|---|---|---|---|
+| `--wm-recorder-padding` | literal | `.6rem` | Root-inset compatibility fallback. |
+| `--wm-recorder-height` | `--wm-control-size` → `--wui-row-h` | `2rem` | Height of every button and of the level bar, so the row reads as one strip. |
+| `--wm-recorder-meter-width` | literal | `90px` | Level bar width. Its height follows the control size above. |
+| `--wm-recorder-border` | `--wm-border` | `#d8d8d8` | Root border. |
+| `--wm-control-border` | `--wm-border` | `#d8d8d8` | Shared non-primary control border fallback. |
+| `--wm-border` | literal | `#d8d8d8` | Shared border fallback. |
+| `--wm-recorder-background` | `--wm-surface` | `#fff` | Root background. |
+| `--wm-surface` | literal fallback | `#fff` | Shared root and button-surface fallback. |
+| `--wm-recorder-text` | `--wm-foreground` | `#222` | Root and inherited button text. |
+| `--wm-foreground` | contextual literal | `#222` text / `#666` muted | Shared foreground fallback. |
+| `--wm-font-family` | `--wm-font` | `system-ui, sans-serif` | Root and button font family; `--wm-font` remains a compatibility fallback. |
+| `--wm-recorder-radius` | `--wm-control-radius` | `0` | Root and inherited button corners. |
+| `--wm-control-radius` | literal fallback | `0` | Shared corner fallback. |
+| `--wm-recorder-button-border` | `--wm-control-border` → `--wm-border` | `#d8d8d8` | Record, playback, and export button border. |
+| `--wm-recorder-button` | `--wm-surface` | `#fff` | Unpressed button background. |
+| `--wm-recorder-accent` | `--wm-accent` | `#c0392b` | Pressed record background and level fill. |
+| `--wm-recorder-accent-text` | `--wm-accent-foreground` | `#fff` | Pressed record text. |
+| `--wm-recorder-track` | `--wm-surface-muted` | `#ddd` | Compact level track background. |
+| `--wm-recorder-status-font` | `.76rem var(--wm-font-mono, ui-monospace, monospace)` | `.76rem ui-monospace, monospace` | Complete status font shorthand. |
+| `--wm-font-mono` | literal | `ui-monospace, monospace` | Status font family when no complete shorthand is supplied. |
+| `--wm-focus` | `currentColor` | Current text color | 2px keyboard-focus outline on record, playback and export buttons. |
+| `--wm-recorder-muted` | `--wm-foreground-muted` → `--wm-foreground` | `#666` | Status text color. |
+| `--wm-foreground-muted` | literal fallback | `#666` | Shared muted-text fallback. |
+
+**Classes**
+
+| Node | Canonical class | Present when | Fixed compatibility class |
+|---|---|---|---|
+| Root | `.wui-recorder` | Always | `.wrap` |
+| Any action | `.wui-recorder__button` | Record, playback, and every export | Format id is also a class on export buttons |
+| Record | `.wui-recorder__record` | Always | `.rec`; `.armed` while recording |
+| Playback | `.wui-recorder__play` | `togglePlayback` exists | `.play`; `.on` while playing |
+| Meter track | `.wui-recorder__meter` | Always, hidden when level is absent | `.meter` |
+| Level fill | `.wui-recorder__level` | Always | `.level` |
+| Export container | `.wui-recorder__exports` | Always; may be empty | — |
+| Status | `.wui-recorder__status` | Always | `.status` |
+
+**Parts**
+
+| Node | Canonical part | Present when |
+|---|---|---|
+| Root | `root` | Always |
+| Record button | `record` | Always |
+| Playback button | `play` | `togglePlayback` exists |
+| Meter track | `meter` | Always, possibly hidden |
+| Level fill | `level` | Always |
+| Export group | `exports` | Always, hidden when empty |
+| Status | `status` | Always |
+
+The export container is named **Export take** with `role="group"`; its generated buttons do
+not expose separate part tokens.
+
+</details>
+
+<UiPresenterRelated presenter="recorder" />

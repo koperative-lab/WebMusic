@@ -1,0 +1,219 @@
+---
+title: '@webmusic/ui/stage'
+description: 'Generic retained and canvas render hosts with DPR, resize, animation, status, and surface-slider support.'
+sidebar:
+  label: 'stage'
+  order: 2
+---
+
+import UiPresenterLiveDemo from '../../../../components/UiPresenterLiveDemo.astro';
+import UiPresenterRelated from '../../../../components/UiPresenterRelated.astro';
+
+`@webmusic/ui/stage` supplies three domain-neutral presentation lifecycles. `mountStage()` gives
+caller rendering a retained DOM surface, `mountCanvasStage()` owns canvas sizing and redraws, and
+`mountSurfaceSlider()` adds pointer and keyboard slider behavior to an existing element.
+
+Use [status](/uikit/layout-feedback/status/) for a standalone loading or failure surface and
+[analysis](/uikit/views-analysis/analysis/) for ready-made analytical output. Stage is the lower
+level choice when the caller still owns the domain pixels or DOM.
+
+<UiPresenterLiveDemo presenter="stage" />
+
+## Import
+
+```ts
+import {mountCanvasStage} from '@webmusic/ui/stage';
+
+const handle = mountCanvasStage(host, {
+  draw: ({context, width, height}) => drawWaveform(context, width, height),
+  subscribe: (notify) => model.subscribe(notify),
+});
+```
+
+## Three mounting models
+
+`mountStage()` clears and re-runs `binding.render(surface)` on every update, calling the previous
+render cleanup first. If rendering, cleanup, or synchronous subscription notification mounts a
+replacement on the same host, the outgoing stage stops updating and immediately releases any
+cleanup returned after replacement. `mountCanvasStage()` retains one canvas, sizes its backing store for the
+device pixel ratio, and calls `draw(frame)` after resize, notification, explicit update, or every
+animation frame when `animate` is enabled.
+
+`mountSurfaceSlider()` creates no pixels and installs no stylesheet. It augments the supplied
+element with slider semantics and delegates domain hit-testing to `valueAt(point)`. `commit()` is
+the only write port. All three follow the
+[shared presenter ownership contract](/uikit/api/#the-shared-presenter-shape).
+
+<details class="component-section">
+<summary>API</summary>
+
+The module exports three related contracts; the canvas presenter shown above has no snapshot
+State because its caller draws each frame directly.
+
+**Retained stage binding**
+
+| Member | Kind | Description |
+|---|---|---|
+| `render(surface)` | `(HTMLElement) => void \| (() => void)` | Required renderer. Its optional cleanup runs before the next render and during destruction. |
+| `subscribe?(notify)` | `(notify: () => void) => () => void` | Publishes when the retained surface must be rendered again. |
+
+**Retained stage options**
+
+| Member | Kind | Default | Description |
+|---|---|---|---|
+| `label` | `string` | — | Adds `role="region"` and an accessible name to the root. |
+| `fill` | `boolean` | `false` | Makes the stage and its surface fill a host with definite height. |
+| `surfaceMinWidth` | `string` | `0` | Minimum CSS width of the inner drawing. Combine with `overflow: 'auto'` to preserve readable content inside a narrower host. It does not resize the host. |
+| `background` | `string` | Stage theme (`transparent`) | CSS background color of the retained viewport. Applies behind the whole scroll viewport so long drawings retain their background after scrolling. |
+| `overflow` | `'hidden' \| 'auto' \| 'visible' \| 'clip' \| 'scroll'` | `hidden` | How the stage crops content that exceeds it. Scrolling is a mounting decision, not a theme, so it is an option rather than a `--wm-stage-overflow` write the caller has to know about. |
+| `classNames` | `StageClassNames` | `{}` | Adds compatibility classes for `root` and `surface`. |
+| `parts` | `StageParts` | `{}` | Adds part tokens for `root` and `surface`. |
+| `onError` | `(error: unknown) => void` | — | Receives render, subscription, and cleanup failures. |
+
+**Retained stage handle**
+
+| Member | Kind | Description |
+|---|---|---|
+| `element` | `HTMLElement` | Presenter-owned `.wui-stage` root. |
+| `surface` | `HTMLElement` | Stable `.wui-stage__surface` passed to `render()`. |
+| `update()` | `() => void` | Releases the prior render, clears the surface, and calls `render()` again. |
+| `destroy()` | `() => void` | Releases rendering and subscription resources, then removes the root and style. |
+
+**Surface-slider State**
+
+| Member | Kind | Description |
+|---|---|---|
+| `minimum` | `number` | Lower value bound; non-finite input becomes `0`. |
+| `maximum` | `number` | Upper bound, normalized to be at least `minimum`. |
+| `value` | `number` | Current value, clamped to the normalized bounds. |
+| `disabled?` | `boolean` | Strict `true` suppresses pointer and keyboard commits. |
+
+**Surface-slider binding**
+
+| Member | Kind | Description |
+|---|---|---|
+| `snapshot()` | `() => SurfaceSliderState` | Required authoritative slider state. |
+| `valueAt(point)` | `(SurfaceSliderPoint) => number` | Required domain hit-test. The point includes client and local coordinates, pointer id, bounds, and pointer surface. |
+| `commit(value)` | `(number) => void` | Required write port receiving a finite, clamped pointer or keyboard value. |
+| `preview(value)` | `(number) => void` | Optional. With `commitOn: 'release'` this receives every in-flight drag position, so the caller can paint the scrub while the domain sees exactly one write. |
+| `subscribe?(notify)` | `(notify: () => void) => () => void` | Publishes authoritative State changes. |
+
+**Surface-slider options**
+
+| Member | Kind | Default | Description |
+|---|---|---|---|
+| `label` | `string` | `'Value'` | Accessible name when the element has neither `aria-label` nor `aria-labelledby`. |
+| `orientation` | `'horizontal' \| 'vertical'` | `'horizontal'` | Sets ARIA orientation and Arrow-key direction. |
+| `pointerTarget` | `HTMLElement` | mounted element | Receives pointer listeners and capture while ARIA remains on the mounted element. |
+| `keyboardStep` | `number \| (state, event) => number` | span ÷ 100, or `1` | Amount committed for each Arrow key. The callback receives the keyboard event too, so a modifier can select a coarser step — the transport uses `Shift` for a long seek. |
+| `commitOn` | `'move' \| 'release'` | `'move'` | When a pointer drag reaches `commit()`. `'release'` previews the drag and commits once, on pointerup — one seek per scrub rather than one per move. A cancelled drag repaints from the owner's state and commits nothing. |
+| `formatValue` | `(value, state) => string \| undefined` | — | Supplies `aria-valuetext`; `undefined` removes it. |
+| `onError` | `(error: unknown) => void` | — | Receives snapshot, hit-test, commit, formatting, subscription, and pointer-capture failures. |
+
+**Surface-slider handle**
+
+| Member | Kind | Description |
+|---|---|---|
+| `element` | `HTMLElement` | Caller element carrying role, focus, and ARIA. |
+| `surface` | `HTMLElement` | Pointer surface: `pointerTarget` or the mounted element. |
+| `update()` | `() => void` | Re-reads State and applies ARIA values. |
+| `destroy()` | `() => void` | Removes listeners and restores attributes and touch behavior that the presenter assigned. |
+
+The presenter manages `tabindex` only when it assigned one: a disabled slider leaves the tab order
+and rejoins it when re-enabled. An author-supplied `tabindex` is that author's focus policy and is
+never rewritten.
+
+**Canvas binding and frame**
+
+| Member | Kind | Description |
+|---|---|---|
+| `draw(frame)` | `(CanvasStageFrame) => void` | Required drawing callback. The frame carries `context`, `canvas`, CSS-pixel `width` / `height`, `pixelRatio`, and frame `time`. |
+| `status?()` | `() => StatusState` | Supplies a ready, loading, empty, or error overlay. |
+| `subscribe?(notify)` | `(notify: () => void) => () => void` | Requests a redraw from the caller's source. |
+
+**Canvas options**
+
+| Member | Kind | Default | Description |
+|---|---|---|---|
+| `label` | `string` | — | Adds `role="img"` and an accessible name to the stage root. |
+| `animate` | `boolean` | `false` | Continuously redraws through `requestAnimationFrame`. |
+| `fallbackWidth` | `number` | `300` | CSS-pixel width used when the stage has no positive measured width. |
+| `fallbackHeight` | `number` | `150` | CSS-pixel height used when the stage has no positive measured height. |
+| `classNames` | `CanvasStageClassNames` | `{}` | Adds compatibility classes for `root`, `canvas`, and `status`. |
+| `parts` | `CanvasStageParts` | `{}` | Adds part tokens for `root`, `canvas`, and `status`. |
+| `onError` | `(error: unknown) => void` | — | Receives draw, status, subscription, resize, and cleanup failures. |
+| `stylesheet` | `boolean` | `true` | Installs the presenter's stylesheet unless explicitly `false`, for a light-DOM host that cannot inject CSS into its page. |
+
+**Canvas handle**
+
+| Member | Kind | Description |
+|---|---|---|
+| `element` | `HTMLElement` | Presenter-owned `.wui-stage--canvas` root. |
+| `canvas` | `HTMLCanvasElement` | DPR-sized drawing surface. |
+| `update()` | `() => void` | Redraws now and starts animation when configured. |
+| `redraw()` | `() => void` | Draws exactly one frame. |
+| `destroy()` | `() => void` | Cancels animation and resize observation, destroys status, and removes owned DOM. |
+
+**Accessibility.** A labelled retained stage is a named region. A labelled canvas stage is a
+named image while its canvas is decorative; a supplied status is exposed through the semantics
+documented by [status](/uikit/layout-feedback/status/). Surface sliders preserve pre-existing role,
+focus and naming attributes, expose min/max/now/disabled values, support Arrow keys plus Home and
+End, and restore only presenter-assigned attributes on destroy.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+Use the shared [surface and palette tokens](/uikit/#theme-with-css-custom-properties) for
+background (including `transparent`), foreground, accent, outer border and corner radius.
+Presenter-specific tokens below take precedence within their documented roles.
+
+`mountStage()` and `mountCanvasStage()` install the shared stage stylesheet by default. Set
+`stylesheet: false` to omit it; the canvas stage also omits its nested status stylesheet. The host
+must then supply `stageStyle`, any needed `statusStyle`, or its own CSS. The presenter root
+uses the shared [`--wm-component-*` surface](/uikit/#theme-with-css-custom-properties), or
+`--wm-stage-surface-*` for a stage-only override. The `--wm-stage-*` properties below style the
+full-bleed inner drawing viewport. A surface slider installs no visual style because its element
+and pixels remain caller-owned.
+
+**Tokens**
+
+| Property | Falls back to | Default | Controls |
+|---|---|---|---|
+| `--wm-stage-background` | literal | `transparent` | Drawing background; `background` also covers the retained root scrollport. |
+| `--wm-stage-foreground` | `--wm-foreground` → literal | `#444` | Stage foreground context. |
+| `--wm-stage-border` | literal | `0` | Inner drawing-viewport border. |
+| `--wm-stage-radius` | `--wm-control-radius` | `0` | Inner drawing-viewport corner radius. |
+| `--wm-stage-overflow` | literal | `hidden` | Retained root scrollport behavior; canvas stages apply it to their inner viewport. |
+| `--wm-stage-surface-min-width` | literal | `0` | Minimum width of the retained inner drawing. `surfaceMinWidth` sets this token on the stage root. |
+
+A canvas status overlay mounts the status presenter's embedded variant. It fills the inner viewport
+without drawing a second box, while its message still accepts the relevant
+[`--wm-status-*` text tokens](/uikit/layout-feedback/status/).
+
+**Classes**
+
+| Node | Canonical class | Present when | `classNames` key |
+|---|---|---|---|
+| Root | `.wui-stage` | Always | `root` |
+| Fill modifier | `.wui-stage--fill` | Retained `fill: true` | — |
+| Retained surface | `.wui-stage__surface` | `mountStage()` | `surface` |
+| Canvas modifier | `.wui-stage--canvas` | `mountCanvasStage()` | — |
+| Canvas surface | `.wui-stage__surface.wui-stage__canvas-surface` | `mountCanvasStage()` | — |
+| Canvas | `.wui-stage__canvas` | `mountCanvasStage()` | `canvas` |
+| Status layer | `.wui-stage__status` | Canvas binding has `status()` | `status` |
+| Status mount host | `.wui-status-host` | Canvas binding has `status()` | — |
+
+**Parts**
+
+| Node | Canonical part | Present when | `parts` key |
+|---|---|---|---|
+| Root | `root` | Retained or canvas stage | `root` |
+| Retained surface | `surface` | `mountStage()` | `surface` |
+| Canvas | `canvas surface` | `mountCanvasStage()` | `canvas` adds tokens beside both canonical names |
+| Status layer | `status` | Canvas binding has `status()` | `status` |
+
+</details>
+
+<UiPresenterRelated presenter="stage" />

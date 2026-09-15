@@ -1,0 +1,954 @@
+/* ============================================================================
+   WebMusic docs UI kit — one control vocabulary for the documentation site.
+
+   Loaded globally through Starlight `customCss` (see the site's
+   astro.config.mjs), so it also reaches markup that demos mount from
+   JavaScript — Astro's scoped <style> does not, because the scope class is
+   only stamped onto nodes present at build time.
+
+   The values here are grounded in the established controls shipped by
+   @webmusic/score/play/element. Some of those elements
+   encapsulate their UI in Shadow DOM and expose only public custom properties;
+   others render into light DOM. This sheet styles the documentation kit, not
+   production element internals, while keeping their control metrics aligned:
+
+     knob track  #dcdcdc / 5px      knob arc   #999999 / 5px
+     knob ptr    #111111 / 3px      knob box   46px, viewBox 0 0 40 40
+     param name  10.88px #666       param val  11.2px #444   (system-ui)
+     fader       32x96, well #f3f3f3, fill #999, thumb #111
+     transport   32x32 button, #111 on #fff
+     meter       well #1d1d1d, fill #fff, peak #c0392b on a #111 body
+
+   Everything is square: piano.css forces `border-radius: 0 !important` on
+   every input/select/button site-wide, so no radius is declared here.
+   ========================================================================= */
+
+:root {
+  /* -- surfaces ---------------------------------------------------------- */
+  --wui-panel: #ffffff;
+  --wui-surface: #fafafa;
+  --wui-inset: #f3f3f3;
+
+  /* -- hairlines --------------------------------------------------------- */
+  --wui-line: #ececec;
+  --wui-line-mid: #dcdcdc;
+  --wui-line-strong: #d8d8d8;
+  --wui-line-control: #b0b0b0;
+
+  /* -- ink --------------------------------------------------------------- */
+  --wui-ink: #111111;
+  --wui-ink-soft: #444444;
+  --wui-ink-mute: #666666;
+  --wui-on-ink: #ffffff;
+
+  /* -- the control ramp, lifted from the knob ---------------------------- */
+  --wui-track: #dcdcdc;
+  --wui-fill: #999999;
+  --wui-pointer: #111111;
+  --wui-peak: #c0392b;
+  --wui-record: #b40000;
+  --wui-success: #267347;
+  --wui-warning: #8a5a00;
+
+  /* -- type -------------------------------------------------------------- */
+  --wui-font-ui: system-ui, sans-serif;
+  --wui-font-mono: var(--sl-font-mono, ui-monospace, monospace);
+  --wui-size-label: 0.68rem;
+  --wui-size-readout: 0.7rem;
+  --wui-size-control: 0.8rem;
+
+  /* -- metrics ----------------------------------------------------------- */
+  --wui-row-h: 2rem;
+  /* The kit's house geometry, fed from the docs' own row height. These pierce
+     every shadow root, which the `border-radius: 0 !important` rule in
+     piano.css cannot: it stops at the boundary. Every in-row control on the
+     site — kit presenter, custom element or docs chrome — resolves to this. */
+  --wm-control-size: var(--wui-row-h);
+  --wm-control-radius: 0;
+  --wui-gap: 0.4rem;
+  --wui-gap-lg: 0.7rem;
+  --doc-knob-size: 46px;
+  --doc-knob-stroke: 5px;
+  --wui-pointer-stroke: 3px;
+  --doc-fader-w: 32px;
+  --doc-fader-h: 96px;
+  --doc-fader-handle: 10px;
+}
+
+/* Demo surfaces stay light in black mode — they are sample canvases for
+   light-themed widgets. piano.css lifts them off the dark page with a shadow;
+   only the frame needs to know about the theme. */
+:root[data-theme='dark'] .wui-panel {
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.65);
+}
+
+/* ============================================================================
+   Panel — the demo card frame and its title bar.
+   ========================================================================= */
+
+.wui-panel {
+  min-width: 0;
+  border: 1px solid var(--wui-line-strong);
+  background: var(--wui-panel);
+  color: var(--wui-ink);
+  padding: 0.85rem;
+  overflow: hidden;
+}
+
+/* A panel dropped straight into MDX prose. `not-content` (which every demo
+   root needs, see the note on .wui-row) also removes the margin Starlight
+   would otherwise give it, so a standalone demo has to ask for its own
+   breathing room. Panels laid out by a parent grid must NOT use this. */
+.wui-panel--flow {
+  margin-block: 1rem 1.5rem;
+}
+
+.wui-panel__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  min-width: 0;
+}
+
+.wui-panel__title > * {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.wui-panel__title span {
+  color: var(--wui-ink-mute);
+  font-family: var(--wui-font-mono);
+  font-size: 0.72rem;
+}
+
+.wui-panel__title strong {
+  font-size: 0.92rem;
+}
+
+.wui-panel__hint {
+  margin: 0.5rem 0 0;
+  color: var(--wui-ink-mute);
+  font-family: var(--wui-font-mono);
+  font-size: 0.72rem;
+}
+
+.wui-panel__hint code {
+  font-size: 1em;
+}
+
+/* ============================================================================
+   Row — every control sits on one 2rem baseline so mixed rows line up.
+   ========================================================================= */
+
+.wui-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--wui-gap) var(--wui-gap-lg);
+}
+
+.wui-row--end {
+  justify-content: flex-end;
+}
+
+.wui-row--between {
+  justify-content: space-between;
+}
+
+.wui-row + .wui-row {
+  margin-top: 0.55rem;
+}
+
+/* One labelled control: label + input + readout. */
+.wui-field {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--wui-gap);
+  height: var(--wui-row-h);
+}
+
+/* ============================================================================
+   Type — one scale. Labels name a thing, readouts report a value.
+   (Both sites previously mixed a mono `readout` with an Inter `time` at two
+   different colours for the same job.)
+   ========================================================================= */
+
+.wui-label {
+  color: var(--wui-ink-mute);
+  font-family: var(--wui-font-mono);
+  font-size: var(--wui-size-label);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.wui-readout {
+  min-width: 5ch;
+  color: var(--wui-ink-soft);
+  font-family: var(--wui-font-mono);
+  font-size: var(--wui-size-readout);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.wui-readout--strong {
+  color: var(--wui-ink);
+}
+
+.wui-readout--wide {
+  min-width: 8ch;
+}
+
+/* ============================================================================
+   Button — one shape, states via data attributes (never modifier classes).
+   ========================================================================= */
+
+.wui-btn {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  height: var(--wui-row-h);
+  padding: 0 0.7rem;
+  border: 1px solid var(--wui-ink);
+  background: var(--wui-ink);
+  color: var(--wui-on-ink);
+  font-family: var(--wui-font-ui);
+  font-size: var(--wui-size-control);
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.wui-btn[data-variant='ghost'] {
+  background: var(--wui-panel);
+  color: var(--wui-ink);
+}
+
+.wui-btn:hover,
+.wui-btn[data-on='true'],
+.wui-btn[aria-pressed='true'] {
+  background: var(--wui-ink);
+  color: var(--wui-on-ink);
+}
+
+/* A toggle needs a visible off state even when it uses the primary button
+   shape. `data-role` describes behavior; `data-on` describes state. */
+.wui-btn[data-role='toggle'][data-on='false'],
+.wui-btn[data-role='toggle'][aria-pressed='false'] {
+  background: var(--wui-panel);
+  color: var(--wui-ink);
+}
+
+.wui-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.wui-btn[data-variant='ghost']:disabled:hover,
+.wui-btn[data-role='toggle'][data-on='false']:disabled:hover {
+  background: var(--wui-panel);
+  color: var(--wui-ink);
+}
+
+.wui-btn:disabled:hover {
+  opacity: 0.45;
+}
+
+.wui-btn:focus-visible,
+.wui-select:focus-visible {
+  outline: 2px solid var(--wui-ink);
+  outline-offset: 2px;
+}
+
+/* Square icon button — the transport play/pause size from the shipped player. */
+.wui-btn--icon {
+  width: var(--wui-row-h);
+  padding: 0;
+  font-size: 0.9rem;
+}
+
+/* Segmented group: buttons butt together with one shared hairline. */
+.wui-seg {
+  display: inline-flex;
+}
+
+.wui-seg .wui-btn + .wui-btn {
+  margin-left: -1px;
+}
+
+/* ============================================================================
+   Slider — ONE control, two orientations.
+
+   A range input is the only native control whose default chrome cannot be
+   nudged into line: `accent-color` alone still leaves a rounded, platform-drawn
+   thumb on a rail, which reads nothing like the square well-and-handle of the
+   mixer strip. So the native chrome is switched off entirely and both
+   orientations are drawn from the same declarations: a hairline well, a fill up
+   to the value, and a square handle. A horizontal slider and a vertical fader
+   differ only in which axis is the travel axis.
+
+   The fill is a background gradient stopping at `--wui-range-pct`, which
+   enhanceRanges() in ./ui.ts keeps in step with the value. Firefox additionally
+   gets ::-moz-range-progress, so it fills correctly even before the script runs.
+   ========================================================================= */
+
+.wui-range {
+  /* Cross-axis size of the well; travel-axis size of the handle. */
+  --wui-slider-thickness: var(--wui-row-h);
+  --wui-slider-handle: 10px;
+
+  -webkit-appearance: none;
+  appearance: none;
+  box-sizing: border-box;
+  width: 6.5rem;
+  max-width: 34vw;
+  height: var(--wui-slider-thickness);
+  margin: 0;
+  border: 1px solid var(--wui-line-control);
+  background-color: var(--wui-inset);
+  background-image: linear-gradient(
+    to right,
+    var(--wui-fill) 0,
+    var(--wui-fill) var(--wui-range-pct, 0%),
+    transparent var(--wui-range-pct, 0%)
+  );
+  cursor: pointer;
+}
+
+.wui-range--wide {
+  width: 100%;
+  flex: 1 1 8rem;
+  max-width: none;
+}
+
+/* The well is painted by the input itself, so the UA track must get out of
+   the way rather than draw a second rail underneath. */
+.wui-range::-webkit-slider-runnable-track {
+  height: 100%;
+  border: none;
+  background: transparent;
+}
+
+.wui-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: var(--wui-slider-handle);
+  height: calc(var(--wui-slider-thickness) - 2px);
+  border: none;
+  background: var(--wui-pointer);
+}
+
+.wui-range::-moz-range-track {
+  height: 100%;
+  border: none;
+  background: transparent;
+}
+
+.wui-range::-moz-range-progress {
+  height: 100%;
+  background: var(--wui-fill);
+}
+
+.wui-range::-moz-range-thumb {
+  width: var(--wui-slider-handle);
+  height: calc(var(--wui-slider-thickness) - 2px);
+  border: none;
+  border-radius: 0;
+  background: var(--wui-pointer);
+}
+
+.wui-range:focus-visible {
+  outline: 2px solid var(--wui-ink);
+  outline-offset: 2px;
+}
+
+.wui-range:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* -- vertical ------------------------------------------------------------- *
+   `writing-mode: vertical-lr` + `direction: rtl` makes the travel axis run
+   bottom-to-top, which is what a fader has to do. Everything else — the well,
+   the fill, the handle — is the horizontal rule set with the axes swapped. */
+
+.wui-range[data-orient='vertical'] {
+  width: var(--wui-slider-thickness);
+  max-width: none;
+  height: 6rem;
+  writing-mode: vertical-lr;
+  direction: rtl;
+  background-image: linear-gradient(
+    to top,
+    var(--wui-fill) 0,
+    var(--wui-fill) var(--wui-range-pct, 0%),
+    transparent var(--wui-range-pct, 0%)
+  );
+}
+
+.wui-range[data-orient='vertical']::-webkit-slider-runnable-track {
+  width: 100%;
+}
+
+.wui-range[data-orient='vertical']::-webkit-slider-thumb {
+  width: calc(var(--wui-slider-thickness) - 2px);
+  height: var(--wui-slider-handle);
+}
+
+.wui-range[data-orient='vertical']::-moz-range-thumb {
+  width: calc(var(--wui-slider-thickness) - 2px);
+  height: var(--wui-slider-handle);
+}
+
+/* Select — a real control, not a readout. The two sites had previously styled
+   the same <select> as opposite things: a readout on one, a ghost button on
+   the other. It is an input, so it reads as one. */
+.wui-select {
+  height: var(--wui-row-h);
+  padding: 0 0.4rem;
+  border: 1px solid var(--wui-line-control);
+  background: var(--wui-panel);
+  color: var(--wui-ink);
+  font-family: var(--wui-font-mono);
+  font-size: var(--wui-size-readout);
+  cursor: pointer;
+}
+
+.wui-select:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* ============================================================================
+   Track / fill — progress and seek bars.
+   ========================================================================= */
+
+.wui-track {
+  position: relative;
+  flex: 1 1 8rem;
+  min-width: 6rem;
+  height: var(--wui-row-h);
+  border: 1px solid var(--wui-line-control);
+  background: var(--wui-inset);
+  overflow: hidden;
+}
+
+.wui-track__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  background: var(--wui-fill);
+}
+
+/* A marked span of the track — an A–B loop region. */
+.wui-track__region {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(17, 17, 17, 0.16);
+  border-left: 1px solid var(--wui-ink);
+  border-right: 1px solid var(--wui-ink);
+}
+
+/* A beat / activity indicator. */
+.wui-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  flex: 0 0 auto;
+  border: 1px solid var(--wui-ink);
+  background: transparent;
+}
+
+.wui-dot[data-on='true'] {
+  background: var(--wui-ink);
+}
+
+/* ============================================================================
+   Surface — an inset area inside a panel: a canvas, a plot, a drawing.
+   ========================================================================= */
+
+.wui-surface {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--wui-line-control);
+  background: var(--wui-surface);
+}
+
+/* ============================================================================
+   Knob — geometry mirrors packages/score/src/play/element/internal/knob.ts:
+   a 270 degree arc from -135 to 135 with the gap at the bottom, r=16 on a
+   40x40 viewBox. The markup is emitted by knob() in ./ui.js.
+   ========================================================================= */
+
+.doc-knob {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  width: calc(var(--doc-knob-size) + 14px);
+}
+
+.doc-knob__dial {
+  position: relative;
+  display: block;
+  width: var(--doc-knob-size);
+  height: var(--doc-knob-size);
+}
+
+.doc-knob__dial svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.doc-knob__dial .track {
+  stroke: var(--wui-track);
+  stroke-width: var(--doc-knob-stroke);
+  stroke-linecap: butt;
+}
+
+.doc-knob__dial .arc {
+  stroke: var(--wui-fill);
+  stroke-width: var(--doc-knob-stroke);
+  stroke-linecap: butt;
+}
+
+.doc-knob__dial .ptr {
+  stroke: var(--wui-pointer);
+  stroke-width: var(--wui-pointer-stroke);
+  stroke-linecap: butt;
+}
+
+/* The real input sits invisibly over the dial so the knob stays keyboard
+   reachable and screen-reader announceable. It is deliberately NOT a
+   `.wui-range`: the slider chrome would be drawn underneath the dial. The
+   vertical writing mode makes it answer to an up/down drag, the way the
+   shipped elements' knobs do. */
+.doc-knob__dial input[type='range'] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: ns-resize;
+  -webkit-appearance: none;
+  appearance: none;
+  writing-mode: vertical-lr;
+  direction: rtl;
+}
+
+/* The native input is transparent, so its own outline would disappear with
+   it. Paint keyboard focus on the visible dial instead. */
+.doc-knob__dial:focus-within {
+  outline: 2px solid var(--wui-ink);
+  outline-offset: 2px;
+}
+
+.doc-knob__name {
+  color: var(--wui-ink-mute);
+  font-family: var(--wui-font-ui);
+  font-size: 0.68rem;
+  line-height: 1;
+}
+
+.doc-knob__val {
+  color: var(--wui-ink-soft);
+  font-family: var(--wui-font-ui);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+/* ============================================================================
+   Fader — the vertical slider plus a name, at mixer-strip width.
+
+   This is a PRESET of .wui-range, not a second control: it only widens the
+   well and lengthens the travel. Every visual property — hairline, fill,
+   square handle — comes from the slider rules above, so the two can never
+   drift apart.
+   ========================================================================= */
+
+.doc-fader {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.doc-fader .wui-range {
+  --wui-slider-thickness: var(--doc-fader-w);
+  --wui-slider-handle: var(--doc-fader-handle);
+  height: var(--doc-fader-h);
+}
+
+.doc-fader__name {
+  color: var(--wui-ink-soft);
+  font-family: var(--wui-font-ui);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.doc-fader__val {
+  min-width: 4ch;
+  color: var(--wui-ink-mute);
+  font-family: var(--wui-font-mono);
+  font-size: 0.64rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+/* ============================================================================
+   Transport — play/pause + seek + elapsed, matching the shipped player.
+   ========================================================================= */
+
+.doc-transport {
+  display: flex;
+  align-items: center;
+  gap: var(--wui-gap-lg);
+}
+
+.doc-transport__time {
+  min-width: 4.5ch;
+  color: var(--wui-ink-soft);
+  font-family: var(--wui-font-mono);
+  font-size: var(--wui-size-readout);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.wui-player {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.wui-player__label {
+  font-weight: 700;
+}
+
+.wui-player__params {
+  padding-top: 0.1rem;
+}
+
+/* ============================================================================
+   Meter — level display; dark body, per <level-meter>.
+   ========================================================================= */
+
+.doc-meter {
+  display: block;
+  padding: 0.5rem;
+  border: 1px solid var(--wui-ink);
+  background: var(--wui-ink);
+}
+
+.doc-meter__track {
+  position: relative;
+  height: 0.75rem;
+  background: #1d1d1d;
+  overflow: hidden;
+}
+
+.doc-meter__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  background: #ffffff;
+}
+
+.doc-meter__peak {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--wui-peak);
+}
+
+.doc-meter__db {
+  margin-top: 0.3rem;
+  color: #bbbbbb;
+  font-family: var(--wui-font-mono);
+  font-size: 0.64rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============================================================================
+   Stage — a fixed window onto a drawing that sizes itself.
+
+   The view renderers stamp `height: …px !important` and `max-height: none
+   !important` onto the SVG they draw into, so a cap on the drawing is ignored;
+   it has to live on an ancestor. That ancestor is this.
+   ========================================================================= */
+
+.doc-stage {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--wui-line);
+  background: var(--wui-surface);
+  overflow: auto;
+}
+
+/* ============================================================================
+   Data list — the small key/value readout block used by analysis panels.
+   ========================================================================= */
+
+.wui-data {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0;
+}
+
+.wui-data > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border-bottom: 1px solid var(--wui-line);
+  padding-bottom: 0.45rem;
+}
+
+.wui-data dt,
+.wui-data dd {
+  margin: 0;
+  font-size: 0.82rem;
+}
+
+.wui-data dt {
+  color: var(--wui-ink-mute);
+}
+
+.wui-data dd {
+  font-weight: 800;
+  text-align: right;
+}
+
+/* ============================================================================
+   Status — an inline failure line, hidden until something goes wrong.
+   ========================================================================= */
+
+.doc-status {
+  margin: 0.5rem 0 0;
+  color: var(--wui-ink-mute);
+  font-family: var(--wui-font-mono);
+  font-size: 0.72rem;
+}
+
+.doc-status[data-tone='error'] {
+  color: var(--wui-record);
+}
+
+.doc-status[data-tone='success'] {
+  color: var(--wui-success);
+}
+
+.doc-status[data-tone='warning'] {
+  color: var(--wui-warning);
+}
+
+/* ============================================================================
+   Small structural primitives used by the complete UI catalog.
+   ============================================================================ */
+
+.wui-toolbar,
+.wui-tabs,
+.wui-cluster {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--wui-gap);
+}
+
+.wui-toolbar {
+  justify-content: space-between;
+  padding-bottom: 0.55rem;
+  border-bottom: 1px solid var(--wui-line);
+}
+
+.wui-tabs {
+  gap: 0;
+  border-bottom: 1px solid var(--wui-line-control);
+}
+
+.wui-tab {
+  appearance: none;
+  min-height: var(--wui-row-h);
+  margin-bottom: -1px;
+  padding: 0 0.65rem;
+  border: 1px solid transparent;
+  border-bottom-color: var(--wui-line-control);
+  background: transparent;
+  color: var(--wui-ink-mute);
+  font: 600 var(--wui-size-control)/1 var(--wui-font-ui);
+  cursor: pointer;
+}
+
+.wui-tab[aria-selected='true'] {
+  border-color: var(--wui-line-control);
+  border-bottom-color: var(--wui-panel);
+  background: var(--wui-panel);
+  color: var(--wui-ink);
+}
+
+.wui-tab:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid var(--wui-ink);
+  outline-offset: -2px;
+}
+
+.wui-badge,
+.wui-chip {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 1.35rem;
+  padding: 0.15rem 0.4rem;
+  border: 1px solid var(--wui-line-control);
+  background: var(--wui-panel);
+  color: var(--wui-ink-soft);
+  font: 600 0.62rem/1 var(--wui-font-mono);
+  letter-spacing: 0.025em;
+  white-space: nowrap;
+}
+
+.wui-badge[data-status='composed'] {
+  border-color: var(--wui-success);
+  color: var(--wui-success);
+}
+
+.wui-badge[data-status='partial'] {
+  border-color: var(--wui-warning);
+  color: var(--wui-warning);
+}
+
+.wui-badge[data-status='extract'] {
+  border-color: var(--wui-record);
+  color: var(--wui-record);
+}
+
+.wui-badge[data-status='behavior'] {
+  color: var(--wui-ink-mute);
+}
+
+.wui-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: var(--wui-gap-lg);
+}
+
+.wui-empty {
+  display: grid;
+  place-items: center;
+  min-height: 5rem;
+  padding: 1rem;
+  border: 1px dashed var(--wui-line-control);
+  color: var(--wui-ink-mute);
+  font: 0.72rem/1.5 var(--wui-font-mono);
+  text-align: center;
+}
+
+.wui-metric {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.7rem;
+  border: 1px solid var(--wui-line);
+  background: var(--wui-surface);
+}
+
+.wui-metric strong {
+  color: var(--wui-ink);
+  font: 800 1.35rem/1 var(--wui-font-mono);
+}
+
+.wui-metric span {
+  color: var(--wui-ink-mute);
+  font: var(--wui-size-label)/1.2 var(--wui-font-mono);
+}
+
+.wui-spectrum {
+  display: flex;
+  align-items: end;
+  gap: 2px;
+  height: 3.5rem;
+  padding: 0.35rem;
+  border: 1px solid var(--wui-ink);
+  background: var(--wui-ink);
+}
+
+.wui-spectrum > span {
+  flex: 1 1 0;
+  min-width: 2px;
+  height: var(--wui-level, 20%);
+  background: var(--wui-on-ink);
+}
+
+.wui-pad-grid,
+.wui-step-grid,
+.wui-keyboard {
+  display: grid;
+  gap: 2px;
+  padding: 0.4rem;
+  border: 1px solid var(--wui-line-control);
+  background: var(--wui-inset);
+}
+
+.wui-pad-grid {
+  grid-template-columns: repeat(4, minmax(2rem, 1fr));
+}
+
+.wui-step-grid {
+  grid-template-columns: repeat(8, minmax(1.35rem, 1fr));
+}
+
+.wui-pad,
+.wui-step {
+  appearance: none;
+  aspect-ratio: 1;
+  border: 1px solid var(--wui-line-control);
+  background: var(--wui-panel);
+  color: var(--wui-ink);
+  font: 600 0.65rem/1 var(--wui-font-mono);
+  cursor: pointer;
+}
+
+.wui-pad[data-on='true'],
+.wui-step[data-on='true'],
+.wui-step[aria-pressed='true'] {
+  border-color: var(--wui-ink);
+  background: var(--wui-ink);
+  color: var(--wui-on-ink);
+}
+
+.wui-step[data-playhead='true'] {
+  outline: 2px solid var(--wui-peak);
+  outline-offset: -3px;
+}
+
+.wui-keyboard {
+  grid-template-columns: repeat(8, minmax(1.5rem, 1fr));
+  align-items: stretch;
+  height: 5.5rem;
+}
+
+.wui-key {
+  appearance: none;
+  border: 1px solid var(--wui-line-control);
+  background: var(--wui-panel);
+  color: var(--wui-ink-mute);
+  font: 0.58rem/1 var(--wui-font-mono);
+  cursor: pointer;
+}
+
+.wui-key[data-black='true'] {
+  height: 62%;
+  background: var(--wui-ink);
+  color: var(--wui-on-ink);
+}
+
+.wui-key[data-on='true'] {
+  background: var(--wui-fill);
+  color: var(--wui-on-ink);
+}

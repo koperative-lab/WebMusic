@@ -1,0 +1,26 @@
+{
+  "package": "static-browser-server",
+  "version": "1.0.3",
+  "artifacts": [
+    {
+      "file": "out/lib/main.js",
+      "sha256": "d47b18f44a86055399dd90b9c33b815d068db351c7bcc45c5e9d45082afd2bf9"
+    }
+  ],
+  "documents": [
+    {
+      "title": "mime-db 1.52.0, embedded in static-browser-server",
+      "source": "https://github.com/jshttp/mime-db/blob/v1.52.0/LICENSE",
+      "file": "mime-db-1.52.0-MIT.txt",
+      "sha256": "cc1dfd4dafa27271e8212cd3b274eeb3f262e40a6fdab36ddc3f9696f706f58b"
+    }
+  ],
+  "sourceEvidence": {
+    "npmArtifact": "static-browser-server@1.0.3/out/lib/main.js",
+    "moduleMarkers": [
+      "node_modules/.pnpm/mime-db@1.52.0/node_modules/mime-db/db.json",
+      "node_modules/.pnpm/mime-db@1.52.0/node_modules/mime-db/index.js"
+    ],
+    "note": "These are the complete foreign module markers in the unminified npm esbuild bundle. The other source markers belong to static-browser-server."
+  }
+}

@@ -1,0 +1,207 @@
+---
+title: Score Web Components
+description: Every drop-in Score element by capability — what each tag is for, how the groups compose, the registration entries and the shared theming variables.
+sidebar:
+  hidden: true
+---
+
+The drop-in custom elements of `@webmusic/score` — place a tag on the page, no
+JavaScript wiring required. Each capability ships its elements from its
+`/element` subpath, so the capability root tree-shakes free of DOM code. To load
+and register them — via a CDN script, a bundler, or individual `define*` calls —
+see [Score setup](/score/#drop-in-web-components). Only `play` publishes `/auto` and
+`/global` entries; register the analyze and view tags with the `defineAll*` functions
+listed in their sections below.
+
+| Capability | Elements |
+| --- | --- |
+| [Play](#play) | Playing a score: the transport, a rack mixer, note input, recording and synth control. |
+| [Analyze](#analyze) | Following a performance: chord progression, current chord, key changes, Roman harmony and voice leading. |
+| [View](#view) | Whole-score representations, held-pitch representations and optional sheet engraving. |
+
+## Play
+
+The elements of [`@webmusic/score/play`](/score/api/play/). **Five elements cover the capability, one per job**; four workflow pages keep components that are configured and demonstrated together in one place.
+
+| Element | Job |
+| --- | --- |
+| [`<score-player>`](/score/element/play/score-player/) | **Play a score back.** Load a file or assign a `Score`; play/pause, seek, emit note events. Drive a whole `Rack` via `.rack`, or assign `.controller` to drive an engine you already own. |
+| [`<rack-control>`](/score/element/play/rack-control/) | **Mix a rack.** Master and per-member volume faders for a shared `Rack`. |
+| [`<note-input>`](/score/element/play/note-input/) | **Play notes by hand.** One element with three layouts — piano / grid / chords — plus optional QWERTY control through `keyboard`. |
+| [`<score-recorder>`](/score/element/play/note-input/#score-recorder) | **Capture a performance.** Record note input into a `Score`, replay it, download MIDI / MusicXML. |
+| [`<synth-panel>`](/score/element/play/synth-panel/) | **Shape the sound.** Timbre, effect chain, ADSR, EQ, LFO and macro knobs in one panel; the `sections` attribute picks which areas render, so `sections="eq"` is an EQ on its own. |
+
+Transport and mixing are deliberately separate: point [`<score-player>`](/score/element/play/score-player/) and [`<rack-control>`](/score/element/play/rack-control/) at one shared `Rack`.
+
+The input surfaces share one tiny contract — bubbling `webscore:noteon` / `webscore:noteoff` `CustomEvent`s (`{ midi, velocity }`) plus an optional `.onNote(midi, velocity, on)` callback — so any of them wires to any player or a `Sound.midiOut`. For the programmatic engines, timbres, effects, and ensemble behind them, see the [Play API](/score/api/play/).
+
+Each workflow page has a live demo, API details and styling variables. `<score-recorder>` shares the
+[`<note-input>` page](/score/element/play/note-input/#score-recorder) because it mounts onto that
+input and the combined demo is the useful unit readers configure.
+
+| Element | Register | Job |
+| --- | --- | --- |
+| [`<score-player>`](/score/element/play/score-player/) | `defineScorePlayerElement(tag?)` | Load a file or assign a `Score`; play/pause, seek, emit note events. |
+| [`<rack-control>`](/score/element/play/rack-control/) | `defineRackControlElement(tag?)` | Mixer (master + per-member volume faders) for a shared `Rack`. |
+| [`<note-input>`](/score/element/play/note-input/) | `defineNoteInputElement(tag?)` | Discrete note surface — `layout` piano / grid / chords, `keyboard` for QWERTY. |
+| [`<score-recorder>`](/score/element/play/note-input/#score-recorder) | `defineScoreRecorderElement(tag?)` | Record note input → `Score`, replay, download MIDI / MusicXML. |
+| [`<synth-panel>`](/score/element/play/synth-panel/) | `defineSynthPanelElement(tag?)` | Control panel — `sections` sound / effects / envelope / eq / lfo / macros. |
+| — | `defineAllElements()` | Register every element at its default tag (what `@webmusic/score/play/auto` calls). |
+
+## Analyze
+
+Choose one component for the musical question you need to follow during a performance. Each tag renders one surface and connects to an existing player.
+
+| Purpose | Component | What it does |
+| --- | --- | --- |
+| Follow the chord progression | [`<chord-analysis>`](/score/element/analyze/chord-analysis/) | Chord bands follow the score position; seek a harmonic segment. |
+| Identify the current chord | [`<live-chord-analysis>`](/score/element/analyze/live-chord-analysis/) | Name the sounding notes and choose alternate interpretations. |
+| Track key changes | [`<key-analysis>`](/score/element/analyze/key-analysis/) | Follow tonal decisions across score time and inspect a section. |
+| Read harmonic function | [`<roman-analysis>`](/score/element/analyze/roman-analysis/) | Follow Roman numerals and the optional harmonic-function row. |
+| Inspect voice leading | [`<voice-leading-analysis>`](/score/element/analyze/voice-leading-analysis/) | Follow voices and navigate to issue brackets. |
+
+Whole-score summaries, histograms and rhythmic-vocabulary reports use the [Headless report workflow](/score/api/analyze/#reports). Candidate rankings, tonal comparisons, pitch weights and retained chord history belong to [application-owned diagnostics](/score/headless/analyze/live-trackers/#key-diagnostics). [Motif search](/score/api/analyze/#find-motifs) remains available as data.
+
+### Compose a performance
+
+```html
+<script type="module">
+  import {defineScorePlayerElement} from '@webmusic/score/play/element';
+  import {defineVoiceLeadingAnalysisElement} from '@webmusic/score/analyze/element';
+  import {definePitchViewElement} from '@webmusic/score/view/element';
+  defineScorePlayerElement();
+  defineVoiceLeadingAnalysisElement();
+  definePitchViewElement();
+</script>
+
+<score-player id="piece" src="/midi/demo.mid"></score-player>
+<voice-leading-analysis player="#piece"></voice-leading-analysis>
+<pitch-view type="keyboard" player="#piece" low="48" high="84"></pitch-view>
+<pitch-view type="staff" player="#piece" system="grand"></pitch-view>
+```
+
+The player loads once. Score-based companions borrow its resolved data and position; pitch views borrow its held notes. Each is an ordinary sibling that can be placed, styled or omitted independently. Configuration belongs to each tag’s attributes and application-owned controls. Each tag-owned live demo pairs that Analyze component with one player; the example above shows an optional composition. No Analyze component mounts an internal keyboard, staff, fretboard, tab bar or settings dock.
+
+Score input precedence is explicit `.score`, then `src`, then the selected player’s resolved data. Score lanes also work with standalone input: they update local inspection and emit seek requests without creating playback resources. When bound, navigation goes to the existing player with explicit nominal/transport time conversion. The current-chord nameplate reads sounding note activity and does not seek score time.
+
+### Shared player connection
+
+Native bindings consume the [nonvisual playback source](/score/api/#shared-playback-observation).
+They obtain data and an initial snapshot before waiting for another note/time
+event, and follow replacements without fetching the player's URL again. Explicit
+`.score` takes precedence over `src`, then borrowed player data. Failed explicit
+loading does not silently fall back to another source. When explicit data differs
+from a native player's Score, navigation rejects the mismatch rather than seeking
+with unrelated geometry. Omit the companion `src` to share the loaded Score.
+
+`player` selects one unique target in the same Document or ShadowRoot. Discovery
+follows late insertion, upgrade and replacement until disconnect. The read-only
+`data-player-state` attribute exposes target resolution (`missing`, `invalid`,
+`ambiguous`, `ready`) and native source readiness. Legacy events remain usable
+when a target has no source or reports `unavailable`, including custom player
+renderers. They cannot supply resolved data or an initial snapshot automatically.
+When a native source is available, legacy events are ignored to avoid duplicates.
+
+A custom target may expose `.playback` and dispatch a bubbling
+`webmusic:sourcechange` when replacing that property. Disconnecting releases
+subscriptions, discovery and owned analysis work, without stopping the player.
+
+| Element | Register |
+| --- | --- |
+| [`<chord-analysis>`](/score/element/analyze/chord-analysis/) | `defineChordAnalysisElement(tag?)` |
+| [`<live-chord-analysis>`](/score/element/analyze/live-chord-analysis/) | `defineLiveChordAnalysisElement(tag?)` |
+| [`<key-analysis>`](/score/element/analyze/key-analysis/) | `defineKeyAnalysisElement(tag?)` |
+| [`<roman-analysis>`](/score/element/analyze/roman-analysis/) | `defineRomanAnalysisElement(tag?)` |
+| [`<voice-leading-analysis>`](/score/element/analyze/voice-leading-analysis/) | `defineVoiceLeadingAnalysisElement(tag?)` |
+| — | `defineAllAnalysisElements()` registers all five. |
+
+## View
+
+Three View elements group representations by the data and resources they use.
+
+| Element | Representations | Register |
+| --- | --- | --- |
+| [`<score-view>`](/score/element/view/score-view/) | `piano-roll`, `staff`, `waterfall`, `map` and `thumbnail` over a whole Score. | `defineScoreViewElement(tag?)` |
+| [`<pitch-view>`](/score/element/view/pitch-view/) | `keyboard`, `staff` and `fretboard` for currently held MIDI pitches. | `definePitchViewElement(tag?)` |
+| [`<sheet-view>`](/score/element/view/sheet-view/) | Engraved sheet music using the optional OpenSheetMusicDisplay peer. | `defineSheetViewElement(tag?)` |
+
+`defineAllViewElements()` from `@webmusic/score/view/element` registers all three.
+Each type stays on its owning page, with its controls in external Parameters.
+`score-view` borrows resolved score data and position; `pitch-view` borrows held
+notes. `sheet-view` requires explicit `.score` or `src` and follows player events;
+it does not borrow the player's loaded score.
+
+```html
+<score-player id="p" src="/xml/demo.xml"></score-player>
+<score-view type="staff" player="#p"></score-view>
+<score-view type="map" player="#p"></score-view>
+<pitch-view type="keyboard" player="#p" low="48" high="84"></pitch-view>
+```
+
+No follower creates another player. Each component can be placed or omitted
+independently; a tag-owned demo contains one player and that page's component.
+See the [View API](/score/api/view/) and [Headless models](/score/headless/#view)
+for application-owned presentation and the same data projections.
+
+## Theming
+
+Set public CSS custom properties on an element, its ancestor, or `:root`. They
+inherit into Score's UIKit presenters, including controls inside Shadow DOM.
+The default palette is mostly neutral with square corners; active notes and
+recording indicators retain their role-specific accent defaults.
+
+```css
+/* Apply to a shared wrapper, or put these declarations on one component. */
+.music {
+  --wm-component-background: transparent;
+  --wm-component-border: 1px solid #8291a5;
+  --wm-component-radius: 12px;
+  --wm-foreground: #25344a;
+  --wm-foreground-muted: #596b83;
+  --wm-accent: #e23b3b;
+  --wm-accent-foreground: #fff;
+  --wm-border: #8291a5;
+  --wm-control-border: #8291a5;
+  --wm-control-radius: 6px;
+  --wm-focus: #146dcc;
+}
+```
+
+`--wm-component-*` styles the outer surface. The border value is a complete CSS
+border such as `1px solid #8291a5` or `none`; `--wm-border` and
+`--wm-control-border` are colors. `--wm-component-padding` accepts CSS spacing.
+Presenter-specific `--wm-<presenter>-surface-*` values take precedence when a
+surface needs its own background, border, radius or padding.
+
+Inner drawing surfaces and controls have separate tokens. For example, making
+the outer frame transparent does not erase the contrast between white and black
+piano keys. For a completely transparent drawing surface, also set the relevant
+`--wm-surface`, `--wm-surface-muted`, `--wm-surface-inverse`, or the specific
+background token listed by its owner. Pair dark surfaces with readable
+`--wm-foreground`, `--wm-foreground-muted` and `--wm-foreground-on-inverse`.
+Keep `--wm-accent-foreground` visible against the accent color; it is independent
+of the component background.
+
+| Surface | Owning styling reference |
+| --- | --- |
+| Transport and compatibility alias | [Score player](/score/element/play/score-player/) |
+| Piano/grid/chord input and recorder | [Note input](/score/element/play/note-input/) |
+| Channel mixer | [Rack control](/score/element/play/rack-control/) |
+| Parameters, envelope, EQ, LFO and macros | [Synth panel](/score/element/play/synth-panel/) |
+| Score drawings and active notes | [Score view](/score/element/view/score-view/) |
+| Keyboard, staff and fretboard readouts | [Pitch view](/score/element/view/pitch-view/) |
+| Engraved paper and ink | [Sheet view](/score/element/view/sheet-view/) |
+| Live analysis | Each [Analyze component](#analyze) and its UIKit Harmony/Workbench tokens |
+
+Existing legacy variables and explicit renderer color options retain their
+documented precedence. CSS changes update DOM/SVG colors without replacing the
+score or player. CSS cannot override an explicit renderer
+color option that takes precedence over the theme.
+
+Use `::part(...)` for the documented parts of Shadow DOM components such as
+`note-input` and `synth-panel`. Score player, Analyze and View render in light
+DOM: target their public `[part~="..."]` hooks instead. Do not select private
+UIKit child classes. UIKit can also be mounted directly with the same variables,
+parts and named handle nodes; see [UIKit styling](/uikit/).
+`rack-part` is a nonvisual declaration. Demo wrapper elements inherit their
+theme into the components they compose.

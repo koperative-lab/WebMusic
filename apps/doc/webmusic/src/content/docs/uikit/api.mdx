@@ -1,0 +1,122 @@
+---
+title: '@webmusic/ui'
+description: 'The @webmusic/ui root: the twenty-one published presenter entries, their shared contracts and deliberate differences, and the release boundary.'
+sidebar:
+  label: '@webmusic/ui'
+  order: 6
+---
+
+`@webmusic/ui` is the domain-neutral presenter layer for Score and custom interfaces:
+DOM presenters and semantic styling hooks with **no** dependency on kernel,
+score or audio, and no custom-element registration. Every entry below is an
+import path of the one package, not a separate npm package.
+
+This page is the root reference — the entry list, the shape they share, and
+what the release boundary admits. Positioning and theming live on the
+[UI Kit overview](/uikit/); the browse surface is the
+[Catalog](/uikit/catalog/); each entry's own State, Binding, Options, Handle,
+tokens and parts live on its page.
+
+## Install
+
+:::note
+Use an available published version, or the monorepo workspaces for local development.
+:::
+
+```bash
+npm install @webmusic/ui
+```
+
+It has no dependencies and no required peers. Score declares it as an
+**optional** peer: package roots and `/headless` entries never reach it, so a
+headless-only install does not pull it in.
+
+## Package subpaths
+
+The root re-exports all twenty-one; import a subpath to keep the rest out of
+your bundle.
+
+| Entry | Class | What it presents |
+| --- | --- | --- |
+| [`@webmusic/ui/analysis`](/uikit/views-analysis/analysis/) | Views and analysis | Score and audio analysis result views rendered from plain result objects. |
+| [`@webmusic/ui/envelope`](/uikit/parameters-gestures/envelope/) | Parameters and modulation | Accessible ADSR editor over a structural envelope binding. |
+| [`@webmusic/ui/eq`](/uikit/parameters-gestures/eq/) | Parameters and modulation | Accessible graphic-EQ presenter over a structural band/response binding. |
+| [`@webmusic/ui/harmony`](/uikit/views-analysis/harmony/) | Views and analysis | Flow lane, nameplate, chip strip and wheel: read-outs that show an analysis happening. |
+| [`@webmusic/ui/lfo`](/uikit/parameters-gestures/lfo/) | Parameters and modulation | Accessible LFO controls and waveform over a structural modulation binding. |
+| [`@webmusic/ui/macro`](/uikit/parameters-gestures/macro/) | Parameters and modulation | Macro control with target readouts, composed over the parameter rack. |
+| [`@webmusic/ui/meter`](/uikit/mixing-capture/meter/) | Mixing and capture | Level/spectrum presenter and structural meter binding; pulls and `redraw()`s. |
+| [`@webmusic/ui/minimap`](/uikit/transport-time/minimap/) | Transport and navigation | DPR-aware overview canvas with an accessible viewport range brush. |
+| [`@webmusic/ui/mixer`](/uikit/mixing-capture/mixer/) | Mixing and capture | Master/channel fader presenter over a structural mixer binding. |
+| [`@webmusic/ui/note`](/uikit/notes/note/) | Note input | Piano/grid/chord note-surface presenter over a structural note binding. |
+| [`@webmusic/ui/panel`](/uikit/layout-feedback/panel/) | Layout and feedback | Semantic section panel that owns section and presenter-slot hosts. |
+| [`@webmusic/ui/parameter`](/uikit/parameters-gestures/parameter/) | Parameters and modulation | `mountParameterRack()`, its structural binding and side-effect-free style text. |
+| [`@webmusic/ui/pitch`](/uikit/views-analysis/pitch/) | Views and analysis | Keyboard, grand stave and fretboard read-outs coloured by the role each pitch is given. |
+| [`@webmusic/ui/playlist`](/uikit/transport-time/playlist/) | Transport and navigation | Transport-and-track-list presenter over a structural playlist binding. |
+| [`@webmusic/ui/recorder`](/uikit/mixing-capture/recorder/) | Mixing and capture | Record/playback/export presenter over a structural recorder binding. |
+| [`@webmusic/ui/stage`](/uikit/layout-feedback/stage/) | Layout and feedback | Framed rendering surface whose binding paints a caller-owned view. |
+| [`@webmusic/ui/status`](/uikit/layout-feedback/status/) | Layout and feedback | Generic loading, empty and error status surface over structural state. |
+| [`@webmusic/ui/timeline`](/uikit/transport-time/timeline/) | Transport and navigation | Numeric ruler, regions, ranges, playhead and seek surface. |
+| [`@webmusic/ui/track-list`](/uikit/transport-time/track-list/) | Transport and navigation | Accessible named-row index with one current item. |
+| [`@webmusic/ui/transport`](/uikit/transport-time/transport/) | Transport and navigation | Structural transport binding plus `mountTransport()` and its named `controls`. |
+| [`@webmusic/ui/workbench`](/uikit/layout-feedback/workbench/) | Layout and feedback | The shell an analysis view sits in: tabs, a stage, docks, a status bar, one clock. |
+
+`@webmusic/ui` (the root) is the stable aggregate of the twenty-one. Presenter
+styles are exported by their owning entries; there is no separate stylesheet subpath.
+
+## The shared presenter shape
+
+Most entries export three things: a `mount*()` function, the structural binding interface it
+consumes, and the same stylesheet text the mount installs, as a side-effect-free string constant.
+
+```ts
+const handle = mountX(host, binding, options);
+
+handle.element;   // the presenter's root node inside the host
+handle.update();  // re-read binding.snapshot() and repaint
+handle.destroy(); // remove nodes, listeners and the subscription
+```
+
+For ordinary snapshot-based mounts:
+
+- **Host.** `host` is an `HTMLElement` or an open `ShadowRoot`. The mount appends its
+  presenter markup and normally installs its exported style text, then removes what it
+  created on destroy. `stylesheet: false` skips stylesheet installation where supported.
+- **Structural binding.** The binding is a plain object the caller writes: `snapshot()` returns
+  current state, commands such as `setValue()` or `play()` perform changes and may return
+  `void` or a `Promise`, and `subscribe(notify)` returns an unsubscribe function. The presenter
+  repaints from a fresh snapshot after each command settles. `subscribe` is optional on most
+  bindings; `TransportBinding` requires it.
+- **One presenter per host, per entry.** Each module keeps a `WeakMap` from host to handle.
+  Mounting the same kind of presenter on a host again destroys the previous handle first, so a
+  host never accumulates duplicate racks or transports.
+- **Idempotent destroy.** `destroy()` is safe to call repeatedly; cleanup failures are collected
+  and reported instead of thrown.
+- **`onError`.** Options accept `onError?: (error: unknown) => void`. Snapshot, command,
+  subscription and cleanup failures are routed there; without it they are dropped after the
+  presenter restores a consistent paint. Presenters do not throw from event handlers.
+- **DOM-safe at import.** Every entry evaluates in Node/SSR: importing reads no browser global,
+  and mounting uses `host.ownerDocument` — including `@webmusic/ui/analysis`, whose render
+  helpers create nodes in the caller-supplied root's owner document
+  (`createAnalysisRoot(document?)` is the one place a document can be passed directly).
+
+The following entry-specific shapes serve different lifetimes. They are not
+interchangeable bindings:
+
+| Entry | Difference |
+| --- | --- |
+| [meter](/uikit/mixing-capture/meter/) | Pulls frame data through `readLevel` or `readSpectrum`; exposes `redraw()` and optional animation. |
+| [note](/uikit/notes/note/) | Uses a note-surface snapshot and optional synchronous interaction ports for note holds and release. |
+| [analysis](/uikit/views-analysis/analysis/) | Renders caller-owned report output through one-shot helpers; the caller replaces/removes it and updates any retained painter or playhead. |
+| [stage](/uikit/layout-feedback/stage/) | Uses `render(surface)` for retained DOM or `draw(frame)` for canvas; its surface-slider helper augments an existing element. |
+| [panel](/uikit/layout-feedback/panel/) | Receives section descriptors rather than a state binding; returns stable slots whose child mounts the caller owns. |
+
+Each owning page describes its complete state, cleanup and styling contract.
+
+## Release boundary
+
+Import presenters through the explicit subpaths above or the root barrel.
+The first-release UI package includes all entries listed here, including those
+without a current Score Element consumer. Audio and Bridge packages continue on
+`dev`; UI bindings remain independent of either domain package. Package entries
+and their supported features are defined by their references, not by a historical
+component count or the number of current Element consumers.

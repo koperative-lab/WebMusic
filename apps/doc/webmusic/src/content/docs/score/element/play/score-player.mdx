@@ -1,0 +1,271 @@
+---
+title: '<score-player>'
+description: 'The Score transport widget — play/pause and a draggable seek bar over a file, an assigned Score, a whole Rack, or a controller you already own.'
+sidebar:
+  order: 1
+---
+
+import ScorePlayerPlayground from '../../../../../components/elements/ScorePlayerPlayground.astro';
+
+`<score-player>` is the Score transport: play/pause and a draggable seek bar, over music it loads and schedules itself. Point `src` at a file (or hand it a `Score`) and it plays — no JavaScript wiring, and no other element required.
+
+In native score mode, View and Analyze companions resolve this player with
+`player="#id"` and borrow its score, state and note events. One player can drive
+[`<score-view>`](/score/element/view/score-view/),
+[`<pitch-view>`](/score/element/view/pitch-view/) and
+[`<chord-analysis>`](/score/element/analyze/chord-analysis/) together.
+For several Rack members, nest a [`<rack-control>`](/score/element/play/rack-control/)
+desk with nonvisual `<rack-part>` declarations inside this player. Applications
+that already own an engine can use [the borrowed controller mode](#four-ways-to-drive-it).
+
+<ScorePlayerPlayground />
+
+## Add an effect chain
+
+Use **Effects** in the demo's Parameters panel to add reverb, a three-band equalizer, filters, delay, chorus, compression, or distortion. Effects run from top to bottom; each card can be expanded, reordered, or removed. The equalizer is compiled to three peaking filters, so the demo uses the same public `Effect` recipes as application code rather than a docs-only audio path.
+
+An effect is an object graph, not an HTML attribute. The editor therefore assigns the real `.effect` property and adds a **JavaScript setup** block beside the live markup. **Copy** includes both blocks. Committing an effect edit stops and rebuilds the player's audio graph, so playback returns to the start; **Reset** clears the chain back to dry output.
+
+That property belongs to the element's single-score mode. When `.rack` is the
+active source (including a nested `<rack-control>` composition), the Rack owns
+the shared audio graph; put the chain on `rack.effect` or
+`rackControl.effect` instead. The Rack editor uses this same stack UI and the
+same `Effect.chain(...)` recipes on its summed master bus.
+
+```js
+import { Effect } from '@webmusic/score/play/headless';
+
+/** @type {import('@webmusic/score/play/element').ScorePlayerElement | null} */
+const player = document.querySelector('score-player');
+if (player) player.effect = Effect.chain(
+  Effect.reverb({ wet: 0.28, dry: 0.82 }),
+  Effect.filter({ type: 'peaking', frequency: 1000, gain: 3, Q: 0.9 }),
+);
+```
+
+## Import
+
+```html
+<script type="module">
+  import { defineScorePlayerElement } from '@webmusic/score/play/element';
+  defineScorePlayerElement();
+</script>
+
+<score-player src="song.mid"></score-player>
+```
+
+That is the whole setup. To see what any attribute does to a live element, use the control strip on the demo above — it writes to the real tag and shows you the resulting markup.
+
+`@webmusic/score/play/auto` registers this element (and the other Score elements) on import instead; `@webmusic/score/play/global` is the prebuilt `<script>`-tag bundle for pages with no build step.
+
+**Legacy compatibility.** `<simple-score-player>`, `SimpleScorePlayerElement` and `defineSimpleScorePlayerElement()` remain available as deprecated aliases, and the auto/global bundles register both tags. Existing pages can migrate without an immediate break, but new code should use the canonical names above.
+
+## Four ways to drive it
+
+The element resolves exactly one source of music, in a fixed order of precedence. The first one present wins and the rest are ignored:
+
+| Precedence | Source | What the element owns |
+| --- | --- | --- |
+| 1 | `.controller` | Nothing. Chrome only — no score is loaded, and the borrowed [`PlayerController`](/score/headless/play/player-controller/) outlives the element. |
+| 2 | `.rack`, else the first nested `<rack-control>`'s Rack | A transport binding over the borrowed [`Rack`](/score/headless/play/rack/). Commands reach its members; the seek bar follows the longest built timeline member. An explicit `.rack` wins over the desk. |
+| 3 | `.score` | The transport and the audio graph, over a `Score` you already parsed. |
+| 4 | `src` | All of the above, plus the fetch and parse. |
+
+`src` is loaded through the sibling [`@webmusic/score/io`](/score/api/io/) capability, imported on demand so callers who only ever assign `.score` never pull the parser stack into their bundle. The format is taken from `format`, else the file extension, else sniffed from the bytes. A failed load publishes an error through `.playback`. Native replacement releases the previous owner first, so loading and error snapshots carry no stale Score. Reassigning a source retries.
+
+Switching source at runtime is supported: assign a new one and the element tears the previous transport down before mounting the next. Only the latest render survives, so a fast sequence of changes cannot leave a stale player scheduling in the background.
+
+Every mode mounts into an element-owned inner host. Authored children, including
+a nested desk and its declarations, survive mode switches. Removing or replacing
+the selected desk releases the old composed Rack binding; events from another
+desk do not replace the selected one.
+
+In Rack mode, `currentTime` and `duration` read the same mounted transport that
+drives the controls. Duration is `0` until a member player is built, normally by
+`rack.preload()` or the first play. `seekFraction(f)` takes a fraction of the
+longest built member's duration and seeks each member to that many transport
+seconds, clamped to its own end. `seek(seconds)` uses that same axis.
+`seekNominal()` rejects because the Rack has no single nominal score timeline.
+Member command coordination does not replace their separate Headless clocks
+with one shared clock.
+
+## Share data and state with companions
+
+`.playback` is the stable [ScorePlaybackSource](/score/api/#shared-playback-observation)
+for this Element's lifetime. Native mode publishes the score actually loaded by
+`src` or assigned through `.score`, an immediate playback snapshot and subsequent
+updates. Controller/Rack modes without a single native Score report `unavailable`.
+The `.score` property remains the explicit assignment; use the source snapshot
+when you need the data actually selected for playback.
+
+Companions can borrow that data without repeating `src`:
+
+```html
+<score-player id="shared-player" src="/example.musicxml"></score-player>
+<score-view player="#shared-player"></score-view>
+<chord-analysis player="#shared-player"></chord-analysis>
+```
+
+Register each tag through its owning `/element` entry. A follower borrows the
+player and never disposes it. Native replacement releases the previous owner before loading the next. Loading
+and failure have explicit readiness and no committed Score; failure is not
+successful empty data. Source revisions change when the committed owner
+changes, including teardown; callbacks from old owners cannot restore them.
+
+The compatibility `.resolvedScore` and `getPlaybackSnapshot()` read the currently
+mounted native owner. New integrations can use `.playback` to observe explicit
+readiness and revision changes through the nonvisual contract.
+
+## Ownership and teardown
+
+The element is careful about what it disposes, because most of what it plays through belongs to somebody else:
+
+- **Borrowed.** `.controller`, `.rack`, `.sound`, `.audioContext` and `.destination` remain caller-owned. A nested desk owns its automatically created Rack. Unmounting the player's Rack transport stops its playback but does not dispose the Rack; borrowed controller mode only releases the UI binding.
+- **Owned.** Native player engines, mounted controls and resources created by the element are released on teardown. A SoundFont synth/context pair is cached against its template while mounted, then disposed by its owner. Scores are immutable data, not disposable engines.
+- **Native settings survive a remount.** Stored `rate`, `volume`, `pan` and `loop` values are applied when a native player mounts. They do not reconfigure Rack members. Controller mounting preserves the owner's settings; an explicit `.rate` write delegates to `controller.setRate()`.
+
+Native and Rack `play()` await preparation and startup. Borrowed controller
+mode delegates its command and resolves immediately; the controller's error
+channel is forwarded as `webscore:error`.
+
+<details class="component-section">
+<summary>API</summary>
+
+The source attributes are read only while a source is being resolved; assigning a source property re-renders immediately when the element is connected. The four transport knobs are the exception — they apply live, in place, without rebuilding the player.
+
+**Source and audio**
+
+| Member | Kind | Default | Description |
+| --- | --- | --- | --- |
+| `src` | attribute | — | URL of a MIDI / MusicXML / MXL / ABC file. Optional when a source property is assigned. |
+| `format` | attribute | extension, else byte sniff | Force `midi` / `mxl` / `musicxml` / `abc`. Passed through unvalidated; an unsupported value fails the load. |
+| `sound-font` | attribute | the built-in oscillator synth | Sample URL template containing `{midi}`, one file per note (`/sf/{midi}.mp3`). A template without `{midi}` is ignored, as is any value once `.sound` is set. |
+| `.score` | property | — | A parsed `Score`. Overrides `src`. |
+| `.playback` | read-only property | stable source | Resolved data and revisioned snapshots/subscriptions; optional `seekNominal` uses nominal seconds. See [shared source](/score/api/#shared-playback-observation). |
+| `.resolvedScore` | read-only property | `undefined` | Current mounted `Score`, including one loaded from `src`; undefined during source replacement and in Rack/controller modes. `.score` still returns only explicit assignment. |
+| `.rack` | property | — | A borrowed [`Rack`](/score/headless/play/rack/) whose members share these transport commands. Overrides the nested desk, `.score` and `src`. |
+| `.controller` | property | — | A borrowed [`PlayerController`](/score/headless/play/player-controller/). Overrides every other source; see [Four ways to drive it](#four-ways-to-drive-it). |
+| `.sound` | property | — | A `Sound` / `HeadlessSynth` timbre. Overrides `sound-font`. |
+| `.effect` | property | — | An `Effect` or `Effect.chain(...)` on the owned single-score output. Assigning it rebuilds that graph and resets playback; in `.rack` / `.controller` mode, set the owning Rack or controller instead. |
+| `.audioContext` | property | one created on demand | Share an existing `AudioContext` — with an analyser, or with another player. |
+| `.destination` | property | `context.destination` | Route output into this node instead. Its `.context` also serves as the SoundFont context. |
+
+**Transport**
+
+| Member | Kind | Default | Description |
+| --- | --- | --- | --- |
+| `rate` / `.rate` | attribute + property | `1` | Native playback speed, applied live; non-finite or non-positive values fall back to `1`. Explicit `.rate` writes also reach a borrowed controller. Inert for Rack members. |
+| `volume` / `.volume` | attribute + property | `1` | Native linear volume, applied live and clamped to `>= 0`. Rack mixing belongs to `<rack-control>`; inert in Rack/controller mode. |
+| `pan` / `.pan` | attribute + property | `0` | Native stereo pan, applied live and clamped to `[-1, 1]`. Inert in Rack/controller mode. |
+| `loop` / `.loop` | attribute + property | `false` | Native whole-piece looping. A bare `loop` is on; `loop="false"` (also `0` / `no` / `off`) is off. Inert in Rack/controller mode. |
+| `time-control` | attribute | `off` | Add the clock to the chrome: `simple` is the elapsed time (`0:12`), `full` adds the total (`0:12 / 3:40`). Works in every mode. |
+| `volume-control` | attribute | `off` | Add a volume control to the chrome, as a horizontal `fader` or a rotary `knob`. Either moves the same knob `volume` sets, and needs the element's own engine, so both are inert in `.rack` and `.controller` mode. |
+| `.currentTime` | property (read-only) | `0` | Live transport seconds from the native player, borrowed controller or longest built Rack member. |
+| `.duration` | property (read-only) | `0` | Live transport duration from the same owner. Rack duration remains `0` before member players are built. |
+| `.play()` | method | — | Start; returns `Promise<void>`. Native/Rack startup is awaited; borrowed-controller mode delegates immediately and reports failures through events. |
+| `.pause()` | method | — | Pause where it is. |
+| `.stop()` | method | — | Stop and rewind to the start. |
+| `.seek(seconds)` | method | — | Seek transport seconds, clamped to the mounted timeline. Rack mode uses the longest built member's axis and clamps each shorter member to its end. Async native seek/restart failures emit `webscore:error`. |
+| `.seekNominal(seconds)` | method | — | Returns `Promise<void>` for nominal score seconds. Native mode delegates to the engine; controller mode divides by its rate. Rack mode rejects: use `seek()` or `seekFraction()`. Await/catch this method's rejection. |
+| `.getPlaybackSnapshot()` | method | `undefined` | Native `ScorePlayerPlaybackSnapshot`: timeupdate fields plus required `rate`, `playing` and `activeNotes: readonly {midi, startTime}[]`; undefined before native mount or in Rack/controller modes. Allocates no audio. |
+| `.seekFraction(fraction)` | method | — | Seek the mounted transport, `0` = start and `1` = end. Rack mode uses the longest built member's duration; async native seek/restart failures emit `webscore:error`. |
+
+Supported settings apply in place without rebuilding the player. Each native
+setting is seeded from its attribute until the matching property is assigned;
+later attribute writes cannot replace a pinned property. Rack member settings
+remain with the Rack and its mixer. A borrowed controller retains its own
+settings on mount and accepts explicit `.rate` writes.
+
+`time-control` and `volume-control` are chrome, not state: changing either mid-piece never touches playback. The clock is mounted once and `simple` merely drops its second half, so switching between the two is a style change. The volume control is built when you ask for one and replaced in place when you ask for the other shape — swapping a fader for a knob does not rebuild the row. A word the element does not know reads as `off` rather than throwing, so a typo leaves you with a working player and no chrome.
+
+Dragging either volume control updates `.volume` without pinning it, because the reader moving a control is not the same as your code assigning the property.
+
+```html
+<score-player src="song.mid" volume="0.5" rate="0.8" pan="-1" loop></score-player>
+<score-player src="song.mid" time-control="full" volume-control="fader"></score-player>
+<score-player src="song.mid" time-control="simple" volume-control="knob"></score-player>
+```
+
+**Events** — bubbling `CustomEvent`s; `webscore:error` is composed, while the
+native note/state/navigation events are non-composed.
+
+| Event | Detail | Fires when |
+| --- | --- | --- |
+| `webscore:noteon` | `{ midi, startTime }` | A note starts. `startTime` is its onset in nominal score seconds, which is what a bound view matches on. |
+| `webscore:noteoff` | `{ midi, startTime }` | The same note releases. |
+| `webscore:timeupdate` | `{ nominalSeconds, transportSeconds, transportDurationSeconds, progress, rate, playing }` | Every cursor tick, and once per seek. `seconds` and `duration` are deprecated aliases of `nominalSeconds` and `transportDurationSeconds` — two different domains, so never pair them. |
+| `webscore:scorechange` | `{score: Score \| undefined}` | The mounted native score is cleared or replaced. |
+| `webscore:statechange` | `ScorePlayerPlaybackSnapshot` | A native engine mounts, changes playback state/settings, or receives explicit navigation. |
+| `webscore:seek` | none | A non-controller `seek`, `seekNominal` or `seekFraction` command is issued, or the native seek bar commits pointer/keyboard navigation; read the current snapshot for units and position. |
+| `webscore:stop` | none | A non-controller stop command is issued. |
+| `webscore:end` | — | The piece finished playing. |
+| `webscore:error` | `{operation: 'seek' \| 'playback', error}` | `seek` reports asynchronous native failures from void seek commands; `playback` reports mounted playback/controller errors, including Rack transport failures. |
+
+**Subclassing.** `ScorePlayerElement` is exported from `/element` without registering a tag, and exposes protected seams for the two things a custom player usually needs to change: which UI is mounted (`mountScore()`, `mountRack()`, `mountController()`, and `replaceHandle()` to swap one safely) and where the music comes from (`resolveScore()`, `buildSynth()`). `render()` and `teardown()` bracket the whole lifecycle if you need to wrap it.
+
+For direct `mountPresetPlayer(score, host, options)` integration, the optional
+`PresetPlayerOptions.onSeek` callback reports native seek-bar navigation. The
+Element forwards it as `webscore:seek` so live evidence starts a new
+accumulation after pointer or keyboard seeking. Preserve that callback when
+overriding `mountScore()`.
+
+`PresetPlayerHandle` also accepts optional read-only `currentTime` and `duration`
+in transport seconds, plus `seek(seconds)` and `seekFraction(fraction)` returning
+`void | Promise<void>`.
+All built-in mounts expose them; the Element uses the mounted handle for Rack
+readback and seeking. Older custom handles can omit them without changing
+their existing shape; native handles can still supply `.player` for engine
+readback. The handle owns its mounted UI and subscriptions, and `destroy()`
+must release those while respecting the selected mode's borrowed resources.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+The transport is light DOM, so the host is styleable like any block element. The controls themselves read one custom property each, and each falls back through the shared `@webmusic/ui` transport tokens before reaching its built-in default — so setting `--wm-accent` once re-skins this element along with every other WebMusic control, while a `--webscore-play-*` value overrides it here only.
+
+UIKit owns the wrapping layout and inline control geometry. The facade also
+mounts UIKit's shared `transportStateStyle` for keyboard focus and disabled
+feedback, including volume faders and knobs. That style node survives chrome
+changes and is removed with the mounted transport.
+
+Set `--wm-component-background: transparent`, `--wm-component-border: none`
+and `--wm-component-radius: 12px` to style the outer surface. Use
+`--wm-control-radius` for button, seek-track and volume-control rounding;
+`--wm-accent` and `--wm-accent-foreground` recolor the button and active fill.
+The same variables work on `<simple-score-player>` and the demo wrappers.
+For structural overrides, select public light-DOM parts such as
+`score-player [part~="play"]`; this element has no Shadow DOM for `::part()`.
+
+```css
+score-player {
+  --webscore-play-gap: 0.75rem;
+  --webscore-play-height: 2rem;
+  --webscore-play-button-bg: #111;
+  --webscore-play-progress-fill: #999;
+}
+```
+
+| Property | Falls back to | Default | Controls |
+| --- | --- | --- | --- |
+| `--webscore-play-gap` | `--wm-control-gap` | `0.75rem` | Gap between the button and the seek bar |
+| `--webscore-play-height` | `--wm-transport-height` → `--wm-control-size` | `2rem` | Control height |
+| `--webscore-play-button-width` | `--webscore-play-height` → `--wm-transport-height` → `--wm-control-size` | `2rem` | Button width |
+| `--webscore-play-button-height` | `--webscore-play-height` → `--wm-transport-height` → `--wm-control-size` | `2rem` | Button height |
+| `--webscore-play-button-bg` | `--wm-transport-button-background` → `--wm-accent` | `#111` | Button background |
+| `--webscore-play-button-color` | `--wm-transport-button-foreground` → `--wm-accent-foreground` | `#fff` | Button glyph colour |
+| `--webscore-play-button-border` | `--wm-transport-border` → `--wm-border` | `#111` | Border of the play button. The seek bar has none. |
+| `--webscore-play-icon-size` | — | `1.25rem` | Play / pause icon size |
+| `--webscore-play-time-color` | `--wm-transport-foreground` → `--wm-foreground-muted` → `--wm-foreground` | `#444` | `time-control` readout colour |
+| `--webscore-play-time-font` | — | `0.85rem/1.2 --wm-font-family` | `time-control` readout font |
+| `--webscore-play-volume-width` | `--wm-transport-volume-width` | `4.5rem` | `volume-control="fader"` length |
+| `--webscore-play-volume-height` | `--webscore-play-progress-height` → common control height | `2rem` | `volume-control="fader"` thickness — the seek bar's own height, so the two match |
+| `--webscore-play-volume-size` | `--webscore-play-progress-height` → common control height | `2rem` | `volume-control="knob"` diameter |
+| `--webscore-play-volume-thumb` | `--wm-transport-thumb` → `--wm-foreground` | `#111` | Fader handle, and the knob's pointer |
+| `--webscore-play-progress-bg` | `--wm-transport-track` → `--wm-surface-muted` | `#f3f3f3` | Unplayed seek track |
+| `--webscore-play-progress-fill` | `--wm-transport-fill` → `--wm-accent` | `#999` | Played fill |
+| `--webscore-play-progress-height` | `--webscore-play-height` → `--wm-transport-height` → `--wm-control-size` | `2rem` | Seek bar height |
+| — | `--wm-transport-radius` → `--wm-control-radius` | `0` | Corner radius. There is no `--webscore-play-*` name for it: rounding is only reachable through the shared tokens. |
+
+</details>

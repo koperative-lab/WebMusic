@@ -1,0 +1,29 @@
+---
+title: 'Catalog'
+description: 'Browse the twenty-one @webmusic/ui presenters by UI function, and see which Element composes which.'
+sidebar:
+  label: 'Catalog'
+  order: 1
+---
+
+import UiPresenterCatalog from '../../../components/UiPresenterCatalog.astro';
+import UiCompositionCatalog from '../../../components/UiCompositionCatalog.astro';
+
+The UI Kit publishes presenters, not Custom Elements. Pick a functional group
+below, then mount the presenter against any compatible Headless object, store,
+controller or binding. Each card links to the entry's own page.
+The groups describe UI responsibilities; they do not change npm import paths.
+Presenters with no current Score Element consumer are independently usable.
+
+<UiPresenterCatalog />
+
+<details class="component-section">
+<summary>How Score Elements compose these presenters</summary>
+
+These relationships show which presenter to reuse when replacing part of a
+Score Element. Declaration-only Elements have no visible UI, so the presenter
+column is not applicable to them.
+
+<UiCompositionCatalog />
+
+</details>

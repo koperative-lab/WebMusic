@@ -1,0 +1,13 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": "..",
+    "paths": {
+      "@webmusic/kernel": ["platform/kernel/src/index.ts"],
+      "@webmusic/kernel/element": ["platform/kernel/src/elements.ts"],
+      "@webmusic/kernel/*": ["platform/kernel/src/*"],
+      "@webmusic/ui": ["packages/ui/src/index.ts"],
+      "@webmusic/ui/*": ["packages/ui/src/*"]
+    }
+  }
+}

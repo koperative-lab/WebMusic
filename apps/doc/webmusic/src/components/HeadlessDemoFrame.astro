@@ -1,0 +1,45 @@
+---
+import LiveDemoCanvas from './LiveDemoCanvas.astro';
+
+interface Props {
+  entry: string;
+  name: string;
+  hint?: string;
+  code: string;
+  rootAttrs?: Record<string, string | boolean | number | undefined>;
+}
+const {entry, name, hint, code, rootAttrs = {}} = Astro.props;
+---
+
+<div class="wui-panel wui-panel--flow not-content wm-pg wm-hl" data-headless-demo {...rootAttrs}>
+  <div class="wui-panel__title"><span>{entry}</span><strong>{name}</strong></div>
+  {hint ? <p class="wm-pg__hint">{hint}</p> : null}
+  <LiveDemoCanvas>
+    <div class="wm-pg__stage" data-hl-stage><slot /></div>
+  </LiveDemoCanvas>
+  <details class="wm-pg__params" open>
+    <summary>Parameters</summary>
+    <div class="wm-hl__parameters"><slot name="parameters" /></div>
+  </details>
+  <p class="wm-pg__note wm-hl__feedback" data-hl-feedback role="status" hidden></p>
+  <div class="wm-pg__output">
+    <pre class="wm-pg__markup" data-hl-readout>{code}</pre>
+    <div class="wm-pg__actions">
+      <button class="wui-btn" data-variant="ghost" type="button" data-hl-copy>Copy</button>
+      <button class="wui-btn" data-variant="ghost" type="button" data-hl-reset>Reset</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  import '../lib/headless-frame-client';
+</script>
+
+<style is:global>
+  .wm-hl [hidden] { display: none !important; }
+  .wm-hl__parameters { min-width: 0; }
+  .wm-hl__parameters fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+  .wm-hl__parameters fieldset + fieldset { margin-top: .75rem; }
+  .wm-hl__parameters legend { padding: .5rem 0; font-size: .75rem; font-weight: 600; }
+  .wm-hl__feedback { margin: 0; overflow-wrap: anywhere; }
+</style>

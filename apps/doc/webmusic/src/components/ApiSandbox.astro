@@ -1,0 +1,102 @@
+---
+import LiveDemoCanvas from './LiveDemoCanvas.astro';
+
+interface Props {
+  /** Source shown in the editor (becomes /index.ts). */
+  code: string;
+  /** Editor height in px. */
+  height?: number;
+  /** Show the live preview pane (requires the deps to resolve on npm). */
+  preview?: boolean;
+  /** Extra npm dependencies for the sandbox. */
+  dependencies?: Record<string, string>;
+  /** Package path shown in the demo chrome. */
+  entry?: string;
+  /** Demo title shown above the live editor. */
+  title?: string;
+}
+
+const {
+  code,
+  height = 340,
+  preview = false,
+  dependencies = { '@webmusic/score': 'latest' },
+  entry = '@webmusic/score/play',
+  title = 'Interactive API sandbox',
+} = Astro.props;
+---
+
+<div class="wui-panel wui-panel--flow not-content api-sandbox-panel">
+  <div class="wui-panel__title">
+    <span>{entry}</span>
+    <strong>{title}</strong>
+  </div>
+  <LiveDemoCanvas size="tall" label="Live TypeScript editor">
+    <div
+      class="api-sandbox"
+      data-api-sandbox
+      data-code={JSON.stringify(code)}
+      data-height={String(height)}
+      data-preview={preview ? 'true' : 'false'}
+      data-deps={JSON.stringify(dependencies)}
+    >
+      <pre class="api-sandbox__fallback"><code>{code}</code></pre>
+    </div>
+  </LiveDemoCanvas>
+</div>
+
+<script>
+  import {mountDemos} from './demo-lifecycle';
+
+  let sandboxModule: Promise<typeof import('./api-sandbox-client')> | undefined;
+  const loadSandbox = () => (sandboxModule ??= import('./api-sandbox-client').catch((error) => {
+    sandboxModule = undefined;
+    throw error;
+  }));
+
+  mountDemos('[data-api-sandbox]', (el, scope) => {
+    let loading = false;
+    const mount = async () => {
+      if (loading || !scope.active) return;
+      loading = true;
+      el.dataset.apiSandboxState = 'loading';
+      try {
+        const {mountApiSandbox} = await loadSandbox();
+        if (!scope.active) return;
+        scope.add(mountApiSandbox(el));
+      } catch (error) {
+        if (!scope.active) return;
+        loading = false;
+        delete el.dataset.apiSandboxState;
+        throw error;
+      }
+    };
+    scope.add(() => { delete el.dataset.apiSandboxState; });
+
+    if ('IntersectionObserver' in window) {
+      const observer = new IntersectionObserver((entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          observer.disconnect();
+          scope.run(mount());
+        }
+      }, {rootMargin: '200px'});
+      scope.add(() => observer.disconnect());
+      observer.observe(el);
+    } else {
+      scope.run(mount());
+    }
+  });
+</script>
+
+<style>
+  .api-sandbox {
+    min-width: 0;
+    overflow: hidden;
+  }
+  .api-sandbox__fallback {
+    margin: 0;
+    padding: 0.85rem;
+    overflow: auto;
+    font-size: 0.78rem;
+  }
+</style>

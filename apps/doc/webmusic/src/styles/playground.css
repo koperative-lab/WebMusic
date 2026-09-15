@@ -1,0 +1,593 @@
+/* ============================================================================
+   Element playground — the parameter strip under every live component demo.
+
+   Every `<ElementPlayground>` panel renders one control per observed attribute
+   of the element it wraps, including the ones no demo would normally set. The
+   strip is documentation chrome, so it follows the site tokens; the demo stage
+   above it keeps the light `--wui-panel` canvas the widgets are drawn for.
+   ========================================================================= */
+
+.wm-pg {
+  min-width: 0;
+  /* Keep focus rings and controls visible; wide musical canvases and markup
+     manage their own scrolling inside the demo. */
+  overflow: visible;
+}
+
+.wm-pg__stage {
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+
+/* Explicit demo siblings retain independent component surfaces. */
+.wm-play-composition {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: .85rem;
+  min-width: 0;
+}
+
+.wm-pg__params {
+  container: wm-parameters / inline-size;
+  min-width: 0;
+  margin-top: 0.85rem;
+  border: 1px solid var(--wui-line-mid);
+  background: var(--wui-surface);
+  color: var(--wui-ink);
+}
+
+.wm-pg__params > summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  color: var(--wui-ink-soft);
+  font-family: var(--wui-font-ui);
+  font-size: var(--wui-size-label);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.wm-pg__params > summary::-webkit-details-marker {
+  display: none;
+}
+
+.wm-pg__params > summary::before {
+  width: 0.36rem;
+  height: 0.36rem;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  content: '';
+  opacity: 0.6;
+  transform: rotate(-45deg);
+  transition: transform 0.15s ease;
+}
+
+.wm-pg__params[open] > summary::before {
+  transform: rotate(45deg);
+}
+
+.wm-pg__params[open] > summary {
+  border-bottom: 1px solid var(--wui-line-mid);
+}
+
+.wm-pg__count {
+  margin-left: auto;
+  color: var(--wui-ink-mute);
+  font-family: var(--wui-font-mono);
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.wm-pg__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  padding: 0 0.6rem 0.2rem;
+}
+
+/* One attribute per row, read left to right: what it is called, the control
+   that sets it, then what it does. A two-column masonry made the reader hop
+   between columns to pair a control with its own description. */
+.wm-pg__param {
+  display: grid;
+  /* The name column clears the longest attribute in the catalog
+     (`smoothing-time-constant`, 151px) without wrapping; the width it takes
+     comes out of the control, not out of the note a reader is here to read. */
+  grid-template-columns: minmax(0, 10.5rem) minmax(0, 11rem) minmax(0, 1fr);
+  align-items: center;
+  gap: 0.2rem 0.9rem;
+  min-width: 0;
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--wui-line);
+}
+
+.wm-pg__param:last-child {
+  border-bottom: 0;
+}
+
+.wm-pg__param[hidden] {
+  display: none;
+}
+
+.wm-pg__name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.1rem 0.35rem;
+  min-width: 0;
+  color: var(--wui-ink);
+  font-family: var(--wui-font-mono);
+  font-size: var(--wui-size-label);
+  overflow-wrap: anywhere;
+}
+
+.wm-pg__name em {
+  color: var(--wui-ink-mute);
+  font-family: var(--wui-font-ui);
+  font-size: 0.62rem;
+  font-style: normal;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+/* An attribute the surrounding demo cannot make visible on its own (it needs
+   data, a device or a peer the doc page does not provide). It is still wired —
+   the flag only warns that nothing may change on screen. */
+.wm-pg__name em[data-inert] {
+  color: var(--wui-warning);
+}
+
+.wm-pg__note {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--wui-ink-mute);
+  font-size: 0.68rem;
+  line-height: 1.35;
+}
+
+.wm-pg__param .wui-select,
+.wm-pg__input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.wm-pg__input {
+  height: var(--wui-row-h);
+  padding: 0 0.45rem;
+  border: 1px solid var(--wui-line-control);
+  background: var(--wui-panel);
+  color: var(--wui-ink);
+  font-family: var(--wui-font-mono);
+  font-size: var(--wui-size-control);
+}
+
+.wm-pg__input:focus-visible {
+  outline: 2px solid var(--wui-ink);
+  outline-offset: 1px;
+}
+
+/* How to operate the demo, directly under its title — an instruction, not a
+   footnote, so it is read before the controls rather than after them. */
+.wm-pg__hint {
+  margin: -0.35rem 0 0.75rem;
+  color: var(--wui-ink-mute);
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.wm-pg__empty {
+  margin: 0;
+  padding: 0.6rem 0.6rem 0;
+  color: var(--wui-ink-mute);
+  font-size: 0.68rem;
+  line-height: 1.5;
+}
+
+/* The markup readout: the panel's output, and the thing a reader takes away.
+   Sized to be read and copied rather than squinted at. */
+.wm-pg__output {
+  min-width: 0;
+  padding: 0 0.6rem 0.6rem;
+}
+
+.wm-pg__code-stack,
+.wm-pg__code-extra {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.wm-pg__code-extra {
+  margin-top: 0.55rem;
+}
+
+.wm-pg__code-extra[hidden] {
+  display: none;
+}
+
+.wm-pg__code-label {
+  color: var(--wui-ink-mute);
+  font-family: var(--wui-font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.wm-pg__markup {
+  box-sizing: border-box;
+  display: block;
+  margin: 0;
+  min-height: 4.5rem;
+  max-height: 18rem;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--wui-line-mid);
+  background: var(--wui-panel);
+  color: var(--wui-ink);
+  font-family: var(--wui-font-mono);
+  font-size: 0.78rem;
+  line-height: 1.6;
+  tab-size: 2;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.wm-pg__markup::selection,
+.wm-pg__markup *::selection {
+  background: var(--wui-track);
+}
+
+.wm-pg__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+
+/* A composed element owns a collection rather than pretending its nested
+   children are one more scalar parameter. The cards keep the same generated
+   rows and binding semantics as the root playground, but make add/remove and
+   the identity of each child legible at a glance. */
+.wm-pg__collection {
+  min-width: 0;
+  padding: 0.7rem 0 0.8rem;
+  border-bottom: 1px solid var(--wui-line);
+}
+
+.wm-pg__collection-header,
+.wm-pg__collection-heading,
+.wm-pg__collection-add,
+.wm-pg__collection-draft-title,
+.wm-pg__collection-item-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.wm-pg__collection-header {
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.wm-pg__collection-heading {
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.wm-pg__collection-add {
+  justify-content: flex-end;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.wm-pg__collection-add .wui-select {
+  width: auto;
+  min-width: 9.5rem;
+}
+
+.wm-pg__collection-title {
+  color: var(--wui-ink);
+  font-family: var(--wui-font-mono);
+  font-size: var(--wui-size-label);
+  font-weight: 600;
+}
+
+.wm-pg__collection-count {
+  padding: 0.12rem 0.35rem;
+  border: 1px solid var(--wui-line-mid);
+  background: var(--wui-inset);
+  color: var(--wui-ink-mute);
+  font-family: var(--wui-font-mono);
+  font-size: 0.62rem;
+  line-height: 1.2;
+}
+
+.wm-pg__collection-help,
+.wm-pg__collection-draft-note,
+.wm-pg__collection-empty,
+.wm-pg__collection-status,
+.wm-pg__collection-error {
+  color: var(--wui-ink-mute);
+  font-size: 0.68rem;
+  line-height: 1.4;
+}
+
+.wm-pg__collection-help {
+  margin: 0.35rem 0 0.65rem;
+}
+
+.wm-pg__collection-help code,
+.wm-pg__collection-draft-title code,
+.wm-pg__collection-summary code {
+  border: 0;
+  background: transparent;
+  color: var(--wui-ink-mute);
+  font-family: var(--wui-font-mono);
+  font-size: 0.68rem;
+}
+
+.wm-pg__collection-list {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.wm-pg__collection-item {
+  min-width: 0;
+  margin: 0;
+  border: 1px solid var(--wui-line-mid);
+  background: var(--wui-panel);
+}
+
+.wm-pg__collection-draft {
+  margin-bottom: 0.4rem;
+}
+
+.wm-pg__collection-draft[hidden] {
+  display: none;
+}
+
+.wm-pg__collection-draft-title {
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.55rem 0.65rem;
+  border-bottom: 1px solid var(--wui-line-mid);
+  background: var(--wui-surface);
+  font-family: var(--wui-font-ui);
+  font-size: 0.72rem;
+}
+
+.wm-pg__collection-draft-note {
+  margin: 0;
+  padding: 0.55rem 0.65rem 0;
+}
+
+.wm-pg__collection-summary {
+  display: grid;
+  grid-template-columns: auto max-content minmax(5rem, 1fr) minmax(0, auto);
+  align-items: center;
+  gap: 0.3rem 0.55rem;
+  min-width: 0;
+  padding: 0.55rem 0.65rem;
+  color: var(--wui-ink);
+  cursor: pointer;
+  list-style: none;
+}
+
+.wm-pg__collection-summary::-webkit-details-marker {
+  display: none;
+}
+
+.wm-pg__collection-summary::before {
+  width: 0.36rem;
+  height: 0.36rem;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  content: '';
+  opacity: 0.55;
+  transform: rotate(-45deg);
+  transition: transform 0.15s ease;
+}
+
+.wm-pg__collection-item[open] > .wm-pg__collection-summary::before {
+  transform: rotate(45deg);
+}
+
+.wm-pg__collection-item[open] > .wm-pg__collection-summary {
+  border-bottom: 1px solid var(--wui-line-mid);
+  background: var(--wui-surface);
+}
+
+.wm-pg__collection-summary:focus-visible {
+  outline: 2px solid var(--wui-ink);
+  outline-offset: -2px;
+}
+
+.wm-pg__collection-summary strong {
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--wui-font-ui);
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wm-pg__collection-summary [data-rc-summary-meta],
+.wm-pg__collection-summary [data-fx-summary-meta],
+.wm-pg__collection-summary [data-ni-recorder-summary-meta] {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--wui-ink-mute);
+  font-family: var(--wui-font-mono);
+  font-size: 0.62rem;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wm-pg__collection-fields .wm-pg__param {
+  padding-right: 0.65rem;
+  padding-left: 0.65rem;
+}
+
+.wm-pg__effect-description {
+  margin: 0;
+  padding: 0.55rem 0.65rem;
+  border-bottom: 1px solid var(--wui-line);
+  color: var(--wui-ink-mute);
+  font-size: 0.68rem;
+  line-height: 1.4;
+}
+
+.wm-pg__effect-fields {
+  min-width: 0;
+}
+
+.wm-pg__effect-group {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.wm-pg__effect-group + .wm-pg__effect-group {
+  border-top: 1px solid var(--wui-line-mid);
+}
+
+.wm-pg__effect-group > legend {
+  margin-left: 0.65rem;
+  padding: 0.45rem 0.35rem 0;
+  color: var(--wui-ink-mute);
+  font-family: var(--wui-font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.wm-pg__effect-group .wm-pg__param {
+  padding-right: 0.65rem;
+  padding-left: 0.65rem;
+}
+
+.wm-pg__collection-error {
+  margin: 0;
+  padding: 0 0.65rem;
+  color: var(--wui-record);
+}
+
+.wm-pg__collection-error:not(:empty) {
+  padding-top: 0.45rem;
+}
+
+.wm-pg__collection-item-actions {
+  justify-content: flex-end;
+  gap: 0.4rem;
+  padding: 0.5rem 0.65rem;
+  border-top: 1px solid var(--wui-line);
+}
+
+.wm-pg__collection .wui-btn {
+  height: var(--wui-row-h);
+  padding-inline: 0.6rem;
+  font-size: 0.72rem;
+}
+
+.wm-pg__collection .wui-btn[data-variant='ghost'] {
+  border-color: var(--wui-line-control);
+  font-weight: 500;
+}
+
+.wm-pg__collection-empty {
+  margin: 0;
+  padding: 0.75rem;
+  border: 1px dashed var(--wui-line-mid);
+  text-align: center;
+}
+
+.wm-pg__collection-status {
+  min-height: 1em;
+  margin: 0.35rem 0 0;
+}
+
+/* Measure the assigned demo width, including a narrow desktop column. */
+@container wm-parameters (max-width: 640px) {
+  .wm-pg__param {
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    align-items: start;
+    gap: 0.35rem 0.75rem;
+  }
+  .wm-pg__note { grid-column: 1 / -1; }
+}
+
+@container wm-parameters (max-width: 400px) {
+  .wm-pg__param {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: 0.25rem;
+  }
+
+  .wm-pg__collection-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .wm-pg__collection-add {
+    width: 100%;
+  }
+
+  .wm-pg__collection-add .wui-select {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .wm-pg__collection-summary {
+    grid-template-columns: auto max-content minmax(0, 1fr);
+  }
+
+  .wm-pg__collection-summary [data-rc-summary-meta],
+  .wm-pg__collection-summary [data-fx-summary-meta],
+  .wm-pg__collection-summary [data-ni-recorder-summary-meta] {
+    grid-column: 2 / -1;
+    text-align: left;
+  }
+}
+
+.wm-pg__companion {
+  min-width: 0;
+  margin: 0 0.6rem 0.6rem;
+}
+
+.wm-pg__companion .wm-pg__grid {
+  padding-inline: 0;
+}
+
+@supports not (container-type: inline-size) {
+  @media (max-width: 640px) {
+    .wm-pg__param { grid-template-columns: minmax(0, 1fr); gap: 0.25rem; }
+    .wm-pg__note { grid-column: 1 / -1; }
+  }
+}
+
+.wm-pg__child > summary,
+.wm-pg__companion > summary {
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--wui-line);
+  color: var(--wui-ink);
+  font-family: var(--wui-font-ui);
+  font-size: var(--wui-size-label);
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.wm-pg__child[open] > summary,
+.wm-pg__companion[open] > summary { color: var(--wui-ink-soft); }

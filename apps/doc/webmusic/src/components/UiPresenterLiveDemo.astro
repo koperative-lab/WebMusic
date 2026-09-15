@@ -1,0 +1,535 @@
+---
+import {
+  uiPresenterClass,
+  uiPresenterEntry,
+  type UiPresenterControlSpec,
+} from '../../../shared/ui-presenter-catalog';
+import {defaultOptionLabel} from '../lib/default-label';
+import LiveDemoCanvas from './LiveDemoCanvas.astro';
+
+interface Props {
+  presenter: string;
+}
+
+const {presenter} = Astro.props;
+const entry = uiPresenterEntry(presenter);
+const presenterClass = uiPresenterClass(entry.classSlug);
+const state = entry.state ?? [];
+const options = entry.options ?? [];
+const interactive = state.length > 0 || options.length > 0;
+const groups = [
+  {scope: 'state', label: 'State', members: state},
+  {scope: 'option', label: 'Options', members: options},
+] as const;
+const visibleGroups = groups.filter(({members}) => members.length > 0);
+const mountName =
+  entry.invocation?.name ?? entry.api.match(/\bmount[A-Z][A-Za-z0-9]*/)?.[0] ?? 'mountPresenter';
+const mountArguments = entry.invocation?.arguments ?? 'host, binding';
+const initialReadout = entry.invocation?.initial ?? `${mountName}(${mountArguments});`;
+/**
+ * The option list with the default folded into the value that carries it, so a
+ * control offers `on` / `off` rather than a third entry that means the same
+ * thing. A default that is not one of the values — `no handler` over
+ * a lone `report demo errors` — still gets its own entry.
+ */
+const UNSET = '__unset__';
+interface DemoChoice {
+  value: string;
+  label: string;
+  literal?: string;
+  selected: boolean;
+}
+const choicesFor = (member: UiPresenterControlSpec): DemoChoice[] => {
+  const real: DemoChoice[] =
+    member.kind === 'boolean'
+      ? [
+          {value: 'true', label: 'on', selected: member.initial === true},
+          {value: 'false', label: 'off', selected: member.initial === false},
+        ]
+      : (member.choices ?? []).map((choice) => ({
+          value: JSON.stringify(choice.value),
+          label: choice.label,
+          ...(choice.literal === undefined ? {} : {literal: choice.literal}),
+          selected: choice.value === member.initial,
+        }));
+  // A required field is always passed, so it has no "not set" state to fold in.
+  if (member.required) return real;
+  const label = defaultOptionLabel(member.fallback);
+  const carrier = real.find((choice) => choice.label.toLowerCase() === label.toLowerCase());
+  if (!carrier) {
+    return [{value: UNSET, label, selected: member.initial === undefined}, ...real];
+  }
+  return real.map((choice) =>
+    choice === carrier
+      ? {
+          value: UNSET,
+          label: choice.label,
+          selected: member.initial === undefined || choice.selected,
+        }
+      : choice,
+  );
+};
+---
+
+<section
+  class="wui-panel wui-panel--flow not-content wm-pg presenter-live"
+  aria-label={`${entry.label} live presenter`}
+  data-presenter-panel
+  data-presenter={entry.presenter}
+  data-mount-name={mountName}
+  data-mount-arguments={mountArguments}
+  data-readout-variant={entry.invocation?.variant}
+>
+  <div class="wui-panel__title">
+    <span>@webmusic/ui/{entry.presenter}</span>
+    <strong>{presenterClass.label}</strong>
+  </div>
+
+  {entry.hint ? <p class="wm-pg__hint">{entry.hint}</p> : null}
+
+  <LiveDemoCanvas size={entry.presenter === 'stage' ? 'tall' : 'default'}>
+    <div class="presenter-live__viewport" data-presenter-live={entry.presenter}>
+      <div class="presenter-live__host" data-presenter-live-host></div>
+      <span
+        class="presenter-live__state"
+        role="status"
+        aria-live="polite"
+        data-presenter-live-state
+      >
+        Loading…
+      </span>
+    </div>
+  </LiveDemoCanvas>
+
+  {
+    interactive ? (
+      <>
+        <form data-presenter-controls>
+          {visibleGroups.map(({scope, label, members}, groupIndex) => (
+            <details class="wm-pg__params" open>
+                <summary>
+                  {label}
+                  <span class="wm-pg__count">
+                    {members.length} {members.length === 1 ? 'member' : 'members'}
+                  </span>
+                </summary>
+                <div class="wm-pg__grid">
+                  {members.map((member) => (
+                    <label class="wm-pg__param">
+                      <span class="wm-pg__name">
+                        {member.name}
+                        {member.inert ? (
+                          <span class="presenter-live__inert" data-inert>
+                            <em data-inert>no visible change here</em>
+                            <small>{member.inert}</small>
+                          </span>
+                        ) : null}
+                      </span>
+
+                      {member.kind === 'boolean' ? (
+                        <select
+                          class="wui-select"
+                          data-presenter-member={member.name}
+                          data-presenter-scope={scope}
+                          data-presenter-kind="boolean"
+                        >
+                          {choicesFor(member).map((choice) => (
+                            <option value={choice.value} selected={choice.selected}>
+                              {choice.label}
+                            </option>
+                          ))}
+                        </select>
+                      ) : member.kind === 'enum' ? (
+                        <select
+                          class="wui-select"
+                          data-presenter-member={member.name}
+                          data-presenter-scope={scope}
+                          data-presenter-kind="enum"
+                        >
+                          {choicesFor(member).map((choice) => (
+                            <option
+                              value={choice.value}
+                              data-presenter-literal={choice.literal}
+                              selected={choice.selected}
+                            >
+                              {choice.label}
+                            </option>
+                          ))}
+                        </select>
+                      ) : member.kind === 'number' ? (
+                        <input
+                          class="wm-pg__input"
+                          type="number"
+                          value={typeof member.initial === 'number' ? member.initial : ''}
+                          min={member.min}
+                          max={member.max}
+                          step={member.step ?? 'any'}
+                          placeholder={member.placeholder ?? member.fallback ?? ''}
+                          data-presenter-member={member.name}
+                          data-presenter-scope={scope}
+                          data-presenter-kind="number"
+                        />
+                      ) : (
+                        <input
+                          class="wm-pg__input"
+                          type="text"
+                          value={typeof member.initial === 'string' ? member.initial : ''}
+                          placeholder={member.placeholder ?? member.fallback ?? ''}
+                          data-presenter-member={member.name}
+                          data-presenter-scope={scope}
+                          data-presenter-kind="text"
+                        />
+                      )}
+
+                      <span class="wm-pg__note">{member.note}</span>
+                    </label>
+                  ))}
+                </div>
+
+                {groupIndex === visibleGroups.length - 1 ? (
+                  <div class="wm-pg__output">
+                    <pre class="wm-pg__markup" data-presenter-readout>
+                      {initialReadout}
+                    </pre>
+                    <div class="wm-pg__actions">
+                      <button
+                        class="wui-btn"
+                        data-variant="ghost"
+                        type="button"
+                        data-presenter-copy
+                      >
+                        Copy
+                      </button>
+                      <button
+                        class="wui-btn"
+                        data-variant="ghost"
+                        type="button"
+                        data-presenter-reset
+                      >
+                        Reset
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+            </details>
+          ))}
+        </form>
+      </>
+    ) : null
+  }
+</section>
+
+<script>
+  import {mountUiPresenterDemo} from '../lib/ui-presenter-demos';
+  import type {UiPresenterDemoHandle} from '../lib/ui-presenter-demos/types';
+
+  interface PresenterLiveWindow extends Window {
+    __webmusicPresenterLiveLifecycle?: {
+      controller: AbortController;
+      cleanup(): void;
+    };
+  }
+
+  type MemberControl = HTMLInputElement | HTMLSelectElement;
+
+  const liveWindow = window as PresenterLiveWindow;
+  liveWindow.__webmusicPresenterLiveLifecycle?.cleanup();
+  const lifecycle = new AbortController();
+  const handles: UiPresenterDemoHandle[] = [];
+  const subscriptions: Array<() => void> = [];
+  let cleaned = false;
+
+  const cleanup = (): void => {
+    if (cleaned) return;
+    cleaned = true;
+    for (const unsubscribe of subscriptions.splice(0)) {
+      try {
+        unsubscribe();
+      } catch {
+        // Continue releasing the remaining demo resources.
+      }
+    }
+    for (const handle of handles.splice(0)) {
+      try {
+        handle.destroy();
+      } catch {
+        // One faulty demo cleanup must not strand the remaining presenters.
+      }
+    }
+    lifecycle.abort();
+    if (liveWindow.__webmusicPresenterLiveLifecycle?.controller === lifecycle) {
+      delete liveWindow.__webmusicPresenterLiveLifecycle;
+    }
+  };
+  liveWindow.__webmusicPresenterLiveLifecycle = {controller: lifecycle, cleanup};
+
+  const valueOf = (control: MemberControl): unknown => {
+    const raw = control.value;
+    if (raw === '__unset__' || raw.trim() === '') return undefined;
+    if (control.dataset.presenterKind === 'number') return Number(raw);
+    if (control.dataset.presenterKind === 'boolean' || control.dataset.presenterKind === 'enum') {
+      return JSON.parse(raw) as unknown;
+    }
+    return raw;
+  };
+
+  const setControlValue = (control: MemberControl, value: unknown, force = false): void => {
+    if (!force && document.activeElement === control) return;
+    if (value === undefined) control.value = control instanceof HTMLSelectElement ? '__unset__' : '';
+    else if (control.dataset.presenterKind === 'boolean' || control.dataset.presenterKind === 'enum') {
+      control.value = JSON.stringify(value);
+    } else control.value = String(value);
+    // A default folded into the option that carries it holds the unset
+    // sentinel, so the encoded form of that very value matches no option and
+    // would leave the select on selectedIndex -1, showing nothing.
+    if (control instanceof HTMLSelectElement && control.selectedIndex === -1) {
+      control.value = '__unset__';
+    }
+  };
+
+  const literalOf = (control: MemberControl, value: unknown): string => {
+    if (control instanceof HTMLSelectElement) {
+      const literal = control.selectedOptions[0]?.dataset.presenterLiteral;
+      if (literal) return literal;
+    }
+    if (typeof value === 'string') return JSON.stringify(value);
+    return String(value);
+  };
+
+  const formatCall = (name: string, argumentsText: string, members: string[]): string => {
+    if (members.length === 0) return `${name}(${argumentsText});`;
+    const oneLine = `${name}(${argumentsText}, {${members.join(', ')}});`;
+    return oneLine.length <= 72
+      ? oneLine
+      : `${name}(${argumentsText}, {\n${members.map((member) => `  ${member},`).join('\n')}\n});`;
+  };
+
+  const updateReadout = (panel: HTMLElement): void => {
+    const mountName = panel.dataset.mountName ?? 'mountPresenter';
+    const mountArguments = panel.dataset.mountArguments ?? 'host, binding';
+    const readout = panel.querySelector<HTMLElement>('[data-presenter-readout]');
+    if (!readout) return;
+    const entries = [...panel.querySelectorAll<MemberControl>('[data-presenter-scope="option"]')]
+      .map((control) => ({control, name: control.dataset.presenterMember, value: valueOf(control)}))
+      .filter((entry) => entry.name && entry.value !== undefined);
+    if (panel.dataset.readoutVariant === 'stage-compound') {
+      type StageTarget = 'retained' | 'canvas' | 'surface';
+      const names: Record<StageTarget, ReadonlySet<string>> = {
+        retained: new Set(['label', 'fill', 'classNames', 'parts', 'onError']),
+        canvas: new Set([
+          'label',
+          'animate',
+          'fallbackWidth',
+          'fallbackHeight',
+          'classNames',
+          'parts',
+          'onError',
+        ]),
+        surface: new Set([
+          'label',
+          'orientation',
+          'pointerTarget',
+          'keyboardStep',
+          'formatValue',
+          'onError',
+        ]),
+      };
+      const stageMembers = (target: StageTarget): string[] => entries.flatMap((entry) => {
+        const name = entry.name;
+        if (!name || !names[target].has(name)) return [];
+        let literal = literalOf(entry.control, entry.value);
+        if (name === 'classNames') {
+          literal = target === 'retained'
+            ? "{root: 'demo-stage', surface: 'demo-stage-surface'}"
+            : "{root: 'demo-stage', canvas: 'demo-stage-canvas', status: 'demo-stage-status'}";
+        } else if (name === 'parts') {
+          literal = target === 'retained'
+            ? "{root: 'demo-root', surface: 'demo-surface'}"
+            : "{root: 'demo-root', canvas: 'demo-canvas', status: 'demo-status'}";
+        }
+        return [`${name}: ${literal}`];
+      });
+      readout.textContent = [
+        formatCall('mountStage', 'domHost, stageBinding', stageMembers('retained')),
+        formatCall('mountCanvasStage', 'canvasHost, canvasBinding', stageMembers('canvas')),
+        formatCall('mountSurfaceSlider', 'surface, sliderBinding', stageMembers('surface')),
+      ].join('\n');
+      return;
+    }
+    if (entries.length === 0) {
+      readout.textContent = `${mountName}(${mountArguments});`;
+      return;
+    }
+    const members = entries.map(
+      ({control, name, value}) => `${name}: ${literalOf(control, value)}`,
+    );
+    readout.textContent = formatCall(mountName, mountArguments, members);
+  };
+
+  const wireCopy = (panel: HTMLElement): void => {
+    const button = panel.querySelector<HTMLButtonElement>('[data-presenter-copy]');
+    const readout = panel.querySelector<HTMLElement>('[data-presenter-readout]');
+    if (!button || !readout) return;
+    const initialLabel = button.textContent?.trim() || 'Copy';
+    let restore: number | undefined;
+    const report = (label: string): void => {
+      button.textContent = label;
+      if (restore !== undefined) window.clearTimeout(restore);
+      restore = window.setTimeout(() => {
+        button.textContent = initialLabel;
+      }, 1400);
+    };
+    const selectReadout = (): void => {
+      const range = document.createRange();
+      range.selectNodeContents(readout);
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+      report('Selected — press ⌘/Ctrl+C');
+    };
+    button.addEventListener('click', () => {
+      const copy = navigator.clipboard?.writeText(readout.textContent ?? '');
+      if (!copy) {
+        selectReadout();
+        return;
+      }
+      void copy.then(
+        () => report('Copied'),
+        selectReadout,
+      );
+    }, {signal: lifecycle.signal});
+  };
+
+  for (const panel of document.querySelectorAll<HTMLElement>('[data-presenter-panel]')) {
+    const presenter = panel.dataset.presenter;
+    const host = panel.querySelector<HTMLElement>('[data-presenter-live-host]');
+    const liveState = panel.querySelector<HTMLElement>('[data-presenter-live-state]');
+    if (!presenter || !host) continue;
+    host.replaceChildren();
+    try {
+      const handle = mountUiPresenterDemo(presenter, host);
+      handles.push(handle);
+      if (liveState) liveState.textContent = 'Live';
+
+      const stateControls = [
+        ...panel.querySelectorAll<MemberControl>('[data-presenter-scope="state"]'),
+      ];
+      const optionControls = [
+        ...panel.querySelectorAll<MemberControl>('[data-presenter-scope="option"]'),
+      ];
+      const syncState = (): void => {
+        const snapshot = handle.snapshot?.();
+        if (!snapshot) return;
+        for (const control of stateControls) {
+          const name = control.dataset.presenterMember;
+          if (name) setControlValue(control, snapshot[name]);
+        }
+      };
+      const applyState = (control: MemberControl, forceSync = false): void => {
+        const name = control.dataset.presenterMember;
+        if (!name) return;
+        handle.setState?.(name, valueOf(control));
+        if (forceSync) setControlValue(control, handle.snapshot?.()[name], true);
+      };
+      const applyOption = (control: MemberControl): void => {
+        const name = control.dataset.presenterMember;
+        if (name) handle.setOption?.(name, valueOf(control));
+        updateReadout(panel);
+      };
+
+      for (const control of stateControls) {
+        control.addEventListener('change', () => applyState(control, true), {
+          signal: lifecycle.signal,
+        });
+        if (control instanceof HTMLInputElement) {
+          control.addEventListener('input', () => applyState(control), {signal: lifecycle.signal});
+        }
+      }
+      for (const control of optionControls) {
+        control.addEventListener('change', () => applyOption(control), {signal: lifecycle.signal});
+        if (control instanceof HTMLInputElement) {
+          control.addEventListener('input', () => applyOption(control), {signal: lifecycle.signal});
+        }
+      }
+
+      const unsubscribe = handle.subscribe?.(syncState);
+      if (unsubscribe) subscriptions.push(unsubscribe);
+      panel.querySelector<HTMLButtonElement>('[data-presenter-reset]')?.addEventListener(
+        'click',
+        () => {
+          panel.querySelector<HTMLFormElement>('[data-presenter-controls]')?.reset();
+          handle.reset?.();
+          syncState();
+          updateReadout(panel);
+        },
+        {signal: lifecycle.signal},
+      );
+      wireCopy(panel);
+      syncState();
+      updateReadout(panel);
+    } catch (error) {
+      if (liveState) liveState.textContent = 'Unavailable';
+      const message = document.createElement('p');
+      message.className = 'presenter-live__error';
+      message.setAttribute('role', 'alert');
+      message.textContent = error instanceof Error ? error.message : String(error);
+      host.replaceChildren(message);
+    }
+  }
+
+  document.addEventListener('astro:before-swap', cleanup, {
+    once: true,
+    signal: lifecycle.signal,
+  });
+</script>
+
+<style>
+  .presenter-live__viewport {
+    position: relative;
+    width: 100%;
+    min-width: 0;
+  }
+  .presenter-live__host {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+  .presenter-live__state {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .presenter-live form {
+    margin: 0;
+  }
+  .presenter-live :global(.demo-transport) {
+    outline: 2px dashed var(--wui-warning);
+    outline-offset: 0.25rem;
+  }
+  .presenter-live :global([part~='demo-root']) {
+    box-shadow: inset 0 0 0 2px var(--wui-peak);
+  }
+  .presenter-live :global(.presenter-live__error) {
+    margin: 0;
+    padding: 1rem;
+    color: var(--wui-peak);
+    font: 0.75rem/1.5 var(--wui-font-mono);
+  }
+  .presenter-live__inert {
+    display: grid;
+    flex-basis: 100%;
+    gap: 0.1rem;
+  }
+  .presenter-live__inert small {
+    color: var(--wui-ink-mute);
+    font: 0.62rem/1.3 var(--wui-font-ui);
+    letter-spacing: normal;
+    text-transform: none;
+  }
+</style>

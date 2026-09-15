@@ -1,0 +1,154 @@
+---
+title: '@webmusic/ui/panel'
+description: 'Creates a labelled section-and-slot skeleton for composing specialized presenters.'
+sidebar:
+  label: 'panel'
+  order: 1
+---
+
+import UiPresenterLiveDemo from '../../../../components/UiPresenterLiveDemo.astro';
+import UiPresenterRelated from '../../../../components/UiPresenterRelated.astro';
+
+`mountSectionPanel()` creates a presenter-owned root, semantic sections and stable slot elements.
+The caller supplies section descriptors and mounts specialized presenters into the returned
+slots; the panel owns no domain state or child lifecycle.
+
+Use it when [parameter](/uikit/parameters-gestures/parameter/),
+[envelope](/uikit/parameters-gestures/envelope/), [LFO](/uikit/parameters-gestures/lfo/) or other
+presenters need one shared frame. [`<synth-panel>`](/score/element/play/synth-panel/) composes the
+same pattern; mount this entry when your application owns the section list and children.
+
+<UiPresenterLiveDemo presenter="panel" />
+
+## Import
+
+```ts
+import {mountSectionPanel} from '@webmusic/ui/panel';
+
+const handle = mountSectionPanel(
+  host,
+  [
+    {id: 'voice', label: 'Voice parameters'},
+    {id: 'envelope', label: 'Amplitude envelope'},
+  ],
+  {label: 'Synth voice controls'},
+);
+
+mountVoice(handle.slot('voice'));
+mountEnvelope(handle.slot('envelope'));
+```
+
+## Section normalization and child ownership
+
+A section may be a string id or a `SectionPanelSection`. Ids are stringified and trimmed; empty
+ids and later duplicates are skipped, so `slots` always has one entry per normalized id in input
+order. Descriptor-level classes and parts are added after the panel-level values.
+
+The panel does not destroy anything mounted into a slot. Destroy child presenters first, then the
+panel, as the Live Demo does. This entry also has no binding or `update()` because its section
+topology is fixed at mount. Remount it to change sections or Options. The
+[shared presenter shape](/uikit/api/#the-shared-presenter-shape) covers common host ownership.
+
+<details class="component-section">
+<summary>API</summary>
+
+`mountSectionPanel(host, sections, options?)` accepts an `HTMLElement` or `ShadowRoot` and returns
+a `SectionPanelHandle`.
+
+**State and binding**
+
+The presenter has no `State` or `Binding`. Its required `sections` argument is mount-time structure,
+not mutable state.
+
+**Sections**
+
+| Member | Kind | Description |
+|---|---|---|
+| `sections` | `readonly (SectionPanelSection \| string)[]` | Required ordered descriptors; string entries are shorthand for `{id}`. |
+| `sections[].id` | `string` | Stable lookup key stored on `data-section` / `data-slot` and used by `slot(id)`. |
+| `sections[].label?` | `string` | Adds an accessible name to the semantic `<section>`. |
+| `sections[].classNames?.section` | `string` | Adds descriptor-specific classes to this section. |
+| `sections[].classNames?.slot` | `string` | Adds descriptor-specific classes to this slot. |
+| `sections[].parts?.section` | `string` | Adds descriptor-specific part tokens to this section. |
+| `sections[].parts?.slot` | `string` | Adds descriptor-specific part tokens to this slot. |
+
+**Options**
+
+| Member | Kind | Default | Description |
+|---|---|---|---|
+| `label` | `string` | — | When truthy, adds `role="group"` and this `aria-label` to the root. |
+| `classNames` | `SectionPanelClassNames` | `{}` | Adds compatibility classes to `root`, every `section`, and every `slot`. |
+| `parts` | `SectionPanelParts` | `{}` | Adds part tokens to `root`, every `section`, and every `slot`. |
+| `styleText` | `string` | — | Appends caller compatibility rules after the canonical panel stylesheet in the same style node. |
+| `stylesheet` | `boolean` | `true` | Installs the presenter's stylesheet unless explicitly `false`, for a light-DOM host that cannot inject CSS into its page. |
+
+**Handle**
+
+| Member | Kind | Description |
+|---|---|---|
+| `element` | `HTMLElement` | Presenter-owned `.wui-section-panel` root. |
+| `slots` | `ReadonlyMap<string, HTMLElement>` | Stable map in normalized section order; cleared by `destroy()`. |
+| `slot(id)` | `(string) => HTMLElement \| undefined` | Looks up a current slot without exposing its wrapper structure. |
+| `destroy()` | `() => void` | Idempotently clears the map and removes root and installed stylesheet; child resources remain caller-owned. |
+
+**Accessibility.** Labelled sections are semantic `<section>` elements with `aria-label`. An
+`options.label` gives the root `role="group"`; without it the root stays a neutral `<div>`. Slots
+add no roles of their own and never overwrite accessibility attributes on child presenter nodes.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+Use the shared [surface and palette tokens](/uikit/#theme-with-css-custom-properties) for
+background (including `transparent`), foreground, accent, outer border and corner radius.
+Presenter-specific tokens below take precedence within their documented roles.
+
+The presenter installs `sectionPanelStyle` by default. `styleText` appends caller compatibility
+rules in the same style node. Set `stylesheet: false` to omit that node, including `styleText`,
+and supply the exported stylesheet or your own CSS from the host.
+
+The root, sections and slots can shrink within flex/grid containers; child presenters remain
+responsible for their own readable geometry. Use `--wm-panel-surface-border: 0` and
+`--wm-panel-surface-padding: 0` for a composition whose children already provide their own surfaces.
+
+**Tokens**
+
+| Property | Falls back to | Default | Controls |
+|---|---|---|---|
+| `--wm-panel-gap` | literal | `.7rem` | Vertical gap between sections. |
+| `--wm-panel-padding` | literal | `.6rem` | Root-inset compatibility fallback. |
+| `--wm-panel-border` | `1px solid var(--wm-border)` | `1px solid #d8d8d8` | Complete root border shorthand. |
+| `--wm-border` | literal | `#d8d8d8` | Border-color fallback inside the default shorthand. |
+| `--wm-panel-radius` | `--wm-control-radius` | `0` | Root corners. |
+| `--wm-control-radius` | literal | `0` | Shared radius fallback. |
+| `--wm-panel-background` | `--wm-surface` | `#fff` | Root surface. |
+| `--wm-surface` | literal | `#fff` | Shared surface fallback. |
+| `--wm-panel-foreground` | `--wm-foreground` | `#444` | Root text/current color. |
+| `--wm-foreground` | literal | `#444` | Shared foreground fallback. |
+| `--wm-panel-font` | `.8rem var(--wm-font-family)` | `.8rem system-ui, sans-serif` | Complete root font shorthand. |
+| `--wm-font-family` | literal | `system-ui, sans-serif` | Font-family fallback inside the default shorthand. |
+
+**Classes**
+
+`classNames` and descriptor-level classes are additive; canonical classes stay present.
+
+| Node | Canonical class | Global key | Descriptor key |
+|---|---|---|---|
+| Root | `.wui-section-panel` | `classNames.root` | — |
+| Section | `.wui-section-panel__section` | `classNames.section` | `section.classNames.section` |
+| Slot | `.wui-section-panel__slot` | `classNames.slot` | `section.classNames.slot` |
+
+**Parts**
+
+| Node | Canonical part | Global key | Descriptor key |
+|---|---|---|---|
+| Root | `root` | `parts.root` | — |
+| Section | `section` | `parts.section` | `section.parts.section` |
+| Slot | `slot` | `parts.slot` | `section.parts.slot` |
+
+Canonical, global and descriptor tokens are de-duplicated before the `part` attribute is written.
+
+</details>
+
+<UiPresenterRelated presenter="panel" />

@@ -1,0 +1,161 @@
+---
+import type { HTMLAttributes } from 'astro/types';
+
+interface Props extends HTMLAttributes<'div'> {
+  /** Controls the minimum breathing room without constraining taller demos. */
+  size?: 'compact' | 'default' | 'tall';
+  /** Stretch wide demos by default; centre small controls when requested. */
+  align?: 'stretch' | 'center';
+  /** Visible canvas label and the region's accessible name. */
+  label?: string;
+}
+
+const {
+  size = 'default',
+  align = 'stretch',
+  label = 'Live canvas',
+  class: className,
+  role = 'region',
+  'aria-label': ariaLabel = label,
+  ...attributes
+} = Astro.props;
+---
+
+<div
+  {...attributes}
+  class:list={['wm-live-canvas', className]}
+  data-size={size}
+  data-align={align}
+  role={role}
+  aria-label={ariaLabel}
+>
+  <div class="wm-live-canvas__bar" aria-hidden="true">
+    <span class="wm-live-canvas__label">{label}</span>
+    <span class="wm-live-canvas__status">
+      <span class="wm-live-canvas__dot"></span>
+      Live
+    </span>
+  </div>
+  <div class="wm-live-canvas__surface">
+    <div class="wm-live-canvas__content">
+      <slot />
+    </div>
+  </div>
+</div>
+
+<style>
+  .wm-live-canvas {
+    --wm-live-canvas-min-height: 0;
+    --wm-live-canvas-minor-grid: rgba(17, 17, 17, 0.035);
+    --wm-live-canvas-major-grid: rgba(17, 17, 17, 0.065);
+
+    position: relative;
+    min-width: 0;
+    border: 1px solid var(--wui-line-mid);
+    background-color: var(--wui-surface);
+    background-image:
+      linear-gradient(to right, var(--wm-live-canvas-major-grid) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--wm-live-canvas-major-grid) 1px, transparent 1px),
+      linear-gradient(to right, var(--wm-live-canvas-minor-grid) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--wm-live-canvas-minor-grid) 1px, transparent 1px);
+    background-position: -1px -1px;
+    background-size: 80px 80px, 80px 80px, 16px 16px, 16px 16px;
+    color: var(--wui-ink);
+    overflow: hidden;
+  }
+
+  .wm-live-canvas[data-size='compact'] {
+    --wm-live-canvas-min-height: 5rem;
+  }
+
+  .wm-live-canvas[data-size='tall'] {
+    --wm-live-canvas-min-height: 16rem;
+  }
+
+  .wm-live-canvas__bar {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    min-height: 1.75rem;
+    padding: 0.2rem 0.65rem;
+    border-bottom: 1px solid var(--wui-line-mid);
+    background: rgba(250, 250, 250, 0.9);
+    color: var(--wui-ink-mute);
+    font-family: var(--wui-font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.08em;
+    line-height: 1;
+    text-transform: uppercase;
+  }
+
+  .wm-live-canvas__status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    color: var(--wui-success);
+    font-weight: 700;
+  }
+
+  .wm-live-canvas__dot {
+    width: 0.38rem;
+    height: 0.38rem;
+    border-radius: 50%;
+    background: currentColor;
+    animation: wm-live-canvas-pulse 1.8s ease-in-out infinite;
+  }
+
+  .wm-live-canvas__surface {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    min-height: var(--wm-live-canvas-min-height);
+    padding: clamp(0.85rem, 2.5vw, 1.5rem);
+    overflow: auto;
+  }
+
+  .wm-live-canvas__content {
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .wm-live-canvas[data-align='center'] .wm-live-canvas__surface {
+    align-items: center;
+    justify-content: center;
+  }
+
+  .wm-live-canvas[data-align='center'] .wm-live-canvas__content {
+    flex: 0 1 auto;
+    width: auto;
+  }
+
+  @keyframes wm-live-canvas-pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.35;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .wm-live-canvas__dot {
+      animation: none;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .wm-live-canvas[data-size='tall'] {
+      --wm-live-canvas-min-height: 12rem;
+    }
+
+    .wm-live-canvas__surface {
+      padding: 0.75rem;
+    }
+  }
+</style>

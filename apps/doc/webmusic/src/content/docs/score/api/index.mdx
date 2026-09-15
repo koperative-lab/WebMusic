@@ -1,0 +1,591 @@
+---
+title: '@webmusic/score'
+description: The thin, DOM-free Score root — immutable score model, primitives, time map, queries, events, and serialization.
+---
+
+The `@webmusic/score` root is the **foundation** of Score: the immutable `Score` model, the musical primitives (`Rational`, `Pitch`, `Duration`), the `TimeMap`, note queries, a typed event emitter, and JSON serialization. This root entry has no UI or browser dependency.
+
+It is intentionally thin. Functional APIs live in capability subpaths of the same package:
+
+- **Playback utilities** (SFZ, recorded-note conversion, offline rendering) live in [`@webmusic/score/play`](/score/api/play/). Stateful engines and effects use `@webmusic/score/play/headless`; browser transport adapters use `/play/drivers`.
+- **Analysis** (`summarizeScore`, `chordTimeline`, key/chord/roman/motif/voice-leading) lives in [`@webmusic/score/analyze`](/score/api/analyze/).
+- **File loading** (MIDI, MusicXML, MXL, ABC) lives in [`@webmusic/score/io`](/score/api/io/).
+- **Layout and projections** live in [`@webmusic/score/view`](/score/api/view/). Each capability's `/element` entry supplies its Web Components; [`@webmusic/score/react`](/score/api/react/) supplies React adapters.
+
+Install `@webmusic/score` once, then import the root model or a capability entry such as `@webmusic/score/play` as needed.
+
+## Package subpaths
+
+Every published entry of `@webmusic/score`, grouped by capability. A
+capability root is its API; `/headless` is code-only domain objects;
+`/element` is side-effect-free Web Component classes and `/auto` registers
+them; `/global` is the browser IIFE. This table is the package map — the
+capability pages below document what is inside each entry.
+
+| Entry | Form | What is there |
+| --- | --- | --- |
+| `@webmusic/score` | package root | The immutable model, primitives, `TimeMap`, queries, events, JSON — this page. |
+| `@webmusic/score/io` | [capability root](/score/api/io/) | Format detection, loaders, parsers and serializers. |
+| `@webmusic/score/io/load` | code-only sub-entry | The loader surface on its own, for consumers that want only `loadScore`. |
+| `@webmusic/score/io/formats` | code-only sub-entry | Per-format parsers and serializers (MIDI, MusicXML, MXL, ABC). |
+| `@webmusic/score/io/worker-client` · `@webmusic/score/io/worker-protocol` · `@webmusic/score/io/worker` | worker triple | Off-main-thread parsing: the client, the wire protocol, and the worker runtime. |
+| `@webmusic/score/play` | [capability root](/score/api/play/) | Stateless playback: SFZ parsing, offline WAV render, recording → `Score`. |
+| `@webmusic/score/play/headless` | [Headless](/score/headless/#play) | `ScorePlayer`, `InteractivePlayer`, `Rack`, `Sound`, `Effect`, `LfoController`, `PlayerController`. |
+| `@webmusic/score/play/drivers` | code-only sub-entry | Browser transport adapters: scroll, pointer, orientation, arbitrary values. |
+| `@webmusic/score/play/element` | [Web Components](/score/element/#play) | `<score-player>`, `<rack-control>`, `<note-input>`, `<score-recorder>`, `<synth-panel>`. |
+| `@webmusic/score/play/auto` | registration | Imports the play elements and registers them on evaluation. |
+| `@webmusic/score/play/global` | browser IIFE | `<script>`-tag bundle exposing `WebMusicScorePlay` and registering the play elements. |
+| `@webmusic/score/play/demos` | teaching entry | Ready-made demo elements with built-in sample music. |
+| `@webmusic/score/analyze` | [capability root](/score/api/analyze/) | Key, chords, roman numerals, motifs, voice leading, rhythm, distributions, summaries. |
+| `@webmusic/score/analyze/headless` | [Headless](/score/headless/#analyze) | `AnalysisSession`, the live trackers, `createScoreReport`. |
+| `@webmusic/score/analyze/element` | [Web Components](/score/element/#analyze) | Live chord progression, current chord, key changes, Roman harmony and voice leading. |
+| `@webmusic/score/analyze/worker-client` · `@webmusic/score/analyze/worker-protocol` · `@webmusic/score/analyze/worker` | worker triple | Off-main-thread analysis: the client, the wire protocol, and the worker runtime. |
+| `@webmusic/score/view` | [capability root](/score/api/view/) | Layout and projection helpers for notation surfaces. |
+| `@webmusic/score/view/headless` | [Headless](/score/headless/#view) | `createScoreView`, `createActiveNoteTracker`. |
+| `@webmusic/score/view/render` | code-only sub-entry | Imperative DOM/canvas/SVG renderers and the player binding. |
+| `@webmusic/score/view/element` | [Web Components](/score/element/#view) | `<score-view>`, `<pitch-view>` and `<sheet-view>`. |
+| `@webmusic/score/react` | [capability root](/score/api/react/) | React components and hooks over the four capabilities; React is an optional peer. |
+
+Score has no `/view/auto` or `/view/global`, and no `/analyze/auto`: only the
+play capability ships registration and IIFE conveniences.
+
+## Install
+
+`npm install @webmusic/score` — use an available published version or the local workspace; [Install](/score/#install) has the full setup.
+
+The package root touches no browser APIs, so that entry is safe to import in Node and SSR environments. Format, rendering, playback, and optional-engine dependencies stay behind their capability subpaths.
+
+## Build A Score In Code
+
+`ScoreBuilder` is the entry point when you generate a score or write an importer. It collects metadata, parts, measures, tempo, meter, and notes, then returns an immutable `Score`.
+
+```ts
+import {
+  Duration,
+  MeasureId,
+  PartId,
+  Pitch,
+  Rational,
+  ScoreBuilder,
+  VoiceId,
+} from '@webmusic/score';
+
+const builder = new ScoreBuilder();
+const partId = PartId('piano');
+const voice = VoiceId('piano-v1');
+const timeSignature = { numerator: 4, denominator: 4 };
+
+builder
+  .setMetadata({ title: 'Core API Etude', composer: 'Score' })
+  .addTempo({ atQuarters: Rational.ZERO, bpm: 96 })
+  .addMeter({ atQuarters: Rational.ZERO, measureNumber: 1, timeSignature });
+
+builder.addPart({ id: partId, name: 'Piano', midiProgram: 0, staves: 2 });
+builder.addMeasure({
+  id: MeasureId('m1'),
+  number: 1,
+  onsetQuarters: Rational.ZERO,
+  durationQuarters: new Rational(4),
+  timeSignature,
+  keySignature: { fifths: 0, mode: 'major' },
+});
+
+['C4', 'E4', 'G4', 'C5'].forEach((pitch, index) => {
+  builder.addNote(partId, {
+    id: builder.newNoteId(),
+    pitch: Pitch.parse(pitch),
+    onsetQuarters: new Rational(index),
+    duration: Duration.quarter(),
+    performed: { onsetSec: index * 0.625, durationSec: 0.5, velocity: 84 },
+    voice,
+    staff: 1,
+  });
+});
+
+const score = builder.build();
+```
+
+To turn a file into a `Score`, use `loadScore` from [`@webmusic/score/io`](/score/api/io/). To play or analyze the `Score`, pass it to [`@webmusic/score/play`](/score/api/play/) or [`@webmusic/score/analyze`](/score/api/analyze/).
+
+## Work With Model Primitives
+
+Use `Rational` for exact musical positions and durations, `Pitch` for notated pitches, and `Duration` for note lengths.
+
+`Rational` stores reduced safe-integer numerator and denominator values. Arithmetic
+and comparison use exact integer intermediates when Number arithmetic would lose
+precision. A result whose reduced representation exceeds the safe-integer range
+throws `RangeError`; `toFloat()` and conversion to seconds are floating-point
+projections. Division by zero is rejected.
+
+`Pitch` accepts steps A–G, integer alterations from −2 to 2, and safe-integer
+octaves and MIDI projections. Invalid values, fractional MIDI input and nonfinite
+or nonpositive A4 reference frequencies throw `RangeError`. The model supports
+signed integer pitches outside MIDI's 0–127 protocol range; a destination format
+may impose stricter limits. Frequency conversion uses equal temperament and
+JavaScript floating-point arithmetic. `pitchToMidi` validates plain objects using
+the same pitch rules. Semitone transposition returns a sharp-preferring spelling.
+
+```ts
+import { Duration, Pitch, Rational, midiToPitch, pitchToMidi } from '@webmusic/score';
+
+const values = {
+  rational: new Rational(1, 3).add(new Rational(2, 3)).toString(),
+  pitchMidi: Pitch.parse('F#4').midi,
+  transposed: Pitch.parse('C4').transpose(7).toString(),
+  frequency: Pitch.parse('A4').toFrequency(),
+  pitchToMidi: pitchToMidi(Pitch.parse('Bb3')),
+  midiToPitch: midiToPitch(61).toString(),
+  tripletEighth: Duration.triplet(Duration.eighth()).quarters.toString(),
+  dottedQuarter: Duration.dotted(Duration.quarter()).quarters.toString(),
+};
+```
+
+## Use The Immutable Model
+
+`Score`, `Part`, `Measure`, and `Note` are immutable runtime objects. Share the same score between a player, renderer, analyzer, worker, or API process without letting one consumer mutate the original data.
+
+JSON-like metadata extensions are recursively snapshotted, including own keys
+such as `__proto__` and null-prototype records. Nonplain application values such
+as `Date`, `Map` or class instances remain borrowed; this is not a general-purpose
+deep clone. Cached `tempos`, `timeSignatures` and `keySignatures` freeze both their
+arrays and entries and may be shared with derived Scores.
+
+```ts
+import {
+  SCORE_JSON_SCHEMA_ID,
+  ScoreJSONError,
+  scoreFromJSON,
+} from '@webmusic/score';
+
+const firstNote = score.notes[0];
+const sameNote = score.getNote(firstNote.id);
+const firstPart = score.getPart(score.parts[0].id);
+const updated = score.withMetadata({ title: 'Updated title' });
+const cloned = scoreFromJSON(score.toJSON());
+
+console.log({
+  originalTitle: score.metadata.title,
+  updatedTitle: updated.metadata.title,
+  sameNotePitch: sameNote?.pitch.toString(),
+  firstPart: firstPart?.name,
+  clonedNotes: cloned.notes.length,
+});
+```
+
+`Score.toJSON()` emits the exact `SCORE_JSON_SCHEMA_ID` (`v0.1`).
+`scoreFromJSON()` also accepts an unmarked legacy payload, but rejects an
+unknown marked version with `ScoreJSONError.code === 'unsupported-schema'`;
+future schema versions require an explicit migration rather than prefix-based
+guessing. Every present known field is checked at runtime: malformed metadata,
+notation, tempo, meter, and Note values reject with `code === 'invalid-json'`.
+Open values under `metadata.custom` and extended `metadata.encoding` records
+remain available for integrations.
+
+When every serialized tempo/meter entry declares provenance, an
+`explicit: false` entry must equal the Measure metadata it claims to derive
+from. A mismatch rejects with `code === 'invalid-score'`, preventing notation
+and playback from observing different canonical tempo or meter values.
+`explicit: true` entries remain intentional overrides, while an old/direct
+TimeMap with missing provenance stays conservatively independent.
+
+## Batch Edits With `score.edit`
+
+For interactive editing (e.g. dragging a note per animation frame), use `score.edit(fn)` instead of rebuilding a `Part` by hand. The transaction object (`ScoreEditSession`) buffers note and measure operations and applies them in one incremental rebuild at commit: touched parts are reprocessed, and untouched parts can share their indexes. Cost depends on the edits and affected parts. The original score is never modified; `edit` returns a new immutable `Score` (or the same instance if no operations were buffered). Unknown ids throw with a clear error.
+
+```ts
+import { Duration, Pitch, Rational } from '@webmusic/score';
+
+const next = score.edit((tx) => {
+  // Move and re-pitch existing notes (id stays the same).
+  tx.updateNote(noteId, { onsetQuarters: new Rational(7, 2) });
+  tx.updateNote(otherId, { dynamic: 'mf', lyric: 'la' });
+
+  // Remove a note, add a new one (Note instance or plain NoteData).
+  tx.removeNote(staleId);
+  tx.addNote(partId, {
+    id: newNoteId,
+    pitch: new Pitch('G', 0, 4),
+    onsetQuarters: new Rational(8),
+    duration: new Duration({ base: [1, 2] }),
+    voice: voiceId,
+  });
+
+  // Measures work too.
+  tx.updateMeasure(measureId, { keySignature: { fifths: -3 } });
+});
+
+console.log(score.durationQuarters.toString(), next.durationQuarters.toString());
+```
+
+The callback is synchronous. The transaction closes after success, callback
+failure or commit failure; retaining it does not permit later edits. Patches
+change only the named fields: changing notated onset does not rewrite absolute
+`performed.onsetSec`, and moving or removing a measure does not automatically move
+or remove its notes. An application that edits both projections must update both.
+
+## Convert Musical Time
+
+`TimeMap` converts between musical quarters, seconds, and measure/beat positions.
+`secondsToQuarters(seconds, ppq = 480)` rounds to the nearest tick at the chosen
+resolution. Compatibility helpers also accept an optional PPQ, defaulting to
+`DEFAULT_PPQ` (480); `secondsToTick` uses that same resolution throughout the
+conversion. PPQ must be a positive safe integer, seconds must be finite, and
+projected tick positions must fit safe integers. Negative seconds clamp to the
+origin. `timeMapMapping(map)` retains the legacy 480 PPQ transport contract.
+
+```ts
+import { Rational, TimeMap, locateSeconds, tickToMeasureBeat } from '@webmusic/score';
+
+const map = new TimeMap(score);
+
+const values = {
+  twoQuartersSeconds: map.quartersToSeconds(new Rational(2)),
+  secondsToQuarters: map.secondsToQuarters(1.25).toString(),
+  quarterFive: map.quartersToMBS(new Rational(5)),
+  mbsToQuarters: map.mbsToQuarters({
+    measure: 2,
+    beat: 2,
+    subbeat: Rational.ZERO,
+  }),
+  tick2400: tickToMeasureBeat(score, 2400),
+  seconds125: locateSeconds(score, 1.25),
+};
+```
+
+## Query Notes
+
+Use the query helpers to answer score-navigation questions: which notes are sounding at a position, which notes start inside a range, and which notes overlap a range.
+
+Range queries use half-open intervals `[from, to)`. `notesIn` and
+`notesOverlapping` return no notes when `to <= from`; use `notesAt` for a point
+query, including notes held across that position.
+Zero-duration ordinary notes have no sounding interval and do not overlap;
+explicitly marked grace notes retain the onset rule below. `notesIn` still
+lists all eligible source events by onset, including zero-duration ones.
+
+```ts
+import { Rational, noteMidi, notesAt, notesIn, notesOverlapping } from '@webmusic/score';
+
+const values = {
+  notesAtQ2: notesAt(score, new Rational(2)).map((note) => note.pitch.toString()),
+  notesInFirstMeasure: notesIn(score, Rational.ZERO, new Rational(4)).map((note) =>
+    note.pitch.toString(),
+  ),
+  notesOverlappingQ1Q3: notesOverlapping(score, new Rational(1), new Rational(3)).map((note) =>
+    note.pitch.toString(),
+  ),
+  firstMidi: noteMidi(score.notes[0]),
+};
+```
+
+All three queries take an optional `NoteQueryOptions` argument:
+
+- `includeRests` (default `false`) — include explicit rest notes (`note.rest === true`). The helper `restsIn(score, from, to)` returns only rests in a range.
+- `includeGrace` (default `true`) — zero-duration grace notes are matched on their exact onset; pass `false` to exclude them.
+
+```ts
+import { notesAt, restsIn } from '@webmusic/score';
+
+const withRests = notesAt(score, new Rational(2), { includeRests: true });
+const rests = restsIn(score, Rational.ZERO, new Rational(4));
+```
+
+## Rests & Grace Notes
+
+A `Note` can be an explicit rest (`rest: true`) — it has an onset, a duration, and a voice but **no pitch** (the constructor rejects a pitchless non-rest). Rests are excluded from the flattened `score.notes` view and from queries by default; reach them via `part.notes`, `score.allNotes()`, or `includeRests`.
+
+Optional `restDisplay: {step, octave}` preserves a rest's authored staff position.
+`step` is `A…G` and `octave` is an integer `0…9`; this does not give the rest a
+sounding pitch. The value is copied and frozen and requires `rest: true`.
+
+A grace note carries `grace: true` or `grace: { slash?, stealQuarters? }` and a zero notated duration. Playback in `@webmusic/score/play` skips grace notes.
+
+Both flags round-trip through `toJSON()` / `scoreFromJSON()` and through MusicXML (`<rest/>`, `<grace/>`).
+
+## Notated Rhythm And Grouping
+
+`Duration.base` is the written value in quarters before dots and tuplets.
+An eighth-note triplet has `base: [1, 2]`, `dots: 0`, `tuplet: [3, 2]` and
+`quarters: 1/3`. Its written value remains an eighth note even though its
+sounding length differs. MusicXML import retains these fields when they agree
+with the encoded duration; see [I/O precision and diagnostics](/score/api/io/#representation-and-information-loss).
+
+The following optional `NoteData` fields preserve authored notation. They do
+not change playback timing or allocate a renderer.
+
+| Field | Shape and behavior |
+| --- | --- |
+| `beams` | `readonly BeamMark[]`: each mark has a unique `number` from `1` to `8` and `type` of `begin`, `continue`, `end`, `forward hook`, or `backward hook`. Absent marks allow a renderer to choose grouping. |
+| `stem` | `StemDirection`: `up`, `down`, `none`, or `double`; absent means no authored direction. |
+| `printObject` | `false` hides notation while retaining musical time and playback. Absent or `true` permits drawing. |
+| `tupletId` | Group identifier shared by notes in one tuplet. MusicXML import derives voice-scoped identifiers from explicit endpoints; the strings are regenerated on import. |
+| `tupletMarks` | `readonly TupletMark[]`: `type: 'start' \| 'stop'`, optional `number` (`1…16`, default `1` in MusicXML), `bracket` boolean, `placement: 'above' \| 'below'`, and `showNumber: 'actual' \| 'both' \| 'none'`. Numbered endpoints preserve nested groups; `tupletId` identifies the innermost active group. |
+| `slur` | `start`, `continue`, or `stop`; a `SlurMark` with optional `number` (`1…6`) and `placement: 'above' \| 'below'`; or an array of numbered marks for overlapping slurs. |
+| `tiePlacement` | `above` or `below`; authored tie side, independent of the `tie` start/continue/stop state. |
+| `articulations` | Array of `staccato`, `accent`, `tenuto`, `marcato`, or `staccatissimo`. MusicXML maps `strong-accent` to `marcato`; engraving placement is not retained by this string-based field. |
+
+Beam and tuplet arrays and their entries are copied and frozen by `Note`.
+Invalid beam levels, duplicate levels, stem values and tuplet marks reject at
+construction. `Note.with`, Score editing, and JSON serialization preserve the
+metadata. Rendering support belongs to the selected [View](/score/api/view/).
+
+## Clefs
+
+A `Clef` is `{ sign: 'G' | 'F' | 'C' | 'percussion' | 'TAB', line?, octaveChange? }` — e.g. treble `{ sign: 'G', line: 2 }`, bass `{ sign: 'F', line: 4 }`.
+
+`Part.clefChanges` is the authored stream, including changes inside a measure:
+each `PartClefChange` has `onsetQuarters: Rational`, a 1-based `staff`, and `clef`.
+MusicXML populates this stream independently for every part. A defined stream
+(including `[]`) owns that part's clefs; it takes precedence over the legacy
+master-measure `measure.clef` shorthand and `measure.clefs` staff record.
+Those compatibility fields still describe clef declarations at bar boundaries.
+
+Use `builder.addClefChange(partId, change)` or pass `clefChanges` to `addPart`.
+The builder rejects unknown part IDs and invalid positions/staff/clef values.
+Construction copies, sorts by exact onset and freezes the stream and clef objects;
+editing and JSON round-trips retain it.
+
+## Timed Directions And Barlines
+
+`Part.directions` stores `PartDirection` records on the same absolute musical
+axis as notes. Each has `onsetQuarters: Rational` and a `kind` from the table.
+`DirectionPosition` supplies optional `staff` (defaults to the first staff),
+`placement: 'above' | 'below'`, `printObject`, and numeric `defaultX`, `defaultY`,
+`relativeX`, `relativeY` engraving offsets in MusicXML tenths. Negative onsets
+are permitted for directions offset before the score's first event.
+
+| `kind` | Additional fields |
+| --- | --- |
+| `words`, `rehearsal` | `text`; optional `fontStyle: 'normal' \| 'italic'`, `fontWeight: 'normal' \| 'bold'`, positive numeric `fontSize`. |
+| `dynamics` | `values: readonly string[]`, e.g. `['pp']` or a custom `other-dynamics` text. |
+| `metronome` | `beatUnit: Duration`, positive `perMinute`, optional `parentheses` boolean. This is a visual marking; use tempo entries to change playback. |
+| `pedal` | `type: 'start' \| 'stop' \| 'change' \| 'continue' \| 'resume' \| 'discontinue'`; optional `number` (`1…16`), `line` and `sign` booleans. |
+| `wedge` | `type: 'crescendo' \| 'diminuendo' \| 'stop' \| 'continue'`; optional `number` (`1…16`), nonnegative `spread` in tenths, and `niente` boolean. |
+
+Use `builder.addDirection(partId, direction)` or pass `directions` to `addPart`.
+The builder snapshots inputs immediately; built parts keep sorted frozen arrays
+and nested values. Invalid discriminants, positions and field values reject.
+The stream preserves MusicXML direction offsets without moving note time;
+pedal and wedge numbers identify spans within their source part and staff.
+Renderer support and layout policy belong to [View](/score/api/view/).
+
+`Measure.barlineStart` and `barlineEnd` retain MusicXML left/right `BarlineStyle`:
+`regular`, `dotted`, `dashed`, `heavy`, `light-light`, `light-heavy`, `heavy-light`,
+`heavy-heavy`, `tick`, `short`, or `none`. These are visual styles on the shared
+master grid; repeat playback remains the separate `repeat`/`volta` contract.
+
+## Transposing Instruments
+
+A `Part` may declare `transpose: { chromatic, diatonic?, octaveChange? }` (MusicXML semantics: sounding = written + `chromatic` + 12 × `octaveChange`; a B♭ clarinet is `{ chromatic: -2, diatonic: -1 }`). Helpers:
+
+```ts
+import { soundingPitch, writtenPitch, transpositionSemitones } from '@webmusic/score';
+
+transpositionSemitones(part); // total semitone shift, 0 for concert-pitch parts
+soundingPitch(note, part);    // concert pitch of a written note
+writtenPitch(note, part);     // inverse: written pitch for a concert note
+```
+
+The conversion is MIDI-based, so spelling prefers sharps; the `diatonic` hint is informational. Playback in `@webmusic/score/play` automatically uses sounding pitch.
+
+## Expand Repeats
+
+`expandRepeats(score)` unrolls flat matched repeat spans and their in-span volta
+endings into a new `Score` in performance order: sequential measure numbers,
+recomputed onsets and derived IDs (`<id>@2`, …; `~N` resolves collisions with
+existing IDs). `repeat.times` is a nonnegative safe integer, defaults to 2, and
+retains at least one pass when set to 0. An unchanged playback order returns the
+original Score; an empty order returns a valid empty Score.
+
+The algorithm matches a start to its first end and filters in-span voltas by
+pass. It is not a full navigation engine for nested repeats, multiple backward
+endings, D.C. or D.S. Notes outside measure extents are omitted during expansion;
+notes crossing a boundary are not split. Explicit tempo/meter declarations and
+performed onset offsets are carried to each played occurrence. Part clef changes
+and directions are shifted to each occurrence too; a repeat jump restores the
+source clef, and pedal/hairpin stop marks on a barline follow the phrase that
+ends there.
+
+`playedDurationSeconds(score)` equals the expanded Score's `durationSeconds`:
+the notated extent, including measures and rests, converted through its TimeMap.
+Performed tails extending beyond that extent belong to the player's timeline
+duration and are not added by this helper.
+
+```ts
+import { expandRepeats, playedDurationSeconds } from '@webmusic/score';
+
+const performed = expandRepeats(score);
+const seconds = playedDurationSeconds(score);
+```
+
+## Tie Chains
+
+`tieChains(part)` groups a part's notes into tie chains (runs connected by `tie: 'start' | 'continue' | 'stop'` in the same voice at the same pitch; untied notes are single-element chains, malformed ties degrade gracefully). `mergedTiedNotes(part)` merges each chain into one sounding event:
+
+```ts
+import { mergedTiedNotes } from '@webmusic/score';
+
+for (const event of mergedTiedNotes(score.parts[0])) {
+  // event.first, event.notes, event.onsetQuarters, event.durationQuarters
+}
+```
+
+Playback in `@webmusic/score/play` uses merged ties, so tied notes are attacked exactly once.
+
+Each connection must join the previous note's exact notated endpoint. A gap or
+overlap closes the earlier chain; a disconnected `continue` starts another chain
+and a disconnected `stop` remains a separate note. Valid ties may cross staves
+within the same voice. Performed timing remains a separate playback projection.
+
+## Coordinate Events
+
+`EventEmitter` is a small typed pub/sub utility. Use it to connect import status, player cursor state, note selection, or analysis results without adding a UI framework. (The playback engine in `@webmusic/score/play` is built on it.)
+
+```ts
+import { EventEmitter } from '@webmusic/score';
+
+type ScoreEvents = {
+  ready: { id: string };
+  select: { pitch: string };
+};
+
+const events = new EventEmitter<ScoreEvents>();
+
+const offReady = events.once('ready', ({ id }) => {
+  console.log('ready', id);
+});
+
+const offSelect = events.on('select', ({ pitch }) => {
+  console.log('selected', pitch);
+});
+
+events.emit('ready', { id: score.id });
+events.emit('select', { pitch: score.notes[0].pitch.toString() });
+
+offReady();
+offSelect();
+```
+
+`emit()` deliberately keeps normal exception propagation. Use
+`emitSafely(event, payload, onError)` only at lifecycle/timing boundaries that
+must continue after application listener failures. It snapshots the listener
+set and reports both synchronous throws and rejected listener Promises through
+`onError`.
+
+## API Reference
+
+| API | Kind | Use it for |
+| --- | --- | --- |
+| `Rational` | Primitive | Exact quarter positions, durations, and subbeats. |
+| `Pitch` | Primitive | Parse, spell, transpose, compare, and convert pitches. |
+| `Duration` | Primitive | Whole, half, quarter, eighth, dotted, and triplet durations. |
+| `ScoreBuilder` | Builder | Build scores from generators and importers. |
+| `ScoreEditSession` | Transaction | Buffer synchronous edits; normally obtained from `score.edit`. |
+| `Score` | Model | Top-level immutable score with metadata, parts, measures, and a time map. |
+| `Part` | Model | Instrument or voice container with notes, MIDI program, and staff count. |
+| `Measure` | Model | Measure number, onset, duration, meter, key, tempo, and repeats. |
+| `Note` | Model | Pitch, onset, duration, performed timing, velocity, voice, and staff data. |
+| `TimeMap` | Time | Convert between quarters, seconds, measure/beat positions, and legacy ticks. |
+| `timeMapMapping` | Time | Expose the fixed 480 PPQ neutral timeline mapping. |
+| `validateScore`, `assertValidScore` | Validation | Collect structural/model issues or throw on an invalid Score. |
+| `notesAt` | Query | Find notes sounding at a quarter position. |
+| `notesIn` | Query | Find notes whose onset is inside a range. |
+| `notesOverlapping` | Query | Find notes that overlap a range in any way. |
+| `restsIn` | Query | Find explicit rest notes whose onset is inside a range. |
+| `isPitchedNote`, `isSoundingNote` | Type guards | Distinguish pitch-bearing and sounding notes from rests. |
+| `soundingPitch`, `writtenPitch`, `transpositionSemitones` | Query | Written ↔ sounding pitch for transposing parts. |
+| `tieChains`, `mergedTiedNotes` | Query | Group tied notes; merge chains into single sounding events. |
+| `expandRepeats`, `playedDurationSeconds` | Transform | Unroll repeats/voltas into performance order; played length in seconds. |
+| `EventEmitter` | Events | Typed pub/sub for ready, cursor, selection, and status events. |
+| `scoreFromJSON` | Serialization | Rehydrate a `Score` from `score.toJSON()`. |
+| `SCORE_JSON_SCHEMA_ID`, `SCORE_JSON_SCHEMA_VERSION`, `ScoreJSONError` | Serialization | Identify the wire schema and inspect structured deserialization failures. |
+| `makeId` | Utility | Generate a local unique ID with a readable prefix. |
+| `PartId`, `MeasureId`, `NoteId`, `VoiceId`, `ScoreId` | IDs | Brand strings so TypeScript can distinguish ID types. |
+| `pitchToMidi`, `midiToPitch` | Compatibility | Convert between `Pitch` and MIDI note number. |
+| `DEFAULT_PPQ`, `quartersToTicks`, `ticksToQuarters` | Compatibility | Convert between quarter rationals and ticks at a requested PPQ (default 480). |
+| `noteMidi`, `noteOnsetTicks`, `noteDurationTicks`, `noteEndTicks` | Compatibility | Read MIDI/tick-style data from `Note`. |
+| `noteOnsetSeconds`, `noteDurationSeconds`, `noteEndSeconds` | Compatibility | Read second-based timing from `Note` and `Score`. |
+| `noteVelocity`, `noteVoiceString` | Compatibility | Read velocity and voice values from `Note`. |
+| `scoreNotes`, `scoreTitle`, `scoreComposer` | Compatibility | Read flattened notes and metadata from `Score`. |
+| `scoreDurationTicks`, `scoreDurationSeconds` | Compatibility | Read total score duration. |
+| `scoreTempos`, `scoreTimeSignatures`, `scoreKeySignatures` | Compatibility | Read tempo, meter, and key changes in legacy shapes. |
+| `tickToSeconds`, `secondsToTick`, `tickToMeasureBeat` | Compatibility | Convert score positions using tick and second values. |
+| `locateTick`, `locateSeconds` | Compatibility | Return `{ tick, seconds, measure, beat }` positions. |
+| `measureStartTicks`, `measureDurationTicks` | Compatibility | Read tick-style measure position and length. |
+
+Public companion types are grouped by the owning contract below. Branded ID
+names above are both constructors and types; classes likewise provide their
+instance types.
+
+| Types | Owning contract |
+|---|---|
+| `DurationOpts`, `Step`, `Alter`, `Octave`, `MidiNumber` | Musical primitives and their validated values. |
+| `NoteData`, `PerformedAttributes`, `Articulation`, `Ornament`, `Tie`, `Slur`, `SlurMark`, `SlurValue`, `GraceNote`, `BeamMark`, `StemDirection`, `TupletMark`, `RestDisplay` | Note construction, notation and performed timing; see [notated rhythm and grouping](#notated-rhythm-and-grouping). |
+| `MeasureData`, `MeasureRepeat`, `Clef`, `BarlineStyle`, `PartData`, `PartClefChange`, `DirectionPosition`, `PartDirection`, `Transpose`, `ScoreData` | Model construction, timed notation and repeat/transposition metadata. |
+| `TimeSignature`, `KeySignature`, `Mode`, `Tempo`, `ScoreMetadata` | Shared score metadata. |
+| `TempoEntry`, `MeterEntry`, `MBS`, `MeasureRef`, `TimelineMapping` | TimeMap entries, measure/beat/subbeat and the neutral mapping adapter. |
+| `NoteQueryOptions`, `PitchedNote`, `SoundingNote`, `MergedNoteEvent` | Queries, narrowed note types and tie merging. |
+| `ScoreValidationIssue`, `ScoreValidationIssueCode`, `ScoreJSONErrorCode` | Structural validation and JSON failures. |
+| `TempoChange`, `TimeSignatureChange`, `KeySignatureChange`, `TimePosition` | Compatibility projections at a declared PPQ. |
+| `EventListenerFailureMode` | Listener error handling in EventEmitter. |
+| `ScorePlaybackSource`, `ScorePlaybackSnapshot`, `ScorePlaybackNote`, `ScorePlaybackReadiness`, `ScorePlaybackState` | Shared playback observation, detailed below. |
+
+`scoreTempos(score, ppq?)` and the cached `score.tempos` expose quarter notes per
+minute: `TempoEntry.bpm * (TempoEntry.unit ?? 1)`. For example, half note = 60
+becomes 120 in these legacy `{tick, bpm}` entries. `score.tempos` uses 480 PPQ;
+`scoreTempos` accepts a custom PPQ. The original metronome unit remains on
+`score.timeMap.tempi`. MusicXML serialization uses this normalized tempo so a
+reloaded score retains the same performance duration.
+
+## Shared playback observation
+
+`ScorePlaybackSource`, `ScorePlaybackSnapshot`, `ScorePlaybackNote`,
+`ScorePlaybackReadiness`, `ScorePlaybackState` and `observeScorePlayback` are
+exported from `@webmusic/score`. They carry model/state contracts without importing
+Play, Analyze, View, DOM or an audio engine. Native
+[`ScorePlayer`](/score/headless/play/score-player/) and
+[`<score-player>`](/score/element/play/score-player/) expose the source as `.playback`.
+
+| Source member | Contract |
+|---|---|
+| `snapshot()` | Return a coherent immutable `ScorePlaybackSnapshot`; reading does not create an audio graph or start playback. |
+| `subscribe(listener)` | Register and synchronously deliver the initial snapshot, then ordered changes. Returns an unsubscribe function; a reentrant publication cannot deliver an older revision after a newer one. |
+| `seekNominal?(seconds)` | Optional authorized command in unscaled score seconds. Native sources clamp finite positions and reject unavailable/disposed playback or a failed running restart. Read-only sources omit it. |
+| `observeScorePlayback(source, listener)` | Subscribe to the same source from custom UI or Headless code, filtering older revisions. Returns idempotent cleanup that stops observation without disposing playback. |
+
+| Snapshot member | Meaning |
+|---|---|
+| `revision` | Monotonic publication revision within this source. |
+| `sourceRevision` | Identity of the committed source selection; use with occurrence IDs across replacements. |
+| `readiness` | `empty`, `loading`, `ready`, `unavailable`, `error` or `disposed`. Data readiness is distinct from playback state. |
+| `state` | `stopped`, `starting`, `playing`, `paused` or `ended`. |
+| `score` | Resolved immutable Score, when this owner supplies that capability. |
+| `nominalSeconds` / `nominalDurationSeconds` | Unscaled position/duration on the score timeline; `null` means unavailable. |
+| `transportSeconds` / `transportDurationSeconds` | Position/duration after playback-rate scaling; `null` means unavailable. |
+| `rate` | Playback speed relative to the score; `null` means unavailable. |
+| `activeNotes` | Immutable `ScorePlaybackNote[]` for sounding occurrences, not future scheduled attacks. |
+| `error` | Optional failure value supplied by the owner. |
+
+Each `ScorePlaybackNote` has `occurrenceId`, `noteId`, `partId`, sounding `midi`,
+`nominalStartSeconds` and `nominalEndSeconds`. Equal pitches in different parts or
+repeated attacks retain separate occurrence identities. Occurrence identity is
+scoped to the source/revision; it is not a globally unique project identifier.
+
+```ts
+import {observeScorePlayback} from '@webmusic/score';
+import {ScorePlayer} from '@webmusic/score/play/headless';
+import {ScoreBuilder} from '@webmusic/score';
+const observedPlayer = new ScorePlayer(new ScoreBuilder().build());
+const detach = observeScorePlayback(observedPlayer.playback, (state) => {
+  console.log(state.readiness, state.nominalSeconds, state.activeNotes);
+});
+detach();
+observedPlayer.dispose();
+```
+
+A custom source must preserve the subscription/identity contract. Its optional
+commands belong to the current authority: when a player participates in a
+coordinated group, route commands through that group rather than directly seeking
+one participant. The [Kernel transport group](/kernel/api/#sync--webmusickernelsync)
+provides that command authority. Native controller/Rack modes without a single
+resolved Score report the missing capability as unavailable.

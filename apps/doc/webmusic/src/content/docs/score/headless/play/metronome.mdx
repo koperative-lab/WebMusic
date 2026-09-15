@@ -1,0 +1,128 @@
+---
+title: 'Metronome'
+description: 'A beat clock with tap-tempo, independent of any score.'
+sidebar:
+  order: 6
+---
+
+import ProgrammaticMetronomeDemo from '../../../../../components/programmatic/ProgrammaticMetronomeDemo.astro';
+
+`Metronome` is a beat callback driven by the kernel tick source, using a worker where available and a timer fallback otherwise. Driving an `InteractivePlayer` with it (`bindClock(player)`) gives the pull engine an external beat clock; here it just ticks and flashes on each beat. Its cadence is a rounded millisecond timer interval, not sample-accurate audio scheduling.
+
+<ProgrammaticMetronomeDemo />
+
+## Import
+
+```ts
+import {Metronome} from '@webmusic/score/play/headless';
+
+const clock = new Metronome((secondsPerBeat) => flashBeat(secondsPerBeat), {bpm: 120});
+clock.start();
+clock.setBpm(100);
+clock.stop(); // releases the current tick source; start() can create another
+```
+
+The source contract is `Metronome` and `ClockOptions` at
+`@webmusic/score/play/headless`. It owns the tick source created by its
+factory; the callback and anything that callback drives remain caller-owned.
+There is no audio context, score, UI, event emitter or `dispose()` method.
+
+<details class="component-section">
+<summary>API</summary>
+
+**Construction** — `new Metronome(onTick, options?)`.
+
+| Input / option | Default | Contract |
+| --- | --- | --- |
+| `onTick(secondsPerBeat)` | Required | Callback on each tick; argument is `60 / bpm` in seconds. |
+| `ClockOptions.bpm` | `120` | Beats per minute, with an effective minimum of `1`; supply a finite number. |
+| `ClockOptions.createTickSource(intervalMs)` | Kernel tick-source factory | Receives the rounded beat interval in milliseconds. The metronome owns/disposes each returned source. |
+
+**Commands and state**
+
+| Member | Return / contract |
+| --- | --- |
+| `start()` | `this`; starts ticking, or does nothing if already running. |
+| `stop()` | `this`; stops and disposes the current tick source. Repeat calls are safe. |
+| `setBpm(bpm)` | `this`; changes BPM and replaces a running tick source at the new cadence. |
+| `bpm` | Current BPM. |
+| `running` | Whether a tick source is installed. |
+
+**Lifecycle** — call `stop()` on unmount. It can later restart; it does not
+release anything owned by `onTick`. For a clock bound to a player, use the
+cleanup returned by [bindClock](/score/headless/play/interactive-player/#clock-input).
+
+</details>
+
+## TempoController
+
+`TempoController` is the tap side of tempo, DOM-free: press timings in, a BPM
+and — in conduct mode — an advance decision out. It owns no clock and no
+audio; pair it with an [`InteractivePlayer`](/score/headless/play/interactive-player/)
+as its `target` when a press should sound the next beat.
+
+```ts
+import {TempoController} from '@webmusic/score/play/headless';
+
+const tempo = new TempoController({mode: 'tap'});
+const off = tempo.subscribe(() => paint(tempo.snapshot()));
+
+button.onpointerdown = () => tempo.press();
+button.onpointerup = () => tempo.release();
+
+off();
+tempo.dispose();
+```
+
+Taps accumulate in a rolling window of `TAP_WINDOW` (6) intervals, up to 7
+presses, and a gap
+longer than `TAP_RESET_GAP` (2) seconds starts a fresh series rather than
+averaging across a pause — the alternative is a tempo that drifts toward wrong
+for as long as anyone remembers tapping. `tapBpm(taps)` is that inference on
+its own and `appendTap(taps, time, resetGap?, windowSize?)` is the windowing,
+both exported so a caller can hold the tap array itself.
+
+<details class="component-section">
+<summary>TempoController API</summary>
+
+**Construction — `new TempoController(options?)`**
+
+| `TempoControllerOptions` member | Default / contract |
+| --- | --- |
+| `mode` | `'tap'`; `TempoMode` also accepts `'conduct'`. |
+| `conduct` | `'hold'`; `TempoConductMode` also accepts `'full'`. |
+| `target` | Borrowed `AdvanceTarget`: required `advance(options?)`, optional `advanceHold()` and `allNotesOff()`. |
+| `now` | Monotonic seconds callback; injected clocks also return seconds. |
+| `resetGap` | `TAP_RESET_GAP` (`2` seconds); minimum zero. |
+| `windowSize` | `TAP_WINDOW` (`6` intervals); at least one integer interval. |
+
+`TempoControllerConfig` can change `mode`, `conduct` and `target` through
+`configure()`. It does not replace the time source or tap-window options.
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `press(atSeconds?)` | command | Registers a press; returns the `TempoPressResult` it implies, or `undefined` for an ignored press. |
+| `release()` | command | Ends the press, for conduct-hold mode. |
+| `configure(config)` | command | Changes mode, conduct style or target live; a held note is released before observers see the change. |
+| `snapshot()` | state | `TempoControllerState` — `mode`, `conduct`, inferred `bpm` (`null` before enough valid taps), `holding`, accepted-press `activation` count, optional conduct `secondsPerBeat` (capped at 2 s). |
+| `subscribe(notify)` | subscription | Fires on state change. Returns the unsubscribe. |
+| `dispose()` | lifecycle | Idempotent. Releases held sound and makes the controller inert. |
+| `tapBpm(taps)` · `appendTap(taps, time, …)` | helper | The inference and the windowing as pure functions. |
+| `TAP_WINDOW` · `TAP_RESET_GAP` | constant | The window (6 intervals / at most 7 timestamps) and reset gap (2 s). |
+
+</details>
+
+`TempoPressResult` is `{type: 'tap', bpm: number | null}` or
+`{type: 'beat', secondsPerBeat?: number}`; an ignored press returns
+`undefined`. Tap mode measures tempo without playing. Conduct mode calls
+the borrowed target; hold mode uses `advanceHold()` when available and
+releases through `allNotesOff()`. `subscribe()` is a change notification
+without a payload or immediate initial call; read `snapshot()` when mounting.
+The pure `appendTap()` helper returns a new timestamp array and `tapBpm()`
+returns rounded BPM or `null`; neither retains resources.
+
+## Related
+
+- [Transport drivers](/score/headless/play/interactive-player/#clock-input) — `bindClock` cleanup.
+- [InteractivePlayer](/score/headless/play/interactive-player/) — conducted beats.
+- [AbPlayer](/score/headless/play/ab-player/) — arrangement switching on an owned metronome.

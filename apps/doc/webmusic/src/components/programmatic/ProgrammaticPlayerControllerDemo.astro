@@ -1,0 +1,115 @@
+---
+import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
+---
+<HeadlessDemoFrame
+  entry="@webmusic/score/play/headless"
+  name="PlayerController"
+  hint="Use the live controls to hear the result. Reset stops playback and restores the default parameters."
+  code={`// Configure PlayerController below.`}
+  rootAttrs={{'data-programmatic-playercontroller': true}}
+>
+  <div class="wui-row"><button class="wui-btn" data-play type="button">▶ Play</button><button class="wui-btn" data-variant="ghost" data-pause type="button">⏸ Pause</button><button class="wui-btn" data-variant="ghost" data-seek type="button">Scrub +2s</button><div class="wui-track"><div class="wui-track__fill" data-fill></div></div><span class="wui-readout" data-time>0.0s</span></div>
+  <div slot="parameters" class="wm-pg__grid">
+    <div class="wm-pg__param"><span class="wm-pg__name">scrub delta</span><input class="wm-pg__input" type="number" data-scrub-seconds value="2" min="-10" max="10" step="0.5" aria-label="Scrub delta in seconds" /><span class="wm-pg__note">Signed seconds passed to controller.scrub(deltaSeconds).</span></div>
+  </div>
+</HeadlessDemoFrame>
+
+<script>
+  import {mountProgrammaticDemo, programmaticCode, programmaticFeedback} from './programmatic-demo-lifecycle';
+  import { Duration, MeasureId, PartId, Pitch, Rational, ScoreBuilder, VoiceId } from '@webmusic/score';
+  import { PlayerController, ScorePlayer, Sound } from '@webmusic/score/play/headless';
+
+  function sampleScore() {
+    const b = new ScoreBuilder();
+    const partId = PartId('piano');
+    const voice = VoiceId('v1');
+    const timeSignature = { numerator: 4, denominator: 4 };
+    b.setMetadata({ title: 'Controller Etude' })
+      .addTempo({ atQuarters: Rational.ZERO, bpm: 96 })
+      .addMeter({ atQuarters: Rational.ZERO, measureNumber: 1, timeSignature });
+    b.addPart({ id: partId, name: 'Piano', staves: 1 });
+    const pitches = ['C4','E4','G4','C5','G4','E4','C4','E4','D4','F4','A4','D5','A4','F4','D4','F4'];
+    pitches.forEach((name, i) => {
+      const measureNumber = Math.floor(i / 8) + 1;
+      if (i % 8 === 0) {
+        b.addMeasure({
+          id: MeasureId(`m${measureNumber}`),
+          number: measureNumber,
+          onsetQuarters: new Rational((measureNumber - 1) * 4, 1),
+          durationQuarters: new Rational(4, 1),
+          timeSignature,
+        });
+      }
+      b.addNote(partId, {
+        id: b.newNoteId(),
+        pitch: Pitch.parse(name),
+        onsetQuarters: new Rational(i, 2),
+        duration: Duration.eighth(),
+        voice,
+      });
+    });
+    return b.build();
+  }
+
+  mountProgrammaticDemo('[data-programmatic-playercontroller]', (root, scope) => {
+    const playBtn = root.querySelector<HTMLButtonElement>('[data-play]')!;
+    const pauseBtn = root.querySelector<HTMLButtonElement>('[data-pause]')!;
+    const seekBtn = root.querySelector<HTMLButtonElement>('[data-seek]')!;
+    const fill = root.querySelector<HTMLElement>('[data-fill]')!;
+    const time = root.querySelector<HTMLElement>('[data-time]')!;
+
+    const scrubInput = root.querySelector<HTMLInputElement>('[data-scrub-seconds]');
+    const scrubSeconds = () => Math.max(-10, Math.min(10, Number(scrubInput?.value ?? 2)));
+    const updateCode = () => {
+      const seconds = scrubSeconds();
+      seekBtn.textContent = `Scrub ${seconds >= 0 ? '+' : ''}${seconds}s`;
+      programmaticCode(root, `import {PlayerController, ScorePlayer, Sound} from '@webmusic/score/play/headless';
+
+const player = new ScorePlayer(score, {
+  synth: Sound.oscillator({type: 'triangle', gain: 0.2, releaseSeconds: 0.05}),
+  synthOwnership: 'owned',
+});
+const controller = new PlayerController(player, score);
+// In a play gesture: controller.play();
+// In a scrub gesture: controller.scrub(${seconds});
+// On cleanup: controller.destroy(); player.dispose();`);
+    };
+    if (scrubInput) scope.listen(scrubInput, 'input', updateCode);
+    updateCode();
+
+    const player = new ScorePlayer(sampleScore(), {
+      synth: Sound.oscillator({ type: 'triangle', gain: 0.2, releaseSeconds: 0.05 }),
+      synthOwnership: 'owned',
+    });
+    scope.add(() => player.dispose());
+    const controller = new PlayerController(player, sampleScore());
+    scope.add(() => controller.destroy());
+
+    const paint = () => {
+      const cur = controller.currentTime;
+      const dur = controller.duration || 1;
+      fill.style.width = `${Math.min(100, (cur / dur) * 100)}%`;
+      time.textContent = `${cur.toFixed(1)}s`;
+    };
+
+    controller.on('timeupdate', paint);
+    scope.add(controller.on('error', (error) => {
+      if (scope.active) programmaticFeedback(root, error instanceof Error ? error.message : String(error));
+    }));
+    controller.on('end', () => {
+      playBtn.textContent = '▶ Play';
+      controller.seek(0);
+      paint();
+    });
+
+    scope.listen(playBtn, 'click', () => {
+      controller.play();
+      playBtn.textContent = '▶ Play';
+    });
+    scope.listen(pauseBtn, 'click', () => controller.pause());
+    scope.listen(seekBtn, 'click', () => {
+      controller.scrub(scrubSeconds());
+      paint();
+    });
+  });
+</script>

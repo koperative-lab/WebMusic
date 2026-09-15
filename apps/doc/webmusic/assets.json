@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 2,
+  "assets": [
+    {
+      "path": "xml/demo.xml",
+      "title": "WebMusic Study No. 1",
+      "author": "WebMusic Contributors",
+      "source": "scripts/demo-assets.mjs",
+      "license": "MIT",
+      "sha256": "8ab01d296305644bc2172c91f89f20c9d953117f6c0891a1123b860c199155d0",
+      "sourceLicenseFile": "LICENSE"
+    },
+    {
+      "path": "mxl/demo.mxl",
+      "title": "WebMusic Study No. 1 (compressed MusicXML)",
+      "author": "WebMusic Contributors",
+      "source": "scripts/demo-assets.mjs",
+      "license": "MIT",
+      "sha256": "c69761a7a4ded66e4d03fb70ef2f5b32788577593fdc7509247b58293c5de13c",
+      "sourceLicenseFile": "LICENSE"
+    },
+    {
+      "path": "midi/demo.mid",
+      "title": "WebMusic Study No. 1 (MIDI)",
+      "author": "WebMusic Contributors",
+      "source": "scripts/demo-assets.mjs",
+      "license": "MIT",
+      "sha256": "c6e3e3992b200e4f5dbf5f884e121d6f2a945809f097c11ede954491f3ac5e43",
+      "sourceLicenseFile": "LICENSE"
+    },
+    {
+      "path": "xml/chord-progression.musicxml",
+      "title": "Block chord progression",
+      "author": "WebMusic Contributors",
+      "source": "Original four-bar exercise authored in this repository; provenance comment in the file.",
+      "license": "MIT",
+      "sha256": "47814f2ae2380383def7321b696fd7e68ac3eccb2e18b917e9df0540cc41195a",
+      "sourceLicenseFile": "LICENSE"
+    },
+    {
+      "path": "favicon.svg",
+      "title": "WebMusic note icon",
+      "author": "WebMusic Contributors",
+      "source": "Original SVG paths in this repository.",
+      "license": "MIT",
+      "sha256": "33071a9268e03dc2c5606381a151c8a373332384be25a3c486c5b13fb0c41f05",
+      "sourceLicenseFile": "LICENSE"
+    }
+  ]
+}

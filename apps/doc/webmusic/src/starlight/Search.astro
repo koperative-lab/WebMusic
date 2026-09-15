@@ -1,0 +1,68 @@
+---
+const indexUrl = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/search-index.json`;
+---
+
+<webmusic-doc-search class={Astro.props.class} data-index-url={indexUrl} data-dev={import.meta.env.DEV ? 'true' : undefined}>
+  <button type="button" data-search-open disabled aria-label="Search documentation" aria-keyshortcuts="Control+K Meta+K">
+    <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="10" cy="10" r="7"/><path d="m15 15 6 6"/></svg>
+    <span class="search-label">Search documentation</span>
+    <kbd>⌘ / Ctrl K</kbd>
+  </button>
+  <dialog aria-labelledby="webmusic-search-heading">
+    <div class="search-frame">
+      <header>
+        <h2 id="webmusic-search-heading">Search documentation</h2>
+        <button type="button" data-search-close aria-label="Close search">Close <kbd>Esc</kbd></button>
+      </header>
+      <label for="webmusic-search-input">Title, API, or topic</label>
+      <input id="webmusic-search-input" type="search" autocomplete="off" spellcheck="false" placeholder="e.g. ScorePlayer, transport, MIDI" aria-controls="webmusic-search-results" aria-describedby="webmusic-search-status" />
+      <p id="webmusic-search-status" role="status" aria-live="polite">Enter a title, API, or topic.</p>
+      <button type="button" data-search-retry hidden>Retry loading search</button>
+      <ol id="webmusic-search-results" data-search-results></ol>
+    </div>
+  </dialog>
+</webmusic-doc-search>
+
+<script>
+  import {mountDocumentationSearch} from './search-client';
+
+  class DocumentationSearch extends HTMLElement {
+    private detach?: () => void;
+    connectedCallback() { this.detach ??= mountDocumentationSearch(this); }
+    disconnectedCallback() { this.detach?.(); this.detach = undefined; }
+  }
+  if (!customElements.get('webmusic-doc-search')) customElements.define('webmusic-doc-search', DocumentationSearch);
+</script>
+
+<style>
+  webmusic-doc-search { display: contents; }
+  button { font: inherit; cursor: pointer; color: var(--sl-color-text); }
+  [data-search-open] { display: flex; align-items: center; gap: .6rem; padding: .5rem .7rem; border: 1px solid var(--sl-color-gray-5); background: var(--sl-color-black); border-radius: .25rem; }
+  [data-search-open]:hover { border-color: var(--sl-color-gray-2); }
+  kbd { font: inherit; font-size: .75rem; color: var(--sl-color-gray-2); white-space: nowrap; }
+  [data-search-open] kbd { margin-inline-start: auto; }
+  dialog { margin: 4rem auto; padding: 0; width: min(42rem, calc(100% - 2rem)); max-height: calc(100dvh - 8rem); color: var(--sl-color-text); background: var(--sl-color-black); border: 1px solid var(--sl-color-gray-4); border-radius: .5rem; box-shadow: var(--sl-shadow-lg); }
+  dialog::backdrop { background: var(--sl-color-backdrop-overlay); backdrop-filter: blur(.25rem); }
+  .search-frame { padding: 1.25rem; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.2rem; }
+  h2 { font-size: 1.1rem; margin: 0; color: var(--sl-color-white); }
+  [data-search-close], [data-search-retry] { padding: .4rem .6rem; border: 1px solid var(--sl-color-gray-4); background: var(--sl-color-gray-6); border-radius: .25rem; }
+  label { display: block; margin-bottom: .35rem; font-size: .9rem; }
+  input { box-sizing: border-box; width: 100%; padding: .8rem; border: 1px solid var(--sl-color-gray-3); border-radius: .25rem; background: var(--sl-color-gray-6); color: var(--sl-color-white); font: inherit; }
+  :is(button,input):focus-visible { outline: 2px solid var(--sl-color-text-accent); outline-offset: 2px; }
+  [role='status'] { margin: .8rem 0; font-size: .875rem; color: var(--sl-color-gray-2); }
+  ol { list-style: none; margin: 0; padding: 0; }
+  :global([data-search-results] li + li) { margin-top: .6rem; }
+  :global([data-search-results] a) { display: block; padding: .85rem; border: 1px solid var(--sl-color-gray-5); border-radius: .25rem; text-decoration: none; color: var(--sl-color-text); overflow-wrap: anywhere; }
+  :global([data-search-results] a:hover), :global([data-search-results] a:focus-visible) { outline: 2px solid var(--sl-color-text-accent); outline-offset: -2px; background: var(--sl-color-gray-6); }
+  :global([data-search-results] strong) { color: var(--sl-color-text-accent); }
+  :global([data-search-results] p) { margin: .3rem 0; font-size: .9rem; line-height: 1.5; }
+  :global([data-search-results] small) { color: var(--sl-color-gray-2); font-size: .75rem; }
+  :global(body[data-webmusic-search-open]) { overflow: hidden; }
+  @media (max-width: 49.99rem) {
+    .search-label, [data-search-open] kbd { display: none; }
+    [data-search-open] { border: none; }
+    dialog { margin: 1rem auto; max-height: calc(100dvh - 2rem); }
+    .search-frame { padding: 1rem; }
+  }
+</style>

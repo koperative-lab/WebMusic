@@ -1,0 +1,416 @@
+---
+title: '@webmusic/score/react'
+description: React provider, hooks, controls, and score views
+---
+
+import ReactPresetShowcase from '../../../../components/ReactPresetShowcase.astro';
+
+`@webmusic/score/react` is the React binding capability of the `@webmusic/score` package. It gives you two levels of API:
+
+- Ready-made modules for direct JSX usage, such as `<SimpleScorePlayer score={score} />`.
+- Lower-level Provider, hooks, and view components for custom application design.
+
+It expects your app to provide a `Score` object. It does not import files or create a standalone app shell.
+
+## Install
+
+`npm install @webmusic/score react` — use an available published version or the local workspace; [Install](/score/#install) has the full setup.
+
+React is a peer dependency:
+
+```txt
+react >= 18
+```
+
+## SimpleScorePlayer
+
+Use `SimpleScorePlayer` when you only need playback controls for a score.
+
+```tsx
+import type { Score } from '@webmusic/score';
+import { SimpleScorePlayer } from '@webmusic/score/react';
+
+export function Page({ score }: { score: Score }) {
+  return (
+    <SimpleScorePlayer
+      score={score}
+      className="score-player"
+      controlsClassName="transport"
+    />
+  );
+}
+```
+
+<ReactPresetShowcase demo="player" />
+
+## SimplePianoRoll
+
+Use `SimplePianoRoll` when you want the packaged piano-roll view without manually adding a provider.
+
+```tsx
+import type { Score } from '@webmusic/score';
+import { SimplePianoRoll } from '@webmusic/score/react';
+
+export function Page({ score }: { score: Score }) {
+  return (
+    <SimplePianoRoll
+      score={score}
+      width={720}
+      height={240}
+      pixelsPerSecond={96}
+      laneHeight={12}
+      className="piano-roll"
+    />
+  );
+}
+```
+
+<ReactPresetShowcase demo="piano-roll" />
+
+## SimpleStaff
+
+Use `SimpleStaff` when you want the packaged staff view without wiring player events yourself.
+
+```tsx
+import type { Score } from '@webmusic/score';
+import { SimpleStaff } from '@webmusic/score/react';
+
+export function Page({ score }: { score: Score }) {
+  return (
+    <SimpleStaff
+      score={score}
+      width={720}
+      height={220}
+      pixelsPerSecond={0}
+      laneHeight={7}
+      className="staff"
+    />
+  );
+}
+```
+
+<ReactPresetShowcase demo="staff" />
+
+## SimpleWaterfall
+
+Use `SimpleWaterfall` for a packaged falling-note timeline with piano-style pitch columns. It renders no keyboard; compose a separate pitch view when needed.
+
+```tsx
+import type { Score } from '@webmusic/score';
+import { SimpleWaterfall } from '@webmusic/score/react';
+
+export function Page({ score }: { score: Score }) {
+  return (
+    <SimpleWaterfall
+      score={score}
+      width={720}
+      height={320}
+      pixelsPerSecond={64}
+      laneHeight={16}
+      className="waterfall"
+    />
+  );
+}
+```
+
+<ReactPresetShowcase demo="waterfall" />
+
+## AnalysisSummary
+
+Use `AnalysisSummary` when you want a compact packaged summary of key, chords, roman numerals, motifs, and voice-leading issues.
+
+An empty score displays `Unknown` for the key. The underlying analysis retains
+its compatibility placeholder, but an empty candidate list supplies no evidence
+for a detected key. Nonempty estimates are heuristic rankings, not calibrated
+probabilities; see the [Analyze API](/score/api/analyze/).
+
+You can pass `score` directly:
+
+```tsx
+import type { Score } from '@webmusic/score';
+import { AnalysisSummary } from '@webmusic/score/react';
+
+export function Page({ score }: { score: Score }) {
+  return <AnalysisSummary score={score} className="analysis" />;
+}
+```
+
+Or render it inside `ScoreProvider`:
+
+```tsx
+import type { Score } from '@webmusic/score';
+import { AnalysisSummary, ScoreProvider } from '@webmusic/score/react';
+
+export function Page({ score }: { score: Score }) {
+  return (
+    <ScoreProvider score={score}>
+      <AnalysisSummary className="analysis" />
+    </ScoreProvider>
+  );
+}
+```
+
+<ReactPresetShowcase demo="analysis" />
+
+## SimpleScoreWorkspace
+
+Use `SimpleScoreWorkspace` when you want a complete packaged workspace from a single component.
+
+```tsx
+import type { Score } from '@webmusic/score';
+import { SimpleScoreWorkspace } from '@webmusic/score/react';
+
+export function Page({ score }: { score: Score }) {
+  return (
+    <SimpleScoreWorkspace
+      score={score}
+      className="score-workspace"
+      controlsClassName="transport"
+      analysis
+      pianoRoll={{ width: 720, height: 240 }}
+      staff={{ width: 720, height: 220 }}
+      waterfall={{ width: 720, height: 320 }}
+    />
+  );
+}
+```
+
+<ReactPresetShowcase demo="workspace" />
+
+Disable parts you do not need:
+
+```tsx
+<SimpleScoreWorkspace
+  score={score}
+  analysis={false}
+  staff={false}
+  waterfall={false}
+/>
+```
+
+## Customize With Provider
+
+Use `ScoreProvider` directly when you want one shared score/player context and full control over the layout.
+
+```tsx
+import type { Score } from '@webmusic/score';
+import { ScoreProvider } from '@webmusic/score/react';
+
+export function App({ score }: { score: Score }) {
+  return (
+    <ScoreProvider
+      score={score}
+      playerOptions={{
+        tempo: 96,
+        synth: {
+          noteOn(midi, velocity, time, durationSeconds) {
+            console.log('on', midi, velocity, time, durationSeconds);
+          },
+          noteOff(midi, time) {
+            console.log('off', midi, time);
+          },
+        },
+      }}
+    >
+      <CustomWorkspace />
+    </ScoreProvider>
+  );
+}
+```
+
+Provider output:
+
+```txt
+ScoreProvider
+  -> ScoreContext
+  -> PlayerContext
+  -> CursorContext
+```
+
+## Customize With Hooks
+
+Use hooks inside `ScoreProvider` to build custom controls, readouts, analysis panels, or editor UI.
+
+```tsx
+import { useCursor, usePlayer, useScore, useScoreAnalysis } from '@webmusic/score/react';
+
+export function CursorReadout() {
+  const score = useScore();
+  const player = usePlayer();
+  const cursor = useCursor();
+  const analysis = useScoreAnalysis({ windowQuarters: 4 });
+
+  return (
+    <button type="button" onClick={() => player.seek(0)}>
+      {score.metadata.title}: {analysis.key.tonic} {analysis.key.mode}, measure {cursor.measure}, beat {cursor.beat.toFixed(2)}
+    </button>
+  );
+}
+```
+
+Hook output:
+
+```txt
+useScore()              -> Score
+usePlayer()             -> Player
+useCursor()             -> { tick, seconds, measure, beat }
+useScoreAnalysis()      -> { key, chords, roman, motifs, issues }
+useScoreAnalysisAsync() -> { result, pending }
+```
+
+For large scores, `useScoreAnalysisAsync` runs the same analysis off the main thread in a Web Worker (see [Analysis in a Worker](/score/api/analyze/#analysis-in-a-worker)). Instead of blocking the render it returns `{ result, pending }`: `result` is the latest finished analysis (`null` until the first one lands), `pending` is true while the current score is being analyzed. Edits are coalesced latest-wins — rapid successive edits only analyze the newest score — and when `Worker` is unavailable (SSR, tests) the hook falls back to an in-process session. The worker is disposed on unmount. Pass the same options as `useScoreAnalysis`, plus an optional `worker` (instance or factory) for custom bundler setups:
+
+```tsx
+const { result, pending } = useScoreAnalysisAsync({ windowQuarters: 4 });
+if (result) console.log(result.key.tonic, pending ? '(updating…)' : '');
+```
+
+Hooks must be called inside `ScoreProvider`:
+
+```txt
+useScore must be used inside ScoreProvider
+usePlayer must be used inside ScoreProvider
+useCursor must be used inside ScoreProvider
+```
+
+## Customize Individual Components
+
+Use the lower-level components when you want to compose your own workspace but still want packaged React wrappers around the view layer.
+
+```tsx
+import type { Score } from '@webmusic/score';
+import {
+  AnalysisSummary,
+  PianoRollView,
+  PlayerControls,
+  ScoreProvider,
+  StaffView,
+  WaterfallView,
+  useCursor,
+  useScore,
+} from '@webmusic/score/react';
+
+function StatusBar() {
+  const score = useScore();
+  const cursor = useCursor();
+
+  return (
+    <output>
+      {score.metadata.title} · measure {cursor.measure} · beat {cursor.beat.toFixed(2)}
+    </output>
+  );
+}
+
+export function CustomWorkspace({ score }: { score: Score }) {
+  return (
+    <ScoreProvider score={score}>
+      <PlayerControls className="transport" />
+      <StatusBar />
+      <AnalysisSummary className="analysis" />
+      <PianoRollView width={720} height={240} className="piano-roll" />
+      <StaffView width={720} height={220} className="staff" />
+      <WaterfallView width={720} height={320} className="waterfall" />
+    </ScoreProvider>
+  );
+}
+```
+
+Component tree:
+
+```txt
+ScoreProvider
+  PlayerControls
+  StatusBar
+  AnalysisSummary
+  PianoRollView
+  StaffView
+  WaterfallView
+```
+
+## Annotation visibility
+
+`PianoRollView`, `StaffView` and `WaterfallView`, and their `Simple*` presets,
+accept `showAnnotations` (default `true`) for the packaged SVG renderers. Set it
+to `false` to hide words, dynamics, tempo, rehearsal, pedal and hairpin marks
+and remove their reserved space. Notes and notation essentials remain visible.
+`StaffView` and `WaterfallView` retain their explicit/default viewport heights;
+use `height="auto"` on `StaffView` to follow its compact natural drawing height.
+OSMD engraving remains configured through its own `osmdOptions`.
+
+## OSMD Staff Mode
+
+`StaffView` and `SimpleStaff` use the lightweight staff renderer by default. Pass `osmd` when you want OpenSheetMusicDisplay engraving.
+
+```tsx
+import { SimpleStaff } from '@webmusic/score/react';
+import { OpenSheetMusicDisplay } from 'opensheetmusicdisplay';
+
+<SimpleStaff
+  score={score}
+  osmd={{
+    musicXML,
+    OpenSheetMusicDisplay,
+    osmdOptions: {
+      drawTitle: false,
+      drawPartNames: false,
+      autoResize: true,
+    },
+  }}
+/>;
+```
+
+Output:
+
+```txt
+SimpleStaff without osmd -> lightweight staff renderer
+SimpleStaff with osmd    -> OpenSheetMusicDisplay renderer
+```
+
+## Styling
+
+Preset and low-level components accept `className` props and render normal DOM nodes. Every visible
+component already owns the same outer surface: a white background, `1px solid #d8d8d8` border,
+`.6rem` padding, and square corners. Override the shared tokens when an application needs a different
+theme; no documentation wrapper or page rule is required. The seek track's line follows the shared
+`--wm-control-border` → `--wm-border` → `#d8d8d8` chain, while the primary play button keeps its
+black fill and border.
+
+```css
+.music-ui {
+  --wm-component-background: #fff;
+  --wm-component-border: 1px solid #d8d8d8;
+  --wm-component-padding: 0.6rem;
+  --wm-component-radius: 0;
+}
+```
+
+Rendered roots:
+
+```txt
+PlayerControls -> div
+AnalysisSummary -> dl
+PianoRollView  -> div -> scroll viewport -> svg
+StaffView      -> div
+WaterfallView  -> div
+```
+
+## API Reference
+
+| API | Kind | Use it for |
+| --- | --- | --- |
+| `SimpleScorePlayer` | Preset | Render `ScoreProvider` + `PlayerControls` from a `score` prop. |
+| `SimplePianoRoll` | Preset | Render `ScoreProvider` + `PianoRollView` from a `score` prop. |
+| `SimpleStaff` | Preset | Render `ScoreProvider` + `StaffView` from a `score` prop. |
+| `SimpleWaterfall` | Preset | Render `ScoreProvider` + `WaterfallView` from a `score` prop. |
+| `SimpleScoreWorkspace` | Preset | Render controls, optional analysis, and score views from a `score` prop. |
+| `AnalysisSummary` | Component | Render a compact key/chord/roman/motif/voice-leading summary. |
+| `ScoreProvider` | Provider | Provide `Score`, `Player`, and cursor state to child components. |
+| `useScore()` | Hook | Read the current `Score` from context. |
+| `usePlayer()` | Hook | Read the shared `Player` instance from context. |
+| `useCursor()` | Hook | Read the latest `{ tick, seconds, measure, beat }` cursor position. |
+| `useScoreAnalysis(options?)` | Hook | Read key, chord, roman, motif, and voice-leading analysis from context. |
+| `useScoreAnalysisAsync(options?)` | Hook | The same analysis off the main thread in a Web Worker: `{ result, pending }`. |
+| `PlayerControls` | Component | Render a simple play/pause button and range input. |
+| `PianoRollView` | Component | Render the SVG piano-roll visualizer connected to playback events. |
+| `StaffView` | Component | Render lightweight staff notation or OSMD engraving. |
+| `WaterfallView` | Component | Render falling-note pitch columns connected to playback events, without an embedded keyboard. |

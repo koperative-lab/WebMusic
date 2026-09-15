@@ -1,0 +1,211 @@
+---
+title: 'createScoreView'
+description: 'A code-only view model over a Score: which notes are visible, which are sounding, and where the playhead is — with no surface of its own.'
+sidebar:
+  order: 1
+---
+
+import ScoreWindowPlayground from '../../../../../components/headless/ScoreWindowPlayground.astro';
+
+`createScoreView(score, options?)` is the state a score view needs, without
+the view. It flattens the `Score` into a note sequence once, then answers two
+questions as the piece plays: **what is inside the viewport**, and **what is
+sounding right now**. Your framework subscribes and draws.
+
+Reach for it when you own the surface — a React tree, a canvas engine, a
+native renderer. If you want WebMusic to draw as well, the
+[`/render` adapters](/score/api/view/) draw from the same Score, and
+[`<score-view>`](/score/element/view/score-view/) is both of them behind one
+tag.
+
+It **borrows** the `Score` and its cached immutable flattened sequence, and owns
+its snapshots, active note set and subscriptions. There is no audio, rendering surface or clock.
+`subscribe()` returns an unsubscribe function; `dispose()` releases this
+view model's active state and listeners. Caller-installed player/input
+bindings must be detached separately. A binding supplied through `options.playback`
+is owned by the view and is detached by `dispose()`; the player remains borrowed.
+
+<ScoreWindowPlayground />
+
+## Import
+
+```ts
+import {createScoreView} from '@webmusic/score/view/headless';
+
+const view = createScoreView(score, {
+  type: 'staff',
+  viewport: {startTime: 0, endTime: 8},
+});
+
+const off = view.subscribe(({visibleNotes, activeNotes}) => {
+  renderWithMyFramework({visibleNotes, activeNotes});
+});
+
+view.noteOn(60, 0);   // a player attacked middle C at t=0
+view.seek(4);
+off();
+view.dispose();
+```
+
+## Notation and annotations
+
+Selecting `type: 'staff'` does not engrave notation inside this object.
+`sequence`, `visibleNotes` and `activeNotes` describe sounding notes. The staff
+render adapter additionally reads the original `score` for written durations,
+rests, voices, beams, tuplets, timed clefs and expressive directions. A custom notation renderer should also
+use that Score data; the flattened sequence alone cannot reproduce the source's
+notation. Glyph layout and VexFlow remain on `/render`, with no DOM or engraving
+dependency in this Headless object.
+
+The renderer's [`showAnnotations` option](/score/api/view/#render-annotations)
+controls expressive directions without changing this view model's state or
+playback position. It is not a `createScoreView` construction option.
+
+## Viewport and virtualization
+
+`setViewport(start, end)` narrows the window; `clearViewport()` widens it back
+to the whole piece. Two fields answer the same question at different costs:
+`visibleRange` is an index range into `sequence.notes` — start inclusive, end
+exclusive — that a virtualizing renderer can slice directly, while
+`visibleNotes` is the exact set whose sounding span intersects the window.
+Take the range when you are windowing thousands of notes and the exact set
+when you are drawing a handful.
+
+The exact viewport predicate is `note.endTime > start && note.startTime <= end`:
+a note starting at the right edge is visible, while one ending at the left edge
+is excluded. Sounding activity uses the separate half-open predicate
+`note.startTime <= time && time < note.endTime`. Changing a drawing mode or
+viewport preserves time and active-note identity. Resize belongs to your renderer;
+the model accepts time windows, not pixel dimensions or pointer coordinates.
+
+## Follow a playback source
+
+Pass `{playback: player.playback}` with the same immutable Score used by the
+player. The view applies the initial snapshot immediately and follows nominal
+position and active-note identity. For application-managed observation, call
+`updatePlayback(snapshot)` with values from the
+[shared source](/score/api/#shared-playback-observation).
+
+The view's Score is fixed: source replacement requires a new view for the new
+Score. A snapshot with a different Score cannot silently apply its notes to this
+sequence. This binding reads state only; `view.seek()` remains local projection,
+while playback navigation must use the source's authorized seek command.
+Unavailable, disposed or mismatched snapshots clear highlights and retain the
+last local position. A compatible snapshot with `nominalSeconds: null` likewise
+retains position, while still applying its note identities. Part ID and note ID
+form an exact pair; equal pitches in other parts are not substituted.
+
+## Active notes
+
+`noteOn(midi, startTimeSeconds)` matches an attack against the sequence, so
+the highlight is a real note rather than a pitch. That match is why the second
+argument exists: the same pitch can sound twice in one bar. `noteOn` activates
+all matching sequence notes at that pitch/onset and returns the first match.
+The MIDI value here is the sequence's written pitch. Native playback observation
+uses part/note identity and remains unambiguous for transposing instruments.
+`noteOff(midi, onset?)` releases matching notes; without an onset it releases
+all active notes of that pitch. `clearActiveNotes()` releases all, and `end()` is what a player's `end`
+event should call.
+
+A live source — a MIDI keyboard, a step sequencer — has no sequence onset to
+match against. Use [`createActiveNoteTracker`](/score/headless/view/pitch-view/#active-note-tracker)
+for those; it keys on MIDI alone.
+
+All time arguments are **nominal score seconds**, on the sequence's time
+axis. Use a player's nominal position/onset when playback rate changes;
+rate-scaled transport seconds describe a different axis. `seek()` derives
+the notes sounding at the requested point, while `noteOn` consumes an exact
+sequence onset (within a one-microsecond matching tolerance). The score is
+fixed for the lifetime of a view; create a new model for an edited score.
+
+<details class="component-section">
+<summary>API</summary>
+
+**Construction** — `createScoreView(score: Score, options?: ScoreViewOptions)`
+
+| Member | Kind | Default | Description |
+| --- | --- | --- | --- |
+| `type` | option | `'piano-roll'` | `'piano-roll'`, `'staff'` or `'waterfall'`; picks how a renderer should read the sequence. |
+| `viewport` | option | whole piece | `{startTime, endTime}` in seconds. |
+| `playback` | option | none | Borrow a `ScorePlaybackSource`; synchronously apply the initial snapshot and follow updates without DOM. |
+
+**Commands**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `setType(type)` | command | Switches the drawing mode; returns the new state. |
+| `setViewport(start, end)` | command | Narrows the window; returns the new state. |
+| `clearViewport()` | command | Widens back to the whole piece; returns `ScoreViewState`. |
+| `seek(seconds)` | command | Clamps finite seconds to the score, derives sounding notes, and returns new state. |
+| `noteOn(midi, startTimeSeconds)` | command | Activates matching notes, advances the playhead and publishes; returns the first `ScoreSequenceNote`, or `undefined` if none matches. |
+| `noteOff(midi, startTimeSeconds?)` | command | Releases matching notes; without onset releases all active notes of that pitch. Returns `void`. |
+| `clearActiveNotes()` | command | Releases every sounding note; returns `void`. |
+| `end()` | command | Clears active notes and places the playhead at sequence end; returns `void`. |
+| `reset()` | command | Clears active notes and sets time to zero, retaining the current type and viewport; returns `void`. |
+| `updatePlayback(snapshot)` | command | Apply a `ScorePlaybackSnapshot` for this exact Score identity, using nominal time and part/note identity. Incompatible or unavailable data clears active highlights. Returns the new state. |
+
+**State**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `score` | state | The borrowed `Score`. |
+| `sequence` | state | The flattened sounding-note `ScoreNoteSequence`, computed once; full written notation remains on `score`. |
+| `state` | state | The current immutable `ScoreViewState`. |
+| `state.type` · `state.sequence` | state | Selected drawing mode and the model's flattened sequence. |
+| `state.currentTime` | state | Playhead in seconds. |
+| `state.activeNotes` | state | Sequence notes currently sounding. |
+| `state.visibleRange` | state | `{start, end}` index range into `sequence.notes`. |
+| `state.visibleNotes` | state | Notes intersecting the viewport. |
+| `state.viewport` | state | The active window, or `undefined` for the whole piece. |
+
+**Events**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `subscribe(listener)` | subscription | Called synchronously with new state after each state command, with no initial callback. Returns an unsubscribe function. |
+
+Read `state` on initial mount. The return types differ by command as shown
+above; void-returning commands still publish their resulting state.
+`ScoreViewListener` receives one `ScoreViewState`; callback failures
+propagate to the command caller and have no separate error event.
+If a listener changes state synchronously, that newer publication supersedes
+the remaining callbacks from the older one. A listener removed before its turn
+is skipped. State-returning commands return the latest state after these
+callbacks; their state change remains committed if a callback throws.
+
+**Validation and lifecycle**
+
+MIDI arguments require safe integers in 0…127. Note-on/off onsets must be
+finite non-negative seconds. A viewport requires finite
+`0 <= startTime <= endTime`. Unsupported view types throw `RangeError`.
+Non-finite compatible playback positions throw `RangeError` before changing
+local time or active notes. An initial playback subscription failure propagates
+from construction; the source is responsible for releasing a subscription whose
+synchronous initial delivery throws, as required by its subscription contract.
+`dispose(): void` is idempotent; it clears active notes and listeners without
+publishing, while the last state remains readable. Later state commands and
+new subscriptions throw. It does not dispose the score or an external player.
+Local disposal completes before calling the borrowed subscription's cleanup. If
+that cleanup throws, its error propagates once, the view stays disposed, and late
+source callbacks are ignored.
+
+</details>
+
+The source contracts are `createScoreView`, `ScoreView`, `ScoreViewOptions`,
+`ScoreViewState`, `ScoreViewTimeRange`, `ScoreViewType` and
+`ScoreViewListener` at `@webmusic/score/view/headless`. Sequence data types
+are described by the [View API](/score/api/view/).
+
+## Related
+
+**Composed by.** [`<score-view>`](/score/element/view/score-view/) — Score /
+View, which pairs it with the `/render` adapters and a
+[`@webmusic/ui/stage`](/uikit/layout-feedback/stage/) surface.
+
+[createActiveNoteTracker](/score/headless/view/pitch-view/#active-note-tracker) handles
+live pitches that have no score onset.
+
+[createScoreMapView](/score/headless/view/score-map-view/) follows replacement
+scores and delegates navigation; this model’s `seek()` updates local state.
+[createPitchView](/score/headless/view/pitch-view/) adds playback attachment to
+score-independent held-pitch state.

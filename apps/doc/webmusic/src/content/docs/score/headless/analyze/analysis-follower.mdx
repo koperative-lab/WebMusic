@@ -1,0 +1,238 @@
+---
+title: 'createAnalysisFollower'
+description: 'Analysis, current position and held-note state borrowed from a playback source, with explicit navigation outcomes.'
+sidebar:
+  order: 2
+---
+
+import PlaybackFollowersPlayground from '../../../../../components/headless/PlaybackFollowersPlayground.astro';
+
+`createAnalysisFollower(options?)` keeps a score analysis and its playback
+position together. It borrows a `ScorePlaybackSource`, owns its subscription and
+an analysis session, and publishes plain state for application-owned UI.
+It creates no player, audio context, timer, file request or DOM.
+
+Use [createAnalysisSession](/score/headless/analyze/analysis-session/) for
+caller-driven score edits alone. Use this follower when custom UI also needs
+source replacement, readiness, active notes and navigation.
+
+<PlaybackFollowersPlayground object="analysis-follower" />
+
+## Import
+
+The caller supplies `score` and a retained `ScorePlayer` named `player`.
+The player remains owned by its caller.
+
+```ts
+import {createAnalysisFollower} from '@webmusic/score/analyze/headless';
+
+const follower = createAnalysisFollower({playback: player.playback});
+const unsubscribe = follower.subscribe((state) => {
+  console.log(state.result?.key, state.quarters, state.activeMidis);
+});
+
+const outcome = await follower.seekQuarters(4);
+if (outcome.status === 'failed') console.error(outcome.error);
+
+// Keep the follower while the application view is mounted.
+const dispose = () => {
+  unsubscribe();
+  follower.dispose();
+};
+```
+
+For standalone inspection, construct with `{score}` and no playback source.
+Seeks then move only the local cursor; no sound is started.
+
+## Data and time ownership
+
+An explicit `score` wins over borrowed data. `setScore(undefined)` restores
+borrowing from the current playback source. A different explicit Score object
+produces `readiness: 'mismatched'`: its analysis remains available, while
+incompatible player activity and navigation are suppressed.
+
+The first source snapshot hydrates state immediately; later source changes
+replace the analysis input and invalidate older navigation. Active notes retain
+occurrence identity, so releasing one voice does not clear another occurrence
+of the same MIDI pitch. `activeMidis` is the unique ascending pitch set.
+
+`nominalSeconds` is the rate-independent score position. `quarters` uses the
+same score’s tempo map. The follower reads snapshots without predicting frames;
+use [createTransportClock](/score/headless/analyze/analysis-follower/#presentation-clock) separately
+if presentation needs interpolation.
+
+## Navigation outcomes
+
+`seekNominal(seconds)` and `seekQuarters(quarters)` return
+`Promise<AnalysisSeekOutcome>`. A bound command requires a ready, matching
+source with `seekNominal` support. The source owns the command and the resulting
+snapshot position; a follower never starts or stops playback to implement a seek.
+
+Inputs must be finite nonnegative numbers; values beyond the score duration
+are clamped. Invalid positions and unavailable/read-only sources produce a
+failed outcome.
+
+Inspect `status`: `committed` means the command completed for the current
+binding; `superseded` means a newer request, input replacement or disposal took
+precedence; `failed` carries `error`. A late completion cannot restore an old
+score or overwrite newer state. These outcomes describe this command, not the
+end of playback or completion of any presentation animation.
+
+<details class="component-section">
+<summary>API</summary>
+
+**Construction** — `createAnalysisFollower(options?: AnalysisFollowerOptions): AnalysisFollower`
+
+| Member | Kind | Default | Description |
+| --- | --- | --- | --- |
+| `score` | option | borrow source | Explicit immutable `Score`; omit to follow source data. |
+| `playback` | option | none | Borrowed `ScorePlaybackSource`, normally `player.playback`. |
+| `analysis` | option | session defaults | `AnalysisSessionOptions`: `windowQuarters: 2`, `motifLength: 4`, `minOccurrences: 2`. Fixed for this follower’s lifetime. |
+
+**Commands**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `setScore(score \| undefined)` | command | Sets explicit input or restores borrowed input, updating derived analysis and invalidating pending navigation. |
+| `setPlayback(source \| undefined)` | command | Detaches the previous source, observes the new one and hydrates its state. Does not dispose either source. |
+| `seekNominal(seconds)` | command | Navigates in nominal score seconds and returns an `AnalysisSeekOutcome` promise. |
+| `seekQuarters(quarters)` | command | Converts quarter-note position through the current score and returns the same outcome type. |
+
+**`AnalysisFollowerState`**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `revision` | state | Revision of the published follower state. |
+| `score` | state | Effective Score, or `undefined` when unavailable. |
+| `result` | state | `AnalysisResult` for the effective score, or `undefined` without an available result. |
+| `readiness` | state | `ScorePlaybackReadiness` or `'mismatched'`; standalone supplied data is ready. |
+| `playbackState` | state | Source `ScorePlaybackState`. |
+| `nominalSeconds` | state | Current nominal position or `null` when unavailable. |
+| `quarters` | state | Current quarter-note position or `null` when unavailable. |
+| `activeNotes` | state | Read-only `ScorePlaybackNote[]` with source occurrence identity. |
+| `activeMidis` | state | Read-only unique ascending active MIDI values. |
+| `error` | state | Optional source/analysis error; availability is separate from failure. |
+
+Read the current snapshot through `follower.state`. `AnalysisSeekOutcome`
+contains `status` and `nominalSeconds`; a failed outcome also contains `error`.
+
+**Events and lifecycle**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `subscribe(listener)` | subscription | Synchronously delivers the current state, then later changes. Returns an unsubscribe function. The callback receives one `AnalysisFollowerState`. |
+| `dispose()` | lifecycle | Idempotently releases source observation and listeners and supersedes pending seeks. Borrowed playback is left running and owned by its caller. |
+
+`setScore`, `setPlayback` and new subscriptions after disposal throw. Seeks
+after disposal return a failed outcome. Disposal leaves readable empty state
+with `readiness: 'disposed'`. Listener exceptions propagate to their caller;
+a throwing initial subscriber is removed. Derived-analysis failures appear in
+`state.error` with `readiness: 'error'` and no result.
+
+If the old subscription's cleanup throws, replacement still completes before
+that error is rethrown. If attaching the new subscription fails, borrowed state
+is cleared while explicit input is retained. When both operations fail, an
+`Error` with a read-only `errors` array reports both failures. Retrying `setPlayback` can attach a
+working source; teardown never stops the borrowed player.
+
+### Presentation clock
+
+`createTransportClock(options?)` predicts a display position between playback
+samples. It consumes timestamps supplied by the application and returns nominal
+score seconds. It creates no timer, animation frame, player or subscription.
+
+Use it for smooth presentation when player updates arrive less often than
+frames. This predictor is separate from Kernel’s authoritative transport clock;
+its predicted position must not schedule sound or replace a player snapshot.
+
+#### Clock Import
+
+```ts
+import {createTransportClock} from '@webmusic/score/analyze/headless';
+
+const clock = createTransportClock({durationSeconds: 20});
+clock.sample({nominalSeconds: 4, rate: 1.5, atMs: 1000});
+const reading = clock.readAt(1020);
+console.log(reading.seconds, reading.held, reading.epoch);
+clock.stop(1030, 4.045);
+```
+
+Keep one timestamp origin for samples, reads, stops and releases. Times ending
+in `Ms` are milliseconds; positions and durations are nominal score seconds.
+`rate` is nominal seconds per elapsed real second.
+
+#### Clock Following and scrubbing
+
+Samples re-anchor the prediction. The clock measures their interval and coasts
+for a bounded interval, then settles with `held: true` if updates stop. It can
+detect a seek or loop wrap from a discontinuity, but cannot predict a loop region.
+The `epoch` increases on discontinuities so a presenter can snap immediately.
+
+Use `hold(seconds)` during a drag, then `release(atMs)`. The released position
+stays parked until a sample is accepted; briefly delayed echoes of the old
+position are ignored. These operations change local presentation only and never
+seek a player. Invoke the owner’s seek command separately, or use
+[createAnalysisFollower](/score/headless/analyze/analysis-follower/) for an
+explicit navigation outcome.
+
+
+**Construction** — `createTransportClock(options?: TransportClockOptions): TransportClock`
+
+| Member | Kind | Default | Description |
+| --- | --- | --- | --- |
+| `durationSeconds` | option | no upper bound | Finite nonnegative duration clamps readings to `[0, duration]`. Invalid values disable the upper bound; zero is a valid bound. Positions are always nonnegative. |
+| `expectedIntervalMs` | option | `50` | Initial sample-interval hint. A positive finite value is clamped to `8…400` ms; invalid values use the default. Later valid sample intervals update the estimate. |
+
+**Commands and readings**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `sample({nominalSeconds, rate, atMs})` | command | Accepts a `TransportSample`. Invalid positions/timestamps are ignored; invalid or negative rates preserve the last rate. `rate: 0` is valid. |
+| `readAt(atMs)` | query | Returns `TransportReading` without advancing state. Invalid timestamps return the current anchor; earlier timestamps do not extrapolate backward. |
+| `stop(atMs, seconds?)` | command | Parks at the supplied position, or the current prediction when omitted, sets rate to zero and increments the epoch. |
+| `hold(seconds)` | command | Holds a drag position, with clamping. Each distinct held position increments the epoch; incoming samples cannot move it. |
+| `release(atMs)` | command | Releases an active hold and parks there until a suitable sample. Allows a 250 ms grace period for stale seek echoes. No effect without a hold. |
+
+Invalid command positions retain the current anchor. Invalid stop/release
+timestamps retain the previous anchor timestamp.
+
+**`TransportReading`**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `seconds` | result | Clamped nominal position. Before the first sample, `0`. |
+| `held` | result | Whether parked, scrubbed, rate-zero or past the bounded coast. Initially `true`. |
+| `epoch` | result | Discontinuity counter, initially `0`. |
+| `rate` | result | Last accepted rate, initially `1`; `stop()` sets it to `0`. |
+
+**Helpers**
+
+`rateFromDurations(nominalDurationSeconds, transportDurationSeconds): number`
+returns their ratio when both durations are positive finite numbers and the
+ratio is finite; otherwise it returns `1`. Unlike dividing current positions,
+this remains defined at the start of playback.
+
+**Lifecycle and events**
+
+There is no `dispose()`, subscription or event emitter. Drop the object when
+unused; release application-owned input/frame subscriptions yourself. Options
+are fixed at construction. The public types are `TransportClock`,
+`TransportClockOptions`, `TransportSample` and `TransportReading`.
+
+
+#### Clock Related
+
+[Analyze lanes](/score/element/#analyze) use this predictor for display motion.
+[createAnalysisFollower](/score/headless/analyze/analysis-follower/) reads the
+player’s authoritative state; [Kernel](/kernel/) owns neutral transport contracts.
+
+</details>
+
+## Related
+
+[Analyze Web Components](/score/element/#analyze) adapt shared nonvisual
+following behavior to their DOM inputs and presenters.
+[Live trackers](/score/headless/analyze/live-trackers/) accept raw note events;
+[projections](/score/api/analyze/#the-projections) turn analysis into plain data
+for custom surfaces. [createScoreMapView](/score/headless/view/score-map-view/)
+provides score-map navigation without analysis.

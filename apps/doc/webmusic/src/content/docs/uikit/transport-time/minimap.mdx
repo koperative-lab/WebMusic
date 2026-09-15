@@ -1,0 +1,168 @@
+---
+title: '@webmusic/ui/minimap'
+description: 'A DPR-aware overview canvas with an accessible draggable and keyboard-operable range brush.'
+sidebar:
+  label: 'minimap'
+  order: 3
+---
+
+import UiPresenterLiveDemo from '../../../../components/UiPresenterLiveDemo.astro';
+import UiPresenterRelated from '../../../../components/UiPresenterRelated.astro';
+
+`mountMinimap()` renders a device-pixel-ratio-aware overview canvas beneath a draggable range
+brush. It paints the caller's `MinimapState`, asks the binding to draw the overview, and routes
+range and seek intent back without owning a waveform, score, viewport, or playhead model.
+
+Use [timeline](/uikit/transport-time/timeline/) when labels and editable regions matter,
+[transport](/uikit/transport-time/transport/) for playback controls, or
+[playlist](/uikit/transport-time/playlist/) for an ordered queue. Mount this presenter directly when your own renderer and viewport store should remain authoritative.
+
+<UiPresenterLiveDemo presenter="minimap" />
+
+## Import
+
+```ts
+import {mountMinimap} from '@webmusic/ui/minimap';
+
+const handle = mountMinimap(host, {
+  snapshot: () => store.viewport,
+  draw: ({context, width, height}) => drawOverview(context, width, height),
+});
+```
+
+## Canvas and range geometry
+
+`minimum` and `maximum` are normalized into ascending domain bounds. The brush appears only when
+both `start` and `end` are finite and the domain has positive length; its edges are sorted and
+clamped before painting. That makes the brush a projection of binding state, not a second
+viewport model.
+
+Before every draw, the presenter sizes the canvas backing store from the root's CSS pixels and
+the current device pixel ratio, then resets the 2D transform so `draw()` receives CSS-pixel
+`width` and `height`. A `ResizeObserver`, binding notification, or explicit `update()` redraws
+both canvas and brush.
+
+## Range and seek commands
+
+Dragging near either brush edge resizes that edge; dragging its center moves the complete range.
+Clicking the canvas centers the current-width brush at that value when `setRange()` exists, then
+also calls `seek()` when provided. See the
+[shared presenter shape](/uikit/api/#the-shared-presenter-shape) for common ownership and
+cleanup rules.
+
+`setRange()` may settle asynchronously. The presenter paints an optimistic brush immediately,
+keeps only the newest command revision, then returns to authoritative snapshot state on
+fulfillment or rejection. `seek()` may also return a promise, but it has no presenter-owned
+optimistic playhead; the binding must notify when its visible draw state changes.
+
+<details class="component-section">
+<summary>API</summary>
+
+`mountMinimap(host, binding, options?)` accepts an `HTMLElement` or `ShadowRoot` and returns a
+`MinimapHandle`.
+
+**State**
+
+| Member | Kind | Description |
+|---|---|---|
+| `minimum` | `number` | One domain bound. Non-finite values normalize to `0`; it is sorted with `maximum`. |
+| `maximum` | `number` | The other domain bound. Non-finite values fall back to normalized `minimum`; it is sorted with `minimum`. |
+| `start?` | `number` | One brush edge. Both edges must be finite; they are sorted and clamped to the domain. |
+| `end?` | `number` | The other brush edge. Omission of either edge hides the brush. |
+| `disabled?` | `boolean` | Strict `true` blocks range and seek pointer commands, removes brush keyboard access, and dims the brush. |
+
+**Binding**
+
+| Member | Kind | Description |
+|---|---|---|
+| `snapshot()` | `() => MinimapState` | Required pull port, read on mount and every update. A thrown error reaches `onError` and preserves the previous normalized state. |
+| `draw(frame)` | `(CanvasStageFrame) => void` | Required overview renderer. Receives the 2D context, canvas, CSS-pixel size, pixel ratio, and current time. |
+| `setRange?(start, end)` | `(number, number) => void \| Promise<void>` | Receives sorted, clamped range bounds from pointer or keyboard movement. Its presence makes the brush interactive. |
+| `seek?(value)` | `(number) => void \| Promise<void>` | Receives a domain-clamped value when the overview canvas is pressed. |
+| `subscribe?(notify)` | `(notify: () => void) => () => void` | Optional change subscription; its disposer is called by `destroy()` and on same-host remount. |
+
+**Options**
+
+| Member | Kind | Default | Description |
+|---|---|---|---|
+| `label` | `string` | `'Visible range'` | Accessible name of the brush slider. |
+| `fallbackWidth` | `number` | `320` | CSS-pixel canvas width used only when neither root nor canvas reports a positive width. |
+| `fallbackHeight` | `number` | `40` | CSS-pixel canvas height used only when neither root nor canvas reports a positive height. |
+| `edgeSize` | `number` | `8` | CSS-pixel distance from a brush edge that selects resize rather than move; non-positive values use the default. |
+| `keyboardStep` | `number` | `0.25` | Fraction of current brush width moved by Arrow keys, clamped to `0.001…1`. |
+| `classNames` | `MinimapClassNames` | `{}` | Adds compatibility classes for `root`, `canvas`, and `brush`. |
+| `parts` | `MinimapParts` | `{}` | Adds part tokens for `root`, `canvas`, and `brush`. |
+| `onError` | `(error: unknown) => void` | — | Receives draw, snapshot, command, subscription, observer, and cleanup failures. |
+| `stylesheet` | `boolean` | `true` | Installs the presenter's stylesheet unless explicitly `false`, for a light-DOM host that cannot inject CSS into its page. |
+
+**Handle**
+
+| Member | Kind | Description |
+|---|---|---|
+| `element` | `HTMLElement` | Presenter-owned `.wui-minimap` root. |
+| `canvas` | `HTMLCanvasElement` | DPR-sized, display-only overview canvas. |
+| `brush` | `HTMLDivElement` | Range brush with slider semantics; it can be hidden or removed from the tab order by state/binding capability. |
+| `update()` | `() => void` | Re-reads state, redraws the canvas, and paints the brush; becomes a no-op after destruction. |
+| `destroy()` | `() => void` | Idempotently invalidates pending commands, disconnects observation, disposes the subscription, and removes DOM and stylesheet. |
+
+**Accessibility.** The canvas is `aria-hidden`; the brush is the accessible `role="slider"` with
+dynamic `aria-valuemin`, `aria-valuemax`, `aria-valuenow`, and a two-edge `aria-valuetext`.
+ArrowLeft and ArrowRight move it by `keyboardStep × current range width`; Shift+Arrow moves one
+complete range width, and Home/End align it to the domain bounds. The brush leaves the tab order
+when hidden, disabled, or missing `setRange()`, and exposes `aria-disabled` otherwise. Canvas
+click seeking is pointer-only—the focusable brush remains the keyboard range control—and no
+caller node is rewritten.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+Use the shared [surface and palette tokens](/uikit/#theme-with-css-custom-properties) for
+background (including `transparent`), foreground, accent, outer border and corner radius.
+Presenter-specific tokens below take precedence within their documented roles.
+
+The presenter root uses the shared [`--wm-component-*` surface](/uikit/#theme-with-css-custom-properties),
+or `--wm-minimap-surface-*` for a minimap-only override. The full-bleed inner viewport retains the
+`--wm-minimap-*` geometry tokens below. The canvas drawing itself is caller-owned.
+
+**Tokens**
+
+| Property | Falls back to | Default | Controls |
+|---|---|---|---|
+| `--wm-minimap-background` | `--wm-surface` | `transparent` | Inner viewport background. |
+| `--wm-minimap-foreground` | `--wm-waveform` → `--wm-foreground` | `#444` | Foreground inherited by caller drawing code. |
+| `--wm-minimap-border` | Literal | `0` | Inner viewport border shorthand. |
+| `--wm-minimap-radius` | `--wm-control-radius` | `0` | Inner viewport clipping and corners. |
+| `--wm-minimap-brush-border` | `--wm-selection` | `#4869d8` | Brush border. |
+| `--wm-minimap-brush` | `--wm-selection-fill` | `rgba(72, 105, 216, .18)` | Brush fill. |
+| `--wm-focus` | `currentColor` | Current text color | Brush keyboard focus outline. |
+
+**Classes**
+
+`classNames` adds compatibility classes alongside these canonical names; it never replaces them.
+
+| Node | Canonical class | `classNames` key |
+|---|---|---|
+| Root | `.wui-minimap` | `root` |
+| Viewport | `.wui-minimap__viewport` | — |
+| Canvas | `.wui-minimap__canvas` | `canvas` |
+| Brush | `.wui-minimap__brush` | `brush` |
+
+**Parts**
+
+`parts` adds tokens alongside the canonical tokens and removes duplicates.
+
+| Node | Canonical part | `parts` key |
+|---|---|---|
+| Root | `root` | `root` |
+| Canvas | `canvas` | `canvas` |
+| Brush | `brush` | `brush` |
+
+The mount installs `minimapStyle` by default. Set `stylesheet: false` to omit it and supply the
+exported stylesheet or your own CSS from the host. Style these canonical classes and parts after
+the installed style when you need caller-owned overrides.
+
+</details>
+
+<UiPresenterRelated presenter="minimap" />

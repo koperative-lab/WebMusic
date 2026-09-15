@@ -1,0 +1,184 @@
+---
+title: 'Effect'
+description: 'The post-processing chain: describe an effect as data, and let a player or the offline renderer wire it.'
+sidebar:
+  order: 4
+---
+
+import ProgrammaticEffectDemo from '../../../../../components/programmatic/ProgrammaticEffectDemo.astro';
+
+`Effect` describes post-processing for a player, interactive voice, or
+[`Rack`](/score/headless/play/rack/) master bus. A recipe allocates no Web Audio
+nodes until `build()` or `createAudioNodes()` runs. The built result belongs to
+the graph that realizes it; the recipe itself has no running clock or disposal.
+
+<ProgrammaticEffectDemo />
+
+## Import
+
+```ts
+import {Effect, ScorePlayer} from '@webmusic/score/play/headless';
+
+const effect = Effect.chain(
+  Effect.filter({frequency: 4000}),
+  Effect.delay({delaySeconds: 0.25, feedback: 0.2, wet: 0.15}),
+);
+const player = new ScorePlayer(score, {effect});
+await player.play(); // Starts the player; does not wait for completion.
+
+// Keep the player during playback and release its realized graph at teardown.
+const dispose = () => player.dispose();
+```
+
+## Graph ownership and time
+
+Built-in recipes can be realized separately for separate graphs. A custom
+factory should also create a fresh node bundle per realization. Passing a fixed
+`EffectNode` to `Effect.custom()` returns that same bundle every time; sharing
+it shares its routing, parameters, and cleanup responsibility.
+
+`build(context)` takes an `AudioContext`; `createAudioNodes(context)` accepts a
+`BaseAudioContext`, including offline contexts, through the shared structural
+effect contract. A custom factory must actually support the chosen environment
+and use nodes from the supplied context. No helper closes a borrowed context.
+
+Effect recipes have no transport, events, or subscriptions. Numeric options use
+Web Audio units: seconds, Hz, dB, linear gains, and dimensionless ratios where
+indicated below. Tremolo and chorus start modulation oscillators at realization;
+their `EffectNode.dispose()` stops those oscillators. Live `AudioParam` values
+can be changed by the graph's owner using its own clock.
+
+Distortion and overdrive transfer curves include both input endpoints (`-1`
+and `+1`). Their symmetric sampling preserves zero-input silence under Web
+Audio's linear curve interpolation.
+
+For manual realization, retain the node bundle, remove the graph edges you
+connected, and call its optional `dispose()`. `insertEffect()` supplies a cleanup
+handle for its own insertion edges and the realized bundle. Built-in construction
+does not impose a uniform option validator: stated clamps apply, while other
+invalid values can fail in the underlying Web Audio API. Custom factories are
+responsible for cleaning allocations made before they throw.
+
+## EqController
+
+`EqController` owns a chain of biquad bands and exposes both halves an EQ UI
+needs: the **audio** (an `input` and an `output` you splice into a graph) and
+the **geometry** (a sampled response curve, plus the four conversions between
+frequency/gain and normalised x/y). The conversions are exported separately
+because a presenter needs them before any audio exists — to draw the grid,
+place a handle, and turn a drag back into a band setting.
+
+`setContext()` exists because an EQ UI is built before a gesture has resumed
+an `AudioContext`. Until one is set, `context`, `input` and `output` are
+`undefined`; bands and coordinate conversions remain available, but
+`snapshot().response` is empty. Setting a context realizes the band chain;
+setting `undefined` releases it. Rebuilds are transactional: a failed
+construction leaves the previous graph and state usable. A successful
+`setContext()` or `setBands()` replacement changes the endpoint nodes, so a
+manual caller must reconnect its external route.
+
+```ts
+import {DEFAULT_EQ_BANDS, createEqController, eqFrequencyToX} from '@webmusic/score/play/headless';
+
+const eq = createEqController({bands: DEFAULT_EQ_BANDS});
+const off = eq.subscribe(() => paint(eq.snapshot()));
+
+eq.setContext(context); // after a user gesture; realises the band chain
+source.connect(eq.input!);
+eq.output!.connect(context.destination);
+
+eq.setBand(0, {gain: -3});
+const x = eqFrequencyToX(200); // geometry needs no audio at all
+
+// Retain this cleanup until the EQ's owner is removed.
+const dispose = () => {
+  off();
+  source.disconnect(eq.input!);
+  eq.dispose();
+};
+```
+
+<details class="component-section">
+<summary>API</summary>
+
+### Recipe factories
+
+The constructor is private. Every factory returns `Effect`; all options are
+optional. The option types are exported from the same Headless entry.
+
+| Member | Defaults and units | Realized `params` |
+| --- | --- | --- |
+| `Effect.gain(value = 1)` | Linear gain. | `gain` |
+| `Effect.panner(pan = 0)` | Stereo pan, clamped to −1…1. | `pan` |
+| `Effect.analyser(options?)` | `AnalyserOptions`: `fftSize` and `smoothing` use native node defaults when omitted; `onReady(node)` receives the live analyser during build. Caller polls it. | None |
+| `Effect.limiter(options?)` | `LimiterOptions`: `threshold: -3` dB, `release: 0.1` s. Fixed knee 0, ratio 20, attack 0.002 s. | `threshold`, `ratio` |
+| `Effect.bitcrusher(options?)` | `BitcrusherOptions.bits: 6`, clamped to 1–16; waveshaper amplitude quantization. | None |
+| `Effect.tremolo(options?)` | `TremoloOptions.frequency: 5` Hz, `depth: 0.5` clamped to 0–1. Gain modulation begins at build. | `rate`, `depth` |
+| `Effect.chorus(options?)` | `ChorusOptions.delaySeconds: 0.025`, `depth: 0.005` s, `frequency: 0.8` Hz, `wet: 0.5`; direct dry route has unity gain. | `rate`, `depth`, `wet` |
+| `Effect.filter(options?)` | `FilterOptions.type: 'lowpass'`, `frequency: 1000` Hz, `Q: 1`; optional `gain` in dB otherwise retains the native default. | `frequency`, `Q` |
+| `Effect.delay(options?)` | `DelayOptions.delaySeconds: 0.25`, `feedback: 0.3`, `wet: 0.3`, `dry: 1`; feedback/wet/dry are linear gains. | `time`, `feedback`, `wet` |
+| `Effect.distortion(options?)` | `DistortionOptions.amount: 0.4`, `oversample: '2x'`; waveshaper curve strength and native oversampling mode. | None |
+| `Effect.compressor(options?)` | `CompressorOptions`: optional `threshold`, `knee` (dB), `ratio`, `attack`, `release` (s). Omitted values retain native compressor defaults. | `threshold`, `ratio` |
+| `Effect.reverb(options?)` | `ReverbOptions.seconds: 1.8`, `decay: 2.2`, `wet: 0.28`, `dry: 0.82`; seconds/decay have a minimum of 0.1. Generates a stereo noise impulse. | `wet`, `dry` |
+| `Effect.custom(implementation)` | Factory `(context: AudioContext) => EffectNode`, or a fixed `EffectNode`. | Supplied by caller |
+| `Effect.chain(...effects)` | Series composition; skips `null`/`undefined`. An empty chain is unity gain. | No combined map for a nonempty chain |
+
+`params` lists the actual exported controls, not every underlying node property.
+For example, tremolo `depth` is its modulation gain parameter; changing it does
+not recompute the base gain chosen at construction.
+
+### Realization, state, and helpers
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `label?: string` | state | Optional mutable display label for controls. |
+| `build(context: AudioContext): EffectNode` | command | Realizes a recipe into the supplied live context. |
+| `createAudioNodes(context: BaseAudioContext): EffectNode` | command | Structural cross-family/offline realization. |
+| `EffectNode` | type | `input`, `output`, optional `params: Record<string, AudioParam>`, and optional `dispose()`. Alias of the kernel effect node contract. |
+| `insertEffect(context, source, destination, effect)` | helper | Inserts an optional effect, or a direct route when `effect` is `undefined`; returns `{dispose?: () => void}`. Cleanup removes the exact insertion edges and calls the bundle's disposer once. Construction rollback preserves the initiating error. |
+| `resolveEffect(effect, reverb)` | helper | Prefers a supplied effect. Otherwise turns truthy legacy `ReverbOptions` into `Effect.reverb`; `false`/`undefined` produce no effect. |
+| `createReverbNode(context, options?)` | helper | Returns a caller-owned `ConvolverNode` with a generated stereo impulse. Reads only `ReverbOptions.seconds` and `decay` with the defaults above; it does not create wet/dry mixing, so `wet`/`dry` have no effect here. Disconnect it when its route is removed. |
+
+A built chain attempts each child cleanup even if another child fails, then
+throws the first cleanup error. It releases chain-owned internal edges; callers
+still own external source/destination edges. The `Effect` recipe has no
+`dispose()` or `destroy()` method.
+
+### EqController
+
+**Construction** — `new EqController(options?)` / `createEqController(options?)`:
+the borrowed `context` and the initial `bands` (`{frequency, gain?, q?}`;
+`DEFAULT_EQ_BANDS` when omitted).
+
+`EqBand` uses Hz, dB, and Q. Frequencies clamp to 30–18000 Hz; gain clamps to
+−18…18 dB and defaults to 0; Q defaults to 1 and is kept positive. The default
+bands are 120 Hz/Q 0.8, 1000 Hz/Q 0.9, and 6000 Hz/Q 0.9, all at 0 dB.
+An explicit empty band array gives a pass-through graph and empty response.
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `setContext(context)` | command | Realises the band chain, or releases it with `undefined`. The context is borrowed and never closed. |
+| `setBands(bands)` | command | Replaces the band set; `undefined` restores the defaults. |
+| `setBand(index, band)` | command | Patches one band in place; invalid/nonexistent indices are ignored. |
+| `snapshot()` | state | Fresh `EqControllerState`: copied bands, sampled response, and `ready`. Each `EqResponsePoint` has normalized logarithmic `x` and summed `gain` in dB. Up to 64 samples use the fixed 30–18,000 Hz axis; samples above the context's Nyquist frequency (`sampleRate / 2`) are omitted. Response is empty without filters. |
+| `context` · `input` · `output` | state | The borrowed context and the splice points, once a context exists. |
+| `subscribe(notify)` | subscription | Fires on state change, without an initial callback. Returns the unsubscribe. |
+| `dispose()` · `destroy()` | lifecycle | Final, idempotent cleanup; `destroy` is an alias. Disconnects owned nodes and clears subscribers; never closes the context. Subsequent mutation commands are inert. |
+| `eqFrequencyToX(frequency)` · `eqXToFrequency(x)` · `eqGainToY(gain)` · `eqYToGain(y)` | helper | Pure logarithmic-frequency/linear-gain coordinate conversions; normalized coordinates clamp to 0–1. |
+| `DEFAULT_EQ_BANDS` · `EQ_MIN_FREQUENCY` · `EQ_MAX_FREQUENCY` · `EQ_MAX_GAIN` · `EQ_RESPONSE_SAMPLES` | constant | The default band set and the drawable range (30–18000 Hz, ±18 dB, 64 samples). |
+
+`EqControllerOptions`, `EqControllerState`, `EqBand`, and `EqResponsePoint` are
+exported alongside the class. The EQ has no timer, transport, or named event
+emitter. Synchronous graph, parameter, subscriber, and cleanup failures can
+throw; disposal still marks the controller final before releasing its graph.
+
+</details>
+
+## Related
+
+[`ScorePlayer`](/score/headless/play/score-player/),
+[`InteractivePlayer`](/score/headless/play/interactive-player/), and
+[`Rack`](/score/headless/play/rack/) consume effects.
+[`<synth-panel>`](/score/element/play/synth-panel/) composes effects and EQ through
+[`SynthPanelAudioGraph`](/score/headless/play/sound/#synth-backends-synthpanelaudiograph).
+Use [`Sound`](/score/headless/play/sound/) to choose the timbre before processing.

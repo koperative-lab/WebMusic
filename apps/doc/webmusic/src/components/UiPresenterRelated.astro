@@ -1,0 +1,93 @@
+---
+import {UI_COMPOSITION_CATALOG} from '../../../shared/ui-catalog';
+import {
+  UI_PRESENTER_CATALOG,
+  uiPresenterClass,
+  uiPresenterEntry,
+  uiPresenterHref,
+} from '../../../shared/ui-presenter-catalog';
+
+interface Props {
+  presenter: string;
+}
+
+const {presenter} = Astro.props;
+const entry = uiPresenterEntry(presenter);
+const presenterClass = uiPresenterClass(entry.classSlug);
+const consumers = entry.consumerTags.map((tag) => {
+  const consumer = UI_COMPOSITION_CATALOG.find((candidate) => candidate.tag === tag);
+  if (!consumer) throw new Error(`Unknown consumer <${tag}> for ${entry.presenter}`);
+  return consumer;
+});
+const related = UI_PRESENTER_CATALOG.filter(
+  (candidate) => candidate.presenter !== entry.presenter && candidate.classSlug === entry.classSlug,
+);
+---
+
+<div class="presenter-related not-content">
+  <section>
+    <h2>Used by</h2>
+    {consumers.length > 0 ? (
+      <div class="presenter-related__links presenter-related__links--consumers">
+        {consumers.map((consumer) => (
+          <a href={consumer.href}>
+            <span>&lt;{consumer.tag}&gt;</span>
+            <small>{consumer.family} / {consumer.capability}</small>
+          </a>
+        ))}
+      </div>
+    ) : (
+      <p>Mount this presenter with application-owned state and bindings.</p>
+    )}
+  </section>
+
+  <section>
+    <h2>More in {presenterClass.label}</h2>
+    <div class="presenter-related__links">
+      {
+        related.map((candidate) => (
+          <a href={uiPresenterHref(candidate)}>@webmusic/ui/{candidate.presenter}</a>
+        ))
+      }
+    </div>
+  </section>
+</div>
+
+<style>
+  .presenter-related {
+    display: grid;
+    gap: 1.25rem;
+    margin-block: 1.5rem 2rem;
+  }
+  .presenter-related section {
+    display: grid;
+    gap: 0.7rem;
+  }
+  .presenter-related h2 {
+    margin: 0;
+    font-size: 1.05rem;
+  }
+  .presenter-related__links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+  }
+  .presenter-related__links a {
+    border: 1px solid var(--sl-color-gray-5);
+    padding: 0.5rem 0.65rem;
+    color: var(--sl-color-text-accent);
+    font: 600 0.7rem/1.3 var(--wui-font-mono);
+    text-decoration: none;
+  }
+  .presenter-related__links--consumers a {
+    display: grid;
+    gap: 0.2rem;
+  }
+  .presenter-related__links small {
+    color: var(--sl-color-gray-3);
+    font-size: 0.62rem;
+  }
+  .presenter-related__links a:hover {
+    border-color: var(--sl-color-text-accent);
+  }
+</style>

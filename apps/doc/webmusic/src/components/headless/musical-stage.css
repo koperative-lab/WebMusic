@@ -1,0 +1,17 @@
+.wm-hl-music { display: grid; gap: .75rem; min-width: 0; }
+.wm-hl-music p { margin: 0; font-size: .8rem; }
+.wm-hl-music__summary { font-weight: 600; }
+.wm-hl-music__chips { display: flex; flex-wrap: wrap; gap: .4rem; min-height: 1.75rem; align-items: center; }
+.wm-hl-music__chip { display: inline-flex; padding: .3rem .5rem; border: 1px solid currentColor; font-size: .75rem; line-height: 1.25; }
+.wm-hl-music__chip[data-active="true"] { font-weight: 700; border-width: 2px; }
+.wm-hl-music__lane { position: relative; min-width: 0; height: 9rem; overflow: hidden; border: 1px solid currentColor; }
+.wm-hl-music__bar { position: absolute; height: 1.3rem; min-width: 2px; background: currentColor; opacity: .4; }
+.wm-hl-music__bar[data-active="true"] { opacity: 1; }
+.wm-hl-music__cursor { position: absolute; inset-block: 0; border-left: 2px solid currentColor; pointer-events: none; }
+.wm-hl-music__map { display: flex; align-items: end; gap: 3px; min-height: 6rem; }
+.wm-hl-music__map button { position: relative; flex: 1; min-width: 0; min-height: 2.75rem; padding: .5rem; border: 1px solid currentColor; background: transparent; color: inherit; cursor: pointer; font: inherit; font-size: .75rem; }
+.wm-hl-music__map button::before { content: ''; position: absolute; inset: 0; background: currentColor; opacity: .08; pointer-events: none; }
+.wm-hl-music__map button[aria-current="true"] { border-width: 3px; font-weight: 700; }
+.wm-hl-music__map button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.wm-hl-music__buttons { display: flex; flex-wrap: wrap; gap: .4rem; }
+.wm-hl-music__buttons [aria-pressed="true"] { font-weight: 700; outline: 2px solid currentColor; outline-offset: -3px; }

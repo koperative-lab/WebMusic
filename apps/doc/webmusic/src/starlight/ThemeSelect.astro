@@ -1,0 +1,100 @@
+---
+/**
+ * Top-right black / white mode toggle.
+ *
+ * Starlight renders the `ThemeSelect` slot in the right of the header (and in
+ * the mobile menu), so dropping our toggle here places it in the top-right
+ * corner. It flips between the two modes, persists the choice, and syncs its
+ * own icon through `StarlightThemeProvider.updatePickers`.
+ */
+---
+
+<webscore-theme-toggle>
+  <button type="button" aria-pressed="false" aria-label="Toggle black / white mode">
+    <!-- Shown in white mode: a moon, i.e. "switch to black". -->
+    <svg class="ws-icon ws-moon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"></path>
+    </svg>
+    <!-- Shown in black mode: a sun, i.e. "switch to white". -->
+    <svg class="ws-icon ws-sun" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="4"></circle>
+      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path>
+    </svg>
+  </button>
+</webscore-theme-toggle>
+
+<script>
+  class WebScoreThemeToggle extends HTMLElement {
+    connectedCallback() {
+      const button = this.querySelector('button');
+      if (!button) return;
+
+      // Reflect the mode resolved by the provider before the toggle hydrated.
+      const current = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+      button.dataset.theme = current;
+      button.setAttribute('aria-pressed', String(current === 'dark'));
+
+      button.addEventListener('click', () => {
+        const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+        document.documentElement.dataset.theme = next;
+        try {
+          localStorage.setItem('starlight-theme', next);
+        } catch {
+          // Storage may be unavailable in privacy-restricted browsing modes.
+        }
+        const provider = (window as Window & {
+          StarlightThemeProvider?: {updatePickers(theme: 'light' | 'dark'): void};
+        }).StarlightThemeProvider;
+        provider?.updatePickers(next);
+      });
+    }
+  }
+
+  // ThemeSelect renders in both the header and the mobile menu, so guard the
+  // registration against running twice.
+  if (!customElements.get('webscore-theme-toggle')) {
+    customElements.define('webscore-theme-toggle', WebScoreThemeToggle);
+  }
+</script>
+
+<style>
+  webscore-theme-toggle {
+    display: flex;
+  }
+
+  webscore-theme-toggle button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    padding: 0;
+    border: 1px solid var(--ws-line-strong, #dcdcdc);
+    background: var(--ws-panel, #fff);
+    color: var(--ws-fg, #000);
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+
+  webscore-theme-toggle button:hover,
+  webscore-theme-toggle button:focus-visible {
+    border-color: var(--ws-fg, #000);
+  }
+
+  webscore-theme-toggle .ws-icon {
+    display: block;
+  }
+
+  /* Default / white mode → offer the moon; black mode → offer the sun. Keyed
+     off the root theme (set before paint by the provider) so the icon never
+     flashes the wrong glyph on a dark-mode reload. */
+  webscore-theme-toggle .ws-sun {
+    display: none;
+  }
+  :root[data-theme='dark'] webscore-theme-toggle .ws-moon {
+    display: none;
+  }
+  :root[data-theme='dark'] webscore-theme-toggle .ws-sun {
+    display: block;
+  }
+</style>

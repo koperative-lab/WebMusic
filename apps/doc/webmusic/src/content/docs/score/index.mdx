@@ -1,0 +1,167 @@
+---
+title: Score
+description: 'Symbolic music — capabilities, installation, registration and public references for Score.'
+---
+
+Score is one package, `@webmusic/score`, for **symbolic** music: notes with
+pitches, durations and voices, read from MIDI, MusicXML, MXL or ABC. The
+play, analyze, and view capabilities support Web Components, Headless objects,
+and APIs. Combine the APIs with [UI presenters](/uikit/) or your own interface;
+integration entries such as React build on the same contracts.
+
+For a working player with notation and a keyboard, start with
+[Quick Start](/quick-start/). This page covers package selection and setup.
+
+## Capabilities
+
+| Capability | What it covers | Forms |
+| --- | --- | --- |
+| **play** | Turn a `Score` into sound: push and pull engines, timbres, effect chains, racks, offline WAV render, capture of performed note events into a `Score`. | [Web Components](/score/element/#play) · [Headless](/score/headless/#play) · [API](/score/api/play/) |
+| **analyze** | Ask a `Score` questions: key, chords, roman numerals, motifs, rhythm figures, voice-leading issues, distributions and summaries. | [Web Components](/score/element/#analyze) · [Headless](/score/headless/#analyze) · [API](/score/api/analyze/) |
+| **view** | Draw a `Score`: piano roll, staff, waterfall, engraved notation, whole-piece maps and thumbnails. | [Web Components](/score/element/#view) · [Headless](/score/headless/#view) · [API](/score/api/view/) |
+| **io** | Format detection and MIDI, MusicXML, MXL and ABC parsing/serialization, with worker-backed parsing. | [API](/score/api/io/) |
+| **react** | The same capabilities as React components and hooks. | [API](/score/api/react/) |
+
+The package root is the model itself — `Score`, `Rational`, `Pitch`,
+`Duration`, `TimeMap`, queries and JSON — and it touches no browser API. See
+the [package subpath table](/score/api/#package-subpaths) for every published
+entry.
+
+## What Score is not
+
+Score does not decode recorded audio or analyze PCM waveforms. It synthesizes
+notes and can export their sound as WAV. Audio-file processing and cross-domain
+Bridge development continue on the
+[`dev` branch](https://github.com/mrsteamedbun/WebMusic/tree/dev).
+
+## Install
+
+:::note[Package availability]
+Registry installs and CDN resources require the relevant package versions to be published.
+If npm returns `E404`, use the [local checkout installation](#from-a-local-checkout)
+below. Building the documentation site does not publish those packages.
+:::
+
+### From npm
+
+Once the packages are available in your registry, run this in your application:
+
+```bash
+npm install @webmusic/score @webmusic/kernel @webmusic/ui
+```
+
+### From a local checkout
+
+Use Node.js 22 or later. From the root of a
+[`main` checkout](https://github.com/koperative-lab/WebMusic/tree/main), install the
+locked dependencies, build the packages and create their installable archives:
+
+```bash
+npm ci
+npm run build:packages
+npm pack -w @webmusic/kernel -w @webmusic/ui -w @webmusic/score
+```
+
+`npm pack` writes three `.tgz` files to the repository root and prints their
+filenames. In your existing ES-module bundler application's directory, install
+all three together. Replace `VERSION` with the version in those filenames and
+`../WebMusic` with the relative path to your checkout:
+
+```bash
+npm install "../WebMusic/webmusic-kernel-VERSION.tgz" "../WebMusic/webmusic-ui-VERSION.tgz" "../WebMusic/webmusic-score-VERSION.tgz"
+```
+
+The archives provide the local `@webmusic` packages; npm still installs their
+third-party dependencies from your configured registry. Continue with the
+[bundler registration](#with-a-bundler) below or the
+[Quick Start player](/quick-start/).
+
+### Entries and optional peers
+
+`io`, `play`, `analyze`, `view`, and `react` are export subpaths of that one installed package; use their public import paths rather than installing them separately.
+
+`@webmusic/kernel` is required. Add optional peers for the entries and features
+you use; importing a visual Element requires `@webmusic/ui`.
+
+| Peer | When it is needed |
+| --- | --- |
+| `@webmusic/ui` | Score Web Components and renderers that compose UI presenters. |
+| `tone` | An application-supplied Tone.js transport or instrument. |
+| `spessasynth_lib` | `.sf2` / `.sf3` SoundFont playback. |
+| `opensheetmusicdisplay` | Detailed sheet engraving through OSMD. |
+| `react` | The `/react` components and hooks. |
+
+The built-in oscillator needs no SoundFont peer. SoundFont playback also needs
+a served AudioWorklet. Resource preparation, worklet URLs and ownership details
+belong to the [Play API](/score/api/play/) and
+[View API](/score/api/view/) references.
+
+## Drop-in Web Components
+
+Web Components combine Score behavior with controls or visual presenters.
+Register the tags needed by your page, supply their data and resources, and
+configure them through their public properties and attributes. The
+[Web Components inventory](/score/element/) lists the tags, registration functions
+and shared theming.
+
+### With a bundler
+
+Importing `@webmusic/score/play/auto` registers all **Play** elements at their
+default names. It does not register Analyze or View elements. Use their
+`@webmusic/score/analyze/element` and `@webmusic/score/view/element` entries and
+call the registration functions listed in the inventory.
+
+### Custom registration
+
+Import an individual `define*` function from the capability's `/element` entry
+to register a selected tag or choose a custom tag name. The group registration
+functions register their default names; `defineAllElements()` does not accept
+custom names. See the [Play](/score/element/#play),
+[Analyze](/score/element/#analyze) and [View](/score/element/#view) registration
+references.
+
+### From a CDN
+
+Only Play provides a prebuilt browser IIFE through
+`@webmusic/score/play/global`, emitted as `dist/play/auto.global.js`. Loading that
+published bundle registers the Play elements and exposes `WebMusicScorePlay`
+on `window`. This path needs no bundler, but the requested package version and
+its assets must be available from the CDN.
+
+The ESM entries retain package imports; a plain browser module URL needs an
+application-provided resolution strategy. Use the bundler setup above for the
+three-component [Quick Start](/quick-start/).
+
+## Playback
+
+Use [ScorePlayer](/score/headless/play/score-player/) when your application owns
+the controls. The same Headless engine powers the player Element and exposes
+commands, state and lifecycle hooks. The [Headless inventory](/score/headless/)
+routes to playback, analysis and view objects; their owning pages contain the
+examples and complete contracts.
+
+## API + UI
+
+Use APIs for data operations and independent UI presenters for application-owned
+controls. See the [root API](/score/api/) for models and entry points, and
+[Transport](/uikit/transport-time/transport/) for a presenter binding. The
+[shared playback source](/score/api/#shared-playback-observation) connects
+views and analysis to an existing player's data, state and position.
+
+## React
+
+The [React entry](/score/api/react/) provides components and hooks over the same
+Score models and playback contracts. Framework integration does not replace the
+underlying data model or resource ownership rules.
+
+## Next Steps
+
+- [Quick Start](/quick-start/) for the small player, notation and keyboard example.
+- [Web Components](/score/element/) for every tag, its owning page and shared theming.
+- [Headless](/score/headless/) for engines, sessions and their export ownership.
+- [Core API](/score/api/) for the score model, builder, time map and events.
+- [I/O API](/score/api/io/) for MIDI, MusicXML, MXL and ABC import/export.
+- [Play API](/score/api/play/) for playback, rendering, recording, sounds and effects.
+- [Analyze API](/score/api/analyze/) for musical analysis.
+- [View API](/score/api/view/) for visualization and layout primitives.
+- [React API](/score/api/react/) for providers, hooks and view bindings.

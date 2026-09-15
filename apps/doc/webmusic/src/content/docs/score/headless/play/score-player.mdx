@@ -1,0 +1,349 @@
+---
+title: 'ScorePlayer'
+description: 'The push engine: hand it a Score and a timbre and it schedules and plays the whole piece on its own clock.'
+sidebar:
+  order: 1
+---
+
+import ScorePlayerPlayground from '../../../../../components/headless/ScorePlayerPlayground.astro';
+
+`ScorePlayer` owns an autonomous clock: hand it a `Score` and a timbre and it schedules + plays the whole piece, emitting `cursor` / `end` events. This is the engine behind the `<score-player>` element.
+
+For a one-call code action, `await playScore(score, options)` creates, starts
+and returns that same controllable player; `playScoreFromUrl()` also performs
+the load. Keep the returned player so you can pause, seek and eventually
+`dispose()` it.
+
+`play()` prepares an async `Sound` before it schedules the first note;
+`preload()` is available when you want that warm-up earlier. A supplied synth is
+borrowed by default, so `dispose()` invokes only a route cleanup returned by
+`connect()` and never its global `disconnect()` / `dispose()` unless you choose
+`synthOwnership: 'owned'`.
+
+The [TonePlayer integration](#toneplayer) below covers applications that
+already own a Tone.js transport. It retains its own timing and ownership contract.
+
+
+<ScorePlayerPlayground />
+
+## Import
+
+```ts
+import {ScorePlayer, Sound} from '@webmusic/score/play/headless';
+
+const player = new ScorePlayer(score, {
+  synth: Sound.oscillator(),
+  synthOwnership: 'owned',
+});
+const off = player.on('timeupdate', ({progress}) => paintProgress(progress));
+await player.play(); // call from a user gesture when audio needs permission
+
+// On unmount or replacement:
+off();
+player.dispose();
+```
+
+`Player` is an alias of this class; `PlayerOptions` and `PlayerEvents` alias
+`ScorePlayerOptions` and `ScorePlayerEvents`. The source contract is the
+`ScorePlayer` class and these exported types in
+`@webmusic/score/play/headless`; see the [Play API](/score/api/play/) for the
+capability's other entry points.
+
+## Borrow data and playback state
+
+`player.playback` exposes the [shared nonvisual source](/score/api/#shared-playback-observation).
+Its subscription immediately supplies current data, position and active note
+occurrences, including when a consumer attaches while paused or already playing.
+Unsubscribing leaves the player alive. The immutable score is fixed for this
+player's lifetime; a new player is a new source.
+
+Use `player.playback.seekNominal(seconds)` for an observed command that rejects a
+failed restart. The older direct `seek`/`seekNominal` methods retain their
+compatibility behavior: runtime restart failures use the operation-error channel
+and may resolve with playback paused. All new bindings name their time axis.
+
+## Time and resource roles
+
+The player borrows its immutable `Score`. It owns its scheduler, cursor
+notifications, output/effect nodes and default oscillator. An injected
+`audioContext` or `destination.context` is borrowed; supplying both requires
+the same context. If neither is supplied, the player creates and closes its
+own context. `context` is a lazy getter: reading it can create the graph.
+
+`seconds`, `duration` and `seek()` use rate-scaled transport seconds.
+`nominalSeconds`, `seekNominal()` and the position axis of `clock` use the
+original score timeline. `currentTime` is a musical `TimePosition`, not a
+number. A future `play(when)` arms a start at an absolute AudioContext time;
+the clock reports `holding` at the resume position until that time. A past
+`when` starts immediately. Browser timer cadence and backend capabilities
+still affect scheduling; this is not a wall-clock accuracy guarantee.
+
+Custom synths opt into audio-clock lookahead through
+`supportsScheduledCancellation: true`, unique non-null handles from
+`noteOn()`, and both `noteOffById()` and `cancelScheduledNote()`. Other
+backends receive notes just in time. The full backend contract is on
+[Synth backends](/score/headless/play/sound/#synth-backends).
+
+<details class="component-section">
+<summary>API</summary>
+
+**Construction and options — `ScorePlayerOptions`**
+
+| Member | Default / return | Contract |
+| --- | --- | --- |
+| `new ScorePlayer(score, options?)` · `createScorePlayer(score, options?)` | `ScorePlayer` | Constructs without starting playback. |
+| `createScorePlayerFromUrl(url, options?)` | `Promise<ScorePlayer>` | Loads a score, then constructs; adds an optional `format` to the player options. |
+| `playScore(score, options?)` · `playScoreFromUrl(url, options?)` | `Promise<ScorePlayer>` | Creates, starts and returns the player. The URL helper also accepts `format`. |
+| `audioContext` · `destination` | Created context / its destination | Borrowed context and output node; context identities must match. |
+| `synth` · `synthOwnership` | Owned oscillator / `'borrowed'` for a supplied synth | A supplied `HeadlessSynth` is disposed only with explicit `'owned'` ownership. |
+| `tempo` | Score tempo | BPM override relative to the score's initial tempo. |
+| `effect` · `reverb` | Dry output | An explicit `Effect` takes precedence; `reverb` accepts `ReverbOptions` or `false`. See [Effect](/score/headless/play/effect/). |
+| `cursorIntervalMs` | `50` | Cursor/time-update notification cadence in milliseconds. |
+| `lookaheadSeconds` | `0.1` | Scheduling horizon; effective minimum `0.02`. |
+| `schedulerIntervalMs` | `25` | Scheduler tick interval; effective minimum `5` ms. |
+| `createTickSource(intervalMs)` | Kernel tick-source factory | Inject a scheduler source; the player owns the returned source's lifecycle. |
+| `expandRepeats` | `false` | Expand score repeat structure before playback. |
+
+**Commands**
+
+| Member | Return | Contract |
+| --- | --- | --- |
+| `preload()` | `Promise<void>` | Builds the timeline/graph and awaits sample readiness for sounding pitches, including part transposition; use `play()` to start and resume audio. |
+| `play(when?)` | `Promise<void>` | Prepares audio and starts or arms playback at absolute AudioContext seconds. |
+| `pause()` · `stop()` | `void` | Pause preserves the point; stop resets to the beginning. |
+| `seek(seconds, when?)` · `seekFraction(fraction, when?)` · `seekNominal(seconds, when?)` | `Promise<void>` | Seek in transport seconds, fraction, or nominal score seconds. While playing, optional `when` schedules the restart; paused seeks ignore it. |
+| `scrub(deltaSeconds)` | `Promise<void>` | Relative transport seek. |
+| `setTempo(bpm)` · `setRate(rate)` | `void` | Change playback speed; retain the nominal musical point. |
+| `setVolume(value)` · `setPan(value)` | `void` | Master linear gain (minimum zero) and stereo pan (clamped to −1…1). |
+| `setLoop(startSeconds, endSeconds)` · `clearLoop()` | `void` | Set an ordered, clamped region in current transport seconds, or remove it; an empty region clears the loop. |
+
+**State**
+
+| Member | Type / meaning |
+| --- | --- |
+| `playback` | Borrowed `ScorePlaybackSource`: resolved score, coherent snapshot/subscription and optional nominal seek; see [shared contract](/score/api/#shared-playback-observation). Reading it does not create an audio graph. |
+| `context` | Lazily realised `AudioContext`. |
+| `clock` | Read-only transport clock; nominal score-second position against AudioContext time. |
+| `currentTime` | Musical `TimePosition`. |
+| `seconds` · `nominalSeconds` | Current transport seconds and nominal score seconds respectively. |
+| `durationSeconds` · `duration` | Rate-scaled transport duration, in seconds. |
+| `rate` · `progress` · `isPlaying()` | Tempo scale, fraction of the piece, and playback state. |
+
+**Events — `on(name, listener)` returns an unsubscribe function**
+
+| Event | Payload |
+| --- | --- |
+| `cursor` | `TimePosition`. |
+| `noteOn` · `noteOff` | The score `Note`. |
+| `end` | The completed `Score`. |
+| `timeupdate` | `PlayerTimeUpdate`: `nominalSeconds`, `transportSeconds`, `transportDurationSeconds`, `progress`; deprecated `seconds` and `duration` alias the transport fields. |
+| `operationError` | Contained backend/graph/lifecycle failure: `kind`, `source`, `operation`, `error`. |
+| `listenerError` | Subscriber failure: `kind`, `source`, `event`, `mode`, `error`. Distinct from an operational failure. |
+
+**Lifecycle**
+
+`dispose(): void` is idempotent. It stops scheduling, releases owned nodes and
+resources, and closes an internally created context. For a borrowed synth it
+calls only the cleanup returned by that player's `connect()` route. Keep and
+call subscription cleanups when a view detaches before the player does.
+
+### Offline rendering helpers
+
+These stateless helpers are exported by both `@webmusic/score/play` and
+`@webmusic/score/play/headless`. They use an `OfflineAudioContext`, not the
+live player's clock, and await sample preparation before rendering. A synth
+must route into the renderer's destination through `connect()` to be
+captured. Self-routing Tone/Spessa backends do not meet that requirement;
+use a context-adaptable `Sound` or compatible backend.
+
+```ts
+import {renderScoreToWav, Sound} from '@webmusic/score/play/headless';
+
+const wav = await renderScoreToWav(score, {
+  synth: Sound.oscillator(),
+  synthOwnership: 'owned',
+  sampleRate: 48_000,
+});
+```
+
+| Helper | Return / contract |
+| --- | --- |
+| `renderScoreToBuffer(score, options?)` | `Promise<AudioBuffer>` with scheduled score notes and an optional effect tail. |
+| `renderScoreToWav(score, options?)` | `Promise<Blob>` containing a 16-bit PCM WAV. |
+| `bufferToWav(buffer)` | `Blob` encoding an existing buffer as 16-bit PCM WAV; no audio graph or playback lifecycle. |
+
+**`RenderOptions`**
+
+| Option | Default | Contract |
+| --- | --- | --- |
+| `synth` | Owned oscillator | Compatible `HeadlessSynth` or `Sound` to connect into the offline graph. |
+| `synthOwnership` | `'borrowed'` for a supplied synth | `'owned'` transfers teardown; borrowed synths receive only their returned route cleanup. |
+| `effect` · `reverb` | Dry | Explicit `Effect` takes precedence over legacy `false` / `ReverbOptions`. |
+| `tempo` | Score tempo | BPM override. |
+| `sampleRate` | `44100` | Output samples per second. |
+| `channels` | `2` | Output channel count. |
+| `tailSeconds` | `1.5` with an effect, otherwise `0.15` | Extra time after the score for release/effect tails. |
+
+The renderer owns the offline graph for the operation. It releases effect
+nodes and its synth route after rendering; a borrowed synth remains the
+caller's responsibility. Setup, preparation and rendering failures also release
+the acquired graph. Cleanup attempts every owned resource even if another
+cleanup throws; the initiating failure takes precedence over cleanup errors.
+Native and offline preparation use the same sounding-pitch projection, retaining
+note ids and other note data without changing the Score.
+The resulting `AudioBuffer`/`Blob` needs no
+`dispose()`. If an application creates an object URL for the Blob, it owns
+that URL and must revoke it when finished.
+
+### TonePlayer
+
+`TonePlayer` adapts a [Tone.js](https://tonejs.github.io/) Transport so a `Score` plays through Tone's clock and instruments (requires the optional `tone` peer).
+
+#### TonePlayer Import
+
+```ts
+import * as Tone from 'tone';
+import { TonePlayer } from '@webmusic/score/play/headless';
+
+const instrument = new Tone.PolySynth(Tone.Synth).toDestination();
+const synth = {
+  noteOn(midi, velocity, time) {
+    instrument.triggerAttack(Tone.Frequency(midi, 'midi').toNote(), time, velocity / 127);
+  },
+  noteOff(midi, time) {
+    instrument.triggerRelease(Tone.Frequency(midi, 'midi').toNote(), time);
+  },
+};
+
+// Use shared mode because this host owns Tone.Transport.start().
+const player = new TonePlayer(score, {
+  tone: Tone,
+  synth,
+  transportOwnership: 'shared',
+});
+await player.play();
+Tone.getTransport().start();
+// Later, release this player and the instrument owned by this example.
+const dispose = () => { player.dispose(); instrument.dispose(); };
+```
+
+#### TonePlayer Time and transport ownership
+
+`TonePlayer` supports the rate-aware driver transport surface (`seconds`,
+`duration`, `progress`, `seekFraction`, `scrub`, `setRate`), but it deliberately
+does not expose ScorePlayer's loop or `timeupdate` contract. Use `ScorePlayer`
+when those controls are required. Its default `transportOwnership: 'owned'`
+preserves standalone controls; use `transportOwnership: 'shared'` when a host
+already owns the injected global `Tone.Transport` and must remain its sole
+controller. A supplied synth is borrowed by default, including one passed later
+to `setSynth(synth, ownership)`; opt into `'owned'` only when the player should
+dispose that backend. In shared mode, real Tone transports notify the player about host
+`start` / `pause` / `stop` events, so the player clears only its own voices,
+schedule entries, and cursor when the host pauses or stops. `cancel()` and a
+direct host seek have no lifecycle event; call
+`await player.rearmSharedTransport(localSeconds?)` after either. It never
+changes the host transport, and the optional local seconds argument selects the
+score point to schedule after an external seek. Custom injected transports that
+do not expose `on` / `off` remain supported, but require this explicit rearm
+step after host lifecycle changes too.
+
+The adapter maps nominal score seconds to rate-scaled local transport seconds.
+It schedules callbacks on the injected Tone transport; it does not publish a
+Kernel `TransportClockReader`. A shared-mode `play()` arms the player's entries
+but does not start the host transport. Neither mode's returned Promise means
+the score has finished. Use a user gesture when the injected `tone.start()`
+must unlock audio.
+
+
+**Construction and TonePlayerOptions**
+
+| Member | Default | Contract |
+| --- | --- | --- |
+| `new TonePlayer(score, options)` | — | Builds a performed-score timeline and resolves the injected transport. Throws if no usable transport is supplied. |
+| `tone` | Required | `ToneLike` namespace or structural adapter, described below. |
+| `synth` | None | `SynthBackend` receiving scheduled note attacks/releases; no automatic instrument is created. |
+| `synthOwnership` | `'borrowed'` for supplied synth | `'owned'` allows backend disposal when replaced or when the player is disposed. |
+| `transportOwnership` | `'owned'` | `ToneTransportOwnership`: owned controls the transport; shared schedules only this player's work. |
+| `tempo` | Score's initial tempo | Initial tempo scale, retaining internal tempo changes. |
+| `expandRepeats` | `false` | Expand the Score's repeat structure before scheduling. |
+
+**Commands and state**
+
+| Member | Kind | Contract |
+| --- | --- | --- |
+| `play()` | `Promise<void>` | Unlocks audio when needed and schedules work; owned mode may start the host transport. Rejects after disposal or on unlock failure. |
+| `pause()` | `void` | Releases this player's active voices and pauses its local pass; owned mode also pauses the transport. |
+| `stop()` | `void` | Clears this player's schedule and resets its position; only owned mode stops/rewinds the transport. |
+| `seek(seconds)` | `void` | Clamps to local duration and rebuilds affected schedule entries; shared mode leaves host seconds unchanged. |
+| `seekNominal(seconds)` | `void` | Converts nominal score seconds by the current rate, then seeks. |
+| `scrub(deltaSeconds)` | `void` | Relative seek in rate-scaled seconds. |
+| `seekFraction(fraction)` | `void` | Clamps to 0–1 and seeks within local duration. |
+| `rearmSharedTransport(positionSeconds?)` | `Promise<void>` | Shared mode only; rebuilds entries after host cancellation/repositioning. Omission preserves the current local position. |
+| `setTempo(bpm)` | `void` | Changes the local tempo scale while preserving nominal position; does not set host `Transport.bpm`. Non-finite, nonpositive or unchanged resulting scales are ignored. |
+| `setRate(rate)` | `void` | Scale relative to the score's initial tempo; nonpositive values select 1. Infinite resulting scales are ignored. Use finite positive values; no bounded rate-range validation is provided. |
+| `setSynth(synth, ownership?)` | `void` | Releases active voices through their original backend, installs the new backend, and disposes a distinct previous owned backend. Ownership defaults to borrowed. |
+| `rate` | Readonly number | Current tempo scale. |
+| `seconds` | Readonly number | Local, rate-scaled seconds, clamped to duration. |
+| `nominalSeconds` | Readonly number | `seconds * rate`, on the original score axis. |
+| `duration` / `durationSeconds` | Readonly number | Rate-scaled duration; the latter is an alias. |
+| `progress` | Readonly number | Fraction through local duration, zero for empty duration. |
+| `currentTime` | Readonly `TimePosition` | Score location derived from the nominal position. |
+| `isPlaying()` | boolean | In shared mode requires both an armed local pass and a started host transport. |
+| `on(event, listener)` | Unsubscribe function | Subscribe to `TonePlayerEvents`. |
+| `dispose()` | `void` | Idempotently clears this player's entries, voices, polling, host listeners, and owned synth. Does not close the host audio context or dispose a borrowed synth. |
+
+**TonePlayerEvents**
+
+| Event | Payload | Timing |
+| --- | --- | --- |
+| `cursor` | `TimePosition` | Visual cursor polling and explicit position updates; not an audio scheduling deadline. |
+| `noteOn` / `noteOff` | `Note` | This player's scheduled note lifecycle. |
+| `end` | `Score` | Completion of this player's scheduled material. |
+| `operationError` | `PlaybackOperationError` | Backend/lifecycle failure with `kind`, `source`, `operation`, and `error`. |
+| `listenerError` | `PlaybackListenerError` | Subscriber failure with `kind`, `source`, `event`, `mode`, and `error`. |
+
+The error payload types are shared with
+[ScorePlayer](/score/headless/play/score-player/). There is no `timeupdate`
+event or public loop setter. Disposal removes owned work even in owned mode;
+it is not a general `Tone.Transport.stop()` or context-close operation.
+
+Lifecycle commands may synchronously emit `noteOff`. If a callback issues a
+newer play, seek, rate change, synth replacement or disposal, the older command
+does not overwrite that newer intent afterward. Rebuilding commands invalidate
+their old schedule before releasing a captured list of old voices; every old
+voice still receives its cleanup, while newly scheduled voices remain separate.
+An already running player can re-arm its invalidated pass without taking control
+of a shared host transport.
+
+Audio unlocking has a separate lifetime: pause, stop, rearm and disposal cancel
+an older pending `play()` continuation; seek and tempo changes keep that pending
+play and determine the position/rate it eventually schedules. After disposal,
+pause/stop/seek and tempo/rate controls are inert; `play()`,
+`rearmSharedTransport()` and `setSynth()` continue to reject or throw as
+appropriate to their return types.
+
+**Injected contracts**
+
+| Type | Members | Responsibility |
+| --- | --- | --- |
+| `ToneLike` | `start(): Promise<void>`; optional `now()`, `getContext()`, `getTransport()`, `Transport` | Unlock audio and provide a transport through `getTransport()` or the fallback property. Time fallbacks support cleanup against the audio reference clock. |
+| `ToneTransportLike` | `bpm.value`, `seconds`, `state`, `start`, `pause`, `stop`, `schedule(callback, time)`, `clear(id)`, `cancel(after?)` | Supply transport position and scheduling. Schedule callbacks receive audio-reference time. |
+| `ToneTransportLike.on` / `.off` | Optional start/pause/stop listeners | Observe host lifecycle in shared mode. Without both, the application explicitly re-arms after host changes. |
+
+
+#### TonePlayer Related
+
+[ScorePlayer](/score/headless/play/score-player/) provides the native scheduler
+and loop/timeupdate contract. [Transport drivers](/score/headless/play/interactive-player/#clock-input)
+consume the shared rate-aware transport surface. TonePlayer has no dedicated
+public Element; an application can bind its state to
+[transport UI](/uikit/transport-time/transport/).
+
+</details>
+
+## Related
+
+- [ScorePlayer Web Component](/score/element/play/score-player/) — element composition.
+- [PlayerController](/score/headless/play/player-controller/) — transport UI state.
+- [Sound](/score/headless/play/sound/) and [Effect](/score/headless/play/effect/) — graph recipes and ownership.
+- [InteractivePlayer](/score/headless/play/interactive-player/) — host-driven beat timing.

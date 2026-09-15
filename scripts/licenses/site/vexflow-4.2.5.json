@@ -1,0 +1,32 @@
+{
+  "package": "vexflow",
+  "version": "4.2.5",
+  "artifacts": [
+    {
+      "file": "build/esm/src/fonts/bravura_glyphs.js",
+      "sha256": "7298e3451329a56b0616f4d51e36f3cefb40a04313697ed3e4e788d0b45c2a35"
+    },
+    {
+      "file": "build/esm/src/fonts/petalumascript_glyphs.js",
+      "sha256": "956b67683b88cf6b40c5f1a65a51ea4840e927ce6f2b4e4b293dc641afc00c4d"
+    }
+  ],
+  "documents": [
+    {
+      "title": "Bravura 1.392: outlines converted by VexFlow",
+      "source": "https://github.com/0xfe/vexflow/blob/4.2.5/tools/fonts/@/bravura/LICENSE.txt",
+      "file": "bravura-1.392-OFL.txt",
+      "sha256": "eaf7e8faffbe4e404fc19e625c89cef03992dc736051ae7e2fefe205cd6c93db"
+    },
+    {
+      "title": "Petaluma: text metrics included by VexFlow",
+      "source": "https://github.com/0xfe/vexflow/blob/4.2.5/tools/fonts/@/petaluma/LICENSE.txt",
+      "file": "petaluma-OFL.txt",
+      "sha256": "5789e74d38031e93a4fbdb0a72392d1fd58cf15c29da3efa695c5099433ad0ce"
+    }
+  ],
+  "sourceEvidence": {
+    "conversion": "https://github.com/0xfe/vexflow/tree/4.2.5/tools/fonts",
+    "note": "Bravura_1.392.otf is converted to bravura_glyphs.ts. The bravura entry also imports PetalumaScript text metrics; the Petaluma notice accompanies those metrics without claiming that its outline font is present."
+  }
+}

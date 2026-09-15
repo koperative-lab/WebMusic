@@ -1,0 +1,228 @@
+---
+import LiveDemoCanvas from './LiveDemoCanvas.astro';
+
+interface Props {
+  demo: 'player' | 'piano-roll' | 'staff' | 'waterfall' | 'analysis' | 'workspace';
+}
+
+const { demo } = Astro.props;
+const canvasSize =
+  demo === 'player' || demo === 'analysis'
+    ? 'compact'
+    : demo === 'waterfall' || demo === 'workspace'
+      ? 'tall'
+      : 'default';
+---
+
+<div class="wui-panel wui-panel--flow not-content react-preset-showcase" data-react-preset={demo}>
+  <div class="wui-panel__title">
+    <span>@webmusic/score/react</span>
+    <strong data-react-preset-title>React preset</strong>
+  </div>
+  <LiveDemoCanvas size={canvasSize}>
+    <div class="react-preset-showcase__surface" data-react-preset-root></div>
+  </LiveDemoCanvas>
+</div>
+
+<script>
+  import React from 'react';
+  import { createRoot } from 'react-dom/client';
+  import { Duration, MeasureId, PartId, Pitch, Rational, ScoreBuilder, VoiceId } from '@webmusic/score';
+  import {
+    AnalysisSummary,
+    SimplePianoRoll,
+    SimpleScorePlayer,
+    SimpleScoreWorkspace,
+    SimpleStaff,
+    SimpleWaterfall,
+  } from '@webmusic/score/react';
+
+  const q = (value: number) => new Rational(value, 1);
+
+  const createScore = () => {
+    const builder = new ScoreBuilder();
+    const timeSignature = { numerator: 4, denominator: 4 };
+    const partId = PartId('react-piano');
+    const voice = VoiceId('react-piano-v1');
+
+    builder
+      .setMetadata({ title: 'React Preset Study' })
+      .addTempo({ atQuarters: Rational.ZERO, bpm: 120 })
+      .addMeter({ atQuarters: Rational.ZERO, measureNumber: 1, timeSignature });
+
+    builder.addPart({ id: partId, name: 'Piano', staves: 2, midiProgram: 0 });
+    builder.addMeasure({
+      id: MeasureId('m1'),
+      number: 1,
+      onsetQuarters: Rational.ZERO,
+      durationQuarters: q(4),
+      timeSignature,
+      keySignature: { fifths: 0, mode: 'major' },
+    });
+
+    ['C4', 'E4', 'G4', 'C5', 'E3', 'G3', 'C4', 'E4'].forEach((name, index) => {
+      const pitch = Pitch.parse(name);
+      builder.addNote(partId, {
+        id: builder.newNoteId(),
+        pitch,
+        onsetQuarters: new Rational(index, 2),
+        duration: Duration.eighth(),
+        voice,
+        staff: pitch.midi < 60 ? 2 : 1,
+      });
+    });
+
+    return builder.build();
+  };
+
+  const renderPreset = (root: HTMLElement) => {
+    if (root.dataset.initialized) return;
+    root.dataset.initialized = 'true';
+
+    const mount = root.querySelector<HTMLElement>('[data-react-preset-root]')!;
+    const title = root.querySelector<HTMLElement>('[data-react-preset-title]')!;
+    const score = createScore();
+    const demo = root.dataset.reactPreset;
+    let element: React.ReactNode;
+
+    if (demo === 'player') {
+      title.textContent = 'SimpleScorePlayer';
+      element = React.createElement(SimpleScorePlayer, {
+        score,
+        className: 'react-demo-player',
+        controlsClassName: 'react-demo-transport',
+      });
+    }
+
+    if (demo === 'piano-roll') {
+      title.textContent = 'SimplePianoRoll';
+      element = React.createElement(SimplePianoRoll, {
+        score,
+        width: 720,
+        height: 240,
+        pixelsPerSecond: 96,
+        laneHeight: 12,
+        className: 'react-demo-piano-roll',
+      });
+    }
+
+    if (demo === 'staff') {
+      title.textContent = 'SimpleStaff';
+      element = React.createElement(SimpleStaff, {
+        score,
+        width: 720,
+        height: 220,
+        pixelsPerSecond: 0,
+        laneHeight: 7,
+        className: 'react-demo-staff',
+      });
+    }
+
+    if (demo === 'waterfall') {
+      title.textContent = 'SimpleWaterfall';
+      element = React.createElement(SimpleWaterfall, {
+        score,
+        width: 720,
+        height: 320,
+        pixelsPerSecond: 64,
+        laneHeight: 16,
+        className: 'react-demo-waterfall',
+      });
+    }
+
+    if (demo === 'analysis') {
+      title.textContent = 'AnalysisSummary';
+      element = React.createElement(AnalysisSummary, {
+        score,
+        className: 'react-demo-analysis',
+      });
+    }
+
+    if (demo === 'workspace') {
+      title.textContent = 'SimpleScoreWorkspace';
+      element = React.createElement(SimpleScoreWorkspace, {
+        score,
+        className: 'react-demo-workspace',
+        controlsClassName: 'react-demo-transport',
+        analysis: { className: 'react-demo-analysis' },
+        pianoRoll: { width: 720, height: 220, className: 'react-demo-piano-roll' },
+        staff: { width: 720, height: 220, className: 'react-demo-staff' },
+        waterfall: false,
+      });
+    }
+
+    createRoot(mount).render(element);
+  };
+
+  document.querySelectorAll<HTMLElement>('[data-react-preset]').forEach(renderPreset);
+</script>
+
+<style>
+  .react-preset-showcase__surface {
+    min-height: 4rem;
+    overflow: auto;
+  }
+
+  .react-demo-transport {
+    --webscore-react-control-gap: 0.95rem;
+    --webscore-react-button-width: 3.25rem;
+    --webscore-react-control-height: 3rem;
+    --webscore-react-icon-size: 1.35rem;
+    --webscore-react-progress-height: 0.72rem;
+    --webscore-react-button-bg: #111;
+    --webscore-react-button-color: #fff;
+    --webscore-react-button-border: #111;
+    --webscore-react-progress-bg: #f4f4f4;
+    --webscore-react-progress-fill: #111;
+    display: flex;
+    align-items: center;
+    min-height: 3rem;
+  }
+
+  .react-demo-analysis {
+    display: grid;
+    gap: 0.4rem;
+    margin: 0;
+  }
+
+  .react-demo-analysis div {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    border-top: 1px solid #e3e3e3;
+    padding-top: 0.4rem;
+  }
+
+  .react-demo-analysis div:first-child {
+    border-top: 0;
+    padding-top: 0;
+  }
+
+  .react-demo-analysis dt,
+  .react-demo-analysis dd {
+    margin: 0;
+    font-family: var(--sl-font-mono);
+    font-size: 0.74rem;
+  }
+
+  .react-demo-analysis dt {
+    color: #666;
+  }
+
+  .react-demo-analysis dd {
+    font-weight: 800;
+    text-align: right;
+  }
+
+  .react-demo-piano-roll,
+  .react-demo-staff,
+  .react-demo-waterfall {
+    display: block;
+    max-width: 100%;
+  }
+
+  .react-demo-workspace {
+    display: grid;
+    gap: 0.75rem;
+  }
+</style>

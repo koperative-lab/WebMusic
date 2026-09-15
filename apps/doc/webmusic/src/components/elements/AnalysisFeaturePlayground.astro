@@ -1,0 +1,41 @@
+---
+import ElementPlayground from '../ElementPlayground.astro';
+interface Props { tag: 'chord-analysis' | 'live-chord-analysis' | 'key-analysis' | 'roman-analysis' | 'voice-leading-analysis'; }
+const {tag} = Astro.props;
+const playerId = `pg-${tag}-player`;
+const SRC = `${import.meta.env.BASE_URL}${tag === 'live-chord-analysis' ? 'xml/chord-progression.musicxml' : 'midi/demo.mid'}`;
+const companions = [{tag: 'score-player', target: 'score-player'}];
+---
+
+<ElementPlayground tag={tag} markup="[data-analysis-composition]" companions={companions} class="pg-analysis-feature">
+  <div data-analysis-composition data-pg-fragment>
+    <score-player id={playerId} src={SRC}></score-player>
+    {tag === 'key-analysis' && <key-analysis player={`#${playerId}`}></key-analysis>}
+    {tag === 'chord-analysis' && <chord-analysis player={`#${playerId}`}></chord-analysis>}
+    {tag === 'roman-analysis' && <roman-analysis player={`#${playerId}`}></roman-analysis>}
+    {tag === 'voice-leading-analysis' && <voice-leading-analysis player={`#${playerId}`}></voice-leading-analysis>}
+    {tag === 'live-chord-analysis' && <live-chord-analysis player={`#${playerId}`}></live-chord-analysis>}
+  </div>
+</ElementPlayground>
+
+<script>
+  import {defineScorePlayerElement} from '@webmusic/score/play/element';
+  import {defineAllAnalysisElements} from '@webmusic/score/analyze/element';
+  defineScorePlayerElement();
+  defineAllAnalysisElements();
+</script>
+
+<style>
+  .pg-analysis-feature :global([data-analysis-composition]) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1rem;
+    min-width: 0;
+  }
+  .pg-analysis-feature :global([data-analysis-composition] > *) {
+    min-width: 0;
+  }
+  .pg-analysis-feature :global(score-player) {
+    --webscore-play-height: 2.1rem;
+  }
+</style>

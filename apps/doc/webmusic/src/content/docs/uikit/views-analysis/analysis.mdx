@@ -1,0 +1,202 @@
+---
+title: '@webmusic/ui/analysis'
+description: 'Analysis cards, summaries, distributions, timelines, and playhead-follow rendering helpers.'
+sidebar:
+  label: 'analysis'
+  order: 1
+---
+
+import UiPresenterLiveDemo from '../../../../components/UiPresenterLiveDemo.astro';
+import UiPresenterRelated from '../../../../components/UiPresenterRelated.astro';
+
+`@webmusic/ui/analysis` is a set of one-shot render helpers for analytical cards, distributions,
+timelines, motifs, rhythm patterns, and audio results. `renderHistogram()` can retain selectable bins and active-state updates. `createAnalysisPlayhead()`
+follows other rendered spans: it follows quarter-note positions across span-bearing nodes produced by those helpers.
+
+Use [stage](/uikit/layout-feedback/stage/) when the visualization needs a caller-drawn canvas, or
+[track-list](/uikit/transport-time/track-list/) when the output is a selectable collection alongside the analytical evidence.
+
+<UiPresenterLiveDemo presenter="analysis" />
+
+## Import
+
+```ts
+import {
+  createAnalysisPlayhead,
+  createAnalysisRoot,
+  renderChordTimeline,
+} from '@webmusic/ui/analysis';
+
+const root = createAnalysisRoot(document);
+host.append(root);
+renderChordTimeline(result.chords, root);
+
+const playhead = createAnalysisPlayhead(root);
+playhead.update(player.positionQuarters);
+```
+
+## Reports without Element wrappers
+
+The [Score report workflow](/score/api/analyze/#reports) combines `createScoreReport` and the stateless distribution/rhythm APIs with these presenters. Summary cards, histograms and rhythm lists are caller-owned reports; they do not require dedicated Score Analyze Elements.
+
+## One-shot rendering and playhead follow
+
+Unlike the shared mount shape, render helpers append output immediately and return either nothing,
+the root, or a small painter. The caller owns replacement and removal of that output. Build a
+fresh root or clear one before rendering a new result; only `renderAudioAnalysisCard()` replaces
+its root contents itself.
+
+Timeline, Roman, motif, voice-leading, and rhythm helpers stamp their quarter ranges on rendered
+nodes. The playhead discovers those nodes, highlights every range containing the supplied
+position, sets `aria-current`, and restores each helper's idle inline style when it leaves.
+
+<details class="component-section">
+<summary>API</summary>
+
+There is no module-level `State` or `Binding`: helper arguments are immutable render input and the
+playhead is updated directly.
+
+**Root and render helpers**
+
+| Export | Kind | Description |
+|---|---|---|
+| `createAnalysisRoot(document?)` | `(Document) => HTMLElement` | Creates the canonical `.wui-analysis.webscore-analyze` root without mounting it. |
+| `renderKeyView(result, root, caption?)` | one-shot renderer | Appends detected key, confidence, and the five strongest candidate bars. |
+| `renderChordTimeline(chords, root)` | one-shot renderer | Appends an ordered chord timeline whose rows carry quarter spans. |
+| `renderRomanStrip(key, roman, root)` | one-shot renderer | Appends Roman-numeral chips in the supplied key, each with a quarter span. |
+| `renderMotifList(motifs, root)` | one-shot renderer | Appends up to eight motifs; each row carries all occurrence spans. |
+| `renderVoiceLeadingList(issues, root)` | one-shot renderer | Appends up to twelve severity-coded issues with one quarter span each. |
+| `renderRhythmPatternList(patterns, root, options?)` | one-shot renderer | Appends recurring patterns and their occurrence spans; `options.limit` defaults to `8`. |
+| `renderHistogram(bins, root, options?)` | `AnalysisHistogramHandle` | Appends normalized bars; optional `onSelect` makes nonempty bins native buttons. Retain the handle for current-bin feedback and cleanup. |
+| `renderSummaryCard(card, root)` | `AnalysisSummaryCardHandle` | Appends a title, optional subtitle, and definition list of facts; retain the handle to update row values without rebuilding the report. |
+| `renderAudioAnalysisCard(type, result, root?, options?)` | `HTMLElement` | Replaces and returns a root for key, tempo, loudness, onset, or pitch output. |
+| `appendSummaryRow(list, label, value)` | utility | Appends one `dt` / `dd` pair to a definition list. |
+| `renderLiveChordPanel(root, options?)` | `(HTMLElement, LiveChordPanelOptions?) => LiveChordPanel` | Sounding chord, its notes and a history strip. `formatPitch` spells one MIDI note; it defaults to the number, because how a pitch is spelled — sharps or flats, which enharmonic a key implies — is the domain's answer, not the kit's. |
+
+**Render data**
+
+| Type | Members |
+|---|---|
+| `AnalysisKeyResult` | `tonic`, `mode`, `confidence`, and scored key candidates. |
+| `AnalysisChordSegment` | `chord`, `startQuarters`, `endQuarters`. |
+| `AnalysisRomanSegment` | Chord-segment fields plus `roman`. |
+| `AnalysisLiveChordState` | `chord`, sounding `midis`, and chord `history`. |
+| `AnalysisMotif` | `intervals`, `rhythm`, and occurrence `startQuarters`. |
+| `AnalysisVoiceIssue` | `type`, `severity`, `voices`, `startQuarters`, `endQuarters`. |
+| `AnalysisRhythmPattern` | duration `pattern`, occurrence `count`, and onset quarters. |
+| `AnalysisHistogramBin` | `label` and numeric `value`. |
+| `AnalysisSummaryCard` | `title`, optional `subtitle`, and label/value `rows`. |
+| `AudioAnalysisCardResult` | optional key, tempo, onsets and pitch track plus required loudness metrics. |
+| `AnalysisSpan` | `startQuarters` and `endQuarters` for one playhead-follow range. |
+
+`AudioAnalysisCardType` is `'key' | 'tempo' | 'loudness' | 'onsets' | 'pitch'`.
+Pitch-track `times` are frame timestamps in seconds.
+
+**Helper options**
+
+| Helper | Member | Kind | Default | Description |
+|---|---|---|---|---|
+| `renderRhythmPatternList` | `limit` | `number` | `8` | Maximum number of sorted pattern rows appended. |
+| `renderRhythmPatternList` | `formatDuration` | `(quarters: number) => string` | the number | Names one duration. Notating it — which glyph a value takes, that a dot adds half again — is a convention of the domain, so the caller answers; `@webmusic/score` passes its own. |
+| `renderHistogram` | `emptyLabel` | `string` | `'Nothing to show.'` | Text appended when the bins array is empty. |
+| `renderHistogram` | `format` | `(value: number) => string` | rounded number | Formats each bar's trailing value. |
+| `renderHistogram` | `onSelect` | `(index: number, bin: AnalysisHistogramBin) => Promise<void> \| void` | — | Makes positive-value bins operable buttons; called on pointer or native keyboard activation. |
+| `renderHistogram` | `onError` | `(error: unknown) => void` | — | Reports synchronous or asynchronous selection failures. |
+| `renderAudioAnalysisCard` | `durationSeconds` | `number` | last event / timestamp | Supplies the onset or pitch time span when positive. |
+| `renderAudioAnalysisCard` | `error` | `string` | — | Replaces the card body with a status failure message. |
+
+**Summary handle**
+
+`renderSummaryCard()` returns an `AnalysisSummaryCardHandle` with `setValue(label: string, value: string): void`. It updates all existing rows whose label matches exactly, writes only changed text, and preserves their DOM. Unknown labels are ignored. The caller owns removal of the rendered report; ignoring the return value remains supported.
+
+**Histogram handle**
+
+`AnalysisHistogramOptions` is the exported option bag above. The returned `AnalysisHistogramHandle` provides:
+
+| Member | Description |
+|---|---|
+| `setActive(indexes: readonly number[])` | Set current bins by their input indexes; updates styling and `aria-current` without rebuilding buttons or moving focus. |
+| `destroy()` | Idempotently release selection listeners; the caller owns removal of the rendered output. |
+
+Without `onSelect`, histogram output remains passive. With it, nonempty bins are native buttons and empty bins remain descriptive. Callback rejection is contained and reported through `onError`.
+
+**Playhead options**
+
+| Member | Kind | Default | Description |
+|---|---|---|---|
+| `scroll` | `boolean` | `true` | Scrolls the first newly active node into the nearest visible position unless `false`. |
+| `activeClassName` | `string` | `'is-playing'` | One or more compatibility classes added while a node is active. |
+| `onError` | `(error: unknown) => void` | — | Receives span discovery, style restoration, and scrolling failures. |
+
+**Playhead handle and span utilities**
+
+| Member / export | Kind | Description |
+|---|---|---|
+| `element` | `HTMLElement` | Analysis root controlled by the playhead. |
+| `update(quarters)` | `(number) => void` | Highlights every span containing the finite position; non-finite input becomes `0`. |
+| `clear()` | `() => void` | Restores every active node to its idle style and removes current state. |
+| `destroy()` | `() => void` | Idempotently clears highlighting and releases the root from the controller registry. |
+| `ANALYSIS_SPAN_SELECTOR` | `string` | Selector matching nodes with single or multiple quarter spans. |
+| `readAnalysisSpans(element)` | `(HTMLElement) => AnalysisSpan[]` | Parses `startQuarters` / `endQuarters` and multi-span data into ranges. |
+| `readAnalysisIdleStyle(element)` | `(HTMLElement) => string \| undefined` | Reads the helper-stamped inline style restored after playback. |
+
+**Accessibility.** Timelines and repeated-pattern output use real ordered lists; summaries use
+definition lists. Active span nodes receive `aria-current="true"`. The playhead never moves focus.
+Audio-card failures use `role="status"`; canvas-like pitch output remains supplemental and should
+be given surrounding context by the consuming Element.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+Use the shared [surface and palette tokens](/uikit/#theme-with-css-custom-properties) for
+background (including `transparent`), foreground, accent, outer border and corner radius.
+Presenter-specific tokens below take precedence within their documented roles.
+
+The root uses the shared [`--wm-component-*` surface](/uikit/#theme-with-css-custom-properties),
+with `--wm-analysis-surface-*` available for a presenter-only override. The fallback retains
+the harmony theme, density and scheme token layer, followed by the older `--wm-analysis-*` and
+`--webscore-analyze-*` names. Inline roots and `analysisStyle` use the same declarations. The helpers do
+not install a style node; most structural styles are stamped on their output, and the exported
+`analysisStyle` supplies the base root, muted, and timeline rules when a consumer wants
+stylesheet-owned defaults.
+
+**Tokens**
+
+| Property | Falls back to | Default | Controls |
+|---|---|---|---|
+| `--wm-analysis-bar-height` | literal | `.5rem` | Height of each distribution bar. |
+| `--wm-analysis-strip-height` | literal | `1.4rem` | Height of the onset mark strip. |
+| `--wm-analysis-foreground` | `--webscore-analyze-color` → `--wm-foreground` → literal | `inherit` | Root text; theme and scheme can supply the resolved harmony ink. |
+| `--wm-analysis-background` | `--webscore-analyze-bg` → `--wm-surface` | `transparent` | Root background. Selected text independently uses `--wm-harmony-on-accent` → `--wm-accent-foreground` → `#fff`. |
+| `--wm-analysis-border` | `--webscore-analyze-border` → harmony rule | `1px solid #d8d8d8` | Root border. |
+| `--wm-analysis-padding` | `--webscore-analyze-padding` → literal | `.75rem` | Root padding compatibility fallback. |
+| `--wm-analysis-muted` | `--webscore-analyze-muted` → literal | `#777` | Captions, labels, and secondary values. |
+| `--wm-analysis-track` | `--webscore-analyze-track` → literal | `#eee` | Histogram tracks and active-span background. |
+| `--wm-analysis-accent` | `--webscore-analyze-accent` → literal | `#111` | Bars, outlines, active chips, onset marks, and pitch line. |
+| `--wm-analysis-rule` | `--webscore-analyze-rule` → `--wm-control-border` → `--wm-border` | `#d8d8d8` | Timeline separators and inactive chip borders. |
+| `--wm-control-border` | `--wm-border` | `#d8d8d8` | Shared non-primary control border fallback. |
+| `--wm-analysis-error` | `--wm-error` → literal | `#c0392b` | Audio-card failure text. |
+
+**Classes**
+
+| Node | Canonical class | Compatibility class |
+|---|---|---|
+| Root | `.wui-analysis` | `.webscore-analyze` |
+| Muted base-rule hook | `.wui-analysis__muted` | — |
+| Chord timeline | `.wui-analysis__timeline` | `.webscore-analyze__timeline` |
+| Chord label | — | `.webscore-analyze__chord` |
+| Beat label | — | `.webscore-analyze__beat` |
+| Rhythm list | `.wui-analysis__rhythms` | — |
+| Histogram | `.wui-analysis__histogram` | — |
+| Summary title | `.wui-analysis__title` | `.webscore-analyze__title` |
+| Summary list | `.wui-analysis__list` | `.webscore-analyze__list` |
+| Audio root modifier | `.wui-analysis--audio` | `.waa-card` |
+
+The helpers expose no `parts` option or canonical part tokens. `activeClassName` is appended only
+while a playhead range is active and does not replace these structural classes.
+
+</details>
+
+<UiPresenterRelated presenter="analysis" />

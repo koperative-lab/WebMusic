@@ -1,0 +1,51 @@
+---
+import HeadlessPlayground from '../HeadlessPlayground.astro';
+import './musical-stage.css';
+
+interface Props {
+  object: 'analysis-follower' | 'score-map-view' | 'pitch-view';
+}
+const {object} = Astro.props;
+const factory = {
+  'analysis-follower': '__wmAnalysisFollowerDemo',
+  'score-map-view': '__wmScoreMapViewDemo',
+  'pitch-view': '__wmPitchViewDemo',
+}[object];
+---
+
+<HeadlessPlayground
+  object={object}
+  factory={factory}
+  hint="Options recreate the model and demo player. Play requests audio; the remaining controls work silently."
+>
+  <section class="wm-follower-demo wm-hl-music" aria-label="Playback-connected musical view">
+    <div class="wm-follower-demo__owner">
+      <span>Demo-owned ScorePlayer</span>
+      <button class="wui-btn" type="button" data-follow-play>Play</button>
+      <button class="wui-btn" type="button" data-follow-stop>Stop</button>
+      <button class="wui-btn" type="button" data-follow-owner-seek>Seek owner to 1s</button>
+      <output data-follow-owner aria-label="Player position" aria-live="off">0.00s · stopped</output>
+    </div>
+    <p data-follow-input></p>
+    <p class="wm-follower-demo__summary" data-follow-summary></p>
+    <div class={object === 'score-map-view' ? 'wm-hl-music__map' : 'wm-hl-music__chips'} data-follow-data
+      aria-label={object === 'score-map-view' ? 'Measure density and navigation' : object === 'pitch-view' ? 'Held pitches' : 'Chord segments'}></div>
+    <button class="wui-btn" type="button" data-follow-complete hidden>Complete pending seeks</button>
+    <p data-follow-status role="status">Waiting for the model.</p>
+  </section>
+</HeadlessPlayground>
+
+<script>
+  import {registerPlaybackFollowerFactories} from './playback-followers-client';
+  registerPlaybackFollowerFactories();
+</script>
+
+<style>
+  .wm-follower-demo { display: grid; gap: .75rem; min-width: 0; }
+  .wm-follower-demo [hidden] { display: none; }
+  .wm-follower-demo__owner { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+  .wm-follower-demo__owner span { flex-basis: 100%; font-size: .8rem; }
+  .wm-follower-demo__owner output { font-size: .8rem; font-variant-numeric: tabular-nums; }
+  .wm-follower-demo__summary { font-weight: 600; }
+  .wm-follower-demo p { margin: 0; font-size: .8rem; }
+</style>

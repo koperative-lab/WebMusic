@@ -1,0 +1,104 @@
+---
+import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
+---
+<HeadlessDemoFrame
+  entry="@webmusic/score/play/headless"
+  name="Metronome"
+  hint="Use the live controls to hear the result. Reset stops playback and restores the default parameters."
+  code={`// Configure Metronome below.`}
+  rootAttrs={{'data-programmatic-metronome': true}}
+>
+  <div class="wui-row"><button class="wui-btn" data-toggle type="button">▶ Start</button><span class="wui-dot" data-dot></span><output class="wui-readout" data-readout>120 BPM</output></div>
+  <div slot="parameters" class="wm-pg__grid">
+    <div class="wm-pg__param"><span class="wm-pg__name">bpm</span><input class="wui-range" type="range" data-bpm value="120" min="40" max="200" aria-label="Metronome tempo" /><span class="wm-pg__note">Live tempo in beats per minute; updates metronome.setBpm().</span></div>
+  </div>
+</HeadlessDemoFrame>
+
+<script>
+  import {mountProgrammaticDemo, programmaticCode} from './programmatic-demo-lifecycle';
+  import { Metronome, Sound } from '@webmusic/score/play/headless';
+
+  mountProgrammaticDemo('[data-programmatic-metronome]', (root, scope) => {
+    const btn = root.querySelector<HTMLButtonElement>('[data-toggle]')!;
+    const dot = root.querySelector<HTMLElement>('[data-dot]')!;
+    const slider = root.querySelector<HTMLInputElement>('[data-bpm]')!;
+    const readout = root.querySelector<HTMLElement>('[data-readout]')!;
+
+    const updateCode = () => programmaticCode(root, `import {Metronome, Sound} from '@webmusic/score/play/headless';
+
+// In a start gesture; retain the context and sound.
+const context = new AudioContext();
+await context.resume();
+const click = Sound.oscillator({type: 'triangle', gain: 0.2, releaseSeconds: 0.05});
+click.connect(context.destination);
+await click.preload();
+const metronome = new Metronome(() => {
+  click.noteOn(84, 110, context.currentTime, 0.05);
+}, {bpm: ${Number(slider.value)}});
+metronome.start();
+// Tempo edits: metronome.setBpm(${Number(slider.value)});
+// On cleanup: metronome.stop(); click.dispose(); await context.close();`);
+    updateCode();
+
+    // One shared AudioContext + click timbre, created lazily on first Start.
+    let ctx: AudioContext | undefined;
+    scope.add(() => ctx?.close());
+    const click = Sound.oscillator({ type: 'triangle', gain: 0.2, releaseSeconds: 0.05 });
+    scope.add(() => click.dispose());
+
+    let flashTimer: ReturnType<typeof setTimeout> | undefined;
+    scope.add(() => clearTimeout(flashTimer));
+    const tick = () => {
+      dot.dataset.on = 'true';
+      clearTimeout(flashTimer);
+      flashTimer = setTimeout(() => { dot.dataset.on = 'false'; }, 80);
+      if (ctx) {
+        click.noteOn(84, 110, ctx.currentTime, 0.05);
+      }
+    };
+
+    const metronome = new Metronome(tick, { bpm: 120 });
+    scope.add(() => { metronome.stop(); });
+    let requestedRunning = false;
+    let generation = 0;
+
+    scope.listen(btn, 'click', async () => {
+      const request = ++generation;
+      requestedRunning = !requestedRunning;
+      if (!requestedRunning) {
+        metronome.stop();
+        clearTimeout(flashTimer);
+        btn.textContent = '▶ Start';
+        btn.dataset.on = 'false';
+        dot.dataset.on = 'false';
+        return;
+      }
+      btn.textContent = '⏸ Stop';
+      btn.dataset.on = 'true';
+      try {
+        if (!ctx) {
+          ctx = new AudioContext();
+          click.connect(ctx.destination);
+        }
+        await ctx.resume();
+        await click.preload();
+        if (!scope.active || request !== generation || !requestedRunning) return;
+        metronome.start();
+      } catch (error) {
+        if (scope.active && request === generation) {
+          requestedRunning = false;
+          btn.textContent = '▶ Start';
+          btn.dataset.on = 'false';
+        }
+        throw error;
+      }
+    });
+
+    scope.listen(slider, 'input', () => {
+      const bpm = Number(slider.value);
+      metronome.setBpm(bpm);
+      updateCode();
+      readout.textContent = `${bpm} BPM`;
+    });
+  });
+</script>

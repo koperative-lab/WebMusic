@@ -1,0 +1,177 @@
+---
+title: '@webmusic/ui/eq'
+description: 'Renders an equalizer response curve with draggable band controls over caller-owned graph state.'
+sidebar:
+  label: 'eq'
+  order: 5
+---
+
+import UiPresenterLiveDemo from '../../../../components/UiPresenterLiveDemo.astro';
+import UiPresenterRelated from '../../../../components/UiPresenterRelated.astro';
+
+`mountEq()` renders a logarithmic-frequency response curve, fill, zero line, draggable band points
+and a per-band readout. The caller owns filters and response calculation; the presenter paints
+`EqState` and commits only frequency/gain changes through `setBand()`.
+
+Use [parameter](/uikit/parameters-gestures/parameter/) for independent filter controls or
+[LFO](/uikit/parameters-gestures/lfo/) for cyclic modulation.
+[`<synth-panel>`](/score/element/play/synth-panel/) already composes this presenter with its audio graph.
+
+<UiPresenterLiveDemo presenter="eq" />
+
+## Import
+
+```ts
+import {mountEq} from '@webmusic/ui/eq';
+
+const handle = mountEq(host, {
+  snapshot: () => graph.eqState,
+  setBand: (index, band) => graph.setBand(index, band),
+  subscribe: (notify) => graph.subscribe(notify),
+});
+```
+
+## Coordinate model and response ownership
+
+Horizontal position maps logarithmically from 30 Hz to 18 kHz. Vertical position maps linearly
+from +18 dB at the top to −18 dB at the bottom. Dragging paints the band optimistically and sends
+rounded frequency plus clamped gain; `q` and per-band disabled state remain caller-owned.
+
+`response` already contains normalized x positions and gain values. The presenter clamps x to
+`0…1`, converts gain to y, and connects the points; it never calculates a filter response. The
+Live Demo's caller does that calculation so dragging remains visible. Latest-command revisions are
+tracked independently per band. See the
+[shared presenter shape](/uikit/api/#the-shared-presenter-shape) for common lifecycle rules.
+
+<details class="component-section">
+<summary>API</summary>
+
+`mountEq(host, binding, options?)` accepts an `HTMLElement` or `ShadowRoot` and returns a
+`MountedEqHandle`.
+
+**State**
+
+| Member | Kind | Description |
+|---|---|---|
+| `bands` | `EqBandState[]` | Required ordered band list; a length change rebuilds points and control nodes. |
+| `bands[].frequency` | `number` | Center frequency clamped to `30…18000` Hz; invalid values become `30`. |
+| `bands[].gain?` | `number` | Gain clamped to `−18…18` dB; absent or invalid values become `0`. |
+| `bands[].q?` | `number` | Missing or non-finite input becomes `1`; finite zero or negative values clamp to `Number.EPSILON`. |
+| `bands[].disabled?` | `boolean` | Strict `true` suppresses pointer and input commands for this band. |
+| `response?` | `EqResponsePoint[]` | Ordered caller-calculated points for curve and fill; absent paints no response. |
+| `response[].x` | `number` | Normalized logarithmic-frequency coordinate clamped to `0…1`. |
+| `response[].gain` | `number` | Response gain in dB; non-finite values normalize to `0` and visible y clamps to ±18 dB. |
+| `ready?` | `boolean` | Strict `true` hides the empty-state message below the graph. |
+| `disabled?` | `boolean` | Strict `true` disables every band and sets root `aria-disabled`. |
+
+**Binding**
+
+| Member | Kind | Description |
+|---|---|---|
+| `snapshot()` | `() => EqState` | Required pull port read on mount, notification, command settlement and `update()`. |
+| `setBand(index, band)` | `(number, {frequency: number; gain: number}) => void \| Promise<void>` | Required command for one dragged/edited band; `q` is intentionally not sent. |
+| `subscribe?(notify)` | `(notify: () => void) => () => void` | Optional external-state subscription released on destruction. |
+
+**Options**
+
+| Member | Kind | Default | Description |
+|---|---|---|---|
+| `label` | `string` | `'Equalizer'` | Accessible name of the root group. |
+| `emptyLabel` | `string` | `'Connect an equalizer graph'` | Status text while `ready !== true`. |
+| `classNames` | `EqClassNames` | `{}` | Adds compatibility classes to all EQ node kinds. |
+| `parts` | `EqParts` | `{}` | Adds tokens beside every canonical EQ part; this type has the same keys as `EqClassNames`. |
+| `formatFrequency` | `(frequency: number) => string` | Compact Hz/kHz | Formats each frequency in the visible band readout. |
+| `onError` | `(error: unknown) => void` | — | Receives snapshot, formatter, command, subscription, stabilization and cleanup failures. |
+| `stylesheet` | `boolean` | `true` | Installs the presenter's stylesheet unless explicitly `false`, for a light-DOM host that cannot inject CSS into its page. |
+
+**Handle**
+
+| Member | Kind | Description |
+|---|---|---|
+| `element` | `HTMLElement` | Presenter-owned `.wui-eq` root. |
+| `svg` | `SVGSVGElement` | Stable response SVG for geometry-aware integrations. |
+| `emptyElement()` | `() => HTMLElement` | Stable presenter-owned empty-state message. |
+| `update()` | `() => void` | Re-reads the binding through a 32-pass bounded update loop and restores the last good state after a failed paint. |
+| `destroy()` | `() => void` | Idempotently removes pointer listeners, subscription, root and installed stylesheet. |
+
+**Accessibility.** The root is a named `role="group"` and reflects disabled state through
+`aria-disabled`. Every band has two visually hidden, focusable native ranges: frequency and gain.
+Tab selects a range and the native arrow keys edit it; `aria-valuetext` announces hertz or
+decibels rather than normalized coordinates. Focus outlines the corresponding band point and
+the visible readout names its band and axis. SVG graphics are decorative pointer targets.
+The empty message is a live status region.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+Use the shared [surface and palette tokens](/uikit/#theme-with-css-custom-properties) for
+background (including `transparent`), foreground, accent, outer border and corner radius.
+Presenter-specific tokens below take precedence within their documented roles.
+
+The presenter installs `eqStyle` unless `stylesheet: false`. The SVG fills its container width
+and keeps the height set by `--wm-eq-height`. Readouts and empty text occupy separate, wrapping
+rows below it, so they add to the total height and do not cover the response. Pointer coordinates
+use the SVG's current bounds after resizing.
+Supply the exported stylesheet or your own CSS from the host when opting out.
+
+The graph is an inverse surface: `--wm-surface-inverse` and
+`--wm-foreground-on-inverse` keep its background and marks paired. Ordinary
+`--wm-surface` and `--wm-foreground` do not recolor that inner graph. Set
+`--wm-eq-background` and the documented graph-ink tokens together when
+replacing its palette; the readout below uses ordinary foreground tokens.
+
+**Tokens**
+
+| Property | Falls back to | Default | Controls |
+|---|---|---|---|
+| `--wm-eq-border` | `--wm-control-border` → `--wm-border` | `#d8d8d8` | Inner graph border. |
+| `--wm-control-border` | `--wm-border` | `#d8d8d8` | Shared non-primary control border fallback. |
+| `--wm-border` | literal | `#d8d8d8` | Shared border fallback. |
+| `--wm-eq-radius` | `--wm-control-radius` | `0` | Inner graph corners. |
+| `--wm-control-radius` | literal | `0` | Shared radius fallback. |
+| `--wm-eq-background` | `--wm-surface-inverse` | `#111` | Inner graph surface; the outer root uses the shared `--wm-component-*` surface. |
+| `--wm-surface-inverse` | literal | `#111` | Shared inverse-surface fallback. |
+| `--wm-eq-text` | `--wm-foreground-muted` → `--wm-foreground` | `#666` | Root current color, readout and empty state. |
+| `--wm-eq-height` | `--wm-surface-md` | `144px` | SVG display height, on the shared drawing-surface scale. |
+| `--wm-eq-grid` | literal | `rgba(255,255,255,.12)` | Grid lines. |
+| `--wm-eq-zero` | literal | `rgba(255,255,255,.3)` | Dashed zero-gain line. |
+| `--wm-eq-fill` | literal | `rgba(255,255,255,.1)` | Area under the response curve. |
+| `--wm-eq-curve` | `--wm-foreground-on-inverse` | `#fff` | Response curve. |
+| `--wm-foreground-on-inverse` | literal | `#fff` | Shared inverse foreground fallback. |
+| `--wm-eq-point` | `--wm-foreground-on-inverse` | `#fff` | Band point fill. |
+| `--wm-eq-point-border` | `--wm-control-border` → `--wm-border` | `#d8d8d8` | Band point outline. |
+| `--wm-font-mono` | literal | `ui-monospace, monospace` | Band readout font. |
+| `--wm-font-family` | `--wm-font` | `system-ui, sans-serif` | Empty-state font family; `--wm-font` remains a compatibility fallback. |
+| `--wm-focus` | `--wm-focus-ring` | `currentColor` (root), `Highlight` (band) | Root and focused band outlines. |
+| `--wm-focus-ring` | literal | `currentColor` (root), `Highlight` (band) | Shared focus fallback. |
+
+**Classes**
+
+`classNames` adds compatibility classes beside canonical names.
+
+| Node | Canonical class | `classNames` key |
+|---|---|---|
+| Root | `.wui-eq` | `root` |
+| SVG | `.wui-eq__svg` | `svg` |
+| Grid group | `.wui-eq__grid` | `grid` |
+| Zero line | `.wui-eq__zero` | `zero` |
+| Filled polygon | `.wui-eq__area` | `area` |
+| Response polyline | `.wui-eq__curve` | `curve` |
+| Point group | `.wui-eq__points` | `points` |
+| Each point | `.wui-eq__point` | `point` |
+| Band readout | `.wui-eq__readout` | `readout` |
+| Empty message | `.wui-eq__empty` | `empty` |
+| Each generated range | `.wui-eq__input` | `input` |
+
+Every empty state is a live region — `role="status"`, `aria-live="polite"` — so the message is announced when it appears, not only drawn.
+
+**Parts**
+
+The canonical part tokens are `root`, `svg`, `grid`, `zero`, `area`, `curve`, `points`, `point`,
+`readout`, `empty`, and `input`. `EqParts` adds tokens beside every matching canonical part.
+
+</details>
+
+<UiPresenterRelated presenter="eq" />

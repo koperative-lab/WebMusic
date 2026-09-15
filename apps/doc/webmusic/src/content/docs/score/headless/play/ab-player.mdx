@@ -1,0 +1,82 @@
+---
+title: 'AbPlayer'
+description: 'Live arrangement switching between two sources on one transport.'
+sidebar:
+  order: 8
+---
+
+import ProgrammaticAbPlayerDemo from '../../../../../components/programmatic/ProgrammaticAbPlayerDemo.astro';
+
+`AbPlayer` switches between named arrangements (A / B / …) of one piece through `InteractivePlayer.select()`. Selection is synchronous and carries the cursor proportionally; the next metronome beat plays from the selected source.
+
+<ProgrammaticAbPlayerDemo />
+
+## Import
+
+```ts
+import {AbPlayer} from '@webmusic/score/play/headless';
+
+const ab = new AbPlayer({A: firstScore, B: secondScore}, {bpm: 100});
+const off = ab.player.on('beat', (beat) => paintBeat(beat));
+await ab.play();
+ab.select('B');
+
+off();
+ab.dispose();
+```
+
+The source contract is `AbPlayer`, `createAbPlayer` and `AbPlayerOptions`
+at `@webmusic/score/play/headless`. It owns an `InteractivePlayer`, its
+metronome and its default quiet triangle `Sound`; source scores and an
+injected `sound` are borrowed. The metronome drives written beats at the
+chosen BPM. Audio is prepared before the clock starts, so `play()` is async.
+Selection does not promise device-level zero latency or cancel every
+previously sounding release tail.
+
+<details class="component-section">
+<summary>API</summary>
+
+**Construction and inputs**
+
+| Member | Default / contract |
+| --- | --- |
+| `new AbPlayer(sources, options?)` · `createAbPlayer(sources, options?)` | Returns `AbPlayer`; `sources` is a record of name to immutable `Score`, in registration order. |
+| `AbPlayerOptions.sound` | Optional borrowed `HeadlessSynth`; default is an owned quiet triangle oscillator. |
+| `AbPlayerOptions.bpm` | Quarter-note BPM. Defaults to the first source's initial tempo converted using its tempo unit, otherwise `100`. |
+
+**Commands**
+
+| Member | Return / contract |
+| --- | --- |
+| `play()` | `Promise<void>`; prepares audio then starts the metronome. Concurrent pending calls share startup; no-op when already playing or empty. |
+| `pause()` | `void`; cancels pending startup, including a pause issued inside a sound's preparation callback, stops the metronome and releases held notes, preserving cursor position. An immediate `play()` can start a fresh attempt. |
+| `select(id)` | `void`; switches with proportional cursor carry; unknown/current ids are ignored. |
+
+**State and events**
+
+| Member | Contract |
+| --- | --- |
+| `ids` | Read-only arrangement-id list in registration order. |
+| `active` | Selected arrangement id, or `undefined` for an empty source record. |
+| `playing` | Whether its metronome is running. |
+| `player` | Underlying `InteractivePlayer`; use `player.position` and `player.on(...)` for its state and events. |
+
+There is no separate `AbPlayer.on()`, seek or stop API. The underlying
+engine's [complete event and command contract](/score/headless/play/interactive-player/)
+applies when accessed through `player`; use `ab.select()` for arrangement
+switches so the wrapper's `active` state stays in sync.
+
+**Lifecycle**
+
+`dispose(): void` is idempotent, cancels a pending start and tears down the
+owned metronome/engine. It does not dispose an injected sound. After
+disposal, `play()` rejects and `select()` throws; `pause()` is harmless.
+Release caller-owned input and event bindings when detaching the UI.
+
+</details>
+
+## Related
+
+- [InteractivePlayer](/score/headless/play/interactive-player/) — source routing and beat events.
+- [Metronome](/score/headless/play/metronome/) — beat clock.
+- [Sound](/score/headless/play/sound/) — timbre preparation and route ownership.

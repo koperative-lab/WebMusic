@@ -1,0 +1,141 @@
+---
+title: '<pitch-view>'
+description: 'Current sounding pitches as a keyboard, staff or fretboard, selected by type.'
+sidebar:
+  order: 2
+---
+
+import PitchViewPlayground from '../../../../../components/elements/PitchViewPlayground.astro';
+
+`<pitch-view>` shows the currently held notes from one player or structural note source. Choose `type="keyboard"` (default), `staff` or `fretboard`; every type shares the same note state and owns no playback resources.
+
+<PitchViewPlayground />
+
+## Import
+
+```html
+<script type="module">
+  import {defineScorePlayerElement} from '@webmusic/score/play/element';
+  import {definePitchViewElement} from '@webmusic/score/view/element';
+  defineScorePlayerElement();
+  definePitchViewElement();
+</script>
+
+<score-player id="piece" src="/midi/demo.mid"></score-player>
+<pitch-view player="#piece" type="keyboard"></pitch-view>
+```
+
+The demo contains one player and one pitch view. Change `type` in external Parameters. Type-specific rows appear only when relevant; their attribute values survive switching types. The player has its own parameter group. Copy includes both tags, and Reset restores their original attributes.
+
+## Data and lifetime
+
+`player` must match exactly one target in the current Document or ShadowRoot. A nonempty `player` overrides the legacy `source` selector. Native snapshots initialize held notes; note and state events reconcile them after pause, seek, stop, end and source replacement. Late/replaced targets are rebound; invalid or ambiguous selectors remain unbound. Overlapping occurrences of the same MIDI pitch are counted, so releasing one does not erase another.
+
+The component has no `src`, `.score`, note command or transport command. Changing `type` replaces only the presentation and keeps the current held-note state. Disconnect releases its observer, subscriptions and presenter without stopping the player. To enter notes, use [`<note-input>`](/score/element/play/note-input/).
+
+## Keyboard
+
+`type="keyboard"` shows requested MIDI endpoints `low="36"` through `high="84"` by default. The getters report rounded requested endpoints; the presenter normalizes them to MIDI 0–127, orders reversed endpoints and limits the displayed span to 88 semitones. Notes outside the displayed range remain in `.active`. Released keys clear without a visual release trail.
+
+Use `white-key-width` and `black-key-width` for exact pixel widths, and
+`white-key-height` and `black-key-height` for key lengths. Explicit width fixes
+the board's pitch scale; a narrower host scrolls instead of compressing keys.
+With neither width set, the keyboard keeps its responsive sizing. Black width
+defaults to `0.62 × white width`; setting black width alone derives white width
+by dividing by `0.62`. Black width and height cannot exceed white dimensions.
+
+Set `fit-to-width="true"` to fit the entire normalized keyboard range into its
+container without horizontal scrolling. This overrides both explicit key widths
+and the CSS minimum key width while enabled, using the default `0.62` black/white
+width ratio. Key heights and held notes stay unchanged. Set it to `false` or
+remove it to restore the existing fixed widths or responsive minimum width.
+
+`follow="active"` reveals newly sounding pitches by default. Use `follow="none"`
+when a shared application container should pan the keyboard together with a
+[`waterfall`](/score/element/view/score-view/#align-a-waterfall-and-keyboard).
+
+## Staff
+
+`type="staff"` places current pitches on a `grand`, `treble` or `bass` staff. This is a sounding-pitch readout. To read notation over score time, choose [`<score-view type="staff">`](/score/element/view/score-view/#staff); for full engraving use [`<sheet-view>`](/score/element/view/sheet-view/).
+
+## Fretboard
+
+`type="fretboard"` marks every exact-MIDI location in the selected fret window. It does not choose a playable fingering or infer a chord voicing. Open-string tuning order is preserved, including reentrant instruments. Notes outside the window remain in `.active`; when none fit, the view reports “No sounding pitches in this fret range”.
+
+`fret-width` sets the distance between fret wires, `string-spacing` sets the
+distance between strings, and `string-width` sets their line thickness, all in
+pixels. Explicit fret spacing remains fixed when the container grows and pans
+when it does not fit. String thickness remains independent of the viewport
+scale. Omit these attributes to retain density-based, responsive defaults.
+
+<details class="component-section">
+<summary>API</summary>
+
+| Attribute | Default | Applies to | Description |
+| --- | --- | --- | --- |
+| `type` | `keyboard` | All | `keyboard`, `staff` or `fretboard`; unknown values use keyboard. |
+| `player` | absent | All | Unique selector for a held-note/state source; takes precedence over `source`. |
+| `source` | absent | All | Legacy selector fallback when `player` is empty. |
+| `low` / `high` | `36` / `84` | Keyboard | Requested lowest/highest MIDI key, rounded. |
+| `system` | `grand` | Staff | `grand`, `treble` or `bass`. |
+| `spelling` | `sharp` | All | `sharp` or `flat`; no key inference. |
+| `density` | `comfortable` | All | `comfortable` or `compact`. |
+| `scheme` | `inherit` | All | `inherit`, `system`, `light` or `dark`. |
+| `tuning` | `standard` | Fretboard | Standard guitar `[40,45,50,55,59,64]`, or 1–12 comma/space-separated MIDI pitches in visual string order; invalid values use standard. |
+| `first-fret` | `0` | Fretboard | First displayed fret, clamped to 0–24. |
+| `frets` | `12` | Fretboard | Visible fret count, clamped to 1–24. |
+| `follow` | `active` | Keyboard | `active` reveals newly active pitches; `none` leaves scrolling to the application/user. |
+| `fit-to-width` | `false` | Keyboard | Fit the complete normalized range to the container, overriding explicit widths and the CSS minimum width. Heights remain unchanged. |
+| `white-key-width` | responsive | Keyboard | Fixed natural-key width in px; ignored while `fit-to-width` is enabled. |
+| `black-key-width` | `0.62 × white width` | Keyboard | Fixed accidental-key width in px, capped at white width; alone derives white width as `value / 0.62`. Ignored while `fit-to-width` is enabled. |
+| `white-key-height` | theme height | Keyboard | Natural-key length in px. |
+| `black-key-height` | theme proportion | Keyboard | Accidental-key length in px, capped at white-key height. |
+| `fret-width` | responsive | Fretboard | Fixed distance between adjacent fret wires in px. |
+| `string-spacing` | density geometry | Fretboard | Distance between adjacent strings in px. |
+| `string-width` | density stroke | Fretboard | String stroke thickness in px, independent of viewport scaling. |
+
+`.type` is a writable reflected `PitchViewType` property. Other properties are read-only: `.active` returns a copy of ascending sounding MIDI pitches; `.low`, `.high`, `.system`, `.spelling`, `.density`, `.scheme`, `.firstFret` and `.frets` return the resolved/requested values described above. `.tuning` returns a copy of resolved open-string MIDI pitches. Configure the remaining values through attributes.
+
+The geometry getters `.whiteKeyWidth`, `.blackKeyWidth`, `.whiteKeyHeight`,
+`.blackKeyHeight`, `.fretWidth`, `.stringSpacing` and `.stringWidth` return the
+positive finite pixel request or `undefined`. Missing, empty, nonnumeric,
+non-finite, zero and negative geometry attributes use default geometry;
+removing an override restores the responsive/theme default. `.follow` returns
+the resolved mode. `.fitToWidth` is a read-only boolean, `false` by default.
+An empty or `true` attribute enables fitting; `false`, `0`, `no` and `off`
+disable it, ignoring case and surrounding whitespace. Other present values
+enable it. These settings do not replace the held-note tracker or player.
+
+`PitchViewElement`, `PitchViewType` and `definePitchViewElement(tag?)` are exported from `@webmusic/score/view/element`. Registration is idempotent and SSR-safe; `defineAllViewElements()` registers all View tags. There are no emitted events or public commands.
+
+**Accessibility.** Each surface is a labeled passive graphic (`role="img"`) with current-pitch labels. It has no playable or focusable piano keys; the keyboard’s visual active state is not a button’s `aria-pressed` state. Configure it with native controls outside the component.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+By default, the keyboard and fretboard preserve readable key and marker sizes and scroll locally when their
+full range does not fit. `fit-to-width="true"` lets the keyboard compress its keys to show its complete range.
+A keyboard reveals newly sounding pitches; repeated snapshots and note
+releases leave manual scrolling in place. Wider fretboards expand fret spacing without enlarging
+the dots. Staff lines fill the container while noteheads retain their staff-space size. An
+overflowing surface is one keyboard focus stop for native scrolling; the musical input is unchanged.
+
+
+The light-DOM component uses the public [pitch presenter tokens](/uikit/views-analysis/pitch/). Its rendered nodes expose `root` plus `board` for keyboard, or `root` plus `svg` for staff/fretboard. The presenter owns resizing and note graphics; the application owns host layout and spacing. There is no internal settings bar or additional sibling view. Motion follows the surrounding `data-motion` setting and reduced-motion preference.
+
+All three types inherit `--wm-component-background`, `--wm-component-border` (complete shorthand) and `--wm-component-radius`, overridden by `--wm-pitch-surface-background`, `--wm-pitch-surface-border` and `--wm-pitch-surface-radius`. The default frame remains transparent and borderless. Set `--wm-surface: transparent` for transparent nested surfaces. `--wm-foreground` and `--wm-accent` control shared ink and highlights; specific note/pitch paint tokens take precedence.
+
+Keyboard keys use `--wm-note-key`, `--wm-note-key-alt`, `--wm-note-border`, `--wm-note-label` and `--wm-note-radius`. Staff lines use `--wm-pitch-staff-line`. Fretboard geometry uses `--wm-pitch-fret-neck`, `--wm-pitch-fret-wire`, `--wm-pitch-fret-nut`, `--wm-pitch-fret-string` and `--wm-pitch-fret-inlay`. Theme changes on the host or an ancestor apply directly to the existing DOM/SVG without replacing the note tracker or held notes. Select exposed parts using ordinary light-DOM selectors such as `pitch-view [part~="board"]`.
+
+Key outlines fall back from `--wm-note-border` through `--wm-control-border` and `--wm-border`
+to `#d8d8d8` in a light scheme, matching component frames, or `#333` in a dark scheme.
+Set `--wm-border` on a shared
+ancestor to give a player, score view and keyboard the same border color.
+
+</details>
+
+## Related
+
+[Whole-score views](/score/element/view/score-view/) · [Engraving](/score/element/view/sheet-view/) · [Headless PitchView](/score/headless/view/pitch-view/) · [Analyze composition](/score/element/#compose-a-performance)

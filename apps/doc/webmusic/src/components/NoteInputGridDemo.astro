@@ -1,0 +1,60 @@
+---
+// <note-input layout="grid"> — the mapped panel with built-in synthesized tones.
+// The real tag has always been in the markup here, so the playground strip can
+// resolve it; the map is shipped as an attribute rather than `.pads` so the
+// `map` control stays live.
+import ElementPlayground from './ElementPlayground.astro';
+import { DEFAULT_TR808_GRID_MAP } from '@webmusic/score/play/element';
+
+interface Props {
+  keyboard?: boolean;
+}
+const { keyboard = false } = Astro.props;
+
+---
+
+<ElementPlayground
+  tag="note-input"
+  class="ni-demo"
+  omit={['row-interval']}
+>
+  <note-input
+    data-ni-grid
+    layout="grid"
+    map={DEFAULT_TR808_GRID_MAP}
+    keyboard={keyboard || undefined}
+  ></note-input>
+</ElementPlayground>
+
+<script>
+  // Astro hoists and dedupes this module, so it scans for its own marker.
+  import { defineNoteInputElement } from '@webmusic/score/play/element';
+  import { InteractivePlayer, Sound } from '@webmusic/score/play/headless';
+  import {mountDemos} from './demo-lifecycle';
+
+  defineNoteInputElement();
+
+  mountDemos('note-input[data-ni-grid]', (node, scope) => {
+    const el = node as HTMLElement & {
+      onNote?: (midi: number, velocity: number, on: boolean) => void;
+    };
+
+    const player = new InteractivePlayer();
+    player.addVoice('in', Sound.oscillator({type: 'square', gain: 0.1, releaseSeconds: 0.04}));
+
+    const held = new Map<number, symbol>();
+    scope.add(() => {
+      el.onNote = undefined;
+      held.clear();
+      player.dispose();
+    });
+    el.onNote = (midi, velocity, on) => {
+      if (!on) { held.delete(midi); player.noteOff('in', midi); return; }
+      const press = Symbol();
+      held.set(midi, press);
+      scope.run(player.preload().then(() => {
+        if (scope.active && held.get(midi) === press) player.noteOn('in', midi, velocity, 3600);
+      }));
+    };
+  });
+</script>

@@ -1,0 +1,51 @@
+---
+// <score-player> — the transport widget on its own. The real tag sits in the
+// stage rather than inside a ready-made wrapper, because the playground strip
+// finds its target by querySelector and a wrapper only creates its child on
+// connectedCallback.
+//
+// It is shipped with `src` rather than a `.score`, because an assigned score
+// wins over src in resolveScore() and would leave two of the three source
+// attribute controls dead.
+import EffectChainEditor from '../EffectChainEditor.astro';
+import ElementPlayground from '../ElementPlayground.astro';
+
+const SRC = `${import.meta.env.BASE_URL}midi/demo.mid`;
+---
+
+<ElementPlayground
+  tag="score-player"
+  class="sp-demo"
+  inert={{
+    'sound-font': 'the docs host no per-note sample set, and any value without a {midi} placeholder is ignored',
+  }}
+>
+  <score-player src={SRC}></score-player>
+
+  <EffectChainEditor
+    slot="controls"
+    target="score-player"
+    setupSelector="score-player"
+    setupIdentifier="player"
+  />
+
+  <div class="wm-pg__code-extra" slot="setup" data-fx-code-block hidden>
+    <span class="wm-pg__code-label">JavaScript setup</span>
+    <pre class="wm-pg__markup" data-fx-code data-pg-copy-source></pre>
+  </div>
+</ElementPlayground>
+
+<script>
+  import {defineScorePlayerElement} from '@webmusic/score/play/element';
+  import {mountEffectChainEditors} from '../effect-chain-editor-client';
+
+  defineScorePlayerElement();
+  mountEffectChainEditors();
+</script>
+
+<style>
+  /* :global so the rule reaches the transport the element builds at runtime */
+  .sp-demo :global(score-player) {
+    display: block;
+  }
+</style>

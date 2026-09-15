@@ -1,0 +1,182 @@
+---
+import LiveDemoCanvas from '../LiveDemoCanvas.astro';
+---
+
+<div class="wui-panel wui-panel--flow not-content" data-score-report-demo>
+  <div class="wui-panel__title">
+    <span>Score · Headless + API</span>
+    <strong>Score reports</strong>
+  </div>
+  <LiveDemoCanvas>
+    <div data-report-output></div>
+  </LiveDemoCanvas>
+  <details>
+    <summary>Parameters</summary>
+  <div class="score-report-demo__controls">
+    <label>Report
+      <select data-report-kind>
+        <option value="summary">Summary</option>
+        <option value="histogram">Histogram</option>
+        <option value="rhythm">Rhythm patterns</option>
+      </select>
+    </label>
+    <label>Score
+      <select data-score-variant>
+        <option value="major">C major · eighth notes</option>
+        <option value="minor">A minor · mixed rhythm</option>
+      </select>
+    </label>
+    <label data-histogram-control hidden>Distribution
+      <select data-distribution>
+        <option value="pitchClasses">Pitch classes</option>
+        <option value="intervals">Melodic intervals</option>
+        <option value="durations">Note durations</option>
+      </select>
+    </label>
+    <label data-rhythm-control hidden>Notes per pattern
+      <select data-pattern-length>
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4" selected>4</option>
+        <option value="6">6</option>
+        <option value="8">8</option>
+      </select>
+    </label>
+    <button class="wui-btn" data-report-reset type="button">Reset</button>
+  </div>
+  </details>
+  <p class="score-report-demo__note" data-report-status role="status"></p>
+  <code data-report-call>createScoreReport(score)</code>
+  <details>
+    <summary>Returned data</summary>
+    <pre class="score-report-demo__data" data-report-data></pre>
+  </details>
+</div>
+
+<script>
+  import {Duration, MeasureId, PartId, Pitch, Rational, ScoreBuilder, VoiceId} from '@webmusic/score';
+  import {distributions, rhythmPatterns} from '@webmusic/score/analyze';
+  import {createScoreReport} from '@webmusic/score/analyze/headless';
+  import {
+    analysisStyle,
+    createAnalysisRoot,
+    renderHistogram,
+    renderRhythmPatternList,
+    renderSummaryCard,
+    type AnalysisHistogramHandle,
+  } from '@webmusic/ui/analysis';
+
+  function sampleScore(minor: boolean) {
+    const builder = new ScoreBuilder();
+    const part = PartId('piano');
+    const voice = VoiceId('melody');
+    const meter = {numerator: 4, denominator: 4};
+    builder.setMetadata({title: minor ? 'A minor mixed rhythm' : 'C major eighth notes'})
+      .addTempo({atQuarters: Rational.ZERO, bpm: minor ? 84 : 100})
+      .addMeter({atQuarters: Rational.ZERO, measureNumber: 1, timeSignature: meter})
+      .addPart({id: part, name: 'Piano', staves: 1});
+    for (let number = 1; number <= 2; number += 1) {
+      builder.addMeasure({
+        id: MeasureId(`m${number}`), number,
+        onsetQuarters: new Rational((number - 1) * 4, 1),
+        durationQuarters: new Rational(4, 1), timeSignature: meter,
+      });
+    }
+    const names = minor
+      ? ['A3', 'C4', 'E4', 'A4', 'E4', 'C4', 'D4', 'F4', 'A4', 'E4', 'C4', 'A3']
+      : ['C4', 'E4', 'G4', 'C5', 'F4', 'A4', 'C5', 'F5', 'G4', 'B4', 'D5', 'G5', 'C5', 'G4', 'E4', 'C4'];
+    let eighths = 0;
+    names.forEach((name, index) => {
+      const long = minor && index % 3 === 2;
+      builder.addNote(part, {
+        id: builder.newNoteId(), pitch: Pitch.parse(name),
+        onsetQuarters: new Rational(eighths, 2),
+        duration: long ? Duration.quarter() : Duration.eighth(), voice,
+      });
+      eighths += long ? 2 : 1;
+    });
+    return builder.build();
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-score-report-demo]').forEach((root) => {
+    if (root.dataset.initialized) return;
+    root.dataset.initialized = 'true';
+    const kind = root.querySelector<HTMLSelectElement>('[data-report-kind]')!;
+    const variant = root.querySelector<HTMLSelectElement>('[data-score-variant]')!;
+    const distribution = root.querySelector<HTMLSelectElement>('[data-distribution]')!;
+    const length = root.querySelector<HTMLSelectElement>('[data-pattern-length]')!;
+    const histogramControl = root.querySelector<HTMLElement>('[data-histogram-control]')!;
+    const rhythmControl = root.querySelector<HTMLElement>('[data-rhythm-control]')!;
+    const output = root.querySelector<HTMLElement>('[data-report-output]')!;
+    const status = root.querySelector<HTMLElement>('[data-report-status]')!;
+    const invocation = root.querySelector<HTMLElement>('[data-report-call]')!;
+    const data = root.querySelector<HTMLElement>('[data-report-data]')!;
+    const scores = {major: sampleScore(false), minor: sampleScore(true)};
+    let histogram: AnalysisHistogramHandle | undefined;
+
+    const render = () => {
+      histogram?.destroy();
+      histogram = undefined;
+      const score = variant.value === 'minor' ? scores.minor : scores.major;
+      const surface = createAnalysisRoot(root.ownerDocument);
+      const style = root.ownerDocument.createElement('style');
+      style.textContent = analysisStyle;
+      output.replaceChildren(style, surface);
+      histogramControl.hidden = kind.value !== 'histogram';
+      rhythmControl.hidden = kind.value !== 'rhythm';
+      let result: unknown;
+      if (kind.value === 'histogram') {
+        const type = distribution.value === 'intervals' ? 'intervals'
+          : distribution.value === 'durations' ? 'durations' : 'pitchClasses';
+        const bins = distributions(score)[type];
+        const total = bins.reduce((sum, bin) => sum + bin.value, 0);
+        histogram = renderHistogram(bins, surface, {
+          format: type === 'pitchClasses'
+            ? (value) => `${total ? Math.round(value / total * 100) : 0}%`
+            : (value) => String(value),
+        });
+        result = bins;
+        status.textContent = type === 'pitchClasses'
+          ? 'Bars show each pitch class’s share of total pitched-note duration weight; returned weights use ticks.'
+          : type === 'intervals' ? 'Counts of signed melodic intervals in semitones, within each voice.'
+          : 'Counts of note durations, labeled in quarter notes.';
+        invocation.textContent = `distributions(score).${type}`;
+      } else if (kind.value === 'rhythm') {
+        const count = Number(length.value);
+        const patterns = rhythmPatterns(score, count);
+        renderRhythmPatternList(patterns, surface, {limit: patterns.length, formatDuration: (quarters) => `${quarters}q`});
+        result = patterns;
+        status.textContent = 'Every pattern duration and occurrence onset is in quarter notes. Overlapping occurrences count separately.';
+        invocation.textContent = `rhythmPatterns(score, ${count})`;
+      } else {
+        const report = createScoreReport(score);
+        renderSummaryCard({title: report.title ?? 'Score report', subtitle: report.composer, rows: report.rows}, surface);
+        result = report;
+        status.textContent = 'Formatted facts for the selected whole score. Selecting another score recomputes the report.';
+        invocation.textContent = 'createScoreReport(score)';
+      }
+      data.textContent = JSON.stringify(result, null, 2);
+    };
+
+    for (const control of [kind, variant, distribution, length]) control.addEventListener('change', render);
+    root.querySelector('[data-report-reset]')!.addEventListener('click', () => {
+      kind.value = 'summary';
+      variant.value = 'major';
+      distribution.value = 'pitchClasses';
+      length.value = '4';
+      render();
+    });
+    // All listeners belong to this DOM subtree. There are no subscriptions,
+    // frames, asynchronous loads or playback resources to release on removal.
+    render();
+  });
+</script>
+
+<style>
+  .score-report-demo__controls { display: flex; flex-wrap: wrap; align-items: end; gap: 1rem; }
+  .score-report-demo__controls label { display: grid; gap: .35rem; }
+  .score-report-demo__controls [hidden] { display: none !important; }
+  .score-report-demo__controls select { max-width: 100%; padding: .4rem; font: inherit; }
+  .score-report-demo__note { margin: 0; font-size: .875rem; }
+  .score-report-demo__data { max-height: 22rem; overflow: auto; font-size: .75rem; }
+</style>

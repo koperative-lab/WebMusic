@@ -1,0 +1,37 @@
+---
+import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
+import './musical-stage.css';
+const notes = [{midi: 60, name: 'C4'}, {midi: 62, name: 'D4'}, {midi: 64, name: 'E4'}, {midi: 65, name: 'F4'}, {midi: 67, name: 'G4'}, {midi: 69, name: 'A4'}, {midi: 71, name: 'B4'}];
+const code = "import {createLiveChordTracker, createLiveKeyTracker} from '@webmusic/score/analyze/headless';";
+---
+
+<HeadlessDemoFrame entry="@webmusic/score/analyze/headless" name="Live trackers" code={code}
+  hint="Toggle held notes or send a chord. Chord detection follows held notes; the key estimate accumulates every note-on. These inputs are silent."
+  rootAttrs={{'data-live-trackers-demo': ''}}>
+  <section class="wm-hl-music" aria-label="Live chord and key analysis">
+    <p class="wm-hl-music__summary" data-live-chord></p>
+    <div class="wm-hl-music__chips" data-live-notes aria-label="Held pitches"></div>
+    <p data-live-key></p>
+    <div class="wm-hl-music__chips" data-live-history aria-label="Recent chord history"></div>
+  </section>
+  <div slot="parameters" class="wm-pg__grid">
+    <div class="wm-pg__param"><span class="wm-pg__name">noteOn / noteOff</span>
+      <div class="wm-hl-music__buttons">{notes.map(({midi, name}) => <button class="wui-btn" type="button" data-live-midi={midi} aria-pressed="false">{name}</button>)}</div>
+      <span class="wm-pg__note">Click to hold a pitch; click again to release it.</span>
+    </div>
+    <div class="wm-pg__param"><span class="wm-pg__name">chord input</span>
+      <div class="wm-hl-music__buttons">{['C', 'Am', 'F', 'G7'].map((chord) => <button class="wui-btn" type="button" data-live-preset={chord}>{chord}</button>)}</div>
+      <span class="wm-pg__note">Release current notes, then feed each pitch of the selected chord.</span>
+    </div>
+    <div class="wm-pg__param"><span class="wm-pg__name">release</span>
+      <button class="wui-btn" type="button" data-live-release>Release all notes</button>
+      <span class="wm-pg__note">Keep the accumulated key estimate and recent chord history.</span>
+    </div>
+  </div>
+</HeadlessDemoFrame>
+
+<script>
+  import {mountDemos} from '../demo-lifecycle';
+  import {mountLiveTrackersDemo} from './analysis-view-playgrounds-client';
+  mountDemos('[data-live-trackers-demo]', (root, scope) => { mountLiveTrackersDemo(root, scope); });
+</script>

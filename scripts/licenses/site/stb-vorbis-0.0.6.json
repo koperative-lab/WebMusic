@@ -1,0 +1,65 @@
+{
+  "package": "stb-vorbis",
+  "version": "0.0.6",
+  "artifacts": [
+    {
+      "file": "dist/index.js",
+      "sha256": "f2c9612be9718c3e93cbee86a5b7c25a901b786ba5542e82e9cb8dad3b11637b"
+    }
+  ],
+  "documents": [
+    {
+      "title": "stb_vorbis 1.22 \u2014 MIT / public-domain license alternatives",
+      "file": "stb-vorbis-0.0.6-stb-LICENSE.txt",
+      "source": "https://github.com/spessasus/stb-vorbis/blob/2c5f11f028192b5580650ffd79d49ca3019a32fb/wasm/stb_vorbis.c",
+      "sha256": "7587efcca32db8f95bf5860dea6dfa4be410ee723e1964db3689c8ddf2a2e4a9"
+    },
+    {
+      "title": "Emscripten 6.0.6 \u2014 MIT / NCSA license and bundled notices",
+      "file": "stb-vorbis-0.0.6-emscripten-LICENSE.txt",
+      "source": "https://github.com/emscripten-core/emscripten/blob/ce75e06884093bcefb86a6b8fd56a5d62a4cc245/LICENSE",
+      "sha256": "620a78084fc7ca97c0b5dea9abf891f3ffcadfdbf305276f099c9c4e12fc1d86"
+    },
+    {
+      "title": "Emscripten 6.0.6 musl C runtime \u2014 copyright and license",
+      "file": "stb-vorbis-0.0.6-musl-COPYRIGHT.txt",
+      "source": "https://github.com/emscripten-core/emscripten/blob/ce75e06884093bcefb86a6b8fd56a5d62a4cc245/system/lib/libc/musl/COPYRIGHT",
+      "sha256": "b870108ec5e7790e9f9919064f1b9421d62d5f9b0e6c230c6adf7ea2da62e97b"
+    },
+    {
+      "title": "Emscripten 6.0.6 compiler runtime \u2014 Apache-2.0 with LLVM exception and legacy licenses",
+      "file": "stb-vorbis-0.0.6-compiler-rt-LICENSE.txt",
+      "source": "https://github.com/emscripten-core/emscripten/blob/ce75e06884093bcefb86a6b8fd56a5d62a4cc245/system/lib/compiler-rt/LICENSE.TXT",
+      "sha256": "1a8f1058753f1ba890de984e48f0242a3a5c29a6a8f2ed9fd813f36985387e8d"
+    },
+    {
+      "title": "Emscripten 6.0.6 \u2014 C runtime source notices including musl math and qsort",
+      "file": "stb-vorbis-0.0.6-runtime-NOTICES.txt",
+      "source": "https://github.com/emscripten-core/emscripten/tree/ce75e06884093bcefb86a6b8fd56a5d62a4cc245/system/lib",
+      "sha256": "fb22e007854d0d1aaf20862436fe5ec8991640f2a25fa574908d5d6799ce084b"
+    }
+  ],
+  "sourceEvidence": {
+    "upstreamCommit": "2c5f11f028192b5580650ffd79d49ca3019a32fb",
+    "sourceArchiveSha256": "8f10b3714cbbd02de18caac29c73b3fbdd2e22f183a27751df116e414a546f76",
+    "npmTarball": "https://registry.npmjs.org/stb-vorbis/-/stb-vorbis-0.0.6.tgz",
+    "npmTarballIntegrity": "sha512-CyvjJEGROIdnuZknwFvdOfMIO1ssUxO2OawsXCR3IlbJ8z2IMBjDe8FDxFJqBfLgf1ZOdqvoHAYx3Xk8q9rbbg==",
+    "installedArchiveBytesVerified": true,
+    "workflow": "https://github.com/spessasus/stb-vorbis/blob/2c5f11f028192b5580650ffd79d49ca3019a32fb/.github/workflows/release-package.yml",
+    "registryProvenance": "https://registry.npmjs.org/-/npm/v1/attestations/stb-vorbis@0.0.6",
+    "registryProvenanceInspection": "The published predicate links the release tag to this commit and workflow. Its signature was not independently verified.",
+    "buildRecipe": "https://github.com/spessasus/stb-vorbis/blob/2c5f11f028192b5580650ffd79d49ca3019a32fb/scripts/build-wasm.ts",
+    "emscriptenVersion": "6.0.6",
+    "emscriptenCommit": "ce75e06884093bcefb86a6b8fd56a5d62a4cc245",
+    "emscriptenSourceArchiveSha256": "13ae4138adc0bbb19a9370aa6809ce07178b986ddf0ae55727db24e175186ffa",
+    "stbVorbisVersion": "1.22",
+    "stbSourceSha256": "3eff78a8c4c769ad39720a063e20b90ab1b3184dbb57ccd50afc8580f201718d",
+    "embeddedWasm": {
+      "bytes": 83506,
+      "sha256": "84d0770edcb31baecbf10d812f6d49a249e682e92315fcdb67c9a78c94482716",
+      "customSections": []
+    },
+    "runtimeCoverage": "STANDALONE_WASM C build; Emscripten support, default dlmalloc, musl general C runtime and its per-file notices, and compiler-rt. This conservative notice inventory excludes C++ libraries and compiler frontend tools; optimized linked functions were not individually mapped.",
+    "runtimeNoticeBlocks": 48
+  }
+}

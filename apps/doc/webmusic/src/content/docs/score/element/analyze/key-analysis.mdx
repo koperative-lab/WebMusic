@@ -1,0 +1,111 @@
+---
+title: '<key-analysis>'
+description: 'A seekable key-decision lane following the score’s tonal changes.'
+sidebar:
+  order: 3
+---
+
+import AnalysisFeaturePlayground from '../../../../../components/elements/AnalysisFeaturePlayground.astro';
+
+This component requires score data and shows key decisions over score time. Without a score it displays an inline waiting message. Seek to a band to inspect that section. For detailed candidate rankings, tonal comparisons or pitch weights, use the [Headless key diagnostics](/score/headless/analyze/live-trackers/#key-diagnostics).
+
+<AnalysisFeaturePlayground tag="key-analysis" />
+
+## Import
+
+```html
+<script type="module">
+  import {defineScorePlayerElement} from '@webmusic/score/play/element';
+  import {defineKeyAnalysisElement} from '@webmusic/score/analyze/element';
+  defineScorePlayerElement();
+  defineKeyAnalysisElement();
+</script>
+
+<score-player id="piece" src="/midi/demo.mid"></score-player>
+<key-analysis player="#piece"></key-analysis>
+```
+
+The live demo pairs this component with one `<score-player>`. Parameters configures those two elements; Copy includes their markup and Reset restores their original attributes and connection. For optional supporting views, see [Compose a performance](/score/element/#compose-a-performance). `defineKeyAnalysisElement(tag?)` is idempotent and SSR-safe; `defineAllAnalysisElements()` registers the Analyze family from the same entry.
+
+## Behavior and lifetime
+
+The lane fits its containing block. `window` keeps the same visible duration when
+the container is resized; UIKit recalculates the drawing and pointer coordinates.
+Track labels, the time ruler and the current readout have separate layout space.
+
+The lane supports pointer click/drag, arrow-key steps, Home/End and `[` / `]` boundary navigation. It sends a seek request to the selected player; with standalone score input it updates local inspection and emits the same event. No player, synth or AudioContext is created by the component.
+
+Explicit `.score` wins over `src`, then the selected player’s resolved data. Native bindings prefer the player’s `.playback` [shared source](/score/api/#shared-playback-observation), which supplies readiness, the current position and note identity. Targets without an available source retain the compatibility snapshot/event path. Late or replaced targets are rebound. Explicit input retains precedence on player source changes. Empty input and loading failure are shown on the surface. Stale URL loads cannot restore superseded data. Seek uses `seekNominal()` when available, otherwise converts nominal seconds by the current rate before `seek()`. Failed seeking restores the previous local position if no newer state has arrived.
+
+The selector must match exactly one target in the current Document or ShadowRoot. Invalid or ambiguous matches remain unbound. Native single-score player mode supplies complete initial data/state; Rack/controller modes do not promise that snapshot. Disconnect cancels owned work, releases subscriptions/observation and destroys presenters, while the borrowed player keeps its own lifetime.
+
+<details class="component-section">
+<summary>API</summary>
+
+### Attributes
+
+| Attribute | Values / default | Behavior |
+| --- | --- | --- |
+| `src` | URL, absent | Explicit MIDI / MusicXML / MXL / ABC score; wins over player data. |
+| `format` | `midi` / `mxl` / `musicxml` / `abc`, inferred | Parser override for `src`; otherwise infer from extension or bytes. |
+| `player` | selector, absent | Exactly one source in the component’s Document or ShadowRoot; borrow available score, state and note events. |
+| `density` | `comfortable` / `compact`, `comfortable` | Type and spacing defaults for this surface. |
+| `scheme` | `light` / `dark`, inherited | Pin this surface’s palette; removing it follows the page. |
+| `motion` | `auto` / `continuous` / `stepped` / `none`, `auto` | Automatic reads a `data-motion` ancestor, then reduced-motion preference; explicit values override it. |
+| `window` | seconds `0.5`–`600` or `auto`, `auto` | Visible time scale; automatic uses eight score bars when available, otherwise the presenter default. UIKit fits that duration to the measured lane width. |
+
+Unknown display values fall back to the documented default. This fixed component has no `type`, `show`, `shell`, `range` or `tuning` control; configure sibling pitch views on their own tags.
+
+### Properties
+
+| Property | Type | Behavior |
+| --- | --- | --- |
+| `.score` | `Score \| undefined` | Explicit score; clearing it resumes `src` or player-data fallback. |
+| `.density` | `comfortable \| compact` | Reflected density. |
+| `.scheme` | `light \| dark \| undefined` | Reflected palette; undefined removes the override. |
+| `.motion` | `auto \| continuous \| stepped \| none` | Reflected motion policy. |
+| `.window` | `number \| auto` | Reflected visible duration in seconds. |
+
+`KeyAnalysisElement` is exported from `@webmusic/score/analyze/element`. There are no public playback methods.
+
+### Events
+
+All emitted events bubble and are composed. The shared `AnalysisSeekDetail` type is exported from `@webmusic/score/analyze/element`.
+
+| Event | Detail | Trigger |
+| --- | --- | --- |
+| `webscore:seek` | `AnalysisSeekDetail` (`{quarters, seconds}`) | Lane navigation; quarter notes and nominal score seconds. |
+
+### Accessibility
+
+The lane is a named slider tab stop with keyboard navigation. A semantic ordered list accompanies the graphical data and marks the current score span with `aria-current`. Automatic motion respects reduced-motion preference on moving surfaces; display controls remain outside the component.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+The component uses light DOM. Its block host fills the available width and can shrink in flex/grid layouts; application CSS can override its layout. Set public tokens on this host or any ancestor. The component does not install host-local theme defaults that mask inherited values.
+
+One outer surface owns background, border, padding and radius. The inner musical presenter stays unframed, so translucent backgrounds are painted once. Use `--wm-component-background`, `--wm-component-border` (a complete CSS border), `--wm-component-radius` and `--wm-component-padding`; the corresponding `--wm-workbench-surface-*` tokens provide a specific override. Without overrides this Analyze surface remains transparent, borderless and unpadded. `--wm-surface`, `--wm-foreground`, `--wm-accent`, `--wm-border` (a color) and `--wm-control-radius` supply shared palette and control defaults. Existing `--wm-analysis-*` and `--wm-harmony-*` palette overrides remain supported.
+
+```css
+key-analysis {
+  --wm-component-background: transparent;
+  --wm-component-border: 1px solid #94a3b8;
+  --wm-component-radius: .75rem;
+  --wm-foreground: #0f172a;
+  --wm-accent: #7c3aed;
+  --wm-harmony-flow-tone: rgb(124 58 237 / 18%);
+}
+```
+
+The now line follows `--wm-accent`, with `--wm-harmony-flow-now` as a specific override. Set `--wm-harmony-flow-tone` for one uniform band fill, or `--wm-progression-tone-0` through `--wm-progression-tone-11` for individual pitch-class colors.
+
+Stable part tokens are `root` on the direct child wrapper, `presentation`, `surface`, `content`, `index`, and `lane`, `viewport` and `reel`. Use selectors such as `key-analysis [part~="surface"]` in application CSS. These are light-DOM hooks, not Shadow DOM `::part()` selectors; private `.wui-*` classes are not an API. The same hooks remain available after configuration changes and reconnects.
+
+Lane geometry uses `--wm-harmony-flow-height` and `--wm-harmony-lane-height`; changing colors does not change the time axis or pointer geometry.
+
+The [harmony presenter](/uikit/views-analysis/harmony/) and [workbench presenter](/uikit/layout-feedback/workbench/) own the complete token references. No header, tabs, dock controls or sibling pitch views are embedded in this component.
+
+</details>

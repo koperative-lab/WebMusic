@@ -1,0 +1,200 @@
+---
+import {
+  UI_COMPOSITION_CATALOG,
+  UI_STATUS_DESCRIPTIONS,
+  UI_STATUS_LABELS,
+  type UiCompositionStatus,
+} from '../../../shared/ui-catalog';
+
+const groups = [
+  {family: 'Score', capability: 'Play'},
+  {family: 'Score', capability: 'Analyze'},
+  {family: 'Score', capability: 'View'},
+] as const;
+
+const counts = UI_COMPOSITION_CATALOG.reduce<Record<UiCompositionStatus, number>>(
+  (result, entry) => ({...result, [entry.status]: result[entry.status] + 1}),
+  {composed: 0, partial: 0, extract: 0, behavior: 0},
+);
+const publishedUiCount = UI_COMPOSITION_CATALOG.filter((entry) => entry.publishedUi).length;
+---
+
+<div class="composition not-content">
+  <div class="composition__equation" aria-label="Target Web Component architecture">
+    <section class="wui-panel composition__term">
+      <span class="wui-badge">STATE + BEHAVIOR</span>
+      <strong>Headless Component</strong>
+      <p>Owns clocks, audio graphs, analysis sessions, view state and resource lifecycle. No DOM.</p>
+    </section>
+    <span class="composition__operator" aria-hidden="true">+</span>
+    <section class="wui-panel composition__term">
+      <span class="wui-badge">VIEW + BINDING</span>
+      <strong>UI Kit</strong>
+      <p>Owns tokens, accessible primitives, presenters and reusable DOM bindings. No domain resources.</p>
+    </section>
+    <span class="composition__operator" aria-hidden="true">=</span>
+    <section class="wui-panel composition__term composition__term--result">
+      <span class="wui-badge">COMPOSITION ROOT</span>
+      <strong>Web Component</strong>
+      <p>The concrete Element class maps its own public API and directly composes the two layers.</p>
+    </section>
+  </div>
+
+  <div class="composition__summary" aria-label="Migration status">
+    <div><strong>{UI_COMPOSITION_CATALOG.length}</strong><span>elements catalogued</span></div>
+    <div><strong>{counts.composed}</strong><span>already composed</span></div>
+    <div><strong>{counts.partial}</strong><span>partially composed</span></div>
+    <div><strong>{counts.extract}</strong><span>need headless extraction</span></div>
+    <div><strong>{counts.behavior}</strong><span>behavior-only</span></div>
+    <div><strong>{publishedUiCount}</strong><span>on published UI</span></div>
+  </div>
+
+  <div class="composition__legend" aria-label="Status legend">
+    {Object.entries(UI_STATUS_LABELS).map(([status, label]) => (
+      <span class="composition__legend-item">
+        <span class="wui-badge" data-status={status}>{label}</span>
+        <span>{UI_STATUS_DESCRIPTIONS[status as UiCompositionStatus]}</span>
+      </span>
+    ))}
+  </div>
+
+  {groups.map(({family, capability}) => {
+    const entries = UI_COMPOSITION_CATALOG.filter(
+      (entry) => entry.family === family && entry.capability === capability,
+    );
+    return (
+      <section class="composition__group">
+        <h3>{family} · {capability} <span>{entries.length}</span></h3>
+        <div class="composition__table-wrap">
+          <table class="composition__table">
+            <thead>
+              <tr><th>Web Component</th><th>Headless / model</th><th>UI Kit composition</th><th>Headless status</th><th>Published UI</th></tr>
+            </thead>
+            <tbody>
+              {entries.map((entry) => (
+                <tr>
+                  <td>
+                    <a href={entry.href}><code>&lt;{entry.tag}&gt;</code></a>
+                  </td>
+                  <td>{entry.headless}</td>
+                  <td>{entry.ui}</td>
+                  <td><span class="wui-badge" data-status={entry.status}>{UI_STATUS_LABELS[entry.status]}</span></td>
+                  <td><span class="wui-badge" data-status={entry.status === 'behavior' ? 'behavior' : entry.publishedUi ? 'composed' : 'partial'}>{entry.status === 'behavior' ? 'Not applicable' : entry.publishedUi ? 'Yes' : 'Pending'}</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    );
+  })}
+</div>
+
+<style>
+  .composition {
+    display: grid;
+    gap: 1.25rem;
+    margin-block: 1.25rem 2rem;
+  }
+  .composition__equation {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: stretch;
+    gap: 0.65rem;
+  }
+  .composition__term {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    min-width: 0;
+  }
+  .composition__term--result {
+    border-color: var(--wui-ink);
+    box-shadow: inset 0 -3px 0 var(--wui-ink);
+  }
+  .composition__term strong {
+    font-size: 1rem;
+  }
+  .composition__term p {
+    margin: 0;
+    color: var(--wui-ink-mute);
+    font-size: 0.78rem;
+    line-height: 1.5;
+  }
+  .composition__operator {
+    align-self: center;
+    color: var(--sl-color-gray-3);
+    font: 800 1.5rem/1 var(--wui-font-mono);
+  }
+  .composition__summary {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    border: 1px solid var(--wui-line-strong);
+    background: var(--wui-panel);
+    color: var(--wui-ink);
+  }
+  .composition__summary div {
+    display: grid;
+    gap: 0.15rem;
+    padding: 0.75rem;
+  }
+  .composition__summary div + div { border-left: 1px solid var(--wui-line); }
+  .composition__summary strong { font: 800 1.25rem/1 var(--wui-font-mono); }
+  .composition__summary span { color: var(--wui-ink-mute); font-size: 0.68rem; }
+  .composition__legend { display: grid; gap: 0.45rem; }
+  .composition__legend-item {
+    display: flex;
+    align-items: baseline;
+    gap: 0.55rem;
+    color: var(--sl-color-gray-3);
+    font-size: 0.7rem;
+    line-height: 1.4;
+  }
+  .composition__legend-item .wui-badge { flex: 0 0 auto; }
+  .composition__group { min-width: 0; }
+  .composition__group h3 {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 0 0 0.45rem;
+    font-size: 0.92rem;
+  }
+  .composition__group h3 span {
+    color: var(--sl-color-gray-3);
+    font-family: var(--wui-font-mono);
+    font-size: 0.72rem;
+  }
+  .composition__table-wrap { overflow-x: auto; }
+  .composition__table {
+    width: 100%;
+    min-width: 760px;
+    border-collapse: collapse;
+    background: var(--wui-panel);
+    color: var(--wui-ink);
+    font-size: 0.72rem;
+  }
+  .composition__table th,
+  .composition__table td {
+    border: 1px solid var(--wui-line-strong);
+    padding: 0.55rem 0.6rem;
+    text-align: left;
+    vertical-align: top;
+  }
+  .composition__table th {
+    color: var(--wui-ink-mute);
+    font-family: var(--wui-font-mono);
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .composition__table code { white-space: nowrap; }
+  @media (max-width: 760px) {
+    .composition__equation { grid-template-columns: 1fr; }
+    .composition__operator { transform: rotate(90deg); }
+    .composition__summary { grid-template-columns: 1fr; }
+    .composition__summary div + div {
+      border-top: 1px solid var(--wui-line);
+      border-left: 0;
+    }
+  }
+</style>

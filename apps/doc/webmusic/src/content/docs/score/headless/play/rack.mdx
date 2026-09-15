@@ -1,0 +1,226 @@
+---
+title: 'Rack'
+description: 'Many instruments under one transport, so an ensemble starts, stops and seeks as a unit.'
+sidebar:
+  order: 5
+---
+
+import ProgrammaticRackDemo from '../../../../../components/programmatic/ProgrammaticRackDemo.astro';
+
+A `Rack` composes single-instrument players sharing an `AudioContext` and a
+master bus, with per-member volume / mute / solo. Timeline transport commands
+fan out to members; interactive members advance from caller input. Member
+players retain separate clocks. Rack does not inject one shared clock or pass
+one common future start timestamp to all timeline members.
+
+`rack.rename(oldId, newId)` changes a member's public name in place. Its player, route, order,
+volume, mute and solo state are preserved; renaming onto an existing id is rejected.
+
+`await rack.preload()` warms all members. `rack.play()` performs the same work
+automatically for timeline members; a caller driving interactive members should
+preload before its first `advance()`. Rack-supplied sounds are borrowed unless
+their `soundOwnership` is explicitly `'owned'`.
+
+Internally, member construction, mix-state calculation, and AudioContext adaptation are separate from transport orchestration.
+
+<ProgrammaticRackDemo />
+
+## Import
+
+```ts
+import {Rack} from '@webmusic/score/play/headless';
+
+const rack = new Rack({masterVolume: 0.8});
+rack.add({id: 'melody', score: melody});
+rack.add({id: 'bass', score: bass, volume: 0.6});
+await rack.play();
+// Keep it while the ensemble is in use; release during session teardown.
+const dispose = () => rack.dispose();
+```
+
+`createRack(options?)` is the factory equivalent. Start completion is separate
+from musical completion; listen for `end` when the timeline members finish.
+Construction is lazy, but reading `context` realizes the graph. Preloading and
+playback may need a user gesture to resume the context.
+
+## Reusable effects on the master bus
+
+`Rack` accepts the same lazy `Effect` recipes as `ScorePlayer` and
+`InteractivePlayer`. A rack-level chain runs once after all member channels are
+summed. `rack.setEffect(next)` and the equivalent `rack.effect = next` property
+replace that live master route without rebuilding members, changing their mix
+state, or resetting transport position. If the replacement cannot be built,
+the previous route stays active.
+
+Reassigning the same recipe is a no-op. A different custom recipe returning the
+exact active `EffectNode` bundle keeps the existing route and cleanup owner.
+Other custom replacements must return fresh input/output nodes; distinct bundles
+sharing a current endpoint are rejected before Rack changes its connections.
+The caller retains cleanup responsibility for such a rejected overlapping bundle,
+because its disposer may also destroy the active graph. Effect changes during
+graph construction are rejected, including changes from the initial lazy builder.
+
+```ts
+import {Effect, Rack} from '@webmusic/score/play/headless';
+
+const room = Effect.chain(
+  Effect.compressor({threshold: -20, ratio: 4}),
+  Effect.reverb({wet: 0.2}),
+);
+const rack = new Rack({effect: room});
+
+rack.setEffect(Effect.chain(Effect.filter({frequency: 4_000}), room));
+rack.effect = undefined; // dry summed output
+const dispose = () => rack.dispose(); // retain until this route is no longer used
+```
+
+This is separate from `rack.add({effect})`: a member effect colours only that
+instrument before its channel gain, while `rack.effect` processes the summed
+master output.
+
+## RackTransportController
+
+`RackTransportController` gives a rack the same event-driven transport surface
+[`PlayerController`](/score/headless/play/player-controller/) gives a single
+player: a snapshot, a progress clock, and events when transport state changes —
+so a UI drives the ensemble without reaching into its members. It owns the
+play-generation race, the longest-member clock and the lockstep seek policy.
+
+The rack is **borrowed**. `destroy()` releases polling and subscriptions; if
+the controller still considers playback active, it also stops the rack.
+It never disposes the rack or its members. Its longest-member readout is a
+projection of a member's position, not another musical scheduling authority.
+
+```ts
+import {Rack, createRackTransportController} from '@webmusic/score/play/headless';
+
+const rack = new Rack();
+const transport = createRackTransportController(rack);
+
+const off = transport.on('transportchange', ({playing, progress}) => paint(playing, progress));
+await transport.play();
+transport.seekFraction(0.5);
+
+off();
+transport.destroy();
+rack.dispose();
+```
+
+<details class="component-section">
+<summary>API</summary>
+
+**Rack construction and options**
+
+| Member | Default | Contract |
+| --- | --- | --- |
+| `new Rack(options?)` / `createRack(options?)` | — | Creates a lazy coordinator with a snapshot of `RackOptions`. |
+| `audioContext` | Created lazily if needed | Borrowed when supplied. |
+| `destination` | Context destination | Borrowed target; its context is used if no explicit context is provided. Supplying mismatched contexts fails graph construction. |
+| `masterVolume` | `1` | Master linear gain; use values from 0–1. |
+| `effect` | None | Lazy recipe for the summed master output. |
+
+**RackAddOptions and RackMember**
+
+| Input | Default | Contract |
+| --- | --- | --- |
+| `score` | Required | Score for the newly constructed player. Rack does not accept an existing player in this option shape. |
+| `id` | Generated `player-N` | Public member key. Adding the same key replaces its member. |
+| `mode` | `'timeline'` | `RackMemberMode`: timeline uses ScorePlayer; interactive uses InteractivePlayer. |
+| `sound` | Default oscillator | Supplied HeadlessSynth or a default backend. |
+| `soundOwnership` | `'borrowed'` for supplied sound | `'owned'` transfers release responsibility to the member player. Default-created sound is owned. |
+| `effect` | None | Member processing before its channel enters the master bus. |
+| `volume` | `1` | Member linear level. |
+| `tempo` | Score tempo | Forwarded to timeline players. |
+| `beatUnitQuarters` | InteractivePlayer default | Forwarded to the interactive source's beat grouping. |
+
+Returned `RackMember` values are readonly snapshots of `id`, `mode`, `player`,
+`volume`, `muted`, and `solo`. A snapshot captured before graph construction
+has `player: undefined`; retaining it does not make that field update later.
+Call `get()` or `list()` again after construction and on `memberschange` /
+`mixchange`. Old snapshots can retain old identifiers, mix values, or released
+player references; do not use them as a second authoritative mixer state store.
+
+**Rack commands and state**
+
+| Member | Returns | Contract |
+| --- | --- | --- |
+| `add(options)` | `RackMember` | Registers a member; builds immediately if the graph already exists. Replacement disposes the old member. |
+| `remove(id)` | `this` | Removes and disposes that member, then recalculates remaining solo gates; removing the final solo member restores other unmuted channels. Unknown keys are ignored. |
+| `rename(oldId, newId)` | `this` | Preserves player, mix state, and order. Missing/occupied keys or rename during graph construction throw. |
+| `get(id)` | `RackMember \| undefined` | Fresh snapshot for one member. |
+| `list()` | `RackMember[]` | Fresh snapshots in insertion order. |
+| `preload()` | `Promise<void>` | Builds/prepares members and ensures the context is running; retries when membership changes during preparation. |
+| `play()` | `Promise<void>` | Prepares members, starts timeline players, and rolls back partial/canceled starts. Concurrent starts coalesce. Does not start an interactive progression. |
+| `pause()` / `stop()` | `this` | Cancel pending starts and pause or stop timeline members. |
+| `seek(seconds)` | `this` | Seeks timeline members in their transport seconds; does not await their returned work. |
+| `advance(options?)` | `Record<string, BeatNote[]>` | Drives interactive members using `AdvanceOptions`; results keyed by member id. |
+| `setVolume(id, volume)` | `this` | Clamps the member level to 0–1 and emits mix change. |
+| `mute(id, muted?)` | `this` | Sets the member mute flag; default true. |
+| `solo(id, solo?)` | `this` | Sets the member solo flag; default true. Multiple members may be soloed. |
+| `setMasterVolume(volume)` | `this` | Clamps and sets master level. |
+| `setEffect(effect)` | `this` | Replaces the master route transactionally; pass `undefined` explicitly for dry output. Exact active-bundle reuse retains its route; distinct overlapping bundles and changes during graph construction throw. |
+| `context` | `AudioContext` | Getter that realizes the lazy graph; fails after disposal. |
+| `masterVolume` | number | Readonly master level. |
+| `effect` | `Effect \| undefined` | Read/write master recipe; setter delegates to `setEffect`. |
+| `on(event, listener)` | Unsubscribe | Subscribe to `RackEvents`. |
+| `dispose()` | `void` | Idempotently cancels pending work, disposes member players/routes, and requests closure of an owned context. Borrowed contexts and sounds remain caller-owned. |
+
+Graph construction failures roll back acquired resources. Master-effect build
+failure preserves the old route; later cleanup failures use `operationError`.
+Member replacement releases the old member first. If the new member cannot
+be built, that id remains absent and the remaining solo gates are recalculated.
+Do not reuse a disposed Rack as a new session. Use finite mix/transport inputs;
+numeric clamping is not a general invalid-input validator.
+
+**RackEvents**
+
+| Event | Payload | Meaning |
+| --- | --- | --- |
+| `memberschange` | void | Add, remove, or rename changes membership. |
+| `mixchange` | void | Member/master gain, mute, or solo changes. |
+| `memberEnd` | `{id: string}` | A timeline member ends. |
+| `end` | void | The timeline members complete. |
+| `operationError` | `PlaybackOperationError` | Member/graph/cleanup failure with source, operation and error. |
+| `listenerError` | `PlaybackListenerError` | Subscriber failure with source, event, mode and error. |
+
+**RackTransportController**
+
+**Construction** — `new RackTransportController(rack, options?)` /
+`createRackTransportController(rack, options?)`. The options override the
+animation clock (`requestFrame` / `cancelFrame`) in tests and non-window
+runtimes.
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `play()` | `Promise<void>` | Sets its active intent, invokes Rack.play, and starts state polling after successful preparation/start. Reverts state and rejects on failure. |
+| `pause()` | command | Pauses only when this controller's playback flag is active. |
+| `stop()` | command | Forwards stop and publishes the resulting time state unless destroyed. |
+| `seekFraction(fraction)` | command | Fractional position across the whole rack, in lockstep. |
+| `seek(seconds)` | command | Clamps against the longest member, then seeks each timeline member no later than its own end. Individual seek failures emit `error`. |
+| `snapshot` | state | The `RackTransportState` — `playing`, `progress`, `currentTime`, `duration`. |
+| `playing` | state | The controller's playback flag, set before awaiting Rack.play; it is not an audible-onset measurement. |
+| `on(event, listener)` | subscription | `timeupdate` · `transportchange` · `end` (each carries the state) and `error`. Returns the unsubscribe. |
+| `destroy()` | lifecycle | Idempotent. Stops the rack if active through this controller, drops polling and subscriptions, and retains the borrowed rack. Attempts cleanup before rethrowing a cleanup failure. |
+
+`RackTransportOptions.requestFrame` and `.cancelFrame` replace the polling
+scheduler; defaults use animation frames with a timeout fallback. This polling
+updates UI state and does not schedule musical sound. `RackTransportState`
+contains `playing`, `progress` (0–1), `currentTime`, and `duration` (transport
+seconds), using the longest timeline member. Empty racks have zero position and
+duration. Commands through a different owner do not automatically update this
+controller's playback flag.
+
+`RackTransportEvents` contains `timeupdate`, `transportchange`, and `end`
+with that state, plus `error: unknown`. Listener failures use the shared
+playback diagnostic path. Destroyed controllers ignore transport commands.
+
+</details>
+
+## Related
+
+[`<rack-control>` and `<rack-part>`](/score/element/play/rack-control/) compose
+Rack with [mixer UI](/uikit/mixing-capture/mixer/).
+[ScorePlayer](/score/headless/play/score-player/) owns timeline playback and
+shared error payload types; [InteractivePlayer](/score/headless/play/interactive-player/)
+owns `AdvanceOptions` and `BeatNote`. [Effect](/score/headless/play/effect/)
+owns the master/member recipes.

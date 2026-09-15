@@ -1,0 +1,26 @@
+---
+import ElementPlayground from './ElementPlayground.astro';
+const SRC = `${import.meta.env.BASE_URL}xml/demo.xml`;
+const PLAYER_ID = 'sv-demo-player';
+const companions = [{tag: 'score-player', target: 'score-player'}];
+---
+
+<ElementPlayground tag="score-view" markup="[data-score-composition]" companions={companions} class="sv-demo">
+  <div data-score-composition data-pg-fragment>
+    <score-player id={PLAYER_ID} src={SRC}></score-player>
+    <score-view player={`#${PLAYER_ID}`} type="staff"></score-view>
+  </div>
+</ElementPlayground>
+
+<script>
+  import {defineScorePlayerElement} from '@webmusic/score/play/element';
+  import {defineScoreViewElement} from '@webmusic/score/view/element';
+  defineScorePlayerElement();
+  defineScoreViewElement();
+</script>
+
+<style>
+  .sv-demo :global([data-score-composition]) { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; min-width: 0; }
+  .sv-demo :global([data-score-composition] > *) { min-width: 0; }
+  .sv-demo :global(score-player) { --webscore-play-height: 2.1rem; }
+</style>

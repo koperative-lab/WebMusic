@@ -1,0 +1,596 @@
+/* ============================================================================
+   WebScore docs — monochrome theme with two color modes.
+
+   Every color decision routes through the --ws-* tokens defined below, so the
+   site flips between "white" (light, the signature look) and "black" (dark)
+   from a single place. The white values are the project's original palette;
+   the black set under [data-theme='dark'] is the inverse. The toggle lives in
+   the top-right of the header (see src/starlight/ThemeSelect.astro).
+   ============================================================================ */
+
+/* White mode (default) ----------------------------------------------------- */
+/* Match Starlight's light-mode specificity so its cool-gray palette cannot
+   override the site's neutral tokens on catalog cards and navigation. */
+:root,
+:root[data-theme='light'] {
+  /* Starlight names these by their dark-mode roles: primary ink and canvas. */
+  --sl-color-white: #000000;
+  --sl-color-black: #ffffff;
+  --sl-color-gray-1: #101010;
+  --sl-color-gray-2: #252525;
+  --sl-color-gray-3: #4a4a4a;
+  --sl-color-gray-4: #707070;
+  --sl-color-gray-5: #a8a8a8;
+  --sl-color-gray-6: #dddddd;
+  --sl-color-gray-7: #f5f5f5;
+  --sl-color-accent-low: #f2f2f2;
+  --sl-color-accent: #000000;
+  --sl-color-accent-high: #000000;
+  --sl-color-text: #111111;
+  --sl-color-text-accent: #000000;
+  --sl-color-bg: #ffffff;
+  --sl-color-bg-nav: rgba(255, 255, 255, 0.94);
+  --sl-color-bg-sidebar: #ffffff;
+  --sl-color-bg-inline-code: #f6f6f6;
+  --sl-color-hairline-light: #eeeeee;
+  --sl-color-hairline: #d9d9d9;
+  --sl-color-hairline-shade: #bdbdbd;
+  --sl-shadow-sm: 0 1px 0 rgba(0, 0, 0, 0.08);
+  --sl-shadow-md: 0 18px 45px rgba(0, 0, 0, 0.08);
+  --sl-font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --sl-font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  --webscore-corner: 0px;
+
+  /* WebScore monochrome tokens — white mode */
+  --ws-bg: #ffffff;
+  --ws-bg-nav: rgba(255, 255, 255, 0.94);
+  --ws-fg: #000000;
+  --ws-on-accent: #ffffff;
+  --ws-text: #111111;
+  --ws-text-content: #161616;
+  --ws-text-soft: #252525;
+  --ws-link-underline: rgba(0, 0, 0, 0.28);
+  --ws-panel: #ffffff;
+  --ws-subtle: #f7f7f7;
+  --ws-inline-code-bg: #f7f7f7;
+  --ws-line: #eeeeee;
+  --ws-line-mid: #e6e6e6;
+  --ws-line-strong: #dcdcdc;
+  --ws-line-code: #e0e0e0;
+  --ws-shadow: rgba(0, 0, 0, 0.1);
+  --ws-shadow-2: rgba(0, 0, 0, 0.12);
+  --ws-shadow-block: #eeeeee;
+  --ws-shadow-block-2: #d8d8d8;
+  --ws-scroll-track: #eeeeee;
+  --ws-scroll-thumb: #bdbdbd;
+  --ws-scroll-thumb-hover: #8f8f8f;
+  --ws-hero-base: #ffffff;
+  --ws-hero-key: #000000;
+  --ws-hero-veil-top: rgba(255, 255, 255, 0.04);
+  --ws-hero-veil-mid: rgba(255, 255, 255, 0.84);
+  --ws-hero-veil-end: #ffffff;
+  --ws-code-text: #111111;
+}
+
+/* Black mode --------------------------------------------------------------- */
+:root[data-theme='dark'] {
+  --sl-color-white: #ffffff;
+  --sl-color-black: #000000;
+  --sl-color-gray-1: #f5f5f5;
+  --sl-color-gray-2: #dddddd;
+  --sl-color-gray-3: #a8a8a8;
+  --sl-color-gray-4: #707070;
+  --sl-color-gray-5: #4a4a4a;
+  --sl-color-gray-6: #252525;
+  --sl-color-gray-7: #161616;
+  --sl-color-accent-low: #1c1c1c;
+  --sl-color-accent: #ffffff;
+  --sl-color-accent-high: #ffffff;
+  --sl-color-text: #ececec;
+  --sl-color-text-accent: #ffffff;
+  --sl-color-bg: #000000;
+  --sl-color-bg-nav: rgba(0, 0, 0, 0.94);
+  --sl-color-bg-sidebar: #000000;
+  --sl-color-bg-inline-code: #161616;
+  --sl-color-hairline-light: #222222;
+  --sl-color-hairline: #2a2a2a;
+  --sl-color-hairline-shade: #333333;
+  --sl-shadow-sm: 0 1px 0 rgba(0, 0, 0, 0.6);
+  --sl-shadow-md: 0 18px 45px rgba(0, 0, 0, 0.6);
+
+  /* WebScore monochrome tokens — black mode */
+  --ws-bg: #000000;
+  --ws-bg-nav: rgba(0, 0, 0, 0.94);
+  --ws-fg: #ffffff;
+  --ws-on-accent: #000000;
+  --ws-text: #ececec;
+  --ws-text-content: #e3e3e3;
+  --ws-text-soft: #cfcfcf;
+  --ws-link-underline: rgba(255, 255, 255, 0.3);
+  --ws-panel: #0c0c0c;
+  --ws-subtle: #161616;
+  --ws-inline-code-bg: #161616;
+  --ws-line: #222222;
+  --ws-line-mid: #242424;
+  --ws-line-strong: #2e2e2e;
+  --ws-line-code: #2a2a2a;
+  --ws-shadow: rgba(0, 0, 0, 0.6);
+  --ws-shadow-2: rgba(0, 0, 0, 0.7);
+  --ws-shadow-block: #1a1a1a;
+  --ws-shadow-block-2: #222222;
+  --ws-scroll-track: #1a1a1a;
+  --ws-scroll-thumb: #555555;
+  --ws-scroll-thumb-hover: #777777;
+  --ws-hero-base: #000000;
+  --ws-hero-key: #ffffff;
+  --ws-hero-veil-top: rgba(0, 0, 0, 0.1);
+  --ws-hero-veil-mid: rgba(0, 0, 0, 0.84);
+  --ws-hero-veil-end: #000000;
+  --ws-code-text: #e6e6e6;
+}
+
+html {
+  background: var(--ws-bg);
+}
+
+body {
+  /* Plain ground. The two vertical stripes that used to sit here read as piano
+     keys behind the sidebar on a wide screen and as stray lines down the
+     middle of the page on a phone, where there is no sidebar to hide them. */
+  background: var(--ws-bg);
+  color: var(--ws-text);
+  letter-spacing: 0;
+}
+
+a,
+.sl-markdown-content a:not(:where(.not-content *)) {
+  color: var(--ws-fg);
+  text-decoration-color: var(--ws-link-underline);
+  text-underline-offset: 0.2em;
+}
+
+a:hover,
+.sl-markdown-content a:not(:where(.not-content *)):hover {
+  color: var(--ws-fg);
+  text-decoration-color: var(--ws-fg);
+}
+
+.page {
+  background: transparent;
+}
+
+.header {
+  border-bottom: 0 !important;
+  background: var(--ws-bg-nav);
+  backdrop-filter: blur(18px);
+}
+
+.site-title {
+  color: var(--ws-fg);
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.site-title::before {
+  content: "";
+  display: inline-block;
+  width: 1.2rem;
+  height: 1.2rem;
+  margin-inline-end: 0.55rem;
+  border: 2px solid var(--ws-fg);
+  border-radius: 0;
+  vertical-align: -0.22rem;
+  box-shadow: inset 0 -0.42rem 0 var(--ws-fg);
+}
+
+.social-icons a,
+.theme-toggle,
+.mobile-preferences button,
+button[aria-label],
+site-search button,
+starlight-theme-select label,
+starlight-theme-select select,
+summary,
+dialog,
+.right-sidebar-panel,
+.mobile-toc,
+.mobile-toc button,
+.content-panel,
+.main-pane,
+.main-frame {
+  border-radius: 0;
+}
+
+input,
+select,
+textarea,
+button {
+  border-radius: 0;
+}
+
+.sidebar {
+  border-inline-end: 1px solid var(--ws-line);
+  background: var(--ws-bg);
+}
+
+.sidebar-content a {
+  border-radius: 0;
+}
+
+.sidebar-content a[aria-current='page'],
+.sidebar-content a:hover {
+  background: var(--ws-fg);
+  color: var(--ws-on-accent);
+}
+
+.right-sidebar {
+  border-inline-start: 1px solid var(--ws-line);
+}
+
+.hero {
+  position: relative;
+  display: grid;
+  align-items: end;
+  min-height: clamp(430px, 64vh, 680px);
+  padding-block: clamp(5rem, 12vh, 8rem) clamp(3rem, 7vh, 5rem);
+  overflow: hidden;
+}
+
+.hero::before {
+  content: "";
+  position: absolute;
+  inset: clamp(1rem, 3vw, 2rem);
+  border: 1px solid var(--ws-line-strong);
+  border-radius: 0;
+  background:
+    linear-gradient(90deg, var(--ws-hero-base) 0 8%, var(--ws-hero-key) 8% 11%, var(--ws-hero-base) 11% 18%, var(--ws-hero-key) 18% 21%, var(--ws-hero-base) 21% 31%, var(--ws-hero-key) 31% 34%, var(--ws-hero-base) 34% 43%, var(--ws-hero-base) 43% 51%, var(--ws-hero-key) 51% 54%, var(--ws-hero-base) 54% 64%, var(--ws-hero-key) 64% 67%, var(--ws-hero-base) 67% 76%, var(--ws-hero-key) 76% 79%, var(--ws-hero-base) 79% 100%);
+  box-shadow: 0 26px 70px var(--ws-shadow);
+  z-index: -2;
+}
+
+.hero::after {
+  content: "";
+  position: absolute;
+  inset: clamp(1rem, 3vw, 2rem);
+  border-radius: 0;
+  background: linear-gradient(180deg, var(--ws-hero-veil-top), var(--ws-hero-veil-mid) 58%, var(--ws-hero-veil-end) 100%);
+  z-index: -1;
+}
+
+.hero > img,
+.hero .hero-html {
+  display: none;
+}
+
+.hero h1 {
+  color: var(--ws-fg);
+  max-width: min(100%, 11ch);
+  font-size: clamp(3.7rem, 12vw, 8.6rem);
+  line-height: 0.88;
+  letter-spacing: 0;
+  text-wrap: balance;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.hero .tagline {
+  max-width: 52rem;
+  color: var(--ws-text);
+  font-size: clamp(1.08rem, 2.4vw, 1.55rem);
+  line-height: 1.45;
+}
+
+.hero .actions {
+  gap: 0.85rem;
+}
+
+.hero .actions a {
+  min-height: 3rem;
+  border: 1px solid var(--ws-fg);
+  border-radius: 0;
+  box-shadow: none;
+  font-weight: 750;
+}
+
+.hero .actions a:first-child {
+  background: var(--ws-fg);
+  color: var(--ws-on-accent);
+}
+
+.hero .actions a:is(:hover, :focus-visible) {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 28px var(--ws-shadow-2);
+}
+
+.hero .actions a:not(:first-child) {
+  background: var(--ws-bg);
+  color: var(--ws-fg);
+}
+
+.sl-markdown-content {
+  color: var(--ws-text-content);
+}
+
+.sl-markdown-content h2 {
+  margin-top: 3.5rem;
+  padding-top: 1.4rem;
+  border-top: 1px solid var(--ws-line-mid);
+  color: var(--ws-fg);
+  font-size: clamp(1.7rem, 4vw, 2.7rem);
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.sl-markdown-content h3 {
+  color: var(--ws-fg);
+  letter-spacing: 0;
+}
+
+.sl-markdown-content p,
+.sl-markdown-content li {
+  color: var(--ws-text-soft);
+  line-height: 1.75;
+}
+
+.sl-markdown-content hr {
+  border: 0;
+  height: 1px;
+  background: var(--ws-line-mid);
+  margin-block: 3rem;
+}
+
+.sl-markdown-content code:not(:where(.not-content *)) {
+  border: 1px solid var(--ws-line-code);
+  border-radius: 0;
+  background: var(--ws-inline-code-bg);
+  color: var(--ws-fg);
+  padding: 0.16em 0.48em;
+}
+
+.expressive-code {
+  position: relative;
+  margin: 1.15rem 0 1.85rem;
+  --ec-frm-tooltipSuccessBg: var(--ws-panel);
+  --ec-frm-tooltipSuccessFg: var(--ws-fg);
+  border: 1px solid var(--ws-fg);
+  border-left-width: 10px;
+  border-radius: 0;
+  background: var(--ws-panel);
+  box-shadow: 7px 7px 0 var(--ws-shadow-block);
+  overflow: visible;
+}
+
+.expressive-code .frame {
+  position: relative;
+  margin: 0;
+  border: 0 !important;
+  border-radius: 0;
+  background: var(--ws-panel) !important;
+  box-shadow: none !important;
+}
+
+.expressive-code .header {
+  display: none !important;
+}
+
+.sl-markdown-content .expressive-code pre,
+.expressive-code pre {
+  margin: 0 !important;
+  padding: 1.25rem 1.45rem !important;
+  background: var(--ws-panel) !important;
+  color: var(--ws-code-text) !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  scrollbar-color: var(--ws-scroll-thumb) var(--ws-scroll-track) !important;
+  scrollbar-width: thin !important;
+}
+
+.sl-markdown-content .expressive-code pre::-webkit-scrollbar,
+.expressive-code pre::-webkit-scrollbar {
+  display: block !important;
+  width: 14px !important;
+  height: 14px !important;
+  background-color: var(--ws-scroll-track) !important;
+}
+
+.sl-markdown-content .expressive-code pre::-webkit-scrollbar-track,
+.expressive-code pre::-webkit-scrollbar-track {
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background-color: var(--ws-scroll-track) !important;
+  box-shadow: none !important;
+}
+
+.sl-markdown-content .expressive-code pre::-webkit-scrollbar-track-piece,
+.expressive-code pre::-webkit-scrollbar-track-piece {
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background-color: var(--ws-scroll-track) !important;
+}
+
+.sl-markdown-content .expressive-code pre::-webkit-scrollbar-thumb,
+.expressive-code pre::-webkit-scrollbar-thumb {
+  min-width: 56px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background-color: var(--ws-scroll-thumb) !important;
+  background-clip: border-box !important;
+  box-shadow: none !important;
+}
+
+.sl-markdown-content .expressive-code pre::-webkit-scrollbar-thumb:hover,
+.expressive-code pre::-webkit-scrollbar-thumb:hover {
+  background-color: var(--ws-scroll-thumb-hover) !important;
+}
+
+.sl-markdown-content .expressive-code pre::-webkit-scrollbar-corner,
+.expressive-code pre::-webkit-scrollbar-corner {
+  background-color: var(--ws-scroll-track) !important;
+  border-radius: 0 !important;
+}
+
+.expressive-code code,
+.expressive-code span,
+.expressive-code .code {
+  color: var(--ws-code-text) !important;
+  background: transparent !important;
+  text-shadow: none !important;
+}
+
+.expressive-code .ec-line {
+  min-height: 1.65rem;
+}
+
+.expressive-code .copy {
+  display: none !important;
+}
+
+.expressive-code .copy button {
+  width: 2rem !important;
+  height: 2rem !important;
+  border: 1px solid var(--ws-fg) !important;
+  border-radius: 0 !important;
+  background: var(--ws-panel) !important;
+  color: var(--ws-fg) !important;
+  box-shadow: 3px 3px 0 var(--ws-shadow-block) !important;
+  opacity: 1 !important;
+}
+
+.expressive-code .copy button:hover,
+.expressive-code .copy button:focus-visible {
+  border-color: var(--ws-fg) !important;
+  background: var(--ws-subtle) !important;
+  color: var(--ws-fg) !important;
+  box-shadow: 3px 3px 0 var(--ws-shadow-block-2) !important;
+}
+
+.expressive-code .copy .feedback {
+  position: absolute !important;
+  top: 50% !important;
+  right: calc(100% + 0.55rem) !important;
+  transform: translateY(-50%) !important;
+  border: 1px solid var(--ws-fg) !important;
+  border-radius: 0 !important;
+  background: var(--ws-panel) !important;
+  color: var(--ws-fg) !important;
+  box-shadow: 3px 3px 0 var(--ws-shadow-block) !important;
+  font: 600 0.78rem/1 var(--sl-font, sans-serif) !important;
+  padding: 0.42rem 0.56rem !important;
+  margin: 0 !important;
+  white-space: nowrap !important;
+}
+
+.expressive-code .copy .feedback.show {
+  transform: translateY(-50%) !important;
+}
+
+.expressive-code .copy .feedback::after {
+  display: none !important;
+}
+
+.expressive-code .copy button div {
+  opacity: 0 !important;
+  background: var(--ws-fg) !important;
+}
+
+.expressive-code .copy button:hover div,
+.expressive-code .copy button:focus-visible div {
+  opacity: 0.08 !important;
+}
+
+.card-grid {
+  gap: 1rem;
+}
+
+@media (min-width: 50rem) {
+  .card-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+
+.card {
+  position: relative;
+  border: 1px solid var(--ws-line-strong);
+  border-radius: 0;
+  background: var(--ws-panel);
+  box-shadow: none;
+  overflow: hidden;
+}
+
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0.6rem;
+  background: var(--ws-fg);
+}
+
+.card:is(:hover, :focus-within) {
+  border-color: var(--ws-fg);
+  box-shadow: 0 18px 42px var(--ws-shadow);
+}
+
+.card .title {
+  color: var(--ws-fg);
+}
+
+.card .icon {
+  border: 1px solid var(--ws-fg) !important;
+  border-radius: 0 !important;
+  background: var(--ws-panel) !important;
+  color: var(--ws-fg) !important;
+}
+
+.card svg {
+  color: var(--ws-fg) !important;
+}
+
+.card svg * {
+  fill: currentColor !important;
+  stroke: currentColor !important;
+}
+
+starlight-tabs {
+  --sl-color-accent: var(--ws-fg);
+}
+
+.pagination-links a {
+  border: 1px solid var(--ws-line-strong);
+  border-radius: 0;
+  background: var(--ws-panel);
+  color: var(--ws-fg);
+}
+
+.pagination-links a:hover {
+  border-color: var(--ws-fg);
+}
+
+@media (max-width: 50rem) {
+  .hero {
+    min-height: 520px;
+    padding-block: 5.5rem 3rem;
+  }
+
+  .hero::before,
+  .hero::after {
+    inset: 0.75rem;
+    border-radius: 0;
+  }
+
+  .hero h1 {
+    max-width: 7ch;
+    font-size: clamp(3.5rem, 20vw, 5.5rem);
+  }
+}
+
+/* ============================================================================
+   Live component demos. The demo cards are self-contained light "sample
+   canvases" (the embedded widgets are light-themed at the package level), so
+   in black mode we keep them light and just lift them off the dark page with a
+   soft shadow so they read as intentional sample frames.
+   ============================================================================ */
+:root[data-theme='dark'] [class$='-demo'] {
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.65);
+}

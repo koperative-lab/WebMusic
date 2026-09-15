@@ -1,0 +1,179 @@
+---
+// The <HeadlessPlayground> demo for ScorePlayer.
+//
+// The stage is the smallest UI that makes the object's behaviour visible — a
+// play button, a progress track and a time readout, built from `wui-*`
+// primitives. Deliberately NOT a Custom Element and not a @webmusic/ui
+// presenter: the page's point is what the object does without those.
+//
+// The module publishes a factory on `window`; the shared panel constructs
+// through it, re-creating on every option change and disposing the previous
+// player first, so the demo models the ownership the page documents.
+import HeadlessPlayground from '../HeadlessPlayground.astro';
+---
+
+<HeadlessPlayground
+  object="score-player"
+  factory="__wmScorePlayerDemo"
+  hint="Audio needs a gesture: press Play once. Changing an option re-creates the player, which stops it."
+>
+  <div class="doc-transport" data-sp-stage>
+    <button class="wui-btn" type="button" data-sp-play>▶ Play</button>
+    <div class="wui-track"><div class="wui-track__fill" data-sp-fill></div></div>
+    <span class="doc-transport__time" data-sp-time>0.0s</span>
+  </div>
+</HeadlessPlayground>
+
+<script>
+  import {
+    Duration,
+    MeasureId,
+    PartId,
+    Pitch,
+    Rational,
+    ScoreBuilder,
+    VoiceId,
+    type Score,
+  } from '@webmusic/score';
+  import {ScorePlayer, Sound} from '@webmusic/score/play/headless';
+  import type {
+    HeadlessDemoFactory,
+    HeadlessDemoInstance,
+  } from '../../lib/headless-playground-client';
+
+  let cached: Score | undefined;
+
+  function sampleScore(): Score {
+    if (cached) return cached;
+    const builder = new ScoreBuilder();
+    const partId = PartId('piano');
+    const voice = VoiceId('v1');
+    const timeSignature = {numerator: 4, denominator: 4};
+    builder
+      .setMetadata({title: 'Etude'})
+      .addTempo({atQuarters: Rational.ZERO, bpm: 100})
+      .addMeter({atQuarters: Rational.ZERO, measureNumber: 1, timeSignature});
+    builder.addPart({id: partId, name: 'Piano', staves: 1});
+    const pitches = ['C4', 'E4', 'G4', 'C5', 'B4', 'G4', 'E4', 'C4', 'D4', 'F4', 'A4', 'D5', 'C5', 'A4', 'F4', 'D4'];
+    pitches.forEach((name, index) => {
+      const measureNumber = Math.floor(index / 8) + 1;
+      if (index % 8 === 0) {
+        builder.addMeasure({
+          id: MeasureId(`m${measureNumber}`),
+          number: measureNumber,
+          onsetQuarters: new Rational((measureNumber - 1) * 4, 1),
+          durationQuarters: new Rational(4, 1),
+          timeSignature,
+        });
+      }
+      builder.addNote(partId, {
+        id: builder.newNoteId(),
+        pitch: Pitch.parse(name),
+        onsetQuarters: new Rational(index, 2),
+        duration: Duration.eighth(),
+        voice,
+      });
+    });
+    cached = builder.build();
+    return cached;
+  }
+
+  const factory: HeadlessDemoFactory = (options, stage): HeadlessDemoInstance => {
+    // The synth is created per player and handed over, so each re-create
+    // tears its own graph down rather than sharing one across generations.
+    const synth = Sound.oscillator();
+    const synthOwnership = options.synthOwnership === 'borrowed' ? 'borrowed' : 'owned';
+    let player: ScorePlayer;
+    try {
+      player = new ScorePlayer(sampleScore(), {...options, synth, synthOwnership});
+    } catch (error) {
+      synth.dispose();
+      throw error;
+    }
+    let disposed = false;
+    let playGeneration = 0;
+    let requestedPlaying = false;
+    const feedback = (message: string): void => {
+      if (disposed) return;
+      const node = stage.closest('[data-headless-demo]')?.querySelector<HTMLElement>('[data-hl-feedback]');
+      if (node) { node.textContent = message; node.hidden = !message; }
+    };
+
+    const playButton = stage.querySelector<HTMLButtonElement>('[data-sp-play]');
+    const fill = stage.querySelector<HTMLElement>('[data-sp-fill]');
+    const time = stage.querySelector<HTMLElement>('[data-sp-time]');
+
+    const paint = (): void => {
+      if (fill) fill.style.width = `${Math.round(player.progress * 100)}%`;
+      if (time) time.textContent = `${player.seconds.toFixed(1)}s`;
+      if (playButton) playButton.textContent = requestedPlaying || player.isPlaying() ? '❚❚ Pause' : '▶ Play';
+    };
+
+    const onClick = (): void => {
+      const generation = ++playGeneration;
+      feedback('');
+      if (requestedPlaying || player.isPlaying()) {
+        requestedPlaying = false;
+        player.pause();
+      } else {
+        requestedPlaying = true;
+        feedback('Preparing audio…');
+        void player.play().then(() => {
+          if (disposed || generation !== playGeneration) return;
+          requestedPlaying = false;
+          feedback('');
+          paint();
+        }).catch((error: unknown) => {
+          if (disposed || generation !== playGeneration) return;
+          requestedPlaying = false;
+          feedback(error instanceof Error ? error.message : String(error));
+          paint();
+        });
+      }
+      paint();
+    };
+    playButton?.addEventListener('click', onClick);
+
+    const offTime = player.on('timeupdate', paint);
+    const offEnd = player.on('end', () => { requestedPlaying = false; paint(); });
+    paint();
+
+    return {
+      object: player as unknown as Record<string, unknown>,
+      construction: `import {ScorePlayer, Sound} from '@webmusic/score/play/headless';
+
+const synth = Sound.oscillator();
+const player = new ScorePlayer(score, ${JSON.stringify({...options, synthOwnership}, null, 2).replace('{', '{\n  synth,')});
+// In a play gesture: await player.play();
+// On cleanup: player.dispose();${synthOwnership === 'borrowed' ? ' synth.dispose();' : ''}`,
+
+      on(event, handler) {
+        // The panel is string-keyed by design — it iterates the catalog's
+        // event names — while `on` is keyed by the ScorePlayerEvents map. One
+        // cast at that seam, rather than one per event name.
+        const subscribe = player.on.bind(player) as unknown as (
+          name: string,
+          listener: (payload: unknown) => void,
+        ) => () => void;
+        return subscribe(event, handler);
+      },
+      dispose() {
+        if (disposed) return;
+        disposed = true;
+        ++playGeneration;
+        requestedPlaying = false;
+        offTime();
+        offEnd();
+        playButton?.removeEventListener('click', onClick);
+        try { player.dispose(); }
+        finally { if (synthOwnership === 'borrowed') synth.dispose(); }
+        if (fill) fill.style.width = '0%';
+        if (time) time.textContent = '0.0s';
+        if (playButton) playButton.textContent = '▶ Play';
+      },
+    };
+  };
+
+  (window as unknown as Record<string, HeadlessDemoFactory>).__wmScorePlayerDemo = factory;
+  window.dispatchEvent(new Event('wm:headless-factory-ready'));
+</script>

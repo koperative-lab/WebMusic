@@ -1,0 +1,400 @@
+---
+title: '@webmusic/ui/pitch'
+description: 'Live keyboard, staff and fretboard read-outs that press, spell and slide with the pitches a caller hands them.'
+sidebar:
+  label: 'pitch'
+  order: 2
+---
+
+import UiPresenterLiveDemo from '../../../../components/UiPresenterLiveDemo.astro';
+import UiPresenterRelated from '../../../../components/UiPresenterRelated.astro';
+
+`@webmusic/ui/pitch` draws one set of sounding pitches on three surfaces at once — a keyboard, a
+staff and a fretboard — and keeps all three honest about the same instant. Each is a passive
+read-out: it takes a snapshot, presses what is sounding, fades what has just stopped, and never
+asks who is playing.
+
+The three know no music theory, and that is the boundary. A mark is *"MIDI 64, diatonic step 30,
+role `third`, labelled `E4`"* — never *"the third of Cmaj7"*. Spelling has to be the caller's
+answer, because `F#4` and `Gb4` are one key on a keyboard and two lines on a staff, and only the
+caller knows which it meant. Clefs go one step further: the caller passes the glyph **string** and
+the kit only positions it, so a mount given no `clefs` produces no text node at all.
+
+Reach for [note](/uikit/notes/note/) instead when the surface has to be **played** — that one owns
+pointer and keyboard input and emits notes. These three own no gestures. Use
+[analysis](/uikit/views-analysis/analysis/) for the span-carrying cards and timelines that a
+playhead walks.
+
+<UiPresenterLiveDemo presenter="pitch" />
+
+## Import
+
+```ts
+import {fretPositionsFor, mountKeyboard, mountStaff, staffPlacement} from '@webmusic/ui/pitch';
+
+const keyboard = mountKeyboard(keyboardHost, {
+  snapshot: () => ({
+    marks: [
+      {midi: 60, label: 'C4', role: 'root', since: chordStartedAt},
+      {midi: 64, label: 'E4', role: 'third', since: chordStartedAt},
+      {midi: 67, label: 'G4', role: 'fifth', since: chordStartedAt},
+    ],
+    ghostPitchClasses: [0, 2, 4, 5, 7, 9, 11],
+    octaveLabels: new Map([[60, 'C4']]),
+    now: positionQuarters,
+  }),
+  subscribe: (notify) => store.subscribe(notify),
+});
+
+const staff = mountStaff(
+  staffHost,
+  {
+    snapshot: () => ({
+      marks: [{midi: 66, diatonic: 31, accidental: 'sharp', label: 'F#4', column: 0}],
+      clefs: {upper: trebleClefGlyph},
+      activeColumn: 0,
+      follow: 'anchor',
+    }),
+  },
+  {anchor: 0.35},
+);
+
+// The two pure helpers, for the caller that has to decide before it can hand
+// anything over. Both are arithmetic; WHICH spelling and WHICH grip are yours.
+staffPlacement(28).ledgers; // [28] — middle C stands on one ledger line
+fretPositionsFor(60, [64, 59, 55, 50, 45, 40], {firstFret: 3, fretCount: 5});
+
+keyboard.key(60)?.dataset.phase; // 'attack', then 'sustain', then 'release'
+staff.destroy();
+```
+
+<details class="component-section">
+<summary>API</summary>
+
+All three mount options accept `surface?: 'default' | 'none'` (default `'default'`).
+Use `'none'` inside an already framed presenter; only outer paint and insets are suppressed.
+
+Three mounts, one shared vocabulary, and two pure helpers. Every mount follows the kit's shape:
+`mountX(host, binding, options?)`, a binding that answers `snapshot()` and may offer `subscribe()`,
+and a handle whose `destroy()` is idempotent. Mounting twice on one host replaces the first
+surface; the three kinds are different surfaces, not alternative renderings of one, so they do not
+displace each other.
+
+**Mounts and handles**
+
+| Export | Kind | Description |
+|---|---|---|
+| `mountKeyboard(host, binding, options?)` | `KeyboardHandle` | A keyboard that presses and releases with its input. `key(midi)` returns that key's node, or nothing when the pitch is outside the drawn range. |
+| `mountStaff(host, binding, options?)` | `StaffHandle` | Columns of noteheads on a real staff, with ledgers and accidentals. `note(column, diatonic)` returns one notehead group. |
+| `mountFretboard(host, binding, options?)` | `FretboardHandle` | A neck whose window slides to follow the hand. `dot(stringIndex, fret)` returns one stopped position. |
+| `staffPlacement(diatonic, system?)` | `StaffPlacement` | Where a diatonic step sits and what it has to stand on: a half-space `y` plus the `ledgers` it needs, ordered from the staff outward. The step is clamped to `C-1 … E10` — everything MIDI can name, with every ledger it needs — because a malformed `<octave>` makes a *finite* step of `1e9`, and a ledger line per line between staff and note is half a million SVG nodes. A non-finite step answers middle C. |
+| `fretPositionsFor(midi, tuning, window?)` | `FretPosition[]` | Every place inside the window that sounds one pitch. `tuning[i]` is the open pitch of string `i`. |
+| `pitchStyle` | `string` | The stylesheet all three install, as side-effect-free text. |
+
+**The shared mark**
+
+`PitchMark` is what every surface is told about one sounding pitch.
+
+| Member | Kind | Default | Description |
+|---|---|---|---|
+| `midi` | `number` | — | The pitch. Rounded; a non-finite value is dropped. |
+| `label` | `string` | — | The caller's spelling. The kit never invents a name — a surface prints only what it was given. |
+| `mark` | `string` | the role's abbreviation | The figure printed beside the colour. Pass one wherever the real figure is known: a role alone cannot tell a 9 from a 13. |
+| `role` | `ToneRole` | `'other'` | `'root'`, `'third'`, `'fifth'`, `'seventh'`, `'extension'`, `'bass'`, `'other'` or `'ghost'`. Picks the colour and the default abbreviation. |
+| `weight` | `number` | `1` | `0…1` emphasis: velocity, weight or confidence. **Spent**, not merely accepted — it multiplies the mark's opacity on all three surfaces, through the same `--wui-pitch-weight` the age fade reads. |
+| `active` | `boolean` | `true` | `false` withdraws the mark without removing it from the array. |
+| `since` | `number` | — | When this pitch started sounding, on the same ruler as the surface's `now`. |
+
+`since` and `now` are the caller's own units — quarters, seconds, bars, anything monotonic. Given
+both, a surface publishes `0…1` on each mark for how long it has been held and dims it as it ages;
+given neither, a mark is simply on or off, which is a complete and supported way to use all three.
+`ageSpan` decides how many of those units the `0…1` covers, and it is the **same option with the
+same default on all three surfaces** — one pitch at one instant may not be half a beat old on the
+keyboard and a whole one on the staff.
+
+**Keyboard**
+
+| `KeyboardState` | Kind | Default | Description |
+|---|---|---|---|
+| `marks` | `readonly PitchMark[]` | — | What is sounding. |
+| `low` / `high` | `number` | `48` / `84` | The drawn range, in MIDI. |
+| `ghostPitchClasses` | `readonly number[]` | — | In the key but not sounding, drawn as a wash. A ghost key carries both `data-ghost="true"` and `data-active="false"`, so nothing about it depends on seeing the colour. |
+| `labels` | `'none' \| 'marked' \| 'white' \| 'all'` | `'marked'` | Which keys may print a name. |
+| `octaveLabels` | `ReadonlyMap<number, string>` | — | The ruler's text. Whether middle C is called C4 is a convention, not a fact, so the caller supplies it. |
+| `now` | `number` | — | The caller's current position. |
+
+| `KeyboardOptions` | Kind | Default | Description |
+|---|---|---|---|
+| `label` | `string` | derived from the marks | Accessible name for the surface. |
+| `motion` | `MotionMode` | `'auto'` | See **Motion** below. |
+| `follow` | `'active' \| 'none'` | `'none'` | Scroll a wide keyboard to a newly active group that is outside its viewport. Repeated snapshots and releases preserve the user's scroll. |
+| `fitToWidth` | `boolean` | `false` | Fit the entire normalized range to the container, overriding explicit key widths and the CSS minimum width. Heights remain unchanged. |
+| `whiteKeyWidth` | `number` | responsive | Fixed natural-key width in CSS px; wider boards scroll locally. Ignored while `fitToWidth` is `true`. |
+| `blackKeyWidth` | `number` | `0.62 × white width` | Accidental-key width in CSS px, capped at white width. Alone derives white width as `value / 0.62`. Ignored while `fitToWidth` is `true`. |
+| `whiteKeyHeight` | `number` | theme height | Natural-key length in CSS px. |
+| `blackKeyHeight` | `number` | theme proportion | Accidental-key length in CSS px, capped at white-key height. |
+| `release` | `number` | `140` | How long a lifted key keeps fading, in ms. `0` in any reduced mode. |
+| `trail` | `boolean` | `false` | Leave the role colour on a key for the length of its release. |
+| `ageSpan` | `number` | `4` | How many of the caller's units the published age spans. |
+| `classNames` / `parts` | `{root?, board?}` | — | Extra classes and `part` tokens on the two structural nodes. |
+| `onError` | `(error: unknown) => void` | — | Receives a faulty snapshot or a failed repaint. |
+| `density` | `'comfortable' \| 'compact'` | `'comfortable'` | The compact tier: same information, less room. |
+| `scheme` | `'inherit' \| 'system' \| 'light' \| 'dark'` | `'inherit'` | Pin the colour scheme instead of following the page. |
+| `stylesheet` | `boolean` | `true` | `false` paints the identical declarations onto the nodes instead. |
+
+`KeyboardHandle` is `{element, board, key(midi), update(), destroy()}`.
+
+With `fitToWidth: false` and no explicit geometry, the board fills its container while preserving a minimum white-key width. A wide range scrolls
+inside the root instead of compressing adjacent labels. Long labels stay within their key; their
+full text remains in the title and accessible name. An omitted octave ruler occupies no space.
+Positive finite geometry options override the corresponding dimensions. Invalid,
+zero or negative values use defaults. Exact widths remain fixed when the
+container resizes; heights do not change pitch spacing. Recreate the presenter
+without an option to restore its responsive/theme default. Use the same widths,
+MIDI range and shared scroll container to align with a separately rendered
+waterfall; `follow: 'none'` keeps the keyboard from panning independently.
+`follow: 'active'` reveals new arrivals without moving playback or changing the drawn range. If
+the held group is wider than the viewport, it is centered and remains locally scrollable.
+
+Use `fitToWidth: true` to show every key in the normalized range without
+horizontal scrolling. Key widths follow the container, even when explicit
+`whiteKeyWidth`, `blackKeyWidth` or a CSS minimum width is supplied; black keys
+use `0.62 × white width`. Height options still apply, and fitting changes no
+marks or pitch range. Remount with `fitToWidth: false` or omit it to restore
+the supplied fixed widths or the normal responsive minimum width.
+
+All three surfaces declare the harmony **token layer on their own root**, so one dropped into a
+bare `<div>` looks the same as one in a workbench dock that already carries it. `density` and
+`scheme` are the two dials a caller can move; both are stamped as `data-*` and both are painted
+inline when `stylesheet: false`.
+
+**Staff**
+
+`StaffMark` extends `PitchMark` with `diatonic` (required — C0 = 0, middle C = 28; it follows the
+spelling, not the pitch), an optional `accidental` of `'sharp' | 'flat' | 'natural' |
+'double-sharp' | 'double-flat'`, and a `column`, which is what makes marks sharing a column one
+chord.
+
+| `StaffState` | Kind | Default | Description |
+|---|---|---|---|
+| `marks` | `readonly StaffMark[]` | — | Every notehead, across every column. |
+| `system` | `'grand' \| 'treble' \| 'bass'` | `'grand'` | Which staves are drawn. |
+| `clefs` | `{upper?, lower?}` | — | Glyph **strings** the caller owns. Omit them and no text node is created. |
+| `keySignature` | `readonly {diatonic, accidental}[]` | — | Accidentals placed after the clef, in the given order. |
+| `columns` / `activeColumn` | `number` | widest column + 1 / `0` | How many columns exist, and which one is sounding. |
+| `follow` | `'anchor' \| 'none'` | `'none'` | `'anchor'` pins the active column at a fixed x and lets the columns flow past it. Both produce the identical noteheads with the identical attributes; only the reel's transform differs. |
+| `emptyLabel` | `string` | — | Announced when there is nothing to draw. |
+| `now` | `number` | — | The caller's current position. |
+
+`StaffOptions` adds `anchor` (`0…1`, default `.35`) and `ageSpan` (default `4`) to `label`,
+`motion`, `classNames`, `parts`, `onError` and `stylesheet`; `classNames` and `parts` name
+`{root?, svg?}`. `StaffHandle` is `{element, svg, note(column, diatonic), update(), destroy()}`.
+
+Marks sharing a column stack into one chord. Different accidentals on the same diatonic step
+retain separate noteheads, so simultaneous C and C♯ are both drawn. `note(column, diatonic)`
+returns the first head at that step; it does not select among accidentals.
+
+The staff fills the available inline width. Where `ResizeObserver` is available, staff lines extend
+to that width while noteheads, clefs and column spacing retain their existing proportions. The
+observer uses the rendered SVG dimensions, so the staff-space token still owns vertical sizing;
+no numeric theme tokens are read back. Dense accidental stacks reserve space after the clef and
+signature. Content wider than the available space scrolls at the staff-space size instead of
+shrinking noteheads. Without an observer, the content-sized viewBox remains the fallback.
+`destroy()` disconnects observation together with the subscription and pending effects.
+
+**Fretboard**
+
+`FretMark` is `{stringIndex, fret, midi?, role?, label?, mark?, finger?, active?, since?, weight?,
+id?}`. String `0` is the one drawn at the edge of the board and fret `0` is the open string;
+`finger` overrides the printed abbreviation, because which finger takes a stop is not derivable
+from it. `midi` is never read for geometry — a string and a fret are enough to draw a dot — and is
+stamped as `data-midi`, which is what lets a fretboard be checked against a keyboard and a staff
+without anything re-deriving a tuning.
+
+| `FretboardState` | Kind | Default | Description |
+|---|---|---|---|
+| `marks` | `readonly FretMark[]` | — | The stopped positions. |
+| `strings` | `number` | `6` | Up to `12`. |
+| `firstFret` | `number \| 'auto'` | `0` | The lowest fret in view. `'auto'` frames the marks and keeps a window that still holds every one of them, so a shape alternating between the two ends of a window does not drag the neck back and forth. |
+| `fretCount` | `number` | `5` | How wide the window is. It is closed at both ends — `firstFret … firstFret + fretCount` — so at the nut it is the open string plus five stopped frets, the five-fret box every chord chart draws. `fretPositionsFor` admits exactly the span the neck has room to draw. |
+| `muted` | `readonly number[]` | — | Strings marked as not sounding; a mark on the same string wins. The markers live in a fixed gutter, so a window at the fifth fret does not take them with it. |
+| `barre` | `readonly {fret, fromString, toString}[]` | — | Geometry, not theory: the caller says which strings a bar covers. |
+| `inlays` | `readonly number[]` | — | Which frets carry a position dot. |
+| `stringLabels` | `readonly string[]` | — | The tuning. **Drawn** beside the strings in the fixed gutter, and read into the accessible description. A diagram that only spoke them left a sighted reader no way to tell a drop-D box from a standard one. |
+| `orientation` | `'horizontal' \| 'vertical'` | `'horizontal'` | Only the coordinates turn: the node set and every `data-*` are identical either way. A turned board is sized as a chord box — tall and narrow, with the strings spanning what they span across a horizontal neck. |
+| `emptyLabel` | `string` | — | Announced when there is nothing to draw. |
+| `now` | `number` | — | The caller's current position. |
+
+`FretboardOptions` is `label`, `motion`, `release`, `ageSpan`, `classNames`, `parts`, `onError`,
+`stylesheet`, plus the geometry options below. `classNames` and `parts` accept
+`{root?, svg?}`. `FretboardHandle` is
+`{element, svg, dot(stringIndex, fret), update(), destroy()}`.
+
+| Geometry option | Default | Description |
+| --- | --- | --- |
+| `fretWidth` | responsive | Fixed distance between adjacent fret wires in CSS px. |
+| `stringSpacing` | density geometry | Distance between adjacent strings in CSS px. |
+| `stringWidth` | density stroke | String line thickness in CSS px, independent of SVG viewport scaling. |
+
+All three accept positive finite numbers; missing/invalid values use defaults.
+Explicit fret spacing stays fixed as the host grows; a narrow host scrolls.
+String spacing changes the board height without changing the fret window or
+pitch locations. These are layout options, not values in the musical binding.
+
+With no explicit fret width, a horizontal board fills the available width. Where `ResizeObserver` is available, extra room
+expands fret spacing while circles, text and string spacing retain their size. The minimum
+geometry unit keeps markings readable, including at compact density; narrow boards scroll within
+their root. The height token is a minimum alongside this readable geometry floor. A vertical board
+retains chord-box proportions. Resizing changes no marks or musical window, and `destroy()`
+disconnects both sizing and overflow observation. Without an observer, the minimum-size geometry
+remains readable but wider boxes can retain slack around the drawing.
+
+The window follows the shape it was given, and only as far as it has to. A surface with no marks is
+at the nut, so a shape that fits there does not move the neck at all, and one that does not slides
+up by as little as it can and stops — hysteresis, so a shape alternating between the two ends of a
+window does not drag the neck back and forth once per chord. The neck draws **only the window**: a
+board at the third position has no nut in it, and an open string keeps its marker in the fixed
+gutter beside the muted ones, because an open string is a fact about a string rather than a place
+on the neck.
+
+An **open** string is drawn as a ring and a stopped one as a filled disc — the distinction every
+chord chart in print makes, and the first thing a player reads off one. The ring carries the role
+colour on its stroke, so the greyscale channel survives either way. A mark the window cannot hold
+is not drawn at all rather than drawn off the neck, and it does not enter the accessible sentence;
+the position marker prints `5fr` the way a chord book writes it, never a bare `5` that would read
+as a fingering beside two other kinds of number.
+
+**Motion**
+
+`MotionMode` is `'auto' | 'continuous' | 'stepped' | 'none'`. `'auto'` asks the nearest ancestor's
+`data-motion` **first**: these surfaces render into a caller's light DOM where a shell answers that
+question once for a whole page, and six mounts each reaching their own conclusion would be six
+answers and no answer. With nothing declared above it, a surface asks `prefers-reduced-motion`
+itself, guarded, and the stylesheet carries the same media query so a page whose JavaScript never
+asked is covered anyway — an explicit `'continuous'` does not out-rank the viewer's own setting.
+A reduced mode produces a **pixel-identical** surface with the transitions spent down to `0s` —
+turning the movement off is supported; turning the layout into a different layout is not.
+
+None of the three runs an animation frame loop. Every move is one attribute write plus a CSS
+transition, so a page holding six of these wakes up exactly as often as its data changes. Repeated
+`update()` calls diff by identity — a key, a notehead or a dot that was already sounding is not
+rebuilt — which is what lets a transition finish.
+
+**Accessibility.** Each root is `role="img"` with an accessible name naming the labels it was
+given, and the drawing itself is `aria-hidden` — forty-nine focusable keys would be a screen-reader
+disaster, so a surface has exactly one accessible name. Empty states are `role="status"`. Nothing
+here plays a note or emits an event. A root whose content overflows becomes one keyboard focus
+stop so native scrolling can reach its complete drawing; it leaves the tab order when it fits. A **change** to the sounding set is not
+announced: the name is rewritten, and a rewritten name on a static `role="img"` is not read out.
+Announcing it belongs to the shell that holds one reading per frame, not to four docks announcing
+the same chord four times.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+Use the shared [surface and palette tokens](/uikit/#theme-with-css-custom-properties) for
+background (including `transparent`), foreground, accent, outer border and corner radius.
+Presenter-specific tokens below take precedence within their documented roles.
+
+All three install `pitchStyle`, or paint the same declarations onto the nodes when
+`stylesheet: false`. Both paths are generated from one record, so the sheet and the inline form
+cannot describe two different surfaces. Every colour is a chain ending in a literal, never a bare
+`var()`, so a surface mounted on a node carrying no tokens still paints.
+
+Exact keyboard dimensions, fret spacing, string gaps and string thickness use
+the typed geometry options above. CSS tokens retain ownership of colors,
+frames and default sizing; explicit numeric options override their corresponding
+default geometry without changing the bound musical state. `fitToWidth: true`
+takes precedence over keyboard width options and minimum-width tokens.
+
+The outer frame uses `--wm-pitch-surface-background`, `-border`, `-padding` and `-radius`
+through the shared component quartet, with transparent/zero-inset defaults. Key faces use
+`--wm-note-key` / `--wm-note-key-alt`; their fallbacks are `--wm-surface` / `--wm-surface-inverse`.
+Key outlines use `--wm-note-border` → `--wm-control-border` → `--wm-border`, then
+`#d8d8d8` in a light scheme (matching other neutral controls and frames) or `#333` in a dark
+scheme. Labels and corners
+use `--wm-note-label` and `--wm-note-radius` through the shared foreground and control-radius
+tokens. Staff paint uses
+`--wm-pitch-staff-line` → `--wm-foreground`. Fretboard paint uses
+`--wm-pitch-fret-neck` → `--wm-surface` and `--wm-pitch-fret-wire`, `-nut`, `-string`, `-inlay`
+→ `--wm-foreground`. Unthemed surfaces use neutral light/dark defaults: white keys `#fff` / `#282828`,
+black keys `#222` / `#111`, staff lines `#666` / `#888`, and fretboard ground
+`#eee` / `#222`. Musical marks retain their caller-supplied role colors.
+
+**Compatibility and state tokens**
+
+Older `--wui-*` inputs below remain compatible, but new themes should use the public tokens
+above. Presenter-owned state values such as note weight are not theme configuration.
+
+| Property | Default | Controls |
+|---|---|---|
+| `--wui-pitch-key-min-width` | `2.5rem`; `2.25rem` compact | Minimum white-key width before local scrolling; ignored while `fitToWidth` is `true`. |
+| `--wui-pitch-fretboard-unit` | `2.2px`; `2px` compact | Minimum CSS length per fretboard geometry unit, preserving dots and labels. |
+| `--wui-pitch-key-white` / `--wui-pitch-key-black` | `#fff` / `#282828` and `#222` / `#111` | White and black key faces. |
+| `--wui-pitch-key-border` | `light-dark(#d8d8d8, #333)` after public border tokens | Key outline. |
+| `--wui-pitch-key-label` | `#666` / `#aaa` | The name and abbreviation printed on an unmarked key. |
+| `--wui-pitch-key-radius` | `0` | Key corner radius. |
+| `--wui-pitch-key-black-height` | `62%` | How far a black key reaches down the board. |
+| `--wui-pitch-staff-line` | `#666` / `#888` | Staff lines, ledgers, brace, clef and key signature. |
+| `--wui-pitch-fret-neck` / `--wui-pitch-fret-wire` / `--wui-pitch-fret-nut` | `#eee` / `#222`; `#999` / `#777`; `#444` / `#ccc` | Fretboard ground, fret wires and nut, as light/dark pairs. |
+| `--wui-pitch-fret-string` / `--wui-pitch-fret-inlay` | `#888` / `#aaa`; `#ccc` / `#444` | Strings and position dots, as light/dark pairs. |
+| `--wui-harmony-keyboard-height` | `92px` | Board height. |
+| `--wui-harmony-staff-space` | `9px` | One staff space; the drawn height is derived from it. |
+| `--wui-harmony-fretboard-height` | `104px` | Neck height. |
+| `--wui-harmony-motion-tone` | `90ms` | How fast a key or a notehead takes its colour. |
+| `--wui-harmony-motion-release` | `140ms` | How fast a lifted mark fades. |
+| `--wui-harmony-motion-column` | `200ms` | How fast an anchored reel slides. |
+| `--wui-harmony-motion-ease` | `ease-out` | The easing all three share. |
+| `--wui-harmony-ink` / `--wui-harmony-ink-muted` | inherit / muted | Text on the root, and the octave ruler and empty states. |
+| `--wui-harmony-font` / `--wui-harmony-font-mono` | inherit / `ui-monospace` | Prose and the fixed-width names. |
+| `--wui-harmony-size-micro` / `--wui-harmony-size-label` | `.6875rem` / `.75rem` | Key names and empty-state text. |
+
+Tone colour comes from the shared degree palette: a sounding node is painted from its `role`, and
+`--wui-degree-root` and its siblings sit in front of the `--wm-degree-*` names a theme sets.
+
+Each sounding node also publishes how long its pitch has been held, as `0…1` across `ageSpan` of
+the caller's own units, and **spends it**: a held pitch dims as it ages, by a third of its opacity
+across the span. It is `opacity` on a key and `fill-opacity` on a notehead and a dot, because
+`opacity` on those two already answers to the staff's `data-when` and the fretboard's `data-phase`.
+A theme that disagrees overrides one declaration:
+
+```css
+.wui-pitch-keyboard__key[data-active='true'] {
+  opacity: calc(1 - var(--wui-harmony-age, 0) * 0.5);
+}
+```
+
+**Classes and state attributes**
+
+| Node | Class | Carries |
+|---|---|---|
+| Keyboard root / board / ruler | `.wui-pitch-keyboard`, `.wui-pitch-keyboard__board`, `.wui-pitch-keyboard__ruler` | `data-motion` on the root. |
+| One key | `.wui-pitch-keyboard__key`, plus `.wui-pitch-keyboard__key--white` or `.wui-pitch-keyboard__key--black` | `data-midi`, `data-active`, `data-role`, `data-phase`, `data-ghost`. |
+| Staff root / drawing / reel | `.wui-pitch-staff`, `.wui-pitch-staff__svg`, `.wui-pitch-staff__reel` | The reel carries the follow transform. |
+| One notehead group | `.wui-pitch-staff__note`, holding `.wui-pitch-staff__head`, `.wui-pitch-staff__ledger` and `.wui-pitch-staff__accidental` | `data-column`, `data-diatonic`, `data-midi`, `data-role`, `data-active`, `data-phase`, `data-when`. |
+| Fretboard root / drawing / reel | `.wui-pitch-fretboard`, `.wui-pitch-fretboard__svg`, `.wui-pitch-fretboard__reel` | The reel carries the window transform; `.wui-pitch-fretboard__open` and `.wui-pitch-fretboard__gutter` do not move with it. |
+| One stopped position | `.wui-pitch-fretboard__dot`, holding `.wui-pitch-fretboard__disc` | `data-string`, `data-fret`, `data-midi`, `data-role`, `data-active`, `data-phase`. |
+
+`data-phase` is `attack` on the frame a pitch arrives, `sustain` once it has settled, and `release`
+while it fades — and it is written only when it **changes**, so a repaint with an unchanged set
+writes nothing and no transition restarts. `data-when` is the staff's distance from the sounding
+column: `past`, `now`, `next` or `far`.
+
+Both of those are written as **attributes**, not only as colours, so what a surface is saying can
+be read without seeing it — and the three surfaces always agree, mid-release included: a lifted
+pitch is `data-active="false"` with `data-phase="release"` on every one of them at once.
+
+Repaints do not rebuild. A key, a notehead and a dot are diffed by identity; a notehead's children
+are rebuilt only when its GEOMETRY moves, and a change of role is a guarded `fill` on the ellipse
+that is already there. A replaced element has no previous computed style and therefore cannot
+transition, so this is what makes the colour change a fade rather than a cut — and it is why a
+surface whose data did not change writes nothing at all.
+
+The `parts` option adds `part` tokens for a shadow-DOM host; `classNames` adds classes without
+replacing the structural ones. Neither is required.
+
+</details>
+
+<UiPresenterRelated presenter="pitch" />

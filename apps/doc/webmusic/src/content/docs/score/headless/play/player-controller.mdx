@@ -1,0 +1,101 @@
+---
+title: 'PlayerController'
+description: 'An event-driven transport controller over a ScorePlayer.'
+sidebar:
+  order: 9
+---
+
+import ProgrammaticPlayerControllerDemo from '../../../../../components/programmatic/ProgrammaticPlayerControllerDemo.astro';
+
+`PlayerController` wraps a push `Player` in a small event-driven API (play /
+pause / seek / scrub + `timeupdate` / `transportchange` / `end`), handy for
+binding to your own transport buttons. `transportchange` fires synchronously
+when code calls the controller's play/pause commands, so presenters do not need to poll.
+Its `error` event is an operational `play()` failure;
+`listenerError` independently reports a subscriber that threw or rejected, so
+application bugs never masquerade as engine failures. `MidiPlayerController`
+is an alias of this class; it does not install MIDI listeners.
+
+<ProgrammaticPlayerControllerDemo />
+
+## Import
+
+```ts
+import {PlayerController, ScorePlayer} from '@webmusic/score/play/headless';
+
+const player = new ScorePlayer(score);
+const transport = new PlayerController(player, score);
+const off = transport.on('transportchange', ({playing}) => paintPlaying(playing));
+transport.play(); // void; operational play failures arrive through 'error'
+
+off();
+transport.destroy();
+player.dispose();
+```
+
+The source contract is `PlayerController`, `ControllerEvents`,
+`ControllerEvent` and `PlayerTransportState` at
+`@webmusic/score/play/headless`. The constructor specifically takes a
+`ScorePlayer` (also exported as `Player`) and its `Score`. It borrows both
+and owns only event subscriptions and controller state. It creates no
+musical clock. All numeric seek/current/duration values below use the
+player's rate-scaled transport seconds; `currentPosition` is musical time.
+
+Use the controller as the UI's command path. Its `playing` and `rate` are
+controller state, not a general observer of calls made directly on the
+borrowed player. `playing` becomes true when `play()` requests startup,
+before asynchronous audio preparation completes.
+
+<details class="component-section">
+<summary>API</summary>
+
+**Construction** — `new PlayerController(player: ScorePlayer, score: Score)`;
+no options. `new MidiPlayerController(player, score)` is the same constructor.
+
+**Commands**
+
+| Member | Return / contract |
+| --- | --- |
+| `play()` | `void`; emits optimistic transport state, starts the player, and reports a failed start through `error`. |
+| `pause()` | `void`; clears controller playing state and pauses the player. |
+| `stop()` | `void`; pauses and seeks to zero unless a synchronous callback issues a newer play, pause, seek or destroy command. |
+| `seek(seconds)` · `scrub(deltaSeconds)` · `seekFraction(fraction)` | `void`; clamp/forward seeks in transport seconds or normalized fraction. Use the player directly when an awaitable seek is required. |
+| `setRate(rate)` | `void`; clamps finite values to `0.1…4` and applies that scale to the supplied score's initial BPM. Non-finite input throws `RangeError`; a failed tempo write restores the previous controller rate unless a newer rate command has already superseded it. |
+
+**State**
+
+| Member | Contract |
+| --- | --- |
+| `currentTime` · `duration` | Current and total transport seconds. |
+| `currentPosition` | Player's musical `TimePosition`. |
+| `progress` | Player's normalized position. |
+| `playing` | Controller's requested transport state, corrected on end or play failure. |
+| `rate` | Controller rate, initially `1`. |
+| `loaded` | Whether player duration is greater than zero; this does not mean samples have preloaded. |
+
+**Events — `on(name, callback)` returns an unsubscribe function**
+
+| Event | Payload |
+| --- | --- |
+| `cursor` | `TimePosition`. |
+| `noteOn` · `noteOff` | Score `Note`. |
+| `end` | Completed `Score`. |
+| `timeupdate` | The player's `PlayerTimeUpdate`, including explicit nominal/transport fields. |
+| `transportchange` | `PlayerTransportState`: `{playing: boolean}`. |
+| `error` | `unknown` operational play error. |
+| `listenerError` | Subscriber fault: `kind`, `source`, `event`, `mode`, `error`. |
+
+**Lifecycle**
+
+`destroy(): void` detaches subscriptions and clears listeners/controller
+playing state. It does not pause or dispose the borrowed player. Dispose or
+pause the player separately according to its owner; do not keep using a
+destroyed controller as an active view binding.
+
+</details>
+
+## Related
+
+- [ScorePlayer](/score/headless/play/score-player/) — owned clock, time fields and audio lifecycle.
+- [Web MIDI](/score/headless/play/interactive-player/#web-midi-input) — actual MIDI input binding.
+- [Rack](/score/headless/play/rack/) — ensemble transport controller.

@@ -1,0 +1,30 @@
+---
+import { getEntry, render } from 'astro:content';
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+
+// Share the maintained homepage rather than reversing its former permanent
+// redirect. Existing bookmarks must terminate in a document, not another 301.
+const home = await getEntry('docs', 'index');
+if (!home) throw new Error('The Introduction homepage is missing.');
+const { Content, headings } = await render(home);
+Astro.response.headers.set('Cache-Control', 'no-store');
+---
+
+<StarlightPage
+  frontmatter={{
+    title: home.data.title,
+    description: home.data.description,
+    tableOfContents: home.data.tableOfContents,
+    editUrl: false,
+    pagefind: false,
+    prev: false,
+    next: { label: 'Quick Start', link: '/quick-start/' },
+    head: [
+      ...home.data.head,
+      { tag: 'meta', attrs: { name: 'robots', content: 'noindex, follow' } },
+    ],
+  }}
+  headings={headings}
+>
+  <Content />
+</StarlightPage>

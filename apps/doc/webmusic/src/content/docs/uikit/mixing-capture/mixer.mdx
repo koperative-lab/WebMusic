@@ -1,0 +1,213 @@
+---
+title: '@webmusic/ui/mixer'
+description: 'Renders master and channel faders and routes level, mute, solo, and optional transport commands through a structural binding.'
+sidebar:
+  label: 'mixer'
+  order: 1
+---
+
+import UiPresenterLiveDemo from '../../../../components/UiPresenterLiveDemo.astro';
+import UiPresenterRelated from '../../../../components/UiPresenterRelated.astro';
+
+`mountMixer()` renders a master fader followed by caller-supplied channel strips. It paints
+`MixerState`, exposes mute and solo only when their binding commands exist, and adds Play, Pause,
+and Stop only for the corresponding optional commands.
+
+The board fits its container. The master remains beside a horizontally scrollable
+channel bank, with room around its controls for focus outlines. Channel names wrap
+instead of being truncated; unusually long words also wrap within the label. No
+viewport breakpoint, resize subscription or playback restart is involved.
+
+Use [meter](/uikit/mixing-capture/meter/) for read-only realtime levels or
+[recorder](/uikit/mixing-capture/recorder/) for capture workflow controls. The
+[`<rack-control>`](/score/element/play/rack-control/) element composes this presenter;
+mount it directly when the caller owns channel state or needs the strips inside another layout.
+
+<UiPresenterLiveDemo presenter="mixer" />
+
+## Import
+
+```ts
+import {mountMixer} from '@webmusic/ui/mixer';
+
+const handle = mountMixer(host, {
+  snapshot: () => store.mixer,
+  setMaster: (value) => engine.setMasterGain(value),
+  setChannel: (id, value) => engine.setChannelGain(id, value),
+  subscribe: (notify) => store.subscribe(notify),
+});
+```
+
+## Binding and command settlement
+
+The caller owns channel identity, order, values, and pressed state. A fader input or button calls
+the matching command; `subscribe()` or `handle.update()` then causes the presenter to pull a new
+authoritative snapshot. See the
+[shared presenter shape](/uikit/api/#the-shared-presenter-shape) for the common host,
+replacement, and cleanup contract.
+
+All level, mute, solo, and transport commands may return a promise. The presenter updates once
+that promise fulfills; a rejection goes to `onError`. A synchronous command that changes
+caller-owned state should therefore publish through `subscribe()` so other mounted consumers also
+repaint. Optional commands control structure as well as behavior: omitting all three transport
+commands removes the transport row, while omitting both `setMuted` and `setSolo` removes each
+channel's action row.
+
+<details class="component-section">
+<summary>API</summary>
+
+`mountMixer(host, binding, options?)` accepts an `HTMLElement` or `ShadowRoot` and returns a
+`MixerHandle`. Fader values are clamped to `0…1`; a non-finite value paints as `0`.
+
+**State**
+
+| Member | Kind | Description |
+|---|---|---|
+| `master` | `number` | Required normalized master value painted by the first fader. The master inherits `state.disabled`. |
+| `channels` | `readonly MixerChannel[]` | Required ordered channel records. Updates reuse surviving strips by id, preserving drag and focus state. |
+| `disabled?` | `boolean` | Strict `true` disables all faders, channel actions, and optional transport buttons. |
+
+Each `MixerChannel` has this shape:
+
+| Member | Kind | Description |
+|---|---|---|
+| `id` | `string` | Stable command identifier and the strip's `data-channel-id` value. |
+| `label` | `string` | Visible wrapping label, full `title`, and prefix for the fader and action accessible names. |
+| `value` | `number` | Normalized fader value and fill percentage. |
+| `disabled?` | `boolean` | Strict `true` disables this channel's fader and buttons; global disabled state also wins. |
+| `muted?` | `boolean` | Strict `true` paints the M button pressed when `setMuted` exists. |
+| `solo?` | `boolean` | Strict `true` paints the S button pressed when `setSolo` exists. |
+
+**Binding**
+
+| Member | Kind | Description |
+|---|---|---|
+| `snapshot()` | `() => MixerState` | Required pull port read on mount, notification, command fulfillment, and explicit `update()`. Errors are reported without replacing the last successful DOM. |
+| `setMaster(value)` | `(number) => void \| Promise<void>` | Required command receiving the master range's normalized value. |
+| `setChannel(id, value)` | `(string, number) => void \| Promise<void>` | Required command receiving a channel id and its normalized range value. |
+| `setMuted?(id, muted)` | `(string, boolean) => void \| Promise<void>` | Optional command. Its presence creates an M button on every non-master channel. |
+| `setSolo?(id)` | `(string \| null) => void \| Promise<void>` | Optional command. Pressing an unselected S sends the id; pressing the selected S sends `null`. |
+| `play?()` | `() => void \| Promise<void>` | Optional command whose presence creates the Play button. |
+| `pause?()` | `() => void \| Promise<void>` | Optional command whose presence creates the Pause button. |
+| `stop?()` | `() => void \| Promise<void>` | Optional command whose presence creates the Stop button. |
+| `subscribe?(notify)` | `(notify: () => void) => () => void` | Optional subscription. Its disposer is called during destroy or same-host replacement. |
+
+**Options**
+
+| Member | Kind | Default | Description |
+|---|---|---|---|
+| `classNames` | `MixerClassNames` | `{}` | Adds compatibility classes for `root`, `transport`, `board`, `channels`, `strip`, `master`, `fader`, `input`, `label`, `actions`, `button`, `mute`, `solo`, `play`, `pause`, and `stop`. `fader` and `input` both reach the one fader node. |
+| `parts` | `MixerParts` | `{}` | Adds tokens with the same keys beside the presenter's canonical part tokens. |
+| `onError` | `(error: unknown) => void` | — | Receives snapshot and command errors. Subscription registration/disposal and DOM cleanup errors escape to the caller. An exception thrown by this callback is not caught. |
+| `stylesheet` | `boolean` | `true` | Installs the presenter's stylesheet unless explicitly `false`, for a light-DOM host that cannot inject CSS into its page. |
+| `master` | `boolean` | `true` | Render the master strip; `false` leaves only the channel bank. |
+
+**Handle**
+
+| Member | Kind | Description |
+|---|---|---|
+| `element` | `HTMLElement` | Presenter-owned `.wui-mixer` root. |
+| `update()` | `() => void` | Re-reads state, repaints surviving controls and reconciles channel membership/order; becomes a no-op after destruction. |
+| `destroy()` | `() => void` | On its first call, marks the handle destroyed, calls the subscription disposer, then removes root and style; later calls are no-ops. A throwing disposer escapes before DOM removal. |
+
+**Accessibility.** Every fader is a vertical ARIA slider named `<channel label> volume`.
+Mute and solo are native buttons named `Mute <label>` and `Solo <label>` with `aria-pressed`;
+transport buttons are named Play, Pause, and Stop. Global and per-channel disabled state is
+reflected on the applicable controls. A nonempty channel bank is focusable and named
+`Mixer channels`, allowing native keyboard scrolling; an empty bank leaves the tab order.
+Labels retain their full value in `title`. The presenter does not create a live region or rewrite caller-owned nodes elsewhere in
+the host.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+Use the shared [surface and palette tokens](/uikit/#theme-with-css-custom-properties) for
+background (including `transparent`), foreground, accent, outer border and corner radius.
+Presenter-specific tokens below take precedence within their documented roles.
+
+The installed stylesheet resolves presenter-specific tokens through shared `--wm-*` tokens and
+then literals. The strip's own `--wm-mixer-*` values are handed to the shared fader's
+`--wm-fader-*`, which paints the track; `--wui-fader-fill` is the presenter-owned fill percentage
+written on the control, not a theme input. Mounts install `mixerStyle` unless
+`stylesheet: false`; callers opting out supply that stylesheet or their own layout
+and state styling. `destroy()` removes only the style node installed by that mount.
+
+**Tokens**
+
+| Property | Falls back to | Default | Controls |
+|---|---|---|---|
+| `--wm-mixer-height` | `--wm-control-size` → `--wui-row-h` | `2rem` | Minimum height of the mute and solo buttons. |
+| `--wm-mixer-padding` | literal | `.6rem` | Root-inset compatibility fallback. |
+| `--wm-mixer-border` | `--wm-border` | `#d8d8d8` | Root border and compatibility fallback for mixer buttons. |
+| `--wm-mixer-button-border` | `--wm-mixer-border` → `--wm-control-border` → `--wm-border` | `#d8d8d8` | Unpressed M, S, and transport button borders. |
+| `--wm-control-border` | `--wm-border` | `#d8d8d8` | Shared non-primary control border fallback. |
+| `--wm-border` | literal fallback | `#d8d8d8` | Shared mixer border fallback. |
+| `--wm-mixer-radius` | `--wm-control-radius` | `0` | Root and fader-track corners. |
+| `--wm-control-radius` | literal fallback | `0` | Shared radius fallback. |
+| `--wm-font-family` | `--wm-font` | `system-ui, sans-serif` | Root, label, and control font family; `--wm-font` remains a compatibility fallback. |
+| `--wm-mixer-text` | `--wm-foreground` | `#444` | Labels and unpressed button text. |
+| `--wm-foreground` | literal fallback | `#444` | Shared text fallback. |
+| `--wm-mixer-button` | `--wm-surface` | `#fff` | Unpressed M, S, and transport button background. |
+| `--wm-surface` | literal fallback | `#fff` | Shared button-surface fallback. |
+| `--wm-mixer-fill` | `--wm-accent` | `#999` fader / `#111` pressed button | Fader fill and pressed M / S button background. |
+| `--wm-mixer-active-text` | `--wm-accent-foreground` | `#fff` | Pressed M / S button text. |
+| `--wm-accent-foreground` | literal fallback | `#fff` | Shared active-text fallback. |
+| `--wm-mixer-fader-width` | literal fallback | `2rem` | Fader track width. |
+| `--wm-mixer-fader-height` | literal fallback | `96px` | Fader track height. |
+| `--wm-mixer-track-border` | `--wm-control-border` → `--wm-border` | `#d8d8d8` | Fader track outline. |
+| `--wm-mixer-track` | `--wm-surface-muted` | `#f3f3f3` | Fader track background behind the fill. |
+| `--wm-mixer-handle` | literal fallback | `0.7rem` | Fader handle height. |
+| `--wm-mixer-thumb` | `--wm-foreground` | `#111` | Fader handle color. |
+| `--wm-focus` | `--wm-foreground` | `#111` | Fader, action-button and channel-bank focus outlines. |
+
+Each strip's level control is the kit's shared fader — an ARIA slider drawn from a track, a fill
+and a handle rather than a native `<input type="range">`, because a native slider's handle is only
+reachable through `::-webkit-slider-thumb` and a light-DOM host cannot install that. The painted
+box and the range control it used to contain are now one node, so `fader` and `input` — both class
+and part — land on it together. Drive it in tests with pointer or keyboard events, not by writing
+`.value`.
+
+**Classes**
+
+`classNames` adds compatibility classes beside the canonical classes and the fixed legacy aliases;
+it never replaces either.
+
+| Node | Canonical class | Present when | `classNames` key |
+|---|---|---|---|
+| Root | `.wui-mixer` | Always; also `.mixer` | `root` |
+| Transport row | `.wui-mixer__transport` | Any transport command exists; also `.transport` | `transport` |
+| Board | `.wui-mixer__board` | Always; also `.board` | `board` |
+| Channel scroller | `.wui-mixer__channels` | Always; also `.strips` | `channels` |
+| Strip | `.wui-mixer__strip` | Master and every channel; also `.strip` | `strip` |
+| Master modifier | `.wui-mixer__master` | Master strip; also `.master` | `master` |
+| Fader | `.wui-mixer__fader .wui-mixer__input .wui-fader` | Every strip; also `.fader` | `fader` and `input` both land here |
+| Label | `.wui-mixer__label` | Every strip; also `.name` | `label` |
+| M / S row | `.wui-mixer__actions` | Either channel action exists; also `.btns` | `actions` |
+| Any button | `.wui-mixer__button` | M, S, Play, Pause, or Stop | `button` |
+| M / S button | `.mute` / `.solo` | Matching command exists | `mute` / `solo` |
+| Transport button | `.t-play` / `.t-pause` / `.t-stop` | Matching command exists | `play` / `pause` / `stop` |
+
+**Parts**
+
+`parts` appends tokens to these canonical values and removes duplicates.
+
+| Node | Canonical part | Present when | `parts` key |
+|---|---|---|---|
+| Root | `root` | Always | `root` |
+| Transport row | `transport` | Any transport command exists | `transport` |
+| Board | `board` | Always | `board` |
+| Channel scroller | `channels` | Always | `channels` |
+| Master strip | `strip master` | `master !== false` | `strip`, `master` |
+| Channel strip | `strip channel` | Per channel | `strip` (`channel` is canonical-only) |
+| Fader box | `fader` | Every strip | `fader` |
+| Fader | `fader input` | Every strip | `fader` and `input` both land here |
+| Label | `label` | Every strip | `label` |
+| Action row | `actions` | Either channel action exists | `actions` |
+| M / S button | `button mute` / `button solo` | Matching command exists | `button`, `mute` / `solo` |
+| Transport button | `button play` / `button pause` / `button stop` | Matching command exists | `button`, matching action |
+
+</details>
+
+<UiPresenterRelated presenter="mixer" />

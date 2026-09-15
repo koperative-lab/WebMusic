@@ -1,0 +1,358 @@
+---
+title: 'InteractivePlayer'
+description: 'The pull engine: notes sound as you send them, so a keyboard or a sequencer drives the timing.'
+sidebar:
+  order: 2
+---
+
+import ProgrammaticInteractivePlayerDemo from '../../../../../components/programmatic/ProgrammaticInteractivePlayerDemo.astro';
+
+`InteractivePlayer` owns **no musical clock** — it sounds only when *you* feed it a signal. Each `advance()` pulls and plays the next beat's notes, so a gesture, metronome, scroll, or `requestAnimationFrame` drives playback. It supports many voices and sources; source selection is synchronous and the next driven beat uses the selected source.
+
+Its trigger methods intentionally stay synchronous. Call
+`await player.preload()` before the first driven note: it resumes a suspended
+AudioContext and prepares SFZ, sample, or SoundFont voices. A synchronous
+trigger fails closed while the context is still suspended instead of queuing a
+note that could sound after an unrelated later resume.
+Supplied voices are borrowed by default; `synthOwnership: 'owned'` transfers
+their disposal to the player.
+
+Optional [clock input](#clock-input) and [Web MIDI input](#web-midi-input)
+helpers are documented below with the engine they drive.
+
+
+<ProgrammaticInteractivePlayerDemo />
+
+## Import
+
+```ts
+import {InteractivePlayer, Sound} from '@webmusic/score/play/headless';
+
+const player = new InteractivePlayer();
+player.addVoice('piano', Sound.oscillator(), {synthOwnership: 'owned'});
+player.addSource('piece', score, {route: () => 'piano'});
+await player.preload(); // resume and prepare audio from a user gesture
+player.advance({secondsPerBeat: 0.5});
+
+// Stop the caller's input/clock bindings before teardown.
+player.dispose();
+```
+
+The source contract is `InteractivePlayer`, `InteractivePlayerOptions`,
+`AddVoiceOptions`, `AddSourceOptions`, `AdvanceOptions`, `BeatNote`,
+`NoteInput`, `VoiceResolver`, `SourceRoute` and `InteractivePlayerEvents` at
+`@webmusic/score/play/headless`. The [Play API](/score/api/play/) covers
+stateless recording and score conversion.
+
+## Time and resource roles
+
+Sources borrow immutable scores and index them on a written beat grid.
+`beatUnitQuarters` chooses that grid; `secondsPerBeat` from a host controls
+the performed duration of a driven beat. A `BeatNote` retains both written
+`durationBeats`/`onsetInBeat` and effective `durationSeconds`, including
+performed timing and merged ties. The player does not advance from elapsed
+time by itself. Audio attacks use the context clock plus `lookaheadSeconds`.
+Automatic releases also wait for that audio clock; suspension does not consume
+a note's gate. Explicit releases remain immediate. Each occurrence owns its
+release, so a note started inside release feedback keeps its own timer.
+
+The player owns its graph, voice routes, source indexes and recording state.
+An injected context or destination is borrowed; supplying both requires
+matching context identities. Without either, it creates and closes its own
+context. Each supplied voice synth is borrowed unless its `AddVoiceOptions`
+transfer ownership. A borrowed synth receives only its returned route cleanup
+on removal/disposal, not a global disconnect or disposal.
+
+<details class="component-section">
+<summary>API</summary>
+
+**Construction and options**
+
+| Member | Default / return | Contract |
+| --- | --- | --- |
+| `new InteractivePlayer(options?)` · `createInteractivePlayer(options?)` | `InteractivePlayer` | Constructs without starting a clock. |
+| `InteractivePlayer.fromUrls(sources, options?)` | `Promise<InteractivePlayer>` | Loads a record of named score URLs; registers them in key order with the first active. Add voices before playing. |
+| `audioContext` · `destination` | Internally created context / its destination | Borrowed graph context and output route. |
+| `effect` · `reverb` | Dry output | Explicit effect wins over legacy reverb settings; see [Effect](/score/headless/play/effect/). |
+| `lookaheadSeconds` | `0.03` | Offset from context time for a triggered attack. |
+| `masterVolume` | `1` | Initial linear master gain. |
+| `resolveVoice(note, sourceId)` | None | `VoiceResolver` chooses a voice id or returns `undefined`. |
+| `defaultVoice` | First registered voice | Fallback voice id when no note/source/resolver route applies. |
+| `AddVoiceOptions.volume` · `muted` | `1` / `false` | Initial per-voice mix. |
+| `AddVoiceOptions.effect` · `synthOwnership` | Dry / `'borrowed'` | Per-voice processing and optional `'owned'` backend teardown. |
+| `AddSourceOptions.beatUnitQuarters` | `1` | Quarter notes per driven beat. |
+| `AddSourceOptions.route` | None | `SourceRoute`: part-name to voice-id record, or `(partName) => voiceId \| undefined`. |
+
+**Source and voice commands**
+
+| Member | Return / contract |
+| --- | --- |
+| `addVoice(id, synth, options?)` · `removeVoice(id)` | `this`; register or remove a voice and its route. |
+| `hasVoice(id)` · `listVoices()` | `boolean` / `string[]`. |
+| `setVoiceVolume(id, volume)` · `muteVoice(id, muted = true)` · `soloVoice(id, solo = true)` | `this`; change per-voice mix. |
+| `setMasterVolume(volume)` · `setMix(record)` | `this`; master gain or a record of voice gains. |
+| `addSource(id, score, options?)` · `removeSource(id)` | `this`; register or remove indexed score material. |
+| `addSourceFromUrl(id, url, options?)` | `Promise<this>`; source options additionally accept `format`. |
+| `listSources()` | Registered source ids. |
+| `select(id, {carry?}?)` | `this`; carries proportional cursor position by default; `carry: false` rewinds the selected source. |
+| `seekBeat(beat)` · `rewind()` | `this`; wrap a beat index within the source, or reset to beat zero. |
+| `peek()` | `BeatNote[]` for the next beat without sounding it. |
+
+A same-id `addSource()` replaces the indexed material and resets that source's
+cursor to zero. If it was selected, the replacement stays selected.
+For one id, a newer URL load, synchronous replacement or removal invalidates
+and aborts the previous request. Superseded loads may resolve without installing
+anything; current failures reject. Loads for different ids remain independent.
+Removing the selected source selects the first remaining registration, if any.
+
+**Playback and recording commands**
+
+| Member | Return / contract |
+| --- | --- |
+| `preload()` | `Promise<void>`; resumes audio and awaits voice readiness. |
+| `advance({secondsPerBeat?}?)` | `BeatNote[]`; sounds the current beat and advances, wrapping at the end. |
+| `advanceHold()` | `BeatNote[]`; advances with a sustained gate; call `allNotesOff()` to release it. |
+| `playBeat(beat, {secondsPerBeat?, moveCursor?}?)` | `BeatNote[]`; plays a wrapped beat index; moves the cursor after that beat unless `moveCursor: false`. |
+| `play(notes)` | `this`; sounds a `NoteInput[]` independently of score sources. |
+| `noteOn(voice, midi, velocity = 100, durationSeconds = 0.3)` | `this`; one directly triggered note. |
+| `noteOff(voice, midi)` · `allNotesOff()` | `this`; release a voice/pitch or every active note. |
+| `record()` | `this`; starts a new take of notes this engine fires. |
+| `stopRecording(options?)` | `Score`; ends that take. Options are `bpm` (120), `ppq` (480), `quantizeGrid` (fraction of a quarter; absent means unsnapped), and `title` (`'Recording'`). |
+
+`NoteInput` requires `midi`; optional `velocity` defaults to `100`,
+`durationSeconds` to `0.3`, `timeOffsetSeconds` to `0`, and `voice` to the
+configured fallback. `BeatNote` supplies `midi`, `velocity`, `durationBeats`,
+`durationSeconds`, `onsetInBeat`, `part`, and optional `voice`.
+
+**State**
+
+| Member | Contract |
+| --- | --- |
+| `context` | Lazy AudioContext getter; may construct the graph. |
+| `activeSourceId` | Selected source id or `undefined`. |
+| `position` | `{beat, total, progress}` on the selected written beat grid. |
+| `isRecording` | Whether the engine's performance recorder is armed. |
+
+**Events — `on(name, listener)` returns an unsubscribe function**
+
+| Event | Payload |
+| --- | --- |
+| `beat` | `{source, beat, total, notes: BeatNote[]}`. |
+| `sourceChange` | `{source, beat, total}`. |
+| `wrap` | `{source}` after `advance()` / `advanceHold()` wraps. |
+| `noteOn` | `{voice, midi, velocity, time}`; `time` is AudioContext seconds. |
+| `noteOff` | `{voice, midi, time}`. |
+| `operationError` | Contained operation failure: `kind`, `source`, `operation`, `error`. |
+| `listenerError` | Subscriber failure: `kind`, `source`, `event`, `mode`, `error`. |
+
+**Lifecycle**
+
+`dispose(): void` is idempotent. It aborts outstanding instance URL loads,
+releases voices/routes and owned resources, and clears source/recording state.
+The caller owns external MIDI, clock, DOM and framework subscriptions; unbind
+those before disposing. There is no built-in `play()` transport toggle,
+`pause()`, `stop()` or advancing timer: `play(notes)` is a note command.
+
+### ScoreRecorderSession
+
+`ScoreRecorderSession` is the capture direction: live note events in — from
+[`<note-input>`](/score/element/play/note-input/), a MIDI device, this very
+player — and the recorded notes back out when you finish.
+`recordedNotesToScore()` is the second half, turning that flat list into a
+real `Score`. It is the model behind
+[`<score-recorder>`](/score/element/play/note-input/#score-recorder).
+
+It owns no audio and no clock: you tell it when a note goes on or off, and it
+timestamps with the clock you gave the constructor — `recorderNow()`, a
+monotonic seconds source, by default. Passing your own clock is what makes a
+session testable, and what lets a recording share a timebase with a player
+instead of drifting against it.
+
+Same-pitch presses are queued: each release completes the earliest unmatched
+attack, preserving its original onset and velocity. Durations have a minimum
+of 0.02 seconds. `finish()` returns only completed notes and drops unmatched
+presses. When changing an input source during a take, call `discardPending()`
+to drop those presses while retaining completed notes and the original start
+time; the session remains armed.
+
+Notation conversion preserves each note's performed seconds and velocity,
+while `bpm` and `quantize` determine its notated quarters. Each distinct voice
+gets a separate part, including an unnamed voice alongside a voice named
+`part`; fallback identifiers cannot merge those voices.
+
+```ts
+import {ScoreRecorderSession, recordedNotesToScore} from '@webmusic/score/play/headless';
+
+const session = new ScoreRecorderSession();
+session.start();
+
+session.capture(60, 100, true);  // press
+session.capture(60, 0, false);   // release completes the recorded note
+
+const notes = session.finish();
+const score = notes ? recordedNotesToScore(notes, {bpm: 100, quantize: 0.25}) : undefined;
+```
+
+
+**Construction** — `new ScoreRecorderSession(clock?)`; `clock` defaults to
+`recorderNow`.
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `start()` | command | Begins a take, discarding any previous one. |
+| `capture(midi, velocity, on)` | command | Queues a press or completes the earliest unmatched press of that pitch; returns whether it completed a recorded note. |
+| `discardPending()` | command | Discards unmatched presses without changing completed notes, the recording start time or active state. |
+| `finish()` | command | Ends the take, drops unmatched presses, and returns completed `RecordedNote[]`, or `null` when the session was not armed. |
+| `cancel()` | command | Ends it and discards. |
+| `active` · `noteCount` | state | Whether a take is running, and the notes captured so far. |
+| `recordedNotesToScore(notes, {bpm, quantize, title?})` | helper | Assembles captured notes into a `Score`; `quantize` is a fraction of a quarter (`0.25` means sixteenths, `0` disables snapping). Returns `undefined` for an empty list. |
+| `recorderNow()` | helper | The default monotonic seconds clock, SSR-safe. |
+| `SCORE_RECORDER_VOICE` | constant | The voice id captured notes are written to (`'rec'`). |
+
+
+The recorder retains one press per MIDI pitch: another press of the same
+pitch replaces its pending onset. A completed note stores `midi`, `velocity`,
+`voice`, `onsetSec` and `durationSec`; release duration has a 0.02-second
+minimum. `noteCount` counts completed notes, not currently held presses.
+`ScoreRecorderNotationOptions` requires `bpm` and `quantize`; `title`
+defaults to `'Recording'`. `ScoreRecorderRecordedDetail` is the element's
+`{score: Score}` payload type, not an event emitter on this session.
+There is no subscription, audio resource or `dispose()` method on the
+session; cancel unfinished takes and detach the caller's input listeners.
+
+### Clock input
+
+The `bindClock` helper advances an `InteractivePlayer` one written beat at a time. It borrows the player and owns its tick source until cleanup.
+
+#### Clock input Import
+
+```ts
+import {bindClock, InteractivePlayer, Sound} from '@webmusic/score/play/headless';
+
+const player = new InteractivePlayer();
+player.addVoice('main', Sound.oscillator(), {synthOwnership: 'owned'});
+player.addSource('piece', score);
+await player.preload();
+const unbind = bindClock(player, {bpm: 100}); // starts immediately
+
+unbind(); // stop external beats first
+player.dispose();
+```
+
+The source contract is `bindClock(player: InteractivePlayer, options?:
+ClockOptions): () => void`. It borrows the player and owns a
+`Metronome`/tick source until cleanup. The tick callback supplies
+`secondsPerBeat = 60 / bpm` to `player.advance()`. It neither creates a
+player nor prepares/resumes audio on its behalf.
+
+
+**Input and options**
+
+| Member | Default / contract |
+| --- | --- |
+| `player` | Required borrowed `InteractivePlayer`, ready for synchronous `advance()`. |
+| `ClockOptions.bpm` | `120`; finite beats per minute, effective minimum `1`. |
+| `ClockOptions.createTickSource(intervalMs)` | Kernel tick-source factory, worker-backed where available. The returned source is owned by this binding. |
+
+**Lifecycle and notifications**
+
+`bindClock()` starts immediately and returns an idempotent unbind function
+that stops and disposes its metronome's current tick source. It does not
+dispose the player or release already sounding notes. Call
+`player.allNotesOff()` if stopping the binding must silence them immediately.
+There is no binding state getter or event emitter; observe
+`player.on('beat', ...)`. Use `Metronome` directly if a caller needs live
+`setBpm()` or reusable start/stop control.
+
+
+### Web MIDI input
+
+`bindMidiInput` turns MIDI note-on or clock messages into
+`InteractivePlayer.advance()` calls. In its default mode, a keyboard press
+plays the next beat of the selected score, regardless of the pressed pitch.
+An `onNote` callback can replace that action with a custom response.
+
+`MidiPlayerController` is an alias of
+[`PlayerController`](/score/headless/play/player-controller/). It wraps a
+`ScorePlayer`; its name does not mean it requests MIDI access, subscribes to
+MIDI transport messages, or sends MIDI output. For output timbres, use
+[`Sound.midiOut()`](/score/headless/play/sound/).
+
+#### MIDI input Import
+
+```ts
+import {bindMidiInput, InteractivePlayer, Sound} from '@webmusic/score/play/headless';
+
+const player = new InteractivePlayer();
+player.addVoice('main', Sound.oscillator(), {synthOwnership: 'owned'});
+player.addSource('piece', score);
+await player.preload();
+const access = await navigator.requestMIDIAccess();
+const input = [...access.inputs.values()][0];
+if (!input) throw new Error('Connect a MIDI input first.');
+const unbind = bindMidiInput(player, {input});
+
+unbind();
+player.dispose();
+```
+
+The source contract is `bindMidiInput`, `MidiInputOptions` and
+`MidiInputLike` at `@webmusic/score/play/headless`. The helper borrows both
+the player and device. It owns no clock; incoming messages drive beats.
+Prepare the player's audio separately, from a user gesture, before allowing
+input. Automatic device lookup has no readiness/error event; request access
+yourself and pass `input` when the UI must report permission or device errors.
+
+
+**Input and options — `bindMidiInput(player, options?): () => void`**
+
+| Member | Default / contract |
+| --- | --- |
+| `player` | Required borrowed `InteractivePlayer`. |
+| `input` | Requests the first available MIDI input when omitted. An explicit `MidiInputLike` also supports injected/test inputs. |
+| `mode` | `'note'`; accepts `'clock'`. |
+| `pulsesPerBeat` | `24`; in clock mode each group of this many `0xF8` pulses calls `advance()`. Supply a positive count. |
+| `onNote(midi, velocity)` | Optional callback in note mode; replaces the default `advance()` call. |
+
+`MidiInputLike` requires an assignable `onmidimessage` callback property (or
+`null`), with an event `{data: Uint8Array | number[]}`. Binding replaces
+that property's previous callback; it is not a multiplexing subscription.
+
+**Message behavior**
+
+| Mode / message | Action |
+| --- | --- |
+| `'note'`: channel note-on `0x90…0x9F` with velocity greater than zero | Call `onNote(midi, velocity)` if supplied, otherwise advance one score beat. |
+| `'note'`: note-off or zero-velocity note-on | Ignored; this helper does not pair held notes. |
+| `'clock'`: `0xF8` | Count pulses and advance at `pulsesPerBeat`. |
+| `'clock'`: start `0xFA` or stop `0xFC` | Reset the pulse counter only. No automatic player play/pause command. |
+
+**Lifecycle**
+
+The returned unbind function is idempotent. It disables retained callbacks and restores the
+previous `onmidimessage` handler only while this binding still owns that property. A newer
+application handler remains intact. Cleanup also prevents a pending automatic device request
+from attaching a listener. It does not close the device or dispose/silence the player.
+
+There are no helper state getters or emitted events. Without Web MIDI and
+without an explicit input, the helper warns and returns a harmless cleanup;
+automatic access rejection is swallowed. `MidiPlayerController` has the
+construction, commands, state, events and `destroy()` lifecycle documented
+on the [PlayerController page](/score/headless/play/player-controller/).
+
+
+#### MIDI input Related
+
+- [InteractivePlayer](/score/headless/play/interactive-player/) — note commands and source beats.
+- [PlayerController](/score/headless/play/player-controller/) — the exact `MidiPlayerController` alias contract.
+- [Sound](/score/headless/play/sound/) — MIDI output backend.
+- [Live trackers](/score/headless/analyze/live-trackers/) — analyze actual MIDI pitches from custom input handling.
+
+</details>
+
+## Related
+
+- [ScorePlayer](/score/headless/play/score-player/) — autonomous score scheduling.
+- [Transport drivers](/score/headless/play/interactive-player/#clock-input) and [Web MIDI](/score/headless/play/interactive-player/#web-midi-input) — external beat sources.
+- [Note input and recorder elements](/score/element/play/note-input/) — browser composition.
+- [Sound](/score/headless/play/sound/) — voice recipes and ownership.

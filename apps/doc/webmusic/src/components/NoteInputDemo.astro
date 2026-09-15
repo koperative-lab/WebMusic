@@ -1,0 +1,164 @@
+---
+// One real <note-input> demonstrates every surface. The public `layout`
+// parameter switches that same element between piano, grid, and chords; the
+// preloaded map keeps the grid playable when readers switch to it.
+//
+// <score-recorder> is an optional sibling rather than a hidden wrapper. Its
+// public `.source` property attaches it to the input without taking over the
+// `.onNote` callback that makes this demo audible.
+import {DEFAULT_TR808_GRID_MAP} from '@webmusic/score/play/element';
+import ElementPlayground from './ElementPlayground.astro';
+import ParamRows from './ParamRows.astro';
+---
+
+<ElementPlayground
+  tag="note-input"
+  target="[data-ni-input]"
+  markup="[data-ni-composition]"
+  class="ni-demo"
+  omit={['row-interval']}
+>
+  <div class="ni-demo__composition" data-ni-composition data-pg-fragment>
+    <note-input
+      data-ni-input
+      data-ni-wire
+      layout="piano"
+      start="48"
+      end="71"
+      map={DEFAULT_TR808_GRID_MAP}
+    ></note-input>
+  </div>
+
+  <section
+    class="wm-pg__collection ni-demo__mounted"
+    slot="controls"
+    data-ni-recorder-editor
+    aria-label="Mounted components"
+  >
+    <div class="wm-pg__collection-header">
+      <div class="wm-pg__collection-heading">
+        <span class="wm-pg__collection-title">Mounted components</span>
+        <span class="wm-pg__collection-count" data-ni-recorder-count>0 mounted</span>
+      </div>
+      <button class="wui-btn" type="button" data-ni-recorder-add>
+        + Mount recorder
+      </button>
+    </div>
+
+    <p class="wm-pg__collection-help">
+      Attach a <code>&lt;score-recorder&gt;</code> to this input, then configure and use it
+      directly in the live canvas.
+    </p>
+
+    <div class="wm-pg__collection-list" data-ni-recorder-list></div>
+    <p class="wm-pg__collection-empty" data-ni-recorder-empty>
+      No recorder mounted — notes play directly from the selected surface.
+    </p>
+    <p
+      class="wm-pg__collection-status"
+      data-ni-recorder-status
+      aria-live="polite"
+      aria-atomic="true"
+    ></p>
+
+    <template data-ni-recorder-template>
+      <details class="wm-pg__collection-item" data-ni-recorder-card open>
+        <summary class="wm-pg__collection-summary" data-ni-recorder-summary>
+          <code>&lt;score-recorder&gt;</code>
+          <strong>Recorder</strong>
+          <span data-ni-recorder-summary-meta>120 BPM · quantize 0.25</span>
+        </summary>
+        <p class="wm-pg__effect-description">
+          Captures note events from this input, then replays or exports the completed take.
+        </p>
+        <div class="wm-pg__collection-fields">
+          <ParamRows tag="score-recorder" scope="[data-ni-recorder]" />
+        </div>
+        <div class="wm-pg__collection-item-actions">
+          <button
+            class="wui-btn"
+            data-variant="ghost"
+            type="button"
+            data-ni-recorder-remove
+          >
+            Unmount recorder
+          </button>
+        </div>
+      </details>
+    </template>
+  </section>
+
+  <div class="wm-pg__code-extra" slot="setup" data-ni-recorder-code-block hidden>
+    <span class="wm-pg__code-label">JavaScript setup</span>
+    <pre class="wm-pg__markup" data-ni-recorder-code data-pg-copy-source></pre>
+  </div>
+</ElementPlayground>
+
+<script>
+  import {defineNoteInputElement, defineScoreRecorderElement} from '@webmusic/score/play/element';
+  import {InteractivePlayer, Sound} from '@webmusic/score/play/headless';
+  import {mountNoteInputPlaygrounds} from './note-input-playground-client';
+  import {mountDemos} from './demo-lifecycle';
+
+  defineNoteInputElement();
+  defineScoreRecorderElement();
+
+  type Layout = 'piano' | 'grid' | 'chords';
+  type Surface = HTMLElement & {
+    layout: Layout;
+    onNote?: (midi: number, velocity: number, on: boolean) => void;
+  };
+
+  mountDemos('note-input[data-ni-wire]', (node, scope) => {
+    const input = node as Surface;
+
+    const player = new InteractivePlayer();
+    player.addVoice(
+      'piano',
+      Sound.oscillator({type: 'triangle', gain: 0.2, releaseSeconds: 0.05}),
+    );
+    player.addVoice(
+      'grid',
+      Sound.oscillator({type: 'square', gain: 0.1, releaseSeconds: 0.04}),
+    );
+    player.addVoice(
+      'chords',
+      Sound.oscillator({type: 'sine', gain: 0.14, releaseSeconds: 0.08}),
+    );
+
+    // A layout change releases held notes after the new attribute is visible.
+    // Remember their original voice so those releases reach the route that
+    // actually started each note.
+    const heldVoices = new Map<number, {voice: Layout; press: symbol}>();
+    scope.add(() => {
+      input.onNote = undefined;
+      heldVoices.clear();
+      player.dispose();
+    });
+    input.onNote = (midi, velocity, on) => {
+      if (on) {
+        const voice = input.layout;
+        const press = Symbol();
+        heldVoices.set(midi, {voice, press});
+        scope.run(player.preload().then(() => {
+          if (scope.active && heldVoices.get(midi)?.press === press) player.noteOn(voice, midi, velocity, 3600);
+        }));
+        return;
+      }
+      const voice = heldVoices.get(midi)?.voice ?? input.layout;
+      heldVoices.delete(midi);
+      player.noteOff(voice, midi);
+    };
+  });
+
+  mountNoteInputPlaygrounds();
+</script>
+
+<style>
+  .ni-demo :global(.ni-demo__composition) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.5rem;
+    min-width: 0;
+  }
+</style>

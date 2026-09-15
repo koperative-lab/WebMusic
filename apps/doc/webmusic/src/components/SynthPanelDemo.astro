@@ -1,0 +1,66 @@
+---
+// One live composition exposes every synth-panel section and the property
+// graph that feeds it. Attribute controls still come from ElementPlayground;
+// JavaScript-only configuration is handled by the structured editors below.
+import EffectChainEditor from './EffectChainEditor.astro';
+import ElementPlayground from './ElementPlayground.astro';
+import SynthPanelPropertyEditor from './SynthPanelPropertyEditor.astro';
+---
+
+<ElementPlayground
+  tag="synth-panel"
+  target="[data-syp]"
+  markup="[data-syp-composition]"
+  class="syp-demo"
+  companions={[{tag: 'note-input', target: '[data-syp-input]'}]}
+>
+  <div class="syp-demo__composition" data-syp-composition data-pg-fragment>
+    <note-input data-syp-input layout="piano" start="48" end="71"></note-input>
+    <synth-panel
+      data-syp
+      sections="sound,envelope"
+    ></synth-panel>
+  </div>
+
+  <SynthPanelPropertyEditor slot="controls" />
+
+  <EffectChainEditor
+    slot="controls"
+    assignment="effects"
+    initial={['reverb']}
+    target="[data-syp]"
+    setupSelector="synth-panel"
+    setupIdentifier="synthPanelEffects"
+  />
+
+  <div class="wm-pg__code-extra" slot="setup" data-syp-code-block>
+    <span class="wm-pg__code-label">JavaScript property setup</span>
+    <pre class="wm-pg__markup" data-syp-code data-pg-copy-source></pre>
+  </div>
+
+  <div class="wm-pg__code-extra" slot="setup" data-fx-code-block hidden>
+    <span class="wm-pg__code-label">Effect setup</span>
+    <pre class="wm-pg__markup" data-fx-code data-pg-copy-source></pre>
+  </div>
+</ElementPlayground>
+
+<script>
+  import {defineNoteInputElement, defineSynthPanelElement} from '@webmusic/score/play/element';
+  import {mountEffectChainEditors} from './effect-chain-editor-client';
+  import {mountSynthPanelPlaygrounds} from './synth-panel-playground-client';
+
+  defineNoteInputElement();
+  defineSynthPanelElement();
+  mountSynthPanelPlaygrounds();
+  mountEffectChainEditors();
+</script>
+
+<style>
+  .syp-demo :global(.syp-demo__composition) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.5rem;
+    min-width: 0;
+  }
+
+</style>

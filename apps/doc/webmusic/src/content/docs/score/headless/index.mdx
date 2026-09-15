@@ -1,0 +1,193 @@
+---
+title: Score Headless
+description: Code-only Score engines, state models and helpers — the purpose of each /headless entry and the reference page that owns every exported value.
+sidebar:
+  hidden: true
+---
+
+Headless components are the code-only domain objects behind the elements:
+engines, sessions, controllers and their supporting helpers imported from
+`@webmusic/score/<capability>/headless`. They never touch the DOM.
+
+| Capability | Contents |
+| --- | --- |
+| [Play](#play) | `ScorePlayer`, `TonePlayer`, controllers, rack, tempo. |
+| [Analyze](#analyze) | Analysis sessions, playback followers, live trackers, workers and presentation prediction. |
+| [View](#view) | Score windows, map navigation, current-pitch views and held-note tracking. |
+
+Use these objects when your application owns the interaction or presentation
+layer. The references document inputs, commands, state, event payloads and
+resource/time roles; pure helpers describe their inputs and results instead
+of inventing a lifecycle. Combine them with [UI Kit](/uikit/) presenters or a
+custom surface. Rendering adapters are separate from Headless objects and
+are documented on the capability API pages.
+
+The export tables below route every exported value to its owning reference
+page. `check:docs` checks that each exported value name occurs in backticks on
+this page or on a page in the capability's directory; it does not verify the
+linked page's signatures, type coverage, unique reference ownership or
+completeness. Those require source review.
+
+## Play
+
+The **Headless Components** of [`@webmusic/score/play`](/score/api/play/) —
+the stateful engines you `new` up and drive yourself, with no DOM and no
+custom elements. Some pages include a real interactive demo; others describe
+helpers or optional integrations. In your own app you bring your own UI, or
+none. Each reference separates API details from its example.
+
+Import from `@webmusic/score/play/headless`. The stateless half of the
+capability — SFZ parsing, offline WAV render, recording back into a `Score` —
+is on [`@webmusic/score/play`](/score/api/play/).
+
+**Engines**
+
+| Export | Kind | Page |
+| --- | --- | --- |
+| `ScorePlayer` · `Player` · `createScorePlayer` · `createScorePlayerFromUrl` · `playScore` · `playScoreFromUrl` | class · alias · factories | [ScorePlayer](/score/headless/play/score-player/) |
+| `InteractivePlayer` · `createInteractivePlayer` | class · factory | [InteractivePlayer](/score/headless/play/interactive-player/) |
+| `LoopPlayer` · `createLoopPlayer` | class · factory | [LoopPlayer](/score/headless/play/loop-player/) |
+| `AbPlayer` · `createAbPlayer` | class · factory | [AbPlayer](/score/headless/play/ab-player/) |
+| `TonePlayer` | class | [Tone.js](/score/headless/play/score-player/#toneplayer) |
+| `Metronome` | class | [Metronome](/score/headless/play/metronome/) |
+
+**Timbres and synths**
+
+| Export | Kind | Page |
+| --- | --- | --- |
+| `Sound` | recipe factories · class instances | [Sound](/score/headless/play/sound/) |
+| `OscillatorSynth` · `createOscillatorSynth` | class · factory | [Synth backends](/score/headless/play/sound/#synth-backends) |
+| `SoundfontSynth` · `createSoundfontSynth` | class · factory | [Synth backends](/score/headless/play/sound/#synth-backends) |
+| `SpessaSynthSynth` | class | [Synth backends](/score/headless/play/sound/#synth-backends) — the optional SF2 peer |
+| `RangeSampler` · `chooseZone` · `playbackRateFor` | sampler helpers | [Synth backends](/score/headless/play/sound/#synth-backends) |
+
+**Effects**
+
+| Export | Kind | Page |
+| --- | --- | --- |
+| `Effect` · `insertEffect` · `resolveEffect` | namespace · helpers | [Effect](/score/headless/play/effect/) |
+| `createReverbNode` | factory | [Effect](/score/headless/play/effect/) |
+
+**Ensembles**
+
+| Export | Kind | Page |
+| --- | --- | --- |
+| `Rack` · `createRack` | class · factory | [Rack](/score/headless/play/rack/) |
+| `RackTransportController` · `createRackTransportController` | class · factory | [Rack](/score/headless/play/rack/) |
+| `SynthPanelAudioGraph` | class | [Synth backends](/score/headless/play/sound/#synth-backends) — the graph `<synth-panel>` owns |
+
+**Controllers**
+
+| Export | Kind | Page |
+| --- | --- | --- |
+| `PlayerController` | class | [PlayerController](/score/headless/play/player-controller/) |
+| `MidiPlayerController` | `PlayerController` alias | [PlayerController](/score/headless/play/player-controller/) — [MIDI binding distinction](/score/headless/play/interactive-player/#web-midi-input) |
+| `TempoController` · `appendTap` · `tapBpm` · `TAP_WINDOW` · `TAP_RESET_GAP` | class · tap helpers | [Metronome](/score/headless/play/metronome/) |
+| `LfoController` · `createLfoController` · `lfoWave` · `LFO_SHAPES` | class · factory · helpers | [Synth backends](/score/headless/play/sound/#synth-backends) |
+| `EqController` · `createEqController` | class · factory | [Effect](/score/headless/play/effect/) |
+| `eqFrequencyToX` · `eqXToFrequency` · `eqGainToY` · `eqYToGain` | curve maths | [Effect](/score/headless/play/effect/) |
+| `DEFAULT_EQ_BANDS` · `EQ_MIN_FREQUENCY` · `EQ_MAX_FREQUENCY` · `EQ_MAX_GAIN` · `EQ_RESPONSE_SAMPLES` | constants | [Effect](/score/headless/play/effect/) |
+| `LevelMeterController` · `createLevelMeterController` | class · factory | [Synth backends](/score/headless/play/sound/#synth-backends) — the score-side meter over the kernel tap |
+
+**Recording and rendering**
+
+| Export | Kind | Page |
+| --- | --- | --- |
+| `ScoreRecorderSession` · `recordedNotesToScore` · `recorderNow` · `SCORE_RECORDER_VOICE` | session · helpers | [InteractivePlayer](/score/headless/play/interactive-player/) — capture back into a `Score` |
+| `renderScoreToBuffer` · `renderScoreToWav` · `bufferToWav` | offline render | [ScorePlayer](/score/headless/play/score-player/) |
+
+**Input drivers**
+
+| Export | Kind | Page |
+| --- | --- | --- |
+| `bindClock` | driver | [Transport drivers](/score/headless/play/interactive-player/#clock-input) |
+| `bindMidiInput` | driver | [Web MIDI](/score/headless/play/interactive-player/#web-midi-input) |
+
+Option, event, state and structural interface types belong with their object
+or helper. Examples include `ScorePlayerOptions`, `PlayerTimeUpdate`,
+`RenderOptions`, `InteractivePlayerEvents`, `HeadlessSynth`,
+`TonePlayerOptions` and `TonePlayerEvents`. Use the linked references for
+their fields and ownership rules; a value-name coverage check is not a type
+reference audit.
+
+## Analyze
+
+`@webmusic/score/analyze/headless` contains analysis objects: a session with
+caches that survive edits, a playback follower, a worker client, and trackers
+that accumulate notes. It also exports the pure `createScoreReport` presentation helper.
+The capability root provides the stateless analytical functions.
+
+No DOM, no styles, no rendering. Import from
+`@webmusic/score/analyze/headless`; the elements that draw these results are
+under [Web Components › Analyze](/score/element/#analyze).
+
+| Export | Kind | Page |
+| --- | --- | --- |
+| `createAnalysisSession` | session | [createAnalysisSession](/score/headless/analyze/analysis-session/) |
+| `createAnalysisFollower` | playback follower | [createAnalysisFollower](/score/headless/analyze/analysis-follower/) |
+| `createAnalysisWorker` · `AnalysisWorkerRemoteError` · `ANALYSIS_WORKER_PROTOCOL` · `ANALYSIS_WORKER_PROTOCOL_VERSION` | factory · error · constants | [createAnalysisWorker](/score/headless/analyze/analysis-session/#analysis-worker) |
+| `createLiveChordTracker` | tracker | [Live trackers](/score/headless/analyze/live-trackers/) |
+| `createLiveKeyTracker` | tracker | [Live trackers](/score/headless/analyze/live-trackers/) |
+| `createScoreReport` | report builder | [createScoreReport](/score/api/analyze/#reports) |
+| `createTransportClock` · `rateFromDurations` | predictor · helper | [createTransportClock](/score/headless/analyze/analysis-follower/#presentation-clock) |
+| `projectSounding` · `projectNameplate` · `soundingMidisAt` · `projectProgression` · `projectKeyFlow` · `projectMotifFlow` · `projectVoiceFlow` · `projectTonality` · `projectKeyCandidates` · `projectPitchClassMeters` · `keyPitchClasses` · `formatMetricalPosition` | projections | [The projections](/score/api/analyze/#the-projections) |
+
+The worker row is one module rather than one object: the entry re-exports
+`./worker-client` wholesale, and `@webmusic/score/analyze/worker-client`
+publishes the same four values as an entry of its own. Result and option types
+(`AnalysisResult`,
+`AnalysisSession`, `AnalysisSessionOptions`, `AnalysisFollower`,
+`AnalysisFollowerOptions`, `AnalysisFollowerState`, `AnalysisSeekOutcome`, `LiveChordState`,
+`LiveChordTracker`, `LiveKeyTracker`, `ScoreReport`) are described with the
+object that produces them. Clock types (`TransportClock`,
+`TransportClockOptions`, `TransportSample`, `TransportReading`) belong to the
+follower’s presentation-clock section; projection types belong to [the projection reference](/score/api/analyze/#the-projections).
+
+A **session** analyses a whole score and re-analyses it cheaply after an edit.
+A **tracker** never sees a score at all: it accumulates note events as they
+arrive, so it works for a live keyboard as readily as for playback. Reach for
+the session when you have the piece, and a tracker when you have the
+performance.
+
+The report builder is a third shape: a pure formatting function with no
+retained state or disposal. Worker clients have explicit ownership and
+disposal; sessions and live trackers do not allocate background resources.
+
+## View
+
+`@webmusic/score/view/headless` is the **state** half of drawing a score: it
+tracks what a viewer should be looking at without drawing any of it. No DOM,
+no canvas, no styles — that is the rule every `/headless` entry follows, and
+here it is the whole point, because your framework owns the surface.
+
+Import from `@webmusic/score/view/headless`. `createScoreView` owns sequence
+and viewport state for one Score. `createScoreMapView` follows score replacement
+and delegates quarter-note navigation. `createPitchView` follows held pitches
+without needing a score for manual input. Each releases its subscriptions through
+`dispose()` and leaves borrowed playback with its owner. The smaller
+`createActiveNoteTracker` retains only pitch counts and subscriptions and has no
+dispose method. None owns an audio or playback clock.
+
+| Export | Kind | Page |
+| --- | --- | --- |
+| `createScoreView` | view model | [createScoreView](/score/headless/view/score-view/) |
+| `createScoreMapView` | navigation model | [createScoreMapView](/score/headless/view/score-map-view/) |
+| `createPitchView` | held-pitch model | [createPitchView](/score/headless/view/pitch-view/) |
+| `createActiveNoteTracker` | tracker | [createActiveNoteTracker](/score/headless/view/pitch-view/#active-note-tracker) |
+
+Types (`ScoreView`, `ScoreViewOptions`, `ScoreViewState`,
+`ScoreViewTimeRange`, `ScoreViewType`, `ScoreViewListener`, `ActiveNoteState`,
+`ActiveNoteTracker`, `ActiveNoteListener`) are described with the object that
+produces them. `ScoreMapView`, `ScoreMapViewOptions`, `ScoreMapViewState`,
+`ScoreMapViewListener` and `ScoreMapSeekOutcome` belong to the map-view page;
+`PitchView`, `PitchViewOptions`, `PitchViewState` and `PitchViewListener` belong
+to the pitch-view page.
+
+### Not here: the renderers
+
+`renderPianoRollVisualizer`, `renderStaffVisualizer`,
+`renderWaterfallVisualizer`, `renderOSMDStaffVisualizer` and
+`bindPlayerToVisualizer` are **not** headless components. They draw into a
+caller-owned element, so by rule they are `/render` adapters, and they are
+documented on [`@webmusic/score/view`](/score/api/view/) with the rest of the
+code-facing surface.

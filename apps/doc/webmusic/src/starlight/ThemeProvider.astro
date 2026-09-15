@@ -1,0 +1,51 @@
+---
+/**
+ * WebScore docs theme provider.
+ *
+ * Replaces Starlight's default provider so the site has exactly two color
+ * modes — "white" (light, the signature look) and "black" (dark). The choice
+ * is read synchronously in <head> before paint to avoid a flash, defaults to
+ * white when nothing is stored, and is persisted under the same
+ * `starlight-theme` key the toggle writes to.
+ */
+---
+
+<script is:inline>
+  window.StarlightThemeProvider = (() => {
+    const STORAGE_KEY = 'starlight-theme';
+
+    function stored() {
+      try {
+        return localStorage.getItem(STORAGE_KEY);
+      } catch {
+        return null;
+      }
+    }
+
+    // Two modes only; anything that isn't an explicit "dark" falls back to the
+    // signature white look.
+    const theme = stored() === 'dark' ? 'dark' : 'light';
+    document.documentElement.dataset.theme = theme;
+
+    return {
+      updatePickers(theme = document.documentElement.dataset.theme || 'light') {
+        document.querySelectorAll('webscore-theme-toggle').forEach((toggle) => {
+          const button = toggle.querySelector('button');
+          if (!button) return;
+          button.dataset.theme = theme;
+          button.setAttribute('aria-pressed', String(theme === 'dark'));
+        });
+      },
+    };
+  })();
+</script>
+
+<!--
+  Site-wide UI-kit runtime. The kit's stylesheet is global (Starlight customCss),
+  but its behaviour is not — sliders need their fill painted, and only a page that
+  happened to import the module would get it. This override renders on every page,
+  so it is where the runtime belongs.
+-->
+<script>
+  import '../../../shared/ui';
+</script>

@@ -1,0 +1,161 @@
+---
+title: '@webmusic/ui/meter'
+description: 'Renders a level or spectrum meter by pulling normalized samples from a structural binding.'
+sidebar:
+  label: 'meter'
+  order: 2
+---
+
+import UiPresenterLiveDemo from '../../../../components/UiPresenterLiveDemo.astro';
+import UiPresenterRelated from '../../../../components/UiPresenterRelated.astro';
+
+`mountMeter()` renders either one horizontal level with a held-peak marker or a bank of spectrum
+bars. Unlike snapshot presenters, it pulls current values from `MeterBinding` on its own animation
+frame; the caller keeps the audio graph and sample buffers.
+
+Use [mixer](/uikit/mixing-capture/mixer/) when the surface must also change channel gains, or
+[recorder](/uikit/mixing-capture/recorder/) when a compact input level belongs to a capture
+workflow. Mount this presenter directly for a custom graph, scheduler, or containing layout.
+
+<UiPresenterLiveDemo presenter="meter" />
+
+## Import
+
+```ts
+import {mountMeter} from '@webmusic/ui/meter';
+
+const handle = mountMeter(host, {
+  readLevel: () => levels.current,
+  readSpectrum: (bars) => analyser.readNormalizedBins(bars),
+});
+```
+
+## Pulling and redraw
+
+Meter deliberately has no `snapshot()` or `subscribe()`. With `animate !== false`, it schedules an
+animation frame, calls `redraw()`, and schedules the next frame until destroyed. Level mode calls
+`readLevel()`; spectrum mode calls `readSpectrum(barCount)` and reads one array-like value per
+created bar. Binding values are clamped to `0…1`, and missing spectrum entries become `0`.
+
+With `animate: false`, mount performs one synchronous redraw. Call `handle.redraw()` whenever new
+data is available. Mode and bar count determine the DOM at mount time and require a remount to
+change; only the accessible label has an in-place `updateLabel()` method. The rest of the host and
+lifecycle behavior follows the
+[shared presenter shape](/uikit/api/#the-shared-presenter-shape).
+
+<details class="component-section">
+<summary>API</summary>
+
+`mountMeter(host, binding, options?)` accepts an `HTMLElement` or `ShadowRoot` and returns a
+`MeterHandle`. Non-finite samples become `0`; every sample is then clamped to `0…1`.
+
+**State returned by `readLevel()`**
+
+| Member | Kind | Description |
+|---|---|---|
+| `level` | `number` | Required current fill. It also supplies the accessible percentage. |
+| `peak?` | `number` | Optional instantaneous peak used when `peakHold` is absent. |
+| `peakHold?` | `number` | Optional decaying held-peak position. Fallback order is `peakHold ?? peak ?? level`. |
+
+**Binding**
+
+| Member | Kind | Description |
+|---|---|---|
+| `readLevel()` | `() => MeterLevelState` | Required pull port read on every level-mode redraw. Throws are sent to `onError` and leave the last successful paint in place. |
+| `readSpectrum(bars)` | `(number) => ArrayLike<number>` | Required pull port read on every spectrum redraw. Receives the normalized mount-time bar count. The largest painted bar drives the accessible value. |
+
+**Options**
+
+| Member | Kind | Default | Description |
+|---|---|---|---|
+| `mode` | `'level' \| 'spectrum'` | `'level'` | Builds the track/fill/peak structure or the spectrum/bar structure. |
+| `bars` | `number` | `28` | Spectrum bar count. Values are floored with a minimum of `4`; non-finite values fall back to `28`. |
+| `label` | `string` | `'Audio level'` / `'Spectrum'` | Root accessible name; its default follows mode. |
+| `animate` | `boolean` | `true` | `false` suppresses the frame loop and performs one initial redraw. |
+| `height` | `number \| string` | — | Inline height override. Numbers become non-negative pixel lengths; strings are assigned as supplied. |
+| `color` | `string` | — | Writes inline `--wui-meter-fill`, ahead of stylesheet tokens. |
+| `peakColor` | `string` | — | Writes inline `--wui-meter-peak`. It has no visible effect in spectrum mode. |
+| `backgroundColor` | `string` | — | Writes inline `--wui-meter-background`. |
+| `classNames` | `MeterClassNames` | `{}` | Adds compatibility classes for `root`, `track`, `fill`, `peak`, `spectrum`, and `bar`. |
+| `parts` | `MeterParts` | `{}` | Adds part tokens for the same six node kinds. |
+| `onError` | `(error: unknown) => void` | — | Receives binding-read and cleanup errors. |
+| `stylesheet` | `boolean` | `true` | Installs the presenter's stylesheet unless explicitly `false`, for a light-DOM host that cannot inject CSS into its page. |
+
+**Handle**
+
+| Member | Kind | Description |
+|---|---|---|
+| `element` | `HTMLElement` | Presenter-owned `.wui-meter` root. |
+| `redraw()` | `() => void` | Pulls the active binding method and updates geometry and ARIA; becomes a no-op after destruction. |
+| `updateLabel(label?)` | `(string?) => void` | Updates `aria-label` in place; `undefined` restores the mode-specific default. |
+| `destroy()` | `() => void` | Idempotently cancels the outstanding frame and removes the root and installed style node. Cleanup errors are reported after all cleanup is attempted. |
+
+**Accessibility.** The root has `role="meter"`, the configured or mode-default name,
+`aria-valuemin="0"`, and `aria-valuemax="100"`. Each redraw sets integer `aria-valuenow`; level
+mode exposes `<n>% level` and spectrum mode exposes `<n>% spectrum peak` through
+`aria-valuetext`. The meter is read-only and has no keyboard interaction. In forced-colors mode,
+the root gains a `CanvasText` border, fill uses `Highlight`, and the peak uses `CanvasText`.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+Use the shared [surface and palette tokens](/uikit/#theme-with-css-custom-properties) for
+background (including `transparent`), foreground, accent, outer border and corner radius.
+Presenter-specific tokens below take precedence within their documented roles.
+
+Runtime option values win through inline `--wui-meter-height`, `--wui-meter-fill`,
+`--wui-meter-peak`, and `--wui-meter-background`. Without them, height, background, fill, track,
+and peak first accept legacy `--wameter-*` aliases where shown, then semantic `--wm-*` tokens and
+literals. The root also follows the shared [`--wm-component-*` surface](/uikit/#theme-with-css-custom-properties),
+with `--wm-meter-surface-*` available for a meter-only outer override. The mount installs
+`meterStyle` by default. Set `stylesheet: false` to omit it and supply the exported stylesheet or
+your own CSS from the host.
+
+**Tokens**
+
+| Property | Falls back to | Default | Controls |
+|---|---|---|---|
+| `--wm-meter-height` | after `--wameter-height` | `48px` | Root height when `height` is absent. |
+| `--wm-meter-padding` | literal fallback | `.6rem` | Inset around the track or spectrum. |
+| `--wm-meter-radius` | `--wm-control-radius` | `0` | Root and track radius. |
+| `--wm-control-radius` | literal fallback | `0` | Shared radius fallback. |
+| `--wm-meter-background` | `--wm-surface` after `--wameter-bg` | `#fff` | Root-background compatibility fallback. |
+| `--wm-surface` | literal fallback | `#fff` | Shared background fallback. |
+| `--wm-meter-fill` | `--wm-accent` after `--wameter-fill` | `#4ea1ff` | Level fill and spectrum bars through current color. |
+| `--wm-accent` | literal fallback | `#4ea1ff` | Shared fill fallback. |
+| `--wm-meter-track` | after `--wameter-track` | `#1d1d1d` | Level-mode track background. |
+| `--wm-meter-peak` | `--wm-danger` after `--wameter-peak` | `#e0445b` | Level-mode peak marker. |
+| `--wm-danger` | literal fallback | `#e0445b` | Shared peak fallback. |
+| `--wm-meter-gap` | literal fallback | `2px` | Gap between spectrum bars. |
+
+**Classes**
+
+`classNames` adds compatibility classes beside these canonical names; it never replaces them.
+
+| Node | Canonical class | Present when | `classNames` key |
+|---|---|---|---|
+| Root | `.wui-meter` | Always | `root` |
+| Track | `.wui-meter__track` | Level mode | `track` |
+| Fill | `.wui-meter__fill` | Level mode | `fill` |
+| Peak marker | `.wui-meter__peak` | Level mode | `peak` |
+| Spectrum bank | `.wui-meter__spectrum` | Spectrum mode | `spectrum` |
+| Spectrum bar | `.wui-meter__bar` | Once per bar in spectrum mode | `bar` |
+
+**Parts**
+
+`parts` adds tokens beside the canonical part and removes duplicate tokens.
+
+| Node | Canonical part | Present when | `parts` key |
+|---|---|---|---|
+| Root | `root` | Always | `root` |
+| Track | `track` | Level mode | `track` |
+| Fill | `fill` | Level mode | `fill` |
+| Peak marker | `peak` | Level mode | `peak` |
+| Spectrum bank | `spectrum` | Spectrum mode | `spectrum` |
+| Spectrum bar | `bar` | Once per bar in spectrum mode | `bar` |
+
+</details>
+
+<UiPresenterRelated presenter="meter" />

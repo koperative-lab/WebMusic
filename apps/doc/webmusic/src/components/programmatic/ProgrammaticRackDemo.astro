@@ -1,0 +1,154 @@
+---
+import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
+---
+<HeadlessDemoFrame
+  entry="@webmusic/score/play/headless"
+  name="Rack"
+  hint="Use the live controls to hear the result. Reset stops playback and restores the default parameters."
+  code={`// Configure Rack below.`}
+  rootAttrs={{'data-programmatic-rack': true}}
+>
+  <div class="wui-row"><button class="wui-btn" data-play type="button">▶ Play</button><div class="wui-track"><div class="wui-track__fill" data-fill></div></div><span class="wui-readout" data-time>0.0s</span></div>
+  <div slot="parameters" class="wm-pg__grid">
+    <div class="wm-pg__param"><span class="wm-pg__name">mute melody</span><button class="wui-btn" data-mute="melody" data-variant="ghost" type="button" aria-pressed="false">Melody</button><span class="wm-pg__note">Mute the melody member through rack.mute(id, muted).</span></div><div class="wm-pg__param"><span class="wm-pg__name">mute harmony</span><button class="wui-btn" data-mute="harmony" data-variant="ghost" type="button" aria-pressed="false">Harmony</button><span class="wm-pg__note">Mute the harmony member through rack.mute(id, muted).</span></div><div class="wm-pg__param"><span class="wm-pg__name">mute bass</span><button class="wui-btn" data-mute="bass" data-variant="ghost" type="button" aria-pressed="false">Bass</button><span class="wm-pg__note">Mute the bass member through rack.mute(id, muted).</span></div>
+  </div>
+</HeadlessDemoFrame>
+
+<script>
+  import {mountProgrammaticDemo, programmaticCode} from './programmatic-demo-lifecycle';
+  import { Duration, MeasureId, PartId, Pitch, Rational, ScoreBuilder, VoiceId } from '@webmusic/score';
+  import { createRack, ScorePlayer, Sound } from '@webmusic/score/play/headless';
+
+  // Build a short 2-bar score from a pitch set (one note per eighth).
+  function sampleScore(pitches: string[], title: string) {
+    const b = new ScoreBuilder();
+    const partId = PartId('inst');
+    const voice = VoiceId('v1');
+    const timeSignature = { numerator: 4, denominator: 4 };
+    b.setMetadata({ title })
+      .addTempo({ atQuarters: Rational.ZERO, bpm: 100 })
+      .addMeter({ atQuarters: Rational.ZERO, measureNumber: 1, timeSignature });
+    b.addPart({ id: partId, name: title, staves: 1 });
+    pitches.forEach((name, i) => {
+      const measureNumber = Math.floor(i / 8) + 1;
+      if (i % 8 === 0) {
+        b.addMeasure({
+          id: MeasureId(`m${measureNumber}`),
+          number: measureNumber,
+          onsetQuarters: new Rational((measureNumber - 1) * 4, 1),
+          durationQuarters: new Rational(4, 1),
+          timeSignature,
+        });
+      }
+      b.addNote(partId, {
+        id: b.newNoteId(),
+        pitch: Pitch.parse(name),
+        onsetQuarters: new Rational(i, 2),
+        duration: Duration.eighth(),
+        voice,
+      });
+    });
+    return b.build();
+  }
+
+  mountProgrammaticDemo('[data-programmatic-rack]', (root, scope) => {
+
+    const btn = root.querySelector('[data-play]') as HTMLButtonElement;
+    const fill = root.querySelector('[data-fill]') as HTMLElement;
+    const time = root.querySelector('[data-time]') as HTMLElement;
+    const muteButtons = Array.from(root.querySelectorAll('[data-mute]')) as HTMLButtonElement[];
+
+    const rack = createRack();
+    scope.add(() => rack.dispose());
+
+    // Three single-instrument members, each with its own pitch set + timbre.
+    rack.add({
+      id: 'melody',
+      score: sampleScore(['C5', 'E5', 'G5', 'E5', 'C5', 'D5', 'F5', 'D5', 'B4', 'D5', 'G5', 'D5', 'C5', 'E5', 'G5', 'C6'], 'Melody'),
+      soundOwnership: 'owned',
+      sound: Sound.oscillator({ type: 'triangle', gain: 0.18, releaseSeconds: 0.05 }),
+    });
+    rack.add({
+      id: 'harmony',
+      score: sampleScore(['E4', 'G4', 'C5', 'G4', 'E4', 'F4', 'A4', 'F4', 'D4', 'G4', 'B4', 'G4', 'E4', 'G4', 'C5', 'E5'], 'Harmony'),
+      soundOwnership: 'owned',
+      sound: Sound.oscillator({ type: 'sawtooth', gain: 0.1, releaseSeconds: 0.08 }),
+    });
+    rack.add({
+      id: 'bass',
+      score: sampleScore(['C3', 'C3', 'G2', 'G2', 'A2', 'A2', 'F2', 'F2', 'G2', 'G2', 'C3', 'C3', 'E2', 'E2', 'G2', 'C3'], 'Bass'),
+      soundOwnership: 'owned',
+      sound: Sound.oscillator({ type: 'square', gain: 0.14, releaseSeconds: 0.1 }),
+    });
+
+    let playing = false;
+    const muted: Record<string, boolean> = {};
+    const updateCode = () => programmaticCode(root, `import {createRack, Sound} from '@webmusic/score/play/headless';
+
+const rack = createRack();
+// melodyScore, harmonyScore and bassScore are caller-provided Scores.
+rack.add({id: 'melody', score: melodyScore, soundOwnership: 'owned',
+  sound: Sound.oscillator({type: 'triangle', gain: 0.18, releaseSeconds: 0.05})});
+rack.add({id: 'harmony', score: harmonyScore, soundOwnership: 'owned',
+  sound: Sound.oscillator({type: 'sawtooth', gain: 0.1, releaseSeconds: 0.08})});
+rack.add({id: 'bass', score: bassScore, soundOwnership: 'owned',
+  sound: Sound.oscillator({type: 'square', gain: 0.14, releaseSeconds: 0.1})});
+${['melody', 'harmony', 'bass'].map((id) => "rack.mute('" + id + "', " + Boolean(muted[id]) + ');').join('\n')}
+// In a play gesture: await rack.play();
+// On cleanup: rack.dispose();`);
+    updateCode();
+
+    // Each member has its own player clock. This display follows the melody,
+    // reading a fresh member snapshot after the rack builds its players lazily.
+    const paint = () => {
+      const player = rack.get('melody')?.player;
+      if (!(player instanceof ScorePlayer)) return;
+      const cur = player.seconds;
+      const dur = player.durationSeconds || 1;
+      fill.style.width = `${Math.min(100, (cur / dur) * 100)}%`;
+      time.textContent = `${cur.toFixed(1)}s`;
+    };
+
+    rack.on('end', () => {
+      playing = false;
+      btn.textContent = '▶ Play';
+      rack.seek(0);
+      fill.style.width = '0%';
+      time.textContent = '0.0s';
+    });
+
+    let cursorBound = false;
+    scope.listen(btn, 'click', () => {
+      if (playing) {
+        rack.pause();
+        btn.textContent = '▶ Play';
+        playing = false;
+        return;
+      }
+      scope.run(rack.play().then(() => {
+        if (!scope.active || !playing) return;
+        // Members (and their ScorePlayers) now exist; bind the cursor once.
+        const player = rack.get('melody')?.player;
+        if (!cursorBound && player instanceof ScorePlayer) {
+          scope.add(player.on('cursor', paint));
+          cursorBound = true;
+        }
+      }), () => { playing = false; btn.textContent = '▶ Play'; });
+      btn.textContent = '⏸ Pause';
+      playing = true;
+    });
+
+    muteButtons.forEach((b) => {
+      const id = b.dataset.mute as string;
+      scope.listen(b, 'click', () => {
+        const next = !muted[id];
+        muted[id] = next;
+        rack.mute(id, next);
+        b.dataset.on = next ? 'true' : 'false';
+        b.dataset.variant = next ? '' : 'ghost';
+        b.setAttribute('aria-pressed', String(next));
+        updateCode();
+      });
+    });
+  });
+</script>

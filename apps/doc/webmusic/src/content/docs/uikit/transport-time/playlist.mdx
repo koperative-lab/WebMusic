@@ -1,0 +1,201 @@
+---
+title: '@webmusic/ui/playlist'
+description: 'Playlist transport, track selection, seeking, and per-entry state in one presenter.'
+sidebar:
+  label: 'playlist'
+  order: 4
+---
+
+import UiPresenterLiveDemo from '../../../../components/UiPresenterLiveDemo.astro';
+import UiPresenterRelated from '../../../../components/UiPresenterRelated.astro';
+
+`mountPlaylist()` renders previous, play/pause, next, and seek controls over an ordered list of
+entries. It paints caller-owned `PlaylistState` and routes every transport or selection gesture
+through a required structural `PlaylistBinding`; it never owns a player, queue, decoder, or file.
+
+Use [transport](/uikit/transport-time/transport/) for one current item without a queue,
+[timeline](/uikit/transport-time/timeline/) for labelled time regions, or
+[minimap](/uikit/transport-time/minimap/) for overview-range navigation. Mount this presenter directly when entry identity, loading policy, and player commands live in your store.
+
+<UiPresenterLiveDemo presenter="playlist" />
+
+## Import
+
+```ts
+import {mountPlaylist} from '@webmusic/ui/playlist';
+
+const handle = mountPlaylist(host, {
+  snapshot: () => store.playlist,
+  toggle: () => player.toggle(),
+  previous: () => player.previous(),
+  next: () => player.next(),
+  seek: (fraction) => player.seek(fraction),
+  select: (id) => player.select(id),
+});
+```
+
+## Entry identity and patching
+
+`items` is the caller's ordered queue. Each item supplies a stable `id`, a label, optional
+preformatted duration, optional active state, and optional `loading` or `error` status. The
+presenter deliberately does not format duration or decide whether an errored entry may be
+selected; those are domain policies implemented by the binding.
+
+The row list is rebuilt only when item ids, labels, or order change. Active state, status, and
+duration are patched onto existing rows so frequent progress notifications do not steal focus
+or cancel an in-flight row click. Keep ids unique and stable if code uses `controls.item(id)`.
+
+## Binding and command settlement
+
+All five user commands are required and may return promises. The presenter calls the requested
+command, then re-reads the authoritative snapshot after it fulfills; synchronous throws and
+promise rejections reach `onError`. Subscription notifications can repaint independently. See
+the [shared presenter shape](/uikit/api/#the-shared-presenter-shape) for common ownership and
+cleanup rules.
+
+The presenter does not apply an optimistic queue transition. `toggle()`, `previous()`, `next()`,
+`seek()`, and `select()` must update caller state—then notify, fulfill, or both—for the visible
+state to change.
+
+<details class="component-section">
+<summary>API</summary>
+
+`mountPlaylist(host, binding, options?)` accepts an `HTMLElement` or `ShadowRoot` and returns a
+`PlaylistHandle`.
+
+**State**
+
+| Member | Kind | Description |
+|---|---|---|
+| `playing` | `boolean` | Chooses the pause glyph/label when truthy and the play glyph/label otherwise. |
+| `progress` | `number` | Current-entry position. Finite values clamp to `0…1`; non-finite values paint as `0`. |
+| `disabled?` | `boolean` | Strict `true` disables previous, toggle, next, and seek controls. It does not disable list rows. |
+| `items` | `readonly PlaylistItem[]` | Ordered entries. Absence at runtime is treated as an empty list. |
+
+`PlaylistItem` contains required `id` and `label`, optional preformatted `duration`, optional
+`active`, and optional `status: 'loading' | 'error'`. Strict `active: true` sets
+`aria-current`; status adds a styling data attribute. The presenter does not synthesize status
+text or mutate the item objects.
+
+**Binding**
+
+| Member | Kind | Description |
+|---|---|---|
+| `snapshot()` | `() => PlaylistState` | Required pull port, read on mount, notification, command fulfillment, and explicit update. A throw reaches `onError` and leaves the current DOM unchanged. |
+| `toggle()` | `() => void \| Promise<void>` | Required play/pause intent from the central transport button. |
+| `previous()` | `() => void \| Promise<void>` | Required previous-entry intent. |
+| `next()` | `() => void \| Promise<void>` | Required next-entry intent. |
+| `seek(value)` | `(number) => void \| Promise<void>` | Required current-entry seek intent; receives a normalized `0…1` fraction. |
+| `select(id)` | `(string) => void \| Promise<void>` | Required entry-selection intent from click, Enter, or Space. |
+| `subscribe?(notify)` | `(notify: () => void) => () => void` | Optional change subscription; its disposer is called by `destroy()` and on same-host remount. |
+
+**Options**
+
+| Member | Kind | Default | Description |
+|---|---|---|---|
+| `label` | `string` | `'Playlist'` | Accessible name of the ordered entry list. |
+| `stylesheet` | `boolean` | `true` | Installs `playlistStyle` unless explicitly `false`. |
+| `classNames` | `PlaylistClassNames` | `{}` | Adds compatibility classes for `root`, `bar`, `button`, `seek`, `list`, and `item`. |
+| `parts` | `PlaylistParts` | `{}` | Adds part tokens for the same six node roles. |
+| `onError` | `(error: unknown) => void` | — | Receives snapshot, command, subscription, and cleanup failures. |
+
+**Handle**
+
+| Member | Kind | Description |
+|---|---|---|
+| `element` | `HTMLElement` | Presenter-owned `.wui-playlist` root. |
+| `controls.previous` | `HTMLButtonElement` | Always-present previous button. |
+| `controls.toggle` | `HTMLButtonElement` | Always-present play/pause button. |
+| `controls.next` | `HTMLButtonElement` | Always-present next button. |
+| `controls.seek` | `HTMLInputElement` | Always-present range with DOM values `0…1000`. |
+| `controls.list` | `HTMLOListElement` | Always-present ordered list. |
+| `controls.item(id)` | `(string) => HTMLLIElement \| undefined` | Returns the currently rendered row mapped to an entry id. |
+| `update()` | `() => void` | Re-reads and patches state; becomes a no-op after destruction. |
+| `destroy()` | `() => void` | Idempotently disposes the subscription and removes presenter DOM and any installed stylesheet. |
+
+**Accessibility.** Previous, toggle, and next are native buttons with accessible names; the
+toggle name follows `playing`. Seek is a native range labelled `Seek`, and all four transport
+controls reflect `disabled` through the native attribute. The ordered list receives `label` as
+its accessible name. Each row is a focusable `role="button"` with click, Enter, and Space
+activation plus `aria-current` for the active item. Loading/error are visual data states rather
+than live announcements or disabled semantics, so the binding remains responsible for status
+messaging and whether selection is accepted. Caller nodes outside the presenter root are never
+rewritten.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+Use the shared [surface and palette tokens](/uikit/#theme-with-css-custom-properties) for
+background (including `transparent`), foreground, accent, outer border and corner radius.
+Presenter-specific tokens below take precedence within their documented roles.
+
+The installed stylesheet resolves presenter-specific playlist tokens through shared `--wm-*`
+values and then literals.
+
+**Tokens**
+
+| Property | Falls back to | Default | Controls |
+|---|---|---|---|
+| `--wm-playlist-height` | `--wm-control-size` → `--wui-row-h` | `2rem` | Height of the transport buttons and of the seek rail. |
+| `--wm-playlist-track` | `--wm-surface-muted` | `#f3f3f3` | Unfilled seek rail. |
+| `--wm-playlist-thumb` | `--wm-foreground` | `#111` | Seek handle fill. |
+| `--wm-playlist-thumb-radius` | `--wm-control-radius` | `0` | Seek handle corners. |
+| `--wm-playlist-handle-size` | literal | `.9rem` | Seek handle width. Its height follows the control size. |
+| `--wm-playlist-border` | `--wm-border` | `#d8d8d8` | Root border. |
+| `--wm-playlist-radius` | `--wm-control-radius` | `0` | Root, button, and item corners. |
+| `--wm-playlist-background` | `--wm-surface` | `#fff` | Root background. |
+| `--wm-playlist-text` | `--wm-foreground` | `#444` | Root text color. |
+| `--wm-font-family` | `--wm-font` | `system-ui, sans-serif` | Playlist UI font. |
+| `--wm-playlist-button-border` | `--wm-control-border` → `--wm-border` | `#d8d8d8` | Previous and next button borders. |
+| `--wm-control-border` | `--wm-border` | `#d8d8d8` | Shared non-primary control border fallback. |
+| `--wm-playlist-button` | `--wm-surface` | `#fff` | Previous and next button backgrounds. |
+| `--wm-playlist-button-text` | `--wm-foreground` | `#444` | Previous and next button glyphs. |
+| `--wm-playlist-primary-border` | `--wm-playlist-button-border` → `--wm-accent` | `#111` | Primary play/pause button border. |
+| `--wm-playlist-primary-background` | `--wm-playlist-button` → `--wm-accent` | `#111` | Primary play/pause button background. |
+| `--wm-playlist-primary-foreground` | `--wm-playlist-button-text` → `--wm-accent-foreground` | `#fff` | Primary play/pause button glyph. |
+| `--wm-playlist-accent` | `--wm-accent` | `#111` | Native seek accent. |
+| `--wm-playlist-active` | Literal | `rgba(17, 17, 17, .08)` | Active-row background. |
+| `--wm-playlist-error` | `--wm-error` | `#c0392b` | Error-row text. |
+| `--wm-focus` | `currentColor` | Current text color | 2px keyboard-focus outline on rows, transport buttons and seek control. |
+| `--wm-playlist-muted` | `--wm-foreground-muted` → `--wm-foreground` | `#666` | Duration text. |
+
+**Classes**
+
+`classNames` adds compatibility classes alongside the canonical classes for its six public node
+roles. Labels and durations expose canonical classes but have no `classNames` key.
+
+| Node | Canonical class | `classNames` key |
+|---|---|---|
+| Root | `.wui-playlist` | `root` |
+| Transport bar | `.wui-playlist__bar` | `bar` |
+| Each transport button | `.wui-playlist__button` | `button` |
+| Seek range | `.wui-playlist__seek` | `seek` |
+| Ordered list | `.wui-playlist__items` | `list` |
+| Entry row | `.wui-playlist__item` | `item` |
+| Entry label | `.wui-playlist__label` | — |
+| Entry duration | `.wui-playlist__duration` | — |
+
+**Parts**
+
+`parts` adds tokens alongside canonical tokens and removes duplicates. Each transport button also
+carries its action modifier.
+
+| Node | Canonical part | `parts` key |
+|---|---|---|
+| Root | `root` | `root` |
+| Transport bar | `bar` | `bar` |
+| Previous button | `button prev` | `button` |
+| Toggle button | `button play` | `button` |
+| Next button | `button next` | `button` |
+| Seek range | `seek` | `seek` |
+| Ordered list | `list` | `list` |
+| Entry row | `item` | `item` |
+
+With `stylesheet: false`, the presenter installs no style node; the caller must style these
+classes and parts itself.
+
+</details>
+
+<UiPresenterRelated presenter="playlist" />

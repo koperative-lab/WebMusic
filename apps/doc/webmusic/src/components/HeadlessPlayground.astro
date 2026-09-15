@@ -1,0 +1,142 @@
+---
+// Catalog controls and real-object factories use the same frame as manual demos.
+import { HEADLESS_OBJECTS } from '../lib/headless-params';
+import type { HeadlessControlSpec } from '../lib/headless-params/types';
+import {defaultChoices} from '../lib/default-label';
+import HeadlessDemoFrame from './HeadlessDemoFrame.astro';
+
+interface Props {
+  /** Catalog key, e.g. `score-player`. */
+  object: string;
+  /** Global key the page's demo module publishes its factory under. */
+  factory: string;
+  /** One line under the title: how to operate the demo. */
+  hint?: string;
+  /** Mark controls as wired-but-not-visible here, with the reason. */
+  inert?: Record<string, string>;
+}
+
+const { object, factory, hint, inert = {} } = Astro.props;
+
+const spec = HEADLESS_OBJECTS[object];
+if (!spec) throw new Error(`<HeadlessPlayground object="${object}"> has no entry in src/lib/headless-params`);
+
+const options = spec.options ?? [];
+const commands = spec.commands ?? [];
+const errors = spec.errors ?? [];
+
+const choicesFor = (c: HeadlessControlSpec) =>
+  defaultChoices(
+    c.fallback,
+    c.kind === 'bool' ? ['on', 'off'] : (c.options ?? []),
+    c.kind === 'bool' ? 'unset' : '',
+  );
+const reasonFor = (c: HeadlessControlSpec) => inert[c.name] ?? c.inert;
+---
+
+<HeadlessDemoFrame
+  entry={spec.entry}
+  name={spec.name}
+  hint={hint}
+  code={spec.construction.replace('{options}', '{}')}
+  rootAttrs={{
+    'data-wm-hl': true,
+    'data-hl-object': object,
+    'data-hl-factory': factory,
+    'data-hl-construction': spec.construction,
+    'data-hl-errors': JSON.stringify(errors),
+  }}
+>
+  <slot />
+  <div slot="parameters">
+  {options.length > 0 ? (
+    <fieldset>
+      <legend>
+        Construction
+        <span class="wm-pg__count">recreate on change</span>
+      </legend>
+      <div class="wm-pg__grid">
+        {options.map((c) => (
+          <label class="wm-pg__param">
+            <span class="wm-pg__name">
+              {c.name}
+              {reasonFor(c) ? <em data-inert title={reasonFor(c)}>no visible change here</em> : null}
+            </span>
+            {c.kind === 'bool' ? (
+              <select class="wui-select" data-hl-option={c.name} data-hl-kind="bool">
+                {choicesFor(c).map((choice) => (
+                  <option value={choice.value} selected={choice.selected}>{choice.label}</option>
+                ))}
+              </select>
+            ) : c.kind === 'enum' ? (
+              <select class="wui-select" data-hl-option={c.name} data-hl-kind="enum">
+                {choicesFor(c).map((choice) => (
+                  <option value={choice.value} selected={choice.selected}>{choice.label}</option>
+                ))}
+              </select>
+            ) : (
+              <input
+                class="wm-pg__input"
+                type={c.kind === 'number' ? 'number' : 'text'}
+                data-hl-option={c.name}
+                data-hl-kind={c.kind}
+                min={c.min}
+                max={c.max}
+                step={c.kind === 'number' ? (c.step ?? 'any') : undefined}
+                placeholder={c.placeholder ?? c.fallback ?? ''}
+              />
+            )}
+            <span class="wm-pg__note">{c.note}</span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  ) : null}
+
+  {commands.length > 0 ? (
+    <fieldset>
+      <legend>
+        Commands
+        <span class="wm-pg__count">live — each control calls the method now</span>
+      </legend>
+      <div class="wm-pg__grid">
+        {commands.map((c) => (
+          <label class="wm-pg__param">
+            <span class="wm-pg__name">
+              {c.name}
+              {reasonFor(c) ? <em data-inert title={reasonFor(c)}>no visible change here</em> : null}
+            </span>
+            {c.kind === 'action' ? (
+              <button class="wui-btn" type="button" data-hl-command={c.name} data-hl-kind="action">
+                {c.name}()
+              </button>
+            ) : c.kind === 'enum' ? (
+              <select class="wui-select" data-hl-command={c.name} data-hl-kind="enum">
+                <option value="" disabled selected>Choose…</option>
+                {(c.options ?? []).map((option) => <option value={option}>{option}</option>)}
+              </select>
+            ) : (
+              <input
+                class="wm-pg__input"
+                type={c.kind === 'number' ? 'number' : 'text'}
+                data-hl-command={c.name}
+                data-hl-kind={c.kind}
+                min={c.min}
+                max={c.max}
+                step={c.kind === 'number' ? (c.step ?? 'any') : undefined}
+                placeholder={c.placeholder ?? ''}
+              />
+            )}
+            <span class="wm-pg__note">{c.note}</span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  ) : null}
+
+  </div>
+</HeadlessDemoFrame>
+
+<script>
+  import '../lib/headless-playground-client';
+</script>

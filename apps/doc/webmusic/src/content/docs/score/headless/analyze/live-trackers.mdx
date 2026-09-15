@@ -1,0 +1,165 @@
+---
+title: 'Live trackers'
+description: 'createLiveChordTracker and createLiveKeyTracker: name the chord sounding now, and estimate a key from what has been heard — from note events alone, with no score.'
+sidebar:
+  order: 3
+---
+
+import LiveTrackersPlayground from '../../../../../components/headless/LiveTrackersPlayground.astro';
+
+Two trackers that analyse a **performance** rather than a piece. Neither takes
+a `Score`: they accumulate `noteOn` events as they arrive, so the same code
+works for playback, a MIDI keyboard or
+[`<note-input>`](/score/element/play/note-input/). They share a page because
+they are the same kind of thing driven by the same event, and a reader
+choosing between them is choosing what to ask, not which object to learn.
+
+They own their accumulated musical state but create no player, clock or subscription.
+Both are push-only: the application feeds note events and owns any source listeners.
+Release those listeners at teardown; the trackers have no disposal method.
+
+<LiveTrackersPlayground />
+
+## Import
+
+```ts
+import {
+  createLiveChordTracker,
+  createLiveKeyTracker,
+} from '@webmusic/score/analyze/headless';
+
+const chord = createLiveChordTracker({
+  onUpdate: ({chord, midis, history}) => paint(chord, midis, history),
+  onChordChange: (name) => announce(name),
+});
+
+const key = createLiveKeyTracker((result, heard) => paintKey(result, heard));
+
+const offOn = player.on('noteOn', (note) => {
+  chord.noteOn(note.midi);
+  key.noteOn(note.midi);
+});
+const offOff = player.on('noteOff', (note) => chord.noteOff(note.midi));
+
+// On unmount:
+offOn();
+offOff();
+chord.reset();
+key.reset();
+```
+
+## createLiveChordTracker — what is sounding
+
+Tracks the set of notes held right now and names it. `onUpdate` fires on every
+change with the chord name, the sorted MIDI values and the recent history;
+`onChordChange` fires only when the detected name changes to a nonempty
+name. Silence and reset still update state through `onUpdate`.
+
+Held MIDI pitches are reference-counted: two attacks need two releases.
+History contains at most eight non-empty chord names, most recent last.
+Use `onUpdate` to observe the transition to silence; `onChordChange` does
+not announce an empty name. Notifications are synchronous and callback
+failures propagate to the caller; they are not player-style error events.
+
+## createLiveKeyTracker — what has been heard
+
+Accumulates a duration-agnostic pitch-class histogram and re-estimates the key
+on every note, calling back with the estimate and the number of notes heard.
+`heard` reports sample size, not statistical certainty. Repeating one pitch
+many times can still give a poor estimate of a whole piece. The correlation
+ranking uses major/minor profiles; its confidence is candidate separation, not
+a calibrated probability that the key is correct.
+
+It deliberately has **no `noteOff`**: the histogram counts onsets, so a
+release carries no information. Feeding it releases would double-count.
+
+## Key diagnostics
+
+Candidate rankings and circle-of-fifths comparisons are available as plain data for an application-owned inspector. Feed heard notes to `createLiveKeyTracker`, then use its `KeyResult.scores` directly or the existing projections:
+
+```ts
+import {
+  createLiveKeyTracker,
+  projectKeyCandidates,
+  projectTonality,
+} from '@webmusic/score/analyze/headless';
+
+const tracker = createLiveKeyTracker((result, heard) => {
+  const candidates = projectKeyCandidates(result, {limit: 5});
+  const tonality = projectTonality(result, {
+    reference: {tonic: 'C', mode: 'major'},
+  });
+  console.log({heard, candidates, tonality});
+});
+
+for (const midi of [60, 64, 67, 72]) tracker.noteOn(midi);
+tracker.reset();
+```
+
+These projections do not render, select a reference or bind to a player. The application owns those controls and recomputes the projection when the reference changes. The [projection reference](/score/api/analyze/#the-projections) owns their contracts. `reset()` clears the key tracker without emitting a callback, so an application also clears its displayed evidence at that boundary.
+
+## Pitch evidence
+
+The key tracker exposes the estimate and total heard count, not its internal pitch-class bins. An application needing per-pitch counts retains its own 12 counters, increments the validated MIDI pitch’s class on each note-on, and passes those values to `projectPitchClassMeters`. That projection formats supplied bins; it does not collect note events. Reset the counters at the application’s chosen seek, stop or source-change boundary.
+
+For whole-score duration weights, use [`distributions(score).pitchClasses`](/score/api/analyze/#distributions), as shown in the [report workflow](/score/api/analyze/#report-histograms). Counts and duration weights are different units: use one source at a time, or normalize compatible evidence explicitly before comparing it.
+
+## Chord history
+
+`createLiveChordTracker` publishes the current name and a list of up to eight recent nonempty chord names. This list has no timestamps. For a time-based trail, the application can retain timestamped `onUpdate` values from its own chosen clock, detect transitions and apply its own retention bound and reset policy.
+
+The former Element’s 32-transition trail and eight-second coast were private presentation behavior, not a public Headless history API. They are not reproduced by `LiveChordState.history`. Use [`<live-chord-analysis>`](/score/element/analyze/live-chord-analysis/) for the ready-made current nameplate, or retain tracker updates for a custom history.
+
+<details class="component-section">
+<summary>API</summary>
+
+**Construction**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `createLiveChordTracker({onUpdate, onChordChange?})` | factory | `onUpdate(state)` after commands; `onChordChange(chord, midis)` only when the detected name changes to a nonempty name. No initial callback. |
+| `createLiveKeyTracker(onUpdate)` | factory | `onUpdate(result, heard)` after every note. |
+
+**Commands — chord tracker**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `noteOn(midi)` | command | Increments a held-note count; returns `void`. Requires a safe integer in 0…127. |
+| `noteOff(midi)` | command | Decrements one held-note count; validates the same MIDI range and returns `void`. |
+| `reset()` | command | Clears sounding counts/history and publishes empty state; returns `void`. |
+
+**Commands — key tracker**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `noteOn(midi)` | command | Adds one onset and calls `onUpdate`; requires a safe integer in 0…127 and returns `void`. |
+| `reset()` | command | Empties the histogram without a callback; returns `void`. |
+
+**State**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `LiveChordState.chord` | state | The chord name, or `''` when nothing sounds. |
+| `LiveChordState.midis` | state | Sounding MIDI values, ascending. |
+| `LiveChordState.history` | state | Up to eight recent nonempty chord names, most recent last; no timestamps. |
+| `LiveKeyTracker.heard` | state | How many notes have been counted. |
+| `LiveKeyTracker.result()` | state | The current `KeyResult`, or `undefined` before any note. |
+
+</details>
+
+The source contracts are `LiveChordTracker`, `LiveChordState` and
+`LiveKeyTracker` at `@webmusic/score/analyze/headless`. The key callback
+receives `KeyResult` as described by [detectKey](/score/api/analyze/).
+Trackers do not interpret elapsed seconds or musical beats; they only
+process supplied pitches. The key tracker weights onsets equally, not by
+duration, velocity or recentness.
+
+## Related
+
+**Composed by.** [`<live-chord-analysis>`](/score/element/analyze/live-chord-analysis/)
+uses the chord tracker for sounding-note state. Key diagnostics and retained
+history are available to application-owned code through the APIs above.
+
+[createAnalysisSession](/score/headless/analyze/analysis-session/) works on
+an immutable score. [createActiveNoteTracker](/score/headless/view/pitch-view/#active-note-tracker)
+tracks held pitches without naming chords.

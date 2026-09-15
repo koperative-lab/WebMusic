@@ -1,0 +1,57 @@
+{
+  "package": "spessasynth_core",
+  "version": "4.3.20",
+  "artifacts": [
+    {
+      "file": "dist/index.js",
+      "sha256": "c0dd25fd6cb86477e92b4f1d728f3ebf1e75b55462e92f79eb5619e01272ff5f"
+    },
+    {
+      "file": "dist/index.js.map",
+      "sha256": "cc352f8838e003f516035adbacd87ed80eddaff8297e00df7f5beee38ecf119e"
+    }
+  ],
+  "documents": [
+    {
+      "title": "fflate bundled with SpessaSynth Core",
+      "file": "spessasynth-core-fflate-MIT.txt",
+      "source": "https://raw.githubusercontent.com/spessasus/spessasynth_core/85addf00b18caf4b9e328afa8169e2c4bf77f7db/src/externals/fflate/LICENSE",
+      "sha256": "805f6cb28bb8b6d3a0badd83c93bccd9671fa01a3b4b92b7042b0743325ac243"
+    },
+    {
+      "title": "MeltySynth filter code adapted by SpessaSynth Core",
+      "file": "meltysynth-MIT.txt",
+      "source": "https://raw.githubusercontent.com/sinshu/meltysynth/4ba079c9ee1453b03be7e164d254f48426f0aac3/LICENSE.txt",
+      "sha256": "39ef382469457205ee0eaa6a166091147fe87249a5ac8f7e16feb3c915175c15"
+    },
+    {
+      "title": "DattorroReverbNode adapted by SpessaSynth Core",
+      "file": "dattorro-reverb-LICENSE.txt",
+      "source": "https://raw.githubusercontent.com/khoin/DattorroReverbNode/d65d0dadeb3723fabc2d069897ef4050224551cf/LICENSE",
+      "sha256": "58df521b15ee0ff5b598908f4731fb7d3cbf70300cf478d929194306e341b643"
+    }
+  ],
+  "sourceEvidence": {
+    "npmGitHead": "85addf00b18caf4b9e328afa8169e2c4bf77f7db",
+    "npmMetadata": "https://registry.npmjs.org/spessasynth_core/4.3.20",
+    "fflate": {
+      "source": "https://raw.githubusercontent.com/spessasus/spessasynth_core/85addf00b18caf4b9e328afa8169e2c4bf77f7db/src/externals/fflate/fflate.min.js",
+      "sha256": "4ff4c4e64ac33e8d5486d28ab06afef86c6358f9b2bdba3a17a83eee53ac9c31",
+      "verification": "Byte-identical to sourcesContent in the installed dist/index.js.map. This is the vendored 2023 copyright notice, not the separately installed fflate package."
+    },
+    "adaptedSources": [
+      {
+        "source": "../src/synthesizer/audio_engine/voice/lowpass_filter.ts",
+        "statement": "The coefficient calculation code was originally ported from meltysynth by sinshu."
+      },
+      {
+        "source": "../src/synthesizer/audio_engine/channel/render_voice.ts",
+        "statement": "Initial filtering code was ported from meltysynth created by sinshu."
+      },
+      {
+        "source": "../src/synthesizer/audio_engine/effects/reverb/dattorro.ts",
+        "statement": "Dattorro Reverb Node by khoin on GitHub, public domain. Adapted for spessasynth by spessasus."
+      }
+    ]
+  }
+}

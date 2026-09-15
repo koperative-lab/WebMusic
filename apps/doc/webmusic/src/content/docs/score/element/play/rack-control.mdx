@@ -1,0 +1,177 @@
+---
+title: '<rack-control>'
+description: 'Mixer element for a shared Rack — a master fader plus per-member volume faders, re-rendering whenever members are added or removed.'
+sidebar:
+  order: 2
+---
+
+import RackControlDemo from '../../../../../components/RackControlDemo.astro';
+
+`<rack-control>` is the mixing desk for a [`Rack`](/score/headless/play/rack/): a fader per member,
+a master over them, and mute and solo on each. Write the parts inside it, wrap the whole thing in a
+player, and the composition is the markup:
+
+```html
+<score-player>                       <!-- the transport, for every part at once -->
+  <rack-control>                     <!-- the desk, and the rack's owner -->
+    <rack-part id="lead" src="lead.mid" sound="triangle"></rack-part>
+    <rack-part id="bass" src="bass.mid" sound="sawtooth"></rack-part>
+  </rack-control>
+</score-player>
+```
+
+A [`<rack-part>`](#rack-part) is a **declaration**, not a player: it renders nothing and owns no
+engine. A rack member is headless — a score and a sound, and the rack builds the `ScorePlayer` that
+plays it — and this is how one is written down without pretending otherwise.
+
+The desk announces its Rack to the containing player. Its direct `<rack-part>`
+children supply member declarations; script can also add members to an assigned
+Rack. The Rack owns the member players and their musical state.
+
+Its attributes are about what the desk **shows**. `master`, `mute` and `solo` each add or take away a
+control, which is the only thing a mixing surface has to configure that is not already a property of
+the rack behind it. Hiding mute or solo does not grey a button out: the command is not offered to the
+mixer at all.
+
+The rack is the single source of truth. Levels, mute and solo are read back off it rather than
+mirrored here, so a fader cannot drift from the gain it moves — and because `Rack` reports a mix
+change as well as a membership change, anything else driving the rack repaints this desk too.
+
+<RackControlDemo />
+
+The **Effects** collection in Parameters is the same chain editor used by
+[`<score-player>`](/score/element/play/score-player/). Its order is signal order: the rack's summed
+output enters the first card, then each card below it. The editor assigns the resulting
+`Effect.chain(...)` to the desk's `.effect` property, so it processes the master bus once rather
+than creating a separate copy for every part. The generated JavaScript beneath the markup is part
+of the Copy result too.
+
+## Import
+
+```html
+<script type="module">
+  import {
+    defineScorePlayerElement,
+    defineRackControlElement,
+    defineRackPartElement,
+  } from '@webmusic/score/play/element';
+  defineScorePlayerElement();
+  defineRackControlElement();
+  defineRackPartElement();
+</script>
+
+<score-player>
+  <rack-control>
+    <rack-part id="lead" src="lead.mid" sound="triangle"></rack-part>
+  </rack-control>
+</score-player>
+```
+
+## `<rack-part>`
+
+One member of the desk, declared in markup. This section owns its nonvisual
+contract. Outside a direct `<rack-control>` parent, `src` is not fetched and no
+Rack member or playback engine is created.
+
+| Member | Kind | Default | Description |
+| --- | --- | --- | --- |
+| `id` | attribute | `part-N` | Member id and fader label; `N` is the declaration's position among the desk's direct children. Changing it reconciles the member without reloading its score. |
+| `src` | attribute | — | URL of the score this part contributes, loaded through the sibling `@webmusic/score/io` capability while inside a desk. |
+| `format` | attribute | adaptive | Forces the parser when the extension is missing or lies. Only read while `src` is loading. |
+| `sound` | attribute | the rack's default | Oscillator name: `sine`, `square`, `sawtooth` or `triangle`. |
+| `.score` | property | — | A `Score` assigned directly. Wins over `src`. |
+| `.sound` | property | — | A `HeadlessSynth` assigned directly. Wins over `sound`, and the only way to give a part a synth the attribute cannot name. |
+| `webscore:error` | event | — | `{ operation: 'rack-part', error }`, bubbling and composed. |
+
+The `id` names the fader the desk draws, so give each part one; a part with no `id` falls back to its
+position among its siblings. There is no `rate`, `loop`, `pan` or chrome: a part is not a player, so
+there is nothing on it for those to act on. The player wrapping the desk owns playback for every part
+at once, and the desk owns the levels.
+
+Changing `id` renames the live member without downloading its score again, rebuilding its player or
+resetting its mix state. Duplicate requested ids leave existing members intact and emit an error.
+Changing `sound` re-voices the part in place. Changing `src` or `format`
+reloads its score, which does replace the member — `Rack.add` on an existing id disposes the live
+player, and a new score is a different member.
+
+A source replacement or disconnection aborts its pending request. Late results cannot replace
+the current declaration. A failed current load emits `webscore:error`; the already resolved
+declaration remains until replacement succeeds or its source is cleared. Removing a declaration
+removes its member from the desk. Supplied sounds remain caller-owned.
+
+## Filling the rack
+
+`<rack-part>` covers the markup case. From script, build the members headless and hand a rack over
+instead. Either assign one — adopted, and never disposed
+here — or let the element create its own and reach it through `.rack`:
+
+```ts
+import { Rack, Sound } from '@webmusic/score/play/headless';
+import type { RackControlElement } from '@webmusic/score/play/element';
+
+const rack = new Rack();
+rack.add({ id: 'lead', score: lead, sound: Sound.oscillator() });
+rack.add({ id: 'bass', score: bass, sound: Sound.oscillator({ type: 'sawtooth' }) });
+
+document.querySelector<RackControlElement>('rack-control')!.rack = rack;
+```
+
+Add or remove a member later and the desk redraws its strips; move a level from anywhere and the
+faders follow.
+
+<details class="component-section">
+<summary>API</summary>
+
+
+The desk reads master and member state from its Rack. Membership changes update
+the strips; mix changes update their values. Direct `<rack-part>` children
+declare members, and `.rack` can supply an existing Rack. Transport remains on
+`<score-player>` or the application-owned Headless controller.
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `master` | attribute | Show the master strip. Absent means shown; `master="false"` leaves the channel strips alone. |
+| `mute` | attribute | Show per-channel mute, enabled by default; `mute="false"` removes the command from the mixer. |
+| `solo` | attribute | Show per-channel solo, enabled by default. Soloing one channel clears the rest; `solo="false"` removes the command. |
+| child `<rack-part>` | markup | Each declares one rack member. Labelled by its `id`, or by position when it has none. |
+| `.rack` | property | The `Rack` to mix. Assigning one adopts it — it is never disposed here. Left unset, the element creates its own and disposes it on disconnect. |
+| `.effect` | property | Post-processing recipe for the rack's summed output. Assign an `Effect` or `Effect.chain(...)`; replacing it updates the owned or assigned Rack in place without rebuilding members. |
+| `webscore:error` | event | `{ operation: 'rack-control', error }`, bubbling and composed. Reports member reconciliation, Rack mix commands, master-effect replacement, owned Rack cleanup or presenter failures. |
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+The host fits its container and respects native `hidden`. The master stays beside
+an internally scrollable channel bank; names wrap within their strips, and a
+nonempty bank can receive keyboard focus for horizontal scrolling. Resizing does
+not rebuild controls or alter the Rack.
+
+The `--rc-*` aliases override this desk only. Without them, controls keep their
+`--wm-mixer-*` and shared UIKit theme inputs, including `--wm-foreground`,
+`--wm-surface-muted`, `--wm-accent` and `--wm-focus`. Use the exposed parts to
+change the strip or label layout without replacing the fader behavior.
+
+The outer surface also reads `--wm-component-background`, `--wm-component-border`,
+`--wm-component-radius` and `--wm-component-padding`. Override just this desk
+with `--wm-rack-control-surface-background`, `--wm-rack-control-surface-border`,
+`--wm-rack-control-surface-radius` or `--wm-rack-control-surface-padding`.
+Background accepts `transparent`; the surface border accepts a complete border
+or `none`. Channel declarations (`rack-part`) have no visual surface.
+
+
+```css
+rack-control {
+  --rc-border: #d8d8d8;
+  --rc-fader-width: 2rem;
+  --rc-fader-height: 96px;
+  --rc-track: #f3f3f3;
+  --rc-track-border: #d8d8d8; /* soft control outline */
+  --rc-fill: #999;
+  --rc-thumb: #111;            /* position indicator */
+  --rc-radius: 0;
+}
+```
+
+</details>

@@ -1,0 +1,674 @@
+---
+title: '@webmusic/score/view'
+description: Score visualization — stateless layout APIs, code-only view and navigation models, explicit SVG/OSMD renderers, and three styled Web Components.
+---
+
+
+`@webmusic/score/view` turns `Score` objects into layout data and visual renderings. Its three Web Components are `<score-view>` for score-position views, `<pitch-view>` for sounding pitches, and `<sheet-view>` for optional full engraving.
+
+Playback lives in [`@webmusic/score/play`](/score/api/play/). Views borrow player data or events according to their owning contracts; the thumbnail is a passive whole-score preview. Imperative renderers expose `redraw` for application-driven highlighting.
+
+## Install
+
+`npm install @webmusic/score` — use an available published version or the local workspace; [Install](/score/#install) has the full setup.
+
+The root model and this capability ship in that one package. The browser staff
+renderer includes its VexFlow dependency; it needs no separate installation.
+Optional integration:
+
+```txt
+@webmusic/score/io     sibling capability used by the Web Component to load a `src` file
+opensheetmusicdisplay  required only for the separate OSMD page-engraving workflow
+```
+
+The view capability has four entry points — the [package subpath table](/score/api/#package-subpaths) lists them with every other `@webmusic/score` entry:
+
+The `@webmusic/score/view` root is the **stateless API** (serializable layout data and the note-sequence view model). `/headless` provides [score-window, map-navigation and held-pitch models](/score/headless/#view): they own reusable view behavior and optional playback subscriptions without creating UI or choosing visual styles. Imperative SVG/Canvas/OSMD adapters live explicitly on `/render`, while the styled custom element lives on `/element`.
+
+The browser renderer implementation is also separated by responsibility: shared sizing/lifecycle, SVG virtualization, piano-roll, waterfall, staff, and the public factory each live in their own internal module. These internals are not package subpaths; consumers should use `/render`.
+
+---
+
+## Web Components
+
+`<score-view>`, `<pitch-view>` and `<sheet-view>` live on `@webmusic/score/view/element`. Their owning pages under [Web Components › View](/score/element/#view) document each tag’s types, attributes, events, player binding and styling. This page owns the code-facing APIs they compose.
+
+The code-only APIs below let you maintain view state or build your own renderer; the explicit `/render` adapters draw into browser elements. The examples assume a `score` built with `@webmusic/score`.
+
+## Prepare a score
+
+Score layout APIs work from a `Score`; current-pitch projections below instead accept MIDI values. This page uses a small score built with `@webmusic/score`.
+
+```ts
+import { Duration, MeasureId, PartId, Pitch, Rational, ScoreBuilder, VoiceId } from '@webmusic/score';
+
+const builder = new ScoreBuilder();
+const timeSignature = { numerator: 4, denominator: 4 };
+const partId = PartId('piano');
+const voice = VoiceId('piano-v1');
+
+builder
+  .setMetadata({ title: 'View API Study' })
+  .addTempo({ atQuarters: Rational.ZERO, bpm: 120 })
+  .addMeter({ atQuarters: Rational.ZERO, measureNumber: 1, timeSignature });
+
+builder.addPart({ id: partId, name: 'Piano', staves: 2, midiProgram: 0 });
+builder.addMeasure({
+  id: MeasureId('m1'),
+  number: 1,
+  onsetQuarters: Rational.ZERO,
+  durationQuarters: new Rational(4),
+  timeSignature,
+  keySignature: { fifths: 0, mode: 'major' },
+});
+
+['C4', 'E4', 'G4', 'C5', 'E3', 'G3', 'C4', 'E4'].forEach((name, index) => {
+  const pitch = Pitch.parse(name);
+  builder.addNote(partId, {
+    id: builder.newNoteId(),
+    pitch,
+    onsetQuarters: new Rational(index, 2),
+    duration: Duration.eighth(),
+    voice,
+    staff: pitch.midi < 60 ? 2 : 1,
+  });
+});
+
+const score = builder.build();
+```
+
+## Create a code-only score view
+
+`createScoreView` is a stateful domain component for application code. It
+converts the score once, tracks playback state, recalculates active notes on a
+seek, and computes the notes intersecting a requested time window. Its state is
+immutable plain data, so it can drive React, native UI, WebGL, a terminal, or a
+custom renderer without creating an element or applying a style.
+
+```ts
+import { createScoreView } from '@webmusic/score/view/headless';
+
+const view = createScoreView(score, {
+  type: 'piano-roll',
+  viewport: { startTime: 0, endTime: 8 },
+});
+
+const unsubscribe = view.subscribe((state) => {
+  drawMyOwnView(state.visibleNotes, state.activeNotes);
+});
+
+view.noteOn(60, 0);       // direct player-style control
+view.seek(4);             // activeNotes is recomputed at 4 seconds
+view.setViewport(4, 12);  // publishes a new immutable snapshot
+
+unsubscribe();
+view.dispose();
+```
+
+## Render a piano roll
+
+`renderPianoRollVisualizer` draws the built-in SVG piano roll into an `<svg>` and returns the [renderer handle](#renderer-handle) used by `<score-view type="piano-roll">`.
+
+```ts
+import { renderPianoRollVisualizer } from '@webmusic/score/view/render';
+
+const svg = document.querySelector<SVGSVGElement>('svg#piano-roll')!;
+const rendered = renderPianoRollVisualizer(score, svg, {
+  noteHeight: 12,
+  noteSpacing: 2,
+  pixelsPerSecond: 96,
+  noteRGB: '17, 17, 17',
+  activeNoteRGB: '217, 40, 40',
+});
+
+rendered.redraw(rendered.noteSequence.notes[0], true);
+rendered.clearActiveNotes();
+```
+
+### Renderer handle
+
+The render helpers return `RenderedScoreVisualizer<TVisualizer>`:
+
+| Member | Contract |
+| --- | --- |
+| `noteSequence` | Read-only sequence used by this renderer. |
+| `visualizer` | The underlying renderer instance. |
+| `redraw(activeNote?, scrollIntoView?)` | Existing note-driven drawing entry. Exact-time-capable renderers use the nominated note’s onset; OSMD moves its engraving cursor. Returns a renderer coordinate or `null`. |
+| `redrawAtTime?(nominalSeconds, scrollIntoView?)` | Optional exact-time drawing entry, implemented by the built-in SVG and Canvas piano rolls, waterfall and scrolling staff. Highlights notes where `startTime <= nominalSeconds < endTime`; it does not snap to a selected note’s onset. Returns a renderer coordinate or `null`. |
+| `clearActiveNotes()` | Clear current highlights and the applicable cursor display. |
+| `dispose?()` | Release owned rendering resources and DOM. Supplied by all package renderers and safe to repeat. |
+
+`redrawAtTime` rejects non-finite time with `RangeError`. After disposal it is inert and returns `null`. Use nominal score seconds, without playback-rate scaling. `scrollIntoView: false` updates highlighting without requesting follow scrolling. Coordinate orientation and default following behavior belong to the selected renderer. OSMD retains `redraw` and does not implement `redrawAtTime`.
+
+```ts
+// On a caller-owned clock or position notification:
+rendered.redrawAtTime?.(1.25, false);
+```
+
+## Render annotations
+
+`VisualizerRenderOptions.showAnnotations` defaults to `true` for the SVG
+piano-roll, scrolling staff and waterfall factories. They read the original
+Score's supported `Part.directions`: words such as `rit.`, rehearsal labels,
+dynamics, metronome marks, pedal signs/lines and crescendo/diminuendo hairpins.
+These are visual directions, with no tempo, volume or sustain automation.
+
+The piano roll uses a compact strip above its notes; waterfall uses a side rail
+on its vertical time axis. Staff retains authored above/below placement around
+the notation. The other types use compact timeline labels and span lines,
+without reproducing staff engraving positions. At dense onsets labels can be
+abbreviated or reduced to markers; each mark's SVG title retains the full text.
+Set `showAnnotations: false` to remove the marks and their layout
+space. Staff and piano-roll natural heights shrink; waterfall reclaims width
+while retaining its requested viewport height. Explicit application sizing
+still defines the outer viewport.
+
+The Element's [`show-annotations` attribute](/score/element/view/score-view/#annotations-and-compact-layout)
+also covers its lightweight map and thumbnail types. This is a rendering
+option; Headless `createScoreView` continues to expose sounding-note state and
+does not allocate an annotation surface.
+
+### Static thumbnail
+
+`renderScoreThumbnail(surface, notes, options?)` appends a fitted SVG to a
+caller-owned `HTMLElement` and returns that `SVGSVGElement`. `notes` is the
+readonly `PianoRollNote[]` result of `createPianoRollLayout`; an empty array
+returns `undefined` without drawing. A bare note layout has no expression
+metadata, so supply `options.score` to draw the original Score's directions.
+
+| `ScoreThumbnailRenderOptions` member | Default | Description |
+| --- | --- | --- |
+| `color` | `currentColor` | CSS fill for notes and annotations. |
+| `label` | `Score preview` | Accessible name of the returned SVG. |
+| `score` | absent | Original Score matching the note layout; supplies timed directions. |
+| `showAnnotations` | `true` | Show directions when `score` is supplied; `false` removes their strip. |
+
+With annotations, the drawing uses a `3rem` note preview plus a compact strip
+measured at the surface's current width. Nearby directions form readable
+overview groups with representative labels and counts; their titles retain all
+source text and musical ranges. Text retains its size while the note plot fits
+the remaining height, with a `1rem` minimum note area when annotations are
+visible. Without annotations, the SVG fits the supplied surface.
+This one-shot function creates no resize observer or player binding;
+remove its returned SVG at teardown or before drawing again. The
+[`thumbnail` Element type](/score/element/view/score-view/#thumbnail) owns its
+responsive updates and cleanup.
+
+```ts
+import {createPianoRollLayout} from '@webmusic/score/view';
+import {renderScoreThumbnail} from '@webmusic/score/view/render';
+
+const surface = document.querySelector<HTMLElement>('#preview')!;
+const drawing = renderScoreThumbnail(surface, createPianoRollLayout(score), {
+  score,
+  showAnnotations: true,
+});
+// Keep this callback for the owning surface's teardown.
+const disposePreview = () => drawing?.remove();
+```
+
+## Render staff notation
+
+`renderStaffVisualizer` accepts a parsed Score, including MusicXML imported
+through `@webmusic/score/io`. `StaffRenderOptions.splitStaves` defaults to `true`:
+each part's source staff assignments become separate layers. Set it to `false`
+to combine staves within each part; different parts remain separate and the
+source Score is unchanged. Layers align written onsets and share a scroll
+position and playhead; the bottom timeline supplies manual scrolling.
+`ScrollType.PAGE`, `NOTE` and `BAR` follow that shared position.
+
+The renderer projects the original Score's rational written positions and
+durations, including rests, spelled pitches, string voice identities, chords
+and stored measure boundaries. This data is separate from the cached
+sounding-note sequence used for activity. VexFlow 4.2.5 supplies the SVG glyphs;
+WebMusic groups beams per voice, staff and measure, using source beam marks
+before automatic metric grouping. Written tuplet ratios and group IDs control
+numbers/brackets and source number visibility. Source up/down stems, hidden
+spacing notes, ties and ordinary same-staff slurs are retained. Part-local
+`clefChanges` apply at exact onsets, including within measures, and update the
+fixed signature header while scrolling. Inference only applies when the staff
+has no authored clefs; it limits ledger lines and avoids unnecessary changes.
+
+Part `directions` draw words, rehearsal labels, dynamics, metronome marks,
+pedal signs/lines and crescendo/diminuendo wedges. Spans pair by staff and
+number across measures; their exact musical positions remain independent of
+playback. Text placement and supported styles survive import. Hairpins leave
+space for adjacent dynamics, and marks contribute to vertical staff clearance.
+Ties and slurs are paired from source identity and laid out separately, using
+head/stem-side attachments and surrounding glyph obstacles.
+
+The drawing adds a system-start connector, plus braces and connecting barlines
+for staves within the same part. Active highlighting includes noteheads and
+their shared stems, flags and beams; a shared glyph stays active while any
+associated note sounds.
+
+Adjacent staves in one part use compact spacing based on the full score's glyph
+bounds. Stems, ties and ledger lines keep their clearance even when currently
+offscreen; notation is not scaled down to reduce the gap. Outer padding also
+follows the drawing. `showAnnotations: false` excludes expressions from this
+calculation while retaining notes, rests, clefs, key/time signatures, beams,
+tuplets, ties, slurs and articulations.
+
+A single full-height divider bounds the fixed signature area. The scrolling note drawing is clipped at this boundary to keep notes from overlapping clefs and signatures.
+
+`BAR` follows the current beat when a complete measure cannot fit in the viewport. Resize and hidden-to-visible layout retain the latest following request; `redrawAtTime(time, false)` and a deliberate manual pan preserve their scroll position through resize.
+
+Default spacing considers note and modifier geometry. A positive
+`pixelsPerSecond` requests rhythmic spacing of `pixelsPerSecond × 60 / initialQpm`
+pixels per quarter, with extra width where glyphs need it. The playhead maps
+the complete tempo map onto engraved onset columns; this is not an exact
+linear pixel/time ruler. `defaultKey` is a fallback chromatic major-key index
+(0 = C, 1 = D♭, 2 = D), not a fifths count.
+
+Stored notation is not rounded to a 1/16-quarter grid. MusicXML supplies written
+relationships that timing-only MIDI or legacy sequences cannot recover.
+Without usable written values, glyphs use readable duration/clef inference and
+retain the exact stored onset timeline. `redrawAtTime` tests activity against
+nominal sounding times, not the inferred glyph duration. File-to-Score
+conversion limits remain owned by [I/O](/score/api/io/).
+
+This scrolling renderer does not implement cross-staff/cross-measure beams,
+nested tuplet layout, complete grace notation, lyrics or
+page/system justification.
+Retained metadata does not mean every mark is drawn. [OSMD](#render-with-osmd)
+remains a separate optional page-engraving workflow.
+
+```ts
+import { renderStaffVisualizer } from '@webmusic/score/view/render';
+
+const container = document.querySelector<HTMLDivElement>('#staff')!;
+const rendered = renderStaffVisualizer(score, container, {
+  splitStaves: true,
+  showAnnotations: true,
+  noteHeight: 7,
+  noteSpacing: 1,
+  pixelsPerSecond: 0,
+  noteRGB: '17, 17, 17',
+  activeNoteRGB: '217, 40, 40',
+});
+
+rendered.redraw(rendered.noteSequence.notes[0], true);
+```
+
+## Render a waterfall
+
+`renderWaterfallVisualizer` draws falling notes on a vertical time axis, using
+piano-style pitch columns without an embedded keyboard. Its default range is
+A0–C8, with 20px natural-note columns and accidental columns 0.62 times as wide.
+Set `showOnlyOctavesUsed: true` to use occupied MIDI octaves and `fitToWidth: true`
+to fit the current container width. Positive explicit `whiteNoteWidth` or
+`blackNoteWidth` values disable fitting and retain pixel column widths.
+Setting only `blackNoteWidth` derives natural-note width by dividing by `0.62`;
+accidental width is capped at natural width. Explicit `minPitch` / `maxPitch`
+select exact MIDI endpoints before automatic octave selection. When composing
+an independent keyboard, match those endpoints and widths and use a shared
+horizontal scroller; see the [live aligned example](/score/element/view/score-view/#align-a-waterfall-and-keyboard).
+
+The natural falling-note viewport follows score duration at the chosen time
+scale, bounded to 80–200px. An explicit measurable container height uses the full
+available height. Resizing reflows note columns while preserving the visible
+score position and active notes; hidden containers retain their last useful
+layout until a size is available. `dispose()` releases the resize observer (or
+window-resize fallback) and owned DOM. Annotations follow the same vertical
+time axis in a separate rail.
+
+```ts
+import { renderWaterfallVisualizer } from '@webmusic/score/view/render';
+
+const container = document.querySelector<HTMLDivElement>('#waterfall')!;
+const rendered = renderWaterfallVisualizer(score, container, {
+  noteSpacing: 2,
+  pixelsPerSecond: 64,
+  whiteNoteWidth: 16,
+  showOnlyOctavesUsed: true,
+});
+
+rendered.redraw(rendered.noteSequence.notes[0], true);
+```
+
+`WaterfallVisualizerConfig` controls falling-note geometry and optional fitting;
+it has no keyboard presenter port. `whiteNoteHeight` and `blackNoteHeight` are
+not supported render options and `configure()` rejects them. Applications that
+also need a keyboard compose a separate
+[`<pitch-view type="keyboard">`](/score/element/view/pitch-view/) or UIKit pitch
+presenter around the same borrowed player state.
+
+`VisualizerRenderOptions.noteColor` and `activeNoteColor` accept full CSS colors, including custom-property expressions. They override the corresponding `noteRGB` / `activeNoteRGB` channel strings. The imperative renderers retain neutral defaults: `noteRGB: '96, 96, 96'` and `activeNoteRGB: '32, 32, 32'`.
+
+The published note-renderer factories and `<score-view>` draw SVG. Colors remain live CSS values: host or ancestor class/token changes update existing notes without a source reload, a cursor reset or an additional animation loop. Their SVG drawing backgrounds remain transparent; the application or composing UIKit stage owns the surrounding surface.
+
+The styled [`<score-view>`](/score/element/view/score-view/) supplies its own defaults. Its active color is `var(--wm-score-view-active-note, var(--wm-accent, rgb(240, 84, 119)))`: the specific token precedes the shared accent, with the existing red as the final fallback. Changing the Element’s default does not change the imperative renderer palette.
+
+## Sync a visualizer to playback
+
+`bindPlayerToVisualizer(rendered, subscribe, controller?)` accepts an application-supplied event adapter. It retains held notes across individual releases and clears highlights on end; it does not create a player or clock. This note-event helper uses `redraw`. For continuous exact-time highlighting, drive `redrawAtTime` from the application’s nominal position notifications.
+
+```ts
+import {bindPlayerToVisualizer} from '@webmusic/score/view/render';
+import {createScorePlayer} from '@webmusic/score/play/headless';
+import {noteMidi, noteOnsetSeconds} from '@webmusic/score';
+
+const player = createScorePlayer(score);
+const unbind = bindPlayerToVisualizer(rendered, ({noteOn, noteOff, end}) => {
+  const offOn = player.on('noteOn', note => noteOn(noteMidi(note), noteOnsetSeconds(note, score)));
+  const offOff = player.on('noteOff', note => noteOff(noteMidi(note), noteOnsetSeconds(note, score)));
+  const offEnd = player.on('end', end);
+  return () => { offOn(); offOff(); offEnd(); };
+});
+// … unbind() when the view goes away
+```
+
+To do it by hand instead — or to highlight from a source that is not a player
+— subscribe to `noteOn` yourself and call `redraw` with the matching sequence
+note. `findSequenceNote` locates the rendered note by MIDI pitch and onset.
+
+```ts
+import { findSequenceNote } from '@webmusic/score/view';
+import { renderPianoRollVisualizer } from '@webmusic/score/view/render';
+import { createScorePlayer } from '@webmusic/score/play/headless';
+import { noteMidi, noteOnsetSeconds } from '@webmusic/score';
+
+const rendered = renderPianoRollVisualizer(score, svg);
+const player = createScorePlayer(score);
+
+player.on('noteOn', (note) => {
+  const seqNote = findSequenceNote(rendered.noteSequence, noteMidi(note), noteOnsetSeconds(note, score));
+  rendered.redraw(seqNote, true);
+});
+player.on('end', () => rendered.clearActiveNotes());
+
+await player.play();
+```
+
+## Create layout data
+
+Use layout functions when you want serializable geometry and plan to draw with your own renderer: SVG, Canvas, WebGL, native UI, or a design-system component.
+
+Used layout scales must be finite and positive; invalid `pixelsPerSecond`,
+`laneHeight` or `staffSpace` values throw `RangeError`, including for empty
+scores. `pixelsPerSecond` defaults to 30. Piano-roll `laneHeight` defaults to
+6 pixels; waterfall uses it as natural-note column width (default 20), with accidental columns
+two-thirds as wide. Waterfall columns retain A0 (MIDI 21) at `x = 0` and extend
+across MIDI 0…127; pitches below A0 have negative `x`, which a renderer can
+translate into its own viewport. Recompute geometry when your chosen scale
+changes; these functions own no resize observer or pixel-to-time input adapter.
+
+`createStaffLayout` uses written diatonic steps relative to middle C, with one
+half staff-space per step and separate vertical origins for parts. Its
+`ledgerLines` value is a distance heuristic without a clef model; this projection
+is not a MusicXML engraving layout. Use the notation render adapters for clefs,
+staff structure and engraved glyph placement.
+
+
+```ts
+import { createPianoRollLayout, createStaffLayout, createWaterfallLayout } from '@webmusic/score/view';
+
+const pianoRoll = createPianoRollLayout(score, { pixelsPerSecond: 80, laneHeight: 8 });
+const staff = createStaffLayout(score, { pixelsPerSecond: 60, staffSpace: 10 });
+const waterfall = createWaterfallLayout(score, { pixelsPerSecond: 80, laneHeight: 18 });
+
+const values = {
+  pianoRoll: pianoRoll.slice(0, 3).map((item) => ({
+    pitch: item.note.pitch.toString(),
+    x: item.x,
+    y: item.y,
+    width: item.width,
+    height: item.height,
+  })),
+  staff: staff.slice(0, 3).map((item) => ({
+    pitch: item.note.pitch.toString(),
+    x: item.x,
+    staffY: item.staffY,
+    ledgerLines: item.ledgerLines,
+  })),
+  waterfall: waterfall.slice(0, 3).map((item) => ({
+    pitch: item.note.pitch.toString(),
+    x: item.x,
+    y: item.y,
+    startSeconds: item.startSeconds,
+    durationSeconds: item.durationSeconds,
+  })),
+};
+```
+
+Output:
+
+```json
+{
+  "pianoRoll": [
+    { "pitch": "C4", "x": 0, "y": 112, "width": 19, "height": 8 },
+    { "pitch": "E4", "x": 20, "y": 80, "width": 19, "height": 8 },
+    { "pitch": "G4", "x": 40, "y": 56, "width": 19, "height": 8 }
+  ],
+  "staff": [
+    { "pitch": "C4", "x": 0, "staffY": 0, "ledgerLines": 0 },
+    { "pitch": "E4", "x": 24, "staffY": -10, "ledgerLines": 0 },
+    { "pitch": "G4", "x": 48, "staffY": -20, "ledgerLines": 0 }
+  ],
+  "waterfall": [
+    { "pitch": "C4", "x": 414, "y": 141, "startSeconds": 0, "durationSeconds": 0.25 },
+    { "pitch": "E4", "x": 450, "y": 121, "startSeconds": 0.25, "durationSeconds": 0.25 },
+    { "pitch": "G4", "x": 486, "y": 101, "startSeconds": 0.5, "durationSeconds": 0.25 }
+  ]
+}
+```
+
+## Whole-score map data
+
+`createScoreMap` uses **quarter notes**, rather than the layouts' nominal
+seconds. Its `maxCells` (default 64) and `maxMarks` (default 24) must be finite;
+they are rounded and clamped to at least one, while non-finite values throw
+`RangeError`. Major rehearsal, tempo and meter landmarks survive mark thinning,
+so `maxMarks` is a target rather than a strict total limit. Density counts
+overlapping sounding note spans, including held notes crossing a cell boundary;
+it is neither loudness nor a harmonic estimate. Cells cover the complete
+non-negative score extent, including notes before, between and after supplied
+measures. Unmeasured intervals have no invented measure numbers; measured and
+unmeasured spans share the same `maxCells` budget. Overlapping measures form one
+non-overlapping span, with the actual first/last encountered measure numbers.
+Zero-duration measures remain eligible ruler marks without zero-width cells.
+
+
+```ts
+import {createScoreMap} from '@webmusic/score/view';
+
+const map = createScoreMap(score, {maxCells: 32, maxMarks: 16});
+console.log(map.durationQuarters, map.cells, map.marks);
+```
+
+`ScoreMapOptions.part` filters counts by part ID or name; an unmatched part has
+zero density while timeline coverage remains. `ScoreMapCell` carries
+`startQuarters`, `endQuarters`, `count`, `density` (`0…1`) and optional
+`firstMeasure`/`lastMeasure`. `ScoreMapMark` carries `startQuarters`, `label`
+and `level: 'major' | 'minor'`. `ScoreMap` contains `durationQuarters`, `cells`
+and `marks`; an empty score produces empty arrays.
+
+For source attachment and delegated navigation, compose
+[createScoreMapView](/score/headless/view/score-map-view/). The pure projection
+owns no player subscription, cursor or seek command.
+
+## Current-pitch projections
+
+These exports from `@webmusic/score/view` turn MIDI values into reusable data
+without a Score, chord analysis or UI. Use them with
+[createPitchView](/score/headless/view/pitch-view/) or your own held-note state.
+The arrays deduplicate and sort supplied MIDI pitches; tuning order is preserved.
+No pitch is moved to another octave and no guitar fingering is inferred.
+
+```ts
+import {currentStaffMarks, currentFretMarks, readoutPitch} from '@webmusic/score/view';
+
+const midis = [60, 63, 67];
+console.log(readoutPitch(63, 'flat').toString()); // Eb4
+console.log(currentStaffMarks(midis, 'flat'));
+console.log(currentFretMarks(midis, [40, 45, 50, 55, 59, 64], 0, 12, 'flat'));
+```
+
+| Export | Contract |
+| --- | --- |
+| `readoutPitch(midi, spelling = 'sharp')` | Returns a root-model `Pitch` in the requested sharp/flat spelling. |
+| `currentStaffMarks(midis, spelling = 'sharp')` | Returns `CurrentStaffMark[]`: MIDI, stable ID, written label, diatonic step, optional accidental, `active: true` and `column: 0`. |
+| `currentFretMarks(midis, tuning = STANDARD_VIEW_TUNING, firstFret = 0, frets = 12, spelling = 'sharp')` | Returns every exact-MIDI position within the inclusive fret interval `[firstFret, firstFret + frets]`. A pitch outside that window has no mark. |
+| `STANDARD_VIEW_TUNING` | Frozen low-to-high open-string MIDI array `[40, 45, 50, 55, 59, 64]`. |
+| `PitchReadoutSpelling` | `'sharp' \| 'flat'`; no automatic key inference. |
+| `CurrentStaffMark` | `{midi, id, label, diatonic, accidental?, active: true, column: 0}`. `diatonic` is octave × 7 plus the C-based letter index; accidental is `'sharp'` or `'flat'`. |
+| `CurrentFretMark` | `{midi, stringIndex, fret, label, mark, active: true, id}`. String index follows supplied tuning order, fret is semitones above that string, label includes the octave and mark omits it. |
+
+MIDI inputs must be integers in `0…127`; tuning has 1–12 such values.
+`firstFret` must be an integer in `0…24`, and `frets` an integer in `1…24`.
+Invalid pitches, tuning, spelling or fret geometry throw `RangeError` before
+returning a projection. The helpers own no subscriptions or disposal work.
+
+## Convert to a note sequence
+
+`scoreToNoteSequence` converts a `Score` into the internal view-model used by the visualizers. Use `findSequenceNote` to locate the rendered note that matches a MIDI pitch and start time.
+
+The conversion is cached by immutable Score identity and returns frozen data.
+It describes sounding notes; explicit rests and full written notation remain
+in the source Score. Staff rendering additionally projects that original Score
+instead of reconstructing beams, tuplets or clefs from the flattened sequence.
+Notes are sorted by nominal onset and then pitch. `findSequenceNote` expects
+that sorted order and returns the first matching pitch/onset within a strict
+one-microsecond tolerance; it does not distinguish simultaneous unisons. For
+exact part/note identity and all matching active notes, use the Headless view's
+playback observation.
+
+`secondsToQuarters(tempos, seconds)` integrates the sequence's full tempo map;
+`qpm` means quarter notes per minute, including any source beat-unit conversion.
+It sorts unordered markers without mutating them, extends the first tempo to
+the origin, uses 120 qpm for an empty map, and clamps negative time to zero.
+Seconds must be finite, marker times finite and non-negative, and qpm finite
+and positive; violations throw `RangeError`. Mutable marker arrays are re-read
+on every call. This converts nominal score time, not rate-scaled transport time.
+
+```ts
+import { findSequenceNote, scoreToNoteSequence } from '@webmusic/score/view';
+
+const sequence = scoreToNoteSequence(score);
+const active = findSequenceNote(sequence, 60, 0);
+
+const values = {
+  ticksPerQuarter: sequence.ticksPerQuarter,
+  notes: sequence.notes.length,
+  totalTime: sequence.totalTime,
+  firstNote: sequence.notes[0],
+  active,
+  partInfos: sequence.partInfos,
+};
+```
+
+Output:
+
+```json
+{
+  "ticksPerQuarter": 480,
+  "notes": 8,
+  "totalTime": 2,
+  "firstNote": {
+    "pitch": 60,
+    "velocity": 63,
+    "startTime": 0,
+    "endTime": 0.25,
+    "instrument": 0,
+    "program": 0,
+    "part": 0,
+    "staff": 1
+  },
+  "partInfos": [{ "part": 0, "name": "Piano" }]
+}
+```
+
+## Render with OSMD
+
+`renderOSMDStaffVisualizer` renders full notation engraving through OpenSheetMusicDisplay. The dependency is optional, and `@webmusic/score/view` does not convert scores to MusicXML by itself — pass pre-serialized MusicXML (e.g. `serializeMusicXML` from `@webmusic/score/io`) or a converter function.
+
+Install `opensheetmusicdisplay` to let a browser bundler resolve the lazy peer
+import, or inject `OpenSheetMusicDisplay`/`osmd` as shown below. Native browser
+modules need an import map or constructor injection. Importing the renderer
+does not evaluate the optional engine until rendering is requested.
+
+For an owned OSMD instance, the adapter reflows when its container width changes, using `ResizeObserver` or a window-resize fallback. Height-only changes do not re-engrave the score. Disposal releases the observer and pending resize work; a borrowed instance retains its existing lifecycle.
+
+For this adapter, `redraw(undefined, false)` cancels queued cursor scrolling without moving or clearing the cursor. `clearActiveNotes()` and disposal also invalidate pending scrolling. An explicit `redraw(note, true)` still requests scrolling when the default `followCursor` option is false.
+
+Backward cursor moves reset and replay OSMD’s iterator, reacquiring the replacement iterator created by `reset()` before applying checkpoints. This adapter continues to expose note-driven `redraw`, rather than `redrawAtTime`.
+
+```ts
+import { renderOSMDStaffVisualizer } from '@webmusic/score/view/render';
+import { OpenSheetMusicDisplay } from 'opensheetmusicdisplay';
+
+const rendered = await renderOSMDStaffVisualizer(score, document.querySelector('#osmd'), {
+  musicXML,
+  OpenSheetMusicDisplay,
+  osmdOptions: {
+    drawTitle: false,
+    drawPartNames: false,
+  },
+});
+
+rendered.redraw(rendered.noteSequence.notes[0], true);
+```
+
+Output:
+
+```txt
+Score + MusicXML + OSMD constructor -> RenderedScoreVisualizer<OSMDLike>
+```
+
+## API Reference
+
+| API | Kind | Use it for |
+| --- | --- | --- |
+| `defineScoreViewElement(tag?)` | Web Component | Register `<score-view>` with piano-roll, staff, waterfall, map and thumbnail types. |
+| `definePitchViewElement(tag?)` | Web Component | Register `<pitch-view>` with keyboard, current staff and fretboard types. |
+| `defineSheetViewElement(tag?)` | Web Component | Register `<sheet-view>` with its optional OSMD renderer. |
+| `defineAllViewElements()` | Web Component | Register the three default View tags. |
+| `ScoreViewElement`, `PitchViewElement`, `SheetViewElement` | Web Component | Classes from `@webmusic/score/view/element`; owning [Element references](/score/element/#view) describe properties, attributes and lifecycle. |
+| `ScoreViewElementType` | Type | Five-value Element type: `piano-roll`, `staff`, `waterfall`, `map`, `thumbnail`. |
+| `PitchViewType` | Type | `keyboard`, `staff` or `fretboard`. |
+| `ScoreViewSeekDetail` | Type | Map navigation event detail: `{quarters, seconds}`, with nominal seconds. |
+| `ScoreViewType`, `ScoreViewRenderOptions`, `parseColorAttr` | Element exports | The three note-renderer types, their option union and attribute-color parser; map/thumbnail do not extend the lower-level three-type model. |
+| `createScoreView(score, options?)` | Headless model | [Score window state](/score/headless/view/score-view/), from `@webmusic/score/view/headless`. |
+| `createScoreMapView(options?)` | Headless model | [Map navigation and source following](/score/headless/view/score-map-view/), from `/headless`. |
+| `createPitchView(options?)` | Headless model | [Current pitches and source following](/score/headless/view/pitch-view/), from `/headless`. |
+| `renderPianoRollVisualizer(score, svg, config?)` | Visualizer | Render an SVG piano roll and return a visualizer handle (from `@webmusic/score/view/render`). |
+| `renderStaffVisualizer(score, container, config?)` | Visualizer | Render scrolling SVG staff notation from written Score data (from `@webmusic/score/view/render`). |
+| `renderWaterfallVisualizer(score, container, config?)` | Visualizer | Render falling notes on piano-style pitch columns, without an embedded keyboard (from `@webmusic/score/view/render`). |
+| `renderScoreThumbnail(surface, notes, options?)` | Renderer | Append a static fitted note preview with optional original Score directions; returns its SVG (from `@webmusic/score/view/render`). |
+| `ScoreThumbnailRenderOptions` | Render type | Thumbnail color, accessible label, original Score and annotation visibility (from `@webmusic/score/view/render`). |
+| `WaterfallVisualizerConfig` | Render type | Falling-note geometry plus opt-in container fitting. |
+| `renderOSMDStaffVisualizer(score, container, options?)` | Visualizer | Render full staff engraving through OpenSheetMusicDisplay (from `@webmusic/score/view/render`). |
+| `createPianoRollLayout(score, opts?)` | Layout | Return serializable piano-roll note rectangles. |
+| `createStaffLayout(score, opts?)` | Layout | Return serializable staff glyph positions. |
+| `createWaterfallLayout(score, opts?)` | Layout | Return serializable waterfall note rectangles. |
+| `readoutPitch`, `currentStaffMarks`, `currentFretMarks`, `STANDARD_VIEW_TUNING` | Projection/helpers | [Current-pitch data](#current-pitch-projections), exported by this root. |
+| `PitchViewOptions`, `PitchViewState` | Type | [PitchView construction and state](/score/headless/view/pitch-view/), type-only exports from this root. |
+| `PitchReadoutSpelling`, `CurrentStaffMark`, `CurrentFretMark` | Type | [Current-pitch projection inputs/results](#current-pitch-projections). |
+| `createScoreMap(score, options?)` | Layout | Project a whole score onto one strip: note density per bar, bar and rehearsal landmarks (backs `<score-view type="map">`). |
+| `scoreToNoteSequence(score)` | View model | Convert `Score` into the visualizer note-sequence format. |
+| `findSequenceNote(sequence, pitch, startTime)` | View model | Find the sequence note matching a pitch and start time (for highlighting). |
+| `secondsToQuarters(tempos, seconds)` | Time conversion | Integrate nominal seconds through quarter-notes-per-minute markers; use the Score TimeMap for inverse conversion. |
+| `ScrollType` | Enum | Staff scroll behaviour (`PAGE` / `NOTE` / `BAR`) for `renderStaffVisualizer` (from `@webmusic/score/view/render`). |
+| `ScoreNoteSequence`, `ScoreSequenceNote` | Type | View-model sequence and note shapes. Score-derived sequence notes retain optional `noteId` and `partId` for exact playback identity; external legacy sequences may omit them. |
+| `ScoreViewOptions`, `ScoreViewState`, `ScoreViewTimeRange` | Type | Public configuration and immutable result contracts for `createScoreView` (type-only exports from `@webmusic/score/view`). |
+| `RenderedScoreVisualizer` | Type | The [renderer handle](#renderer-handle), including optional `redrawAtTime` for exact nominal-time activity. |
+| `PianoRollNote`, `WaterfallNote`, `StaffGlyph` | Type | Layout result shapes — geometry plus `startSeconds` / `durationSeconds`. |
+| `ScoreMap`, `ScoreMapCell`, `ScoreMapMark`, `ScoreMapOptions` | Type | Result and option shapes for `createScoreMap`. |
+| `ViewLayoutOptions`, `VisualizerRenderOptions`, `StaffRenderOptions`, `WaterfallRenderOptions` | Type | Layout options and renderer geometry/paint options; render options share `showAnnotations` (default true). |
+| `OSMDStaffOptions` | Type | Options for the OSMD staff renderer. |
+
+## Mode-specific configuration
+
+`ScoreViewConfiguration` is a discriminated union of `{type, options?}` for
+`piano-roll`, `staff` and `waterfall`. `ScoreViewOptionsByType` maps each mode to
+its renderer options. These types prevent options for one mode from silently
+configuring another.
+
+`validateScoreViewConfiguration(configuration): void` validates the mode and
+option keys without creating UI. It throws `TypeError` for an unknown mode,
+malformed options or an unsupported key. It does not replace each renderer's
+value/default semantics. The Element's
+[`configure()`](/score/element/view/score-view/) uses this check before changing
+its mode or options; legacy permissive option bags remain supported. The
+Element-only `map` and `thumbnail` types are outside this three-renderer union;
+configure them with `.type`, `.options` and their documented attributes.
