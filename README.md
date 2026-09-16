@@ -54,6 +54,14 @@ The [Score component reference](apps/doc/webmusic/src/content/docs/score/element
 [UI presenter catalog](apps/doc/webmusic/src/content/docs/uikit/catalog.mdx)
 link to the owning public pages. Package manifests define the available entries.
 
+For AI-assisted application development, see
+[Agent Toolkit](apps/doc/webmusic/src/content/docs/agent-toolkit/index.mdx)
+for public reference entry points, task prompts, project instructions and
+the [portable WebMusic skill](skills/README.md). Documentation builds also
+generate a task-oriented `llms.txt` index, full/component/pattern documentation
+bundles and Markdown API references. The skill includes six lookup scripts;
+the project guide covers both `AGENTS.md` and `CLAUDE.md`.
+
 The npm badges above show the published package versions. Some integrations
 require optional peers or external resources; follow the owning package's
 installation instructions. For contributing and publishing updates, see the

@@ -1,0 +1,63 @@
+---
+title: Agent Toolkit
+description: 'Use WebMusic public references and project instructions to develop music applications with an AI agent.'
+sidebar:
+  label: Overview
+  order: 1
+---
+
+Give your AI agent the WebMusic references for the interaction you want to
+build, along with your application's framework and installed package versions.
+The agent can use those references to choose public imports, connect playback
+and views, and check its work in your application.
+
+Start with [machine-readable documentation](/agent-toolkit/llms-txt/), install
+the [WebMusic skill](/agent-toolkit/skills/) from a source checkout, or copy a
+[project instruction section](/agent-toolkit/agents-md/). Each works independently;
+choose the entry that fits your agent.
+
+## Choose an integration
+
+| Your application needs | Start with | Public reference |
+| --- | --- | --- |
+| A ready-made player, musical input or view | Web Components | [Quick Start](/quick-start/) and [component inventory](/score/element/) |
+| WebMusic behavior behind your own interface | Headless objects | [Headless inventory](/score/headless/) |
+| Score data operations, custom rendering or independent controls | API + UI | [Score API](/score/api/) and [UI Kit](/uikit/) |
+
+These choices can coexist. For example, a custom interface can use a Headless
+player and attach views to its shared playback source. See
+[Score setup](/score/) for dependencies and entry-specific requirements.
+
+The published toolkit covers Score, UI Kit and Kernel. Use the installed
+package's exports and declarations to confirm an API before adding code;
+development-branch features may not be available in that version.
+
+## Start with a concrete request
+
+Copy this into your agent's conversation from your application project:
+
+```text
+Add a MIDI or MusicXML player with synchronized staff notation and a keyboard
+readout to this application using WebMusic.
+
+Start with https://koperative-lab.github.io/WebMusic/quick-start/
+and https://koperative-lab.github.io/WebMusic/score/.
+
+Inspect the framework, package manager and installed WebMusic versions first.
+Use the public entries supported by those versions. Let one player own the
+score and playback; attach both views to it. Include loading and error feedback
+and start sound from a user action. Follow this project's styling conventions.
+
+Run the application's checks and verify loading, play, pause, seeking and
+cleanup. Report what was tested and any browser or sound behavior not verified.
+```
+
+Provide the music file or its public URL, the component or page to change, and
+any interaction requirements. If the agent cannot open the documentation,
+paste the relevant example and reference sections into the conversation.
+
+## Keep useful context close
+
+- [llms.txt and documentation downloads](/agent-toolkit/llms-txt/): start with the index, or select full, component or pattern context.
+- [Skills](/agent-toolkit/skills/): install a reusable development workflow and query references with six lookup scripts.
+- [AGENTS.md / CLAUDE.md](/agent-toolkit/agents-md/): keep WebMusic guidance with your application's existing rules.

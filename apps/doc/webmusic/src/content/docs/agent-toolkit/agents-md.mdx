@@ -1,0 +1,74 @@
+---
+title: AGENTS.md and CLAUDE.md
+description: 'Copy WebMusic guidance into your application’s AGENTS.md or CLAUDE.md.'
+sidebar:
+  label: AGENTS.md / CLAUDE.md
+  order: 4
+---
+
+Copy the section below into your application's project instruction file. Keep
+its existing rules and adapt the guidance to your installed WebMusic version.
+
+| File | When to use it | Format guide |
+| --- | --- | --- |
+| `AGENTS.md` | Your coding agent supports the shared AGENTS.md format. | [AGENTS.md](https://agents.md/) |
+| `CLAUDE.md` | You develop with Claude Code. | [Write an effective CLAUDE.md](https://code.claude.com/docs/en/best-practices#write-an-effective-claude-md) |
+
+## Copy into your project instructions
+
+```markdown
+## WebMusic
+
+- Check package.json, the lockfile and installed @webmusic packages before
+  coding. Confirm imports against their public exports and TypeScript
+  declarations. Match references to the installed version; do not assume a
+  development API is released or silently upgrade packages to use it.
+- Follow this application's integration choice: Web Components for ready-made
+  interactions, Headless for behavior behind custom UI, or API + UI for explicit
+  composition. API-only parsing and analysis need no UI. Preserve the existing
+  framework and styling conventions.
+- Start from the relevant public reference:
+  - [Context index](https://koperative-lab.github.io/WebMusic/llms.txt)
+  - [Setup](https://koperative-lab.github.io/WebMusic/score/)
+  - [First composition](https://koperative-lab.github.io/WebMusic/quick-start/)
+  - [Components](https://koperative-lab.github.io/WebMusic/score/element/)
+  - [Headless](https://koperative-lab.github.io/WebMusic/score/headless/)
+  - [API and shared playback](https://koperative-lab.github.io/WebMusic/score/api/)
+  - [UI presenters](https://koperative-lab.github.io/WebMusic/uikit/)
+- Use the documented dependencies and resources for the chosen entry. Keep
+  browser-only operations in the client lifecycle. Start sound from a user
+  action and provide loading and error feedback.
+- Keep units explicit: nominal seconds, transport seconds, quarter notes, MIDI
+  pitches and velocity ranges follow the owning API. Use matching position
+  and duration axes; do not infer units from a field name alone.
+- Let related views and analysis borrow the intended player's score, state and
+  time where supported. Do not create a second player merely to draw a view.
+- Track ownership of players, audio contexts, workers and subscriptions.
+  Release owned resources during teardown; detach from borrowed resources
+  without disposing them. Handle cancellation and late results when inputs
+  change. Destroying a UI presenter does not dispose its state owner.
+- Run this application's checks and verify the affected browser interaction,
+  including cleanup. State which checks passed and which audible, timing or
+  device behavior remains unverified.
+```
+
+Add your application's music-file location, integration choice and verification
+commands alongside this section. If the instruction file does not exist,
+create it in your application's root.
+
+## Use both files
+
+If the project already shares `AGENTS.md` and `CLAUDE.md` through a symlink,
+edit its target and preserve the link. Alternatively, keep the section in
+`AGENTS.md` and add `@AGENTS.md` to your existing `CLAUDE.md`, using
+[Claude Code's file imports](https://code.claude.com/docs/en/best-practices#write-an-effective-claude-md).
+
+For offline work, save the relevant [documentation bundles](/agent-toolkit/llms-txt/)
+and add their local paths to the section. Review saved context and project
+instructions when upgrading WebMusic.
+
+## Related
+
+- [Agent Toolkit overview](/agent-toolkit/)
+- [Documentation downloads](/agent-toolkit/llms-txt/)
+- [Reusable Skills](/agent-toolkit/skills/)

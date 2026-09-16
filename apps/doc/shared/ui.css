@@ -17,10 +17,10 @@
      param name  10.88px #666       param val  11.2px #444   (system-ui)
      fader       32x96, well #f3f3f3, fill #999, thumb #111
      transport   32x32 button, #111 on #fff
-     meter       well #1d1d1d, fill #fff, peak #c0392b on a #111 body
+     meter       well #1d1d1d, fill #fff, peak #777 on a #111 body
 
-   Everything is square: piano.css forces `border-radius: 0 !important` on
-   every input/select/button site-wide, so no radius is declared here.
+   Controls use square geometry through piano.css and the public component
+   radius token below. Status labels retain their meaning in a neutral palette.
    ========================================================================= */
 
 :root {
@@ -45,10 +45,10 @@
   --wui-track: #dcdcdc;
   --wui-fill: #999999;
   --wui-pointer: #111111;
-  --wui-peak: #c0392b;
-  --wui-record: #b40000;
-  --wui-success: #267347;
-  --wui-warning: #8a5a00;
+  --wui-peak: #777777;
+  --wui-record: #111111;
+  --wui-success: #444444;
+  --wui-warning: #666666;
 
   /* -- type -------------------------------------------------------------- */
   --wui-font-ui: system-ui, sans-serif;
@@ -60,7 +60,7 @@
   /* -- metrics ----------------------------------------------------------- */
   --wui-row-h: 2rem;
   /* The kit's house geometry, fed from the docs' own row height. These pierce
-     every shadow root, which the `border-radius: 0 !important` rule in
+     every shadow root, which the `border-radius: 0` rule in
      piano.css cannot: it stops at the boundary. Every in-row control on the
      site — kit presenter, custom element or docs chrome — resolves to this. */
   --wm-control-size: var(--wui-row-h);
@@ -75,11 +75,118 @@
   --doc-fader-handle: 10px;
 }
 
-/* Demo surfaces stay light in black mode — they are sample canvases for
-   light-themed widgets. piano.css lifts them off the dark page with a shadow;
-   only the frame needs to know about the theme. */
-:root[data-theme='dark'] .wui-panel {
-  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.65);
+/* Demo surfaces stay light in black mode: they are sample canvases for
+   light-themed widgets. Their hairline frames define the surface in both modes. */
+:where(.wui-panel, .wm-live-canvas) {
+  color-scheme: light;
+}
+
+/* Documentation sample theme, supplied only through public component tokens.
+   Keeping these defaults on the canvas ancestor lets an example's own tokens,
+   attributes and renderer options take precedence without touching its DOM.
+   The light scheme keeps samples on their white ground when the surrounding
+   page switches modes. Explicit component scheme controls still select the
+   dark side of these light-dark() colors where each token is consumed. */
+:where(.wm-live-canvas) {
+  --wm-surface: light-dark(#ffffff, #111111);
+  --wm-surface-muted: light-dark(#f3f3f3, #222222);
+  --wm-surface-inverse: light-dark(#111111, #eeeeee);
+  --wm-foreground: light-dark(#444444, #eeeeee);
+  --wm-foreground-muted: light-dark(#666666, #aaaaaa);
+  --wm-foreground-on-inverse: light-dark(#ffffff, #111111);
+  --wm-accent: light-dark(#111111, #ffffff);
+  --wm-accent-foreground: light-dark(#ffffff, #111111);
+  --wm-border: light-dark(#d8d8d8, #444444);
+  --wm-control-border: light-dark(#b0b0b0, #666666);
+  --wm-focus: #767676;
+
+  /* Status text, recording, selection and time markers retain their labels
+     and geometry while using the same neutral contrast ramp. */
+  --wm-danger: light-dark(#111111, #ffffff);
+  --wm-error: light-dark(#111111, #ffffff);
+  --wm-selection: light-dark(#444444, #bbbbbb);
+  --wm-selection-fill: light-dark(rgba(17, 17, 17, 0.12), rgba(255, 255, 255, 0.12));
+  --wm-loop: light-dark(#666666, #aaaaaa);
+  --wm-playhead: light-dark(#111111, #ffffff);
+  --wm-harmony-warning: light-dark(#666666, #aaaaaa);
+  --wm-harmony-info: light-dark(#777777, #aaaaaa);
+
+  /* Inverse plots need a light phase marker; meter fills need an independent
+     track so the shared dark accent cannot disappear against a dark well. */
+  --wm-lfo-head: light-dark(#999999, #666666);
+  --wm-meter-track: light-dark(#dcdcdc, #333333);
+  --wm-meter-fill: light-dark(#666666, #bbbbbb);
+  --wm-meter-peak: light-dark(#111111, #ffffff);
+
+  /* Tone roles and pitch classes keep stable shades and their visible role
+     marks / note labels. Dark schemes invert the ramp and label ink so bare
+     noteheads also remain visible against the dark musical surface. */
+  --wm-degree-root: light-dark(#222222, #dddddd);
+  --wm-degree-third: light-dark(#444444, #bbbbbb);
+  --wm-degree-fifth: light-dark(#666666, #999999);
+  --wm-degree-seventh: light-dark(#333333, #cccccc);
+  --wm-degree-extension: light-dark(#555555, #aaaaaa);
+  --wm-degree-bass: light-dark(#737373, #8c8c8c);
+  --wm-degree-other: light-dark(#666666, #999999);
+  --wm-degree-ghost: light-dark(rgba(17, 17, 17, 0.1), rgba(255, 255, 255, 0.14));
+  --wm-degree-ink: light-dark(#ffffff, #111111);
+  --wm-progression-tone-0: light-dark(#222222, #dddddd);
+  --wm-progression-tone-1: light-dark(#292929, #d6d6d6);
+  --wm-progression-tone-2: light-dark(#303030, #cfcfcf);
+  --wm-progression-tone-3: light-dark(#383838, #c7c7c7);
+  --wm-progression-tone-4: light-dark(#3f3f3f, #c0c0c0);
+  --wm-progression-tone-5: light-dark(#474747, #b8b8b8);
+  --wm-progression-tone-6: light-dark(#4e4e4e, #b1b1b1);
+  --wm-progression-tone-7: light-dark(#565656, #a9a9a9);
+  --wm-progression-tone-8: light-dark(#5d5d5d, #a2a2a2);
+  --wm-progression-tone-9: light-dark(#656565, #9a9a9a);
+  --wm-progression-tone-10: light-dark(#6c6c6c, #939393);
+  --wm-progression-tone-11: light-dark(#737373, #8c8c8c);
+}
+
+/* Timeline fixtures use dark region fills, so their inset selection and focus
+   rings need light ink. Canonical public parts remain present when the demo
+   adds custom parts. A two-tone playhead stays visible across light lanes and
+   dark regions, including density cells in the Score map. */
+.wm-live-canvas [data-presenter-live='timeline'] [part~='region'] {
+  --wm-focus: #ffffff;
+  --wm-selection: #ffffff;
+}
+
+.wm-live-canvas :is([data-presenter-live='timeline'], score-view[type='map']) [part~='playhead'] {
+  outline: 1px solid #ffffff;
+  outline-offset: 0;
+}
+
+/* These surfaces stay light independently of the page theme. Button links
+   retain their own foreground; ordinary links follow an explicit component
+   scheme where present, otherwise using the sample's dark ink. */
+.wui-panel a:not(.wui-btn),
+.wm-live-canvas a:not(.wui-btn),
+.composition__table a {
+  color: var(--wm-foreground, var(--wui-ink));
+  text-decoration-color: var(--wui-line-control);
+}
+
+.wui-panel a:not(.wui-btn):hover,
+.wm-live-canvas a:not(.wui-btn):hover,
+.composition__table a:hover {
+  color: var(--wm-accent, var(--wui-ink));
+  text-decoration-color: currentColor;
+}
+
+.wui-panel a:focus-visible,
+.wm-live-canvas a:focus-visible,
+.composition__table a:focus-visible {
+  outline: 2px solid var(--wm-focus, var(--wui-ink));
+  outline-offset: 2px;
+}
+
+.wui-panel ::selection,
+.wm-live-canvas ::selection,
+.composition__table ::selection {
+  background: var(--wm-accent, var(--wui-ink));
+  color: var(--wm-accent-foreground, var(--wui-on-ink));
 }
 
 /* ============================================================================
@@ -815,18 +922,19 @@
 }
 
 .wui-badge[data-status='composed'] {
-  border-color: var(--wui-success);
-  color: var(--wui-success);
+  border-color: var(--wui-ink);
+  background: var(--wui-ink);
+  color: var(--wui-on-ink);
 }
 
 .wui-badge[data-status='partial'] {
-  border-color: var(--wui-warning);
-  color: var(--wui-warning);
+  background: var(--wui-inset);
+  color: var(--wui-ink-soft);
 }
 
 .wui-badge[data-status='extract'] {
-  border-color: var(--wui-record);
-  color: var(--wui-record);
+  border-color: var(--wui-ink);
+  color: var(--wui-ink);
 }
 
 .wui-badge[data-status='behavior'] {

@@ -22,6 +22,7 @@ import {join, relative, dirname} from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {domainFamilies, packageDirectories} from './package-policy.mjs';
 import {headlessDocProblems} from './headless-docs-policy.mjs';
+import {declaredAgentContextPaths} from '../apps/doc/webmusic/scripts/agent-context.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DOCS = 'apps/doc/webmusic/src/content/docs';
@@ -746,7 +747,10 @@ for (const family of domainFamilies) {
 }
 checkDocsCssNamespace();
 checkDocumentedCssVariables(files);
-checkLinks(files, pages, astroRedirects(), publicAssets());
+// Generated routes come from the same manifest used by the site integration;
+// the build verifies that these files are emitted with their expected bytes.
+const generatedAssets = await declaredAgentContextPaths({root: ROOT});
+checkLinks(files, pages, astroRedirects(), new Set([...publicAssets(), ...generatedAssets]));
 
 notes.push(`${files.length} pages · ${Object.keys(paramsCatalog).length} elements · ${pages.size} routes`);
 
