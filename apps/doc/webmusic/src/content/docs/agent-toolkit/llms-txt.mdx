@@ -1,0 +1,95 @@
+---
+title: llms.txt
+description: 'Download WebMusic documentation by task: a reference index, full documentation, components, or common patterns.'
+sidebar:
+  label: llms.txt
+  order: 2
+---
+
+Give your agent documentation that matches the work. Start with the
+[llms.txt index](/llms.txt) to locate a reference, then read the linked Markdown
+page. For a larger task or an agent that works with attached files, choose one
+of the bundles below. All are generated from the same public sources as this site.
+
+## Available files
+
+| File | Use it for | Download |
+| --- | --- | --- |
+| [llms.txt](/llms.txt) | Locate documentation by development task, then follow selected references. | <a href="/llms.txt" download="llms.txt">Download index</a> |
+| [llms-full.txt](/llms-full.txt) | Read the complete public documentation for the supported release, including API references. | <a href="/llms-full.txt" download="llms-full.txt">Download full documentation</a> |
+| [llms-components.txt](/llms-components.txt) | Work with Web Components, Headless objects and UI presenters. | <a href="/llms-components.txt" download="llms-components.txt">Download components</a> |
+| [llms-patterns.txt](/llms-patterns.txt) | Find common integration and composition examples for building an application. | <a href="/llms-patterns.txt" download="llms-patterns.txt">Download patterns</a> |
+
+Each bundle identifies its included references. Components and patterns are
+focused selections; follow their links when you need another API's complete
+contract. The full bundle is useful for local search, but may exceed an agent's
+context window. Prefer the index and individual pages for a narrow change.
+
+## Use a URL
+
+Ask the agent to read the index and fetch only the relevant pages:
+
+```text
+Read https://koperative-lab.github.io/WebMusic/llms.txt.
+Find the references for a score player with synchronized staff and keyboard
+views, then read those Markdown pages before implementing it in this app.
+Check the installed package versions, exports and types. Keep one playback
+source and handle loading, errors and teardown.
+```
+
+For a composition task, give it the patterns bundle directly:
+
+```text
+Use https://koperative-lab.github.io/WebMusic/llms-patterns.txt to choose a
+WebMusic integration for this application's framework and UI. Follow the
+linked component or API reference for the exact members and lifecycle.
+```
+
+Use `llms-components.txt` when selecting or customizing components. Use
+`llms-full.txt` when the task spans several APIs and your agent can search a
+large document. Providing a URL requires an agent that can fetch documentation;
+it does not automatically configure every editor's context system.
+
+## Download and use locally
+
+Use the download links above, or save a chosen bundle from the command line:
+
+```sh
+curl -fL https://koperative-lab.github.io/WebMusic/llms-components.txt -o webmusic-components.txt
+```
+
+Attach the downloaded file to the conversation, or place it in a documentation
+folder your coding agent can read. Tell the agent which file to use and what to
+build. For example:
+
+```text
+Read the attached webmusic-components.txt. Add play, pause and seek controls
+using the installed WebMusic version. Follow this application's conventions
+and verify loading, error handling and cleanup.
+```
+
+The index contains links; downloading it alone does not download their contents.
+For an offline task, save the relevant bundle or individual references too.
+The [Quick Start in Markdown](/agent-context/quick-start.md) is a small starting
+point for a player with following views.
+
+Text preserves static code, tables and API explanations. Interactive demos stay
+on the linked HTML pages, and downloading documentation does not download music
+files, sound resources or npm packages.
+
+## Match the installed version
+
+The [context manifest](/agent-context/manifest.json) identifies the release
+baseline, package versions and documentation revision. Check it against the
+packages in your application. Refresh saved files when adopting a new reference
+revision; the manifest and files used together must come from the same build.
+
+A newer reference does not establish that an older installed package exports
+the same API. Use matching references and installed declarations; do not upgrade
+a project just to match an example. Historical version archives are not provided.
+
+## Related
+
+- [Agent Toolkit overview](/agent-toolkit/)
+- [Reusable Skills and lookup scripts](/agent-toolkit/skills/)
+- [Project instructions with AGENTS.md or CLAUDE.md](/agent-toolkit/agents-md/)

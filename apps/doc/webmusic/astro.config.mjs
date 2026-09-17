@@ -3,6 +3,8 @@ import starlight from '@astrojs/starlight';
 import {localSearch} from './scripts/local-search.mjs';
 import {browserSandboxAlias} from './scripts/browser-sandbox.mjs';
 import siteNoticeIntegration from '../../../scripts/site-notices.mjs';
+import {agentContext} from './scripts/agent-context.mjs';
+import {docsBaseLinksIntegration} from './scripts/docs-base-links.mjs';
 
 const docsBase = process.env.DOCS_BASE
   ? `${process.env.DOCS_BASE.replace(/\/+$/, '')}/`
@@ -162,6 +164,7 @@ export default defineConfig({
         },
       },
     },
+    docsBaseLinksIntegration(),
     starlight({
       pagefind: false,
       title: 'WebMusic',
@@ -173,6 +176,8 @@ export default defineConfig({
         './src/styles/playground.css',
       ],
       components: {
+        Hero: './src/starlight/Hero.astro',
+        PageTitle: './src/starlight/PageTitle.astro',
         Search: './src/starlight/Search.astro',
         Sidebar: './src/starlight/Sidebar.astro',
         ThemeProvider: './src/starlight/ThemeProvider.astro',
@@ -183,12 +188,22 @@ export default defineConfig({
         { label: 'Introduction', link: '/' },
         { label: 'Quick Start', link: '/quick-start/' },
         {
+          label: 'Agent Toolkit',
+          items: [
+            { label: 'Overview', link: '/agent-toolkit/' },
+            { label: 'llms.txt', link: '/agent-toolkit/llms-txt/' },
+            { label: 'Skills', link: '/agent-toolkit/skills/' },
+            { label: 'AGENTS.md / CLAUDE.md', link: '/agent-toolkit/agents-md/' },
+          ],
+        },
+        {
           label: 'Score',
           items: [
             { label: 'Overview', link: '/score/' },
             {
               label: 'Web Components',
               items: [
+                { label: 'Overview', link: '/score/element/' },
                 elementCapability('score', 'play'),
                 elementCapability('score', 'analyze'),
                 elementCapability('score', 'view'),
@@ -197,6 +212,7 @@ export default defineConfig({
             {
               label: 'Headless',
               items: [
+                { label: 'Overview', link: '/score/headless/' },
                 {
                   label: 'Play',
                   items: [{autogenerate: {directory: 'score/headless/play'}}],
@@ -248,6 +264,7 @@ export default defineConfig({
       ],
     }),
     localSearch(),
+    agentContext(),
     siteNoticeIntegration(),
   ],
 });

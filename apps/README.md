@@ -30,12 +30,24 @@ npm run dev
 at <http://localhost:4321>. Demos resolve workspace packages through their built
 `dist/` files. Both `/` and `/introduction/` render the introduction.
 
+Each documentation page shows breadcrumbs above its title. The shared
+[page heading](doc/webmusic/src/starlight/PageTitle.astro) preserves Starlight's
+title and adds links to the page's section, integration form and capability.
+The [hero override](doc/webmusic/src/starlight/Hero.astro) provides the same
+navigation for the 404 page and pages that use a hero.
+Groups without their own page link to the corresponding inventory section.
+The [route resolver](doc/webmusic/src/starlight/breadcrumbs.ts) respects the
+configured deployment base; the current page is plain text.
+Score's Web Components and Headless menu groups each start with an Overview
+link to their inventory, followed by Play, Analyze and View.
+
 The source of every route below is under `doc/webmusic/src/content/docs/`:
 
 | URL | Content |
 |---|---|
 | `/` | `index.mdx` — introduction |
 | `/quick-start/` | `quick-start.mdx` |
+| `/agent-toolkit/…` | AI-assisted application development: overview, context downloads, Skills, AGENTS.md and CLAUDE.md |
 | `/score/…` | Symbolic music |
 | `/uikit/…` | Presenter overview, catalog, and reference |
 | `/kernel/…` | Shared platform contracts |
@@ -89,3 +101,17 @@ the browser, supports title and multi-word matching, and respects the deployment
 base. Search is available in the built site and `npm run preview -w webmusic-doc`;
 the development server displays a build-and-preview reminder. The Search
 override and local index integration replace Pagefind's browser output.
+
+Agent Toolkit context is available in both the development server and built
+site. The [generator](doc/webmusic/scripts/agent-context.mjs) emits a task index
+(`llms.txt`), full/component/pattern bundles (`llms-full.txt`,
+`llms-components.txt`, `llms-patterns.txt`), per-page Markdown under
+`agent-context/`, and a manifest with release and content identity. It also
+provides the catalog, selected source and styling text used by the portable
+skill's lookup scripts. It preserves documentation examples and applies the configured site
+base to generated links. A [Markdown link plugin](doc/webmusic/scripts/docs-base-links.mjs)
+also applies the base while rendering article links in development and builds;
+the Pages postprocessor still covers component-emitted HTML targets.
+The public [consumer skill](../skills/README.md) can
+be copied independently of this repository. The AGENTS.md / CLAUDE.md
+documentation page provides instructions to copy into an application directly.

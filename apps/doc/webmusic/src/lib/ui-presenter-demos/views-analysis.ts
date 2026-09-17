@@ -331,8 +331,8 @@ function mountStageDemo(host: HTMLElement): UiPresenterDemoHandle {
       const fraction = span > 0 ? (normalized.value - normalized.minimum) / span : 0;
       const styles = getComputedStyle(host);
       const foreground =
-        styles.getPropertyValue('--sl-color-text-accent').trim() || '#7c3aed';
-      const muted = styles.getPropertyValue('--sl-color-gray-5').trim() || '#d8d8d8';
+        styles.getPropertyValue('--wui-ink').trim() || '#111111';
+      const muted = styles.getPropertyValue('--wui-line-strong').trim() || '#d8d8d8';
       const phase = optionValues.animate === true ? time / 900 : 0;
 
       context.strokeStyle = muted;
@@ -542,9 +542,9 @@ function mountStatusDemo(host: HTMLElement): UiPresenterDemoHandle {
 type TrackListMode = 'demo' | 'compact' | 'empty';
 
 const DEMO_TRACK_ITEMS: readonly Omit<TrackListItem, 'active'>[] = [
-  {id: 'melody', label: 'Melody', detail: '8 bars', color: '#7c3aed'},
-  {id: 'harmony', label: 'Harmony', detail: '12 chords', color: '#0ea5e9'},
-  {id: 'bass', label: 'Bass', detail: '4 bars', color: '#f97316'},
+  {id: 'melody', label: 'Melody', detail: '8 bars', color: '#292929'},
+  {id: 'harmony', label: 'Harmony', detail: '12 chords', color: '#666666'},
+  {id: 'bass', label: 'Bass', detail: '4 bars', color: '#999999'},
   {id: 'reference', label: 'Reference', detail: 'muted', disabled: true},
 ];
 
@@ -1457,8 +1457,14 @@ function mountHarmonyDemo(host: HTMLElement): UiPresenterDemoHandle {
   const view = document.defaultView;
   const notifier = createNotifier();
 
-  const layout = document.createElement('div');
-  layout.style.cssText = 'display:grid;gap:.85rem;min-width:0';
+  // This public root resolves the shared palette for standalone harmony
+  // presenters, including severity marks that consume its resolved tokens.
+  const layout = createAnalysisRoot(document);
+  Object.assign(layout.style, {
+    display: 'grid', gap: '.85rem', minWidth: '0',
+    border: '0', padding: '0', background: 'transparent',
+    fontSize: 'inherit', lineHeight: 'inherit',
+  });
   const laneRegion = createStageDemoRegion(document, 'Flow lane');
   const plateRegion = createStageDemoRegion(document, 'Nameplate');
   const chipRegion = createStageDemoRegion(document, 'Chip strip');
@@ -1705,8 +1711,8 @@ function mountHarmonyDemo(host: HTMLElement): UiPresenterDemoHandle {
    * one-row lane with a two-row box would be half a lane of empty surface.
    */
   const applyDensity = (): void => {
-    laneRegion.body.style.setProperty(
-      '--wui-harmony-flow-height',
+    layout.style.setProperty(
+      '--wm-harmony-flow-height',
       state.tracks < 2 ? '48px' : '96px',
     );
   };

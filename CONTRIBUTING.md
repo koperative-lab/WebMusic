@@ -118,6 +118,24 @@ create a development directory in a public checkout. `check:dev-docs` always
 checks public references and catalogs; it additionally checks the local indexes
 and internal links when `.dev/` is present.
 
+### Agent Toolkit
+
+The [consumer skill](skills/README.md) is maintained separately from this
+repository's local agent instructions. Keep its bundled references portable.
+The public AGENTS.md / CLAUDE.md page owns the instructions users copy into
+their applications; the skill links to that page.
+Documentation builds generate `llms.txt`, `llms-full.txt`,
+`llms-components.txt`, `llms-patterns.txt` and Markdown references using the
+[context generator](apps/doc/webmusic/scripts/agent-context.mjs). Its tests
+run with the documentation workspace tests; output verification runs during
+each site build. When a released API changes, review and update the generator's
+release baseline deliberately, along with the skill's compatibility metadata.
+Package version numbers alone do not establish a matching release contract.
+The skill's six read-only Node scripts use the generated manifest and catalog
+to retrieve documentation, selected source files and styling references.
+Keep catalog paths, content hashes and task selections synchronized in the
+generator; do not maintain a separate component inventory in the skill.
+
 ## CI and GitHub Pages
 
 The [CI and Pages workflow](.github/workflows/ci.yml) runs on every branch push,

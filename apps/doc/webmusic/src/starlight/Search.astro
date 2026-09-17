@@ -14,11 +14,18 @@ const indexUrl = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/search-index.js
         <h2 id="webmusic-search-heading">Search documentation</h2>
         <button type="button" data-search-close aria-label="Close search">Close <kbd>Esc</kbd></button>
       </header>
-      <label for="webmusic-search-input">Title, API, or topic</label>
-      <input id="webmusic-search-input" type="search" autocomplete="off" spellcheck="false" placeholder="e.g. ScorePlayer, transport, MIDI" aria-controls="webmusic-search-results" aria-describedby="webmusic-search-status" />
-      <p id="webmusic-search-status" role="status" aria-live="polite">Enter a title, API, or topic.</p>
-      <button type="button" data-search-retry hidden>Retry loading search</button>
+      <div class="search-query">
+        <label for="webmusic-search-input">Title, API, or topic</label>
+        <input id="webmusic-search-input" type="search" autocomplete="off" spellcheck="false" placeholder="e.g. ScorePlayer, transport, MIDI" aria-controls="webmusic-search-results" aria-describedby="webmusic-search-status" />
+        <p id="webmusic-search-status" role="status" aria-live="polite">Enter a title, API, or topic.</p>
+        <button type="button" data-search-retry hidden>Retry loading search</button>
+      </div>
       <ol id="webmusic-search-results" data-search-results></ol>
+      <footer aria-label="Search keyboard shortcuts">
+        <span><kbd>↑ ↓</kbd> Navigate</span>
+        <span><kbd>Enter</kbd> Open result</span>
+        <span><kbd>Esc</kbd> Close</span>
+      </footer>
     </div>
   </dialog>
 </webmusic-doc-search>
@@ -36,33 +43,51 @@ const indexUrl = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/search-index.js
 
 <style>
   webmusic-doc-search { display: contents; }
-  button { font: inherit; cursor: pointer; color: var(--sl-color-text); }
-  [data-search-open] { display: flex; align-items: center; gap: .6rem; padding: .5rem .7rem; border: 1px solid var(--sl-color-gray-5); background: var(--sl-color-black); border-radius: .25rem; }
-  [data-search-open]:hover { border-color: var(--sl-color-gray-2); }
-  kbd { font: inherit; font-size: .75rem; color: var(--sl-color-gray-2); white-space: nowrap; }
+  button { font: inherit; cursor: pointer; color: var(--ws-fg); border-radius: 0; }
+  [data-search-open] { display: flex; align-items: center; gap: .75rem; min-height: 2.75rem; padding: .5rem .75rem; border: 1px solid var(--ws-line-strong); background: var(--ws-subtle); }
+  [data-search-open]:hover { border-color: var(--ws-fg); }
+  kbd { font: .7rem/1.4 var(--sl-font-mono); color: inherit; white-space: nowrap; }
   [data-search-open] kbd { margin-inline-start: auto; }
-  dialog { margin: 4rem auto; padding: 0; width: min(42rem, calc(100% - 2rem)); max-height: calc(100dvh - 8rem); color: var(--sl-color-text); background: var(--sl-color-black); border: 1px solid var(--sl-color-gray-4); border-radius: .5rem; box-shadow: var(--sl-shadow-lg); }
-  dialog::backdrop { background: var(--sl-color-backdrop-overlay); backdrop-filter: blur(.25rem); }
-  .search-frame { padding: 1.25rem; }
-  header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.2rem; }
-  h2 { font-size: 1.1rem; margin: 0; color: var(--sl-color-white); }
-  [data-search-close], [data-search-retry] { padding: .4rem .6rem; border: 1px solid var(--sl-color-gray-4); background: var(--sl-color-gray-6); border-radius: .25rem; }
-  label { display: block; margin-bottom: .35rem; font-size: .9rem; }
-  input { box-sizing: border-box; width: 100%; padding: .8rem; border: 1px solid var(--sl-color-gray-3); border-radius: .25rem; background: var(--sl-color-gray-6); color: var(--sl-color-white); font: inherit; }
-  :is(button,input):focus-visible { outline: 2px solid var(--sl-color-text-accent); outline-offset: 2px; }
-  [role='status'] { margin: .8rem 0; font-size: .875rem; color: var(--sl-color-gray-2); }
-  ol { list-style: none; margin: 0; padding: 0; }
-  :global([data-search-results] li + li) { margin-top: .6rem; }
-  :global([data-search-results] a) { display: block; padding: .85rem; border: 1px solid var(--sl-color-gray-5); border-radius: .25rem; text-decoration: none; color: var(--sl-color-text); overflow-wrap: anywhere; }
-  :global([data-search-results] a:hover), :global([data-search-results] a:focus-visible) { outline: 2px solid var(--sl-color-text-accent); outline-offset: -2px; background: var(--sl-color-gray-6); }
-  :global([data-search-results] strong) { color: var(--sl-color-text-accent); }
-  :global([data-search-results] p) { margin: .3rem 0; font-size: .9rem; line-height: 1.5; }
-  :global([data-search-results] small) { color: var(--sl-color-gray-2); font-size: .75rem; }
+  dialog { --search-max-height: calc(100dvh - 8rem); box-sizing: border-box; margin: 4rem auto; padding: 0; width: min(44rem, calc(100% - 2rem)); max-height: var(--search-max-height); color: var(--ws-text); background: var(--ws-panel); border: 1px solid var(--ws-fg); border-top-width: 6px; border-radius: 0; box-shadow: none; overflow: auto; }
+  dialog::backdrop { background: rgba(0, 0, 0, .6); }
+  .search-frame { display: flex; flex-direction: column; max-height: calc(var(--search-max-height) - 7px); }
+  header { display: flex; flex-shrink: 0; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--ws-line-strong); }
+  h2 { font-size: clamp(1.15rem, 3vw, 1.5rem); font-weight: 750; line-height: 1.2; margin: 0; color: var(--ws-fg); }
+  [data-search-close], [data-search-retry] { min-height: 2.75rem; padding: .5rem .75rem; border: 1px solid var(--ws-line-strong); background: var(--ws-subtle); }
+  [data-search-close] { display: flex; align-items: center; gap: .75rem; flex-shrink: 0; font-size: .8rem; }
+  [data-search-close]:hover, [data-search-retry]:hover { background: var(--ws-fg); color: var(--ws-on-accent); border-color: var(--ws-fg); }
+  .search-query { flex-shrink: 0; padding: 1.25rem 1.5rem; }
+  label { display: block; margin-bottom: .65rem; font: .7rem/1.4 var(--sl-font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ws-text-soft); }
+  input { box-sizing: border-box; width: 100%; min-height: 3.25rem; padding: .8rem 1rem; border: 1px solid var(--ws-line-strong); border-bottom-color: var(--ws-fg); border-radius: 0; background: var(--ws-subtle); color: var(--ws-fg); font: inherit; appearance: none; }
+  input::placeholder { color: var(--ws-text-muted); opacity: 1; }
+  input::-webkit-search-cancel-button { filter: grayscale(1); }
+  :is(button,input):focus-visible { outline: 2px solid var(--ws-fg); outline-offset: 3px; }
+  [role='status'] { margin: .85rem 0 0; font-size: .8rem; line-height: 1.5; color: var(--ws-text-muted); }
+  [data-search-retry] { margin-top: .85rem; }
+  ol { flex: 1 1 auto; min-height: 0; list-style: none; margin: 0; padding: 0; overflow: auto; overscroll-behavior: contain; scrollbar-color: var(--ws-scroll-thumb) var(--ws-scroll-track); scrollbar-width: thin; }
+  ol:not(:empty) { border-top: 1px solid var(--ws-line-strong); }
+  :global([data-search-results] li + li) { border-top: 1px solid var(--ws-line-strong); }
+  :global([data-search-results] a) { display: block; padding: 1rem 1.5rem; border-inline-start: 4px solid transparent; text-decoration: none; color: var(--ws-text); overflow-wrap: anywhere; }
+  :global([data-search-results] a:hover), :global([data-search-results] a:focus-visible) { background: var(--ws-subtle); border-inline-start-color: var(--ws-fg); }
+  :global([data-search-results] a:focus-visible) { outline: 2px solid var(--ws-fg); outline-offset: -2px; }
+  :global([data-search-results] strong) { display: block; color: var(--ws-fg); font-size: 1rem; font-weight: 700; line-height: 1.4; }
+  :global([data-search-results] p) { margin: .4rem 0 .6rem; font-size: .875rem; line-height: 1.6; }
+  :global([data-search-results] small) { display: block; color: var(--ws-text-muted); font: .7rem/1.5 var(--sl-font-mono); }
+  footer { display: flex; flex-shrink: 0; flex-wrap: wrap; gap: .5rem 1.5rem; padding: .75rem 1.5rem; border-top: 1px solid var(--ws-line-strong); background: var(--ws-subtle); color: var(--ws-text-soft); font-size: .7rem; }
+  footer span { display: inline-flex; align-items: center; gap: .4rem; }
   :global(body[data-webmusic-search-open]) { overflow: hidden; }
   @media (max-width: 49.99rem) {
     .search-label, [data-search-open] kbd { display: none; }
-    [data-search-open] { border: none; }
-    dialog { margin: 1rem auto; max-height: calc(100dvh - 2rem); }
-    .search-frame { padding: 1rem; }
+    [data-search-open] { justify-content: center; width: 2.75rem; padding: 0; }
+    dialog { --search-max-height: calc(100dvh - 1.5rem); width: calc(100% - 1.5rem); margin: .75rem auto; }
+    header, .search-query { padding: 1rem; }
+    [data-search-close] kbd { display: none; }
+    :global([data-search-results] a) { padding: 1rem; }
+    footer { padding: .75rem 1rem; gap: .5rem 1rem; }
+  }
+  @media (max-height: 32rem) {
+    dialog { --search-max-height: calc(100dvh - 1rem); margin-block: .5rem; }
+    .search-frame { max-height: none; }
+    ol { flex: none; overflow: visible; }
   }
 </style>
