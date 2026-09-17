@@ -5,7 +5,44 @@ import {
   SandpackLayout,
   SandpackPreview,
   SandpackProvider,
+  type SandpackTheme,
 } from '@codesandbox/sandpack-react';
+
+// The editor is a light sample canvas in either documentation color mode.
+// Weight and neutral ink distinguish syntax without a separate color palette.
+const sandboxTheme = {
+  colors: {
+    surface1: '#ffffff',
+    surface2: '#e6e6e6',
+    surface3: '#f3f3f3',
+    disabled: '#999999',
+    base: '#444444',
+    clickable: '#666666',
+    hover: '#111111',
+    accent: '#111111',
+    error: '#111111',
+    errorSurface: '#eeeeee',
+    warning: '#444444',
+    warningSurface: '#f3f3f3',
+  },
+  syntax: {
+    plain: '#111111',
+    comment: {color: '#666666', fontStyle: 'italic'},
+    keyword: {color: '#111111', fontWeight: 'bold'},
+    definition: {color: '#111111', fontWeight: 'bold'},
+    punctuation: '#666666',
+    property: '#444444',
+    tag: {color: '#111111', fontWeight: 'bold'},
+    static: '#444444',
+    string: '#444444',
+  },
+  font: {
+    body: 'var(--wui-font-ui, system-ui, sans-serif)',
+    mono: 'var(--wui-font-mono, ui-monospace, monospace)',
+    size: '13px',
+    lineHeight: '20px',
+  },
+} satisfies SandpackTheme;
 
 const mounted = new WeakMap<HTMLElement, () => void>();
 
@@ -54,12 +91,12 @@ export function mountApiSandbox(el: HTMLElement): () => void {
         SandpackProvider,
         {
           template: 'vanilla-ts',
-          theme: 'light',
+          theme: sandboxTheme,
           customSetup: { dependencies },
           files: { '/index.ts': { code, active: true } },
           options: { visibleFiles: ['/index.ts'] },
         },
-        React.createElement(SandpackLayout, null, children),
+        React.createElement(SandpackLayout, {style: {borderRadius: 0}}, children),
       ),
     );
     el.dataset.apiSandboxState = 'initialized';

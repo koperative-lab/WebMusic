@@ -1,0 +1,165 @@
+---
+title: Skills
+description: 'Install the WebMusic application-development skill and use it in your own project.'
+sidebar:
+  label: Skills
+  order: 3
+---
+
+The `webmusic` skill helps an agent develop applications with the published
+packages. It includes an integration guide, playback and resource-lifetime
+rules, troubleshooting references, and six
+scripts for looking up documentation and implementation details.
+
+## Install from source
+
+Use a WebMusic source checkout that contains `skills/webmusic/SKILL.md`.
+From your application directory, the [Skills CLI](https://github.com/vercel-labs/skills)
+can install the local folder. Replace the example path with your checkout:
+
+```sh
+npx skills add /path/to/WebMusic/skills/webmusic --copy
+```
+
+Choose your agent and project installation in the CLI. This installs a copy of
+the skill; it does not install WebMusic's npm packages or rewrite `AGENTS.md`.
+
+Alternatively, copy the complete `skills/webmusic/` directory into the skill directory
+supported by your agent. Keep its `scripts/` and `references/`
+alongside `SKILL.md`; copying the entry file alone loses supporting guidance
+and executable helpers.
+
+Follow your agent's normal skill discovery or reload procedure, then select
+`webmusic` for a task in your application. If the agent does not support skill
+installation, ask it to read the copied `SKILL.md` and follow the relevant
+references. Installing the npm packages alone does not install the skill.
+
+The skill targets WebMusic 0.1.0. It reads the installed package's exports and
+types before selecting an API. Detailed API lookup uses the public references
+and may need network access; the bundled files are not a complete offline API
+manual. To update, replace your installed skill folder with the complete folder
+from the source revision you choose, then review its compatibility metadata.
+Keep project-specific guidance in your application's instruction file.
+
+## What the skill covers
+
+The workflow begins with your application: its framework, package manager,
+installed WebMusic versions, existing conventions and requested interaction.
+It helps the agent:
+
+1. Choose Web Components, Headless, or API + UI for the task.
+2. Find the owning public reference and confirm the installed package's exports.
+3. Identify required dependencies, music files, sound resources and browser requirements.
+4. Share a player's data and time with following views and analysis where supported.
+5. Handle loading, failure, cancellation and cleanup according to resource ownership.
+6. Run application checks and exercise the requested interaction in the browser.
+
+Detailed API members will remain in the public references. The skill guides
+the agent to those owners instead of maintaining another API manual.
+
+## Included files
+
+```text
+skills/webmusic/
+├── SKILL.md
+├── LICENSE
+├── scripts/
+│   ├── list_components.mjs
+│   ├── get_component_docs.mjs
+│   ├── get_source.mjs
+│   ├── get_styles.mjs
+│   ├── get_theme.mjs
+│   ├── get_docs.mjs
+│   └── _context.mjs         # Shared lookup and validation helpers
+├── references/              # Integration, lifecycle and script guidance
+└── evals/                   # Application-development evaluation scenarios
+```
+
+The Skill uses WebMusic's MIT license. Its scripts require Node.js 22.19 or
+later and no extra npm dependencies. They print retrieved content to standard
+output and do not edit your application.
+
+## Query with the scripts
+
+Run these commands from the installed `webmusic` Skill folder, or replace
+`scripts/` with its full path. Start by listing components, then use the exact
+identifier returned by the catalog:
+
+```sh
+node scripts/list_components.mjs
+node scripts/get_component_docs.mjs element/score-player
+```
+
+| Script | Purpose | Example |
+| --- | --- | --- |
+| `list_components.mjs` | List Web Components, Headless objects and UI presenters with stable identifiers. | `node scripts/list_components.mjs --kind headless` |
+| `get_component_docs.mjs` | Read a selected component's public reference. | `node scripts/get_component_docs.mjs headless/score-player` |
+| `get_source.mjs` | Inspect selected implementation entry files from the verified release. | `node scripts/get_source.mjs element/score-player` |
+| `get_styles.mjs` | Read a component's documented styling contract, such as tokens, parts and visual bindings. | `node scripts/get_styles.mjs ui/transport` |
+| `get_theme.mjs` | Read shared theming guidance and its selected source definitions. | `node scripts/get_theme.mjs` |
+| `get_docs.mjs` | Read a documentation page or one of the four bundles. | `node scripts/get_docs.mjs patterns` |
+
+Source inspection returns selected owning files, not the complete dependency
+tree. Use the package's exported entries when developing your application.
+Styling output is reference text, not a generated stylesheet; Headless objects
+have no visual styling contract. Use their UI presenter's reference when adding
+custom visuals.
+
+Every script provides help, for example `node scripts/get_docs.mjs --help`.
+`list_components.mjs --json` provides structured
+output for other tools. `get_docs.mjs` accepts `index`, `full`, `components`,
+`patterns`, or a documentation route:
+
+```sh
+node scripts/get_docs.mjs /quick-start/
+node scripts/get_docs.mjs components
+```
+
+By default the scripts read the public WebMusic documentation site. For a local
+build, a preview deployment or a saved context snapshot, choose the source:
+
+```sh
+node scripts/get_docs.mjs patterns --base-url http://localhost:4321/WebMusic/
+node scripts/get_component_docs.mjs element/score-player --context-dir /path/to/WebMusic/apps/doc/webmusic/dist
+```
+
+The `--base-url URL` option must point to the documentation root, including its
+deployment prefix. `--context-dir PATH` points to the built site's root directory. Keep its
+`agent-context/` directory and the four `llms*.txt` files from one build together;
+a single downloaded bundle is sufficient to read or attach manually, but is
+not a complete input for the scripts.
+
+The scripts check the context's package compatibility and content hashes.
+A missing reference, unsupported version or mixed snapshot produces an error
+instead of supplying mismatched content. Match your application's installed
+versions separately before using an example.
+
+## Use the skill
+
+This example asks for a custom interface using Headless behavior:
+
+```text
+Use the webmusic skill to build a custom score player, using this application's
+framework and visual conventions. Add play, pause and seek controls, plus
+loading and error feedback.
+
+Read https://koperative-lab.github.io/WebMusic/score/headless/play/score-player/
+and https://koperative-lab.github.io/WebMusic/score/api/io/.
+
+Check the installed versions and public types before choosing imports. Keep
+one authoritative player for this interaction and use each command's documented
+time units. Start browser sound from a user action. Release owned players and
+subscriptions when the interface unmounts, and handle a replaced or failed load.
+
+Run the application's checks. Verify the controls and cleanup in the browser,
+then summarize the changes and what remains unverified.
+```
+
+Add your file URL and the page or component to update. For a ready-made
+interface, use the [Quick Start composition](/quick-start/) instead.
+
+## Related
+
+- [Agent Toolkit overview](/agent-toolkit/)
+- [Documentation context with llms.txt](/agent-toolkit/llms-txt/)
+- [Persistent project instructions](/agent-toolkit/agents-md/)

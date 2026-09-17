@@ -222,16 +222,16 @@ const TIMELINE_TICKS = Array.from({length: 9}, (_, index) => ({
 function timelineRegions(mode: string): TimelineState['regions'] {
   if (mode === 'markers') {
     return [
-      {id: 'cue-a', label: 'Cue A', start: 4, color: '#5274d9'},
-      {id: 'section', label: 'Section', start: 10, end: 22, color: '#8a63d2'},
-      {id: 'cue-b', label: 'Cue B', start: 28, color: '#2f9272', disabled: true},
+      {id: 'cue-a', label: 'Cue A', start: 4, color: '#292929'},
+      {id: 'section', label: 'Section', start: 10, end: 22, color: '#484848'},
+      {id: 'cue-b', label: 'Cue B', start: 28, color: '#666666', disabled: true},
     ];
   }
   return [
-    {id: 'intro', label: 'Intro', start: 0, end: 8, color: '#5274d9'},
-    {id: 'verse', label: 'Verse', start: 8, end: 20, color: '#8a63d2'},
-    {id: 'bridge', label: 'Bridge', start: 20, end: 26, color: '#2f9272'},
-    {id: 'outro', label: 'Outro', start: 26, end: 32, color: '#c46a3a'},
+    {id: 'intro', label: 'Intro', start: 0, end: 8, color: '#292929'},
+    {id: 'verse', label: 'Verse', start: 8, end: 20, color: '#484848'},
+    {id: 'bridge', label: 'Bridge', start: 20, end: 26, color: '#666666'},
+    {id: 'outro', label: 'Outro', start: 26, end: 32, color: '#3b3b3b'},
   ];
 }
 
@@ -465,7 +465,7 @@ function mountMinimapDemo(host: HTMLElement): UiPresenterDemoHandle {
       const middle = height / 2;
       context.save();
       context.lineWidth = 1.5;
-      context.strokeStyle = '#5274d9';
+      context.strokeStyle = '#666666';
       context.beginPath();
       for (let x = 0; x <= width; x += 2) {
         const phase = (x / Math.max(1, width)) * Math.PI * 18;
@@ -480,7 +480,7 @@ function mountMinimapDemo(host: HTMLElement): UiPresenterDemoHandle {
       const maximum = Math.max(state.minimum, state.maximum);
       const span = Math.max(1, maximum - minimum);
       const cursorX = ((playhead - minimum) / span) * width;
-      context.strokeStyle = '#c0392b';
+      context.strokeStyle = '#111111';
       context.beginPath();
       context.moveTo(cursorX, 0);
       context.lineTo(cursorX, height);

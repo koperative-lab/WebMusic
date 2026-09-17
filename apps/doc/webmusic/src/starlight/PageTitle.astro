@@ -1,0 +1,13 @@
+---
+import Default from '@astrojs/starlight/components/PageTitle.astro';
+import Breadcrumbs from './Breadcrumbs.astro';
+---
+
+<div class="page-heading">
+  <Breadcrumbs />
+  <Default />
+</div>
+
+<style>
+  .page-heading :global(h1) { margin-block-start: .75rem; }
+</style>
