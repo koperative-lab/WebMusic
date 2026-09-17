@@ -1,0 +1,41 @@
+---
+import {getBreadcrumbs} from './breadcrumbs';
+
+const route = Astro.locals.starlightRoute;
+const crumbs = getBreadcrumbs({
+  pathname: Astro.url.pathname,
+  base: import.meta.env.BASE_URL,
+  title: route.entry.data.title,
+  sidebar: route.sidebar,
+});
+---
+
+<nav aria-label="Breadcrumb" data-pagefind-ignore data-search-ignore>
+  <ol>
+    {crumbs.map((crumb, index) => (
+      <li>
+        {index > 0 && (
+          <svg aria-hidden="true" width="12" height="12" viewBox="0 0 16 16" fill="none">
+            <path d="m6 3 5 5-5 5" stroke="currentColor" stroke-width="1.5" />
+          </svg>
+        )}
+        {crumb.href
+          ? <a href={crumb.href}>{crumb.label}</a>
+          : <span aria-current="page">{crumb.label}</span>}
+      </li>
+    ))}
+  </ol>
+</nav>
+
+<style>
+  nav { color: var(--sl-color-gray-2); font-size: .8125rem; line-height: 1.5; }
+  ol { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem .45rem; list-style: none; margin: 0; padding: 0; }
+  li { display: flex; align-items: center; gap: .45rem; min-width: 0; max-width: 100%; margin: 0; }
+  svg { flex: none; color: var(--sl-color-gray-3); }
+  a, span { min-width: 0; overflow-wrap: anywhere; }
+  a { display: inline-block; padding-block: .125rem; color: inherit; text-decoration: none; }
+  a:hover { color: var(--sl-color-text-accent); text-decoration: underline; text-underline-offset: .2em; }
+  a:focus-visible { color: var(--sl-color-text-accent); outline: 2px solid currentColor; outline-offset: 3px; }
+  [aria-current='page'] { color: var(--sl-color-text); font-weight: 500; }
+  :global([dir='rtl']) svg { transform: scaleX(-1); }
+</style>

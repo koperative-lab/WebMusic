@@ -211,6 +211,11 @@ function role(file) {
   if (path.posix.basename(file) === 'AGENTS.md') return 'Agent onboarding, documentation routing and development workflow';
   if (file.startsWith('.agent/skills/') && file.endsWith('/SKILL.md')) return 'Project skill source; client discovery is configured separately';
   if (file.startsWith('.agent/')) return 'Project agent toolkit / workflow / rule-owner map; local development notes remain optional';
+  if (file === 'skills/README.md') return 'Public consumer skill installation and maintenance';
+  if (file.startsWith('skills/') && file.endsWith('/SKILL.md')) return 'Portable application-development skill entry point';
+  if (file.startsWith('skills/') && file.includes('/assets/')) return 'Bundled consumer-project instruction fragment';
+  if (file.startsWith('skills/') && file.includes('/evals/')) return 'Consumer skill behavioral acceptance scenarios';
+  if (file.startsWith('skills/')) return 'Public consumer skill reference';
   if (file.startsWith(`${DOCS}/`)) return 'Public reference / orientation; public source, examples and owning reference';
   if (file.startsWith('.dev/') && file.endsWith('/README.md') && !isDatedAudit(file)) return DEV_HISTORY.test(file)
     ? 'Maintained navigation to historical records or prototypes; not a current work queue'
@@ -235,6 +240,7 @@ function documentationMap(files) {
   const groups = new Map([
     ['Project and contribution entry points', []],
     ['Project agent toolkit', []],
+    ['Consumer Agent Toolkit', []],
     ['Core development guidance and generated indexes', []],
     ['Component design', []],
     ['Documentation authoring', []],
@@ -247,6 +253,7 @@ function documentationMap(files) {
   for (const file of files) {
     const group = !file.includes('/') ? 'Project and contribution entry points'
       : file.startsWith('.agent/') ? 'Project agent toolkit'
+      : file.startsWith('skills/') ? 'Consumer Agent Toolkit'
       : file.startsWith('.dev/design/') ? 'Component design'
       : file.startsWith('.dev/docs/') ? 'Documentation authoring'
       : file.startsWith('.dev/release/') ? 'Release operations'

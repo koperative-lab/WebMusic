@@ -29,26 +29,25 @@
   --sl-color-text: #111111;
   --sl-color-text-accent: #000000;
   --sl-color-bg: #ffffff;
-  --sl-color-bg-nav: rgba(255, 255, 255, 0.94);
+  --sl-color-bg-nav: #ffffff;
   --sl-color-bg-sidebar: #ffffff;
   --sl-color-bg-inline-code: #f6f6f6;
   --sl-color-hairline-light: #eeeeee;
   --sl-color-hairline: #d9d9d9;
   --sl-color-hairline-shade: #bdbdbd;
-  --sl-shadow-sm: 0 1px 0 rgba(0, 0, 0, 0.08);
-  --sl-shadow-md: 0 18px 45px rgba(0, 0, 0, 0.08);
   --sl-font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --sl-font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
   --webscore-corner: 0px;
 
   /* WebScore monochrome tokens — white mode */
   --ws-bg: #ffffff;
-  --ws-bg-nav: rgba(255, 255, 255, 0.94);
+  --ws-bg-nav: #ffffff;
   --ws-fg: #000000;
   --ws-on-accent: #ffffff;
   --ws-text: #111111;
   --ws-text-content: #161616;
   --ws-text-soft: #252525;
+  --ws-text-muted: #626262;
   --ws-link-underline: rgba(0, 0, 0, 0.28);
   --ws-panel: #ffffff;
   --ws-subtle: #f7f7f7;
@@ -89,23 +88,22 @@
   --sl-color-text: #ececec;
   --sl-color-text-accent: #ffffff;
   --sl-color-bg: #000000;
-  --sl-color-bg-nav: rgba(0, 0, 0, 0.94);
+  --sl-color-bg-nav: #000000;
   --sl-color-bg-sidebar: #000000;
   --sl-color-bg-inline-code: #161616;
   --sl-color-hairline-light: #222222;
   --sl-color-hairline: #2a2a2a;
   --sl-color-hairline-shade: #333333;
-  --sl-shadow-sm: 0 1px 0 rgba(0, 0, 0, 0.6);
-  --sl-shadow-md: 0 18px 45px rgba(0, 0, 0, 0.6);
 
   /* WebScore monochrome tokens — black mode */
   --ws-bg: #000000;
-  --ws-bg-nav: rgba(0, 0, 0, 0.94);
+  --ws-bg-nav: #000000;
   --ws-fg: #ffffff;
   --ws-on-accent: #000000;
   --ws-text: #ececec;
   --ws-text-content: #e3e3e3;
   --ws-text-soft: #cfcfcf;
+  --ws-text-muted: #aaaaaa;
   --ws-link-underline: rgba(255, 255, 255, 0.3);
   --ws-panel: #0c0c0c;
   --ws-subtle: #161616;
@@ -129,8 +127,45 @@
   --ws-code-text: #e6e6e6;
 }
 
+/* Starlight surfaces share the same palette, including callouts and badges.
+   Their labels and icons retain meaning without introducing a second palette. */
+:root,
+:root[data-theme] {
+  --sl-color-text-invert: var(--ws-on-accent);
+  --sl-color-bg-accent: var(--ws-fg);
+  --sl-color-blue: var(--ws-fg);
+  --sl-color-blue-low: var(--ws-subtle);
+  --sl-color-blue-high: var(--ws-fg);
+  --sl-color-green: var(--ws-fg);
+  --sl-color-green-low: var(--ws-subtle);
+  --sl-color-green-high: var(--ws-fg);
+  --sl-color-orange: var(--ws-fg);
+  --sl-color-orange-low: var(--ws-subtle);
+  --sl-color-orange-high: var(--ws-fg);
+  --sl-color-purple: var(--ws-fg);
+  --sl-color-purple-low: var(--ws-subtle);
+  --sl-color-purple-high: var(--ws-fg);
+  --sl-color-red: var(--ws-fg);
+  --sl-color-red-low: var(--ws-subtle);
+  --sl-color-red-high: var(--ws-fg);
+  --sl-shadow-sm: none;
+  --sl-shadow-md: none;
+  --sl-shadow-lg: none;
+}
+
 html {
   background: var(--ws-bg);
+  accent-color: var(--ws-fg);
+}
+
+::selection {
+  background: var(--ws-fg);
+  color: var(--ws-on-accent);
+}
+
+:where(a, button, input, select, textarea, summary):focus-visible {
+  outline: 2px solid var(--wm-focus, var(--ws-fg));
+  outline-offset: 3px;
 }
 
 body {
@@ -159,10 +194,9 @@ a:hover,
   background: transparent;
 }
 
-.header {
+.page > .header {
   border-bottom: 0 !important;
   background: var(--ws-bg-nav);
-  backdrop-filter: blur(18px);
 }
 
 .site-title {
@@ -193,8 +227,10 @@ starlight-theme-select select,
 summary,
 dialog,
 .right-sidebar-panel,
-.mobile-toc,
-.mobile-toc button,
+mobile-starlight-toc .toggle,
+mobile-starlight-toc .dropdown,
+.sl-link-card,
+.sl-badge,
 .content-panel,
 .main-pane,
 .main-frame {
@@ -227,6 +263,57 @@ button {
   border-inline-start: 1px solid var(--ws-line);
 }
 
+mobile-starlight-toc .toggle {
+  border-color: var(--ws-line-strong);
+  background: var(--ws-subtle);
+}
+
+mobile-starlight-toc details[open] .toggle {
+  background: var(--ws-fg);
+  color: var(--ws-on-accent);
+}
+
+mobile-starlight-toc .dropdown {
+  border-color: var(--ws-line-strong);
+  box-shadow: none;
+}
+
+.sl-link-card,
+.sl-badge {
+  border-color: var(--ws-line-strong);
+  background: var(--ws-subtle);
+  color: var(--ws-fg);
+  box-shadow: none;
+}
+
+.starlight-aside {
+  --sl-color-asides-text-accent: var(--ws-fg);
+  --sl-color-asides-border: var(--ws-fg);
+  background: var(--ws-subtle);
+  border: 1px solid var(--ws-line-strong);
+  border-inline-start: 4px solid var(--ws-fg);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.sl-markdown-content .starlight-aside__title {
+  color: var(--ws-fg);
+}
+
+.sl-markdown-content blockquote {
+  border-inline-start: 4px solid var(--ws-fg);
+  background: var(--ws-subtle);
+  padding: 1rem 1.25rem;
+}
+
+.sl-markdown-content :is(th, td):not(:where(.not-content *)) {
+  border-color: var(--ws-line-strong);
+}
+
+.sl-markdown-content th:not(:where(.not-content *)) {
+  background: var(--ws-subtle);
+}
+
 .hero {
   position: relative;
   display: grid;
@@ -244,7 +331,7 @@ button {
   border-radius: 0;
   background:
     linear-gradient(90deg, var(--ws-hero-base) 0 8%, var(--ws-hero-key) 8% 11%, var(--ws-hero-base) 11% 18%, var(--ws-hero-key) 18% 21%, var(--ws-hero-base) 21% 31%, var(--ws-hero-key) 31% 34%, var(--ws-hero-base) 34% 43%, var(--ws-hero-base) 43% 51%, var(--ws-hero-key) 51% 54%, var(--ws-hero-base) 54% 64%, var(--ws-hero-key) 64% 67%, var(--ws-hero-base) 67% 76%, var(--ws-hero-key) 76% 79%, var(--ws-hero-base) 79% 100%);
-  box-shadow: 0 26px 70px var(--ws-shadow);
+  box-shadow: none;
   z-index: -2;
 }
 
@@ -298,8 +385,8 @@ button {
 }
 
 .hero .actions a:is(:hover, :focus-visible) {
-  transform: translateY(-1px);
-  box-shadow: 0 14px 28px var(--ws-shadow-2);
+  outline: 2px solid var(--ws-fg);
+  outline-offset: 3px;
 }
 
 .hero .actions a:not(:first-child) {
@@ -311,7 +398,7 @@ button {
   color: var(--ws-text-content);
 }
 
-.sl-markdown-content h2 {
+.sl-markdown-content h2:not(:where(.not-content *)) {
   margin-top: 3.5rem;
   padding-top: 1.4rem;
   border-top: 1px solid var(--ws-line-mid);
@@ -321,13 +408,13 @@ button {
   letter-spacing: 0;
 }
 
-.sl-markdown-content h3 {
+.sl-markdown-content h3:not(:where(.not-content *)) {
   color: var(--ws-fg);
   letter-spacing: 0;
 }
 
-.sl-markdown-content p,
-.sl-markdown-content li {
+.sl-markdown-content p:not(:where(.not-content *)),
+.sl-markdown-content li:not(:where(.not-content *)) {
   color: var(--ws-text-soft);
   line-height: 1.75;
 }
@@ -443,6 +530,28 @@ button {
   min-height: 1.65rem;
 }
 
+/* Astro's standalone Code component bypasses Expressive Code (for example,
+   computed snippets in Quick Start), but belongs to the same visual system. */
+.sl-markdown-content pre.astro-code {
+  padding: 1.25rem 1.45rem;
+  border: 1px solid var(--ws-fg);
+  border-inline-start-width: 10px;
+  border-radius: 0;
+  background: var(--ws-panel) !important;
+  color: var(--ws-code-text) !important;
+  box-shadow: 7px 7px 0 var(--ws-shadow-block);
+  overflow: auto;
+  scrollbar-color: var(--ws-scroll-thumb) var(--ws-scroll-track);
+  scrollbar-width: thin;
+}
+
+.sl-markdown-content .astro-code :is(code, span) {
+  border: 0;
+  padding: 0;
+  background: transparent !important;
+  color: var(--ws-code-text) !important;
+}
+
 .expressive-code .copy {
   display: none !important;
 }
@@ -529,7 +638,7 @@ button {
 
 .card:is(:hover, :focus-within) {
   border-color: var(--ws-fg);
-  box-shadow: 0 18px 42px var(--ws-shadow);
+  background: var(--ws-subtle);
 }
 
 .card .title {
@@ -585,12 +694,5 @@ starlight-tabs {
   }
 }
 
-/* ============================================================================
-   Live component demos. The demo cards are self-contained light "sample
-   canvases" (the embedded widgets are light-themed at the package level), so
-   in black mode we keep them light and just lift them off the dark page with a
-   soft shadow so they read as intentional sample frames.
-   ============================================================================ */
-:root[data-theme='dark'] [class$='-demo'] {
-  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.65);
-}
+/* Live demos retain light sample canvases in both modes. Their public
+   presenter tokens and flat frame styling live in shared/ui.css. */
