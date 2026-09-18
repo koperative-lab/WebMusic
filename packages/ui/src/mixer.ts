@@ -4,6 +4,7 @@ import {installStyle} from './internal/style';
 import {addClassNames, clamp01, setParts} from './internal/dom';
 import {componentSurfaceCss, controlBorderFallback} from './internal/surface';
 import {controlHeight, controlRadius} from './internal/control';
+import {bindLocalization, formatPercent, message, type UILocalization} from './localization';
 
 export interface MixerChannel {
   id: string;
@@ -54,6 +55,7 @@ export interface MixerClassNames {
 export type MixerParts = MixerClassNames;
 
 export interface MixerOptions {
+  localization?: UILocalization;
   classNames?: MixerClassNames;
   parts?: MixerParts;
   onError?: (error: unknown) => void;
@@ -122,6 +124,7 @@ export function mountMixer(
 
   let destroyed = false;
   let unsubscribe: (() => void) | undefined;
+  let unbindLocalization: (() => void) | undefined;
   const report = createErrorSink(options.onError);
   const command = (work: () => Promise<void> | void): void => {
     if (destroyed) return;
@@ -172,7 +175,8 @@ export function mountMixer(
     // carries BOTH documented hooks: `fader` for the track, `input` for the
     // control that was inside it.
     const control = createFader(document, {
-      label: `${initial.label} volume`,
+      label: message(options.localization, 'mixer.volume', '{label} volume', {label: initial.label}),
+      formatValue: (value) => formatPercent(options.localization, value),
       value: clamp01(initial.value),
       orientation: "vertical",
       disabled: initial.disabled === true,
@@ -208,7 +212,6 @@ export function mountMixer(
         addClassNames(mute, options.classNames?.button);
         addClassNames(mute, options.classNames?.mute);
         setParts(mute, ["button", "mute"], options.parts?.button, options.parts?.mute);
-        mute.textContent = "M";
         mute.addEventListener("click", () =>
           command(() => binding.setMuted!(current.id, current.muted !== true)));
         actions.append(mute);
@@ -220,7 +223,6 @@ export function mountMixer(
         addClassNames(solo, options.classNames?.button);
         addClassNames(solo, options.classNames?.solo);
         setParts(solo, ["button", "solo"], options.parts?.button, options.parts?.solo);
-        solo.textContent = "S";
         solo.addEventListener("click", () =>
           command(() => binding.setSolo!(current.solo ? null : current.id)));
         actions.append(solo);
@@ -234,19 +236,19 @@ export function mountMixer(
       if (label.textContent !== channel.label) {
         label.title = channel.label;
         label.textContent = channel.label;
-        // `mountSurfaceSlider` only names a slider that has no name yet, so a
-        // renamed channel needs its accessible name written here.
-        control.element.setAttribute("aria-label", `${channel.label} volume`);
       }
+      control.updateLabel(message(options.localization, 'mixer.volume', '{label} volume', {label: channel.label}));
       control.paint(clamp01(channel.value), disabled);
       if (mute) {
         mute.disabled = disabled;
-        mute.setAttribute("aria-label", `Mute ${channel.label}`);
+        mute.textContent = message(options.localization, 'mixer.muteText', 'M');
+        mute.setAttribute("aria-label", message(options.localization, 'mixer.mute', 'Mute {label}', {label: channel.label}));
         mute.setAttribute("aria-pressed", String(channel.muted === true));
       }
       if (solo) {
         solo.disabled = disabled;
-        solo.setAttribute("aria-label", `Solo ${channel.label}`);
+        solo.textContent = message(options.localization, 'mixer.soloText', 'S');
+        solo.setAttribute("aria-label", message(options.localization, 'mixer.solo', 'Solo {label}', {label: channel.label}));
         solo.setAttribute("aria-pressed", String(channel.solo === true));
       }
     };
@@ -261,7 +263,7 @@ export function mountMixer(
   transport.className = "wui-mixer__transport transport";
   addClassNames(transport, options.classNames?.transport);
   setParts(transport, ["transport"], options.parts?.transport);
-  const actionButtons: HTMLButtonElement[] = [];
+  const actionButtons: Array<{button: HTMLButtonElement; kind: MixerAction; label: string}> = [];
   const action = (
     kind: MixerAction,
     label: string,
@@ -275,10 +277,10 @@ export function mountMixer(
     addClassNames(button, options.classNames?.button);
     addClassNames(button, options.classNames?.[kind]);
     setParts(button, ["button", kind], options.parts?.button, options.parts?.[kind]);
-    button.setAttribute("aria-label", label);
+    button.setAttribute("aria-label", message(options.localization, `mixer.${kind}`, label));
     button.textContent = text;
     button.addEventListener("click", () => command(work));
-    actionButtons.push(button);
+    actionButtons.push({button, kind, label});
     transport.append(button);
   };
   action("play", "Play", "▶", binding.play);
@@ -293,11 +295,11 @@ export function mountMixer(
   channelsBox.className = "wui-mixer__channels strips";
   channelsBox.tabIndex = 0;
   channelsBox.setAttribute("role", "group");
-  channelsBox.setAttribute("aria-label", "Mixer channels");
+  channelsBox.setAttribute("aria-label", message(options.localization, 'mixer.channels', 'Mixer channels'));
   addClassNames(channelsBox, options.classNames?.channels);
   setParts(channelsBox, ["channels"], options.parts?.channels);
   const showMaster = options.master !== false;
-  const masterStrip = showMaster ? createStrip({id: "master", label: "master", value: 0}, true) : undefined;
+  const masterStrip = showMaster ? createStrip({id: "master", label: message(options.localization, 'mixer.master', 'master'), value: 0}, true) : undefined;
   board.append(...(masterStrip ? [masterStrip.element] : []), channelsBox);
   root.replaceChildren(...(transport.childNodes.length ? [transport, board] : [board]));
 
@@ -309,8 +311,12 @@ export function mountMixer(
       if (destroyed || !claim.isCurrent()) return;
       const disabled = state.disabled === true;
       channelsBox.tabIndex = state.channels.length ? 0 : -1;
-      for (const button of actionButtons) button.disabled = disabled;
-      masterStrip?.paint({id: "master", label: "master", value: state.master}, disabled);
+      channelsBox.setAttribute('aria-label', message(options.localization, 'mixer.channels', 'Mixer channels'));
+      for (const {button, kind, label} of actionButtons) {
+        button.disabled = disabled;
+        button.setAttribute('aria-label', message(options.localization, `mixer.${kind}`, label));
+      }
+      masterStrip?.paint({id: "master", label: message(options.localization, 'mixer.master', 'master'), value: state.master}, disabled);
 
       const seen = new Set<string>();
       const order: HTMLElement[] = [];
@@ -356,10 +362,13 @@ export function mountMixer(
       destroyed = true;
       const stop = unsubscribe;
       unsubscribe = undefined;
+      const releaseText = unbindLocalization;
+      unbindLocalization = undefined;
       const ownedStrips = [...strips.values()];
       strips.clear();
       runCleanups([
         stop,
+        releaseText,
         ...ownedStrips.map((strip) => () => strip.destroy()),
         () => masterStrip?.destroy(),
         () => claim.release(),
@@ -395,5 +404,6 @@ export function mountMixer(
       report(error);
     }
   }
+  unbindLocalization = bindLocalization(options.localization, update, () => !destroyed && claim.isCurrent(), report);
   return handle;
 }

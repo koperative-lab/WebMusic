@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 
+import {createUILocalization, type UILocalization} from '../src/localization';
+
 import {describe, expect, it, vi} from 'vitest';
 import {
   createTransportIcon,
@@ -388,5 +390,243 @@ describe('mountTransport', () => {
 
     expect(seek.value).toBe('750');
     expect(seek.getAttribute('aria-valuetext')).toBe('0:45 of 1:00');
+  });
+});
+
+describe('transport capabilities and localization', () => {
+  it('supports a minimal play/pause binding and reveals only reported data', () => {
+    const host = document.createElement('div');
+    let state: TransportState = {playing: false};
+    const binding: TransportBinding = {
+      snapshot: () => state,
+      play: () => { state = {...state, playing: true}; },
+      pause: () => { state = {...state, playing: false}; },
+    };
+    const handle = mountTransport(host, binding);
+    expect(handle.controls.seek).toBeUndefined();
+    expect(handle.controls.track.hidden).toBe(true);
+    expect(handle.controls.time?.hidden).toBe(true);
+    handle.controls.play.click();
+    expect(handle.controls.play.getAttribute('aria-label')).toBe('Pause');
+    state = {...state, progress: .4};
+    handle.update();
+    expect(handle.controls.track.hidden).toBe(false);
+    expect(handle.controls.track.style.getPropertyValue('--wui-progress')).toBe('40.0%');
+    expect(handle.controls.track.getAttribute('role')).toBe('progressbar');
+    expect(handle.controls.time?.hidden).toBe(true);
+    state = {...state, progress: undefined, seconds: 30, duration: 120};
+    handle.update();
+    expect(handle.controls.track.style.getPropertyValue('--wui-progress')).toBe('25.0%');
+    expect(handle.controls.time?.hidden).toBe(false);
+    expect(handle.controls.time?.textContent).toBe('0:30 / 2:00');
+    handle.destroy();
+  });
+
+  it.each(['native', 'surface'] as const)('does not render unsupported %s seek', (seekControl) => {
+    const handle = mountTransport(document.createElement('div'), {
+      snapshot: () => ({playing: false, progress: .5}), play() {}, pause() {},
+    }, {seekControl});
+    expect(handle.controls.seek).toBeUndefined();
+    expect(handle.controls.fill?.style.width).toBe('50%');
+    expect(handle.controls.track.getAttribute('role')).toBe('progressbar');
+    expect(handle.controls.track.style.getPropertyValue('--wui-progress')).toBe('50.0%');
+    handle.destroy();
+  });
+
+  it.each(['native', 'surface'] as const)('updates %s text, time and volume without replacing focused controls', (seekControl) => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const binding = Object.assign(new FakeTransport(), {setVolume: vi.fn()});
+    binding.state = {playing: false, progress: .25, seconds: 15, duration: 60, volume: .4};
+    const localization = createUILocalization();
+    const handle = mountTransport(host, binding, {seekControl, showVolume: 'fader', localization});
+    const slider = handle.controls.seek ?? handle.controls.track;
+    const volume = handle.controls.volume!;
+    const button = handle.controls.play;
+    slider.focus();
+    localization.update({
+      messages: {
+        'transport.play': '播放', 'transport.pause': '暂停', 'transport.label': '播放器',
+        'transport.seek': '{label}位置', 'transport.seekValue': '{elapsed}，共{duration}',
+        'transport.timeTotal': ' · {duration}', 'transport.volume': '音量',
+      },
+      formatters: {time: (value) => `${value}秒`, percent: (value) => `${Math.round(value * 100)}百分比`},
+    });
+    expect(document.activeElement).toBe(slider);
+    expect(handle.controls.play).toBe(button);
+    expect(handle.controls.volume).toBe(volume);
+    expect(button.getAttribute('aria-label')).toBe('播放');
+    expect(button.title).toBe('播放');
+    expect(slider.getAttribute('aria-label')).toBe('播放器位置');
+    expect(slider.getAttribute('aria-valuetext')).toBe('15秒，共60秒');
+    expect(handle.controls.time?.textContent).toBe('15秒 · 60秒');
+    expect(volume.getAttribute('aria-label')).toBe('音量');
+    expect(volume.getAttribute('aria-valuetext')).toBe('40百分比');
+    button.click();
+    expect(button.getAttribute('aria-label')).toBe('暂停');
+    handle.setVolumeControl('knob');
+    expect(handle.controls.volume?.getAttribute('aria-label')).toBe('音量');
+    expect(handle.controls.volume?.getAttribute('aria-valuetext')).toBe('40百分比');
+    handle.destroy();
+    host.remove();
+  });
+
+  it('preserves native dragging and formats optimistic input across language updates', () => {
+    const binding = Object.assign(new FakeTransport(), {seekFraction: vi.fn()});
+    const localization = createUILocalization();
+    const handle = mountTransport(document.createElement('div'), binding, {localization});
+    const seek = handle.controls.seek!;
+    seek.dispatchEvent(new Event('pointerdown'));
+    seek.value = '700';
+    seek.dispatchEvent(new Event('input'));
+    localization.update({formatters: {percent: (fraction) => `pct ${fraction * 100}`}});
+    expect(seek.value).toBe('700');
+    expect(seek.getAttribute('aria-valuetext')).toBe('pct 70');
+    seek.value = '800';
+    seek.dispatchEvent(new Event('input'));
+    expect(seek.getAttribute('aria-valuetext')).toBe('pct 80');
+    handle.destroy();
+  });
+
+  it('keeps explicit labels and resets translated defaults without remounting', () => {
+    const localization = createUILocalization({messages: {'transport.play': '播放', 'transport.volume': '音量'}});
+    const handle = mountTransport(document.createElement('div'), Object.assign(new FakeTransport(), {setVolume() {}}), {
+      localization, playLabel: 'Audition', volumeLabel: 'Gain', showVolume: true,
+    });
+    expect(handle.controls.play.getAttribute('aria-label')).toBe('Audition');
+    expect(handle.controls.volume?.getAttribute('aria-label')).toBe('Gain');
+    localization.update({messages: undefined});
+    expect(handle.controls.play.getAttribute('aria-label')).toBe('Audition');
+    handle.destroy();
+  });
+
+  it('releases a subscription returned after synchronous replacement', () => {
+    const host = document.createElement('div');
+    const release = vi.fn();
+    let replacement: ReturnType<typeof mountTransport> | undefined;
+    const binding = new FakeTransport();
+    binding.subscribe = () => {
+      replacement = mountTransport(host, new FakeTransport());
+      return release;
+    };
+    const stale = mountTransport(host, binding);
+    expect(release).toHaveBeenCalledOnce();
+    expect(host.querySelector('.wui-transport')).toBe(replacement?.element);
+    stale.destroy();
+    expect(release).toHaveBeenCalledOnce();
+    replacement?.destroy();
+  });
+
+  it('releases localization despite throwing binding cleanup and ignores later updates', () => {
+    const original = createUILocalization();
+    const releaseLocale = vi.fn();
+    const localization: UILocalization = {
+      ...original,
+      subscribe(notify) {
+        const release = original.subscribe(notify);
+        return () => { releaseLocale(); release(); };
+      },
+    };
+    const binding = new FakeTransport();
+    binding.subscribe = () => () => { throw new Error('release'); };
+    const handle = mountTransport(document.createElement('div'), binding, {
+      localization, onError: () => { throw new Error('sink'); },
+    });
+    expect(() => handle.destroy()).not.toThrow();
+    expect(releaseLocale).toHaveBeenCalledOnce();
+    original.update({messages: {'transport.play': 'Changed'}});
+    expect(handle.controls.play.getAttribute('aria-label')).toBe('Play');
+  });
+
+  it('allows a locale formatter to replace a mounting surface transport', () => {
+    const host = document.createElement('div');
+    let replacement: ReturnType<typeof mountTransport> | undefined;
+    const localization = createUILocalization({formatters: {time: () => {
+      replacement ??= mountTransport(host, new FakeTransport());
+      return 'formatted';
+    }}});
+    const stale = mountTransport(host, new FakeTransport(), {localization, seekControl: 'surface'});
+    expect(host.querySelectorAll('.wui-transport')).toHaveLength(1);
+    expect(host.querySelector('.wui-transport')).toBe(replacement?.element);
+    stale.destroy();
+    expect(host.querySelector('.wui-transport')).toBe(replacement?.element);
+    replacement?.destroy();
+  });
+});
+
+describe('read-only transport progress', () => {
+  it('localizes the read-only fill and accessible progress without introducing seeking', () => {
+    const localization = createUILocalization();
+    const handle = mountTransport(document.createElement('div'), {
+      snapshot: () => ({playing: false, progress: .45}), play() {}, pause() {},
+    }, {localization});
+    expect(handle.controls.fill?.style.width).toBe('45%');
+    expect(handle.controls.track.getAttribute('aria-valuenow')).toBe('45');
+    localization.update({messages: {'transport.progress': '{label}位置'}, formatters: {percent: value => `进度${value}`}});
+    expect(handle.controls.track.getAttribute('aria-label')).toBe('Transport位置');
+    expect(handle.controls.track.getAttribute('aria-valuetext')).toBe('进度0.45');
+    expect(handle.controls.track.tabIndex).toBe(-1);
+    handle.destroy();
+  });
+
+  it.each(['fader', 'knob'] as const)('releases a %s returned after a mounting formatter replaces the transport', (showVolume) => {
+    const host = document.createElement('div');
+    let replacement: ReturnType<typeof mountTransport> | undefined;
+    const localization = createUILocalization({formatters: {percent: () => {
+      replacement ??= mountTransport(host, new FakeTransport());
+      return 'formatted';
+    }}});
+    const stale = mountTransport(host, Object.assign(new FakeTransport(), {setVolume() {}}), {localization, showVolume});
+    expect(host.querySelectorAll('.wui-transport')).toHaveLength(1);
+    expect(host.querySelector('.wui-transport')).toBe(replacement?.element);
+    expect(host.querySelector('.wui-transport__volume')).toBeNull();
+    stale.destroy();
+    expect(host.querySelector('.wui-transport')).toBe(replacement?.element);
+    replacement?.destroy();
+  });
+});
+
+describe('transport caller-owned clock visibility', () => {
+  it.each([true, false])('preserves explicit clock display across state and locale updates (stylesheet: %s)', (stylesheet) => {
+    const localization = createUILocalization();
+    const binding = Object.assign(new FakeTransport(), {setVolume() {}});
+    const handle = mountTransport(document.createElement('div'), binding, {stylesheet, localization});
+    const time = handle.controls.time!;
+    const originalDisplay = time.style.display;
+    time.style.display = 'none';
+    handle.setVolumeControl('fader');
+    binding.state.playing = true;
+    binding.emit();
+    localization.update({messages: {'transport.pause': '暂停'}});
+    expect(time.style.display).toBe('none');
+    time.style.display = originalDisplay;
+    binding.emit();
+    expect(time.style.display).toBe(originalDisplay);
+    handle.destroy();
+  });
+
+  it('restores caller visibility after automatic hiding for missing data', () => {
+    const binding = new FakeTransport();
+    const handle = mountTransport(document.createElement('div'), binding, {stylesheet: false});
+    const time = handle.controls.time!;
+    const track = handle.controls.track;
+    expect(time.style.display).toBe('flex');
+    binding.state = {playing: false};
+    binding.emit();
+    expect(time.hidden).toBe(true);
+    expect(track.hidden).toBe(true);
+    binding.state = {playing: false, seconds: 1, duration: 20};
+    binding.emit();
+    expect(time.hidden).toBe(false);
+    expect(time.style.display).toBe('flex');
+    time.style.display = 'none';
+    track.style.display = 'grid';
+    binding.state = {playing: false};
+    binding.emit();
+    binding.state = {playing: false, seconds: 2, duration: 20};
+    binding.emit();
+    expect(time.style.display).toBe('none');
+    expect(track.style.display).toBe('grid');
+    handle.destroy();
   });
 });

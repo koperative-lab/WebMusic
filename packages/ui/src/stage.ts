@@ -2,6 +2,7 @@ import {installStyle} from './internal/style';
 import {claimHost, createErrorSink} from './internal/lifecycle';
 import {finitePositive, addClassNames, setParts} from './internal/dom';
 import {mountStatus, type StatusHandle, type StatusState} from './status';
+import {bindLocalization, formatNumber, message, type UILocalization} from './localization';
 import {componentSurfaceCss} from './internal/surface';
 
 export interface StageBinding {
@@ -88,6 +89,7 @@ export interface SurfaceSliderBinding {
 }
 
 export interface SurfaceSliderOptions {
+  localization?: UILocalization;
   label?: string;
   orientation?: 'horizontal' | 'vertical';
   /**
@@ -114,6 +116,8 @@ export interface SurfaceSliderHandle {
   element: HTMLElement;
   surface: HTMLElement;
   update(): void;
+  /** Update the accessible name without replacing the surface or moving focus. */
+  updateLabel(label?: string): void;
   destroy(): void;
 }
 
@@ -136,6 +140,7 @@ export interface CanvasStageBinding {
 }
 
 export interface CanvasStageOptions {
+  localization?: UILocalization;
   label?: string;
   /** Continuously redraw with requestAnimationFrame. Defaults to false. */
   animate?: boolean;
@@ -347,6 +352,7 @@ export function mountSurfaceSlider(
   const orientation = options.orientation === 'vertical' ? 'vertical' : 'horizontal';
   let destroyed = false;
   let unsubscribe: (() => void) | undefined;
+  let unlocalize: (() => void) | undefined;
   let activePointer: number | 'fallback' | undefined;
   let state: SurfaceSliderState = {minimum: 0, maximum: 0, value: 0, disabled: true};
 
@@ -385,9 +391,10 @@ export function mountSurfaceSlider(
     // presenter owns the attribute. An author-supplied tabindex is their focus
     // policy and stays untouched, as stage.test.ts pins.
     if (ownsTabIndex) assign('tabindex', state.disabled === true ? '-1' : '0');
-    if (!options.formatValue) return;
+    if (!options.formatValue && !options.localization) return;
     try {
-      const text = options.formatValue(state.value, state);
+      const text = options.formatValue ? options.formatValue(state.value, state) : formatNumber(options.localization, state.value);
+      if (destroyed || !claim.isCurrent()) return;
       if (text === undefined) releaseAssigned('aria-valuetext');
       else assign('aria-valuetext', text);
     } catch (error) {
@@ -399,8 +406,10 @@ export function mountSurfaceSlider(
     if (destroyed) return;
     try {
       state = normalizeSurfaceSliderState(binding.snapshot());
+      if (destroyed || !claim.isCurrent()) return;
       applyState();
     } catch (error) {
+      if (destroyed || !claim.isCurrent()) return;
       state = {minimum: 0, maximum: 0, value: 0, disabled: true};
       applyState();
       report(error);
@@ -533,14 +542,28 @@ export function mountSurfaceSlider(
 
   let originalTouchAction = '';
   let ownsTabIndex = false;
+  let ownsLabel = false;
+  let labelOverride: string | undefined;
+  const updateLabel = (label?: string): void => {
+    if (destroyed) return;
+    labelOverride = label;
+    ownsLabel = true;
+    const text = label ?? options.label ?? message(options.localization, 'stage.value', 'Value');
+    if (destroyed || !claim.isCurrent()) return;
+    assign('aria-label', text);
+  };
 
   const handle: SurfaceSliderHandle = {
     element,
     surface,
     update,
+    updateLabel,
     destroy(): void {
       if (destroyed) return;
       destroyed = true;
+      const releaseText = unlocalize;
+      unlocalize = undefined;
+      releaseText?.();
       surface.removeEventListener('pointerdown', onPointerDown);
       surface.removeEventListener('pointermove', onPointerMove);
       surface.removeEventListener('pointerup', onPointerUp);
@@ -578,8 +601,9 @@ export function mountSurfaceSlider(
     ownsTabIndex = true;
   }
   if (!element.hasAttribute('aria-label') && !element.hasAttribute('aria-labelledby')) {
-    assign('aria-label', options.label ?? 'Value');
+    updateLabel();
   }
+  if (destroyed || !claim.isCurrent()) return handle;
   assign('aria-orientation', orientation);
   originalTouchAction = surface.style.touchAction;
   surface.style.touchAction = 'none';
@@ -590,13 +614,20 @@ export function mountSurfaceSlider(
   element.addEventListener('keydown', onKeyDown);
 
   update();
+  if (destroyed || !claim.isCurrent()) return handle;
   if (binding.subscribe) {
     try {
-      unsubscribe = binding.subscribe(update);
+      const cleanup = binding.subscribe(update);
+      if (destroyed || !claim.isCurrent()) cleanup();
+      else unsubscribe = cleanup;
     } catch (error) {
       report(error);
     }
   }
+  unlocalize = bindLocalization(options.localization, () => {
+    if (ownsLabel) updateLabel(labelOverride);
+    update();
+  }, () => !destroyed && claim.isCurrent(), options.onError);
   return handle;
 }
 
@@ -653,6 +684,7 @@ export function mountCanvasStage(
         classNames: {root: 'wui-status--embedded'},
         onError: options.onError,
         stylesheet: options.stylesheet,
+        localization: options.localization,
       },
     );
   }

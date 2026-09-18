@@ -38,8 +38,10 @@ const handle = mountParameterRack(host, {
 `group` string, preserves first-seen group order, and labels non-empty groups. A missing or empty
 group remains an unlabelled group. Duplicate normalized `id` values are rejected and reported.
 
-The presenter rebuilds its item DOM only when layout or structural item fields change: `id`,
-`label`, bounds, step, unit, group, or choices. Value and disabled changes repaint existing nodes.
+The presenter rebuilds its item DOM when identity, order, bounds, step, group membership or
+whether a group is named changes. A different choice count changes normalized bounds. Labels,
+units, choice text, group headings, values and disabled state patch existing nodes, preserving
+focus when translating caller-owned text without changing membership.
 `setValue()` paints optimistically, then re-reads the authoritative snapshot after the command
 settles. See the [shared presenter shape](/uikit/api/#the-shared-presenter-shape) for host
 ownership and lifecycle rules.
@@ -83,6 +85,7 @@ indices `0…options.length - 1` and forces `step: 1`.
 
 | Member | Kind | Default | Description |
 |---|---|---|---|
+| `localization` | `UILocalization` | — | Borrowed text and number-format source; updates repaint in place and destruction releases its subscription. |
 | `layout` | `'flat' \| 'grouped'` | `'flat'` | Chooses per-item borders or named group containers. |
 | `emptyLabel` | `string` | `'No parameters'` | Placeholder text when `parameters` is empty. |
 | `formatValue` | `(parameter, value) => string` | Built-in choice/numeric formatter | Formats the visible readout and `aria-valuetext`; thrown errors are reported before the built-in fallback is used. |
@@ -101,6 +104,19 @@ indices `0…options.length - 1` and forces `step: 1`.
 | `emptyElement()` | `() => HTMLElement \| undefined` | Returns the placeholder only while the list is empty. |
 | `update()` | `() => void` | Re-reads and repaints the binding; re-entrant updates are bounded to 32 passes. |
 | `destroy()` | `() => void` | Idempotently removes item listeners, subscription, root and installed stylesheet. |
+
+**Localization.** Pass an instance-local [localization controller](/uikit/api/) as
+`localization`. The `number` formatter handles built-in numeric readouts; `parameter.value`
+combines that formatted value with a caller-supplied unit. Supplied choice labels are already
+formatted caller text. Explicit `formatValue` and `emptyLabel` options take precedence; a failing
+`formatValue` falls back to the localized built-in formatter. Localization updates retain focused
+inputs, numeric range values and group label relationships. Destroy releases the localization
+subscription.
+
+| Message key | Default | Values |
+|---|---|---|
+| `parameter.empty` | `No parameters` | — |
+| `parameter.value` | `{value} {unit}` | Formatted `value`, caller-supplied `unit` |
 
 **Accessibility.** Each knob contains a native `input[type="range"]` named by the item label and
 given formatted `aria-valuetext`. Native range keys provide the keyboard interaction. Named

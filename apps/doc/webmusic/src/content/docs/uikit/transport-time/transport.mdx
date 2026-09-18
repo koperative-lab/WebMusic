@@ -57,14 +57,20 @@ so a scrub is one seek rather than one per pointer move, and `Shift` selects a c
   progress properties on the track.
 
 The older `seek: false` option selects the third mode only when `seekControl` is not supplied.
-An explicit `seekControl` always wins.
+An explicit `seekControl` wins over `seek`. A binding without `seekFraction` always gets a
+read-only progress bar with a fill and no native or surface slider, regardless of these options.
 
 ## Binding and command settlement
 
-The binding remains authoritative. `subscribe()` tells the presenter when to re-read
+The binding remains authoritative. Optional `subscribe()` tells the presenter when to re-read
 `snapshot()`; it does not push a second copy of state into the UI. See the
 [shared presenter shape](/uikit/api/#the-shared-presenter-shape) for the common ownership and
-cleanup contract.
+cleanup contract. Without `subscribe`, call `handle.update()` after external state changes;
+commands still trigger their own refresh. A minimal binding only needs `snapshot`, `play`,
+and `pause`, and its snapshot only needs `playing`. No fake progress, seek, or subscription
+is needed. The track is hidden when no position/time fields are reported; the clock is hidden
+when both `seconds` and `duration` are absent. These nodes remain available through `controls`
+and are revealed in place when data appears.
 
 `play()` and `seekFraction()` may return promises. The presenter repaints immediately and again
 after a command fulfills; `pause()` is synchronous. While a native thumb or surface is being
@@ -83,7 +89,7 @@ paint.
 | Member | Kind | Description |
 |---|---|---|
 | `playing` | `boolean` | Strict `true` selects the pause action and icon; every other value selects play. |
-| `progress` | `number` | Normalized position. Paints the native range, surface fill, and progress custom properties after clamping to `0…1`. |
+| `progress?` | `number` | Optional normalized position. When absent, derives `seconds / duration` for a positive duration, otherwise uses `0` for geometry. Paints the native range, surface fill, and progress custom properties after clamping to `0…1`. |
 | `seconds?` | `number` | Elapsed seconds. When absent or non-finite, falls back to `progress × duration`; negative values paint as `0`. |
 | `duration?` | `number` | Total seconds used by the clock and seek value text; absent, non-finite, or negative values paint as `0`. |
 | `disabled?` | `boolean` | Strict `true` disables play and seek. Surface mode also sets `aria-disabled` and removes the track from the tab order. |
@@ -96,19 +102,20 @@ paint.
 | `snapshot()` | `() => TransportState` | Required pull port read on mount, notification, command interaction, and explicit `update()`. If it throws, `onError` receives the error and that paint uses a stopped, zero-progress, disabled fallback state. |
 | `play()` | `() => void \| Promise<void>` | Required command called while stopped. |
 | `pause()` | `() => void` | Required synchronous command called while playing. |
-| `seekFraction(value)` | `(number) => void \| Promise<void>` | Required seek command. Receives a clamped `0…1` fraction from either seek mode. |
+| `seekFraction(value)` | `(number) => void \| Promise<void>` | Optional seek command. Its absence suppresses both seek controls. Receives a clamped `0…1` fraction from either seek mode. |
 | `setVolume(value)` | `(number) => void \| Promise<void>` | Optional volume command, receiving a clamped `0…1` level. A binding without it renders no volume slider, whatever `showVolume` says. |
-| `subscribe(notify)` | `(notify: () => void) => () => void` | Required subscription. Its disposer is called by `destroy()` and when the same presenter is remounted into the host. |
+| `subscribe(notify)` | `(notify: () => void) => () => void` | Optional subscription; otherwise refresh with `update()`. Its disposer is called by `destroy()` and when the same presenter is remounted into the host. |
 
 **Options**
 
 | Member | Kind | Default | Description |
 |---|---|---|---|
+| `localization` | `UILocalization` | — | Borrowed shared text and numeric formatting; live updates preserve nodes, focus, and current dragging. |
 | `label` | `string` | `'Transport'` | Prefix for the native or surface seek control's accessible name: `<label> seek`. |
-| `showTime` | `boolean \| 'elapsed' \| 'full'` | `true` | Creates the clock when not `false`. `'full'` (and `true`) reads `elapsed / total`; `'elapsed'` drops the total. |
+| `showTime` | `boolean \| 'elapsed' \| 'full'` | `true` | Creates the clock when not `false`, and hides it until seconds or duration are reported. `'full'` (and `true`) reads `elapsed / total`; `'elapsed'` drops the total. |
 | `showVolume` | `boolean \| 'fader' \| 'knob'` | `false` | Creates a volume control — `'fader'` (and `true`) the kit's horizontal fader, `'knob'` its rotary — but only when the binding implements `setVolume`. |
 | `volumeLabel` | `string` | `'Volume'` | Accessible name of the volume control. |
-| `seekControl` | `'native' \| 'surface' \| false` | `'native'` | Selects the native range, ARIA surface slider, or empty caller-owned track. |
+| `seekControl` | `'native' \| 'surface' \| false` | `'native'` | Selects the native range, ARIA surface slider, or empty caller-owned track when `seekFraction` exists. |
 | `seek` | `boolean` | `true` | Compatibility option. `false` suppresses seek only when `seekControl` is absent. |
 | `stylesheet` | `boolean` | `true` | Installs the canonical transport stylesheet unless explicitly `false`. |
 | `playLabel` | `string` | `'Play'` | Accessible name and title while stopped. |
@@ -124,16 +131,40 @@ paint.
 |---|---|---|
 | `element` | `HTMLElement` | Presenter-owned `.wui-transport` root. |
 | `controls.play` | `HTMLButtonElement` | Always-present play/pause toggle. |
-| `controls.track` | `HTMLDivElement` | Always-present progress track; empty and caller-fillable when seeking is suppressed. |
-| `controls.seek?` | `HTMLInputElement` | Native range, defined only for `seekControl: 'native'`. |
-| `controls.fill?` | `HTMLSpanElement` | Progress fill, defined only for `seekControl: 'surface'`. |
-| `controls.time?` | `HTMLSpanElement` | Clock, undefined when `showTime: false`. |
+| `controls.track` | `HTMLDivElement` | Always-present progress track; hidden without reported position/time, a read-only progress bar when seeking is unsupported, and empty/caller-fillable when a seek-capable binding sets seeking off. |
+| `controls.seek?` | `HTMLInputElement` | Native range, defined only for `seekControl: 'native'` with `seekFraction`. |
+| `controls.fill?` | `HTMLSpanElement` | Progress fill for `seekControl: 'surface'` or a binding without `seekFraction`. |
+| `controls.time?` | `HTMLSpanElement` | Clock, undefined when `showTime: false`; hidden when seconds and duration are absent. |
 | `controls.timeElapsed?` | `HTMLSpanElement` | The elapsed half of the clock. |
 | `controls.timeTotal?` | `HTMLSpanElement` | The ` / total` half. Hiding this node is all `showTime: 'elapsed'` does, so a caller can switch between the two without remounting. |
 | `controls.volume?` | `HTMLDivElement` | The volume control: an ARIA slider on a `0…1` scale, carrying `.wui-transport__volume`. Defined only when `showVolume` mounted one, and replaced by `setVolumeControl` — read it again rather than holding the node. |
 | `setVolumeControl(kind)` | `(false \| 'fader' \| 'knob') => void` | Swaps the volume control, or removes it with `false`, without rebuilding the rest of the row. A no-op when it is already that shape, or when the binding has no `setVolume`. |
 | `update()` | `() => void` | Re-reads the binding and repaints; becomes a no-op after destruction. |
-| `destroy()` | `() => void` | Idempotently removes presenter listeners, subscription, root, and installed stylesheet without destroying the binding or caller DOM. |
+| `destroy()` | `() => void` | Idempotently removes presenter listeners, binding/localization subscriptions, root, and installed stylesheet without destroying borrowed objects or caller DOM. All releases are attempted even when one throws; callback errors are contained. Late-returned subscriptions from a replaced mount are immediately released. |
+
+**Localization**
+
+Create a shared `createUILocalization()` controller from `@webmusic/ui` and pass it as
+`localization`. `controller.update({messages, formatters})` replaces supplied maps and refreshes
+mounted controls without remounting. Explicit `playLabel`, `pauseLabel`, `volumeLabel`, and
+`label` remain application-owned overrides. The seek template still formats the supplied label.
+Clock values use `formatters.time(seconds)` and seek/volume percentages use
+`formatters.percent(fraction)`; machine-readable ARIA numbers retain their numeric syntax.
+The defaults below remain unchanged when no localization is supplied.
+
+| Message key | Default | Values |
+|---|---|---|
+| `transport.play` / `transport.pause` | `Play` / `Pause` | — |
+| `transport.label` | `Transport` | — |
+| `transport.seek` | `{label} seek` | `label` |
+| `transport.progress` | `{label} progress` | `label` |
+| `transport.volume` | `Volume` | — |
+| `transport.seekValue` | `{elapsed} of {duration}` | Formatted `elapsed`, `duration` |
+| `transport.timeTotal` | ` / {duration}` | Formatted `duration` |
+
+`createFader` and `createKnob` also accept `formatValue(fraction)` for their accessible value
+and expose `updateLabel(label)` to update the name in place. Their owners refresh formatted
+values through `paint()`; Transport does this automatically on localization updates.
 
 **Exports**
 
@@ -159,11 +190,13 @@ The entry also exports the shared controls used by the volume slider.
 **Accessibility.** The toggle is a native button with dynamic `aria-label`, `title`, and
 `aria-pressed`. Native seek is a labelled range; surface seek is a focusable `role="slider"` with
 `aria-valuemin="0"`, `aria-valuemax="100"`, and integer-percentage `aria-valuenow`. Both seek
-modes expose floored `m:ss of m:ss` `aria-valuetext` when duration is positive, or a rounded
+modes by default expose floored `m:ss of m:ss` `aria-valuetext` when duration is positive, or a rounded
 percentage when it is zero. Surface Arrow keys move 5 percentage points, Shift+Arrow moves 10,
 and Home/End move to the bounds. The clock uses `aria-live="off"` so playback does not flood a
 screen reader. Disabled state is reflected on every interactive node, and the presenter never
-rewrites unrelated caller nodes in the host.
+rewrites unrelated caller nodes in the host. A binding without seeking renders a read-only
+`role="progressbar"` with the same localized value text and a `0…100` numeric range; it has no
+keyboard seeking or tab stop.
 
 </details>
 
@@ -222,7 +255,7 @@ seek control.
 | Toggle | `.wui-transport__play` | Always | `play` |
 | Track | `.wui-transport__track` | Always | `track` |
 | Surface modifier on track | `.wui-transport__surface` | `seekControl: 'surface'` | `seek` is added to the same node |
-| Surface fill | `.wui-transport__fill` | `seekControl: 'surface'` | `fill` |
+| Surface/read-only fill | `.wui-transport__fill` | Surface seeking or no `seekFraction` | `fill` |
 | Native range | `.wui-transport__seek` | `seekControl: 'native'` | `seek` |
 | Clock | `.wui-transport__time` | `showTime !== false` | `time` |
 | Volume fader | `.wui-fader .wui-fader--horizontal .wui-transport__volume` | `showVolume` and `binding.setVolume` | `volume` |
@@ -239,7 +272,7 @@ seek control.
 | Track | `track` | Always | `track` |
 | Surface track | `track seek` | `seekControl: 'surface'` | Both `track` and `seek` are added |
 | Native range | `seek` | `seekControl: 'native'` | `seek` |
-| Surface fill | `fill` | `seekControl: 'surface'` | `fill` |
+| Surface/read-only fill | `fill` | Surface seeking or no `seekFraction` | `fill` |
 | Clock | `time` | `showTime !== false` | `time` |
 | Volume fader | `fader volume` | `showVolume` and `binding.setVolume` | `volume` |
 | Volume fill / handle | `fader-fill`, `fader-thumb` | `showVolume` and `binding.setVolume` | — owned by the shared fader |

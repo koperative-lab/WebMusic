@@ -1,3 +1,4 @@
+import {bindLocalization, message as uiMessage, formatNumber, type UILocalization} from './localization';
 import {installStyle} from './internal/style';
 import {claimHost, createErrorSink} from './internal/lifecycle';
 import {finitePositive, addClassNames, clamp, finite, setParts} from './internal/dom';
@@ -33,6 +34,8 @@ export interface MinimapParts {
 }
 
 export interface MinimapOptions {
+  /** Borrowed live text and formatting; language updates preserve controls. */
+  localization?: UILocalization;
   label?: string;
   fallbackWidth?: number;
   fallbackHeight?: number;
@@ -180,6 +183,7 @@ export function mountMinimap(
   let commandRevision = 0;
   let destroyed = false;
   let unsubscribe: (() => void) | undefined;
+  let releaseLocalization = (): void => {};
   let drag: DragState | undefined;
   let resizeObserver: ResizeObserver | undefined;
 
@@ -224,6 +228,7 @@ export function mountMinimap(
   };
 
   const paintBrush = (): void => {
+    brush.setAttribute('aria-label', options.label ?? uiMessage(options.localization, 'minimap.label', 'Visible range'));
     const range = effectiveRange();
     const span = state.maximum - state.minimum;
     const hidden = !range || !(span > 0);
@@ -242,7 +247,10 @@ export function mountMinimap(
     brush.style.left = `${clamp(startFraction, 0, 1) * 100}%`;
     brush.style.width = `${Math.max(.5, clamp(endFraction - startFraction, 0, 1) * 100)}%`;
     brush.setAttribute('aria-valuenow', String(range.start));
-    brush.setAttribute('aria-valuetext', `${range.start.toFixed(2)} to ${range.end.toFixed(2)}`);
+    brush.setAttribute('aria-valuetext', uiMessage(options.localization, 'minimap.range', '{start} to {end}', {
+      start: formatNumber(options.localization, range.start, range.start.toFixed(2)),
+      end: formatNumber(options.localization, range.end, range.end.toFixed(2)),
+    }));
   };
 
   const readSnapshot = (): void => {
@@ -391,6 +399,7 @@ export function mountMinimap(
     destroy(): void {
       if (destroyed) return;
       destroyed = true;
+      releaseLocalization();
       commandRevision += 1;
       optimisticRange = undefined;
       try {
@@ -447,5 +456,6 @@ export function mountMinimap(
       report(error);
     }
   }
+  releaseLocalization = bindLocalization(options.localization, update, () => !destroyed && claim.isCurrent(), options.onError);
   return handle;
 }

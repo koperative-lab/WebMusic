@@ -36,6 +36,14 @@ Changing `kind` changes visibility and live-region behavior; changing `message` 
 painted copy. The rest of mounting and cleanup follows the
 [shared presenter shape](/uikit/api/#the-shared-presenter-shape).
 
+## Localization
+
+Pass a shared [`localization`](/uikit/api/#localization) source to translate default messages.
+`status.loading` defaults to `Loading…`, `status.empty` to `Nothing to show.`, `status.error` to
+`Something went wrong.`, and `status.ready` to an empty string. An explicit `state.message`
+always takes precedence. Language changes update the existing message node; the ready state
+remains hidden and other states retain their live-region semantics.
+
 <details class="component-section">
 <summary>API</summary>
 
@@ -60,6 +68,7 @@ went wrong.”, and ready has no text.
 
 | Member | Kind | Default | Description |
 |---|---|---|---|
+| `localization` | `UILocalization` | — | Borrowed live text source; its subscription is released on destruction. |
 | `classNames` | `StatusClassNames` | `{}` | Adds compatibility classes for `root` and `message`. |
 | `parts` | `StatusParts` | `{}` | Adds part tokens for `root` and `message`. |
 | `onError` | `(error: unknown) => void` | — | Receives snapshot, subscription, and cleanup failures; errors thrown by the sink do not escape. |

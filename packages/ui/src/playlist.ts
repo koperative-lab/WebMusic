@@ -3,6 +3,7 @@ import {claimHost, createErrorSink} from './internal/lifecycle';
 import {addClassNames, clamp01, setParts} from './internal/dom';
 import {componentSurfaceCss, controlBorderFallback} from './internal/surface';
 import {controlHeight, controlRadius, controlThumbRadius} from './internal/control';
+import {bindLocalization, formatNumber, formatPercent, message, type UILocalization} from './localization';
 // ============================================================================
 // Domain-neutral queue presenter: a transport bar over an ordered list of
 // entries. It knows nothing about audio, scores or files — only labels,
@@ -61,6 +62,7 @@ export interface PlaylistParts {
 }
 
 export interface PlaylistOptions {
+  localization?: UILocalization;
   /** Accessible name of the list. Defaults to 'Playlist'. */
   label?: string;
   /** Install the exported stylesheet into the host. Defaults to true. */
@@ -267,16 +269,16 @@ export function mountPlaylist(
     return node;
   };
 
-  const previous = button('prev', 'Previous', '⏮');
-  const toggle = button('play', 'Play', '▶');
-  const next = button('next', 'Next', '⏭');
+  const previous = button('prev', message(options.localization, 'playlist.previous', 'Previous'), '⏮');
+  const toggle = button('play', message(options.localization, 'playlist.play', 'Play'), '▶');
+  const next = button('next', message(options.localization, 'playlist.next', 'Next'), '⏭');
 
   const seek = document.createElement('input');
   seek.type = 'range';
   seek.min = '0';
   seek.max = '1000';
   seek.className = 'wui-playlist__seek seek';
-  seek.setAttribute('aria-label', 'Seek');
+  seek.setAttribute('aria-label', message(options.localization, 'playlist.seek', 'Seek'));
   addClassNames(seek, options.classNames?.seek);
   setParts(seek, 'seek', options.parts?.seek);
 
@@ -284,7 +286,7 @@ export function mountPlaylist(
 
   const list = document.createElement('ol');
   list.className = 'wui-playlist__items';
-  list.setAttribute('aria-label', options.label ?? 'Playlist');
+  list.setAttribute('aria-label', options.label ?? message(options.localization, 'playlist.label', 'Playlist'));
   addClassNames(list, options.classNames?.list);
   setParts(list, 'list', options.parts?.list);
 
@@ -292,6 +294,7 @@ export function mountPlaylist(
 
   let destroyed = false;
   let unsubscribe: (() => void) | undefined;
+  let unbindLocalization: (() => void) | undefined;
   let listSignature = '';
   const rows = new Map<string, HTMLLIElement>();
 
@@ -344,13 +347,17 @@ export function mountPlaylist(
   };
 
   /** Patch the mutable parts of a row: active, per-entry status, duration. */
-  const paintRow = (row: HTMLLIElement, item: PlaylistItem): void => {
+  const paintRow = (row: HTMLLIElement, item: PlaylistItem, index: number): void => {
     row.classList.toggle('on', item.active === true);
     row.setAttribute('aria-current', String(item.active === true));
     if (item.status) row.dataset.status = item.status;
     else delete row.dataset.status;
     const duration = row.querySelector<HTMLElement>('.wui-playlist__duration');
     if (duration) duration.textContent = item.duration ?? '';
+    const label = row.querySelector<HTMLElement>('.wui-playlist__label');
+    if (label) label.textContent = item.label;
+    const ordinal = row.querySelector<HTMLElement>('.num');
+    if (ordinal) ordinal.textContent = formatNumber(options.localization, index + 1);
   };
 
   update = (): void => {
@@ -360,7 +367,14 @@ export function mountPlaylist(
       const items = state.items ?? [];
 
       toggle.textContent = state.playing ? '⏸' : '▶';
-      toggle.setAttribute('aria-label', state.playing ? 'Pause' : 'Play');
+      toggle.setAttribute('aria-label', state.playing
+        ? message(options.localization, 'playlist.pause', 'Pause')
+        : message(options.localization, 'playlist.play', 'Play'));
+      previous.setAttribute('aria-label', message(options.localization, 'playlist.previous', 'Previous'));
+      next.setAttribute('aria-label', message(options.localization, 'playlist.next', 'Next'));
+      seek.setAttribute('aria-label', message(options.localization, 'playlist.seek', 'Seek'));
+      seek.setAttribute('aria-valuetext', formatPercent(options.localization, clamp01(state.progress)));
+      list.setAttribute('aria-label', options.label ?? message(options.localization, 'playlist.label', 'Playlist'));
       for (const control of [previous, toggle, next, seek]) {
         control.toggleAttribute('disabled', state.disabled === true);
       }
@@ -369,7 +383,7 @@ export function mountPlaylist(
 
       // Only the identity and order of the entries force a rebuild; label,
       // duration, active and status are patched onto the existing rows.
-      const signature = JSON.stringify(items.map((item) => [item.id, item.label]));
+      const signature = JSON.stringify(items.map((item) => item.id));
       if (signature !== listSignature) {
         rows.clear();
         const nodes = items.map((item, index) => {
@@ -380,9 +394,9 @@ export function mountPlaylist(
         list.replaceChildren(...nodes);
         listSignature = signature;
       }
-      for (const item of items) {
+      for (const [index, item] of items.entries()) {
         const row = rows.get(item.id);
-        if (row) paintRow(row, item);
+        if (row) paintRow(row, item, index);
       }
     } catch (error) {
       report(error);
@@ -417,6 +431,9 @@ export function mountPlaylist(
       } catch (error) {
         report(error);
       }
+      const releaseText = unbindLocalization;
+      unbindLocalization = undefined;
+      releaseText?.();
       claim.release();
       root.remove();
       style?.remove();
@@ -445,5 +462,6 @@ export function mountPlaylist(
       report(error);
     }
   }
+  unbindLocalization = bindLocalization(options.localization, update, () => !destroyed && claim.isCurrent(), report);
   return handle;
 }

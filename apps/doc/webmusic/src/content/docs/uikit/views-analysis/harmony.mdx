@@ -91,6 +91,26 @@ strip.item('Cmaj7')?.dataset.chip;
 wheel.destroy();
 ```
 
+## Localization
+
+All four mount Options accept a borrowed `localization` source from
+[`createUILocalization`](/uikit/api/#localization). Updates refresh text and ARIA
+in place; destroy unsubscribes. Explicit labels and `formatPosition` retain
+precedence, while chord names, spellings, empty text and annotations in the
+snapshot remain caller-owned. Nameplate alternate buttons retain focus when
+their labels or metadata change and commands receive the current candidate.
+
+| Message key | Default / interpolation values |
+| --- | --- |
+| `harmony.flowLane`, `harmony.chord`, `harmony.readout`, `harmony.wheel` | Flow lane / Chord / Read-out / Wheel, followed by `: {names}` when named data is present. `names` is a joined string. |
+| `harmony.position` | Position |
+| `harmony.positionValue` | `{value} — {label}`; formatted position and current band label. |
+| `harmony.occurrences` | `x{count}`; formatted count. |
+| `harmony.share` | `{label} {value}`; segment label and formatted percentage. |
+
+The number formatter handles positions/counts and the percentage formatter
+handles shares. Geometry and machine ARIA positions remain numeric.
+
 <details class="component-section">
 <summary>API</summary>
 

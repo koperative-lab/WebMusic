@@ -100,6 +100,17 @@ shell.update(); // re-read the snapshot. The clock never calls this.
 shell.destroy();
 ```
 
+## Localization
+
+`WorkbenchOptions.localization` borrows a shared
+[`createUILocalization`](/uikit/api/#localization) source. Its `workbench.views`
+and `workbench.analysis` messages default to `Views` and `Analysis`; an explicit
+`label` option takes precedence. Language updates retain tabs, focused controls
+and child slots, and destroy releases the observer. View names, dock labels,
+titles and status text are caller data: translate them in the snapshot while
+keeping stable IDs. Child presenters receive the same source through their own
+mount options.
+
 <details class="component-section">
 <summary>API</summary>
 

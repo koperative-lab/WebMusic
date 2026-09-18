@@ -30,6 +30,8 @@ export type KnobParts = KnobClassNames;
 export interface KnobOptions {
   /** Accessible name of the control. */
   label: string;
+  /** Human-readable value; machine ARIA values remain numeric. */
+  formatValue?: (fraction: number) => string;
   /** Starting level, clamped to `0…1`. Defaults to `1`. */
   value?: number;
   /** Start disabled. Later changes go through {@link KnobHandle.paint}. */
@@ -59,6 +61,7 @@ export interface KnobHandle {
   readonly value: number;
   /** Repaint from the owner's state, without emitting `onInput`. */
   paint: (value: number, disabled?: boolean) => void;
+  updateLabel: (label: string) => void;
   /** Release the slider's listeners and ARIA. */
   destroy: () => void;
 }
@@ -220,7 +223,7 @@ export function createKnob(document: Document, options: KnobOptions): KnobHandle
       label: options.label,
       orientation: 'vertical',
       keyboardStep: options.keyboardStep ?? 0.05,
-      formatValue: (value) => `${Math.round(value * 100)}%`,
+      formatValue: options.formatValue ?? ((value) => `${Math.round(value * 100)}%`),
       onError: options.onError,
     },
   );
@@ -234,6 +237,7 @@ export function createKnob(document: Document, options: KnobOptions): KnobHandle
       return level;
     },
     paint,
+    updateLabel: (label) => slider?.updateLabel(label),
     destroy() {
       slider?.destroy();
       slider = undefined;

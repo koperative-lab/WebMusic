@@ -5,6 +5,11 @@ work and does not establish npm publication, a release tag or a deployment.
 
 ## Unreleased
 
+- Add instance-local UI localization with replaceable messages and number,
+  percentage and time formatters, including ARIA and in-place language updates.
+  Preserve focused controls when caller labels change under stable identities.
+- Allow a minimal play/pause Transport binding and mode-specific Meter readers
+  without placeholder progress, seek, subscription or spectrum methods.
 - Allow React StaffView, PianoRollView and WaterfallView to render an explicit
   Score or borrow a playback source without creating a Player. ScoreViewElement
   accepts a direct playback property alongside its existing selector binding.

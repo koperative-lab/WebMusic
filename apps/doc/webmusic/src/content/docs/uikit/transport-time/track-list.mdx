@@ -67,6 +67,7 @@ be supplied.
 
 | Member | Kind | Default | Description |
 |---|---|---|---|
+| `localization` | `UILocalization` | — | Borrowed text and number-format source; updates repaint in place and destruction releases its subscription. |
 | `label` | `string` | `'Tracks'` | Accessible name applied to the semantic list. |
 | `ordered` | `boolean` | `false` | Renders an `<ol>` instead of `<ul>` when order is meaningful. |
 | `emptyLabel` | `string` | `'No items'` | Visible text replacing the rows when `items` is empty. |
@@ -89,6 +90,17 @@ be supplied.
 | `controls.focus(id)` | `(string) => boolean` | Moves DOM focus to an enabled rendered row and reports success. |
 | `update()` | `() => void` | Re-reads State and patches list structure, labels, current state, disabled state, and focus. |
 | `destroy()` | `() => void` | Releases listeners and subscription, then removes owned DOM and installed style. |
+
+**Localization.** Pass an instance-local [localization controller](/uikit/api/) as
+`localization` to update the list name and empty state in place. Explicit `label` and `emptyLabel`
+options take precedence. Item labels and preformatted details remain caller text; new labels for
+stable ids patch existing rows and preserve focus and roving tabindex. Destroy releases the
+localization subscription.
+
+| Message key | Default | Values |
+|---|---|---|
+| `trackList.label` | `Tracks` | — |
+| `trackList.empty` | `No items` | — |
 
 **Accessibility.** The named `<ul>` or `<ol>` contains real list items and buttons. Active rows
 use `aria-current="true"`; disabled item and global state use native button disabling. Roving

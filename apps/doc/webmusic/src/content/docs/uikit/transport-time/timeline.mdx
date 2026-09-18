@@ -71,6 +71,24 @@ region buttons call them and repaint after settlement; a rejected command is rou
 `onError`. Without `seek()`, the hidden range is removed from interaction. Without
 `selectRegion()`, every region button is disabled.
 
+## Localization
+
+Pass a shared [`localization`](/uikit/api/#localization) source to relabel the timeline and
+format generated ruler values and seek announcements. An explicit `label`, `formatPosition`,
+tick label, or region label takes precedence over its default. The `number` formatter receives
+positions in the caller's units; range values and seek commands remain numeric.
+
+| Message key | Fallback / interpolation values |
+|---|---|
+| `timeline.label` | `Timeline` |
+| `timeline.playhead` | `{label} playhead`; label is the resolved root name. |
+| `timeline.region` | `Region {id}` |
+| `timeline.marker` | `Marker {id}` |
+
+Region and marker buttons are retained by `id` while visible. Updating only language or their
+data labels does not detach a focused button. Generated ruler text is refreshed on language
+changes even when the timeline geometry is unchanged.
+
 <details class="component-section">
 <summary>API</summary>
 
@@ -108,6 +126,7 @@ sets its pressed state; strict `disabled: true` disables only that region.
 
 | Member | Kind | Default | Description |
 |---|---|---|---|
+| `localization` | `UILocalization` | — | Borrowed live text and number-formatting source; its subscription is released on destruction. |
 | `label` | `string` | `'Timeline'` | Accessible name of the root group and prefix for the hidden playhead range. |
 | `majorStep` | `number` | Derived readable interval | Fixed generated-tick interval. Non-positive or non-finite values use the derived interval. |
 | `keyboardStep` | `number` | `majorStep / 4` | Step of the hidden range. Non-positive or non-finite values use the default. |

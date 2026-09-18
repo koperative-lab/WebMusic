@@ -3,6 +3,7 @@ import {installStyle} from "./internal/style";
 import {markEmptyState, addClassNames, clamp01, finite, setParts} from "./internal/dom";
 import {componentSurfaceCss} from "./internal/surface";
 import {mountParameterRack, type ParameterRackHandle} from "./parameter";
+import {bindLocalization, formatNumber, formatPercent, message, type UILocalization} from './localization';
 
 export interface MacroTargetState { label: string; value: number; unit?: string; }
 export interface MacroState { label: string; value: number; targets: readonly MacroTargetState[]; disabled?: boolean; }
@@ -12,6 +13,7 @@ export interface MacroBinding {
   subscribe?(notify: () => void): () => void;
 }
 export interface MacroOptions {
+  localization?: UILocalization;
   onError?: (error: unknown) => void;
   /** Install the exported stylesheet into the host. Defaults to true. */
   stylesheet?: boolean;
@@ -69,9 +71,9 @@ display:flex; flex-direction:column; gap:var(--wm-macro-rack-gap,.55rem); min-wi
 .wui-macro-rack__item > .wui-macro { box-sizing:border-box; padding:0; border:0; border-radius:0; background:transparent; }
 `;
 
-function format(value: number, unit?: string): string {
+function defaultNumber(value: number): string {
   const text = Math.abs(value) >= 100 ? String(Math.round(value)) : value.toFixed(Math.abs(value) >= 10 ? 1 : 2);
-  return `${text}${unit ?? ""}`;
+  return text;
 }
 
 export function mountMacro(host: MacroHost, binding: MacroBinding, options: MacroOptions = {}): MacroHandle {
@@ -88,14 +90,15 @@ export function mountMacro(host: MacroHost, binding: MacroBinding, options: Macr
   targets.setAttribute("part", "targets");
   root.append(control, targets);
   let destroyed = false;
-  let state: MacroState = {label: "MACRO", value: 0, targets: []};
+  let state: MacroState = {label: message(options.localization, 'macro.label', 'MACRO'), value: 0, targets: []};
   let unsubscribe: (() => void) | undefined;
+  let unbindLocalization: (() => void) | undefined;
   const report = createErrorSink(options.onError);
 
   const read = (): MacroState => {
     const next = binding.snapshot();
     return {
-      label: String(next.label ?? "MACRO"),
+      label: String(next.label ?? message(options.localization, 'macro.label', 'MACRO')),
       value: clamp01(next.value),
       targets: (next.targets ?? []).map((target) => ({label: String(target.label), value: finite(target.value), unit: target.unit})),
       disabled: next.disabled === true,
@@ -111,7 +114,9 @@ export function mountMacro(host: MacroHost, binding: MacroBinding, options: Macr
       const value = document.createElement("span");
       value.className = "wui-macro__target-value dv";
       value.dataset.i = String(index);
-      value.textContent = format(target.value, target.unit);
+      value.textContent = message(options.localization, 'macro.targetValue', '{value}{unit}', {
+        value: formatNumber(options.localization, target.value, defaultNumber(target.value)), unit: target.unit ?? '',
+      });
       row.append(label, value);
       return row;
     }) : [emptyTargets()]));
@@ -119,7 +124,7 @@ export function mountMacro(host: MacroHost, binding: MacroBinding, options: Macr
   function emptyTargets(): HTMLElement {
     const node = document.createElement("div");
     node.className = "wui-macro__empty empty";
-    node.textContent = "Assign .targets";
+    node.textContent = message(options.localization, 'macro.empty', 'Assign .targets');
     markEmptyState(node);
     return node;
   }
@@ -147,10 +152,13 @@ export function mountMacro(host: MacroHost, binding: MacroBinding, options: Macr
       destroyed = true;
       const stop = unsubscribe;
       unsubscribe = undefined;
+      const releaseText = unbindLocalization;
+      unbindLocalization = undefined;
       const child = parameter;
       parameter = undefined;
       runCleanups([
         stop,
+        releaseText,
         () => child?.destroy(),
         () => claim.release(),
         () => root.remove(),
@@ -180,7 +188,8 @@ export function mountMacro(host: MacroHost, binding: MacroBinding, options: Macr
   }, {
     layout: "flat",
     classNames: {item: "knobwrap", label: "name", control: "knob", track: "track", fill: "arc", pointer: "ptr", value: "pct"},
-    formatValue: (_parameter, value) => `${Math.round(value * 100)}%`,
+    formatValue: (_parameter, value) => formatPercent(options.localization, value),
+    localization: options.localization,
     onError: report,
     stylesheet: options.stylesheet,
   });
@@ -199,6 +208,7 @@ export function mountMacro(host: MacroHost, binding: MacroBinding, options: Macr
       report(error);
     }
   }
+  unbindLocalization = bindLocalization(options.localization, update, () => !destroyed && claim.isCurrent(), report);
   return handle;
 }
 
@@ -269,6 +279,7 @@ export function mountMacroRack(
     const item = mountMacro(itemHost, binding, {
       onError: report,
       stylesheet: options.stylesheet,
+      localization: options.localization,
     });
     mountingHost = undefined;
     if (destroyed || !claim.isCurrent()) {

@@ -1838,7 +1838,8 @@ describe('<score-recorder>', () => {
     expect(routes).toBe(2);
     expect(cleanups).toBe(1);
     expect(host.events.filter((event) => event.type === 'webscore:error')).toEqual([]);
-    expect(byAria(host.root, 'Play take').classList.contains('on')).toBe(true);
+    expect(byAria(host.root, 'Stop take').classList.contains('on')).toBe(true);
+    expect(byAria(host.root, 'Stop take').getAttribute('aria-pressed')).toBe('true');
     host.disconnect();
     expect(cleanups).toBe(2);
   });

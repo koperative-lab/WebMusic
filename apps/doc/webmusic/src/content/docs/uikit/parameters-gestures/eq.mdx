@@ -43,6 +43,27 @@ Live Demo's caller does that calculation so dragging remains visible. Latest-com
 tracked independently per band. See the
 [shared presenter shape](/uikit/api/#the-shared-presenter-shape) for common lifecycle rules.
 
+## Localization
+
+Pass a shared [`localization`](/uikit/api/#localization) source to relabel controls and format
+numbers in place. Explicit `label`, `emptyLabel`, and `formatFrequency` options take precedence.
+Focus remains on the same band range when only language changes. Replacing the contents of
+`emptyElement()` with application nodes also preserves those nodes during language updates.
+
+| Message key | Fallback / interpolation values |
+|---|---|
+| `eq.label` | `Equalizer` |
+| `eq.empty` | `Connect an equalizer graph` |
+| `eq.bandFrequency`, `eq.bandGain` | `Band {index} frequency`, `Band {index} gain`; index is a formatted, one-based band number. |
+| `eq.frequency`, `eq.gain` | `frequency`, `gain` |
+| `eq.kilohertzShort` | `{value}k` |
+| `eq.hertz`, `eq.decibels` | `{value} hertz`, `{value} decibels` |
+| `eq.bandValue` | `{frequency} {gain}dB` |
+| `eq.focusedBand` | `Band {index} {axis}: {value}` |
+
+The `number` formatter receives hertz, kilohertz, decibels, or band indices as appropriate.
+Message values are already formatted; frequency/gain range values and commands remain numeric.
+
 <details class="component-section">
 <summary>API</summary>
 
@@ -76,11 +97,12 @@ tracked independently per band. See the
 
 | Member | Kind | Default | Description |
 |---|---|---|---|
+| `localization` | `UILocalization` | — | Borrowed live text and number-formatting source; its subscription is released on destruction. |
 | `label` | `string` | `'Equalizer'` | Accessible name of the root group. |
 | `emptyLabel` | `string` | `'Connect an equalizer graph'` | Status text while `ready !== true`. |
 | `classNames` | `EqClassNames` | `{}` | Adds compatibility classes to all EQ node kinds. |
 | `parts` | `EqParts` | `{}` | Adds tokens beside every canonical EQ part; this type has the same keys as `EqClassNames`. |
-| `formatFrequency` | `(frequency: number) => string` | Compact Hz/kHz | Formats each frequency in the visible band readout. |
+| `formatFrequency` | `(frequency: number) => string` | Compact Hz/kHz | Formats frequency in visible readouts and frequency-range `aria-valuetext`; takes precedence over localization formatting. |
 | `onError` | `(error: unknown) => void` | — | Receives snapshot, formatter, command, subscription, stabilization and cleanup failures. |
 | `stylesheet` | `boolean` | `true` | Installs the presenter's stylesheet unless explicitly `false`, for a light-DOM host that cannot inject CSS into its page. |
 

@@ -44,7 +44,11 @@ The [Score report workflow](/score/api/analyze/#reports) combines `createScoreRe
 Unlike the shared mount shape, render helpers append output immediately and return either nothing,
 the root, or a small painter. The caller owns replacement and removal of that output. Build a
 fresh root or clear one before rendering a new result; only `renderAudioAnalysisCard()` replaces
-its root contents itself.
+its root contents itself. Helpers accepting `AnalysisLocalizationOptions` read text and formatting
+at render time; they do not subscribe. Re-render a one-shot report when its language changes.
+`renderLiveChordPanel().paint()` reads the latest localization on each paint.
+`renderHistogram()` subscribes and updates existing values/button labels; retain and destroy its
+handle before discarding the report to release that subscription.
 
 Timeline, Roman, motif, voice-leading, and rhythm helpers stamp their quarter ranges on rendered
 nodes. The playhead discovers those nodes, highlights every range containing the supplied
@@ -61,11 +65,11 @@ playhead is updated directly.
 | Export | Kind | Description |
 |---|---|---|
 | `createAnalysisRoot(document?)` | `(Document) => HTMLElement` | Creates the canonical `.wui-analysis.webscore-analyze` root without mounting it. |
-| `renderKeyView(result, root, caption?)` | one-shot renderer | Appends detected key, confidence, and the five strongest candidate bars. |
-| `renderChordTimeline(chords, root)` | one-shot renderer | Appends an ordered chord timeline whose rows carry quarter spans. |
-| `renderRomanStrip(key, roman, root)` | one-shot renderer | Appends Roman-numeral chips in the supplied key, each with a quarter span. |
-| `renderMotifList(motifs, root)` | one-shot renderer | Appends up to eight motifs; each row carries all occurrence spans. |
-| `renderVoiceLeadingList(issues, root)` | one-shot renderer | Appends up to twelve severity-coded issues with one quarter span each. |
+| `renderKeyView(result, root, caption?, options?)` | one-shot renderer | Appends detected key, confidence, and the five strongest candidate bars. |
+| `renderChordTimeline(chords, root, options?)` | one-shot renderer | Appends an ordered chord timeline whose rows carry quarter spans. |
+| `renderRomanStrip(key, roman, root, options?)` | one-shot renderer | Appends Roman-numeral chips in the supplied key, each with a quarter span. |
+| `renderMotifList(motifs, root, options?)` | one-shot renderer | Appends up to eight motifs; each row carries all occurrence spans. |
+| `renderVoiceLeadingList(issues, root, options?)` | one-shot renderer | Appends up to twelve severity-coded issues with one quarter span each. |
 | `renderRhythmPatternList(patterns, root, options?)` | one-shot renderer | Appends recurring patterns and their occurrence spans; `options.limit` defaults to `8`. |
 | `renderHistogram(bins, root, options?)` | `AnalysisHistogramHandle` | Appends normalized bars; optional `onSelect` makes nonempty bins native buttons. Retain the handle for current-bin feedback and cleanup. |
 | `renderSummaryCard(card, root)` | `AnalysisSummaryCardHandle` | Appends a title, optional subtitle, and definition list of facts; retain the handle to update row values without rebuilding the report. |
@@ -96,12 +100,13 @@ Pitch-track `times` are frame timestamps in seconds.
 
 | Helper | Member | Kind | Default | Description |
 |---|---|---|---|---|
+| Text-generating render helpers | `localization` | `UILocalization` | — | `AnalysisLocalizationOptions`; borrowed text/formatting source shared by the helper-specific option bags. Summary titles, rows, bin labels and explicit errors remain application-owned strings. |
 | `renderRhythmPatternList` | `limit` | `number` | `8` | Maximum number of sorted pattern rows appended. |
 | `renderRhythmPatternList` | `formatDuration` | `(quarters: number) => string` | the number | Names one duration. Notating it — which glyph a value takes, that a dot adds half again — is a convention of the domain, so the caller answers; `@webmusic/score` passes its own. |
 | `renderHistogram` | `emptyLabel` | `string` | `'Nothing to show.'` | Text appended when the bins array is empty. |
-| `renderHistogram` | `format` | `(value: number) => string` | rounded number | Formats each bar's trailing value. |
+| `renderHistogram` | `format` | `(value: number) => string` | rounded number | Formats each bar's trailing value and button value text, ahead of the localization number formatter. |
 | `renderHistogram` | `onSelect` | `(index: number, bin: AnalysisHistogramBin) => Promise<void> \| void` | — | Makes positive-value bins operable buttons; called on pointer or native keyboard activation. |
-| `renderHistogram` | `onError` | `(error: unknown) => void` | — | Reports synchronous or asynchronous selection failures. |
+| `renderHistogram` | `onError` | `(error: unknown) => void` | — | Reports selection, localization notification, refresh, and cleanup failures. |
 | `renderAudioAnalysisCard` | `durationSeconds` | `number` | last event / timestamp | Supplies the onset or pitch time span when positive. |
 | `renderAudioAnalysisCard` | `error` | `string` | — | Replaces the card body with a status failure message. |
 
@@ -116,9 +121,67 @@ Pitch-track `times` are frame timestamps in seconds.
 | Member | Description |
 |---|---|
 | `setActive(indexes: readonly number[])` | Set current bins by their input indexes; updates styling and `aria-current` without rebuilding buttons or moving focus. |
-| `destroy()` | Idempotently release selection listeners; the caller owns removal of the rendered output. |
+| `destroy()` | Idempotently release selection/localization listeners and remove only this histogram's rendered output; unrelated root children remain. |
 
 Without `onSelect`, histogram output remains passive. With it, nonempty bins are native buttons and empty bins remain descriptive. Callback rejection is contained and reported through `onError`.
+
+**Localization keys and formatting**
+
+Pass a `createUILocalization()` controller from `@webmusic/ui` through `options.localization`.
+The four one-shot list/strip helpers use an optional final `AnalysisLocalizationOptions` argument;
+`renderKeyView` keeps `caption` in its existing third position and accepts these options fourth.
+`LiveChordPanelOptions`, `RhythmPatternListOptions`, `AnalysisHistogramOptions`, and
+`AudioAnalysisCardOptions` extend that same option shape. `renderSummaryCard`,
+`appendSummaryRow`, root creation and playhead utilities generate no translatable copy.
+
+`formatters.number` receives the original numeric value, and `formatters.percent` receives a
+fraction. Existing per-helper `format`, `formatPitch`, and `formatDuration` callbacks take
+precedence. Without localization, previous rounding and precision remain unchanged. Localization
+never changes quarter-span attributes, SVG coordinates, bar widths, or underlying report data.
+Application-supplied captions, chord/roman symbols, history, bin labels, summary strings, and
+error messages remain application-owned. `keyName`, `inKey`, and `voiceIssue` can translate the
+presentation of supplied domain identifiers through a message callback.
+
+All keys below have the `analysis.` prefix. Values such as `value`, `minimum`, and `maximum`
+are already formatted strings; numeric `count`, `beat`, `quarters`, `bpm`, `confidence`, and
+`rawValue` remain available to message callbacks where listed, including for plural selection.
+
+| Key suffix | Default | Values |
+|---|---|---|
+| `emptyValue` | `—` | — |
+| `keyName` | `{tonic} {mode}` | `tonic`, `mode` |
+| `confidence` | `confidence {value}` | `value`, numeric `confidence` |
+| `noNotes` | `no notes heard yet` | — |
+| `beat` | `beat {value}` | `value`, numeric `beat` |
+| `inKey` | `in {tonic} {mode}` | `tonic`, `mode` |
+| `soundingNow` | `sounding now` | — |
+| `waiting` | `waiting for playback…` | — |
+| `noMotifs` | `No repeated motifs found.` | — |
+| `count` | `×{value}` | `value`, numeric `count` |
+| `intervals` | `intervals [{values}]` | Comma-separated formatted `values` |
+| `noVoiceIssues` | `No voice-leading issues — clean.` | — |
+| `voiceIssue` | `{label}` | Raw `type`, humanized `label` |
+| `issueLocation` | `{voices} · {beat}` | Joined `voices`, formatted beat phrase `beat` |
+| `noRhythms` | `No repeated rhythms found.` | — |
+| `quarters` | `{value} q` | `value`, numeric `quarters` |
+| `histogramEmpty` | `Nothing to show.` | — |
+| `histogramSelect` | `{label}: {value}. Go to next occurrence` | `label`, `value`, numeric `rawValue` |
+| `noAnalysis` | `No analysis yet.` | — |
+| `keyUnavailable` | `Key not analyzed.` | — |
+| `tempoUnavailable` | `Tempo not analyzed.` | — |
+| `tempo` | `{value} BPM` | `value`, numeric `bpm` |
+| `tempoDetails` | `confidence {confidence} · {value} beats` | Formatted `confidence`, formatted count `value`, numeric `count` |
+| `integrated` | `Integrated` | — |
+| `truePeak` | `True peak` | — |
+| `rms` | `RMS` | — |
+| `negativeInfinity` | `−∞` | — |
+| `lufs` | `{value} LUFS` | `value` |
+| `dbfs` | `{value} dBFS` | `value` |
+| `onsetsUnavailable` | `Onsets not analyzed.` | — |
+| `onsets` | `{value} onsets` | `value`, numeric `count` |
+| `pitchUnavailable` | `Pitch not analyzed.` | — |
+| `noVoicedPitch` | `No voiced pitch found.` | — |
+| `pitchRange` | `{minimum}–{maximum} Hz` | `minimum`, `maximum` |
 
 **Playhead options**
 

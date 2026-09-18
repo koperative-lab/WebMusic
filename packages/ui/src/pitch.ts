@@ -1,3 +1,4 @@
+import {bindLocalization, message as localize, type UILocalization, formatNumber} from './localization';
 import {
   harmonyValues,
   harmonyDensity,
@@ -562,8 +563,8 @@ function ageOf(now: unknown, since: unknown, span: number): string | undefined {
 }
 
 /** The label a surface announces when the caller supplies none. */
-function describe(subject: string, names: readonly string[]): string {
-  return names.length > 0 ? `${subject}: ${names.join(', ')}` : subject;
+function describe(localization: UILocalization | undefined, key: string, subject: string, names: readonly string[]): string {
+  return localize(localization, key, names.length > 0 ? `${subject}: {names}` : subject, {names: names.join(', ')});
 }
 
 /**
@@ -713,6 +714,7 @@ export interface KeyboardParts {
 }
 
 export interface KeyboardOptions {
+  localization?: UILocalization;
   /** Fit the complete normalized range to the available width, ignoring key widths and their CSS minimum. Defaults to false. */
   fitToWidth?: boolean;
   /** Exact white-key width in CSS px; absent/invalid retains responsive minimum sizing. Ignored by fitToWidth. */
@@ -847,6 +849,7 @@ export function mountKeyboard(
   let pendingReveal: readonly number[] = [];
   let destroyed = false;
   let unsubscribe: (() => void) | undefined;
+  let unlocalize: (() => void) | undefined;
 
   const report = createErrorSink(options.onError);
   const beat = createBeat(view);
@@ -1114,7 +1117,7 @@ export function mountKeyboard(
       sounding = next;
       if (attacked) beat.settle(promote);
       armSweep();
-      setLabel(root, options.label ?? describe('Sounding', names));
+      setLabel(root, options.label ?? describe(options.localization, 'pitch.keyboard', 'Sounding', names));
     } catch (error) {
       report(error);
     }
@@ -1149,6 +1152,9 @@ export function mountKeyboard(
     destroy(): void {
       if (destroyed) return;
       destroyed = true;
+      const releaseText = unlocalize;
+      unlocalize = undefined;
+      releaseText?.();
       beat.cancel();
       scroll?.destroy();
       try {
@@ -1194,6 +1200,7 @@ export function mountKeyboard(
       report(error);
     }
   }
+  unlocalize = bindLocalization(options.localization, update, () => !destroyed && claim.isCurrent(), options.onError);
   return handle;
 }
 
@@ -1263,6 +1270,7 @@ export interface StaffParts {
 }
 
 export interface StaffOptions {
+  localization?: UILocalization;
   /** Outer surface, or no frame/background when a containing presenter owns it. Defaults to 'default'. */
   surface?: 'default' | 'none';
   label?: string;
@@ -1392,6 +1400,7 @@ export function mountStaff(
   let held = new Set<string>();
   let destroyed = false;
   let unsubscribe: (() => void) | undefined;
+  let unlocalize: (() => void) | undefined;
   let resizeObserver: ResizeObserver | undefined;
   let viewportUnits = 0;
   let frameHeight = 0;
@@ -1776,7 +1785,7 @@ export function mountStaff(
         root,
         options.label ??
           describe(
-            'Staff',
+            options.localization, 'pitch.staff', 'Staff',
             marks.map((mark) => mark.label).filter((label): label is string => Boolean(label)),
           ),
       );
@@ -1795,6 +1804,9 @@ export function mountStaff(
     destroy(): void {
       if (destroyed) return;
       destroyed = true;
+      const releaseText = unlocalize;
+      unlocalize = undefined;
+      releaseText?.();
       beat.cancel();
       resizeObserver?.disconnect();
       resizeObserver = undefined;
@@ -1857,6 +1869,7 @@ export function mountStaff(
       report(error);
     }
   }
+  unlocalize = bindLocalization(options.localization, update, () => !destroyed && claim.isCurrent(), options.onError);
   return handle;
 }
 
@@ -1936,6 +1949,7 @@ export interface FretboardParts {
 }
 
 export interface FretboardOptions {
+  localization?: UILocalization;
   /** Exact adjacent-fret spacing in CSS px; absent/invalid retains responsive spacing. */
   fretWidth?: number;
   /** Exact adjacent-string spacing in CSS px; absent/invalid retains density geometry. */
@@ -2096,6 +2110,7 @@ export function mountFretboard(
   let resizeObserver: ResizeObserver | undefined;
   let destroyed = false;
   let unsubscribe: (() => void) | undefined;
+  let unlocalize: (() => void) | undefined;
 
   const report = createErrorSink(options.onError);
   const beat = createBeat(view);
@@ -2496,10 +2511,13 @@ export function mountFretboard(
         number.setAttribute('class', 'wui-pitch-fretboard__fret-number');
         // `5fr`, the way a chord book writes it, and not a bare `5` that reads
         // as a fingering or a string number beside two of each.
-        number.textContent = window_ > 0 ? `${window_}fr` : '';
+        number.textContent = window_ > 0 ? localize(options.localization, 'pitch.fret', '{value}fr', {value: formatNumber(options.localization, window_)}) : '';
         items.push(number);
         gutter.replaceChildren(...items);
       }
+
+      const fretLabel = gutter.querySelector('.wui-pitch-fretboard__fret-number');
+      if (fretLabel) setText(fretLabel, window_ > 0 ? localize(options.localization, 'pitch.fret', '{value}fr', {value: formatNumber(options.localization, window_)}) : '');
 
       // The frame follows what the neck actually SPANS after the slide, so the
       // board fills its box at every window. A frame sized for the widest case
@@ -2557,7 +2575,7 @@ export function mountFretboard(
         root,
         options.label ??
           describe(
-            'Fretboard',
+            options.localization, 'pitch.fretboard', 'Fretboard',
             drawn
               .map((mark) => mark.label ?? state.stringLabels?.[Math.round(mark.stringIndex)])
               .filter((label): label is string => Boolean(label)),
@@ -2578,6 +2596,9 @@ export function mountFretboard(
     destroy(): void {
       if (destroyed) return;
       destroyed = true;
+      const releaseText = unlocalize;
+      unlocalize = undefined;
+      releaseText?.();
       beat.cancel();
       scroll.destroy();
       resizeObserver?.disconnect();
@@ -2633,5 +2654,6 @@ export function mountFretboard(
       report(error);
     }
   }
+  unlocalize = bindLocalization(options.localization, update, () => !destroyed && claim.isCurrent(), options.onError);
   return handle;
 }

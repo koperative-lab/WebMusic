@@ -55,6 +55,14 @@ keeps only the newest command revision, then returns to authoritative snapshot s
 fulfillment or rejection. `seek()` may also return a promise, but it has no presenter-owned
 optimistic playhead; the binding must notify when its visible draw state changes.
 
+## Localization
+
+Pass a shared [`localization`](/uikit/api/#localization) source to update the brush name and
+spoken range without moving focus. `minimap.label` defaults to `Visible range`; an explicit
+`label` takes precedence. `minimap.range` defaults to `{start} to {end}`, using values from the
+`number` formatter in the caller's position units. Numeric ARIA attributes and range commands
+retain their original values.
+
 <details class="component-section">
 <summary>API</summary>
 
@@ -85,6 +93,7 @@ optimistic playhead; the binding must notify when its visible draw state changes
 
 | Member | Kind | Default | Description |
 |---|---|---|---|
+| `localization` | `UILocalization` | — | Borrowed live text and number-formatting source; its subscription is released on destruction. |
 | `label` | `string` | `'Visible range'` | Accessible name of the brush slider. |
 | `fallbackWidth` | `number` | `320` | CSS-pixel canvas width used only when neither root nor canvas reports a positive width. |
 | `fallbackHeight` | `number` | `40` | CSS-pixel canvas height used only when neither root nor canvas reports a positive height. |

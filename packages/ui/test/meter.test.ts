@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 
+import {createUILocalization, type UILocalization} from '../src/localization';
+
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {
   meterStyle,
@@ -139,5 +141,82 @@ describe('mountMeter', () => {
     expect(meterStyle).toContain('--wm-meter-fill');
     expect(meterStyle).toContain('--wameter-bg');
     expect(meterStyle).toContain('--wameter-fill');
+  });
+});
+
+describe('meter capabilities and localization', () => {
+  it('requires only the selected pull port', () => {
+    const host = document.createElement('div');
+    const level = mountMeter(host, {readLevel: () => ({level: .25})}, {animate: false});
+    expect(level.element.getAttribute('aria-valuetext')).toBe('25% level');
+    const spectrum = mountMeter(host, {readSpectrum: () => [.2, .7]}, {mode: 'spectrum', animate: false});
+    expect(spectrum.element.getAttribute('aria-valuetext')).toBe('70% spectrum peak');
+    spectrum.destroy();
+  });
+
+  it.each(['level', 'spectrum'] as const)('updates %s name and value without replacing the root or bars', (mode) => {
+    const host = document.createElement('div');
+    const localization = createUILocalization();
+    const handle = mountMeter(host, {readLevel: () => ({level: .3}), readSpectrum: () => [.2, .3]}, {
+      mode, animate: false, localization,
+    });
+    const child = handle.element.firstElementChild;
+    localization.update({
+      messages: {'meter.level': '电平', 'meter.spectrum': '频谱', 'meter.levelValue': '电平 {value}', 'meter.spectrumValue': '峰值 {value}'},
+      formatters: {percent: (value) => `百分之${value * 100}`},
+    });
+    expect(handle.element.firstElementChild).toBe(child);
+    expect(handle.element.getAttribute('aria-label')).toBe(mode === 'level' ? '电平' : '频谱');
+    expect(handle.element.getAttribute('aria-valuetext')).toBe(mode === 'level' ? '电平 百分之30' : '峰值 百分之30');
+    expect(handle.element.getAttribute('aria-valuenow')).toBe('30');
+    handle.updateLabel('Bus A');
+    localization.update({messages: {'meter.level': 'Level B', 'meter.spectrum': 'Spectrum B'}});
+    expect(handle.element.getAttribute('aria-label')).toBe('Bus A');
+    handle.updateLabel();
+    expect(handle.element.getAttribute('aria-label')).toBe(mode === 'level' ? 'Level B' : 'Spectrum B');
+    handle.destroy();
+  });
+
+  it('reports wrong JavaScript binding modes without calling the other port', () => {
+    const onError = vi.fn();
+    const readLevel = vi.fn(() => ({level: .4}));
+    const handle = mountMeter(document.createElement('div'), {readLevel} as unknown as MeterBinding, {mode: 'spectrum', animate: false, onError});
+    expect(readLevel).not.toHaveBeenCalled();
+    expect(onError).toHaveBeenCalledWith(expect.objectContaining({message: 'Spectrum meter requires readSpectrum(bars)'}));
+    handle.destroy();
+  });
+
+  it('lets a translation callback replace the mounting meter without a leaked frame', () => {
+    const request = vi.fn(() => 1);
+    vi.stubGlobal('requestAnimationFrame', request);
+    const host = document.createElement('div');
+    let replacement: ReturnType<typeof mountMeter> | undefined;
+    const localization = createUILocalization({messages: {'meter.level': () => {
+      replacement ??= mountMeter(host, {readLevel: () => ({level: .2})}, {animate: false});
+      return 'Stale';
+    }}});
+    const stale = mountMeter(host, {readLevel: () => ({level: .9})}, {localization});
+    expect(request).not.toHaveBeenCalled();
+    expect(host.querySelectorAll('.wui-meter')).toHaveLength(1);
+    expect(host.querySelector('.wui-meter')).toBe(replacement?.element);
+    stale.destroy();
+    replacement?.destroy();
+  });
+
+  it('drops a locale subscription returned after reentrant replacement', () => {
+    const host = document.createElement('div');
+    const release = vi.fn();
+    const localization: UILocalization = {
+      ...createUILocalization(),
+      subscribe() {
+        mountMeter(host, {readLevel: () => ({level: .2})}, {animate: false});
+        return release;
+      },
+    };
+    const stale = mountMeter(host, {readLevel: () => ({level: .5})}, {localization, animate: false});
+    expect(release).toHaveBeenCalledOnce();
+    expect(host.querySelector('.wui-meter')?.getAttribute('aria-valuenow')).toBe('20');
+    stale.destroy();
+    expect(release).toHaveBeenCalledOnce();
   });
 });

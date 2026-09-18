@@ -1,3 +1,4 @@
+import {bindLocalization, message as uiMessage, type UILocalization} from './localization';
 import {installStyle} from './internal/style';
 import {claimHost, createErrorSink} from './internal/lifecycle';
 import {addClassNames, setParts} from './internal/dom';
@@ -26,6 +27,8 @@ export interface StatusParts {
 }
 
 export interface StatusOptions {
+  /** Borrowed live text and formatting; language updates preserve controls. */
+  localization?: UILocalization;
   classNames?: StatusClassNames;
   parts?: StatusParts;
   onError?: (error: unknown) => void;
@@ -107,6 +110,7 @@ export function mountStatus(
 
   let destroyed = false;
   let unsubscribe: (() => void) | undefined;
+  let releaseLocalization = (): void => {};
 
   const report = createErrorSink(options.onError);
 
@@ -131,7 +135,7 @@ export function mountStatus(
         root.setAttribute('aria-live', 'polite');
       }
       if (kind === 'loading') root.setAttribute('aria-busy', 'true');
-      message.textContent = state.message ?? defaultMessage(kind);
+      message.textContent = state.message ?? uiMessage(options.localization, `status.${kind}`, defaultMessage(kind));
     } catch (error) {
       report(error);
     }
@@ -144,6 +148,7 @@ export function mountStatus(
     destroy(): void {
       if (destroyed) return;
       destroyed = true;
+      releaseLocalization();
       try {
         unsubscribe?.();
       } catch (error) {
@@ -178,5 +183,6 @@ export function mountStatus(
       report(error);
     }
   }
+  releaseLocalization = bindLocalization(options.localization, update, () => !destroyed && claim.isCurrent(), options.onError);
   return handle;
 }

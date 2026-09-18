@@ -121,6 +121,13 @@ export const UI_PRESENTER_CLASSES: readonly UiPresenterClass[] = [
 ] as const;
 
 /** The complete set of 21 public `@webmusic/ui` presenter subpaths on main. */
+const localizationOption: UiPresenterControlSpec = {
+  name: 'localization',
+  kind: 'text',
+  note: 'Borrow a shared createUILocalization source for messages and human-readable formatting.',
+  inert: 'This is an object with a subscription, not a scalar. See the UI API localization example for changing language in place.',
+};
+
 export const UI_PRESENTER_CATALOG: readonly UiPresenterEntry[] = [
   {
     presenter: 'transport',
@@ -149,7 +156,6 @@ const handle = mountTransport(host, {
       {
         name: 'progress',
         kind: 'number',
-        required: true,
         initial: 0.18,
         min: 0,
         max: 1,
@@ -183,6 +189,7 @@ const handle = mountTransport(host, {
       },
     ],
     options: [
+      localizationOption,
       {
         name: 'label',
         kind: 'text',
@@ -379,6 +386,7 @@ const handle = mountTimeline(host, {
       },
     ],
     options: [
+      localizationOption,
       {
         name: 'label',
         kind: 'text',
@@ -519,6 +527,7 @@ const handle = mountMinimap(host, {
       },
     ],
     options: [
+      localizationOption,
       {
         name: 'label',
         kind: 'text',
@@ -664,6 +673,7 @@ const handle = mountPlaylist(host, {
       },
     ],
     options: [
+      localizationOption,
       {
         name: 'label',
         kind: 'text',
@@ -755,6 +765,7 @@ const handle = mountParameterRack(host, binding, options);`,
       },
     ],
     options: [
+      localizationOption,
       {
         name: 'layout',
         kind: 'enum',
@@ -843,6 +854,7 @@ const handle = mountMacro(host, binding, options);`,
       {name: 'disabled', kind: 'boolean', initial: false, fallback: 'off', note: 'Disables the nested macro range input.'},
     ],
     options: [
+      localizationOption,
       {
         name: 'classNames',
         kind: 'enum',
@@ -947,6 +959,7 @@ const handle = mountEnvelope(host, binding, options);`,
       {name: 'disabled', kind: 'boolean', initial: false, fallback: 'off', note: 'Disables pointer and keyboard envelope editing.'},
     ],
     options: [
+      localizationOption,
       {name: 'label', kind: 'text', fallback: 'Envelope', placeholder: 'Envelope', note: 'Sets the root group accessible name.', inert: 'Changes the accessibility tree, not visible text.'},
       {name: 'classNames', kind: 'enum', fallback: 'canonical classes only', choices: [{value: 'demo', label: 'demo compatibility hooks', literal: "{root: 'demo-transport', svg: 'demo-envelope-svg', grid: 'demo-envelope-grid', area: 'demo-envelope-area', curve: 'demo-envelope-curve', handle: 'demo-envelope-handle', readout: 'demo-envelope-readout', inputs: 'demo-envelope-inputs', input: 'demo-envelope-input'}"}], note: 'Adds compatibility classes alongside every canonical envelope class.'},
       {name: 'parts', kind: 'enum', fallback: 'canonical parts only', choices: [{value: 'demo', label: 'demo part hooks', literal: "{root: 'demo-root', svg: 'demo-svg', grid: 'demo-grid', area: 'demo-area', curve: 'demo-curve', handle: 'demo-handle', readout: 'demo-readout', inputs: 'demo-inputs', input: 'demo-input'}"}], note: 'Adds part tokens alongside every canonical envelope part.'},
@@ -972,6 +985,7 @@ const handle = mountLfo(host, binding, options);`,
       {name: 'disabled', kind: 'boolean', initial: false, fallback: 'off', note: 'Disables every LFO button and range input.'},
     ],
     options: [
+      localizationOption,
       {name: 'label', kind: 'text', fallback: 'LFO', placeholder: 'LFO', note: 'Sets the root group accessible name.', inert: 'Changes the accessibility tree, not visible text.'},
       {name: 'runLabel', kind: 'text', fallback: 'Run', placeholder: 'Run', note: 'Accessible name of the stopped run button.', inert: 'Changes the button accessible name, not its glyph.'},
       {name: 'stopLabel', kind: 'text', fallback: 'Stop', placeholder: 'Stop', note: 'Accessible name of the running stop button.', inert: 'Changes the button accessible name, not its glyph.'},
@@ -999,6 +1013,7 @@ const handle = mountEq(host, binding, options);`,
       {name: 'disabled', kind: 'boolean', initial: false, fallback: 'off', note: 'Disables every band point and hidden range input.'},
     ],
     options: [
+      localizationOption,
       {name: 'label', kind: 'text', fallback: 'Equalizer', placeholder: 'Equalizer', note: 'Sets the root group accessible name.', inert: 'Changes the accessibility tree, not visible text.'},
       {name: 'emptyLabel', kind: 'text', fallback: 'Connect an equalizer graph', placeholder: 'Connect an equalizer graph', note: 'Labels the graph while ready is not true.'},
       {name: 'classNames', kind: 'enum', fallback: 'canonical classes only', choices: [{value: 'demo', label: 'demo compatibility hooks', literal: "{root: 'demo-transport', svg: 'demo-eq-svg', grid: 'demo-eq-grid', zero: 'demo-eq-zero', area: 'demo-eq-area', curve: 'demo-eq-curve', points: 'demo-eq-points', point: 'demo-eq-point', readout: 'demo-eq-readout', empty: 'demo-eq-empty', input: 'demo-eq-input'}"}], note: 'Adds compatibility classes alongside every canonical EQ class.'},
@@ -1053,6 +1068,7 @@ const handle = mountMixer(host, {
       },
     ],
     options: [
+      localizationOption,
       {
         name: 'classNames',
         kind: 'enum',
@@ -1138,6 +1154,7 @@ const handle = mountMeter(host, {
       },
     ],
     options: [
+      localizationOption,
       {
         name: 'mode',
         kind: 'enum',
@@ -1264,6 +1281,7 @@ const handle = mountRecorder(host, {
       {name: 'canExport', kind: 'boolean', initial: false, fallback: 'off — until the snapshot carries takeCount', note: 'Explicitly enables or disables every export button.'},
     ],
     options: [
+      localizationOption,
       {
         name: 'exportFormats',
         kind: 'enum',
@@ -1364,6 +1382,7 @@ const handle = mountNoteSurface(host, {
       },
     ],
     options: [
+      localizationOption,
       {
         name: 'onError',
         kind: 'enum',
@@ -1433,6 +1452,7 @@ mountSurfaceSlider(surface, sliderBinding);`,
       },
     ],
     options: [
+      localizationOption,
       {
         name: 'label',
         kind: 'text',
@@ -1619,6 +1639,7 @@ const handle = mountStatus(host, binding, options);`,
       },
     ],
     options: [
+      localizationOption,
       {
         name: 'classNames',
         kind: 'enum',
@@ -1694,6 +1715,7 @@ const handle = mountTrackList(host, binding, options);`,
       },
     ],
     options: [
+      localizationOption,
       {
         name: 'label',
         kind: 'text',
@@ -1788,6 +1810,7 @@ const playhead = createAnalysisPlayhead(root);`,
     ],
     hint: 'Watch the real playhead move across helper-rendered spans; Options remount its controller.',
     options: [
+      localizationOption,
       {
         name: 'scroll',
         kind: 'boolean',
@@ -1899,6 +1922,7 @@ const fretboard = mountFretboard(fretboardHost, fretboardBinding);`,
       },
     ],
     options: [
+      localizationOption,
       {
         name: 'follow',
         kind: 'enum',
@@ -2065,6 +2089,7 @@ const wheel = mountWheel(wheelHost, wheelBinding);`,
       },
     ],
     options: [
+      localizationOption,
       {
         name: 'motion',
         kind: 'enum',
@@ -2233,6 +2258,7 @@ if (rail) mountKeyboard(rail, keyboardBinding);`,
       },
     ],
     options: [
+      localizationOption,
       {
         name: 'chrome',
         kind: 'enum',

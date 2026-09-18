@@ -84,8 +84,9 @@ For ordinary snapshot-based mounts:
 - **Structural binding.** The binding is a plain object the caller writes: `snapshot()` returns
   current state, commands such as `setValue()` or `play()` perform changes and may return
   `void` or a `Promise`, and `subscribe(notify)` returns an unsubscribe function. The presenter
-  repaints from a fresh snapshot after each command settles. `subscribe` is optional on most
-  bindings; `TransportBinding` requires it.
+  repaints from a fresh snapshot after each command settles. `subscribe` is optional;
+  without it the application calls `update()` for external changes. Transport can expose
+  just play/pause, and Meter requires only the reader for its selected mode.
 - **One presenter per host, per entry.** Each module keeps a `WeakMap` from host to handle.
   Mounting the same kind of presenter on a host again destroys the previous handle first, so a
   host never accumulates duplicate racks or transports.
@@ -111,6 +112,89 @@ interchangeable bindings:
 | [panel](/uikit/layout-feedback/panel/) | Receives section descriptors rather than a state binding; returns stable slots whose child mounts the caller owns. |
 
 Each owning page describes its complete state, cleanup and styling contract.
+
+## Localization
+
+The root exports `createUILocalization(options?)` and the `UILocalization`,
+`UILocalizationController`, `UILocalizationOptions`, `UIMessage`, `UIMessageValues`
+and `UIFormatters` types. A localization source is borrowed presentation state:
+the application owns language selection and may share one source among related
+presenters. No language is selected globally and no translation framework is required.
+
+```ts
+import {createUILocalization} from '@webmusic/ui';
+import {mountTransport} from '@webmusic/ui/transport';
+import {mountMeter} from '@webmusic/ui/meter';
+
+const localization = createUILocalization();
+let playing = false;
+const transport = mountTransport(transportHost, {
+  snapshot: () => ({playing}),
+  play: () => { playing = true; },
+  pause: () => { playing = false; },
+}, {localization});
+const meter = mountMeter(meterHost, {
+  readLevel: () => ({level: 0.42}),
+}, {localization, animate: false});
+
+// Keep both handles mounted. A focused control keeps its node and focus.
+localization.update({
+  messages: {
+    'transport.play': '播放',
+    'transport.pause': '暂停',
+    'meter.level': '音频电平',
+    'meter.levelValue': '电平 {value}',
+  },
+  formatters: {
+    number: value => new Intl.NumberFormat('zh-CN').format(value),
+    percent: fraction => new Intl.NumberFormat('zh-CN', {style: 'percent'}).format(fraction),
+    time: seconds => `${Math.floor(seconds / 60)}分${Math.floor(seconds % 60)}秒`,
+  },
+});
+
+// Removing a view releases its observer; the shared source remains usable.
+transport.destroy();
+meter.destroy();
+```
+
+`transportHost` and `meterHost` are application-owned DOM hosts. This example
+needs no seek, progress, subscription or spectrum placeholder methods.
+
+| Options | Meaning |
+| --- | --- |
+| `messages?: Readonly<Record<string, UIMessage>>` | Presenter-scoped keys listed on each reference page. A value is a plain text template or `(values: UIMessageValues) => string`. Templates substitute named `{values}`; functions support plural rules and whole-sentence reordering. Values are strings or numbers. Missing keys use the presenter's English default. |
+| `formatters.number?: (value: number) => string` | Human-readable numbers. The default retains each presenter's existing precision. |
+| `formatters.percent?: (fraction: number) => string` | Human-readable percentages: `1` means 100 percent. |
+| `formatters.time?: (seconds: number) => string` | Human-readable elapsed/duration clocks in seconds. |
+| `onError?: (error: unknown) => void` | Receives message, formatter and notification failures. Failed message/formatter calls use the default text. An error callback's own throw/rejection is contained. |
+
+The controller also implements `message(key, fallback, values?)`,
+`formatNumber(value, fallback)`, `formatPercent(fraction, fallback)`,
+`formatTime(seconds, fallback)` and `subscribe(notify)`. Formatter fallback
+arguments are strings. Subscribing does not immediately call the listener and
+returns an idempotent unsubscribe. These methods allow custom UI to share the
+same presentation settings.
+
+`update(options)` atomically **replaces** every supplied messages/formatters map.
+Omitted fields retain their current values; explicit `undefined` resets that
+field. Replace the complete language map when switching language, so a missing
+translation falls back to the default instead of retaining the previous language.
+Maps are copied at the boundary. Notifications are synchronous, isolated from
+one another and bounded against endless reentrant updates.
+
+Explicit presenter `label`, `formatValue` and similar options still win over
+defaults. Labels in snapshots, parameter choice names, musical spellings,
+caller-supplied status/error messages and unit identifiers remain application
+data: translate them in the binding, retaining stable IDs. Set HTML `lang`/`dir`
+on the application surface as appropriate. Machine values such as `input.value`,
+`aria-valuenow` and geometry always retain standard numeric syntax.
+
+Mounted presenters observe localization and repaint in place. One-shot analysis
+helpers read it only when called, while the retained histogram observes it until
+`destroy()`. Section panels and plain DOM stages generate no default prose; their
+section labels and custom content remain caller-owned. The live demo option
+panels describe the object-valued entry; the example above shows actual language
+switching without remounting.
 
 ## Release boundary
 

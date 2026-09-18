@@ -41,7 +41,7 @@ preformatted duration, optional active state, and optional `loading` or `error` 
 presenter deliberately does not format duration or decide whether an errored entry may be
 selected; those are domain policies implemented by the binding.
 
-The row list is rebuilt only when item ids, labels, or order change. Active state, status, and
+The row list is rebuilt only when item ids or order change. Labels, active state, status, and
 duration are patched onto existing rows so frequent progress notifications do not steal focus
 or cancel an in-flight row click. Keep ids unique and stable if code uses `controls.item(id)`.
 
@@ -93,6 +93,7 @@ text or mutate the item objects.
 
 | Member | Kind | Default | Description |
 |---|---|---|---|
+| `localization` | `UILocalization` | — | Borrowed text and number-format source; updates repaint in place and destruction releases its subscription. |
 | `label` | `string` | `'Playlist'` | Accessible name of the ordered entry list. |
 | `stylesheet` | `boolean` | `true` | Installs `playlistStyle` unless explicitly `false`. |
 | `classNames` | `PlaylistClassNames` | `{}` | Adds compatibility classes for `root`, `bar`, `button`, `seek`, `list`, and `item`. |
@@ -113,8 +114,22 @@ text or mutate the item objects.
 | `update()` | `() => void` | Re-reads and patches state; becomes a no-op after destruction. |
 | `destroy()` | `() => void` | Idempotently disposes the subscription and removes presenter DOM and any installed stylesheet. |
 
+**Localization.** Pass an instance-local [localization controller](/uikit/api/) as
+`localization`. Updates patch accessible names, row ordinals and seek value text while retaining
+focused rows and controls. The `number` formatter handles ordinals; `percent` receives the
+normalized seek fraction for `aria-valuetext`. The native seek value remains `0…1000` and commands
+still receive `0…1`. Explicit `label` takes precedence. Item labels and preformatted durations are
+caller text. Destroy releases the localization subscription.
+
+| Message key | Default | Values |
+|---|---|---|
+| `playlist.label` | `Playlist` | — |
+| `playlist.previous` / `playlist.next` | `Previous` / `Next` | — |
+| `playlist.play` / `playlist.pause` | `Play` / `Pause` | — |
+| `playlist.seek` | `Seek` | — |
+
 **Accessibility.** Previous, toggle, and next are native buttons with accessible names; the
-toggle name follows `playing`. Seek is a native range labelled `Seek`, and all four transport
+toggle name follows `playing`. Seek is a native range labelled `Seek`, with a formatted percentage in `aria-valuetext`; all four transport
 controls reflect `disabled` through the native attribute. The ordered list receives `label` as
 its accessible name. Each row is a focusable `role="button"` with click, Enter, and Space
 activation plus `aria-current` for the active item. Loading/error are visual data states rather

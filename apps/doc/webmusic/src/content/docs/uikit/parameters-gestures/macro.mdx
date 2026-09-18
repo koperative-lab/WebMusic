@@ -56,7 +56,7 @@ The entry exports both `mountMacro()` and `mountMacroRack()`.
 | Member | Kind | Description |
 |---|---|---|
 | `label` | `string` | Visible knob label; nullish input normalizes to `'MACRO'`. |
-| `value` | `number` | Normalized macro value clamped to `0…1` and painted as an integer percentage. |
+| `value` | `number` | Normalized macro value clamped to `0…1` and painted as a percentage (an integer percentage by default). |
 | `targets` | `readonly MacroTargetState[]` | Ordered, read-only destination rows. An empty list paints `Assign .targets`. |
 | `disabled?` | `boolean` | Strict `true` disables the nested parameter range. |
 | `targets[].label` | `string` | Destination label. |
@@ -75,6 +75,7 @@ The entry exports both `mountMacro()` and `mountMacroRack()`.
 
 | Member | Kind | Default | Description |
 |---|---|---|---|
+| `localization` | `UILocalization` | — | Borrowed text and number-format source; updates repaint in place and destruction releases its subscription. |
 | `mountMacro: onError` | `(error: unknown) => void` | — | Receives read/update, subscription and cleanup failures, plus nested parameter errors. Callback throws/rejections are contained. A failed subscription leaves explicit `update()` available. |
 | `mountMacroRack: onError` | `(error: unknown) => void` | — | Receives child errors and rack cleanup failures; callback throws/rejections are contained. |
 | `mountMacroRack: classNames` | `MacroRackClassNames` | `{}` | Adds compatibility classes to rack `root` and each `item` host. |
@@ -91,8 +92,20 @@ The entry exports both `mountMacro()` and `mountMacroRack()`.
 | `rack.items` | `readonly MacroHandle[]` | Stable child handle array in binding order. |
 | `rack.item(index)` | `(number) => MacroHandle \| undefined` | Returns the child at an index without exposing private wrappers. |
 
+**Localization.** Both mounts accept the same instance-local
+[localization controller](/uikit/api/) through `localization`; racks forward it to each macro
+and nested parameter control. Updates preserve the focused range. `percent` formats the normalized
+macro value, and `number` formats target values. Labels and units supplied by the binding remain
+caller text. Destroy releases all child localization subscriptions.
+
+| Message key | Default | Values |
+|---|---|---|
+| `macro.label` | `MACRO` | — |
+| `macro.empty` | `Assign .targets` | — |
+| `macro.targetValue` | `{value}{unit}` | Formatted `value`, caller-supplied `unit` |
+
 **Accessibility.** The macro value is the accessible native range created by the nested parameter
-presenter and named by `MacroState.label`; its value text is an integer percentage. Destination
+presenter and named by `MacroState.label`; its value text is a localized percentage (an integer percentage by default). Destination
 rows are ordinary readable text, not controls. `disabled` reaches the native range. A macro rack
 adds no extra landmark or label, so callers should provide surrounding context when the list needs
 an accessible group name.

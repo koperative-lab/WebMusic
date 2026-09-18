@@ -26,7 +26,6 @@ import {mountMeter} from '@webmusic/ui/meter';
 
 const handle = mountMeter(host, {
   readLevel: () => levels.current,
-  readSpectrum: (bars) => analyser.readNormalizedBins(bars),
 });
 ```
 
@@ -35,11 +34,15 @@ const handle = mountMeter(host, {
 Meter deliberately has no `snapshot()` or `subscribe()`. With `animate !== false`, it schedules an
 animation frame, calls `redraw()`, and schedules the next frame until destroyed. Level mode calls
 `readLevel()`; spectrum mode calls `readSpectrum(barCount)` and reads one array-like value per
-created bar. Binding values are clamped to `0…1`, and missing spectrum entries become `0`.
+created bar. Supply only `LevelMeterBinding.readLevel` for the default level mode, or only
+`SpectrumMeterBinding.readSpectrum` for an explicit `{mode: 'spectrum'}`. The original
+`MeterBinding` includes both ports and remains useful when `mode` is chosen at runtime.
+Binding values are clamped to `0…1`, and missing spectrum entries become `0`.
 
 With `animate: false`, mount performs one synchronous redraw. Call `handle.redraw()` whenever new
 data is available. Mode and bar count determine the DOM at mount time and require a remount to
-change; only the accessible label has an in-place `updateLabel()` method. The rest of the host and
+change. Accessible text and percentage formatting update in place through a shared localization
+controller; `updateLabel()` remains available for an explicit application-owned name. The rest of the host and
 lifecycle behavior follows the
 [shared presenter shape](/uikit/api/#the-shared-presenter-shape).
 
@@ -61,13 +64,14 @@ lifecycle behavior follows the
 
 | Member | Kind | Description |
 |---|---|---|
-| `readLevel()` | `() => MeterLevelState` | Required pull port read on every level-mode redraw. Throws are sent to `onError` and leave the last successful paint in place. |
-| `readSpectrum(bars)` | `(number) => ArrayLike<number>` | Required pull port read on every spectrum redraw. Receives the normalized mount-time bar count. The largest painted bar drives the accessible value. |
+| `readLevel()` | `() => MeterLevelState` | Required only in level mode; read on every level-mode redraw. Throws are sent to `onError` and leave the last successful paint in place. |
+| `readSpectrum(bars)` | `(number) => ArrayLike<number>` | Required only in spectrum mode; read on every spectrum redraw. Receives the normalized mount-time bar count. The largest painted bar drives the accessible value. |
 
 **Options**
 
 | Member | Kind | Default | Description |
 |---|---|---|---|
+| `localization` | `UILocalization` | — | Borrowed shared text and percentage formatting; live updates preserve the root and sample nodes. |
 | `mode` | `'level' \| 'spectrum'` | `'level'` | Builds the track/fill/peak structure or the spectrum/bar structure. |
 | `bars` | `number` | `28` | Spectrum bar count. Values are floored with a minimum of `4`; non-finite values fall back to `28`. |
 | `label` | `string` | `'Audio level'` / `'Spectrum'` | Root accessible name; its default follows mode. |
@@ -87,12 +91,30 @@ lifecycle behavior follows the
 |---|---|---|
 | `element` | `HTMLElement` | Presenter-owned `.wui-meter` root. |
 | `redraw()` | `() => void` | Pulls the active binding method and updates geometry and ARIA; becomes a no-op after destruction. |
-| `updateLabel(label?)` | `(string?) => void` | Updates `aria-label` in place; `undefined` restores the mode-specific default. |
-| `destroy()` | `() => void` | Idempotently cancels the outstanding frame and removes the root and installed style node. Cleanup errors are reported after all cleanup is attempted. |
+| `updateLabel(label?)` | `(string?) => void` | Updates `aria-label` in place; `undefined` restores the current localized mode-specific default. |
+| `destroy()` | `() => void` | Idempotently cancels the outstanding frame, releases the localization subscription, and removes the root and installed style node. The binding/localization objects remain caller-owned. Cleanup errors are reported after all cleanup is attempted; throwing error callbacks are contained. |
+
+**Localization**
+
+Pass a shared `createUILocalization()` controller from `@webmusic/ui` as `localization`.
+Updating its messages/formatters refreshes the current label and value text without replacing
+the root or bars, even with `animate: false`. Explicit `label` and `updateLabel(value)` take
+precedence until `updateLabel()` restores the localized default. The percentage formatter
+receives a normalized fraction; `aria-valuenow` remains a machine-readable integer.
+
+| Message key | Default | Values |
+|---|---|---|
+| `meter.level` | `Audio level` | — |
+| `meter.spectrum` | `Spectrum` | — |
+| `meter.levelValue` | `{value} level` | `value` from `formatters.percent(level)` |
+| `meter.spectrumValue` | `{value} spectrum peak` | `value` from `formatters.percent(maximum)` |
+
+A JavaScript binding missing its selected read method reports a `TypeError` through `onError`;
+the presenter never calls the other mode's method as a fallback.
 
 **Accessibility.** The root has `role="meter"`, the configured or mode-default name,
 `aria-valuemin="0"`, and `aria-valuemax="100"`. Each redraw sets integer `aria-valuenow`; level
-mode exposes `<n>% level` and spectrum mode exposes `<n>% spectrum peak` through
+mode by default exposes `<n>% level` and spectrum mode exposes `<n>% spectrum peak` through
 `aria-valuetext`. The meter is read-only and has no keyboard interaction. In forced-colors mode,
 the root gains a `CanvasText` border, fill uses `Highlight`, and the peak uses `CanvasText`.
 

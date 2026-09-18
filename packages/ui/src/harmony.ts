@@ -1,3 +1,4 @@
+import {bindLocalization, message as localize, type UILocalization, formatNumber, formatPercent} from './localization';
 import {
   harmonyValues,
   harmonyInline,
@@ -970,8 +971,8 @@ function dressing(
 }
 
 /** The label a read-out announces when the caller supplies none. */
-function describe(subject: string, names: readonly string[]): string {
-  return names.length > 0 ? `${subject}: ${names.join(', ')}` : subject;
+function describe(localization: UILocalization | undefined, key: string, subject: string, names: readonly string[]): string {
+  return localize(localization, key, names.length > 0 ? `${subject}: {names}` : subject, {names: names.join(', ')});
 }
 
 /**
@@ -1133,6 +1134,7 @@ export interface FlowLaneParts {
 }
 
 export interface FlowLaneOptions {
+  localization?: UILocalization;
   /** Outer surface, or no frame/background when a containing presenter owns it. Defaults to 'default'. */
   surface?: 'default' | 'none';
   label?: string;
@@ -1354,6 +1356,7 @@ export function mountFlowLane(
   let pulse: Animation | undefined;
   let destroyed = false;
   let unsubscribe: (() => void) | undefined;
+  let unlocalize: (() => void) | undefined;
   let leaveLoop: (() => void) | undefined;
   let resizeObserver: ResizeObserver | undefined;
   let intersectionObserver: IntersectionObserver | undefined;
@@ -1446,7 +1449,7 @@ export function mountFlowLane(
       viewport,
       'aria-valuetext',
       options.formatPosition?.(position) ??
-        (current?.primary ? `${coordinate(position)} — ${current.primary}` : coordinate(position)),
+        (current?.primary ? localize(options.localization, 'harmony.positionValue', '{value} — {label}', {value: formatNumber(options.localization, position, coordinate(position)), label: current.primary}) : formatNumber(options.localization, position, coordinate(position))),
     );
   };
 
@@ -1969,6 +1972,7 @@ export function mountFlowLane(
       // Only where the viewport is actually a slider. A range on a node with no
       // role is a promise to a reader that nothing keeps.
       if (binding.seek) {
+        setLabel(viewport, options.label ?? localize(options.localization, 'harmony.position', 'Position'));
         setAttr(viewport, 'aria-valuemin', coordinate(axis.start));
         setAttr(viewport, 'aria-valuemax', coordinate(axis.end));
         setAttr(viewport, 'aria-disabled', state.disabled ? 'true' : undefined);
@@ -1983,7 +1987,7 @@ export function mountFlowLane(
         root,
         options.label ??
           describe(
-            'Flow lane',
+            options.localization, 'harmony.flowLane', 'Flow lane',
             ordered
               .slice(0, 4)
               .map((band) => band.primary)
@@ -2135,7 +2139,7 @@ export function mountFlowLane(
     viewport.tabIndex = 0;
     viewport.setAttribute('role', 'slider');
     viewport.setAttribute('aria-orientation', 'horizontal');
-    setLabel(viewport, options.label ?? 'Position');
+    setLabel(viewport, options.label ?? localize(options.localization, 'harmony.position', 'Position'));
     viewport.addEventListener('pointerdown', onPointerDown);
     viewport.addEventListener('pointermove', onPointerMove);
     viewport.addEventListener('pointerup', onPointerUp);
@@ -2199,6 +2203,9 @@ export function mountFlowLane(
     destroy(): void {
       if (destroyed) return;
       destroyed = true;
+      const releaseText = unlocalize;
+      unlocalize = undefined;
+      releaseText?.();
       partLoop();
       pulse?.cancel();
       if (wheelTimer !== undefined) clearTimeout(wheelTimer);
@@ -2307,6 +2314,7 @@ export function mountFlowLane(
       report(error);
     }
   }
+  unlocalize = bindLocalization(options.localization, update, () => !destroyed && claim.isCurrent(), options.onError);
   return handle;
 }
 
@@ -2369,6 +2377,7 @@ export interface NameplateParts {
 }
 
 export interface NameplateOptions {
+  localization?: UILocalization;
   /** Outer surface, or no frame/background when a containing presenter owns it. Defaults to 'default'. */
   surface?: 'default' | 'none';
   label?: string;
@@ -2498,6 +2507,7 @@ export function mountNameplate(
   let animation: Animation | undefined;
   let destroyed = false;
   let unsubscribe: (() => void) | undefined;
+  let unlocalize: (() => void) | undefined;
   let leaveLoop: (() => void) | undefined;
   const report = createErrorSink(options.onError);
   const clockNow = (): number => view?.performance?.now?.() ?? Date.now();
@@ -2601,21 +2611,9 @@ export function mountNameplate(
       setHidden(voicing, voices.length === 0);
 
       const readings = state.alternates ?? [];
-      // `key` and `weight` belong in the signature even though neither is drawn.
-      // The guard exists to keep a focused `<button>` alive across a chord
-      // change, and every button closes over the candidate object it was built
-      // from — so any field the guard omits is a field `selectAlternate` can be
-      // handed a stale copy of. `key` is documented as "the opaque identity of
-      // this naming", which makes it precisely the field a caller looks at.
-      const readingKey = JSON.stringify([
-        binding.selectAlternate !== undefined,
-        readings.map((candidate) => [
-          candidate.symbol,
-          candidate.note ?? null,
-          candidate.key ?? null,
-          candidate.weight ?? null,
-        ]),
-      ]);
+      // Labels, weights and opaque candidate keys can change without replacing
+      // the focused control. Commands read the current candidate at click time.
+      const readingKey = JSON.stringify([binding.selectAlternate !== undefined, readings.length]);
       const items: HTMLLIElement[] = [];
       if (readingKey !== readingSignature)
         readings.forEach((candidate, at) => {
@@ -2633,7 +2631,8 @@ export function mountNameplate(
             dress(button, nameplateParts.alternate, nameplateParts.alternateButton);
             button.addEventListener('click', () => {
               try {
-                void Promise.resolve(binding.selectAlternate!(at, candidate)).catch(report);
+                const current = state.alternates?.[at];
+                if (current) void Promise.resolve(binding.selectAlternate!(at, current)).catch(report);
               } catch (error) {
                 report(error);
               }
@@ -2657,6 +2656,12 @@ export function mountNameplate(
         readingSignature = readingKey;
         alternates.replaceChildren(...items);
       }
+      readings.forEach((candidate, at) => {
+        const item = alternates.children[at];
+        if (!item) return;
+        const target = item.querySelector('button') ?? item;
+        setText(target, candidate.note ? `${candidate.symbol} (${candidate.note})` : candidate.symbol);
+      });
       setHidden(alternates, readings.length === 0);
 
       const historyKey = JSON.stringify([state.history ?? [], primary?.symbol ?? null]);
@@ -2686,7 +2691,7 @@ export function mountNameplate(
       setHidden(empty, !showEmpty);
       setLabel(
         root,
-        options.label ?? describe('Chord', primary ? [primary.full ?? primary.symbol] : []),
+        options.label ?? describe(options.localization, 'harmony.chord', 'Chord', primary ? [primary.full ?? primary.symbol] : []),
       );
     } catch (error) {
       report(error);
@@ -2704,6 +2709,9 @@ export function mountNameplate(
     destroy(): void {
       if (destroyed) return;
       destroyed = true;
+      const releaseText = unlocalize;
+      unlocalize = undefined;
+      releaseText?.();
       leaveLoop?.();
       leaveLoop = undefined;
       animation?.cancel();
@@ -2755,6 +2763,7 @@ export function mountNameplate(
       report(error);
     }
   }
+  unlocalize = bindLocalization(options.localization, update, () => !destroyed && claim.isCurrent(), options.onError);
   return handle;
 }
 
@@ -2816,6 +2825,7 @@ export interface ChipStripParts {
 }
 
 export interface ChipStripOptions {
+  localization?: UILocalization;
   /** Outer surface, or no frame/background when a containing presenter owns it. Defaults to 'default'. */
   surface?: 'default' | 'none';
   label?: string;
@@ -2881,6 +2891,7 @@ export function mountChipStrip(
   const boxes = new WeakMap<HTMLLIElement, string>();
   let destroyed = false;
   let unsubscribe: (() => void) | undefined;
+  let unlocalize: (() => void) | undefined;
   const report = createErrorSink(options.onError);
 
   const update = (): void => {
@@ -2911,7 +2922,9 @@ export function mountChipStrip(
         items.delete(id);
         node.remove();
       }
-      list.replaceChildren(...ordered);
+      ordered.forEach((node, index) => {
+        if (list.children[index] !== node) list.insertBefore(node, list.children[index] ?? null);
+      });
 
       const message = state.emptyLabel ?? '';
       const showEmpty = ordered.length === 0 && message !== '';
@@ -2921,7 +2934,7 @@ export function mountChipStrip(
         root,
         options.label ??
           describe(
-            'Read-out',
+            options.localization, 'harmony.readout', 'Read-out',
             rows.slice(0, 4).map((item) => item.primary),
           ),
       );
@@ -3019,7 +3032,7 @@ export function mountChipStrip(
     if (item.trailing !== undefined || item.occurrences?.length) {
       const trailing = document.createElement('span');
       trailing.className = 'wui-harmony-chip__trailing';
-      trailing.textContent = item.trailing ?? `x${item.occurrences?.length ?? 0}`;
+      trailing.textContent = item.trailing ?? localize(options.localization, 'harmony.occurrences', 'x{count}', {count: formatNumber(options.localization, item.occurrences?.length ?? 0)});
       dress(trailing, chipParts.trailing);
       children.push(trailing);
     }
@@ -3053,6 +3066,9 @@ export function mountChipStrip(
     destroy(): void {
       if (destroyed) return;
       destroyed = true;
+      const releaseText = unlocalize;
+      unlocalize = undefined;
+      releaseText?.();
       try {
         unsubscribe?.();
       } catch (error) {
@@ -3083,6 +3099,7 @@ export function mountChipStrip(
       report(error);
     }
   }
+  unlocalize = bindLocalization(options.localization, update, () => !destroyed && claim.isCurrent(), options.onError);
   return handle;
 }
 
@@ -3140,6 +3157,7 @@ export interface WheelParts {
 }
 
 export interface WheelOptions {
+  localization?: UILocalization;
   /** Outer surface, or no frame/background when a containing presenter owns it. Defaults to 'default'. */
   surface?: 'default' | 'none';
   label?: string;
@@ -3260,6 +3278,7 @@ export function mountWheel(
   let angle = 0;
   let destroyed = false;
   let unsubscribe: (() => void) | undefined;
+  let unlocalize: (() => void) | undefined;
   const report = createErrorSink(options.onError);
 
   const drawRing = (
@@ -3302,8 +3321,8 @@ export function mountWheel(
       // is worse than the ring saying nothing about strength at all. A share is
       // said only where there is a denominator to say it against.
       const share =
-        total > 0 ? Math.round((Math.max(0, finite(segment.weight, 0)) / total) * 100) : undefined;
-      label.textContent = share === undefined ? segment.label : `${segment.label} ${share}%`;
+        total > 0 ? Math.max(0, finite(segment.weight, 0)) / total : undefined;
+      label.textContent = share === undefined ? segment.label : localize(options.localization, 'harmony.share', '{label} {value}', {label: segment.label, value: formatPercent(options.localization, share)});
       label.dataset.segment = segment.id;
       label.dataset.ring = ring;
       entries.push(label);
@@ -3338,6 +3357,20 @@ export function mountWheel(
           drawRing(inner, RING_MIDDLE - 2, RING_INNER, 'inner', shapes, entries);
         rings.replaceChildren(...shapes);
         index.replaceChildren(...entries);
+      }
+
+      // Geometry can stay cached while the human-readable share changes language.
+      let labelIndex = 0;
+      for (const segments of [outer, inner]) {
+        const total = segments.reduce((sum, segment) => sum + Math.max(0, finite(segment.weight, 0)), 0);
+        for (const segment of segments) {
+          const label = index.children[labelIndex++];
+          if (!label) continue;
+          const share = total > 0 ? Math.max(0, finite(segment.weight, 0)) / total : undefined;
+          setText(label, share === undefined ? segment.label : localize(options.localization, 'harmony.share', '{label} {value}', {
+            label: segment.label, value: formatPercent(options.localization, share),
+          }));
+        }
       }
 
       const onInner = state.needle?.ring === 'inner' && inner.length > 0;
@@ -3428,7 +3461,7 @@ export function mountWheel(
         root,
         options.label ??
           state.needle?.label ??
-          describe('Wheel', state.centre?.primary ? [state.centre.primary] : []),
+          describe(options.localization, 'harmony.wheel', 'Wheel', state.centre?.primary ? [state.centre.primary] : []),
       );
     } catch (error) {
       report(error);
@@ -3463,6 +3496,9 @@ export function mountWheel(
     destroy(): void {
       if (destroyed) return;
       destroyed = true;
+      const releaseText = unlocalize;
+      unlocalize = undefined;
+      releaseText?.();
       try {
         unsubscribe?.();
       } catch (error) {
@@ -3493,5 +3529,6 @@ export function mountWheel(
       report(error);
     }
   }
+  unlocalize = bindLocalization(options.localization, update, () => !destroyed && claim.isCurrent(), options.onError);
   return handle;
 }

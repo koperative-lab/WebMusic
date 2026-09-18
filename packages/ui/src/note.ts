@@ -1,3 +1,4 @@
+import {bindLocalization, message as uiMessage, type UILocalization} from './localization';
 import {installStyle} from './internal/style';
 import {claimHost, createErrorSink, createUpdateLoop} from './internal/lifecycle';
 import {componentSurfaceCss, controlBorderFallback} from './internal/surface';
@@ -61,6 +62,8 @@ export interface NoteSurfaceBinding {
 }
 
 export interface NoteSurfaceOptions {
+  /** Borrowed live text and formatting; language updates preserve controls. */
+  localization?: UILocalization;
   onError?: (error: unknown) => void;
   /** Install the exported stylesheet into the host. Defaults to true. */
   stylesheet?: boolean;
@@ -168,9 +171,9 @@ function paintActiveMidis(root: HTMLElement, midis: readonly number[] | undefine
 function structureKey(state: NoteSurfaceState): string {
   return JSON.stringify([
     state.layout, Boolean(state.keyboard), state.mapOnly === true,
-    state.layout === 'piano' ? (state.piano ?? []).map(({midi, black, left, width, label}) => [midi, Boolean(black), left, width, label]) : undefined,
-    state.layout === 'grid' ? [state.gridColumns ?? 7, (state.grid ?? []).map(({midi, code, ref}) => [midi, code, ref])] : undefined,
-    state.layout === 'chords' ? (state.chords ?? []).map(({index, label, midis}) => [index, label, [...(midis ?? [])]]) : undefined,
+    state.layout === 'piano' ? (state.piano ?? []).map(({midi, black, left, width}) => [midi, Boolean(black), left, width]) : undefined,
+    state.layout === 'grid' ? [state.gridColumns ?? 7, (state.grid ?? []).map(({midi, code}) => [midi, code])] : undefined,
+    state.layout === 'chords' ? (state.chords ?? []).map(({index, midis}) => [index, [...(midis ?? [])]]) : undefined,
   ]);
 }
 
@@ -675,12 +678,53 @@ export function mountNoteSurface(
   let structure = structureKey(initialState);
   let destroyed = false;
   let unsubscribe: (() => void) | undefined;
+  let releaseLocalization = (): void => {};
   const report = createErrorSink(options.onError);
   const interactions = binding.interaction
     ? new NoteSurfaceInteractions(binding.interaction, report)
     : undefined;
   const isCurrent = (): boolean => !destroyed && claim.isCurrent();
   const paint = (state: NoteSurfaceState): void => {
+    const hint = root.querySelector<HTMLElement>('.wui-note__hint');
+    if (hint) hint.textContent = state.layout === 'grid' && state.mapOnly
+      ? uiMessage(options.localization, 'note.hintMapped', 'Type to play · Esc stop')
+      : uiMessage(options.localization, 'note.hint', 'Type to play · Z / X octave · Esc stop');
+    const start = root.querySelector<HTMLElement>('.wui-note__start');
+    if (start) start.textContent = uiMessage(options.localization, 'note.start', '▸ Click to start');
+    const viewport = root.querySelector<HTMLElement>('.wui-note__viewport');
+    if (viewport) viewport.setAttribute('aria-label', state.layout === 'piano'
+      ? uiMessage(options.localization, 'note.keyboard', 'Note keyboard')
+      : uiMessage(options.localization, 'note.grid', 'Note grid'));
+    // Names are presentation data. Updating them must not release a held note
+    // or replace a focused chord button whose musical identity did not change.
+    root.querySelectorAll<HTMLElement>('.wui-note__key').forEach((node, index) => {
+      const text = state.piano?.[index]?.label ?? '';
+      let label = node.querySelector<HTMLElement>('.wui-note__key-label');
+      if (!label && text) {
+        label = document.createElement('span');
+        label.className = 'wui-note__key-label keylab';
+        node.append(label);
+      }
+      if (label) { label.textContent = text; label.hidden = !text; }
+      if (text) node.title = text;
+      else node.removeAttribute('title');
+    });
+    root.querySelectorAll<HTMLElement>('.wui-note__cell').forEach((node, index) => {
+      const text = state.grid?.[index]?.ref ?? '';
+      let label = node.querySelector<HTMLElement>('.wui-note__reference');
+      if (!label && text) {
+        label = document.createElement('span');
+        label.className = 'wui-note__reference ref';
+        node.append(label);
+      }
+      if (label) { label.textContent = text; label.hidden = !text; }
+      if (text) node.dataset.ref = text;
+      else delete node.dataset.ref;
+    });
+    root.querySelectorAll<HTMLElement>('.wui-note__chord').forEach((node, index) => {
+      const label = node.firstElementChild;
+      if (label) label.textContent = state.chords?.[index]?.label ?? '';
+    });
     const octave = root.querySelector<HTMLElement>('.wui-note__octave');
     if (octave) octave.textContent = state.octaveLabel ?? '';
     if (interactions) interactions.paint(state);
@@ -734,6 +778,7 @@ export function mountNoteSurface(
     destroy(): void {
       if (destroyed) return;
       destroyed = true;
+      releaseLocalization();
       loop.cancel();
       interactions?.detach();
       interactions?.releaseAll();
@@ -770,5 +815,6 @@ export function mountNoteSurface(
       report(error);
     }
   }
+  releaseLocalization = bindLocalization(options.localization, update, () => !destroyed && claim.isCurrent(), options.onError);
   return handle;
 }

@@ -19,3 +19,5 @@ export * from "./timeline";
 export * from "./track-list";
 export * from "./transport";
 export * from "./workbench";
+export {createUILocalization} from './localization';
+export type {UIMessageValues, UIMessage, UIFormatters, UILocalizationOptions, UILocalization, UILocalizationController} from './localization';
