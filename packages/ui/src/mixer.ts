@@ -1,4 +1,4 @@
-import {claimHost} from './internal/lifecycle';
+import {claimHost, createErrorSink, runCleanups} from './internal/lifecycle';
 import {createFader, faderStyle} from './fader';
 import {installStyle} from './internal/style';
 import {addClassNames, clamp01, setParts} from './internal/dom';
@@ -122,11 +122,15 @@ export function mountMixer(
 
   let destroyed = false;
   let unsubscribe: (() => void) | undefined;
+  const report = createErrorSink(options.onError);
   const command = (work: () => Promise<void> | void): void => {
+    if (destroyed) return;
     try {
-      void Promise.resolve(work()).then(update, options.onError);
+      void Promise.resolve(work()).then(update, (error) => {
+        if (!destroyed) report(error);
+      });
     } catch (error) {
-      options.onError?.(error);
+      if (!destroyed) report(error);
     }
   };
 
@@ -181,7 +185,7 @@ export function mountMixer(
       onInput: (value) => command(() => master
         ? binding.setMaster(value)
         : binding.setChannel(current.id, value)),
-      onError: (error) => options.onError?.(error),
+      onError: report,
     });
 
     const label = document.createElement("div");
@@ -298,16 +302,11 @@ export function mountMixer(
   root.replaceChildren(...(transport.childNodes.length ? [transport, board] : [board]));
 
   const strips = new Map<string, Strip>();
-  const releaseStrips = (): void => {
-    for (const strip of strips.values()) strip.destroy();
-    strips.clear();
-    masterStrip?.destroy();
-  };
-
   const update = (): void => {
     if (destroyed) return;
     try {
       const state = binding.snapshot();
+      if (destroyed || !claim.isCurrent()) return;
       const disabled = state.disabled === true;
       channelsBox.tabIndex = state.channels.length ? 0 : -1;
       for (const button of actionButtons) button.disabled = disabled;
@@ -345,7 +344,7 @@ export function mountMixer(
       });
       while (channelsBox.children.length > order.length) channelsBox.lastElementChild?.remove();
     } catch (error) {
-      options.onError?.(error);
+      report(error);
     }
   };
 
@@ -355,11 +354,18 @@ export function mountMixer(
     destroy() {
       if (destroyed) return;
       destroyed = true;
-      unsubscribe?.();
-      releaseStrips();
-      claim.release();
-      root.remove();
-      style?.remove();
+      const stop = unsubscribe;
+      unsubscribe = undefined;
+      const ownedStrips = [...strips.values()];
+      strips.clear();
+      runCleanups([
+        stop,
+        ...ownedStrips.map((strip) => () => strip.destroy()),
+        () => masterStrip?.destroy(),
+        () => claim.release(),
+        () => root.remove(),
+        () => style?.remove(),
+      ], report);
     },
   };
   // Claim the host before destroying the previous mount: its cleanup may mount
@@ -377,6 +383,17 @@ export function mountMixer(
     return handle;
   }
   update();
-  if (binding.subscribe) unsubscribe = binding.subscribe(update);
+  if (destroyed || !claim.isCurrent()) return handle;
+  if (binding.subscribe) {
+    try {
+      const stop = binding.subscribe(update);
+      // A synchronous notification may destroy or replace this mount before
+      // registration returns its disposer. Do not retain that late resource.
+      if (destroyed || !claim.isCurrent()) runCleanups([stop], report);
+      else unsubscribe = stop;
+    } catch (error) {
+      report(error);
+    }
+  }
   return handle;
 }

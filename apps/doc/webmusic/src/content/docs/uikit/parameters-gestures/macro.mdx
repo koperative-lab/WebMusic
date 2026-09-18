@@ -69,14 +69,14 @@ The entry exports both `mountMacro()` and `mountMacroRack()`.
 |---|---|---|
 | `snapshot()` | `() => MacroState` | Required pull port read on mount and every update. |
 | `setValue(value)` | `(number) => void \| Promise<void>` | Required command delegated by the nested normalized parameter control. |
-| `subscribe?(notify)` | `(notify: () => void) => () => void` | Optional external-state subscription released on destruction. |
+| `subscribe?(notify)` | `(notify: () => void) => () => void` | Optional subscription released once on destruction, including when registration returns after a synchronous replacement. |
 
 **Options**
 
 | Member | Kind | Default | Description |
 |---|---|---|---|
-| `mountMacro: onError` | `(error: unknown) => void` | — | Receives macro read/update failures and errors forwarded by the nested parameter presenter. |
-| `mountMacroRack: onError` | `(error: unknown) => void` | — | Forwarded to every child macro. |
+| `mountMacro: onError` | `(error: unknown) => void` | — | Receives read/update, subscription and cleanup failures, plus nested parameter errors. Callback throws/rejections are contained. A failed subscription leaves explicit `update()` available. |
+| `mountMacroRack: onError` | `(error: unknown) => void` | — | Receives child errors and rack cleanup failures; callback throws/rejections are contained. |
 | `mountMacroRack: classNames` | `MacroRackClassNames` | `{}` | Adds compatibility classes to rack `root` and each `item` host. |
 | `mountMacroRack: parts` | `MacroRackParts` | `{}` | Adds part tokens to rack `root` and each `item` host. |
 | `stylesheet` | `boolean` | `true` | Installs the presenter and nested macro/parameter stylesheets unless explicitly `false`. Applies to both mounts. |
@@ -87,7 +87,7 @@ The entry exports both `mountMacro()` and `mountMacroRack()`.
 |---|---|---|
 | `element` | `HTMLElement` | `.wui-macro` for one macro or `.wui-macro-rack` for a compound rack. |
 | `update()` | `() => void` | Re-reads one binding; the rack variant forwards to all child handles. |
-| `destroy()` | `() => void` | Idempotently removes subscriptions, nested controls, roots and installed styles. |
+| `destroy()` | `() => void` | Idempotently releases subscriptions, nested controls, roots and installed styles. Cleanup continues after a failure, including for sibling rack items. Pending command results are ignored; bindings remain caller-owned. |
 | `rack.items` | `readonly MacroHandle[]` | Stable child handle array in binding order. |
 | `rack.item(index)` | `(number) => MacroHandle \| undefined` | Returns the child at an index without exposing private wrappers. |
 

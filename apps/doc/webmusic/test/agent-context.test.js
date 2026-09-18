@@ -115,9 +115,9 @@ describe('agent context release and output contracts', () => {
   });
 
   it('generates deterministic references for root and Pages deployments', async () => {
-    const plain = await generateAgentContext({root, site: 'https://docs.example.test', base: '/'});
-    const repeated = await generateAgentContext({root, site: 'https://docs.example.test', base: '/'});
-    const pages = await generateAgentContext({root, site: 'https://docs.example.test', base: '/WebMusic/'});
+    const plain = await generateAgentContext({mode: 'development', root, site: 'https://docs.example.test', base: '/'});
+    const repeated = await generateAgentContext({mode: 'development', root, site: 'https://docs.example.test', base: '/'});
+    const pages = await generateAgentContext({mode: 'development', root, site: 'https://docs.example.test', base: '/WebMusic/'});
     expect([...plain.files]).toEqual([...repeated.files]);
     expect(pages.files.get('llms.txt')).toContain('https://docs.example.test/WebMusic/agent-context/quick-start.md');
     expect(plain.files.get('llms.txt')).toContain('https://docs.example.test/agent-context/quick-start.md');
@@ -125,7 +125,11 @@ describe('agent context release and output contracts', () => {
     expect(pages.files.get('agent-context/uikit/catalog.md')).toContain('| Presenter | Group | Purpose |');
     expect(pages.files.get('agent-context/uikit/catalog.md')).toContain('@webmusic/ui/transport');
     expect(pages.files.get('agent-context/score/api/play.md')).toContain('renderScoreToBuffer');
-    expect(pages.manifest.release.packages).toEqual({'@webmusic/kernel': '0.1.0', '@webmusic/ui': '0.1.0', '@webmusic/score': '0.1.0'});
+    expect(pages.manifest.development.packages).toEqual({'@webmusic/kernel': '0.1.0', '@webmusic/ui': '0.1.0', '@webmusic/score': '0.1.0'});
+    expect(pages.manifest.release).toBeNull();
+    expect(pages.manifest.mode).toBe('development');
+    expect(pages.files.get('llms.txt')).toContain('UNRELEASED DEVELOPMENT SNAPSHOT');
+    expect(pages.files.get('agent-context/score/api/react.md')).not.toContain('Release compatibility:');
     expect(pages.manifest.inputs.every((input) => !input.source.includes('.dev/') && !input.source.endsWith('/AGENTS.md'))).toBe(true);
     expect([...await declaredAgentContextPaths({root})].sort()).toEqual([...pages.files.keys()].map((name) => `/${name}`).sort());
   });
@@ -147,16 +151,20 @@ describe('agent context release and output contracts', () => {
       await mkdir(path.dirname(path.join(directory, source)), {recursive: true});
       await cp(path.join(root, source), path.join(directory, source), {recursive: true});
     }
-    const generated = await generateAgentContext({root: directory});
+    const generated = await generateAgentContext({mode: 'development', root: directory});
     expect(generated.files.get('agent-context/quick-start.md')).toContain('mountQuickStartStatus');
     expect(generated.files.has('llms.txt')).toBe(true);
     expect(generated.manifest.inputs.some((input) => input.source.startsWith('.'))).toBe(false);
+    await write(directory, 'platform/kernel/src/development-preview-test.ts', 'export const preview = true;\n');
+    const updated = await generateAgentContext({root: directory, mode: 'development'});
+    expect(updated.manifest.development.revision).not.toBe(generated.manifest.development.revision);
+    await expect(generateAgentContext({root: directory})).rejects.toThrow(/release baseline mismatch/);
     await write(directory, 'apps/doc/webmusic/scripts/agent-context-catalog.mjs', '// A reviewed recipe selection change.\n');
-    expect((await generateAgentContext({root: directory})).manifest.documentationRevision).not.toBe(generated.manifest.documentationRevision);
+    expect((await generateAgentContext({mode: 'development', root: directory})).manifest.documentationRevision).not.toBe(generated.manifest.documentationRevision);
   });
 
   it('separates task discovery, complete references, components and focused patterns', async () => {
-    const {files, manifest} = await generateAgentContext({root});
+    const {files, manifest} = await generateAgentContext({mode: 'development', root});
     const full = files.get('llms-full.txt');
     const patterns = files.get('llms-patterns.txt');
     const bundles = Object.fromEntries(manifest.bundles.map((bundle) => [bundle.id, bundle]));
@@ -168,6 +176,8 @@ describe('agent context release and output contracts', () => {
     expect(bundles.patterns.sections.find(({title}) => title === 'Style a custom music interface').headings).toContain('Theme with CSS custom properties');
     expect(patterns).toContain('<score-view player="#shared-player">');
     expect(patterns).toContain('## Customize With Hooks');
+    expect(patterns).toContain('<StaffView playback={playback} />');
+    expect(patterns).toContain('## Render readiness and failures');
     expect(patterns).toContain('## Parse in a Worker');
     expect(patterns).not.toContain('## API Reference — @webmusic/score/io');
     expect(patterns).not.toContain('| `.resolvedScore`');
@@ -184,7 +194,7 @@ describe('agent context release and output contracts', () => {
   });
 
   it('links stable component IDs to verified owning sources and contracts', async () => {
-    const {files, manifest} = await generateAgentContext({root});
+    const {files, manifest} = await generateAgentContext({mode: 'development', root});
     const catalog = JSON.parse(files.get(manifest.catalog));
     expect(catalog.license).toEqual({id: 'MIT', output: 'agent-context/LICENSE.txt'});
     expect(files.get(catalog.license.output)).toBe(await readFile(path.join(root, 'LICENSE'), 'utf8'));

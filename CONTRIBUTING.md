@@ -109,9 +109,12 @@ npm run pages:build
 
 Snippet checks compile supported examples against built declarations; rebuild
 packages first when their source changed. They do not execute examples or prove
-complete API coverage. `docs:build` builds the normal production site;
-`pages:build` validates the `/WebMusic/` deployment base. Inspect the changed
-pages in a browser as well. Both commands produce local output without deploying.
+complete API coverage. `docs:build` builds the site with unreleased development
+context. `pages:build` validates the `/WebMusic/` deployment base and defaults
+to verified-release context. For unreleased source changes, run
+`WEBMUSIC_AGENT_CONTEXT=development npm run pages:build` to validate that base
+without claiming release compatibility. Inspect the changed pages in a browser
+as well. These commands produce local output without deploying.
 
 `docs:sync` updates local indexes only when `.dev/` already exists. It does not
 create a development directory in a public checkout. `check:dev-docs` always
@@ -131,6 +134,11 @@ run with the documentation workspace tests; output verification runs during
 each site build. When a released API changes, review and update the generator's
 release baseline deliberately, along with the skill's compatibility metadata.
 Package version numbers alone do not establish a matching release contract.
+The local development server and `docs:build` mark context as an unreleased
+snapshot with `release: null`; release Skill lookups reject it. The default
+Pages build still checks the retained release baseline. Non-main CI explicitly
+uses development context; main deployment keeps release verification. Do not
+refresh the release fingerprint merely to make an unreleased build pass.
 The skill's six read-only Node scripts use the generated manifest and catalog
 to retrieve documentation, selected source files and styling references.
 Keep catalog paths, content hashes and task selections synchronized in the

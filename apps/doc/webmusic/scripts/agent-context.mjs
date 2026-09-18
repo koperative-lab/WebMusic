@@ -321,9 +321,24 @@ export function patternSections(markdown, names, filename) {
   }).join('\n\n');
 }
 
-export async function generateAgentContext({root = defaultRoot, site = 'https://koperative-lab.github.io', base = '/'} = {}) {
+async function developmentSnapshot(root) {
+  const packages = [];
+  for (const directory of packageDirectories) {
+    const manifest = await readPublic(root, `${directory}/package.json`);
+    const {name, version} = JSON.parse(manifest);
+    const source = [];
+    for (const relative of await walkFiles(path.join(root, directory, 'src'))) {
+      source.push([relative, digest(await readPublic(root, `${directory}/src/${relative}`))]);
+    }
+    packages.push({name, version, directory, manifestSha256: digest(manifest), sourceSha256: digest(json(source))});
+  }
+  return {commit: null, revision: digest(json(packages)), packages};
+}
+
+export async function generateAgentContext({root = defaultRoot, site = 'https://koperative-lab.github.io', base = '/', mode = 'release'} = {}) {
+  if (mode !== 'release' && mode !== 'development') throw new Error(`Unknown agent context mode: ${mode}`);
   root = path.resolve(root);
-  const release = await verifyReleaseBaseline({root});
+  const release = mode === 'release' ? await verifyReleaseBaseline({root}) : await developmentSnapshot(root);
   const url = urls(site, base);
   const inputs = new Map();
   // Curated membership and extraction logic change the documentation product
@@ -351,9 +366,13 @@ export async function generateAgentContext({root = defaultRoot, site = 'https://
     const output = pageOutput(relative);
     const record = {title: page.title, description: page.description, source: filename, route: pageRoute(relative), canonical, output, url: url.absolute(output), package: owner, version: owner ? packageVersions[owner] : null};
     pages.push(record);
-    files.set(output, `# ${page.title}\n\n${page.description ? `> ${page.description}\n\n` : ''}Canonical documentation: ${canonical}\n\nRelease compatibility: ${Object.entries(owner ? {[owner]: packageVersions[owner]} : packageVersions).map(([name, version]) => `${name}@${version}`).join(', ')}. Source baseline: ${release.commit}.\n\n${page.body}`);
+    const provenance = mode === 'release'
+      ? `Release compatibility: ${Object.entries(owner ? {[owner]: packageVersions[owner]} : packageVersions).map(([name, version]) => `${name}@${version}`).join(', ')}. Source baseline: ${release.commit}.`
+      : `UNRELEASED DEVELOPMENT SNAPSHOT: ${release.revision}. These APIs describe this source checkout; declared package versions do not establish published compatibility.`;
+    files.set(output, `# ${page.title}\n\n${page.description ? `> ${page.description}\n\n` : ''}Canonical documentation: ${canonical}\n\n${provenance}\n\n${page.body}`);
   }
   const catalog = componentCatalog(pages, presenters.UI_PRESENTER_CATALOG, composition.UI_COMPOSITION_CATALOG);
+  if (mode === 'development') catalog.sourceScope = 'Selected owning implementation files in an unreleased development snapshot; imports and internal selectors are not public entry points.';
   for (const source of catalogSourcePaths(catalog)) {
     assertPublicRuntimeSource(source, release);
     files.set(sourceOutput(source), await readPublic(root, source, inputs));
@@ -365,7 +384,9 @@ export async function generateAgentContext({root = defaultRoot, site = 'https://
   files.set(licenseOutput, await readPublic(root, 'LICENSE', inputs));
   const inputsList = [...inputs].sort(([a], [b]) => compare(a, b)).map(([source, sha256]) => ({source, sha256}));
   const documentationRevision = digest(json(inputsList));
-  const compatibility = `This context covers ${Object.entries(packageVersions).map(([name, version]) => `${name}@${version}`).join(', ')}. Runtime sources and package manifests match release ${release.commit}; documentation revision ${documentationRevision}. Check installed exports and declarations before coding. This is the current verified release, not an archive of arbitrary versions.`;
+  const compatibility = mode === 'release'
+    ? `This context covers ${Object.entries(packageVersions).map(([name, version]) => `${name}@${version}`).join(', ')}. Runtime sources and package manifests match release ${release.commit}; documentation revision ${documentationRevision}. Check installed exports and declarations before coding. This is the current verified release, not an archive of arbitrary versions.`
+    : `UNRELEASED DEVELOPMENT SNAPSHOT: ${release.revision}; documentation revision ${documentationRevision}. This context describes the current source checkout. Declared manifest versions (${Object.entries(packageVersions).map(([name, version]) => `${name}@${version}`).join(', ')}) are not a compatibility claim for published packages. The release Skill refuses this preview; use the verified published context for installed releases.`;
   const selection = new Map();
   // Put orientation first, followed by task groups in a stable order.
   for (const page of [...pages].sort((a, b) => (functionalIndexGroup(a) === 'Start here and choose an integration' ? -1 : 0) - (functionalIndexGroup(b) === 'Start here and choose an integration' ? -1 : 0))) {
@@ -392,7 +413,9 @@ export async function generateAgentContext({root = defaultRoot, site = 'https://
     files.set(bundle.output, `# ${bundle.title}\n\n> ${bundle.description}\n\n${compatibility}\n\n[Documentation index](${url.absolute(contextFiles.index)})\n\n${body}\n`);
   }
   const manifest = {
-    schemaVersion: 1, release: {commit: release.commit, packages: packageVersions, verification: 'runtime-source-and-manifest-sha256'},
+    schemaVersion: 1, mode,
+    release: mode === 'release' ? {commit: release.commit, packages: packageVersions, verification: 'runtime-source-and-manifest-sha256'} : null,
+    ...(mode === 'development' ? {development: {revision: release.revision, packages: packageVersions, fingerprints: release.packages}} : {}),
     documentationRevision, site: new URL(site).origin, base: url.prefix,
     extraction: {interactiveDemos: 'canonical-page-link', staticCode: 'preserved', mdxExpressions: 'literal-only', catalogComponents: 'static-tables'},
     inputs: inputsList, pages, bundles, catalog: catalogOutput, license: catalog.license,
@@ -430,7 +453,8 @@ export async function verifyAgentContextOutput(directory, generated) {
   }
 }
 
-export function agentContext() {
+export function agentContext({mode = 'release'} = {}) {
+  if (mode !== 'release' && mode !== 'development') throw new Error(`Unknown agent context mode: ${mode}`);
   let root = defaultRoot;
   let site = 'https://koperative-lab.github.io';
   let base = '/';
@@ -453,7 +477,7 @@ export function agentContext() {
           const relative = pathname.startsWith(prefix) ? pathname.slice(prefix.length) : pathname.replace(/^\//, '');
           if (!Object.values(contextFiles).includes(relative) && !relative.startsWith('agent-context/')) return next();
           try {
-            const generated = await generateAgentContext({root, site, base});
+            const generated = await generateAgentContext({root, site, base, mode: 'development'});
             const contents = generated.files.get(relative);
             if (contents === undefined) return next();
             response.setHeader('Content-Type', relative.endsWith('.json') ? 'application/json; charset=utf-8' : 'text/plain; charset=utf-8');
@@ -464,13 +488,13 @@ export function agentContext() {
       },
       'astro:build:done': async ({dir, logger}) => {
         const directory = fileURLToPath(dir);
-        const generated = await generateAgentContext({root, site, base});
+        const generated = await generateAgentContext({root, site, base, mode});
         for (const [relative, contents] of generated.files) {
           await mkdir(path.dirname(path.join(directory, relative)), {recursive: true});
           await writeFile(path.join(directory, relative), contents);
         }
         await verifyAgentContextOutput(directory, generated);
-        logger.info(`Agent context verified ${generated.manifest.pages.length} public Markdown references, four llms files and the Skill catalog.`);
+        logger.info(`Agent context (${mode}) verified ${generated.manifest.pages.length} public Markdown references, four llms files and the catalog.`);
       },
     },
   };

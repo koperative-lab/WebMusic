@@ -365,25 +365,31 @@ export async function renderOSMDStaffVisualizer(
     });
   };
 
+  const redrawAtTime = (seconds: number, scrollIntoView?: boolean): null => {
+    if (!ownsOSMD()) return null;
+    if (!Number.isFinite(seconds)) throw new RangeError('Score view time must be finite.');
+    if (scrollIntoView === false) invalidateScroll();
+    if (!cursorVisible) {
+      cursorVisible = true;
+      cursor?.show?.();
+    }
+    const ticks = secondsToTick(score, seconds);
+    const moved = moveCursorTo(ticks / DEFAULT_PPQ / 4); // ticks -> quarters -> whole notes
+    if (moved && (scrollIntoView ?? options.followCursor ?? true)) scheduleScrollIntoView();
+    return null;
+  };
+
   return {
     noteSequence,
     visualizer: osmd,
+    redrawAtTime,
     redraw(activeNote?: ScoreSequenceNote, scrollIntoView?: boolean): number | null {
       if (!ownsOSMD()) return null;
       // A caller can withdraw a pending scroll without clearing or moving the
       // cursor. This also handles a note-off repaint before the queued frame.
       if (scrollIntoView === false) invalidateScroll();
       if (!activeNote) return null;
-      if (!cursorVisible) {
-        cursorVisible = true;
-        cursor?.show?.();
-      }
-      const ticks = secondsToTick(score, activeNote.startTime ?? 0);
-      const moved = moveCursorTo(ticks / DEFAULT_PPQ / 4); // ticks -> quarters -> whole notes
-      if (moved && (scrollIntoView ?? options.followCursor ?? true)) {
-        scheduleScrollIntoView();
-      }
-      return null;
+      return redrawAtTime(activeNote.startTime ?? 0, scrollIntoView);
     },
     clearActiveNotes(): void {
       if (!ownsOSMD()) return;

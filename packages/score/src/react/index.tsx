@@ -28,3 +28,4 @@ export {
   type StaffViewProps,
   type ViewProps,
 } from './views';
+export type {ScoreViewRenderState, ScoreViewRenderStatus, ScoreViewRenderPhase} from '../view/render';

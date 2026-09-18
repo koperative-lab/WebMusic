@@ -1,41 +1,21 @@
 import React from 'react';
-import {noteMidi, noteOnsetSeconds, type Score} from '../core';
-import type {Player} from '../play/headless';
 import {
-  bindPlayerToVisualizer,
   renderOSMDStaffVisualizer,
   renderPianoRollVisualizer,
   renderStaffVisualizer,
   renderWaterfallVisualizer,
   type OSMDStaffOptions,
 } from '../view/render';
-import type {RenderedScoreVisualizer, ViewLayoutOptions} from '../view/api';
-import {useCursor, usePlayer, useScore} from './context';
+import type {ViewLayoutOptions} from '../view/api';
+import {useCursor, usePlayer} from './context';
 import {componentSurfaceStyle} from './surface';
+import {useScoreViewRenderer, type ReactScoreRenderer, type ReactScoreViewSource} from './view-lifecycle';
 
 const stageSurfaceStyle = componentSurfaceStyle('stage');
 const transportSurfaceStyle = componentSurfaceStyle('transport');
 
-/**
- * Wire a `@webmusic/score/play` Player's noteOn/end events to a rendered visualizer
- * via the shared `bindPlayerToVisualizer` helper. Returns an unbind function
- * that also clears any remaining highlight.
- */
-function bindPlayer(rendered: RenderedScoreVisualizer, player: Player, score: Score): () => void {
-  return bindPlayerToVisualizer(rendered, ({noteOn, end}) => {
-    const offNoteOn = player.on('noteOn', (note) =>
-      noteOn(noteMidi(note), noteOnsetSeconds(note, score)),
-    );
-    const offEnd = player.on('end', end);
-    return () => {
-      offNoteOn();
-      offEnd();
-    };
-  });
-}
-
-export interface ViewProps extends ViewLayoutOptions {
-  /** Show score expression directions in the scrolling renderers; default true. OSMD uses its own options. */
+export interface ViewProps extends ViewLayoutOptions, ReactScoreViewSource {
+  /** Show score expression directions; default true. OSMD uses its own options. */
   showAnnotations?: boolean;
   /** CSS width or numeric pixel width. Defaults to the containing block. */
   width?: number | string;
@@ -48,206 +28,85 @@ export interface ViewProps extends ViewLayoutOptions {
 }
 
 export interface StaffViewProps extends ViewProps {
-  /**
-   * Render page notation with OpenSheetMusicDisplay instead of the scrolling staff renderer.
-   * Pass `toMusicXML` (e.g. `serializeMusicXML` from `@webmusic/score/io`) and,
-   * if not installed as a peer, the `OpenSheetMusicDisplay` constructor.
-   */
+  /** Optional page engraving. Supply MusicXML or a converter and the optional OSMD peer. */
   osmd?: OSMDStaffOptions;
 }
 
 export function PianoRollView({
-  width = '100%',
-  height = 240,
-  className,
-  style,
-  ariaLabel = 'Piano roll',
-  ...layoutOptions
+  width = '100%', height = 240, className, style, ariaLabel = 'Piano roll',
+  score, playback, onStateChange, laneHeight, pixelsPerSecond, showAnnotations,
 }: ViewProps) {
-  const score = useScore();
-  const player = usePlayer();
-  const svgRef = React.useRef<SVGSVGElement>(null);
-
-  React.useEffect(() => {
-    if (!svgRef.current) return;
-    const rendered = renderPianoRollVisualizer(score, svgRef.current, {
-      noteHeight: layoutOptions.laneHeight,
-      pixelsPerSecond: layoutOptions.pixelsPerSecond,
-      showAnnotations: layoutOptions.showAnnotations,
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const renderer = React.useCallback<ReactScoreRenderer>((currentScore, surface) => {
+    const svg = surface.ownerDocument.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('width', '100%');
+    svg.setAttribute('height', String(height));
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('focusable', 'false');
+    svg.style.display = 'block';
+    surface.append(svg);
+    return renderPianoRollVisualizer(currentScore, svg, {
+      noteHeight: laneHeight, pixelsPerSecond, showAnnotations,
     });
-    const unbind = bindPlayer(rendered, player, score);
-    return () => {
-      unbind();
-      // Undo the visualizer's DOM side effects: it reparents the svg into a
-      // scroll-viewport wrapper; dispose restores the svg under our ref's
-      // original parent and removes the wrapper + drawn notes.
-      rendered.dispose?.();
-    };
-  }, [score, player, layoutOptions.laneHeight, layoutOptions.pixelsPerSecond, layoutOptions.showAnnotations]);
-
-  // The renderer reparents the SVG into its horizontal scroll viewport. Keep
-  // the public surface on this stable wrapper so the frame stays fixed around
-  // the viewport instead of becoming part of the full-width scrolling score.
-  // No viewBox on the SVG: the visualizer owns its explicit content size.
-  return (
-    <div
-      className={className}
-      style={{...stageSurfaceStyle, width, maxWidth: '100%', ...style}}
-      role="img"
-      aria-label={ariaLabel}
-    >
-      <svg
-        ref={svgRef}
-        width="100%"
-        height={height}
-        style={{display: 'block'}}
-        aria-hidden="true"
-        focusable="false"
-      />
-    </div>
-  );
+  }, [height, laneHeight, pixelsPerSecond, showAnnotations]);
+  useScoreViewRenderer(containerRef, {score, playback, onStateChange}, 'piano-roll', renderer);
+  return <div ref={containerRef} className={className}
+    style={{...stageSurfaceStyle, width, maxWidth: '100%', ...style}}
+    role="img" aria-label={ariaLabel} />;
 }
 
 export function StaffView({
-  width = '100%',
-  height = 220,
-  className,
-  style,
-  ariaLabel = 'Musical staff',
-  osmd,
-  ...layoutOptions
+  width = '100%', height = 220, className, style, ariaLabel = 'Musical staff', osmd,
+  score, playback, onStateChange, laneHeight, pixelsPerSecond, showAnnotations,
 }: StaffViewProps) {
-  const score = useScore();
-  const player = usePlayer();
   const containerRef = React.useRef<HTMLDivElement>(null);
-
-  // `osmd` is an options object that callers usually write inline, so its
-  // identity changes every parent render. Using it directly in the effect deps
-  // would tear down and re-render OSMD constantly. Behavior: the latest `osmd`
-  // object is kept in a ref and only switching OSMD on/off re-renders the
-  // staff; changes *inside* an existing osmd options object are ignored until
-  // the view re-renders for another reason (remount with a `key` to force it).
+  // Preserve the existing options contract: inline object identity does not
+  // restart OSMD. Remount to apply changed options within an enabled mode.
   const osmdRef = React.useRef(osmd);
   osmdRef.current = osmd;
   const osmdEnabled = Boolean(osmd);
-
-  React.useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    // Every render generation owns an isolated staging root. Detach the old
-    // root before a replacement starts so a late async OSMD load can only
-    // render/clear detached DOM, never overwrite the current score.
-    const staging = document.createElement('div');
-    staging.style.width = '100%';
-    staging.style.minHeight = '100%';
-    container.replaceChildren(staging);
-
-    let disposed = false;
-    let unbind: (() => void) | undefined;
-    let renderedVisualizer: RenderedScoreVisualizer | undefined;
-    let cancelPendingRender: (() => void) | undefined;
-
-    const bind = (rendered: RenderedScoreVisualizer): void => {
-      renderedVisualizer = rendered;
-      unbind = bindPlayer(rendered, player, score);
-    };
-
-    const osmdOptions = osmdRef.current;
-    if (osmdEnabled && osmdOptions) {
-      const controller = new AbortController();
-      const externalSignal = osmdOptions.signal;
-      const abortFromCaller = (): void => controller.abort(externalSignal?.reason);
-      if (externalSignal?.aborted) abortFromCaller();
-      else externalSignal?.addEventListener('abort', abortFromCaller, {once: true});
-      cancelPendingRender = () => {
-        externalSignal?.removeEventListener('abort', abortFromCaller);
-        controller.abort();
-      };
-      // OSMD renders asynchronously (load + render); guard against unmount.
-      renderOSMDStaffVisualizer(score, staging, {...osmdOptions, signal: controller.signal})
-        .then((rendered) => (disposed ? rendered.dispose?.() : bind(rendered)))
-        .catch((error) => {
-          if (!disposed && !isAbortError(error)) {
-            console.error('[WebScore] OSMD staff render failed', error);
-          }
-        });
-    } else {
-      bind(
-        renderStaffVisualizer(score, staging, {
-          noteHeight: layoutOptions.laneHeight,
-          pixelsPerSecond: layoutOptions.pixelsPerSecond ?? 0,
-          showAnnotations: layoutOptions.showAnnotations,
-        }),
-      );
+  const renderer = React.useCallback<ReactScoreRenderer>((currentScore, surface, signal) => {
+    const options = osmdRef.current;
+    if (!osmdEnabled || !options) {
+      return renderStaffVisualizer(currentScore, surface, {
+        noteHeight: laneHeight, pixelsPerSecond: pixelsPerSecond ?? 0, showAnnotations,
+      });
     }
-
-    return () => {
-      disposed = true;
-      // Invalidate a pending shared/injected OSMD generation before the next
-      // renderer is installed. Its load cannot be force-cancelled, but its
-      // eventual render/clear is now stale and inert.
-      cancelPendingRender?.();
-      if (staging.parentNode === container) staging.remove();
-      unbind?.();
-      // dispose() removes the OSMD resize listener / scrolling staff layers; the
-      // replaceChildren is a belt-and-braces sweep of anything left behind.
-      renderedVisualizer?.dispose?.();
-      staging.replaceChildren();
+    const controller = new AbortController();
+    const externalSignal = options.signal;
+    const abortExternal = (): void => controller.abort(externalSignal?.reason);
+    const abortOwned = (): void => {
+      controller.abort(signal.reason);
+      externalSignal?.removeEventListener('abort', abortExternal);
     };
-  }, [score, player, osmdEnabled, layoutOptions.laneHeight, layoutOptions.pixelsPerSecond, layoutOptions.showAnnotations]);
-
-  return (
-    <div
-      ref={containerRef}
-      className={className}
-      style={{...stageSurfaceStyle, width, height, overflow: 'auto', ...style}}
-      role="img"
-      aria-label={ariaLabel}
-    />
-  );
-}
-
-function isAbortError(error: unknown): boolean {
-  return error instanceof Error && error.name === 'AbortError';
+    if (signal.aborted) abortOwned();
+    else signal.addEventListener('abort', abortOwned, {once: true});
+    if (externalSignal?.aborted) abortExternal();
+    else externalSignal?.addEventListener('abort', abortExternal, {once: true});
+    return renderOSMDStaffVisualizer(currentScore, surface, {...options, signal: controller.signal})
+      .finally(() => {
+        signal.removeEventListener('abort', abortOwned);
+        externalSignal?.removeEventListener('abort', abortExternal);
+      });
+  }, [osmdEnabled, laneHeight, pixelsPerSecond, showAnnotations]);
+  useScoreViewRenderer(containerRef, {score, playback, onStateChange}, 'staff', renderer);
+  return <div ref={containerRef} className={className}
+    style={{...stageSurfaceStyle, width, height, overflow: 'auto', ...style}}
+    role="img" aria-label={ariaLabel} />;
 }
 
 export function WaterfallView({
-  width = '100%',
-  height = 320,
-  className,
-  style,
-  ariaLabel = 'Waterfall score view',
-  ...layoutOptions
+  width = '100%', height = 320, className, style, ariaLabel = 'Waterfall score view',
+  score, playback, onStateChange, laneHeight, pixelsPerSecond, showAnnotations,
 }: ViewProps) {
-  const score = useScore();
-  const player = usePlayer();
   const containerRef = React.useRef<HTMLDivElement>(null);
-
-  React.useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    const rendered = renderWaterfallVisualizer(score, container, {
-      noteHeight: layoutOptions.laneHeight,
-      pixelsPerSecond: layoutOptions.pixelsPerSecond,
-      showAnnotations: layoutOptions.showAnnotations,
-    });
-    const unbind = bindPlayer(rendered, player, score);
-    return () => {
-      unbind();
-      rendered.dispose?.();
-      container.replaceChildren();
-    };
-  }, [score, player, layoutOptions.laneHeight, layoutOptions.pixelsPerSecond, layoutOptions.showAnnotations]);
-
-  return (
-    <div
-      ref={containerRef}
-      className={className}
-      style={{...stageSurfaceStyle, width, height, overflow: 'hidden', ...style}}
-      role="img"
-      aria-label={ariaLabel}
-    />
-  );
+  const renderer = React.useCallback<ReactScoreRenderer>((currentScore, surface) => renderWaterfallVisualizer(currentScore, surface, {
+    noteHeight: laneHeight, pixelsPerSecond, showAnnotations,
+  }), [laneHeight, pixelsPerSecond, showAnnotations]);
+  useScoreViewRenderer(containerRef, {score, playback, onStateChange}, 'waterfall', renderer);
+  return <div ref={containerRef} className={className}
+    style={{...stageSurfaceStyle, width, height, overflow: 'hidden', ...style}}
+    role="img" aria-label={ariaLabel} />;
 }
 
 export function PlayerControls({className}: {className?: string}) {

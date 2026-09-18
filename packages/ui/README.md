@@ -452,7 +452,10 @@ They establish the behavior callers should account for, not a prioritized backlo
   subset suited to their input and rendering model. Notably transport has no
   command revisions, so an out-of-order settlement repaints unconditionally;
   stage and minimap do own their resize observers, subscriptions and animation
-  cleanup.
+  cleanup. Mixer, Macro (including MacroRack) and Recorder contain subscription
+  failures and finish releasing their owned resources even when a disposer or
+  error callback throws. A subscription returned after synchronous replacement
+  is released immediately; destroyed handles ignore pending command results.
 - **Optimistic isolation is an lfo guarantee, not a package guarantee.** In eq
   and parameter any update repaints every control from the authoritative
   snapshot, discarding a sibling's in-flight optimistic paint.

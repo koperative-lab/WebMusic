@@ -144,6 +144,8 @@ it('rejects unsupported releases and missing output from incomplete snapshots', 
   changed.release.packages['@webmusic/score'] = '0.2.0';
   await writeFile(path.join(mismatch, 'agent-context/manifest.json'), json(changed));
   expect((await cli('get_docs', ['index'], mismatch)).stderr).toContain('Unsupported context version');
+  await writeFile(path.join(mismatch, 'agent-context/manifest.json'), json({...manifest, mode: 'development', release: null}));
+  expect((await cli('get_docs', ['index'], mismatch)).stderr).toContain('Unreleased development context');
   await writeFile(path.join(mismatch, 'agent-context/manifest.json'), json(manifest));
   await rm(path.join(mismatch, 'llms.txt'));
   expect((await cli('get_docs', ['index'], mismatch)).stderr).toContain('Missing context file');

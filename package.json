@@ -34,7 +34,7 @@
     "check": "npm run check:source && npm run check:licenses && npm run check:packages && npm run check:release-manifests",
     "release:prepare": "node scripts/release-manifests.mjs --write",
     "docs:dev": "npm run dev -w webmusic-doc",
-    "docs:build": "npm run build:packages && npm run build -w webmusic-doc",
+    "docs:build": "npm run build:packages && WEBMUSIC_AGENT_CONTEXT=development npm run build -w webmusic-doc",
     "pages:build": "npm run build:packages && DOCS_SITE=https://koperative-lab.github.io DOCS_BASE=/WebMusic/ npm run build -w webmusic-doc && node scripts/prefix-docs-base.mjs apps/doc/webmusic/dist /WebMusic && node scripts/site-notices.mjs --check",
     "audit:dependencies": "npm audit --audit-level=high",
     "check:assets": "node scripts/demo-assets.mjs --check && node --test scripts/demo-assets.test.mjs",

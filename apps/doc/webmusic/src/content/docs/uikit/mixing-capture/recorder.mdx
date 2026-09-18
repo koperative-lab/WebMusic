@@ -78,14 +78,14 @@ when `takeCount` is defined, then `Ready`.
 | `toggleRecording()` | `() => void \| Promise<void>` | Required command called by the record toggle in both directions. |
 | `togglePlayback?()` | `() => void \| Promise<void>` | Optional command. Its presence creates the playback toggle. |
 | `export?(format)` | `(string) => void \| Promise<void>` | Optional command receiving the clicked `exportFormats` id. |
-| `subscribe?(notify)` | `(notify: () => void) => () => void` | Optional subscription. Its disposer is called during destroy or same-host replacement. |
+| `subscribe?(notify)` | `(notify: () => void) => () => void` | Optional subscription. Its disposer is called once during destroy or same-host replacement, including when registration returns after a synchronous replacement. |
 
 **Options**
 
 | Member | Kind | Default | Description |
 |---|---|---|---|
 | `exportFormats` | `readonly {id: string; label: string}[]` | `[]` | Creates one export button per record. `id` is passed to `export()` and added as a class; `label` supplies visible and accessible text. |
-| `onError` | `(error: unknown) => void` | — | Receives snapshot and command errors. Subscription registration/disposal and DOM cleanup errors escape to the caller. |
+| `onError` | `(error: unknown) => void` | — | Receives snapshot, command, subscription and cleanup failures. Error callback throws/rejections are contained. A failed subscription leaves the mounted handle available for explicit `update()` calls. |
 | `stylesheet` | `boolean` | `true` | Installs the presenter's stylesheet unless explicitly `false`, for a light-DOM host that cannot inject CSS into its page. |
 
 **Handle**
@@ -94,7 +94,7 @@ when `takeCount` is defined, then `Ready`.
 |---|---|---|
 | `element` | `HTMLElement` | Presenter-owned `.wui-recorder` root. |
 | `update()` | `() => void` | Re-reads state and repaints every control; becomes a no-op after destruction. |
-| `destroy()` | `() => void` | On its first call, marks the handle destroyed, calls the subscription disposer, then removes root and style; later calls are no-ops. A throwing disposer escapes before DOM removal. |
+| `destroy()` | `() => void` | Releases the subscription, root and style; attempts every cleanup even if one fails, then reports the first failure. Later calls and pending command results are ignored. Recording/playback resources remain caller-owned. |
 
 **Accessibility.** Record is a native button whose dynamic `aria-label`, `aria-pressed`, and
 `aria-busy` mirror capture state. Playback is a native `Play take` button with dynamic

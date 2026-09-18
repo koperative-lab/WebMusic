@@ -5,6 +5,15 @@ work and does not establish npm publication, a release tag or a deployment.
 
 ## Unreleased
 
+- Allow React StaffView, PianoRollView and WaterfallView to render an explicit
+  Score or borrow a playback source without creating a Player. ScoreViewElement
+  accepts a direct playback property alongside its existing selector binding.
+- Expose generation-aware presentation readiness and failures through React
+  onStateChange and ScoreViewElement renderState / webscore:renderstatechange.
+- Complete Mixer, Macro, MacroRack and Recorder cleanup when a subscription,
+  child disposer or error callback fails, including reentrant replacement.
+- Mark local documentation context as an unreleased development snapshot while
+  retaining verified-release checks for publication and release Skill lookups.
 - Prepare the first public source and npm release for `@webmusic/kernel`,
   `@webmusic/ui` and `@webmusic/score`.
 - Include contributor, security, development and release guidance in the public

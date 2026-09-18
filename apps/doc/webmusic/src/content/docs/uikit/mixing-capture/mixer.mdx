@@ -90,7 +90,7 @@ Each `MixerChannel` has this shape:
 | `play?()` | `() => void \| Promise<void>` | Optional command whose presence creates the Play button. |
 | `pause?()` | `() => void \| Promise<void>` | Optional command whose presence creates the Pause button. |
 | `stop?()` | `() => void \| Promise<void>` | Optional command whose presence creates the Stop button. |
-| `subscribe?(notify)` | `(notify: () => void) => () => void` | Optional subscription. Its disposer is called during destroy or same-host replacement. |
+| `subscribe?(notify)` | `(notify: () => void) => () => void` | Optional subscription. Its disposer is called once during destroy or same-host replacement, including when registration returns after a synchronous replacement. |
 
 **Options**
 
@@ -98,7 +98,7 @@ Each `MixerChannel` has this shape:
 |---|---|---|---|
 | `classNames` | `MixerClassNames` | `{}` | Adds compatibility classes for `root`, `transport`, `board`, `channels`, `strip`, `master`, `fader`, `input`, `label`, `actions`, `button`, `mute`, `solo`, `play`, `pause`, and `stop`. `fader` and `input` both reach the one fader node. |
 | `parts` | `MixerParts` | `{}` | Adds tokens with the same keys beside the presenter's canonical part tokens. |
-| `onError` | `(error: unknown) => void` | — | Receives snapshot and command errors. Subscription registration/disposal and DOM cleanup errors escape to the caller. An exception thrown by this callback is not caught. |
+| `onError` | `(error: unknown) => void` | — | Receives snapshot, command, subscription and cleanup failures. Error callback throws/rejections are contained. A failed subscription leaves the mounted handle available for explicit `update()` calls. |
 | `stylesheet` | `boolean` | `true` | Installs the presenter's stylesheet unless explicitly `false`, for a light-DOM host that cannot inject CSS into its page. |
 | `master` | `boolean` | `true` | Render the master strip; `false` leaves only the channel bank. |
 
@@ -108,7 +108,7 @@ Each `MixerChannel` has this shape:
 |---|---|---|
 | `element` | `HTMLElement` | Presenter-owned `.wui-mixer` root. |
 | `update()` | `() => void` | Re-reads state, repaints surviving controls and reconciles channel membership/order; becomes a no-op after destruction. |
-| `destroy()` | `() => void` | On its first call, marks the handle destroyed, calls the subscription disposer, then removes root and style; later calls are no-ops. A throwing disposer escapes before DOM removal. |
+| `destroy()` | `() => void` | Releases the subscription, all faders, root and style; attempts every cleanup even if one fails, then reports the first failure. Later calls and pending command results are ignored. The binding remains caller-owned. |
 
 **Accessibility.** Every fader is a vertical ARIA slider named `<channel label> volume`.
 Mute and solo are native buttons named `Mute <label>` and `Solo <label>` with `aria-pressed`;

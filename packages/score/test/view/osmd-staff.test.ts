@@ -140,6 +140,34 @@ async function renderWith(timestamps: number[]) {
 }
 
 describe('renderOSMDStaffVisualizer cursor sync', () => {
+  it('positions directly from nominal seconds without a note event, retaining bounded seek state', async () => {
+    const {rendered, state} = await renderWith(eighthGrid(1025));
+    rendered.redrawAtTime!(248, false);
+    expect(state.index).toBe(992);
+    const reads = state.timestampReads;
+    rendered.redrawAtTime!(246, false);
+    expect(state.index).toBe(984);
+    expect(state.timestampReads - reads).toBeLessThan(40);
+    expect(state.scrollCalls).toBe(0);
+    rendered.clearActiveNotes();
+    rendered.redrawAtTime!(2, false);
+    expect(state.index).toBe(8);
+    expect(() => rendered.redrawAtTime!(Number.NaN)).toThrow(RangeError);
+    expect(state.index).toBe(8);
+    rendered.dispose?.();
+    rendered.redrawAtTime!(8);
+    expect(state.index).toBe(8);
+  });
+
+  it('maps an in-between time to the next available OSMD cursor position', async () => {
+    const {rendered, state} = await renderWith([0, 0.25, 0.5, 1]);
+    rendered.redrawAtTime!(0.6, false); // 0.3 whole notes lies between cursor positions
+    expect(state.index).toBe(2);
+    rendered.redrawAtTime!(0.1, false);
+    expect(state.index).toBe(1);
+    rendered.dispose?.();
+  });
+
   it('chord-duplicate redraws at the same timestamp cause zero extra cursor calls', async () => {
     const {rendered, state} = await renderWith(eighthGrid(64));
 

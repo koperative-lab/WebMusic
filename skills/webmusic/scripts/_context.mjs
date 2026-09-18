@@ -80,6 +80,7 @@ export async function loadContext(settings) {
 
   const manifest = json(await read('agent-context/manifest.json'), 'Context manifest');
   if (manifest.schemaVersion !== 1 || !Array.isArray(manifest.outputs) || !Array.isArray(manifest.pages)) throw new Error('Unsupported context manifest. Update the skill and context together.');
+  if (manifest.mode === 'development') throw new Error('Unreleased development context is not compatible with this release Skill. Use the verified published context for installed packages.');
   for (const name of packages) {
     if (manifest.release?.packages?.[name] !== '0.1.0') throw new Error(`Unsupported context version for ${name}: ${manifest.release?.packages?.[name] ?? 'missing'}. This skill supports 0.1.0; use matching context and installed package declarations.`);
   }

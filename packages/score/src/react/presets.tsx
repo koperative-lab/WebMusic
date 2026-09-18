@@ -34,7 +34,7 @@ export function SimpleScorePlayer({
   );
 }
 
-export interface SimplePianoRollProps extends ViewProps {
+export interface SimplePianoRollProps extends Omit<ViewProps, 'score' | 'playback'> {
   score: Score;
   playerOptions?: PlayerOptions;
 }
@@ -47,7 +47,7 @@ export function SimplePianoRoll({score, playerOptions, ...viewProps}: SimplePian
   );
 }
 
-export interface SimpleStaffProps extends StaffViewProps {
+export interface SimpleStaffProps extends Omit<StaffViewProps, 'score' | 'playback'> {
   score: Score;
   playerOptions?: PlayerOptions;
 }
@@ -60,7 +60,7 @@ export function SimpleStaff({score, playerOptions, ...viewProps}: SimpleStaffPro
   );
 }
 
-export interface SimpleWaterfallProps extends ViewProps {
+export interface SimpleWaterfallProps extends Omit<ViewProps, 'score' | 'playback'> {
   score: Score;
   playerOptions?: PlayerOptions;
 }

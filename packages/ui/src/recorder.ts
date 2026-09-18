@@ -1,6 +1,6 @@
 import {installStyle} from './internal/style';
 import {clamp01} from './internal/dom';
-import {claimHost} from './internal/lifecycle';
+import {claimHost, createErrorSink, runCleanups} from './internal/lifecycle';
 import {componentSurfaceCss, controlBorderFallback} from './internal/surface';
 import {controlHeight, controlRadius} from './internal/control';
 export interface RecorderState {
@@ -63,12 +63,13 @@ export function mountRecorder(host: RecorderHost, binding: RecorderBinding, opti
   const status = document.createElement('div'); status.className='wui-recorder__status status'; status.setAttribute('part','status');
   root.append(record, ...(binding.togglePlayback ? [play] : []), meter, exports, status);
   let destroyed=false; let unsubscribe:(()=>void)|undefined;
-  const command=(work:()=>Promise<void>|void):void=>{try{void Promise.resolve(work()).then(update,options.onError)}catch(error){options.onError?.(error)}};
+  const report = createErrorSink(options.onError);
+  const command=(work:()=>Promise<void>|void):void=>{if(destroyed)return;try{void Promise.resolve(work()).then(update,(error)=>{if(!destroyed)report(error)})}catch(error){if(!destroyed)report(error)}};
   record.addEventListener('click',()=>command(()=>binding.toggleRecording()));
   play.addEventListener('click',()=>{if(binding.togglePlayback)command(()=>binding.togglePlayback!())});
   for(const format of options.exportFormats??[]){const button=document.createElement('button');button.type='button';button.className=`wui-recorder__button ${format.id}`;button.textContent=`⬇ ${format.label}`;button.setAttribute('aria-label',`Download ${format.label}`);button.addEventListener('click',()=>{if(binding.export)command(()=>binding.export!(format.id))});exports.append(button);exportButtons.push(button)}
-  const update=():void=>{if(destroyed)return;try{const state=binding.snapshot();record.disabled=state.busy===true;record.classList.toggle('armed',state.recording);record.setAttribute('aria-busy',String(state.busy===true));record.setAttribute('aria-pressed',String(state.recording));record.setAttribute('aria-label',state.recording?'Stop recording':'Record');record.textContent=state.recording?'■ Stop':'● Record';play.disabled=!(state.canPlay??state.takeCount!=null);play.classList.toggle('on',state.playing===true);play.setAttribute('aria-pressed',String(state.playing===true));play.textContent=state.playing?'■ Stop':'▶ Play';for(const button of exportButtons)button.disabled=!(state.canExport??state.takeCount!=null);const amount=clamp01(state.level);level.style.setProperty('--wui-recorder-level',String(amount));meter.hidden=state.level==null;status.textContent=state.status??(state.recording?`● recording… ${state.recordedCount??0}`:state.playing?'playing take…':state.takeCount!=null?`captured ${state.takeCount}`:'Ready');}catch(error){options.onError?.(error)}};
-  const handle:RecorderHandle={element:root,update,destroy(){if(destroyed)return;destroyed=true;unsubscribe?.();claim.release();root.remove();style?.remove()}};
+  const update=():void=>{if(destroyed)return;try{const state=binding.snapshot();if(destroyed||!claim.isCurrent())return;record.disabled=state.busy===true;record.classList.toggle('armed',state.recording);record.setAttribute('aria-busy',String(state.busy===true));record.setAttribute('aria-pressed',String(state.recording));record.setAttribute('aria-label',state.recording?'Stop recording':'Record');record.textContent=state.recording?'■ Stop':'● Record';play.disabled=!(state.canPlay??state.takeCount!=null);play.classList.toggle('on',state.playing===true);play.setAttribute('aria-pressed',String(state.playing===true));play.textContent=state.playing?'■ Stop':'▶ Play';for(const button of exportButtons)button.disabled=!(state.canExport??state.takeCount!=null);const amount=clamp01(state.level);level.style.setProperty('--wui-recorder-level',String(amount));meter.hidden=state.level==null;status.textContent=state.status??(state.recording?`● recording… ${state.recordedCount??0}`:state.playing?'playing take…':state.takeCount!=null?`captured ${state.takeCount}`:'Ready');}catch(error){report(error)}};
+  const handle:RecorderHandle={element:root,update,destroy(){if(destroyed)return;destroyed=true;const stop=unsubscribe;unsubscribe=undefined;runCleanups([stop,()=>claim.release(),()=>root.remove(),()=>style?.remove()],report)}};
   // Claim the host before destroying the previous recorder: its cleanup may
   // mount a replacement, and that replacement must win.
   const claim = claimHost(mounted, host, handle);
@@ -82,5 +83,16 @@ export function mountRecorder(host: RecorderHost, binding: RecorderBinding, opti
     style?.remove();
     return handle;
   }
-  update();if(binding.subscribe)unsubscribe=binding.subscribe(update);return handle;
+  update();
+  if (destroyed || !claim.isCurrent()) return handle;
+  if (binding.subscribe) {
+    try {
+      const stop = binding.subscribe(update);
+      if (destroyed || !claim.isCurrent()) runCleanups([stop], report);
+      else unsubscribe = stop;
+    } catch (error) {
+      report(error);
+    }
+  }
+  return handle;
 }

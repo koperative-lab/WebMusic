@@ -12,6 +12,12 @@ import ReactPresetShowcase from '../../../../components/ReactPresetShowcase.astr
 
 It expects your app to provide a `Score` object. It does not import files or create a standalone app shell.
 
+`PianoRollView`, `StaffView` and `WaterfallView` also work without a provider:
+pass `score` for a static drawing, or `playback` to borrow an existing
+[`ScorePlaybackSource`](/score/api/#shared-playback-observation). These forms
+create no player or audio resource. The `Simple*` presets and `ScoreProvider`
+retain their owned-player behavior.
+
 ## Install
 
 `npm install @webmusic/score react` — use an available published version or the local workspace; [Install](/score/#install) has the full setup.
@@ -327,6 +333,95 @@ ScoreProvider
   WaterfallView
 ```
 
+## Static views and external playback
+
+Use the same low-level views when sound belongs to an application engine. No
+hidden element, selector, provider or manual DOM event is needed:
+
+```tsx
+import type {Score, ScorePlaybackSource} from '@webmusic/score';
+import {StaffView} from '@webmusic/score/react';
+
+export function StaticScore({score}: {score: Score}) {
+  return <StaffView score={score} />;
+}
+
+export function FollowingScore({playback}: {playback: ScorePlaybackSource}) {
+  return <StaffView playback={playback} />;
+}
+```
+
+| Props | Data and ownership |
+| --- | --- |
+| `score` | Draw this immutable score statically, including inside a provider. |
+| `playback` | Borrow the source's current score, nominal position and note activity; follow source replacement. |
+| `score` + `playback` | Keep the explicit score; follow only ready snapshots with that exact Score identity. A mismatch or unavailable source remains static and clears the borrowed projection. |
+| Neither | Inherit the `ScoreProvider` score and its player's shared playback source. Outside a provider, the view reports `empty`. |
+
+Snapshots initialize the view synchronously on subscription, including a paused
+position. Time-aware renderers show the cursor and score notes at that position,
+including when playback is paused. OSMD maps nominal seconds through the score
+tempo map to its next available cursor position at or after that time (or the
+end). Its cursor is discrete, not a continuous position within a note or rest.
+Later seeks and rate changes use nominal score seconds, without
+starting another timer or forwarding seek commands. Replacing a source or
+unmounting a view releases its subscription and drawing resources only; it
+never stops or disposes borrowed playback. Unsubscribe failure does not skip
+renderer cleanup. Source callbacks arriving after detach are ignored.
+
+The score identity check also applies when MIDI drives a separate MusicXML
+score: the application must supply an explicitly mapped source whose snapshots
+refer to the displayed score and its part/note IDs. Matching pitches, URLs or
+duration alone does not establish a correspondence. This API does not infer
+repeat mappings, create a playback source for an arbitrary engine, or add
+playback observation to `InteractivePlayer`.
+
+## Render readiness and failures
+
+All three views accept `onStateChange(state)`. Its immutable
+`ScoreViewRenderState` is also exported from `@webmusic/score/react` and
+[`@webmusic/score/view/render`](/score/api/view/). It reports readiness of this
+view's drawing, independently of the audio engine:
+
+```tsx
+import type {Score} from '@webmusic/score';
+import {StaffView, type ScoreViewRenderState} from '@webmusic/score/react';
+
+export function ObservedScore({score, onStateChange}: {
+  score: Score;
+  onStateChange: (state: ScoreViewRenderState) => void;
+}) {
+  return <StaffView score={score} onStateChange={onStateChange} />;
+}
+```
+
+| Field | Contract |
+| --- | --- |
+| `status` | React views publish `empty`, `loading`, `rendering`, `ready`, `error` or `disposed`. Static data normally transitions from `rendering` to `ready`. |
+| `phase` | `source` for borrowed loading/readiness or subscription failure, `render` for drawing, and `null` for a static empty view or disposal. React views do not parse files or publish the shared type's `load` phase. |
+| `revision` | Increases for each state publication in this mounted view. |
+| `generation` | Identifies a source/render attempt. Replacement and effect cleanup invalidate previous asynchronous work. |
+| `score` | The selected score, when available. A source may retain one during `loading` or `error`; neither status means the view is ready. |
+| `cause` | Original source/render failure when available, including OSMD rejections. |
+
+`ready` means the current drawing has been constructed. A borrowed source's
+`ready` state alone does not establish it. When the source supplies the data,
+source `loading`/`error` and unavailable/disposed sources clear the old drawing
+and report `loading`/`error` or `empty`, respectively. An explicit `score` stays
+renderable under those source states; its rendering can be `ready` while the
+borrowed source is unavailable, with no playback projection. Observe the source
+itself for source errors in that mode. A renderer failure releases the failed drawing;
+replace the score/source or change rendering options to retry.
+
+OSMD completion and failure from superseded or unmounted generations are
+ignored, and late handles are disposed. A callback may replace the source
+without allowing the obsolete generation to publish `ready`. Effect cleanup
+reports `disposed`, including before a replacement effect and during React
+StrictMode's cleanup/remount check. Changing only the callback does not recreate
+the renderer. Callback and cleanup exceptions are reported to `console.error`;
+source/render errors are logged there when no callback is supplied. Hosts own
+translated loading/error UI and retry controls.
+
 ## Annotation visibility
 
 `PianoRollView`, `StaffView` and `WaterfallView`, and their `Simple*` presets,
@@ -411,6 +506,8 @@ WaterfallView  -> div
 | `useScoreAnalysis(options?)` | Hook | Read key, chord, roman, motif, and voice-leading analysis from context. |
 | `useScoreAnalysisAsync(options?)` | Hook | The same analysis off the main thread in a Web Worker: `{ result, pending }`. |
 | `PlayerControls` | Component | Render a simple play/pause button and range input. |
-| `PianoRollView` | Component | Render the SVG piano-roll visualizer connected to playback events. |
-| `StaffView` | Component | Render lightweight staff notation or OSMD engraving. |
-| `WaterfallView` | Component | Render falling-note pitch columns connected to playback events, without an embedded keyboard. |
+| `PianoRollView` | Component | Render a static SVG piano roll or follow shared playback snapshots. |
+| `StaffView` | Component | Render static or playback-connected lightweight staff notation or OSMD engraving. |
+| `WaterfallView` | Component | Render static or playback-connected falling-note pitch columns, without an embedded keyboard. |
+| `ViewProps` · `StaffViewProps` | Types | Static/borrowed `score` and `playback`, render-state callback, layout, accessibility and styling props; Staff adds `osmd`. |
+| `ScoreViewRenderState` · `ScoreViewRenderStatus` · `ScoreViewRenderPhase` | Types | Observable presentation readiness, generation and original failure. |

@@ -88,6 +88,16 @@ A newer reference does not establish that an older installed package exports
 the same API. Use matching references and installed declarations; do not upgrade
 a project just to match an example. Historical version archives are not provided.
 
+Local development servers and `npm run docs:build` emit an explicitly marked
+**unreleased development snapshot**. Its manifest has `mode: "development"`,
+`release: null` and source fingerprints under `development`; declared package
+versions are not published-API compatibility claims. The release Skill rejects
+these previews. `npm run pages:build` defaults to release verification and fails
+if runtime sources differ from the retained published baseline. Non-main CI
+builds explicitly select development mode; main deployment retains release
+verification. A local Pages preview can use
+`WEBMUSIC_AGENT_CONTEXT=development npm run pages:build`.
+
 ## Related
 
 - [Agent Toolkit overview](/agent-toolkit/)
