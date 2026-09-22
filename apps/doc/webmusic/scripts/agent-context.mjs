@@ -165,7 +165,7 @@ export async function extractAgentMarkdown(source, {
   resolveLink = (value) => value, inputs = new Map(), catalogs,
 } = {}) {
   let tree;
-  try { tree = mdxToMdast(source); } catch (error) { throw new Error(`${filename}: cannot parse MDX: ${error.message}`); }
+  try { tree = mdxToMdast(source); } catch (error) { throw new Error(`${filename}: cannot parse MDX: ${error.message}`, {cause: error}); }
   const frontmatter = tree.children.find((node) => node.type === 'yaml');
   const metadata = frontmatter ? loadYaml(frontmatter.value, {json: true}) : {};
   if (!metadata || typeof metadata.title !== 'string') throw new Error(`${filename}: a string title is required`);
@@ -416,7 +416,7 @@ export async function verifyAgentContextOutput(directory, generated) {
   const {files, manifest} = generated;
   for (const page of manifest.pages) {
     const local = page.route.replace(/^\/+/, '');
-    await readFile(path.join(directory, local, 'index.html')).catch(() => { throw new Error(`Agent context canonical page has no built target: ${page.canonical}`); });
+    await readFile(path.join(directory, local, 'index.html')).catch((cause) => { throw new Error(`Agent context canonical page has no built target: ${page.canonical}`, {cause}); });
   }
   for (const [relative, expected] of files) {
     if (await readFile(path.join(directory, relative), 'utf8') !== expected) throw new Error(`Agent context output mismatch: ${relative}`);
@@ -430,7 +430,7 @@ export async function verifyAgentContextOutput(directory, generated) {
           if (!target.pathname.startsWith(manifest.base)) throw new Error(`${relative}: link escapes documentation base: ${address}`);
           const local = decodeURIComponent(target.pathname.slice(manifest.base.length));
           const filename = local.endsWith('/') || !path.extname(local) ? `${local.replace(/\/$/, '')}/index.html`.replace(/^\//, '') : local;
-          await readFile(path.join(directory, safeRelative(filename))).catch(() => { throw new Error(`${relative}: generated link has no built target: ${address}`); });
+          await readFile(path.join(directory, safeRelative(filename))).catch((cause) => { throw new Error(`${relative}: generated link has no built target: ${address}`, {cause}); });
         }
       }
       for (const child of node.children ?? []) await visit(child);

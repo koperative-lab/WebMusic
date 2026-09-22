@@ -77,6 +77,18 @@ types, tests, licenses, built exports and release manifests. The command chain
 in [package.json](package.json) is authoritative. Add an Unreleased entry to
 [CHANGELOG.md](CHANGELOG.md) for changes users need to know about.
 
+ESLint 10's recommended rules remain enabled. The committed
+[eslint-suppressions.json](eslint-suppressions.json) records only existing
+unused-assignment and caught-error findings in retained release sources and
+two archived release scripts. `npm run lint` applies this per-file, per-rule
+count baseline; increased counts fail, and resolved findings require
+`npm run lint -- --prune-suppressions`. Counts do not identify exact lines, so
+review changes within a suppressed file even when its count stays the same.
+Editor integrations may still show these findings if they do not apply ESLint
+suppressions. Review runtime exceptions with the next source-baseline change,
+preserving MXL manifest cleanup and the renderer's ES2020 compatibility. Do
+not refresh fingerprints or grow suppressions solely to pass lint.
+
 Describe what changed, why, the commands and results, and any material behavior
 that remains unverified. Tests and static checks do not establish audible
 timing, browser/device interaction or accessibility. Exercise changed browser

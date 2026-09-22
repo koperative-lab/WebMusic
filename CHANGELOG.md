@@ -19,6 +19,8 @@ work and does not establish npm publication, a release tag or a deployment.
   reject missing or stale package output before packing.
 - Adopt Astro's ESLint 3 plugin with ESLint 10 and its supported development
   Node versions, retaining project diagnostics through `astro check`.
+- Adopt ESLint 10's JavaScript rules with scoped compatibility exceptions for
+  retained release sources; preserve original errors in Agent Toolkit helpers.
 - Keep Agent Toolkit release verification stable across development dependency
   updates while retaining runtime source and package contract checks.
 - Resolve optional SoundFont and OSMD dependencies in browser production

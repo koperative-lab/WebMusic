@@ -43,6 +43,14 @@ const releaseFixture = async () => {
 afterEach(async () => { await Promise.all(temporary.splice(0).map((directory) => rm(directory, {recursive: true, force: true}))); });
 
 describe('agent context MDX extraction', () => {
+  it('retains the parser cause behind a filename-qualified MDX error', async () => {
+    const failure = await extractAgentMarkdown(document('<Unclosed'), {filename: 'broken.mdx'}).catch((error) => error);
+    expect(failure).toBeInstanceOf(Error);
+    expect(failure.name).toBe('Error');
+    expect(failure.cause).toBeInstanceOf(Error);
+    expect(failure.message).toBe(`broken.mdx: cannot parse MDX: ${failure.cause.message}`);
+  });
+
   it('preserves Unicode prose, tables, literal examples and URLs inside code', async () => {
     const markdown = 'é — 😀\n\n| Units | Default |\n| --- | --- |\n| seconds | `0` |\n\n```ts\nconst path = "/asset.wav";\n```\n\n[Reference](/score/api/)';
     const result = await extractAgentMarkdown(document(markdown), {resolveLink: (url) => `https://example.test/WebMusic${url}`});
@@ -245,7 +253,11 @@ describe('agent context release and output contracts', () => {
     const files = new Map([['llms.txt', '[Score](https://docs.example.test/WebMusic/score/)\n']]);
     const generated = {files, manifest: {site: 'https://docs.example.test', base: '/WebMusic/', pages: []}};
     await write(directory, 'llms.txt', files.get('llms.txt'));
-    await expect(verifyAgentContextOutput(directory, generated)).rejects.toThrow(/no built target/);
+    await expect(verifyAgentContextOutput(directory, generated)).rejects.toMatchObject({
+      name: 'Error',
+      message: 'llms.txt: generated link has no built target: https://docs.example.test/WebMusic/score/',
+      cause: {code: 'ENOENT', path: path.join(directory, 'score/index.html')},
+    });
     await write(directory, 'score/index.html', '<h1>Score</h1>');
     await expect(verifyAgentContextOutput(directory, generated)).resolves.toBeUndefined();
     files.set('llms.txt', '<a href="https://docs.example.test/WebMusic/missing/">Missing</a>\n');
@@ -256,6 +268,16 @@ describe('agent context release and output contracts', () => {
     await expect(verifyAgentContextOutput(directory, generated)).rejects.toThrow(/escapes documentation base/);
     await write(directory, 'llms.txt', 'stale');
     await expect(verifyAgentContextOutput(directory, generated)).rejects.toThrow(/output mismatch/);
+  });
+
+  it('retains the missing-file cause when a canonical page was not built', async () => {
+    const directory = await temp();
+    const generated = {files: new Map(), manifest: {pages: [{route: '/score/', canonical: 'https://docs.example.test/score/'}]}};
+    await expect(verifyAgentContextOutput(directory, generated)).rejects.toMatchObject({
+      name: 'Error',
+      message: 'Agent context canonical page has no built target: https://docs.example.test/score/',
+      cause: {code: 'ENOENT', path: path.join(directory, 'score/index.html')},
+    });
   });
 
   it('serves generated files in development with the configured base and no stale cache', async () => {
