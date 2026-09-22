@@ -25,7 +25,7 @@ export default tseslint.config(
       globals: {...globals.browser, ...globals.node},
     },
   },
-  ...astro.configs['flat/recommended'],
+  ...astro.configs.recommended,
   ...tseslint.configs.recommended.map((config) => ({
     ...config,
     files: ['**/*.{ts,tsx}'],
