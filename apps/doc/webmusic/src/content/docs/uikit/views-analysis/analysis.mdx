@@ -44,11 +44,11 @@ The [Score report workflow](/score/api/analyze/#reports) combines `createScoreRe
 Unlike the shared mount shape, render helpers append output immediately and return either nothing,
 the root, or a small painter. The caller owns replacement and removal of that output. Build a
 fresh root or clear one before rendering a new result; only `renderAudioAnalysisCard()` replaces
-its root contents itself. Helpers accepting `AnalysisLocalizationOptions` read text and formatting
-at render time; they do not subscribe. Re-render a one-shot report when its language changes.
-`renderLiveChordPanel().paint()` reads the latest localization on each paint.
-`renderHistogram()` subscribes and updates existing values/button labels; retain and destroy its
-handle before discarding the report to release that subscription.
+its root contents itself. Helpers accepting `AnalysisTextOptions` read text and formatting
+at render time; they do not subscribe. Re-render a one-shot report when application text changes.
+`renderLiveChordPanel().paint()` reads the latest application text on each paint.
+`renderHistogram().update()` refreshes retained bin labels and formatted readouts explicitly; retain and
+destroy its handle before discarding the report to release selection listeners.
 
 Timeline, Roman, motif, voice-leading, and rhythm helpers stamp their quarter ranges on rendered
 nodes. The playhead discovers those nodes, highlights every range containing the supplied
@@ -100,13 +100,15 @@ Pitch-track `times` are frame timestamps in seconds.
 
 | Helper | Member | Kind | Default | Description |
 |---|---|---|---|---|
-| Text-generating render helpers | `localization` | `UILocalization` | — | `AnalysisLocalizationOptions`; borrowed text/formatting source shared by the helper-specific option bags. Summary titles, rows, bin labels and explicit errors remain application-owned strings. |
+| Text-generating render helpers | `getText` | `() => AnalysisText` | — | Final strings/contextual callbacks, read when rendering or explicitly updating. |
+| Text-generating render helpers | `formatters` | `UIValueFormatters` | — | Pure number and percentage callbacks; no locale or formatting state is owned by UI. |
+| Text-generating render helpers | `onError` | `(error: unknown) => void` | — | Reports text/formatting callback failures before falling back to defaults. |
 | `renderRhythmPatternList` | `limit` | `number` | `8` | Maximum number of sorted pattern rows appended. |
 | `renderRhythmPatternList` | `formatDuration` | `(quarters: number) => string` | the number | Names one duration. Notating it — which glyph a value takes, that a dot adds half again — is a convention of the domain, so the caller answers; `@webmusic/score` passes its own. |
 | `renderHistogram` | `emptyLabel` | `string` | `'Nothing to show.'` | Text appended when the bins array is empty. |
-| `renderHistogram` | `format` | `(value: number) => string` | rounded number | Formats each bar's trailing value and button value text, ahead of the localization number formatter. |
+| `renderHistogram` | `format` | `(value: number) => string` | rounded number | Formats each bar's trailing value and button value text, ahead of `formatters.number`. |
 | `renderHistogram` | `onSelect` | `(index: number, bin: AnalysisHistogramBin) => Promise<void> \| void` | — | Makes positive-value bins operable buttons; called on pointer or native keyboard activation. |
-| `renderHistogram` | `onError` | `(error: unknown) => void` | — | Reports selection, localization notification, refresh, and cleanup failures. |
+| `renderHistogram` | `onError` | `(error: unknown) => void` | — | Reports selection, text refresh, and cleanup failures. |
 | `renderAudioAnalysisCard` | `durationSeconds` | `number` | last event / timestamp | Supplies the onset or pitch time span when positive. |
 | `renderAudioAnalysisCard` | `error` | `string` | — | Replaces the card body with a status failure message. |
 
@@ -120,68 +122,71 @@ Pitch-track `times` are frame timestamps in seconds.
 
 | Member | Description |
 |---|---|
+| `update()` | Re-read retained bin labels, application text and formatting without rebuilding rows or moving focus. |
 | `setActive(indexes: readonly number[])` | Set current bins by their input indexes; updates styling and `aria-current` without rebuilding buttons or moving focus. |
-| `destroy()` | Idempotently release selection/localization listeners and remove only this histogram's rendered output; unrelated root children remain. |
+| `destroy()` | Idempotently release selection listeners and remove only this histogram's rendered output; unrelated root children remain. |
 
 Without `onSelect`, histogram output remains passive. With it, nonempty bins are native buttons and empty bins remain descriptive. Callback rejection is contained and reported through `onError`.
 
-**Localization keys and formatting**
+The report retains the original bin records in their initial order and snapshots their numeric
+values for bar widths, readouts and button availability. Change a retained record's `label` and
+call `update()` to refresh its visible button or span text and accessible label while preserving
+focus and active state. Selection still receives the original index and bin record. Replacing
+records, changing their order or count, or changing numeric values requires `destroy()` followed
+by a new `renderHistogram()` call.
 
-Pass a `createUILocalization()` controller from `@webmusic/ui` through `options.localization`.
-The four one-shot list/strip helpers use an optional final `AnalysisLocalizationOptions` argument;
-`renderKeyView` keeps `caption` in its existing third position and accepts these options fourth.
+**Application text and formatting**
+
+Supply `getText(): AnalysisText` and optional pure `formatters` callbacks through
+`AnalysisTextOptions`. The four one-shot list/strip helpers take this as an optional final
+argument; `renderKeyView` keeps `caption` third and accepts options fourth.
 `LiveChordPanelOptions`, `RhythmPatternListOptions`, `AnalysisHistogramOptions`, and
-`AudioAnalysisCardOptions` extend that same option shape. `renderSummaryCard`,
-`appendSummaryRow`, root creation and playhead utilities generate no translatable copy.
+`AudioAnalysisCardOptions` extend the same shape. `renderSummaryCard`, `appendSummaryRow`,
+root creation and playhead utilities generate no translatable copy.
 
-`formatters.number` receives the original numeric value, and `formatters.percent` receives a
-fraction. Existing per-helper `format`, `formatPitch`, and `formatDuration` callbacks take
-precedence. Without localization, previous rounding and precision remain unchanged. Localization
-never changes quarter-span attributes, SVG coordinates, bar widths, or underlying report data.
-Application-supplied captions, chord/roman symbols, history, bin labels, summary strings, and
-error messages remain application-owned. `keyName`, `inKey`, and `voiceIssue` can translate the
-presentation of supplied domain identifiers through a message callback.
+The application can call its own translation package from `getText()` or a contextual callback.
+UI stores no catalog or language state, interprets no templates, and observes no language events.
+Strings are final and literal. For external text changes, re-render one-shot output, call live
+panel `paint(state)`, or call histogram `update()` to retain focused buttons.
 
-All keys below have the `analysis.` prefix. Values such as `value`, `minimum`, and `maximum`
-are already formatted strings; numeric `count`, `beat`, `quarters`, `bpm`, `confidence`, and
-`rawValue` remain available to message callbacks where listed, including for plural selection.
+`formatters.number` receives the original number and `formatters.percent` receives a fraction.
+Existing `format`, `formatPitch`, and `formatDuration` callbacks retain precedence. Defaults
+preserve previous rounding and precision. Text formatting never changes quarter-span attributes,
+SVG coordinates, bar widths, or underlying report data. Application-supplied captions,
+chord/roman symbols, history, bin labels, summary strings, and errors remain application-owned.
+Missing text fields use existing defaults; failed callbacks report to `onError` and fall back.
 
-| Key suffix | Default | Values |
+The following optional `AnalysisText` fields accept final strings. Fields with context also
+accept `(values) => string` through `UITextValue`. Formatted values are strings; raw numeric
+values remain available to application callbacks for formatting and plural selection.
+
+| Field | Default meaning | Callback context |
 |---|---|---|
-| `emptyValue` | `—` | — |
-| `keyName` | `{tonic} {mode}` | `tonic`, `mode` |
-| `confidence` | `confidence {value}` | `value`, numeric `confidence` |
-| `noNotes` | `no notes heard yet` | — |
-| `beat` | `beat {value}` | `value`, numeric `beat` |
-| `inKey` | `in {tonic} {mode}` | `tonic`, `mode` |
-| `soundingNow` | `sounding now` | — |
-| `waiting` | `waiting for playback…` | — |
-| `noMotifs` | `No repeated motifs found.` | — |
-| `count` | `×{value}` | `value`, numeric `count` |
-| `intervals` | `intervals [{values}]` | Comma-separated formatted `values` |
-| `noVoiceIssues` | `No voice-leading issues — clean.` | — |
-| `voiceIssue` | `{label}` | Raw `type`, humanized `label` |
-| `issueLocation` | `{voices} · {beat}` | Joined `voices`, formatted beat phrase `beat` |
-| `noRhythms` | `No repeated rhythms found.` | — |
-| `quarters` | `{value} q` | `value`, numeric `quarters` |
-| `histogramEmpty` | `Nothing to show.` | — |
-| `histogramSelect` | `{label}: {value}. Go to next occurrence` | `label`, `value`, numeric `rawValue` |
-| `noAnalysis` | `No analysis yet.` | — |
-| `keyUnavailable` | `Key not analyzed.` | — |
-| `tempoUnavailable` | `Tempo not analyzed.` | — |
-| `tempo` | `{value} BPM` | `value`, numeric `bpm` |
-| `tempoDetails` | `confidence {confidence} · {value} beats` | Formatted `confidence`, formatted count `value`, numeric `count` |
-| `integrated` | `Integrated` | — |
-| `truePeak` | `True peak` | — |
-| `rms` | `RMS` | — |
-| `negativeInfinity` | `−∞` | — |
-| `lufs` | `{value} LUFS` | `value` |
-| `dbfs` | `{value} dBFS` | `value` |
-| `onsetsUnavailable` | `Onsets not analyzed.` | — |
-| `onsets` | `{value} onsets` | `value`, numeric `count` |
-| `pitchUnavailable` | `Pitch not analyzed.` | — |
-| `noVoicedPitch` | `No voiced pitch found.` | — |
-| `pitchRange` | `{minimum}–{maximum} Hz` | `minimum`, `maximum` |
+| `emptyValue` | Empty marker `—` | — |
+| `keyName` | Tonic and mode | `tonic`, `mode` |
+| `confidence` | Confidence percentage | Formatted `value`, numeric `confidence` |
+| `noNotes` | No notes heard yet | — |
+| `beat` | Beat position | Formatted `value`, numeric `beat` |
+| `inKey` | Key caption | `tonic`, `mode` |
+| `soundingNow` / `waiting` | Live playback captions | — |
+| `noMotifs` / `noVoiceIssues` / `noRhythms` | Empty report messages | — |
+| `count` | Occurrence count | Formatted `value`, numeric `count` |
+| `intervals` | Interval list | Comma-separated formatted `values` |
+| `voiceIssue` | Humanized issue type | Raw `type`, humanized `label` |
+| `issueLocation` | Voices and beat phrase | Joined `voices`, formatted beat phrase `beat` |
+| `quarters` | Quarter-note duration | Formatted `value`, numeric `quarters` |
+| `histogramEmpty` | Nothing to show | — |
+| `histogramSelect` | Bin label/value and next-occurrence action | `label`, formatted `value`, numeric `rawValue` |
+| `noAnalysis` | No analysis yet | — |
+| `keyUnavailable` / `tempoUnavailable` / `onsetsUnavailable` / `pitchUnavailable` | Unavailable analysis messages | — |
+| `tempo` | Tempo in BPM | Formatted `value`, numeric `bpm` |
+| `tempoDetails` | Confidence and beat count | Formatted `confidence`, formatted count `value`, numeric `count` |
+| `integrated` / `truePeak` / `rms` | Loudness fact labels | — |
+| `negativeInfinity` | Nonfinite loudness marker `−∞` | — |
+| `lufs` / `dbfs` | Loudness value and unit | Formatted `value` |
+| `onsets` | Onset count | Formatted `value`, numeric `count` |
+| `noVoicedPitch` | No voiced pitch found | — |
+| `pitchRange` | Frequency range in Hz | Formatted `minimum`, `maximum` |
 
 **Playhead options**
 

@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
 
-import {createUILocalization, type UILocalization} from '../src/localization';
 
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {
   meterStyle,
   mountMeter,
   type MeterBinding,
+  type MeterText,
 } from '../src/meter';
 
 afterEach(() => {
@@ -144,7 +144,7 @@ describe('mountMeter', () => {
   });
 });
 
-describe('meter capabilities and localization', () => {
+describe('meter capabilities and application text', () => {
   it('requires only the selected pull port', () => {
     const host = document.createElement('div');
     const level = mountMeter(host, {readLevel: () => ({level: .25})}, {animate: false});
@@ -154,23 +154,24 @@ describe('meter capabilities and localization', () => {
     spectrum.destroy();
   });
 
-  it.each(['level', 'spectrum'] as const)('updates %s name and value without replacing the root or bars', (mode) => {
-    const host = document.createElement('div');
-    const localization = createUILocalization();
-    const handle = mountMeter(host, {readLevel: () => ({level: .3}), readSpectrum: () => [.2, .3]}, {
-      mode, animate: false, localization,
+  it.each(['level', 'spectrum'] as const)('refreshes %s final text without replacing the root or bars', (mode) => {
+    let copy: MeterText = {};
+    let prefix = '';
+    const handle = mountMeter(document.createElement('div'), {readLevel: () => ({level: .3}), readSpectrum: () => [.2, .3]}, {
+      mode, animate: false, getText: () => copy, formatters: {percent: value => `${prefix}${value * 100}`},
     });
     const child = handle.element.firstElementChild;
-    localization.update({
-      messages: {'meter.level': '电平', 'meter.spectrum': '频谱', 'meter.levelValue': '电平 {value}', 'meter.spectrumValue': '峰值 {value}'},
-      formatters: {percent: (value) => `百分之${value * 100}`},
-    });
+    copy = {level: '电平', spectrum: '频谱', levelValue: ({value}) => `电平 ${value}`, spectrumValue: ({value}) => `峰值 ${value}`};
+    prefix = '百分之';
+    expect(handle.element.getAttribute('aria-label')).toBe(mode === 'level' ? 'Audio level' : 'Spectrum');
+    handle.redraw();
     expect(handle.element.firstElementChild).toBe(child);
     expect(handle.element.getAttribute('aria-label')).toBe(mode === 'level' ? '电平' : '频谱');
     expect(handle.element.getAttribute('aria-valuetext')).toBe(mode === 'level' ? '电平 百分之30' : '峰值 百分之30');
     expect(handle.element.getAttribute('aria-valuenow')).toBe('30');
     handle.updateLabel('Bus A');
-    localization.update({messages: {'meter.level': 'Level B', 'meter.spectrum': 'Spectrum B'}});
+    copy = {level: 'Level B', spectrum: 'Spectrum B'};
+    handle.redraw();
     expect(handle.element.getAttribute('aria-label')).toBe('Bus A');
     handle.updateLabel();
     expect(handle.element.getAttribute('aria-label')).toBe(mode === 'level' ? 'Level B' : 'Spectrum B');
@@ -186,37 +187,30 @@ describe('meter capabilities and localization', () => {
     handle.destroy();
   });
 
-  it('lets a translation callback replace the mounting meter without a leaked frame', () => {
+  it('lets a text callback replace the mounting meter without a leaked frame', () => {
     const request = vi.fn(() => 1);
     vi.stubGlobal('requestAnimationFrame', request);
     const host = document.createElement('div');
     let replacement: ReturnType<typeof mountMeter> | undefined;
-    const localization = createUILocalization({messages: {'meter.level': () => {
+    const stale = mountMeter(host, {readLevel: () => ({level: .9})}, {getText: () => {
       replacement ??= mountMeter(host, {readLevel: () => ({level: .2})}, {animate: false});
-      return 'Stale';
-    }}});
-    const stale = mountMeter(host, {readLevel: () => ({level: .9})}, {localization});
+      return {level: 'Stale'};
+    }});
     expect(request).not.toHaveBeenCalled();
     expect(host.querySelectorAll('.wui-meter')).toHaveLength(1);
     expect(host.querySelector('.wui-meter')).toBe(replacement?.element);
-    stale.destroy();
-    replacement?.destroy();
+    stale.destroy(); replacement?.destroy();
   });
 
-  it('drops a locale subscription returned after reentrant replacement', () => {
-    const host = document.createElement('div');
-    const release = vi.fn();
-    const localization: UILocalization = {
-      ...createUILocalization(),
-      subscribe() {
-        mountMeter(host, {readLevel: () => ({level: .2})}, {animate: false});
-        return release;
-      },
-    };
-    const stale = mountMeter(host, {readLevel: () => ({level: .5})}, {localization, animate: false});
-    expect(release).toHaveBeenCalledOnce();
-    expect(host.querySelector('.wui-meter')?.getAttribute('aria-valuenow')).toBe('20');
-    stale.destroy();
-    expect(release).toHaveBeenCalledOnce();
+  it('treats supplied strings literally and reports failed callbacks through onError', () => {
+    const failure = new Error('text');
+    const onError = vi.fn();
+    const handle = mountMeter(document.createElement('div'), {readLevel: () => ({level: .4})}, {
+      animate: false, getText: () => ({level: '{literal}', levelValue: () => { throw failure; }}), onError,
+    });
+    expect(handle.element.getAttribute('aria-label')).toBe('{literal}');
+    expect(handle.element.getAttribute('aria-valuetext')).toBe('40% level');
+    expect(onError).toHaveBeenCalledWith(failure);
+    handle.destroy();
   });
 });

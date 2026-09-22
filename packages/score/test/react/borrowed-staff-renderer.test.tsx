@@ -13,6 +13,29 @@ import {StaffView} from '../../src/react/views';
 
 afterEach(cleanup);
 
+it('draws and clears actual staff notes when a source supplies activity without nominal time', () => {
+  const builder = new ScoreBuilder();
+  const part = builder.addPart({id: PartId('p'), name: 'Piano'});
+  builder.addNote(part, {id: NoteId('n'), pitch: Pitch.parse('C4'), onsetQuarters: Rational.ZERO,
+    duration: Duration.whole(), voice: VoiceId('v')});
+  const score = builder.build();
+  let snapshot: ScorePlaybackSnapshot = {revision: 0, sourceRevision: 0, readiness: 'ready', state: 'playing', score,
+    nominalSeconds: null, nominalDurationSeconds: score.durationSeconds, transportSeconds: null,
+    transportDurationSeconds: null, rate: null, activeNotes: [{occurrenceId: 'sound-1', partId: 'p', noteId: 'n',
+      midi: 72, nominalStartSeconds: 0, nominalEndSeconds: score.durationSeconds}]};
+  let notify: (state: ScorePlaybackSnapshot) => void = () => {};
+  const source: ScorePlaybackSource = {snapshot: () => snapshot,
+    subscribe(listener) { notify = listener; listener(snapshot); return () => { notify = () => {}; }; }};
+  render(<StaffView playback={source} />);
+  const root = screen.getByRole('img', {name: 'Musical staff'});
+  expect(root.querySelector('[data-note-id="n"][data-active]')).not.toBeNull();
+  act(() => {
+    snapshot = {...snapshot, revision: 1, activeNotes: []};
+    notify(snapshot);
+  });
+  expect(root.querySelector('[data-note-id="n"][data-active]')).toBeNull();
+});
+
 it('retains the real staff playhead through paused snapshots with no sounding notes', () => {
   const builder = new ScoreBuilder();
   const part = builder.addPart({id: PartId('p'), name: 'Piano'});

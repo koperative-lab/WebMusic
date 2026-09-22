@@ -67,14 +67,14 @@ be supplied.
 
 | Member | Kind | Default | Description |
 |---|---|---|---|
-| `localization` | `UILocalization` | — | Borrowed text and number-format source; updates repaint in place and destruction releases its subscription. |
+| `getText` | `() => TrackListText` | — | Supplies one application-owned text snapshot per update. After external text changes, call `update()`. |
 | `label` | `string` | `'Tracks'` | Accessible name applied to the semantic list. |
 | `ordered` | `boolean` | `false` | Renders an `<ol>` instead of `<ul>` when order is meaningful. |
 | `emptyLabel` | `string` | `'No items'` | Visible text replacing the rows when `items` is empty. |
 | `stylesheet` | `boolean` | `true` | Installs the exported track-list stylesheet unless explicitly `false`. |
 | `classNames` | `TrackListClassNames` | `{}` | Adds compatibility classes for every named node. |
 | `parts` | `TrackListParts` | `{}` | Adds part tokens for every named node. |
-| `onError` | `(error: unknown) => void` | — | Receives command, snapshot, subscription, and cleanup failures. |
+| `onError` | `(error: unknown) => void` | — | Receives command, snapshot, text, subscription, and cleanup failures. |
 
 `TrackListClassNames` and `TrackListParts` both expose `root`, `list`, `item`, `row`, `swatch`,
 `label`, `detail`, and `empty` keys.
@@ -91,16 +91,16 @@ be supplied.
 | `update()` | `() => void` | Re-reads State and patches list structure, labels, current state, disabled state, and focus. |
 | `destroy()` | `() => void` | Releases listeners and subscription, then removes owned DOM and installed style. |
 
-**Localization.** Pass an instance-local [localization controller](/uikit/api/) as
-`localization` to update the list name and empty state in place. Explicit `label` and `emptyLabel`
-options take precedence. Item labels and preformatted details remain caller text; new labels for
-stable ids patch existing rows and preserve focus and roving tabindex. Destroy releases the
-localization subscription.
+**Text.** `getText()` supplies optional final strings for the list name and empty
+state. Call `handle.update()` after the application's text changes. Explicit `label` and
+`emptyLabel` options take precedence. Item labels and preformatted details remain caller text;
+new labels for stable ids patch existing rows and preserve focus and roving tabindex. See the
+[shared text hooks](/uikit/api/). The presenter does not own or subscribe to language state.
 
-| Message key | Default | Values |
+| `TrackListText` field | Type | Default |
 |---|---|---|
-| `trackList.label` | `Tracks` | — |
-| `trackList.empty` | `No items` | — |
+| `label` | `string` | `Tracks` |
+| `empty` | `string` | `No items` |
 
 **Accessibility.** The named `<ul>` or `<ol>` contains real list items and buttons. Active rows
 use `aria-current="true"`; disabled item and global state use native button disabling. Roving

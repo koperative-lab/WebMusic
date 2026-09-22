@@ -1,4 +1,4 @@
-import {bindLocalization, message as uiMessage, formatNumber, type UILocalization} from './localization';
+import {readText, textValue, type UITextValue, formatNumber, type UIValueFormatters} from './text';
 import {installStyle} from './internal/style';
 import {createErrorSink, claimHost, createUpdateLoop} from "./internal/lifecycle";
 import {markEmptyState, addClassNames, clamp, finite, setParts} from './internal/dom';
@@ -55,9 +55,24 @@ export interface EqClassNames {
 
 export type EqParts = EqClassNames;
 
+export interface EqText {
+  label?: UITextValue;
+  empty?: UITextValue;
+  frequency?: UITextValue;
+  gain?: UITextValue;
+  bandFrequency?: UITextValue<{index: string; bandIndex: number}>;
+  bandGain?: UITextValue<{index: string; bandIndex: number}>;
+  kilohertzShort?: UITextValue<{value: string; kilohertz: number}>;
+  hertz?: UITextValue<{value: string; hertz: number}>;
+  decibels?: UITextValue<{value: string; decibels: number}>;
+  bandValue?: UITextValue<{frequency: string; gain: string; band: EqBandState}>;
+  focusedBand?: UITextValue<{index: string; bandIndex: number; axis: string; value: string}>;
+}
+
 export interface EqOptions {
-  /** Borrowed live text and formatting; language updates preserve controls. */
-  localization?: UILocalization;
+  /** Read application-resolved text once per paint; call update() after external changes. */
+  getText?: () => EqText;
+  formatters?: UIValueFormatters;
   label?: string;
   emptyLabel?: string;
   classNames?: EqClassNames;
@@ -176,12 +191,11 @@ function yToGain(y: number): number {
   return -(clamp(y, 0, 1, 0.5) - 0.5) * MAX_GAIN * 2;
 }
 
-function defaultFormatFrequency(frequency: number, localization?: UILocalization): string {
-  return frequency >= 1_000
-    ? uiMessage(localization, 'eq.kilohertzShort', '{value}k', {
-      value: formatNumber(localization, frequency / 1_000, (frequency / 1_000).toFixed(frequency >= 10_000 ? 0 : 1)),
-    })
-    : formatNumber(localization, frequency, String(Math.round(frequency)));
+function defaultFormatFrequency(frequency: number, text: EqText | undefined, options: EqOptions): string {
+  if (frequency < 1_000) return formatNumber(options.formatters, frequency, String(Math.round(frequency)), options.onError);
+  const kilohertz = frequency / 1_000;
+  const value = formatNumber(options.formatters, kilohertz, kilohertz.toFixed(frequency >= 10_000 ? 0 : 1), options.onError);
+  return textValue(text?.kilohertzShort, `${value}k`, {value, kilohertz}, options.onError);
 }
 
 
@@ -316,34 +330,42 @@ export function mountEq(host: EqHost, binding: EqBinding, options: EqOptions = {
     focusedInput = undefined;
   };
 
-  const paintFocusAndReadout = (state: EqState): void => {
+  const paintFocusAndReadout = (state: EqState, text: EqText | undefined): void => {
+    if (!isCurrent()) return;
     const focusedIndex = focusedInput && !focusedInput.disabled ? Number(focusedInput.dataset.i) : -1;
     for (let index = 0; index < points.children.length; index++) {
       points.children[index]?.classList.toggle("is-focused", index === focusedIndex);
     }
-    const format = options.formatFrequency ?? ((value: number) => defaultFormatFrequency(value, options.localization));
+    const format = options.formatFrequency ?? ((value: number) => defaultFormatFrequency(value, text, options));
     const bandText = (band: EqBandState): string => {
       const gain = band.gain ?? 0;
-      return uiMessage(options.localization, 'eq.bandValue', '{frequency} {gain}dB', {
+      const values = {
         frequency: format(band.frequency),
-        gain: `${gain >= 0 ? '+' : ''}${formatNumber(options.localization, gain, gain.toFixed(1))}`,
-      });
+        gain: `${gain >= 0 ? '+' : ''}${formatNumber(options.formatters, gain, gain.toFixed(1), options.onError)}`,
+        band,
+      };
+      return textValue(text?.bandValue, `${values.frequency} ${values.gain}dB`, values, options.onError);
     };
     const focusedBand = state.bands[focusedIndex];
-    readout.textContent = focusedBand
-      ? uiMessage(options.localization, 'eq.focusedBand', 'Band {index} {axis}: {value}', {
-        index: formatNumber(options.localization, focusedIndex + 1),
-        axis: uiMessage(options.localization, `eq.${focusedInput?.dataset.axis}`, focusedInput?.dataset.axis ?? ''),
+    if (focusedBand) {
+      const axis = focusedInput?.dataset.axis === 'frequency' ? 'frequency' : 'gain';
+      const values = {
+        index: formatNumber(options.formatters, focusedIndex + 1, undefined, options.onError),
+        bandIndex: focusedIndex,
+        axis: textValue(text?.[axis], axis, {}, options.onError),
         value: bandText(focusedBand),
-      })
-      : state.bands.map(bandText).join("  ·  ");
+      };
+      readout.textContent = textValue(text?.focusedBand, `Band ${values.index} ${values.axis}: ${values.value}`, values, options.onError);
+    } else readout.textContent = state.bands.map(bandText).join("  ·  ");
   };
 
   const paint = (state: EqState): void => {
+    const text = readText(options.getText, options.onError);
+    if (!isCurrent()) return;
     if (points.childElementCount !== state.bands.length) rebuildBands(state);
-    root.setAttribute('aria-label', options.label ?? uiMessage(options.localization, 'eq.label', 'Equalizer'));
+    root.setAttribute('aria-label', options.label ?? textValue(text?.label, 'Equalizer', {}, options.onError));
     if (emptyText.parentNode === empty) {
-      emptyText.nodeValue = options.emptyLabel ?? uiMessage(options.localization, 'eq.empty', 'Connect an equalizer graph');
+      emptyText.nodeValue = options.emptyLabel ?? textValue(text?.empty, 'Connect an equalizer graph', {}, options.onError);
     }
     root.setAttribute("aria-disabled", String(state.disabled === true));
     empty.hidden = state.ready === true;
@@ -359,24 +381,26 @@ export function mountEq(host: EqHost, binding: EqBinding, options: EqOptions = {
       point?.setAttribute("cy", String(gainToY(band.gain ?? 0) * 100));
       const frequencyInput = inputs.querySelector<HTMLInputElement>(`input[data-i="${index}"][data-axis="frequency"]`);
       const gainInput = inputs.querySelector<HTMLInputElement>(`input[data-i="${index}"][data-axis="gain"]`);
+      const bandNumber = {index: formatNumber(options.formatters, index + 1, undefined, options.onError), bandIndex: index};
       if (frequencyInput) {
         frequencyInput.value = String(frequencyToX(band.frequency));
-        frequencyInput.setAttribute('aria-label', uiMessage(options.localization, 'eq.bandFrequency', 'Band {index} frequency', {index: formatNumber(options.localization, index + 1)}));
+        frequencyInput.setAttribute('aria-label', textValue(text?.bandFrequency, `Band ${bandNumber.index} frequency`, bandNumber, options.onError));
+        const value = formatNumber(options.formatters, band.frequency, String(Math.round(band.frequency)), options.onError);
         frequencyInput.setAttribute('aria-valuetext', options.formatFrequency?.(band.frequency)
-          ?? uiMessage(options.localization, 'eq.hertz', '{value} hertz', {value: formatNumber(options.localization, band.frequency, String(Math.round(band.frequency)))}));
+          ?? textValue(text?.hertz, `${value} hertz`, {value, hertz: band.frequency}, options.onError));
         frequencyInput.disabled = state.disabled === true || band.disabled === true;
       }
       if (gainInput) {
         gainInput.value = String(1 - gainToY(band.gain ?? 0));
-        gainInput.setAttribute('aria-label', uiMessage(options.localization, 'eq.bandGain', 'Band {index} gain', {index: formatNumber(options.localization, index + 1)}));
-        gainInput.setAttribute('aria-valuetext', uiMessage(options.localization, 'eq.decibels', '{value} decibels', {
-          value: formatNumber(options.localization, band.gain ?? 0, (band.gain ?? 0).toFixed(1)),
-        }));
+        gainInput.setAttribute('aria-label', textValue(text?.bandGain, `Band ${bandNumber.index} gain`, bandNumber, options.onError));
+        const decibels = band.gain ?? 0;
+        const value = formatNumber(options.formatters, decibels, decibels.toFixed(1), options.onError);
+        gainInput.setAttribute('aria-valuetext', textValue(text?.decibels, `${value} decibels`, {value, decibels}, options.onError));
         gainInput.disabled = state.disabled === true || band.disabled === true;
       }
     });
     roundPoints?.update();
-    paintFocusAndReadout(state);
+    paintFocusAndReadout(state, text);
   };
 
   const onFocus = (event: FocusEvent): void => {
@@ -384,7 +408,7 @@ export function mountEq(host: EqHost, binding: EqBinding, options: EqOptions = {
     const target = (event.type === "focusin" ? event.target : event.relatedTarget) as HTMLInputElement | null;
     focusedInput = target?.nodeType === 1 && inputs.contains(target) && target.matches("input[data-axis]") ? target : undefined;
     try {
-      paintFocusAndReadout(current);
+      paintFocusAndReadout(current, readText(options.getText, options.onError));
     } catch (error) {
       report(error);
     }
@@ -583,7 +607,6 @@ export function mountEq(host: EqHost, binding: EqBinding, options: EqOptions = {
   try {
     update();
     if (binding.subscribe) cleanups.push(binding.subscribe(update));
-    cleanups.push(bindLocalization(options.localization, update, isCurrent, options.onError));
     return handle;
   } catch (error) {
     handle.destroy();

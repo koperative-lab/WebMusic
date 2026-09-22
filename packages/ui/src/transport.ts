@@ -1,5 +1,5 @@
 import {claimHost, createErrorSink, createUpdateLoop, runCleanups} from './internal/lifecycle';
-import {bindLocalization, formatPercent, formatTime, message, type UILocalization} from './localization';
+import {formatPercent, formatTime, readText, textValue, type UITextValue, type UIValueFormatters} from './text';
 import {installStyle, paint} from './internal/style';
 import {addClassNames, clamp01, finite, setParts} from './internal/dom';
 import {createFader} from './fader';
@@ -82,9 +82,31 @@ export type TransportTimeDisplay = 'elapsed' | 'full';
 /** Which shape the volume control takes. */
 export type TransportVolumeControl = 'fader' | 'knob';
 
+export interface TransportPositionTextValues {
+  elapsed: string;
+  duration: string;
+  progress: number;
+  seconds?: number;
+  durationSeconds?: number;
+  seeking: boolean;
+}
+
+export interface TransportText {
+  play?: string;
+  pause?: string;
+  label?: string;
+  volume?: string;
+  seek?: UITextValue<{label: string}>;
+  progress?: UITextValue<{label: string}>;
+  seekValue?: UITextValue<TransportPositionTextValues>;
+  timeTotal?: UITextValue<{duration: string; durationSeconds?: number}>;
+}
+
 export interface TransportOptions {
-  /** Shared, caller-owned text and number formatting. Updates preserve controls. */
-  localization?: UILocalization;
+  /** Application-supplied final text; call update() after external text changes. */
+  getText?: () => TransportText;
+  /** Borrowed pure formatters; UI does not own language selection. */
+  formatters?: UIValueFormatters;
   /** Prefix used by the seek control's accessible name. */
   label?: string;
   /**
@@ -242,7 +264,7 @@ export function mountTransport(
 ): MountedTransportHandle {
 
   const document = host.ownerDocument;
-  const localization = options.localization;
+  const formatters = options.formatters;
   const canSeek = typeof binding.seekFraction === 'function';
   const seekControl = canSeek
     ? options.seekControl ?? (options.seek === false ? false : 'native')
@@ -344,7 +366,7 @@ export function mountTransport(
     const setVolume = binding.setVolume.bind(binding);
     const shared = {
       label: options.volumeLabel ?? 'Volume',
-      formatValue: (value: number) => formatPercent(localization, value),
+      formatValue: (value: number) => formatPercent(formatters, value, undefined, reportError),
       classNames: {root: ['wui-transport__volume', options.classNames?.volume].filter(Boolean).join(' ')},
       parts: {root: ['volume', options.parts?.volume].filter(Boolean).join(' ')},
       onError: (error: unknown) => reportError(error),
@@ -400,15 +422,15 @@ export function mountTransport(
   const progressOf = (state: TransportState): number => clamp01(
     state.progress ?? (finite(state.duration) > 0 ? finite(state.seconds) / finite(state.duration) : 0),
   );
-  const clock = (seconds: number): string => formatTime(localization, seconds, formatClock(seconds));
-  const seekName = (): string => message(localization, 'transport.seek', '{label} seek', {
-    label: options.label ?? message(localization, 'transport.label', 'Transport'),
-  });
-  const seekValue = (progress: number, seconds: number, duration: number): string => duration > 0
-    ? message(localization, 'transport.seekValue', '{elapsed} of {duration}', {
-        elapsed: clock(seconds), duration: clock(duration),
-      })
-    : formatPercent(localization, progress);
+  const clock = (seconds: number): string => formatTime(formatters, seconds, formatClock(seconds), reportError);
+  const positionText = (copy: TransportText | undefined, progress: number, seconds: number | undefined, duration: number | undefined, seeking: boolean): string => {
+    const elapsed = clock(seconds ?? 0);
+    const total = clock(duration ?? 0);
+    const fallback = (duration ?? 0) > 0 && !seeking ? `${elapsed} of ${total}` : formatPercent(formatters, progress, undefined, reportError);
+    return textValue(copy?.seekValue, fallback, {
+      elapsed, duration: total, progress, seconds, durationSeconds: duration, seeking,
+    }, reportError);
+  };
 
   const readState = (): TransportState => {
     try {
@@ -469,6 +491,8 @@ export function mountTransport(
       if (destroyed) return;
       const state = readState();
       if (destroyed) return;
+      const copy = readText(options.getText, reportError);
+      if (destroyed) return;
       const progress = progressOf(state);
       const playing = state.playing === true;
       const disabled = state.disabled === true;
@@ -478,17 +502,21 @@ export function mountTransport(
         ? seek ? Number(seek.value) / 1000 : surfaceProgress
         : progress;
       const action = playing
-        ? options.pauseLabel ?? message(localization, 'transport.pause', 'Pause')
-        : options.playLabel ?? message(localization, 'transport.play', 'Play');
-      const accessibleSeekName = canSeek ? seekName() : message(localization, 'transport.progress', '{label} progress', {
-        label: options.label ?? message(localization, 'transport.label', 'Transport'),
-      });
-      const accessibleSeekValue = dragging
-        ? formatPercent(localization, displayedProgress)
-        : seekValue(progress, seconds, duration);
+        ? options.pauseLabel ?? textValue(copy?.pause, 'Pause', {}, reportError)
+        : options.playLabel ?? textValue(copy?.play, 'Play', {}, reportError);
+      const label = options.label ?? textValue(copy?.label, 'Transport', {}, reportError);
+      const accessibleSeekName = canSeek
+        ? textValue(copy?.seek, `${label} seek`, {label}, reportError)
+        : textValue(copy?.progress, `${label} progress`, {label}, reportError);
+      const describedDuration = state.duration === undefined ? undefined : duration;
+      const describedSeconds = dragging
+        ? describedDuration === undefined ? undefined : displayedProgress * duration
+        : state.seconds !== undefined || (state.progress !== undefined && describedDuration !== undefined) ? seconds : undefined;
+      const accessibleSeekValue = positionText(copy, displayedProgress, describedSeconds, describedDuration, dragging);
       const elapsed = clock(seconds);
-      const total = message(localization, 'transport.timeTotal', ' / {duration}', {duration: clock(duration)});
-      const volumeLabel = options.volumeLabel ?? message(localization, 'transport.volume', 'Volume');
+      const formattedDuration = clock(duration);
+      const total = textValue(copy?.timeTotal, ` / ${formattedDuration}`, {duration: formattedDuration, durationSeconds: describedDuration}, reportError);
+      const volumeLabel = options.volumeLabel ?? textValue(copy?.volume, 'Volume', {}, reportError);
       const icon = lastPlaying !== playing ? renderIcon(playing) : undefined;
       // Text/icon callbacks may destroy or replace this mount.
       if (destroyed) return;
@@ -567,7 +595,9 @@ export function mountTransport(
       if (destroyed || readState().disabled || destroyed) return;
       const fraction = clamp01(Number(seek.value) / 1000);
       paintProgress(fraction);
-      const valueText = formatPercent(localization, fraction);
+      const state = readState();
+      const duration = Math.max(0, finite(state.duration));
+      const valueText = positionText(readText(options.getText, reportError), fraction, state.duration === undefined ? undefined : fraction * duration, state.duration === undefined ? undefined : duration, true);
       if (destroyed) return;
       seek.setAttribute('aria-valuetext', valueText);
       try {
@@ -627,9 +657,11 @@ export function mountTransport(
           const duration = Math.max(0, finite(state.duration));
           const progress = progressOf(state);
           const seconds = Math.max(0, finite(state.seconds, progress * duration));
-          return dragging
-            ? formatPercent(localization, surfaceProgress)
-            : seekValue(progress, seconds, duration);
+          const describedDuration = state.duration === undefined ? undefined : duration;
+          const describedSeconds = dragging
+            ? describedDuration === undefined ? undefined : surfaceProgress * duration
+            : state.seconds !== undefined || (state.progress !== undefined && describedDuration !== undefined) ? seconds : undefined;
+          return positionText(readText(options.getText, reportError), dragging ? surfaceProgress : progress, describedSeconds, describedDuration, dragging);
         },
         onError: (error) => reportError(error),
       },
@@ -681,7 +713,6 @@ export function mountTransport(
   };
 
   let unsubscribe: (() => void) | undefined;
-  let unsubscribeLocalization: (() => void) | undefined;
 
   const handle: MountedTransportHandle = {
     element: root,
@@ -726,16 +757,13 @@ export function mountTransport(
       destroyed = true;
       updateLoop.cancel();
       const releaseBinding = unsubscribe;
-      const releaseLocalization = unsubscribeLocalization;
       unsubscribe = undefined;
-      unsubscribeLocalization = undefined;
       runCleanups([
         ...listeners.splice(0),
         ...volumeListeners.splice(0),
         () => surfaceSlider?.destroy(),
         () => volumeFader?.destroy(),
         releaseBinding,
-        releaseLocalization,
         () => root.remove(),
         () => style?.remove(),
         () => claim.release(),
@@ -762,8 +790,6 @@ export function mountTransport(
 
   // Subscribe and paint only once this mount owns the host, so the previous
   // transport's unsubscribe always runs before this one subscribes.
-  unsubscribeLocalization = bindLocalization(localization, update, () => !destroyed, reportError);
-  if (destroyed) return handle;
   mountSeekSurface();
   if (destroyed) return handle;
   if (initialVolumeKind) handle.setVolumeControl(initialVolumeKind);

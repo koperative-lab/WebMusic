@@ -68,21 +68,23 @@ keyboard.key(60)?.dataset.phase; // 'attack', then 'sustain', then 'release'
 staff.destroy();
 ```
 
-## Localization
+## External presentation inputs
 
-`KeyboardOptions`, `StaffOptions` and `FretboardOptions` accept a borrowed
-[`localization`](/uikit/api/#localization) source. Language changes update the
-default accessible description and fret text in place; destroy unsubscribes.
-Explicit `label` options and all musical labels supplied in snapshots remain
-application-owned.
+`KeyboardOptions.getText`, `StaffOptions.getText` and `FretboardOptions.getText`
+return `KeyboardText`, `StaffText` and `FretboardText`. Each has a `description`
+field accepting a final string or callback with `{names: string}`. Defaults are
+Sounding / Staff / Fretboard, followed by named data when present. An explicit
+`label` option retains precedence.
 
-| Message key | Default / interpolation values |
-| --- | --- |
-| `pitch.keyboard`, `pitch.staff`, `pitch.fretboard` | Sounding / Staff / Fretboard, followed by `: {names}` when named data is present. |
-| `pitch.fret` | `{value}fr`; `value` is the formatted first-fret number. |
+`FretboardText.fret` accepts final text or a callback with
+`{value: string, fret: number}`; the default is the formatted first-fret number
+followed by `fr`. `FretboardOptions.formatters.number` receives the raw fret.
+Call `handle.update()` after changing external display inputs; descriptions and
+fret text refresh without replacing cached geometry. Pitch identities and
+machine attributes stay unchanged. Snapshot labels remain caller-owned.
 
-These settings affect human-readable output, without changing pitch identities,
-geometry or machine attributes.
+[The shared presentation contract](/uikit/api/#external-presentation-inputs)
+leaves translation, language selection and update subscriptions to the application.
 
 <details class="component-section">
 <summary>API</summary>

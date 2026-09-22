@@ -147,26 +147,26 @@ handle's update method after external state changes. Transport requires only
 snapshot/play/pause; missing seek or time data does not produce a fake control.
 Meter accepts a level-only or spectrum-only reader for its selected mode.
 
-### Localization without remounting
+### External presentation inputs
 
-`createUILocalization` from the root entry creates a caller-owned text source.
-Pass it as `options.localization` to presenters that generate text, and call
-`localization.update({messages, formatters})` when the application's language
-changes. Related presenters can share the same object; there is no global locale.
-The public [localization reference][docs-localization] owns the complete API;
-presenter pages list their message keys and interpolation values.
+WebMusic consumes final text and formatting callbacks. Translation frameworks,
+language selection, resource loading, interpolation, plural rules and change
+subscriptions belong to the application and its existing tools.
 
-Messages replace whole phrases, including visible text and ARIA. Number,
-percentage and time formatters receive numbers; they never change machine
-attributes, CSS geometry or the binding's units. Existing explicit label and
-formatter options retain precedence. Application labels, musical spellings,
-unit identifiers and errors remain application data.
+Text-producing presenters accept a typed `getText()` callback. It returns final
+strings or contextual render callbacks defined by that presenter's `*Text`
+interface. The applicable `formatters` callbacks receive raw numbers, fractional
+percentages and seconds. Existing explicit label/formatter options retain
+precedence. Strings are literal; WebMusic never interprets translation keys or
+substitutes tokens. The [presentation reference][docs-presentation] owns the
+shared boundary, while each presenter page lists its fields and refresh method.
 
-Language notifications update existing controls and release with their mounts.
-They do not recreate players, trigger commands or reset focused inputs. One-shot
-analysis renderers read localization when called; their owning application
-rerenders the report. The retained histogram instead updates its existing
-buttons and releases its observer through destroy.
+On an external change, the application calls `update()`, Meter `redraw()`, or
+the retained painter's documented method. Text refresh preserves existing
+controls and focus. WebMusic does not observe the application's translation
+system or maintain another copy of its state. Machine attributes, geometry,
+musical spelling, input units and caller-owned snapshot data retain their
+existing contracts. One-shot analysis output is rerendered by its owner.
 
 ### The handle owns nodes, never domain objects
 
@@ -574,7 +574,7 @@ MIT
 
 [docs]: ../../apps/doc/webmusic/src/content/docs/uikit/index.mdx
 [docs-presenters]: ../../apps/doc/webmusic/src/content/docs/uikit/catalog.mdx
-[docs-localization]: ../../apps/doc/webmusic/src/content/docs/uikit/api.mdx#localization
+[docs-presentation]: ../../apps/doc/webmusic/src/content/docs/uikit/api.mdx#external-presentation-inputs
 
 For source contributions and release verification, see the
 [contribution guide](https://github.com/koperative-lab/WebMusic/blob/main/CONTRIBUTING.md).

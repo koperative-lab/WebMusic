@@ -96,10 +96,11 @@ Each `MixerChannel` has this shape:
 
 | Member | Kind | Default | Description |
 |---|---|---|---|
-| `localization` | `UILocalization` | — | Borrowed text and number-format source; updates repaint in place and destruction releases its subscription. |
+| `getText` | `() => MixerText` | — | Supplies one application-owned text snapshot per update. After external text changes, call `update()`. |
+| `formatters` | `UIValueFormatters` | — | The `percent` callback formats normalized fader values. Other fields are unused by this presenter. |
 | `classNames` | `MixerClassNames` | `{}` | Adds compatibility classes for `root`, `transport`, `board`, `channels`, `strip`, `master`, `fader`, `input`, `label`, `actions`, `button`, `mute`, `solo`, `play`, `pause`, and `stop`. `fader` and `input` both reach the one fader node. |
 | `parts` | `MixerParts` | `{}` | Adds tokens with the same keys beside the presenter's canonical part tokens. |
-| `onError` | `(error: unknown) => void` | — | Receives snapshot, command, subscription and cleanup failures. Error callback throws/rejections are contained. A failed subscription leaves the mounted handle available for explicit `update()` calls. |
+| `onError` | `(error: unknown) => void` | — | Receives snapshot, text/formatter, command, subscription and cleanup failures. Error callback throws/rejections are contained. A failed subscription leaves the mounted handle available for explicit `update()` calls. |
 | `stylesheet` | `boolean` | `true` | Installs the presenter's stylesheet unless explicitly `false`, for a light-DOM host that cannot inject CSS into its page. |
 | `master` | `boolean` | `true` | Render the master strip; `false` leaves only the channel bank. |
 
@@ -111,20 +112,24 @@ Each `MixerChannel` has this shape:
 | `update()` | `() => void` | Re-reads state, repaints surviving controls and reconciles channel membership/order; becomes a no-op after destruction. |
 | `destroy()` | `() => void` | Releases the subscription, all faders, root and style; attempts every cleanup even if one fails, then reports the first failure. Later calls and pending command results are ignored. The binding remains caller-owned. |
 
-**Localization.** Pass an instance-local [localization controller](/uikit/api/) as
-`localization`. Its updates patch labels and accessible value text without replacing faders or
-moving focus. The `percent` formatter receives normalized levels. Caller-owned channel labels
-remain caller text; changing them for the same ids updates the existing strips. Destroy releases
-the localization subscription.
+**Text and formatting.** `getText()` supplies an application-owned `MixerText`
+snapshot on each update. After changing language in the application, call `handle.update()`;
+existing faders, focus and command bindings stay in place. The `percent` formatter receives
+normalized levels. Caller-owned channel labels remain caller text; changing them for the same
+ids updates existing strips. See the [shared text hooks](/uikit/api/) for error handling and
+integration with an application's translation library. No text-source subscription is created.
 
-| Message key | Default | Values |
+| `MixerText` field | Type | Default / callback values |
 |---|---|---|
-| `mixer.master` | `master` | — |
-| `mixer.channels` | `Mixer channels` | — |
-| `mixer.volume` | `{label} volume` | `label` |
-| `mixer.mute` / `mixer.solo` | `Mute {label}` / `Solo {label}` | `label` |
-| `mixer.muteText` / `mixer.soloText` | `M` / `S` | — |
-| `mixer.play` / `mixer.pause` / `mixer.stop` | `Play` / `Pause` / `Stop` | — |
+| `master` | `string` | `master` |
+| `channels` | `string` | `Mixer channels` |
+| `volume` | `UITextValue<{label: string}>` | Defaults to the label followed by ` volume`; callback receives `label`. |
+| `mute` / `solo` | `UITextValue<{label: string}>` | Defaults to `Mute ` / `Solo ` followed by the label. |
+| `muteText` / `soloText` | `string` | `M` / `S` |
+| `play` / `pause` / `stop` | `string` | `Play` / `Pause` / `Stop` |
+
+All fields are optional. Strings are final text, including any braces; the presenter does not
+interpolate them. Use a callback for values within a translated sentence.
 
 **Accessibility.** Every fader is a vertical ARIA slider named `<channel label> volume`.
 Mute and solo are native buttons named `Mute <label>` and `Solo <label>` with `aria-pressed`;

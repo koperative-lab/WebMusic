@@ -1,4 +1,4 @@
-import {bindLocalization, message as uiMessage, formatNumber, type UILocalization} from './localization';
+import {readText, textValue, type UITextValue, formatNumber, type UIValueFormatters} from './text';
 import {installStyle} from './internal/style';
 import {claimHost, createErrorSink} from './internal/lifecycle';
 import {finitePositive, addClassNames, clamp, finite, setParts} from './internal/dom';
@@ -33,9 +33,15 @@ export interface MinimapParts {
   brush?: string;
 }
 
+export interface MinimapText {
+  label?: UITextValue;
+  range?: UITextValue<{start: string; end: string; rawStart: number; rawEnd: number}>;
+}
+
 export interface MinimapOptions {
-  /** Borrowed live text and formatting; language updates preserve controls. */
-  localization?: UILocalization;
+  /** Read application-resolved text once per paint; call update() after external changes. */
+  getText?: () => MinimapText;
+  formatters?: UIValueFormatters;
   label?: string;
   fallbackWidth?: number;
   fallbackHeight?: number;
@@ -183,7 +189,6 @@ export function mountMinimap(
   let commandRevision = 0;
   let destroyed = false;
   let unsubscribe: (() => void) | undefined;
-  let releaseLocalization = (): void => {};
   let drag: DragState | undefined;
   let resizeObserver: ResizeObserver | undefined;
 
@@ -228,7 +233,9 @@ export function mountMinimap(
   };
 
   const paintBrush = (): void => {
-    brush.setAttribute('aria-label', options.label ?? uiMessage(options.localization, 'minimap.label', 'Visible range'));
+    const text = readText(options.getText, options.onError);
+    if (destroyed || !claim.isCurrent()) return;
+    brush.setAttribute('aria-label', options.label ?? textValue(text?.label, 'Visible range', {}, options.onError));
     const range = effectiveRange();
     const span = state.maximum - state.minimum;
     const hidden = !range || !(span > 0);
@@ -247,10 +254,12 @@ export function mountMinimap(
     brush.style.left = `${clamp(startFraction, 0, 1) * 100}%`;
     brush.style.width = `${Math.max(.5, clamp(endFraction - startFraction, 0, 1) * 100)}%`;
     brush.setAttribute('aria-valuenow', String(range.start));
-    brush.setAttribute('aria-valuetext', uiMessage(options.localization, 'minimap.range', '{start} to {end}', {
-      start: formatNumber(options.localization, range.start, range.start.toFixed(2)),
-      end: formatNumber(options.localization, range.end, range.end.toFixed(2)),
-    }));
+    const values = {
+      start: formatNumber(options.formatters, range.start, range.start.toFixed(2), options.onError),
+      end: formatNumber(options.formatters, range.end, range.end.toFixed(2), options.onError),
+      rawStart: range.start, rawEnd: range.end,
+    };
+    brush.setAttribute('aria-valuetext', textValue(text?.range, `${values.start} to ${values.end}`, values, options.onError));
   };
 
   const readSnapshot = (): void => {
@@ -399,7 +408,6 @@ export function mountMinimap(
     destroy(): void {
       if (destroyed) return;
       destroyed = true;
-      releaseLocalization();
       commandRevision += 1;
       optimisticRange = undefined;
       try {
@@ -456,6 +464,5 @@ export function mountMinimap(
       report(error);
     }
   }
-  releaseLocalization = bindLocalization(options.localization, update, () => !destroyed && claim.isCurrent(), options.onError);
   return handle;
 }

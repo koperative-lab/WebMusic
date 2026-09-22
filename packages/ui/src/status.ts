@@ -1,4 +1,4 @@
-import {bindLocalization, message as uiMessage, type UILocalization} from './localization';
+import {readText, textValue, type UITextValue} from './text';
 import {installStyle} from './internal/style';
 import {claimHost, createErrorSink} from './internal/lifecycle';
 import {addClassNames, setParts} from './internal/dom';
@@ -26,9 +26,16 @@ export interface StatusParts {
   message?: string;
 }
 
+export interface StatusText {
+  ready?: UITextValue;
+  loading?: UITextValue;
+  empty?: UITextValue;
+  error?: UITextValue;
+}
+
 export interface StatusOptions {
-  /** Borrowed live text and formatting; language updates preserve controls. */
-  localization?: UILocalization;
+  /** Read application-resolved text once per paint; call update() after external changes. */
+  getText?: () => StatusText;
   classNames?: StatusClassNames;
   parts?: StatusParts;
   onError?: (error: unknown) => void;
@@ -110,7 +117,6 @@ export function mountStatus(
 
   let destroyed = false;
   let unsubscribe: (() => void) | undefined;
-  let releaseLocalization = (): void => {};
 
   const report = createErrorSink(options.onError);
 
@@ -118,6 +124,8 @@ export function mountStatus(
     if (destroyed) return;
     try {
       const state = binding.snapshot();
+      const text = readText(options.getText, options.onError);
+      if (destroyed || !claim.isCurrent()) return;
       const kind: StatusKind =
         state.kind === 'loading' || state.kind === 'empty' || state.kind === 'error'
           ? state.kind
@@ -135,7 +143,7 @@ export function mountStatus(
         root.setAttribute('aria-live', 'polite');
       }
       if (kind === 'loading') root.setAttribute('aria-busy', 'true');
-      message.textContent = state.message ?? uiMessage(options.localization, `status.${kind}`, defaultMessage(kind));
+      message.textContent = state.message ?? textValue(text?.[kind], defaultMessage(kind), {}, options.onError);
     } catch (error) {
       report(error);
     }
@@ -148,7 +156,6 @@ export function mountStatus(
     destroy(): void {
       if (destroyed) return;
       destroyed = true;
-      releaseLocalization();
       try {
         unsubscribe?.();
       } catch (error) {
@@ -183,6 +190,5 @@ export function mountStatus(
       report(error);
     }
   }
-  releaseLocalization = bindLocalization(options.localization, update, () => !destroyed && claim.isCurrent(), options.onError);
   return handle;
 }

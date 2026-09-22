@@ -43,26 +43,29 @@ Live Demo's caller does that calculation so dragging remains visible. Latest-com
 tracked independently per band. See the
 [shared presenter shape](/uikit/api/#the-shared-presenter-shape) for common lifecycle rules.
 
-## Localization
+## Display text and values
 
-Pass a shared [`localization`](/uikit/api/#localization) source to relabel controls and format
-numbers in place. Explicit `label`, `emptyLabel`, and `formatFrequency` options take precedence.
-Focus remains on the same band range when only language changes. Replacing the contents of
-`emptyElement()` with application nodes also preserves those nodes during language updates.
+`getText()` returns application-resolved `EqText` once per paint. Call `handle.update()` after
+external settings change. Explicit `label`, `emptyLabel`, and `formatFrequency` take precedence.
+Focused band ranges remain mounted. Application nodes placed in `emptyElement()` also survive
+text updates. See [application-owned text](/uikit/api/#external-presentation-inputs) for external
+translation-package composition.
 
-| Message key | Fallback / interpolation values |
+Fields accept literal strings or callbacks returning final strings, with no template interpolation.
+Missing fields and failed callbacks use defaults; callback failures reach `onError`.
+
+| `EqText` field | Default / callback context |
 |---|---|
-| `eq.label` | `Equalizer` |
-| `eq.empty` | `Connect an equalizer graph` |
-| `eq.bandFrequency`, `eq.bandGain` | `Band {index} frequency`, `Band {index} gain`; index is a formatted, one-based band number. |
-| `eq.frequency`, `eq.gain` | `frequency`, `gain` |
-| `eq.kilohertzShort` | `{value}k` |
-| `eq.hertz`, `eq.decibels` | `{value} hertz`, `{value} decibels` |
-| `eq.bandValue` | `{frequency} {gain}dB` |
-| `eq.focusedBand` | `Band {index} {axis}: {value}` |
+| `label`, `empty` | `Equalizer`, `Connect an equalizer graph`; no context values. |
+| `frequency`, `gain` | `frequency`, `gain`; no context values. |
+| `bandFrequency`, `bandGain` | Band number plus axis name; `{index: string, bandIndex: number}` includes the formatted one-based number and raw zero-based index. |
+| `kilohertzShort` | Value followed by `k`; `{value: string, kilohertz: number}`. |
+| `hertz`, `decibels` | Value followed by the unit name; `{value: string, hertz: number}` or `{value: string, decibels: number}`. |
+| `bandValue` | Frequency plus signed gain and `dB`; `{frequency: string, gain: string, band: EqBandState}`. |
+| `focusedBand` | Band number, axis, and value; `{index: string, bandIndex: number, axis: string, value: string}`. |
 
-The `number` formatter receives hertz, kilohertz, decibels, or band indices as appropriate.
-Message values are already formatted; frequency/gain range values and commands remain numeric.
+`formatters.number` receives hertz, kilohertz, decibels, or one-based band numbers as appropriate.
+Range values and commands retain their numeric coordinate system.
 
 <details class="component-section">
 <summary>API</summary>
@@ -97,12 +100,13 @@ Message values are already formatted; frequency/gain range values and commands r
 
 | Member | Kind | Default | Description |
 |---|---|---|---|
-| `localization` | `UILocalization` | — | Borrowed live text and number-formatting source; its subscription is released on destruction. |
+| `getText` | `() => EqText` | — | Reads application-resolved display text once per paint; call `update()` after external changes. |
+| `formatters` | `UIValueFormatters` | — | Pure numeric display callbacks; explicit presenter formatters take precedence. |
 | `label` | `string` | `'Equalizer'` | Accessible name of the root group. |
 | `emptyLabel` | `string` | `'Connect an equalizer graph'` | Status text while `ready !== true`. |
 | `classNames` | `EqClassNames` | `{}` | Adds compatibility classes to all EQ node kinds. |
 | `parts` | `EqParts` | `{}` | Adds tokens beside every canonical EQ part; this type has the same keys as `EqClassNames`. |
-| `formatFrequency` | `(frequency: number) => string` | Compact Hz/kHz | Formats frequency in visible readouts and frequency-range `aria-valuetext`; takes precedence over localization formatting. |
+| `formatFrequency` | `(frequency: number) => string` | Compact Hz/kHz | Formats frequency in visible readouts and frequency-range `aria-valuetext`; takes precedence over `formatters.number`. |
 | `onError` | `(error: unknown) => void` | — | Receives snapshot, formatter, command, subscription, stabilization and cleanup failures. |
 | `stylesheet` | `boolean` | `true` | Installs the presenter's stylesheet unless explicitly `false`, for a light-DOM host that cannot inject CSS into its page. |
 

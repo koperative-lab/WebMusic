@@ -1,9 +1,9 @@
 import {installStyle} from './internal/style';
-import {claimHost, createErrorSink} from './internal/lifecycle';
+import {claimHost, createErrorSink, createUpdateLoop} from './internal/lifecycle';
 import {addClassNames, clamp01, setParts} from './internal/dom';
 import {componentSurfaceCss, controlBorderFallback} from './internal/surface';
 import {controlHeight, controlRadius, controlThumbRadius} from './internal/control';
-import {bindLocalization, formatNumber, formatPercent, message, type UILocalization} from './localization';
+import {formatNumber, formatPercent, readText, textValue, type UIValueFormatters} from './text';
 // ============================================================================
 // Domain-neutral queue presenter: a transport bar over an ordered list of
 // entries. It knows nothing about audio, scores or files — only labels,
@@ -61,8 +61,19 @@ export interface PlaylistParts {
   item?: string;
 }
 
+export interface PlaylistText {
+  label?: string;
+  previous?: string;
+  next?: string;
+  play?: string;
+  pause?: string;
+  seek?: string;
+}
+
 export interface PlaylistOptions {
-  localization?: UILocalization;
+  /** Read application-provided text on each update. */
+  getText?: () => PlaylistText;
+  formatters?: UIValueFormatters;
   /** Accessible name of the list. Defaults to 'Playlist'. */
   label?: string;
   /** Install the exported stylesheet into the host. Defaults to true. */
@@ -246,6 +257,8 @@ export function mountPlaylist(
 ): PlaylistHandle {
 
   const document = host.ownerDocument;
+  let texts: PlaylistText | undefined;
+
   const style = installStyle(document, 'playlist', playlistStyle, options.stylesheet);
 
   const root = document.createElement('div');
@@ -269,16 +282,16 @@ export function mountPlaylist(
     return node;
   };
 
-  const previous = button('prev', message(options.localization, 'playlist.previous', 'Previous'), '⏮');
-  const toggle = button('play', message(options.localization, 'playlist.play', 'Play'), '▶');
-  const next = button('next', message(options.localization, 'playlist.next', 'Next'), '⏭');
+  const previous = button('prev', textValue(texts?.previous, 'Previous', {}, options.onError), '⏮');
+  const toggle = button('play', textValue(texts?.play, 'Play', {}, options.onError), '▶');
+  const next = button('next', textValue(texts?.next, 'Next', {}, options.onError), '⏭');
 
   const seek = document.createElement('input');
   seek.type = 'range';
   seek.min = '0';
   seek.max = '1000';
   seek.className = 'wui-playlist__seek seek';
-  seek.setAttribute('aria-label', message(options.localization, 'playlist.seek', 'Seek'));
+  seek.setAttribute('aria-label', textValue(texts?.seek, 'Seek', {}, options.onError));
   addClassNames(seek, options.classNames?.seek);
   setParts(seek, 'seek', options.parts?.seek);
 
@@ -286,7 +299,7 @@ export function mountPlaylist(
 
   const list = document.createElement('ol');
   list.className = 'wui-playlist__items';
-  list.setAttribute('aria-label', options.label ?? message(options.localization, 'playlist.label', 'Playlist'));
+  list.setAttribute('aria-label', options.label ?? textValue(texts?.label, 'Playlist', {}, options.onError));
   addClassNames(list, options.classNames?.list);
   setParts(list, 'list', options.parts?.list);
 
@@ -294,7 +307,6 @@ export function mountPlaylist(
 
   let destroyed = false;
   let unsubscribe: (() => void) | undefined;
-  let unbindLocalization: (() => void) | undefined;
   let listSignature = '';
   const rows = new Map<string, HTMLLIElement>();
 
@@ -357,24 +369,27 @@ export function mountPlaylist(
     const label = row.querySelector<HTMLElement>('.wui-playlist__label');
     if (label) label.textContent = item.label;
     const ordinal = row.querySelector<HTMLElement>('.num');
-    if (ordinal) ordinal.textContent = formatNumber(options.localization, index + 1);
+    if (ordinal) ordinal.textContent = formatNumber(options.formatters, index + 1, undefined, options.onError);
   };
 
-  update = (): void => {
+  const paintSnapshot = (): void => {
     if (destroyed) return;
     try {
       const state = binding.snapshot();
+      if (destroyed || !claim.isCurrent()) return;
+      texts = readText(options.getText, options.onError);
+      if (destroyed || !claim.isCurrent()) return;
       const items = state.items ?? [];
 
       toggle.textContent = state.playing ? '⏸' : '▶';
       toggle.setAttribute('aria-label', state.playing
-        ? message(options.localization, 'playlist.pause', 'Pause')
-        : message(options.localization, 'playlist.play', 'Play'));
-      previous.setAttribute('aria-label', message(options.localization, 'playlist.previous', 'Previous'));
-      next.setAttribute('aria-label', message(options.localization, 'playlist.next', 'Next'));
-      seek.setAttribute('aria-label', message(options.localization, 'playlist.seek', 'Seek'));
-      seek.setAttribute('aria-valuetext', formatPercent(options.localization, clamp01(state.progress)));
-      list.setAttribute('aria-label', options.label ?? message(options.localization, 'playlist.label', 'Playlist'));
+        ? textValue(texts?.pause, 'Pause', {}, options.onError)
+        : textValue(texts?.play, 'Play', {}, options.onError));
+      previous.setAttribute('aria-label', textValue(texts?.previous, 'Previous', {}, options.onError));
+      next.setAttribute('aria-label', textValue(texts?.next, 'Next', {}, options.onError));
+      seek.setAttribute('aria-label', textValue(texts?.seek, 'Seek', {}, options.onError));
+      seek.setAttribute('aria-valuetext', formatPercent(options.formatters, clamp01(state.progress), undefined, options.onError));
+      list.setAttribute('aria-label', options.label ?? textValue(texts?.label, 'Playlist', {}, options.onError));
       for (const control of [previous, toggle, next, seek]) {
         control.toggleAttribute('disabled', state.disabled === true);
       }
@@ -403,6 +418,12 @@ export function mountPlaylist(
     }
   };
 
+  const updateLoop = createUpdateLoop({
+    name: 'Playlist', pass: paintSnapshot,
+    isCurrent: () => !destroyed && claim.isCurrent(), report,
+  });
+  update = (): void => updateLoop.run();
+
   previous.addEventListener('click', () => command(() => binding.previous()));
   toggle.addEventListener('click', () => command(() => binding.toggle()));
   next.addEventListener('click', () => command(() => binding.next()));
@@ -426,14 +447,13 @@ export function mountPlaylist(
     destroy(): void {
       if (destroyed) return;
       destroyed = true;
+      updateLoop.cancel();
       try {
         unsubscribe?.();
       } catch (error) {
         report(error);
       }
-      const releaseText = unbindLocalization;
-      unbindLocalization = undefined;
-      releaseText?.();
+
       claim.release();
       root.remove();
       style?.remove();
@@ -462,6 +482,6 @@ export function mountPlaylist(
       report(error);
     }
   }
-  unbindLocalization = bindLocalization(options.localization, update, () => !destroyed && claim.isCurrent(), report);
+
   return handle;
 }

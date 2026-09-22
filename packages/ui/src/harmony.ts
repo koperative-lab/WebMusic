@@ -1,4 +1,4 @@
-import {bindLocalization, message as localize, type UILocalization, formatNumber, formatPercent} from './localization';
+import {formatNumber, formatPercent, readText, textValue, type UITextValue, type UIValueFormatters} from './text';
 import {
   harmonyValues,
   harmonyInline,
@@ -44,7 +44,7 @@ import {
   type FrameTick,
   type MotionMode,
 } from './internal/frame';
-import {claimHost, createErrorSink} from './internal/lifecycle';
+import {claimHost, createErrorSink, createUpdateLoop, runCleanups} from './internal/lifecycle';
 import {restampActiveStyle, stampIdleStyle, stampSpans} from './internal/spans';
 import {installStyle, paint} from './internal/style';
 import {componentSurfaceDeclarations, embeddedSurfaceDeclarations} from './internal/surface';
@@ -971,8 +971,9 @@ function dressing(
 }
 
 /** The label a read-out announces when the caller supplies none. */
-function describe(localization: UILocalization | undefined, key: string, subject: string, names: readonly string[]): string {
-  return localize(localization, key, names.length > 0 ? `${subject}: {names}` : subject, {names: names.join(', ')});
+function describe(override: UITextValue<{names: string}> | undefined, subject: string, names: readonly string[], onError?: (error: unknown) => void): string {
+  const joined = names.join(', ');
+  return textValue(override, names.length > 0 ? `${subject}: ${joined}` : subject, {names: joined}, onError);
 }
 
 /**
@@ -1133,8 +1134,16 @@ export interface FlowLaneParts {
   reel?: string;
 }
 
+export interface FlowLaneText {
+  description?: UITextValue<{names: string}>;
+  position?: string;
+  positionValue?: UITextValue<{value: string; position: number; label: string}>;
+}
+
 export interface FlowLaneOptions {
-  localization?: UILocalization;
+  /** Final text from application-owned presentation state; refreshed by update(). */
+  getText?: () => FlowLaneText;
+  formatters?: UIValueFormatters;
   /** Outer surface, or no frame/background when a containing presenter owns it. Defaults to 'default'. */
   surface?: 'default' | 'none';
   label?: string;
@@ -1355,8 +1364,8 @@ export function mountFlowLane(
   let primaryTrack = 0;
   let pulse: Animation | undefined;
   let destroyed = false;
+  let text: FlowLaneText | undefined;
   let unsubscribe: (() => void) | undefined;
-  let unlocalize: (() => void) | undefined;
   let leaveLoop: (() => void) | undefined;
   let resizeObserver: ResizeObserver | undefined;
   let intersectionObserver: IntersectionObserver | undefined;
@@ -1449,7 +1458,7 @@ export function mountFlowLane(
       viewport,
       'aria-valuetext',
       options.formatPosition?.(position) ??
-        (current?.primary ? localize(options.localization, 'harmony.positionValue', '{value} — {label}', {value: formatNumber(options.localization, position, coordinate(position)), label: current.primary}) : formatNumber(options.localization, position, coordinate(position))),
+        (current?.primary ? textValue(text?.positionValue, `${formatNumber(options.formatters, position, coordinate(position), options.onError)} — ${current.primary}`, {value: formatNumber(options.formatters, position, coordinate(position), options.onError), position, label: current.primary}, options.onError) : formatNumber(options.formatters, position, coordinate(position), options.onError)),
     );
   };
 
@@ -1913,10 +1922,13 @@ export function mountFlowLane(
     laneWidth = finitePositive(viewport.clientWidth || root.clientWidth, fallbackWidth);
   };
 
-  const update = (): void => {
+  const pass = (): void => {
     if (destroyed) return;
+    text = readText(options.getText, options.onError);
+    if (destroyed || !claim.isCurrent()) return;
     try {
       state = binding.snapshot();
+      if (destroyed || !claim.isCurrent()) return;
       ordered = (state.bands ?? []).filter(
         (band): band is FlowBand =>
           Boolean(band) && Number.isFinite(band.start) && Number.isFinite(band.end),
@@ -1972,7 +1984,7 @@ export function mountFlowLane(
       // Only where the viewport is actually a slider. A range on a node with no
       // role is a promise to a reader that nothing keeps.
       if (binding.seek) {
-        setLabel(viewport, options.label ?? localize(options.localization, 'harmony.position', 'Position'));
+        setLabel(viewport, options.label ?? text?.position ?? 'Position');
         setAttr(viewport, 'aria-valuemin', coordinate(axis.start));
         setAttr(viewport, 'aria-valuemax', coordinate(axis.end));
         setAttr(viewport, 'aria-disabled', state.disabled ? 'true' : undefined);
@@ -1987,11 +1999,11 @@ export function mountFlowLane(
         root,
         options.label ??
           describe(
-            options.localization, 'harmony.flowLane', 'Flow lane',
+            text?.description, 'Flow lane',
             ordered
               .slice(0, 4)
               .map((band) => band.primary)
-              .filter((label): label is string => Boolean(label)),
+              .filter((label): label is string => Boolean(label)), options.onError,
           ),
       );
       // `state.now` seeds the FIRST placement and nothing after it: once a
@@ -2006,6 +2018,14 @@ export function mountFlowLane(
       report(error);
     }
   };
+
+  const updates = createUpdateLoop({
+    name: 'FlowLane',
+    pass,
+    isCurrent: () => !destroyed && claim.isCurrent(),
+    report,
+  });
+  const update = updates.run;
 
   // -------------------------------------------------------------------------
   // Pointer, wheel and keyboard. The lane takes a callback; turning it into an
@@ -2139,7 +2159,7 @@ export function mountFlowLane(
     viewport.tabIndex = 0;
     viewport.setAttribute('role', 'slider');
     viewport.setAttribute('aria-orientation', 'horizontal');
-    setLabel(viewport, options.label ?? localize(options.localization, 'harmony.position', 'Position'));
+    setLabel(viewport, options.label ?? text?.position ?? 'Position');
     viewport.addEventListener('pointerdown', onPointerDown);
     viewport.addEventListener('pointermove', onPointerMove);
     viewport.addEventListener('pointerup', onPointerUp);
@@ -2203,9 +2223,7 @@ export function mountFlowLane(
     destroy(): void {
       if (destroyed) return;
       destroyed = true;
-      const releaseText = unlocalize;
-      unlocalize = undefined;
-      releaseText?.();
+      updates.cancel();
       partLoop();
       pulse?.cancel();
       if (wheelTimer !== undefined) clearTimeout(wheelTimer);
@@ -2223,8 +2241,10 @@ export function mountFlowLane(
       }
       resizeObserver?.disconnect();
       intersectionObserver?.disconnect();
+      const stop = unsubscribe;
+      unsubscribe = undefined;
       try {
-        unsubscribe?.();
+        stop?.();
       } catch (error) {
         report(error);
       }
@@ -2287,14 +2307,18 @@ export function mountFlowLane(
 
   measure();
   update();
+  if (destroyed || !claim.isCurrent()) return handle;
   joinLoop();
   if (options.clock) {
     try {
-      unsubscribe = options.clock.subscribe(tickAt);
+      const stop = options.clock.subscribe(tickAt);
+      if (destroyed || !claim.isCurrent()) stop();
+      else unsubscribe = stop;
     } catch (error) {
       report(error);
     }
   }
+  if (destroyed || !claim.isCurrent()) return handle;
   if (binding.subscribe) {
     const chained = unsubscribe;
     try {
@@ -2306,15 +2330,12 @@ export function mountFlowLane(
       // with no symptom a caller could see. The other three mounts already call
       // it this way; this one is the odd file out.
       const stop = binding.subscribe(update);
-      unsubscribe = (): void => {
-        chained?.();
-        stop();
-      };
+      if (destroyed || !claim.isCurrent()) stop();
+      else unsubscribe = (): void => runCleanups([chained, stop], options.onError);
     } catch (error) {
       report(error);
     }
   }
-  unlocalize = bindLocalization(options.localization, update, () => !destroyed && claim.isCurrent(), options.onError);
   return handle;
 }
 
@@ -2376,8 +2397,13 @@ export interface NameplateParts {
   symbol?: string;
 }
 
+export interface NameplateText {
+  description?: UITextValue<{names: string}>;
+}
+
 export interface NameplateOptions {
-  localization?: UILocalization;
+  /** Final text from application-owned presentation state; refreshed by update(). */
+  getText?: () => NameplateText;
   /** Outer surface, or no frame/background when a containing presenter owns it. Defaults to 'default'. */
   surface?: 'default' | 'none';
   label?: string;
@@ -2506,8 +2532,8 @@ export function mountNameplate(
   let state: NameplateState = {};
   let animation: Animation | undefined;
   let destroyed = false;
+  let text: NameplateText | undefined;
   let unsubscribe: (() => void) | undefined;
-  let unlocalize: (() => void) | undefined;
   let leaveLoop: (() => void) | undefined;
   const report = createErrorSink(options.onError);
   const clockNow = (): number => view?.performance?.now?.() ?? Date.now();
@@ -2561,10 +2587,13 @@ export function mountNameplate(
     }
   };
 
-  const update = (): void => {
+  const pass = (): void => {
     if (destroyed) return;
+    text = readText(options.getText, options.onError);
+    if (destroyed || !claim.isCurrent()) return;
     try {
       state = binding.snapshot();
+      if (destroyed || !claim.isCurrent()) return;
       const primary = state.primary;
       const identity = primary ? (primary.key ?? primary.symbol) : undefined;
       setText(symbol, primary?.symbol ?? '');
@@ -2691,12 +2720,20 @@ export function mountNameplate(
       setHidden(empty, !showEmpty);
       setLabel(
         root,
-        options.label ?? describe(options.localization, 'harmony.chord', 'Chord', primary ? [primary.full ?? primary.symbol] : []),
+        options.label ?? describe(text?.description, 'Chord', primary ? [primary.full ?? primary.symbol] : [], options.onError),
       );
     } catch (error) {
       report(error);
     }
   };
+
+  const updates = createUpdateLoop({
+    name: 'Nameplate',
+    pass,
+    isCurrent: () => !destroyed && claim.isCurrent(),
+    report,
+  });
+  const update = updates.run;
 
   const handle: NameplateHandle = {
     element: root,
@@ -2709,14 +2746,14 @@ export function mountNameplate(
     destroy(): void {
       if (destroyed) return;
       destroyed = true;
-      const releaseText = unlocalize;
-      unlocalize = undefined;
-      releaseText?.();
+      updates.cancel();
       leaveLoop?.();
       leaveLoop = undefined;
       animation?.cancel();
+      const stop = unsubscribe;
+      unsubscribe = undefined;
       try {
-        unsubscribe?.();
+        stop?.();
       } catch (error) {
         report(error);
       }
@@ -2738,6 +2775,7 @@ export function mountNameplate(
   }
 
   update();
+  if (destroyed || !claim.isCurrent()) return handle;
   const animate = options.clock ? false : (options.animate ?? binding.approach !== undefined);
   if (animate && !stepped) {
     leaveLoop = joinFrameLoop(view, (at, degraded) =>
@@ -2746,24 +2784,24 @@ export function mountNameplate(
   }
   if (options.clock) {
     try {
-      unsubscribe = options.clock.subscribe(tickAt);
+      const stop = options.clock.subscribe(tickAt);
+      if (destroyed || !claim.isCurrent()) stop();
+      else unsubscribe = stop;
     } catch (error) {
       report(error);
     }
   }
+  if (destroyed || !claim.isCurrent()) return handle;
   if (binding.subscribe) {
     const chained = unsubscribe;
     try {
       const stop = binding.subscribe(update);
-      unsubscribe = (): void => {
-        chained?.();
-        stop();
-      };
+      if (destroyed || !claim.isCurrent()) stop();
+      else unsubscribe = (): void => runCleanups([chained, stop], options.onError);
     } catch (error) {
       report(error);
     }
   }
-  unlocalize = bindLocalization(options.localization, update, () => !destroyed && claim.isCurrent(), options.onError);
   return handle;
 }
 
@@ -2824,8 +2862,15 @@ export interface ChipStripParts {
   list?: string;
 }
 
+export interface ChipStripText {
+  description?: UITextValue<{names: string}>;
+  occurrences?: UITextValue<{count: number; value: string}>;
+}
+
 export interface ChipStripOptions {
-  localization?: UILocalization;
+  /** Final text from application-owned presentation state; refreshed by update(). */
+  getText?: () => ChipStripText;
+  formatters?: UIValueFormatters;
   /** Outer surface, or no frame/background when a containing presenter owns it. Defaults to 'default'. */
   surface?: 'default' | 'none';
   label?: string;
@@ -2890,14 +2935,17 @@ export function mountChipStrip(
    */
   const boxes = new WeakMap<HTMLLIElement, string>();
   let destroyed = false;
+  let text: ChipStripText | undefined;
   let unsubscribe: (() => void) | undefined;
-  let unlocalize: (() => void) | undefined;
   const report = createErrorSink(options.onError);
 
-  const update = (): void => {
+  const pass = (): void => {
     if (destroyed) return;
+    text = readText(options.getText, options.onError);
+    if (destroyed || !claim.isCurrent()) return;
     try {
       const state = binding.snapshot();
+      if (destroyed || !claim.isCurrent()) return;
       const layout = state.layout ?? 'flow';
       setData(list, 'layout', layout);
       if (inline) {
@@ -2934,14 +2982,22 @@ export function mountChipStrip(
         root,
         options.label ??
           describe(
-            options.localization, 'harmony.readout', 'Read-out',
-            rows.slice(0, 4).map((item) => item.primary),
+            text?.description, 'Read-out',
+            rows.slice(0, 4).map((item) => item.primary), options.onError,
           ),
       );
     } catch (error) {
       report(error);
     }
   };
+
+  const updates = createUpdateLoop({
+    name: 'ChipStrip',
+    pass,
+    isCurrent: () => !destroyed && claim.isCurrent(),
+    report,
+  });
+  const update = updates.run;
 
   const paintChip = (node: HTMLLIElement, item: ChipItem, layout: string): void => {
     node.className = 'wui-harmony-chip__item';
@@ -3032,7 +3088,7 @@ export function mountChipStrip(
     if (item.trailing !== undefined || item.occurrences?.length) {
       const trailing = document.createElement('span');
       trailing.className = 'wui-harmony-chip__trailing';
-      trailing.textContent = item.trailing ?? localize(options.localization, 'harmony.occurrences', 'x{count}', {count: formatNumber(options.localization, item.occurrences?.length ?? 0)});
+      trailing.textContent = item.trailing ?? textValue(text?.occurrences, `x${formatNumber(options.formatters, item.occurrences?.length ?? 0, undefined, options.onError)}`, {count: item.occurrences?.length ?? 0, value: formatNumber(options.formatters, item.occurrences?.length ?? 0, undefined, options.onError)}, options.onError);
       dress(trailing, chipParts.trailing);
       children.push(trailing);
     }
@@ -3066,11 +3122,11 @@ export function mountChipStrip(
     destroy(): void {
       if (destroyed) return;
       destroyed = true;
-      const releaseText = unlocalize;
-      unlocalize = undefined;
-      releaseText?.();
+      updates.cancel();
+      const stop = unsubscribe;
+      unsubscribe = undefined;
       try {
-        unsubscribe?.();
+        stop?.();
       } catch (error) {
         report(error);
       }
@@ -3092,14 +3148,16 @@ export function mountChipStrip(
   }
 
   update();
+  if (destroyed || !claim.isCurrent()) return handle;
   if (binding.subscribe) {
     try {
-      unsubscribe = binding.subscribe(update);
+      const stop = binding.subscribe(update);
+      if (destroyed || !claim.isCurrent()) stop();
+      else unsubscribe = stop;
     } catch (error) {
       report(error);
     }
   }
-  unlocalize = bindLocalization(options.localization, update, () => !destroyed && claim.isCurrent(), options.onError);
   return handle;
 }
 
@@ -3156,8 +3214,15 @@ export interface WheelParts {
   svg?: string;
 }
 
+export interface WheelText {
+  description?: UITextValue<{names: string}>;
+  share?: UITextValue<{label: string; value: string; fraction: number}>;
+}
+
 export interface WheelOptions {
-  localization?: UILocalization;
+  /** Final text from application-owned presentation state; refreshed by update(). */
+  getText?: () => WheelText;
+  formatters?: UIValueFormatters;
   /** Outer surface, or no frame/background when a containing presenter owns it. Defaults to 'default'. */
   surface?: 'default' | 'none';
   label?: string;
@@ -3277,8 +3342,8 @@ export function mountWheel(
   let ringSignature = '';
   let angle = 0;
   let destroyed = false;
+  let text: WheelText | undefined;
   let unsubscribe: (() => void) | undefined;
-  let unlocalize: (() => void) | undefined;
   const report = createErrorSink(options.onError);
 
   const drawRing = (
@@ -3322,17 +3387,20 @@ export function mountWheel(
       // said only where there is a denominator to say it against.
       const share =
         total > 0 ? Math.max(0, finite(segment.weight, 0)) / total : undefined;
-      label.textContent = share === undefined ? segment.label : localize(options.localization, 'harmony.share', '{label} {value}', {label: segment.label, value: formatPercent(options.localization, share)});
+      label.textContent = share === undefined ? segment.label : textValue(text?.share, `${segment.label} ${formatPercent(options.formatters, share, undefined, options.onError)}`, {label: segment.label, value: formatPercent(options.formatters, share, undefined, options.onError), fraction: share}, options.onError);
       label.dataset.segment = segment.id;
       label.dataset.ring = ring;
       entries.push(label);
     });
   };
 
-  const update = (): void => {
+  const pass = (): void => {
     if (destroyed) return;
+    text = readText(options.getText, options.onError);
+    if (destroyed || !claim.isCurrent()) return;
     try {
       const state = binding.snapshot();
+      if (destroyed || !claim.isCurrent()) return;
       const outer: readonly WheelSegment[] =
         (state.outer?.length ?? 0) > 0
           ? state.outer
@@ -3367,9 +3435,9 @@ export function mountWheel(
           const label = index.children[labelIndex++];
           if (!label) continue;
           const share = total > 0 ? Math.max(0, finite(segment.weight, 0)) / total : undefined;
-          setText(label, share === undefined ? segment.label : localize(options.localization, 'harmony.share', '{label} {value}', {
-            label: segment.label, value: formatPercent(options.localization, share),
-          }));
+          setText(label, share === undefined ? segment.label : textValue(text?.share, `${segment.label} ${formatPercent(options.formatters, share, undefined, options.onError)}`, {
+            label: segment.label, value: formatPercent(options.formatters, share, undefined, options.onError), fraction: share,
+          }, options.onError));
         }
       }
 
@@ -3461,12 +3529,20 @@ export function mountWheel(
         root,
         options.label ??
           state.needle?.label ??
-          describe(options.localization, 'harmony.wheel', 'Wheel', state.centre?.primary ? [state.centre.primary] : []),
+          describe(text?.description, 'Wheel', state.centre?.primary ? [state.centre.primary] : [], options.onError),
       );
     } catch (error) {
       report(error);
     }
   };
+
+  const updates = createUpdateLoop({
+    name: 'Wheel',
+    pass,
+    isCurrent: () => !destroyed && claim.isCurrent(),
+    report,
+  });
+  const update = updates.run;
 
   const onClick = (event: MouseEvent): void => {
     if (!binding.selectSegment) return;
@@ -3496,11 +3572,11 @@ export function mountWheel(
     destroy(): void {
       if (destroyed) return;
       destroyed = true;
-      const releaseText = unlocalize;
-      unlocalize = undefined;
-      releaseText?.();
+      updates.cancel();
+      const stop = unsubscribe;
+      unsubscribe = undefined;
       try {
-        unsubscribe?.();
+        stop?.();
       } catch (error) {
         report(error);
       }
@@ -3522,13 +3598,15 @@ export function mountWheel(
   }
 
   update();
+  if (destroyed || !claim.isCurrent()) return handle;
   if (binding.subscribe) {
     try {
-      unsubscribe = binding.subscribe(update);
+      const stop = binding.subscribe(update);
+      if (destroyed || !claim.isCurrent()) stop();
+      else unsubscribe = stop;
     } catch (error) {
       report(error);
     }
   }
-  unlocalize = bindLocalization(options.localization, update, () => !destroyed && claim.isCurrent(), options.onError);
   return handle;
 }

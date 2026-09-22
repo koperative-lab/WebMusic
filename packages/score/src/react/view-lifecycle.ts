@@ -107,7 +107,7 @@ export function useScoreViewRenderer(
           ?? model.sequence.notes[Math.max(0, upperBoundByStartTime(model.sequence.notes, state.currentTime) - 1)];
       }
       if (!last) rendered.clearActiveNotes();
-      else if (!rendered.redrawAtTime) {
+      else {
         const note = rendered.noteSequence.notes.find((candidate) => candidate.partId === last.partId && candidate.noteId === last.noteId);
         if (note) rendered.redraw(note, true);
       }

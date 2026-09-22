@@ -5,9 +5,11 @@ work and does not establish npm publication, a release tag or a deployment.
 
 ## Unreleased
 
-- Add instance-local UI localization with replaceable messages and number,
-  percentage and time formatters, including ARIA and in-place language updates.
-  Preserve focused controls when caller labels change under stable identities.
+- Add typed text and formatting hooks for application-owned presentation tools,
+  with explicit refresh methods and stable controls. Translation, language state
+  and change subscriptions remain outside WebMusic.
+- Keep borrowed React views responsive to active-note updates when an external
+  playback source has no nominal time, including renderers with time support.
 - Allow a minimal play/pause Transport binding and mode-specific Meter readers
   without placeholder progress, seek, subscription or spectrum methods.
 - Allow React StaffView, PianoRollView and WaterfallView to render an explicit

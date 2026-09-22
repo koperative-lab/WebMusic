@@ -84,9 +84,10 @@ when `takeCount` is defined, then `Ready`.
 
 | Member | Kind | Default | Description |
 |---|---|---|---|
-| `localization` | `UILocalization` | — | Borrowed text and number-format source; updates repaint in place and destruction releases its subscription. |
+| `getText` | `() => RecorderText` | — | Supplies one application-owned text snapshot per update. After external text changes, call `update()`. |
+| `formatters` | `UIValueFormatters` | — | The `number` callback formats recorded and captured counts. Other fields are unused by this presenter. |
 | `exportFormats` | `readonly {id: string; label: string}[]` | `[]` | Creates one export button per record. `id` is passed to `export()` and added as a class; `label` supplies visible and accessible text. |
-| `onError` | `(error: unknown) => void` | — | Receives snapshot, command, subscription and cleanup failures. Error callback throws/rejections are contained. A failed subscription leaves the mounted handle available for explicit `update()` calls. |
+| `onError` | `(error: unknown) => void` | — | Receives snapshot, text/formatter, command, subscription and cleanup failures. Error callback throws/rejections are contained. A failed subscription leaves the mounted handle available for explicit `update()` calls. |
 | `stylesheet` | `boolean` | `true` | Installs the presenter's stylesheet unless explicitly `false`, for a light-DOM host that cannot inject CSS into its page. |
 
 **Handle**
@@ -97,27 +98,29 @@ when `takeCount` is defined, then `Ready`.
 | `update()` | `() => void` | Re-reads state and repaints every control; becomes a no-op after destruction. |
 | `destroy()` | `() => void` | Releases the subscription, root and style; attempts every cleanup even if one fails, then reports the first failure. Later calls and pending command results are ignored. Recording/playback resources remain caller-owned. |
 
-**Localization.** Pass an instance-local [localization controller](/uikit/api/) as
-`localization` to update button text, accessible names and generated status text in place.
-The `number` formatter formats take counts. Message functions receive both numeric `count` and
-`formattedCount`, allowing plural rules without parsing displayed text. Explicit `state.status`
-remains authoritative caller text; export format labels also remain caller text. Localization
-updates preserve focus and do not issue recording or playback commands. Destroy releases the
-localization subscription.
+**Text and formatting.** `getText()` supplies a `RecorderText` snapshot for one
+update. The application owns translation and calls `handle.update()` when its display settings
+change. Updates preserve focused controls and issue no capture/playback commands. The `number`
+formatter handles counts; status callbacks receive numeric `count` and `formattedCount` so the
+application can apply its existing plural rules. Explicit `state.status` and export format labels
+remain caller text. See the [shared text hooks](/uikit/api/); no language observer is installed.
 
-| Message key | Default | Values |
+| `RecorderText` field | Type | Default / callback values |
 |---|---|---|
-| `recorder.record` | `Record` | — |
-| `recorder.stopRecording` | `Stop recording` | — |
-| `recorder.stop` / `recorder.play` | `Stop` / `Play` | — |
-| `recorder.playTake` / `recorder.stopPlayback` | `Play take` / `Stop take` | — |
-| `recorder.exports` | `Export take` | — |
-| `recorder.download` | `Download {label}` | Export `label` |
-| `recorder.downloadText` | `⬇ {label}` | Export `label` |
-| `recorder.recordingStatus` | `● recording… {formattedCount}` | `count`, `formattedCount` |
-| `recorder.playingStatus` | `playing take…` | — |
-| `recorder.capturedStatus` | `captured {formattedCount}` | `count`, `formattedCount` |
-| `recorder.readyStatus` | `Ready` | — |
+| `record` | `string` | `Record` |
+| `stopRecording` | `string` | `Stop recording` |
+| `stop` / `play` | `string` | `Stop` / `Play` |
+| `playTake` / `stopPlayback` | `string` | `Play take` / `Stop take` |
+| `exports` | `string` | `Export take` |
+| `download` | `UITextValue<{label: string}>` | `Download ` followed by export `label`. |
+| `downloadText` | `UITextValue<{label: string}>` | `⬇ ` followed by export `label`. |
+| `recordingStatus` | `UITextValue<{count: number; formattedCount: string}>` | `● recording… ` followed by `formattedCount`. |
+| `playingStatus` | `string` | `playing take…` |
+| `capturedStatus` | `UITextValue<{count: number; formattedCount: string}>` | `captured ` followed by `formattedCount`. |
+| `readyStatus` | `string` | `Ready` |
+
+All fields are optional. Strings are final text and are not interpolated. Callbacks return the
+complete message; translation lookup and plural selection belong to the application.
 
 **Accessibility.** Record is a native button whose dynamic `aria-label`, `aria-pressed`, and
 `aria-busy` mirror capture state. Playback is a native button named `Play take` or `Stop take` according to

@@ -364,7 +364,10 @@ including when playback is paused. OSMD maps nominal seconds through the score
 tempo map to its next available cursor position at or after that time (or the
 end). Its cursor is discrete, not a continuous position within a note or rest.
 Later seeks and rate changes use nominal score seconds, without
-starting another timer or forwarding seek commands. Replacing a source or
+starting another timer or forwarding seek commands. When `nominalSeconds` is
+unavailable (`null`), views use the source's active part/note identities for
+note-based drawing and clear that drawing when activity ends. They do not
+construct a clock to fill the missing capability. Replacing a source or
 unmounting a view releases its subscription and drawing resources only; it
 never stops or disposes borrowed playback. Unsubscribe failure does not skip
 renderer cleanup. Source callbacks arriving after detach are ignored.

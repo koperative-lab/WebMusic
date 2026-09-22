@@ -87,7 +87,7 @@ export const patternSelection = [
   {title: 'Connect a view to playback', page: 'score/element/view/score-view.mdx', sections: ['Data and playback']},
   {title: 'Follow analysis and navigate musical positions', page: 'score/headless/analyze/analysis-follower.mdx', sections: ['Import', 'Data and time ownership', 'Navigation outcomes']},
   {title: 'Compose React state and components', page: 'score/api/react.mdx', sections: ['Install', 'Customize With Provider', 'Customize With Hooks', 'Customize Individual Components', 'Static views and external playback', 'Render readiness and failures']},
-  {title: 'Bind an independent presenter', page: 'uikit/api.mdx', sections: ['The shared presenter shape', 'Localization']},
+  {title: 'Bind an independent presenter', page: 'uikit/api.mdx', sections: ['The shared presenter shape', 'External presentation inputs']},
   {title: 'Style a custom music interface', page: 'uikit/index.mdx', sections: ['Use UI Kit directly', 'Theme with CSS custom properties', 'Customization depth']},
   {title: 'Load, convert and parse music in a worker', page: 'score/api/io.mdx', sections: ['Install', 'Load and detect formats', 'Parse and serialize directly', 'Parse in a Worker']},
 ];

@@ -20,3 +20,10 @@ const minimal: TransportBinding = {
   snapshot: () => ({playing: false}), play() {}, pause() {},
 };
 mountTransport(host, minimal);
+
+mountTransport(host, minimal, {getText: () => ({play: 'Play', seekValue: ({progress, seeking}) => `${progress} ${seeking}`})});
+mountMeter(host, level, {getText: () => ({levelValue: ({level, value}) => `${level}: ${value}`})});
+// @ts-expect-error Text supply uses presenter-owned fields rather than translation key registries.
+mountTransport(host, minimal, {getText: () => ({'transport.play': 'Play'})});
+// @ts-expect-error UI does not accept a localization engine/controller.
+mountTransport(host, minimal, {localization: {subscribe() { return () => {}; }}});

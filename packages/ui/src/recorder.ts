@@ -1,9 +1,9 @@
 import {installStyle} from './internal/style';
 import {clamp01} from './internal/dom';
-import {claimHost, createErrorSink, runCleanups} from './internal/lifecycle';
+import {claimHost, createErrorSink, createUpdateLoop, runCleanups} from './internal/lifecycle';
 import {componentSurfaceCss, controlBorderFallback} from './internal/surface';
 import {controlHeight, controlRadius} from './internal/control';
-import {bindLocalization, formatNumber, message, type UILocalization} from './localization';
+import {formatNumber, readText, textValue, type UITextValue, type UIValueFormatters} from './text';
 export interface RecorderState {
   recording: boolean;
   busy?: boolean;
@@ -24,8 +24,26 @@ export interface RecorderBinding {
   subscribe?(notify: () => void): () => void;
 }
 
+export interface RecorderText {
+  record?: string;
+  stopRecording?: string;
+  stop?: string;
+  play?: string;
+  playTake?: string;
+  stopPlayback?: string;
+  exports?: string;
+  download?: UITextValue<{label: string}>;
+  downloadText?: UITextValue<{label: string}>;
+  recordingStatus?: UITextValue<{count: number; formattedCount: string}>;
+  playingStatus?: string;
+  capturedStatus?: UITextValue<{count: number; formattedCount: string}>;
+  readyStatus?: string;
+}
+
 export interface RecorderOptions {
-  localization?: UILocalization;
+  /** Read application-provided text on each update. */
+  getText?: () => RecorderText;
+  formatters?: UIValueFormatters;
   exportFormats?: readonly {id: string; label: string}[];
   onError?: (error: unknown) => void;
   /** Install the exported stylesheet into the host. Defaults to true. */
@@ -57,15 +75,15 @@ export function mountRecorder(host: RecorderHost, binding: RecorderBinding, opti
   const style = installStyle(document, 'recorder', recorderStyle, options.stylesheet);
   const root = document.createElement('div'); root.className = 'wui-recorder wrap'; root.setAttribute('part','root');
   const record = document.createElement('button'); record.type='button'; record.className='wui-recorder__button wui-recorder__record rec'; record.setAttribute('part','record');
-  const play = document.createElement('button'); play.type='button'; play.className='wui-recorder__button wui-recorder__play play'; play.setAttribute('part','play'); play.setAttribute('aria-label',message(options.localization, 'recorder.playTake', 'Play take'));
+  const play = document.createElement('button'); play.type='button'; play.className='wui-recorder__button wui-recorder__play play'; play.setAttribute('part','play'); play.setAttribute('aria-label','Play take');
   const meter = document.createElement('div'); meter.className='wui-recorder__meter meter'; meter.setAttribute('part','meter');
   const level = document.createElement('div'); level.className='wui-recorder__level level'; level.setAttribute('part','level'); meter.append(level);
-  const exports = document.createElement('span'); exports.className='wui-recorder__exports'; exports.setAttribute('part', 'exports'); exports.setAttribute('role', 'group'); exports.setAttribute('aria-label', message(options.localization, 'recorder.exports', 'Export take'));
+  const exports = document.createElement('span'); exports.className='wui-recorder__exports'; exports.setAttribute('part', 'exports'); exports.setAttribute('role', 'group'); exports.setAttribute('aria-label', 'Export take');
   const exportButtons: Array<{button: HTMLButtonElement; format: {id: string; label: string}}> = [];
   const status = document.createElement('div'); status.className='wui-recorder__status status'; status.setAttribute('part','status');
   root.append(record, ...(binding.togglePlayback ? [play] : []), meter, exports, status);
   let destroyed=false; let unsubscribe:(()=>void)|undefined;
-  let unbindLocalization: (() => void) | undefined;
+  let texts: RecorderText | undefined;
   const report = createErrorSink(options.onError);
   const command=(work:()=>Promise<void>|void):void=>{if(destroyed)return;try{void Promise.resolve(work()).then(update,(error)=>{if(!destroyed)report(error)})}catch(error){if(!destroyed)report(error)}};
   record.addEventListener('click',()=>command(()=>binding.toggleRecording()));
@@ -78,42 +96,50 @@ export function mountRecorder(host: RecorderHost, binding: RecorderBinding, opti
     exports.append(button);
     exportButtons.push({button, format});
   }
-  const update = (): void => {
+  const paintSnapshot = (): void => {
     if (destroyed) return;
     try {
       const state = binding.snapshot();
       if (destroyed || !claim.isCurrent()) return;
-      const localize = (key: string, fallback: string): string => message(options.localization, `recorder.${key}`, fallback);
+      texts = readText(options.getText, options.onError);
+      if (destroyed || !claim.isCurrent()) return;
+      const label = (key: "record" | "stopRecording" | "stop" | "play" | "playTake" | "stopPlayback" | "exports" | "playingStatus" | "readyStatus", fallback: string): string => textValue(texts?.[key], fallback, {}, options.onError);
       record.disabled = state.busy === true;
       record.classList.toggle('armed', state.recording);
       record.setAttribute('aria-busy', String(state.busy === true));
       record.setAttribute('aria-pressed', String(state.recording));
-      record.setAttribute('aria-label', state.recording ? localize('stopRecording', 'Stop recording') : localize('record', 'Record'));
-      record.textContent = state.recording ? `■ ${localize('stop', 'Stop')}` : `● ${localize('record', 'Record')}`;
+      record.setAttribute('aria-label', state.recording ? label('stopRecording', 'Stop recording') : label('record', 'Record'));
+      record.textContent = state.recording ? `■ ${label('stop', 'Stop')}` : `● ${label('record', 'Record')}`;
       play.disabled = !(state.canPlay ?? state.takeCount != null);
       play.classList.toggle('on', state.playing === true);
       play.setAttribute('aria-pressed', String(state.playing === true));
-      play.setAttribute('aria-label', state.playing ? localize('stopPlayback', 'Stop take') : localize('playTake', 'Play take'));
-      play.textContent = state.playing ? `■ ${localize('stop', 'Stop')}` : `▶ ${localize('play', 'Play')}`;
-      exports.setAttribute('aria-label', localize('exports', 'Export take'));
+      play.setAttribute('aria-label', state.playing ? label('stopPlayback', 'Stop take') : label('playTake', 'Play take'));
+      play.textContent = state.playing ? `■ ${label('stop', 'Stop')}` : `▶ ${label('play', 'Play')}`;
+      exports.setAttribute('aria-label', label('exports', 'Export take'));
       for (const {button, format} of exportButtons) {
         button.disabled = !(state.canExport ?? state.takeCount != null);
-        button.textContent = message(options.localization, 'recorder.downloadText', '⬇ {label}', {label: format.label});
-        button.setAttribute('aria-label', message(options.localization, 'recorder.download', 'Download {label}', {label: format.label}));
+        button.textContent = textValue(texts?.downloadText, `⬇ ${format.label}`, {label: format.label}, options.onError);
+        button.setAttribute('aria-label', textValue(texts?.download, `Download ${format.label}`, {label: format.label}, options.onError));
       }
       const amount = clamp01(state.level);
       level.style.setProperty('--wui-recorder-level', String(amount));
       meter.hidden = state.level == null;
       const count = state.recording ? state.recordedCount ?? 0 : state.takeCount ?? 0;
-      const values = {count, formattedCount: formatNumber(options.localization, count)};
+      const values = {count, formattedCount: formatNumber(options.formatters, count, undefined, options.onError)};
       status.textContent = state.status ?? (state.recording
-        ? message(options.localization, 'recorder.recordingStatus', '● recording… {formattedCount}', values)
-        : state.playing ? localize('playingStatus', 'playing take…')
-        : state.takeCount != null ? message(options.localization, 'recorder.capturedStatus', 'captured {formattedCount}', values)
-        : localize('readyStatus', 'Ready'));
+        ? textValue(texts?.recordingStatus, `● recording… ${values.formattedCount}`, values, options.onError)
+        : state.playing ? label('playingStatus', 'playing take…')
+        : state.takeCount != null ? textValue(texts?.capturedStatus, `captured ${values.formattedCount}`, values, options.onError)
+        : label('readyStatus', 'Ready'));
     } catch (error) { report(error); }
   };
-  const handle:RecorderHandle={element:root,update,destroy(){if(destroyed)return;destroyed=true;const stop=unsubscribe;unsubscribe=undefined;const releaseText=unbindLocalization;unbindLocalization=undefined;runCleanups([stop,releaseText,()=>claim.release(),()=>root.remove(),()=>style?.remove()],report)}};
+  const updateLoop = createUpdateLoop({
+    name: 'Recorder', pass: paintSnapshot,
+    isCurrent: () => !destroyed && claim.isCurrent(), report,
+  });
+  const update = (): void => updateLoop.run();
+
+  const handle:RecorderHandle={element:root,update,destroy(){if(destroyed)return;destroyed=true;updateLoop.cancel();const stop=unsubscribe;unsubscribe=undefined;runCleanups([stop,()=>claim.release(),()=>root.remove(),()=>style?.remove()],report)}};
   // Claim the host before destroying the previous recorder: its cleanup may
   // mount a replacement, and that replacement must win.
   const claim = claimHost(mounted, host, handle);
@@ -138,6 +164,6 @@ export function mountRecorder(host: RecorderHost, binding: RecorderBinding, opti
       report(error);
     }
   }
-  unbindLocalization = bindLocalization(options.localization, update, () => !destroyed && claim.isCurrent(), report);
+
   return handle;
 }

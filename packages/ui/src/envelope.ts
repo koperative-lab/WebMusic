@@ -1,4 +1,4 @@
-import {bindLocalization, message as uiMessage, formatNumber, formatPercent, type UILocalization} from './localization';
+import {readText, textValue, type UITextValue, formatNumber, type UIValueFormatters, formatPercent} from './text';
 import {installStyle} from './internal/style';
 import {claimHost, createUpdateLoop} from "./internal/lifecycle";
 import {addClassNames, clamp01, finite, setParts} from './internal/dom';
@@ -66,9 +66,21 @@ export interface EnvelopeParts {
   input?: string;
 }
 
+export interface EnvelopeText {
+  label?: UITextValue;
+  attack?: UITextValue;
+  decay?: UITextValue;
+  sustain?: UITextValue;
+  release?: UITextValue;
+  seconds?: UITextValue<{value: string; seconds: number}>;
+  secondsShort?: UITextValue<{value: string; seconds: number}>;
+  readout?: UITextValue<{attack: string; decay: string; sustain: string; release: string}>;
+}
+
 export interface EnvelopeOptions {
-  /** Borrowed live text and formatting; language updates preserve controls. */
-  localization?: UILocalization;
+  /** Read application-resolved text once per paint; call update() after external changes. */
+  getText?: () => EnvelopeText;
+  formatters?: UIValueFormatters;
   label?: string;
   classNames?: EnvelopeClassNames;
   parts?: EnvelopeParts;
@@ -231,24 +243,26 @@ function envelopePoints(
   };
 }
 
-function readout(envelope: EnvelopeState, localization?: UILocalization): string {
-  const seconds = (value: number) => uiMessage(localization, 'envelope.secondsShort', '{value}s', {
-    value: formatNumber(localization, value, value.toFixed(2)),
-  });
-  return uiMessage(localization, 'envelope.readout', 'A {attack} · D {decay} · S {sustain} · R {release}', {
+function readout(envelope: EnvelopeState, text: EnvelopeText | undefined, options: EnvelopeOptions): string {
+  const seconds = (raw: number): string => {
+    const value = formatNumber(options.formatters, raw, raw.toFixed(2), options.onError);
+    return textValue(text?.secondsShort, `${value}s`, {value, seconds: raw}, options.onError);
+  };
+  const values = {
     attack: seconds(envelope.attack), decay: seconds(envelope.decay),
-    sustain: formatPercent(localization, envelope.sustain), release: seconds(envelope.release),
-  });
+    sustain: formatPercent(options.formatters, envelope.sustain, undefined, options.onError), release: seconds(envelope.release),
+  };
+  return textValue(text?.readout, `A ${values.attack} · D ${values.decay} · S ${values.sustain} · R ${values.release}`, values, options.onError);
 }
 
 function stageLabel(stage: EnvelopeStage): string {
   return stage[0]!.toUpperCase() + stage.slice(1);
 }
 
-function stageValueText(stage: EnvelopeStage, value: number, localization?: UILocalization): string {
-  return stage === "sustain"
-    ? formatPercent(localization, value)
-    : uiMessage(localization, 'envelope.seconds', '{value} seconds', {value: formatNumber(localization, value, value.toFixed(2))});
+function stageValueText(stage: EnvelopeStage, raw: number, text: EnvelopeText | undefined, options: EnvelopeOptions): string {
+  if (stage === 'sustain') return formatPercent(options.formatters, raw, undefined, options.onError);
+  const value = formatNumber(options.formatters, raw, raw.toFixed(2), options.onError);
+  return textValue(text?.seconds, `${value} seconds`, {value, seconds: raw}, options.onError);
 }
 
 function handleForStage(stage: EnvelopeStage): EnvelopeHandleName {
@@ -384,6 +398,8 @@ export function mountEnvelope(
 
   const paint = (snapshot: NormalizedSnapshot): void => {
     if (!isCurrent()) return;
+    const text = readText(options.getText, options.onError);
+    if (!isCurrent()) return;
     current = snapshot;
     const points = envelopePoints(snapshot.envelope, snapshot.ranges);
     const line = `0,${HEIGHT} ${points.a[0]},${points.a[1]} ${points.ds[0]},${points.ds[1]} ${points.ds[0] + SEGMENT},${points.ds[1]} ${points.r[0]},${points.r[1]}`;
@@ -394,8 +410,8 @@ export function mountEnvelope(
       handles.get(name)!.setAttribute("cy", String(points[name][1]));
     }
     roundHandles?.update();
-    root.setAttribute('aria-label', options.label ?? uiMessage(options.localization, 'envelope.label', 'Envelope'));
-    output.textContent = readout(snapshot.envelope, options.localization);
+    root.setAttribute('aria-label', options.label ?? textValue(text?.label, 'Envelope', {}, options.onError));
+    output.textContent = readout(snapshot.envelope, text, options);
     root.classList.toggle("is-disabled", snapshot.disabled);
     for (const [stage, input] of inputByStage) {
       const maximum =
@@ -413,8 +429,8 @@ export function mountEnvelope(
       input.value = String(value);
       input.defaultValue = String(value);
       input.disabled = snapshot.disabled;
-      input.setAttribute('aria-label', uiMessage(options.localization, `envelope.${stage}`, stageLabel(stage)));
-      input.setAttribute("aria-valuetext", stageValueText(stage, value, options.localization));
+      input.setAttribute('aria-label', textValue(text?.[stage], stageLabel(stage), {}, options.onError));
+      input.setAttribute("aria-valuetext", stageValueText(stage, value, text, options));
     }
   };
 
@@ -663,7 +679,6 @@ export function mountEnvelope(
       if (isCurrent()) reportError(error);
     }
     if (isCurrent()) update();
-    cleanups.push(bindLocalization(options.localization, update, isCurrent, options.onError));
   } catch (error) {
     rollback();
     throw error;

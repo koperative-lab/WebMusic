@@ -115,6 +115,23 @@ describe('standalone and borrowed React score views', () => {
     expect(drawing.noteSequence.notes[0].pitch).toBe(60);
   });
 
+  it.each([StaffView, PianoRollView, WaterfallView])('follows note activity when the source has no nominal position', (View) => {
+    const score = music();
+    const source = playback(score, {nominalSeconds: null, activeNotes: [{occurrenceId: 'sound-1',
+      partId: 'p', noteId: 'n', midi: 72, nominalStartSeconds: 0, nominalEndSeconds: 2}]});
+    const renderer = View === StaffView ? renderStaffVisualizer : View === PianoRollView ? renderPianoRollVisualizer : renderWaterfallVisualizer;
+    render(<View playback={source} />);
+    const drawing = vi.mocked(renderer).mock.results[0]!.value as ReturnType<typeof visualizer>;
+    expect(drawing.redrawAtTime).not.toHaveBeenCalled();
+    expect(drawing.redraw).toHaveBeenLastCalledWith(drawing.noteSequence.notes[0], true);
+    expect(drawing.noteSequence.notes[0].pitch).toBe(60);
+    act(() => source.emit({activeNotes: []}));
+    expect(drawing.clearActiveNotes).toHaveBeenCalledOnce();
+    act(() => source.emit({nominalSeconds: 0.75}));
+    expect(drawing.redrawAtTime).toHaveBeenLastCalledWith(0.75, true);
+    expect(renderer).toHaveBeenCalledOnce();
+  });
+
   it('positions an event-only renderer at a score note when paused with no active occurrences', () => {
     const score = music();
     const source = playback(score, {state: 'paused', nominalSeconds: 0.75, activeNotes: []});

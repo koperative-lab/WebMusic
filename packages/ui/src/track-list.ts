@@ -1,8 +1,8 @@
 import {installStyle} from './internal/style';
-import {claimHost, createErrorSink} from './internal/lifecycle';
+import {claimHost, createErrorSink, createUpdateLoop} from './internal/lifecycle';
 import {markEmptyState, addClassNames, setParts} from './internal/dom';
 import {componentSurfaceCss} from './internal/surface';
-import {bindLocalization, message, type UILocalization} from './localization';
+import {readText, textValue} from './text';
 // ============================================================================
 // Domain-neutral list presenter: an ordered index of named rows, one of which
 // may be current. It knows nothing about audio, regions, scores or time — only
@@ -62,8 +62,14 @@ export interface TrackListParts {
   empty?: string;
 }
 
+export interface TrackListText {
+  label?: string;
+  empty?: string;
+}
+
 export interface TrackListOptions {
-  localization?: UILocalization;
+  /** Read application-provided text on each update. */
+  getText?: () => TrackListText;
   /** Accessible name of the list. Defaults to 'Tracks'. */
   label?: string;
   /**
@@ -227,6 +233,8 @@ export function mountTrackList(
 ): TrackListHandle {
 
   const document = host.ownerDocument;
+  let texts: TrackListText | undefined;
+
   const style = installStyle(document, 'track-list', trackListStyle, options.stylesheet);
 
   const root = document.createElement('div');
@@ -238,7 +246,7 @@ export function mountTrackList(
   list.className = 'wui-track-list__items';
   // The list carries the name, not the wrapper: a screen reader reads it
   // together with "list, N items", which is the useful announcement.
-  list.setAttribute('aria-label', options.label ?? message(options.localization, 'trackList.label', 'Tracks'));
+  list.setAttribute('aria-label', options.label ?? textValue(texts?.label, 'Tracks', {}, options.onError));
   addClassNames(list, options.classNames?.list);
   setParts(list, 'list', options.parts?.list);
 
@@ -246,7 +254,6 @@ export function mountTrackList(
 
   let destroyed = false;
   let unsubscribe: (() => void) | undefined;
-  let unbindLocalization: (() => void) | undefined;
   let listSignature = '';
   /** The id that currently owns the list's single tab stop. */
   let rovingId: string | undefined;
@@ -395,20 +402,23 @@ export function mountTrackList(
   const renderEmpty = (): HTMLLIElement => {
     const empty = document.createElement('li');
     empty.className = 'wui-track-list__empty';
-    empty.textContent = options.emptyLabel ?? message(options.localization, 'trackList.empty', 'No items');
+    empty.textContent = options.emptyLabel ?? textValue(texts?.empty, 'No items', {}, options.onError);
     addClassNames(empty, options.classNames?.empty);
     setParts(empty, 'empty', options.parts?.empty);
     markEmptyState(empty);
     return empty;
   };
 
-  update = (): void => {
+  const paintSnapshot = (): void => {
     if (destroyed) return;
     try {
       const state = binding.snapshot();
+      if (destroyed || !claim.isCurrent()) return;
+      texts = readText(options.getText, options.onError);
+      if (destroyed || !claim.isCurrent()) return;
       const items = state.items ?? [];
       const disabled = state.disabled === true;
-      list.setAttribute('aria-label', options.label ?? message(options.localization, 'trackList.label', 'Tracks'));
+      list.setAttribute('aria-label', options.label ?? textValue(texts?.label, 'Tracks', {}, options.onError));
 
       // Text changes preserve the focused row and roving tab stop.
       const signature = JSON.stringify(items.map((item) => item.id));
@@ -426,7 +436,7 @@ export function mountTrackList(
         rovingId = undefined;
       }
       if (!items.length && list.firstElementChild) {
-        list.firstElementChild.textContent = options.emptyLabel ?? message(options.localization, 'trackList.empty', 'No items');
+        list.firstElementChild.textContent = options.emptyLabel ?? textValue(texts?.empty, 'No items', {}, options.onError);
       }
       for (const item of items) {
         const entry = rows.get(item.id);
@@ -446,6 +456,12 @@ export function mountTrackList(
     }
   };
 
+  const updateLoop = createUpdateLoop({
+    name: 'Track list', pass: paintSnapshot,
+    isCurrent: () => !destroyed && claim.isCurrent(), report,
+  });
+  update = (): void => updateLoop.run();
+
   const handle: TrackListHandle = {
     element: root,
     controls: {
@@ -464,14 +480,13 @@ export function mountTrackList(
     destroy(): void {
       if (destroyed) return;
       destroyed = true;
+      updateLoop.cancel();
       try {
         unsubscribe?.();
       } catch (error) {
         report(error);
       }
-      const releaseText = unbindLocalization;
-      unbindLocalization = undefined;
-      releaseText?.();
+
       claim.release();
       root.remove();
       style?.remove();
@@ -500,6 +515,6 @@ export function mountTrackList(
       report(error);
     }
   }
-  unbindLocalization = bindLocalization(options.localization, update, () => !destroyed && claim.isCurrent(), report);
+
   return handle;
 }

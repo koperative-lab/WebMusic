@@ -1,4 +1,4 @@
-import {bindLocalization, message as uiMessage, type UILocalization} from './localization';
+import {readText, textValue, type UITextValue} from './text';
 import {installStyle} from './internal/style';
 import {claimHost, createErrorSink, createUpdateLoop} from './internal/lifecycle';
 import {componentSurfaceCss, controlBorderFallback} from './internal/surface';
@@ -61,9 +61,17 @@ export interface NoteSurfaceBinding {
   subscribe?(notify: () => void): () => void;
 }
 
+export interface NoteSurfaceText {
+  hint?: UITextValue;
+  hintMapped?: UITextValue;
+  start?: UITextValue;
+  keyboard?: UITextValue;
+  grid?: UITextValue;
+}
+
 export interface NoteSurfaceOptions {
-  /** Borrowed live text and formatting; language updates preserve controls. */
-  localization?: UILocalization;
+  /** Read application-resolved text once per paint; call update() after external changes. */
+  getText?: () => NoteSurfaceText;
   onError?: (error: unknown) => void;
   /** Install the exported stylesheet into the host. Defaults to true. */
   stylesheet?: boolean;
@@ -678,23 +686,24 @@ export function mountNoteSurface(
   let structure = structureKey(initialState);
   let destroyed = false;
   let unsubscribe: (() => void) | undefined;
-  let releaseLocalization = (): void => {};
   const report = createErrorSink(options.onError);
   const interactions = binding.interaction
     ? new NoteSurfaceInteractions(binding.interaction, report)
     : undefined;
   const isCurrent = (): boolean => !destroyed && claim.isCurrent();
   const paint = (state: NoteSurfaceState): void => {
+    const text = readText(options.getText, options.onError);
+    if (!isCurrent()) return;
     const hint = root.querySelector<HTMLElement>('.wui-note__hint');
     if (hint) hint.textContent = state.layout === 'grid' && state.mapOnly
-      ? uiMessage(options.localization, 'note.hintMapped', 'Type to play · Esc stop')
-      : uiMessage(options.localization, 'note.hint', 'Type to play · Z / X octave · Esc stop');
+      ? textValue(text?.hintMapped, 'Type to play · Esc stop', {}, options.onError)
+      : textValue(text?.hint, 'Type to play · Z / X octave · Esc stop', {}, options.onError);
     const start = root.querySelector<HTMLElement>('.wui-note__start');
-    if (start) start.textContent = uiMessage(options.localization, 'note.start', '▸ Click to start');
+    if (start) start.textContent = textValue(text?.start, '▸ Click to start', {}, options.onError);
     const viewport = root.querySelector<HTMLElement>('.wui-note__viewport');
     if (viewport) viewport.setAttribute('aria-label', state.layout === 'piano'
-      ? uiMessage(options.localization, 'note.keyboard', 'Note keyboard')
-      : uiMessage(options.localization, 'note.grid', 'Note grid'));
+      ? textValue(text?.keyboard, 'Note keyboard', {}, options.onError)
+      : textValue(text?.grid, 'Note grid', {}, options.onError));
     // Names are presentation data. Updating them must not release a held note
     // or replace a focused chord button whose musical identity did not change.
     root.querySelectorAll<HTMLElement>('.wui-note__key').forEach((node, index) => {
@@ -778,7 +787,6 @@ export function mountNoteSurface(
     destroy(): void {
       if (destroyed) return;
       destroyed = true;
-      releaseLocalization();
       loop.cancel();
       interactions?.detach();
       interactions?.releaseAll();
@@ -815,6 +823,5 @@ export function mountNoteSurface(
       report(error);
     }
   }
-  releaseLocalization = bindLocalization(options.localization, update, () => !destroyed && claim.isCurrent(), options.onError);
   return handle;
 }

@@ -55,13 +55,21 @@ keeps only the newest command revision, then returns to authoritative snapshot s
 fulfillment or rejection. `seek()` may also return a promise, but it has no presenter-owned
 optimistic playhead; the binding must notify when its visible draw state changes.
 
-## Localization
+## Display text and values
 
-Pass a shared [`localization`](/uikit/api/#localization) source to update the brush name and
-spoken range without moving focus. `minimap.label` defaults to `Visible range`; an explicit
-`label` takes precedence. `minimap.range` defaults to `{start} to {end}`, using values from the
-`number` formatter in the caller's position units. Numeric ARIA attributes and range commands
-retain their original values.
+`getText()` returns application-resolved `MinimapText` once per brush paint. Call `handle.update()`
+after external settings change; focus remains on the brush. See
+[application-owned text](/uikit/api/#external-presentation-inputs) for external translation-package
+composition. Fields accept literal strings or callbacks returning final strings, with no template
+interpolation. Failures reach `onError` and use defaults.
+
+| `MinimapText` field | Default / callback context |
+|---|---|
+| `label` | `Visible range`; no context values. An explicit `label` option takes precedence. |
+| `range` | Formatted start and end joined by ` to `; `{start: string, end: string, rawStart: number, rawEnd: number}`. |
+
+`formatters.number` receives positions in the caller's units. Numeric ARIA attributes and
+range commands retain their original values.
 
 <details class="component-section">
 <summary>API</summary>
@@ -93,7 +101,8 @@ retain their original values.
 
 | Member | Kind | Default | Description |
 |---|---|---|---|
-| `localization` | `UILocalization` | — | Borrowed live text and number-formatting source; its subscription is released on destruction. |
+| `getText` | `() => MinimapText` | — | Reads application-resolved display text once per paint; call `update()` after external changes. |
+| `formatters` | `UIValueFormatters` | — | Pure numeric display callbacks; explicit presenter formatters take precedence. |
 | `label` | `string` | `'Visible range'` | Accessible name of the brush slider. |
 | `fallbackWidth` | `number` | `320` | CSS-pixel canvas width used only when neither root nor canvas reports a positive width. |
 | `fallbackHeight` | `number` | `40` | CSS-pixel canvas height used only when neither root nor canvas reports a positive height. |

@@ -110,7 +110,8 @@ paint.
 
 | Member | Kind | Default | Description |
 |---|---|---|---|
-| `localization` | `UILocalization` | — | Borrowed shared text and numeric formatting; live updates preserve nodes, focus, and current dragging. |
+| `getText` | `() => TransportText` | — | Reads application-owned final text on update; call `update()` after external text changes. |
+| `formatters` | `UIValueFormatters` | — | Pure `percent(fraction)` and `time(seconds)` callbacks; defaults preserve existing formatting. |
 | `label` | `string` | `'Transport'` | Prefix for the native or surface seek control's accessible name: `<label> seek`. |
 | `showTime` | `boolean \| 'elapsed' \| 'full'` | `true` | Creates the clock when not `false`, and hides it until seconds or duration are reported. `'full'` (and `true`) reads `elapsed / total`; `'elapsed'` drops the total. |
 | `showVolume` | `boolean \| 'fader' \| 'knob'` | `false` | Creates a volume control — `'fader'` (and `true`) the kit's horizontal fader, `'knob'` its rotary — but only when the binding implements `setVolume`. |
@@ -123,7 +124,7 @@ paint.
 | `icon` | `(playing: boolean) => Node` | `createTransportIcon` | Supplies the play/pause glyph. A thrown callback is reported and falls back to the built-in SVG. |
 | `classNames` | `TransportClassNames` | `{}` | Adds compatibility classes for `root`, `play`, `track`, `seek`, `fill`, `time`, and `volume` (which lands on the fader). |
 | `parts` | `TransportParts` | `{}` | Adds part tokens for `root`, `play`, `track`, `seek`, `fill`, `time`, and `volume`. |
-| `onError` | `(error: unknown) => void` | — | Receives snapshot, command, subscription, icon, and cleanup failures. |
+| `onError` | `(error: unknown) => void` | — | Receives snapshot, command, subscription, icon, text/formatting, and cleanup failures. |
 
 **Handle**
 
@@ -140,31 +141,35 @@ paint.
 | `controls.volume?` | `HTMLDivElement` | The volume control: an ARIA slider on a `0…1` scale, carrying `.wui-transport__volume`. Defined only when `showVolume` mounted one, and replaced by `setVolumeControl` — read it again rather than holding the node. |
 | `setVolumeControl(kind)` | `(false \| 'fader' \| 'knob') => void` | Swaps the volume control, or removes it with `false`, without rebuilding the rest of the row. A no-op when it is already that shape, or when the binding has no `setVolume`. |
 | `update()` | `() => void` | Re-reads the binding and repaints; becomes a no-op after destruction. |
-| `destroy()` | `() => void` | Idempotently removes presenter listeners, binding/localization subscriptions, root, and installed stylesheet without destroying borrowed objects or caller DOM. All releases are attempted even when one throws; callback errors are contained. Late-returned subscriptions from a replaced mount are immediately released. |
+| `destroy()` | `() => void` | Idempotently removes presenter listeners, binding subscriptions, root, and installed stylesheet without destroying borrowed objects or caller DOM. All releases are attempted even when one throws; callback errors are contained. Late-returned subscriptions from a replaced mount are immediately released. |
 
-**Localization**
+**Application text and formatting**
 
-Create a shared `createUILocalization()` controller from `@webmusic/ui` and pass it as
-`localization`. `controller.update({messages, formatters})` replaces supplied maps and refreshes
-mounted controls without remounting. Explicit `playLabel`, `pauseLabel`, `volumeLabel`, and
-`label` remain application-owned overrides. The seek template still formats the supplied label.
-Clock values use `formatters.time(seconds)` and seek/volume percentages use
-`formatters.percent(fraction)`; machine-readable ARIA numbers retain their numeric syntax.
-The defaults below remain unchanged when no localization is supplied.
+`getText()` returns a `TransportText` object containing final strings or contextual rendering
+callbacks. The application can call its preferred translation/formatting package inside those
+callbacks. UI owns no message catalog, interpolation, locale state, or language subscription.
+Call `handle.update()` after changing application text. This keeps the controls, focus, drag
+position, and caller-owned clock visibility intact. Explicit `playLabel`, `pauseLabel`,
+`volumeLabel`, and `label` retain precedence over the corresponding text fields.
 
-| Message key | Default | Values |
+| `TransportText` field | Kind | Default / context |
 |---|---|---|
-| `transport.play` / `transport.pause` | `Play` / `Pause` | — |
-| `transport.label` | `Transport` | — |
-| `transport.seek` | `{label} seek` | `label` |
-| `transport.progress` | `{label} progress` | `label` |
-| `transport.volume` | `Volume` | — |
-| `transport.seekValue` | `{elapsed} of {duration}` | Formatted `elapsed`, `duration` |
-| `transport.timeTotal` | ` / {duration}` | Formatted `duration` |
+| `play` / `pause` | `string` | `Play` / `Pause` |
+| `label` | `string` | `Transport` |
+| `seek` / `progress` | `UITextValue<{label: string}>` | Final accessible name; default appends `seek` / `progress` to `label`. |
+| `volume` | `string` | `Volume` |
+| `seekValue` | `UITextValue<TransportPositionTextValues>` | Final seek/read-only progress value text; defaults to elapsed/total or percentage. Receives formatted `elapsed`, `duration`, normalized `progress`, numeric `seconds`, `durationSeconds`, and `seeking`. Dragging supplies preview values; absent time data remains `undefined` in numeric context. |
+| `timeTotal` | `UITextValue<{duration: string; durationSeconds?: number}>` | Final total-time segment; defaults to ` / ` followed by formatted duration. |
+
+`UITextValue` accepts a literal string or a callback returning a final string. Braces in
+strings remain literal; callers construct complete sentences themselves. `formatters.time`
+receives seconds; `formatters.percent` receives fractions, including the volume value.
+Machine-readable ARIA numbers and progress geometry retain numeric syntax. Missing fields
+use defaults. Failed text/format callbacks are reported through `onError` and use default text.
 
 `createFader` and `createKnob` also accept `formatValue(fraction)` for their accessible value
 and expose `updateLabel(label)` to update the name in place. Their owners refresh formatted
-values through `paint()`; Transport does this automatically on localization updates.
+values through `paint()`; Transport does this during `update()`.
 
 **Exports**
 
@@ -195,7 +200,7 @@ percentage when it is zero. Surface Arrow keys move 5 percentage points, Shift+A
 and Home/End move to the bounds. The clock uses `aria-live="off"` so playback does not flood a
 screen reader. Disabled state is reflected on every interactive node, and the presenter never
 rewrites unrelated caller nodes in the host. A binding without seeking renders a read-only
-`role="progressbar"` with the same localized value text and a `0…100` numeric range; it has no
+`role="progressbar"` with the same application-supplied value text and a `0…100` numeric range; it has no
 keyboard seeking or tab stop.
 
 </details>

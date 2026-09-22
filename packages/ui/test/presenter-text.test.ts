@@ -1,13 +1,12 @@
 // @vitest-environment jsdom
 import {afterEach, describe, expect, it, vi} from 'vitest';
-import {createUILocalization, type UILocalization} from '../src/localization';
-import {mountEnvelope} from '../src/envelope';
-import {mountEq} from '../src/eq';
-import {mountLfo} from '../src/lfo';
-import {mountMinimap} from '../src/minimap';
-import {mountNoteSurface, type NoteSurfaceState} from '../src/note';
-import {mountStatus, type StatusState} from '../src/status';
-import {mountTimeline, type TimelineState} from '../src/timeline';
+import {mountEnvelope, type EnvelopeText} from '../src/envelope';
+import {mountEq, type EqText} from '../src/eq';
+import {mountLfo, type LfoText} from '../src/lfo';
+import {mountMinimap, type MinimapText} from '../src/minimap';
+import {mountNoteSurface, type NoteSurfaceState, type NoteSurfaceText} from '../src/note';
+import {mountStatus, type StatusState, type StatusText} from '../src/status';
+import {mountTimeline, type TimelineState, type TimelineText} from '../src/timeline';
 
 const mounts: Array<{destroy(): void}> = [];
 function host() { const node = document.createElement('div'); document.body.append(node); return node; }
@@ -20,16 +19,16 @@ afterEach(() => {
 
 describe('live text on parameter and navigation presenters', () => {
   it('updates envelope names and values without replacing focused ranges or localizing machine values', () => {
-    const localization = createUILocalization();
+    let text: EnvelopeText = {};
     const handle = keep(mountEnvelope(host(), {
       snapshot: () => ({envelope: {attack: 0.15, decay: 0.25, sustain: 0.5, release: 0.3}, ranges: {attackMax: 2, decayMax: 2, releaseMax: 2}}), setEnvelope: vi.fn(),
-    }, {localization}));
+    }, {getText: () => text, formatters: {number: value => `N${value}`, percent: value => `P${value}`}}));
     const attack = handle.element.querySelector<HTMLInputElement>('[data-stage="attack"]')!;
     attack.focus();
-    localization.update({messages: {
-      'envelope.label': 'Hüllkurve', 'envelope.attack': 'Anstieg', 'envelope.seconds': '{value} Sekunden',
-      'envelope.secondsShort': '{value} Sek', 'envelope.readout': '{attack} / {decay} / {sustain} / {release}',
-    }, formatters: {number: (value) => `N${value}`, percent: (value) => `P${value}`}});
+    text = {label: 'Hüllkurve', attack: 'Anstieg', seconds: ({value}) => `${value} Sekunden`,
+      secondsShort: ({value}) => `${value} Sek`, readout: ({attack, decay, sustain, release}) => `${attack} / ${decay} / ${sustain} / ${release}`};
+    expect(attack.getAttribute('aria-label')).toBe('Attack');
+    handle.update();
     expect(document.activeElement).toBe(attack);
     expect(handle.element.getAttribute('aria-label')).toBe('Hüllkurve');
     expect(attack.getAttribute('aria-label')).toBe('Anstieg');
@@ -39,19 +38,18 @@ describe('live text on parameter and navigation presenters', () => {
   });
 
   it('updates EQ band ARIA in place and preserves application content in the empty-state handle', () => {
-    const localization = createUILocalization();
+    let text: EqText = {};
     const handle = keep(mountEq(host(), {
       snapshot: () => ({bands: [{frequency: 440, gain: -2}], ready: false}), setBand: vi.fn(),
-    }, {localization}));
+    }, {getText: () => text, formatters: {number: value => `N${value}`}}));
     const frequency = handle.element.querySelector<HTMLInputElement>('[data-axis="frequency"]')!;
     frequency.focus();
     const value = frequency.value;
     handle.emptyElement().replaceChildren(document.createElement('code'));
     const ownedByCaller = handle.emptyElement().firstChild;
-    localization.update({messages: {
-      'eq.label': 'Égaliseur', 'eq.bandFrequency': 'Fréquence {index}', 'eq.hertz': '{value} Hertz local',
-      'eq.frequency': 'fréquence', 'eq.focusedBand': '{axis} {index} : {value}',
-    }, formatters: {number: (number) => `N${number}`}});
+    text = {label: 'Égaliseur', bandFrequency: ({index}) => `Fréquence ${index}`, hertz: ({value}) => `${value} Hertz local`,
+      frequency: 'fréquence', focusedBand: ({axis, index, value}) => `${axis} ${index} : ${value}`};
+    handle.update();
     expect(document.activeElement).toBe(frequency);
     expect(frequency.value).toBe(value);
     expect(frequency.getAttribute('aria-label')).toBe('Fréquence N1');
@@ -61,21 +59,21 @@ describe('live text on parameter and navigation presenters', () => {
   });
 
   it('updates LFO controls, wave names and both visible and spoken values in place', () => {
-    const localization = createUILocalization();
+    let text: LfoText = {};
+    const number = vi.fn(() => 'unused');
     const handle = keep(mountLfo(host(), {
       snapshot: () => ({shape: 'sine', rate: 2, depth: 0.5, phase: 0, running: false}),
       setRunning: vi.fn(), setShape: vi.fn(), setRate: vi.fn(), setDepth: vi.fn(),
-    }, {localization, formatRate: (rate) => `explicit ${rate}`}));
+    }, {getText: () => text, formatters: {number, percent: fraction => `${fraction * 100} pour cent`}, formatRate: (rate) => `explicit ${rate}`}));
     const rate = handle.controls.rateInput;
     rate.focus();
-    localization.update({messages: {
-      'lfo.label': 'Oscillateur', 'lfo.rate': 'Vitesse', 'lfo.depth': 'Profondeur',
-      'lfo.run': 'Démarrer', 'lfo.shape': 'Forme', 'lfo.shape.sine': 'Sinus',
-    }, formatters: {percent: (fraction) => `${fraction * 100} pour cent`}});
+    text = {label: 'Oscillateur', rate: 'Vitesse', depth: 'Profondeur', run: 'Démarrer', shape: 'Forme', sine: 'Sinus'};
+    handle.update();
     expect(document.activeElement).toBe(rate);
     expect(rate.getAttribute('aria-label')).toBe('Vitesse');
     expect(rate.getAttribute('aria-valuetext')).toBe('explicit 2');
     expect(handle.controls.rateValue.textContent).toBe('explicit 2');
+    expect(number).not.toHaveBeenCalled();
     expect(handle.controls.depthInput.getAttribute('aria-valuetext')).toBe('50 pour cent');
     expect(handle.controls.run.getAttribute('aria-label')).toBe('Démarrer');
     expect(handle.controls.shapes.querySelector('[aria-label="Sinus"]')).not.toBeNull();
@@ -84,14 +82,11 @@ describe('live text on parameter and navigation presenters', () => {
   it.each(['formatRate', 'formatDepth'] as const)('keeps the LFO safe fallback localized when %s throws', (formatter) => {
     const failure = new Error('caller formatter failed');
     const onError = vi.fn();
-    const localization = createUILocalization({
-      messages: {'lfo.hertz': '{value} Hertz local'},
-      formatters: {number: (value) => `N${value}`, percent: (value) => `P${value}`},
-    });
+    const text: LfoText = {hertz: ({value}) => `${value} Hertz local`};
     const handle = keep(mountLfo(host(), {
       snapshot: () => ({shape: 'sine', rate: 2, depth: 0.5, phase: 0, running: false}),
       setRunning: vi.fn(), setShape: vi.fn(), setRate: vi.fn(), setDepth: vi.fn(),
-    }, {localization, onError, [formatter]: () => { throw failure; }}));
+    }, {getText: () => text, formatters: {number: value => `N${value}`, percent: value => `P${value}`}, onError, [formatter]: () => { throw failure; }}));
     expect(onError).toHaveBeenCalledWith(failure);
     expect(handle.controls.rateInput.disabled).toBe(true);
     expect(handle.controls.rateValue.textContent).toBe('N1 Hertz local');
@@ -102,13 +97,13 @@ describe('live text on parameter and navigation presenters', () => {
 
   it('updates minimap range language while keeping focus and numeric ARIA attributes', () => {
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
-    const localization = createUILocalization();
+    let text: MinimapText = {};
     const handle = keep(mountMinimap(host(), {
       snapshot: () => ({minimum: 0, maximum: 10, start: 2, end: 6}), draw: vi.fn(), setRange: vi.fn(),
-    }, {localization}));
+    }, {getText: () => text, formatters: {number: value => `N${value}`}}));
     handle.brush.focus();
-    localization.update({messages: {'minimap.label': 'Bereich', 'minimap.range': 'von {start} bis {end}'},
-      formatters: {number: (value) => `N${value}`}});
+    text = {label: 'Bereich', range: ({start, end}) => `von ${start} bis ${end}`};
+    handle.update();
     expect(document.activeElement).toBe(handle.brush);
     expect(handle.brush.getAttribute('aria-label')).toBe('Bereich');
     expect(handle.brush.getAttribute('aria-valuetext')).toBe('von N2 bis N6');
@@ -117,32 +112,35 @@ describe('live text on parameter and navigation presenters', () => {
   });
 
   it('keeps caller status messages authoritative and translates only defaults', () => {
-    const localization = createUILocalization();
+    let text: StatusText = {};
     let state: StatusState = {kind: 'loading'};
-    const handle = keep(mountStatus(host(), {snapshot: () => state}, {localization}));
+    const handle = keep(mountStatus(host(), {snapshot: () => state}, {getText: () => text}));
     const node = handle.message;
-    localization.update({messages: {'status.loading': 'Chargement…', 'status.error': 'Échec'}});
+    text = {loading: 'Chargement…', error: 'Échec'};
+    handle.update();
     expect(handle.message).toBe(node);
     expect(node.textContent).toBe('Chargement…');
     state = {kind: 'error', message: 'Specific application diagnosis'};
     handle.update();
-    localization.update({messages: {'status.error': 'Anderer Fehler'}});
+    text = {error: 'Anderer Fehler'};
+    handle.update();
     expect(node.textContent).toBe('Specific application diagnosis');
     expect(handle.element.getAttribute('role')).toBe('alert');
   });
 
   it('keeps a focused, held chord when translated data labels and language change', () => {
-    const localization = createUILocalization();
+    let text: NoteSurfaceText = {};
     let state: NoteSurfaceState = {layout: 'chords', keyboard: true, chords: [{index: 7, label: 'Major', midis: [60, 64]}]};
     const setNote = vi.fn();
-    const handle = keep(mountNoteSurface(host(), {snapshot: () => state, interaction: {setNote}}, {localization}));
+    const handle = keep(mountNoteSurface(host(), {snapshot: () => state, interaction: {setNote}}, {getText: () => text}));
     const root = handle.element;
     const button = root.querySelector<HTMLButtonElement>('button')!;
     button.focus();
     button.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true}));
     expect(setNote.mock.calls).toEqual([[60, true], [64, true]]);
     state = {...state, chords: [{index: 7, label: 'Dur', midis: [60, 64]}]};
-    localization.update({messages: {'note.hint': 'Spielen mit Tastatur', 'note.start': 'Hier starten'}});
+    text = {hint: 'Spielen mit Tastatur', start: 'Hier starten'};
+    handle.update();
     expect(handle.element).toBe(root);
     expect(document.activeElement).toBe(button);
     expect(button.textContent).toBe('Dur');
@@ -155,14 +153,15 @@ describe('live text on parameter and navigation presenters', () => {
   });
 
   it('updates piano and grid labels without rebuilding their musical surfaces', () => {
-    const localization = createUILocalization();
+    let text: NoteSurfaceText = {};
     let state: NoteSurfaceState = {layout: 'piano', piano: [{midi: 60, black: false, left: 0, width: 100, label: 'C'}]};
-    const handle = keep(mountNoteSurface(host(), {snapshot: () => state}, {localization}));
+    const handle = keep(mountNoteSurface(host(), {snapshot: () => state}, {getText: () => text}));
     const key = handle.board!.firstElementChild;
     const viewport = handle.element.querySelector<HTMLElement>('[part="viewport"]')!;
     viewport.focus();
     state = {...state, piano: [{...state.piano![0], label: 'Do'}]};
-    localization.update({messages: {'note.keyboard': 'Clavier'}});
+    text = {keyboard: 'Clavier'};
+    handle.update();
     expect(handle.board!.firstElementChild).toBe(key);
     expect(key!.textContent).toBe('Do');
     expect(document.activeElement).toBe(viewport);
@@ -177,20 +176,25 @@ describe('live text on parameter and navigation presenters', () => {
   });
 
   it('relabels timeline controls and cached ruler values without detaching a focused region', () => {
-    const localization = createUILocalization();
+    let text: TimelineText = {};
+    let prefix = '';
     const state: TimelineState = {duration: 8, playhead: 2, regions: [{id: 'a', start: 0, end: 4}]};
     const selectRegion = vi.fn();
-    const handle = keep(mountTimeline(host(), {snapshot: () => state, seek: vi.fn(), selectRegion}, {localization}));
+    const handle = keep(mountTimeline(host(), {snapshot: () => state, seek: vi.fn(), selectRegion}, {getText: () => text, formatters: {number: value => `${prefix}${value}`}}));
     const button = handle.regionElement('a')!;
     button.focus();
-    localization.update({messages: {'timeline.label': 'Zeitleiste', 'timeline.playhead': 'Position in {label}', 'timeline.region': 'Bereich {id}'},
-      formatters: {number: (value) => `N${value}`}});
+    const region = vi.fn(({id}: {id: string; start: number; end?: number}) => `Bereich ${id}`);
+    text = {label: 'Zeitleiste', playhead: ({label}) => `Position in ${label}`, region};
+    prefix = 'N';
+    expect(handle.ruler.textContent).not.toContain('N');
+    handle.update();
     expect(handle.regionElement('a')).toBe(button);
     expect(document.activeElement).toBe(button);
     expect(button.getAttribute('aria-label')).toBe('Bereich a');
     expect(handle.seek.getAttribute('aria-label')).toBe('Position in Zeitleiste');
     expect(handle.seek.getAttribute('aria-valuetext')).toBe('N2');
     expect(handle.ruler.textContent).toContain('N');
+    expect(region).toHaveBeenCalledWith({id: 'a', start: 0, end: 4});
     state.regions![0].label = 'Application translation';
     handle.update();
     expect(document.activeElement).toBe(button);
@@ -199,16 +203,13 @@ describe('live text on parameter and navigation presenters', () => {
     expect(selectRegion).toHaveBeenCalledWith('a', {additive: false});
   });
 
-  it('releases all seven localization subscriptions and ignores notifications after destruction', () => {
+  it.each([false, true])('reads display input once per paint, even on failure (%s), and ignores updates after destruction', (fails) => {
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
-    const listeners = new Set<() => void>();
-    const controller = createUILocalization();
-    const localization: UILocalization = {...controller, subscribe: (notify) => {
-      listeners.add(notify);
-      return () => { listeners.delete(notify); };
-    }};
+    const failure = new Error('display input failed');
+    const onError = vi.fn();
+    const getText = vi.fn(() => { if (fails) throw failure; return {}; });
     const snapshots = vi.fn(() => ({}));
-    const options = {localization};
+    const options = {getText, onError};
     const handles = [
       mountEnvelope(host(), {snapshot: () => { snapshots(); return {envelope: {attack: 0, decay: 0, sustain: 1, release: 0}, ranges: {attackMax: 2, decayMax: 2, releaseMax: 2}}; }, setEnvelope: vi.fn()}, options),
       mountEq(host(), {snapshot: () => { snapshots(); return {bands: []}; }, setBand: vi.fn()}, options),
@@ -218,12 +219,16 @@ describe('live text on parameter and navigation presenters', () => {
       mountStatus(host(), {snapshot: () => { snapshots(); return {kind: 'empty'}; }}, options),
       mountTimeline(host(), {snapshot: () => { snapshots(); return {duration: 1, regions: []}; }}, options),
     ];
-    expect(listeners.size).toBe(7);
-    const late = [...listeners];
+    getText.mockClear();
+    onError.mockClear();
+    for (const handle of handles) handle.update();
+    expect(getText).toHaveBeenCalledTimes(7);
+    expect(onError).toHaveBeenCalledTimes(fails ? 7 : 0);
     for (const handle of handles) { handle.destroy(); handle.destroy(); }
-    expect(listeners.size).toBe(0);
     snapshots.mockClear();
-    for (const notify of late) notify();
+    getText.mockClear();
+    for (const handle of handles) handle.update();
     expect(snapshots).not.toHaveBeenCalled();
+    expect(getText).not.toHaveBeenCalled();
   });
 });

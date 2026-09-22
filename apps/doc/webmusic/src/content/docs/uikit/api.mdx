@@ -113,88 +113,93 @@ interchangeable bindings:
 
 Each owning page describes its complete state, cleanup and styling contract.
 
-## Localization
+## External presentation inputs
 
-The root exports `createUILocalization(options?)` and the `UILocalization`,
-`UILocalizationController`, `UILocalizationOptions`, `UIMessage`, `UIMessageValues`
-and `UIFormatters` types. A localization source is borrowed presentation state:
-the application owns language selection and may share one source among related
-presenters. No language is selected globally and no translation framework is required.
+WebMusic supplies music behavior and its presentation hooks. The application
+keeps its existing translation, state-management and UI tools. WebMusic has no
+translation engine, message catalog, language selector or translation-change
+subscription. It consumes final strings and synchronous rendering callbacks.
+
+Text-producing presenters expose `getText?: () => PresenterText`, with the
+concrete type and fields defined on their leaf reference. The callback is read
+when that presenter paints. Simple fields contain final strings; contextual
+fields accept a `UITextValue<Values>`: a literal string or `(values) => string`.
+WebMusic passes the documented context and inserts the returned string as text.
+It does not interpret keys, interpolate templates or apply plural rules.
+
+Where numeric display is generated, `formatters?: UIValueFormatters` accepts
+application-owned functions:
+
+| Callback | Input |
+|---|---|
+| `number(value)` | The raw number, retaining the presenter's existing units. |
+| `percent(fraction)` | A fraction: `1` means 100 percent. |
+| `time(seconds)` | Seconds, never a timestamp or preformatted string. |
+
+The root exports only the shared `UITextValue` and `UIValueFormatters` types.
+No controller or factory is required. Missing fields preserve existing defaults;
+existing explicit label and formatter options retain precedence. Callback
+failures fall back to the default and use the presenter's `onError` sink.
+Machine values (`input.value`, `aria-valuenow`) and geometry stay numeric.
+
+This example accepts already-resolved application text. Its text can come from
+any translation library, a framework, a preference store or ordinary props:
 
 ```ts
-import {createUILocalization} from '@webmusic/ui';
 import {mountTransport} from '@webmusic/ui/transport';
 import {mountMeter} from '@webmusic/ui/meter';
 
-const localization = createUILocalization();
+let display = {
+  play: 'Play', pause: 'Pause', meter: 'Audio level',
+  describeLevel: (value: string) => `${value} level`,
+  percent: (fraction: number) => `${Math.round(fraction * 100)}%`,
+};
 let playing = false;
 const transport = mountTransport(transportHost, {
   snapshot: () => ({playing}),
   play: () => { playing = true; },
   pause: () => { playing = false; },
-}, {localization});
+}, {getText: () => ({play: display.play, pause: display.pause})});
 const meter = mountMeter(meterHost, {
   readLevel: () => ({level: 0.42}),
-}, {localization, animate: false});
-
-// Keep both handles mounted. A focused control keeps its node and focus.
-localization.update({
-  messages: {
-    'transport.play': '播放',
-    'transport.pause': '暂停',
-    'meter.level': '音频电平',
-    'meter.levelValue': '电平 {value}',
-  },
-  formatters: {
-    number: value => new Intl.NumberFormat('zh-CN').format(value),
-    percent: fraction => new Intl.NumberFormat('zh-CN', {style: 'percent'}).format(fraction),
-    time: seconds => `${Math.floor(seconds / 60)}分${Math.floor(seconds % 60)}秒`,
-  },
+}, {
+  animate: false,
+  getText: () => ({level: display.meter, levelValue: ({value}) => display.describeLevel(value)}),
+  formatters: {percent: fraction => display.percent(fraction)},
 });
 
-// Removing a view releases its observer; the shared source remains usable.
+// The application handles its external tool's change notification.
+function refreshDisplay(next: typeof display) {
+  display = next;
+  transport.update();
+  meter.redraw();
+}
+refreshDisplay({
+  play: '播放', pause: '暂停', meter: '音频电平',
+  describeLevel: value => `电平 ${value}`,
+  percent: fraction => `${Math.round(fraction * 100)}%`,
+});
+
+// Also unsubscribe the application's own external listener when removing it.
 transport.destroy();
 meter.destroy();
 ```
 
-`transportHost` and `meterHost` are application-owned DOM hosts. This example
-needs no seek, progress, subscription or spectrum placeholder methods.
+`transportHost` and `meterHost` are application-owned DOM hosts. The binding
+needs no placeholder seek, progress, subscription or spectrum methods.
 
-| Options | Meaning |
-| --- | --- |
-| `messages?: Readonly<Record<string, UIMessage>>` | Presenter-scoped keys listed on each reference page. A value is a plain text template or `(values: UIMessageValues) => string`. Templates substitute named `{values}`; functions support plural rules and whole-sentence reordering. Values are strings or numbers. Missing keys use the presenter's English default. |
-| `formatters.number?: (value: number) => string` | Human-readable numbers. The default retains each presenter's existing precision. |
-| `formatters.percent?: (fraction: number) => string` | Human-readable percentages: `1` means 100 percent. |
-| `formatters.time?: (seconds: number) => string` | Human-readable elapsed/duration clocks in seconds. |
-| `onError?: (error: unknown) => void` | Receives message, formatter and notification failures. Failed message/formatter calls use the default text. An error callback's own throw/rejection is contained. |
+The application decides when to refresh: ordinary mounts use `update()`, Meter
+uses `redraw()` (including `animate: false`), live analysis uses `paint(state)`
+and a retained histogram exposes `update()`. One-shot analysis helpers read
+inputs when invoked; the application clears/replaces its own report output
+before rendering again. Surface sliders use their existing `updateLabel(text)`
+and `formatValue`/`update()` ports. Canvas status text comes from the status
+binding. Plain stage content and panel section descriptors remain caller-owned.
 
-The controller also implements `message(key, fallback, values?)`,
-`formatNumber(value, fallback)`, `formatPercent(fraction, fallback)`,
-`formatTime(seconds, fallback)` and `subscribe(notify)`. Formatter fallback
-arguments are strings. Subscribing does not immediately call the listener and
-returns an idempotent unsubscribe. These methods allow custom UI to share the
-same presentation settings.
-
-`update(options)` atomically **replaces** every supplied messages/formatters map.
-Omitted fields retain their current values; explicit `undefined` resets that
-field. Replace the complete language map when switching language, so a missing
-translation falls back to the default instead of retaining the previous language.
-Maps are copied at the boundary. Notifications are synchronous, isolated from
-one another and bounded against endless reentrant updates.
-
-Explicit presenter `label`, `formatValue` and similar options still win over
-defaults. Labels in snapshots, parameter choice names, musical spellings,
-caller-supplied status/error messages and unit identifiers remain application
-data: translate them in the binding, retaining stable IDs. Set HTML `lang`/`dir`
-on the application surface as appropriate. Machine values such as `input.value`,
-`aria-valuenow` and geometry always retain standard numeric syntax.
-
-Mounted presenters observe localization and repaint in place. One-shot analysis
-helpers read it only when called, while the retained histogram observes it until
-`destroy()`. Section panels and plain DOM stages generate no default prose; their
-section labels and custom content remain caller-owned. The live demo option
-panels describe the object-valued entry; the example above shows actual language
-switching without remounting.
+Translate snapshot labels, choices, musical descriptions and application error
+messages before supplying them, retaining stable IDs. Set HTML `lang`/`dir` in
+the application. Changing display text does not create a new player, replace a
+focused control or subscribe WebMusic to a translation service.
 
 ## Release boundary
 

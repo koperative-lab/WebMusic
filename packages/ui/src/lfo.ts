@@ -1,4 +1,4 @@
-import {bindLocalization, message as uiMessage, formatNumber, formatPercent, type UILocalization} from './localization';
+import {readText, textValue, type UITextValue, formatNumber, type UIValueFormatters, formatPercent} from './text';
 import {installStyle} from './internal/style';
 import {claimHost, createUpdateLoop} from "./internal/lifecycle";
 import {addClassNames, clamp, setParts} from './internal/dom';
@@ -78,9 +78,24 @@ export interface LfoParts {
   head?: string;
 }
 
+export interface LfoText {
+  label?: UITextValue;
+  shape?: UITextValue;
+  rate?: UITextValue;
+  depth?: UITextValue;
+  run?: UITextValue;
+  stop?: UITextValue;
+  sine?: UITextValue;
+  triangle?: UITextValue;
+  square?: UITextValue;
+  saw?: UITextValue;
+  hertz?: UITextValue<{value: string; hertz: number}>;
+}
+
 export interface LfoOptions {
-  /** Borrowed live text and formatting; language updates preserve controls. */
-  localization?: UILocalization;
+  /** Read application-resolved text once per paint; call update() after external changes. */
+  getText?: () => LfoText;
+  formatters?: UIValueFormatters;
   label?: string;
   runLabel?: string;
   stopLabel?: string;
@@ -573,6 +588,7 @@ export function mountLfo(
     snapshot: LfoState,
     rateText: string,
     depthText: string,
+    text: LfoText | undefined,
   ): void => {
     if (!isCurrent()) return;
     const firstFrame = current === undefined;
@@ -582,10 +598,10 @@ export function mountLfo(
     currentRateText = rateText;
     currentDepthText = depthText;
 
-    root.setAttribute('aria-label', options.label ?? uiMessage(options.localization, 'lfo.label', 'LFO'));
-    shapes.setAttribute('aria-label', uiMessage(options.localization, 'lfo.shape', 'Shape'));
+    root.setAttribute('aria-label', options.label ?? textValue(text?.label, 'LFO', {}, options.onError));
+    shapes.setAttribute('aria-label', textValue(text?.shape, 'Shape', {}, options.onError));
     for (const [name, control] of [['rate', rateControl], ['depth', depthControl]] as const) {
-      const label = uiMessage(options.localization, `lfo.${name}`, name);
+      const label = textValue(text?.[name], name, {}, options.onError);
       control.label.firstChild!.nodeValue = `${label} `;
       control.input.setAttribute('aria-label', label);
     }
@@ -594,12 +610,12 @@ export function mountLfo(
     run.setAttribute(
       "aria-label",
       snapshot.running
-        ? (options.stopLabel ?? uiMessage(options.localization, 'lfo.stop', 'Stop'))
-        : (options.runLabel ?? uiMessage(options.localization, 'lfo.run', 'Run')),
+        ? (options.stopLabel ?? textValue(text?.stop, 'Stop', {}, options.onError))
+        : (options.runLabel ?? textValue(text?.run, 'Run', {}, options.onError)),
     );
     run.replaceChildren(createRunGlyph(document, snapshot.running));
     for (const [shape, button] of shapeButtons) {
-      const label = uiMessage(options.localization, `lfo.shape.${shape}`, shape);
+      const label = textValue(text?.[shape], shape, {}, options.onError);
       button.title = label;
       button.setAttribute('aria-label', label);
       const active = shape === snapshot.shape;
@@ -627,22 +643,25 @@ export function mountLfo(
     if (!isCurrent()) return;
     const revision = ++paintRevision;
     const canCommit = (): boolean => isCurrent() && revision === paintRevision;
-    const rateText = useCustomFormatters && options.formatRate
-      ? options.formatRate(snapshot.rate)
-      : uiMessage(options.localization, 'lfo.hertz', '{value}Hz', {
-          value: formatNumber(options.localization, snapshot.rate, snapshot.rate.toFixed(2)),
-        });
+    const text = readText(options.getText, options.onError);
+    if (!canCommit()) return;
+    let rateText: string;
+    if (useCustomFormatters && options.formatRate) rateText = options.formatRate(snapshot.rate);
+    else {
+      const value = formatNumber(options.formatters, snapshot.rate, snapshot.rate.toFixed(2), options.onError);
+      rateText = textValue(text?.hertz, `${value}Hz`, {value, hertz: snapshot.rate}, options.onError);
+    }
     if (!canCommit()) return;
     const depthText = useCustomFormatters && options.formatDepth
       ? options.formatDepth(snapshot.depth)
-      : formatPercent(options.localization, snapshot.depth);
+      : formatPercent(options.formatters, snapshot.depth, undefined, options.onError);
     if (!canCommit()) return;
-    commitFrame(snapshot, rateText, depthText);
+    commitFrame(snapshot, rateText, depthText, text);
   };
 
   const restoreCurrentFrame = (): void => {
     if (!current) return;
-    commitFrame(current, currentRateText, currentDepthText);
+    commitFrame(current, currentRateText, currentDepthText, readText(options.getText, options.onError));
   };
 
   const fallback: LfoState = {
@@ -875,7 +894,6 @@ export function mountLfo(
       if (isCurrent()) reportError(error);
     }
     if (isCurrent()) update();
-    cleanups.push(bindLocalization(options.localization, update, isCurrent, options.onError));
   } catch (error) {
     rollback();
     throw error;

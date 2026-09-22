@@ -75,8 +75,9 @@ The entry exports both `mountMacro()` and `mountMacroRack()`.
 
 | Member | Kind | Default | Description |
 |---|---|---|---|
-| `localization` | `UILocalization` | — | Borrowed text and number-format source; updates repaint in place and destruction releases its subscription. |
-| `mountMacro: onError` | `(error: unknown) => void` | — | Receives read/update, subscription and cleanup failures, plus nested parameter errors. Callback throws/rejections are contained. A failed subscription leaves explicit `update()` available. |
+| `getText` | `() => MacroText` | — | Supplies one application-owned text snapshot per update. After external text changes, call `update()`. |
+| `formatters` | `UIValueFormatters` | — | The `percent` callback formats macro values; `number` formats target values. Other fields are unused by this presenter. |
+| `mountMacro: onError` | `(error: unknown) => void` | — | Receives read/update, text/formatter, subscription and cleanup failures, plus nested parameter errors. Callback throws/rejections are contained. A failed subscription leaves explicit `update()` available. |
 | `mountMacroRack: onError` | `(error: unknown) => void` | — | Receives child errors and rack cleanup failures; callback throws/rejections are contained. |
 | `mountMacroRack: classNames` | `MacroRackClassNames` | `{}` | Adds compatibility classes to rack `root` and each `item` host. |
 | `mountMacroRack: parts` | `MacroRackParts` | `{}` | Adds part tokens to rack `root` and each `item` host. |
@@ -92,20 +93,23 @@ The entry exports both `mountMacro()` and `mountMacroRack()`.
 | `rack.items` | `readonly MacroHandle[]` | Stable child handle array in binding order. |
 | `rack.item(index)` | `(number) => MacroHandle \| undefined` | Returns the child at an index without exposing private wrappers. |
 
-**Localization.** Both mounts accept the same instance-local
-[localization controller](/uikit/api/) through `localization`; racks forward it to each macro
-and nested parameter control. Updates preserve the focused range. `percent` formats the normalized
-macro value, and `number` formats target values. Labels and units supplied by the binding remain
-caller text. Destroy releases all child localization subscriptions.
+**Text and formatting.** Both mounts accept `getText()` and `formatters`. The rack
+forwards these application-owned callbacks to each macro; `handle.update()` rereads text while
+preserving the focused range. `percent` formats the normalized macro value, and `number` formats
+target values. Labels and units supplied by the binding remain caller text. See the
+[shared text hooks](/uikit/api/). The presenter does not observe a language store.
 
-| Message key | Default | Values |
+| `MacroText` field | Type | Default / callback values |
 |---|---|---|
-| `macro.label` | `MACRO` | — |
-| `macro.empty` | `Assign .targets` | — |
-| `macro.targetValue` | `{value}{unit}` | Formatted `value`, caller-supplied `unit` |
+| `label` | `string` | `MACRO` when the binding label is nullish. |
+| `empty` | `string` | `Assign .targets` |
+| `targetValue` | `UITextValue<{value: string; unit: string}>` | Concatenates the formatted `value` and caller-supplied `unit` by default. |
+
+Fields are optional; strings are literal final text. A `targetValue` callback can delegate
+sentence ordering and translation to the application's existing library.
 
 **Accessibility.** The macro value is the accessible native range created by the nested parameter
-presenter and named by `MacroState.label`; its value text is a localized percentage (an integer percentage by default). Destination
+presenter and named by `MacroState.label`; its value text is a formatted percentage (an integer percentage by default). Destination
 rows are ordinary readable text, not controls. `disabled` reaches the native range. A macro rack
 adds no extra landmark or label, so callers should provide surrounding context when the list needs
 an accessible group name.

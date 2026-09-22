@@ -46,21 +46,28 @@ After the latest command settles, the presenter re-reads authoritative state.
 and calls the binding subscription. `update()` is re-entrancy-safe and bounded to 32 passes. See
 the [shared presenter shape](/uikit/api/#the-shared-presenter-shape) for the common lifecycle.
 
-## Localization
+## Display text and values
 
-Pass a shared [`localization`](/uikit/api/#localization) source to update visible labels,
-accessible names, wave-shape names, and readouts while retaining the same focused controls.
-Explicit `label`, `runLabel`, `stopLabel`, `formatRate`, and `formatDepth` options take precedence.
-The `number` formatter receives rate in hertz; `percent` receives depth as a fraction. Input and
-command values remain numeric.
+`getText()` returns application-resolved `LfoText` once per paint. Call `handle.update()` when
+external settings change; focused controls remain mounted. Explicit `label`, `runLabel`,
+`stopLabel`, `formatRate`, and `formatDepth` take precedence. See
+[application-owned text](/uikit/api/#external-presentation-inputs) for external translation-package
+composition and notification ownership.
 
-| Message key | Fallback / interpolation values |
+Fields accept literal strings or callbacks returning final strings. There is no template
+interpolation. Missing fields and failed callbacks use defaults; failures reach `onError`.
+
+| `LfoText` field | Default / callback context |
 |---|---|
-| `lfo.label`, `lfo.shape` | `LFO`, `Shape` |
-| `lfo.rate`, `lfo.depth` | `rate`, `depth` |
-| `lfo.run`, `lfo.stop` | `Run`, `Stop` |
-| `lfo.shape.sine`, `lfo.shape.triangle`, `lfo.shape.square`, `lfo.shape.saw` | `sine`, `triangle`, `square`, `saw` |
-| `lfo.hertz` | `{value}Hz`; value is already formatted. |
+| `label`, `shape` | `LFO`, `Shape`; no context values. |
+| `rate`, `depth` | `rate`, `depth`; no context values. |
+| `run`, `stop` | `Run`, `Stop`; no context values. |
+| `sine`, `triangle`, `square`, `saw` | The corresponding shape name; no context values. |
+| `hertz` | Formatted value followed by `Hz`; `{value: string, hertz: number}`. |
+
+`formatters.number` receives rate in hertz; `formatters.percent` receives depth as a fraction.
+Input and command values remain numeric. The safe initial frame after an explicit formatter
+failure still uses these display callbacks.
 
 <details class="component-section">
 <summary>API</summary>
@@ -94,7 +101,8 @@ command values remain numeric.
 
 | Member | Kind | Default | Description |
 |---|---|---|---|
-| `localization` | `UILocalization` | — | Borrowed live text and number-formatting source; its subscription is released on destruction. |
+| `getText` | `() => LfoText` | — | Reads application-resolved display text once per paint; call `update()` after external changes. |
+| `formatters` | `UIValueFormatters` | — | Pure numeric display callbacks; explicit presenter formatters take precedence. |
 | `label` | `string` | `'LFO'` | Accessible name of the root group. |
 | `runLabel` | `string` | `'Run'` | Run button accessible name while stopped. |
 | `stopLabel` | `string` | `'Stop'` | Run button accessible name while running. |

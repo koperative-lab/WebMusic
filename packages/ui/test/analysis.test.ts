@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 
 import {describe, expect, it, vi} from 'vitest';
-import {createUILocalization} from '../src/localization';
 import {
   ANALYSIS_SPAN_SELECTOR,
   analysisStyle,
@@ -14,6 +13,7 @@ import {
   renderHistogram,
   renderKeyView,
   type AudioAnalysisCardResult,
+  type AnalysisText,
   renderLiveChordPanel,
   renderRhythmPatternList,
   renderMotifList,
@@ -310,40 +310,38 @@ describe('interactive histogram controls', () => {
   });
 });
 
-describe('analysis localization', () => {
-  it('translates key confidence and candidate names without altering bar geometry', () => {
-    const localization = createUILocalization({
-      messages: {'analysis.keyName': '{tonic}调{mode}', 'analysis.confidence': '可信度 {value}'},
-      formatters: {percent: (fraction) => `百分之${fraction * 100}`},
-    });
+describe('analysis application text', () => {
+  it('reads final key text at render time, with no automatic rerender', () => {
+    let copy: AnalysisText = {keyName: ({tonic, mode}) => `${tonic}调${mode}`, confidence: ({value}) => `可信度 ${value}`};
     const root = createAnalysisRoot(document);
-    renderKeyView({tonic: 'C', mode: 'major', confidence: .8, scores: [{tonic: 'G', mode: 'major', score: .2}]}, root, 'Caption', {localization});
+    const getText = () => copy;
+    renderKeyView({tonic: 'C', mode: 'major', confidence: .8, scores: [{tonic: 'G', mode: 'major', score: .2}]}, root, 'Caption', {
+      getText, formatters: {percent: value => `百分之${value * 100}`},
+    });
     expect(root.textContent).toContain('CaptionC调major可信度 百分之80G调major');
     expect(root.querySelector<HTMLElement>('span > span')?.style.width).toBe('100%');
-    localization.update({messages: {'analysis.keyName': '{tonic}!'}});
-    expect(root.textContent).toContain('C调major'); // One-shot rendering owns no subscription.
+    copy = {noNotes: '{literal}'};
+    expect(root.textContent).toContain('C调major');
     root.replaceChildren();
-    renderKeyView(undefined, root, undefined, {localization: createUILocalization({messages: {'analysis.noNotes': '暂无音符'}})});
-    expect(root.textContent).toContain('暂无音符');
+    renderKeyView(undefined, root, undefined, {getText});
+    expect(root.textContent).toBe('—{literal}');
   });
 
-  it('localizes beat/count/duration text while keeping numeric playhead spans', () => {
-    const localization = createUILocalization({
-      messages: {
-        'analysis.beat': '第{value}拍', 'analysis.inKey': '{tonic}调式{mode}',
-        'analysis.count': ({count, value}) => Number(count) === 1 ? `${value}次` : `${value}多次`,
-        'analysis.intervals': '音程 {values}', 'analysis.quarters': '{value}四分音符',
-        'analysis.voiceIssue': ({type}) => type === 'parallel-fifths' ? '平行五度' : String(type),
-        'analysis.issueLocation': '{voices}；{beat}',
-      },
-      formatters: {number: (value) => `[${value}]`},
-    });
+  it('gives count callbacks raw numbers while preserving numeric playhead spans', () => {
+    const copy: AnalysisText = {
+      beat: ({value}) => `第${value}拍`, inKey: ({tonic, mode}) => `${tonic}调式${mode}`,
+      count: ({count, value}) => count === 1 ? `${value}次` : `${value}多次`,
+      intervals: ({values}) => `音程 ${values}`, quarters: ({value}) => `${value}四分音符`,
+      voiceIssue: ({type}) => type === 'parallel-fifths' ? '平行五度' : type,
+      issueLocation: ({voices, beat}) => `${voices}；${beat}`,
+    };
+    const options = {getText: () => copy, formatters: {number: (value: number) => `[${value}]`}};
     const root = createAnalysisRoot(document);
-    renderChordTimeline([{chord: 'C', startQuarters: 1, endQuarters: 3}], root, {localization});
-    renderRomanStrip({tonic: 'C', mode: 'major', confidence: 1, scores: []}, [], root, {localization});
-    renderMotifList([{intervals: [2], rhythm: [1], occurrences: [{startQuarters: 4}]}], root, {localization});
-    renderRhythmPatternList([{pattern: [1, .5], count: 2, onsets: [5]}], root, {localization});
-    renderVoiceLeadingList([{type: 'parallel-fifths', severity: 'warning', voices: ['S', 'A'], startQuarters: 7, endQuarters: 8}], root, {localization});
+    renderChordTimeline([{chord: 'C', startQuarters: 1, endQuarters: 3}], root, options);
+    renderRomanStrip({tonic: 'C', mode: 'major', confidence: 1, scores: []}, [], root, options);
+    renderMotifList([{intervals: [2], rhythm: [1], occurrences: [{startQuarters: 4}]}], root, options);
+    renderRhythmPatternList([{pattern: [1, .5], count: 2, onsets: [5]}], root, options);
+    renderVoiceLeadingList([{type: 'parallel-fifths', severity: 'warning', voices: ['S', 'A'], startQuarters: 7, endQuarters: 8}], root, options);
     expect(root.textContent).toContain('第[2]拍');
     expect(root.textContent).toContain('C调式major');
     expect(root.textContent).toContain('[1]次音程 [2]');
@@ -353,11 +351,11 @@ describe('analysis localization', () => {
     expect(readAnalysisSpans(root.querySelector('[data-start-quarters]')!)).toEqual([{startQuarters: 1, endQuarters: 3}]);
   });
 
-  it('reads current localization on live paint and preserves explicit pitch formatting', () => {
-    const localization = createUILocalization();
+  it('reads latest application text on live paint and preserves explicit pitch formatting', () => {
+    let copy: AnalysisText = {};
     const root = createAnalysisRoot(document);
-    const panel = renderLiveChordPanel(root, {localization, formatPitch: (midi) => `note-${midi}`});
-    localization.update({messages: {'analysis.soundingNow': '当前发声', 'analysis.waiting': '等待播放'}});
+    const panel = renderLiveChordPanel(root, {getText: () => copy, formatPitch: midi => `note-${midi}`});
+    copy = {soundingNow: '当前发声', waiting: '等待播放'};
     panel.paint({chord: '', midis: [], history: []});
     expect(root.textContent).toBe('当前发声—等待播放');
     panel.paint({chord: 'C', midis: [60], history: ['C']});
@@ -370,48 +368,50 @@ describe('analysis localization', () => {
     loudness: {integratedLufs: -14, truePeakDb: -1, rms: .1},
     onsets: [1, 2], pitchTrack: {frequencies: [220, 440], times: [0, 1]},
   };
-
-  it('formats audio units, facts and counts while retaining time/pitch geometry', () => {
-    const localization = createUILocalization({
-      messages: {
-        'analysis.tempo': '{value}拍每分', 'analysis.tempoDetails': '{confidence}；{value}拍',
-        'analysis.integrated': '综合', 'analysis.truePeak': '真峰值', 'analysis.rms': '均方根',
-        'analysis.lufs': '{value}响度', 'analysis.dbfs': '{value}峰值单位',
-        'analysis.onsets': '{value}起音', 'analysis.pitchRange': '{minimum}至{maximum}赫兹',
-      },
-      formatters: {number: (value) => `N${value}`, percent: (value) => `P${value}`},
-    });
+  it('renders supplied audio units and counts without changing time/pitch geometry', () => {
+    const copy: AnalysisText = {
+      tempo: ({value}) => `${value}拍每分`, tempoDetails: ({confidence, value}) => `${confidence}；${value}拍`,
+      integrated: '综合', truePeak: '真峰值', rms: '均方根',
+      lufs: ({value}) => `${value}响度`, dbfs: ({value}) => `${value}峰值单位`,
+      onsets: ({value}) => `${value}起音`, pitchRange: ({minimum, maximum}) => `${minimum}至${maximum}赫兹`,
+    };
+    const options = {getText: () => copy, formatters: {number: (value: number) => `N${value}`, percent: (value: number) => `P${value}`}};
     const root = createAnalysisRoot(document);
-    renderAudioAnalysisCard('tempo', audio, root, {localization});
+    renderAudioAnalysisCard('tempo', audio, root, options);
     expect(root.textContent).toBe('N120拍每分P0.7；N2拍');
-    renderAudioAnalysisCard('loudness', audio, root, {localization});
+    renderAudioAnalysisCard('loudness', audio, root, options);
     expect(root.textContent).toBe('综合N-14响度真峰值N-1峰值单位均方根N0.1');
-    renderAudioAnalysisCard('onsets', audio, root, {localization, durationSeconds: 4});
+    renderAudioAnalysisCard('onsets', audio, root, {...options, durationSeconds: 4});
     expect(root.textContent).toBe('N2起音');
     expect([...root.querySelectorAll('span')].map(node => node.style.left)).toEqual(['25%', '50%']);
-    renderAudioAnalysisCard('pitch', audio, root, {localization});
+    renderAudioAnalysisCard('pitch', audio, root, options);
     expect(root.textContent).toBe('N220至N440赫兹');
     expect(root.querySelector('path')?.getAttribute('d')).toBe('M0.0 48.0 L240.0 0.0');
   });
 
   it.each([
     ['key', 'keyUnavailable'], ['tempo', 'tempoUnavailable'], ['onsets', 'onsetsUnavailable'], ['pitch', 'pitchUnavailable'],
-  ] as const)('translates the missing %s state', (type, key) => {
-    const localization = createUILocalization({messages: {[`analysis.${key}`]: '尚未分析'}});
-    const root = renderAudioAnalysisCard(type, {loudness: audio.loudness}, undefined, {localization});
+  ] as const)('uses the application missing-%s label', (type, field) => {
+    const root = renderAudioAnalysisCard(type, {loudness: audio.loudness}, undefined, {getText: () => ({[field]: '尚未分析'})});
     expect(root.textContent).toBe('尚未分析');
   });
 
-  it('updates a histogram in place with focus, active bins and selection intact', () => {
-    const localization = createUILocalization();
+  it('explicitly updates histogram text with focus, active bins and selection intact', () => {
+    let copy: AnalysisText = {};
+    let prefix = '';
     const root = createAnalysisRoot(document);
     document.body.append(root);
     const onSelect = vi.fn();
-    const handle = renderHistogram([{label: 'C', value: 2}, {label: 'D', value: 1}], root, {localization, onSelect});
+    const getText = vi.fn(() => copy);
+    const handle = renderHistogram([{label: 'C', value: 2}, {label: 'D', value: 1}], root, {
+      getText, onSelect, formatters: {number: value => `${prefix}${value}`},
+    });
     const button = root.querySelector('button')!;
     button.focus();
     handle.setActive([0]);
-    localization.update({messages: {'analysis.histogramSelect': '{label}，{value}，跳至下一处'}, formatters: {number: (value) => `数${value}`}});
+    copy = {histogramSelect: ({label, value}) => `${label}，${value}，跳至下一处`}; prefix = '数';
+    expect(button.getAttribute('aria-label')).toBe('C: 2. Go to next occurrence');
+    handle.update();
     expect(root.querySelector('button')).toBe(button);
     expect(document.activeElement).toBe(button);
     expect(button.getAttribute('aria-current')).toBe('true');
@@ -420,26 +420,100 @@ describe('analysis localization', () => {
     button.click();
     expect(onSelect).toHaveBeenCalledWith(0, {label: 'C', value: 2});
     handle.destroy();
-    localization.update({messages: undefined});
-    button.click();
+    getText.mockClear();
+    handle.update(); button.click();
+    expect(getText).not.toHaveBeenCalled();
     expect(onSelect).toHaveBeenCalledOnce();
     expect(root.childElementCount).toBe(0);
     root.remove();
   });
 
-  it('preserves histogram formatter/empty overrides and contains reentrant destruction', () => {
-    const localization = createUILocalization();
+  it('preserves histogram explicit overrides and contains reentrant destruction', () => {
+    let copy: AnalysisText = {};
+    const getText = () => copy;
     const root = createAnalysisRoot(document);
-    const empty = renderHistogram([], root, {localization, emptyLabel: 'Application empty'});
-    localization.update({messages: {'analysis.histogramEmpty': 'Translated'}});
-    expect(root.textContent).toBe('Application empty');
-    empty.destroy();
-    const handle = renderHistogram([{label: 'C', value: 2}], root, {localization, format: value => `${value} own`, onSelect() {}});
+    const empty = renderHistogram([], root, {getText, emptyLabel: 'Application empty'});
+    copy = {histogramEmpty: 'Ignored'}; empty.update();
+    expect(root.textContent).toBe('Application empty'); empty.destroy();
+    const handle = renderHistogram([{label: 'C', value: 2}], root, {getText, format: value => `${value} own`, onSelect() {}});
     const button = root.querySelector('button')!;
-    localization.update({formatters: {number: () => 'Ignored'}});
     expect(root.textContent).toBe('C2 own');
-    localization.update({messages: {'analysis.histogramSelect': () => { handle.destroy(); return 'Stale'; }}});
+    copy = {histogramSelect: () => { handle.destroy(); return 'Stale'; }}; handle.update();
     expect(root.childElementCount).toBe(0);
     expect(button.getAttribute('aria-label')).not.toBe('Stale');
+  });
+
+  it.each([false, true])('refreshes retained histogram labels with selectable=%s', (selectable) => {
+    const root = createAnalysisRoot(document);
+    document.body.append(root);
+    const bins = [{label: 'Major', value: 2}, {label: 'Minor', value: 1}];
+    const onSelect = selectable ? vi.fn() : undefined;
+    const handle = renderHistogram(bins, root, {onSelect});
+    const rows = [...root.querySelector('.wui-analysis__histogram')!.children];
+    const labels = rows.map(row => row.firstElementChild as HTMLElement);
+    if (selectable) {
+      labels[0]!.focus();
+      handle.setActive([0]);
+    }
+
+    bins[0]!.label = '大调';
+    bins[1]!.label = '小调';
+    expect(labels.map(label => label.textContent)).toEqual(['Major', 'Minor']);
+    handle.update();
+
+    expect([...root.querySelector('.wui-analysis__histogram')!.children]).toEqual(rows);
+    expect(rows.map(row => row.firstElementChild)).toEqual(labels);
+    expect(labels.map(label => label.textContent)).toEqual(['大调', '小调']);
+    if (selectable) {
+      expect(document.activeElement).toBe(labels[0]);
+      expect(labels[0]!.getAttribute('aria-current')).toBe('true');
+      expect(labels[0]!.getAttribute('aria-label')).toBe('大调: 2. Go to next occurrence');
+      labels[0]!.click();
+      expect(onSelect).toHaveBeenCalledWith(0, bins[0]);
+    } else {
+      expect(labels.every(label => label.tagName === 'SPAN')).toBe(true);
+    }
+    handle.destroy();
+    root.remove();
+  });
+
+  it('keeps histogram order and numeric presentation at the mounted snapshot', () => {
+    const root = createAnalysisRoot(document);
+    const first = {label: 'Major', value: 2};
+    const second = {label: 'Minor', value: 1};
+    const bins = [first, second];
+    const handle = renderHistogram(bins, root, {onSelect() {}});
+    const rows = [...root.querySelector('.wui-analysis__histogram')!.children];
+    const widths = rows.map(row => (row.children[1]!.firstElementChild as HTMLElement).style.width);
+
+    first.label = '大调';
+    first.value = 0;
+    bins.reverse();
+    bins.push({label: 'Other', value: 10});
+    handle.update();
+
+    expect(root.textContent).toBe('大调2Minor1');
+    expect(root.querySelectorAll('button')).toHaveLength(2);
+    expect((rows[0]!.firstElementChild as HTMLButtonElement).disabled).toBe(false);
+    expect(rows.map(row => (row.children[1]!.firstElementChild as HTMLElement).style.width)).toEqual(widths);
+    handle.destroy();
+  });
+});
+
+describe('analysis application formatting failures', () => {
+  it('reports failing number callbacks in one-shot and live paints and keeps defaults', () => {
+    const failure = new Error('Application number format');
+    const onError = vi.fn();
+    const options = {formatters: {number: () => { throw failure; }}, onError};
+    const root = createAnalysisRoot(document);
+    renderRhythmPatternList([{pattern: [1], count: 2, onsets: [0]}], root, options);
+    expect(root.textContent).toContain('×21');
+    expect(onError).toHaveBeenCalledWith(failure);
+    onError.mockClear();
+    root.replaceChildren();
+    const panel = renderLiveChordPanel(root, options);
+    panel.paint({chord: 'C', midis: [60], history: []});
+    expect(root.textContent).toContain('60');
+    expect(onError).toHaveBeenCalledWith(failure);
   });
 });

@@ -77,21 +77,27 @@ the board instead of half outside it. Positions are percentages, so CSS alone ca
 the finished keyboard. `PointerSurface` exposes the same multi-pointer, ref-counted hold lifecycle
 for another board whose nodes carry `data-midi` or `data-pitch`.
 
-## Localization
+## Display text
 
-Pass a shared [`localization`](/uikit/api/#localization) source for library-generated hints and
-accessible names. Piano labels, grid references, chord names, and `octaveLabel` are application
-data: supply translated state and notify the binding or call `update()`. Changing only these
-labels or library text preserves focus, scroll, DOM identity, and held notes. Changes to the
-musical mappings or geometry retain the release-and-rebuild behavior described above.
+`getText()` returns application-resolved `NoteSurfaceText` once per paint. Call `handle.update()`
+after external text settings change. See [application-owned text](/uikit/api/#external-presentation-inputs)
+for composing an external translation package without giving the presenter a language source.
+Each field is a literal string or a callback with no context values returning the final string.
+There is no template interpolation. Missing fields and failed callbacks use defaults; failures
+reach `onError`.
 
-| Message key | Fallback |
+| `NoteSurfaceText` field | Default |
 |---|---|
-| `note.hint` | `Type to play · Z / X octave · Esc stop` |
-| `note.hintMapped` | `Type to play · Esc stop` |
-| `note.start` | `▸ Click to start` |
-| `note.keyboard` | `Note keyboard` |
-| `note.grid` | `Note grid` |
+| `hint` | `Type to play · Z / X octave · Esc stop` |
+| `hintMapped` | `Type to play · Esc stop` |
+| `start` | `▸ Click to start` |
+| `keyboard` | `Note keyboard` |
+| `grid` | `Note grid` |
+
+Piano labels, grid references, chord names, and `octaveLabel` remain application data. Supply
+translated state and notify the binding or call `update()`. Changing only these labels or display
+text preserves focus, scroll, DOM identity, and held notes. Musical mapping or geometry changes
+retain the release-and-rebuild behavior described above.
 
 <details class="component-section">
 <summary>API</summary>
@@ -150,7 +156,7 @@ The interaction port has these members:
 
 | Member | Kind | Default | Description |
 |---|---|---|---|
-| `localization` | `UILocalization` | — | Borrowed live text source; its subscription is released on destruction. |
+| `getText` | `() => NoteSurfaceText` | — | Reads application-resolved display text once per paint; call `update()` after external changes. |
 | `onError` | `(error: unknown) => void` | — | Receives snapshot, interaction, subscription, and cleanup failures. Exceptions thrown by the error sink are swallowed. |
 | `stylesheet` | `boolean` | `true` | Installs the presenter's stylesheet unless explicitly `false`, for a light-DOM host that cannot inject CSS into its page. |
 

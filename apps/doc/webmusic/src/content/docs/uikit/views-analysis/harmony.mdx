@@ -91,25 +91,29 @@ strip.item('Cmaj7')?.dataset.chip;
 wheel.destroy();
 ```
 
-## Localization
+## External presentation inputs
 
-All four mount Options accept a borrowed `localization` source from
-[`createUILocalization`](/uikit/api/#localization). Updates refresh text and ARIA
-in place; destroy unsubscribes. Explicit labels and `formatPosition` retain
-precedence, while chord names, spellings, empty text and annotations in the
-snapshot remain caller-owned. Nameplate alternate buttons retain focus when
-their labels or metadata change and commands receive the current candidate.
+Each mount accepts a typed `getText()` callback, read on `handle.update()`.
+The application supplies final strings or contextual callbacks through
+`FlowLaneText`, `NameplateText`, `ChipStripText` and `WheelText`.
+[The shared presentation contract](/uikit/api/#external-presentation-inputs)
+keeps translation and its change notifications outside WebMusic. Explicit
+`label` and `formatPosition` options retain precedence.
 
-| Message key | Default / interpolation values |
-| --- | --- |
-| `harmony.flowLane`, `harmony.chord`, `harmony.readout`, `harmony.wheel` | Flow lane / Chord / Read-out / Wheel, followed by `: {names}` when named data is present. `names` is a joined string. |
-| `harmony.position` | Position |
-| `harmony.positionValue` | `{value} — {label}`; formatted position and current band label. |
-| `harmony.occurrences` | `x{count}`; formatted count. |
-| `harmony.share` | `{label} {value}`; segment label and formatted percentage. |
+| Text field | Default and callback context |
+|---|---|
+| All four: `description` | Flow lane / Chord / Read-out / Wheel, followed by the named data when present; context `{names: string}`. |
+| FlowLane: `position` | Position |
+| FlowLane: `positionValue` | Formatted position and current band label; context `{value: string, position: number, label: string}`. |
+| ChipStrip: `occurrences` | `x` followed by the formatted count; context `{count: number, value: string}`. |
+| Wheel: `share` | Segment label and formatted percentage; context `{label: string, value: string, fraction: number}`. |
 
-The number formatter handles positions/counts and the percentage formatter
-handles shares. Geometry and machine ARIA positions remain numeric.
+FlowLane/ChipStrip `formatters.number` receive positions/counts, and Wheel
+`formatters.percent` receives the raw fractional share. Geometry and machine
+ARIA positions stay numeric. Change application state and call `update()` to
+refresh text even when geometry remains cached. Nameplate alternate buttons
+retain focus and commands receive the current candidate. Chord spellings,
+empty labels, annotations and other snapshot text remain caller-owned.
 
 <details class="component-section">
 <summary>API</summary>

@@ -1,4 +1,4 @@
-import {bindLocalization, message as uiMessage, formatNumber, type UILocalization} from './localization';
+import {readText, textValue, type UITextValue, formatNumber, type UIValueFormatters} from './text';
 import {installStyle} from './internal/style';
 import {claimHost, createErrorSink} from './internal/lifecycle';
 import {addClassNames, clamp, finite, setParts} from './internal/dom';
@@ -84,9 +84,17 @@ export interface TimelineParts {
   seek?: string;
 }
 
+export interface TimelineText {
+  label?: UITextValue;
+  playhead?: UITextValue<{label: string}>;
+  region?: UITextValue<{id: string; start: number; end?: number}>;
+  marker?: UITextValue<{id: string; start: number; end?: number}>;
+}
+
 export interface TimelineOptions {
-  /** Borrowed live text and formatting; language updates preserve controls. */
-  localization?: UILocalization;
+  /** Read application-resolved text once per paint; call update() after external changes. */
+  getText?: () => TimelineText;
+  formatters?: UIValueFormatters;
   label?: string;
   /** Fixed major-tick interval. By default a readable interval is derived. */
   majorStep?: number;
@@ -372,7 +380,6 @@ export function mountTimeline(
 
   let destroyed = false;
   let unsubscribe: (() => void) | undefined;
-  let releaseLocalization = (): void => {};
   let animationFrame: number | undefined;
   let viewport: TimelineRange = {start: 0, end: 1};
   let duration = 1;
@@ -380,8 +387,6 @@ export function mountTimeline(
   let rulerSignature = '';
   let resizeObserver: ResizeObserver | undefined;
   let rulerLabels: Array<{tick: HTMLElement; label: HTMLElement; fraction: number; major: boolean}> = [];
-  let regionSignature = '';
-  let localizationRevision = 0;
   const regionElements = new Map<string, HTMLButtonElement>();
 
   const reportError = createErrorSink(options.onError);
@@ -443,7 +448,7 @@ export function mountTimeline(
 
   const renderRuler = (state: TimelineState): void => {
     const tickNodes: HTMLElement[] = [];
-    const formatPosition = options.formatPosition ?? ((position: number) => formatNumber(options.localization, position, defaultFormatPosition(position)));
+    const formatPosition = options.formatPosition ?? ((position: number) => formatNumber(options.formatters, position, defaultFormatPosition(position), options.onError));
     const tickState: TimelineTick[] = [];
 
     if (state.ticks !== undefined) {
@@ -472,9 +477,15 @@ export function mountTimeline(
       }
     }
 
+    // Text callbacks may read external settings even when geometry is unchanged.
+    const resolved = tickState.map(item => ({...item, label: item.label ?? formatPosition(item.position)}));
+    if (destroyed || !claim.isCurrent()) return;
+    const signature = JSON.stringify([viewport, resolved]);
+    if (signature === rulerSignature) return;
+    rulerSignature = signature;
     resizeObserver?.disconnect();
     rulerLabels = [];
-    for (const item of tickState) {
+    for (const item of resolved) {
       const tick = document.createElement('span');
       tick.className = 'wui-timeline__tick';
       tick.dataset.tickId = item.id;
@@ -485,7 +496,7 @@ export function mountTimeline(
 
       const label = document.createElement('span');
       label.className = 'wui-timeline__tick-label';
-      label.textContent = item.label ?? formatPosition(item.position);
+      label.textContent = item.label;
       tick.title = label.textContent;
       addClassNames(label, options.classNames?.tickLabel);
       setParts(label, 'tick-label', options.parts?.tickLabel);
@@ -499,7 +510,7 @@ export function mountTimeline(
     observeRuler();
   };
 
-  const renderRegions = (state: TimelineState): void => {
+  const renderRegions = (state: TimelineState, text: TimelineText | undefined): void => {
     const nodes: HTMLElement[] = [];
     const ids = new Set<string>();
 
@@ -550,7 +561,9 @@ export function mountTimeline(
       button.setAttribute('aria-pressed', String(region.selected === true));
       button.setAttribute(
         'aria-label',
-        region.label ?? uiMessage(options.localization, marker ? 'timeline.marker' : 'timeline.region', marker ? 'Marker {id}' : 'Region {id}', {id: region.id}),
+        region.label ?? textValue(marker ? text?.marker : text?.region, `${marker ? 'Marker' : 'Region'} ${region.id}`, {
+          id: region.id, start: region.start, end: region.end,
+        }, options.onError),
       );
       addClassNames(button, options.classNames?.region);
       if (marker) addClassNames(button, options.classNames?.marker);
@@ -591,9 +604,11 @@ export function mountTimeline(
 
     try {
       const state = binding.snapshot();
-      const label = options.label ?? uiMessage(options.localization, 'timeline.label', 'Timeline');
+      const text = readText(options.getText, options.onError);
+      if (destroyed || !claim.isCurrent()) return;
+      const label = options.label ?? textValue(text?.label, 'Timeline', {}, options.onError);
       root.setAttribute('aria-label', label);
-      seek.setAttribute('aria-label', uiMessage(options.localization, 'timeline.playhead', '{label} playhead', {label}));
+      seek.setAttribute('aria-label', textValue(text?.playhead, `${label} playhead`, {label}, options.onError));
       duration = Math.max(Number.EPSILON, finite(state.duration, 1));
       viewport = normalizeRange(state.viewport, 0, duration) ?? {
         start: 0,
@@ -607,42 +622,9 @@ export function mountTimeline(
           ? options.majorStep
           : derivedStep;
 
-      const nextRulerSignature = JSON.stringify({
-        localizationRevision,
-        viewport,
-        majorStep,
-        ticks: state.ticks?.map((tick) => [
-          tick.id,
-          tick.position,
-          tick.label,
-          tick.level,
-        ]),
-      });
-      if (nextRulerSignature !== rulerSignature) {
-        renderRuler(state);
-        rulerSignature = nextRulerSignature;
-      }
-
-      const nextRegionSignature = JSON.stringify({
-        localizationRevision,
-        duration,
-        viewport,
-        disabled: state.disabled === true,
-        selectable: binding.selectRegion !== undefined,
-        regions: (state.regions ?? []).map((region) => [
-          region.id,
-          region.start,
-          region.end,
-          region.label,
-          region.color,
-          region.selected,
-          region.disabled,
-        ]),
-      });
-      if (nextRegionSignature !== regionSignature) {
-        renderRegions(state);
-        regionSignature = nextRegionSignature;
-      }
+      renderRuler(state);
+      if (destroyed || !claim.isCurrent()) return;
+      renderRegions(state, text);
 
       const normalizedLoop = normalizeRange(
         state.loop,
@@ -701,7 +683,7 @@ export function mountTimeline(
         seek.value = String(position);
         seek.setAttribute(
           'aria-valuetext',
-          options.formatPosition?.(position) ?? formatNumber(options.localization, position, defaultFormatPosition(position)),
+          options.formatPosition?.(position) ?? formatNumber(options.formatters, position, defaultFormatPosition(position), options.onError),
         );
       } else {
         seek.hidden = true;
@@ -754,7 +736,6 @@ export function mountTimeline(
     destroy(): void {
       if (destroyed) return;
       destroyed = true;
-      releaseLocalization();
       resizeObserver?.disconnect();
       resizeObserver = undefined;
       view?.removeEventListener('resize', layoutRulerLabels);
@@ -810,9 +791,5 @@ export function mountTimeline(
       reportError(error);
     }
   }
-  releaseLocalization = bindLocalization(options.localization, () => {
-    localizationRevision += 1;
-    update();
-  }, () => !destroyed && claim.isCurrent(), options.onError);
   return handle;
 }

@@ -1,10 +1,10 @@
-import {claimHost, createErrorSink, runCleanups} from './internal/lifecycle';
+import {claimHost, createErrorSink, createUpdateLoop, runCleanups} from './internal/lifecycle';
 import {createFader, faderStyle} from './fader';
 import {installStyle} from './internal/style';
 import {addClassNames, clamp01, setParts} from './internal/dom';
 import {componentSurfaceCss, controlBorderFallback} from './internal/surface';
 import {controlHeight, controlRadius} from './internal/control';
-import {bindLocalization, formatPercent, message, type UILocalization} from './localization';
+import {formatPercent, readText, textValue, type UITextValue, type UIValueFormatters} from './text';
 
 export interface MixerChannel {
   id: string;
@@ -54,8 +54,23 @@ export interface MixerClassNames {
 
 export type MixerParts = MixerClassNames;
 
+export interface MixerText {
+  master?: string;
+  channels?: string;
+  volume?: UITextValue<{label: string}>;
+  mute?: UITextValue<{label: string}>;
+  solo?: UITextValue<{label: string}>;
+  muteText?: string;
+  soloText?: string;
+  play?: string;
+  pause?: string;
+  stop?: string;
+}
+
 export interface MixerOptions {
-  localization?: UILocalization;
+  /** Read application-provided text on each update. */
+  getText?: () => MixerText;
+  formatters?: UIValueFormatters;
   classNames?: MixerClassNames;
   parts?: MixerParts;
   onError?: (error: unknown) => void;
@@ -123,8 +138,9 @@ export function mountMixer(
   setParts(root, ["root"], options.parts?.root);
 
   let destroyed = false;
+  let ownsHost = false;
   let unsubscribe: (() => void) | undefined;
-  let unbindLocalization: (() => void) | undefined;
+  let texts: MixerText | undefined;
   const report = createErrorSink(options.onError);
   const command = (work: () => Promise<void> | void): void => {
     if (destroyed) return;
@@ -175,8 +191,8 @@ export function mountMixer(
     // carries BOTH documented hooks: `fader` for the track, `input` for the
     // control that was inside it.
     const control = createFader(document, {
-      label: message(options.localization, 'mixer.volume', '{label} volume', {label: initial.label}),
-      formatValue: (value) => formatPercent(options.localization, value),
+      label: textValue(texts?.volume, `${initial.label} volume`, {label: initial.label}, options.onError),
+      formatValue: (value) => formatPercent(ownsHost ? options.formatters : undefined, value, undefined, options.onError),
       value: clamp01(initial.value),
       orientation: "vertical",
       disabled: initial.disabled === true,
@@ -237,18 +253,20 @@ export function mountMixer(
         label.title = channel.label;
         label.textContent = channel.label;
       }
-      control.updateLabel(message(options.localization, 'mixer.volume', '{label} volume', {label: channel.label}));
+      control.updateLabel(textValue(texts?.volume, `${channel.label} volume`, {label: channel.label}, options.onError));
+      if (destroyed) return;
       control.paint(clamp01(channel.value), disabled);
+      if (destroyed) return;
       if (mute) {
         mute.disabled = disabled;
-        mute.textContent = message(options.localization, 'mixer.muteText', 'M');
-        mute.setAttribute("aria-label", message(options.localization, 'mixer.mute', 'Mute {label}', {label: channel.label}));
+        mute.textContent = textValue(texts?.muteText, 'M', {}, options.onError);
+        mute.setAttribute("aria-label", textValue(texts?.mute, `Mute ${channel.label}`, {label: channel.label}, options.onError));
         mute.setAttribute("aria-pressed", String(channel.muted === true));
       }
       if (solo) {
         solo.disabled = disabled;
-        solo.textContent = message(options.localization, 'mixer.soloText', 'S');
-        solo.setAttribute("aria-label", message(options.localization, 'mixer.solo', 'Solo {label}', {label: channel.label}));
+        solo.textContent = textValue(texts?.soloText, 'S', {}, options.onError);
+        solo.setAttribute("aria-label", textValue(texts?.solo, `Solo ${channel.label}`, {label: channel.label}, options.onError));
         solo.setAttribute("aria-pressed", String(channel.solo === true));
       }
     };
@@ -277,7 +295,7 @@ export function mountMixer(
     addClassNames(button, options.classNames?.button);
     addClassNames(button, options.classNames?.[kind]);
     setParts(button, ["button", kind], options.parts?.button, options.parts?.[kind]);
-    button.setAttribute("aria-label", message(options.localization, `mixer.${kind}`, label));
+    button.setAttribute("aria-label", textValue(texts?.[kind], label, {}, options.onError));
     button.textContent = text;
     button.addEventListener("click", () => command(work));
     actionButtons.push({button, kind, label});
@@ -295,28 +313,31 @@ export function mountMixer(
   channelsBox.className = "wui-mixer__channels strips";
   channelsBox.tabIndex = 0;
   channelsBox.setAttribute("role", "group");
-  channelsBox.setAttribute("aria-label", message(options.localization, 'mixer.channels', 'Mixer channels'));
+  channelsBox.setAttribute("aria-label", textValue(texts?.channels, 'Mixer channels', {}, options.onError));
   addClassNames(channelsBox, options.classNames?.channels);
   setParts(channelsBox, ["channels"], options.parts?.channels);
   const showMaster = options.master !== false;
-  const masterStrip = showMaster ? createStrip({id: "master", label: message(options.localization, 'mixer.master', 'master'), value: 0}, true) : undefined;
+  const masterStrip = showMaster ? createStrip({id: "master", label: textValue(texts?.master, 'master', {}, options.onError), value: 0}, true) : undefined;
   board.append(...(masterStrip ? [masterStrip.element] : []), channelsBox);
   root.replaceChildren(...(transport.childNodes.length ? [transport, board] : [board]));
 
   const strips = new Map<string, Strip>();
-  const update = (): void => {
+  const paintSnapshot = (): void => {
     if (destroyed) return;
     try {
       const state = binding.snapshot();
       if (destroyed || !claim.isCurrent()) return;
+      texts = readText(options.getText, options.onError);
+      if (destroyed || !claim.isCurrent()) return;
       const disabled = state.disabled === true;
       channelsBox.tabIndex = state.channels.length ? 0 : -1;
-      channelsBox.setAttribute('aria-label', message(options.localization, 'mixer.channels', 'Mixer channels'));
+      channelsBox.setAttribute('aria-label', textValue(texts?.channels, 'Mixer channels', {}, options.onError));
       for (const {button, kind, label} of actionButtons) {
         button.disabled = disabled;
-        button.setAttribute('aria-label', message(options.localization, `mixer.${kind}`, label));
+        button.setAttribute('aria-label', textValue(texts?.[kind], label, {}, options.onError));
       }
-      masterStrip?.paint({id: "master", label: message(options.localization, 'mixer.master', 'master'), value: state.master}, disabled);
+      masterStrip?.paint({id: "master", label: textValue(texts?.master, 'master', {}, options.onError), value: state.master}, disabled);
+      if (destroyed || !claim.isCurrent()) return;
 
       const seen = new Set<string>();
       const order: HTMLElement[] = [];
@@ -330,9 +351,14 @@ export function mountMixer(
         let strip = strips.get(key);
         if (!strip) {
           strip = createStrip(merged);
+          if (destroyed || !claim.isCurrent()) {
+            runCleanups([strip.destroy], report);
+            return;
+          }
           strips.set(key, strip);
         }
         strip.paint(merged, merged.disabled);
+        if (destroyed || !claim.isCurrent()) return;
         order.push(strip.element);
       }
       for (const [key, strip] of [...strips]) {
@@ -354,21 +380,27 @@ export function mountMixer(
     }
   };
 
+  const updateLoop = createUpdateLoop({
+    name: 'Mixer', pass: paintSnapshot,
+    isCurrent: () => !destroyed && claim.isCurrent(), report,
+  });
+  const update = (): void => updateLoop.run();
+
   const handle: MixerHandle = {
     element: root,
     update,
     destroy() {
       if (destroyed) return;
       destroyed = true;
+      ownsHost = false;
+      updateLoop.cancel();
       const stop = unsubscribe;
       unsubscribe = undefined;
-      const releaseText = unbindLocalization;
-      unbindLocalization = undefined;
+
       const ownedStrips = [...strips.values()];
       strips.clear();
       runCleanups([
         stop,
-        releaseText,
         ...ownedStrips.map((strip) => () => strip.destroy()),
         () => masterStrip?.destroy(),
         () => claim.release(),
@@ -391,6 +423,7 @@ export function mountMixer(
     style?.remove();
     return handle;
   }
+  ownsHost = true;
   update();
   if (destroyed || !claim.isCurrent()) return handle;
   if (binding.subscribe) {
@@ -404,6 +437,6 @@ export function mountMixer(
       report(error);
     }
   }
-  unbindLocalization = bindLocalization(options.localization, update, () => !destroyed && claim.isCurrent(), report);
+
   return handle;
 }

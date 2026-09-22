@@ -1,4 +1,4 @@
-import {bindLocalization, message as localize, type UILocalization} from './localization';
+import {readText} from './text';
 import {
   harmonyValues,
   harmonyDensity,
@@ -209,8 +209,14 @@ export interface WorkbenchParts {
   index?: string;
 }
 
+export interface WorkbenchText {
+  views?: string;
+  analysis?: string;
+}
+
 export interface WorkbenchOptions {
-  localization?: UILocalization;
+  /** Final display strings from application-owned presentation state. */
+  getText?: () => WorkbenchText;
   /**
    * `full` (the default) is header, stage, rail, strip and status bar. `bare`
    * is an unframed stage with no padding — a sibling element wraps the card it
@@ -879,11 +885,11 @@ export function mountWorkbench(
 
   let resolved: ResolvedMotion = resolveMotion(host, options.motion, view);
   let destroyed = false;
+  let text: WorkbenchText | undefined;
   let phase: WorkbenchPhase = 'idle';
   let roving: string | undefined;
   let leaveLoop: (() => void) | undefined;
   let unsubscribe: (() => void) | undefined;
-  let unlocalize: (() => void) | undefined;
   let stopPreference: (() => void) | undefined;
   let lastFrame: number | undefined;
   let activeId: string | undefined;
@@ -946,7 +952,7 @@ export function mountWorkbench(
   tablist.className = 'wui-workbench__tablist';
   tablist.setAttribute('role', 'tablist');
   tablist.setAttribute('aria-orientation', 'horizontal');
-  tablist.setAttribute('aria-label', options.label ?? localize(options.localization, 'workbench.views', 'Views'));
+  tablist.setAttribute('aria-label', options.label ?? text?.views ?? 'Views');
   addClassNames(tablist, options.classNames?.tablist);
   setParts(tablist, 'tablist', options.parts?.tablist);
   dress(tablist, workbenchParts.tablist);
@@ -958,7 +964,7 @@ export function mountWorkbench(
   main.id = `${scope}-panel`;
   if (chrome === 'full') {
     main.setAttribute('role', navigation ? 'tabpanel' : 'region');
-    if (!navigation) main.setAttribute('aria-label', options.label ?? localize(options.localization, 'workbench.analysis', 'Analysis'));
+    if (!navigation) main.setAttribute('aria-label', options.label ?? text?.analysis ?? 'Analysis');
     // A panel whose only content is a caller's presenter may have nothing
     // focusable in it at all, and an unreachable panel is a page a keyboard
     // cannot read. The stop is cheap; an inaccessible view is not.
@@ -1192,6 +1198,8 @@ export function mountWorkbench(
 
   const pass = (): void => {
     if (destroyed) return;
+    text = readText(options.getText, options.onError);
+    if (destroyed || !claim.isCurrent()) return;
     let snapshot: WorkbenchState;
     try {
       snapshot = binding.snapshot();
@@ -1200,8 +1208,8 @@ export function mountWorkbench(
       return;
     }
 
-    tablist.setAttribute('aria-label', options.label ?? localize(options.localization, 'workbench.views', 'Views'));
-    if (!navigation) main.setAttribute('aria-label', options.label ?? localize(options.localization, 'workbench.analysis', 'Analysis'));
+    tablist.setAttribute('aria-label', options.label ?? text?.views ?? 'Views');
+    if (!navigation) main.setAttribute('aria-label', options.label ?? text?.analysis ?? 'Analysis');
 
     const views = (snapshot.views ?? []).filter(
       (candidate): candidate is WorkbenchView => typeof candidate?.id === 'string',
@@ -1596,9 +1604,6 @@ export function mountWorkbench(
     destroy(): void {
       if (destroyed) return;
       destroyed = true;
-      const releaseText = unlocalize;
-      unlocalize = undefined;
-      releaseText?.();
       leaveLoop?.();
       leaveLoop = undefined;
       draws.clear();
@@ -1663,6 +1668,5 @@ export function mountWorkbench(
       report(error);
     }
   }
-  unlocalize = bindLocalization(options.localization, updates.run, () => !destroyed && claim.isCurrent(), options.onError);
   return handle;
 }

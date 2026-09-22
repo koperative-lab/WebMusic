@@ -1,5 +1,5 @@
 import {claimHost, createErrorSink, createUpdateLoop, runCleanups} from './internal/lifecycle';
-import {bindLocalization, formatPercent, message, type UILocalization} from './localization';
+import {formatPercent, readText, textValue, type UITextValue, type UIValueFormatters} from './text';
 import {installStyle} from './internal/style';
 import {addClassNames, clamp01, finite, setParts} from './internal/dom';
 import {componentSurfaceCss} from './internal/surface';
@@ -48,9 +48,17 @@ export interface MeterParts {
   bar?: string;
 }
 
+export interface MeterText {
+  level?: string;
+  spectrum?: string;
+  levelValue?: UITextValue<{value: string; level: number; peak?: number; peakHold?: number}>;
+  spectrumValue?: UITextValue<{value: string; maximum: number}>;
+}
+
 export interface MeterOptions {
-  /** Shared, caller-owned text and percentage formatting. */
-  localization?: UILocalization;
+  /** Application-supplied final text; call redraw() after external text changes. */
+  getText?: () => MeterText;
+  formatters?: UIValueFormatters;
   mode?: 'level' | 'spectrum';
   bars?: number;
   label?: string;
@@ -164,7 +172,7 @@ export function mountMeter(
 
   const document = host.ownerDocument;
   const mode = options.mode === 'spectrum' ? 'spectrum' : 'level';
-  const localization = options.localization;
+  const formatters = options.formatters;
   let labelOverride = options.label;
   const defaultLabel = mode === 'spectrum' ? 'Spectrum' : 'Audio level';
   const barCount = countBars(options.bars);
@@ -225,15 +233,14 @@ export function mountMeter(
   let destroyed = false;
   let rafId: number | null = null;
   const reportError = createErrorSink(options.onError);
-  let unsubscribeLocalization: (() => void) | undefined;
-  const localizedLabel = (): string => labelOverride ?? message(
-    localization, mode === 'spectrum' ? 'meter.spectrum' : 'meter.level', defaultLabel,
+  const textLabel = (copy: MeterText | undefined): string => labelOverride ?? textValue(
+    mode === 'spectrum' ? copy?.spectrum : copy?.level, defaultLabel, {}, reportError,
   );
   const updateLabel = (label?: string): void => {
     if (destroyed) return;
     labelOverride = label;
     try {
-      const text = localizedLabel();
+      const text = textLabel(readText(options.getText, reportError));
       if (!destroyed) root.setAttribute('aria-label', text);
     } catch (error) {
       reportError(error);
@@ -247,7 +254,8 @@ export function mountMeter(
     pass: () => {
       if (destroyed) return;
       try {
-        const label = localizedLabel();
+        const copy = readText(options.getText, reportError);
+        const label = textLabel(copy);
         if (destroyed) return;
         if (mode === 'spectrum') {
           if (!('readSpectrum' in binding) || typeof binding.readSpectrum !== 'function') {
@@ -257,9 +265,8 @@ export function mountMeter(
           if (destroyed) return;
           const values = bars.map((_bar, index) => clamp01(samples[index]));
           const maximum = values.reduce((largest, value) => Math.max(largest, value), 0);
-          const text = message(localization, 'meter.spectrumValue', '{value} spectrum peak', {
-            value: formatPercent(localization, maximum),
-          });
+          const value = formatPercent(formatters, maximum, undefined, reportError);
+          const text = textValue(copy?.spectrumValue, `${value} spectrum peak`, {value, maximum}, reportError);
           if (destroyed) return;
           bars.forEach((bar, index) => { bar.style.height = `${Math.max(1, values[index]! * 100)}%`; });
           root.setAttribute('aria-valuenow', String(Math.round(maximum * 100)));
@@ -272,9 +279,8 @@ export function mountMeter(
           if (destroyed) return;
           const level = clamp01(state.level);
           const held = clamp01(state.peakHold ?? state.peak ?? level);
-          const text = message(localization, 'meter.levelValue', '{value} level', {
-            value: formatPercent(localization, level),
-          });
+          const value = formatPercent(formatters, level, undefined, reportError);
+          const text = textValue(copy?.levelValue, `${value} level`, {value, level, peak: state.peak, peakHold: state.peakHold}, reportError);
           if (destroyed) return;
           fill!.style.width = `${level * 100}%`;
           peak!.style.left = `${held * 100}%`;
@@ -313,15 +319,12 @@ export function mountMeter(
       destroyed = true;
       redrawLoop.cancel();
       const frame = rafId;
-      const releaseLocalization = unsubscribeLocalization;
       rafId = null;
-      unsubscribeLocalization = undefined;
       bars = [];
       fill = undefined;
       peak = undefined;
       runCleanups([
         () => { if (frame != null) cancelFrame?.(frame); },
-        releaseLocalization,
         () => root.remove(),
         () => style?.remove(),
         () => claim.release(),
@@ -342,8 +345,6 @@ export function mountMeter(
     handle.destroy();
     return handle;
   }
-  unsubscribeLocalization = bindLocalization(localization, redraw, () => !destroyed, reportError);
-  if (destroyed) return handle;
   updateLabel(labelOverride);
   if (destroyed) return handle;
   if (options.animate === false) redraw();

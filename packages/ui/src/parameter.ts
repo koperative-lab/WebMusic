@@ -2,7 +2,7 @@ import {installStyle} from './internal/style';
 import {claimHost, createUpdateLoop} from "./internal/lifecycle";
 import {markEmptyState, addClassNames, clamp, finite, setParts} from './internal/dom';
 import {componentSurfaceCss, controlBorderFallback} from './internal/surface';
-import {bindLocalization, formatNumber as localizeNumber, message, type UILocalization} from './localization';
+import {formatNumber as formatDisplayNumber, readText, textValue, type UITextValue, type UIValueFormatters} from './text';
 // ============================================================================
 // Domain-neutral parameter-rack presenter.
 //
@@ -69,8 +69,15 @@ export interface ParameterRackParts {
   empty?: string;
 }
 
+export interface ParameterRackText {
+  empty?: string;
+  value?: UITextValue<{value: string; unit: string}>;
+}
+
 export interface ParameterRackOptions {
-  localization?: UILocalization;
+  /** Read application-provided text on each update. */
+  getText?: () => ParameterRackText;
+  formatters?: UIValueFormatters;
   /** Flat racks border each item; grouped racks border each named group. */
   layout?: "flat" | "grouped";
   emptyLabel?: string;
@@ -311,11 +318,11 @@ function formatNumber(value: number): string {
   return value.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
 }
 
-function defaultFormat(parameter: ParameterRackItem, value: number, localization?: UILocalization): string {
+function defaultFormat(parameter: ParameterRackItem, value: number, texts?: ParameterRackText, formatters?: UIValueFormatters, onError?: (error: unknown) => void): string {
   const option = parameter.options?.[Math.round(value)];
   if (option !== undefined) return option;
-  const number = localizeNumber(localization, value, formatNumber(value));
-  return parameter.unit ? message(localization, 'parameter.value', '{value} {unit}', {value: number, unit: parameter.unit}) : number;
+  const number = formatDisplayNumber(formatters, value, formatNumber(value), onError);
+  return parameter.unit ? textValue(texts?.value, `${number} ${parameter.unit}`, {value: number, unit: parameter.unit}, onError) : number;
 }
 
 function structureSignature(
@@ -405,7 +412,7 @@ export function mountParameterRack(
   const groupIdPrefix = `wui-parameter-rack-${++parameterRackSequence}-group`;
   let groupSequence = 0;
   let unsubscribe: (() => void) | undefined;
-  let unbindLocalization: (() => void) | undefined;
+  let texts: ParameterRackText | undefined;
   const isCurrent = (): boolean =>
     !destroyed && mountedParameterRacks.get(host) === handle;
   const reportError = (error: unknown): void => options.onError?.(error);
@@ -418,7 +425,7 @@ export function mountParameterRack(
       // into an unhandled rejection.
     }
   };
-  const format = options.formatValue ?? ((parameter: ParameterRackItem, value: number) => defaultFormat(parameter, value, options.localization));
+  const format = options.formatValue ?? ((parameter: ParameterRackItem, value: number) => defaultFormat(parameter, value, texts, options.formatters, options.onError));
 
   const paint = (
     record: ParameterNodes,
@@ -446,7 +453,7 @@ export function mountParameterRack(
       if (!isCurrent()) return false;
       reportError(error);
       if (!isCurrent()) return false;
-      text = defaultFormat(parameter, current, options.localization);
+      text = defaultFormat(parameter, current, texts, options.formatters, options.onError);
     }
     if (!isCurrent()) return false;
     record.fill.setAttribute("d", fillPath);
@@ -529,6 +536,7 @@ export function mountParameterRack(
           currentParameter.min,
           currentParameter.max,
         );
+        texts = readText(options.getText, options.onError);
         if (!paint(record, currentParameter, next)) return;
         const revision = (commandRevisions.get(record.id) ?? 0) + 1;
         commandRevisions.set(record.id, revision);
@@ -571,7 +579,7 @@ export function mountParameterRack(
       if (next.length === 0) {
         const empty = document.createElement("div");
         empty.className = "wui-parameter-rack__empty";
-        empty.textContent = options.emptyLabel ?? message(options.localization, 'parameter.empty', 'No parameters');
+        empty.textContent = options.emptyLabel ?? textValue(texts?.empty, 'No parameters', {}, options.onError);
         addClassNames(empty, options.classNames?.empty);
         setParts(empty, "empty", options.parts?.empty);
         markEmptyState(empty);
@@ -686,6 +694,9 @@ export function mountParameterRack(
     let nextSignature: string;
     try {
       const state = binding.snapshot();
+      if (!isCurrent()) return;
+      texts = readText(options.getText, options.onError);
+      if (!isCurrent()) return;
       disabled = state?.disabled === true;
       next = Array.from(state?.parameters ?? []).map(normalize);
       const ids = new Set<string>();
@@ -718,7 +729,7 @@ export function mountParameterRack(
     const parameterById = new Map(
       parameters.map((parameter) => [parameter.id, parameter] as const),
     );
-    if (emptyNode) emptyNode.textContent = options.emptyLabel ?? message(options.localization, 'parameter.empty', 'No parameters');
+    if (emptyNode) emptyNode.textContent = options.emptyLabel ?? textValue(texts?.empty, 'No parameters', {}, options.onError);
     for (const group of groupLabels) {
       const name = parameterById.get(group.parameterId)?.group ?? '';
       group.label.textContent = name;
@@ -762,8 +773,7 @@ export function mountParameterRack(
       // Preserve the mount failure after best-effort rollback.
     }
     unsubscribe = undefined;
-    unbindLocalization?.();
-    unbindLocalization = undefined;
+
     try {
       root.remove();
     } catch {
@@ -805,8 +815,7 @@ export function mountParameterRack(
         cleanupError ??= error;
       }
       unsubscribe = undefined;
-      unbindLocalization?.();
-      unbindLocalization = undefined;
+
       try {
         root.remove();
       } catch (error) {
@@ -854,7 +863,7 @@ export function mountParameterRack(
       if (isCurrent()) reportError(error);
     }
     if (isCurrent()) update();
-    unbindLocalization = bindLocalization(options.localization, update, isCurrent, reportAsyncError);
+
   } catch (error) {
     rollback();
     throw error;

@@ -62,6 +62,12 @@ and browser drivers own their visual and platform integration. Review
 [scripts/check-architecture.mjs](scripts/check-architecture.mjs), manifests and
 build mappings together when changing a public entry or dependency boundary.
 
+Keep external tools responsible for their own features. WebMusic exposes music
+behavior and composable presentation hooks; it does not implement translation
+engines, application state stores or form/layout frameworks. Prefer a minimal
+adapter or missing update/observation hook to a parallel subsystem. Supply final
+text and formatting callbacks from the application's existing tools.
+
 Run the affected workspace's tests and typecheck during development, for example
 `npm test -w @webmusic/score` and `npm run typecheck -w @webmusic/score`.
 Build dependencies first when consumers resolve their public entries from

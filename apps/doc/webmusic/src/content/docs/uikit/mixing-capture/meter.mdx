@@ -41,8 +41,8 @@ Binding values are clamped to `0…1`, and missing spectrum entries become `0`.
 
 With `animate: false`, mount performs one synchronous redraw. Call `handle.redraw()` whenever new
 data is available. Mode and bar count determine the DOM at mount time and require a remount to
-change. Accessible text and percentage formatting update in place through a shared localization
-controller; `updateLabel()` remains available for an explicit application-owned name. The rest of the host and
+change. Accessible text and percentage formatting update in place through application-supplied
+callbacks and `redraw()`; `updateLabel()` remains available for an explicit application-owned name. The rest of the host and
 lifecycle behavior follows the
 [shared presenter shape](/uikit/api/#the-shared-presenter-shape).
 
@@ -71,7 +71,8 @@ lifecycle behavior follows the
 
 | Member | Kind | Default | Description |
 |---|---|---|---|
-| `localization` | `UILocalization` | — | Borrowed shared text and percentage formatting; live updates preserve the root and sample nodes. |
+| `getText` | `() => MeterText` | — | Reads application-owned final text; call `redraw()` after external text changes. |
+| `formatters` | `UIValueFormatters` | — | Pure percentage formatting; receives the normalized displayed value. |
 | `mode` | `'level' \| 'spectrum'` | `'level'` | Builds the track/fill/peak structure or the spectrum/bar structure. |
 | `bars` | `number` | `28` | Spectrum bar count. Values are floored with a minimum of `4`; non-finite values fall back to `28`. |
 | `label` | `string` | `'Audio level'` / `'Spectrum'` | Root accessible name; its default follows mode. |
@@ -82,7 +83,7 @@ lifecycle behavior follows the
 | `backgroundColor` | `string` | — | Writes inline `--wui-meter-background`. |
 | `classNames` | `MeterClassNames` | `{}` | Adds compatibility classes for `root`, `track`, `fill`, `peak`, `spectrum`, and `bar`. |
 | `parts` | `MeterParts` | `{}` | Adds part tokens for the same six node kinds. |
-| `onError` | `(error: unknown) => void` | — | Receives binding-read and cleanup errors. |
+| `onError` | `(error: unknown) => void` | — | Receives binding-read, text/formatting, and cleanup errors. |
 | `stylesheet` | `boolean` | `true` | Installs the presenter's stylesheet unless explicitly `false`, for a light-DOM host that cannot inject CSS into its page. |
 
 **Handle**
@@ -91,23 +92,28 @@ lifecycle behavior follows the
 |---|---|---|
 | `element` | `HTMLElement` | Presenter-owned `.wui-meter` root. |
 | `redraw()` | `() => void` | Pulls the active binding method and updates geometry and ARIA; becomes a no-op after destruction. |
-| `updateLabel(label?)` | `(string?) => void` | Updates `aria-label` in place; `undefined` restores the current localized mode-specific default. |
-| `destroy()` | `() => void` | Idempotently cancels the outstanding frame, releases the localization subscription, and removes the root and installed style node. The binding/localization objects remain caller-owned. Cleanup errors are reported after all cleanup is attempted; throwing error callbacks are contained. |
+| `updateLabel(label?)` | `(string?) => void` | Updates `aria-label` in place; `undefined` restores the current application-supplied or mode-specific default. |
+| `destroy()` | `() => void` | Idempotently cancels the outstanding frame and removes the root and installed style node. The binding remains caller-owned. Cleanup errors are reported after all cleanup is attempted; throwing error callbacks are contained. |
 
-**Localization**
+**Application text and formatting**
 
-Pass a shared `createUILocalization()` controller from `@webmusic/ui` as `localization`.
-Updating its messages/formatters refreshes the current label and value text without replacing
-the root or bars, even with `animate: false`. Explicit `label` and `updateLabel(value)` take
-precedence until `updateLabel()` restores the localized default. The percentage formatter
-receives a normalized fraction; `aria-valuenow` remains a machine-readable integer.
+`getText()` returns `MeterText` final strings or contextual callbacks. The application owns
+translation, formatting state, and language notifications. Call `handle.redraw()` after changing
+that state; the root, bars, and value semantics stay in place, including with `animate: false`.
+Explicit `label` and `updateLabel(value)` take precedence until `updateLabel()` restores the
+current application-supplied or default name.
 
-| Message key | Default | Values |
+| `MeterText` field | Kind | Default / context |
 |---|---|---|
-| `meter.level` | `Audio level` | — |
-| `meter.spectrum` | `Spectrum` | — |
-| `meter.levelValue` | `{value} level` | `value` from `formatters.percent(level)` |
-| `meter.spectrumValue` | `{value} spectrum peak` | `value` from `formatters.percent(maximum)` |
+| `level` | `string` | `Audio level` |
+| `spectrum` | `string` | `Spectrum` |
+| `levelValue` | `UITextValue<{value: string; level: number; peak?: number; peakHold?: number}>` | Final value text, defaulting to formatted percentage followed by `level`. |
+| `spectrumValue` | `UITextValue<{value: string; maximum: number}>` | Final value text, defaulting to formatted percentage followed by `spectrum peak`. |
+
+`value` is formatted with `formatters.percent(fraction)`. Numeric context remains available for
+application logic. Strings are literal; UI does not interpolate placeholders or subscribe to
+language changes. Missing fields use defaults; failed callbacks report through `onError` and
+fall back to default text. `aria-valuenow` remains a machine-readable integer.
 
 A JavaScript binding missing its selected read method reports a `TypeError` through `onError`;
 the presenter never calls the other mode's method as a fallback.

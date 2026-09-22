@@ -71,23 +71,26 @@ region buttons call them and repaint after settlement; a rejected command is rou
 `onError`. Without `seek()`, the hidden range is removed from interaction. Without
 `selectRegion()`, every region button is disabled.
 
-## Localization
+## Display text and values
 
-Pass a shared [`localization`](/uikit/api/#localization) source to relabel the timeline and
-format generated ruler values and seek announcements. An explicit `label`, `formatPosition`,
-tick label, or region label takes precedence over its default. The `number` formatter receives
-positions in the caller's units; range values and seek commands remain numeric.
+`getText()` returns application-resolved `TimelineText` once per paint. Call `handle.update()`
+after external settings change. Explicit `label`, `formatPosition`, tick labels, and region labels
+take precedence over defaults. See [application-owned text](/uikit/api/#external-presentation-inputs)
+for external translation-package composition and notification ownership.
 
-| Message key | Fallback / interpolation values |
+Fields accept literal strings or callbacks returning final strings; there is no template
+interpolation. Missing fields and failed callbacks use defaults; failures reach `onError`.
+
+| `TimelineText` field | Default / callback context |
 |---|---|
-| `timeline.label` | `Timeline` |
-| `timeline.playhead` | `{label} playhead`; label is the resolved root name. |
-| `timeline.region` | `Region {id}` |
-| `timeline.marker` | `Marker {id}` |
+| `label` | `Timeline`; no context values. |
+| `playhead` | Root name followed by ` playhead`; `{label: string}`. |
+| `region`, `marker` | `Region` or `Marker` followed by the ID; `{id: string, start: number, end?: number}` in the caller's units. |
 
-Region and marker buttons are retained by `id` while visible. Updating only language or their
-data labels does not detach a focused button. Generated ruler text is refreshed on language
-changes even when the timeline geometry is unchanged.
+`formatters.number` receives positions in the caller's units. Range values and seek commands
+remain numeric. Region and marker buttons retain their identity by `id` while visible. Updating
+text does not detach a focused button. Generated ruler output is compared after formatting on
+every update, so callbacks can reflect external settings even when geometry is unchanged.
 
 <details class="component-section">
 <summary>API</summary>
@@ -126,7 +129,8 @@ sets its pressed state; strict `disabled: true` disables only that region.
 
 | Member | Kind | Default | Description |
 |---|---|---|---|
-| `localization` | `UILocalization` | — | Borrowed live text and number-formatting source; its subscription is released on destruction. |
+| `getText` | `() => TimelineText` | — | Reads application-resolved display text once per paint; call `update()` after external changes. |
+| `formatters` | `UIValueFormatters` | — | Pure numeric display callbacks; explicit presenter formatters take precedence. |
 | `label` | `string` | `'Timeline'` | Accessible name of the root group and prefix for the hidden playhead range. |
 | `majorStep` | `number` | Derived readable interval | Fixed generated-tick interval. Non-positive or non-finite values use the derived interval. |
 | `keyboardStep` | `number` | `majorStep / 4` | Step of the hidden range. Non-positive or non-finite values use the default. |

@@ -44,21 +44,21 @@ element with slider semantics and delegates domain hit-testing to `valueAt(point
 the only write port. All three follow the
 [shared presenter ownership contract](/uikit/api/#the-shared-presenter-shape).
 
-## Localization
+## External presentation inputs
 
-`SurfaceSliderOptions.localization` borrows a shared
-[`localization`](/uikit/api/#localization) source. `stage.value` defaults to
-`Value`; an explicit label or existing caller-owned ARIA name takes precedence.
-The number formatter supplies readable value text unless `formatValue` is given.
-Machine value attributes remain numeric. `handle.updateLabel(label?)` updates a
-name without moving focus; omitting the label restores the option/default name.
-It intentionally takes ownership of that attribute and restores its original
-value on cleanup, provided the caller has not overwritten it afterward.
+Surface sliders already expose `formatValue(value, state)` and
+`handle.updateLabel(label?)`. Supply final value text through the callback and
+call `update()` after changing application display state. `updateLabel(text)`
+changes the accessible name without moving focus; omitting its argument
+restores the option/default name (`Value`). It intentionally takes ownership of
+that attribute and restores its original value on cleanup, provided the caller
+has not overwritten it afterward. Existing caller-owned ARIA names are preserved
+until this explicit call. Machine value attributes remain numeric.
 
-`CanvasStageOptions.localization` forwards the source to its owned status
-presenter. The plain DOM stage has no default prose: its label, rendering and
-error explanation remain caller-owned. Neither stage implicitly translates
-custom drawing output.
+Canvas status messages come from the existing `binding.status()` result;
+`update()` refreshes them. Plain stage labels, content and error explanations
+remain caller-owned. Stage has no translation engine or translation subscription.
+See the [shared presentation contract](/uikit/api/#external-presentation-inputs).
 
 <details class="component-section">
 <summary>API</summary>
@@ -118,7 +118,6 @@ State because its caller draws each frame directly.
 
 | Member | Kind | Default | Description |
 |---|---|---|---|
-| `localization` | `UILocalization` | — | Borrowed name/value formatting source; see Localization above. |
 | `label` | `string` | `'Value'` | Accessible name when the element has neither `aria-label` nor `aria-labelledby`. |
 | `orientation` | `'horizontal' \| 'vertical'` | `'horizontal'` | Sets ARIA orientation and Arrow-key direction. |
 | `pointerTarget` | `HTMLElement` | mounted element | Receives pointer listeners and capture while ARIA remains on the mounted element. |
@@ -153,7 +152,6 @@ never rewritten.
 
 | Member | Kind | Default | Description |
 |---|---|---|---|
-| `localization` | `UILocalization` | — | Forwarded to the owned status presenter. |
 | `label` | `string` | — | Adds `role="img"` and an accessible name to the stage root. |
 | `animate` | `boolean` | `false` | Continuously redraws through `requestAnimationFrame`. |
 | `fallbackWidth` | `number` | `300` | CSS-pixel width used when the stage has no positive measured width. |
