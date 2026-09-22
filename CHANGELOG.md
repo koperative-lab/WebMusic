@@ -15,8 +15,10 @@ work and does not establish npm publication, a release tag or a deployment.
   TypeScript consumption of the Element and browser-global entries.
 - Include complete bundled dependency notices and font licensing; replace
   unverified demo resources with original music and oscillator synthesis.
-- Upgrade the documentation and test toolchain, add Node 22.19.0/24 CI and
+- Upgrade the documentation and test toolchain, add Node 22.22.3/24 CI and
   reject missing or stale package output before packing.
+- Adopt Astro's ESLint 3 plugin with ESLint 10 and its supported development
+  Node versions, retaining project diagnostics through `astro check`.
 - Keep Agent Toolkit release verification stable across development dependency
   updates while retaining runtime source and package contract checks.
 - Resolve optional SoundFont and OSMD dependencies in browser production

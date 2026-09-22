@@ -22,10 +22,10 @@ Read the owning package's [Score architecture](packages/score/ARCHITECTURE.md),
 
 ## Set up the repository
 
-Use Node.js 22.19.0 or later and npm with the committed lockfile. CI checks
-Node 22.19.0 and 24; the root [package.json](package.json) owns the command
-and engine definitions. Published packages declare their runtime requirements
-in their own manifests.
+Use Node.js 22.22.3+ on the 22.x line, 24.16.0+ on the 24.x line, or 26.3.0+,
+and npm with the committed lockfile. CI checks Node 22.22.3 and 24; the root
+[package.json](package.json) owns the command and engine definitions. Published
+packages declare their runtime requirements in their own manifests.
 
 ```sh
 git clone https://github.com/koperative-lab/WebMusic.git
@@ -146,7 +146,7 @@ generator; do not maintain a separate component inventory in the skill.
 The [CI and Pages workflow](.github/workflows/ci.yml) runs on every branch push,
 pull request and manual dispatch. The quality matrix installs from the lockfile
 with `npm ci`, then runs `npm run check`, `npm run check:external-install` and
-`npm run audit:dependencies` on Node 22.19.0 and 24. A separate Node 24 job runs
+`npm run audit:dependencies` on Node 22.22.3 and 24. A separate Node 24 job runs
 `npm ci` and `npm run pages:build` to validate the production site, its
 `/WebMusic/` base and generated license notices.
 
@@ -225,7 +225,7 @@ and browser consumers. It requires network access; add `-- --keep` to retain its
 temporary consumer for diagnosis. It does not check already published registry
 artifacts or attest provenance. Review the CI result for the same commit
 separately. [The active workflow](.github/workflows/ci.yml) runs quality, external
-consumer and full dependency checks on Node 22.19.0 and 24, plus a Node 24 Pages
+consumer and full dependency checks on Node 22.22.3 and 24, plus a Node 24 Pages
 build. Successful eligible `main` runs deploy documentation as described in
 [CI and GitHub Pages](#ci-and-github-pages); npm publication remains manual.
 
