@@ -69,8 +69,9 @@ installation instructions. For contributing and publishing updates, see the
 
 ## Develop locally
 
-Node.js 22.19.0 or later is required for repository development. The package
-runtime requirements are declared separately in each package manifest.
+Repository development requires Node.js 22.22.3+ on the 22.x line, 24.16.0+
+on the 24.x line, or 26.3.0+. The package runtime requirements are declared
+separately in each package manifest.
 
 ~~~bash
 npm ci
@@ -88,7 +89,7 @@ npm run docs:build      # production documentation build
 ~~~
 
 The [CI and Pages workflow](.github/workflows/ci.yml) checks every branch push
-and pull request on Node 22.19.0 and 24, and builds the documentation on Node 24.
+and pull request on Node 22.22.3 and 24, and builds the documentation on Node 24.
 After both jobs pass, a push to `main` in the official repository deploys the
 site to [GitHub Pages](https://koperative-lab.github.io/WebMusic/). The same
 workflow can be run manually from `main`; other branches, pull requests and
