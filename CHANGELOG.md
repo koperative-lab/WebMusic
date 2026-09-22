@@ -17,6 +17,8 @@ work and does not establish npm publication, a release tag or a deployment.
   unverified demo resources with original music and oscillator synthesis.
 - Upgrade the documentation and test toolchain, add Node 22.19.0/24 CI and
   reject missing or stale package output before packing.
+- Keep Agent Toolkit release verification stable across development dependency
+  updates while retaining runtime source and package contract checks.
 - Resolve optional SoundFont and OSMD dependencies in browser production
   builds; require the supported Spessa 4.x API and remove obsolete SoundFont
   inspection documentation.

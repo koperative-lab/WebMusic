@@ -69,6 +69,7 @@ pages-dist/
 # Test coverage and browser-test output; keep test source and fixtures.
 coverage/
 .nyc_output/
+.vitest/
 *.lcov
 playwright-report/
 playwright/.cache/

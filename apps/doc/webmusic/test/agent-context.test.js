@@ -24,6 +24,22 @@ const write = async (directory, relative, contents) => {
   await mkdir(path.dirname(path.join(directory, relative)), {recursive: true});
   await writeFile(path.join(directory, relative), contents);
 };
+const releaseFixture = async () => {
+  const directory = await temp();
+  // Explicit expected contract in canonical top-level order. No production
+  // fingerprint helper is used to construct the expected hash.
+  const manifest = {
+    dependencies: {parser: '^1.0.0'},
+    exports: {'.': {import: './dist/index.js', default: './dist/index.cjs'}},
+    name: '@webmusic/test',
+    version: '0.1.0',
+  };
+  const source = 'export const value = 1;\n';
+  await write(directory, 'package/package.json', json(manifest));
+  await write(directory, 'package/src/index.ts', source);
+  const baseline = {packages: [{name: manifest.name, version: manifest.version, directory: 'package', manifestSha256: digest(json(manifest)), sourceSha256: digest(json([['index.ts', digest(source)]]))}]};
+  return {directory, manifest, baseline};
+};
 afterEach(async () => { await Promise.all(temporary.splice(0).map((directory) => rm(directory, {recursive: true, force: true}))); });
 
 describe('agent context MDX extraction', () => {
@@ -103,15 +119,38 @@ describe('agent context release and output contracts', () => {
   });
 
   it('fails when runtime code changes without a package version change', async () => {
-    const directory = await temp();
-    const manifest = json({name: '@webmusic/test', version: '0.1.0'});
-    const source = 'export const value = 1;\n';
-    await write(directory, 'package/package.json', manifest);
-    await write(directory, 'package/src/index.ts', source);
-    const baseline = {packages: [{name: '@webmusic/test', version: '0.1.0', directory: 'package', manifestSha256: digest(manifest), sourceSha256: digest(json([['index.ts', digest(source)]]))}]};
+    const {directory, baseline} = await releaseFixture();
     await expect(verifyReleaseBaseline({root: directory, baseline})).resolves.toEqual(baseline);
     await write(directory, 'package/src/index.ts', 'export const value = 2;\n');
     await expect(verifyReleaseBaseline({root: directory, baseline})).rejects.toThrow(/unchanged package versions are insufficient/);
+  });
+
+  it('allows development dependency changes, formatting and top-level key ordering only', async () => {
+    const {directory, manifest, baseline} = await releaseFixture();
+    for (const devDependencies of [{vitest: '^4.1.11'}, {vitest: '^5.0.0', typescript: '^5.9.3'}, {}]) {
+      const reordered = {version: manifest.version, name: manifest.name, devDependencies, exports: manifest.exports, dependencies: manifest.dependencies};
+      await write(directory, 'package/package.json', JSON.stringify(reordered));
+      await expect(verifyReleaseBaseline({root: directory, baseline})).resolves.toEqual(baseline);
+    }
+    await write(directory, 'package/package.json', json(manifest));
+    await expect(verifyReleaseBaseline({root: directory, baseline})).resolves.toEqual(baseline);
+  });
+
+  it.each([
+    ['runtime dependencies', {dependencies: {parser: '^2.0.0'}}],
+    ['optional dependencies', {optionalDependencies: {engine: '^1.0.0'}}],
+    ['peer dependencies', {peerDependencies: {react: '^19.0.0'}}],
+    ['export targets', {exports: {'.': {import: './dist/other.js', default: './dist/index.cjs'}}}],
+    ['conditional export ordering', {exports: {'.': {default: './dist/index.cjs', import: './dist/index.js'}}}],
+    ['package version', {version: '0.2.0'}],
+    ['package name', {name: '@webmusic/renamed'}],
+    ['package scripts', {scripts: {build: 'tsup'}}],
+    ['unknown manifest fields', {futureContract: {enabled: true}}],
+  ])('rejects changed %s even alongside a development dependency update', async (_label, changes) => {
+    const {directory, manifest, baseline} = await releaseFixture();
+    await expect(verifyReleaseBaseline({root: directory, baseline})).resolves.toEqual(baseline);
+    await write(directory, 'package/package.json', json({...manifest, ...changes, devDependencies: {vitest: '^5.0.0'}}));
+    await expect(verifyReleaseBaseline({root: directory, baseline})).rejects.toThrow(/release baseline mismatch/);
   });
 
   it('generates deterministic references for root and Pages deployments', async () => {

@@ -131,6 +131,11 @@ run with the documentation workspace tests; output verification runs during
 each site build. When a released API changes, review and update the generator's
 release baseline deliberately, along with the skill's compatibility metadata.
 Package version numbers alone do not establish a matching release contract.
+The fingerprint checks runtime source and every parsed package manifest field
+except `devDependencies`, so development-tool updates do not require a new
+release baseline. Manifest formatting and top-level key order are normalized;
+nested order remains significant for conditional exports. Runtime dependencies,
+exports, scripts and all other metadata still require explicit baseline review.
 The skill's six read-only Node scripts use the generated manifest and catalog
 to retrieve documentation, selected source files and styling references.
 Keep catalog paths, content hashes and task selections synchronized in the

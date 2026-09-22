@@ -288,7 +288,16 @@ export async function extractAgentMarkdown(source, {
   return {title: metadata.title, description: metadata.description ?? '', body: `${body}\n`};
 }
 
-/** Check the retained release source fingerprint, not just package versions. */
+function manifestFingerprint(manifest) {
+  // Development tooling does not describe the consumer contract. Keep every
+  // other field, including scripts, dependencies and unknown future metadata.
+  // Only top-level keys are sorted: conditional exports depend on key order.
+  const contract = Object.fromEntries(Object.keys(manifest).filter((key) => key !== 'devDependencies')
+    .sort().map((key) => [key, manifest[key]]));
+  return digest(json(contract));
+}
+
+/** Check retained source and manifest contracts, not just package versions. */
 export async function verifyReleaseBaseline({root = defaultRoot, baseline = releaseBaseline} = {}) {
   if (baseline === releaseBaseline && JSON.stringify(baseline.packages.map(({directory}) => directory)) !== JSON.stringify(packageDirectories)) {
     throw new Error('Agent context release mapping must match the public package policy.');
@@ -299,7 +308,7 @@ export async function verifyReleaseBaseline({root = defaultRoot, baseline = rele
     const sourceFiles = await walkFiles(path.join(root, record.directory, 'src'));
     const source = [];
     for (const relative of sourceFiles) source.push([relative, digest(await readPublic(root, `${record.directory}/src/${relative}`))]);
-    if (parsed.name !== record.name || parsed.version !== record.version || digest(manifest) !== record.manifestSha256 || digest(json(source)) !== record.sourceSha256) {
+    if (parsed.name !== record.name || parsed.version !== record.version || manifestFingerprint(parsed) !== record.manifestSha256 || digest(json(source)) !== record.sourceSha256) {
       throw new Error(`Agent context release baseline mismatch for ${record.name}. Review source/API compatibility and update the verified release mapping before publishing context; unchanged package versions are insufficient.`);
     }
   }
