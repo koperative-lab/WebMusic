@@ -23,7 +23,7 @@ export const releaseBaseline = Object.freeze({
       "name": "@webmusic/score",
       "version": "0.1.0",
       "directory": "packages/score",
-      "manifestSha256": "3f364ad637003b3464f3b854b74b9f7eb5e7585e5d467f86e381850b8b7c42c9",
+      "manifestSha256": "97b8cdc42836e615356fa3fbedb6c29b73bd157c230db0fdbcbbd8248a5cc0d5",
       "sourceSha256": "7d0007a1c52ff81ba3842bd9959e5f148cbddea6449d54987e184a9ec4faeb68"
     }
   ]
