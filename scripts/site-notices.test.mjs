@@ -95,7 +95,7 @@ test('real React, Sandpack, Bravura, OSMD and SpessaSynth ship complete site not
   }
   const inventory = JSON.parse(await readFile(path.join(dist, 'licenses/BUNDLED_ASSETS.json'), 'utf8'));
   assert.ok(inventory.modules.some((id) => id.includes('bravura_glyphs.js')));
-  assert.ok(inventory.packages.some(({key}) => key === 'opensheetmusicdisplay@1.9.9 bundled assets'));
+  assert.ok(inventory.packages.some(({key}) => key === 'opensheetmusicdisplay@2.1.3 bundled assets'));
   assert.ok(inventory.packages.some(({key}) => key === 'spessasynth_core@4.3.20 bundled assets'));
   assert.ok(inventory.packages.some(({key}) => key === 'stb-vorbis@0.0.6 bundled assets'));
   assert.ok(!inventory.packages.some(({key}) => key.startsWith('@codesandbox/nodebox@')));

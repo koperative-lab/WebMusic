@@ -1,0 +1,257 @@
+{
+  "package": "opensheetmusicdisplay",
+  "version": "2.1.3",
+  "artifacts": [
+    {
+      "file": "build/opensheetmusicdisplay.min.js",
+      "sha256": "099b2125aef055ca4faae75957037404973f9451544b52d9b3a0b1f788b33581"
+    }
+  ],
+  "documents": [
+    {
+      "title": "OpenSheetMusicDisplay embedded dependencies",
+      "source": "https://github.com/opensheetmusicdisplay/opensheetmusicdisplay/releases/tag/2.1.3",
+      "file": "opensheetmusicdisplay-2.1.3-bundled.txt",
+      "sha256": "3be39e88b290b4412bcc0b83874d0f16cc2f68a989ea151d0baca829ea8d9bb8"
+    },
+    {
+      "title": "Gonville font provenance and unrestricted output permission",
+      "source": "https://github.com/0xfe/vexflow/blob/4.2.5/tools/fonts/@/gonville/LICENSE.txt",
+      "file": "gonville-LICENSE.txt",
+      "sha256": "b151e7a321e4b4095abca498165155823b9e3bcbfa7f33fe2486c37694ed9800"
+    }
+  ],
+  "sourceEvidence": {
+    "sourceMap": "https://github.com/opensheetmusicdisplay/opensheetmusicdisplay/releases/download/2.1.3/opensheetmusicdisplay.min.js.map",
+    "sourceMapSha256": "2357ee55721478f9301c51976e1a48d99fd15969f1e00e8defba7f2041eb372d",
+    "releaseJavaScriptSha256": "1bfa2a0a8a7e0bc543435bdec0909cda25db42f8d096dd039ea1cc03ed0c3507",
+    "npmJavaScriptMatchesRelease": "Byte-identical after removing the final sourceMappingURL comment.",
+    "npmSources": [
+      "webpack://opensheetmusicdisplay/./node_modules/jszip/dist/jszip.min.js",
+      "webpack://opensheetmusicdisplay/./node_modules/loglevel/lib/loglevel.js",
+      "webpack://opensheetmusicdisplay/./node_modules/typescript-collections/dist/lib/BSTree.js",
+      "webpack://opensheetmusicdisplay/./node_modules/typescript-collections/dist/lib/BSTreeKV.js",
+      "webpack://opensheetmusicdisplay/./node_modules/typescript-collections/dist/lib/Bag.js",
+      "webpack://opensheetmusicdisplay/./node_modules/typescript-collections/dist/lib/Dictionary.js",
+      "webpack://opensheetmusicdisplay/./node_modules/typescript-collections/dist/lib/FactoryDictionary.js",
+      "webpack://opensheetmusicdisplay/./node_modules/typescript-collections/dist/lib/Heap.js",
+      "webpack://opensheetmusicdisplay/./node_modules/typescript-collections/dist/lib/LinkedDictionary.js",
+      "webpack://opensheetmusicdisplay/./node_modules/typescript-collections/dist/lib/LinkedList.js",
+      "webpack://opensheetmusicdisplay/./node_modules/typescript-collections/dist/lib/MultiDictionary.js",
+      "webpack://opensheetmusicdisplay/./node_modules/typescript-collections/dist/lib/MultiRootTree.js",
+      "webpack://opensheetmusicdisplay/./node_modules/typescript-collections/dist/lib/PriorityQueue.js",
+      "webpack://opensheetmusicdisplay/./node_modules/typescript-collections/dist/lib/Queue.js",
+      "webpack://opensheetmusicdisplay/./node_modules/typescript-collections/dist/lib/Set.js",
+      "webpack://opensheetmusicdisplay/./node_modules/typescript-collections/dist/lib/Stack.js",
+      "webpack://opensheetmusicdisplay/./node_modules/typescript-collections/dist/lib/arrays.js",
+      "webpack://opensheetmusicdisplay/./node_modules/typescript-collections/dist/lib/index.js",
+      "webpack://opensheetmusicdisplay/./node_modules/typescript-collections/dist/lib/util.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/vex.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/fraction.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/registry.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/element.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/boundingboxcomputation.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/boundingbox.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/fonts/vexflow_font.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/glyph.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/tables.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/canvascontext.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/raphaelcontext.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/svgcontext.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/renderer.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/stem.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/tuplet.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/beam.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/voice.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/staveconnector.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/tickable.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/note.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/notehead.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/stemmablenote.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/modifier.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/dot.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/stavenote.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/frethandfinger.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/music.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/accidental.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/notesubgroup.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/stavetie.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/tabtie.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/gracenotegroup.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/strokes.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/stringnumber.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/tickcontext.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/articulation.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/ornament.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/annotation.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/bend.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/vibrato.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/modifiercontext.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/formatter.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/stavemodifier.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/stavebarline.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/staverepetition.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/stavesection.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/stavetempo.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/textnote.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/stavetext.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/clef.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/keysignature.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/timesignature.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/stavevolta.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/stave.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/tabstave.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/tabnote.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/vibratobracket.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/multimeasurerest.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/clefnote.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/keysignote.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/timesignote.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/tabslide.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/gracenote.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/gracetabnote.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/tuning.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/stavehairpin.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/curve.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/textdynamics.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/staveline.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/pedalmarking.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/textbracket.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/barnote.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/ghostnote.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/tremolo.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/crescendo.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/parser.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/easyscore.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/factory.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/system.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/index.js",
+      "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/keymanager.js"
+    ],
+    "packages": [
+      {
+        "name": "jszip",
+        "installedLicenseVersion": "3.10.1",
+        "license": "(MIT OR GPL-3.0-or-later)",
+        "licenseSource": "https://www.npmjs.com/package/jszip/v/3.10.1"
+      },
+      {
+        "name": "loglevel",
+        "installedLicenseVersion": "1.9.2",
+        "license": "MIT",
+        "licenseSource": "https://www.npmjs.com/package/loglevel/v/1.9.2"
+      },
+      {
+        "name": "typescript-collections",
+        "installedLicenseVersion": "1.3.3",
+        "license": "MIT",
+        "licenseSource": "https://www.npmjs.com/package/typescript-collections/v/1.3.3"
+      },
+      {
+        "name": "vexflow",
+        "installedLicenseVersion": "1.2.93",
+        "license": "MIT",
+        "licenseSource": "https://www.npmjs.com/package/vexflow/v/1.2.93"
+      },
+      {
+        "name": "lie",
+        "installedLicenseVersion": "3.3.0",
+        "license": "MIT",
+        "licenseSource": "https://www.npmjs.com/package/lie/v/3.3.0"
+      },
+      {
+        "name": "immediate",
+        "installedLicenseVersion": "3.0.6",
+        "license": "MIT",
+        "licenseSource": "https://www.npmjs.com/package/immediate/v/3.0.6"
+      },
+      {
+        "name": "pako",
+        "installedLicenseVersion": "1.0.11",
+        "license": "(MIT AND Zlib)",
+        "licenseSource": "https://www.npmjs.com/package/pako/v/1.0.11"
+      },
+      {
+        "name": "setimmediate",
+        "installedLicenseVersion": "1.0.5",
+        "license": "MIT",
+        "licenseSource": "https://www.npmjs.com/package/setimmediate/v/1.0.5"
+      }
+    ],
+    "releaseJavaScript": "https://github.com/opensheetmusicdisplay/opensheetmusicdisplay/releases/download/2.1.3/opensheetmusicdisplay.min.js",
+    "comparison": {
+      "baselineVersion": "1.9.9",
+      "baselineSourceMap": "https://github.com/opensheetmusicdisplay/opensheetmusicdisplay/releases/download/1.9.9/opensheetmusicdisplay.min.js.map",
+      "baselineSourceMapSha256": "724d96b934c2936b2a27cd6e71a9e4df5c1c4adbfcb8a5127e02736da5c18e42",
+      "npmSourceMembership": "The same 100 paths appear in both source maps; 93 source texts are byte-identical.",
+      "changedNpmSources": [
+        {
+          "source": "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/glyph.js",
+          "previousSha256": "065d48a2dc62f316cef21a6a3d184be4052aeaf6ccf754e7d4da0a1ee842031c",
+          "sha256": "cdb9ed5147fb105d7bc1d76e12c072e7160189863040a960daff6722b2464d96",
+          "upstreamPatch": "https://github.com/opensheetmusicdisplay/opensheetmusicdisplay/blob/2.1.3/src/VexFlowPatch/src/glyph.js"
+        },
+        {
+          "source": "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/tables.js",
+          "previousSha256": "27dfe1ac6784ea351e44442964b3593b7af5fc03a2260b24bb0d0c6fa0839f68",
+          "sha256": "c86e48e5b7c5b269023dd6dfc0d630cf6eefc1f2ad96943e7e26204c0ebe462b",
+          "upstreamPatch": "https://github.com/opensheetmusicdisplay/opensheetmusicdisplay/blob/2.1.3/src/VexFlowPatch/src/tables.js"
+        },
+        {
+          "source": "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/notehead.js",
+          "previousSha256": "fde4946a615f7a1b21070ea3bb876db0aadd174a61df8415bc4288e42456a6aa",
+          "sha256": "3de2967877f1cf2de1c6075c65d5e1b868568cb90057d58b101415d46b26779b",
+          "upstreamPatch": "https://github.com/opensheetmusicdisplay/opensheetmusicdisplay/blob/2.1.3/src/VexFlowPatch/src/notehead.js"
+        },
+        {
+          "source": "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/stavenote.js",
+          "previousSha256": "0ff97bc40ee1a9c647f4b9c89c743e82a160acff6a14f8508bfca3a08d932610",
+          "sha256": "184993d9be698e38cdabff20d3c98f12ac047bd87a7983903e6ecd3f669c7478",
+          "upstreamPatch": "https://github.com/opensheetmusicdisplay/opensheetmusicdisplay/blob/2.1.3/src/VexFlowPatch/src/stavenote.js"
+        },
+        {
+          "source": "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/formatter.js",
+          "previousSha256": "b970b45e2c44b2d7006471d158bd71dddf9a59b004bad952a1bc4eca3e8c1fb9",
+          "sha256": "536df25817a04d03f383a55dceaaa4eb9a8593f24bc64ed7f7b052637c4912f1",
+          "upstreamPatch": "https://github.com/opensheetmusicdisplay/opensheetmusicdisplay/blob/2.1.3/src/VexFlowPatch/src/formatter.js"
+        },
+        {
+          "source": "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/stavesection.js",
+          "previousSha256": "1b354d5ffe8a68f18f74673c2df547778331c4e203f7c44a67b787a170d266e3",
+          "sha256": "7d97b83d96de6c89d39a501e33820f54eae4f71e3267e0e87879b1bb1b46196f",
+          "upstreamPatch": "https://github.com/opensheetmusicdisplay/opensheetmusicdisplay/blob/2.1.3/src/VexFlowPatch/src/stavesection.js"
+        },
+        {
+          "source": "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/stave.js",
+          "previousSha256": "d635ac53c3b8efdbde579e16240285664ae5e12ebef996ae91e20cded56330de",
+          "sha256": "f5ba11a46fcf522a9e809ce6c4fe28d249979a9f031317022e0a62dae6584b76",
+          "upstreamPatch": "https://github.com/opensheetmusicdisplay/opensheetmusicdisplay/blob/2.1.3/src/VexFlowPatch/src/stave.js"
+        }
+      ],
+      "changedNpmSourceReview": "OSMD VexFlow patches change glyph caching, unison layout, formatter caching and section clearance. The existing copyright headers remain unchanged; no new third-party notices or font data are introduced.",
+      "font": {
+        "source": "webpack://opensheetmusicdisplay/./node_modules/vexflow/src/fonts/vexflow_font.js",
+        "sha256": "11a0a527e46d2f3b360b4b4abf41c98108247cb9ca1de82c7639d489aaa23f89",
+        "comparison": "Byte-identical to the 1.9.9 source map; retains the previously reviewed VexFlow-18/Gonville provenance."
+      },
+      "addedOsmdSources": [
+        "webpack://opensheetmusicdisplay/./src/MusicalScore/Graphical/GeometricSkyBottomLineContext.ts",
+        "webpack://opensheetmusicdisplay/./src/Plugins/Braille/BrailleBarOverBar.ts",
+        "webpack://opensheetmusicdisplay/./src/Plugins/Braille/BrailleChordRenderer.ts",
+        "webpack://opensheetmusicdisplay/./src/Plugins/Braille/BrailleConverter.ts",
+        "webpack://opensheetmusicdisplay/./src/Plugins/Braille/BrailleDOMRenderer.ts",
+        "webpack://opensheetmusicdisplay/./src/Plugins/Braille/BrailleExpressions.ts",
+        "webpack://opensheetmusicdisplay/./src/Plugins/Braille/BrailleKeySignature.ts",
+        "webpack://opensheetmusicdisplay/./src/Plugins/Braille/BrailleLyrics.ts",
+        "webpack://opensheetmusicdisplay/./src/Plugins/Braille/BrailleMeasureRenderer.ts",
+        "webpack://opensheetmusicdisplay/./src/Plugins/Braille/BrailleNoteRenderer.ts",
+        "webpack://opensheetmusicdisplay/./src/Plugins/Braille/BrailleOctaveTracker.ts",
+        "webpack://opensheetmusicdisplay/./src/Plugins/Braille/BrailleSymbols.ts",
+        "webpack://opensheetmusicdisplay/./src/Plugins/Braille/BrailleTimeSignature.ts",
+        "webpack://opensheetmusicdisplay/./src/Plugins/Braille/index.ts"
+      ],
+      "addedSourceReview": "One geometric skyline context and 13 Braille plugin modules are OSMD source under its BSD-3-Clause package license; none adds third-party copyright or license notices.",
+      "noticeReuse": "All license text and additional copyright notices after the introductory review paragraph are preserved verbatim from the reviewed 1.9.9 record. Installed license versions remain identical."
+    }
+  }
+}
