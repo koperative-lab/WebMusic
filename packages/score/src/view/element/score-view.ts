@@ -350,6 +350,10 @@ export class ScoreViewElement extends HTMLElementBase {
       this.lastSnapshot = undefined;
       this.setAttribute('data-player-state', 'mismatched');
     }
+    // Initial source delivery precedes asynchronous score resolution. Reapply
+    // its position once identity can be checked, including lightweight modes
+    // that never create a visualizer and therefore cannot replay on rebind.
+    if (native) this.followPlayback(native);
     this.playheadSeconds = score ? this.lastSnapshot?.nominalSeconds ?? 0 : 0;
     this.renderCurrent(false);
   }
