@@ -128,7 +128,9 @@ export default defineConfig({
     '/score/element/view/waterfall': withDocsBase('/score/element/view/score-view'),
   },
   vite: {
-    resolve: {alias: [browserSandboxAlias]},
+    // Keep each server consumer's YAML major version when prerendering:
+    // Starlight still imports the v4 default export, while our scripts use v5.
+    resolve: {alias: [browserSandboxAlias], noExternal: ['js-yaml']},
     optimizeDeps: {
       // Pre-bundle the CommonJS deps the linked workspace dists pull in, so
       // Vite's dev server doesn't 504 on late-discovered optimized dependencies
