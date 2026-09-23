@@ -100,6 +100,19 @@ shell.update(); // re-read the snapshot. The clock never calls this.
 shell.destroy();
 ```
 
+## External presentation inputs
+
+`WorkbenchOptions.getText?: () => WorkbenchText` returns the final `views` and
+`analysis` strings (defaults `Views` and `Analysis`). An explicit `label` option
+retains precedence. Change application display state and call `shell.update()`:
+tabs, focus and child slots remain intact. Workbench does not subscribe to a
+translation library or forward presentation state to children; the application
+supplies each child mount's own inputs.
+
+View names, dock labels, titles and status text remain snapshot data. Keep
+stable IDs when changing them. See the
+[shared presentation contract](/uikit/api/#external-presentation-inputs).
+
 <details class="component-section">
 <summary>API</summary>
 

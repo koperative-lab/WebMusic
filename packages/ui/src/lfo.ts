@@ -1,3 +1,4 @@
+import {readText, textValue, type UITextValue, formatNumber, type UIValueFormatters, formatPercent} from './text';
 import {installStyle} from './internal/style';
 import {claimHost, createUpdateLoop} from "./internal/lifecycle";
 import {addClassNames, clamp, setParts} from './internal/dom';
@@ -77,7 +78,24 @@ export interface LfoParts {
   head?: string;
 }
 
+export interface LfoText {
+  label?: UITextValue;
+  shape?: UITextValue;
+  rate?: UITextValue;
+  depth?: UITextValue;
+  run?: UITextValue;
+  stop?: UITextValue;
+  sine?: UITextValue;
+  triangle?: UITextValue;
+  square?: UITextValue;
+  saw?: UITextValue;
+  hertz?: UITextValue<{value: string; hertz: number}>;
+}
+
 export interface LfoOptions {
+  /** Read application-resolved text once per paint; call update() after external changes. */
+  getText?: () => LfoText;
+  formatters?: UIValueFormatters;
   label?: string;
   runLabel?: string;
   stopLabel?: string;
@@ -570,6 +588,7 @@ export function mountLfo(
     snapshot: LfoState,
     rateText: string,
     depthText: string,
+    text: LfoText | undefined,
   ): void => {
     if (!isCurrent()) return;
     const firstFrame = current === undefined;
@@ -579,16 +598,26 @@ export function mountLfo(
     currentRateText = rateText;
     currentDepthText = depthText;
 
+    root.setAttribute('aria-label', options.label ?? textValue(text?.label, 'LFO', {}, options.onError));
+    shapes.setAttribute('aria-label', textValue(text?.shape, 'Shape', {}, options.onError));
+    for (const [name, control] of [['rate', rateControl], ['depth', depthControl]] as const) {
+      const label = textValue(text?.[name], name, {}, options.onError);
+      control.label.firstChild!.nodeValue = `${label} `;
+      control.input.setAttribute('aria-label', label);
+    }
     root.classList.toggle("is-disabled", snapshot.disabled === true);
     run.disabled = snapshot.disabled === true;
     run.setAttribute(
       "aria-label",
       snapshot.running
-        ? (options.stopLabel ?? "Stop")
-        : (options.runLabel ?? "Run"),
+        ? (options.stopLabel ?? textValue(text?.stop, 'Stop', {}, options.onError))
+        : (options.runLabel ?? textValue(text?.run, 'Run', {}, options.onError)),
     );
     run.replaceChildren(createRunGlyph(document, snapshot.running));
     for (const [shape, button] of shapeButtons) {
+      const label = textValue(text?.[shape], shape, {}, options.onError);
+      button.title = label;
+      button.setAttribute('aria-label', label);
       const active = shape === snapshot.shape;
       button.disabled = snapshot.disabled === true;
       button.classList.toggle("is-active", active);
@@ -614,24 +643,25 @@ export function mountLfo(
     if (!isCurrent()) return;
     const revision = ++paintRevision;
     const canCommit = (): boolean => isCurrent() && revision === paintRevision;
-    const rateText = useCustomFormatters
-      ? (options.formatRate ?? ((rate) => `${rate.toFixed(2)}Hz`))(
-          snapshot.rate,
-        )
-      : `${snapshot.rate.toFixed(2)}Hz`;
+    const text = readText(options.getText, options.onError);
     if (!canCommit()) return;
-    const depthText = useCustomFormatters
-      ? (options.formatDepth ?? ((depth) => `${Math.round(depth * 100)}%`))(
-          snapshot.depth,
-        )
-      : `${Math.round(snapshot.depth * 100)}%`;
+    let rateText: string;
+    if (useCustomFormatters && options.formatRate) rateText = options.formatRate(snapshot.rate);
+    else {
+      const value = formatNumber(options.formatters, snapshot.rate, snapshot.rate.toFixed(2), options.onError);
+      rateText = textValue(text?.hertz, `${value}Hz`, {value, hertz: snapshot.rate}, options.onError);
+    }
     if (!canCommit()) return;
-    commitFrame(snapshot, rateText, depthText);
+    const depthText = useCustomFormatters && options.formatDepth
+      ? options.formatDepth(snapshot.depth)
+      : formatPercent(options.formatters, snapshot.depth, undefined, options.onError);
+    if (!canCommit()) return;
+    commitFrame(snapshot, rateText, depthText, text);
   };
 
   const restoreCurrentFrame = (): void => {
     if (!current) return;
-    commitFrame(current, currentRateText, currentDepthText);
+    commitFrame(current, currentRateText, currentDepthText, readText(options.getText, options.onError));
   };
 
   const fallback: LfoState = {

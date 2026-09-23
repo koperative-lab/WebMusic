@@ -5,6 +5,27 @@ work and does not establish npm publication, a release tag or a deployment.
 
 ## Unreleased
 
+- Preserve untimed Element note activity and post-render OSMD cancellation;
+  avoid replaying the engraving cursor for every forward playback frame.
+- Coalesce reentrant Timeline, Status and Minimap text refreshes, and release
+  subscriptions returned after a presenter is replaced.
+
+- Add typed text and formatting hooks for application-owned presentation tools,
+  with explicit refresh methods and stable controls. Translation, language state
+  and change subscriptions remain outside WebMusic.
+- Keep borrowed React views responsive to active-note updates when an external
+  playback source has no nominal time, including renderers with time support.
+- Allow a minimal play/pause Transport binding and mode-specific Meter readers
+  without placeholder progress, seek, subscription or spectrum methods.
+- Allow React StaffView, PianoRollView and WaterfallView to render an explicit
+  Score or borrow a playback source without creating a Player. ScoreViewElement
+  accepts a direct playback property alongside its existing selector binding.
+- Expose generation-aware presentation readiness and failures through React
+  onStateChange and ScoreViewElement renderState / webscore:renderstatechange.
+- Complete Mixer, Macro, MacroRack and Recorder cleanup when a subscription,
+  child disposer or error callback fails, including reentrant replacement.
+- Mark local documentation context as an unreleased development snapshot while
+  retaining verified-release checks for publication and release Skill lookups.
 - Prepare the first public source and npm release for `@webmusic/kernel`,
   `@webmusic/ui` and `@webmusic/score`.
 - Include contributor, security, development and release guidance in the public
@@ -15,8 +36,14 @@ work and does not establish npm publication, a release tag or a deployment.
   TypeScript consumption of the Element and browser-global entries.
 - Include complete bundled dependency notices and font licensing; replace
   unverified demo resources with original music and oscillator synthesis.
-- Upgrade the documentation and test toolchain, add Node 22.19.0/24 CI and
+- Upgrade the documentation and test toolchain, add Node 22.22.3/24 CI and
   reject missing or stale package output before packing.
+- Adopt Astro's ESLint 3 plugin with ESLint 10 and its supported development
+  Node versions, retaining project diagnostics through `astro check`.
+- Adopt ESLint 10's JavaScript rules with scoped compatibility exceptions for
+  retained release sources; preserve original errors in Agent Toolkit helpers.
+- Keep Agent Toolkit release verification stable across development dependency
+  updates while retaining runtime source and package contract checks.
 - Resolve optional SoundFont and OSMD dependencies in browser production
   builds; require the supported Spessa 4.x API and remove obsolete SoundFont
   inspection documentation.

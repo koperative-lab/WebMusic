@@ -111,6 +111,7 @@ function createHost(attrs: Record<string, string> = {}, root?: {querySelector(se
   };
   surface.isConnected = true;
   el.getAttribute = (name: string) => attributes[name] ?? null;
+  el.dispatchEvent = () => true;
   el.setAttribute = (name: string, value: string) => {
     attributes[name] = value;
     (el as unknown as {attributeChangedCallback(name: string): void}).attributeChangedCallback(name);

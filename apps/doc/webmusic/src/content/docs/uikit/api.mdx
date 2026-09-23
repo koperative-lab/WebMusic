@@ -84,8 +84,9 @@ For ordinary snapshot-based mounts:
 - **Structural binding.** The binding is a plain object the caller writes: `snapshot()` returns
   current state, commands such as `setValue()` or `play()` perform changes and may return
   `void` or a `Promise`, and `subscribe(notify)` returns an unsubscribe function. The presenter
-  repaints from a fresh snapshot after each command settles. `subscribe` is optional on most
-  bindings; `TransportBinding` requires it.
+  repaints from a fresh snapshot after each command settles. `subscribe` is optional;
+  without it the application calls `update()` for external changes. Transport can expose
+  just play/pause, and Meter requires only the reader for its selected mode.
 - **One presenter per host, per entry.** Each module keeps a `WeakMap` from host to handle.
   Mounting the same kind of presenter on a host again destroys the previous handle first, so a
   host never accumulates duplicate racks or transports.
@@ -111,6 +112,94 @@ interchangeable bindings:
 | [panel](/uikit/layout-feedback/panel/) | Receives section descriptors rather than a state binding; returns stable slots whose child mounts the caller owns. |
 
 Each owning page describes its complete state, cleanup and styling contract.
+
+## External presentation inputs
+
+WebMusic supplies music behavior and its presentation hooks. The application
+keeps its existing translation, state-management and UI tools. WebMusic has no
+translation engine, message catalog, language selector or translation-change
+subscription. It consumes final strings and synchronous rendering callbacks.
+
+Text-producing presenters expose `getText?: () => PresenterText`, with the
+concrete type and fields defined on their leaf reference. The callback is read
+when that presenter paints. Simple fields contain final strings; contextual
+fields accept a `UITextValue<Values>`: a literal string or `(values) => string`.
+WebMusic passes the documented context and inserts the returned string as text.
+It does not interpret keys, interpolate templates or apply plural rules.
+
+Where numeric display is generated, `formatters?: UIValueFormatters` accepts
+application-owned functions:
+
+| Callback | Input |
+|---|---|
+| `number(value)` | The raw number, retaining the presenter's existing units. |
+| `percent(fraction)` | A fraction: `1` means 100 percent. |
+| `time(seconds)` | Seconds, never a timestamp or preformatted string. |
+
+The root exports only the shared `UITextValue` and `UIValueFormatters` types.
+No controller or factory is required. Missing fields preserve existing defaults;
+existing explicit label and formatter options retain precedence. Callback
+failures fall back to the default and use the presenter's `onError` sink.
+Machine values (`input.value`, `aria-valuenow`) and geometry stay numeric.
+
+This example accepts already-resolved application text. Its text can come from
+any translation library, a framework, a preference store or ordinary props:
+
+```ts
+import {mountTransport} from '@webmusic/ui/transport';
+import {mountMeter} from '@webmusic/ui/meter';
+
+let display = {
+  play: 'Play', pause: 'Pause', meter: 'Audio level',
+  describeLevel: (value: string) => `${value} level`,
+  percent: (fraction: number) => `${Math.round(fraction * 100)}%`,
+};
+let playing = false;
+const transport = mountTransport(transportHost, {
+  snapshot: () => ({playing}),
+  play: () => { playing = true; },
+  pause: () => { playing = false; },
+}, {getText: () => ({play: display.play, pause: display.pause})});
+const meter = mountMeter(meterHost, {
+  readLevel: () => ({level: 0.42}),
+}, {
+  animate: false,
+  getText: () => ({level: display.meter, levelValue: ({value}) => display.describeLevel(value)}),
+  formatters: {percent: fraction => display.percent(fraction)},
+});
+
+// The application handles its external tool's change notification.
+function refreshDisplay(next: typeof display) {
+  display = next;
+  transport.update();
+  meter.redraw();
+}
+refreshDisplay({
+  play: '播放', pause: '暂停', meter: '音频电平',
+  describeLevel: value => `电平 ${value}`,
+  percent: fraction => `${Math.round(fraction * 100)}%`,
+});
+
+// Also unsubscribe the application's own external listener when removing it.
+transport.destroy();
+meter.destroy();
+```
+
+`transportHost` and `meterHost` are application-owned DOM hosts. The binding
+needs no placeholder seek, progress, subscription or spectrum methods.
+
+The application decides when to refresh: ordinary mounts use `update()`, Meter
+uses `redraw()` (including `animate: false`), live analysis uses `paint(state)`
+and a retained histogram exposes `update()`. One-shot analysis helpers read
+inputs when invoked; the application clears/replaces its own report output
+before rendering again. Surface sliders use their existing `updateLabel(text)`
+and `formatValue`/`update()` ports. Canvas status text comes from the status
+binding. Plain stage content and panel section descriptors remain caller-owned.
+
+Translate snapshot labels, choices, musical descriptions and application error
+messages before supplying them, retaining stable IDs. Set HTML `lang`/`dir` in
+the application. Changing display text does not create a new player, replace a
+focused control or subscribe WebMusic to a translation service.
 
 ## Release boundary
 

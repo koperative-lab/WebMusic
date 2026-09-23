@@ -179,6 +179,8 @@ export const SCORE_VIEW_PARAMS: ElementParamCatalog = {
     ],
     properties: [
       {name: 'score', note: 'Assign a loaded Score; overrides src and cancels any in-flight load.'},
+      {name: 'playback', note: 'Borrow a ScorePlaybackSource directly; takes precedence over player discovery. Assign undefined to restore the selector.'},
+      {name: 'renderState', note: 'Read-only immutable source/load/render observation with revision, generation, status, phase, score and original failure cause.'},
       {name: 'currentTime', note: 'Read-only nominal score position in seconds.'},
       {name: 'active', note: 'Read-only MIDI pitches at the current score position; empty for map and thumbnail.'},
       {name: 'configure(configuration)', note: 'Atomically select piano-roll, staff or waterfall with compatible options. Map and thumbnail use type/options/attributes.'},
@@ -187,7 +189,10 @@ export const SCORE_VIEW_PARAMS: ElementParamCatalog = {
       {name: 'forPart', note: 'Read-only map part filter, or undefined.'},
       {name: 'cells', note: 'Read-only map cell limit, default 64 and minimum 1.'},
     ],
-    events: [{name: 'webscore:seek', note: 'Map only: {quarters, seconds}, with nominal seconds; bubbling and composed.'}],
+    events: [
+      {name: 'webscore:seek', note: 'Map only: {quarters, seconds}, with nominal seconds; bubbling and composed.'},
+      {name: 'webscore:renderstatechange', note: 'All modes: immutable ScoreViewRenderState detail; bubbling and composed. Readiness describes the presentation, not audio.'},
+    ],
   },
 
   'sheet-view': {

@@ -41,7 +41,7 @@ preformatted duration, optional active state, and optional `loading` or `error` 
 presenter deliberately does not format duration or decide whether an errored entry may be
 selected; those are domain policies implemented by the binding.
 
-The row list is rebuilt only when item ids, labels, or order change. Active state, status, and
+The row list is rebuilt only when item ids or order change. Labels, active state, status, and
 duration are patched onto existing rows so frequent progress notifications do not steal focus
 or cancel an in-flight row click. Keep ids unique and stable if code uses `controls.item(id)`.
 
@@ -93,11 +93,13 @@ text or mutate the item objects.
 
 | Member | Kind | Default | Description |
 |---|---|---|---|
+| `getText` | `() => PlaylistText` | — | Supplies one application-owned text snapshot per update. After external text changes, call `update()`. |
+| `formatters` | `UIValueFormatters` | — | The `number` callback formats ordinals; `percent` formats seek value text. Other fields are unused by this presenter. |
 | `label` | `string` | `'Playlist'` | Accessible name of the ordered entry list. |
 | `stylesheet` | `boolean` | `true` | Installs `playlistStyle` unless explicitly `false`. |
 | `classNames` | `PlaylistClassNames` | `{}` | Adds compatibility classes for `root`, `bar`, `button`, `seek`, `list`, and `item`. |
 | `parts` | `PlaylistParts` | `{}` | Adds part tokens for the same six node roles. |
-| `onError` | `(error: unknown) => void` | — | Receives snapshot, command, subscription, and cleanup failures. |
+| `onError` | `(error: unknown) => void` | — | Receives snapshot, text/formatter, command, subscription, and cleanup failures. |
 
 **Handle**
 
@@ -113,8 +115,23 @@ text or mutate the item objects.
 | `update()` | `() => void` | Re-reads and patches state; becomes a no-op after destruction. |
 | `destroy()` | `() => void` | Idempotently disposes the subscription and removes presenter DOM and any installed stylesheet. |
 
+**Text and formatting.** `getText()` supplies the following optional final strings.
+The application calls `handle.update()` after changing text or formatting settings; updates patch
+names, row ordinals and seek value text while preserving focused rows and controls. `number`
+formats ordinals; `percent` receives the normalized seek fraction for `aria-valuetext`. Native
+seek values remain `0…1000` and commands still receive `0…1`. Explicit `label` takes precedence.
+Item labels and preformatted durations remain caller text. See the
+[shared text hooks](/uikit/api/); no text-source observer is installed.
+
+| `PlaylistText` field | Type | Default |
+|---|---|---|
+| `label` | `string` | `Playlist` |
+| `previous` / `next` | `string` | `Previous` / `Next` |
+| `play` / `pause` | `string` | `Play` / `Pause` |
+| `seek` | `string` | `Seek` |
+
 **Accessibility.** Previous, toggle, and next are native buttons with accessible names; the
-toggle name follows `playing`. Seek is a native range labelled `Seek`, and all four transport
+toggle name follows `playing`. Seek is a native range labelled `Seek`, with a formatted percentage in `aria-valuetext`; all four transport
 controls reflect `disabled` through the native attribute. The ordered list receives `label` as
 its accessible name. Each row is a focusable `role="button"` with click, Enter, and Space
 activation plus `aria-current` for the active item. Loading/error are visual data states rather

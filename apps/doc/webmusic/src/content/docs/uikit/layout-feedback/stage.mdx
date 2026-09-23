@@ -44,6 +44,22 @@ element with slider semantics and delegates domain hit-testing to `valueAt(point
 the only write port. All three follow the
 [shared presenter ownership contract](/uikit/api/#the-shared-presenter-shape).
 
+## External presentation inputs
+
+Surface sliders already expose `formatValue(value, state)` and
+`handle.updateLabel(label?)`. Supply final value text through the callback and
+call `update()` after changing application display state. `updateLabel(text)`
+changes the accessible name without moving focus; omitting its argument
+restores the option/default name (`Value`). It intentionally takes ownership of
+that attribute and restores its original value on cleanup, provided the caller
+has not overwritten it afterward. Existing caller-owned ARIA names are preserved
+until this explicit call. Machine value attributes remain numeric.
+
+Canvas status messages come from the existing `binding.status()` result;
+`update()` refreshes them. Plain stage labels, content and error explanations
+remain caller-owned. Stage has no translation engine or translation subscription.
+See the [shared presentation contract](/uikit/api/#external-presentation-inputs).
+
 <details class="component-section">
 <summary>API</summary>
 
@@ -117,6 +133,7 @@ State because its caller draws each frame directly.
 | `element` | `HTMLElement` | Caller element carrying role, focus, and ARIA. |
 | `surface` | `HTMLElement` | Pointer surface: `pointerTarget` or the mounted element. |
 | `update()` | `() => void` | Re-reads State and applies ARIA values. |
+| `updateLabel(label?)` | `(label?: string) => void` | Updates the accessible name in place; undefined uses the option/default. |
 | `destroy()` | `() => void` | Removes listeners and restores attributes and touch behavior that the presenter assigned. |
 
 The presenter manages `tabindex` only when it assigned one: a disabled slider leaves the tab order

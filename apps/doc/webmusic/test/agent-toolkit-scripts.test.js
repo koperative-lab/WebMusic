@@ -1,6 +1,6 @@
 import {execFile} from 'node:child_process';
 import {createHash} from 'node:crypto';
-import {cp, mkdir, mkdtemp, readFile, rm, symlink, writeFile} from 'node:fs/promises';
+import {cp, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
@@ -144,9 +144,18 @@ it('rejects unsupported releases and missing output from incomplete snapshots', 
   changed.release.packages['@webmusic/score'] = '0.2.0';
   await writeFile(path.join(mismatch, 'agent-context/manifest.json'), json(changed));
   expect((await cli('get_docs', ['index'], mismatch)).stderr).toContain('Unsupported context version');
+  await writeFile(path.join(mismatch, 'agent-context/manifest.json'), json({...manifest, mode: 'development', release: null}));
+  expect((await cli('get_docs', ['index'], mismatch)).stderr).toContain('Unreleased development context');
   await writeFile(path.join(mismatch, 'agent-context/manifest.json'), json(manifest));
   await rm(path.join(mismatch, 'llms.txt'));
   expect((await cli('get_docs', ['index'], mismatch)).stderr).toContain('Missing context file');
+  const context = await loadContext({'--context-dir': mismatch});
+  const missingPath = path.join(await realpath(mismatch), 'llms.txt');
+  await expect(context.document('index')).rejects.toMatchObject({
+    name: 'Error',
+    message: 'Missing context file: llms.txt. --context-dir must point to a complete generated site root.',
+    cause: {code: 'ENOENT', path: missingPath},
+  });
 });
 
 it('does not follow snapshot symlinks outside the selected context directory', async () => {
@@ -185,4 +194,23 @@ it('reports HTTP failures and hash errors from fetched responses', async () => {
   const context = await loadContext({'--base-url': 'https://docs.example/'});
   await expect(context.document('patterns')).rejects.toThrow('Context hash mismatch');
   expect(await readFile(path.join(site, 'llms-patterns.txt'), 'utf8')).toBe(files.get('llms-patterns.txt'));
+});
+
+it('retains network causes without changing the actionable fetch message', async () => {
+  const cause = new TypeError('connection refused');
+  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(cause));
+  await expect(loadContext({'--base-url': 'https://docs.example/'})).rejects.toMatchObject({
+    name: 'Error',
+    message: 'Could not fetch https://docs.example/agent-context/manifest.json: connection refused. Check the site root or use --context-dir.',
+    cause,
+  });
+});
+
+it('retains JSON syntax errors behind the context manifest message', async () => {
+  vi.stubGlobal('fetch', vi.fn(async () => new Response('{invalid')));
+  await expect(loadContext({'--base-url': 'https://docs.example/'})).rejects.toMatchObject({
+    name: 'Error',
+    message: 'Context manifest is not valid JSON. Use a generated WebMusic documentation site.',
+    cause: expect.any(SyntaxError),
+  });
 });

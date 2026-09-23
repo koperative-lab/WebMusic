@@ -55,7 +55,7 @@ chord and QWERTY gestures, focus, scroll position, and DOM identity survive sync
 notifications. A key stays visibly pressed while either the caller or a presenter holder keeps
 it active; releasing local input does not erase a caller-owned active pitch.
 
-Changes to layout, QWERTY/map-only mode, piano geometry, grid cells/columns, or chord descriptors
+Changes to layout, QWERTY/map-only mode, piano geometry, grid mappings/columns, or chord pitches/indices
 rebuild the board and release every presenter holder first. The presenter compares descriptor
 values, so new arrays with identical contents do not rebuild, and edits made in place are still
 detected. Releases use the old copied pitch mapping. A mapping, snapshot, or note callback
@@ -76,6 +76,28 @@ half a white key at that end, so the raised key — which is centred on the boun
 the board instead of half outside it. Positions are percentages, so CSS alone can size
 the finished keyboard. `PointerSurface` exposes the same multi-pointer, ref-counted hold lifecycle
 for another board whose nodes carry `data-midi` or `data-pitch`.
+
+## Display text
+
+`getText()` returns application-resolved `NoteSurfaceText` once per paint. Call `handle.update()`
+after external text settings change. See [application-owned text](/uikit/api/#external-presentation-inputs)
+for composing an external translation package without giving the presenter a language source.
+Each field is a literal string or a callback with no context values returning the final string.
+There is no template interpolation. Missing fields and failed callbacks use defaults; failures
+reach `onError`.
+
+| `NoteSurfaceText` field | Default |
+|---|---|
+| `hint` | `Type to play · Z / X octave · Esc stop` |
+| `hintMapped` | `Type to play · Esc stop` |
+| `start` | `▸ Click to start` |
+| `keyboard` | `Note keyboard` |
+| `grid` | `Note grid` |
+
+Piano labels, grid references, chord names, and `octaveLabel` remain application data. Supply
+translated state and notify the binding or call `update()`. Changing only these labels or display
+text preserves focus, scroll, DOM identity, and held notes. Musical mapping or geometry changes
+retain the release-and-rebuild behavior described above.
 
 <details class="component-section">
 <summary>API</summary>
@@ -134,6 +156,7 @@ The interaction port has these members:
 
 | Member | Kind | Default | Description |
 |---|---|---|---|
+| `getText` | `() => NoteSurfaceText` | — | Reads application-resolved display text once per paint; call `update()` after external changes. |
 | `onError` | `(error: unknown) => void` | — | Receives snapshot, interaction, subscription, and cleanup failures. Exceptions thrown by the error sink are swallowed. |
 | `stylesheet` | `boolean` | `true` | Installs the presenter's stylesheet unless explicitly `false`, for a light-DOM host that cannot inject CSS into its page. |
 
@@ -144,7 +167,7 @@ The interaction port has these members:
 | `element` | `HTMLElement` | Getter returning the current `.wui-note` root; ordinary updates preserve it, while structural changes replace it. |
 | `board?` | `HTMLElement` | Getter returning the current piano, grid, or chord board. |
 | `releaseAll()` | `() => void` | Idempotently releases every pointer, chord, and QWERTY holder; externally active pitches remain visibly pressed. |
-| `update()` | `() => void` | Pulls state and repaints values in place. Only changed layout or descriptors rebuild the root and release held input. |
+| `update()` | `() => void` | Pulls state and repaints values and labels in place. Changed layout, geometry, or musical mappings rebuild the root and release held input. |
 | `destroy()` | `() => void` | Idempotently releases all notes, detaches listeners, unsubscribes, and removes the current root and installed style node. |
 
 **Utilities**

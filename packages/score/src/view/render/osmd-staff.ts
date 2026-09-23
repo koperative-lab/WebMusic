@@ -267,6 +267,7 @@ export async function renderOSMDStaffVisualizer(
   const moveCursorTo = (targetWholeNotes: number): boolean => {
     let iterator = cursor?.iterator;
     if (!cursor?.next || !iterator) return false;
+    const previousTarget = lastTargetWholeNotes;
     if (
       lastTargetWholeNotes !== null &&
       Math.abs(targetWholeNotes - lastTargetWholeNotes) < EPSILON
@@ -277,7 +278,14 @@ export async function renderOSMDStaffVisualizer(
     }
     lastTargetWholeNotes = targetWholeNotes;
 
-    if (currentWholeNotes(iterator) > targetWholeNotes + EPSILON) {
+    const cursorTime = currentWholeNotes(iterator);
+    // Continuous time can lie before the next available engraving boundary.
+    // Forward frames within that same interval must retain the cursor instead
+    // of resetting and replaying the entire score on every notification.
+    if (previousTarget !== null && targetWholeNotes > previousTarget
+      && cursorTime >= targetWholeNotes - EPSILON) return false;
+
+    if (cursorTime > targetWholeNotes + EPSILON) {
       // Backward seek: forward-only iterator, so reset and replay. Jump to
       // the last checkpoint at or before the target without per-step
       // timestamp reads, then fall through to the fine forward walk.
@@ -365,25 +373,31 @@ export async function renderOSMDStaffVisualizer(
     });
   };
 
+  const redrawAtTime = (seconds: number, scrollIntoView?: boolean): null => {
+    if (!ownsOSMD()) return null;
+    if (!Number.isFinite(seconds)) throw new RangeError('Score view time must be finite.');
+    if (scrollIntoView === false) invalidateScroll();
+    if (!cursorVisible) {
+      cursorVisible = true;
+      cursor?.show?.();
+    }
+    const ticks = secondsToTick(score, seconds);
+    const moved = moveCursorTo(ticks / DEFAULT_PPQ / 4); // ticks -> quarters -> whole notes
+    if (moved && (scrollIntoView ?? options.followCursor ?? true)) scheduleScrollIntoView();
+    return null;
+  };
+
   return {
     noteSequence,
     visualizer: osmd,
+    redrawAtTime,
     redraw(activeNote?: ScoreSequenceNote, scrollIntoView?: boolean): number | null {
       if (!ownsOSMD()) return null;
       // A caller can withdraw a pending scroll without clearing or moving the
       // cursor. This also handles a note-off repaint before the queued frame.
       if (scrollIntoView === false) invalidateScroll();
       if (!activeNote) return null;
-      if (!cursorVisible) {
-        cursorVisible = true;
-        cursor?.show?.();
-      }
-      const ticks = secondsToTick(score, activeNote.startTime ?? 0);
-      const moved = moveCursorTo(ticks / DEFAULT_PPQ / 4); // ticks -> quarters -> whole notes
-      if (moved && (scrollIntoView ?? options.followCursor ?? true)) {
-        scheduleScrollIntoView();
-      }
-      return null;
+      return redrawAtTime(activeNote.startTime ?? 0, scrollIntoView);
     },
     clearActiveNotes(): void {
       if (!ownsOSMD()) return;

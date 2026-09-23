@@ -37,7 +37,7 @@ function outputPath(value) {
 
 function json(contents, label) {
   try { return JSON.parse(contents); }
-  catch { throw new Error(`${label} is not valid JSON. Use a generated WebMusic documentation site.`); }
+  catch (cause) { throw new Error(`${label} is not valid JSON. Use a generated WebMusic documentation site.`, {cause}); }
 }
 
 export async function loadContext(settings) {
@@ -52,7 +52,7 @@ export async function loadContext(settings) {
     if (directory) {
       let filename;
       try { filename = await realpath(path.join(directory, relative)); }
-      catch { throw new Error(`Missing context file: ${relative}. --context-dir must point to a complete generated site root.`); }
+      catch (cause) { throw new Error(`Missing context file: ${relative}. --context-dir must point to a complete generated site root.`, {cause}); }
       const inside = path.relative(directory, filename);
       if (inside.startsWith(`..${path.sep}`) || inside === '..' || path.isAbsolute(inside)) throw new Error(`Context file escapes the selected directory: ${relative}`);
       data = await readFile(filename);
@@ -60,7 +60,7 @@ export async function loadContext(settings) {
       const url = new URL(relative, base);
       let response;
       try { response = await fetch(url, {signal: AbortSignal.timeout(30_000), redirect: 'error'}); }
-      catch (error) { throw new Error(`Could not fetch ${url}: ${error.message}. Check the site root or use --context-dir.`); }
+      catch (error) { throw new Error(`Could not fetch ${url}: ${error.message}. Check the site root or use --context-dir.`, {cause: error}); }
       if (!response.ok) {
         await response.body?.cancel();
         throw new Error(`HTTP ${response.status} for ${url}. Check that the Agent Toolkit is deployed at this site root.`);
@@ -80,6 +80,7 @@ export async function loadContext(settings) {
 
   const manifest = json(await read('agent-context/manifest.json'), 'Context manifest');
   if (manifest.schemaVersion !== 1 || !Array.isArray(manifest.outputs) || !Array.isArray(manifest.pages)) throw new Error('Unsupported context manifest. Update the skill and context together.');
+  if (manifest.mode === 'development') throw new Error('Unreleased development context is not compatible with this release Skill. Use the verified published context for installed packages.');
   for (const name of packages) {
     if (manifest.release?.packages?.[name] !== '0.1.0') throw new Error(`Unsupported context version for ${name}: ${manifest.release?.packages?.[name] ?? 'missing'}. This skill supports 0.1.0; use matching context and installed package declarations.`);
   }

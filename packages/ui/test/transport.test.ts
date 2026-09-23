@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+
 import {describe, expect, it, vi} from 'vitest';
 import {
   createTransportIcon,
@@ -7,6 +8,7 @@ import {
   transportStateStyle,
   type TransportBinding,
   type TransportState,
+  type TransportText,
 } from '../src/transport';
 
 class FakeTransport implements TransportBinding {
@@ -388,5 +390,234 @@ describe('mountTransport', () => {
 
     expect(seek.value).toBe('750');
     expect(seek.getAttribute('aria-valuetext')).toBe('0:45 of 1:00');
+  });
+});
+
+describe('transport capabilities and application text', () => {
+  it('supports a minimal play/pause binding and reveals only reported data', () => {
+    const host = document.createElement('div');
+    let state: TransportState = {playing: false};
+    const handle = mountTransport(host, {
+      snapshot: () => state,
+      play: () => { state = {...state, playing: true}; },
+      pause: () => { state = {...state, playing: false}; },
+    });
+    expect(handle.controls.seek).toBeUndefined();
+    expect(handle.controls.track.hidden).toBe(true);
+    expect(handle.controls.time?.hidden).toBe(true);
+    handle.controls.play.click();
+    expect(handle.controls.play.getAttribute('aria-label')).toBe('Pause');
+    state = {...state, progress: .4};
+    handle.update();
+    expect(handle.controls.track.hidden).toBe(false);
+    expect(handle.controls.fill?.style.width).toBe('40%');
+    expect(handle.controls.track.getAttribute('role')).toBe('progressbar');
+    expect(handle.controls.time?.hidden).toBe(true);
+    state = {...state, progress: undefined, seconds: 30, duration: 120};
+    handle.update();
+    expect(handle.controls.fill?.style.width).toBe('25%');
+    expect(handle.controls.time?.hidden).toBe(false);
+    expect(handle.controls.time?.textContent).toBe('0:30 / 2:00');
+    handle.destroy();
+  });
+
+  it.each(['native', 'surface'] as const)('does not render unsupported %s seek', (seekControl) => {
+    const handle = mountTransport(document.createElement('div'), {
+      snapshot: () => ({playing: false, progress: .5}), play() {}, pause() {},
+    }, {seekControl});
+    expect(handle.controls.seek).toBeUndefined();
+    expect(handle.controls.fill?.style.width).toBe('50%');
+    expect(handle.controls.track.getAttribute('role')).toBe('progressbar');
+    expect(handle.controls.track.tabIndex).toBe(-1);
+    handle.destroy();
+  });
+
+  it.each(['native', 'surface'] as const)('refreshes application %s text without replacing focused controls', (seekControl) => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const binding = Object.assign(new FakeTransport(), {setVolume: vi.fn()});
+    binding.state = {playing: false, progress: .25, seconds: 15, duration: 60, volume: .4};
+    let copy: TransportText = {};
+    let unit = '';
+    const handle = mountTransport(host, binding, {
+      seekControl, showVolume: 'fader', getText: () => copy,
+      formatters: {time: value => `${value}${unit}`, percent: value => `${Math.round(value * 100)}${unit}`},
+    });
+    const slider = handle.controls.seek ?? handle.controls.track;
+    const volume = handle.controls.volume!;
+    slider.focus();
+    copy = {
+      play: '播放', pause: '暂停', label: '播放器', seek: ({label}) => `${label}位置`,
+      seekValue: ({elapsed, duration}) => `${elapsed}，共${duration}`,
+      timeTotal: ({duration}) => ` · ${duration}`, volume: '音量',
+    };
+    unit = '单位';
+    expect(handle.controls.play.getAttribute('aria-label')).toBe('Play');
+    handle.update(); // The application owns the language notification.
+    expect(document.activeElement).toBe(slider);
+    expect(handle.controls.volume).toBe(volume);
+    expect(handle.controls.play.getAttribute('aria-label')).toBe('播放');
+    expect(slider.getAttribute('aria-label')).toBe('播放器位置');
+    expect(slider.getAttribute('aria-valuetext')).toBe('15单位，共60单位');
+    expect(handle.controls.time?.textContent).toBe('15单位 · 60单位');
+    expect(volume.getAttribute('aria-label')).toBe('音量');
+    expect(volume.getAttribute('aria-valuetext')).toBe('40单位');
+    handle.controls.play.click();
+    expect(handle.controls.play.getAttribute('aria-label')).toBe('暂停');
+    handle.setVolumeControl('knob');
+    expect(handle.controls.volume?.getAttribute('aria-label')).toBe('音量');
+    expect(handle.controls.volume?.getAttribute('aria-valuetext')).toBe('40单位');
+    handle.destroy();
+    host.remove();
+  });
+
+  it('preserves native dragging and gives text callbacks raw preview values', () => {
+    const binding = Object.assign(new FakeTransport(), {seekFraction: vi.fn()});
+    let prefix = 'Position';
+    const contexts: Array<{progress: number; seconds?: number; seeking: boolean}> = [];
+    const handle = mountTransport(document.createElement('div'), binding, {getText: () => ({
+      seekValue: values => { contexts.push(values); return `${prefix} ${values.progress}`; },
+    })});
+    const seek = handle.controls.seek!;
+    seek.dispatchEvent(new Event('pointerdown'));
+    seek.value = '700';
+    seek.dispatchEvent(new Event('input'));
+    prefix = '位置';
+    handle.update();
+    expect(seek.value).toBe('700');
+    expect(seek.getAttribute('aria-valuetext')).toBe('位置 0.7');
+    expect(contexts.at(-1)).toMatchObject({progress: .7, seconds: 42, seeking: true});
+    handle.destroy();
+  });
+
+  it('uses final strings literally and preserves explicit legacy labels', () => {
+    const handle = mountTransport(document.createElement('div'), new FakeTransport(), {
+      playLabel: 'Audition', getText: () => ({play: 'Ignored', seek: '{literal}'}),
+    });
+    expect(handle.controls.play.getAttribute('aria-label')).toBe('Audition');
+    expect(handle.controls.seek?.getAttribute('aria-label')).toBe('{literal}');
+    handle.destroy();
+  });
+
+  it('releases a binding subscription returned after synchronous replacement', () => {
+    const host = document.createElement('div');
+    const release = vi.fn();
+    let replacement: ReturnType<typeof mountTransport> | undefined;
+    const binding = new FakeTransport();
+    binding.subscribe = () => { replacement = mountTransport(host, new FakeTransport()); return release; };
+    const stale = mountTransport(host, binding);
+    expect(release).toHaveBeenCalledOnce();
+    expect(host.querySelector('.wui-transport')).toBe(replacement?.element);
+    stale.destroy();
+    expect(release).toHaveBeenCalledOnce();
+    replacement?.destroy();
+  });
+
+  it('falls back when text suppliers and formatters throw, and contains the error sink', () => {
+    const failure = new Error('Application text failed');
+    const onError = vi.fn(() => { throw new Error('sink'); });
+    const handle = mountTransport(document.createElement('div'), new FakeTransport(), {
+      getText: () => { throw failure; }, formatters: {time: () => { throw failure; }}, onError,
+    });
+    expect(handle.controls.play.getAttribute('aria-label')).toBe('Play');
+    expect(handle.controls.time?.textContent).toBe('0:00 / 1:00');
+    expect(onError).toHaveBeenCalledWith(failure);
+    handle.destroy();
+  });
+
+  it.each(['fader', 'knob'] as const)('releases a %s returned after a mounting formatter replaces the transport', (showVolume) => {
+    const host = document.createElement('div');
+    let replacement: ReturnType<typeof mountTransport> | undefined;
+    const stale = mountTransport(host, Object.assign(new FakeTransport(), {setVolume() {}}), {
+      showVolume, formatters: {percent: () => { replacement ??= mountTransport(host, new FakeTransport()); return 'stale'; }},
+    });
+    expect(host.querySelectorAll('.wui-transport')).toHaveLength(1);
+    expect(host.querySelector('.wui-transport')).toBe(replacement?.element);
+    expect(host.querySelector('.wui-transport__volume')).toBeNull();
+    stale.destroy();
+    replacement?.destroy();
+  });
+
+  it('lets a text callback replace a mounting surface transport', () => {
+    const host = document.createElement('div');
+    let replacement: ReturnType<typeof mountTransport> | undefined;
+    const stale = mountTransport(host, new FakeTransport(), {seekControl: 'surface', getText: () => {
+      replacement ??= mountTransport(host, new FakeTransport());
+      return {play: 'Stale'};
+    }});
+    expect(host.querySelectorAll('.wui-transport')).toHaveLength(1);
+    expect(host.querySelector('.wui-transport')).toBe(replacement?.element);
+    stale.destroy();
+    replacement?.destroy();
+  });
+
+  it('refreshes read-only progress text and stops reading suppliers after destruction', () => {
+    let label = 'Progress';
+    const getText = vi.fn(() => ({progress: label, seekValue: ({progress}: {progress: number}) => `P${progress}`}));
+    const handle = mountTransport(document.createElement('div'), {
+      snapshot: () => ({playing: false, progress: .45}), play() {}, pause() {},
+    }, {getText});
+    label = '位置';
+    handle.update();
+    expect(handle.controls.track.getAttribute('aria-label')).toBe('位置');
+    expect(handle.controls.track.getAttribute('aria-valuetext')).toBe('P0.45');
+    handle.destroy();
+    getText.mockClear();
+    handle.update();
+    expect(getText).not.toHaveBeenCalled();
+  });
+});
+
+describe('transport caller-owned clock visibility', () => {
+  it.each([true, false])('preserves explicit clock display across state and text updates (stylesheet: %s)', (stylesheet) => {
+    let pause = 'Pause';
+    const binding = Object.assign(new FakeTransport(), {setVolume() {}});
+    const handle = mountTransport(document.createElement('div'), binding, {stylesheet, getText: () => ({pause})});
+    const time = handle.controls.time!;
+    const originalDisplay = time.style.display;
+    time.style.display = 'none';
+    handle.setVolumeControl('fader');
+    binding.state.playing = true;
+    binding.emit();
+    pause = '暂停';
+    handle.update();
+    expect(time.style.display).toBe('none');
+    time.style.display = originalDisplay;
+    binding.emit();
+    expect(time.style.display).toBe(originalDisplay);
+    handle.destroy();
+  });
+
+  it('restores caller visibility after automatic hiding for missing data', () => {
+    const binding = new FakeTransport();
+    const handle = mountTransport(document.createElement('div'), binding, {stylesheet: false});
+    const time = handle.controls.time!;
+    const track = handle.controls.track;
+    expect(time.style.display).toBe('flex');
+    binding.state = {playing: false}; binding.emit();
+    expect(time.hidden).toBe(true);
+    expect(track.hidden).toBe(true);
+    binding.state = {playing: false, seconds: 1, duration: 20}; binding.emit();
+    expect(time.hidden).toBe(false);
+    expect(time.style.display).toBe('flex');
+    time.style.display = 'none'; track.style.display = 'grid';
+    binding.state = {playing: false}; binding.emit();
+    binding.state = {playing: false, seconds: 2, duration: 20}; binding.emit();
+    expect(time.style.display).toBe('none');
+    expect(track.style.display).toBe('grid');
+    handle.destroy();
+  });
+});
+
+describe('transport missing time in text callbacks', () => {
+  it('keeps absent time values absent for progress-only bindings', () => {
+    const contexts: Array<{seconds?: number; durationSeconds?: number; progress: number}> = [];
+    const handle = mountTransport(document.createElement('div'), {
+      snapshot: () => ({playing: false, progress: .5}), play() {}, pause() {},
+    }, {getText: () => ({seekValue: values => { contexts.push(values); return 'Half'; }})});
+    expect(contexts.at(-1)).toMatchObject({progress: .5, seconds: undefined, durationSeconds: undefined});
+    expect(handle.controls.time?.hidden).toBe(true);
+    expect(handle.controls.track.getAttribute('aria-valuetext')).toBe('Half');
+    handle.destroy();
   });
 });

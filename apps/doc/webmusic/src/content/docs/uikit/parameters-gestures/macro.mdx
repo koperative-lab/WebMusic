@@ -56,7 +56,7 @@ The entry exports both `mountMacro()` and `mountMacroRack()`.
 | Member | Kind | Description |
 |---|---|---|
 | `label` | `string` | Visible knob label; nullish input normalizes to `'MACRO'`. |
-| `value` | `number` | Normalized macro value clamped to `0…1` and painted as an integer percentage. |
+| `value` | `number` | Normalized macro value clamped to `0…1` and painted as a percentage (an integer percentage by default). |
 | `targets` | `readonly MacroTargetState[]` | Ordered, read-only destination rows. An empty list paints `Assign .targets`. |
 | `disabled?` | `boolean` | Strict `true` disables the nested parameter range. |
 | `targets[].label` | `string` | Destination label. |
@@ -69,14 +69,16 @@ The entry exports both `mountMacro()` and `mountMacroRack()`.
 |---|---|---|
 | `snapshot()` | `() => MacroState` | Required pull port read on mount and every update. |
 | `setValue(value)` | `(number) => void \| Promise<void>` | Required command delegated by the nested normalized parameter control. |
-| `subscribe?(notify)` | `(notify: () => void) => () => void` | Optional external-state subscription released on destruction. |
+| `subscribe?(notify)` | `(notify: () => void) => () => void` | Optional subscription released once on destruction, including when registration returns after a synchronous replacement. |
 
 **Options**
 
 | Member | Kind | Default | Description |
 |---|---|---|---|
-| `mountMacro: onError` | `(error: unknown) => void` | — | Receives macro read/update failures and errors forwarded by the nested parameter presenter. |
-| `mountMacroRack: onError` | `(error: unknown) => void` | — | Forwarded to every child macro. |
+| `getText` | `() => MacroText` | — | Supplies one application-owned text snapshot per update. After external text changes, call `update()`. |
+| `formatters` | `UIValueFormatters` | — | The `percent` callback formats macro values; `number` formats target values. Other fields are unused by this presenter. |
+| `mountMacro: onError` | `(error: unknown) => void` | — | Receives read/update, text/formatter, subscription and cleanup failures, plus nested parameter errors. Callback throws/rejections are contained. A failed subscription leaves explicit `update()` available. |
+| `mountMacroRack: onError` | `(error: unknown) => void` | — | Receives child errors and rack cleanup failures; callback throws/rejections are contained. |
 | `mountMacroRack: classNames` | `MacroRackClassNames` | `{}` | Adds compatibility classes to rack `root` and each `item` host. |
 | `mountMacroRack: parts` | `MacroRackParts` | `{}` | Adds part tokens to rack `root` and each `item` host. |
 | `stylesheet` | `boolean` | `true` | Installs the presenter and nested macro/parameter stylesheets unless explicitly `false`. Applies to both mounts. |
@@ -87,12 +89,27 @@ The entry exports both `mountMacro()` and `mountMacroRack()`.
 |---|---|---|
 | `element` | `HTMLElement` | `.wui-macro` for one macro or `.wui-macro-rack` for a compound rack. |
 | `update()` | `() => void` | Re-reads one binding; the rack variant forwards to all child handles. |
-| `destroy()` | `() => void` | Idempotently removes subscriptions, nested controls, roots and installed styles. |
+| `destroy()` | `() => void` | Idempotently releases subscriptions, nested controls, roots and installed styles. Cleanup continues after a failure, including for sibling rack items. Pending command results are ignored; bindings remain caller-owned. |
 | `rack.items` | `readonly MacroHandle[]` | Stable child handle array in binding order. |
 | `rack.item(index)` | `(number) => MacroHandle \| undefined` | Returns the child at an index without exposing private wrappers. |
 
+**Text and formatting.** Both mounts accept `getText()` and `formatters`. The rack
+forwards these application-owned callbacks to each macro; `handle.update()` rereads text while
+preserving the focused range. `percent` formats the normalized macro value, and `number` formats
+target values. Labels and units supplied by the binding remain caller text. See the
+[shared text hooks](/uikit/api/). The presenter does not observe a language store.
+
+| `MacroText` field | Type | Default / callback values |
+|---|---|---|
+| `label` | `string` | `MACRO` when the binding label is nullish. |
+| `empty` | `string` | `Assign .targets` |
+| `targetValue` | `UITextValue<{value: string; unit: string}>` | Concatenates the formatted `value` and caller-supplied `unit` by default. |
+
+Fields are optional; strings are literal final text. A `targetValue` callback can delegate
+sentence ordering and translation to the application's existing library.
+
 **Accessibility.** The macro value is the accessible native range created by the nested parameter
-presenter and named by `MacroState.label`; its value text is an integer percentage. Destination
+presenter and named by `MacroState.label`; its value text is a formatted percentage (an integer percentage by default). Destination
 rows are ordinary readable text, not controls. `disabled` reaches the native range. A macro rack
 adds no extra landmark or label, so callers should provide surrounding context when the list needs
 an accessible group name.

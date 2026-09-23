@@ -264,7 +264,7 @@ export default defineConfig({
       ],
     }),
     localSearch(),
-    agentContext(),
+    agentContext({mode: process.env.WEBMUSIC_AGENT_CONTEXT || 'release'}),
     siteNoticeIntegration(),
   ],
 });

@@ -8,7 +8,8 @@ import {
   severityFill,
 } from './harmony-style';
 import {markEmptyState} from './internal/dom';
-import {claimHost, createErrorSink} from './internal/lifecycle';
+import {claimHost, createErrorSink, createUpdateLoop, runCleanups} from './internal/lifecycle';
+import {formatNumber, formatPercent, readText, textValue, type UITextValue, type UIValueFormatters} from './text';
 import type {Declarations} from './styles';
 import {componentSurfaceDeclarations} from './internal/surface';
 export interface AnalysisKeyResult { tonic: string; mode: string; confidence: number; scores: readonly {tonic: string; mode: string; score: number}[]; }
@@ -35,7 +36,56 @@ export interface AudioAnalysisCardResult {
   pitchTrack?: {frequencies: ArrayLike<number>; times?: ArrayLike<number>};
 }
 
-export interface AudioAnalysisCardOptions {
+export interface AnalysisText {
+  emptyValue?: string;
+  keyName?: UITextValue<{tonic: string; mode: string}>;
+  confidence?: UITextValue<{value: string; confidence: number}>;
+  noNotes?: string;
+  beat?: UITextValue<{value: string; beat: number}>;
+  inKey?: UITextValue<{tonic: string; mode: string}>;
+  soundingNow?: string;
+  waiting?: string;
+  noMotifs?: string;
+  count?: UITextValue<{value: string; count: number}>;
+  intervals?: UITextValue<{values: string}>;
+  noVoiceIssues?: string;
+  voiceIssue?: UITextValue<{type: string; label: string}>;
+  issueLocation?: UITextValue<{voices: string; beat: string}>;
+  noRhythms?: string;
+  quarters?: UITextValue<{value: string; quarters: number}>;
+  histogramEmpty?: string;
+  histogramSelect?: UITextValue<{label: string; value: string; rawValue: number}>;
+  noAnalysis?: string;
+  keyUnavailable?: string;
+  tempoUnavailable?: string;
+  tempo?: UITextValue<{value: string; bpm: number}>;
+  tempoDetails?: UITextValue<{confidence: string; value: string; count: number}>;
+  integrated?: string;
+  truePeak?: string;
+  rms?: string;
+  negativeInfinity?: string;
+  lufs?: UITextValue<{value: string}>;
+  dbfs?: UITextValue<{value: string}>;
+  onsetsUnavailable?: string;
+  onsets?: UITextValue<{value: string; count: number}>;
+  pitchUnavailable?: string;
+  noVoicedPitch?: string;
+  pitchRange?: UITextValue<{minimum: string; maximum: string}>;
+}
+
+export interface AnalysisTextOptions {
+  /** Final text supplied by the application at render/update time. */
+  getText?: () => AnalysisText;
+  formatters?: UIValueFormatters;
+  onError?: (error: unknown) => void;
+}
+
+/** Evaluate a component's default text with already-formatted values exactly once. */
+function analysisText<Values extends object>(override: UITextValue<Values> | undefined, fallback: (values: Values) => string, values: Values, onError?: (error: unknown) => void): string {
+  return textValue(override, fallback(values), values, onError);
+}
+
+export interface AudioAnalysisCardOptions extends AnalysisTextOptions {
   /**
    * Clip length in seconds. The onset track is a time axis, so without it the
    * marks are normalized by the LAST onset — which draws a clip whose last
@@ -245,30 +295,35 @@ export function createAnalysisRoot(document: Document = globalThis.document): HT
   return root;
 }
 
-export function renderKeyView(result: AnalysisKeyResult|undefined, root: HTMLElement, caption?: string): void {
+export function renderKeyView(result: AnalysisKeyResult|undefined, root: HTMLElement, caption?: string, options: AnalysisTextOptions = {}): void {
   const el=makeEl(documentOf(root));
+  const formatters = options.formatters;
+  const copy = readText(options.getText, options.onError);
   if(caption)root.append(paint(el("div",caption),harmonyParts.inkMuted,harmonyParts.caption));
-  const head=paint(el("div",result?`${result.tonic} ${result.mode}`:"—"),harmonyParts.headline);
-  const sub=paint(el("div",result?`confidence ${Math.round(result.confidence*100)}%`:"no notes heard yet"),harmonyParts.inkMuted,harmonyParts.subhead);root.append(head,sub);if(!result)return;
+  const head=paint(el("div",result?analysisText(copy?.keyName, (values) => values.tonic + " " + values.mode, {tonic: result.tonic, mode: result.mode}, options.onError):textValue(copy?.emptyValue, "—", {}, options.onError)),harmonyParts.headline);
+  const sub=paint(el("div",result?analysisText(copy?.confidence, (values) => "confidence " + values.value, {value: formatPercent(formatters, result.confidence, undefined, options.onError), confidence: result.confidence}, options.onError):textValue(copy?.noNotes, "no notes heard yet", {}, options.onError)),harmonyParts.inkMuted,harmonyParts.subhead);root.append(head,sub);if(!result)return;
   const top=result.scores.slice(0,5);const max=Math.max(...top.map(x=>x.score),1e-6);const list=paint(el("div"),harmonyParts.meterList);
-  for(const candidate of top){const row=paint(el("div"),harmonyParts.candidateRow);const label=paint(el("span",`${candidate.tonic} ${candidate.mode}`),harmonyParts.inkMuted,harmonyParts.monoLabel);const track=paint(el("span"),harmonyParts.meterTrack);const fill=paint(el("span"),harmonyParts.meterFill,{width:`${Math.max(2,candidate.score/max*100)}%`});track.append(fill);row.append(label,track);list.append(row)}root.append(list);
+  for(const candidate of top){const row=paint(el("div"),harmonyParts.candidateRow);const label=paint(el("span",analysisText(copy?.keyName, (values) => values.tonic + " " + values.mode, {tonic: candidate.tonic, mode: candidate.mode}, options.onError)),harmonyParts.inkMuted,harmonyParts.monoLabel);const track=paint(el("span"),harmonyParts.meterTrack);const fill=paint(el("span"),harmonyParts.meterFill,{width:`${Math.max(2,candidate.score/max*100)}%`});track.append(fill);row.append(label,track);list.append(row)}root.append(list);
 }
 
-export function renderChordTimeline(chords: readonly AnalysisChordSegment[], root: HTMLElement): void {
+export function renderChordTimeline(chords: readonly AnalysisChordSegment[], root: HTMLElement, options: AnalysisTextOptions = {}): void {
   const el=makeEl(documentOf(root));
+  const formatters = options.formatters;
+  const copy = readText(options.getText, options.onError);
   const list=documentOf(root).createElement("ol");list.className="wui-analysis__timeline webscore-analyze__timeline";list.style.cssText=harmonyInline(harmonyParts.stackList);
   const idle=harmonyInline(harmonyParts.timelineRow);
-  for(const segment of chords){const row=el("li");row.style.cssText=idle;row.dataset.webscoreIdleStyle=idle;row.dataset.startQuarters=String(segment.startQuarters);row.dataset.endQuarters=String(segment.endQuarters);const chord=paint(el("span",segment.chord||"—"),harmonyParts.chordName);chord.className="webscore-analyze__chord";const at=paint(el("span",`beat ${(segment.startQuarters+1).toFixed(0)}`),harmonyParts.inkMuted,harmonyParts.beatLabel);at.className="webscore-analyze__beat";row.append(chord,at);list.append(row)}root.append(list);
+  for(const segment of chords){const row=el("li");row.style.cssText=idle;row.dataset.webscoreIdleStyle=idle;row.dataset.startQuarters=String(segment.startQuarters);row.dataset.endQuarters=String(segment.endQuarters);const chord=paint(el("span",segment.chord||textValue(copy?.emptyValue, "—", {}, options.onError)),harmonyParts.chordName);chord.className="webscore-analyze__chord";const at=paint(el("span",analysisText(copy?.beat, (values) => "beat " + values.value, {value: formatNumber(formatters, segment.startQuarters + 1, (segment.startQuarters + 1).toFixed(0), options.onError), beat: segment.startQuarters + 1}, options.onError)),harmonyParts.inkMuted,harmonyParts.beatLabel);at.className="webscore-analyze__beat";row.append(chord,at);list.append(row)}root.append(list);
 }
 
-export function renderRomanStrip(key: AnalysisKeyResult, roman: readonly AnalysisRomanSegment[], root: HTMLElement): void {
+export function renderRomanStrip(key: AnalysisKeyResult, roman: readonly AnalysisRomanSegment[], root: HTMLElement, options: AnalysisTextOptions = {}): void {
   const el=makeEl(documentOf(root));
-  root.append(paint(el("div",`in ${key.tonic} ${key.mode}`),harmonyParts.inkMuted,harmonyParts.captionSpaced));const strip=paint(el("div"),harmonyParts.chipStrip);
+  const copy = readText(options.getText, options.onError);
+  root.append(paint(el("div",analysisText(copy?.inKey, (values) => "in " + values.tonic + " " + values.mode, {tonic: key.tonic, mode: key.mode}, options.onError)),harmonyParts.inkMuted,harmonyParts.captionSpaced));const strip=paint(el("div"),harmonyParts.chipStrip);
   const idle=harmonyInline(harmonyParts.chip);
   for(const segment of roman){const chip=el("div");chip.style.cssText=idle;chip.dataset.webscoreIdleStyle=idle;chip.dataset.startQuarters=String(segment.startQuarters);chip.dataset.endQuarters=String(segment.endQuarters);const numeral=paint(el("div",segment.roman),harmonyParts.chipNumeral);const chord=paint(el("div",segment.chord),harmonyParts.inkMuted,harmonyParts.chipCaption);chip.append(numeral,chord);strip.append(chip)}root.append(strip);
 }
 
-export interface LiveChordPanelOptions {
+export interface LiveChordPanelOptions extends AnalysisTextOptions {
   /**
    * Spell one MIDI note number. Defaults to the number itself, because how a
    * pitch is SPELLED is domain knowledge: sharps or flats, ASCII or Unicode,
@@ -281,23 +336,29 @@ export interface LiveChordPanelOptions {
 
 export function renderLiveChordPanel(root: HTMLElement, options: LiveChordPanelOptions = {}): LiveChordPanel {
   const el=makeEl(documentOf(root));
-  const caption=paint(el("div","sounding now"),harmonyParts.inkMuted,harmonyParts.caption);const chord=paint(el("div","—"),harmonyParts.nameplate);const notes=paint(el("div","waiting for playback…"),harmonyParts.inkMuted,harmonyParts.voicing);const history=paint(el("div"),harmonyParts.history);root.append(caption,chord,notes,history);
+  const formatters = options.formatters;
+  const copy = readText(options.getText, options.onError);
+  const caption=paint(el("div",textValue(copy?.soundingNow, "sounding now", {}, options.onError)),harmonyParts.inkMuted,harmonyParts.caption);const chord=paint(el("div",textValue(copy?.emptyValue, "—", {}, options.onError)),harmonyParts.nameplate);const notes=paint(el("div",textValue(copy?.waiting, "waiting for playback…", {}, options.onError)),harmonyParts.inkMuted,harmonyParts.voicing);const history=paint(el("div"),harmonyParts.history);root.append(caption,chord,notes,history);
   const chipIdle=harmonyInline(harmonyParts.historyChip);const chipSounding=harmonyInline(harmonyParts.historyChip,harmonyParts.historyChipActive);
-  return{paint(state){chord.textContent=state.chord||"—";notes.textContent=state.midis.length?state.midis.map(options.formatPitch ?? String).join("  "):"waiting for playback…";history.replaceChildren(...state.history.map(label=>{const chip=el("span",label);chip.style.cssText=label===state.chord&&state.midis.length?chipSounding:chipIdle;return chip}))}};
+  return{paint(state){const copy = readText(options.getText, options.onError);caption.textContent=textValue(copy?.soundingNow, "sounding now", {}, options.onError);chord.textContent=state.chord||textValue(copy?.emptyValue, "—", {}, options.onError);notes.textContent=state.midis.length?state.midis.map(options.formatPitch ?? ((midi) => formatNumber(formatters, midi, undefined, options.onError))).join("  "):textValue(copy?.waiting, "waiting for playback…", {}, options.onError);history.replaceChildren(...state.history.map(label=>{const chip=el("span",label);chip.style.cssText=label===state.chord&&state.midis.length?chipSounding:chipIdle;return chip}))}};
 }
 
-export function renderMotifList(motifs: readonly AnalysisMotif[], root: HTMLElement): void {
+export function renderMotifList(motifs: readonly AnalysisMotif[], root: HTMLElement, options: AnalysisTextOptions = {}): void {
   const el=makeEl(documentOf(root));
-  if(!motifs.length){root.append(muted(el("div","No repeated motifs found.")));return}const list=paint(el("ol"),harmonyParts.stackList,harmonyParts.stackGap);
+  const formatters = options.formatters;
+  const copy = readText(options.getText, options.onError);
+  if(!motifs.length){root.append(muted(el("div",textValue(copy?.noMotifs, "No repeated motifs found.", {}, options.onError))));return}const list=paint(el("ol"),harmonyParts.stackList,harmonyParts.stackGap);
   const idle=harmonyInline(harmonyParts.stackRow);
-  for(const motif of motifs.slice(0,8)){const row=el("li");row.style.cssText=idle;row.dataset.webscoreIdleStyle=idle;const length=motif.rhythm.reduce((sum,value)=>sum+value,0);row.dataset.spans=motif.occurrences.map(x=>`${x.startQuarters}:${x.startQuarters+length}`).join(" ");const count=paint(el("span",`×${motif.occurrences.length}`),harmonyParts.count);const shape=paint(el("span",`intervals [${motif.intervals.join(", ")}]`),harmonyParts.inkMuted,harmonyParts.monoLabel);row.append(count,shape);list.append(row)}root.append(list);
+  for(const motif of motifs.slice(0,8)){const row=el("li");row.style.cssText=idle;row.dataset.webscoreIdleStyle=idle;const length=motif.rhythm.reduce((sum,value)=>sum+value,0);row.dataset.spans=motif.occurrences.map(x=>`${x.startQuarters}:${x.startQuarters+length}`).join(" ");const count=paint(el("span",analysisText(copy?.count, (values) => "×" + values.value, {value: formatNumber(formatters, motif.occurrences.length, undefined, options.onError), count: motif.occurrences.length}, options.onError)),harmonyParts.count);const shape=paint(el("span",analysisText(copy?.intervals, (values) => "intervals [" + values.values + "]", {values: motif.intervals.map(value => formatNumber(formatters, value, undefined, options.onError)).join(", ")}, options.onError)),harmonyParts.inkMuted,harmonyParts.monoLabel);row.append(count,shape);list.append(row)}root.append(list);
 }
 
-export function renderVoiceLeadingList(issues: readonly AnalysisVoiceIssue[], root: HTMLElement): void {
+export function renderVoiceLeadingList(issues: readonly AnalysisVoiceIssue[], root: HTMLElement, options: AnalysisTextOptions = {}): void {
   const el=makeEl(documentOf(root));
-  if(!issues.length){root.append(muted(el("div","No voice-leading issues — clean.")));return}const list=paint(el("ol"),harmonyParts.stackList,harmonyParts.stackGap);
+  const formatters = options.formatters;
+  const copy = readText(options.getText, options.onError);
+  if(!issues.length){root.append(muted(el("div",textValue(copy?.noVoiceIssues, "No voice-leading issues — clean.", {}, options.onError))));return}const list=paint(el("ol"),harmonyParts.stackList,harmonyParts.stackGap);
   const idle=harmonyInline(harmonyParts.issueRow);
-  for(const issue of issues.slice(0,12)){const row=el("li");row.style.cssText=idle;row.dataset.webscoreIdleStyle=idle;row.dataset.startQuarters=String(issue.startQuarters);row.dataset.endQuarters=String(Math.max(issue.endQuarters,issue.startQuarters+1));const dot=paint(el("span"),harmonyParts.severityDot,{background:severityFill(issue.severity)});const label=el("span",issue.type.replace(/-/g," "));const where=muted(el("span",`${issue.voices.join(" / ")} · beat ${(issue.startQuarters+1).toFixed(0)}`));row.append(dot,label,where);list.append(row)}root.append(list);
+  for(const issue of issues.slice(0,12)){const row=el("li");row.style.cssText=idle;row.dataset.webscoreIdleStyle=idle;row.dataset.startQuarters=String(issue.startQuarters);row.dataset.endQuarters=String(Math.max(issue.endQuarters,issue.startQuarters+1));const dot=paint(el("span"),harmonyParts.severityDot,{background:severityFill(issue.severity)});const label=el("span",analysisText(copy?.voiceIssue, (values) => values.label, {type: issue.type, label: issue.type.replace(/-/g," ")}, options.onError));const where=muted(el("span",analysisText(copy?.issueLocation, (values) => values.voices + " · " + values.beat, {voices: issue.voices.join(" / "), beat: analysisText(copy?.beat, (values) => "beat " + values.value, {value: formatNumber(formatters, issue.startQuarters + 1, (issue.startQuarters + 1).toFixed(0), options.onError), beat: issue.startQuarters + 1}, options.onError)}, options.onError)));row.append(dot,label,where);list.append(row)}root.append(list);
 }
 
 /**
@@ -311,7 +372,7 @@ export function renderVoiceLeadingList(issues: readonly AnalysisVoiceIssue[], ro
  * every occurrence's span, so a bound playhead lights the figure that is
  * sounding — the same `data-spans` contract the motif list uses.
  */
-export interface RhythmPatternListOptions {
+export interface RhythmPatternListOptions extends AnalysisTextOptions {
   limit?: number;
   /**
    * Name one duration, in quarters. Defaults to the number itself, because
@@ -324,16 +385,18 @@ export interface RhythmPatternListOptions {
 
 export function renderRhythmPatternList(patterns: readonly AnalysisRhythmPattern[], root: HTMLElement, options: RhythmPatternListOptions = {}): void {
   const el=makeEl(documentOf(root));
-  if(!patterns.length){root.append(muted(el("div","No repeated rhythms found.")));return}
+  const formatters = options.formatters;
+  const copy = readText(options.getText, options.onError);
+  if(!patterns.length){root.append(muted(el("div",textValue(copy?.noRhythms, "No repeated rhythms found.", {}, options.onError))));return}
   const list=paint(el("ol"),harmonyParts.stackList,harmonyParts.stackGap);list.className="wui-analysis__rhythms";
   const idle=harmonyInline(harmonyParts.stackRow);
   for(const entry of patterns.slice(0,options.limit??8)){
     const row=el("li");row.style.cssText=idle;row.dataset.webscoreIdleStyle=idle;
     const length=entry.pattern.reduce((sum,value)=>sum+value,0);
     row.dataset.spans=entry.onsets.map(onset=>`${onset}:${onset+length}`).join(" ");
-    const count=paint(el("span",`×${entry.count}`),harmonyParts.count);
-    const figure=paint(el("span",entry.pattern.map(options.formatDuration ?? String).join(" ")),harmonyParts.figure);
-    const span=paint(el("span",`${Math.round(length*100)/100} q`),harmonyParts.inkMuted,harmonyParts.microNote);
+    const count=paint(el("span",analysisText(copy?.count, (values) => "×" + values.value, {value: formatNumber(formatters, entry.count, undefined, options.onError), count: entry.count}, options.onError)),harmonyParts.count);
+    const figure=paint(el("span",entry.pattern.map(options.formatDuration ?? ((value) => formatNumber(formatters, value, undefined, options.onError))).join(" ")),harmonyParts.figure);
+    const span=paint(el("span",analysisText(copy?.quarters, (values) => values.value + " q", {value: formatNumber(formatters, length, String(Math.round(length*100)/100), options.onError), quarters: length}, options.onError)),harmonyParts.inkMuted,harmonyParts.microNote);
     row.append(count,figure,span);list.append(row)}
   root.append(list);
 }
@@ -344,7 +407,7 @@ export function renderRhythmPatternList(patterns: readonly AnalysisRhythmPattern
  * renders flat rather than dividing by zero. `format` styles the readout;
  * omit it to show the raw number.
  */
-export interface AnalysisHistogramOptions {
+export interface AnalysisHistogramOptions extends AnalysisTextOptions {
   emptyLabel?: string;
   format?: (value: number) => string;
   /** Selecting a nonempty bin, from a pointer or a native keyboard button. */
@@ -353,40 +416,50 @@ export interface AnalysisHistogramOptions {
 }
 
 export interface AnalysisHistogramHandle {
+  /** Refresh retained bin labels, application text and formatters without rebuilding controls. */
+  update(): void;
   /** Reflect active bin indexes without rebuilding focused controls. */
   setActive(indexes: readonly number[]): void;
   destroy(): void;
 }
 
+/**
+ * Retains the initial bin records in order and snapshots their numeric values.
+ * `update()` re-reads those records' labels; new bins, order or values require
+ * destroying this report and rendering another one.
+ */
 export function renderHistogram(
   bins: readonly AnalysisHistogramBin[],
   root: HTMLElement,
   options: AnalysisHistogramOptions = {},
 ): AnalysisHistogramHandle {
   const el = makeEl(documentOf(root));
+  const entries = bins.map(bin => ({bin, value: bin.value}));
   const nodes: HTMLElement[] = [];
   const buttons: HTMLButtonElement[] = [];
+  const labelNodes: HTMLElement[] = [];
+  const valueNodes: HTMLElement[] = [];
   const report = createErrorSink(options.onError);
   const cleanups: (() => void)[] = [];
   let destroyed = false;
-  if (!bins.length) {
-    const empty = muted(el("div", options.emptyLabel ?? "Nothing to show."));
+  let empty: HTMLElement | undefined;
+  if (!entries.length) {
+    empty = muted(el("div"));
     markEmptyState(empty);
     root.append(empty);
     nodes.push(empty);
   } else {
-    const format = options.format ?? ((value: number) => String(Math.round(value * 100) / 100));
-    const max = Math.max(...bins.map(bin => bin.value), 0);
+    const max = Math.max(...entries.map(entry => entry.value), 0);
     const list = paint(el("div"), harmonyParts.meterList);
     list.className = "wui-analysis__histogram";
-    for (const [index, bin] of bins.entries()) {
+    for (const [index, {bin, value: rawValue}] of entries.entries()) {
       const row = paint(el("div"), harmonyParts.histogramRow);
       const label = paint(el(options.onSelect ? "button" : "span", bin.label), harmonyParts.inkMuted, harmonyParts.monoLabel);
+      labelNodes[index] = label;
       if (options.onSelect) {
         const button = label as HTMLButtonElement;
         button.type = "button";
-        button.disabled = !(bin.value > 0);
-        button.setAttribute("aria-label", `${bin.label}: ${format(bin.value)}. Go to next occurrence`);
+        button.disabled = !(rawValue > 0);
         button.style.cursor = button.disabled ? "default" : "pointer";
         const select = (): void => {
           if (destroyed || button.disabled) return;
@@ -401,16 +474,53 @@ export function renderHistogram(
         buttons[index] = button;
       }
       const track = paint(el("span"), harmonyParts.meterTrack);
-      const fill = paint(el("span"), harmonyParts.meterFill, {width: `${max > 0 ? Math.max(0, bin.value / max * 100) : 0}%`});
+      const fill = paint(el("span"), harmonyParts.meterFill, {width: `${max > 0 ? Math.max(0, rawValue / max * 100) : 0}%`});
       track.append(fill);
-      const value = paint(el("span", format(bin.value)), harmonyParts.inkMuted, harmonyParts.monoValue);
+      const value = paint(el("span"), harmonyParts.inkMuted, harmonyParts.monoValue);
+      valueNodes[index] = value;
       row.append(label, track, value);
       list.append(row);
     }
     root.append(list);
     nodes.push(list);
   }
-  return {
+  const refresh = createUpdateLoop({
+    name: 'Analysis histogram',
+    isCurrent: () => !destroyed,
+    report,
+    pass: () => {
+      try {
+        const copy = readText(options.getText, report);
+        if (destroyed) return;
+        if (empty) {
+          const text = options.emptyLabel ?? textValue(copy?.histogramEmpty, 'Nothing to show.', {}, report);
+          if (!destroyed) empty.textContent = text;
+          return;
+        }
+        const rows = entries.map(({bin, value: rawValue}) => {
+          const visibleLabel = bin.label;
+          const value = options.format?.(rawValue) ?? formatNumber(
+            options.formatters, rawValue, String(Math.round(rawValue * 100) / 100), report,
+          );
+          const label = options.onSelect ? textValue(
+            copy?.histogramSelect, visibleLabel + ': ' + value + '. Go to next occurrence',
+            {label: visibleLabel, value, rawValue}, report,
+          ) : undefined;
+          return {value, label, visibleLabel};
+        });
+        if (destroyed) return;
+        rows.forEach(({value, label, visibleLabel}, index) => {
+          labelNodes[index]!.textContent = visibleLabel;
+          valueNodes[index]!.textContent = value;
+          if (label !== undefined) buttons[index]!.setAttribute('aria-label', label);
+        });
+      } catch (error) {
+        report(error);
+      }
+    },
+  });
+  const handle: AnalysisHistogramHandle = {
+    update: refresh.run,
     setActive(indexes) {
       if (destroyed) return;
       const active = new Set(indexes);
@@ -424,10 +534,15 @@ export function renderHistogram(
     destroy() {
       if (destroyed) return;
       destroyed = true;
-      for (const cleanup of cleanups) cleanup();
-      for (const node of nodes) node.remove();
+      refresh.cancel();
+      runCleanups([
+        ...cleanups.splice(0),
+        ...nodes.splice(0).map(node => () => node.remove()),
+      ], report);
     },
   };
+  if (!destroyed) refresh.run();
+  return handle;
 }
 
 export interface AnalysisSummaryCardHandle {
@@ -462,13 +577,15 @@ export function appendSummaryRow(list: HTMLDListElement,label:string,value:strin
 
 export function renderAudioAnalysisCard(type: AudioAnalysisCardType, result: AudioAnalysisCardResult | undefined, root = createAnalysisRoot(), options: AudioAnalysisCardOptions = {}): HTMLElement {
   const el=makeEl(documentOf(root));
+  const formatters = options.formatters;
+  const copy = readText(options.getText, options.onError);
   root.classList.add("wui-analysis--audio", "waa-card");
   root.replaceChildren();
   if(options.error){const failure=paint(el("div",options.error),harmonyParts.failure);failure.setAttribute("role","status");root.append(failure);return root}
-  if(!result){root.append(muted(el("div","No analysis yet.")));return root}
-  if(type==="key"){const value=result.key;if(!value){root.append(muted(el("div","Key not analyzed.")));return root}const head=paint(el("div",`${value.tonic} ${value.mode}`),harmonyParts.headline);root.append(head,muted(el("div",`confidence ${Math.round(value.confidence*100)}%`)));return root}
-  if(type==="tempo"){const value=result.tempo;if(!value){root.append(muted(el("div","Tempo not analyzed.")));return root}const head=paint(el("div",`${Math.round(value.bpm)} BPM`),harmonyParts.headline);root.append(head,muted(el("div",`confidence ${Math.round(value.confidence*100)}% · ${value.grid.beats.length} beats`)));return root}
-  if(type==="loudness"){const dl=documentOf(root).createElement("dl");dl.style.cssText=harmonyInline(harmonyParts.factList);const db=(value:number)=>Number.isFinite(value)?value.toFixed(1):"−∞";appendSummaryRow(dl,"Integrated",`${db(result.loudness.integratedLufs)} LUFS`);appendSummaryRow(dl,"True peak",`${db(result.loudness.truePeakDb)} dBFS`);appendSummaryRow(dl,"RMS",result.loudness.rms.toFixed(4));root.append(dl);return root}
-  if(type==="onsets"){const onsets=result.onsets;if(!onsets){root.append(muted(el("div","Onsets not analyzed.")));return root}const head=paint(el("div",`${onsets.length} onsets`),harmonyParts.strong);const track=paint(el("div"),harmonyParts.onsetTrack);const span=options.durationSeconds&&options.durationSeconds>0?options.durationSeconds:(onsets[onsets.length-1]??1);for(const time of onsets.slice(0,400))track.append(paint(el("span"),harmonyParts.onsetMark,{left:`${time/(span||1)*100}%`}));root.append(head,track);return root}
-  const values=result.pitchTrack?.frequencies;if(!values?.length){root.append(muted(el("div","Pitch not analyzed.")));return root}const voiced=Array.from(values).filter(value=>value>0);if(!voiced.length){root.append(muted(el("div","No voiced pitch found.")));return root}const min=Math.min(...voiced),max=Math.max(...voiced),width=240,height=48,range=max-min||1;const svg=documentOf(root).createElementNS("http://www.w3.org/2000/svg","svg");svg.setAttribute("viewBox",`0 0 ${width} ${height}`);svg.style.cssText=harmonyInline(harmonyParts.contour);const times=result.pitchTrack?.times;const lastTime=times?.length?times[times.length-1]:0;const span=options.durationSeconds&&options.durationSeconds>0?options.durationSeconds:lastTime;let d="";let broken=true;Array.from(values).forEach((value,index)=>{if(value<=0){broken=true;return}const at=times?.length&&span>0?Number(times[index])/span:index/Math.max(1,values.length-1);const x=at*width;const y=height-(value-min)/range*height;d+=`${broken?"M":"L"}${x.toFixed(1)} ${y.toFixed(1)} `;broken=false});const path=documentOf(root).createElementNS("http://www.w3.org/2000/svg","path");path.setAttribute("d",d.trim());path.setAttribute("fill","none");path.setAttribute("stroke",harmonyValues.accent);path.setAttribute("stroke-width","1.5");svg.append(path);root.append(el("div",`${Math.round(min)}–${Math.round(max)} Hz`),svg);return root
+  if(!result){root.append(muted(el("div",textValue(copy?.noAnalysis, "No analysis yet.", {}, options.onError))));return root}
+  if(type==="key"){const value=result.key;if(!value){root.append(muted(el("div",textValue(copy?.keyUnavailable, "Key not analyzed.", {}, options.onError))));return root}const head=paint(el("div",analysisText(copy?.keyName, (values) => values.tonic + " " + values.mode, {tonic: value.tonic, mode: value.mode}, options.onError)),harmonyParts.headline);root.append(head,muted(el("div",analysisText(copy?.confidence, (values) => "confidence " + values.value, {value: formatPercent(formatters, value.confidence, undefined, options.onError), confidence: value.confidence}, options.onError))));return root}
+  if(type==="tempo"){const value=result.tempo;if(!value){root.append(muted(el("div",textValue(copy?.tempoUnavailable, "Tempo not analyzed.", {}, options.onError))));return root}const head=paint(el("div",analysisText(copy?.tempo, (values) => values.value + " BPM", {value: formatNumber(formatters, value.bpm, String(Math.round(value.bpm)), options.onError), bpm: value.bpm}, options.onError)),harmonyParts.headline);root.append(head,muted(el("div",analysisText(copy?.tempoDetails, (values) => "confidence " + values.confidence + " · " + values.value + " beats", {confidence: formatPercent(formatters, value.confidence, undefined, options.onError), value: formatNumber(formatters, value.grid.beats.length, undefined, options.onError), count: value.grid.beats.length}, options.onError))));return root}
+  if(type==="loudness"){const dl=documentOf(root).createElement("dl");dl.style.cssText=harmonyInline(harmonyParts.factList);const db=(value:number)=>Number.isFinite(value)?formatNumber(formatters, value, value.toFixed(1), options.onError):textValue(copy?.negativeInfinity, "−∞", {}, options.onError);appendSummaryRow(dl,textValue(copy?.integrated, "Integrated", {}, options.onError),analysisText(copy?.lufs, (values) => values.value + " LUFS", {value: db(result.loudness.integratedLufs)}, options.onError));appendSummaryRow(dl,textValue(copy?.truePeak, "True peak", {}, options.onError),analysisText(copy?.dbfs, (values) => values.value + " dBFS", {value: db(result.loudness.truePeakDb)}, options.onError));appendSummaryRow(dl,textValue(copy?.rms, "RMS", {}, options.onError),formatNumber(formatters, result.loudness.rms, result.loudness.rms.toFixed(4), options.onError));root.append(dl);return root}
+  if(type==="onsets"){const onsets=result.onsets;if(!onsets){root.append(muted(el("div",textValue(copy?.onsetsUnavailable, "Onsets not analyzed.", {}, options.onError))));return root}const head=paint(el("div",analysisText(copy?.onsets, (values) => values.value + " onsets", {value: formatNumber(formatters, onsets.length, undefined, options.onError), count: onsets.length}, options.onError)),harmonyParts.strong);const track=paint(el("div"),harmonyParts.onsetTrack);const span=options.durationSeconds&&options.durationSeconds>0?options.durationSeconds:(onsets[onsets.length-1]??1);for(const time of onsets.slice(0,400))track.append(paint(el("span"),harmonyParts.onsetMark,{left:`${time/(span||1)*100}%`}));root.append(head,track);return root}
+  const values=result.pitchTrack?.frequencies;if(!values?.length){root.append(muted(el("div",textValue(copy?.pitchUnavailable, "Pitch not analyzed.", {}, options.onError))));return root}const voiced=Array.from(values).filter(value=>value>0);if(!voiced.length){root.append(muted(el("div",textValue(copy?.noVoicedPitch, "No voiced pitch found.", {}, options.onError))));return root}const min=Math.min(...voiced),max=Math.max(...voiced),width=240,height=48,range=max-min||1;const svg=documentOf(root).createElementNS("http://www.w3.org/2000/svg","svg");svg.setAttribute("viewBox",`0 0 ${width} ${height}`);svg.style.cssText=harmonyInline(harmonyParts.contour);const times=result.pitchTrack?.times;const lastTime=times?.length?times[times.length-1]:0;const span=options.durationSeconds&&options.durationSeconds>0?options.durationSeconds:lastTime;let d="";let broken=true;Array.from(values).forEach((value,index)=>{if(value<=0){broken=true;return}const at=times?.length&&span>0?Number(times[index])/span:index/Math.max(1,values.length-1);const x=at*width;const y=height-(value-min)/range*height;d+=`${broken?"M":"L"}${x.toFixed(1)} ${y.toFixed(1)} `;broken=false});const path=documentOf(root).createElementNS("http://www.w3.org/2000/svg","path");path.setAttribute("d",d.trim());path.setAttribute("fill","none");path.setAttribute("stroke",harmonyValues.accent);path.setAttribute("stroke-width","1.5");svg.append(path);root.append(el("div",analysisText(copy?.pitchRange, (values) => values.minimum + "–" + values.maximum + " Hz", {minimum: formatNumber(formatters, min, String(Math.round(min)), options.onError), maximum: formatNumber(formatters, max, String(Math.round(max)), options.onError)}, options.onError)),svg);return root
 }

@@ -1,5 +1,6 @@
+import {readText, textValue, type UITextValue, formatNumber, type UIValueFormatters} from './text';
 import {installStyle} from './internal/style';
-import {claimHost, createErrorSink} from './internal/lifecycle';
+import {claimHost, createErrorSink, createUpdateLoop} from './internal/lifecycle';
 import {finitePositive, addClassNames, clamp, finite, setParts} from './internal/dom';
 import type {CanvasStageFrame} from './stage';
 import {componentSurfaceCss} from './internal/surface';
@@ -32,7 +33,15 @@ export interface MinimapParts {
   brush?: string;
 }
 
+export interface MinimapText {
+  label?: UITextValue;
+  range?: UITextValue<{start: string; end: string; rawStart: number; rawEnd: number}>;
+}
+
 export interface MinimapOptions {
+  /** Read application-resolved text once per paint; call update() after external changes. */
+  getText?: () => MinimapText;
+  formatters?: UIValueFormatters;
   label?: string;
   fallbackWidth?: number;
   fallbackHeight?: number;
@@ -224,6 +233,11 @@ export function mountMinimap(
   };
 
   const paintBrush = (): void => {
+    const text = readText(options.getText, options.onError);
+    if (destroyed || !claim.isCurrent()) return;
+    const label = options.label ?? textValue(text?.label, 'Visible range', {}, options.onError);
+    if (destroyed || !claim.isCurrent()) return;
+    brush.setAttribute('aria-label', label);
     const range = effectiveRange();
     const span = state.maximum - state.minimum;
     const hidden = !range || !(span > 0);
@@ -242,22 +256,46 @@ export function mountMinimap(
     brush.style.left = `${clamp(startFraction, 0, 1) * 100}%`;
     brush.style.width = `${Math.max(.5, clamp(endFraction - startFraction, 0, 1) * 100)}%`;
     brush.setAttribute('aria-valuenow', String(range.start));
-    brush.setAttribute('aria-valuetext', `${range.start.toFixed(2)} to ${range.end.toFixed(2)}`);
+    const values = {
+      start: formatNumber(options.formatters, range.start, range.start.toFixed(2), options.onError),
+      end: formatNumber(options.formatters, range.end, range.end.toFixed(2), options.onError),
+      rawStart: range.start, rawEnd: range.end,
+    };
+    brush.setAttribute('aria-valuetext', textValue(text?.range, `${values.start} to ${values.end}`, values, options.onError));
   };
 
   const readSnapshot = (): void => {
     try {
-      state = normalize(binding.snapshot());
+      const next = normalize(binding.snapshot());
+      if (!destroyed && claim.isCurrent()) state = next;
     } catch (error) {
       report(error);
     }
   };
 
+  // Brush-only gestures share the same repaint latch as full updates so text
+  // callbacks cannot recursively paint an older frame over a newer one.
+  let needsSnapshot = false;
+  const updates = createUpdateLoop({
+    name: 'Minimap',
+    isCurrent: () => !destroyed && claim.isCurrent(),
+    report,
+    pass: () => {
+      const refresh = needsSnapshot;
+      needsSnapshot = false;
+      if (refresh) {
+        readSnapshot();
+        if (destroyed || !claim.isCurrent()) return;
+        paintCanvas();
+        if (destroyed || !claim.isCurrent()) return;
+      }
+      paintBrush();
+    },
+  });
   const update = (): void => {
     if (destroyed) return;
-    readSnapshot();
-    paintCanvas();
-    paintBrush();
+    needsSnapshot = true;
+    updates.run();
   };
 
   const settleRange = (revision: number, error?: unknown): void => {
@@ -276,7 +314,8 @@ export function mountMinimap(
     const nextEnd = nextStart + width;
     const revision = ++commandRevision;
     optimisticRange = {start: nextStart, end: nextEnd, revision};
-    paintBrush();
+    updates.run();
+    if (destroyed || !claim.isCurrent()) return;
     try {
       void Promise.resolve(binding.setRange(nextStart, nextEnd)).then(
         () => settleRange(revision),
@@ -391,6 +430,7 @@ export function mountMinimap(
     destroy(): void {
       if (destroyed) return;
       destroyed = true;
+      updates.cancel();
       commandRevision += 1;
       optimisticRange = undefined;
       try {
@@ -440,9 +480,12 @@ export function mountMinimap(
     }
   }
   update();
+  if (destroyed || !claim.isCurrent()) return handle;
   if (binding.subscribe) {
     try {
-      unsubscribe = binding.subscribe(update);
+      const stop = binding.subscribe(update);
+      if (destroyed || !claim.isCurrent()) stop();
+      else unsubscribe = stop;
     } catch (error) {
       report(error);
     }

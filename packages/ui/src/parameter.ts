@@ -2,6 +2,7 @@ import {installStyle} from './internal/style';
 import {claimHost, createUpdateLoop} from "./internal/lifecycle";
 import {markEmptyState, addClassNames, clamp, finite, setParts} from './internal/dom';
 import {componentSurfaceCss, controlBorderFallback} from './internal/surface';
+import {formatNumber as formatDisplayNumber, readText, textValue, type UITextValue, type UIValueFormatters} from './text';
 // ============================================================================
 // Domain-neutral parameter-rack presenter.
 //
@@ -68,7 +69,15 @@ export interface ParameterRackParts {
   empty?: string;
 }
 
+export interface ParameterRackText {
+  empty?: string;
+  value?: UITextValue<{value: string; unit: string}>;
+}
+
 export interface ParameterRackOptions {
+  /** Read application-provided text on each update. */
+  getText?: () => ParameterRackText;
+  formatters?: UIValueFormatters;
   /** Flat racks border each item; grouped racks border each named group. */
   layout?: "flat" | "grouped";
   emptyLabel?: string;
@@ -119,6 +128,7 @@ interface ParameterNodes {
   fill: SVGPathElement;
   pointer: SVGLineElement;
   value: HTMLElement;
+  label: HTMLElement;
 }
 
 const mountedParameterRacks = new WeakMap<ParameterHost, ParameterRackHandle>();
@@ -308,27 +318,30 @@ function formatNumber(value: number): string {
   return value.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
 }
 
-function defaultFormat(parameter: ParameterRackItem, value: number): string {
+function defaultFormat(parameter: ParameterRackItem, value: number, texts?: ParameterRackText, formatters?: UIValueFormatters, onError?: (error: unknown) => void): string {
   const option = parameter.options?.[Math.round(value)];
   if (option !== undefined) return option;
-  return `${formatNumber(value)}${parameter.unit ? ` ${parameter.unit}` : ""}`;
+  const number = formatDisplayNumber(formatters, value, formatNumber(value), onError);
+  return parameter.unit ? textValue(texts?.value, `${number} ${parameter.unit}`, {value: number, unit: parameter.unit}, onError) : number;
 }
 
 function structureSignature(
   parameters: readonly NormalizedParameter[],
   layout: string,
 ): string {
+  const groupIndices = new Map<string, number>();
+  for (const parameter of parameters) {
+    const group = parameter.group ?? '';
+    if (!groupIndices.has(group)) groupIndices.set(group, groupIndices.size);
+  }
   return JSON.stringify([
     layout,
     ...parameters.map((parameter) => [
       parameter.id ?? "",
-      parameter.label,
       parameter.min,
       parameter.max,
       parameter.step,
-      parameter.unit ?? "",
-      parameter.group ?? "",
-      parameter.options ?? [],
+      ...(layout === 'grouped' ? [groupIndices.get(parameter.group ?? ''), Boolean(parameter.group)] : []),
     ]),
   ]);
 }
@@ -391,6 +404,7 @@ export function mountParameterRack(
   let signature = "";
   let nodes: ParameterNodes[] = [];
   let emptyNode: HTMLElement | undefined;
+  let groupLabels: Array<{label: HTMLElement; parameterId: string}> = [];
   let parameters: NormalizedParameter[] = [];
   const nodeCleanups: Array<() => void> = [];
   const commandRevisions = new Map<string, number>();
@@ -398,6 +412,7 @@ export function mountParameterRack(
   const groupIdPrefix = `wui-parameter-rack-${++parameterRackSequence}-group`;
   let groupSequence = 0;
   let unsubscribe: (() => void) | undefined;
+  let texts: ParameterRackText | undefined;
   const isCurrent = (): boolean =>
     !destroyed && mountedParameterRacks.get(host) === handle;
   const reportError = (error: unknown): void => options.onError?.(error);
@@ -410,7 +425,7 @@ export function mountParameterRack(
       // into an unhandled rejection.
     }
   };
-  const format = options.formatValue ?? defaultFormat;
+  const format = options.formatValue ?? ((parameter: ParameterRackItem, value: number) => defaultFormat(parameter, value, texts, options.formatters, options.onError));
 
   const paint = (
     record: ParameterNodes,
@@ -438,7 +453,7 @@ export function mountParameterRack(
       if (!isCurrent()) return false;
       reportError(error);
       if (!isCurrent()) return false;
-      text = defaultFormat(parameter, current);
+      text = defaultFormat(parameter, current, texts, options.formatters, options.onError);
     }
     if (!isCurrent()) return false;
     record.fill.setAttribute("d", fillPath);
@@ -507,7 +522,7 @@ export function mountParameterRack(
     setParts(value, "value", options.parts?.value);
     item.append(label, control, value);
 
-    const record = { id: parameter.id, item, input, fill, pointer, value };
+    const record = { id: parameter.id, item, input, fill, pointer, value, label };
     targetNodes.push(record);
     listen(
       input,
@@ -521,6 +536,7 @@ export function mountParameterRack(
           currentParameter.min,
           currentParameter.max,
         );
+        texts = readText(options.getText, options.onError);
         if (!paint(record, currentParameter, next)) return;
         const revision = (commandRevisions.get(record.id) ?? 0) + 1;
         commandRevisions.set(record.id, revision);
@@ -557,12 +573,13 @@ export function mountParameterRack(
     const nextNodes: ParameterNodes[] = [];
     const nextCleanups: Array<() => void> = [];
     let nextEmpty: HTMLElement | undefined;
+    const nextGroupLabels: Array<{label: HTMLElement; parameterId: string}> = [];
 
     try {
       if (next.length === 0) {
         const empty = document.createElement("div");
         empty.className = "wui-parameter-rack__empty";
-        empty.textContent = options.emptyLabel ?? "No parameters";
+        empty.textContent = options.emptyLabel ?? textValue(texts?.empty, 'No parameters', {}, options.onError);
         addClassNames(empty, options.classNames?.empty);
         setParts(empty, "empty", options.parts?.empty);
         markEmptyState(empty);
@@ -591,6 +608,7 @@ export function mountParameterRack(
             groupLabel.className = "wui-parameter-rack__group-label";
             groupLabel.textContent = groupName;
             groupLabel.title = groupName;
+            nextGroupLabels.push({label: groupLabel, parameterId: entries[0]!.id});
             let groupLabelId = groupLabelIds.get(groupName);
             if (!groupLabelId) {
               groupLabelId = `${groupIdPrefix}-${++groupSequence}`;
@@ -629,6 +647,7 @@ export function mountParameterRack(
       nodes: nextNodes,
       cleanups: nextCleanups,
       empty: nextEmpty,
+      groups: nextGroupLabels,
     };
   };
 
@@ -661,6 +680,7 @@ export function mountParameterRack(
     }
     nodes = built.nodes;
     emptyNode = built.empty;
+    groupLabels = built.groups;
     nodeCleanups.push(...built.cleanups);
     parameters = [...next];
     signature = nextSignature;
@@ -674,6 +694,9 @@ export function mountParameterRack(
     let nextSignature: string;
     try {
       const state = binding.snapshot();
+      if (!isCurrent()) return;
+      texts = readText(options.getText, options.onError);
+      if (!isCurrent()) return;
       disabled = state?.disabled === true;
       next = Array.from(state?.parameters ?? []).map(normalize);
       const ids = new Set<string>();
@@ -706,10 +729,19 @@ export function mountParameterRack(
     const parameterById = new Map(
       parameters.map((parameter) => [parameter.id, parameter] as const),
     );
+    if (emptyNode) emptyNode.textContent = options.emptyLabel ?? textValue(texts?.empty, 'No parameters', {}, options.onError);
+    for (const group of groupLabels) {
+      const name = parameterById.get(group.parameterId)?.group ?? '';
+      group.label.textContent = name;
+      group.label.title = name;
+    }
     for (const record of nodes) {
       if (!isCurrent()) return;
       const parameter = parameterById.get(record.id);
       if (!parameter) continue;
+      record.label.textContent = parameter.label;
+      record.label.title = parameter.label;
+      record.input.setAttribute('aria-label', parameter.label);
       record.input.disabled = disabled || parameter.disabled === true;
       record.item.classList.toggle("is-disabled", record.input.disabled);
       if (!paint(record, parameter, parameter.value)) return;
@@ -741,6 +773,7 @@ export function mountParameterRack(
       // Preserve the mount failure after best-effort rollback.
     }
     unsubscribe = undefined;
+
     try {
       root.remove();
     } catch {
@@ -782,6 +815,7 @@ export function mountParameterRack(
         cleanupError ??= error;
       }
       unsubscribe = undefined;
+
       try {
         root.remove();
       } catch (error) {
@@ -829,6 +863,7 @@ export function mountParameterRack(
       if (isCurrent()) reportError(error);
     }
     if (isCurrent()) update();
+
   } catch (error) {
     rollback();
     throw error;

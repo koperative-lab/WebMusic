@@ -68,6 +68,24 @@ keyboard.key(60)?.dataset.phase; // 'attack', then 'sustain', then 'release'
 staff.destroy();
 ```
 
+## External presentation inputs
+
+`KeyboardOptions.getText`, `StaffOptions.getText` and `FretboardOptions.getText`
+return `KeyboardText`, `StaffText` and `FretboardText`. Each has a `description`
+field accepting a final string or callback with `{names: string}`. Defaults are
+Sounding / Staff / Fretboard, followed by named data when present. An explicit
+`label` option retains precedence.
+
+`FretboardText.fret` accepts final text or a callback with
+`{value: string, fret: number}`; the default is the formatted first-fret number
+followed by `fr`. `FretboardOptions.formatters.number` receives the raw fret.
+Call `handle.update()` after changing external display inputs; descriptions and
+fret text refresh without replacing cached geometry. Pitch identities and
+machine attributes stay unchanged. Snapshot labels remain caller-owned.
+
+[The shared presentation contract](/uikit/api/#external-presentation-inputs)
+leaves translation, language selection and update subscriptions to the application.
+
 <details class="component-section">
 <summary>API</summary>
 

@@ -91,6 +91,30 @@ strip.item('Cmaj7')?.dataset.chip;
 wheel.destroy();
 ```
 
+## External presentation inputs
+
+Each mount accepts a typed `getText()` callback, read on `handle.update()`.
+The application supplies final strings or contextual callbacks through
+`FlowLaneText`, `NameplateText`, `ChipStripText` and `WheelText`.
+[The shared presentation contract](/uikit/api/#external-presentation-inputs)
+keeps translation and its change notifications outside WebMusic. Explicit
+`label` and `formatPosition` options retain precedence.
+
+| Text field | Default and callback context |
+|---|---|
+| All four: `description` | Flow lane / Chord / Read-out / Wheel, followed by the named data when present; context `{names: string}`. |
+| FlowLane: `position` | Position |
+| FlowLane: `positionValue` | Formatted position and current band label; context `{value: string, position: number, label: string}`. |
+| ChipStrip: `occurrences` | `x` followed by the formatted count; context `{count: number, value: string}`. |
+| Wheel: `share` | Segment label and formatted percentage; context `{label: string, value: string, fraction: number}`. |
+
+FlowLane/ChipStrip `formatters.number` receive positions/counts, and Wheel
+`formatters.percent` receives the raw fractional share. Geometry and machine
+ARIA positions stay numeric. Change application state and call `update()` to
+refresh text even when geometry remains cached. Nameplate alternate buttons
+retain focus and commands receive the current candidate. Chord spellings,
+empty labels, annotations and other snapshot text remain caller-owned.
+
 <details class="component-section">
 <summary>API</summary>
 

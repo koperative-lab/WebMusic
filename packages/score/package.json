@@ -282,7 +282,7 @@
     "@tonaljs/chord": "^6.1.2",
     "@tonaljs/chord-detect": "^4.9.1",
     "@tonejs/midi": "^2.0.28",
-    "fast-xml-parser": "^5.9.3",
+    "fast-xml-parser": "^5.11.1",
     "fflate": "^0.8.2",
     "vexflow": "4.2.5"
   },
@@ -323,7 +323,7 @@
     "spessasynth_lib": "^4.3.14",
     "tsup": "^8.5.0",
     "typescript": "^5.4.0",
-    "vitest": "^4.1.11"
+    "vitest": "^5.0.0"
   },
   "license": "MIT",
   "publishConfig": {

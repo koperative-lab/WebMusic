@@ -44,6 +44,27 @@ cannot overwrite a newer gesture. Subscription and explicit updates use the same
 repaint path. See the [shared presenter shape](/uikit/api/#the-shared-presenter-shape) for the
 common lifecycle contract.
 
+## Display text and values
+
+`getText()` returns application-resolved `EnvelopeText` once per paint. Call `handle.update()`
+after external text or formatting settings change; the focused ranges remain mounted. Explicit
+`label` takes precedence. See [application-owned text](/uikit/api/#external-presentation-inputs)
+for composing an external translation package and owning its notifications.
+
+Each field is a literal string or a callback returning the final string. WebMusic performs no
+message lookup or template interpolation. Callback failures go to `onError` and use defaults.
+
+| `EnvelopeText` field | Default / callback context |
+|---|---|
+| `label` | `Envelope`; no context values. |
+| `attack`, `decay`, `sustain`, `release` | `Attack`, `Decay`, `Sustain`, `Release`; no context values. |
+| `seconds` | Formatted value followed by ` seconds`; `{value: string, seconds: number}`. |
+| `secondsShort` | Formatted value followed by `s`; `{value: string, seconds: number}`. |
+| `readout` | ADSR readout; `{attack: string, decay: string, sustain: string, release: string}` contains the formatted values. |
+
+`formatters.number` receives seconds; `formatters.percent` receives sustain as a fraction.
+Native range values and command values remain numeric.
+
 <details class="component-section">
 <summary>API</summary>
 
@@ -80,6 +101,8 @@ shown below; curve geometry clamps values to each visible range without mutating
 
 | Member | Kind | Default | Description |
 |---|---|---|---|
+| `getText` | `() => EnvelopeText` | — | Reads application-resolved display text once per paint; call `update()` after external changes. |
+| `formatters` | `UIValueFormatters` | — | Pure numeric display callbacks; explicit presenter formatters take precedence. |
 | `label` | `string` | `'Envelope'` | Accessible name of the root group. |
 | `classNames` | `EnvelopeClassNames` | `{}` | Adds compatibility classes to root, SVG, grid, area, curve, handles, readout, inputs wrapper and inputs. |
 | `parts` | `EnvelopeParts` | `{}` | Adds tokens beside the canonical parts for the same node set. |

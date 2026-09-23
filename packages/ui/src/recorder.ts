@@ -1,8 +1,9 @@
 import {installStyle} from './internal/style';
 import {clamp01} from './internal/dom';
-import {claimHost} from './internal/lifecycle';
+import {claimHost, createErrorSink, createUpdateLoop, runCleanups} from './internal/lifecycle';
 import {componentSurfaceCss, controlBorderFallback} from './internal/surface';
 import {controlHeight, controlRadius} from './internal/control';
+import {formatNumber, readText, textValue, type UITextValue, type UIValueFormatters} from './text';
 export interface RecorderState {
   recording: boolean;
   busy?: boolean;
@@ -23,7 +24,26 @@ export interface RecorderBinding {
   subscribe?(notify: () => void): () => void;
 }
 
+export interface RecorderText {
+  record?: string;
+  stopRecording?: string;
+  stop?: string;
+  play?: string;
+  playTake?: string;
+  stopPlayback?: string;
+  exports?: string;
+  download?: UITextValue<{label: string}>;
+  downloadText?: UITextValue<{label: string}>;
+  recordingStatus?: UITextValue<{count: number; formattedCount: string}>;
+  playingStatus?: string;
+  capturedStatus?: UITextValue<{count: number; formattedCount: string}>;
+  readyStatus?: string;
+}
+
 export interface RecorderOptions {
+  /** Read application-provided text on each update. */
+  getText?: () => RecorderText;
+  formatters?: UIValueFormatters;
   exportFormats?: readonly {id: string; label: string}[];
   onError?: (error: unknown) => void;
   /** Install the exported stylesheet into the host. Defaults to true. */
@@ -59,16 +79,67 @@ export function mountRecorder(host: RecorderHost, binding: RecorderBinding, opti
   const meter = document.createElement('div'); meter.className='wui-recorder__meter meter'; meter.setAttribute('part','meter');
   const level = document.createElement('div'); level.className='wui-recorder__level level'; level.setAttribute('part','level'); meter.append(level);
   const exports = document.createElement('span'); exports.className='wui-recorder__exports'; exports.setAttribute('part', 'exports'); exports.setAttribute('role', 'group'); exports.setAttribute('aria-label', 'Export take');
-  const exportButtons: HTMLButtonElement[] = [];
+  const exportButtons: Array<{button: HTMLButtonElement; format: {id: string; label: string}}> = [];
   const status = document.createElement('div'); status.className='wui-recorder__status status'; status.setAttribute('part','status');
   root.append(record, ...(binding.togglePlayback ? [play] : []), meter, exports, status);
   let destroyed=false; let unsubscribe:(()=>void)|undefined;
-  const command=(work:()=>Promise<void>|void):void=>{try{void Promise.resolve(work()).then(update,options.onError)}catch(error){options.onError?.(error)}};
+  let texts: RecorderText | undefined;
+  const report = createErrorSink(options.onError);
+  const command=(work:()=>Promise<void>|void):void=>{if(destroyed)return;try{void Promise.resolve(work()).then(update,(error)=>{if(!destroyed)report(error)})}catch(error){if(!destroyed)report(error)}};
   record.addEventListener('click',()=>command(()=>binding.toggleRecording()));
   play.addEventListener('click',()=>{if(binding.togglePlayback)command(()=>binding.togglePlayback!())});
-  for(const format of options.exportFormats??[]){const button=document.createElement('button');button.type='button';button.className=`wui-recorder__button ${format.id}`;button.textContent=`⬇ ${format.label}`;button.setAttribute('aria-label',`Download ${format.label}`);button.addEventListener('click',()=>{if(binding.export)command(()=>binding.export!(format.id))});exports.append(button);exportButtons.push(button)}
-  const update=():void=>{if(destroyed)return;try{const state=binding.snapshot();record.disabled=state.busy===true;record.classList.toggle('armed',state.recording);record.setAttribute('aria-busy',String(state.busy===true));record.setAttribute('aria-pressed',String(state.recording));record.setAttribute('aria-label',state.recording?'Stop recording':'Record');record.textContent=state.recording?'■ Stop':'● Record';play.disabled=!(state.canPlay??state.takeCount!=null);play.classList.toggle('on',state.playing===true);play.setAttribute('aria-pressed',String(state.playing===true));play.textContent=state.playing?'■ Stop':'▶ Play';for(const button of exportButtons)button.disabled=!(state.canExport??state.takeCount!=null);const amount=clamp01(state.level);level.style.setProperty('--wui-recorder-level',String(amount));meter.hidden=state.level==null;status.textContent=state.status??(state.recording?`● recording… ${state.recordedCount??0}`:state.playing?'playing take…':state.takeCount!=null?`captured ${state.takeCount}`:'Ready');}catch(error){options.onError?.(error)}};
-  const handle:RecorderHandle={element:root,update,destroy(){if(destroyed)return;destroyed=true;unsubscribe?.();claim.release();root.remove();style?.remove()}};
+  for (const format of options.exportFormats ?? []) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `wui-recorder__button ${format.id}`;
+    button.addEventListener('click', () => { if (binding.export) command(() => binding.export!(format.id)); });
+    exports.append(button);
+    exportButtons.push({button, format});
+  }
+  const paintSnapshot = (): void => {
+    if (destroyed) return;
+    try {
+      const state = binding.snapshot();
+      if (destroyed || !claim.isCurrent()) return;
+      texts = readText(options.getText, options.onError);
+      if (destroyed || !claim.isCurrent()) return;
+      const label = (key: "record" | "stopRecording" | "stop" | "play" | "playTake" | "stopPlayback" | "exports" | "playingStatus" | "readyStatus", fallback: string): string => textValue(texts?.[key], fallback, {}, options.onError);
+      record.disabled = state.busy === true;
+      record.classList.toggle('armed', state.recording);
+      record.setAttribute('aria-busy', String(state.busy === true));
+      record.setAttribute('aria-pressed', String(state.recording));
+      record.setAttribute('aria-label', state.recording ? label('stopRecording', 'Stop recording') : label('record', 'Record'));
+      record.textContent = state.recording ? `■ ${label('stop', 'Stop')}` : `● ${label('record', 'Record')}`;
+      play.disabled = !(state.canPlay ?? state.takeCount != null);
+      play.classList.toggle('on', state.playing === true);
+      play.setAttribute('aria-pressed', String(state.playing === true));
+      play.setAttribute('aria-label', state.playing ? label('stopPlayback', 'Stop take') : label('playTake', 'Play take'));
+      play.textContent = state.playing ? `■ ${label('stop', 'Stop')}` : `▶ ${label('play', 'Play')}`;
+      exports.setAttribute('aria-label', label('exports', 'Export take'));
+      for (const {button, format} of exportButtons) {
+        button.disabled = !(state.canExport ?? state.takeCount != null);
+        button.textContent = textValue(texts?.downloadText, `⬇ ${format.label}`, {label: format.label}, options.onError);
+        button.setAttribute('aria-label', textValue(texts?.download, `Download ${format.label}`, {label: format.label}, options.onError));
+      }
+      const amount = clamp01(state.level);
+      level.style.setProperty('--wui-recorder-level', String(amount));
+      meter.hidden = state.level == null;
+      const count = state.recording ? state.recordedCount ?? 0 : state.takeCount ?? 0;
+      const values = {count, formattedCount: formatNumber(options.formatters, count, undefined, options.onError)};
+      status.textContent = state.status ?? (state.recording
+        ? textValue(texts?.recordingStatus, `● recording… ${values.formattedCount}`, values, options.onError)
+        : state.playing ? label('playingStatus', 'playing take…')
+        : state.takeCount != null ? textValue(texts?.capturedStatus, `captured ${values.formattedCount}`, values, options.onError)
+        : label('readyStatus', 'Ready'));
+    } catch (error) { report(error); }
+  };
+  const updateLoop = createUpdateLoop({
+    name: 'Recorder', pass: paintSnapshot,
+    isCurrent: () => !destroyed && claim.isCurrent(), report,
+  });
+  const update = (): void => updateLoop.run();
+
+  const handle:RecorderHandle={element:root,update,destroy(){if(destroyed)return;destroyed=true;updateLoop.cancel();const stop=unsubscribe;unsubscribe=undefined;runCleanups([stop,()=>claim.release(),()=>root.remove(),()=>style?.remove()],report)}};
   // Claim the host before destroying the previous recorder: its cleanup may
   // mount a replacement, and that replacement must win.
   const claim = claimHost(mounted, host, handle);
@@ -82,5 +153,17 @@ export function mountRecorder(host: RecorderHost, binding: RecorderBinding, opti
     style?.remove();
     return handle;
   }
-  update();if(binding.subscribe)unsubscribe=binding.subscribe(update);return handle;
+  update();
+  if (destroyed || !claim.isCurrent()) return handle;
+  if (binding.subscribe) {
+    try {
+      const stop = binding.subscribe(update);
+      if (destroyed || !claim.isCurrent()) runCleanups([stop], report);
+      else unsubscribe = stop;
+    } catch (error) {
+      report(error);
+    }
+  }
+
+  return handle;
 }

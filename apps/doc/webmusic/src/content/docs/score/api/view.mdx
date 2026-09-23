@@ -134,16 +134,39 @@ The render helpers return `RenderedScoreVisualizer<TVisualizer>`:
 | `noteSequence` | Read-only sequence used by this renderer. |
 | `visualizer` | The underlying renderer instance. |
 | `redraw(activeNote?, scrollIntoView?)` | Existing note-driven drawing entry. Exact-time-capable renderers use the nominated note’s onset; OSMD moves its engraving cursor. Returns a renderer coordinate or `null`. |
-| `redrawAtTime?(nominalSeconds, scrollIntoView?)` | Optional exact-time drawing entry, implemented by the built-in SVG and Canvas piano rolls, waterfall and scrolling staff. Highlights notes where `startTime <= nominalSeconds < endTime`; it does not snap to a selected note’s onset. Returns a renderer coordinate or `null`. |
+| `redrawAtTime?(nominalSeconds, scrollIntoView?)` | Optional position-driven drawing entry. SVG/Canvas piano rolls, waterfall and scrolling staff highlight spans where `startTime <= nominalSeconds < endTime`; OSMD advances its discrete notation cursor. Returns a renderer coordinate or `null`. |
 | `clearActiveNotes()` | Clear current highlights and the applicable cursor display. |
 | `dispose?()` | Release owned rendering resources and DOM. Supplied by all package renderers and safe to repeat. |
 
-`redrawAtTime` rejects non-finite time with `RangeError`. After disposal it is inert and returns `null`. Use nominal score seconds, without playback-rate scaling. `scrollIntoView: false` updates highlighting without requesting follow scrolling. Coordinate orientation and default following behavior belong to the selected renderer. OSMD retains `redraw` and does not implement `redrawAtTime`.
+`redrawAtTime` rejects non-finite time with `RangeError`. After disposal it is inert and returns `null`. Use nominal score seconds, without playback-rate scaling. `scrollIntoView: false` updates the position without requesting follow scrolling. Coordinate orientation and default following behavior belong to the selected renderer. OSMD retains its discrete cursor positions rather than interpolating a playhead between them.
 
 ```ts
 // On a caller-owned clock or position notification:
 rendered.redrawAtTime?.(1.25, false);
 ```
+
+### Presentation state
+
+The [React score views](/score/api/react/) and
+[`<score-view>`](/score/element/view/score-view/) expose `ScoreViewRenderState`
+from `@webmusic/score/view/render` (also exported by their respective entries).
+This describes the view's presentation independently of playback readiness.
+Bare renderer factories retain their synchronous return/throw or asynchronous
+Promise contracts; they do not create a separate state subscription.
+
+| Member | Meaning |
+| --- | --- |
+| `status` | `empty`, `loading`, `rendering`, `ready`, `error`, or `disposed`. |
+| `phase` | `source` for borrowed data, `load` for local loading, `render` for presentation, or `null` when no phase applies. |
+| `revision` | Increasing notification revision within this view. |
+| `generation` | Current source/render attempt; old asynchronous results cannot mark a replacement ready. |
+| `score?` | Score associated with this state, when available. |
+| `cause?` | Original failure when status is `error`; the host chooses its user-facing message. |
+
+`ready` means the current presentation has been constructed. It does not mean
+audio is ready or that the browser has painted a frame. A data-only view skips
+loading; no synthetic parsing progress is emitted. Follow the owning component
+reference for notifications, replacement and teardown behavior.
 
 ## Render annotations
 
@@ -591,7 +614,7 @@ For an owned OSMD instance, the adapter reflows when its container width changes
 
 For this adapter, `redraw(undefined, false)` cancels queued cursor scrolling without moving or clearing the cursor. `clearActiveNotes()` and disposal also invalidate pending scrolling. An explicit `redraw(note, true)` still requests scrolling when the default `followCursor` option is false.
 
-Backward cursor moves reset and replay OSMD’s iterator, reacquiring the replacement iterator created by `reset()` before applying checkpoints. This adapter continues to expose note-driven `redraw`, rather than `redrawAtTime`.
+Backward cursor moves reset and replay OSMD’s iterator, reacquiring the replacement iterator created by `reset()` before applying checkpoints. Both note-driven `redraw` and nominal-second `redrawAtTime` share that cursor machinery. Position-driven updates work while paused with no active note event; they retain OSMD's discrete notation positions and return `null`. `redrawAtTime(seconds, false)` cancels pending cursor scrolling without hiding the cursor.
 
 ```ts
 import { renderOSMDStaffVisualizer } from '@webmusic/score/view/render';
@@ -636,6 +659,8 @@ Score + MusicXML + OSMD constructor -> RenderedScoreVisualizer<OSMDLike>
 | `renderWaterfallVisualizer(score, container, config?)` | Visualizer | Render falling notes on piano-style pitch columns, without an embedded keyboard (from `@webmusic/score/view/render`). |
 | `renderScoreThumbnail(surface, notes, options?)` | Renderer | Append a static fitted note preview with optional original Score directions; returns its SVG (from `@webmusic/score/view/render`). |
 | `ScoreThumbnailRenderOptions` | Render type | Thumbnail color, accessible label, original Score and annotation visibility (from `@webmusic/score/view/render`). |
+| `ScoreViewRenderState` | Render type | Immutable presentation status, phase, revision, generation, Score and original failure; see [Presentation state](#presentation-state). |
+| `ScoreViewRenderStatus`, `ScoreViewRenderPhase` | Render types | Presentation lifecycle and work/failure owner, exported by `@webmusic/score/view/render`. |
 | `WaterfallVisualizerConfig` | Render type | Falling-note geometry plus opt-in container fitting. |
 | `renderOSMDStaffVisualizer(score, container, options?)` | Visualizer | Render full staff engraving through OpenSheetMusicDisplay (from `@webmusic/score/view/render`). |
 | `createPianoRollLayout(score, opts?)` | Layout | Return serializable piano-roll note rectangles. |

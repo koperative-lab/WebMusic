@@ -36,6 +36,20 @@ Changing `kind` changes visibility and live-region behavior; changing `message` 
 painted copy. The rest of mounting and cleanup follows the
 [shared presenter shape](/uikit/api/#the-shared-presenter-shape).
 
+## Display text
+
+`getText()` returns application-resolved `StatusText` once per paint. Call `handle.update()` after
+external settings change. Its fields `loading`, `empty`, `error`, and `ready` default to
+`Loading…`, `Nothing to show.`, `Something went wrong.`, and an empty string respectively.
+An explicit `state.message` takes precedence. Fields accept literal strings or callbacks with no
+context values returning final strings; there is no interpolation or internal subscription.
+Failures reach `onError` and use defaults. See
+[application-owned text](/uikit/api/#external-presentation-inputs) for external translation-package
+composition.
+
+Text updates retain the message node. Ready remains hidden; other states retain their live-region
+semantics.
+
 <details class="component-section">
 <summary>API</summary>
 
@@ -60,6 +74,7 @@ went wrong.”, and ready has no text.
 
 | Member | Kind | Default | Description |
 |---|---|---|---|
+| `getText` | `() => StatusText` | — | Reads application-resolved display text once per paint; call `update()` after external changes. |
 | `classNames` | `StatusClassNames` | `{}` | Adds compatibility classes for `root` and `message`. |
 | `parts` | `StatusParts` | `{}` | Adds part tokens for `root` and `message`. |
 | `onError` | `(error: unknown) => void` | — | Receives snapshot, subscription, and cleanup failures; errors thrown by the sink do not escape. |

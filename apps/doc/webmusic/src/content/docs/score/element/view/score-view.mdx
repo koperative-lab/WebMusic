@@ -262,9 +262,34 @@ but time changes do not redraw the thumbnail.
 
 ## Data and playback
 
-Source precedence is explicit `.score`, then `src`, then the selected player’s resolved score. Explicit URLs load through [`@webmusic/score/io`](/score/api/io/). A player-only view borrows data without another fetch. Changing `type` reuses the resolved score and player snapshot while replacing the old presentation.
+Source precedence is explicit `.score`, then `src`, then the borrowed playback source's resolved score. Assign `.playback` to borrow a `ScorePlaybackSource` directly; otherwise `player` selects a DOM owner. Explicit URLs load through [`@webmusic/score/io`](/score/api/io/). A playback-only view borrows data without another fetch. Changing `type` reuses the resolved score and player snapshot while replacing the old presentation.
+
+```ts
+import {ScoreViewElement, defineScoreViewElement} from '@webmusic/score/view/element';
+import type {ScorePlaybackSource} from '@webmusic/score';
+
+function mountFollowingScore(host: HTMLElement, playback: ScorePlaybackSource) {
+  defineScoreViewElement();
+  const view = new ScoreViewElement();
+  view.type = 'staff';
+  view.playback = playback;
+  host.append(view);
+  return () => view.remove(); // Detaches the view; the playback owner survives.
+}
+```
+
+Direct `.playback` takes precedence over `player`, including when the direct
+source is loading, unavailable or failed. Assign `undefined` to resume selector
+discovery. It is borrowed: assigning, replacing or removing the view never
+creates, stops or disposes a player. Both paths enforce the same Score identity
+check. Different MIDI and MusicXML Score objects need an explicit application
+projection; assigning an unrelated score does not imply position alignment.
 
 The `player` selector must resolve uniquely in the current Document or ShadowRoot. Native snapshots initialize position, including paused state, then data/state/time updates keep it current. Late or replaced targets rebind; invalid or ambiguous selectors remain unbound. Disconnect cancels pending work and releases owned subscriptions and renderers without stopping playback. No type creates a player or audio resource. Only `map` sends seek commands.
+
+When a ready source supplies active notes but no nominal position, the three note
+views follow part/note identity and clear released notes without creating a clock.
+Sounding MIDI transposition does not change which written score note is highlighted.
 
 Native binding prefers the target's `.playback` [shared source](/score/api/#shared-playback-observation).
 An available source suppresses duplicate legacy events. A target without a source,
@@ -276,13 +301,42 @@ target replacing its `.playback` property dispatches `webmusic:sourcechange`.
 
 Missing source data displays a waiting status. The three note views show an empty status for a score without notes, and load or drawing failures show an accessible error message. Replacing the source or drawing options retries the applicable work. Disconnect also releases the waterfall resize observer.
 
+### Observe presentation readiness
+
+Read `.renderState` for the current immutable snapshot, and listen for
+`webscore:renderstatechange` for subsequent snapshots in `event.detail`. This
+describes the view's presentation separately from the player's readiness:
+
+| Status / phase | Meaning |
+| --- | --- |
+| `empty` / `null` | No usable input, including an empty, unavailable or disposed borrowed source. |
+| `loading` / `source` | The borrowed source is preparing its score. |
+| `loading` / `load` | This view is fetching or parsing its explicit `src`; no separate parser-progress phase is inferred. |
+| `rendering` / `render` | The selected drawing is being constructed. |
+| `ready` / `render` | Construction completed for the current `.renderState.score`, including an empty-score presentation. This does not establish audio readiness. |
+| `error` / `source`, `load` or `render` | The named stage failed. `cause` retains the original failure for host logging, localization and retry UI. |
+| `disposed` / `null` | The view disconnected and released its presentation and subscriptions; it can reconnect. |
+
+`revision` increases on every notification; `generation` identifies a source or
+render attempt. A source replacement clears the prior presentation while new
+data is pending. Superseded loads cannot publish success or failure for the new
+input. State-event listeners may synchronously change the source, type or
+options, or remove the element; an older attempt cannot then publish `ready`.
+Subscription or snapshot-read failures report `error` / `source`; an explicit
+Score can remain visible as static data while its requested playback binding
+has failed. A later cursor-drawing failure reports `error` / `render` too.
+Failed unsubscribe still releases the view and emits a source error before
+`disposed`; the borrowed owner is never stopped or disposed.
+The initial state before connection is `empty`. Rendering is synchronous, so
+attach listeners before mounting if the host needs intermediate transitions.
+
 <details class="component-section">
 <summary>API</summary>
 
 | Member | Kind | Description |
 | --- | --- | --- |
 | `src` / `format` | attributes | Explicit MIDI / MusicXML / MXL / ABC URL and optional parser override. |
-| `player` | attribute | Unique source/position selector; explicit score input retains precedence. |
+| `player` | attribute | Unique source/position selector, used when `.playback` is undefined; explicit score input retains precedence. |
 | `type` / `.type` | attribute / writable property | `piano-roll`, `staff`, `waterfall`, `map` or `thumbnail`; unknown values use piano-roll. |
 | `width` / `height` | attributes | Bare numbers are px; CSS lengths pass through. Width defaults to 100%; height follows the drawing. Thumbnail uses 3rem plus any annotation strip. A fixed height makes a taller surface scroll within its box. |
 | `show-annotations` | attribute | All types; default true. `false` hides score directions and removes their reserved space. Absent, empty or `true` shows them. `.options.showAnnotations` takes precedence. |
@@ -300,14 +354,16 @@ Missing source data displays a waiting status. The three note views show an empt
 | `default-key` | attribute | Staff fallback major-key index, 0…11 by chromatic pitch class (0 = C, 1 = D♭, 2 = D); default 0. This is not a fifths count. |
 | `note-color` / `active-note-color` | attributes | Score-renderer idle/active colors; the Element’s active default is red `rgb(240, 84, 119)`. `note-color` also styles thumbnail. Map uses timeline tokens. |
 | `.score` | writable property | Assign a loaded Score; overrides `src` and player data, cancelling obsolete loads. |
+| `.playback` | writable property | Borrow a `ScorePlaybackSource` directly, ahead of `player`; `undefined` restores selector discovery. Never owns its playback resources. |
+| `.renderState` | read-only property | Immutable `ScoreViewRenderState`: `revision`, `generation`, `status`, `phase`, optional resolved `score`, and original failure `cause`. See presentation readiness above. |
 | `configure(configuration)` | method | Atomically select `piano-roll`, `staff` or `waterfall` and replace optional mode-specific `.options`. Invalid modes, malformed options and unsupported keys throw `TypeError` before changing the view. Map/thumbnail use `.type`, `.options` and their attributes. |
 | `.options` | writable property | `ScoreViewRenderOptions` override note-renderer attributes; map/thumbnail also honor `showAnnotations`, `noteRGB` and `noteColor`; see the [renderer API](/score/api/view/). |
 | `.currentTime` | read-only property | Current nominal score position in seconds. |
-| `.active` | read-only property | MIDI pitches at the current score position; empty for map and thumbnail. |
+| `.active` | read-only property | Written MIDI pitches at the current position, or active source notes when nominal time is unavailable; empty for map and thumbnail. |
 
 Type-specific attributes stay on the element when another type is selected and do not affect that other surface. Missing or invalid numeric values use their corresponding defaults.
 
-`ScoreViewElement`, `ScoreViewElementType`, `ScoreViewSeekDetail`, `ScoreViewRenderOptions`, `ScoreViewType`, `parseColorAttr` and `defineScoreViewElement(tag?)` are exported from `@webmusic/score/view/element`. `ScoreViewElementType` includes all five Element types; the lower-level `ScoreViewType` remains `piano-roll | staff | waterfall`. Registration is idempotent and SSR-safe.
+`ScoreViewElement`, `ScoreViewElementType`, `ScoreViewSeekDetail`, `ScoreViewRenderOptions`, `ScoreViewRenderState`, `ScoreViewType`, `parseColorAttr` and `defineScoreViewElement(tag?)` are exported from `@webmusic/score/view/element`. `ScoreViewElementType` includes all five Element types; the lower-level `ScoreViewType` remains `piano-roll | staff | waterfall`. Registration is idempotent and SSR-safe.
 
 `ScoreViewConfiguration` and `ScoreViewOptionsByType` describe the three full
 renderer modes and are exported from both `@webmusic/score/view` and
@@ -321,7 +377,7 @@ const configuredView = new ScoreViewElement();
 configuredView.configure({type: 'staff', options: {splitStaves: true, showAnnotations: false}});
 ```
 
-**Events.** Only map emits `webscore:seek`: `{quarters, seconds}`, bubbling and composed, with nominal seconds. Other types are passive displays.
+**Events.** Every mode emits `webscore:renderstatechange` with its immutable `ScoreViewRenderState` as detail. Only map emits `webscore:seek`: `{quarters, seconds}`, with nominal seconds. Both events bubble and are composed. Other types are passive displays.
 
 **Accessibility.** The map uses the shared [timeline interaction](/uikit/transport-time/timeline/). Other types provide labeled graphics and current-position highlighting where applicable; thumbnail adds no interactive controls. Native external Parameters configure the selected drawing.
 

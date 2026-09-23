@@ -38,8 +38,10 @@ const handle = mountParameterRack(host, {
 `group` string, preserves first-seen group order, and labels non-empty groups. A missing or empty
 group remains an unlabelled group. Duplicate normalized `id` values are rejected and reported.
 
-The presenter rebuilds its item DOM only when layout or structural item fields change: `id`,
-`label`, bounds, step, unit, group, or choices. Value and disabled changes repaint existing nodes.
+The presenter rebuilds its item DOM when identity, order, bounds, step, group membership or
+whether a group is named changes. A different choice count changes normalized bounds. Labels,
+units, choice text, group headings, values and disabled state patch existing nodes, preserving
+focus when translating caller-owned text without changing membership.
 `setValue()` paints optimistically, then re-reads the authoritative snapshot after the command
 settles. See the [shared presenter shape](/uikit/api/#the-shared-presenter-shape) for host
 ownership and lifecycle rules.
@@ -83,12 +85,14 @@ indices `0…options.length - 1` and forces `step: 1`.
 
 | Member | Kind | Default | Description |
 |---|---|---|---|
+| `getText` | `() => ParameterRackText` | — | Supplies one application-owned text snapshot per update. After external text changes, call `update()`. |
+| `formatters` | `UIValueFormatters` | — | The `number` callback formats built-in numeric readouts. Other fields are unused by this presenter. |
 | `layout` | `'flat' \| 'grouped'` | `'flat'` | Chooses per-item borders or named group containers. |
 | `emptyLabel` | `string` | `'No parameters'` | Placeholder text when `parameters` is empty. |
 | `formatValue` | `(parameter, value) => string` | Built-in choice/numeric formatter | Formats the visible readout and `aria-valuetext`; thrown errors are reported before the built-in fallback is used. |
 | `classNames` | `ParameterRackClassNames` | `{}` | Adds compatibility classes for all thirteen presenter node kinds. |
 | `parts` | `ParameterRackParts` | `{}` | Adds part tokens for all thirteen presenter node kinds. |
-| `onError` | `(error: unknown) => void` | — | Receives snapshot, duplicate-id, formatter, command, subscription, stabilization and cleanup failures. |
+| `onError` | `(error: unknown) => void` | — | Receives snapshot, duplicate-id, text/formatter, command, subscription, stabilization and cleanup failures. |
 | `stylesheet` | `boolean` | `true` | Installs the presenter's stylesheet unless explicitly `false`, for a light-DOM host that cannot inject CSS into its page. |
 
 **Handle**
@@ -101,6 +105,22 @@ indices `0…options.length - 1` and forces `step: 1`.
 | `emptyElement()` | `() => HTMLElement \| undefined` | Returns the placeholder only while the list is empty. |
 | `update()` | `() => void` | Re-reads and repaints the binding; re-entrant updates are bounded to 32 passes. |
 | `destroy()` | `() => void` | Idempotently removes item listeners, subscription, root and installed stylesheet. |
+
+**Text and formatting.** `getText()` supplies a `ParameterRackText` snapshot for each
+update; call `handle.update()` after changing external display settings. `number` formats built-in
+numeric readouts, and the `value` callback can combine the formatted number with a caller-supplied
+unit. Choice labels remain preformatted caller text. Explicit `formatValue` and `emptyLabel`
+options take precedence; a failing `formatValue` uses the built-in fallback with these callbacks.
+Inputs, numeric values and group label relationships survive text changes. See the
+[shared text hooks](/uikit/api/); the presenter owns no language state or subscription.
+
+| `ParameterRackText` field | Type | Default / callback values |
+|---|---|---|
+| `empty` | `string` | `No parameters` |
+| `value` | `UITextValue<{value: string; unit: string}>` | Formatted `value`, one space, then caller-supplied `unit`. Used only when a unit is present. |
+
+Fields are optional. Strings are literal final output; callbacks can call the application's
+translation library with the supplied values.
 
 **Accessibility.** Each knob contains a native `input[type="range"]` named by the item label and
 given formatted `aria-valuetext`. Native range keys provide the keyboard interaction. Named

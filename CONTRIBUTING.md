@@ -22,10 +22,10 @@ Read the owning package's [Score architecture](packages/score/ARCHITECTURE.md),
 
 ## Set up the repository
 
-Use Node.js 22.19.0 or later and npm with the committed lockfile. CI checks
-Node 22.19.0 and 24; the root [package.json](package.json) owns the command
-and engine definitions. Published packages declare their runtime requirements
-in their own manifests.
+Use Node.js 22.22.3+ on the 22.x line, 24.16.0+ on the 24.x line, or 26.3.0+,
+and npm with the committed lockfile. CI checks Node 22.22.3 and 24; the root
+[package.json](package.json) owns the command and engine definitions. Published
+packages declare their runtime requirements in their own manifests.
 
 ```sh
 git clone https://github.com/koperative-lab/WebMusic.git
@@ -62,6 +62,12 @@ and browser drivers own their visual and platform integration. Review
 [scripts/check-architecture.mjs](scripts/check-architecture.mjs), manifests and
 build mappings together when changing a public entry or dependency boundary.
 
+Keep external tools responsible for their own features. WebMusic exposes music
+behavior and composable presentation hooks; it does not implement translation
+engines, application state stores or form/layout frameworks. Prefer a minimal
+adapter or missing update/observation hook to a parallel subsystem. Supply final
+text and formatting callbacks from the application's existing tools.
+
 Run the affected workspace's tests and typecheck during development, for example
 `npm test -w @webmusic/score` and `npm run typecheck -w @webmusic/score`.
 Build dependencies first when consumers resolve their public entries from
@@ -76,6 +82,18 @@ reference checks, package builds, asset validation, documentation snippets,
 types, tests, licenses, built exports and release manifests. The command chain
 in [package.json](package.json) is authoritative. Add an Unreleased entry to
 [CHANGELOG.md](CHANGELOG.md) for changes users need to know about.
+
+ESLint 10's recommended rules remain enabled. The committed
+[eslint-suppressions.json](eslint-suppressions.json) records only existing
+unused-assignment and caught-error findings in retained release sources and
+two archived release scripts. `npm run lint` applies this per-file, per-rule
+count baseline; increased counts fail, and resolved findings require
+`npm run lint -- --prune-suppressions`. Counts do not identify exact lines, so
+review changes within a suppressed file even when its count stays the same.
+Editor integrations may still show these findings if they do not apply ESLint
+suppressions. Review runtime exceptions with the next source-baseline change,
+preserving MXL manifest cleanup and the renderer's ES2020 compatibility. Do
+not refresh fingerprints or grow suppressions solely to pass lint.
 
 Describe what changed, why, the commands and results, and any material behavior
 that remains unverified. Tests and static checks do not establish audible
@@ -109,9 +127,12 @@ npm run pages:build
 
 Snippet checks compile supported examples against built declarations; rebuild
 packages first when their source changed. They do not execute examples or prove
-complete API coverage. `docs:build` builds the normal production site;
-`pages:build` validates the `/WebMusic/` deployment base. Inspect the changed
-pages in a browser as well. Both commands produce local output without deploying.
+complete API coverage. `docs:build` builds the site with unreleased development
+context. `pages:build` validates the `/WebMusic/` deployment base and defaults
+to verified-release context. For unreleased source changes, run
+`WEBMUSIC_AGENT_CONTEXT=development npm run pages:build` to validate that base
+without claiming release compatibility. Inspect the changed pages in a browser
+as well. These commands produce local output without deploying.
 
 `docs:sync` updates local indexes only when `.dev/` already exists. It does not
 create a development directory in a public checkout. `check:dev-docs` always
@@ -131,6 +152,17 @@ run with the documentation workspace tests; output verification runs during
 each site build. When a released API changes, review and update the generator's
 release baseline deliberately, along with the skill's compatibility metadata.
 Package version numbers alone do not establish a matching release contract.
+The local development server and `docs:build` mark context as an unreleased
+snapshot with `release: null`; release Skill lookups reject it. The default
+Pages build still checks the retained release baseline. Development branch CI
+uses development context; main and pull requests targeting main keep release
+verification. Do not refresh the release fingerprint merely to make an
+unreleased build pass.
+The fingerprint checks runtime source and every parsed package manifest field
+except `devDependencies`, so development-tool updates do not require a new
+release baseline. Manifest formatting and top-level key order are normalized;
+nested order remains significant for conditional exports. Runtime dependencies,
+exports, scripts and all other metadata still require explicit baseline review.
 The skill's six read-only Node scripts use the generated manifest and catalog
 to retrieve documentation, selected source files and styling references.
 Keep catalog paths, content hashes and task selections synchronized in the
@@ -141,7 +173,7 @@ generator; do not maintain a separate component inventory in the skill.
 The [CI and Pages workflow](.github/workflows/ci.yml) runs on every branch push,
 pull request and manual dispatch. The quality matrix installs from the lockfile
 with `npm ci`, then runs `npm run check`, `npm run check:external-install` and
-`npm run audit:dependencies` on Node 22.19.0 and 24. A separate Node 24 job runs
+`npm run audit:dependencies` on Node 22.22.3 and 24. A separate Node 24 job runs
 `npm ci` and `npm run pages:build` to validate the production site, its
 `/WebMusic/` base and generated license notices.
 
@@ -220,7 +252,7 @@ and browser consumers. It requires network access; add `-- --keep` to retain its
 temporary consumer for diagnosis. It does not check already published registry
 artifacts or attest provenance. Review the CI result for the same commit
 separately. [The active workflow](.github/workflows/ci.yml) runs quality, external
-consumer and full dependency checks on Node 22.19.0 and 24, plus a Node 24 Pages
+consumer and full dependency checks on Node 22.22.3 and 24, plus a Node 24 Pages
 build. Successful eligible `main` runs deploy documentation as described in
 [CI and GitHub Pages](#ci-and-github-pages); npm publication remains manual.
 

@@ -142,8 +142,31 @@ to `onError`.
 Bindings are minimal by design and optional members change what renders: a
 timeline without `seek` hides its seek control, a mixer without `setMuted`
 renders no M/S row, a recorder without `togglePlayback` renders no play button.
-Only `TransportBinding` requires `subscribe`; every other first-release binding
-that exposes a subscription treats it as optional.
+Subscriptions are optional wherever exposed. Without one, call the retained
+handle's update method after external state changes. Transport requires only
+snapshot/play/pause; missing seek or time data does not produce a fake control.
+Meter accepts a level-only or spectrum-only reader for its selected mode.
+
+### External presentation inputs
+
+WebMusic consumes final text and formatting callbacks. Translation frameworks,
+language selection, resource loading, interpolation, plural rules and change
+subscriptions belong to the application and its existing tools.
+
+Text-producing presenters accept a typed `getText()` callback. It returns final
+strings or contextual render callbacks defined by that presenter's `*Text`
+interface. The applicable `formatters` callbacks receive raw numbers, fractional
+percentages and seconds. Existing explicit label/formatter options retain
+precedence. Strings are literal; WebMusic never interprets translation keys or
+substitutes tokens. The [presentation reference][docs-presentation] owns the
+shared boundary, while each presenter page lists its fields and refresh method.
+
+On an external change, the application calls `update()`, Meter `redraw()`, or
+the retained painter's documented method. Text refresh preserves existing
+controls and focus. WebMusic does not observe the application's translation
+system or maintain another copy of its state. Machine attributes, geometry,
+musical spelling, input units and caller-owned snapshot data retain their
+existing contracts. One-shot analysis output is rerendered by its owner.
 
 ### The handle owns nodes, never domain objects
 
@@ -452,7 +475,10 @@ They establish the behavior callers should account for, not a prioritized backlo
   subset suited to their input and rendering model. Notably transport has no
   command revisions, so an out-of-order settlement repaints unconditionally;
   stage and minimap do own their resize observers, subscriptions and animation
-  cleanup.
+  cleanup. Mixer, Macro (including MacroRack) and Recorder contain subscription
+  failures and finish releasing their owned resources even when a disposer or
+  error callback throws. A subscription returned after synchronous replacement
+  is released immediately; destroyed handles ignore pending command results.
 - **Optimistic isolation is an lfo guarantee, not a package guarantee.** In eq
   and parameter any update repaints every control from the authoritative
   snapshot, discarding a sibling's in-flight optimistic paint.
@@ -548,6 +574,7 @@ MIT
 
 [docs]: ../../apps/doc/webmusic/src/content/docs/uikit/index.mdx
 [docs-presenters]: ../../apps/doc/webmusic/src/content/docs/uikit/catalog.mdx
+[docs-presentation]: ../../apps/doc/webmusic/src/content/docs/uikit/api.mdx#external-presentation-inputs
 
 For source contributions and release verification, see the
 [contribution guide](https://github.com/koperative-lab/WebMusic/blob/main/CONTRIBUTING.md).

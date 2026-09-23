@@ -116,7 +116,8 @@ node scripts/get_docs.mjs components
 ```
 
 By default the scripts read the public WebMusic documentation site. For a local
-build, a preview deployment or a saved context snapshot, choose the source:
+release build, a release-compatible preview or a saved release snapshot, choose
+the source:
 
 ```sh
 node scripts/get_docs.mjs patterns --base-url http://localhost:4321/WebMusic/
@@ -133,6 +134,11 @@ The scripts check the context's package compatibility and content hashes.
 A missing reference, unsupported version or mixed snapshot produces an error
 instead of supplying mismatched content. Match your application's installed
 versions separately before using an example.
+
+Unreleased development context from `docs:dev` or `docs:build` is explicitly
+rejected, even when package manifests still declare `0.1.0`. Those previews
+describe repository changes and can be read manually; the release Skill uses
+verified release context for installed packages.
 
 ## Use the skill
 

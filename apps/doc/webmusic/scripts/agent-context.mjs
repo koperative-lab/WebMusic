@@ -165,7 +165,7 @@ export async function extractAgentMarkdown(source, {
   resolveLink = (value) => value, inputs = new Map(), catalogs,
 } = {}) {
   let tree;
-  try { tree = mdxToMdast(source); } catch (error) { throw new Error(`${filename}: cannot parse MDX: ${error.message}`); }
+  try { tree = mdxToMdast(source); } catch (error) { throw new Error(`${filename}: cannot parse MDX: ${error.message}`, {cause: error}); }
   const frontmatter = tree.children.find((node) => node.type === 'yaml');
   const metadata = frontmatter ? loadYaml(frontmatter.value, {json: true}) : {};
   if (!metadata || typeof metadata.title !== 'string') throw new Error(`${filename}: a string title is required`);
@@ -288,7 +288,16 @@ export async function extractAgentMarkdown(source, {
   return {title: metadata.title, description: metadata.description ?? '', body: `${body}\n`};
 }
 
-/** Check the retained release source fingerprint, not just package versions. */
+function manifestFingerprint(manifest) {
+  // Development tooling does not describe the consumer contract. Keep every
+  // other field, including scripts, dependencies and unknown future metadata.
+  // Only top-level keys are sorted: conditional exports depend on key order.
+  const contract = Object.fromEntries(Object.keys(manifest).filter((key) => key !== 'devDependencies')
+    .sort().map((key) => [key, manifest[key]]));
+  return digest(json(contract));
+}
+
+/** Check retained source and manifest contracts, not just package versions. */
 export async function verifyReleaseBaseline({root = defaultRoot, baseline = releaseBaseline} = {}) {
   if (baseline === releaseBaseline && JSON.stringify(baseline.packages.map(({directory}) => directory)) !== JSON.stringify(packageDirectories)) {
     throw new Error('Agent context release mapping must match the public package policy.');
@@ -299,7 +308,7 @@ export async function verifyReleaseBaseline({root = defaultRoot, baseline = rele
     const sourceFiles = await walkFiles(path.join(root, record.directory, 'src'));
     const source = [];
     for (const relative of sourceFiles) source.push([relative, digest(await readPublic(root, `${record.directory}/src/${relative}`))]);
-    if (parsed.name !== record.name || parsed.version !== record.version || digest(manifest) !== record.manifestSha256 || digest(json(source)) !== record.sourceSha256) {
+    if (parsed.name !== record.name || parsed.version !== record.version || manifestFingerprint(parsed) !== record.manifestSha256 || digest(json(source)) !== record.sourceSha256) {
       throw new Error(`Agent context release baseline mismatch for ${record.name}. Review source/API compatibility and update the verified release mapping before publishing context; unchanged package versions are insufficient.`);
     }
   }
@@ -321,9 +330,24 @@ export function patternSections(markdown, names, filename) {
   }).join('\n\n');
 }
 
-export async function generateAgentContext({root = defaultRoot, site = 'https://koperative-lab.github.io', base = '/'} = {}) {
+async function developmentSnapshot(root) {
+  const packages = [];
+  for (const directory of packageDirectories) {
+    const manifest = await readPublic(root, `${directory}/package.json`);
+    const {name, version} = JSON.parse(manifest);
+    const source = [];
+    for (const relative of await walkFiles(path.join(root, directory, 'src'))) {
+      source.push([relative, digest(await readPublic(root, `${directory}/src/${relative}`))]);
+    }
+    packages.push({name, version, directory, manifestSha256: digest(manifest), sourceSha256: digest(json(source))});
+  }
+  return {commit: null, revision: digest(json(packages)), packages};
+}
+
+export async function generateAgentContext({root = defaultRoot, site = 'https://koperative-lab.github.io', base = '/', mode = 'release'} = {}) {
+  if (mode !== 'release' && mode !== 'development') throw new Error(`Unknown agent context mode: ${mode}`);
   root = path.resolve(root);
-  const release = await verifyReleaseBaseline({root});
+  const release = mode === 'release' ? await verifyReleaseBaseline({root}) : await developmentSnapshot(root);
   const url = urls(site, base);
   const inputs = new Map();
   // Curated membership and extraction logic change the documentation product
@@ -351,9 +375,13 @@ export async function generateAgentContext({root = defaultRoot, site = 'https://
     const output = pageOutput(relative);
     const record = {title: page.title, description: page.description, source: filename, route: pageRoute(relative), canonical, output, url: url.absolute(output), package: owner, version: owner ? packageVersions[owner] : null};
     pages.push(record);
-    files.set(output, `# ${page.title}\n\n${page.description ? `> ${page.description}\n\n` : ''}Canonical documentation: ${canonical}\n\nRelease compatibility: ${Object.entries(owner ? {[owner]: packageVersions[owner]} : packageVersions).map(([name, version]) => `${name}@${version}`).join(', ')}. Source baseline: ${release.commit}.\n\n${page.body}`);
+    const provenance = mode === 'release'
+      ? `Release compatibility: ${Object.entries(owner ? {[owner]: packageVersions[owner]} : packageVersions).map(([name, version]) => `${name}@${version}`).join(', ')}. Source baseline: ${release.commit}.`
+      : `UNRELEASED DEVELOPMENT SNAPSHOT: ${release.revision}. These APIs describe this source checkout; declared package versions do not establish published compatibility.`;
+    files.set(output, `# ${page.title}\n\n${page.description ? `> ${page.description}\n\n` : ''}Canonical documentation: ${canonical}\n\n${provenance}\n\n${page.body}`);
   }
   const catalog = componentCatalog(pages, presenters.UI_PRESENTER_CATALOG, composition.UI_COMPOSITION_CATALOG);
+  if (mode === 'development') catalog.sourceScope = 'Selected owning implementation files in an unreleased development snapshot; imports and internal selectors are not public entry points.';
   for (const source of catalogSourcePaths(catalog)) {
     assertPublicRuntimeSource(source, release);
     files.set(sourceOutput(source), await readPublic(root, source, inputs));
@@ -365,7 +393,9 @@ export async function generateAgentContext({root = defaultRoot, site = 'https://
   files.set(licenseOutput, await readPublic(root, 'LICENSE', inputs));
   const inputsList = [...inputs].sort(([a], [b]) => compare(a, b)).map(([source, sha256]) => ({source, sha256}));
   const documentationRevision = digest(json(inputsList));
-  const compatibility = `This context covers ${Object.entries(packageVersions).map(([name, version]) => `${name}@${version}`).join(', ')}. Runtime sources and package manifests match release ${release.commit}; documentation revision ${documentationRevision}. Check installed exports and declarations before coding. This is the current verified release, not an archive of arbitrary versions.`;
+  const compatibility = mode === 'release'
+    ? `This context covers ${Object.entries(packageVersions).map(([name, version]) => `${name}@${version}`).join(', ')}. Runtime sources and package manifests match release ${release.commit}; documentation revision ${documentationRevision}. Check installed exports and declarations before coding. This is the current verified release, not an archive of arbitrary versions.`
+    : `UNRELEASED DEVELOPMENT SNAPSHOT: ${release.revision}; documentation revision ${documentationRevision}. This context describes the current source checkout. Declared manifest versions (${Object.entries(packageVersions).map(([name, version]) => `${name}@${version}`).join(', ')}) are not a compatibility claim for published packages. The release Skill refuses this preview; use the verified published context for installed releases.`;
   const selection = new Map();
   // Put orientation first, followed by task groups in a stable order.
   for (const page of [...pages].sort((a, b) => (functionalIndexGroup(a) === 'Start here and choose an integration' ? -1 : 0) - (functionalIndexGroup(b) === 'Start here and choose an integration' ? -1 : 0))) {
@@ -392,7 +422,9 @@ export async function generateAgentContext({root = defaultRoot, site = 'https://
     files.set(bundle.output, `# ${bundle.title}\n\n> ${bundle.description}\n\n${compatibility}\n\n[Documentation index](${url.absolute(contextFiles.index)})\n\n${body}\n`);
   }
   const manifest = {
-    schemaVersion: 1, release: {commit: release.commit, packages: packageVersions, verification: 'runtime-source-and-manifest-sha256'},
+    schemaVersion: 1, mode,
+    release: mode === 'release' ? {commit: release.commit, packages: packageVersions, verification: 'runtime-source-and-manifest-sha256'} : null,
+    ...(mode === 'development' ? {development: {revision: release.revision, packages: packageVersions, fingerprints: release.packages}} : {}),
     documentationRevision, site: new URL(site).origin, base: url.prefix,
     extraction: {interactiveDemos: 'canonical-page-link', staticCode: 'preserved', mdxExpressions: 'literal-only', catalogComponents: 'static-tables'},
     inputs: inputsList, pages, bundles, catalog: catalogOutput, license: catalog.license,
@@ -407,7 +439,7 @@ export async function verifyAgentContextOutput(directory, generated) {
   const {files, manifest} = generated;
   for (const page of manifest.pages) {
     const local = page.route.replace(/^\/+/, '');
-    await readFile(path.join(directory, local, 'index.html')).catch(() => { throw new Error(`Agent context canonical page has no built target: ${page.canonical}`); });
+    await readFile(path.join(directory, local, 'index.html')).catch((cause) => { throw new Error(`Agent context canonical page has no built target: ${page.canonical}`, {cause}); });
   }
   for (const [relative, expected] of files) {
     if (await readFile(path.join(directory, relative), 'utf8') !== expected) throw new Error(`Agent context output mismatch: ${relative}`);
@@ -421,7 +453,7 @@ export async function verifyAgentContextOutput(directory, generated) {
           if (!target.pathname.startsWith(manifest.base)) throw new Error(`${relative}: link escapes documentation base: ${address}`);
           const local = decodeURIComponent(target.pathname.slice(manifest.base.length));
           const filename = local.endsWith('/') || !path.extname(local) ? `${local.replace(/\/$/, '')}/index.html`.replace(/^\//, '') : local;
-          await readFile(path.join(directory, safeRelative(filename))).catch(() => { throw new Error(`${relative}: generated link has no built target: ${address}`); });
+          await readFile(path.join(directory, safeRelative(filename))).catch((cause) => { throw new Error(`${relative}: generated link has no built target: ${address}`, {cause}); });
         }
       }
       for (const child of node.children ?? []) await visit(child);
@@ -430,7 +462,8 @@ export async function verifyAgentContextOutput(directory, generated) {
   }
 }
 
-export function agentContext() {
+export function agentContext({mode = 'release'} = {}) {
+  if (mode !== 'release' && mode !== 'development') throw new Error(`Unknown agent context mode: ${mode}`);
   let root = defaultRoot;
   let site = 'https://koperative-lab.github.io';
   let base = '/';
@@ -453,7 +486,7 @@ export function agentContext() {
           const relative = pathname.startsWith(prefix) ? pathname.slice(prefix.length) : pathname.replace(/^\//, '');
           if (!Object.values(contextFiles).includes(relative) && !relative.startsWith('agent-context/')) return next();
           try {
-            const generated = await generateAgentContext({root, site, base});
+            const generated = await generateAgentContext({root, site, base, mode: 'development'});
             const contents = generated.files.get(relative);
             if (contents === undefined) return next();
             response.setHeader('Content-Type', relative.endsWith('.json') ? 'application/json; charset=utf-8' : 'text/plain; charset=utf-8');
@@ -464,13 +497,13 @@ export function agentContext() {
       },
       'astro:build:done': async ({dir, logger}) => {
         const directory = fileURLToPath(dir);
-        const generated = await generateAgentContext({root, site, base});
+        const generated = await generateAgentContext({root, site, base, mode});
         for (const [relative, contents] of generated.files) {
           await mkdir(path.dirname(path.join(directory, relative)), {recursive: true});
           await writeFile(path.join(directory, relative), contents);
         }
         await verifyAgentContextOutput(directory, generated);
-        logger.info(`Agent context verified ${generated.manifest.pages.length} public Markdown references, four llms files and the Skill catalog.`);
+        logger.info(`Agent context (${mode}) verified ${generated.manifest.pages.length} public Markdown references, four llms files and the catalog.`);
       },
     },
   };

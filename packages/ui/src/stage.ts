@@ -114,6 +114,8 @@ export interface SurfaceSliderHandle {
   element: HTMLElement;
   surface: HTMLElement;
   update(): void;
+  /** Update the accessible name without replacing the surface or moving focus. */
+  updateLabel(label?: string): void;
   destroy(): void;
 }
 
@@ -388,6 +390,7 @@ export function mountSurfaceSlider(
     if (!options.formatValue) return;
     try {
       const text = options.formatValue(state.value, state);
+      if (destroyed || !claim.isCurrent()) return;
       if (text === undefined) releaseAssigned('aria-valuetext');
       else assign('aria-valuetext', text);
     } catch (error) {
@@ -399,8 +402,10 @@ export function mountSurfaceSlider(
     if (destroyed) return;
     try {
       state = normalizeSurfaceSliderState(binding.snapshot());
+      if (destroyed || !claim.isCurrent()) return;
       applyState();
     } catch (error) {
+      if (destroyed || !claim.isCurrent()) return;
       state = {minimum: 0, maximum: 0, value: 0, disabled: true};
       applyState();
       report(error);
@@ -533,11 +538,18 @@ export function mountSurfaceSlider(
 
   let originalTouchAction = '';
   let ownsTabIndex = false;
+  const updateLabel = (label?: string): void => {
+    if (destroyed) return;
+    const text = label ?? options.label ?? 'Value';
+    if (destroyed || !claim.isCurrent()) return;
+    assign('aria-label', text);
+  };
 
   const handle: SurfaceSliderHandle = {
     element,
     surface,
     update,
+    updateLabel,
     destroy(): void {
       if (destroyed) return;
       destroyed = true;
@@ -578,8 +590,9 @@ export function mountSurfaceSlider(
     ownsTabIndex = true;
   }
   if (!element.hasAttribute('aria-label') && !element.hasAttribute('aria-labelledby')) {
-    assign('aria-label', options.label ?? 'Value');
+    updateLabel();
   }
+  if (destroyed || !claim.isCurrent()) return handle;
   assign('aria-orientation', orientation);
   originalTouchAction = surface.style.touchAction;
   surface.style.touchAction = 'none';
@@ -590,9 +603,12 @@ export function mountSurfaceSlider(
   element.addEventListener('keydown', onKeyDown);
 
   update();
+  if (destroyed || !claim.isCurrent()) return handle;
   if (binding.subscribe) {
     try {
-      unsubscribe = binding.subscribe(update);
+      const cleanup = binding.subscribe(update);
+      if (destroyed || !claim.isCurrent()) cleanup();
+      else unsubscribe = cleanup;
     } catch (error) {
       report(error);
     }

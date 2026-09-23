@@ -1,3 +1,4 @@
+import {formatNumber, readText, textValue, type UITextValue, type UIValueFormatters} from './text';
 import {
   harmonyValues,
   harmonyDensity,
@@ -14,7 +15,7 @@ import {
 } from './harmony-style';
 import {addClassNames, clamp, markEmptyState, setParts} from './internal/dom';
 import {resolveMotion, type MotionMode} from './internal/frame';
-import {claimHost, createErrorSink} from './internal/lifecycle';
+import {claimHost, createErrorSink, createUpdateLoop} from './internal/lifecycle';
 import {neutralColor} from './internal/palette';
 import {installStyle, paint} from './internal/style';
 import {componentSurfaceDeclarations, embeddedSurfaceDeclarations} from './internal/surface';
@@ -562,8 +563,9 @@ function ageOf(now: unknown, since: unknown, span: number): string | undefined {
 }
 
 /** The label a surface announces when the caller supplies none. */
-function describe(subject: string, names: readonly string[]): string {
-  return names.length > 0 ? `${subject}: ${names.join(', ')}` : subject;
+function describe(override: UITextValue<{names: string}> | undefined, subject: string, names: readonly string[], onError?: (error: unknown) => void): string {
+  const joined = names.join(', ');
+  return textValue(override, names.length > 0 ? `${subject}: ${joined}` : subject, {names: joined}, onError);
 }
 
 /**
@@ -712,7 +714,13 @@ export interface KeyboardParts {
   board?: string;
 }
 
+export interface KeyboardText {
+  description?: UITextValue<{names: string}>;
+}
+
 export interface KeyboardOptions {
+  /** Final text from application-owned presentation state; refreshed by update(). */
+  getText?: () => KeyboardText;
   /** Fit the complete normalized range to the available width, ignoring key widths and their CSS minimum. Defaults to false. */
   fitToWidth?: boolean;
   /** Exact white-key width in CSS px; absent/invalid retains responsive minimum sizing. Ignored by fitToWidth. */
@@ -846,6 +854,7 @@ export function mountKeyboard(
   let rulerSignature = '';
   let pendingReveal: readonly number[] = [];
   let destroyed = false;
+  let text: KeyboardText | undefined;
   let unsubscribe: (() => void) | undefined;
 
   const report = createErrorSink(options.onError);
@@ -993,10 +1002,13 @@ export function mountKeyboard(
     setHidden(node.mark, true);
   };
 
-  const update = (): void => {
+  const pass = (): void => {
     if (destroyed) return;
+    text = readText(options.getText, options.onError);
+    if (destroyed || !claim.isCurrent()) return;
     try {
       const state = binding.snapshot();
+      if (destroyed || !claim.isCurrent()) return;
       const low = clamp(state.low, MIDI_FLOOR, MIDI_CEILING, 48);
       const high = clamp(state.high, MIDI_FLOOR, MIDI_CEILING, 84);
       const lo = Math.round(Math.min(low, high));
@@ -1114,11 +1126,19 @@ export function mountKeyboard(
       sounding = next;
       if (attacked) beat.settle(promote);
       armSweep();
-      setLabel(root, options.label ?? describe('Sounding', names));
+      setLabel(root, options.label ?? describe(text?.description, 'Sounding', names, options.onError));
     } catch (error) {
       report(error);
     }
   };
+
+  const updates = createUpdateLoop({
+    name: 'Keyboard',
+    pass,
+    isCurrent: () => !destroyed && claim.isCurrent(),
+    report,
+  });
+  const update = updates.run;
 
   const paintLabel = (
     node: KeyNode,
@@ -1149,6 +1169,7 @@ export function mountKeyboard(
     destroy(): void {
       if (destroyed) return;
       destroyed = true;
+      updates.cancel();
       beat.cancel();
       scroll?.destroy();
       try {
@@ -1188,7 +1209,7 @@ export function mountKeyboard(
   if (binding.subscribe) {
     try {
       const stop = binding.subscribe(update);
-      if (destroyed) stop();
+      if (destroyed || !claim.isCurrent()) stop();
       else unsubscribe = stop;
     } catch (error) {
       report(error);
@@ -1262,7 +1283,13 @@ export interface StaffParts {
   svg?: string;
 }
 
+export interface StaffText {
+  description?: UITextValue<{names: string}>;
+}
+
 export interface StaffOptions {
+  /** Final text from application-owned presentation state; refreshed by update(). */
+  getText?: () => StaffText;
   /** Outer surface, or no frame/background when a containing presenter owns it. Defaults to 'default'. */
   surface?: 'default' | 'none';
   label?: string;
@@ -1391,6 +1418,7 @@ export function mountStaff(
   let systemSignature = '';
   let held = new Set<string>();
   let destroyed = false;
+  let text: StaffText | undefined;
   let unsubscribe: (() => void) | undefined;
   let resizeObserver: ResizeObserver | undefined;
   let viewportUnits = 0;
@@ -1591,10 +1619,13 @@ export function mountStaff(
     return {root: node, head, shape: ''};
   };
 
-  const update = (): void => {
+  const pass = (): void => {
     if (destroyed) return;
+    text = readText(options.getText, options.onError);
+    if (destroyed || !claim.isCurrent()) return;
     try {
       const state = binding.snapshot();
+      if (destroyed || !claim.isCurrent()) return;
       const name = state.system ?? 'grand';
       const marks = (state.marks ?? []).filter((mark) => {
         if (typeof mark?.diatonic === 'number' && Number.isFinite(mark.diatonic)) return true;
@@ -1776,14 +1807,22 @@ export function mountStaff(
         root,
         options.label ??
           describe(
-            'Staff',
-            marks.map((mark) => mark.label).filter((label): label is string => Boolean(label)),
+            text?.description, 'Staff',
+            marks.map((mark) => mark.label).filter((label): label is string => Boolean(label)), options.onError,
           ),
       );
     } catch (error) {
       report(error);
     }
   };
+
+  const updates = createUpdateLoop({
+    name: 'Staff',
+    pass,
+    isCurrent: () => !destroyed && claim.isCurrent(),
+    report,
+  });
+  const update = updates.run;
 
   const handle: StaffHandle = {
     element: root,
@@ -1795,6 +1834,7 @@ export function mountStaff(
     destroy(): void {
       if (destroyed) return;
       destroyed = true;
+      updates.cancel();
       beat.cancel();
       resizeObserver?.disconnect();
       resizeObserver = undefined;
@@ -1851,7 +1891,7 @@ export function mountStaff(
   if (binding.subscribe) {
     try {
       const stop = binding.subscribe(update);
-      if (destroyed) stop();
+      if (destroyed || !claim.isCurrent()) stop();
       else unsubscribe = stop;
     } catch (error) {
       report(error);
@@ -1935,7 +1975,15 @@ export interface FretboardParts {
   svg?: string;
 }
 
+export interface FretboardText {
+  description?: UITextValue<{names: string}>;
+  fret?: UITextValue<{value: string; fret: number}>;
+}
+
 export interface FretboardOptions {
+  /** Final text from application-owned presentation state; refreshed by update(). */
+  getText?: () => FretboardText;
+  formatters?: UIValueFormatters;
   /** Exact adjacent-fret spacing in CSS px; absent/invalid retains responsive spacing. */
   fretWidth?: number;
   /** Exact adjacent-string spacing in CSS px; absent/invalid retains density geometry. */
@@ -2095,6 +2143,7 @@ export function mountFretboard(
   let verticalFrame = false;
   let resizeObserver: ResizeObserver | undefined;
   let destroyed = false;
+  let text: FretboardText | undefined;
   let unsubscribe: (() => void) | undefined;
 
   const report = createErrorSink(options.onError);
@@ -2246,10 +2295,13 @@ export function mountFretboard(
     }
   };
 
-  const update = (): void => {
+  const pass = (): void => {
     if (destroyed) return;
+    text = readText(options.getText, options.onError);
+    if (destroyed || !claim.isCurrent()) return;
     try {
       const state = binding.snapshot();
+      if (destroyed || !claim.isCurrent()) return;
       const vertical = state.orientation === 'vertical';
       const strings = Math.max(1, Math.min(MAX_STRINGS, whole(state.strings, DEFAULT_STRINGS)));
       const fretCount = Math.max(
@@ -2496,10 +2548,13 @@ export function mountFretboard(
         number.setAttribute('class', 'wui-pitch-fretboard__fret-number');
         // `5fr`, the way a chord book writes it, and not a bare `5` that reads
         // as a fingering or a string number beside two of each.
-        number.textContent = window_ > 0 ? `${window_}fr` : '';
+        number.textContent = window_ > 0 ? textValue(text?.fret, `${formatNumber(options.formatters, window_, undefined, options.onError)}fr`, {value: formatNumber(options.formatters, window_, undefined, options.onError), fret: window_}, options.onError) : '';
         items.push(number);
         gutter.replaceChildren(...items);
       }
+
+      const fretLabel = gutter.querySelector('.wui-pitch-fretboard__fret-number');
+      if (fretLabel) setText(fretLabel, window_ > 0 ? textValue(text?.fret, `${formatNumber(options.formatters, window_, undefined, options.onError)}fr`, {value: formatNumber(options.formatters, window_, undefined, options.onError), fret: window_}, options.onError) : '');
 
       // The frame follows what the neck actually SPANS after the slide, so the
       // board fills its box at every window. A frame sized for the widest case
@@ -2557,16 +2612,24 @@ export function mountFretboard(
         root,
         options.label ??
           describe(
-            'Fretboard',
+            text?.description, 'Fretboard',
             drawn
               .map((mark) => mark.label ?? state.stringLabels?.[Math.round(mark.stringIndex)])
-              .filter((label): label is string => Boolean(label)),
+              .filter((label): label is string => Boolean(label)), options.onError,
           ),
       );
     } catch (error) {
       report(error);
     }
   };
+
+  const updates = createUpdateLoop({
+    name: 'Fretboard',
+    pass,
+    isCurrent: () => !destroyed && claim.isCurrent(),
+    report,
+  });
+  const update = updates.run;
 
   const handle: FretboardHandle = {
     element: root,
@@ -2578,6 +2641,7 @@ export function mountFretboard(
     destroy(): void {
       if (destroyed) return;
       destroyed = true;
+      updates.cancel();
       beat.cancel();
       scroll.destroy();
       resizeObserver?.disconnect();
@@ -2627,7 +2691,7 @@ export function mountFretboard(
   if (binding.subscribe) {
     try {
       const stop = binding.subscribe(update);
-      if (destroyed) stop();
+      if (destroyed || !claim.isCurrent()) stop();
       else unsubscribe = stop;
     } catch (error) {
       report(error);

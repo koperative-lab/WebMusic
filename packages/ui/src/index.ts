@@ -19,3 +19,4 @@ export * from "./timeline";
 export * from "./track-list";
 export * from "./transport";
 export * from "./workbench";
+export type {UITextValue, UIValueFormatters} from './text';

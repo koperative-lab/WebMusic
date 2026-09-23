@@ -39,6 +39,26 @@ export function createErrorSink(
   };
 }
 
+/** Run every release before reporting the first failure, even if the sink throws. */
+export function runCleanups(
+  cleanups: Iterable<(() => void) | undefined>,
+  onError?: (error: unknown) => void,
+): void {
+  let failed = false;
+  let firstError: unknown;
+  for (const cleanup of cleanups) {
+    try {
+      cleanup?.();
+    } catch (error) {
+      if (!failed) {
+        failed = true;
+        firstError = error;
+      }
+    }
+  }
+  if (failed) createErrorSink(onError)(firstError);
+}
+
 export interface UpdateLoopOptions {
   /**
    * Presenter name for the "did not stabilize" message, e.g. `'Equalizer'`.

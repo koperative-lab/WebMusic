@@ -1,3 +1,4 @@
+import {readText, textValue, type UITextValue} from './text';
 import {installStyle} from './internal/style';
 import {claimHost, createErrorSink, createUpdateLoop} from './internal/lifecycle';
 import {componentSurfaceCss, controlBorderFallback} from './internal/surface';
@@ -60,7 +61,17 @@ export interface NoteSurfaceBinding {
   subscribe?(notify: () => void): () => void;
 }
 
+export interface NoteSurfaceText {
+  hint?: UITextValue;
+  hintMapped?: UITextValue;
+  start?: UITextValue;
+  keyboard?: UITextValue;
+  grid?: UITextValue;
+}
+
 export interface NoteSurfaceOptions {
+  /** Read application-resolved text once per paint; call update() after external changes. */
+  getText?: () => NoteSurfaceText;
   onError?: (error: unknown) => void;
   /** Install the exported stylesheet into the host. Defaults to true. */
   stylesheet?: boolean;
@@ -168,9 +179,9 @@ function paintActiveMidis(root: HTMLElement, midis: readonly number[] | undefine
 function structureKey(state: NoteSurfaceState): string {
   return JSON.stringify([
     state.layout, Boolean(state.keyboard), state.mapOnly === true,
-    state.layout === 'piano' ? (state.piano ?? []).map(({midi, black, left, width, label}) => [midi, Boolean(black), left, width, label]) : undefined,
-    state.layout === 'grid' ? [state.gridColumns ?? 7, (state.grid ?? []).map(({midi, code, ref}) => [midi, code, ref])] : undefined,
-    state.layout === 'chords' ? (state.chords ?? []).map(({index, label, midis}) => [index, label, [...(midis ?? [])]]) : undefined,
+    state.layout === 'piano' ? (state.piano ?? []).map(({midi, black, left, width}) => [midi, Boolean(black), left, width]) : undefined,
+    state.layout === 'grid' ? [state.gridColumns ?? 7, (state.grid ?? []).map(({midi, code}) => [midi, code])] : undefined,
+    state.layout === 'chords' ? (state.chords ?? []).map(({index, midis}) => [index, [...(midis ?? [])]]) : undefined,
   ]);
 }
 
@@ -681,6 +692,48 @@ export function mountNoteSurface(
     : undefined;
   const isCurrent = (): boolean => !destroyed && claim.isCurrent();
   const paint = (state: NoteSurfaceState): void => {
+    const text = readText(options.getText, options.onError);
+    if (!isCurrent()) return;
+    const hint = root.querySelector<HTMLElement>('.wui-note__hint');
+    if (hint) hint.textContent = state.layout === 'grid' && state.mapOnly
+      ? textValue(text?.hintMapped, 'Type to play · Esc stop', {}, options.onError)
+      : textValue(text?.hint, 'Type to play · Z / X octave · Esc stop', {}, options.onError);
+    const start = root.querySelector<HTMLElement>('.wui-note__start');
+    if (start) start.textContent = textValue(text?.start, '▸ Click to start', {}, options.onError);
+    const viewport = root.querySelector<HTMLElement>('.wui-note__viewport');
+    if (viewport) viewport.setAttribute('aria-label', state.layout === 'piano'
+      ? textValue(text?.keyboard, 'Note keyboard', {}, options.onError)
+      : textValue(text?.grid, 'Note grid', {}, options.onError));
+    // Names are presentation data. Updating them must not release a held note
+    // or replace a focused chord button whose musical identity did not change.
+    root.querySelectorAll<HTMLElement>('.wui-note__key').forEach((node, index) => {
+      const text = state.piano?.[index]?.label ?? '';
+      let label = node.querySelector<HTMLElement>('.wui-note__key-label');
+      if (!label && text) {
+        label = document.createElement('span');
+        label.className = 'wui-note__key-label keylab';
+        node.append(label);
+      }
+      if (label) { label.textContent = text; label.hidden = !text; }
+      if (text) node.title = text;
+      else node.removeAttribute('title');
+    });
+    root.querySelectorAll<HTMLElement>('.wui-note__cell').forEach((node, index) => {
+      const text = state.grid?.[index]?.ref ?? '';
+      let label = node.querySelector<HTMLElement>('.wui-note__reference');
+      if (!label && text) {
+        label = document.createElement('span');
+        label.className = 'wui-note__reference ref';
+        node.append(label);
+      }
+      if (label) { label.textContent = text; label.hidden = !text; }
+      if (text) node.dataset.ref = text;
+      else delete node.dataset.ref;
+    });
+    root.querySelectorAll<HTMLElement>('.wui-note__chord').forEach((node, index) => {
+      const label = node.firstElementChild;
+      if (label) label.textContent = state.chords?.[index]?.label ?? '';
+    });
     const octave = root.querySelector<HTMLElement>('.wui-note__octave');
     if (octave) octave.textContent = state.octaveLabel ?? '';
     if (interactions) interactions.paint(state);

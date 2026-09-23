@@ -24,9 +24,33 @@ const write = async (directory, relative, contents) => {
   await mkdir(path.dirname(path.join(directory, relative)), {recursive: true});
   await writeFile(path.join(directory, relative), contents);
 };
+const releaseFixture = async () => {
+  const directory = await temp();
+  // Explicit expected contract in canonical top-level order. No production
+  // fingerprint helper is used to construct the expected hash.
+  const manifest = {
+    dependencies: {parser: '^1.0.0'},
+    exports: {'.': {import: './dist/index.js', default: './dist/index.cjs'}},
+    name: '@webmusic/test',
+    version: '0.1.0',
+  };
+  const source = 'export const value = 1;\n';
+  await write(directory, 'package/package.json', json(manifest));
+  await write(directory, 'package/src/index.ts', source);
+  const baseline = {packages: [{name: manifest.name, version: manifest.version, directory: 'package', manifestSha256: digest(json(manifest)), sourceSha256: digest(json([['index.ts', digest(source)]]))}]};
+  return {directory, manifest, baseline};
+};
 afterEach(async () => { await Promise.all(temporary.splice(0).map((directory) => rm(directory, {recursive: true, force: true}))); });
 
 describe('agent context MDX extraction', () => {
+  it('retains the parser cause behind a filename-qualified MDX error', async () => {
+    const failure = await extractAgentMarkdown(document('<Unclosed'), {filename: 'broken.mdx'}).catch((error) => error);
+    expect(failure).toBeInstanceOf(Error);
+    expect(failure.name).toBe('Error');
+    expect(failure.cause).toBeInstanceOf(Error);
+    expect(failure.message).toBe(`broken.mdx: cannot parse MDX: ${failure.cause.message}`);
+  });
+
   it('preserves Unicode prose, tables, literal examples and URLs inside code', async () => {
     const markdown = 'é — 😀\n\n| Units | Default |\n| --- | --- |\n| seconds | `0` |\n\n```ts\nconst path = "/asset.wav";\n```\n\n[Reference](/score/api/)';
     const result = await extractAgentMarkdown(document(markdown), {resolveLink: (url) => `https://example.test/WebMusic${url}`});
@@ -103,21 +127,44 @@ describe('agent context release and output contracts', () => {
   });
 
   it('fails when runtime code changes without a package version change', async () => {
-    const directory = await temp();
-    const manifest = json({name: '@webmusic/test', version: '0.1.0'});
-    const source = 'export const value = 1;\n';
-    await write(directory, 'package/package.json', manifest);
-    await write(directory, 'package/src/index.ts', source);
-    const baseline = {packages: [{name: '@webmusic/test', version: '0.1.0', directory: 'package', manifestSha256: digest(manifest), sourceSha256: digest(json([['index.ts', digest(source)]]))}]};
+    const {directory, baseline} = await releaseFixture();
     await expect(verifyReleaseBaseline({root: directory, baseline})).resolves.toEqual(baseline);
     await write(directory, 'package/src/index.ts', 'export const value = 2;\n');
     await expect(verifyReleaseBaseline({root: directory, baseline})).rejects.toThrow(/unchanged package versions are insufficient/);
   });
 
+  it('allows development dependency changes, formatting and top-level key ordering only', async () => {
+    const {directory, manifest, baseline} = await releaseFixture();
+    for (const devDependencies of [{vitest: '^4.1.11'}, {vitest: '^5.0.0', typescript: '^5.9.3'}, {}]) {
+      const reordered = {version: manifest.version, name: manifest.name, devDependencies, exports: manifest.exports, dependencies: manifest.dependencies};
+      await write(directory, 'package/package.json', JSON.stringify(reordered));
+      await expect(verifyReleaseBaseline({root: directory, baseline})).resolves.toEqual(baseline);
+    }
+    await write(directory, 'package/package.json', json(manifest));
+    await expect(verifyReleaseBaseline({root: directory, baseline})).resolves.toEqual(baseline);
+  });
+
+  it.each([
+    ['runtime dependencies', {dependencies: {parser: '^2.0.0'}}],
+    ['optional dependencies', {optionalDependencies: {engine: '^1.0.0'}}],
+    ['peer dependencies', {peerDependencies: {react: '^19.0.0'}}],
+    ['export targets', {exports: {'.': {import: './dist/other.js', default: './dist/index.cjs'}}}],
+    ['conditional export ordering', {exports: {'.': {default: './dist/index.cjs', import: './dist/index.js'}}}],
+    ['package version', {version: '0.2.0'}],
+    ['package name', {name: '@webmusic/renamed'}],
+    ['package scripts', {scripts: {build: 'tsup'}}],
+    ['unknown manifest fields', {futureContract: {enabled: true}}],
+  ])('rejects changed %s even alongside a development dependency update', async (_label, changes) => {
+    const {directory, manifest, baseline} = await releaseFixture();
+    await expect(verifyReleaseBaseline({root: directory, baseline})).resolves.toEqual(baseline);
+    await write(directory, 'package/package.json', json({...manifest, ...changes, devDependencies: {vitest: '^5.0.0'}}));
+    await expect(verifyReleaseBaseline({root: directory, baseline})).rejects.toThrow(/release baseline mismatch/);
+  });
+
   it('generates deterministic references for root and Pages deployments', async () => {
-    const plain = await generateAgentContext({root, site: 'https://docs.example.test', base: '/'});
-    const repeated = await generateAgentContext({root, site: 'https://docs.example.test', base: '/'});
-    const pages = await generateAgentContext({root, site: 'https://docs.example.test', base: '/WebMusic/'});
+    const plain = await generateAgentContext({mode: 'development', root, site: 'https://docs.example.test', base: '/'});
+    const repeated = await generateAgentContext({mode: 'development', root, site: 'https://docs.example.test', base: '/'});
+    const pages = await generateAgentContext({mode: 'development', root, site: 'https://docs.example.test', base: '/WebMusic/'});
     expect([...plain.files]).toEqual([...repeated.files]);
     expect(pages.files.get('llms.txt')).toContain('https://docs.example.test/WebMusic/agent-context/quick-start.md');
     expect(plain.files.get('llms.txt')).toContain('https://docs.example.test/agent-context/quick-start.md');
@@ -125,7 +172,11 @@ describe('agent context release and output contracts', () => {
     expect(pages.files.get('agent-context/uikit/catalog.md')).toContain('| Presenter | Group | Purpose |');
     expect(pages.files.get('agent-context/uikit/catalog.md')).toContain('@webmusic/ui/transport');
     expect(pages.files.get('agent-context/score/api/play.md')).toContain('renderScoreToBuffer');
-    expect(pages.manifest.release.packages).toEqual({'@webmusic/kernel': '0.1.0', '@webmusic/ui': '0.1.0', '@webmusic/score': '0.1.0'});
+    expect(pages.manifest.development.packages).toEqual({'@webmusic/kernel': '0.1.0', '@webmusic/ui': '0.1.0', '@webmusic/score': '0.1.0'});
+    expect(pages.manifest.release).toBeNull();
+    expect(pages.manifest.mode).toBe('development');
+    expect(pages.files.get('llms.txt')).toContain('UNRELEASED DEVELOPMENT SNAPSHOT');
+    expect(pages.files.get('agent-context/score/api/react.md')).not.toContain('Release compatibility:');
     expect(pages.manifest.inputs.every((input) => !input.source.includes('.dev/') && !input.source.endsWith('/AGENTS.md'))).toBe(true);
     expect([...await declaredAgentContextPaths({root})].sort()).toEqual([...pages.files.keys()].map((name) => `/${name}`).sort());
   });
@@ -147,16 +198,20 @@ describe('agent context release and output contracts', () => {
       await mkdir(path.dirname(path.join(directory, source)), {recursive: true});
       await cp(path.join(root, source), path.join(directory, source), {recursive: true});
     }
-    const generated = await generateAgentContext({root: directory});
+    const generated = await generateAgentContext({mode: 'development', root: directory});
     expect(generated.files.get('agent-context/quick-start.md')).toContain('mountQuickStartStatus');
     expect(generated.files.has('llms.txt')).toBe(true);
     expect(generated.manifest.inputs.some((input) => input.source.startsWith('.'))).toBe(false);
+    await write(directory, 'platform/kernel/src/development-preview-test.ts', 'export const preview = true;\n');
+    const updated = await generateAgentContext({root: directory, mode: 'development'});
+    expect(updated.manifest.development.revision).not.toBe(generated.manifest.development.revision);
+    await expect(generateAgentContext({root: directory})).rejects.toThrow(/release baseline mismatch/);
     await write(directory, 'apps/doc/webmusic/scripts/agent-context-catalog.mjs', '// A reviewed recipe selection change.\n');
-    expect((await generateAgentContext({root: directory})).manifest.documentationRevision).not.toBe(generated.manifest.documentationRevision);
+    expect((await generateAgentContext({mode: 'development', root: directory})).manifest.documentationRevision).not.toBe(generated.manifest.documentationRevision);
   });
 
   it('separates task discovery, complete references, components and focused patterns', async () => {
-    const {files, manifest} = await generateAgentContext({root});
+    const {files, manifest} = await generateAgentContext({mode: 'development', root});
     const full = files.get('llms-full.txt');
     const patterns = files.get('llms-patterns.txt');
     const bundles = Object.fromEntries(manifest.bundles.map((bundle) => [bundle.id, bundle]));
@@ -168,6 +223,8 @@ describe('agent context release and output contracts', () => {
     expect(bundles.patterns.sections.find(({title}) => title === 'Style a custom music interface').headings).toContain('Theme with CSS custom properties');
     expect(patterns).toContain('<score-view player="#shared-player">');
     expect(patterns).toContain('## Customize With Hooks');
+    expect(patterns).toContain('<StaffView playback={playback} />');
+    expect(patterns).toContain('## Render readiness and failures');
     expect(patterns).toContain('## Parse in a Worker');
     expect(patterns).not.toContain('## API Reference — @webmusic/score/io');
     expect(patterns).not.toContain('| `.resolvedScore`');
@@ -184,7 +241,7 @@ describe('agent context release and output contracts', () => {
   });
 
   it('links stable component IDs to verified owning sources and contracts', async () => {
-    const {files, manifest} = await generateAgentContext({root});
+    const {files, manifest} = await generateAgentContext({mode: 'development', root});
     const catalog = JSON.parse(files.get(manifest.catalog));
     expect(catalog.license).toEqual({id: 'MIT', output: 'agent-context/LICENSE.txt'});
     expect(files.get(catalog.license.output)).toBe(await readFile(path.join(root, 'LICENSE'), 'utf8'));
@@ -206,7 +263,11 @@ describe('agent context release and output contracts', () => {
     const files = new Map([['llms.txt', '[Score](https://docs.example.test/WebMusic/score/)\n']]);
     const generated = {files, manifest: {site: 'https://docs.example.test', base: '/WebMusic/', pages: []}};
     await write(directory, 'llms.txt', files.get('llms.txt'));
-    await expect(verifyAgentContextOutput(directory, generated)).rejects.toThrow(/no built target/);
+    await expect(verifyAgentContextOutput(directory, generated)).rejects.toMatchObject({
+      name: 'Error',
+      message: 'llms.txt: generated link has no built target: https://docs.example.test/WebMusic/score/',
+      cause: {code: 'ENOENT', path: path.join(directory, 'score/index.html')},
+    });
     await write(directory, 'score/index.html', '<h1>Score</h1>');
     await expect(verifyAgentContextOutput(directory, generated)).resolves.toBeUndefined();
     files.set('llms.txt', '<a href="https://docs.example.test/WebMusic/missing/">Missing</a>\n');
@@ -217,6 +278,16 @@ describe('agent context release and output contracts', () => {
     await expect(verifyAgentContextOutput(directory, generated)).rejects.toThrow(/escapes documentation base/);
     await write(directory, 'llms.txt', 'stale');
     await expect(verifyAgentContextOutput(directory, generated)).rejects.toThrow(/output mismatch/);
+  });
+
+  it('retains the missing-file cause when a canonical page was not built', async () => {
+    const directory = await temp();
+    const generated = {files: new Map(), manifest: {pages: [{route: '/score/', canonical: 'https://docs.example.test/score/'}]}};
+    await expect(verifyAgentContextOutput(directory, generated)).rejects.toMatchObject({
+      name: 'Error',
+      message: 'Agent context canonical page has no built target: https://docs.example.test/score/',
+      cause: {code: 'ENOENT', path: path.join(directory, 'score/index.html')},
+    });
   });
 
   it('serves generated files in development with the configured base and no stale cache', async () => {

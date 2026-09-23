@@ -1,8 +1,9 @@
-import {claimHost} from "./internal/lifecycle";
+import {claimHost, createErrorSink, createUpdateLoop, runCleanups} from "./internal/lifecycle";
 import {installStyle} from "./internal/style";
 import {markEmptyState, addClassNames, clamp01, finite, setParts} from "./internal/dom";
 import {componentSurfaceCss} from "./internal/surface";
 import {mountParameterRack, type ParameterRackHandle} from "./parameter";
+import {formatNumber, formatPercent, readText, textValue, type UITextValue, type UIValueFormatters} from './text';
 
 export interface MacroTargetState { label: string; value: number; unit?: string; }
 export interface MacroState { label: string; value: number; targets: readonly MacroTargetState[]; disabled?: boolean; }
@@ -11,7 +12,16 @@ export interface MacroBinding {
   setValue(value: number): Promise<void> | void;
   subscribe?(notify: () => void): () => void;
 }
+export interface MacroText {
+  label?: string;
+  empty?: string;
+  targetValue?: UITextValue<{value: string; unit: string}>;
+}
+
 export interface MacroOptions {
+  /** Read application-provided text on each update. */
+  getText?: () => MacroText;
+  formatters?: UIValueFormatters;
   onError?: (error: unknown) => void;
   /** Install the exported stylesheet into the host. Defaults to true. */
   stylesheet?: boolean;
@@ -69,9 +79,9 @@ display:flex; flex-direction:column; gap:var(--wm-macro-rack-gap,.55rem); min-wi
 .wui-macro-rack__item > .wui-macro { box-sizing:border-box; padding:0; border:0; border-radius:0; background:transparent; }
 `;
 
-function format(value: number, unit?: string): string {
+function defaultNumber(value: number): string {
   const text = Math.abs(value) >= 100 ? String(Math.round(value)) : value.toFixed(Math.abs(value) >= 10 ? 1 : 2);
-  return `${text}${unit ?? ""}`;
+  return text;
 }
 
 export function mountMacro(host: MacroHost, binding: MacroBinding, options: MacroOptions = {}): MacroHandle {
@@ -90,11 +100,13 @@ export function mountMacro(host: MacroHost, binding: MacroBinding, options: Macr
   let destroyed = false;
   let state: MacroState = {label: "MACRO", value: 0, targets: []};
   let unsubscribe: (() => void) | undefined;
+  let texts: MacroText | undefined;
+  const report = createErrorSink(options.onError);
 
   const read = (): MacroState => {
     const next = binding.snapshot();
     return {
-      label: String(next.label ?? "MACRO"),
+      label: String(next.label ?? textValue(texts?.label, 'MACRO', {}, options.onError)),
       value: clamp01(next.value),
       targets: (next.targets ?? []).map((target) => ({label: String(target.label), value: finite(target.value), unit: target.unit})),
       disabled: next.disabled === true,
@@ -110,7 +122,8 @@ export function mountMacro(host: MacroHost, binding: MacroBinding, options: Macr
       const value = document.createElement("span");
       value.className = "wui-macro__target-value dv";
       value.dataset.i = String(index);
-      value.textContent = format(target.value, target.unit);
+      const values = {value: formatNumber(options.formatters, target.value, defaultNumber(target.value), options.onError), unit: target.unit ?? ''};
+      value.textContent = textValue(texts?.targetValue, `${values.value}${values.unit}`, values, options.onError);
       row.append(label, value);
       return row;
     }) : [emptyTargets()]));
@@ -118,18 +131,29 @@ export function mountMacro(host: MacroHost, binding: MacroBinding, options: Macr
   function emptyTargets(): HTMLElement {
     const node = document.createElement("div");
     node.className = "wui-macro__empty empty";
-    node.textContent = "Assign .targets";
+    node.textContent = textValue(texts?.empty, 'Assign .targets', {}, options.onError);
     markEmptyState(node);
     return node;
   }
-  const update = (): void => {
+  const paintSnapshot = (): void => {
     if (destroyed) return;
     try {
-      state = read();
+      texts = readText(options.getText, options.onError);
+      if (destroyed || !claim.isCurrent()) return;
+      const next = read();
+      if (destroyed || !claim.isCurrent()) return;
+      state = next;
       parameter?.update();
+      if (destroyed || !claim.isCurrent()) return;
       renderTargets();
-    } catch (error) { options.onError?.(error); }
+    } catch (error) { report(error); }
   };
+  const updateLoop = createUpdateLoop({
+    name: 'Macro', pass: paintSnapshot,
+    isCurrent: () => !destroyed && claim.isCurrent(), report,
+  });
+  const update = (): void => updateLoop.run();
+
   // Declared before the handle, because claiming the host makes destroy() and
   // update() reachable from the previous mount's cleanup — while a `const`
   // declared further down is still in its temporal dead zone, and `?.` does not
@@ -141,11 +165,19 @@ export function mountMacro(host: MacroHost, binding: MacroBinding, options: Macr
     destroy() {
       if (destroyed) return;
       destroyed = true;
-      unsubscribe?.();
-      parameter?.destroy();
-      claim.release();
-      root.remove();
-      style?.remove();
+      updateLoop.cancel();
+      const stop = unsubscribe;
+      unsubscribe = undefined;
+
+      const child = parameter;
+      parameter = undefined;
+      runCleanups([
+        stop,
+        () => child?.destroy(),
+        () => claim.release(),
+        () => root.remove(),
+        () => style?.remove(),
+      ], report);
     },
   };
   // Claim the host before destroying the previous mount: its cleanup may mount
@@ -162,19 +194,35 @@ export function mountMacro(host: MacroHost, binding: MacroBinding, options: Macr
     style?.remove();
     return handle;
   }
-  state = read();
-  parameter = mountParameterRack(control, {
+  update();
+  if (destroyed || !claim.isCurrent()) return handle;
+  const nextParameter = mountParameterRack(control, {
     snapshot: () => ({parameters: [{id: "macro", label: state.label, value: state.value, min: 0, max: 1, step: .005}], disabled: state.disabled}),
     setValue: (_id, value) => binding.setValue(value),
   }, {
     layout: "flat",
     classNames: {item: "knobwrap", label: "name", control: "knob", track: "track", fill: "arc", pointer: "ptr", value: "pct"},
-    formatValue: (_parameter, value) => `${Math.round(value * 100)}%`,
-    onError: options.onError,
+    formatValue: (_parameter, value) => formatPercent(options.formatters, value, undefined, options.onError),
+    formatters: options.formatters,
+    onError: report,
     stylesheet: options.stylesheet,
   });
+  if (destroyed || !claim.isCurrent()) {
+    runCleanups([() => nextParameter.destroy()], report);
+    return handle;
+  }
+  parameter = nextParameter;
   renderTargets();
-  if (binding.subscribe) unsubscribe = binding.subscribe(update);
+  if (binding.subscribe) {
+    try {
+      const stop = binding.subscribe(update);
+      if (destroyed || !claim.isCurrent()) runCleanups([stop], report);
+      else unsubscribe = stop;
+    } catch (error) {
+      report(error);
+    }
+  }
+
   return handle;
 }
 
@@ -195,6 +243,10 @@ export function mountMacroRack(
   setParts(root, "root", options.parts?.root);
 
   const items: MacroHandle[] = [];
+  const report = createErrorSink(options.onError);
+  // A child's snapshot can replace this rack before mountMacro returns its
+  // handle. Its host already has a claim, so teardown can still reach it.
+  let mountingHost: HTMLElement | undefined;
 
   let destroyed = false;
   const handle: MacroRackHandle = {
@@ -208,10 +260,15 @@ export function mountMacroRack(
     destroy() {
       if (destroyed) return;
       destroyed = true;
-      for (const item of items) item.destroy();
-      claim.release();
-      root.remove();
-      style?.remove();
+      const mountingChild = mountingHost ? mounted.get(mountingHost) : undefined;
+      mountingHost = undefined;
+      runCleanups([
+        () => mountingChild?.destroy(),
+        ...items.map((item) => () => item.destroy()),
+        () => claim.release(),
+        () => root.remove(),
+        () => style?.remove(),
+      ], report);
     },
   };
   // Claim the host before destroying the previous mount: its cleanup may mount
@@ -226,15 +283,25 @@ export function mountMacroRack(
   // earlier would subscribe the new macros before the previous rack's children
   // had unsubscribed.
   for (const binding of bindings) {
+    if (destroyed || !claim.isCurrent()) break;
     const itemHost = document.createElement("div");
     itemHost.className = "wui-macro-rack__item";
     addClassNames(itemHost, options.classNames?.item);
     setParts(itemHost, "item", options.parts?.item);
     root.append(itemHost);
-    items.push(mountMacro(itemHost, binding, {
-      onError: options.onError,
+    mountingHost = itemHost;
+    const item = mountMacro(itemHost, binding, {
+      onError: report,
       stylesheet: options.stylesheet,
-    }));
+      getText: options.getText,
+      formatters: options.formatters,
+    });
+    mountingHost = undefined;
+    if (destroyed || !claim.isCurrent()) {
+      runCleanups([() => item.destroy()], report);
+      break;
+    }
+    items.push(item);
   }
   if (!claim.isCurrent()) return handle;
   return handle;

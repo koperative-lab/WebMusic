@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
 
+
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {
   meterStyle,
   mountMeter,
   type MeterBinding,
+  type MeterText,
 } from '../src/meter';
 
 afterEach(() => {
@@ -139,5 +141,76 @@ describe('mountMeter', () => {
     expect(meterStyle).toContain('--wm-meter-fill');
     expect(meterStyle).toContain('--wameter-bg');
     expect(meterStyle).toContain('--wameter-fill');
+  });
+});
+
+describe('meter capabilities and application text', () => {
+  it('requires only the selected pull port', () => {
+    const host = document.createElement('div');
+    const level = mountMeter(host, {readLevel: () => ({level: .25})}, {animate: false});
+    expect(level.element.getAttribute('aria-valuetext')).toBe('25% level');
+    const spectrum = mountMeter(host, {readSpectrum: () => [.2, .7]}, {mode: 'spectrum', animate: false});
+    expect(spectrum.element.getAttribute('aria-valuetext')).toBe('70% spectrum peak');
+    spectrum.destroy();
+  });
+
+  it.each(['level', 'spectrum'] as const)('refreshes %s final text without replacing the root or bars', (mode) => {
+    let copy: MeterText = {};
+    let prefix = '';
+    const handle = mountMeter(document.createElement('div'), {readLevel: () => ({level: .3}), readSpectrum: () => [.2, .3]}, {
+      mode, animate: false, getText: () => copy, formatters: {percent: value => `${prefix}${value * 100}`},
+    });
+    const child = handle.element.firstElementChild;
+    copy = {level: '电平', spectrum: '频谱', levelValue: ({value}) => `电平 ${value}`, spectrumValue: ({value}) => `峰值 ${value}`};
+    prefix = '百分之';
+    expect(handle.element.getAttribute('aria-label')).toBe(mode === 'level' ? 'Audio level' : 'Spectrum');
+    handle.redraw();
+    expect(handle.element.firstElementChild).toBe(child);
+    expect(handle.element.getAttribute('aria-label')).toBe(mode === 'level' ? '电平' : '频谱');
+    expect(handle.element.getAttribute('aria-valuetext')).toBe(mode === 'level' ? '电平 百分之30' : '峰值 百分之30');
+    expect(handle.element.getAttribute('aria-valuenow')).toBe('30');
+    handle.updateLabel('Bus A');
+    copy = {level: 'Level B', spectrum: 'Spectrum B'};
+    handle.redraw();
+    expect(handle.element.getAttribute('aria-label')).toBe('Bus A');
+    handle.updateLabel();
+    expect(handle.element.getAttribute('aria-label')).toBe(mode === 'level' ? 'Level B' : 'Spectrum B');
+    handle.destroy();
+  });
+
+  it('reports wrong JavaScript binding modes without calling the other port', () => {
+    const onError = vi.fn();
+    const readLevel = vi.fn(() => ({level: .4}));
+    const handle = mountMeter(document.createElement('div'), {readLevel} as unknown as MeterBinding, {mode: 'spectrum', animate: false, onError});
+    expect(readLevel).not.toHaveBeenCalled();
+    expect(onError).toHaveBeenCalledWith(expect.objectContaining({message: 'Spectrum meter requires readSpectrum(bars)'}));
+    handle.destroy();
+  });
+
+  it('lets a text callback replace the mounting meter without a leaked frame', () => {
+    const request = vi.fn(() => 1);
+    vi.stubGlobal('requestAnimationFrame', request);
+    const host = document.createElement('div');
+    let replacement: ReturnType<typeof mountMeter> | undefined;
+    const stale = mountMeter(host, {readLevel: () => ({level: .9})}, {getText: () => {
+      replacement ??= mountMeter(host, {readLevel: () => ({level: .2})}, {animate: false});
+      return {level: 'Stale'};
+    }});
+    expect(request).not.toHaveBeenCalled();
+    expect(host.querySelectorAll('.wui-meter')).toHaveLength(1);
+    expect(host.querySelector('.wui-meter')).toBe(replacement?.element);
+    stale.destroy(); replacement?.destroy();
+  });
+
+  it('treats supplied strings literally and reports failed callbacks through onError', () => {
+    const failure = new Error('text');
+    const onError = vi.fn();
+    const handle = mountMeter(document.createElement('div'), {readLevel: () => ({level: .4})}, {
+      animate: false, getText: () => ({level: '{literal}', levelValue: () => { throw failure; }}), onError,
+    });
+    expect(handle.element.getAttribute('aria-label')).toBe('{literal}');
+    expect(handle.element.getAttribute('aria-valuetext')).toBe('40% level');
+    expect(onError).toHaveBeenCalledWith(failure);
+    handle.destroy();
   });
 });

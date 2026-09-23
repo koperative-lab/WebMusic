@@ -5,7 +5,8 @@ import {
   bindViewPlayer, seekViewPlayer, readViewPlayerScore, readViewPlayerSnapshot, resolveViewPlayer,
   type ViewPlayerNote, type ViewPlayerSnapshot,
 } from './internal/player-binding';
-import {Rational, type Score, type ScorePlaybackSource} from '../../core';
+import {Rational, type Score, type ScorePlaybackSnapshot, type ScorePlaybackSource} from '../../core';
+import type {ScoreViewRenderState} from '../render/state';
 import type {ScoreMap} from '../core/map';
 import {createScoreMapView, type ScoreMapView} from '../headless/score-map';
 import {createPianoRollLayout} from '../core/layout';
@@ -31,6 +32,7 @@ const ELEMENT_ACTIVE_NOTE_RGB = '240, 84, 119';
 
 export type {ScoreViewType} from '../core/types';
 export type {ScoreViewConfiguration, ScoreViewOptionsByType} from '../core/types';
+export type {ScoreViewRenderState} from '../render/state';
 
 /** Element modes include lightweight previews without expanding renderer types. */
 export type ScoreViewElementType = ScoreViewType | 'map' | 'thumbnail';
@@ -164,6 +166,12 @@ export class ScoreViewElement extends HTMLElementBase {
   }
 
   private explicitScore?: Score;
+  private explicitPlayback?: ScorePlaybackSource;
+  private playbackSnapshot?: ScorePlaybackSnapshot;
+  private sourceBindingError?: {cause: unknown};
+  private bindingRevision = 0;
+  private renderGeneration = 0;
+  private renderStateValue: ScoreViewRenderState = Object.freeze({revision: 0, generation: 0, status: 'empty', phase: null});
   /** The score currently rendered, whether assigned or loaded from `src`. */
   private resolvedScore?: Score;
   private explicitOptions?: ScoreViewRenderOptions;
@@ -178,7 +186,7 @@ export class ScoreViewElement extends HTMLElementBase {
   private view?: ScoreView;
   private stage?: StageHandle;
   private status?: StatusHandle;
-  private loadError?: unknown;
+  private loadFailure?: {cause: unknown};
   private map?: ScoreMap;
   private mapView?: ScoreMapView;
   private timeline?: TimelineHandle;
@@ -192,22 +200,28 @@ export class ScoreViewElement extends HTMLElementBase {
   private ownedSizes = new Map<string, string>();
 
   connectedCallback(): void {
-    upgradeProperties(this, ['score', 'options', 'type']);
+    upgradeProperties(this, ['score', 'playback', 'options', 'type']);
     this.bindPlayer();
     void this.refresh();
   }
 
   disconnectedCallback(): void {
+    const generation = ++this.renderGeneration;
     this.cancelLoad();
-    this.unbindPlayer();
+    if (generation !== this.renderGeneration) return;
+    const cleanup = this.unbindPlayer();
+    if (generation !== this.renderGeneration) return;
     this.disposePresentation();
     this.resolvedScore = undefined;
     this.sourceInitialized = false;
+    if (cleanup.failure) this.publishRenderState('error', 'source', undefined, cleanup.failure.cause);
+    if (generation !== this.renderGeneration) return;
+    this.publishRenderState('disposed', null);
   }
 
   attributeChangedCallback(name: string): void {
     if (!this.isConnected) return;
-    if (name === 'player') this.bindPlayer();
+    if (name === 'player') { if (!this.explicitPlayback) this.bindPlayer(); }
     else if (name === 'src' || name === 'format') void this.refresh();
     else if (name === 'width' || name === 'height') this.applyHostSize();
     else if (name === 'for-part' || name === 'cells') this.remap();
@@ -224,12 +238,28 @@ export class ScoreViewElement extends HTMLElementBase {
     return this.explicitScore ?? this.resolvedScore;
   }
 
+  /** Borrow a nonvisual source directly; undefined restores `player` discovery. */
+  set playback(source: ScorePlaybackSource | undefined) {
+    if (source === this.explicitPlayback) return;
+    this.explicitPlayback = source;
+    if (this.isConnected) this.bindPlayer();
+  }
+
+  get playback(): ScorePlaybackSource | undefined {
+    return this.explicitPlayback;
+  }
+
+  /** Immutable source/load/drawing observation, separate from player readiness. */
+  get renderState(): ScoreViewRenderState {
+    return this.renderStateValue;
+  }
+
   /** Current position on the nominal score timeline, in seconds. */
   get currentTime(): number {
     return this.view?.state.currentTime ?? this.playheadSeconds;
   }
 
-  /** MIDI pitches intersecting the current score position, ascending. */
+  /** Written MIDI pitches at the current position, or active source notes without a clock. */
   get active(): number[] {
     return [...new Set(this.view?.state.activeNotes.map((note) => note.pitch) ?? [])].sort((a, b) => a - b);
   }
@@ -282,30 +312,48 @@ export class ScoreViewElement extends HTMLElementBase {
 
   private async refresh(): Promise<void> {
     const src = this.getAttribute('src');
-    const input = this.explicitScore ?? (src || readViewPlayerScore(this.boundPlayer));
+    let input: Score | string | undefined = this.explicitScore ?? (src || undefined);
+    if (!input && !this.sourceBindingError && (!this.playbackSnapshot
+      || this.playbackSnapshot.readiness === 'ready' || this.playbackSnapshot.readiness === 'unavailable')) {
+      try { input = readViewPlayerScore(this.boundPlayer, this.explicitPlayback); }
+      catch (cause) { this.recordSourceFailure(cause); this.sourceInitialized = false; }
+    }
     const format = typeof input === 'string' ? this.getAttribute('format') ?? undefined : undefined;
     if (this.sourceInitialized && input === this.sourceInput && format === this.sourceFormat) return;
     this.sourceInitialized = true;
     this.sourceInput = input;
     this.sourceFormat = format;
-    this.loadError = undefined;
+    this.loadFailure = undefined;
     this.cancelLoad();
     const token = this.loadToken;
     const controller = new AbortController();
     this.loadController = controller;
+    this.resolvedScore = undefined;
+    this.renderCurrent(false);
+    if (token !== this.loadToken || !this.isConnected) return;
     let score: Score | undefined;
     try {
       score = await this.resolveScore(input, format, controller.signal);
+    } catch (error) {
+      if (token !== this.loadToken || controller.signal.aborted || !this.isConnected) return;
+      this.loadFailure = {cause: error};
+      console.error('[WebScore] <score-view> failed to load', input, error, '(is @webmusic/score/io installed?)');
     } finally {
       if (this.loadController === controller) this.loadController = undefined;
     }
     if (token !== this.loadToken || !this.isConnected) return; // superseded or detached
     this.resolvedScore = score;
-    const native = (this.boundPlayer as (Element & {playback?: ScorePlaybackSource}) | undefined)?.playback?.snapshot();
+    let native: ScorePlaybackSnapshot | undefined;
+    try { native = this.currentPlayback()?.snapshot(); }
+    catch (cause) { this.recordSourceFailure(cause); }
     if (native && native.readiness !== 'unavailable' && native.score && score !== native.score) {
       this.lastSnapshot = undefined;
       this.setAttribute('data-player-state', 'mismatched');
     }
+    // Initial source delivery precedes asynchronous score resolution. Reapply
+    // its position once identity can be checked, including lightweight modes
+    // that never create a visualizer and therefore cannot replay on rebind.
+    if (native) this.followPlayback(native);
     this.playheadSeconds = score ? this.lastSnapshot?.nominalSeconds ?? 0 : 0;
     this.renderCurrent(false);
   }
@@ -333,6 +381,46 @@ export class ScoreViewElement extends HTMLElementBase {
   }
 
   private renderCurrent(preservePosition = true): void {
+    if (!this.isConnected) return;
+    const generation = ++this.renderGeneration;
+    const current = () => generation === this.renderGeneration && this.isConnected;
+    const score = this.resolvedScore;
+    if (score) this.publishRenderState('rendering', 'render', score);
+    else if (this.loadFailure) this.publishRenderState('error', 'load', undefined, this.loadFailure.cause);
+    else if (typeof this.sourceInput === 'string' && this.loadController) this.publishRenderState('loading', 'load');
+    else if (this.sourceBindingError) this.publishRenderState('error', 'source', undefined, this.sourceBindingError.cause);
+    else if (!this.explicitScore && !this.getAttribute('src') && this.playbackSnapshot?.readiness === 'error') {
+      this.publishRenderState('error', 'source', undefined, this.playbackSnapshot.error);
+    } else if (!this.explicitScore && !this.getAttribute('src') && this.playbackSnapshot?.readiness === 'loading') {
+      this.publishRenderState('loading', 'source');
+    } else this.publishRenderState('empty', null);
+    if (!current()) return;
+    try {
+      this.renderPresentation(preservePosition);
+    } catch (cause) {
+      if (!current()) return;
+      this.disposePresentation();
+      if (this.ownerDocument) this.showStatus('error', this.errorMessage(cause));
+      this.publishRenderState('error', 'render', score, cause);
+      return;
+    }
+    if (current() && score) {
+      if (this.sourceBindingError) this.publishRenderState('error', 'source', score, this.sourceBindingError.cause);
+      else this.publishRenderState('ready', 'render', score);
+    }
+  }
+
+  private publishRenderState(status: ScoreViewRenderState['status'], phase: ScoreViewRenderState['phase'], score?: Score, cause?: unknown): void {
+    this.renderStateValue = Object.freeze({
+      revision: this.renderStateValue.revision + 1, generation: this.renderGeneration,
+      status, phase, ...(score ? {score} : {}), ...(cause === undefined ? {} : {cause}),
+    });
+    this.dispatchEvent(new CustomEvent<ScoreViewRenderState>('webscore:renderstatechange', {
+      detail: this.renderStateValue, bubbles: true, composed: true,
+    }));
+  }
+
+  private renderPresentation(preservePosition: boolean): void {
     if (preservePosition) this.playheadSeconds = this.currentTime;
     this.disposePresentation();
     this.applyHostSize();
@@ -348,8 +436,10 @@ export class ScoreViewElement extends HTMLElementBase {
       this.append(style);
     }
     if (!score) {
-      if (owner) this.showStatus(this.loadError === undefined ? 'empty' : 'error',
-        this.loadError === undefined ? 'Waiting for a score' : this.errorMessage(this.loadError));
+      const failure = this.loadFailure ?? this.sourceBindingError ?? (!this.explicitScore && !this.getAttribute('src')
+        && this.playbackSnapshot?.readiness === 'error' ? {cause: this.playbackSnapshot.error} : undefined);
+      if (owner) this.showStatus(failure ? 'error' : 'empty',
+        failure ? this.errorMessage(failure.cause) : 'Waiting for a score');
       return;
     }
     if (type === 'map') {
@@ -419,8 +509,7 @@ export class ScoreViewElement extends HTMLElementBase {
       this.rendered = undefined;
       this.view.dispose();
       this.view = undefined;
-      this.showStatus('error', this.errorMessage(failure));
-      return;
+      throw failure;
     }
     this.rebindRendered(this.rendered);
   }
@@ -527,19 +616,11 @@ export class ScoreViewElement extends HTMLElementBase {
 
   private async resolveScore(input: Score | string | undefined, format: string | undefined, signal: AbortSignal): Promise<Score | undefined> {
     if (typeof input !== 'string') return input;
-    try {
-      const io = await import('../../io/load');
-      const loaded = await io.loadScoreFromUrl(input, {
-        ...(format ? {format: format as never} : {}),
-        signal,
-      });
-      return loaded;
-    } catch (error) {
-      if (signal.aborted) return undefined;
-      this.loadError = error;
-      console.error('[WebScore] <score-view> failed to load', input, error, '(is @webmusic/score/io installed?)');
-      return undefined;
-    }
+    const io = await import('../../io/load');
+    if (signal.aborted) return undefined;
+    return io.loadScoreFromUrl(input, {
+      ...(format ? {format: format as never} : {}), signal,
+    });
   }
 
   private remap(): void {
@@ -549,14 +630,14 @@ export class ScoreViewElement extends HTMLElementBase {
       this.mapView = createScoreMapView({score: this.resolvedScore, ...options,
         seekNominal: (seconds) => {
           const target = this.boundPlayer as (Element & {rate?: number; playback?: ScorePlaybackSource}) | undefined;
-          const playback = target?.playback;
+          const playback = this.currentPlayback();
           const model = this.mapView;
-          const candidateRate = readViewPlayerSnapshot(target)?.rate ?? target?.rate ?? this.lastSnapshot?.rate;
+          const candidateRate = readViewPlayerSnapshot(target, this.explicitPlayback)?.rate ?? target?.rate ?? this.lastSnapshot?.rate;
           const rate = typeof candidateRate === 'number' && Number.isFinite(candidateRate) && candidateRate > 0
             ? candidateRate : 1;
-          const result = seekViewPlayer(target, seconds, this.resolvedScore, rate);
+          const result = seekViewPlayer(target, seconds, this.resolvedScore, rate, this.explicitPlayback);
           const reconcile = (): void => {
-            if (model !== this.mapView || target !== this.boundPlayer || playback !== target?.playback) return;
+            if (model !== this.mapView || target !== this.boundPlayer || playback !== this.currentPlayback()) return;
             // Native snapshots settle even a no-op command. Legacy owners report
             // new positions through events; their getter may still be stale.
             const actual = playback?.snapshot();
@@ -649,9 +730,11 @@ export class ScoreViewElement extends HTMLElementBase {
     const presentationRevision = this.presentationRevision;
     const beforeState = mapView.state;
     const beforeSnapshot = this.snapshotRevision;
+    const bindingRevision = this.bindingRevision;
     const current = () => this.isConnected && mapView === this.mapView
       && sourceRevision === this.loadToken && presentationRevision === this.presentationRevision
-      && target === this.boundPlayer && target === resolveViewPlayer(this);
+      && bindingRevision === this.bindingRevision && target === this.boundPlayer
+      && (Boolean(this.explicitPlayback) || target === resolveViewPlayer(this));
     this.dispatchEvent(new CustomEvent<ScoreViewSeekDetail>('webscore:seek', {
       detail: {quarters, seconds}, bubbles: true, composed: true,
     }));
@@ -665,44 +748,85 @@ export class ScoreViewElement extends HTMLElementBase {
   // ---- Playback sync (player="#id") ----
 
   private bindPlayer(): void {
-    this.unbindPlayer();
-    this.playerUnbind = bindViewPlayer(this, {
-      score: () => this.explicitScore ?? (this.getAttribute('src') ? this.resolvedScore : undefined),
-      targetChanged: (target) => {
-        this.boundPlayer = target;
-        this.mapView?.setScore(this.resolvedScore);
-      },
-      scoreChanged: () => {
-        if (!this.explicitScore && !this.getAttribute('src')) void this.refresh();
-      },
-      snapshot: (snapshot) => this.followSnapshot(snapshot),
-      noteOn: (note) => this.followNote(note, true),
-      noteOff: (note) => this.followNote(note, false),
-      reset: () => {
-        this.snapshotRevision += 1;
-        this.lastSnapshot = undefined;
-        this.playheadSeconds = 0;
-        this.mapView?.setPosition(0);
-        this.view?.reset();
-        this.rendered?.clearActiveNotes();
-        this.timeline?.update();
-      },
-      end: () => {
-        if (this.lastSnapshot) this.view?.seek(this.lastSnapshot.nominalSeconds);
-        else this.view?.end();
-        this.view?.clearActiveNotes();
-        this.rendered?.clearActiveNotes();
-        if (!readViewPlayerSnapshot(this.boundPlayer)) this.playheadSeconds = 0;
-        this.timeline?.update();
-      },
-    });
-    if (!this.playerUnbind && !this.explicitScore && !this.getAttribute('src')) void this.refresh();
+    const cleanup = this.unbindPlayer();
+    const bindingRevision = cleanup.revision;
+    const source = this.explicitPlayback;
+    const current = () => bindingRevision === this.bindingRevision && this.isConnected && source === this.explicitPlayback;
+    if (!current()) return;
+    if (cleanup.failure) this.publishRenderState('error', 'source', undefined, cleanup.failure.cause);
+    if (!current()) return;
+    let unbind: (() => void) | undefined;
+    try {
+      unbind = bindViewPlayer(this, {
+        isCurrent: current,
+        score: () => this.explicitScore ?? (this.getAttribute('src') ? this.resolvedScore : undefined),
+        targetChanged: (target) => {
+          this.boundPlayer = target;
+          this.mapView?.setScore(this.resolvedScore);
+        },
+        scoreChanged: () => {
+          if (!this.explicitScore && !this.getAttribute('src')) void this.refresh();
+        },
+        sourceSnapshot: (snapshot) => {
+          const previous = this.playbackSnapshot;
+          this.sourceBindingError = undefined;
+          this.playbackSnapshot = snapshot;
+          if (!this.explicitScore && !this.getAttribute('src') && (!previous
+            || previous.readiness !== snapshot.readiness || previous.sourceRevision !== snapshot.sourceRevision
+            || previous.score !== snapshot.score || previous.error !== snapshot.error)) {
+            this.sourceInitialized = false;
+            void this.refresh();
+          }
+        },
+        sourceError: (cause) => {
+          this.recordSourceFailure(cause);
+          this.sourceInitialized = false;
+          void this.refresh();
+        },
+        playbackSnapshot: (snapshot) => this.followPlayback(snapshot),
+        snapshot: (snapshot) => this.followSnapshot(snapshot),
+        noteOn: (note) => this.followNote(note, true),
+        noteOff: (note) => this.followNote(note, false),
+        reset: () => {
+          this.snapshotRevision += 1;
+          this.lastSnapshot = undefined;
+          this.playheadSeconds = 0;
+          this.mapView?.setPosition(0);
+          this.view?.reset();
+          this.rendered?.clearActiveNotes();
+          this.timeline?.update();
+        },
+        end: () => {
+          if (this.lastSnapshot) this.view?.seek(this.lastSnapshot.nominalSeconds);
+          else this.view?.end();
+          this.view?.clearActiveNotes();
+          this.rendered?.clearActiveNotes();
+          if (!readViewPlayerSnapshot(this.boundPlayer, this.explicitPlayback)) this.playheadSeconds = 0;
+          this.timeline?.update();
+        },
+      }, 'player', source);
+    } catch (cause) {
+      if (!current()) return;
+      this.recordSourceFailure(cause);
+      this.sourceInitialized = false;
+      void this.refresh();
+      return;
+    }
+    if (!current()) {
+      try { unbind?.(); } catch { /* The detached binding cannot affect its replacement. */ }
+      return;
+    }
+    this.playerUnbind = unbind;
+    if (!unbind && !this.explicitScore && !this.getAttribute('src')) void this.refresh();
   }
 
-  private unbindPlayer(): void {
-    this.playerUnbind?.();
+  private unbindPlayer(): {revision: number; failure?: {cause: unknown}} {
+    const revision = ++this.bindingRevision;
+    const unbind = this.playerUnbind;
     this.playerUnbind = undefined;
     this.boundPlayer = undefined;
+    this.playbackSnapshot = undefined;
+    this.sourceBindingError = undefined;
     this.lastSnapshot = undefined;
     this.snapshotRevision += 1;
     this.playheadSeconds = 0;
@@ -710,10 +834,16 @@ export class ScoreViewElement extends HTMLElementBase {
     this.view?.reset();
     this.rendered?.clearActiveNotes();
     this.timeline?.update();
+    try { unbind?.(); } catch (cause) { return {revision, failure: {cause}}; }
+    return {revision};
   }
 
   private followNote(note: ViewPlayerNote, on: boolean): void {
-    const snapshot = readViewPlayerSnapshot(this.boundPlayer);
+    // Native sources publish one coherent snapshot after their note changes.
+    if (this.playbackSnapshot && this.playbackSnapshot.readiness !== 'unavailable') return;
+    let snapshot: ViewPlayerSnapshot | undefined;
+    try { snapshot = readViewPlayerSnapshot(this.boundPlayer, this.explicitPlayback); }
+    catch (cause) { this.recordSourceFailure(cause); this.renderCurrent(); return; }
     if (snapshot) {
       this.followSnapshot(snapshot);
       return;
@@ -723,13 +853,84 @@ export class ScoreViewElement extends HTMLElementBase {
     else this.visualizerHandlers?.noteOff(note.midi, note.startTime);
   }
 
+  private currentPlayback(): ScorePlaybackSource | undefined {
+    return this.explicitPlayback ?? (this.boundPlayer as (Element & {playback?: ScorePlaybackSource}) | undefined)?.playback;
+  }
+
+  private recordSourceFailure(cause: unknown): void {
+    this.sourceBindingError = {cause};
+    this.playbackSnapshot = undefined;
+    this.lastSnapshot = undefined;
+    this.playheadSeconds = 0;
+    this.setAttribute('data-player-state', 'error');
+  }
+
   private followSnapshot(snapshot: ViewPlayerSnapshot): void {
     this.snapshotRevision += 1;
     this.lastSnapshot = snapshot;
-    this.playheadSeconds = this.resolvedScore ? snapshot.nominalSeconds : 0;
-    this.mapView?.setPosition(this.playheadSeconds);
-    this.timeline?.update();
-    this.paintPosition(snapshot.nominalSeconds);
+    try {
+      this.playheadSeconds = this.resolvedScore ? snapshot.nominalSeconds : 0;
+      this.mapView?.setPosition(this.playheadSeconds);
+      this.timeline?.update();
+      this.paintPosition(snapshot.nominalSeconds);
+    } catch (cause) {
+      const generation = ++this.renderGeneration;
+      this.disposePresentation();
+      if (generation !== this.renderGeneration || !this.isConnected) return;
+      if (this.ownerDocument) this.showStatus('error', this.errorMessage(cause));
+      this.publishRenderState('error', 'render', this.resolvedScore, cause);
+    }
+  }
+
+  private followPlayback(snapshot: ScorePlaybackSnapshot): void {
+    // Unavailable native owners retain the binding's legacy event path.
+    if (snapshot.readiness === 'unavailable') return;
+    try {
+      if (snapshot.readiness === 'ready' && snapshot.score === this.resolvedScore && snapshot.nominalSeconds !== null) {
+        this.followSnapshot({
+          nominalSeconds: snapshot.nominalSeconds,
+          transportSeconds: snapshot.transportSeconds ?? 0,
+          transportDurationSeconds: snapshot.transportDurationSeconds ?? 0,
+          ...(snapshot.rate === null ? {} : {rate: snapshot.rate}),
+          playing: snapshot.state === 'playing',
+        });
+        if (snapshot.state === 'ended') {
+          this.view?.clearActiveNotes();
+          this.rendered?.clearActiveNotes();
+        }
+        return;
+      }
+      this.snapshotRevision += 1;
+      this.lastSnapshot = undefined;
+      if (snapshot.readiness !== 'ready' || snapshot.score !== this.resolvedScore) {
+        this.playheadSeconds = 0;
+        this.mapView?.setPosition(0);
+        this.view?.reset();
+        this.rendered?.clearActiveNotes();
+        this.timeline?.update();
+        return;
+      }
+      if (!this.view || !this.rendered) return;
+      if (snapshot.state === 'ended') {
+        this.view.clearActiveNotes();
+        this.rendered.clearActiveNotes();
+        return;
+      }
+      // A valid source may expose note activity without a nominal clock.
+      // Project stable identity rather than sounding MIDI (which can transpose).
+      const state = this.view.updatePlayback(snapshot);
+      const active = state.activeNotes[state.activeNotes.length - 1];
+      const note = active && this.rendered.noteSequence.notes.find((candidate) =>
+        candidate.partId === active.partId && candidate.noteId === active.noteId);
+      if (note) this.rendered.redraw(note, true);
+      else this.rendered.clearActiveNotes();
+    } catch (cause) {
+      const generation = ++this.renderGeneration;
+      this.disposePresentation();
+      if (generation !== this.renderGeneration || !this.isConnected) return;
+      if (this.ownerDocument) this.showStatus('error', this.errorMessage(cause));
+      this.publishRenderState('error', 'render', this.resolvedScore, cause);
+    }
   }
 
   private paintPosition(seconds: number): void {
@@ -755,7 +956,8 @@ export class ScoreViewElement extends HTMLElementBase {
       this.visualizerHandlers = handlers;
       return () => { this.visualizerHandlers = undefined; };
     }, this.view);
-    if (this.lastSnapshot) this.followSnapshot(this.lastSnapshot);
+    if (this.playbackSnapshot && this.playbackSnapshot.readiness !== 'unavailable') this.followPlayback(this.playbackSnapshot);
+    else if (this.lastSnapshot) this.followSnapshot(this.lastSnapshot);
     else this.paintPosition(this.playheadSeconds);
   }
 }
