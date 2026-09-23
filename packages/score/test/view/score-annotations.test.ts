@@ -183,7 +183,7 @@ describe('compact overview annotations', () => {
     expect(first.hasAttribute('viewBox')).toBe(false);
     expect(first.querySelector('svg')!.hasAttribute('viewBox')).toBe(true);
     expect(first.style.height).toBe('100%');
-    expect(first.style.minHeight).toBe('calc(1rem + 24px)');
+    expect(first.style.minHeight).toBe('calc(24px + 1rem)');
     expect(heights).toHaveBeenCalledTimes(1);
     resize();
     expect(host.querySelector('svg')).toBe(first);

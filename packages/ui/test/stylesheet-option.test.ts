@@ -180,7 +180,7 @@ describe('the kit-wide stylesheet opt-out', () => {
         expect(child.element.style.background).toBe('transparent');
         expect(child.element.style.border).toBe('0px');
         expect(child.element.style.padding).toBe('0px');
-        expect(child.element.style.borderRadius).toBe('0');
+        expect(child.element.style.borderRadius).toBe('0px');
       }
       child.destroy();
       node.remove();
