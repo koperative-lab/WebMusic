@@ -714,7 +714,7 @@ describe('mountNameplate responsive content', () => {
       expect(style.overflowWrap).toBe('anywhere');
       expect(style.maxWidth).toBe('100%');
     }
-    expect(getComputedStyle(button.parentElement!).minWidth).toBe('0');
+    expect(getComputedStyle(button.parentElement!).minWidth).toBe('0px');
     expect(handle.symbol.textContent).toBe(name);
     handle.destroy();
   });
