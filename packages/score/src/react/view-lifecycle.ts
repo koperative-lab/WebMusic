@@ -21,7 +21,7 @@ export type ReactScoreRenderer = (
 
 /** One subscription and render lifetime, shared by all three React views. */
 export function useScoreViewRenderer(
-  containerRef: RefObject<HTMLDivElement>,
+  containerRef: RefObject<HTMLDivElement | null>,
   inputs: ReactScoreViewSource,
   type: ScoreViewType,
   render: ReactScoreRenderer,

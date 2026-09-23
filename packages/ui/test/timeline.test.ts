@@ -360,7 +360,7 @@ it('keeps tiny ranged-region hit boxes proportional while retaining point-marker
   expect(next.style.left).toBe('0.1%');
   for (const region of [small, next]) {
     const style = getComputedStyle(region);
-    expect(style.minWidth).toBe('0');
+    expect(style.minWidth).toBe('0px');
     expect(style.padding).toBe('0px');
     expect(style.borderWidth).toBe('0px');
     expect(style.boxSizing).toBe('border-box');

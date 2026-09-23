@@ -90,12 +90,12 @@ test('real React, Sandpack, Bravura, OSMD and SpessaSynth ship complete site not
   const dist = await compile(directory, source, collector, [browserSandboxAlias]);
   await collector.write(dist);
   const text = await readFile(path.join(dist, 'licenses/THIRD_PARTY_NOTICES.txt'), 'utf8');
-  for (const required of ['Facebook, Inc.', 'Apache License', 'CodeSandbox', 'Steinberg Media Technologies', 'SIL OPEN FONT LICENSE', 'Copyright 2019 PhonicScore', 'Stuart Knightley', 'Jean-loup Gailly', 'Basarat Ali Syed', 'Copyright (c) 2023 Arjun Barrett', 'Copyright (C) 2021 Nobuaki Tanaka', 'Emscripten 6.0.6', 'musl C runtime']) {
+  for (const required of ['Meta Platforms, Inc. and affiliates.', 'Apache License', 'CodeSandbox', 'Steinberg Media Technologies', 'SIL OPEN FONT LICENSE', 'Copyright 2019 PhonicScore', 'Stuart Knightley', 'Jean-loup Gailly', 'Basarat Ali Syed', 'Copyright (c) 2023 Arjun Barrett', 'Copyright (C) 2021 Nobuaki Tanaka', 'Emscripten 6.0.6', 'musl C runtime']) {
     assert.ok(text.includes(required), `Missing upstream notice: ${required}`);
   }
   const inventory = JSON.parse(await readFile(path.join(dist, 'licenses/BUNDLED_ASSETS.json'), 'utf8'));
   assert.ok(inventory.modules.some((id) => id.includes('bravura_glyphs.js')));
-  assert.ok(inventory.packages.some(({key}) => key === 'opensheetmusicdisplay@1.9.9 bundled assets'));
+  assert.ok(inventory.packages.some(({key}) => key === 'opensheetmusicdisplay@2.1.3 bundled assets'));
   assert.ok(inventory.packages.some(({key}) => key === 'spessasynth_core@4.3.20 bundled assets'));
   assert.ok(inventory.packages.some(({key}) => key === 'stb-vorbis@0.0.6 bundled assets'));
   assert.ok(!inventory.packages.some(({key}) => key.startsWith('@codesandbox/nodebox@')));
@@ -103,7 +103,7 @@ test('real React, Sandpack, Bravura, OSMD and SpessaSynth ship complete site not
   await writeFile(path.join(dist, 'untracked.js'), 'globalThis.unlicensed = true;');
   await assert.rejects(verifySiteNotices(dist), /does not cover/);
   await rm(path.join(dist, 'untracked.js'));
-  await writeFile(path.join(dist, 'licenses/THIRD_PARTY_NOTICES.txt'), text.replace('Facebook, Inc.', 'Removed'));
+  await writeFile(path.join(dist, 'licenses/THIRD_PARTY_NOTICES.txt'), text.replace('Meta Platforms, Inc. and affiliates.', 'Removed'));
   await assert.rejects(verifySiteNotices(dist), /notices are missing or changed/);
   await mkdir(path.join(dist, 'pagefind'));
   await writeFile(path.join(dist, 'pagefind/wasm.en.pagefind'), 'unreviewed search binary');
