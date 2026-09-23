@@ -287,6 +287,10 @@ projection; assigning an unrelated score does not imply position alignment.
 
 The `player` selector must resolve uniquely in the current Document or ShadowRoot. Native snapshots initialize position, including paused state, then data/state/time updates keep it current. Late or replaced targets rebind; invalid or ambiguous selectors remain unbound. Disconnect cancels pending work and releases owned subscriptions and renderers without stopping playback. No type creates a player or audio resource. Only `map` sends seek commands.
 
+When a ready source supplies active notes but no nominal position, the three note
+views follow part/note identity and clear released notes without creating a clock.
+Sounding MIDI transposition does not change which written score note is highlighted.
+
 Native binding prefers the target's `.playback` [shared source](/score/api/#shared-playback-observation).
 An available source suppresses duplicate legacy events. A target without a source,
 or one reporting `unavailable`, retains the compatibility snapshot/event path.
@@ -355,7 +359,7 @@ attach listeners before mounting if the host needs intermediate transitions.
 | `configure(configuration)` | method | Atomically select `piano-roll`, `staff` or `waterfall` and replace optional mode-specific `.options`. Invalid modes, malformed options and unsupported keys throw `TypeError` before changing the view. Map/thumbnail use `.type`, `.options` and their attributes. |
 | `.options` | writable property | `ScoreViewRenderOptions` override note-renderer attributes; map/thumbnail also honor `showAnnotations`, `noteRGB` and `noteColor`; see the [renderer API](/score/api/view/). |
 | `.currentTime` | read-only property | Current nominal score position in seconds. |
-| `.active` | read-only property | MIDI pitches at the current score position; empty for map and thumbnail. |
+| `.active` | read-only property | Written MIDI pitches at the current position, or active source notes when nominal time is unavailable; empty for map and thumbnail. |
 
 Type-specific attributes stay on the element when another type is selected and do not affect that other surface. Missing or invalid numeric values use their corresponding defaults.
 

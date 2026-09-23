@@ -93,9 +93,9 @@ Local development servers and `npm run docs:build` emit an explicitly marked
 `release: null` and source fingerprints under `development`; declared package
 versions are not published-API compatibility claims. The release Skill rejects
 these previews. `npm run pages:build` defaults to release verification and fails
-if runtime sources differ from the retained published baseline. Non-main CI
-builds explicitly select development mode; main deployment retains release
-verification. A local Pages preview can use
+if runtime sources differ from the retained published baseline. Development
+branch CI builds select development mode; main and PRs targeting main retain
+release verification. A local Pages preview can use
 `WEBMUSIC_AGENT_CONTEXT=development npm run pages:build`.
 
 ## Related

@@ -1,6 +1,6 @@
 import {readText, textValue, type UITextValue, formatNumber, type UIValueFormatters} from './text';
 import {installStyle} from './internal/style';
-import {claimHost, createErrorSink} from './internal/lifecycle';
+import {claimHost, createErrorSink, createUpdateLoop} from './internal/lifecycle';
 import {addClassNames, clamp, finite, setParts} from './internal/dom';
 import {componentSurfaceCss, controlBorderFallback} from './internal/surface';
 import {surfaceHeight} from './internal/control';
@@ -599,16 +599,19 @@ export function mountTimeline(
     }
   };
 
-  const update = (): void => {
+  const paintSnapshot = (): void => {
     if (destroyed) return;
 
     try {
       const state = binding.snapshot();
+      if (destroyed || !claim.isCurrent()) return;
       const text = readText(options.getText, options.onError);
       if (destroyed || !claim.isCurrent()) return;
       const label = options.label ?? textValue(text?.label, 'Timeline', {}, options.onError);
+      const playheadLabel = textValue(text?.playhead, `${label} playhead`, {label}, options.onError);
+      if (destroyed || !claim.isCurrent()) return;
       root.setAttribute('aria-label', label);
-      seek.setAttribute('aria-label', textValue(text?.playhead, `${label} playhead`, {label}, options.onError));
+      seek.setAttribute('aria-label', playheadLabel);
       duration = Math.max(Number.EPSILON, finite(state.duration, 1));
       viewport = normalizeRange(state.viewport, 0, duration) ?? {
         start: 0,
@@ -625,6 +628,7 @@ export function mountTimeline(
       renderRuler(state);
       if (destroyed || !claim.isCurrent()) return;
       renderRegions(state, text);
+      if (destroyed || !claim.isCurrent()) return;
 
       const normalizedLoop = normalizeRange(
         state.loop,
@@ -695,6 +699,12 @@ export function mountTimeline(
     }
   };
 
+  const updates = createUpdateLoop({
+    name: 'Timeline', pass: paintSnapshot,
+    isCurrent: () => !destroyed && claim.isCurrent(), report: reportError,
+  });
+  const update = updates.run;
+
   scheduleUpdate = (): void => {
     if (destroyed || animationFrame !== undefined) return;
     const view = document.defaultView;
@@ -736,6 +746,7 @@ export function mountTimeline(
     destroy(): void {
       if (destroyed) return;
       destroyed = true;
+      updates.cancel();
       resizeObserver?.disconnect();
       resizeObserver = undefined;
       view?.removeEventListener('resize', layoutRulerLabels);

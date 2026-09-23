@@ -93,3 +93,34 @@ it('positions the actual OSMD adapter from a paused source without a note event'
   });
   expect(index).toBe(1);
 });
+
+it('keeps an external OSMD cancellation signal effective after rendering finishes', async () => {
+  const builder = new ScoreBuilder();
+  const part = builder.addPart({id: PartId('p'), name: 'Piano'});
+  builder.addNote(part, {id: NoteId('n'), pitch: Pitch.parse('C4'), onsetQuarters: Rational.ZERO,
+    duration: Duration.whole(), voice: VoiceId('v')});
+  const score = builder.build();
+  let snapshot: ScorePlaybackSnapshot = {revision: 0, sourceRevision: 0, readiness: 'ready', state: 'paused', score,
+    nominalSeconds: 0, nominalDurationSeconds: 2, transportSeconds: 0,
+    transportDurationSeconds: 2, rate: 1, activeNotes: []};
+  let notify: (state: ScorePlaybackSnapshot) => void = () => {};
+  const source: ScorePlaybackSource = {snapshot: () => snapshot,
+    subscribe(listener) { notify = listener; listener(snapshot); return () => {}; }};
+  let index = 0;
+  const osmd = {load: async () => {}, render() {}, clear() {}, cursor: {
+    show() {}, hide() {}, reset() { index = 0; }, next() { index += 1; }, update() {},
+    iterator: {get EndReached() { return index >= 4; },
+      currentTimeStamp: {get RealValue() { return index / 4; }}},
+  }};
+  const controller = new AbortController();
+  const {unmount} = render(<StaffView playback={source} osmd={{musicXML: '<score-partwise/>', osmd, signal: controller.signal}} />);
+  await act(async () => {});
+  expect(index).toBe(0);
+  controller.abort();
+  act(() => {
+    snapshot = {...snapshot, revision: 1, nominalSeconds: 1, transportSeconds: 1};
+    notify(snapshot);
+  });
+  expect(index).toBe(0);
+  unmount();
+});

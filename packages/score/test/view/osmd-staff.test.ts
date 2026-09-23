@@ -168,6 +168,26 @@ describe('renderOSMDStaffVisualizer cursor sync', () => {
     rendered.dispose?.();
   });
 
+  it('retains the cursor for forward frames within a boundary and still handles crossing and backward seeks', async () => {
+    const {rendered, state} = await renderWith(eighthGrid(1025));
+    rendered.redrawAtTime!(248.01, false);
+    expect(state.index).toBe(993);
+    const before = {...state};
+    for (const seconds of [248.02, 248.1, 248.2, 248.25]) rendered.redrawAtTime!(seconds, false);
+    expect(state.index).toBe(993);
+    expect(state.nextCalls).toBe(before.nextCalls);
+    expect(state.resetCalls).toBe(before.resetCalls);
+    expect(state.updateCalls).toBe(before.updateCalls);
+    rendered.redrawAtTime!(248.26, false);
+    expect(state.index).toBe(994);
+    expect(state.nextCalls).toBe(before.nextCalls + 1);
+    expect(state.resetCalls).toBe(before.resetCalls);
+    rendered.redrawAtTime!(246, false);
+    expect(state.index).toBe(984);
+    expect(state.resetCalls).toBe(before.resetCalls + 1);
+    rendered.dispose?.();
+  });
+
   it('chord-duplicate redraws at the same timestamp cause zero extra cursor calls', async () => {
     const {rendered, state} = await renderWith(eighthGrid(64));
 

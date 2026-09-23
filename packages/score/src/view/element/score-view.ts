@@ -259,7 +259,7 @@ export class ScoreViewElement extends HTMLElementBase {
     return this.view?.state.currentTime ?? this.playheadSeconds;
   }
 
-  /** MIDI pitches intersecting the current score position, ascending. */
+  /** Written MIDI pitches at the current position, or active source notes without a clock. */
   get active(): number[] {
     return [...new Set(this.view?.state.activeNotes.map((note) => note.pitch) ?? [])].sort((a, b) => a - b);
   }
@@ -779,6 +779,7 @@ export class ScoreViewElement extends HTMLElementBase {
           this.sourceInitialized = false;
           void this.refresh();
         },
+        playbackSnapshot: (snapshot) => this.followPlayback(snapshot),
         snapshot: (snapshot) => this.followSnapshot(snapshot),
         noteOn: (note) => this.followNote(note, true),
         noteOff: (note) => this.followNote(note, false),
@@ -877,6 +878,57 @@ export class ScoreViewElement extends HTMLElementBase {
     }
   }
 
+  private followPlayback(snapshot: ScorePlaybackSnapshot): void {
+    // Unavailable native owners retain the binding's legacy event path.
+    if (snapshot.readiness === 'unavailable') return;
+    try {
+      if (snapshot.readiness === 'ready' && snapshot.score === this.resolvedScore && snapshot.nominalSeconds !== null) {
+        this.followSnapshot({
+          nominalSeconds: snapshot.nominalSeconds,
+          transportSeconds: snapshot.transportSeconds ?? 0,
+          transportDurationSeconds: snapshot.transportDurationSeconds ?? 0,
+          ...(snapshot.rate === null ? {} : {rate: snapshot.rate}),
+          playing: snapshot.state === 'playing',
+        });
+        if (snapshot.state === 'ended') {
+          this.view?.clearActiveNotes();
+          this.rendered?.clearActiveNotes();
+        }
+        return;
+      }
+      this.snapshotRevision += 1;
+      this.lastSnapshot = undefined;
+      if (snapshot.readiness !== 'ready' || snapshot.score !== this.resolvedScore) {
+        this.playheadSeconds = 0;
+        this.mapView?.setPosition(0);
+        this.view?.reset();
+        this.rendered?.clearActiveNotes();
+        this.timeline?.update();
+        return;
+      }
+      if (!this.view || !this.rendered) return;
+      if (snapshot.state === 'ended') {
+        this.view.clearActiveNotes();
+        this.rendered.clearActiveNotes();
+        return;
+      }
+      // A valid source may expose note activity without a nominal clock.
+      // Project stable identity rather than sounding MIDI (which can transpose).
+      const state = this.view.updatePlayback(snapshot);
+      const active = state.activeNotes[state.activeNotes.length - 1];
+      const note = active && this.rendered.noteSequence.notes.find((candidate) =>
+        candidate.partId === active.partId && candidate.noteId === active.noteId);
+      if (note) this.rendered.redraw(note, true);
+      else this.rendered.clearActiveNotes();
+    } catch (cause) {
+      const generation = ++this.renderGeneration;
+      this.disposePresentation();
+      if (generation !== this.renderGeneration || !this.isConnected) return;
+      if (this.ownerDocument) this.showStatus('error', this.errorMessage(cause));
+      this.publishRenderState('error', 'render', this.resolvedScore, cause);
+    }
+  }
+
   private paintPosition(seconds: number): void {
     if (!this.view || !this.rendered) return;
     const state = this.view.seek(seconds);
@@ -900,7 +952,8 @@ export class ScoreViewElement extends HTMLElementBase {
       this.visualizerHandlers = handlers;
       return () => { this.visualizerHandlers = undefined; };
     }, this.view);
-    if (this.lastSnapshot) this.followSnapshot(this.lastSnapshot);
+    if (this.playbackSnapshot && this.playbackSnapshot.readiness !== 'unavailable') this.followPlayback(this.playbackSnapshot);
+    else if (this.lastSnapshot) this.followSnapshot(this.lastSnapshot);
     else this.paintPosition(this.playheadSeconds);
   }
 }

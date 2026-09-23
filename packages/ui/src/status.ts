@@ -1,6 +1,6 @@
 import {readText, textValue, type UITextValue} from './text';
 import {installStyle} from './internal/style';
-import {claimHost, createErrorSink} from './internal/lifecycle';
+import {claimHost, createErrorSink, createUpdateLoop} from './internal/lifecycle';
 import {addClassNames, setParts} from './internal/dom';
 import {componentSurfaceCss} from './internal/surface';
 export type StatusKind = 'ready' | 'loading' | 'empty' | 'error';
@@ -120,16 +120,19 @@ export function mountStatus(
 
   const report = createErrorSink(options.onError);
 
-  const update = (): void => {
+  const paintSnapshot = (): void => {
     if (destroyed) return;
     try {
       const state = binding.snapshot();
+      if (destroyed || !claim.isCurrent()) return;
       const text = readText(options.getText, options.onError);
       if (destroyed || !claim.isCurrent()) return;
       const kind: StatusKind =
         state.kind === 'loading' || state.kind === 'empty' || state.kind === 'error'
           ? state.kind
           : 'ready';
+      const content = state.message ?? textValue(text?.[kind], defaultMessage(kind), {}, options.onError);
+      if (destroyed || !claim.isCurrent()) return;
       root.dataset.kind = kind;
       root.hidden = kind === 'ready';
       root.removeAttribute('role');
@@ -143,11 +146,17 @@ export function mountStatus(
         root.setAttribute('aria-live', 'polite');
       }
       if (kind === 'loading') root.setAttribute('aria-busy', 'true');
-      message.textContent = state.message ?? textValue(text?.[kind], defaultMessage(kind), {}, options.onError);
+      message.textContent = content;
     } catch (error) {
       report(error);
     }
   };
+
+  const updates = createUpdateLoop({
+    name: 'Status', pass: paintSnapshot,
+    isCurrent: () => !destroyed && claim.isCurrent(), report,
+  });
+  const update = updates.run;
 
   const handle: StatusHandle = {
     element: root,
@@ -156,6 +165,7 @@ export function mountStatus(
     destroy(): void {
       if (destroyed) return;
       destroyed = true;
+      updates.cancel();
       try {
         unsubscribe?.();
       } catch (error) {
@@ -183,9 +193,12 @@ export function mountStatus(
   }
 
   update();
+  if (destroyed || !claim.isCurrent()) return handle;
   if (binding.subscribe) {
     try {
-      unsubscribe = binding.subscribe(update);
+      const stop = binding.subscribe(update);
+      if (destroyed || !claim.isCurrent()) stop();
+      else unsubscribe = stop;
     } catch (error) {
       report(error);
     }

@@ -83,10 +83,20 @@ export function StaffView({
     else signal.addEventListener('abort', abortOwned, {once: true});
     if (externalSignal?.aborted) abortExternal();
     else externalSignal?.addEventListener('abort', abortExternal, {once: true});
+    const detachSignals = (): void => {
+      signal.removeEventListener('abort', abortOwned);
+      externalSignal?.removeEventListener('abort', abortExternal);
+    };
     return renderOSMDStaffVisualizer(currentScore, surface, {...options, signal: controller.signal})
-      .finally(() => {
-        signal.removeEventListener('abort', abortOwned);
-        externalSignal?.removeEventListener('abort', abortExternal);
+      .then((rendered) => ({
+        ...rendered,
+        dispose() {
+          detachSignals();
+          rendered.dispose?.();
+        },
+      }), (error) => {
+        detachSignals();
+        throw error;
       });
   }, [osmdEnabled, laneHeight, pixelsPerSecond, showAnnotations]);
   useScoreViewRenderer(containerRef, {score, playback, onStateChange}, 'staff', renderer);

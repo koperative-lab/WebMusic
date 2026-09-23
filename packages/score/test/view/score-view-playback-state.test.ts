@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import {afterEach, describe, expect, it, vi} from 'vitest';
-import {Duration, Pitch, Rational, ScoreBuilder, VoiceId, type Score, type ScorePlaybackSnapshot, type ScorePlaybackSource} from '../../src/core';
+import {Duration, NoteId, PartId, Pitch, Rational, ScoreBuilder, VoiceId, type Score, type ScorePlaybackSnapshot, type ScorePlaybackSource} from '../../src/core';
 import {ScoreViewElement, type ScoreViewRenderState} from '../../src/view/element/score-view';
 import {renderScoreVisualizer} from '../../src/view/render/score-visualizer';
 
@@ -43,6 +43,43 @@ function view() { return document.createElement('borrowed-state-score-view') as 
 afterEach(() => { document.body.replaceChildren(); vi.clearAllMocks(); });
 
 describe('score-view borrowed playback and render observation', () => {
+  it.each(['piano-roll', 'staff', 'waterfall'] as const)('follows untimed native note identity in %s and clears released notes', async (type) => {
+    const builder = new ScoreBuilder();
+    const part = builder.addPart({id: PartId('part'), name: 'Part'});
+    builder.addNote(part, {id: NoteId('first'), pitch: Pitch.parse('C4'), onsetQuarters: Rational.ZERO,
+      duration: Duration.quarter(), voice: VoiceId('voice')});
+    builder.addNote(part, {id: NoteId('second'), pitch: Pitch.parse('G4'), onsetQuarters: Rational.from(2),
+      duration: Duration.quarter(), voice: VoiceId('voice')});
+    const owner = playback(builder.build());
+    owner.publish({nominalSeconds: null, activeNotes: [{occurrenceId: 'second-1', partId: 'part', noteId: 'second',
+      midi: 79, nominalStartSeconds: 1, nominalEndSeconds: 1.5}]});
+    const element = view();
+    element.type = type;
+    element.playback = owner.source;
+    document.body.append(element);
+    await flush();
+    expect(element.renderState.status).toBe('ready');
+    expect(element.active).toEqual([67]);
+    const rendered = vi.mocked(renderScoreVisualizer).mock.results.at(-1)!.value;
+    const clear = vi.spyOn(rendered, 'clearActiveNotes');
+    const redraw = vi.spyOn(rendered, 'redraw');
+    owner.publish({activeNotes: []});
+    expect(element.active).toEqual([]);
+    expect(clear).toHaveBeenCalled();
+    owner.publish({activeNotes: [{occurrenceId: 'first-1', partId: 'part', noteId: 'first',
+      midi: 72, nominalStartSeconds: 0, nominalEndSeconds: 0.5}]});
+    expect(element.active).toEqual([60]);
+    expect(redraw).toHaveBeenLastCalledWith(expect.objectContaining({noteId: 'first', pitch: 60}), true);
+    owner.publish({nominalSeconds: 1.25, activeNotes: []});
+    expect(element.currentTime).toBe(1.25);
+    expect(element.active).toEqual([67]);
+    owner.publish({nominalSeconds: null, activeNotes: []});
+    expect(element.active).toEqual([]);
+    element.remove();
+    expect(owner.listeners.size).toBe(0);
+    expect(owner.source.dispose).not.toHaveBeenCalled();
+  });
+
   it('borrows directly ahead of a selector, restores that selector, and releases only subscriptions', async () => {
     const direct = playback();
     const selected = playback(music('G4'));
