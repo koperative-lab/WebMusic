@@ -1,0 +1,6 @@
+QWERTY across two light-DOM pianos: {"eventsA":[],"eventsB":[[60,true]],"firstPressed":true,"secondPressed":false}
+Pointer drag from first board over second: {"eventsA":[[60,true],[60,false],[72,true],[72,false]],"eventsB":[[60,true],[60,false]]}
+macro stylesheet:false: ["parameter"]
+macroRack stylesheet:false: ["macro","parameter"]
+canvasStage stylesheet:false: ["status"]
+Stage remount inside render: {"oldSubscriptions":1,"oldCleanup":0,"oldUnsubscribe":0,"remainingChildren":0}

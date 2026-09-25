@@ -1,0 +1,34 @@
+{
+  "code-alignment-browser-smoke.json": {
+    "bytes": 2080,
+    "sha256": "57f089147e6bd458f3e835b59ad8cb1991f88b9eaecfb0998fad4650af7dc0d8"
+  },
+  "code-alignment-check.txt": {
+    "bytes": 134296,
+    "sha256": "50466a1702a806edfdffb6fc2baf468be9d3fbfae205ae7f9d8960b2b84e88f0"
+  },
+  "code-alignment-demo-script-types.txt": {
+    "bytes": 106,
+    "sha256": "b125be0cf3ff395905745ca2964d6b556bba5f2cd34a4ef7436cea3faa2734a0"
+  },
+  "code-alignment-demo-tests.txt": {
+    "bytes": 543,
+    "sha256": "221e71c3422851eb1cd59f52aa2c2a2b7d361bf1f926b0f4b5a73fc48eb12423"
+  },
+  "code-alignment-docs-build.txt": {
+    "bytes": 146490,
+    "sha256": "9b5e240fd890b0445389ac77dfb21106f0bf24e9c8f2cc760c22fc6c17eb5ad1"
+  },
+  "code-alignment-final-docs-build.txt": {
+    "bytes": 32543,
+    "sha256": "f6a4b80eb058ffbe7c0ce51621162abca73e39e9c78b621d772232bb8a401c9a"
+  },
+  "code-alignment-final-static.txt": {
+    "bytes": 642,
+    "sha256": "f949e8d64d74572cc7a23ff8e0dffd505e08b81d72fc6d538a0f6b399156a4b6"
+  },
+  "code-alignment-rack-demo-tests.txt": {
+    "bytes": 353,
+    "sha256": "86d8548d5ef0657e5e56bb175f5ee96d447e425f9061680018a261ce2750046f"
+  }
+}

@@ -1,0 +1,103 @@
+{
+  "writtenInput": {
+    "chords": [
+      "Am/C",
+      "Bm/D"
+    ],
+    "pitchWeights": [
+      {
+        "label": "C",
+        "value": 480,
+        "key": 0
+      },
+      {
+        "label": "D",
+        "value": 480,
+        "key": 2
+      },
+      {
+        "label": "E",
+        "value": 480,
+        "key": 4
+      },
+      {
+        "label": "F#",
+        "value": 480,
+        "key": 6
+      },
+      {
+        "label": "A",
+        "value": 480,
+        "key": 9
+      },
+      {
+        "label": "B",
+        "value": 480,
+        "key": 11
+      }
+    ],
+    "issues": [],
+    "sessionChords": [
+      "Am/C",
+      "Bm/D"
+    ]
+  },
+  "concertReference": {
+    "chords": [
+      "CM",
+      "DM"
+    ],
+    "pitchWeights": [
+      {
+        "label": "C",
+        "value": 480,
+        "key": 0
+      },
+      {
+        "label": "D",
+        "value": 480,
+        "key": 2
+      },
+      {
+        "label": "E",
+        "value": 480,
+        "key": 4
+      },
+      {
+        "label": "F#",
+        "value": 480,
+        "key": 6
+      },
+      {
+        "label": "G",
+        "value": 480,
+        "key": 7
+      },
+      {
+        "label": "A",
+        "value": 480,
+        "key": 9
+      }
+    ],
+    "issues": [
+      {
+        "type": "parallel-fifth",
+        "startQuarters": 0,
+        "endQuarters": 1,
+        "voices": [
+          "bass",
+          "upper"
+        ],
+        "voiceParts": [
+          "piano",
+          "clarinet"
+        ],
+        "severity": "error"
+      }
+    ],
+    "sessionChords": [
+      "CM",
+      "DM"
+    ]
+  }
+}

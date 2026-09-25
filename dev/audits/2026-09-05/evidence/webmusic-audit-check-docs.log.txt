@@ -1,0 +1,5 @@
+
+> check:docs
+> node --experimental-strip-types --no-warnings scripts/check-docs.mjs
+
+check-docs: clean — 62 live-demo pages · 77 instances, 119 pages · 31 elements · 119 routes

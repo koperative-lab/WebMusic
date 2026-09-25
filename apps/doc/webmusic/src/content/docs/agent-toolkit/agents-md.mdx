@@ -1,18 +1,14 @@
 ---
-title: AGENTS.md and CLAUDE.md
-description: 'Copy WebMusic guidance into your application’s AGENTS.md or CLAUDE.md.'
+title: AGENTS.md
+description: 'Copy WebMusic guidance into your application’s AGENTS.md.'
 sidebar:
-  label: AGENTS.md / CLAUDE.md
+  label: AGENTS.md
   order: 4
 ---
 
-Copy the section below into your application's project instruction file. Keep
-its existing rules and adapt the guidance to your installed WebMusic version.
-
-| File | When to use it | Format guide |
-| --- | --- | --- |
-| `AGENTS.md` | Your coding agent supports the shared AGENTS.md format. | [AGENTS.md](https://agents.md/) |
-| `CLAUDE.md` | You develop with Claude Code. | [Write an effective CLAUDE.md](https://code.claude.com/docs/en/best-practices#write-an-effective-claude-md) |
+Copy the section below into your application's `AGENTS.md`. Keep its existing
+rules and adapt the guidance to your installed WebMusic version. See the
+[AGENTS.md format guide](https://agents.md/) for general project instructions.
 
 ## Copy into your project instructions
 
@@ -53,15 +49,8 @@ its existing rules and adapt the guidance to your installed WebMusic version.
 ```
 
 Add your application's music-file location, integration choice and verification
-commands alongside this section. If the instruction file does not exist,
-create it in your application's root.
-
-## Use both files
-
-If the project already shares `AGENTS.md` and `CLAUDE.md` through a symlink,
-edit its target and preserve the link. Alternatively, keep the section in
-`AGENTS.md` and add `@AGENTS.md` to your existing `CLAUDE.md`, using
-[Claude Code's file imports](https://code.claude.com/docs/en/best-practices#write-an-effective-claude-md).
+commands alongside this section. If `AGENTS.md` does not exist, create it in
+your application's root.
 
 For offline work, save the relevant [documentation bundles](/agent-toolkit/llms-txt/)
 and add their local paths to the section. Review saved context and project

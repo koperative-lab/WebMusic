@@ -8,6 +8,9 @@ ledger records extracted capabilities, their consumers and policies that remain
 with the domains. Package usage belongs in [kernel/README.md](kernel/README.md).
 The [Score architecture](../packages/score/ARCHITECTURE.md) describes the domain's
 composition and timing boundaries; the policies linked below enforce package edges.
+This first-release checkout contains Kernel, UI and Score. The accepted Audio and
+Bridge boundaries in [Architecture](../dev/ARCHITECTURE.md) remain design context;
+their source and public references have not been migrated here.
 
 ## Admission and extension
 
@@ -31,7 +34,7 @@ migration checklist.
 
 | Kernel entry | Shared capability / origin | Policy retained by domains or callers |
 |---|---|---|
-| `/events` | Typed `EventEmitter`, unified from the hardened Score implementation; both domain cores use shims. | Event names, payloads and the choice of `emit` versus `emitSafely`. |
+| `/events` | Typed `EventEmitter`, unified from the hardened Score implementation; Score core re-exports it. | Event names, payloads and the choice of `emit` versus `emitSafely`. |
 | `/element` | `HTMLElementBase`, `WebMusicElement`, `upgradeProperty/Properties`, attribute readers and `defineOnce`, replacing local element helpers. Implementation is `src/elements.ts`; public spelling is `/element`. | Shadow DOM, themes, attributes, presenters, domain state and special teardown order. |
 | `/worker` | `WorkerLike`, `RequestTracker` correlation, and `dedicatedWorkerScope()` detection. | Protocol versions, cancellation, latest-wins, restart and replacement; Score analyze's session model remains distinct. |
 | `/audio-context` | SSR-safe `getAudioContextConstructor` and `createWebAudioContext`. | Liveness, resume, creation versus borrowing, and closure; sharing the helper does not share a context instance. |
@@ -39,19 +42,20 @@ migration checklist.
 | `/effect` | `Effect` / `EffectNodes` over `BaseAudioContext`, allowing a recipe to serve live or offline graphs. | Effect catalogs, chain/insert helpers, parameters, replacement, rollback and release. Shared recipes do not imply shared live nodes. |
 | `/transport` | `TransportClock` affine anchors and `TimelineMapping`. | Score quarters/nominal seconds, Audio clip seconds/samples, duration clamping and loop policy. |
 | `/tick` | Worker-backed wakeups and main-thread fallback. | Lookahead horizons, note commitments, boundaries and UI refresh cadence; each instance has an owner responsible for stopping it. |
-| `/meter` | `AnalyserMeter`, byte-domain RMS/peak, subtractive peak hold and `aggregateSpectrumBars`, extracted from Score/Audio analyser taps. | Public frames, default scale/decay, spectrum-bar floors and error policy; Audio PCM `calculateLevelMeter` stays local. |
+| `/meter` | `AnalyserMeter`, byte-domain RMS/peak, subtractive peak hold and `aggregateSpectrumBars`, extracted from Score/Audio analyser taps. | Public frames, default scale/decay, spectrum-bar floors and error policy; Audio PCM `calculateLevelMeter` belongs in Audio when migrated. |
 | `/sync` | `TransportGroup` roles, N followers, fixed offsets, rate/drift reconciliation, command serialization, generations and intent; `MirrorClockMaster` for clockless adaptation. | Score/Audio axis conversion, the shared rate's domain limits, model conversion and application session assembly. |
 
-`dedicatedWorkerScope()` is shared by Score `io`/`analyze` and Audio `play`/`analyze`
-runtimes. It prevents accidental registration on the main thread, during SSR or
-in Shared/Service worker scopes. Protocol and request-completion policy remain
+`dedicatedWorkerScope()` serves Score `io`/`analyze` runtimes in this checkout.
+The same neutral contract is intended for Audio `play`/`analyze` after migration.
+It prevents accidental registration on the main thread, during SSR or in
+Shared/Service worker scopes. Protocol and request-completion policy remain
 with each client.
 
-Meter extraction unifies the algorithm and tap. Score `LevelMeterController` and
-Audio `AudioMeterController` remain API adapters: Score publishes
-`{level, peak, peakHold}` and Audio publishes `{rms, peak, peakHold, level}`.
-PCM analysis's multiplicative retention is distinct from an analyser's absolute
-per-read peak decay.
+Meter extraction unifies the algorithm and tap. Score's
+`LevelMeterController` publishes `{level, peak, peakHold}` in this checkout.
+The Audio adapter is a future domain integration; its designed
+`{rms, peak, peakHold, level}` frame and PCM analysis's multiplicative retention
+remain distinct from an analyser's absolute per-read peak decay.
 
 ## Keeping contracts aligned
 
@@ -60,30 +64,30 @@ Objects that need a shared shape rather than a shared base class use type-only
 `*-contract.ts` assertions:
 
 - [Score playerlike-contract](../packages/score/src/play/headless/playerlike-contract.ts)
-  and [Audio playerlike-contract](https://github.com/mrsteamedbun/WebMusic/blob/dev/packages/audio/src/play/headless/playerlike-contract.ts)
-  pin the capability tiers implemented by real players.
-- [Bridge transport-contracts](https://github.com/mrsteamedbun/WebMusic/blob/dev/bridges/score-audio/src/transport-contracts.ts)
-  pins ScorePlayer/TonePlayer's master interface and AudioClipPlayer's follower interface.
-- Reverse composition adapts domain positions in
-  [audio-master.ts](https://github.com/mrsteamedbun/WebMusic/blob/dev/bridges/score-audio/src/audio-master.ts); real-player
-  integration tests cover the behavior.
+  pins the capability tiers implemented by current Score players.
+- The [cross-domain architecture](../dev/ARCHITECTURE.md) and
+  [session-clock design](shared-clock-injection.md) define the intended
+  Audio/Bridge role assertions, axis adaptation and both master directions.
+  Those domain adapters and their integration tests have not been migrated into
+  this checkout.
 
-Public type imports/exports keep these assertions in the checked reachability
-graph without runtime code. Structural compatibility does not establish timing
-accuracy, cleanup or concurrency ordering; those require behavioral tests.
+Public type imports/exports keep the present Score assertion in the checked
+reachability graph without runtime code. Structural compatibility does not
+establish timing accuracy, cleanup or concurrency ordering; those require
+behavioral tests.
 
-The `/sync` extraction came from the proven Bridge coordinator, not two historical
-copies. It resides in Kernel together with the master/follower role contracts
-needed by both domains; domain adapters remain in Bridge. New pairings should
-reuse these roles and the group instead of copying queues and drift monitors.
+The `/sync` extraction originated in cross-domain coordination work, not two
+historical copies. It resides in Kernel together with the structural
+master/follower roles. Future Bridge adapters should reuse these roles and the
+group instead of copying queues and drift monitors.
 
 ## Session-time contract boundary
 
 The accepted rule is one authoritative timeline per session, with independent
-sessions. Today's group reads one master as its position authority and coordinates
-participants against one reference clock; both master directions are implemented.
-This does not merge the private `TransportClock` instances inside the Score
-scheduler and Audio buffer engine.
+sessions. The current Kernel group reads one structural master as its position
+authority and coordinates participants against one reference clock. The Score
+scheduler owns its private `TransportClock`; Audio's buffer engine and the Bridge
+factories for both master directions are not in this checkout.
 
 `TransportClock` has no anchor-change event, epoch or write-ownership protocol.
 Same-instance injection, invalidation/rescheduling of committed audio, and

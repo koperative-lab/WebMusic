@@ -47,7 +47,7 @@ The source of every route below is under `doc/webmusic/src/content/docs/`:
 |---|---|
 | `/` | `index.mdx` — introduction |
 | `/quick-start/` | `quick-start.mdx` |
-| `/agent-toolkit/…` | AI-assisted application development: overview, context downloads, Skills, AGENTS.md and CLAUDE.md |
+| `/agent-toolkit/…` | AI-assisted application development: overview, context downloads, Skills, and AGENTS.md |
 | `/score/…` | Symbolic music |
 | `/uikit/…` | Presenter overview, catalog, and reference |
 | `/kernel/…` | Shared platform contracts |
@@ -113,5 +113,5 @@ base to generated links. A [Markdown link plugin](doc/webmusic/scripts/docs-base
 also applies the base while rendering article links in development and builds;
 the Pages postprocessor still covers component-emitted HTML targets.
 The public [consumer skill](../skills/README.md) can
-be copied independently of this repository. The AGENTS.md / CLAUDE.md
+be copied independently of this repository. The AGENTS.md
 documentation page provides instructions to copy into an application directly.

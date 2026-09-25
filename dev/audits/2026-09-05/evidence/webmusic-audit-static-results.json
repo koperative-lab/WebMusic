@@ -1,0 +1,44 @@
+[
+  {
+    "check": "check:format",
+    "status": 0,
+    "seconds": 0.366,
+    "output": "\n> check:format\n> node scripts/check-format.mjs\n\nFormat check passed.\n"
+  },
+  {
+    "check": "check:lockfile",
+    "status": 0,
+    "seconds": 0.116,
+    "output": "\n> check:lockfile\n> node scripts/check-lockfile.mjs\n\nLockfile check passed: every declared optional dependency is present across 1139 locked packages.\n"
+  },
+  {
+    "check": "lint",
+    "status": 1,
+    "seconds": 27.416,
+    "output": "\n> lint\n> eslint .\n\n\n/Users/mamingchen/GitHub/WebMusic/.claude/worktrees/debug-branch-db7bf5/packages/audio/src/react/index.tsx\n  262:5  error  Definition for rule 'react-hooks/exhaustive-deps' was not found  react-hooks/exhaustive-deps\n\n/Users/mamingchen/GitHub/WebMusic/.claude/worktrees/debug-branch-db7bf5/packages/score/src/react/analysis.tsx\n  269:5  error  Definition for rule 'react-hooks/exhaustive-deps' was not found  react-hooks/exhaustive-deps\n\n/Users/mamingchen/GitHub/WebMusic/.claude/worktrees/kind-swartz-c081f5/packages/audio/src/react/index.tsx\n  262:5  error  Definition for rule 'react-hooks/exhaustive-deps' was not found  react-hooks/exhaustive-deps\n\n/Users/mamingchen/GitHub/WebMusic/.claude/worktrees/kind-swartz-c081f5/packages/score/src/react/analysis.tsx\n  269:5  error  Definition for rule 'react-hooks/exhaustive-deps' was not found  react-hooks/exhaustive-deps\n\n/Users/mamingchen/GitHub/WebMusic/.claude/worktrees/mvmnt-features-review-41f87a/packages/audio/src/react/index.tsx\n  262:5  error  Definition for rule 'react-hooks/exhaustive-deps' was not found  react-hooks/exhaustive-deps\n\n/Users/mamingchen/GitHub/WebMusic/.claude/worktrees/mvmnt-features-review-41f87a/packages/score/src/react/analysis.tsx\n  269:5  error  Definition for rule 'react-hooks/exhaustive-deps' was not found  react-hooks/exhaustive-deps\n\n/Users/mamingchen/GitHub/WebMusic/.claude/worktrees/sharp-austin-904c97/packages/audio/src/react/index.tsx\n  262:5  error  Definition for rule 'react-hooks/exhaustive-deps' was not found  react-hooks/exhaustive-deps\n\n/Users/mamingchen/GitHub/WebMusic/.claude/worktrees/sharp-austin-904c97/packages/score/src/react/analysis.tsx\n  269:5  error  Definition for rule 'react-hooks/exhaustive-deps' was not found  react-hooks/exhaustive-deps\n\n✖ 8 problems (8 errors, 0 warnings)\n\n"
+  },
+  {
+    "check": "check:architecture",
+    "status": 0,
+    "seconds": 1.211,
+    "output": "\n> check:architecture\n> node scripts/check-architecture.mjs\n\nArchitecture check passed for 5 packages and 354 source modules.\n"
+  },
+  {
+    "check": "check:docs",
+    "status": 0,
+    "seconds": 0.274,
+    "output": "\n> check:docs\n> node --experimental-strip-types --no-warnings scripts/check-docs.mjs\n\ncheck-docs: clean — 62 live-demo pages · 77 instances, 119 pages · 31 elements · 119 routes\n"
+  },
+  {
+    "check": "check:licenses",
+    "status": 0,
+    "seconds": 0.115,
+    "output": "\n> check:licenses\n> node scripts/license-gate.mjs\n\nLicense gate passed: no copyleft package in hard dependencies; all restricted peers are optional.\n"
+  },
+  {
+    "check": "check:release-manifests",
+    "status": 0,
+    "seconds": 0.12,
+    "output": "\n> check:release-manifests\n> node scripts/release-manifests.mjs\n\nRelease manifests are consistent at 0.1.0.\n"
+  }
+]

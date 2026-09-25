@@ -1,0 +1,5 @@
+
+> check:architecture
+> node scripts/check-architecture.mjs
+
+Architecture check passed for 5 packages and 354 source modules.

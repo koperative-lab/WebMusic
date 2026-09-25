@@ -1,0 +1,39 @@
+import {createAudioClip} from '/Users/mamingchen/GitHub/WebMusic/packages/audio/src/core/index.ts';
+import {AudioPlaylist} from '/Users/mamingchen/GitHub/WebMusic/packages/audio/src/play/headless/playlist.ts';
+import {AudioMixer} from '/Users/mamingchen/GitHub/WebMusic/packages/audio/src/play/headless/mixer.ts';
+const activeTimers=new Set();let timer=0;
+globalThis.setInterval=(() => {const id=++timer;activeTimers.add(id);return id;}) as any;
+globalThis.clearInterval=((id)=>activeTimers.delete(id)) as any;
+function fakeContext(){const sources:any[]=[];const node=()=>({connect(){},disconnect(){}});return {sources,context:{state:'running',currentTime:0,destination:node(),resume:async()=>{},close:async()=>{},createGain:()=>({...node(),gain:{value:1}}),createStereoPanner:()=>({...node(),pan:{value:0}}),createAnalyser:()=>({...node(),fftSize:0,smoothingTimeConstant:0}),createBuffer:(channels,length,sampleRate)=>({numberOfChannels:channels,length,sampleRate,duration:length/sampleRate,getChannelData:()=>new Float32Array(length)}),createBufferSource:()=>{const s={...node(),playbackRate:{value:1},onended:null,stopped:false,started:false,start(){this.started=true},stop(){this.stopped=true}};sources.push(s);return s;}} as any};}
+const clip=(seconds=1)=>createAudioClip({sampleRate:1000,channelData:[new Float32Array(seconds*1000)]});
+const flush=async()=>{for(let i=0;i<10;i++)await Promise.resolve();};
+{
+ const {context,sources}=fakeContext();const q=new AudioPlaylist({audioContext:context,entries:[{id:'a',clip:clip()}]});
+ const changes=[];q.on('trackchange',d=>changes.push(d.id));await Promise.all([q.play(),q.play()]);q.dispose();
+ console.log('playlist concurrent play',JSON.stringify({sources:sources.length,changes,stopped:sources.map(s=>s.stopped),leakedCursorTimers:activeTimers.size}));activeTimers.clear();
+}
+{
+ const {context,sources}=fakeContext();let finish;const q=new AudioPlaylist({audioContext:context,prefetch:false,entries:[{id:'old',src:'old.wav'}],loadEntry:()=>new Promise(r=>finish=r)});
+ const pending=q.play();q.setEntries([{id:'new',clip:clip(3)}]);finish(clip(1));await pending;await q.play();
+ console.log('playlist stale removed entry',JSON.stringify({current:q.current?.id,currentClipDuration:q.currentClip?.duration,activePlayerDuration:q.activePlayer?.duration,sources:sources.length}));q.dispose();
+}
+{
+ const {context}=fakeContext();let finish;const q=new AudioPlaylist({audioContext:context,prefetch:false,entries:[{id:'a',src:'a.wav'}],loadEntry:()=>new Promise(r=>finish=r)});
+ const pending=q.play();q.setEntries([{id:'a',src:'a.wav',label:'renamed'}]);finish(clip());await pending;
+ console.log('playlist rerender during load',JSON.stringify({status:q.statusOf('a'),currentClip:!!q.currentClip,playing:q.playing}));q.dispose();
+}
+{
+ const {context,sources}=fakeContext();const q=new AudioPlaylist({audioContext:context,prefetch:false,entries:[{id:'a',clip:clip(1)}]});await q.play();q.setEntries([{id:'a',clip:clip(3)}]);
+ console.log('playlist changed source',JSON.stringify({currentClipDuration:q.currentClip?.duration,activePlayerDuration:q.activePlayer?.duration}));q.dispose();
+}
+{
+ const {context}=fakeContext();const q=new AudioPlaylist({audioContext:context,loop:true,entries:[{id:'bad'}]});let failures=0;q.on('error',()=>{failures++;if(failures===20)q.stop()});await q.play();console.log('playlist looping failed entry',JSON.stringify({failuresBeforeManualStop:failures,status:q.statusOf('bad')}));q.dispose();
+}
+{
+ const {context,sources}=fakeContext();const mixer=new AudioMixer({audioContext:context});mixer.add({id:'a',clip:clip()});const pending=mixer.play();mixer.stop();await pending;
+ console.log('mixer play then immediate stop',JSON.stringify({sources:sources.length,playingAfterStop:sources.some(s=>s.started&&!s.stopped)}));mixer.dispose();
+}
+{
+ const {context,sources}=fakeContext();const mixer=new AudioMixer({audioContext:context});mixer.add({id:'a',clip:clip(4)});await mixer.play();mixer.seek(1);mixer.stop();await flush();
+ console.log('mixer seek then immediate stop',JSON.stringify({sources:sources.length,playingAfterStop:sources.some(s=>s.started&&!s.stopped)}));mixer.dispose();
+}

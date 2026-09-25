@@ -1,0 +1,896 @@
+{
+  "scope": [
+    {
+      "file": "dev/API-PAGE-TEMPLATE.md",
+      "lines": 212,
+      "sha256": "cd4d120abcf3252b4c4d9160703c45d10bf6c638b6f3dea8897ff89455126490"
+    },
+    {
+      "file": "dev/COMPONENT-PAGE-TEMPLATE.md",
+      "lines": 282,
+      "sha256": "09a31a0d1327b70689516b341f69414126027b894e44f588410d2f01e41d8b88"
+    },
+    {
+      "file": "dev/DEVELOPMENT.md",
+      "lines": 283,
+      "sha256": "c7bf8773af001256d859372456de1ca8ab65777d0dac7f8d1dd8cd659f598b52"
+    },
+    {
+      "file": "dev/DOCS-CONVENTIONS.md",
+      "lines": 161,
+      "sha256": "787fbce5cd3a32786141ef0291f42d98e30cf07595b43e2f05cfbd41d7730711"
+    },
+    {
+      "file": "dev/DOCS-SITE-PLAN.md",
+      "lines": 403,
+      "sha256": "fd1c24f52d9b4d1373971e46a621ed1a0da6107af4e81fb56adfb7c903b93831"
+    },
+    {
+      "file": "dev/HEADLESS-PAGE-TEMPLATE.md",
+      "lines": 286,
+      "sha256": "dd483c549e1266551cc4db20d5494f95b12ae98a4fefe43a9d87ad6f6f29a405"
+    },
+    {
+      "file": "dev/UIKIT-PAGE-TEMPLATE.md",
+      "lines": 274,
+      "sha256": "2477bc6002ca8a54158e9f83139f3af40c01b4e1d1993e24e121642eae0ea506"
+    },
+    {
+      "file": "dev/audits/2026-09-05/FIXES.md",
+      "lines": 59,
+      "sha256": "ee5df2e1a4f8f38323d66ea45e9be1d636def8c09450070f176d1c17729a6db1"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "lines": 273,
+      "sha256": "21a5fc09fdaa6b9ea04269ee0f731e89d271446f228517e59b29f068dacc0a51"
+    },
+    {
+      "file": "dev/plans/audio-analyze-elements.md",
+      "lines": 455,
+      "sha256": "b95b2dd5242c7caf10415dac71ed6a8d4bc964c254a44305a76bc5d7a975c072"
+    },
+    {
+      "file": "dev/plans/audio-play-elements.md",
+      "lines": 522,
+      "sha256": "5ac4b7b38b7e40ab345086d719b5fd9684a136471137159a5ab7f8416d47c958"
+    },
+    {
+      "file": "dev/plans/audio-view-elements.md",
+      "lines": 465,
+      "sha256": "961384b6002d1e426e3db89bfc76af7021a43a2253d810716b93f97c719c53a3"
+    },
+    {
+      "file": "dev/plans/docs-site-backlog.md",
+      "lines": 266,
+      "sha256": "f39bbf03ad1066bd3d6b8895da5445bf582ece4cdcf1875c51ae5776fd4ce74d"
+    },
+    {
+      "file": "dev/plans/repo-review-2026-08-22.md",
+      "lines": 368,
+      "sha256": "668e0837794a60bb2de06a46fab85712c80f446e3f4b7b58ed51412161ed1115"
+    },
+    {
+      "file": "dev/plans/score-analyze-elements.md",
+      "lines": 440,
+      "sha256": "d9241d98fbef0b66294535a2afb12ac864e9000949790c6d8f0a8d876c89f48a"
+    },
+    {
+      "file": "dev/plans/score-view-elements.md",
+      "lines": 503,
+      "sha256": "b1193099bd258c28654bb0b7c145026db02d255d3e1f57dff21dc045be279272"
+    }
+  ],
+  "summary": {
+    "markdown_files": 16,
+    "lines": 5252,
+    "checked_local_markdown_links": 110,
+    "missing_local_links": 0,
+    "absolute_local_links": 68,
+    "ignored_dev_files": 20
+  },
+  "missing_links": [],
+  "absolute_local_links": [
+    {
+      "file": "dev/audits/2026-09-05/FIXES.md",
+      "line": 9,
+      "target": "/Users/mamingchen/GitHub/WebMusic/packages/audio/src/play/headless/playlist.ts",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "packages/audio/src/play/headless/playlist.ts"
+    },
+    {
+      "file": "dev/audits/2026-09-05/FIXES.md",
+      "line": 11,
+      "target": "/Users/mamingchen/GitHub/WebMusic/packages/audio/src/play/headless/mixer.ts",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "packages/audio/src/play/headless/mixer.ts"
+    },
+    {
+      "file": "dev/audits/2026-09-05/FIXES.md",
+      "line": 12,
+      "target": "/Users/mamingchen/GitHub/WebMusic/packages/audio/src/play/headless/playlist.ts",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "packages/audio/src/play/headless/playlist.ts"
+    },
+    {
+      "file": "dev/audits/2026-09-05/FIXES.md",
+      "line": 13,
+      "target": "/Users/mamingchen/GitHub/WebMusic/packages/score/src/play/headless/synth-panel-audio.ts",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "packages/score/src/play/headless/synth-panel-audio.ts"
+    },
+    {
+      "file": "dev/audits/2026-09-05/FIXES.md",
+      "line": 13,
+      "target": "/Users/mamingchen/GitHub/WebMusic/packages/score/src/play/element/synth-panel.ts",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "packages/score/src/play/element/synth-panel.ts"
+    },
+    {
+      "file": "dev/audits/2026-09-05/FIXES.md",
+      "line": 14,
+      "target": "/Users/mamingchen/GitHub/WebMusic/packages/score/src/play/headless/score-player-scheduler.ts",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "packages/score/src/play/headless/score-player-scheduler.ts"
+    },
+    {
+      "file": "dev/audits/2026-09-05/FIXES.md",
+      "line": 15,
+      "target": "/Users/mamingchen/GitHub/WebMusic/packages/score/src/play/element/score-player.ts",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "packages/score/src/play/element/score-player.ts"
+    },
+    {
+      "file": "dev/audits/2026-09-05/FIXES.md",
+      "line": 17,
+      "target": "/Users/mamingchen/GitHub/WebMusic/packages/score/src/play/element/internal/preset-player.ts",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "packages/score/src/play/element/internal/preset-player.ts"
+    },
+    {
+      "file": "dev/audits/2026-09-05/FIXES.md",
+      "line": 17,
+      "target": "/Users/mamingchen/GitHub/WebMusic/packages/score/src/play/headless/rack-transport.ts",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "packages/score/src/play/headless/rack-transport.ts"
+    },
+    {
+      "file": "dev/audits/2026-09-05/FIXES.md",
+      "line": 18,
+      "target": "/Users/mamingchen/GitHub/WebMusic/bridges/score-audio/src/owned-context.ts",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "bridges/score-audio/src/owned-context.ts"
+    },
+    {
+      "file": "dev/audits/2026-09-05/FIXES.md",
+      "line": 18,
+      "target": "/Users/mamingchen/GitHub/WebMusic/bridges/score-audio/src/sync.ts",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "bridges/score-audio/src/sync.ts"
+    },
+    {
+      "file": "dev/audits/2026-09-05/FIXES.md",
+      "line": 18,
+      "target": "/Users/mamingchen/GitHub/WebMusic/bridges/score-audio/src/audio-master.ts",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "bridges/score-audio/src/audio-master.ts"
+    },
+    {
+      "file": "dev/audits/2026-09-05/FIXES.md",
+      "line": 19,
+      "target": "/Users/mamingchen/GitHub/WebMusic/platform/kernel/src/sync.ts",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "platform/kernel/src/sync.ts"
+    },
+    {
+      "file": "dev/audits/2026-09-05/FIXES.md",
+      "line": 20,
+      "target": "/Users/mamingchen/GitHub/WebMusic/packages/ui/src/note.ts",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "packages/ui/src/note.ts"
+    },
+    {
+      "file": "dev/audits/2026-09-05/FIXES.md",
+      "line": 21,
+      "target": "/Users/mamingchen/GitHub/WebMusic/packages/ui/src/macro.ts",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "packages/ui/src/macro.ts"
+    },
+    {
+      "file": "dev/audits/2026-09-05/FIXES.md",
+      "line": 21,
+      "target": "/Users/mamingchen/GitHub/WebMusic/packages/ui/src/stage.ts",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "packages/ui/src/stage.ts"
+    },
+    {
+      "file": "dev/audits/2026-09-05/FIXES.md",
+      "line": 22,
+      "target": "/Users/mamingchen/GitHub/WebMusic/eslint.config.mjs",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "eslint.config.mjs"
+    },
+    {
+      "file": "dev/audits/2026-09-05/FIXES.md",
+      "line": 23,
+      "target": "/Users/mamingchen/GitHub/WebMusic/apps/doc/webmusic/src/content/docs/uikit/index.mdx",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "apps/doc/webmusic/src/content/docs/uikit/index.mdx"
+    },
+    {
+      "file": "dev/audits/2026-09-05/FIXES.md",
+      "line": 24,
+      "target": "/Users/mamingchen/GitHub/WebMusic/packages/ui/src/stage.ts",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "packages/ui/src/stage.ts"
+    },
+    {
+      "file": "dev/audits/2026-09-05/FIXES.md",
+      "line": 25,
+      "target": "/Users/mamingchen/GitHub/WebMusic/tsconfig.test.json",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "tsconfig.test.json"
+    },
+    {
+      "file": "dev/audits/2026-09-05/FIXES.md",
+      "line": 55,
+      "target": "/Users/mamingchen/GitHub/WebMusic/dev/audits/2026-09-05/repair-evidence/check.log",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "dev/audits/2026-09-05/repair-evidence/check.log"
+    },
+    {
+      "file": "dev/audits/2026-09-05/FIXES.md",
+      "line": 56,
+      "target": "/Users/mamingchen/GitHub/WebMusic/dev/audits/2026-09-05/repair-evidence/docs-build.log",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "dev/audits/2026-09-05/repair-evidence/docs-build.log"
+    },
+    {
+      "file": "dev/audits/2026-09-05/FIXES.md",
+      "line": 57,
+      "target": "/Users/mamingchen/GitHub/WebMusic/dev/audits/2026-09-05/README.md",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "dev/audits/2026-09-05/README.md"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "line": 3,
+      "target": "/Users/mamingchen/GitHub/WebMusic/dev/audits/2026-09-05/FIXES.md",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "dev/audits/2026-09-05/FIXES.md"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "line": 50,
+      "target": "/Users/mamingchen/GitHub/WebMusic/packages/audio/src/play/headless/playlist.ts:369",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "packages/audio/src/play/headless/playlist.ts"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "line": 50,
+      "target": "/Users/mamingchen/GitHub/WebMusic/packages/audio/src/play/headless/playlist.ts:436",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "packages/audio/src/play/headless/playlist.ts"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "line": 62,
+      "target": "/Users/mamingchen/GitHub/WebMusic/packages/audio/src/play/headless/playlist.ts:363",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "packages/audio/src/play/headless/playlist.ts"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "line": 74,
+      "target": "/Users/mamingchen/GitHub/WebMusic/packages/audio/src/play/headless/mixer.ts:226",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "packages/audio/src/play/headless/mixer.ts"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "line": 74,
+      "target": "/Users/mamingchen/GitHub/WebMusic/packages/audio/src/play/headless/mixer.ts:138",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "packages/audio/src/play/headless/mixer.ts"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "line": 86,
+      "target": "/Users/mamingchen/GitHub/WebMusic/packages/audio/src/play/headless/playlist.ts:132",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "packages/audio/src/play/headless/playlist.ts"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "line": 86,
+      "target": "/Users/mamingchen/GitHub/WebMusic/packages/audio/src/play/headless/playlist.ts:147",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "packages/audio/src/play/headless/playlist.ts"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "line": 86,
+      "target": "/Users/mamingchen/GitHub/WebMusic/packages/audio/src/play/headless/playlist.ts:349",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "packages/audio/src/play/headless/playlist.ts"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "line": 100,
+      "target": "/Users/mamingchen/GitHub/WebMusic/packages/score/src/play/headless/synth-panel-audio.ts:94",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "packages/score/src/play/headless/synth-panel-audio.ts"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "line": 112,
+      "target": "/Users/mamingchen/GitHub/WebMusic/packages/score/src/play/headless/score-player-scheduler.ts:689",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "packages/score/src/play/headless/score-player-scheduler.ts"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "line": 112,
+      "target": "/Users/mamingchen/GitHub/WebMusic/packages/score/src/play/headless/score-player-scheduler.ts:718",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "packages/score/src/play/headless/score-player-scheduler.ts"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "line": 124,
+      "target": "/Users/mamingchen/GitHub/WebMusic/packages/score/src/play/element/score-player.ts:337",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "packages/score/src/play/element/score-player.ts"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "line": 124,
+      "target": "/Users/mamingchen/GitHub/WebMusic/packages/score/src/play/element/score-player.ts:365",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "packages/score/src/play/element/score-player.ts"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "line": 134,
+      "target": "/Users/mamingchen/GitHub/WebMusic/packages/score/src/play/element/score-player.ts:479",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "packages/score/src/play/element/score-player.ts"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "line": 134,
+      "target": "/Users/mamingchen/GitHub/WebMusic/packages/score/src/play/element/score-player.ts:524",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "packages/score/src/play/element/score-player.ts"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "line": 144,
+      "target": "/Users/mamingchen/GitHub/WebMusic/packages/score/src/play/element/score-player.ts:415",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "packages/score/src/play/element/score-player.ts"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "line": 144,
+      "target": "/Users/mamingchen/GitHub/WebMusic/packages/score/src/play/element/score-player.ts:428",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "packages/score/src/play/element/score-player.ts"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "line": 156,
+      "target": "/Users/mamingchen/GitHub/WebMusic/bridges/score-audio/src/sync.ts:435",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "bridges/score-audio/src/sync.ts"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "line": 156,
+      "target": "/Users/mamingchen/GitHub/WebMusic/bridges/score-audio/src/audio-master.ts:221",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "bridges/score-audio/src/audio-master.ts"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "line": 168,
+      "target": "/Users/mamingchen/GitHub/WebMusic/bridges/score-audio/src/audio-master.ts:151",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "bridges/score-audio/src/audio-master.ts"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "line": 168,
+      "target": "/Users/mamingchen/GitHub/WebMusic/platform/kernel/src/sync.ts:482",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "platform/kernel/src/sync.ts"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "line": 180,
+      "target": "/Users/mamingchen/GitHub/WebMusic/packages/ui/src/note.ts:211",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "packages/ui/src/note.ts"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "line": 180,
+      "target": "/Users/mamingchen/GitHub/WebMusic/packages/ui/src/note.ts:224",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "packages/ui/src/note.ts"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "line": 180,
+      "target": "/Users/mamingchen/GitHub/WebMusic/packages/ui/src/note.ts:350",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "packages/ui/src/note.ts"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "line": 192,
+      "target": "/Users/mamingchen/GitHub/WebMusic/packages/ui/src/macro.ts:168",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "packages/ui/src/macro.ts"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "line": 192,
+      "target": "/Users/mamingchen/GitHub/WebMusic/packages/ui/src/macro.ts:232",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "packages/ui/src/macro.ts"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "line": 192,
+      "target": "/Users/mamingchen/GitHub/WebMusic/packages/ui/src/stage.ts:628",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "packages/ui/src/stage.ts"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "line": 204,
+      "target": "/Users/mamingchen/GitHub/WebMusic/eslint.config.mjs:9",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "eslint.config.mjs"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "line": 204,
+      "target": "/Users/mamingchen/GitHub/WebMusic/eslint.config.mjs:47",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "eslint.config.mjs"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "line": 216,
+      "target": "/Users/mamingchen/GitHub/WebMusic/apps/doc/webmusic/src/content/docs/uikit/notes/note.mdx:169",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "apps/doc/webmusic/src/content/docs/uikit/notes/note.mdx"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "line": 216,
+      "target": "/Users/mamingchen/GitHub/WebMusic/apps/doc/webmusic/src/content/docs/uikit/parameters-gestures/eq.mdx:109",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "apps/doc/webmusic/src/content/docs/uikit/parameters-gestures/eq.mdx"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "line": 216,
+      "target": "/Users/mamingchen/GitHub/WebMusic/apps/doc/webmusic/src/content/docs/uikit/transport-time/timeline.mdx:208",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "apps/doc/webmusic/src/content/docs/uikit/transport-time/timeline.mdx"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "line": 260,
+      "target": "/Users/mamingchen/GitHub/WebMusic/dev/audits/2026-09-05/evidence/webmusic-audit-test.log",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "dev/audits/2026-09-05/evidence/webmusic-audit-test.log"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "line": 261,
+      "target": "/Users/mamingchen/GitHub/WebMusic/dev/audits/2026-09-05/evidence/webmusic-audit-build.log",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "dev/audits/2026-09-05/evidence/webmusic-audit-build.log"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "line": 262,
+      "target": "/Users/mamingchen/GitHub/WebMusic/dev/audits/2026-09-05/evidence/webmusic-audit-docs-build.log",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "dev/audits/2026-09-05/evidence/webmusic-audit-docs-build.log"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "line": 263,
+      "target": "/Users/mamingchen/GitHub/WebMusic/dev/audits/2026-09-05/evidence/webmusic-audit-lint.log",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "dev/audits/2026-09-05/evidence/webmusic-audit-lint.log"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "line": 264,
+      "target": "/Users/mamingchen/GitHub/WebMusic/dev/audits/2026-09-05/evidence/runtime-repros.log",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "dev/audits/2026-09-05/evidence/runtime-repros.log"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "line": 265,
+      "target": "/Users/mamingchen/GitHub/WebMusic/dev/audits/2026-09-05/evidence/score-repros.log",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "dev/audits/2026-09-05/evidence/score-repros.log"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "line": 266,
+      "target": "/Users/mamingchen/GitHub/WebMusic/dev/audits/2026-09-05/evidence/ui-repro.log",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "dev/audits/2026-09-05/evidence/ui-repro.log"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "line": 267,
+      "target": "/Users/mamingchen/GitHub/WebMusic/dev/audits/2026-09-05/evidence/audio-repro.ts.txt",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "dev/audits/2026-09-05/evidence/audio-repro.ts.txt"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "line": 268,
+      "target": "/Users/mamingchen/GitHub/WebMusic/dev/audits/2026-09-05/evidence/bridge-repro.ts.txt",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "dev/audits/2026-09-05/evidence/bridge-repro.ts.txt"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "line": 269,
+      "target": "/Users/mamingchen/GitHub/WebMusic/dev/audits/2026-09-05/evidence/score-repro.test.ts.txt",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "dev/audits/2026-09-05/evidence/score-repro.test.ts.txt"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "line": 270,
+      "target": "/Users/mamingchen/GitHub/WebMusic/dev/audits/2026-09-05/evidence/ui-repro.cjs.txt",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "dev/audits/2026-09-05/evidence/ui-repro.cjs.txt"
+    },
+    {
+      "file": "dev/audits/2026-09-05/README.md",
+      "line": 271,
+      "target": "/Users/mamingchen/GitHub/WebMusic/dev/audits/2026-09-05/evidence/playlist-loop-repro.ts.txt",
+      "exists": true,
+      "absolute_local": true,
+      "dest": "dev/audits/2026-09-05/evidence/playlist-loop-repro.ts.txt"
+    }
+  ],
+  "ignored_dev_files": [
+    "dev/audits/2026-09-05/evidence/runtime-repros.log",
+    "dev/audits/2026-09-05/evidence/score-repros.log",
+    "dev/audits/2026-09-05/evidence/ui-repro.log",
+    "dev/audits/2026-09-05/evidence/webmusic-audit-build.log",
+    "dev/audits/2026-09-05/evidence/webmusic-audit-check-architecture.log",
+    "dev/audits/2026-09-05/evidence/webmusic-audit-check-doc-snippets.log",
+    "dev/audits/2026-09-05/evidence/webmusic-audit-check-docs.log",
+    "dev/audits/2026-09-05/evidence/webmusic-audit-check-format.log",
+    "dev/audits/2026-09-05/evidence/webmusic-audit-check-licenses.log",
+    "dev/audits/2026-09-05/evidence/webmusic-audit-check-lockfile.log",
+    "dev/audits/2026-09-05/evidence/webmusic-audit-check-packages.log",
+    "dev/audits/2026-09-05/evidence/webmusic-audit-check-release-manifests.log",
+    "dev/audits/2026-09-05/evidence/webmusic-audit-docs-build.log",
+    "dev/audits/2026-09-05/evidence/webmusic-audit-lint-scoped.log",
+    "dev/audits/2026-09-05/evidence/webmusic-audit-lint.log",
+    "dev/audits/2026-09-05/evidence/webmusic-audit-test.log",
+    "dev/audits/2026-09-05/evidence/webmusic-audit-typecheck-tests.log",
+    "dev/audits/2026-09-05/evidence/webmusic-audit-typecheck.log",
+    "dev/audits/2026-09-05/repair-evidence/check.log",
+    "dev/audits/2026-09-05/repair-evidence/docs-build.log"
+  ],
+  "exact_repeated_paragraphs": [
+    {
+      "text": "One backlog, in [DOCS-SITE-PLAN.md](DOCS-SITE-PLAN.md) §\"Where today's site falls short of this\" — including what this template's pages still need. A per-template list goes stale faster than anyone reads it.",
+      "files": [
+        "dev/API-PAGE-TEMPLATE.md",
+        "dev/HEADLESS-PAGE-TEMPLATE.md",
+        "dev/UIKIT-PAGE-TEMPLATE.md"
+      ]
+    }
+  ],
+  "review": {
+    "recorded_at": "2026-09-05T11:50:33.203122-04:00",
+    "head": "086905cacb7b22de57b9dc4a191bb67f268dd271",
+    "branch": "main",
+    "scope": "Original 16 dev Markdown documents before creation of DEV-DOCS-REVIEW.md; local worktree includes uncommitted changes",
+    "limits": [
+      "Current remote GitHub and npm facts remain unverified; public-page fetch attempts yielded no usable content.",
+      "Local Markdown link scan excludes code fences, external URLs, site-absolute URLs and fragment validation",
+      "Existing build output inspected; no new full build or full tests in this documentation review"
+    ]
+  },
+  "checks": [
+    {
+      "command": "npm run check:docs",
+      "exit_code": 0,
+      "output": "check-docs: clean — 62 live-demo pages · 77 instances, 119 pages · 31 elements · 119 routes"
+    },
+    {
+      "command": "npm run check:doc-snippets",
+      "exit_code": 0,
+      "output": "Doc snippet check passed: 153 snippets compile against the built .d.ts files."
+    },
+    {
+      "command": "npm run check:architecture",
+      "exit_code": 0,
+      "output": "Architecture check passed for 5 packages and 355 source modules."
+    }
+  ],
+  "local_tag": {
+    "name": "v0.1.0",
+    "kind": "annotated",
+    "tag_object": "c09ff2b761413d306332a7b809452a65945a5657",
+    "commit": "0d01ee29ae6039e74330842ed45be8b7fe1216c5",
+    "does_not_prove_npm_publication": true
+  },
+  "source_evidence_hashes": {
+    "package.json": "3c0f846bbefd3338570bfa2382592afdff6f8972a33a457c3ab9bef1b67fe66f",
+    ".github/workflows/ci.yml": "7ae03ab87e63b28c657d24496c9702c7dd272203f9e0409a89658dbaf56b92ea",
+    "tsconfig.test.json": "5c2d1a24a9192413cb2029aa189d581b009ece221542838c617e234c5355eb03",
+    "scripts/check-docs.mjs": "ce74db316be5c82aa65054bb66748319d489f0b98cc1893d29e30aa41b333e8a",
+    "scripts/check-doc-snippets.mjs": "f32344604bbf285a591d5752eb1e6507765a3801cbc43bf5658eb123b9e18df1",
+    "scripts/check-architecture.mjs": "88daca3d342c5b580b2f155d3ba176c061b5a7cfd90b442aa74483c8a03e8907",
+    "scripts/check-format.mjs": "8fe5d6e060d6d28dbfffd1a98e26be5427d49a2c69b7ae1245b3834c8724ee4c",
+    "scripts/package-policy.mjs": "6084af701cde0dc47f77601c91895c2c5b2de786501a5443fd9a352c5fd4efdd",
+    "scripts/element-composition-policy.mjs": "d3c79253c7fab150c7f4c13e87979cb1d9374f404ecb5182d57f488b082bb1f4",
+    "apps/doc/shared/ui-catalog.ts": "c5b41ab181b383433aad55fa3e877d4e7dbc8fe6bc55c3458c3cb55d4a3d5ffc",
+    "apps/doc/webmusic/src/lib/headless-params/index.ts": "7c253ccb4387fd6a628786121f3bc2f01911226d9b6ad0364a3a360de51e9386",
+    "packages/audio/src/play/core/decode.ts": "3285819a768d195cd0ca5a0824713c2ccdf894d40c9652ead925d9e5a02e8680",
+    "packages/audio/src/core/time/BeatGrid.ts": "b18acf54930f562f1fbfbb22c8fea928306d6a6a47dbc063624c52ae64cded7e",
+    "packages/audio/src/analyze/element/audio-analysis-timeline.ts": "82a5550cefa63425c091d6dcad2c0a4cd777794d7e0f5b676125f9858772babb",
+    "packages/audio/src/view/element/audio-view.ts": "65f3d63bf519a2c8935fb54c245f99a367c33c50cb45f2d948e07fa538b4feae"
+  },
+  "ignored_log_hashes": {
+    "dev/audits/2026-09-05/evidence/runtime-repros.log": "e3ff5b8db489bf4bbc54217dc0615f53591f606dd944a5545c5b32440e73983f",
+    "dev/audits/2026-09-05/evidence/score-repros.log": "bf29188fe634427ee28fc4910d33046fef1ab15a19858950ec58ba35b779a2f2",
+    "dev/audits/2026-09-05/evidence/ui-repro.log": "2663ce49c7170ac48d8e05d62f8c85c7aaee9980a79f8854923f3047681de9b9",
+    "dev/audits/2026-09-05/evidence/webmusic-audit-build.log": "926ca19647f024259c1fd3262639fd31993b03f314820211d4e84256034c0a74",
+    "dev/audits/2026-09-05/evidence/webmusic-audit-check-architecture.log": "8dfc5a77b434d96faf189ca65958d56816c245290212f7012ab8c2fe85b1397f",
+    "dev/audits/2026-09-05/evidence/webmusic-audit-check-doc-snippets.log": "7c70a3d19c480eaa7cf98b9cd71d5694c16e0f90ea515894e86f48fe48511679",
+    "dev/audits/2026-09-05/evidence/webmusic-audit-check-docs.log": "741d61a98ada061239829d717e8d66b0e679c18bcefe91d8c01ad6b9dfe57e84",
+    "dev/audits/2026-09-05/evidence/webmusic-audit-check-format.log": "15e16f6d7a78aa5bd216816782901a4f52f778a526ef6687e5f6c3bca41455b3",
+    "dev/audits/2026-09-05/evidence/webmusic-audit-check-licenses.log": "9466d819769fd4808dc22551926d6a32e915e5f4a67427a0001c42da42dbca34",
+    "dev/audits/2026-09-05/evidence/webmusic-audit-check-lockfile.log": "87ea8e6047883af43642e2671da4d56fc37d81d811ea886f192628198fd7ed15",
+    "dev/audits/2026-09-05/evidence/webmusic-audit-check-packages.log": "05fbfa21bcc42fb6f6ce11542ac31caecb4843d76c11985e706ef7d2f5c07659",
+    "dev/audits/2026-09-05/evidence/webmusic-audit-check-release-manifests.log": "7f7bd208fcda03025463f4273090079eaa7848af50e9a516d2c50ee6098fa46f",
+    "dev/audits/2026-09-05/evidence/webmusic-audit-docs-build.log": "3ec5f9c6ca1f5562319be072eaf497e2e1aabf952e919ea4d6e8e8b426998f0a",
+    "dev/audits/2026-09-05/evidence/webmusic-audit-lint-scoped.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "dev/audits/2026-09-05/evidence/webmusic-audit-lint.log": "f2c91edf1b5dc791db3f4cff9ae2bb12bc348dad9931e129b5129a380d7a0d5e",
+    "dev/audits/2026-09-05/evidence/webmusic-audit-test.log": "65c7fed8520a38e6d3dfd43d414762514aee398d07a82eb2d9f4c92f071f8175",
+    "dev/audits/2026-09-05/evidence/webmusic-audit-typecheck-tests.log": "59265ebb041913c6a9a636043bfcea7f5b19109cc40b23d8d85c5388dd4eb53d",
+    "dev/audits/2026-09-05/evidence/webmusic-audit-typecheck.log": "1a4cf9de0d5d4785ac7919797e92a82ceb2da11a71533fffe93e781a5520d069",
+    "dev/audits/2026-09-05/repair-evidence/check.log": "f2081f411ec1e8c7f346fd2d722c07c926df1df7eee270695d5ffdf7ad730559",
+    "dev/audits/2026-09-05/repair-evidence/docs-build.log": "18e8eba8e17a6286d43e2eb3579d7d80656e612a9594008565155274e973454c"
+  },
+  "score_play_headless_shape": [
+    {
+      "file": "apps/doc/webmusic/src/content/docs/score/headless/play/ab-player.mdx",
+      "has_import_heading": false,
+      "has_api_details": false
+    },
+    {
+      "file": "apps/doc/webmusic/src/content/docs/score/headless/play/effect.mdx",
+      "has_import_heading": false,
+      "has_api_details": false
+    },
+    {
+      "file": "apps/doc/webmusic/src/content/docs/score/headless/play/interactive-player.mdx",
+      "has_import_heading": false,
+      "has_api_details": false
+    },
+    {
+      "file": "apps/doc/webmusic/src/content/docs/score/headless/play/loop-player.mdx",
+      "has_import_heading": false,
+      "has_api_details": false
+    },
+    {
+      "file": "apps/doc/webmusic/src/content/docs/score/headless/play/metronome.mdx",
+      "has_import_heading": false,
+      "has_api_details": false
+    },
+    {
+      "file": "apps/doc/webmusic/src/content/docs/score/headless/play/player-controller.mdx",
+      "has_import_heading": false,
+      "has_api_details": false
+    },
+    {
+      "file": "apps/doc/webmusic/src/content/docs/score/headless/play/rack.mdx",
+      "has_import_heading": false,
+      "has_api_details": false
+    },
+    {
+      "file": "apps/doc/webmusic/src/content/docs/score/headless/play/score-player.mdx",
+      "has_import_heading": false,
+      "has_api_details": false
+    },
+    {
+      "file": "apps/doc/webmusic/src/content/docs/score/headless/play/sound.mdx",
+      "has_import_heading": false,
+      "has_api_details": false
+    },
+    {
+      "file": "apps/doc/webmusic/src/content/docs/score/headless/play/synth-backends.mdx",
+      "has_import_heading": false,
+      "has_api_details": false
+    },
+    {
+      "file": "apps/doc/webmusic/src/content/docs/score/headless/play/tone-player.mdx",
+      "has_import_heading": false,
+      "has_api_details": false
+    },
+    {
+      "file": "apps/doc/webmusic/src/content/docs/score/headless/play/transport-drivers.mdx",
+      "has_import_heading": false,
+      "has_api_details": false
+    },
+    {
+      "file": "apps/doc/webmusic/src/content/docs/score/headless/play/web-midi.mdx",
+      "has_import_heading": false,
+      "has_api_details": false
+    }
+  ],
+  "kernel_same_page_anchors": {
+    "events": {
+      "href_present": true,
+      "short_id_exists": false,
+      "rendered_matching_ids": [
+        "events--webmusickernelevents"
+      ]
+    },
+    "element": {
+      "href_present": true,
+      "short_id_exists": false,
+      "rendered_matching_ids": [
+        "element--webmusickernelelement"
+      ]
+    },
+    "worker": {
+      "href_present": true,
+      "short_id_exists": false,
+      "rendered_matching_ids": [
+        "worker--webmusickernelworker"
+      ]
+    },
+    "audio-context": {
+      "href_present": true,
+      "short_id_exists": false,
+      "rendered_matching_ids": [
+        "audio-context--webmusickernelaudio-context"
+      ]
+    },
+    "player": {
+      "href_present": true,
+      "short_id_exists": false,
+      "rendered_matching_ids": [
+        "player--webmusickernelplayer"
+      ]
+    },
+    "effect": {
+      "href_present": true,
+      "short_id_exists": false,
+      "rendered_matching_ids": [
+        "effect--webmusickerneleffect"
+      ]
+    },
+    "transport": {
+      "href_present": true,
+      "short_id_exists": false,
+      "rendered_matching_ids": [
+        "transport--webmusickerneltransport"
+      ]
+    },
+    "tick": {
+      "href_present": true,
+      "short_id_exists": false,
+      "rendered_matching_ids": [
+        "tick--webmusickerneltick"
+      ]
+    }
+  },
+  "public_page_attempts": [
+    {
+      "url": "https://registry.npmjs.org/@webmusic%2Fscore",
+      "result": "web fetch rejected URL; no package metadata obtained"
+    },
+    {
+      "url": "https://github.com/mrsteamedbun/WebMusic-Score",
+      "result": "web fetch cache miss"
+    },
+    {
+      "url": "https://github.com/mrsteamedbun/WebMusic-Audio",
+      "result": "web fetch cache miss"
+    },
+    {
+      "url": "https://github.com/mrsteamedbun/WebMusic-Dev",
+      "result": "web fetch cache miss"
+    }
+  ],
+  "artifact_qa": {
+    "independent_review": "Completed; three scope/wording clarifications applied",
+    "original_docs_unchanged": 16,
+    "report_local_links_checked": 45,
+    "missing_report_links": 0,
+    "format_check_exit_code": 0,
+    "git_diff_whitespace_exit_code": 0
+  }
+}

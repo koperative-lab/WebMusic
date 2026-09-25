@@ -1,0 +1,5 @@
+
+> check:release-manifests
+> node scripts/release-manifests.mjs
+
+Release manifests are consistent at 0.1.0.

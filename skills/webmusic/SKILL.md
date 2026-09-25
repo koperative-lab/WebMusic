@@ -51,10 +51,8 @@ it does not guarantee that an audio operation runs in Node or during SSR.
   before replacing a backend, adding dependencies or changing the architecture.
 - **For project instruction setup requested by the user:** copy the section from
   [project instruction guidance](https://koperative-lab.github.io/WebMusic/agent-toolkit/agents-md/)
-  into the existing project
-  `AGENTS.md` or `CLAUDE.md`, according to its agent client. Preserve surrounding
-  rules and symlinks. Skill use alone is not a request to create or rewrite
-  instruction files.
+  into the existing project `AGENTS.md`. Preserve surrounding rules. Skill use
+  alone is not a request to create or rewrite instruction files.
 
 Run the application's relevant typecheck/build/tests. For browser interactions,
 exercise loading, the requested controls and teardown; separate observed UI and

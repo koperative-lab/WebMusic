@@ -1,0 +1,2016 @@
+[
+  {
+    "entry": "index.ts",
+    "exports": [
+      {
+        "name": "Alter",
+        "kind": "type",
+        "source": "packages/score/src/core/types/pitch.ts"
+      },
+      {
+        "name": "Articulation",
+        "kind": "type",
+        "source": "packages/score/src/core/model/Note.ts"
+      },
+      {
+        "name": "assertValidScore",
+        "kind": "value",
+        "source": "packages/score/src/core/validate.ts"
+      },
+      {
+        "name": "Clef",
+        "kind": "type",
+        "source": "packages/score/src/core/model/Measure.ts"
+      },
+      {
+        "name": "DEFAULT_PPQ",
+        "kind": "value",
+        "source": "packages/score/src/core/compat.ts"
+      },
+      {
+        "name": "Duration",
+        "kind": "value",
+        "source": "packages/score/src/core/primitives/Duration.ts"
+      },
+      {
+        "name": "DurationOpts",
+        "kind": "type",
+        "source": "packages/score/src/core/primitives/Duration.ts"
+      },
+      {
+        "name": "EventEmitter",
+        "kind": "value",
+        "source": "platform/kernel/dist/events.d.ts"
+      },
+      {
+        "name": "EventListenerFailureMode",
+        "kind": "type",
+        "source": "platform/kernel/dist/events.d.ts"
+      },
+      {
+        "name": "expandRepeats",
+        "kind": "value",
+        "source": "packages/score/src/core/transform/expandRepeats.ts"
+      },
+      {
+        "name": "GraceNote",
+        "kind": "type",
+        "source": "packages/score/src/core/model/Note.ts"
+      },
+      {
+        "name": "isPitchedNote",
+        "kind": "value",
+        "source": "packages/score/src/core/query/note-kind.ts"
+      },
+      {
+        "name": "isSoundingNote",
+        "kind": "value",
+        "source": "packages/score/src/core/query/note-kind.ts"
+      },
+      {
+        "name": "KeySignature",
+        "kind": "type",
+        "source": "packages/score/src/core/types/meta.ts"
+      },
+      {
+        "name": "KeySignatureChange",
+        "kind": "type",
+        "source": "packages/score/src/core/compat.ts"
+      },
+      {
+        "name": "locateSeconds",
+        "kind": "value",
+        "source": "packages/score/src/core/compat.ts"
+      },
+      {
+        "name": "locateTick",
+        "kind": "value",
+        "source": "packages/score/src/core/compat.ts"
+      },
+      {
+        "name": "makeId",
+        "kind": "value",
+        "source": "packages/score/src/core/utils/id.ts"
+      },
+      {
+        "name": "MBS",
+        "kind": "type",
+        "source": "packages/score/src/core/time/TimeMap.ts"
+      },
+      {
+        "name": "Measure",
+        "kind": "value",
+        "source": "packages/score/src/core/model/Measure.ts"
+      },
+      {
+        "name": "MeasureData",
+        "kind": "type",
+        "source": "packages/score/src/core/model/Measure.ts"
+      },
+      {
+        "name": "measureDurationTicks",
+        "kind": "value",
+        "source": "packages/score/src/core/compat.ts"
+      },
+      {
+        "name": "MeasureId",
+        "kind": "value",
+        "source": "packages/score/src/core/types/ids.ts"
+      },
+      {
+        "name": "MeasureRef",
+        "kind": "type",
+        "source": "packages/score/src/core/time/TimeMap.ts"
+      },
+      {
+        "name": "MeasureRepeat",
+        "kind": "type",
+        "source": "packages/score/src/core/model/Measure.ts"
+      },
+      {
+        "name": "measureStartTicks",
+        "kind": "value",
+        "source": "packages/score/src/core/compat.ts"
+      },
+      {
+        "name": "MergedNoteEvent",
+        "kind": "type",
+        "source": "packages/score/src/core/query/ties.ts"
+      },
+      {
+        "name": "mergedTiedNotes",
+        "kind": "value",
+        "source": "packages/score/src/core/query/ties.ts"
+      },
+      {
+        "name": "MeterEntry",
+        "kind": "type",
+        "source": "packages/score/src/core/time/TimeMap.ts"
+      },
+      {
+        "name": "MidiNumber",
+        "kind": "type",
+        "source": "packages/score/src/core/types/pitch.ts"
+      },
+      {
+        "name": "midiToPitch",
+        "kind": "value",
+        "source": "packages/score/src/core/compat.ts"
+      },
+      {
+        "name": "Mode",
+        "kind": "type",
+        "source": "packages/score/src/core/types/meta.ts"
+      },
+      {
+        "name": "Note",
+        "kind": "value",
+        "source": "packages/score/src/core/model/Note.ts"
+      },
+      {
+        "name": "NoteData",
+        "kind": "type",
+        "source": "packages/score/src/core/model/Note.ts"
+      },
+      {
+        "name": "noteDurationSeconds",
+        "kind": "value",
+        "source": "packages/score/src/core/compat.ts"
+      },
+      {
+        "name": "noteDurationTicks",
+        "kind": "value",
+        "source": "packages/score/src/core/compat.ts"
+      },
+      {
+        "name": "noteEndSeconds",
+        "kind": "value",
+        "source": "packages/score/src/core/compat.ts"
+      },
+      {
+        "name": "noteEndTicks",
+        "kind": "value",
+        "source": "packages/score/src/core/compat.ts"
+      },
+      {
+        "name": "NoteId",
+        "kind": "value",
+        "source": "packages/score/src/core/types/ids.ts"
+      },
+      {
+        "name": "noteMidi",
+        "kind": "value",
+        "source": "packages/score/src/core/compat.ts"
+      },
+      {
+        "name": "noteOnsetSeconds",
+        "kind": "value",
+        "source": "packages/score/src/core/compat.ts"
+      },
+      {
+        "name": "noteOnsetTicks",
+        "kind": "value",
+        "source": "packages/score/src/core/compat.ts"
+      },
+      {
+        "name": "NoteQueryOptions",
+        "kind": "type",
+        "source": "packages/score/src/core/query/queries.ts"
+      },
+      {
+        "name": "notesAt",
+        "kind": "value",
+        "source": "packages/score/src/core/query/queries.ts"
+      },
+      {
+        "name": "notesIn",
+        "kind": "value",
+        "source": "packages/score/src/core/query/queries.ts"
+      },
+      {
+        "name": "notesOverlapping",
+        "kind": "value",
+        "source": "packages/score/src/core/query/queries.ts"
+      },
+      {
+        "name": "noteVelocity",
+        "kind": "value",
+        "source": "packages/score/src/core/compat.ts"
+      },
+      {
+        "name": "noteVoiceString",
+        "kind": "value",
+        "source": "packages/score/src/core/compat.ts"
+      },
+      {
+        "name": "observeScorePlayback",
+        "kind": "value",
+        "source": "packages/score/src/core/playback.ts"
+      },
+      {
+        "name": "Octave",
+        "kind": "type",
+        "source": "packages/score/src/core/types/pitch.ts"
+      },
+      {
+        "name": "Ornament",
+        "kind": "type",
+        "source": "packages/score/src/core/model/Note.ts"
+      },
+      {
+        "name": "Part",
+        "kind": "value",
+        "source": "packages/score/src/core/model/Part.ts"
+      },
+      {
+        "name": "PartData",
+        "kind": "type",
+        "source": "packages/score/src/core/model/Part.ts"
+      },
+      {
+        "name": "PartId",
+        "kind": "value",
+        "source": "packages/score/src/core/types/ids.ts"
+      },
+      {
+        "name": "PerformedAttributes",
+        "kind": "type",
+        "source": "packages/score/src/core/model/Note.ts"
+      },
+      {
+        "name": "Pitch",
+        "kind": "value",
+        "source": "packages/score/src/core/primitives/Pitch.ts"
+      },
+      {
+        "name": "PitchedNote",
+        "kind": "type",
+        "source": "packages/score/src/core/query/note-kind.ts"
+      },
+      {
+        "name": "pitchToMidi",
+        "kind": "value",
+        "source": "packages/score/src/core/compat.ts"
+      },
+      {
+        "name": "playedDurationSeconds",
+        "kind": "value",
+        "source": "packages/score/src/core/transform/expandRepeats.ts"
+      },
+      {
+        "name": "quartersToTicks",
+        "kind": "value",
+        "source": "packages/score/src/core/compat.ts"
+      },
+      {
+        "name": "Rational",
+        "kind": "value",
+        "source": "packages/score/src/core/primitives/Rational.ts"
+      },
+      {
+        "name": "restsIn",
+        "kind": "value",
+        "source": "packages/score/src/core/query/queries.ts"
+      },
+      {
+        "name": "Score",
+        "kind": "value",
+        "source": "packages/score/src/core/model/Score.ts"
+      },
+      {
+        "name": "SCORE_JSON_SCHEMA_ID",
+        "kind": "value",
+        "source": "packages/score/src/core/serialize/schema.ts"
+      },
+      {
+        "name": "SCORE_JSON_SCHEMA_VERSION",
+        "kind": "value",
+        "source": "packages/score/src/core/serialize/schema.ts"
+      },
+      {
+        "name": "ScoreBuilder",
+        "kind": "value",
+        "source": "packages/score/src/core/model/ScoreBuilder.ts"
+      },
+      {
+        "name": "scoreComposer",
+        "kind": "value",
+        "source": "packages/score/src/core/compat.ts"
+      },
+      {
+        "name": "ScoreData",
+        "kind": "type",
+        "source": "packages/score/src/core/model/Score.ts"
+      },
+      {
+        "name": "scoreDurationSeconds",
+        "kind": "value",
+        "source": "packages/score/src/core/compat.ts"
+      },
+      {
+        "name": "scoreDurationTicks",
+        "kind": "value",
+        "source": "packages/score/src/core/compat.ts"
+      },
+      {
+        "name": "ScoreEditSession",
+        "kind": "value",
+        "source": "packages/score/src/core/model/ScoreEditSession.ts"
+      },
+      {
+        "name": "scoreFromJSON",
+        "kind": "value",
+        "source": "packages/score/src/core/serialize/fromJSON.ts"
+      },
+      {
+        "name": "ScoreId",
+        "kind": "value",
+        "source": "packages/score/src/core/types/ids.ts"
+      },
+      {
+        "name": "ScoreJSONError",
+        "kind": "value",
+        "source": "packages/score/src/core/serialize/schema.ts"
+      },
+      {
+        "name": "ScoreJSONErrorCode",
+        "kind": "type",
+        "source": "packages/score/src/core/serialize/schema.ts"
+      },
+      {
+        "name": "scoreKeySignatures",
+        "kind": "value",
+        "source": "packages/score/src/core/compat.ts"
+      },
+      {
+        "name": "ScoreMetadata",
+        "kind": "type",
+        "source": "packages/score/src/core/types/meta.ts"
+      },
+      {
+        "name": "scoreNotes",
+        "kind": "value",
+        "source": "packages/score/src/core/compat.ts"
+      },
+      {
+        "name": "ScorePlaybackNote",
+        "kind": "type",
+        "source": "packages/score/src/core/playback.ts"
+      },
+      {
+        "name": "ScorePlaybackReadiness",
+        "kind": "type",
+        "source": "packages/score/src/core/playback.ts"
+      },
+      {
+        "name": "ScorePlaybackSnapshot",
+        "kind": "type",
+        "source": "packages/score/src/core/playback.ts"
+      },
+      {
+        "name": "ScorePlaybackSource",
+        "kind": "type",
+        "source": "packages/score/src/core/playback.ts"
+      },
+      {
+        "name": "ScorePlaybackState",
+        "kind": "type",
+        "source": "packages/score/src/core/playback.ts"
+      },
+      {
+        "name": "scoreTempos",
+        "kind": "value",
+        "source": "packages/score/src/core/compat.ts"
+      },
+      {
+        "name": "scoreTimeSignatures",
+        "kind": "value",
+        "source": "packages/score/src/core/compat.ts"
+      },
+      {
+        "name": "scoreTitle",
+        "kind": "value",
+        "source": "packages/score/src/core/compat.ts"
+      },
+      {
+        "name": "ScoreValidationIssue",
+        "kind": "type",
+        "source": "packages/score/src/core/validate.ts"
+      },
+      {
+        "name": "ScoreValidationIssueCode",
+        "kind": "type",
+        "source": "packages/score/src/core/validate.ts"
+      },
+      {
+        "name": "secondsToTick",
+        "kind": "value",
+        "source": "packages/score/src/core/compat.ts"
+      },
+      {
+        "name": "Slur",
+        "kind": "type",
+        "source": "packages/score/src/core/model/Note.ts"
+      },
+      {
+        "name": "SlurMark",
+        "kind": "type",
+        "source": "packages/score/src/core/model/Note.ts"
+      },
+      {
+        "name": "SlurValue",
+        "kind": "type",
+        "source": "packages/score/src/core/model/Note.ts"
+      },
+      {
+        "name": "SoundingNote",
+        "kind": "type",
+        "source": "packages/score/src/core/query/note-kind.ts"
+      },
+      {
+        "name": "soundingPitch",
+        "kind": "value",
+        "source": "packages/score/src/core/query/transposition.ts"
+      },
+      {
+        "name": "Step",
+        "kind": "type",
+        "source": "packages/score/src/core/types/pitch.ts"
+      },
+      {
+        "name": "Tempo",
+        "kind": "type",
+        "source": "packages/score/src/core/types/meta.ts"
+      },
+      {
+        "name": "TempoChange",
+        "kind": "type",
+        "source": "packages/score/src/core/compat.ts"
+      },
+      {
+        "name": "TempoEntry",
+        "kind": "type",
+        "source": "packages/score/src/core/time/TimeMap.ts"
+      },
+      {
+        "name": "ticksToQuarters",
+        "kind": "value",
+        "source": "packages/score/src/core/compat.ts"
+      },
+      {
+        "name": "tickToMeasureBeat",
+        "kind": "value",
+        "source": "packages/score/src/core/compat.ts"
+      },
+      {
+        "name": "tickToSeconds",
+        "kind": "value",
+        "source": "packages/score/src/core/compat.ts"
+      },
+      {
+        "name": "Tie",
+        "kind": "type",
+        "source": "packages/score/src/core/model/Note.ts"
+      },
+      {
+        "name": "tieChains",
+        "kind": "value",
+        "source": "packages/score/src/core/query/ties.ts"
+      },
+      {
+        "name": "TimelineMapping",
+        "kind": "type",
+        "source": "platform/kernel/dist/transport.d.ts"
+      },
+      {
+        "name": "TimeMap",
+        "kind": "value",
+        "source": "packages/score/src/core/time/TimeMap.ts"
+      },
+      {
+        "name": "timeMapMapping",
+        "kind": "value",
+        "source": "packages/score/src/core/time/timeline-mapping.ts"
+      },
+      {
+        "name": "TimePosition",
+        "kind": "type",
+        "source": "packages/score/src/core/compat.ts"
+      },
+      {
+        "name": "TimeSignature",
+        "kind": "type",
+        "source": "packages/score/src/core/types/meta.ts"
+      },
+      {
+        "name": "TimeSignatureChange",
+        "kind": "type",
+        "source": "packages/score/src/core/compat.ts"
+      },
+      {
+        "name": "Transpose",
+        "kind": "type",
+        "source": "packages/score/src/core/model/Part.ts"
+      },
+      {
+        "name": "transpositionSemitones",
+        "kind": "value",
+        "source": "packages/score/src/core/query/transposition.ts"
+      },
+      {
+        "name": "validateScore",
+        "kind": "value",
+        "source": "packages/score/src/core/validate.ts"
+      },
+      {
+        "name": "VoiceId",
+        "kind": "value",
+        "source": "packages/score/src/core/types/ids.ts"
+      },
+      {
+        "name": "writtenPitch",
+        "kind": "value",
+        "source": "packages/score/src/core/query/transposition.ts"
+      }
+    ]
+  },
+  {
+    "entry": "io/index.ts",
+    "exports": [
+      {
+        "name": "ABCParseLimitError",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/abc.ts"
+      },
+      {
+        "name": "ABCParseLimits",
+        "kind": "type",
+        "source": "packages/score/src/io/formats/abc.ts"
+      },
+      {
+        "name": "ABCParseOptions",
+        "kind": "type",
+        "source": "packages/score/src/io/formats/abc.ts"
+      },
+      {
+        "name": "assertABCInputByteLength",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/abc.ts"
+      },
+      {
+        "name": "assertMIDIStructureLimits",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/midi.ts"
+      },
+      {
+        "name": "assertMusicXmlElementLimit",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/musicxml/ordered-tree.ts"
+      },
+      {
+        "name": "assertMusicXmlInputLimit",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/musicxml/ordered-tree.ts"
+      },
+      {
+        "name": "assertScoreInputByteLength",
+        "kind": "value",
+        "source": "packages/score/src/io/load.ts"
+      },
+      {
+        "name": "DEFAULT_ABC_PARSE_LIMITS",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/abc.ts"
+      },
+      {
+        "name": "DEFAULT_LOAD_SCORE_LIMITS",
+        "kind": "value",
+        "source": "packages/score/src/io/load.ts"
+      },
+      {
+        "name": "DEFAULT_MIDI_PARSE_LIMITS",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/midi.ts"
+      },
+      {
+        "name": "DEFAULT_MUSICXML_MAX_ELEMENTS",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/musicxml/ordered-tree.ts"
+      },
+      {
+        "name": "DEFAULT_MUSICXML_MAX_INPUT_BYTES",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/musicxml/ordered-tree.ts"
+      },
+      {
+        "name": "DEFAULT_MXL_PARSE_LIMITS",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/mxl.ts"
+      },
+      {
+        "name": "detectFormat",
+        "kind": "value",
+        "source": "packages/score/src/io/load.ts"
+      },
+      {
+        "name": "formatFromExtension",
+        "kind": "value",
+        "source": "packages/score/src/io/load.ts"
+      },
+      {
+        "name": "loadScore",
+        "kind": "value",
+        "source": "packages/score/src/io/load.ts"
+      },
+      {
+        "name": "loadScoreDetailed",
+        "kind": "value",
+        "source": "packages/score/src/io/load.ts"
+      },
+      {
+        "name": "loadScoreFromUrl",
+        "kind": "value",
+        "source": "packages/score/src/io/load.ts"
+      },
+      {
+        "name": "loadScoreFromUrlDetailed",
+        "kind": "value",
+        "source": "packages/score/src/io/load.ts"
+      },
+      {
+        "name": "LoadScoreLimits",
+        "kind": "type",
+        "source": "packages/score/src/io/load.ts"
+      },
+      {
+        "name": "LoadScoreOptions",
+        "kind": "type",
+        "source": "packages/score/src/io/load.ts"
+      },
+      {
+        "name": "MIDIParseLimitError",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/midi.ts"
+      },
+      {
+        "name": "MIDIParseLimits",
+        "kind": "type",
+        "source": "packages/score/src/io/formats/midi.ts"
+      },
+      {
+        "name": "MIDIParseOptions",
+        "kind": "type",
+        "source": "packages/score/src/io/formats/midi.ts"
+      },
+      {
+        "name": "MusicXMLParseLimitError",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/musicxml/ordered-tree.ts"
+      },
+      {
+        "name": "MusicXMLParseOptions",
+        "kind": "type",
+        "source": "packages/score/src/io/formats/musicxml/parser.ts"
+      },
+      {
+        "name": "MXLParseLimitError",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/mxl.ts"
+      },
+      {
+        "name": "MXLParseLimits",
+        "kind": "type",
+        "source": "packages/score/src/io/formats/mxl.ts"
+      },
+      {
+        "name": "MXLParseOptions",
+        "kind": "type",
+        "source": "packages/score/src/io/formats/mxl.ts"
+      },
+      {
+        "name": "parseABC",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/abc.ts"
+      },
+      {
+        "name": "parseABCDetailed",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/abc.ts"
+      },
+      {
+        "name": "parseMIDI",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/midi.ts"
+      },
+      {
+        "name": "parseMIDIDetailed",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/midi.ts"
+      },
+      {
+        "name": "parseMusicXML",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/musicxml/parser.ts"
+      },
+      {
+        "name": "parseMusicXMLDetailed",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/musicxml/parser.ts"
+      },
+      {
+        "name": "parseMXL",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/mxl.ts"
+      },
+      {
+        "name": "parseMXLDetailed",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/mxl.ts"
+      },
+      {
+        "name": "resolveABCParseLimits",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/abc.ts"
+      },
+      {
+        "name": "resolveLoadScoreLimits",
+        "kind": "value",
+        "source": "packages/score/src/io/load.ts"
+      },
+      {
+        "name": "resolveMIDIParseLimits",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/midi.ts"
+      },
+      {
+        "name": "resolveMXLParseLimits",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/mxl.ts"
+      },
+      {
+        "name": "ScoreDiagnostic",
+        "kind": "type",
+        "source": "packages/score/src/io/diagnostics.ts"
+      },
+      {
+        "name": "ScoreDiagnosticFormat",
+        "kind": "type",
+        "source": "packages/score/src/io/diagnostics.ts"
+      },
+      {
+        "name": "ScoreFormat",
+        "kind": "type",
+        "source": "packages/score/src/io/load.ts"
+      },
+      {
+        "name": "ScoreInputLimitError",
+        "kind": "value",
+        "source": "packages/score/src/io/load.ts"
+      },
+      {
+        "name": "ScoreLoadAbortError",
+        "kind": "value",
+        "source": "packages/score/src/io/cancellation.ts"
+      },
+      {
+        "name": "ScoreLoadTimeoutError",
+        "kind": "value",
+        "source": "packages/score/src/io/cancellation.ts"
+      },
+      {
+        "name": "ScoreParseResult",
+        "kind": "type",
+        "source": "packages/score/src/io/diagnostics.ts"
+      },
+      {
+        "name": "ScoreSerializeResult",
+        "kind": "type",
+        "source": "packages/score/src/io/diagnostics.ts"
+      },
+      {
+        "name": "serializeABC",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/abc.ts"
+      },
+      {
+        "name": "serializeABCDetailed",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/abc.ts"
+      },
+      {
+        "name": "serializeMIDI",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/midi.ts"
+      },
+      {
+        "name": "serializeMusicXML",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/musicxml/serializer.ts"
+      },
+      {
+        "name": "serializeMXL",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/mxl.ts"
+      }
+    ]
+  },
+  {
+    "entry": "io/load.ts",
+    "exports": [
+      {
+        "name": "assertScoreInputByteLength",
+        "kind": "value",
+        "source": "packages/score/src/io/load.ts"
+      },
+      {
+        "name": "DEFAULT_LOAD_SCORE_LIMITS",
+        "kind": "value",
+        "source": "packages/score/src/io/load.ts"
+      },
+      {
+        "name": "detectFormat",
+        "kind": "value",
+        "source": "packages/score/src/io/load.ts"
+      },
+      {
+        "name": "formatFromExtension",
+        "kind": "value",
+        "source": "packages/score/src/io/load.ts"
+      },
+      {
+        "name": "loadScore",
+        "kind": "value",
+        "source": "packages/score/src/io/load.ts"
+      },
+      {
+        "name": "loadScoreDetailed",
+        "kind": "value",
+        "source": "packages/score/src/io/load.ts"
+      },
+      {
+        "name": "loadScoreFromUrl",
+        "kind": "value",
+        "source": "packages/score/src/io/load.ts"
+      },
+      {
+        "name": "loadScoreFromUrlDetailed",
+        "kind": "value",
+        "source": "packages/score/src/io/load.ts"
+      },
+      {
+        "name": "LoadScoreLimits",
+        "kind": "type",
+        "source": "packages/score/src/io/load.ts"
+      },
+      {
+        "name": "LoadScoreOptions",
+        "kind": "type",
+        "source": "packages/score/src/io/load.ts"
+      },
+      {
+        "name": "readScoreResponse",
+        "kind": "value",
+        "source": "packages/score/src/io/load.ts"
+      },
+      {
+        "name": "resolveLoadScoreLimits",
+        "kind": "value",
+        "source": "packages/score/src/io/load.ts"
+      },
+      {
+        "name": "ScoreFormat",
+        "kind": "type",
+        "source": "packages/score/src/io/load.ts"
+      },
+      {
+        "name": "scoreInputByteLengthAtMost",
+        "kind": "value",
+        "source": "packages/score/src/io/load.ts"
+      },
+      {
+        "name": "ScoreInputLimitError",
+        "kind": "value",
+        "source": "packages/score/src/io/load.ts"
+      },
+      {
+        "name": "ScoreLoadAbortError",
+        "kind": "value",
+        "source": "packages/score/src/io/cancellation.ts"
+      },
+      {
+        "name": "ScoreLoadTimeoutError",
+        "kind": "value",
+        "source": "packages/score/src/io/cancellation.ts"
+      }
+    ]
+  },
+  {
+    "entry": "io/formats/index.ts",
+    "exports": [
+      {
+        "name": "ABCParseLimitError",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/abc.ts"
+      },
+      {
+        "name": "ABCParseLimits",
+        "kind": "type",
+        "source": "packages/score/src/io/formats/abc.ts"
+      },
+      {
+        "name": "ABCParseOptions",
+        "kind": "type",
+        "source": "packages/score/src/io/formats/abc.ts"
+      },
+      {
+        "name": "assertABCInputByteLength",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/abc.ts"
+      },
+      {
+        "name": "assertMIDIStructureLimits",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/midi.ts"
+      },
+      {
+        "name": "assertMusicXmlElementLimit",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/musicxml/ordered-tree.ts"
+      },
+      {
+        "name": "assertMusicXmlInputLimit",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/musicxml/ordered-tree.ts"
+      },
+      {
+        "name": "DEFAULT_ABC_PARSE_LIMITS",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/abc.ts"
+      },
+      {
+        "name": "DEFAULT_MIDI_PARSE_LIMITS",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/midi.ts"
+      },
+      {
+        "name": "DEFAULT_MUSICXML_MAX_ELEMENTS",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/musicxml/ordered-tree.ts"
+      },
+      {
+        "name": "DEFAULT_MUSICXML_MAX_INPUT_BYTES",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/musicxml/ordered-tree.ts"
+      },
+      {
+        "name": "DEFAULT_MXL_PARSE_LIMITS",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/mxl.ts"
+      },
+      {
+        "name": "MIDIParseLimitError",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/midi.ts"
+      },
+      {
+        "name": "MIDIParseLimits",
+        "kind": "type",
+        "source": "packages/score/src/io/formats/midi.ts"
+      },
+      {
+        "name": "MIDIParseOptions",
+        "kind": "type",
+        "source": "packages/score/src/io/formats/midi.ts"
+      },
+      {
+        "name": "MusicXMLParseLimitError",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/musicxml/ordered-tree.ts"
+      },
+      {
+        "name": "MusicXMLParseOptions",
+        "kind": "type",
+        "source": "packages/score/src/io/formats/musicxml/parser.ts"
+      },
+      {
+        "name": "MXLParseLimitError",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/mxl.ts"
+      },
+      {
+        "name": "MXLParseLimits",
+        "kind": "type",
+        "source": "packages/score/src/io/formats/mxl.ts"
+      },
+      {
+        "name": "MXLParseOptions",
+        "kind": "type",
+        "source": "packages/score/src/io/formats/mxl.ts"
+      },
+      {
+        "name": "parseABC",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/abc.ts"
+      },
+      {
+        "name": "parseABCDetailed",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/abc.ts"
+      },
+      {
+        "name": "parseMIDI",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/midi.ts"
+      },
+      {
+        "name": "parseMIDIDetailed",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/midi.ts"
+      },
+      {
+        "name": "parseMusicXML",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/musicxml/parser.ts"
+      },
+      {
+        "name": "parseMusicXMLDetailed",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/musicxml/parser.ts"
+      },
+      {
+        "name": "parseMXL",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/mxl.ts"
+      },
+      {
+        "name": "parseMXLDetailed",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/mxl.ts"
+      },
+      {
+        "name": "resolveABCParseLimits",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/abc.ts"
+      },
+      {
+        "name": "resolveMIDIParseLimits",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/midi.ts"
+      },
+      {
+        "name": "resolveMXLParseLimits",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/mxl.ts"
+      },
+      {
+        "name": "ScoreDiagnostic",
+        "kind": "type",
+        "source": "packages/score/src/io/diagnostics.ts"
+      },
+      {
+        "name": "ScoreDiagnosticFormat",
+        "kind": "type",
+        "source": "packages/score/src/io/diagnostics.ts"
+      },
+      {
+        "name": "ScoreParseResult",
+        "kind": "type",
+        "source": "packages/score/src/io/diagnostics.ts"
+      },
+      {
+        "name": "ScoreSerializeResult",
+        "kind": "type",
+        "source": "packages/score/src/io/diagnostics.ts"
+      },
+      {
+        "name": "serializeABC",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/abc.ts"
+      },
+      {
+        "name": "serializeABCDetailed",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/abc.ts"
+      },
+      {
+        "name": "serializeMIDI",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/midi.ts"
+      },
+      {
+        "name": "serializeMusicXML",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/musicxml/serializer.ts"
+      },
+      {
+        "name": "serializeMXL",
+        "kind": "value",
+        "source": "packages/score/src/io/formats/mxl.ts"
+      }
+    ]
+  },
+  {
+    "entry": "io/worker-client.ts",
+    "exports": [
+      {
+        "name": "createParserWorker",
+        "kind": "value",
+        "source": "packages/score/src/io/worker-client.ts"
+      },
+      {
+        "name": "createRequestTracker",
+        "kind": "value",
+        "source": "platform/kernel/dist/worker.d.ts"
+      },
+      {
+        "name": "ParserWorker",
+        "kind": "type",
+        "source": "packages/score/src/io/worker-client.ts"
+      },
+      {
+        "name": "ParserWorkerOptions",
+        "kind": "type",
+        "source": "packages/score/src/io/worker-client.ts"
+      },
+      {
+        "name": "ParserWorkerRemoteError",
+        "kind": "value",
+        "source": "packages/score/src/io/worker-client.ts"
+      },
+      {
+        "name": "RequestTracker",
+        "kind": "type",
+        "source": "platform/kernel/dist/worker.d.ts"
+      },
+      {
+        "name": "WorkerLike",
+        "kind": "type",
+        "source": "platform/kernel/dist/worker.d.ts"
+      }
+    ]
+  },
+  {
+    "entry": "io/worker-protocol.ts",
+    "exports": [
+      {
+        "name": "CancelParseRequest",
+        "kind": "type",
+        "source": "packages/score/src/io/worker-protocol.ts"
+      },
+      {
+        "name": "handleParseRequest",
+        "kind": "value",
+        "source": "packages/score/src/io/worker-protocol.ts"
+      },
+      {
+        "name": "PARSE_WORKER_PROTOCOL",
+        "kind": "value",
+        "source": "packages/score/src/io/worker-protocol.ts"
+      },
+      {
+        "name": "PARSE_WORKER_PROTOCOL_VERSION",
+        "kind": "value",
+        "source": "packages/score/src/io/worker-protocol.ts"
+      },
+      {
+        "name": "ParseRequest",
+        "kind": "type",
+        "source": "packages/score/src/io/worker-protocol.ts"
+      },
+      {
+        "name": "ParseResponse",
+        "kind": "type",
+        "source": "packages/score/src/io/worker-protocol.ts"
+      },
+      {
+        "name": "ParseWorkerError",
+        "kind": "type",
+        "source": "packages/score/src/io/worker-protocol.ts"
+      },
+      {
+        "name": "ParseWorkerErrorCode",
+        "kind": "type",
+        "source": "packages/score/src/io/worker-protocol.ts"
+      },
+      {
+        "name": "ParseWorkerFormat",
+        "kind": "type",
+        "source": "packages/score/src/io/worker-protocol.ts"
+      },
+      {
+        "name": "ParseWorkerRequest",
+        "kind": "type",
+        "source": "packages/score/src/io/worker-protocol.ts"
+      },
+      {
+        "name": "ScoreJSON",
+        "kind": "type",
+        "source": "packages/score/src/io/worker-protocol.ts"
+      }
+    ]
+  },
+  {
+    "entry": "io/worker.ts",
+    "exports": []
+  },
+  {
+    "entry": "analyze/index.ts",
+    "exports": [
+      {
+        "name": "AnalysisResult",
+        "kind": "type",
+        "source": "packages/score/src/analyze/headless/session.ts"
+      },
+      {
+        "name": "AnalysisSessionOptions",
+        "kind": "type",
+        "source": "packages/score/src/analyze/headless/session.ts"
+      },
+      {
+        "name": "ChordSegment",
+        "kind": "type",
+        "source": "packages/score/src/analyze/core/types.ts"
+      },
+      {
+        "name": "chordTimeline",
+        "kind": "value",
+        "source": "packages/score/src/analyze/core/summary.ts"
+      },
+      {
+        "name": "ChordTimelineOptions",
+        "kind": "type",
+        "source": "packages/score/src/analyze/core/summary.ts"
+      },
+      {
+        "name": "ChordTimelineSegment",
+        "kind": "type",
+        "source": "packages/score/src/analyze/core/summary.ts"
+      },
+      {
+        "name": "ChordWindowOptions",
+        "kind": "type",
+        "source": "packages/score/src/analyze/core/types.ts"
+      },
+      {
+        "name": "detectKey",
+        "kind": "value",
+        "source": "packages/score/src/analyze/core/key.ts"
+      },
+      {
+        "name": "DistributionBin",
+        "kind": "type",
+        "source": "packages/score/src/analyze/core/types.ts"
+      },
+      {
+        "name": "distributions",
+        "kind": "value",
+        "source": "packages/score/src/analyze/core/distributions.ts"
+      },
+      {
+        "name": "Distributions",
+        "kind": "type",
+        "source": "packages/score/src/analyze/core/types.ts"
+      },
+      {
+        "name": "findMotifs",
+        "kind": "value",
+        "source": "packages/score/src/analyze/core/motif.ts"
+      },
+      {
+        "name": "identifyChord",
+        "kind": "value",
+        "source": "packages/score/src/analyze/core/chords.ts"
+      },
+      {
+        "name": "identifyChordFromMidi",
+        "kind": "value",
+        "source": "packages/score/src/analyze/core/chords.ts"
+      },
+      {
+        "name": "Key",
+        "kind": "type",
+        "source": "packages/score/src/analyze/core/types.ts"
+      },
+      {
+        "name": "KeyResult",
+        "kind": "type",
+        "source": "packages/score/src/analyze/core/types.ts"
+      },
+      {
+        "name": "LiveChordState",
+        "kind": "type",
+        "source": "packages/score/src/analyze/headless/live-trackers.ts"
+      },
+      {
+        "name": "Motif",
+        "kind": "type",
+        "source": "packages/score/src/analyze/core/types.ts"
+      },
+      {
+        "name": "MotifOptions",
+        "kind": "type",
+        "source": "packages/score/src/analyze/core/types.ts"
+      },
+      {
+        "name": "RhythmPattern",
+        "kind": "type",
+        "source": "packages/score/src/analyze/core/types.ts"
+      },
+      {
+        "name": "rhythmPatterns",
+        "kind": "value",
+        "source": "packages/score/src/analyze/core/motif.ts"
+      },
+      {
+        "name": "RNAResult",
+        "kind": "type",
+        "source": "packages/score/src/analyze/core/types.ts"
+      },
+      {
+        "name": "romanNumeralForChord",
+        "kind": "value",
+        "source": "packages/score/src/analyze/core/roman.ts"
+      },
+      {
+        "name": "RomanNumeralOptions",
+        "kind": "type",
+        "source": "packages/score/src/analyze/core/roman.ts"
+      },
+      {
+        "name": "romanNumerals",
+        "kind": "value",
+        "source": "packages/score/src/analyze/core/roman.ts"
+      },
+      {
+        "name": "ScoreSummary",
+        "kind": "type",
+        "source": "packages/score/src/analyze/core/summary.ts"
+      },
+      {
+        "name": "segmentChords",
+        "kind": "value",
+        "source": "packages/score/src/analyze/core/chords.ts"
+      },
+      {
+        "name": "summarizeScore",
+        "kind": "value",
+        "source": "packages/score/src/analyze/core/summary.ts"
+      },
+      {
+        "name": "voiceLeading",
+        "kind": "value",
+        "source": "packages/score/src/analyze/core/voice-leading.ts"
+      },
+      {
+        "name": "VoiceLeadingIssue",
+        "kind": "type",
+        "source": "packages/score/src/analyze/core/types.ts"
+      }
+    ]
+  },
+  {
+    "entry": "play/index.ts",
+    "exports": [
+      {
+        "name": "AbPlayerOptions",
+        "kind": "type",
+        "source": "packages/score/src/play/headless/ab-player.ts"
+      },
+      {
+        "name": "AddSourceOptions",
+        "kind": "type",
+        "source": "packages/score/src/play/headless/interactive/contracts.ts"
+      },
+      {
+        "name": "AddVoiceOptions",
+        "kind": "type",
+        "source": "packages/score/src/play/headless/interactive/contracts.ts"
+      },
+      {
+        "name": "AdvanceOptions",
+        "kind": "type",
+        "source": "packages/score/src/play/headless/interactive/contracts.ts"
+      },
+      {
+        "name": "bufferToWav",
+        "kind": "value",
+        "source": "packages/score/src/play/headless/render.ts"
+      },
+      {
+        "name": "DEFAULT_CHORDS",
+        "kind": "value",
+        "source": "packages/score/src/play/core/note-input-model.ts"
+      },
+      {
+        "name": "DEFAULT_SFZ_PARSE_LIMITS",
+        "kind": "value",
+        "source": "packages/score/src/play/core/sfz.ts"
+      },
+      {
+        "name": "DEFAULT_TR808_GRID_MAP",
+        "kind": "value",
+        "source": "packages/score/src/play/core/note-input-model.ts"
+      },
+      {
+        "name": "GRID_ROW_LETTERS",
+        "kind": "value",
+        "source": "packages/score/src/play/core/note-input-model.ts"
+      },
+      {
+        "name": "gridCellMidi",
+        "kind": "value",
+        "source": "packages/score/src/play/core/note-input-model.ts"
+      },
+      {
+        "name": "gridIndexToRef",
+        "kind": "value",
+        "source": "packages/score/src/play/core/note-input-model.ts"
+      },
+      {
+        "name": "gridKeyboardMidi",
+        "kind": "value",
+        "source": "packages/score/src/play/core/note-input-model.ts"
+      },
+      {
+        "name": "gridPadIndex",
+        "kind": "value",
+        "source": "packages/score/src/play/core/note-input-model.ts"
+      },
+      {
+        "name": "gridPadMidi",
+        "kind": "value",
+        "source": "packages/score/src/play/core/note-input-model.ts"
+      },
+      {
+        "name": "gridQwertyCellMidi",
+        "kind": "value",
+        "source": "packages/score/src/play/core/note-input-model.ts"
+      },
+      {
+        "name": "gridRefToCoords",
+        "kind": "value",
+        "source": "packages/score/src/play/core/note-input-model.ts"
+      },
+      {
+        "name": "gridRefToIndex",
+        "kind": "value",
+        "source": "packages/score/src/play/core/note-input-model.ts"
+      },
+      {
+        "name": "HeadlessSynth",
+        "kind": "type",
+        "source": "packages/score/src/play/headless/audio-contracts.ts"
+      },
+      {
+        "name": "InteractivePlayerEvents",
+        "kind": "type",
+        "source": "packages/score/src/play/headless/interactive/contracts.ts"
+      },
+      {
+        "name": "InteractivePlayerOptions",
+        "kind": "type",
+        "source": "packages/score/src/play/headless/interactive/contracts.ts"
+      },
+      {
+        "name": "LoopPlayerOptions",
+        "kind": "type",
+        "source": "packages/score/src/play/headless/loop-player.ts"
+      },
+      {
+        "name": "normalizeNoteInputLayout",
+        "kind": "value",
+        "source": "packages/score/src/play/core/note-input-model.ts"
+      },
+      {
+        "name": "NoteInputChord",
+        "kind": "type",
+        "source": "packages/score/src/play/core/note-input-model.ts"
+      },
+      {
+        "name": "NoteInputDetail",
+        "kind": "type",
+        "source": "packages/score/src/play/core/note-input-model.ts"
+      },
+      {
+        "name": "NoteInputLayout",
+        "kind": "type",
+        "source": "packages/score/src/play/core/note-input-model.ts"
+      },
+      {
+        "name": "NoteInputPad",
+        "kind": "type",
+        "source": "packages/score/src/play/core/note-input-model.ts"
+      },
+      {
+        "name": "notesToScore",
+        "kind": "value",
+        "source": "packages/score/src/play/core/record.ts"
+      },
+      {
+        "name": "OscillatorSynthOptions",
+        "kind": "type",
+        "source": "packages/score/src/play/headless/audio-contracts.ts"
+      },
+      {
+        "name": "parseGridMap",
+        "kind": "value",
+        "source": "packages/score/src/play/core/note-input-model.ts"
+      },
+      {
+        "name": "parseSfz",
+        "kind": "value",
+        "source": "packages/score/src/play/core/sfz.ts"
+      },
+      {
+        "name": "parseSfzKey",
+        "kind": "value",
+        "source": "packages/score/src/play/core/sfz.ts"
+      },
+      {
+        "name": "PlayerEvents",
+        "kind": "type",
+        "source": "packages/score/src/play/headless/audio-contracts.ts"
+      },
+      {
+        "name": "PlayerOptions",
+        "kind": "type",
+        "source": "packages/score/src/play/headless/audio-contracts.ts"
+      },
+      {
+        "name": "PlayerTimeUpdate",
+        "kind": "type",
+        "source": "packages/score/src/play/headless/audio-contracts.ts"
+      },
+      {
+        "name": "QWERTY_GRID_COLS",
+        "kind": "value",
+        "source": "packages/score/src/play/core/note-input-model.ts"
+      },
+      {
+        "name": "QWERTY_GRID_KEYS",
+        "kind": "value",
+        "source": "packages/score/src/play/core/note-input-model.ts"
+      },
+      {
+        "name": "QWERTY_GRID_ROWS",
+        "kind": "value",
+        "source": "packages/score/src/play/core/note-input-model.ts"
+      },
+      {
+        "name": "QWERTY_KEY_LABEL",
+        "kind": "value",
+        "source": "packages/score/src/play/core/note-input-model.ts"
+      },
+      {
+        "name": "QWERTY_KEY_MAP",
+        "kind": "value",
+        "source": "packages/score/src/play/core/note-input-model.ts"
+      },
+      {
+        "name": "QWERTY_SPAN",
+        "kind": "value",
+        "source": "packages/score/src/play/core/note-input-model.ts"
+      },
+      {
+        "name": "qwertyLabelMap",
+        "kind": "value",
+        "source": "packages/score/src/play/core/note-input-model.ts"
+      },
+      {
+        "name": "qwertyMidi",
+        "kind": "value",
+        "source": "packages/score/src/play/core/note-input-model.ts"
+      },
+      {
+        "name": "qwertyOffsetIsBlack",
+        "kind": "value",
+        "source": "packages/score/src/play/core/note-input-model.ts"
+      },
+      {
+        "name": "RackAddOptions",
+        "kind": "type",
+        "source": "packages/score/src/play/headless/rack/contracts.ts"
+      },
+      {
+        "name": "RackEvents",
+        "kind": "type",
+        "source": "packages/score/src/play/headless/rack/contracts.ts"
+      },
+      {
+        "name": "RackOptions",
+        "kind": "type",
+        "source": "packages/score/src/play/headless/rack/contracts.ts"
+      },
+      {
+        "name": "RecordedNote",
+        "kind": "type",
+        "source": "packages/score/src/play/core/record.ts"
+      },
+      {
+        "name": "RecordToScoreOptions",
+        "kind": "type",
+        "source": "packages/score/src/play/core/record.ts"
+      },
+      {
+        "name": "RenderOptions",
+        "kind": "type",
+        "source": "packages/score/src/play/headless/render.ts"
+      },
+      {
+        "name": "renderScoreToBuffer",
+        "kind": "value",
+        "source": "packages/score/src/play/headless/render.ts"
+      },
+      {
+        "name": "renderScoreToWav",
+        "kind": "value",
+        "source": "packages/score/src/play/headless/render.ts"
+      },
+      {
+        "name": "resolveSfzZones",
+        "kind": "value",
+        "source": "packages/score/src/play/core/sfz.ts"
+      },
+      {
+        "name": "ReverbOptions",
+        "kind": "type",
+        "source": "packages/score/src/play/headless/audio-contracts.ts"
+      },
+      {
+        "name": "SampleZone",
+        "kind": "type",
+        "source": "packages/score/src/play/core/sfz.ts"
+      },
+      {
+        "name": "ScorePlayerEvents",
+        "kind": "type",
+        "source": "packages/score/src/play/headless/audio-contracts.ts"
+      },
+      {
+        "name": "ScorePlayerOptions",
+        "kind": "type",
+        "source": "packages/score/src/play/headless/audio-contracts.ts"
+      },
+      {
+        "name": "SfzParseOptions",
+        "kind": "type",
+        "source": "packages/score/src/play/core/sfz.ts"
+      },
+      {
+        "name": "SfzRegion",
+        "kind": "type",
+        "source": "packages/score/src/play/core/sfz.ts"
+      },
+      {
+        "name": "SoundfontSynthOptions",
+        "kind": "type",
+        "source": "packages/score/src/play/headless/audio-contracts.ts"
+      },
+      {
+        "name": "SynthBackend",
+        "kind": "type",
+        "source": "packages/score/src/play/headless/audio-contracts.ts"
+      },
+      {
+        "name": "SynthOwnership",
+        "kind": "type",
+        "source": "packages/score/src/play/headless/audio-contracts.ts"
+      }
+    ]
+  },
+  {
+    "entry": "view/index.ts",
+    "exports": [
+      {
+        "name": "createPianoRollLayout",
+        "kind": "value",
+        "source": "packages/score/src/view/core/layout.ts"
+      },
+      {
+        "name": "createScoreMap",
+        "kind": "value",
+        "source": "packages/score/src/view/core/map.ts"
+      },
+      {
+        "name": "createStaffLayout",
+        "kind": "value",
+        "source": "packages/score/src/view/core/layout.ts"
+      },
+      {
+        "name": "createWaterfallLayout",
+        "kind": "value",
+        "source": "packages/score/src/view/core/layout.ts"
+      },
+      {
+        "name": "findSequenceNote",
+        "kind": "value",
+        "source": "packages/score/src/view/core/note-sequence.ts"
+      },
+      {
+        "name": "PianoRollNote",
+        "kind": "type",
+        "source": "packages/score/src/view/core/types.ts"
+      },
+      {
+        "name": "RenderedScoreVisualizer",
+        "kind": "type",
+        "source": "packages/score/src/view/core/types.ts"
+      },
+      {
+        "name": "ScoreMap",
+        "kind": "type",
+        "source": "packages/score/src/view/core/map.ts"
+      },
+      {
+        "name": "ScoreMapCell",
+        "kind": "type",
+        "source": "packages/score/src/view/core/map.ts"
+      },
+      {
+        "name": "ScoreMapMark",
+        "kind": "type",
+        "source": "packages/score/src/view/core/map.ts"
+      },
+      {
+        "name": "ScoreMapOptions",
+        "kind": "type",
+        "source": "packages/score/src/view/core/map.ts"
+      },
+      {
+        "name": "ScoreNoteSequence",
+        "kind": "type",
+        "source": "packages/score/src/view/core/types.ts"
+      },
+      {
+        "name": "ScoreSequenceNote",
+        "kind": "type",
+        "source": "packages/score/src/view/core/types.ts"
+      },
+      {
+        "name": "scoreToNoteSequence",
+        "kind": "value",
+        "source": "packages/score/src/view/core/note-sequence.ts"
+      },
+      {
+        "name": "ScoreViewConfiguration",
+        "kind": "type",
+        "source": "packages/score/src/view/core/types.ts"
+      },
+      {
+        "name": "ScoreViewOptions",
+        "kind": "type",
+        "source": "packages/score/src/view/headless/score-view.ts"
+      },
+      {
+        "name": "ScoreViewOptionsByType",
+        "kind": "type",
+        "source": "packages/score/src/view/core/types.ts"
+      },
+      {
+        "name": "ScoreViewState",
+        "kind": "type",
+        "source": "packages/score/src/view/headless/score-view.ts"
+      },
+      {
+        "name": "ScoreViewTimeRange",
+        "kind": "type",
+        "source": "packages/score/src/view/headless/score-view.ts"
+      },
+      {
+        "name": "ScoreViewType",
+        "kind": "type",
+        "source": "packages/score/src/view/core/types.ts"
+      },
+      {
+        "name": "secondsToQuarters",
+        "kind": "value",
+        "source": "packages/score/src/view/core/note-sequence.ts"
+      },
+      {
+        "name": "StaffGlyph",
+        "kind": "type",
+        "source": "packages/score/src/view/core/types.ts"
+      },
+      {
+        "name": "StaffRenderOptions",
+        "kind": "type",
+        "source": "packages/score/src/view/core/types.ts"
+      },
+      {
+        "name": "validateScoreViewConfiguration",
+        "kind": "value",
+        "source": "packages/score/src/view/core/configuration.ts"
+      },
+      {
+        "name": "ViewLayoutOptions",
+        "kind": "type",
+        "source": "packages/score/src/view/core/types.ts"
+      },
+      {
+        "name": "VisualizerRenderOptions",
+        "kind": "type",
+        "source": "packages/score/src/view/core/types.ts"
+      },
+      {
+        "name": "WaterfallNote",
+        "kind": "type",
+        "source": "packages/score/src/view/core/types.ts"
+      },
+      {
+        "name": "WaterfallRenderOptions",
+        "kind": "type",
+        "source": "packages/score/src/view/core/types.ts"
+      }
+    ]
+  },
+  {
+    "entry": "react/index.tsx",
+    "exports": [
+      {
+        "name": "AnalysisSummary",
+        "kind": "value",
+        "source": "packages/score/src/react/analysis.tsx"
+      },
+      {
+        "name": "AnalysisSummaryProps",
+        "kind": "type",
+        "source": "packages/score/src/react/analysis.tsx"
+      },
+      {
+        "name": "PianoRollView",
+        "kind": "value",
+        "source": "packages/score/src/react/views.tsx"
+      },
+      {
+        "name": "PlayerControls",
+        "kind": "value",
+        "source": "packages/score/src/react/views.tsx"
+      },
+      {
+        "name": "ScoreProvider",
+        "kind": "value",
+        "source": "packages/score/src/react/context.tsx"
+      },
+      {
+        "name": "ScoreProviderProps",
+        "kind": "type",
+        "source": "packages/score/src/react/context.tsx"
+      },
+      {
+        "name": "SimplePianoRoll",
+        "kind": "value",
+        "source": "packages/score/src/react/presets.tsx"
+      },
+      {
+        "name": "SimplePianoRollProps",
+        "kind": "type",
+        "source": "packages/score/src/react/presets.tsx"
+      },
+      {
+        "name": "SimpleScorePlayer",
+        "kind": "value",
+        "source": "packages/score/src/react/presets.tsx"
+      },
+      {
+        "name": "SimpleScorePlayerProps",
+        "kind": "type",
+        "source": "packages/score/src/react/presets.tsx"
+      },
+      {
+        "name": "SimpleScoreWorkspace",
+        "kind": "value",
+        "source": "packages/score/src/react/presets.tsx"
+      },
+      {
+        "name": "SimpleScoreWorkspaceProps",
+        "kind": "type",
+        "source": "packages/score/src/react/presets.tsx"
+      },
+      {
+        "name": "SimpleStaff",
+        "kind": "value",
+        "source": "packages/score/src/react/presets.tsx"
+      },
+      {
+        "name": "SimpleStaffProps",
+        "kind": "type",
+        "source": "packages/score/src/react/presets.tsx"
+      },
+      {
+        "name": "SimpleWaterfall",
+        "kind": "value",
+        "source": "packages/score/src/react/presets.tsx"
+      },
+      {
+        "name": "SimpleWaterfallProps",
+        "kind": "type",
+        "source": "packages/score/src/react/presets.tsx"
+      },
+      {
+        "name": "StaffView",
+        "kind": "value",
+        "source": "packages/score/src/react/views.tsx"
+      },
+      {
+        "name": "StaffViewProps",
+        "kind": "type",
+        "source": "packages/score/src/react/views.tsx"
+      },
+      {
+        "name": "useCursor",
+        "kind": "value",
+        "source": "packages/score/src/react/context.tsx"
+      },
+      {
+        "name": "useOptionalScore",
+        "kind": "value",
+        "source": "packages/score/src/react/context.tsx"
+      },
+      {
+        "name": "usePlayer",
+        "kind": "value",
+        "source": "packages/score/src/react/context.tsx"
+      },
+      {
+        "name": "useScore",
+        "kind": "value",
+        "source": "packages/score/src/react/context.tsx"
+      },
+      {
+        "name": "useScoreAnalysis",
+        "kind": "value",
+        "source": "packages/score/src/react/analysis.tsx"
+      },
+      {
+        "name": "useScoreAnalysisAsync",
+        "kind": "value",
+        "source": "packages/score/src/react/analysis.tsx"
+      },
+      {
+        "name": "UseScoreAnalysisAsyncOptions",
+        "kind": "type",
+        "source": "packages/score/src/react/analysis.tsx"
+      },
+      {
+        "name": "UseScoreAnalysisAsyncResult",
+        "kind": "type",
+        "source": "packages/score/src/react/analysis.tsx"
+      },
+      {
+        "name": "UseScoreAnalysisOptions",
+        "kind": "type",
+        "source": "packages/score/src/react/analysis.tsx"
+      },
+      {
+        "name": "ViewProps",
+        "kind": "type",
+        "source": "packages/score/src/react/views.tsx"
+      },
+      {
+        "name": "WaterfallView",
+        "kind": "value",
+        "source": "packages/score/src/react/views.tsx"
+      }
+    ]
+  }
+]
