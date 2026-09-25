@@ -1,0 +1,20 @@
+
+> docs:sync
+> node --experimental-strip-types --no-warnings scripts/docs-catalog.mjs --write
+
+Documentation inventories generated: 175 documents, 31 elements, 18 presenters.
+
+> check:dev-docs
+> node --experimental-strip-types --no-warnings scripts/docs-catalog.mjs --check
+
+Development documentation check passed: 175 documents; generated inventories and local file links are consistent.
+
+> check:docs
+> node --experimental-strip-types --no-warnings scripts/check-docs.mjs
+
+check-docs: clean — 62 live-demo pages · 77 instances, 119 pages · 31 elements · 119 routes
+
+> check:format
+> node scripts/check-format.mjs
+
+Format check passed.

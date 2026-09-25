@@ -40,10 +40,10 @@ are needed, or `npm run docs:dev` when those outputs already exist. Package
 builds clean their output directories, so do not run a consuming test or
 documentation build concurrently with a package rebuild.
 
-This guide and the public package references contain the required contributor
-instructions. Ignored `.dev/` notes, agent instructions and editor settings
-are optional local material. Source checks, builds and published documentation
-must work without them; do not recreate a `dev/` directory as a prerequisite.
+The repository's [agent guide](AGENTS.md) and
+[development handbook](dev/DEVELOPMENT.md) own the current contributor workflow.
+Product, architecture and accepted design live under `dev/`; package
+references document the installed APIs.
 
 ## Prepare a pull request
 
@@ -125,16 +125,14 @@ complete API coverage. `docs:build` builds the normal production site;
 `pages:build` validates the `/WebMusic/` deployment base. Inspect the changed
 pages in a browser as well. Both commands produce local output without deploying.
 
-`docs:sync` updates local indexes only when `.dev/` already exists. It does not
-create a development directory in a public checkout. `check:dev-docs` always
-checks public references and catalogs; it additionally checks the local indexes
-and internal links when `.dev/` is present.
+`docs:sync` regenerates the component and documentation indexes under `dev/`.
+`check:dev-docs` checks those indexes and maintained local links.
 
 ### Agent Toolkit
 
 The [consumer skill](skills/README.md) is maintained separately from this
 repository's local agent instructions. Keep its bundled references portable.
-The public AGENTS.md / CLAUDE.md page owns the instructions users copy into
+The public AGENTS.md page owns the instructions users copy into
 their applications; the skill links to that page.
 Documentation builds generate `llms.txt`, `llms-full.txt`,
 `llms-components.txt`, `llms-patterns.txt` and Markdown references using the
@@ -276,8 +274,8 @@ reconciliation; changed artifacts require a new shared version.
 
 Production documentation builds generate `licenses/THIRD_PARTY_NOTICES.txt`
 and `licenses/BUNDLED_ASSETS.json` from emitted browser modules and styles.
-Keep that generated directory with the deployed site. Source-side `.dev/`
-notes and unused static asset directories are not deployment prerequisites.
+Keep that generated directory with the deployed site. Repository guidance under
+`dev/` and unused static asset directories are not deployment prerequisites.
 Publishing packages, tagging source and deploying documentation are separate
 operations. The [archived release pipeline](scripts/release-pipeline/README.md)
 is historical context, not the active release procedure.

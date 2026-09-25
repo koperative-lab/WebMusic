@@ -1,0 +1,31 @@
+
+> lint
+> eslint .
+
+
+/Users/mamingchen/GitHub/WebMusic/.claude/worktrees/debug-branch-db7bf5/packages/audio/src/react/index.tsx
+  262:5  error  Definition for rule 'react-hooks/exhaustive-deps' was not found  react-hooks/exhaustive-deps
+
+/Users/mamingchen/GitHub/WebMusic/.claude/worktrees/debug-branch-db7bf5/packages/score/src/react/analysis.tsx
+  269:5  error  Definition for rule 'react-hooks/exhaustive-deps' was not found  react-hooks/exhaustive-deps
+
+/Users/mamingchen/GitHub/WebMusic/.claude/worktrees/kind-swartz-c081f5/packages/audio/src/react/index.tsx
+  262:5  error  Definition for rule 'react-hooks/exhaustive-deps' was not found  react-hooks/exhaustive-deps
+
+/Users/mamingchen/GitHub/WebMusic/.claude/worktrees/kind-swartz-c081f5/packages/score/src/react/analysis.tsx
+  269:5  error  Definition for rule 'react-hooks/exhaustive-deps' was not found  react-hooks/exhaustive-deps
+
+/Users/mamingchen/GitHub/WebMusic/.claude/worktrees/mvmnt-features-review-41f87a/packages/audio/src/react/index.tsx
+  262:5  error  Definition for rule 'react-hooks/exhaustive-deps' was not found  react-hooks/exhaustive-deps
+
+/Users/mamingchen/GitHub/WebMusic/.claude/worktrees/mvmnt-features-review-41f87a/packages/score/src/react/analysis.tsx
+  269:5  error  Definition for rule 'react-hooks/exhaustive-deps' was not found  react-hooks/exhaustive-deps
+
+/Users/mamingchen/GitHub/WebMusic/.claude/worktrees/sharp-austin-904c97/packages/audio/src/react/index.tsx
+  262:5  error  Definition for rule 'react-hooks/exhaustive-deps' was not found  react-hooks/exhaustive-deps
+
+/Users/mamingchen/GitHub/WebMusic/.claude/worktrees/sharp-austin-904c97/packages/score/src/react/analysis.tsx
+  269:5  error  Definition for rule 'react-hooks/exhaustive-deps' was not found  react-hooks/exhaustive-deps
+
+✖ 8 problems (8 errors, 0 warnings)
+

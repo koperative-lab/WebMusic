@@ -1,0 +1,307 @@
+
+> test
+> npm run test --workspaces --if-present
+
+
+> @webmusic/kernel@0.1.0 test
+> vitest run
+
+
+ RUN  v3.2.7 /Users/mamingchen/GitHub/WebMusic/platform/kernel
+
+ ✓ test/player-capabilities.test.ts (4 tests) 2ms
+ ✓ test/worker-scope.test.ts (5 tests) 2ms
+ ✓ test/element-ssr.test.ts (1 test) 3ms
+ ✓ test/analyser-meter.test.ts (11 tests) 5ms
+ ✓ test/transport-clock.test.ts (16 tests) 5ms
+ ✓ test/tick-source.test.ts (10 tests) 8ms
+ ✓ test/event-emitter.test.ts (14 tests) 4ms
+ ✓ test/sync.test.ts (16 tests) 22ms
+ ✓ test/element-lifecycle.test.ts (7 tests) 6ms
+
+ Test Files  9 passed (9)
+      Tests  84 passed (84)
+   Start at  10:25:29
+   Duration  2.88s (transform 485ms, setup 0ms, collect 673ms, tests 57ms, environment 2.58s, prepare 879ms)
+
+
+> @webmusic/audio@0.1.0 test
+> vitest run
+
+
+ RUN  v2.1.9 /Users/mamingchen/GitHub/WebMusic/packages/audio
+
+ ✓ test/play/wav.test.ts (24 tests) 8ms
+ ✓ test/play/effects.test.ts (12 tests) 5ms
+ ✓ test/play/media-engine.test.ts (7 tests) 5ms
+ ✓ test/play/worker.test.ts (32 tests) 24ms
+ ✓ test/play/buffer-engine.test.ts (23 tests) 6ms
+ ✓ test/play/resource-limits.test.ts (11 tests) 41ms
+ ✓ test/play/player-lifecycle.test.ts (8 tests) 9ms
+ ✓ test/play/mixer.test.ts (14 tests) 7ms
+ ✓ test/core/audio-clip.test.ts (9 tests) 10ms
+ ✓ test/play/playlist.test.ts (19 tests) 77ms
+ ✓ test/play/recorder-lifecycle.test.ts (6 tests) 35ms
+ ✓ test/core/edit-session.test.ts (9 tests) 7ms
+ ✓ test/view/live.test.ts (11 tests) 4ms
+ ✓ test/play/clip-player-src-race.test.ts (6 tests) 5ms
+ ✓ test/play/meter.test.ts (5 tests) 5ms
+ ✓ test/view/windowing.test.ts (17 tests) 4ms
+ ✓ test/play/load.test.ts (30 tests) 4ms
+ ✓ test/play/element-lifecycle.test.ts (4 tests) 7ms
+ ✓ test/view/colormaps.test.ts (11 tests) 5ms
+ ✓ test/view/headless.test.ts (5 tests) 4ms
+ ✓ test/analyze/peaks.test.ts (5 tests) 7ms
+ ✓ test/analyze/worker.test.ts (22 tests) 281ms
+ ✓ test/analyze/spectrogram.test.ts (5 tests) 138ms
+ ✓ test/analyze/session-incremental.test.ts (3 tests) 198ms
+ ✓ test/analyze/onsets-pitch-features.test.ts (8 tests) 281ms
+ ✓ test/analyze/loudness.test.ts (4 tests) 83ms
+ ✓ test/play/clip-player-clock.test.ts (1 test) 9ms
+ ✓ test/core/beat-grid.test.ts (5 tests) 6ms
+ ✓ test/core/peaks.test.ts (4 tests) 2ms
+ ✓ test/play/export.test.ts (3 tests) 5ms
+ ✓ test/analyze/summary-elements.test.ts (4 tests) 17ms
+ ✓ test/play/format.test.ts (9 tests) 3ms
+ ✓ test/analyze/key.test.ts (4 tests) 78ms
+ ✓ test/core/timeline-mapping.test.ts (2 tests) 4ms
+ ✓ test/core/event-emitter.test.ts (4 tests) 3ms
+ ✓ test/analyze/tempo.test.ts (4 tests) 479ms
+ ✓ test/play/audio-meter-element.test.ts (8 tests) 42ms
+ ✓ test/view/elements.test.ts (7 tests) 111ms
+ ✓ test/react/hooks.test.tsx (6 tests) 35ms
+ ✓ test/play/recorder-element.test.ts (12 tests) 70ms
+ ✓ test/play/mixer-element.test.ts (14 tests) 90ms
+ ✓ test/view/audio-view-element.test.ts (16 tests) 248ms
+ ✓ test/play/clip-player-element.test.ts (24 tests) 88ms
+ ✓ test/play/playlist-element.test.ts (14 tests) 108ms
+ ✓ test/play/compatibility-bridge.test.ts (4 tests) 68ms
+ ✓ test/view/new-elements.test.ts (17 tests) 174ms
+ ✓ test/analyze/analyze-elements.test.ts (24 tests) 178ms
+ ✓ test/view/region-list.test.ts (9 tests) 36ms
+ ✓ test/view/spectrogram-render.test.ts (5 tests) 27ms
+ ✓ test/view/waveform-render.test.ts (3 tests) 19ms
+ ✓ test/view/meter-render.test.ts (3 tests) 20ms
+ ✓ test/play/element-style-reuse.test.ts (3 tests) 31ms
+ ✓ test/analyze/element-lifecycle.test.ts (7 tests) 470ms
+
+ Test Files  53 passed (53)
+      Tests  526 passed (526)
+   Start at  10:25:33
+   Duration  3.90s (transform 4.18s, setup 0ms, collect 10.25s, tests 3.68s, environment 8.96s, prepare 4.29s)
+
+
+> @webmusic/score@0.1.0 test
+> vitest run
+
+
+ RUN  v3.2.7 /Users/mamingchen/GitHub/WebMusic/packages/score
+
+ ✓ test/play/scheduler-regressions.test.ts (24 tests) 29ms
+ ✓ test/play/elements-inputs.test.ts (9 tests) 516ms
+   ✓ input element SSR safety > imports and constructs without DOM globals  512ms
+ ✓ test/play/elements-internal.test.ts (13 tests) 737ms
+   ✓ SSR safety > importing the whole elements entry in Node does not throw  732ms
+ ✓ test/analyze/score-source-cancellation.test.ts (3 tests) 210ms
+ ✓ test/play/simple-score-player.test.ts (18 tests) 582ms
+   ✓ <score-player> URL cancellation > aborts a superseded src and mounts only the newest score without logging cancellation  357ms
+ ✓ test/play/elements-players.test.ts (53 tests) 69ms
+ ✓ test/view/elements.test.ts (28 tests) 304ms
+ ✓ test/dist-exports.test.ts (6 tests) 1025ms
+   ✓ @webmusic/score built dist > play entries are populated  348ms
+ ✓ test/play/rack.test.ts (26 tests) 262ms
+ ✓ test/analyze/worker.test.ts (43 tests) 646ms
+ ✓ test/analyze/session.test.ts (7 tests) 798ms
+   ✓ createAnalysisSession > matches a from-scratch analysis across 20 random edits (2k notes)  543ms
+ ✓ test/io/abc-limits.test.ts (15 tests) 28ms
+ ✓ test/view/virtualization.test.ts (15 tests) 147ms
+ ✓ test/core/query-fastpath.test.ts (10 tests) 124ms
+ ✓ test/play/interactive-player.test.ts (23 tests) 97ms
+ ✓ test/view/canvas-visualizer.test.ts (10 tests) 87ms
+ ✓ test/io/parser-fixes.test.ts (24 tests) 42ms
+ ✓ test/play/sfz-limits.test.ts (19 tests) 86ms
+ ✓ test/io/load-limits.test.ts (12 tests) 115ms
+ ✓ test/play/headless-audio.test.ts (30 tests) 43ms
+ ✓ test/play/sound.test.ts (35 tests) 213ms
+ ✓ test/play/effect-kernel-contract.test.ts (3 tests) 43ms
+ ✓ test/analyze/elements.test.ts (24 tests) 100ms
+ ✓ test/io/worker.test.ts (41 tests) 115ms
+ ✓ test/core/edit-session.test.ts (27 tests) 107ms
+ ✓ test/play/scheduler-perf.test.ts (4 tests) 28ms
+ ✓ test/play/audio-graph-lifecycle.test.ts (16 tests) 36ms
+ ✓ test/play/soundfont-resource-limits.test.ts (15 tests) 79ms
+ ✓ test/io/io.test.ts (21 tests) 169ms
+ ✓ test/play/tone-player.test.ts (40 tests) 80ms
+ ✓ test/io/structure-limits.test.ts (6 tests) 23ms
+ ✓ test/analyze/summary.test.ts (1 test) 5ms
+ ✓ test/io/diagnostics.test.ts (4 tests) 14ms
+ ✓ test/core/extensions.test.ts (17 tests) 13ms
+ ✓ test/play/readiness-lifecycle.test.ts (9 tests) 70ms
+ ✓ test/play/effects.test.ts (20 tests) 37ms
+ ✓ test/play/loop-ab-player.test.ts (14 tests) 19ms
+ ✓ test/play/playback-extensions.test.ts (5 tests) 79ms
+ ✓ test/io/musicxml-extensions.test.ts (12 tests) 83ms
+ ✓ test/play/interactive-modules.test.ts (7 tests) 50ms
+ ✓ test/play/audio-modules.test.ts (9 tests) 53ms
+ ✓ test/play/lfo-controller.test.ts (19 tests) 25ms
+ ✓ test/view/note-sequence.test.ts (17 tests) 9ms
+ ✓ test/view/windowing.test.ts (25 tests) 30ms
+ ✓ test/analyze/chords.test.ts (19 tests) 34ms
+ ✓ test/view/osmd-staff.test.ts (11 tests) 14ms
+ ✓ test/core/serialize.test.ts (15 tests) 18ms
+ ✓ test/core/score-validation.test.ts (16 tests) 14ms
+ ✓ test/analyze/distributions.test.ts (6 tests) 8ms
+ ✓ test/play/playback-events.test.ts (8 tests) 7ms
+ ✓ test/play/controller.test.ts (6 tests) 8ms
+ ✓ test/core/time-map.test.ts (23 tests) 7ms
+ ✓ test/core/score-roundtrip.test.ts (7 tests) 9ms
+ ✓ test/view/layout.test.ts (8 tests) 15ms
+ ✓ test/view/headless-score-view.test.ts (5 tests) 8ms
+ ✓ test/play/rack-transport.test.ts (7 tests) 6ms
+ ✓ test/analyze/motif.test.ts (9 tests) 9ms
+ ✓ test/play/inputs.test.ts (8 tests) 16ms
+ ✓ test/play/render.test.ts (6 tests) 12ms
+ ✓ test/play/tempo-controller.test.ts (12 tests) 10ms
+ ✓ test/analyze/voice-leading.test.ts (11 tests) 6ms
+ ✓ test/play/eq-controller.test.ts (4 tests) 5ms
+ ✓ test/play/score-timeline.test.ts (2 tests) 5ms
+ ✓ test/core/builder-tempo.test.ts (8 tests) 6ms
+ ✓ test/play/transport.test.ts (4 tests) 8ms
+ ✓ test/play/score-recorder-modules.test.ts (3 tests) 6ms
+ ✓ test/view/binding.test.ts (1 test) 5ms
+ ✓ test/analyze/unpitched.test.ts (1 test) 7ms
+ ✓ test/play/synth-panel-modules.test.ts (4 tests) 5ms
+ ✓ test/core/timeline-mapping.test.ts (2 tests) 2ms
+ ✓ test/analyze/key.test.ts (3 tests) 7ms
+ ✓ test/core/model-validation.test.ts (3 tests) 3ms
+ ✓ test/core/duration.test.ts (14 tests) 3ms
+ ✓ test/play/level-meter-controller.test.ts (4 tests) 6ms
+ ✓ test/analyze/live-trackers.test.ts (3 tests) 8ms
+ ✓ test/view/active-notes.test.ts (3 tests) 3ms
+ ✓ test/core/note-kind.test.ts (1 test) 3ms
+ ✓ test/io/musicxml-modules.test.ts (3 tests) 5ms
+ ✓ test/core/event-emitter.test.ts (11 tests) 3ms
+ ✓ test/react/surface.test.ts (1 test) 3ms
+ ✓ test/view/visualizer.test.ts (4 tests) 2ms
+ ✓ test/core/rational.test.ts (10 tests) 3ms
+ ✓ test/play/elements.test.ts (4 tests) 2ms
+ ✓ test/play/sound-modules.test.ts (2 tests) 4ms
+ ✓ test/core/compat.test.ts (6 tests) 3ms
+ ✓ test/core/pitch.test.ts (5 tests) 2ms
+ ✓ test/play/effects-rack-modules.test.ts (3 tests) 2ms
+ ✓ test/play/element-lifecycle-base.test.ts (3 tests) 2ms
+ ✓ test/play/xss.test.ts (1 test) 20ms
+ ✓ test/react/context.test.tsx (6 tests) 32ms
+ ✓ test/react/views.test.tsx (7 tests) 103ms
+ ✓ test/play/element-composition.test.ts (6 tests) 78ms
+ ✓ test/play/lfo-controls.test.ts (11 tests) 92ms
+ ✓ test/play/note-input-modules.test.ts (2 tests) 17ms
+ ✓ test/analyze/playhead.test.ts (3 tests) 59ms
+ ✓ test/analyze/new-elements.test.ts (13 tests) 69ms
+ ✓ test/react/analysis.test.tsx (8 tests) 30ms
+ ✓ test/play/envelope-controls.test.ts (11 tests) 41ms
+ ✓ test/view/new-elements.test.ts (21 tests) 323ms
+
+ Test Files  99 passed (99)
+      Tests  1157 passed (1157)
+   Start at  10:25:37
+   Duration  5.73s (transform 5.56s, setup 0ms, collect 20.40s, tests 8.60s, environment 5.87s, prepare 7.85s)
+
+
+> @webmusic/ui@0.1.0 test
+> vitest run
+
+
+ RUN  v3.2.7 /Users/mamingchen/GitHub/WebMusic/packages/ui
+
+ ✓ test/status.test.ts (5 tests) 39ms
+ ✓ test/note.test.ts (8 tests) 40ms
+ ✓ test/playlist.test.ts (12 tests) 60ms
+ ✓ test/eq.test.ts (6 tests) 60ms
+ ✓ test/parameter.test.ts (20 tests) 83ms
+ ✓ test/analysis.test.ts (18 tests) 93ms
+ ✓ test/track-list.test.ts (17 tests) 102ms
+ ✓ test/envelope.test.ts (15 tests) 93ms
+ ✓ test/lfo.test.ts (24 tests) 217ms
+ ✓ test/stylesheet-option.test.ts (7 tests) 56ms
+ ✓ test/stage.test.ts (13 tests) 55ms
+ ✓ test/timeline.test.ts (5 tests) 58ms
+ ✓ test/macro.test.ts (2 tests) 30ms
+ ✓ test/meter.test.ts (6 tests) 16ms
+ ✓ test/minimap.test.ts (5 tests) 29ms
+ ✓ test/fader.test.ts (8 tests) 24ms
+ ✓ test/internal-dom.test.ts (4 tests) 3ms
+ ✓ test/transport.test.ts (13 tests) 56ms
+ ✓ test/mixer.test.ts (3 tests) 55ms
+ ✓ test/panel.test.ts (2 tests) 18ms
+ ✓ test/recorder.test.ts (5 tests) 20ms
+ ✓ test/knob.test.ts (8 tests) 43ms
+ ✓ test/ssr.test.ts (1 test) 2ms
+ ✓ test/surface.test.ts (42 tests) 6ms
+
+ Test Files  24 passed (24)
+      Tests  249 passed (249)
+   Start at  10:25:43
+   Duration  2.27s (transform 1.42s, setup 0ms, collect 2.57s, tests 1.26s, environment 12.20s, prepare 2.15s)
+
+
+> @webmusic/bridge@0.1.0 test
+> vitest run
+
+
+ RUN  v3.2.7 /Users/mamingchen/GitHub/WebMusic/bridges/score-audio
+
+ ✓ test/transcription.test.ts (9 tests) 18ms
+ ✓ test/mapping.test.ts (11 tests) 16ms
+ ✓ test/audio-master.test.ts (6 tests) 13ms
+ ✓ test/player-contracts.test.ts (4 tests) 15ms
+ ✓ test/sync.test.ts (55 tests) 25ms
+
+ Test Files  5 passed (5)
+      Tests  85 passed (85)
+   Start at  10:25:46
+   Duration  518ms (transform 384ms, setup 0ms, collect 1.13s, tests 88ms, environment 1ms, prepare 256ms)
+
+
+> test
+> vitest run
+
+
+ RUN  v3.2.7 /Users/mamingchen/GitHub/WebMusic/apps/doc/webmusic
+
+ ✓ test/note-input-playground-client.test.ts (9 tests) 72ms
+ ✓ test/playground-client.test.ts (9 tests) 94ms
+ ✓ test/rack-control-playground-client.test.ts (6 tests) 115ms
+ ✓ test/synth-panel-playground-client.test.ts (6 tests) 88ms
+ ✓ test/effect-chain-editor-client.test.ts (10 tests) 116ms
+
+ Test Files  5 passed (5)
+      Tests  40 passed (40)
+   Start at  10:25:46
+   Duration  849ms (transform 370ms, setup 0ms, collect 731ms, tests 485ms, environment 1.39s, prepare 249ms)
+
+stderr | test/analyze/tempo.test.ts > detectTempo > unknown engine falls back to the default music-tempo engine
+[WebAudio] tempo engine "essentia" unavailable, falling back to music-tempo Error: Could not resolve "essentia.js" imported by "@webmusic/audio". Is it installed?
+    at /Users/mamingchen/GitHub/WebMusic/packages/audio/__vite-optional-peer-dep:essentia.js:@webmusic/audio:1:7
+    at VitestExecutor.runModule (file:///Users/mamingchen/GitHub/WebMusic/packages/audio/node_modules/vite-node/dist/client.mjs:399:11)
+    at VitestExecutor.runModule (file:///Users/mamingchen/GitHub/WebMusic/packages/audio/node_modules/vitest/dist/chunks/execute.2pr0rHgK.js:766:20)
+    at VitestExecutor.directRequest (file:///Users/mamingchen/GitHub/WebMusic/packages/audio/node_modules/vite-node/dist/client.mjs:381:16)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at VitestExecutor.cachedRequest (file:///Users/mamingchen/GitHub/WebMusic/packages/audio/node_modules/vite-node/dist/client.mjs:206:14)
+    at VitestExecutor.dependencyRequest (file:///Users/mamingchen/GitHub/WebMusic/packages/audio/node_modules/vite-node/dist/client.mjs:259:12)
+    at tryAdvancedEngine (/Users/mamingchen/GitHub/WebMusic/packages/audio/src/analyze/core/tempo.ts:114:24)
+    at Module.detectTempo (/Users/mamingchen/GitHub/WebMusic/packages/audio/src/analyze/core/tempo.ts:83:22)
+    at /Users/mamingchen/GitHub/WebMusic/packages/audio/test/analyze/tempo.test.ts:42:20
+
+stderr | test/view/new-elements.test.ts > <sheet-view> > surfaces the engine's own message instead of failing silently
+Error: Not implemented: HTMLCanvasElement.prototype.getContext (without installing the canvas npm package)
+    at module.exports (/Users/mamingchen/GitHub/WebMusic/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at HTMLCanvasElementImpl.getContext (/Users/mamingchen/GitHub/WebMusic/node_modules/jsdom/lib/jsdom/living/nodes/HTMLCanvasElement-impl.js:42:5)
+    at HTMLCanvasElement.getContext (/Users/mamingchen/GitHub/WebMusic/node_modules/jsdom/lib/jsdom/living/generated/HTMLCanvasElement.js:131:58)
+    at new e.VexFlowTextMeasurer (/Users/mamingchen/GitHub/WebMusic/node_modules/opensheetmusicdisplay/build/opensheetmusicdisplay.min.js:2:496110)
+    at new D (/Users/mamingchen/GitHub/WebMusic/node_modules/opensheetmusicdisplay/build/opensheetmusicdisplay.min.js:2:442232)
+    at w.updateGraphic (/Users/mamingchen/GitHub/WebMusic/node_modules/opensheetmusicdisplay/build/opensheetmusicdisplay.min.js:2:789842)
+    at w.load (/Users/mamingchen/GitHub/WebMusic/node_modules/opensheetmusicdisplay/build/opensheetmusicdisplay.min.js:2:789781)
+    at Module.renderOSMDStaffVisualizer (/Users/mamingchen/GitHub/WebMusic/packages/score/src/view/render/osmd-staff.ts:142:18)
+    at SheetViewElement.refresh (/Users/mamingchen/GitHub/WebMusic/packages/score/src/view/element/sheet-view.ts:136:24) undefined
+

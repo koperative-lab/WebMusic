@@ -17,9 +17,10 @@ on Kernel. Package resolution does not allocate shared runtime objects: a shared
 Kernel package, an AudioContext and a session TransportClock are three distinct
 things. See the [session-clock design boundary](https://github.com/koperative-lab/WebMusic/blob/main/platform/shared-clock-injection.md).
 
-The first-release packages are Kernel, UI and Score. Audio and Bridge continue
-on the [`dev` branch](https://github.com/mrsteamedbun/WebMusic/tree/dev);
-the cross-domain examples below describe those shared contracts.
+The first-release packages are Kernel, UI and Score. Audio and Bridge source,
+tests and public references are absent from this checkout. The
+cross-domain examples below describe the accepted direction in the
+[architecture](../../dev/ARCHITECTURE.md), not additional installed packages.
 
 ## Install and use
 
@@ -103,18 +104,19 @@ These recur across the modules and explain most of the local decisions.
 
 **Player, effect and mapping contracts are structural.** Consumers satisfy these
 interfaces by shape without inheriting a shared domain base class. The optional
-`WebMusicElement` lifecycle base serves a separate browser composition concern. `AudioClipPlayer`
-and `ScorePlayer` satisfy `PlayerLike` without either knowing the other
-exists; an `Effect` crosses families because it has `createAudioNodes`. Two
-consequences are load-bearing: contract members use method-shorthand syntax
+`WebMusicElement` lifecycle base serves a separate browser composition concern.
+`ScorePlayer` satisfies `PlayerLike`; a future `AudioClipPlayer` can satisfy the
+same structural contract without either domain importing the other. The `Effect`
+shape is reusable across families because it has `createAudioNodes`. Contract
+members use method-shorthand syntax
 so that method bivariance lets a typed-emitter `on<K extends keyof E>(…)`
 satisfy the loose `on(event: string, …)` (arrow-property signatures would
-reject every typed-emitter implementer under `strictFunctionTypes`), and
-families pin their conformance in type-only `*-contract.ts` modules so drift
-fails at the definition site rather than at some distant call.
+reject every typed-emitter implementer under `strictFunctionTypes`). Score pins
+its conformance in a type-only `*-contract.ts` module; a future Audio adapter
+should do the same so drift fails at the definition site.
 
 **Optional capability, named and guarded.** `PlayerLike`'s optional members
-are the lowest common denominator both families can always promise. Each
+are the lowest common denominator intended for both families. Each
 optional capability is *named* by an interface — `TimedPlayerLike`,
 `StatefulPlayerLike`, `RateControlledPlayerLike`, `VolumeControlledPlayerLike`,
 `DisposablePlayerLike` — and feature-tested through an exported `is*Player()`
@@ -235,9 +237,9 @@ interface TimelineMapping {
 
 Implementations should be total over the reals and monotonic non-decreasing;
 they may clamp negatives and may quantize, so round-trips are approximate by
-the mapping's own policy. Both families ship an adapter (`timeMapMapping`
-over score's `TimeMap`, `beatGridMapping` over audio's `BeatGrid`), which is
-what makes the two musical axes interoperable through seconds.
+the mapping's own policy. Score ships `timeMapMapping` over its `TimeMap`.
+An Audio `beatGridMapping` over `BeatGrid` is an accepted integration target;
+its source is not in this checkout.
 
 ### TickSource — keeping schedulers fed
 
@@ -254,8 +256,8 @@ about what the tick does.
 
 ### TransportGroup — master, followers, and the join dance
 
-`sync` is the choreography the score↔audio bridge proved out, hoisted once
-its class body turned out to reference only kernel types. One **master** whose
+`sync` captures the domain-neutral choreography from cross-domain coordination
+work. Its implementation references only Kernel types. One **master** whose
 clock is the group's timeline, N **followers** that join it, all positions on
 the master's axis against one shared reference clock.
 
@@ -381,8 +383,9 @@ Recorded so the boundaries are visible rather than discovered:
   settlement, but each engine still owns its clock; direct mutations outside
   the group are not automatically versioned. See
   [`platform/shared-clock-injection.md`](https://github.com/koperative-lab/WebMusic/blob/main/platform/shared-clock-injection.md).
-- **No nonlinear mapped alignment.** `TimelineMapping` is published and both
-  families ship adapters. The group consumes constant offset/scale and optional
+- **No nonlinear mapped alignment.** `TimelineMapping` is published and Score
+  ships an adapter; an Audio adapter remains a migration target. The group
+  consumes constant offset/scale and optional
   native-loop phase, not nonlinear rubato or audio-warp mappings.
 - **No shared tick.** `TickSource` is single-callback by contract, so each
   consumer owns a worker; several transports in one page mean several

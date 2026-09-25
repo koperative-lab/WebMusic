@@ -1,0 +1,5 @@
+
+> check:licenses
+> node scripts/license-gate.mjs
+
+License gate passed: no copyleft package in hard dependencies; all restricted peers are optional.

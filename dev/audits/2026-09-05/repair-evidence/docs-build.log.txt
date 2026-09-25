@@ -1,0 +1,409 @@
+
+> build
+> astro build
+
+11:02:37 [types] Generated 234ms
+11:02:37 [build] output: "static"
+11:02:37 [build] directory: /Users/mamingchen/GitHub/WebMusic/apps/doc/webmusic/dist/
+11:02:37 [build] Collecting build info...
+11:02:37 [build] ✓ Completed in 299ms.
+11:02:37 [build] Building static entrypoints...
+11:02:54 [vite] ✓ built in 17.02s
+11:02:54 [build] ✓ Completed in 17.06s.
+
+ building client (vite) 
+11:02:54 [vite] transforming...
+../../../node_modules/@codesandbox/sandpack-react/dist/index.mjs (1:0): Module level directives cause errors when bundled, "use client" in "../../../node_modules/@codesandbox/sandpack-react/dist/index.mjs" was ignored.
+11:02:57 [vite] ✓ 403 modules transformed.
+11:02:57 [vite] rendering chunks...
+11:02:57 [vite] computing gzip size...
+11:02:57 [vite] dist/_astro/audio-CIEyP2s7.js                                                                       0.03 kB
+11:02:57 [vite] dist/_astro/audio-Yjq2woOc.js                                                                       0.03 kB
+11:02:57 [vite] dist/_astro/audio-CBX5vcHl.js                                                                       0.03 kB
+11:02:57 [vite] dist/_astro/decoder-worker-bbGDZ1NP.js                                                              6.44 kB
+11:02:57 [vite] dist/_astro/analysis-worker-COu-5Wlo.js                                                            67.37 kB
+11:02:57 [vite] dist/_astro/worker-DtxdMZz8.js                                                                     80.74 kB
+11:02:57 [vite] dist/_astro/ElementPlayground.astro_astro_type_script_index_0_lang.CfR6PLvd.js                      0.05 kB │ gzip:   0.07 kB
+11:02:57 [vite] dist/_astro/AnalysisHistogramPlayground.astro_astro_type_script_index_0_lang.BkpliG3i.js            0.34 kB │ gzip:   0.22 kB
+11:02:57 [vite] dist/_astro/ScoreAnalysisPlayground.astro_astro_type_script_index_0_lang.DU8USp2a.js                0.34 kB │ gzip:   0.22 kB
+11:02:57 [vite] dist/_astro/chunk-ILKEVUJ3.BZwXEqkf.js                                                              0.40 kB │ gzip:   0.24 kB
+11:02:57 [vite] dist/_astro/AudioClipThumbnailPlayground.astro_astro_type_script_index_0_lang.C_LehZWt.js           0.42 kB │ gzip:   0.25 kB
+11:02:57 [vite] dist/_astro/AudioClipSummaryPlayground.astro_astro_type_script_index_0_lang.BOZf4jM2.js             0.43 kB │ gzip:   0.26 kB
+11:02:57 [vite] dist/_astro/AudioAnalysisViewDemo.astro_astro_type_script_index_0_lang.ChWQ7Is8.js                  0.44 kB │ gzip:   0.27 kB
+11:02:57 [vite] dist/_astro/AudioHistogramPlayground.astro_astro_type_script_index_0_lang.z-tD-o2Q.js               0.44 kB │ gzip:   0.27 kB
+11:02:57 [vite] dist/_astro/chunk-PXG64RU4.DUdiAhuo.js                                                              0.44 kB │ gzip:   0.27 kB
+11:02:57 [vite] dist/_astro/ScoreThumbnailPlayground.astro_astro_type_script_index_0_lang.DmZSJSb1.js               0.44 kB │ gzip:   0.26 kB
+11:02:57 [vite] dist/_astro/core-QFUZDSOK.DEfdaSQT.js                                                               0.56 kB │ gzip:   0.32 kB
+11:02:57 [vite] dist/_astro/serializer-Z2IC4532.-j8e4wkP.js                                                         0.58 kB │ gzip:   0.33 kB
+11:02:57 [vite] dist/_astro/AudioClipPlayerDemo.astro_astro_type_script_index_0_lang.Cya-5HWn.js                    0.61 kB │ gzip:   0.33 kB
+11:02:57 [vite] dist/_astro/AudioCustomStyleDemo.astro_astro_type_script_index_0_lang.Cya-5HWn.js                   0.61 kB │ gzip:   0.33 kB
+11:02:57 [vite] dist/_astro/AudioPlaylistPlayground.astro_astro_type_script_index_0_lang.MLatP-gn.js                0.61 kB │ gzip:   0.33 kB
+11:02:57 [vite] dist/_astro/chunk-DJOPQWDZ.DbuM3beD.js                                                              0.61 kB │ gzip:   0.37 kB
+11:02:57 [vite] dist/_astro/base-80a1f760.BShZTV2g.js                                                               0.63 kB │ gzip:   0.29 kB
+11:02:57 [vite] dist/_astro/_commonjsHelpers.BosuxZz1.js                                                            0.69 kB │ gzip:   0.38 kB
+11:02:57 [vite] dist/_astro/ScorePlayerPlayground.astro_astro_type_script_index_0_lang.CrYVsQ93.js                  0.72 kB │ gzip:   0.40 kB
+11:02:57 [vite] dist/_astro/AnalysisTimelinePlayground.astro_astro_type_script_index_0_lang.B6zS9DxQ.js             0.77 kB │ gzip:   0.40 kB
+11:02:57 [vite] dist/_astro/AnalysisViewPlayground.astro_astro_type_script_index_0_lang.Kn0YSZJB.js                 0.77 kB │ gzip:   0.41 kB
+11:02:57 [vite] dist/_astro/RhythmPatternsPlayground.astro_astro_type_script_index_0_lang.C2vzDl3W.js               0.77 kB │ gzip:   0.41 kB
+11:02:57 [vite] dist/_astro/ScoreViewDemo.astro_astro_type_script_index_0_lang.Bd8aDbt6.js                          0.79 kB │ gzip:   0.41 kB
+11:02:57 [vite] dist/_astro/ViewSyncDemo.astro_astro_type_script_index_0_lang.Bd8aDbt6.js                           0.79 kB │ gzip:   0.41 kB
+11:02:57 [vite] dist/_astro/KeyboardViewPlayground.astro_astro_type_script_index_0_lang.lYMP0PoR.js                 0.79 kB │ gzip:   0.42 kB
+11:02:57 [vite] dist/_astro/ScoreMapPlayground.astro_astro_type_script_index_0_lang.CUNkrJXp.js                     0.79 kB │ gzip:   0.42 kB
+11:02:57 [vite] dist/_astro/SheetViewPlayground.astro_astro_type_script_index_0_lang.Blvq4M06.js                    0.79 kB │ gzip:   0.42 kB
+11:02:57 [vite] dist/_astro/AudioClipRecorderDemo.astro_astro_type_script_index_0_lang.CXitmKSg.js                  0.80 kB │ gzip:   0.47 kB
+11:02:57 [vite] dist/_astro/chunk-E6UZBIJP.CxGoLYzk.js                                                              0.84 kB │ gzip:   0.42 kB
+11:02:57 [vite] dist/_astro/AudioAnalysisTimelinePlayground.astro_astro_type_script_index_0_lang.BkCbmGvn.js        0.86 kB │ gzip:   0.44 kB
+11:02:57 [vite] dist/_astro/AudioMinimapPlayground.astro_astro_type_script_index_0_lang.Cd_WHRiU.js                 0.88 kB │ gzip:   0.51 kB
+11:02:57 [vite] dist/_astro/WaveformExamplesDemo.astro_astro_type_script_index_0_lang.C57PxgAC.js                   0.91 kB │ gzip:   0.56 kB
+11:02:57 [vite] dist/_astro/AudioMixerDemo.astro_astro_type_script_index_0_lang.BGmHUXn7.js                         0.93 kB │ gzip:   0.53 kB
+11:02:57 [vite] dist/_astro/AudioMeterDemo.astro_astro_type_script_index_0_lang.CdMDOvh8.js                         0.95 kB │ gzip:   0.51 kB
+11:02:57 [vite] dist/_astro/AudioLiveViewPlayground.astro_astro_type_script_index_0_lang.r65Ol2X4.js                0.98 kB │ gzip:   0.53 kB
+11:02:57 [vite] dist/_astro/preload-helper.CLcXU_4U.js                                                              0.99 kB │ gzip:   0.60 kB
+11:02:57 [vite] dist/_astro/AudioWorkbenchDemo.astro_astro_type_script_index_0_lang.Cc49UInS.js                     1.03 kB │ gzip:   0.56 kB
+11:02:57 [vite] dist/_astro/ApiSandbox.astro_astro_type_script_index_0_lang.DOT3OEaw.js                             1.11 kB │ gzip:   0.61 kB
+11:02:57 [vite] dist/_astro/ProgrammaticSoundDemo.astro_astro_type_script_index_0_lang.B-btG8Kj.js                  1.11 kB │ gzip:   0.64 kB
+11:02:57 [vite] dist/_astro/AudioAnalysisDemo.astro_astro_type_script_index_0_lang.CcwLMTK2.js                      1.11 kB │ gzip:   0.60 kB
+11:02:57 [vite] dist/_astro/ProgrammaticMetronomeDemo.astro_astro_type_script_index_0_lang.Gcoqw6FQ.js              1.12 kB │ gzip:   0.64 kB
+11:02:57 [vite] dist/_astro/AudioRegionListPlayground.astro_astro_type_script_index_0_lang.gJzQ5glf.js              1.20 kB │ gzip:   0.65 kB
+11:02:57 [vite] dist/_astro/AudioViewDemo.astro_astro_type_script_index_0_lang.CiBFFLcC.js                          1.38 kB │ gzip:   0.77 kB
+11:02:57 [vite] dist/_astro/ProgrammaticInteractivePlayerDemo.astro_astro_type_script_index_0_lang.CHPXowGn.js      1.42 kB │ gzip:   0.85 kB
+11:02:57 [vite] dist/_astro/ProgrammaticTransportDriverDemo.astro_astro_type_script_index_0_lang.CfqhdzVq.js        1.64 kB │ gzip:   0.93 kB
+11:02:57 [vite] dist/_astro/ScorePlayerPlayground.astro_astro_type_script_index_0_lang.C9QnRVPw.js                  1.65 kB │ gzip:   0.95 kB
+11:02:57 [vite] dist/_astro/ProgrammaticPlayerControllerDemo.astro_astro_type_script_index_0_lang.Dp3Pk0R5.js       1.73 kB │ gzip:   0.94 kB
+11:02:57 [vite] dist/_astro/ViewVisualizerDemo.astro_astro_type_script_index_0_lang.CelfJwhV.js                     1.74 kB │ gzip:   0.94 kB
+11:02:57 [vite] dist/_astro/ProgrammaticAbPlayerDemo.astro_astro_type_script_index_0_lang.DotexjDG.js               1.87 kB │ gzip:   0.99 kB
+11:02:57 [vite] dist/_astro/ProgrammaticEffectDemo.astro_astro_type_script_index_0_lang.DU8dOkgT.js                 1.93 kB │ gzip:   1.04 kB
+11:02:57 [vite] dist/_astro/chunk-AMXI3O2Z.D4AEc3fH.js                                                              2.16 kB │ gzip:   1.03 kB
+11:02:57 [vite] dist/_astro/page.7qqag-5g.js                                                                        2.17 kB │ gzip:   0.97 kB
+11:02:57 [vite] dist/_astro/ProgrammaticRackDemo.astro_astro_type_script_index_0_lang.BUAox5Pw.js                   2.34 kB │ gzip:   1.18 kB
+11:02:57 [vite] dist/_astro/chunk-M5S4GQWX.C6HAF6tl.js                                                              2.36 kB │ gzip:   1.07 kB
+11:02:57 [vite] dist/_astro/MultibandWaveformDemo.astro_astro_type_script_index_0_lang.C3y7pZPi.js                  2.36 kB │ gzip:   1.25 kB
+11:02:57 [vite] dist/_astro/ProgrammaticLoopPlayerDemo.astro_astro_type_script_index_0_lang.De5gyguv.js             2.44 kB │ gzip:   1.21 kB
+11:02:57 [vite] dist/_astro/sfz-7PFQOMVB.CrQSlijL.js                                                                2.74 kB │ gzip:   1.23 kB
+11:02:57 [vite] dist/_astro/chunk-HQ35ZZGR.QN0JLARD.js                                                              3.18 kB │ gzip:   1.37 kB
+11:02:57 [vite] dist/_astro/chunk-HY2YIL75.Bvrc-vTj.js                                                              3.46 kB │ gzip:   1.43 kB
+11:02:57 [vite] dist/_astro/chunk-YJSWAOJF.Bq7y1S46.js                                                              3.80 kB │ gzip:   1.47 kB
+11:02:57 [vite] dist/_astro/ScoreWorkbenchDemo.astro_astro_type_script_index_0_lang.BWCuiMco.js                     3.94 kB │ gzip:   1.78 kB
+11:02:57 [vite] dist/_astro/index.BmWzWUX5.js                                                                       3.97 kB │ gzip:   1.74 kB
+11:02:57 [vite] dist/_astro/NoteInputDemo.astro_astro_type_script_index_0_lang.C3hVh369.js                          3.99 kB │ gzip:   1.66 kB
+11:02:57 [vite] dist/_astro/HeadlessPlayground.astro_astro_type_script_index_0_lang.C59bmhlK.js                     4.07 kB │ gzip:   1.59 kB
+11:02:57 [vite] dist/_astro/chunk-VTOXYVSY.DYykkFz9.js                                                              4.42 kB │ gzip:   1.72 kB
+11:02:57 [vite] dist/_astro/api-MQMTIHBZ.BSg9-l69.js                                                                4.71 kB │ gzip:   2.02 kB
+11:02:57 [vite] dist/_astro/playground-client.oRfLWI8G.js                                                           4.97 kB │ gzip:   2.11 kB
+11:02:57 [vite] dist/_astro/chunk-WPQAX66V.DmGZuNqg.js                                                              5.44 kB │ gzip:   2.08 kB
+11:02:57 [vite] dist/_astro/chunk-R4XJ2K6U.CXwbRbfk.js                                                              6.07 kB │ gzip:   1.97 kB
+11:02:57 [vite] dist/_astro/hoisted.B8awXCiX.js                                                                     6.31 kB │ gzip:   2.44 kB
+11:02:57 [vite] dist/_astro/load.D8jdef8H.js                                                                        6.62 kB │ gzip:   2.59 kB
+11:02:57 [vite] dist/_astro/RackControlDemo.astro_astro_type_script_index_0_lang.BYfzLNOX.js                        8.78 kB │ gzip:   3.47 kB
+11:02:57 [vite] dist/_astro/chunk-CAF35UWF.BIw2J5Jp.js                                                             10.42 kB │ gzip:   3.72 kB
+11:02:57 [vite] dist/_astro/chunk-WMXDKTB6.DUtyIOsv.js                                                             10.55 kB │ gzip:   3.78 kB
+11:02:57 [vite] dist/_astro/SynthPanelDemo.astro_astro_type_script_index_0_lang.DInoFiuD.js                        11.73 kB │ gzip:   4.19 kB
+11:02:57 [vite] dist/_astro/ReactPresetShowcase.astro_astro_type_script_index_0_lang.D6exqa93.js                   12.24 kB │ gzip:   4.14 kB
+11:02:57 [vite] dist/_astro/chunk-IP2BPZLJ.CCvn3tT0.js                                                             12.29 kB │ gzip:   4.51 kB
+11:02:57 [vite] dist/_astro/chunk-FI72D72P.BLYSoJWJ.js                                                             13.63 kB │ gzip:   4.33 kB
+11:02:57 [vite] dist/_astro/index.CKjh3CTD.js                                                                      14.30 kB │ gzip:   4.94 kB
+11:02:57 [vite] dist/_astro/chunk-PXG64RU4.D0reAf6g.js                                                             14.57 kB │ gzip:   4.49 kB
+11:02:57 [vite] dist/_astro/effect-chain-editor-client.95hAwf-p.js                                                 14.68 kB │ gzip:   4.85 kB
+11:02:57 [vite] dist/_astro/chunk-HS7XHKEW.DvNnEr3D.js                                                             15.08 kB │ gzip:   5.12 kB
+11:02:57 [vite] dist/_astro/chunk-MY6HNAE6.o7pTZso7.js                                                             15.14 kB │ gzip:   4.48 kB
+11:02:57 [vite] dist/_astro/index.BoJ7_nxL.js                                                                      19.05 kB │ gzip:   5.32 kB
+11:02:57 [vite] dist/_astro/consoleHook-59e792cb.C5dL0Qwh.js                                                       19.71 kB │ gzip:   6.04 kB
+11:02:57 [vite] dist/_astro/ScoreAudioSyncDemo.astro_astro_type_script_index_0_lang.BNvhO7QG.js                    19.78 kB │ gzip:   6.81 kB
+11:02:57 [vite] dist/_astro/chunk-WZFV2PMT.9-ShSudR.js                                                             22.09 kB │ gzip:   8.46 kB
+11:02:57 [vite] dist/_astro/chunk-OASUDGPE.C9EnUDrN.js                                                             22.50 kB │ gzip:   6.71 kB
+11:02:57 [vite] dist/_astro/index.CQk_zceJ.js                                                                      27.77 kB │ gzip:   8.76 kB
+11:02:57 [vite] dist/_astro/chunk-BDROFX32.BBu9O3CA.js                                                             28.22 kB │ gzip:   8.84 kB
+11:02:57 [vite] dist/_astro/chunk-QNRAFXHH.CmG8BRzM.js                                                             28.32 kB │ gzip:   8.66 kB
+11:02:57 [vite] dist/_astro/chunk-5Y6QKVLW.DJKp9h2E.js                                                             28.59 kB │ gzip:   7.43 kB
+11:02:57 [vite] dist/_astro/chunk-CP2P3YMP.DpAhXI85.js                                                             31.37 kB │ gzip:  11.36 kB
+11:02:57 [vite] dist/_astro/chunk-EOTJ3JXJ.Gp4HOrH6.js                                                             33.98 kB │ gzip:   8.86 kB
+11:02:57 [vite] dist/_astro/chunk-Z2SE6V23.fNq6aqbf.js                                                             34.92 kB │ gzip:   8.67 kB
+11:02:57 [vite] dist/_astro/chunk-SBATRXQ2.DFK3cDPM.js                                                             42.25 kB │ gzip:  11.69 kB
+11:02:57 [vite] dist/_astro/chunk-NH3PJM4M.CKxNcwjT.js                                                             48.00 kB │ gzip:  13.65 kB
+11:02:57 [vite] dist/_astro/UiPresenterLiveDemo.astro_astro_type_script_index_0_lang.C9f6r85r.js                   49.41 kB │ gzip:  14.28 kB
+11:02:57 [vite] dist/_astro/chunk-FHMQYRZE.1K1vVFjh.js                                                             49.65 kB │ gzip:  17.15 kB
+11:02:57 [vite] dist/_astro/chunk-SB6YFPEF.Z_Ji7edc.js                                                             54.31 kB │ gzip:  15.99 kB
+11:02:57 [vite] dist/_astro/chunk-YDLXUFLH.GlHV2x2l.js                                                             58.29 kB │ gzip:  16.01 kB
+11:02:57 [vite] dist/_astro/ui-core.DubU7mj9.js                                                                    85.95 kB │ gzip:  27.33 kB
+11:02:57 [vite] dist/_astro/chunk-EG5T5VTW.zPgup-uM.js                                                            117.06 kB │ gzip:  29.83 kB
+11:02:57 [vite] dist/_astro/chunk-AIYMEB6D.CQzgMM6Z.js                                                            130.74 kB │ gzip:  44.48 kB
+11:02:57 [vite] dist/_astro/jsx-runtime.CRBccULh.js                                                               141.74 kB │ gzip:  45.71 kB
+11:02:57 [vite] dist/_astro/index-599aeaf7.Z1VOjsG8.js                                                            144.32 kB │ gzip:  24.42 kB
+11:02:57 [vite] dist/_astro/index.D8PI8hZw.js                                                                     162.91 kB │ gzip:  27.16 kB
+11:02:57 [vite] dist/_astro/api-sandbox-client.h-0nPevR.js                                                        621.18 kB │ gzip: 210.14 kB
+11:02:57 [vite] dist/_astro/opensheetmusicdisplay.min.CjfYX6RG.js                                               1,223.48 kB │ gzip: 322.39 kB
+11:02:57 [WARN] [vite] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+11:02:57 [vite] ✓ built in 3.46s
+
+ generating static routes 
+11:02:58 ▶ /404
+11:02:58   └─ /404.html (+9ms)
+11:02:58 ▶ /[...slug]
+11:02:58   ├─ /audio/api/analyze/index.html (+23ms)
+11:02:58   ├─ /audio/api/index.html (+18ms)
+11:02:58   ├─ /audio/api/play/index.html (+9ms)
+11:02:58   ├─ /audio/api/react/index.html (+13ms)
+11:02:58   ├─ /audio/api/view/index.html (+12ms)
+11:02:58   ├─ /audio/element/analyze/audio-analysis-timeline/index.html (+8ms)
+11:02:58   ├─ /audio/element/analyze/audio-analysis-view/index.html (+10ms)
+11:02:58   ├─ /audio/element/analyze/audio-analysis/index.html (+8ms)
+11:02:58   ├─ /audio/element/analyze/audio-clip-summary/index.html (+7ms)
+11:02:58   ├─ /audio/element/analyze/audio-histogram/index.html (+6ms)
+11:02:58   ├─ /audio/element/analyze/index.html (+6ms)
+11:02:58   ├─ /audio/element/index.html (+3ms)
+11:02:58   ├─ /audio/element/play/audio-clip-player/index.html (+7ms)
+11:02:58   ├─ /audio/element/play/audio-clip-recorder/index.html (+5ms)
+11:02:58   ├─ /audio/element/play/audio-meter/index.html (+6ms)
+11:02:58   ├─ /audio/element/play/audio-mixer/index.html (+5ms)
+11:02:58   ├─ /audio/element/play/audio-playlist/index.html (+7ms)
+11:02:58   ├─ /audio/element/play/index.html (+4ms)
+11:02:58   ├─ /audio/element/view/audio-clip-thumbnail/index.html (+6ms)
+11:02:58   ├─ /audio/element/view/audio-live-view/index.html (+5ms)
+11:02:58   ├─ /audio/element/view/audio-minimap/index.html (+6ms)
+11:02:58   ├─ /audio/element/view/audio-region-list/index.html (+5ms)
+11:02:58   ├─ /audio/element/view/audio-view/index.html (+15ms)
+11:02:58   ├─ /audio/element/view/index.html (+5ms)
+11:02:58   ├─ /audio/getting-started/index.html (+7ms)
+11:02:58   ├─ /audio/headless/analyze/audio-analysis-session/index.html (+6ms)
+11:02:58   ├─ /audio/headless/analyze/index.html (+3ms)
+11:02:58   ├─ /audio/headless/analyze/realtime-analyzer/index.html (+5ms)
+11:02:58   ├─ /audio/headless/index.html (+3ms)
+11:02:58   ├─ /audio/headless/play/audio-clip-player/index.html (+4ms)
+11:02:58   ├─ /audio/headless/play/audio-mixer/index.html (+5ms)
+11:02:58   ├─ /audio/headless/play/audio-playlist/index.html (+4ms)
+11:02:58   ├─ /audio/headless/play/audio-recorder/index.html (+5ms)
+11:02:58   ├─ /audio/headless/play/effects/index.html (+4ms)
+11:02:58   ├─ /audio/headless/play/engines/index.html (+3ms)
+11:02:58   ├─ /audio/headless/play/index.html (+5ms)
+11:02:58   ├─ /audio/headless/view/audio-timeline/index.html (+4ms)
+11:02:58   ├─ /audio/headless/view/index.html (+4ms)
+11:02:58   ├─ /audio/headless/view/live-projection/index.html (+4ms)
+11:02:58   ├─ /audio/headless/view/peaks/index.html (+3ms)
+11:02:58   ├─ /audio/headless/view/view-models/index.html (+5ms)
+11:02:58   ├─ /audio/index.html (+3ms)
+11:02:58   ├─ /bridge/api/index.html (+5ms)
+11:02:58   ├─ /bridge/headless/index.html (+3ms)
+11:02:58   ├─ /bridge/headless/score-audio-sync/index.html (+4ms)
+11:02:58   ├─ /bridge/index.html (+4ms)
+11:02:58   ├─ /index.html (+3ms)
+11:02:58   ├─ /kernel/api/index.html (+7ms)
+11:02:58   ├─ /kernel/index.html (+3ms)
+11:02:58   ├─ /quick-start/index.html (+5ms)
+11:02:58   ├─ /score/api/analyze/index.html (+13ms)
+11:02:58   ├─ /score/api/index.html (+11ms)
+11:02:58   ├─ /score/api/io/index.html (+4ms)
+11:02:58   ├─ /score/api/play/index.html (+7ms)
+11:02:58   ├─ /score/api/react/index.html (+12ms)
+11:02:58   ├─ /score/api/view/index.html (+14ms)
+11:02:58   ├─ /score/element/analyze/analysis-histogram/index.html (+4ms)
+11:02:58   ├─ /score/element/analyze/analysis-timeline/index.html (+4ms)
+11:02:58   ├─ /score/element/analyze/analysis-view/index.html (+6ms)
+11:02:58   ├─ /score/element/analyze/index.html (+3ms)
+11:02:58   ├─ /score/element/analyze/rhythm-patterns/index.html (+4ms)
+11:02:58   ├─ /score/element/analyze/score-analysis/index.html (+3ms)
+11:02:58   ├─ /score/element/index.html (+3ms)
+11:02:58   ├─ /score/element/play/index.html (+5ms)
+11:02:58   ├─ /score/element/play/note-input/index.html (+8ms)
+11:02:58   ├─ /score/element/play/rack-control/index.html (+9ms)
+11:02:58   ├─ /score/element/play/score-player/index.html (+8ms)
+11:02:58   ├─ /score/element/play/synth-panel/index.html (+9ms)
+11:02:58   ├─ /score/element/view/index.html (+4ms)
+11:02:58   ├─ /score/element/view/keyboard-view/index.html (+4ms)
+11:02:58   ├─ /score/element/view/score-map/index.html (+5ms)
+11:02:58   ├─ /score/element/view/score-thumbnail/index.html (+4ms)
+11:02:58   ├─ /score/element/view/score-view/index.html (+9ms)
+11:02:58   ├─ /score/element/view/sheet-view/index.html (+4ms)
+11:02:58   ├─ /score/getting-started/index.html (+8ms)
+11:02:58   ├─ /score/headless/analyze/analysis-session/index.html (+4ms)
+11:02:58   ├─ /score/headless/analyze/index.html (+4ms)
+11:02:58   ├─ /score/headless/analyze/live-trackers/index.html (+4ms)
+11:02:58   ├─ /score/headless/analyze/score-report/index.html (+4ms)
+11:02:58   ├─ /score/headless/index.html (+3ms)
+11:02:58   ├─ /score/headless/play/ab-player/index.html (+3ms)
+11:02:58   ├─ /score/headless/play/effect/index.html (+5ms)
+11:02:58   ├─ /score/headless/play/index.html (+4ms)
+11:02:58   ├─ /score/headless/play/interactive-player/index.html (+5ms)
+11:02:58   ├─ /score/headless/play/loop-player/index.html (+3ms)
+11:02:58   ├─ /score/headless/play/metronome/index.html (+4ms)
+11:02:58   ├─ /score/headless/play/player-controller/index.html (+4ms)
+11:02:58   ├─ /score/headless/play/rack/index.html (+5ms)
+11:02:58   ├─ /score/headless/play/score-player/index.html (+4ms)
+11:02:58   ├─ /score/headless/play/sound/index.html (+3ms)
+11:02:58   ├─ /score/headless/play/synth-backends/index.html (+4ms)
+11:02:58   ├─ /score/headless/play/tone-player/index.html (+5ms)
+11:02:58   ├─ /score/headless/play/transport-drivers/index.html (+3ms)
+11:02:58   ├─ /score/headless/play/web-midi/index.html (+4ms)
+11:02:58   ├─ /score/headless/view/active-note-tracker/index.html (+3ms)
+11:02:58   ├─ /score/headless/view/index.html (+3ms)
+11:02:58   ├─ /score/headless/view/score-view/index.html (+5ms)
+11:02:58   ├─ /score/index.html (+3ms)
+11:02:58   ├─ /uikit/api/index.html (+5ms)
+11:02:58   ├─ /uikit/catalog/index.html (+5ms)
+11:02:58   ├─ /uikit/index.html (+7ms)
+11:02:58   ├─ /uikit/mixing-capture/meter/index.html (+6ms)
+11:02:58   ├─ /uikit/mixing-capture/mixer/index.html (+7ms)
+11:02:58   ├─ /uikit/mixing-capture/recorder/index.html (+5ms)
+11:02:58   ├─ /uikit/notes/note/index.html (+8ms)
+11:02:58   ├─ /uikit/parameters-gestures/envelope/index.html (+6ms)
+11:02:58   ├─ /uikit/parameters-gestures/eq/index.html (+8ms)
+11:02:58   ├─ /uikit/parameters-gestures/lfo/index.html (+6ms)
+11:02:58   ├─ /uikit/parameters-gestures/macro/index.html (+6ms)
+11:02:58   ├─ /uikit/parameters-gestures/panel/index.html (+5ms)
+11:02:58   ├─ /uikit/parameters-gestures/parameter/index.html (+7ms)
+11:02:58   ├─ /uikit/transport-time/minimap/index.html (+5ms)
+11:02:58   ├─ /uikit/transport-time/playlist/index.html (+7ms)
+11:02:58   ├─ /uikit/transport-time/timeline/index.html (+5ms)
+11:02:58   ├─ /uikit/transport-time/transport/index.html (+7ms)
+11:02:58   ├─ /uikit/views-analysis/analysis/index.html (+6ms)
+11:02:58   ├─ /uikit/views-analysis/stage/index.html (+5ms)
+11:02:58   ├─ /uikit/views-analysis/status/index.html (+5ms)
+11:02:58   └─ /uikit/views-analysis/track-list/index.html (+5ms)
+11:02:58 λ /_astro/ec.dy9ns.js
+11:02:58   └─ /_astro/ec.dy9ns.js (+0ms)
+11:02:58 λ /_astro/ec.d6kn2.css
+11:02:58   └─ /_astro/ec.d6kn2.css (+0ms)
+11:02:58 ▶ /audio/api/core
+11:02:58   └─ /audio/api/core/index.html (+0ms)
+11:02:58 ▶ /audio/element/view/meter
+11:02:58   └─ /audio/element/view/meter/index.html (+0ms)
+11:02:58 ▶ /audio/element/view/spectrogram
+11:02:58   └─ /audio/element/view/spectrogram/index.html (+0ms)
+11:02:58 ▶ /audio/element/view/waveform
+11:02:58   └─ /audio/element/view/waveform/index.html (+0ms)
+11:02:58 ▶ /audio/headless-component/analyze
+11:02:58   └─ /audio/headless-component/analyze/index.html (+0ms)
+11:02:58 ▶ /audio/headless-component/play
+11:02:58   └─ /audio/headless-component/play/index.html (+0ms)
+11:02:58 ▶ /audio/headless-component/view
+11:02:58   └─ /audio/headless-component/view/index.html (+0ms)
+11:02:58 ▶ /audio/integration/react
+11:02:58   └─ /audio/integration/react/index.html (+0ms)
+11:02:58 ▶ /audio/web-component/analyze
+11:02:58   └─ /audio/web-component/analyze/index.html (+0ms)
+11:02:58 ▶ /audio/web-component/play
+11:02:58   └─ /audio/web-component/play/index.html (+0ms)
+11:02:58 ▶ /audio/web-component/view
+11:02:58   └─ /audio/web-component/view/index.html (+0ms)
+11:02:58 ▶ /introduction
+11:02:58   └─ /introduction/index.html (+0ms)
+11:02:58 ▶ /score/api/core
+11:02:58   └─ /score/api/core/index.html (+0ms)
+11:02:58 ▶ /score/bridges/score-audio
+11:02:58   └─ /score/bridges/score-audio/index.html (+0ms)
+11:02:58 ▶ /score/element/play/score-recorder
+11:02:58   └─ /score/element/play/score-recorder/index.html (+0ms)
+11:02:58 ▶ /score/element/play/simple-score-player
+11:02:58   └─ /score/element/play/simple-score-player/index.html (+0ms)
+11:02:58 ▶ /score/element/view/piano-roll
+11:02:58   └─ /score/element/view/piano-roll/index.html (+0ms)
+11:02:58 ▶ /score/element/view/staff
+11:02:58   └─ /score/element/view/staff/index.html (+0ms)
+11:02:58 ▶ /score/element/view/waterfall
+11:02:58   └─ /score/element/view/waterfall/index.html (+0ms)
+11:02:58 ▶ /score/headless/play/playercontroller--an-event-wrapper
+11:02:58   └─ /score/headless/play/playercontroller--an-event-wrapper/index.html (+0ms)
+11:02:58 ▶ /score/headless/play/scoreplayer--the-push-engine
+11:02:58   └─ /score/headless/play/scoreplayer--the-push-engine/index.html (+0ms)
+11:02:58 ▶ /score/headless/play/sound--timbres
+11:02:58   └─ /score/headless/play/sound--timbres/index.html (+0ms)
+11:02:58 ▶ /score/headless/view/createscoreview
+11:02:58   └─ /score/headless/view/createscoreview/index.html (+0ms)
+11:02:58 ▶ /score/headless-component/analyze
+11:02:58   └─ /score/headless-component/analyze/index.html (+0ms)
+11:02:58 ▶ /score/headless-component/play
+11:02:58   └─ /score/headless-component/play/index.html (+0ms)
+11:02:58 ▶ /score/headless-component/view
+11:02:58   └─ /score/headless-component/view/index.html (+0ms)
+11:02:58 ▶ /score/integration/react
+11:02:58   └─ /score/integration/react/index.html (+0ms)
+11:02:58 ▶ /score/programmatic/analyze
+11:02:58   └─ /score/programmatic/analyze/index.html (+0ms)
+11:02:58 ▶ /score/programmatic/play
+11:02:58   └─ /score/programmatic/play/index.html (+0ms)
+11:02:58 ▶ /score/programmatic/view
+11:02:58   └─ /score/programmatic/view/index.html (+0ms)
+11:02:58 ▶ /score/ui-kit
+11:02:58   └─ /score/ui-kit/index.html (+0ms)
+11:02:58 ▶ /score/web-component/analyze
+11:02:58   └─ /score/web-component/analyze/index.html (+0ms)
+11:02:58 ▶ /score/web-component/play
+11:02:58   └─ /score/web-component/play/index.html (+0ms)
+11:02:58 ▶ /score/web-component/view
+11:02:58   └─ /score/web-component/view/index.html (+0ms)
+11:02:58 ▶ /ui/presenters
+11:02:58   └─ /ui/presenters/index.html (+0ms)
+11:02:58 ▶ /ui
+11:02:58   └─ /ui/index.html (+0ms)
+11:02:58 ✓ Completed in 737ms.
+
+
+Running Pagefind v1.5.2 (Extended)
+Running from: "/Users/mamingchen/GitHub/WebMusic/node_modules/@astrojs/starlight"
+Source:       "../../../apps/doc/webmusic/dist"
+Output:       "../../../apps/doc/webmusic/dist/pagefind"
+
+[Walking source directory]
+Found 156 files matching **/*.{html}
+
+[Parsing files]
+Found a data-pagefind-body element on the site.
+↳ Ignoring pages without this tag.
+36 pages found without an <html> element. 
+Pages without an outer <html> element will not be processed by default. 
+If adding this element is not possible, use the root selector config to target a different root element.
+  * "/ui/" has no <html> element
+  * "/ui/presenters/" has no <html> element
+  * "/introduction/" has no <html> element
+  * "/score/web-component/view/" has no <html> element
+  * "/score/web-component/analyze/" has no <html> element
+  * "/score/web-component/play/" has no <html> element
+  * "/score/ui-kit/" has no <html> element
+  * "/score/integration/react/" has no <html> element
+  * "/score/element/view/piano-roll/" has no <html> element
+  * "/score/element/view/waterfall/" has no <html> element
+  * "/score/element/view/staff/" has no <html> element
+  * "/score/element/play/simple-score-player/" has no <html> element
+  * "/score/element/play/score-recorder/" has no <html> element
+  * "/score/programmatic/view/" has no <html> element
+  * "/score/programmatic/analyze/" has no <html> element
+  * "/score/programmatic/play/" has no <html> element
+  * "/score/bridges/score-audio/" has no <html> element
+  * "/score/api/core/" has no <html> element
+  * "/score/headless/view/createscoreview/" has no <html> element
+  * "/score/headless/play/scoreplayer--the-push-engine/" has no <html> element
+  * "/score/headless/play/playercontroller--an-event-wrapper/" has no <html> element
+  * "/score/headless/play/sound--timbres/" has no <html> element
+  * "/score/headless-component/view/" has no <html> element
+  * "/score/headless-component/analyze/" has no <html> element
+  * "/score/headless-component/play/" has no <html> element
+  * "/audio/web-component/view/" has no <html> element
+  * "/audio/web-component/analyze/" has no <html> element
+  * "/audio/web-component/play/" has no <html> element
+  * "/audio/integration/react/" has no <html> element
+  * "/audio/element/view/spectrogram/" has no <html> element
+  * "/audio/element/view/meter/" has no <html> element
+  * "/audio/element/view/waveform/" has no <html> element
+  * "/audio/api/core/" has no <html> element
+  * "/audio/headless-component/view/" has no <html> element
+  * "/audio/headless-component/analyze/" has no <html> element
+  * "/audio/headless-component/play/" has no <html> element
+
+[Reading languages]
+Discovered 1 language: en
+
+[Building search indexes]
+Total: 
+  Indexed 1 language
+  Indexed 119 pages
+  Indexed 7403 words
+  Indexed 0 filters
+  Indexed 0 sorts
+
+Finished in 0.212 seconds
+11:02:59 [WARN] [@astrojs/sitemap] The Sitemap integration requires the `site` astro.config option. Skipping.
+11:02:59 [build] 120 page(s) built in 22.22s
+11:02:59 [build] Complete!

@@ -1,0 +1,44 @@
+
+> typecheck
+> npm run typecheck --workspaces --if-present
+
+
+> @webmusic/kernel@0.1.0 typecheck
+> tsc --noEmit
+
+
+> @webmusic/audio@0.1.0 typecheck
+> tsc --noEmit
+
+
+> @webmusic/score@0.1.0 typecheck
+> tsc --noEmit
+
+
+> @webmusic/ui@0.1.0 typecheck
+> tsc --noEmit
+
+
+> @webmusic/bridge@0.1.0 typecheck
+> tsc --noEmit
+
+
+> typecheck
+> astro check
+
+10:25:20 [types] Generated 271ms
+10:25:20 [check] Getting diagnostics for Astro files in /Users/mamingchen/GitHub/WebMusic/apps/doc/webmusic...
+[96msrc/components/AudioClipRecorderDemo.astro[0m:[93m39[0m:[93m66[0m - [93mwarning[0m[90m ts(6385): [0m'AudioRecorderRecordedDetail' is deprecated.
+
+[7m39[0m   el?.addEventListener('webaudio:recorded', ((event: CustomEvent<AudioRecorderRecordedDetail>) => {
+[7m  [0m [93m                                                                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+[96msrc/components/AudioClipRecorderDemo.astro[0m:[93m34[0m:[93m17[0m - [93mwarning[0m[90m ts(6385): [0m'AudioRecorderRecordedDetail' is deprecated.
+
+[7m34[0m   import type { AudioRecorderRecordedDetail } from '@webmusic/audio/play/element';
+[7m  [0m [93m                ~~~~~~~~~~~~~~~~~~~~~~~~~~~[0m
+
+Result (111 files): 
+- 0 errors
+- 0 warnings
+- 2 hints
+

@@ -1,0 +1,125 @@
+{
+  "purpose": "Byte-for-byte log copies with trackable .txt names; original ignored logs retained locally. No assertion of a recoverable pre-fix source checkout.",
+  "copies": [
+    {
+      "original": "dev/audits/2026-09-05/evidence/runtime-repros.log",
+      "stored": "dev/audits/2026-09-05/evidence/runtime-repros.log.txt",
+      "sha256": "e3ff5b8db489bf4bbc54217dc0615f53591f606dd944a5545c5b32440e73983f",
+      "bytes": 1564
+    },
+    {
+      "original": "dev/audits/2026-09-05/evidence/score-repros.log",
+      "stored": "dev/audits/2026-09-05/evidence/score-repros.log.txt",
+      "sha256": "bf29188fe634427ee28fc4910d33046fef1ab15a19858950ec58ba35b779a2f2",
+      "bytes": 1177
+    },
+    {
+      "original": "dev/audits/2026-09-05/evidence/ui-repro.log",
+      "stored": "dev/audits/2026-09-05/evidence/ui-repro.log.txt",
+      "sha256": "2663ce49c7170ac48d8e05d62f8c85c7aaee9980a79f8854923f3047681de9b9",
+      "bytes": 484
+    },
+    {
+      "original": "dev/audits/2026-09-05/evidence/webmusic-audit-build.log",
+      "stored": "dev/audits/2026-09-05/evidence/webmusic-audit-build.log.txt",
+      "sha256": "926ca19647f024259c1fd3262639fd31993b03f314820211d4e84256034c0a74",
+      "bytes": 113880
+    },
+    {
+      "original": "dev/audits/2026-09-05/evidence/webmusic-audit-check-architecture.log",
+      "stored": "dev/audits/2026-09-05/evidence/webmusic-audit-check-architecture.log.txt",
+      "sha256": "8dfc5a77b434d96faf189ca65958d56816c245290212f7012ab8c2fe85b1397f",
+      "bytes": 126
+    },
+    {
+      "original": "dev/audits/2026-09-05/evidence/webmusic-audit-check-doc-snippets.log",
+      "stored": "dev/audits/2026-09-05/evidence/webmusic-audit-check-doc-snippets.log.txt",
+      "sha256": "7c70a3d19c480eaa7cf98b9cd71d5694c16e0f90ea515894e86f48fe48511679",
+      "bytes": 139
+    },
+    {
+      "original": "dev/audits/2026-09-05/evidence/webmusic-audit-check-docs.log",
+      "stored": "dev/audits/2026-09-05/evidence/webmusic-audit-check-docs.log.txt",
+      "sha256": "741d61a98ada061239829d717e8d66b0e679c18bcefe91d8c01ad6b9dfe57e84",
+      "bytes": 183
+    },
+    {
+      "original": "dev/audits/2026-09-05/evidence/webmusic-audit-check-format.log",
+      "stored": "dev/audits/2026-09-05/evidence/webmusic-audit-check-format.log.txt",
+      "sha256": "15e16f6d7a78aa5bd216816782901a4f52f778a526ef6687e5f6c3bca41455b3",
+      "bytes": 70
+    },
+    {
+      "original": "dev/audits/2026-09-05/evidence/webmusic-audit-check-licenses.log",
+      "stored": "dev/audits/2026-09-05/evidence/webmusic-audit-check-licenses.log.txt",
+      "sha256": "9466d819769fd4808dc22551926d6a32e915e5f4a67427a0001c42da42dbca34",
+      "bytes": 149
+    },
+    {
+      "original": "dev/audits/2026-09-05/evidence/webmusic-audit-check-lockfile.log",
+      "stored": "dev/audits/2026-09-05/evidence/webmusic-audit-check-lockfile.log.txt",
+      "sha256": "87ea8e6047883af43642e2671da4d56fc37d81d811ea886f192628198fd7ed15",
+      "bytes": 151
+    },
+    {
+      "original": "dev/audits/2026-09-05/evidence/webmusic-audit-check-packages.log",
+      "stored": "dev/audits/2026-09-05/evidence/webmusic-audit-check-packages.log.txt",
+      "sha256": "05fbfa21bcc42fb6f6ce11542ac31caecb4843d76c11985e706ef7d2f5c07659",
+      "bytes": 111
+    },
+    {
+      "original": "dev/audits/2026-09-05/evidence/webmusic-audit-check-release-manifests.log",
+      "stored": "dev/audits/2026-09-05/evidence/webmusic-audit-check-release-manifests.log.txt",
+      "sha256": "7f7bd208fcda03025463f4273090079eaa7848af50e9a516d2c50ee6098fa46f",
+      "bytes": 108
+    },
+    {
+      "original": "dev/audits/2026-09-05/evidence/webmusic-audit-docs-build.log",
+      "stored": "dev/audits/2026-09-05/evidence/webmusic-audit-docs-build.log.txt",
+      "sha256": "3ec5f9c6ca1f5562319be072eaf497e2e1aabf952e919ea4d6e8e8b426998f0a",
+      "bytes": 32571
+    },
+    {
+      "original": "dev/audits/2026-09-05/evidence/webmusic-audit-lint-scoped.log",
+      "stored": "dev/audits/2026-09-05/evidence/webmusic-audit-lint-scoped.log.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "original": "dev/audits/2026-09-05/evidence/webmusic-audit-lint.log",
+      "stored": "dev/audits/2026-09-05/evidence/webmusic-audit-lint.log.txt",
+      "sha256": "f2c91edf1b5dc791db3f4cff9ae2bb12bc348dad9931e129b5129a380d7a0d5e",
+      "bytes": 1824
+    },
+    {
+      "original": "dev/audits/2026-09-05/evidence/webmusic-audit-test.log",
+      "stored": "dev/audits/2026-09-05/evidence/webmusic-audit-test.log.txt",
+      "sha256": "65c7fed8520a38e6d3dfd43d414762514aee398d07a82eb2d9f4c92f071f8175",
+      "bytes": 15017
+    },
+    {
+      "original": "dev/audits/2026-09-05/evidence/webmusic-audit-typecheck-tests.log",
+      "stored": "dev/audits/2026-09-05/evidence/webmusic-audit-typecheck-tests.log.txt",
+      "sha256": "59265ebb041913c6a9a636043bfcea7f5b19109cc40b23d8d85c5388dd4eb53d",
+      "bytes": 48
+    },
+    {
+      "original": "dev/audits/2026-09-05/evidence/webmusic-audit-typecheck.log",
+      "stored": "dev/audits/2026-09-05/evidence/webmusic-audit-typecheck.log.txt",
+      "sha256": "1a4cf9de0d5d4785ac7919797e92a82ceb2da11a71533fffe93e781a5520d069",
+      "bytes": 1245
+    },
+    {
+      "original": "dev/audits/2026-09-05/repair-evidence/check.log",
+      "stored": "dev/audits/2026-09-05/repair-evidence/check.log.txt",
+      "sha256": "f2081f411ec1e8c7f346fd2d722c07c926df1df7eee270695d5ffdf7ad730559",
+      "bytes": 131513
+    },
+    {
+      "original": "dev/audits/2026-09-05/repair-evidence/docs-build.log",
+      "stored": "dev/audits/2026-09-05/repair-evidence/docs-build.log.txt",
+      "sha256": "18e8eba8e17a6286d43e2eb3579d7d80656e612a9594008565155274e973454c",
+      "bytes": 32394
+    }
+  ]
+}

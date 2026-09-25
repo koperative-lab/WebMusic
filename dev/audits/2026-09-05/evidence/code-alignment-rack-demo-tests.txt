@@ -1,0 +1,14 @@
+
+> test
+> vitest run test/demo-lifecycle.test.ts
+
+
+ RUN  v3.2.7 /Users/mamingchen/GitHub/WebMusic/apps/doc/webmusic
+
+ ✓ test/demo-lifecycle.test.ts (10 tests) 101ms
+
+ Test Files  1 passed (1)
+      Tests  10 passed (10)
+   Start at  17:00:20
+   Duration  1.02s (transform 42ms, setup 0ms, collect 337ms, tests 101ms, environment 369ms, prepare 37ms)
+

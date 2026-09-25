@@ -1,0 +1,58 @@
+{
+  "date": "2026-09-11",
+  "scope": "Kernel release preparation",
+  "baselineHead": "fdfd46f3754cb10c9ad7839b6c811a4e3f493ac5",
+  "workingTree": "uncommitted changes preserved; no clean release commit established",
+  "node": {
+    "primary": "26.8.1",
+    "cleanKernelBuildAndTests": [
+      "22.14.0",
+      "24.21.0"
+    ]
+  },
+  "checks": {
+    "npm ci on Node 22": "passed in isolated workspace",
+    "npm ci on Node 24": "passed in isolated workspace",
+    "kernel tests": 147,
+    "npm run check": "passed",
+    "npm run docs:build": "passed (69 pages)",
+    "npm run audit:production": "passed (0 vulnerabilities)",
+    "npm run check:external-install": "passed (114 runtime entries, 57 ESM declaration entries; additional strict Kernel ESM/CJS Node16/NodeNext tests with and without DOM)"
+  },
+  "package": {
+    "name": "@webmusic/kernel",
+    "version": "0.1.0",
+    "size": 150097,
+    "unpackedSize": 638490,
+    "entryCount": 113,
+    "integrity": "sha512-Oy77hYQo/Ca3BikDhm3XgS0pdSeqtuY+Ylb9HsRLMgXcwBjNJUGPTSnQgXn0IvlNoZavB2rCH0ZDw6oiuHJdfg=="
+  },
+  "packageTopLevel": [
+    "LICENSE",
+    "README.md",
+    "dist",
+    "package.json"
+  ],
+  "browser": {
+    "workerBacked": true,
+    "initial": 3,
+    "stopped": 3,
+    "resumed": 5,
+    "disposed": 5,
+    "unrelated": 1,
+    "selected": 2,
+    "detached": 2,
+    "disposedMounts": 2,
+    "heading": "@webmusic/kernel"
+  },
+  "externalState": {
+    "npmWhoami": "ENEEDAUTH",
+    "kernelRegistryQuery": "E404; version availability and scope rights unconfirmed",
+    "remoteTags": "query succeeded with no tags listed",
+    "localTag": {
+      "name": "v0.1.0",
+      "commit": "0d01ee29ae6039e74330842ed45be8b7fe1216c5"
+    },
+    "published": false
+  }
+}

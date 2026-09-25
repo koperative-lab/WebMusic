@@ -195,7 +195,7 @@ export default defineConfig({
             { label: 'Overview', link: '/agent-toolkit/' },
             { label: 'llms.txt', link: '/agent-toolkit/llms-txt/' },
             { label: 'Skills', link: '/agent-toolkit/skills/' },
-            { label: 'AGENTS.md / CLAUDE.md', link: '/agent-toolkit/agents-md/' },
+            { label: 'AGENTS.md', link: '/agent-toolkit/agents-md/' },
           ],
         },
         {

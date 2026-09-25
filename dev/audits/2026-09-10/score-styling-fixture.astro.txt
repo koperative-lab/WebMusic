@@ -1,0 +1,93 @@
+---
+const views = ['piano-roll', 'staff', 'waterfall', 'map', 'thumbnail'];
+const pitches = ['keyboard', 'staff', 'fretboard'];
+const analyses = ['chord-analysis', 'live-chord-analysis', 'key-analysis', 'roman-analysis', 'voice-leading-analysis'];
+---
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8" /><title>Score styling verification</title></head>
+<body>
+  <nav>
+    <button id="default">Default</button><button id="transparent">Transparent / dark</button>
+    <button id="alternate">Alternate palette</button><button id="narrow">320px</button><button id="wide">760px</button>
+    <button id="hold">Hold C major</button><button id="release">Release notes</button><button id="uniform">Uniform bands</button>
+    <output id="status">Loading</output>
+  </nav>
+  <main id="gallery">
+    <div id="live-input"></div>
+    <section id="play"><h2>Play</h2>
+      <article><h3>score-player</h3><score-player id="player" volume-control="fader" time-control="full"></score-player></article>
+      <article><h3>simple-score-player</h3><simple-score-player id="alias"></simple-score-player></article>
+      {['piano', 'grid', 'chords'].map(layout => <article><h3>note-input {layout}</h3><note-input layout={layout} start="48" end="71" /></article>)}
+      <article><h3>score-recorder</h3><score-recorder /></article>
+      <article><h3>rack-control</h3><rack-control id="rack" /></article>
+      <article><h3>synth-panel: every section</h3><synth-panel id="synth" sections="sound,effects,envelope,eq,lfo,macros" /></article>
+    </section>
+    <section id="views"><h2>View</h2>
+      {views.map(type => <article><h3>score-view {type}</h3><score-view type={type} player="#player" height="200px" /></article>)}
+      {pitches.map(type => <article><h3>pitch-view {type}</h3><pitch-view type={type} player="#live-input" low="48" high="72" /></article>)}
+      <article><h3>sheet-view</h3><sheet-view id="sheet" /></article>
+    </section>
+    <section id="analysis"><h2>Analyze</h2>
+      {analyses.map(Tag => <article><h3>{Tag}</h3><Tag player={Tag === 'live-chord-analysis' ? '#live-input' : '#player'} /> </article>)}
+    </section>
+    <section id="compat"><h2>Inherited demo wrappers</h2>
+      <article><h3>simple-score-player-demo</h3><simple-score-player-demo /></article>
+      <article><h3>preset-player-demo</h3><preset-player-demo /></article>
+      <article><h3>rack-control-demo</h3><rack-control-demo /></article>
+      <article><h3>score-recorder-demo</h3><score-recorder-demo /></article>
+      <article><h3>note-input-demo</h3><note-input-demo /></article>
+      <article><h3>synth-panel-demo</h3><synth-panel-demo /></article>
+    </section>
+  </main>
+  <style is:global>
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 14px system-ui; background: #ededed; }
+    nav { position: sticky; top: 0; z-index: 10; padding: 12px; display: flex; flex-wrap: wrap; gap: 8px; background: #ddd; color: #111; }
+    nav button { min-height: 32px; }
+    main { width: 760px; max-width: 100%; margin: auto; padding: 16px; }
+    article { margin: 18px 0; min-width: 0; }
+    h3 { font: 12px monospace; }
+    main.dark { color: #e5e7eb; background: repeating-linear-gradient(45deg,#182132 0 12px,#202b3b 12px 24px);
+      --wm-component-background: transparent; --wm-component-border: 1px solid #607089; --wm-component-radius: 14px;
+      --wm-surface: transparent; --wm-surface-muted: transparent; --wm-surface-inverse: transparent;
+      --wm-foreground: #e5e7eb; --wm-foreground-muted: #b8c6db; --wm-foreground-on-inverse: #e5e7eb;
+      --wm-accent: #22c5a0; --wm-accent-foreground: #092820; --wm-border: #607089; --wm-control-border: #607089;
+      --wm-control-radius: 8px; --wm-focus: #ffc857; --wm-transport-volume-width: 100px;
+    }
+    main.alternate { --wm-accent: #cf87ef; --wm-foreground: #ffdf94; --wm-foreground-on-inverse: #ffdf94;
+      --wm-component-radius: 22px; --wm-control-radius: 12px; }
+  </style>
+  <script>
+    import {defineAllElements} from '@webmusic/score/play/element';
+    import {defineAllViewElements} from '@webmusic/score/view/element';
+    import {defineAllAnalysisElements} from '@webmusic/score/analyze/element';
+    import {defineAllDemoElements, sampleRack} from '@webmusic/score/play/demos';
+    import {loadScoreFromUrl} from '@webmusic/score/io';
+    import {Effect} from '@webmusic/score/play/headless';
+    defineAllElements(); defineAllViewElements(); defineAllAnalysisElements(); defineAllDemoElements();
+    const gallery = document.querySelector<HTMLElement>('#gallery')!;
+    document.querySelector('#default')!.addEventListener('click', () => gallery.className = '');
+    document.querySelector('#transparent')!.addEventListener('click', () => gallery.className = 'dark');
+    document.querySelector('#alternate')!.addEventListener('click', () => gallery.className = 'dark alternate');
+    document.querySelector('#narrow')!.addEventListener('click', () => gallery.style.width = '320px');
+    document.querySelector('#wide')!.addEventListener('click', () => gallery.style.width = '760px');
+    document.querySelector('#uniform')!.addEventListener('click', () => gallery.style.setProperty('--wm-harmony-flow-tone', 'var(--wm-accent)'));
+    const player = document.querySelector<any>('#player')!;
+    for (const [id, type] of [['hold','noteon'], ['release','noteoff']]) {
+      document.querySelector('#' + id)!.addEventListener('click', () => {
+        for (const midi of [48, 60, 64, 67]) document.querySelector('#live-input')!.dispatchEvent(new CustomEvent('webscore:' + type, {detail: {midi, velocity: 90, startTime: 0}}));
+      });
+    }
+    const synth = document.querySelector<any>('#synth')!;
+    synth.sound = [{name:'Gain', min:0, max:1, value:0.5, apply: () => {}}];
+    synth.macros = [{label:'Morph', value:0.4, targets:[]}];
+    synth.context = new AudioContext();
+    synth.bands = [{frequency:120, gain:2, q:0.8}, {frequency:1000, gain:-3, q:1}, {frequency:6000, gain:1, q:1}];
+    synth.effects = [Effect.reverb({wet:0.25})];
+    document.querySelector<any>('#rack')!.rack = sampleRack();
+    loadScoreFromUrl('/xml/chord-progression.musicxml').then(score => {
+      for (const el of document.querySelectorAll<any>('#player, #alias, score-view, sheet-view, chord-analysis, key-analysis, roman-analysis, voice-leading-analysis')) el.score = score;
+      document.querySelector('#status')!.textContent = 'Ready';
+    }).catch(error => { document.querySelector('#status')!.textContent = String(error); });
+  </script>
+</body></html>

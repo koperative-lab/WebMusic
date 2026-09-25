@@ -14,10 +14,11 @@ a custom instrument, and eventually a full online music workstation.
 
 ## First release
 
-`main` contains Kernel, UI Kit and Score. Audio and Bridge development continues
-on [`dev`](https://github.com/mrsteamedbun/WebMusic/tree/dev), including their
-source, tests, documentation and demos. UI Kit remains a separate package because
-Score Elements and visual renderers use its presenters.
+`main` contains Kernel, UI Kit and Score. Audio and Bridge remain accepted
+product and architecture directions, but their source, tests and public pages
+are absent from this `main` checkout. UI Kit remains a separate package
+because Score Elements and visual renderers use its presenters. See the
+[product scope](dev/PRODUCT.md) and [current status](dev/STATUS.md).
 
 ## Packages
 
@@ -29,7 +30,8 @@ Score Elements and visual renderers use its presenters.
 
 Score provides symbolic music, including sound playback. Kernel supplies neutral
 timing and lifecycle contracts, and UI Kit supplies presentation. Cross-domain
-coordination and shared-instance clock injection continue on `dev`. See the
+coordination and shared-instance clock injection remain design and implementation
+work. See the
 [Score architecture](packages/score/ARCHITECTURE.md) and
 [session-clock design boundary](platform/shared-clock-injection.md).
 
@@ -60,7 +62,7 @@ for public reference entry points, task prompts, project instructions and
 the [portable WebMusic skill](skills/README.md). Documentation builds also
 generate a task-oriented `llms.txt` index, full/component/pattern documentation
 bundles and Markdown API references. The skill includes six lookup scripts;
-the project guide covers both `AGENTS.md` and `CLAUDE.md`.
+the repository's [AGENTS.md](AGENTS.md) guides project work.
 
 The npm badges above show the published package versions. Some integrations
 require optional peers or external resources; follow the owning package's
@@ -83,7 +85,7 @@ at http://localhost:4321. [apps/README.md](apps/README.md) explains documentatio
 development and debugging.
 
 ~~~bash
-npm run docs:sync       # refresh optional .dev indexes when present
+npm run docs:sync       # refresh tracked dev documentation indexes
 npm run check           # source, docs, types, tests, package and release gates
 npm run docs:build      # production documentation build
 ~~~
@@ -106,9 +108,9 @@ explain package boundaries and resource ownership. [apps/README.md](apps/README.
 explains documentation development.
 
 Use [SECURITY.md](SECURITY.md) for private vulnerability reporting and
-[CHANGELOG.md](CHANGELOG.md) for release notes. Ignored `.dev/` notes and local
-agent configuration are optional; the public checkout contains the instructions
-needed to build and contribute. Versions, dependencies and exports remain
+[CHANGELOG.md](CHANGELOG.md) for release notes. The maintained
+[development guide](dev/README.md) and [AGENTS.md](AGENTS.md) are part of this
+checkout. Versions, dependencies and exports remain
 authoritative in package manifests and reviewed policies.
 
 ## License

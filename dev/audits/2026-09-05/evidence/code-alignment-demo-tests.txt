@@ -1,0 +1,16 @@
+
+> test
+> vitest run test/demo-lifecycle.test.ts test/headless-playground-lifecycle.test.ts test/api-sandbox-client.test.ts
+
+
+ RUN  v3.2.7 /Users/mamingchen/GitHub/WebMusic/apps/doc/webmusic
+
+ ✓ test/api-sandbox-client.test.ts (2 tests) 9ms
+ ✓ test/headless-playground-lifecycle.test.ts (4 tests) 130ms
+ ✓ test/demo-lifecycle.test.ts (9 tests) 94ms
+
+ Test Files  3 passed (3)
+      Tests  15 passed (15)
+   Start at  16:51:10
+   Duration  1.07s (transform 139ms, setup 0ms, collect 543ms, tests 233ms, environment 1.19s, prepare 143ms)
+

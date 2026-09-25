@@ -1,0 +1,5 @@
+
+> check:lockfile
+> node scripts/check-lockfile.mjs
+
+Lockfile check passed: every declared optional dependency is present across 1139 locked packages.
