@@ -9,6 +9,12 @@
     },
     {
       "path": "./packages/score"
+    },
+    {
+      "path": "./packages/audio"
+    },
+    {
+      "path": "./bridges/score-audio"
     }
   ]
 }

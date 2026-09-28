@@ -7,15 +7,12 @@
 
 # AI instructions, local agent configuration, sessions, and worktrees.
 AGENT.md
-AGENTS.md
 AGENT.local.md
 AGENTS.local.md
 AGENTS.override.md
-CLAUDE.md
 CLAUDE.local.md
 GEMINI.md
 GEMINI.local.md
-.agent/
 .agents/
 .claude/
 .codex/

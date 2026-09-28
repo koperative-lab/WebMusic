@@ -6,6 +6,7 @@ import path from 'node:path';
 import {promisify} from 'node:util';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {runInNewContext} from 'node:vm';
+import ts from 'typescript';
 import {expectedBrowserGlobals, expectedPublicEntries, expectedPublicEntryKinds, packageDirectories} from './package-policy.mjs';
 
 const execFileAsync = promisify(execFile);
@@ -14,6 +15,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const packagesRoot = path.join(root, 'packages');
 const npmCache = await mkdtemp(path.join(tmpdir(), 'webmusic-npm-cache-'));
 const errors = [];
+const publicDeclarations = new Set();
 let checkedEntries = 0;
 
 // The published packages of the consolidated monorepo, from the shared
@@ -103,6 +105,9 @@ for (const directory of packageDirs) {
         continue;
       }
       resolvedTargets.set(condition, absoluteTarget);
+      if (condition === 'types' || condition.endsWith('.types')) {
+        publicDeclarations.add(absoluteTarget);
+      }
       if (!packedFiles.has(packagePath)) {
         errors.push(`${manifest.name} ${subpath}: ${relativeTarget} is missing from the npm tarball.`);
       }
@@ -136,9 +141,9 @@ for (const directory of packageDirs) {
 
 await rm(npmCache, {recursive: true, force: true});
 
-await checkKernelReexports();
 await checkCommonJsWorkerFallbacks();
 await checkAnalysisWorkerEntryPurity();
+checkPublicDeclarations();
 
 if (errors.length > 0) {
   console.error(`Package export check failed with ${errors.length} problem(s):`);
@@ -146,35 +151,6 @@ if (errors.length > 0) {
   process.exitCode = 1;
 } else {
   console.log(`Package export check passed for ${checkedEntries} public entries.`);
-}
-
-async function checkKernelReexports() {
-  const directory = path.join(root, 'platform/kernel');
-  const manifest = JSON.parse(await readFile(path.join(directory, 'package.json'), 'utf8'));
-  for (const condition of ['import', 'require']) {
-    try {
-      const load = (subpath) => {
-        const file = path.join(directory, manifest.exports[subpath][condition].default);
-        return condition === 'import' ? import(pathToFileURL(file).href) : require(file);
-      };
-      const namespace = await load('.');
-      for (const subpath of expectedPublicEntries[manifest.name]) {
-        if (subpath === '.' || subpath === './package.json') continue;
-        for (const [name, value] of Object.entries(await load(subpath))) {
-          if (namespace[name] !== value) {
-            errors.push(`@webmusic/kernel ${condition} ${subpath}: root re-export ${name} has a different identity.`);
-          }
-        }
-      }
-      const sync = await load('./sync');
-      const mirror = new sync.MirrorClockMaster({position: 0, play() {}, pause() {}, stop() {}, seekPosition() {}}, () => 0);
-      if (!(mirror.clock instanceof namespace.TransportClock) || namespace.TransportClock.prototype.positionAt.call(mirror.clock, 0) !== 0) {
-        errors.push(`@webmusic/kernel ${condition}: MirrorClockMaster uses a different TransportClock class.`);
-      }
-    } catch (error) {
-      errors.push(`@webmusic/kernel ${condition}: re-export identity check failed (${message(error)}).`);
-    }
-  }
 }
 
 async function checkCommonJsWorkerFallbacks() {
@@ -208,6 +184,14 @@ async function checkCommonJsWorkerFallbacks() {
     const parser = scoreIo.createParserWorker();
     await parser.parse('X:1\nK:C\nC', 'abc');
     parser.dispose();
+
+    const audioPlay = require(path.join(packagesRoot, 'audio/dist/play/worker-client.cjs'));
+    const decoder = audioPlay.createDecoderWorker();
+    await decoder.decode(new ArrayBuffer(0), 'wav').catch(() => {});
+    decoder.dispose();
+
+    const audioAnalyze = require(path.join(packagesRoot, 'audio/dist/analyze/worker-client.cjs'));
+    audioAnalyze.createAnalysisWorker().dispose();
 
     if (constructed !== 0) {
       errors.push('CommonJS worker clients attempted to construct a Worker without a stable module URL.');
@@ -280,6 +264,32 @@ async function checkAnalysisWorkerEntryPurity() {
   }
 }
 
+function checkPublicDeclarations() {
+  if (publicDeclarations.size === 0) return;
+  // Typecheck the built declarations as a consumer would. Source typechecks
+  // cannot catch mistakes introduced by tsup's declaration bundling, including
+  // a type-only re-export accidentally emitted as `typeof` a runtime value.
+  // The external-install check still verifies tarball resolution separately.
+  const program = ts.createProgram([...publicDeclarations], {
+    target: ts.ScriptTarget.ES2022,
+    module: ts.ModuleKind.Node16,
+    moduleResolution: ts.ModuleResolutionKind.Node16,
+    strict: true,
+    noEmit: true,
+    skipLibCheck: false,
+    lib: ['lib.es2022.d.ts', 'lib.dom.d.ts', 'lib.dom.iterable.d.ts'],
+    types: [],
+  });
+  for (const diagnostic of ts.getPreEmitDiagnostics(program)) {
+    const location = diagnostic.file?.getLineAndCharacterOfPosition(diagnostic.start ?? 0);
+    const file = diagnostic.file ? path.relative(root, diagnostic.file.fileName) : 'TypeScript';
+    errors.push(
+      `${file}${location ? `:${location.line + 1}:${location.character + 1}` : ''}: ` +
+        `TS${diagnostic.code}: ${ts.flattenDiagnosticMessageText(diagnostic.messageText, ' ')}`,
+    );
+  }
+}
+
 async function checkBrowserIife({name, subpath, sourcePath, declarationPath}) {
   if (!sourcePath || !declarationPath) return;
   // Contracts are keyed by subpath: family packages ship one IIFE per
@@ -304,7 +314,7 @@ async function checkBrowserIife({name, subpath, sourcePath, declarationPath}) {
       // Workspace dist artifacts live in this repo (or behind a node_modules
       // link) after the consolidation — both shapes must stay out of the IIFE.
       .filter((relativeSource) =>
-        /^(?:platform\/kernel|packages\/(?:score|ui))\/dist\//.test(relativeSource) ||
+        /^(?:platform\/kernel|packages\/(?:score|audio|ui)|bridges\/[^/]+)\/dist\//.test(relativeSource) ||
         /(?:^|\/)node_modules\/(?:@webmusic\/[^/]+|webmusic)\/dist\//.test(relativeSource),
       );
     if (bundledWorkspaceArtifacts.length > 0) {

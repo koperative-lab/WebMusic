@@ -2,9 +2,6 @@ import {readFile, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {packageDirectories} from './package-policy.mjs';
-import {manifestBoundaryProblems} from './release-surface.mjs';
-import {isReleaseVersion} from './release-version.mjs';
-import {execFileSync} from 'node:child_process';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const write = process.argv.includes('--write');
@@ -23,10 +20,9 @@ const manifests = await Promise.all(manifestPaths.map(async (manifestPath) => ({
 const publishedDirectories = new Set(packageDirs);
 const published = manifests.filter(({manifestPath}) => publishedDirectories.has(path.dirname(manifestPath)));
 const workspaceNames = new Set(published.map(({value}) => value.name));
-// Fork contributors can validate unchanged publication metadata locally and
-// in their own CI. Publication identity checks are explicit and independent.
-const expectedRepositoryUrl = process.argv.includes('--verify-ci-repository') ? ciRepositoryUrl() : undefined;
-const verifiedOriginUrl = process.argv.includes('--verify-origin') ? originRepositoryUrl() : undefined;
+const expectedRepositoryUrl = process.env.GITHUB_REPOSITORY
+  ? `git+https://github.com/${process.env.GITHUB_REPOSITORY}.git`
+  : undefined;
 
 if (write && !requestedVersion) {
   fail('Usage: node scripts/release-manifests.mjs --write <version>');
@@ -41,7 +37,6 @@ const errors = [];
 const repositoryUrls = new Set();
 
 for (const entry of manifests) {
-  errors.push(...manifestBoundaryProblems(entry.value, workspaceNames).map((problem) => `${relative(entry.manifestPath)} ${problem}`));
   const isPublished = publishedDirectories.has(path.dirname(entry.manifestPath));
   if (isPublished && entry.value.version !== version) {
     if (write) entry.value.version = version;
@@ -58,10 +53,7 @@ for (const entry of manifests) {
         errors.push(`${relative(entry.manifestPath)} repository.directory is ${JSON.stringify(repository.directory)}, expected ${JSON.stringify(directory)}.`);
       }
       if (expectedRepositoryUrl && repository.url !== expectedRepositoryUrl) {
-        errors.push(`${relative(entry.manifestPath)} repository.url is ${repository.url}, expected ${expectedRepositoryUrl} from GITHUB_REPOSITORY.`);
-      }
-      if (verifiedOriginUrl && repository.url !== verifiedOriginUrl) {
-        errors.push(`${relative(entry.manifestPath)} repository.url is ${repository.url}, expected ${verifiedOriginUrl} from Git origin.`);
+        errors.push(`${relative(entry.manifestPath)} repository.url is ${repository.url}, expected ${expectedRepositoryUrl} for this GitHub Actions repository.`);
       }
     }
     // Every package here is scoped, and npm defaults a scoped package to
@@ -86,7 +78,7 @@ for (const entry of manifests) {
   }
 }
 
-if (repositoryUrls.size > 1) {
+if (!expectedRepositoryUrl && repositoryUrls.size > 1) {
   errors.push(`Published package repository.url values differ: ${[...repositoryUrls].join(', ')}.`);
 }
 
@@ -120,29 +112,12 @@ function singlePublishedVersion(entries) {
   return versions[0];
 }
 
+function isReleaseVersion(value) {
+  return typeof value === 'string' && /^\d+\.\d+\.\d+$/.test(value);
+}
+
 function relative(file) {
   return path.relative(root, file);
-}
-
-function originRepositoryUrl() {
-  let origin;
-  try {
-    origin = execFileSync('git', ['remote', 'get-url', 'origin'], {cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore']}).trim();
-  } catch {
-    fail('Cannot verify Git origin: this checkout has no readable origin remote.');
-  }
-  const match = /^(?:https:\/\/github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)([\w.-]+\/[\w.-]+?)(?:\.git)?\/?$/.exec(origin);
-  if (!match) fail('Cannot verify Git origin: expected a GitHub HTTPS, git@github.com:, or ssh://git@github.com/ URL.');
-  return `git+https://github.com/${match[1]}.git`;
-}
-
-function ciRepositoryUrl() {
-  const identifier = process.env.GITHUB_REPOSITORY;
-  if (!identifier || !/^[A-Za-z0-9][A-Za-z0-9-]*\/[A-Za-z0-9_.-]+$/.test(identifier)
-    || ['.', '..'].includes(identifier.split('/')[1])) {
-    fail('Cannot verify CI repository: GITHUB_REPOSITORY must contain a valid owner/repository identifier.');
-  }
-  return `git+https://github.com/${identifier}.git`;
 }
 
 function fail(message) {

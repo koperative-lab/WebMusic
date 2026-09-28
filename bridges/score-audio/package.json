@@ -1,0 +1,69 @@
+{
+  "name": "@webmusic/bridge",
+  "version": "0.1.0",
+  "description": "Bridge between the score and audio families of the WebMusic ecosystem: synchronized score+audio playback on one AudioContext clock, score-to-clip offline rendering, and TimeMap/BeatGrid conversions. The only package allowed to import both families.",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --tsconfig tsconfig.build.json --format esm,cjs --dts --sourcemap --clean",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "tsup": "^8.5.0",
+    "typescript": "^5.4.0",
+    "vitest": "^5.0.0"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "author": "Koperative",
+  "engines": {
+    "node": "^22.22.3 || ^24.16.0 || >=26.3.0"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/koperative-lab/WebMusic.git",
+    "directory": "bridges/score-audio"
+  },
+  "homepage": "https://github.com/koperative-lab/WebMusic",
+  "bugs": {
+    "url": "https://github.com/koperative-lab/WebMusic/issues"
+  },
+  "keywords": [
+    "webmusic",
+    "music",
+    "web-audio",
+    "score",
+    "sync",
+    "bridge",
+    "typescript"
+  ],
+  "peerDependencies": {
+    "@webmusic/audio": "^0.1.0",
+    "@webmusic/kernel": "^0.1.0",
+    "@webmusic/score": "^0.1.0"
+  }
+}

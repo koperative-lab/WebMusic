@@ -222,6 +222,7 @@ async function persistCompletionEvidence(artifacts, snapshots) {
       [error],
       'Latest reached the candidate graph, but durable completion evidence is incomplete or ' +
         'ambiguous; do not report success, recover, or retry without incident review.',
+      {cause: error},
     );
   }
 }
@@ -314,6 +315,7 @@ async function promoteWithRollback(artifacts, snapshots) {
       throw new AggregateError(
         [promotionError, ...rollbackErrors],
         'Latest promotion failed and automatic rollback was incomplete; freeze release operations.',
+        {cause: promotionError},
       );
     }
     throw new Error(

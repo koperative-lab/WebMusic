@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // ============================================================================
-// License gate for the published package policy.
+// License gate (WebAudio.md §12.2).
 //
 // Enforces the copyleft red-line: only permissive licenses may appear in a
 // package's `dependencies` / `optionalDependencies`; every non-permissive
@@ -39,7 +39,7 @@ const fail = (msg) => {
   failed = true;
 };
 
-// Scan the published manifests directly and fail loudly if one is
+// Scan the five published manifests directly and fail loudly if one is
 // unreadable — an empty scan would let a copyleft promotion slip through as
 // a vacuous pass.
 const packageDirs = packageDirectories.map((dir) => join(root, ...dir.split('/')));

@@ -9,13 +9,16 @@ export const packageDirectories = Object.freeze([
   "platform/kernel",
   "packages/ui",
   "packages/score",
+  "packages/audio",
+  "bridges/score-audio",
 ]);
 
 /**
- * Deliberate first-release public surface: Kernel, UI Kit and Score.
- * Updating a package's exports is an API decision, so the manifest and this
- * policy must change together. Score nests its tables per capability — a
- * capability is a first-level directory under the package's `src/`.
+ * Deliberate public package surface for the consolidated monorepo's five
+ * packages. Updating a package's exports is an API decision, so the manifest
+ * and this policy must change together. Family packages (@webmusic/score,
+ * @webmusic/audio) nest their tables per capability — a capability is a
+ * first-level directory under the package's `src/`.
  */
 export const expectedPublicEntries = Object.freeze({
   "@webmusic/kernel": [
@@ -38,17 +41,21 @@ export const expectedPublicEntries = Object.freeze({
     "./envelope",
     "./eq",
     "./harmony",
+    "./level-analyzer",
     "./lfo",
     "./macro",
     "./meter",
     "./minimap",
     "./mixer",
     "./note",
+    "./oscilloscope",
     "./panel",
     "./parameter",
     "./pitch",
     "./playlist",
     "./recorder",
+    "./spectrum-analyzer",
+    "./transient-analyzer",
     "./stage",
     "./status",
     "./timeline",
@@ -85,6 +92,35 @@ export const expectedPublicEntries = Object.freeze({
     "./react",
     "./package.json",
   ],
+  "@webmusic/audio": [
+    ".",
+    "./view",
+    "./view/headless",
+    "./view/render",
+    "./view/element",
+    "./view/auto",
+    "./view/global",
+    "./play",
+    "./play/headless",
+    "./play/element",
+    "./play/auto",
+    "./play/global",
+    "./play/worker-client",
+    "./play/worker-protocol",
+    "./play/worker",
+    "./analyze",
+    "./analyze/headless",
+    "./analyze/element",
+    "./analyze/auto",
+    "./analyze/global",
+    "./analyze/transcribe",
+    "./analyze/worker-client",
+    "./analyze/worker-protocol",
+    "./analyze/worker",
+    "./react",
+    "./package.json",
+  ],
+  "@webmusic/bridge": [".", "./package.json"],
 });
 
 /**
@@ -113,9 +149,17 @@ export const capabilityDependencies = Object.freeze({
     analyze: ["core", "io"],
     react: ["core", "io", "view", "play", "analyze"],
   }),
+  "@webmusic/audio": Object.freeze({
+    root: ["core"],
+    core: [],
+    view: ["core", "play"],
+    play: ["core"],
+    analyze: ["core", "play"],
+    react: ["core", "view", "play", "analyze"],
+  }),
 });
 
-/** Domain families with reviewed capability contracts in this release. */
+/** Domain families with reviewed capability contracts in this checkout. */
 export const domainFamilies = Object.freeze(
   Object.keys(capabilityDependencies).map((name) => name.slice('@webmusic/'.length)),
 );
@@ -144,6 +188,7 @@ const featureLayersFor = (capabilities) =>
 
 export const requiredFeatureLayers = Object.freeze({
   "@webmusic/score": featureLayersFor(["play", "analyze", "view"]),
+  "@webmusic/audio": featureLayersFor(["play", "analyze", "view"]),
 });
 
 /**
@@ -156,6 +201,11 @@ export const expectedPublicEntryKinds = Object.freeze({
   "@webmusic/score": Object.freeze({
     "./play/global": "browser-iife",
   }),
+  "@webmusic/audio": Object.freeze({
+    "./view/global": "browser-iife",
+    "./play/global": "browser-iife",
+    "./analyze/global": "browser-iife",
+  }),
 });
 
 /** Browser-IIFE global contract per `./…/global` entry, keyed by subpath:
@@ -166,14 +216,32 @@ export const expectedBrowserGlobals = Object.freeze({
     "./play/global": {
       globalName: "WebMusicScorePlay",
       defineFunction: "defineAllElements",
-      elements: ["score-player", "simple-score-player", "rack-control"],
+      elements: ["score-player", "score-rack-control", "score-note-input", "score-synth-panel", "score-rack-part", "score-recorder"],
+    },
+  }),
+  "@webmusic/audio": Object.freeze({
+    "./play/global": {
+      globalName: "WebMusicAudioPlay",
+      defineFunction: "defineAllAudioElements",
+      elements: ["audio-player", "audio-playlist", "audio-mixer", "audio-recorder"],
+    },
+    "./analyze/global": {
+      globalName: "WebMusicAudioAnalyze",
+      defineFunction: "defineAllAudioElements",
+      elements: ["audio-level-analyzer", "audio-meter", "audio-oscilloscope", "audio-spectrum-analyzer", "audio-transient-analyzer"],
+    },
+    "./view/global": {
+      globalName: "WebMusicAudioView",
+      defineFunction: "defineAllAudioElements",
+      elements: ["audio-view", "audio-meter"],
     },
   }),
 });
 
 /** Exact workspace dependency graph. External implementation dependencies
  * are intentionally outside this policy; workspace package ownership is not.
- */
+ * The bridge deliberately peer-depends (required) on both families it
+ * bridges, so a single instance of each family wins at the consumer. */
 // Kernel is a REQUIRED peer of every family package: cross-package element
 // and transport identities require one shared instance. UI is an OPTIONAL
 // peer: Headless-only installs do not need it, while callers opting into a
@@ -186,6 +254,16 @@ export const expectedWorkspaceDependencies = Object.freeze({
     optionalPeers: ["@webmusic/ui"],
     requiredPeers: ["@webmusic/kernel"],
   },
+  "@webmusic/audio": {
+    dependencies: [],
+    optionalPeers: ["@webmusic/ui"],
+    requiredPeers: ["@webmusic/kernel"],
+  },
+  "@webmusic/bridge": {
+    dependencies: [],
+    optionalPeers: [],
+    requiredPeers: ["@webmusic/audio", "@webmusic/kernel", "@webmusic/score"],
+  },
 });
 
 /** Public entries whose evaluation intentionally performs registration. */
@@ -193,6 +271,17 @@ export const expectedSideEffectEntries = Object.freeze({
   "@webmusic/kernel": [],
   "@webmusic/ui": [],
   "@webmusic/score": ["./io/worker", "./analyze/worker", "./play/auto", "./play/global"],
+  "@webmusic/audio": [
+    "./view/auto",
+    "./view/global",
+    "./play/auto",
+    "./play/global",
+    "./play/worker",
+    "./analyze/auto",
+    "./analyze/global",
+    "./analyze/worker",
+  ],
+  "@webmusic/bridge": [],
 });
 
 /** Build entries allowed to STATICALLY import an optional peer. The rule
@@ -209,6 +298,16 @@ export const staticOptionalPeerEntries = Object.freeze({
     "analyze/element/index.ts": ["@webmusic/ui"],
     "react/index.tsx": ["react"],
   }),
+  "@webmusic/audio": Object.freeze({
+    "view/render/index.ts": ["@webmusic/ui"],
+    "view/element/index.ts": ["@webmusic/ui"],
+    "view/element/auto.ts": ["@webmusic/ui"],
+    "play/element/index.ts": ["@webmusic/ui"],
+    "play/element/auto.ts": ["@webmusic/ui"],
+    "analyze/element/index.ts": ["@webmusic/ui"],
+    "analyze/element/auto.ts": ["@webmusic/ui"],
+    "react/index.tsx": ["react", "@webmusic/ui"],
+  }),
 });
 
 /** Entry modules that must remain free of runtime DOM globals. Browser-only
@@ -218,7 +317,8 @@ export const staticOptionalPeerEntries = Object.freeze({
  * surface. UI presenter entries intentionally are not DOM-free: they may use
  * a caller-supplied DOM when mounted, while SSR-safe evaluation is covered by
  * package import checks and UI's SSR test. Kernel entries are audited but not
- * yet enforced DOM-free (elements.ts is DOM by design). */
+ * yet enforced DOM-free (elements.ts is DOM by design); the bridge is API-only
+ * and not yet enforced. */
 export const domFreeEntrySources = Object.freeze({
   "@webmusic/kernel": [],
   "@webmusic/ui": [],
@@ -245,6 +345,29 @@ export const domFreeEntrySources = Object.freeze({
     "view/api/index.ts",
     "view/headless/index.ts",
   ],
+  "@webmusic/audio": [
+    "view/index.ts",
+    "view/core/index.ts",
+    "view/api/index.ts",
+    "view/headless/index.ts",
+    "play/index.ts",
+    "play/core/index.ts",
+    "play/api/index.ts",
+    "play/headless/index.ts",
+    // The worker client/protocol pairs are code-only wire plumbing, exactly as
+    // on the score side, which has listed its own since the split. Audio's
+    // were simply never added, so the rule went unenforced for half the
+    // ecosystem's worker entries.
+    "play/worker-client.ts",
+    "play/worker-protocol.ts",
+    "analyze/index.ts",
+    "analyze/core/index.ts",
+    "analyze/api/index.ts",
+    "analyze/headless/index.ts",
+    "analyze/worker-client.ts",
+    "analyze/worker-protocol.ts",
+  ],
+  "@webmusic/bridge": [],
 });
 
 /** Known implementation layers that selected public entries must never reach
@@ -277,6 +400,25 @@ export const forbiddenEntryReachability = Object.freeze({
     "view/index.ts": ["view/render/", "view/headless/", "view/element/"],
     "view/core/index.ts": ["view/render/", "view/headless/", "view/element/"],
     "view/api/index.ts": ["view/render/", "view/headless/", "view/element/"],
+    "view/headless/index.ts": ["view/render/", "view/element/"],
+  },
+  "@webmusic/audio": {
+    "index.ts": ["view/", "play/", "analyze/", "react/"],
+    "play/index.ts": ["play/element/", "play/worker.ts"],
+    "play/core/index.ts": ["play/headless/", "play/element/"],
+    "play/api/index.ts": ["play/element/"],
+    "play/headless/index.ts": ["play/element/"],
+    "play/worker-client.ts": ["play/worker.ts"],
+    "play/worker-protocol.ts": ["play/worker.ts"],
+    "analyze/index.ts": ["analyze/headless/", "analyze/element/", "analyze/worker.ts"],
+    "analyze/core/index.ts": ["analyze/headless/", "analyze/element/"],
+    "analyze/api/index.ts": ["analyze/headless/", "analyze/element/"],
+    "analyze/headless/index.ts": ["analyze/element/"],
+    "analyze/worker-client.ts": ["analyze/worker.ts"],
+    "analyze/worker-protocol.ts": ["analyze/worker.ts"],
+    "view/index.ts": ["view/render/", "view/headless/", "view/element/"],
+    "view/core/index.ts": ["view/render/", "view/headless/", "view/element/"],
+    "view/api/index.ts": ["view/render/", "view/element/"],
     "view/headless/index.ts": ["view/render/", "view/element/"],
   },
 });
