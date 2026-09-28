@@ -52,26 +52,26 @@ function templateMarkup(kind: string): string {
 }
 
 interface RenderOptions {
-  target?: 'score-player' | 'rack-control' | 'synth-panel';
+  target?: 'score-player' | 'score-rack-control' | 'score-synth-panel';
   assignment?: 'effect' | 'effects';
   initial?: string;
   invalidEditorFirst?: boolean;
 }
 
 function renderEffectsPanel(options: RenderOptions = {}) {
-  const isRack = options.target === 'rack-control';
-  const isSynthPanel = options.target === 'synth-panel';
+  const isRack = options.target === 'score-rack-control';
+  const isSynthPanel = options.target === 'score-synth-panel';
   const targetSelector = isRack
     ? '[data-rc-desk]'
-    : isSynthPanel ? 'synth-panel' : 'score-player';
+    : isSynthPanel ? 'score-synth-panel' : 'score-player';
   const targetMarkup = isRack
-    ? '<score-player><rack-control data-rc-desk></rack-control></score-player>'
+    ? '<score-player><score-rack-control data-rc-desk></score-rack-control></score-player>'
     : isSynthPanel
-      ? '<synth-panel></synth-panel>'
+      ? '<score-synth-panel></score-synth-panel>'
       : '<score-player src="/midi/demo.mid"></score-player>';
   const setupSelector = isRack
-    ? 'rack-control'
-    : isSynthPanel ? 'synth-panel' : 'score-player';
+    ? 'score-rack-control'
+    : isSynthPanel ? 'score-synth-panel' : 'score-player';
   const setupIdentifier = isRack
     ? 'rackControl'
     : isSynthPanel ? 'synthPanel' : 'player';
@@ -208,12 +208,12 @@ describe('effect-chain editor shared by component playgrounds', () => {
     expect(setup.match(/type: 'peaking'/g)).toHaveLength(3);
   });
 
-  it('builds and assigns a flat effect array for synth-panel', () => {
+  it('builds and assigns a flat effect array for score-synth-panel', () => {
     const equalizer = createEffectItem('equalizer', 'effect-1');
     expect(buildPlaygroundEffects([equalizer])).toHaveLength(3);
 
     const {panel, setEffect, setEffects, effects, stop} = renderEffectsPanel({
-      target: 'synth-panel',
+      target: 'score-synth-panel',
       assignment: 'effects',
     });
     addEffect(panel, 'equalizer');
@@ -226,7 +226,7 @@ describe('effect-chain editor shared by component playgrounds', () => {
     expect(stop).not.toHaveBeenCalled();
 
     const setup = panel.querySelector<HTMLElement>('[data-fx-code]')?.textContent ?? '';
-    expect(setup).toContain("const synthPanel = document.querySelector('synth-panel');");
+    expect(setup).toContain("const synthPanel = document.querySelector('score-synth-panel');");
     expect(setup).toContain('synthPanel.effects = [');
     expect(setup).not.toContain('synthPanel.effect = Effect.chain(');
     expect(setup.match(/Effect\.filter\(/g)).toHaveLength(3);
@@ -238,7 +238,7 @@ describe('effect-chain editor shared by component playgrounds', () => {
 
   it('loads and restores an authored effect stack', () => {
     const {panel, effects, setEffects} = renderEffectsPanel({
-      target: 'synth-panel',
+      target: 'score-synth-panel',
       assignment: 'effects',
       initial: 'reverb,delay',
     });
@@ -258,8 +258,8 @@ describe('effect-chain editor shared by component playgrounds', () => {
     expect(panel.querySelectorAll('[data-fx-card]')).toHaveLength(2);
   });
 
-  it('targets the rack-control summed bus and emits rack-specific setup code', () => {
-    const {panel, setEffect, stop} = renderEffectsPanel({target: 'rack-control'});
+  it('targets the score-rack-control summed bus and emits rack-specific setup code', () => {
+    const {panel, setEffect, stop} = renderEffectsPanel({target: 'score-rack-control'});
 
     addEffect(panel, 'compressor');
 
@@ -267,12 +267,12 @@ describe('effect-chain editor shared by component playgrounds', () => {
     expect(setEffect).toHaveBeenCalledWith(expect.any(Effect));
     expect(stop).not.toHaveBeenCalled();
     const setup = panel.querySelector<HTMLElement>('[data-fx-code]')?.textContent ?? '';
-    expect(setup).toContain("const rackControl = document.querySelector('rack-control');");
+    expect(setup).toContain("const rackControl = document.querySelector('score-rack-control');");
     expect(setup).toContain('rackControl.effect = Effect.chain(');
   });
 
   it('rolls pending UI back when the target rejects a replacement', async () => {
-    const {panel, setEffect, effect} = renderEffectsPanel({target: 'rack-control'});
+    const {panel, setEffect, effect} = renderEffectsPanel({target: 'score-rack-control'});
     const failure = new Error('replacement failed');
     setEffect.mockImplementationOnce(() => { throw failure; });
 
@@ -385,7 +385,7 @@ describe('effect-chain editor shared by component playgrounds', () => {
   });
 
   it('resets the rack master chain without treating the mixer as a transport', () => {
-    const {panel, effect, stop} = renderEffectsPanel({target: 'rack-control'});
+    const {panel, effect, stop} = renderEffectsPanel({target: 'score-rack-control'});
     addEffect(panel, 'equalizer');
     expect(effect()).toBeInstanceOf(Effect);
 

@@ -144,8 +144,6 @@ it('rejects unsupported releases and missing output from incomplete snapshots', 
   changed.release.packages['@webmusic/score'] = '0.2.0';
   await writeFile(path.join(mismatch, 'agent-context/manifest.json'), json(changed));
   expect((await cli('get_docs', ['index'], mismatch)).stderr).toContain('Unsupported context version');
-  await writeFile(path.join(mismatch, 'agent-context/manifest.json'), json({...manifest, mode: 'development', release: null}));
-  expect((await cli('get_docs', ['index'], mismatch)).stderr).toContain('Unreleased development context');
   await writeFile(path.join(mismatch, 'agent-context/manifest.json'), json(manifest));
   await rm(path.join(mismatch, 'llms.txt'));
   expect((await cli('get_docs', ['index'], mismatch)).stderr).toContain('Missing context file');
@@ -213,4 +211,43 @@ it('retains JSON syntax errors behind the context manifest message', async () =>
     message: 'Context manifest is not valid JSON. Use a generated WebMusic documentation site.',
     cause: expect.any(SyntaxError),
   });
+});
+
+
+it('uses main source-selection options for Audio/Bridge snapshots without another CLI mode', async () => {
+  const directory = path.join(temporary, 'audio-bridge-source');
+  await cp(site, directory, {recursive: true});
+  const owners = {'@webmusic/kernel': 'platform/kernel', '@webmusic/ui': 'packages/ui', '@webmusic/score': 'packages/score', '@webmusic/audio': 'packages/audio', '@webmusic/bridge': 'bridges/score-audio'};
+  const packages = Object.fromEntries(Object.keys(owners).map((name) => [name, '0.1.0']));
+  const fingerprints = Object.entries(owners).map(([name, directory]) => ({name, directory, version: packages[name], sourceSha256: sha256(name), manifestSha256: sha256(packages[name])}));
+  const snapshot = {...manifest, sourceSnapshot: {
+    adapter: 'audio-bridge', revision: sha256(json(fingerprints)), packages, fingerprints,
+    verification: 'working-tree-source-and-manifest-sha256',
+  }};
+  delete snapshot.release;
+  await writeFile(path.join(directory, 'agent-context/manifest.json'), json(snapshot));
+  for (const [command, args] of [
+    ['list_components', ['--json']], ['get_component_docs', ['element/score-player']],
+    ['get_source', ['element/score-player']], ['get_styles', ['element/score-player']],
+    ['get_theme', []], ['get_docs', ['patterns']],
+  ]) {
+    const result = await cli(command, args, directory);
+    expect(result, command).toMatchObject({code: 0, stderr: ''});
+    if (command === 'get_source' || command === 'get_theme') {
+      expect(result.stdout).toContain(`source snapshot ${snapshot.sourceSnapshot.revision}`);
+      expect(result.stdout).not.toContain('at release');
+    }
+    if (command === 'list_components') expect(JSON.parse(result.stdout)[0].id).toBe('element/score-player');
+  }
+  expect((await cli('get_docs', ['index', '--development'], directory)).stderr).toContain('Unknown option');
+  vi.stubGlobal('fetch', vi.fn(async (url) => new Response(String(url).endsWith('/manifest.json') ? json(snapshot) : files.get('llms.txt'))));
+  await expect(loadContext({})).rejects.toThrow('explicitly selected');
+  const remote = await loadContext({'--base-url': 'https://preview.example/'});
+  expect(await remote.document('index')).toBe(files.get('llms.txt'));
+  snapshot.sourceSnapshot.revision = sha256('wrong revision');
+  await writeFile(path.join(directory, 'agent-context/manifest.json'), json(snapshot));
+  expect((await cli('get_docs', ['index'], directory)).stderr).toContain('fingerprint mismatch');
+  delete snapshot.sourceSnapshot.packages['@webmusic/audio'];
+  await writeFile(path.join(directory, 'agent-context/manifest.json'), json(snapshot));
+  expect((await cli('get_docs', ['index'], directory)).stderr).toContain('Incomplete Audio/Bridge');
 });
