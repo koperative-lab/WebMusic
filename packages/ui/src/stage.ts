@@ -70,10 +70,21 @@ export interface SurfaceSliderPoint {
   pointerId?: number;
   rect: DOMRectReadOnly;
   surface: HTMLElement;
+  /** Stable press origin and CSS-pixel travel for the active pointer gesture. */
+  gesture?: Readonly<{
+    startClientX: number;
+    startClientY: number;
+    startValue: number;
+    deltaX: number;
+    deltaY: number;
+    moved: boolean;
+  }>;
 }
 
 export interface SurfaceSliderBinding {
   snapshot(): SurfaceSliderState;
+  /** Start precedes pointer commands; end follows the final commit; cancel drops pending work. */
+  gesture?(phase: 'start' | 'end' | 'cancel'): void;
   /** Convert presenter-owned pointer geometry into a domain value. */
   valueAt(point: SurfaceSliderPoint): number;
   /** Commit one pointer or keyboard value back to the domain owner. */
@@ -96,6 +107,17 @@ export interface SurfaceSliderOptions {
    */
   pointerTarget?: HTMLElement;
   /**
+   * `absolute` retains press/move seeking. `drag` waits for 4 CSS pixels of
+   * travel before continuous updates; a stationary release still acts as a
+   * click. `click` commits only a stationary release. `none` retains keyboard
+   * and ARIA while installing no pointer interaction. Default `absolute`.
+   */
+  pointerMode?: 'absolute' | 'drag' | 'click' | 'none';
+  /** Optional idle pointer cursor; restored conditionally when the presenter releases the surface. */
+  cursor?: string;
+  /** Optional cursor while a pointer gesture is active, such as `grabbing`. */
+  dragCursor?: string;
+  /**
    * Arrow-key step. The callback receives the keyboard event as well as the
    * state, so a modifier can select a coarser step — `Shift` for a long seek,
    * for instance.
@@ -114,8 +136,8 @@ export interface SurfaceSliderHandle {
   element: HTMLElement;
   surface: HTMLElement;
   update(): void;
-  /** Update the accessible name without replacing the surface or moving focus. */
-  updateLabel(label?: string): void;
+  /** Cancel the active pointer gesture without committing pending preview. */
+  cancelGesture(): void;
   destroy(): void;
 }
 
@@ -212,6 +234,14 @@ ${componentSurfaceCss('stage')}
 .wui-stage__status > .wui-status-host { width: 100%; display: flex; }
 `;
 
+/**
+ * Bounded re-render passes for one `update()`. A binding whose render dirties
+ * its own input would otherwise re-enter forever; the ceiling lets the surface
+ * still settle on the newest state while turning a runaway binding into one
+ * reported error instead of a hang.
+ */
+const MAX_UPDATE_PASSES = 32;
+
 /** Mount a generic retained stage whose caller renders into a supplied surface. */
 export function mountStage(
   host: StageHost,
@@ -255,7 +285,10 @@ export function mountStage(
     }
   };
 
-  const update = (): void => {
+  let updating = false;
+  let pendingUpdate = false;
+
+  const renderOnce = (): void => {
     if (destroyed || !claim.isCurrent()) return;
     releaseRender();
     if (destroyed || !claim.isCurrent()) return;
@@ -270,6 +303,39 @@ export function mountStage(
       }
     } catch (error) {
       report(error);
+    }
+  };
+
+  const update = (): void => {
+    if (destroyed) return;
+    // Re-entry records the request rather than recursing, so a render that
+    // dirties its own input costs one more pass instead of the call stack.
+    if (updating) {
+      pendingUpdate = true;
+      return;
+    }
+
+    updating = true;
+    let passes = 0;
+    try {
+      do {
+        pendingUpdate = false;
+        renderOnce();
+        passes += 1;
+      } while (pendingUpdate && !destroyed && passes < MAX_UPDATE_PASSES);
+
+      // Still dirty at the ceiling: keep the last pass that did draw, and say
+      // so once rather than on every pass.
+      if (pendingUpdate && !destroyed) {
+        report(
+          new Error(
+            `StageBinding update did not stabilize after ${MAX_UPDATE_PASSES} passes`,
+          ),
+        );
+      }
+    } finally {
+      pendingUpdate = false;
+      updating = false;
     }
   };
 
@@ -344,16 +410,53 @@ export function mountSurfaceSlider(
   binding: SurfaceSliderBinding,
   options: SurfaceSliderOptions = {},
 ): SurfaceSliderHandle {
-
   const surface = options.pointerTarget ?? element;
   const orientation = options.orientation === 'vertical' ? 'vertical' : 'horizontal';
+  const pointerMode = options.pointerMode ?? 'absolute';
+  const pointerEnabled = pointerMode !== 'none';
+  const view = element.ownerDocument.defaultView;
+  const commitOnRelease = options.commitOn === 'release';
+  const dragThreshold = 4;
   let destroyed = false;
   let unsubscribe: (() => void) | undefined;
-  let activePointer: number | 'fallback' | undefined;
   let state: SurfaceSliderState = {minimum: 0, maximum: 0, value: 0, disabled: true};
+  let updateRevision = 0;
 
+  interface Gesture {
+    key: number | 'fallback';
+    startClientX: number;
+    startClientY: number;
+    startValue: number;
+    moved: boolean;
+    lastCommittedX?: number;
+    lastCommittedY?: number;
+  }
+  let activeGesture: Gesture | undefined;
+  let originalCursor = '';
+  let assignedCursor: string | undefined;
+  let cursorOverridden = false;
+  const setGestureCursor = (active: boolean): void => {
+    if (!pointerEnabled || cursorOverridden) return;
+    if (assignedCursor !== undefined && surface.style.cursor !== assignedCursor) {
+      cursorOverridden = true;
+      return;
+    }
+    const requested = active ? options.dragCursor ?? options.cursor : options.cursor;
+    if (requested !== undefined) {
+      surface.style.cursor = requested;
+      assignedCursor = surface.style.cursor;
+    } else if (assignedCursor !== undefined) {
+      surface.style.cursor = originalCursor;
+      assignedCursor = undefined;
+    }
+  };
+  const releaseCursor = (): void => {
+    if (assignedCursor !== undefined && surface.style.cursor === assignedCursor) {
+      surface.style.cursor = originalCursor;
+    }
+    assignedCursor = undefined;
+  };
   const report = createErrorSink(options.onError);
-
   const originals = new Map<string, string | null>();
   const assigned = new Map<string, string>();
   const assign = (name: string, value: string): void => {
@@ -369,249 +472,258 @@ export function mountSurfaceSlider(
     else element.setAttribute(name, original);
     assigned.delete(name);
   };
-
-  /**
-   * A slider's value is arithmetic — a step added to a fraction — so it arrives
-   * carrying float noise like `64.99999999999999`. That noise is read aloud, so
-   * it is trimmed before it reaches the attribute; an exact value is unchanged.
-   */
   const ariaNumber = (value: number): string => String(Number(value.toFixed(6)));
-
   const applyState = (): void => {
+    if (destroyed) return;
     assign('aria-valuemin', ariaNumber(state.minimum));
     assign('aria-valuemax', ariaNumber(state.maximum));
     assign('aria-valuenow', ariaNumber(state.value));
     assign('aria-disabled', String(state.disabled === true));
-    // A disabled slider leaves the tab order and rejoins it when re-enabled,
-    // rather than being stamped tabbable once at mount — but only when the
-    // presenter owns the attribute. An author-supplied tabindex is their focus
-    // policy and stays untouched, as stage.test.ts pins.
     if (ownsTabIndex) assign('tabindex', state.disabled === true ? '-1' : '0');
     if (!options.formatValue) return;
     try {
       const text = options.formatValue(state.value, state);
-      if (destroyed || !claim.isCurrent()) return;
+      if (destroyed) return;
       if (text === undefined) releaseAssigned('aria-valuetext');
       else assign('aria-valuetext', text);
     } catch (error) {
       report(error);
     }
   };
+  const notifyGesture = (phase: 'start' | 'end' | 'cancel'): void => {
+    try {
+      // A callback returning a Promise still has its rejection reported, even
+      // though gesture ownership itself is synchronous.
+      const result = binding.gesture?.(phase);
+      void Promise.resolve(result).catch(report);
+    } catch (error) {
+      report(error);
+    }
+  };
+  const releaseCapture = (gesture: Gesture): void => {
+    if (typeof gesture.key !== 'number') return;
+    try {
+      surface.releasePointerCapture?.(gesture.key);
+    } catch (error) {
+      report(error);
+    }
+  };
+  const isCurrent = (gesture: Gesture): boolean => !destroyed && activeGesture === gesture;
 
   const update = (): void => {
     if (destroyed) return;
+    const revision = ++updateRevision;
     try {
-      state = normalizeSurfaceSliderState(binding.snapshot());
-      if (destroyed || !claim.isCurrent()) return;
+      const next = normalizeSurfaceSliderState(binding.snapshot());
+      if (destroyed || revision !== updateRevision) return;
+      state = next;
       applyState();
+      if (state.disabled) cancelGesture();
     } catch (error) {
-      if (destroyed || !claim.isCurrent()) return;
+      if (destroyed || revision !== updateRevision) return;
       state = {minimum: 0, maximum: 0, value: 0, disabled: true};
       applyState();
+      cancelGesture();
       report(error);
     }
   };
-
-  const commit = (value: number): void => {
-    if (destroyed || state.disabled) return;
+  const cancelGesture = (): void => {
+    const gesture = activeGesture;
+    if (!gesture) return;
+    activeGesture = undefined;
+    setGestureCursor(false);
+    releaseCapture(gesture);
+    notifyGesture('cancel');
+    // No stale preview owns the value after cancellation. A callback may
+    // destroy/rebind the presenter, so update checks ownership again.
+    if (!destroyed) update();
+  };
+  const commit = (value: number, gesture?: Gesture): boolean => {
+    if (destroyed || state.disabled || (gesture && !isCurrent(gesture))) return false;
     const next = Math.max(state.minimum, Math.min(state.maximum, finiteNumber(value, state.value)));
+    const revision = updateRevision;
     try {
-      binding.commit(next);
-      // Keep the slider responsive even when its domain source publishes on a
-      // later transport tick. The next update remains authoritative.
-      state = {...state, value: next};
-      applyState();
+      const result = binding.commit(next);
+      void Promise.resolve(result).catch(report);
+      if (destroyed || (gesture && !isCurrent(gesture))) return false;
+      // A synchronous update publishes the owner's accepted value (which can
+      // differ after loop wrapping). Only use optimistic state without one.
+      if (revision === updateRevision) {
+        state = {...state, value: next};
+        applyState();
+      }
+      return true;
     } catch (error) {
       report(error);
+      return false;
     }
   };
-
-  const pointFor = (event: PointerEvent): SurfaceSliderPoint => {
+  const pointFor = (event: PointerEvent, gesture: Gesture): SurfaceSliderPoint => {
     const rect = surface.getBoundingClientRect();
     const pointerId = Number.isFinite(event.pointerId) ? event.pointerId : undefined;
+    const deltaX = event.clientX - gesture.startClientX;
+    const deltaY = event.clientY - gesture.startClientY;
+    if (Math.hypot(deltaX, deltaY) >= dragThreshold) gesture.moved = true;
     return {
-      clientX: event.clientX,
-      clientY: event.clientY,
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top,
+      clientX: event.clientX, clientY: event.clientY,
+      x: event.clientX - rect.left, y: event.clientY - rect.top,
       ...(pointerId === undefined ? {} : {pointerId}),
-      rect,
-      surface,
+      rect, surface,
+      gesture: Object.freeze({
+        startClientX: gesture.startClientX, startClientY: gesture.startClientY,
+        startValue: gesture.startValue, deltaX, deltaY, moved: gesture.moved,
+      }),
     };
   };
-
-  const commitOnRelease = options.commitOn === 'release';
-  let dragValue: number | undefined;
-
-  const commitPointer = (event: PointerEvent, final = false): void => {
+  const commitPointer = (event: PointerEvent, gesture: Gesture, final = false): void => {
+    if (!isCurrent(gesture) || state.disabled) return;
     try {
-      const value = binding.valueAt(pointFor(event));
+      const point = pointFor(event, gesture);
+      if (pointerMode === 'click' && (!final || gesture.moved)) return;
+      if (pointerMode === 'drag' && !final && !gesture.moved) return;
+      // The legacy continuous path does not double-commit an unchanged release.
+      if (final && !commitOnRelease &&
+          gesture.lastCommittedX === event.clientX && gesture.lastCommittedY === event.clientY) return;
+      const value = binding.valueAt(point);
+      if (!isCurrent(gesture) || state.disabled) return;
       if (commitOnRelease && !final) {
-        // A scrub paints as it moves and reaches the domain once, on release.
-        dragValue = value;
-        binding.preview?.(value);
-        return;
+        const result = binding.preview?.(value);
+        void Promise.resolve(result).catch(report);
+      } else if (commit(value, gesture)) {
+        gesture.lastCommittedX = event.clientX;
+        gesture.lastCommittedY = event.clientY;
       }
-      commit(value);
     } catch (error) {
       report(error);
     }
   };
-
   const pointerKey = (event: PointerEvent): number | 'fallback' =>
     Number.isFinite(event.pointerId) ? event.pointerId : 'fallback';
-  const matchesPointer = (event: PointerEvent): boolean =>
-    activePointer !== undefined && activePointer === pointerKey(event);
-  const releasePointer = (event: PointerEvent, commitDrag = false): void => {
-    if (!matchesPointer(event)) return;
-    const pointerId = activePointer;
-    activePointer = undefined;
-    if (commitOnRelease) {
-      const pending = dragValue;
-      dragValue = undefined;
-      if (commitDrag) {
-        try {
-          commit(pending ?? binding.valueAt(pointFor(event)));
-        } catch (error) {
-          report(error);
-        }
-      } else {
-        // Cancelled: drop the preview and repaint from the owner's state.
-        update();
-      }
-    }
-    if (typeof pointerId !== 'number') return;
-    try {
-      surface.releasePointerCapture?.(pointerId);
-    } catch (error) {
-      report(error);
-    }
-  };
+  const matchingGesture = (event: PointerEvent): Gesture | undefined =>
+    activeGesture?.key === pointerKey(event) ? activeGesture : undefined;
 
   const onPointerDown = (event: PointerEvent): void => {
-    if (state.disabled || (event.button !== undefined && event.button !== 0)) return;
-    activePointer = pointerKey(event);
-    if (typeof activePointer === 'number') {
-      try {
-        surface.setPointerCapture?.(activePointer);
-      } catch (error) {
-        report(error);
-      }
+    if (destroyed || activeGesture || event.isPrimary === false ||
+        (event.button !== undefined && event.button !== 0)) return;
+    update();
+    if (destroyed || state.disabled || activeGesture) return;
+    const gesture: Gesture = {
+      key: pointerKey(event), startClientX: event.clientX, startClientY: event.clientY,
+      startValue: state.value, moved: false,
+    };
+    activeGesture = gesture;
+    setGestureCursor(true);
+    notifyGesture('start');
+    if (!isCurrent(gesture)) return;
+    if (typeof gesture.key === 'number') {
+      try { surface.setPointerCapture?.(gesture.key); } catch (error) { report(error); }
     }
-    try {
-      element.focus({preventScroll: true});
-    } catch {
-      element.focus();
-    }
-    commitPointer(event);
+    if (!isCurrent(gesture)) return;
+    try { element.focus({preventScroll: true}); } catch { element.focus(); }
+    if (!isCurrent(gesture)) return;
+    if (pointerMode === 'absolute') commitPointer(event, gesture);
     event.preventDefault();
   };
   const onPointerMove = (event: PointerEvent): void => {
-    if (!matchesPointer(event)) return;
-    commitPointer(event);
+    const gesture = matchingGesture(event);
+    if (!gesture || destroyed) return;
+    commitPointer(event, gesture);
     event.preventDefault();
   };
-  const onPointerUp = (event: PointerEvent): void => releasePointer(event, true);
-  const onPointerCancel = (event: PointerEvent): void => releasePointer(event);
-
+  const onPointerUp = (event: PointerEvent): void => {
+    const gesture = matchingGesture(event);
+    if (!gesture || destroyed) return;
+    commitPointer(event, gesture, true);
+    if (!isCurrent(gesture)) return;
+    activeGesture = undefined;
+    setGestureCursor(false);
+    releaseCapture(gesture);
+    if (!destroyed) notifyGesture('end');
+  };
+  const onPointerCancel = (event: PointerEvent): void => {
+    if (matchingGesture(event)) cancelGesture();
+  };
+  const onBlur = (): void => cancelGesture();
   const keyboardStep = (event: KeyboardEvent): number => {
-    const configured =
-      typeof options.keyboardStep === 'function'
-        ? options.keyboardStep(state, event)
-        : options.keyboardStep;
+    const configured = typeof options.keyboardStep === 'function'
+      ? options.keyboardStep(state, event) : options.keyboardStep;
     const span = state.maximum - state.minimum;
     return Math.max(0, finiteNumber(configured, span > 0 ? span / 100 : 1));
   };
   const onKeyDown = (event: KeyboardEvent): void => {
-    if (state.disabled) return;
-    let next: number | undefined;
-    if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
-      next = state.value - keyboardStep(event);
-    } else if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {
-      next = state.value + keyboardStep(event);
-    } else if (event.key === 'Home') next = state.minimum;
-    else if (event.key === 'End') next = state.maximum;
-    if (next === undefined) return;
-    event.preventDefault();
-    commit(next);
+    if (state.disabled || destroyed) return;
+    if (!['ArrowLeft', 'ArrowDown', 'ArrowRight', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+    cancelGesture();
+    if (destroyed || state.disabled) return;
+    try {
+      let next: number;
+      if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') next = state.value - keyboardStep(event);
+      else if (event.key === 'ArrowRight' || event.key === 'ArrowUp') next = state.value + keyboardStep(event);
+      else next = event.key === 'Home' ? state.minimum : state.maximum;
+      event.preventDefault();
+      commit(next);
+    } catch (error) {
+      report(error);
+    }
   };
 
   let originalTouchAction = '';
   let ownsTabIndex = false;
-  const updateLabel = (label?: string): void => {
-    if (destroyed) return;
-    const text = label ?? options.label ?? 'Value';
-    if (destroyed || !claim.isCurrent()) return;
-    assign('aria-label', text);
-  };
-
   const handle: SurfaceSliderHandle = {
-    element,
-    surface,
-    update,
-    updateLabel,
+    element, surface, update, cancelGesture,
     destroy(): void {
       if (destroyed) return;
       destroyed = true;
+      const gesture = activeGesture;
+      activeGesture = undefined;
       surface.removeEventListener('pointerdown', onPointerDown);
       surface.removeEventListener('pointermove', onPointerMove);
       surface.removeEventListener('pointerup', onPointerUp);
       surface.removeEventListener('pointercancel', onPointerCancel);
+      surface.removeEventListener('lostpointercapture', onPointerCancel);
       element.removeEventListener('keydown', onKeyDown);
-      if (typeof activePointer === 'number') {
-        try {
-          surface.releasePointerCapture?.(activePointer);
-        } catch (error) {
-          report(error);
-        }
-      }
-      activePointer = undefined;
-      try {
-        unsubscribe?.();
-      } catch (error) {
-        report(error);
-      }
-      if (surface.style.touchAction === 'none') surface.style.touchAction = originalTouchAction;
+      element.removeEventListener('blur', onBlur);
+      view?.removeEventListener('blur', onBlur);
+      if (pointerEnabled && surface.style.touchAction === 'none') surface.style.touchAction = originalTouchAction;
       for (const name of [...assigned.keys()]) releaseAssigned(name);
+      releaseCursor();
       claim.release();
+      // Restore the borrowed host before callbacks can mount a replacement.
+      if (gesture) { releaseCapture(gesture); notifyGesture('cancel'); }
+      try { unsubscribe?.(); } catch (error) { report(error); }
     },
   };
-
   const claim = claimHost(mountedSurfaceSliders, element, handle);
   claim.destroyPrevious();
   if (!claim.isCurrent()) return handle;
-
-  // Borrow the caller's element only after the previous slider has given it
-  // back: it restores the role, tabindex, aria-* and touch-action it took, and
-  // doing that after this mount had written its own would strip them.
   if (!element.hasAttribute('role')) assign('role', 'slider');
-  if (!element.hasAttribute('tabindex')) {
-    assign('tabindex', '0');
-    ownsTabIndex = true;
-  }
+  if (!element.hasAttribute('tabindex')) { assign('tabindex', '0'); ownsTabIndex = true; }
   if (!element.hasAttribute('aria-label') && !element.hasAttribute('aria-labelledby')) {
-    updateLabel();
+    assign('aria-label', options.label ?? 'Value');
   }
-  if (destroyed || !claim.isCurrent()) return handle;
   assign('aria-orientation', orientation);
-  originalTouchAction = surface.style.touchAction;
-  surface.style.touchAction = 'none';
-  surface.addEventListener('pointerdown', onPointerDown);
-  surface.addEventListener('pointermove', onPointerMove);
-  surface.addEventListener('pointerup', onPointerUp);
-  surface.addEventListener('pointercancel', onPointerCancel);
+  if (pointerEnabled) {
+    originalTouchAction = surface.style.touchAction;
+    originalCursor = surface.style.cursor;
+    surface.style.touchAction = 'none';
+    setGestureCursor(false);
+    surface.addEventListener('pointerdown', onPointerDown);
+    surface.addEventListener('pointermove', onPointerMove);
+    surface.addEventListener('pointerup', onPointerUp);
+    surface.addEventListener('pointercancel', onPointerCancel);
+    surface.addEventListener('lostpointercapture', onPointerCancel);
+    element.addEventListener('blur', onBlur);
+    view?.addEventListener('blur', onBlur);
+  }
   element.addEventListener('keydown', onKeyDown);
-
   update();
   if (destroyed || !claim.isCurrent()) return handle;
   if (binding.subscribe) {
     try {
-      const cleanup = binding.subscribe(update);
-      if (destroyed || !claim.isCurrent()) cleanup();
-      else unsubscribe = cleanup;
-    } catch (error) {
-      report(error);
-    }
+      const stop = binding.subscribe(update);
+      if (destroyed || !claim.isCurrent()) stop();
+      else unsubscribe = stop;
+    } catch (error) { report(error); }
   }
   return handle;
 }

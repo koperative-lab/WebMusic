@@ -8,6 +8,8 @@ import {
   stageStyle,
   type CanvasStageFrame,
   type StatusState,
+  type SurfaceSliderHandle,
+  type SurfaceSliderPoint,
 } from '../src';
 
 const context = {
@@ -519,5 +521,264 @@ describe('mountStage overflow', () => {
     // Unset stays unset, so the stylesheet's own `hidden` default applies.
     expect(cropped.element.style.getPropertyValue('--wm-stage-overflow')).toBe('');
     cropped.destroy();
+  });
+});
+
+
+describe('mountSurfaceSlider gesture modes', () => {
+  it('anchors relative drag geometry once, applies the threshold, and commits the final release before end', () => {
+    const element = document.createElement('div');
+    document.body.append(element);
+    let value = 80;
+    const points: SurfaceSliderPoint[] = [];
+    const events: Array<string | number> = [];
+    const handle = mountSurfaceSlider(element, {
+      snapshot: () => ({minimum: 0, maximum: 100, value}),
+      valueAt: (point) => {
+        points.push(point);
+        return point.gesture!.startValue - point.gesture!.deltaX;
+      },
+      commit: (next) => { value = next; events.push(next); },
+      gesture: (phase) => events.push(phase),
+    }, {pointerMode: 'drag'});
+    element.dispatchEvent(pointerEvent('pointerdown', 100, 20, 1));
+    element.dispatchEvent(pointerEvent('pointermove', 103, 20, 1));
+    expect(events).toEqual(['start']);
+    expect(points).toHaveLength(0);
+    element.dispatchEvent(pointerEvent('pointermove', 110, 20, 1));
+    value = 90;
+    handle.update();
+    element.dispatchEvent(pointerEvent('pointermove', 120, 20, 1));
+    element.dispatchEvent(pointerEvent('pointerup', 125, 20, 1));
+    expect(events).toEqual(['start', 70, 60, 55, 'end']);
+    expect(points[2].gesture).toEqual({
+      startClientX: 100, startClientY: 20, startValue: 80,
+      deltaX: 25, deltaY: 0, moved: true,
+    });
+    expect(Object.isFrozen(points[2].gesture)).toBe(true);
+    element.dispatchEvent(pointerEvent('pointerdown', 10, 20, 2));
+    element.dispatchEvent(pointerEvent('pointermove', 5, 20, 2));
+    expect(points.at(-1)?.gesture?.startValue).toBe(55);
+    expect(value).toBe(60);
+    handle.destroy();
+    expect(events.at(-1)).toBe('cancel');
+  });
+
+  it('turns a stationary drag-mode release into one click, without a press commit', () => {
+    const element = document.createElement('div');
+    const commit = vi.fn();
+    const valueAt = vi.fn((point: SurfaceSliderPoint) => point.clientX);
+    const handle = mountSurfaceSlider(element, {
+      snapshot: () => ({minimum: 0, maximum: 100, value: 0}), valueAt, commit,
+    }, {pointerMode: 'drag'});
+    element.dispatchEvent(pointerEvent('pointerdown', 20, 10, 1));
+    element.dispatchEvent(pointerEvent('pointermove', 22, 10, 1));
+    expect(commit).not.toHaveBeenCalled();
+    element.dispatchEvent(pointerEvent('pointerup', 23, 10, 1));
+    expect(commit).toHaveBeenCalledExactlyOnceWith(23);
+    expect(valueAt.mock.calls[0][0].gesture?.moved).toBe(false);
+    handle.destroy();
+  });
+
+  it('uses the final release position for release-only preview and for legacy continuous input', () => {
+    for (const commitOn of ['release', 'move'] as const) {
+      const element = document.createElement('div');
+      const commit = vi.fn();
+      const preview = vi.fn();
+      const handle = mountSurfaceSlider(element, {
+        snapshot: () => ({minimum: 0, maximum: 100, value: 0}),
+        valueAt: (point) => point.clientX, commit, preview,
+      }, {commitOn});
+      element.dispatchEvent(pointerEvent('pointerdown', 10, 0, 1));
+      element.dispatchEvent(pointerEvent('pointermove', 20, 0, 1));
+      element.dispatchEvent(pointerEvent('pointerup', 30, 0, 1));
+      expect(commit).toHaveBeenLastCalledWith(30);
+      expect(commit).toHaveBeenCalledTimes(commitOn === 'release' ? 1 : 3);
+      if (commitOn === 'release') expect(preview.mock.calls).toEqual([[10], [20]]);
+      handle.destroy();
+    }
+  });
+
+  it('suppresses a click-mode gesture once it crosses the movement threshold, even if it returns', () => {
+    const element = document.createElement('div');
+    const commit = vi.fn();
+    const phases = vi.fn();
+    const handle = mountSurfaceSlider(element, {
+      snapshot: () => ({minimum: 0, maximum: 100, value: 0}),
+      valueAt: (point) => point.clientX, commit, gesture: phases,
+    }, {pointerMode: 'click'});
+    element.dispatchEvent(pointerEvent('pointerdown', 10, 0, 1));
+    element.dispatchEvent(pointerEvent('pointermove', 30, 0, 1));
+    element.dispatchEvent(pointerEvent('pointerup', 10, 0, 1));
+    expect(commit).not.toHaveBeenCalled();
+    expect(phases.mock.calls).toEqual([['start'], ['end']]);
+    element.dispatchEvent(pointerEvent('pointerdown', 10, 0, 2));
+    element.dispatchEvent(pointerEvent('pointerup', 12, 0, 2));
+    expect(commit).toHaveBeenCalledExactlyOnceWith(12);
+    handle.destroy();
+  });
+
+  it('retains only keyboard and ARIA in pointer none mode without taking touch or cursor styles', () => {
+    const element = document.createElement('div');
+    element.style.touchAction = 'pan-y';
+    element.style.cursor = 'crosshair';
+    const commit = vi.fn();
+    const gesture = vi.fn();
+    const handle = mountSurfaceSlider(element, {
+      snapshot: () => ({minimum: 0, maximum: 100, value: 30}),
+      valueAt: () => 0, commit, gesture,
+    }, {pointerMode: 'none', keyboardStep: 5, cursor: 'grab', dragCursor: 'grabbing'});
+    element.dispatchEvent(pointerEvent('pointerdown', 10, 0, 1));
+    element.dispatchEvent(pointerEvent('pointerup', 12, 0, 1));
+    expect(commit).not.toHaveBeenCalled();
+    expect(gesture).not.toHaveBeenCalled();
+    element.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowRight'}));
+    expect(commit).toHaveBeenCalledExactlyOnceWith(35);
+    expect(element.getAttribute('aria-valuenow')).toBe('35');
+    expect(element.style.touchAction).toBe('pan-y');
+    expect(element.style.cursor).toBe('crosshair');
+    handle.destroy();
+    expect(element.style.cursor).toBe('crosshair');
+  });
+
+  it('does not let another or non-primary pointer steal the active gesture', () => {
+    const element = document.createElement('div');
+    const commit = vi.fn();
+    const gesture = vi.fn();
+    const handle = mountSurfaceSlider(element, {
+      snapshot: () => ({minimum: 0, maximum: 100, value: 30}),
+      valueAt: (point) => point.clientX, commit, gesture,
+    }, {pointerMode: 'drag'});
+    const secondary = pointerEvent('pointerdown', 0, 0, 8);
+    Object.defineProperty(secondary, 'isPrimary', {value: false});
+    element.dispatchEvent(secondary);
+    element.dispatchEvent(pointerEvent('pointerdown', 10, 0, 1));
+    element.dispatchEvent(pointerEvent('pointerdown', 80, 0, 2));
+    element.dispatchEvent(pointerEvent('pointermove', 90, 0, 2));
+    element.dispatchEvent(pointerEvent('pointerup', 90, 0, 2));
+    expect(commit).not.toHaveBeenCalled();
+    expect(gesture.mock.calls).toEqual([['start']]);
+    element.dispatchEvent(pointerEvent('pointerup', 20, 0, 1));
+    expect(commit).toHaveBeenCalledExactlyOnceWith(20);
+    expect(gesture.mock.calls).toEqual([['start'], ['end']]);
+    handle.destroy();
+  });
+
+  it.each(['explicit', 'pointercancel', 'lostpointercapture', 'blur', 'disable', 'destroy'])(
+    'cancels pending release previews once on %s and releases capture', (reason) => {
+      const element = document.createElement('div');
+      const release = vi.fn();
+      Object.defineProperty(element, 'releasePointerCapture', {value: release});
+      let disabled = false;
+      const commit = vi.fn();
+      const gesture = vi.fn();
+      const handle = mountSurfaceSlider(element, {
+        snapshot: () => ({minimum: 0, maximum: 100, value: 30, disabled}),
+        valueAt: (point) => point.clientX, commit, gesture,
+      }, {pointerMode: 'drag', commitOn: 'release'});
+      element.dispatchEvent(pointerEvent('pointerdown', 10, 0, 1));
+      element.dispatchEvent(pointerEvent('pointermove', 30, 0, 1));
+      if (reason === 'explicit') handle.cancelGesture();
+      else if (reason === 'blur') window.dispatchEvent(new Event('blur'));
+      else if (reason === 'disable') { disabled = true; handle.update(); }
+      else if (reason === 'destroy') handle.destroy();
+      else element.dispatchEvent(pointerEvent(reason, 30, 0, 1));
+      handle.cancelGesture();
+      element.dispatchEvent(pointerEvent('pointerup', 40, 0, 1));
+      expect(commit).not.toHaveBeenCalled();
+      expect(gesture.mock.calls).toEqual([['start'], ['cancel']]);
+      expect(release).toHaveBeenCalledExactlyOnceWith(1);
+      handle.destroy();
+    },
+  );
+
+  it('keeps a synchronously published accepted value instead of optimistic requested state', () => {
+    const element = document.createElement('div');
+    let value = 0;
+    const handle: SurfaceSliderHandle = mountSurfaceSlider(element, {
+      snapshot: () => ({minimum: 0, maximum: 100, value}),
+      valueAt: () => 85,
+      commit: () => { value = 5; handle.update(); },
+    });
+    element.dispatchEvent(pointerEvent('pointerdown', 10, 0, 1));
+    expect(element.getAttribute('aria-valuenow')).toBe('5');
+    handle.destroy();
+  });
+
+  it('releases grab cursors on terminal gestures and preserves a caller override', () => {
+    const element = document.createElement('div');
+    element.style.cursor = 'crosshair';
+    const handle = mountSurfaceSlider(element, {
+      snapshot: () => ({minimum: 0, maximum: 100, value: 0}),
+      valueAt: () => 0, commit: () => {},
+    }, {pointerMode: 'drag', cursor: 'grab', dragCursor: 'grabbing'});
+    expect(element.style.cursor).toBe('grab');
+    element.dispatchEvent(pointerEvent('pointerdown', 10, 0, 1));
+    expect(element.style.cursor).toBe('grabbing');
+    handle.cancelGesture();
+    expect(element.style.cursor).toBe('grab');
+    element.dispatchEvent(pointerEvent('pointerdown', 10, 0, 2));
+    element.style.cursor = 'wait';
+    element.dispatchEvent(pointerEvent('pointerup', 10, 0, 2));
+    expect(element.style.cursor).toBe('wait');
+    handle.destroy();
+    expect(element.style.cursor).toBe('wait');
+  });
+
+  it('restores the original cursor across same-host replacement and cancels the outgoing gesture', () => {
+    const element = document.createElement('div');
+    element.style.cursor = 'crosshair';
+    const gesture = vi.fn();
+    const binding = {
+      snapshot: () => ({minimum: 0, maximum: 100, value: 0}),
+      valueAt: () => 0, commit: () => {}, gesture,
+    };
+    const first = mountSurfaceSlider(element, binding, {
+      pointerMode: 'drag', cursor: 'grab', dragCursor: 'grabbing',
+    });
+    element.dispatchEvent(pointerEvent('pointerdown', 10, 0, 1));
+    const second = mountSurfaceSlider(element, binding, {
+      pointerMode: 'drag', cursor: 'grab', dragCursor: 'grabbing',
+    });
+    expect(gesture.mock.calls).toEqual([['start'], ['cancel']]);
+    expect(element.style.cursor).toBe('grab');
+    first.destroy();
+    expect(element.style.cursor).toBe('grab');
+    second.destroy();
+    expect(element.style.cursor).toBe('crosshair');
+  });
+
+  it('stops pointer callbacks when a start hook destroys the presenter', () => {
+    const element = document.createElement('div');
+    const commit = vi.fn();
+    const valueAt = vi.fn(() => 30);
+    const phases: string[] = [];
+    const handle: SurfaceSliderHandle = mountSurfaceSlider(element, {
+      snapshot: () => ({minimum: 0, maximum: 100, value: 0}), valueAt, commit,
+      gesture: (phase) => { phases.push(phase); if (phase === 'start') handle.destroy(); },
+    });
+    element.dispatchEvent(pointerEvent('pointerdown', 10, 0, 1));
+    element.dispatchEvent(pointerEvent('pointerup', 20, 0, 1));
+    expect(phases).toEqual(['start', 'cancel']);
+    expect(valueAt).not.toHaveBeenCalled();
+    expect(commit).not.toHaveBeenCalled();
+    expect(element.hasAttribute('role')).toBe(false);
+  });
+
+  it('reports borrowed callback failures while leaving cleanup available', async () => {
+    const element = document.createElement('div');
+    const error = new Error('gesture callback failed');
+    const onError = vi.fn();
+    const handle = mountSurfaceSlider(element, {
+      snapshot: () => ({minimum: 0, maximum: 100, value: 0}), valueAt: () => 20,
+      commit: async () => { throw error; },
+      gesture: (phase) => { if (phase === 'start') throw error; },
+    }, {onError});
+    element.dispatchEvent(pointerEvent('pointerdown', 10, 0, 1));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(onError).toHaveBeenCalledTimes(2);
+    handle.destroy();
+    expect(element.hasAttribute('role')).toBe(false);
   });
 });

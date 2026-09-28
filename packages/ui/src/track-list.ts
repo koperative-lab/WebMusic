@@ -1,8 +1,7 @@
 import {installStyle} from './internal/style';
-import {claimHost, createErrorSink, createUpdateLoop} from './internal/lifecycle';
+import {claimHost, createErrorSink} from './internal/lifecycle';
 import {markEmptyState, addClassNames, setParts} from './internal/dom';
 import {componentSurfaceCss} from './internal/surface';
-import {readText, textValue} from './text';
 // ============================================================================
 // Domain-neutral list presenter: an ordered index of named rows, one of which
 // may be current. It knows nothing about audio, regions, scores or time — only
@@ -62,14 +61,7 @@ export interface TrackListParts {
   empty?: string;
 }
 
-export interface TrackListText {
-  label?: string;
-  empty?: string;
-}
-
 export interface TrackListOptions {
-  /** Read application-provided text on each update. */
-  getText?: () => TrackListText;
   /** Accessible name of the list. Defaults to 'Tracks'. */
   label?: string;
   /**
@@ -233,8 +225,6 @@ export function mountTrackList(
 ): TrackListHandle {
 
   const document = host.ownerDocument;
-  let texts: TrackListText | undefined;
-
   const style = installStyle(document, 'track-list', trackListStyle, options.stylesheet);
 
   const root = document.createElement('div');
@@ -246,7 +236,7 @@ export function mountTrackList(
   list.className = 'wui-track-list__items';
   // The list carries the name, not the wrapper: a screen reader reads it
   // together with "list, N items", which is the useful announcement.
-  list.setAttribute('aria-label', options.label ?? textValue(texts?.label, 'Tracks', {}, options.onError));
+  list.setAttribute('aria-label', options.label ?? 'Tracks');
   addClassNames(list, options.classNames?.list);
   setParts(list, 'list', options.parts?.list);
 
@@ -382,7 +372,6 @@ export function mountTrackList(
 
   /** Patch the mutable parts of a row: colour, detail, current and disabled. */
   const paintRow = (entry: Row, item: TrackListItem, disabled: boolean): void => {
-    entry.label.textContent = item.label;
     const current = item.active === true;
     entry.row.setAttribute('aria-current', String(current));
     entry.item.classList.toggle('on', current);
@@ -402,26 +391,23 @@ export function mountTrackList(
   const renderEmpty = (): HTMLLIElement => {
     const empty = document.createElement('li');
     empty.className = 'wui-track-list__empty';
-    empty.textContent = options.emptyLabel ?? textValue(texts?.empty, 'No items', {}, options.onError);
+    empty.textContent = options.emptyLabel ?? 'No items';
     addClassNames(empty, options.classNames?.empty);
     setParts(empty, 'empty', options.parts?.empty);
     markEmptyState(empty);
     return empty;
   };
 
-  const paintSnapshot = (): void => {
+  update = (): void => {
     if (destroyed) return;
     try {
       const state = binding.snapshot();
-      if (destroyed || !claim.isCurrent()) return;
-      texts = readText(options.getText, options.onError);
-      if (destroyed || !claim.isCurrent()) return;
       const items = state.items ?? [];
       const disabled = state.disabled === true;
-      list.setAttribute('aria-label', options.label ?? textValue(texts?.label, 'Tracks', {}, options.onError));
 
-      // Text changes preserve the focused row and roving tab stop.
-      const signature = JSON.stringify(items.map((item) => item.id));
+      // Only identity, order and label force a rebuild; colour, detail,
+      // current and disabled are patched onto the existing rows.
+      const signature = JSON.stringify(items.map((item) => [item.id, item.label]));
       if (signature !== listSignature) {
         rows.clear();
         order = [];
@@ -434,9 +420,6 @@ export function mountTrackList(
         list.replaceChildren(...(nodes.length > 0 ? nodes : [renderEmpty()]));
         listSignature = signature;
         rovingId = undefined;
-      }
-      if (!items.length && list.firstElementChild) {
-        list.firstElementChild.textContent = options.emptyLabel ?? textValue(texts?.empty, 'No items', {}, options.onError);
       }
       for (const item of items) {
         const entry = rows.get(item.id);
@@ -456,12 +439,6 @@ export function mountTrackList(
     }
   };
 
-  const updateLoop = createUpdateLoop({
-    name: 'Track list', pass: paintSnapshot,
-    isCurrent: () => !destroyed && claim.isCurrent(), report,
-  });
-  update = (): void => updateLoop.run();
-
   const handle: TrackListHandle = {
     element: root,
     controls: {
@@ -480,13 +457,11 @@ export function mountTrackList(
     destroy(): void {
       if (destroyed) return;
       destroyed = true;
-      updateLoop.cancel();
       try {
         unsubscribe?.();
       } catch (error) {
         report(error);
       }
-
       claim.release();
       root.remove();
       style?.remove();
@@ -515,6 +490,5 @@ export function mountTrackList(
       report(error);
     }
   }
-
   return handle;
 }

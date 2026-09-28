@@ -1,5 +1,4 @@
-import {claimHost, createErrorSink, createUpdateLoop, runCleanups} from './internal/lifecycle';
-import {formatPercent, formatTime, readText, textValue, type UITextValue, type UIValueFormatters} from './text';
+import {claimHost} from './internal/lifecycle';
 import {installStyle, paint} from './internal/style';
 import {addClassNames, clamp01, finite, setParts} from './internal/dom';
 import {createFader} from './fader';
@@ -34,8 +33,7 @@ export {
 
 export interface TransportState {
   playing: boolean;
-  /** Normalized position. Omit when this binding has no progress readout. */
-  progress?: number;
+  progress: number;
   seconds?: number;
   duration?: number;
   disabled?: boolean;
@@ -48,12 +46,10 @@ export interface TransportBinding {
   snapshot(): TransportState;
   play(): Promise<void> | void;
   pause(): void;
-  /** Omit for a play/pause-only or read-only progress binding. */
-  seekFraction?(value: number): Promise<void> | void;
+  seekFraction(value: number): Promise<void> | void;
   /** Required by `showVolume`; a binding without it renders no volume control. */
   setVolume?(value: number): Promise<void> | void;
-  /** Without a subscription, call the handle’s update() after external changes. */
-  subscribe?(notify: () => void): () => void;
+  subscribe(notify: () => void): () => void;
 }
 
 export interface TransportClassNames {
@@ -82,35 +78,11 @@ export type TransportTimeDisplay = 'elapsed' | 'full';
 /** Which shape the volume control takes. */
 export type TransportVolumeControl = 'fader' | 'knob';
 
-export interface TransportPositionTextValues {
-  elapsed: string;
-  duration: string;
-  progress: number;
-  seconds?: number;
-  durationSeconds?: number;
-  seeking: boolean;
-}
-
-export interface TransportText {
-  play?: string;
-  pause?: string;
-  label?: string;
-  volume?: string;
-  seek?: UITextValue<{label: string}>;
-  progress?: UITextValue<{label: string}>;
-  seekValue?: UITextValue<TransportPositionTextValues>;
-  timeTotal?: UITextValue<{duration: string; durationSeconds?: number}>;
-}
-
 export interface TransportOptions {
-  /** Application-supplied final text; call update() after external text changes. */
-  getText?: () => TransportText;
-  /** Borrowed pure formatters; UI does not own language selection. */
-  formatters?: UIValueFormatters;
   /** Prefix used by the seek control's accessible name. */
   label?: string;
   /**
-   * Show the clock when seconds or duration are reported. `'full'` (and `true`) reads `elapsed / total`; `'elapsed'`
+   * Show the clock. `'full'` (and `true`) reads `elapsed / total`; `'elapsed'`
    * drops the total, for a row with no space for it. Defaults to true.
    */
   showTime?: boolean | TransportTimeDisplay;
@@ -126,8 +98,7 @@ export interface TransportOptions {
   /**
    * Select the seek UI owned by the presenter. `native` renders an input
    * range, `surface` renders an ARIA slider with a fill element, and `false`
-   * leaves the track empty. Defaults to `native` when seekFraction exists;
-   * a binding without it always has a read-only track.
+   * leaves the track empty. Defaults to `native`.
    */
   seekControl?: 'native' | 'surface' | false;
   /**
@@ -162,11 +133,11 @@ export interface TransportOptions {
 export interface TransportControls {
   /** The play/pause toggle. */
   play: HTMLButtonElement;
-  /** Progress track; hidden without timing data, read-only without seekFraction, empty with seek off. */
+  /** The progress track. Rendered empty (and caller-fillable) with `seek: false`. */
   track: HTMLDivElement;
   /** The native range seek input; defined only in `seekControl: 'native'` mode. */
   seek?: HTMLInputElement;
-  /** Fill for surface seeking or a binding without seekFraction. */
+  /** Progress fill owned by the `surface` seek mode. */
   fill?: HTMLSpanElement;
   /** The clock readout; undefined when mounted with `showTime: false`. */
   time?: HTMLSpanElement;
@@ -264,11 +235,9 @@ export function mountTransport(
 ): MountedTransportHandle {
 
   const document = host.ownerDocument;
-  const formatters = options.formatters;
-  const canSeek = typeof binding.seekFraction === 'function';
-  const seekControl = canSeek
-    ? options.seekControl ?? (options.seek === false ? false : 'native')
-    : false;
+  const playLabel = options.playLabel ?? 'Play';
+  const pauseLabel = options.pauseLabel ?? 'Pause';
+  const seekControl = options.seekControl ?? (options.seek === false ? false : 'native');
   const style = installStyle(document, 'transport', transportStyle, options.stylesheet);
 
   // A host that opts out of the stylesheet gets the same declarations written
@@ -316,8 +285,6 @@ export function mountTransport(
       'track seek',
       [options.parts?.track, options.parts?.seek].filter(Boolean).join(' '),
     );
-  }
-  if (seekControl === 'surface' || !canSeek) {
     fill = document.createElement('span');
     fill.className = 'wui-transport__fill';
     addClassNames(fill, options.classNames?.fill);
@@ -354,24 +321,22 @@ export function mountTransport(
     element: HTMLDivElement;
     readonly value: number;
     paint: (value: number, disabled?: boolean) => void;
-    updateLabel: (label: string) => void;
     destroy: () => void;
   }
   let volumeFader: VolumeControl | undefined;
-  const initialVolumeKind = options.showVolume === true ? 'fader' : (options.showVolume ?? false);
-  let volumeKind: TransportVolumeControl | false = false;
+  let volumeKind: TransportVolumeControl | false =
+    options.showVolume === true ? 'fader' : (options.showVolume ?? false);
 
   const buildVolume = (kind: TransportVolumeControl): VolumeControl | undefined => {
     if (!binding.setVolume) return undefined;
     const setVolume = binding.setVolume.bind(binding);
     const shared = {
       label: options.volumeLabel ?? 'Volume',
-      formatValue: (value: number) => formatPercent(formatters, value, undefined, reportError),
       classNames: {root: ['wui-transport__volume', options.classNames?.volume].filter(Boolean).join(' ')},
       parts: {root: ['volume', options.parts?.volume].filter(Boolean).join(' ')},
       onError: (error: unknown) => reportError(error),
       onInput: (level: number) => {
-        if (destroyed || readState().disabled || destroyed) return;
+        if (readState().disabled) return;
         try {
           void Promise.resolve(setVolume(level)).then(update).catch(reportError);
         } catch (error) {
@@ -390,6 +355,9 @@ export function mountTransport(
     return control;
   };
 
+  if (volumeKind) volumeFader = buildVolume(volumeKind);
+  if (!volumeFader) volumeKind = false;
+
   if (inline) {
     paint(root, transportTokens, transportParts.root);
     paint(play, transportParts.play);
@@ -402,13 +370,9 @@ export function mountTransport(
     if (timeTotal) paint(timeTotal, transportParts.timeSegment);
   }
 
-  if (!canSeek) {
-    track.setAttribute('role', 'progressbar');
-    track.setAttribute('aria-valuemin', '0');
-    track.setAttribute('aria-valuemax', '100');
-  }
   root.append(play, track);
   if (time) root.append(time);
+  if (volumeFader) root.append(volumeFader.element);
 
   const listeners: Array<() => void> = [];
   let destroyed = false;
@@ -418,19 +382,7 @@ export function mountTransport(
   let surfaceProgress = 0;
   let lastPlaying: boolean | undefined;
 
-  const reportError = createErrorSink(options.onError);
-  const progressOf = (state: TransportState): number => clamp01(
-    state.progress ?? (finite(state.duration) > 0 ? finite(state.seconds) / finite(state.duration) : 0),
-  );
-  const clock = (seconds: number): string => formatTime(formatters, seconds, formatClock(seconds), reportError);
-  const positionText = (copy: TransportText | undefined, progress: number, seconds: number | undefined, duration: number | undefined, seeking: boolean): string => {
-    const elapsed = clock(seconds ?? 0);
-    const total = clock(duration ?? 0);
-    const fallback = (duration ?? 0) > 0 && !seeking ? `${elapsed} of ${total}` : formatPercent(formatters, progress, undefined, reportError);
-    return textValue(copy?.seekValue, fallback, {
-      elapsed, duration: total, progress, seconds, durationSeconds: duration, seeking,
-    }, reportError);
-  };
+  const reportError = (error: unknown): void => options.onError?.(error);
 
   const readState = (): TransportState => {
     try {
@@ -463,100 +415,52 @@ export function mountTransport(
     if (fill) fill.style.width = `${Number((normalized * 100).toFixed(1))}%`;
   };
 
-  // Capability-driven hiding must not take over the caller's display choices.
-  // Score facades use the named nodes to toggle clock chrome without remounting.
-  const visibilityForData = (node: HTMLElement | undefined): ((available: boolean) => void) => {
-    let previous: {display: string; hidden: boolean} | undefined;
-    return (available) => {
-      if (!node) return;
-      if (!available && !previous) {
-        previous = {display: node.style.display, hidden: node.hidden};
-        node.hidden = true;
-        node.style.display = 'none';
-      } else if (available && previous) {
-        node.hidden = previous.hidden;
-        node.style.display = previous.display;
-        previous = undefined;
-      }
-    };
-  };
-  const showTrackForData = visibilityForData(track);
-  const showTimeForData = visibilityForData(time);
+  const update = () => {
+    if (destroyed) return;
+    const state = readState();
+    const progress = clamp01(state.progress);
+    const playing = state.playing === true;
+    const disabled = state.disabled === true;
 
-  const updateLoop = createUpdateLoop({
-    name: 'Transport',
-    isCurrent: () => !destroyed,
-    report: reportError,
-    pass: () => {
-      if (destroyed) return;
-      const state = readState();
-      if (destroyed) return;
-      const copy = readText(options.getText, reportError);
-      if (destroyed) return;
-      const progress = progressOf(state);
-      const playing = state.playing === true;
-      const disabled = state.disabled === true;
-      const duration = Math.max(0, finite(state.duration));
-      const seconds = Math.max(0, finite(state.seconds, progress * duration));
-      const displayedProgress = dragging
-        ? seek ? Number(seek.value) / 1000 : surfaceProgress
-        : progress;
-      const action = playing
-        ? options.pauseLabel ?? textValue(copy?.pause, 'Pause', {}, reportError)
-        : options.playLabel ?? textValue(copy?.play, 'Play', {}, reportError);
-      const label = options.label ?? textValue(copy?.label, 'Transport', {}, reportError);
-      const accessibleSeekName = canSeek
-        ? textValue(copy?.seek, `${label} seek`, {label}, reportError)
-        : textValue(copy?.progress, `${label} progress`, {label}, reportError);
-      const describedDuration = state.duration === undefined ? undefined : duration;
-      const describedSeconds = dragging
-        ? describedDuration === undefined ? undefined : displayedProgress * duration
-        : state.seconds !== undefined || (state.progress !== undefined && describedDuration !== undefined) ? seconds : undefined;
-      const accessibleSeekValue = positionText(copy, displayedProgress, describedSeconds, describedDuration, dragging);
-      const elapsed = clock(seconds);
-      const formattedDuration = clock(duration);
-      const total = textValue(copy?.timeTotal, ` / ${formattedDuration}`, {duration: formattedDuration, durationSeconds: describedDuration}, reportError);
-      const volumeLabel = options.volumeLabel ?? textValue(copy?.volume, 'Volume', {}, reportError);
-      const icon = lastPlaying !== playing ? renderIcon(playing) : undefined;
-      // Text/icon callbacks may destroy or replace this mount.
-      if (destroyed) return;
+    if (seek && !dragging) seek.value = String(Math.round(progress * 1000));
+    paintProgress(
+      seek && dragging
+        ? Number(seek.value) / 1000
+        : seekControl === 'surface' && dragging
+          ? surfaceProgress
+          : progress,
+    );
+    play.disabled = disabled;
+    if (seek) seek.disabled = disabled;
+    surfaceSlider?.update();
 
-      const hasPosition = state.progress !== undefined || state.seconds !== undefined || state.duration !== undefined;
-      showTrackForData(hasPosition);
-      showTimeForData(state.seconds !== undefined || state.duration !== undefined);
-      if (seek && !dragging) seek.value = String(Math.round(progress * 1000));
-      paintProgress(displayedProgress);
-      play.disabled = disabled;
-      if (seek) {
-        seek.disabled = disabled;
-        seek.setAttribute('aria-label', accessibleSeekName);
-        seek.setAttribute('aria-valuetext', accessibleSeekValue);
-      }
-      if (seekControl === 'surface' || !canSeek) track.setAttribute('aria-label', accessibleSeekName);
-      if (!canSeek) {
-        track.setAttribute('aria-valuenow', String(Math.round(progress * 100)));
-        track.setAttribute('aria-valuetext', accessibleSeekValue);
-      }
-      play.setAttribute('aria-label', action);
-      play.setAttribute('aria-pressed', String(playing));
-      play.title = action;
-      if (icon) {
-        play.replaceChildren(icon);
-        lastPlaying = playing;
-      }
-      if (timeElapsed) timeElapsed.textContent = elapsed;
-      if (timeTotal) timeTotal.textContent = total;
-      surfaceSlider?.update();
-      if (destroyed) return;
-      // Keep a drag authoritative until it ends, including across locale updates.
-      if (volumeFader) {
-        volumeFader.updateLabel(volumeLabel);
-        volumeFader.paint(draggingVolume ? volumeFader.value : finite(state.volume, 1), disabled);
-      }
-    },
-  });
-  const update = (): void => {
-    try { updateLoop.run(); } catch (error) { reportError(error); }
+    const action = playing ? pauseLabel : playLabel;
+    play.setAttribute('aria-label', action);
+    play.setAttribute('aria-pressed', String(playing));
+    play.title = action;
+    if (lastPlaying !== playing) {
+      play.replaceChildren(renderIcon(playing));
+      lastPlaying = playing;
+    }
+
+    const seconds = Math.max(0, finite(state.seconds, progress * Math.max(0, finite(state.duration))));
+    const duration = Math.max(0, finite(state.duration));
+    if (seek) {
+      seek.setAttribute(
+        'aria-valuetext',
+        duration > 0
+          ? `${formatClock(seconds)} of ${formatClock(duration)}`
+          : `${Math.round(progress * 100)}%`,
+      );
+    }
+    if (timeElapsed) timeElapsed.textContent = formatClock(seconds);
+    if (timeTotal) timeTotal.textContent = ` / ${formatClock(duration)}`;
+    // A drag is the authority on its own control until it ends; a disabled
+    // repaint still has to land, so it goes through on its own.
+    if (volumeFader) {
+      if (draggingVolume) volumeFader.paint(volumeFader.value, disabled);
+      else volumeFader.paint(finite(state.volume, 1), disabled);
+    }
   };
 
   const listen = <T extends EventTarget>(target: T, type: string, listener: EventListener) => {
@@ -565,11 +469,9 @@ export function mountTransport(
   };
 
   listen(play, 'click', (() => {
-    if (destroyed) return;
-    const state = readState();
-    if (state.disabled || destroyed) return;
+    if (readState().disabled) return;
     try {
-      if (state.playing) {
+      if (readState().playing) {
         binding.pause();
         update();
       } else {
@@ -592,16 +494,12 @@ export function mountTransport(
     listen(seek, 'pointercancel', finishDragging as EventListener);
     listen(seek, 'change', finishDragging as EventListener);
     listen(seek, 'input', (() => {
-      if (destroyed || readState().disabled || destroyed) return;
+      if (readState().disabled) return;
       const fraction = clamp01(Number(seek.value) / 1000);
       paintProgress(fraction);
-      const state = readState();
-      const duration = Math.max(0, finite(state.duration));
-      const valueText = positionText(readText(options.getText, reportError), fraction, state.duration === undefined ? undefined : fraction * duration, state.duration === undefined ? undefined : duration, true);
-      if (destroyed) return;
-      seek.setAttribute('aria-valuetext', valueText);
+      seek.setAttribute('aria-valuetext', `${Math.round(fraction * 100)}%`);
       try {
-        const pending = binding.seekFraction?.(fraction);
+        const pending = binding.seekFraction(fraction);
         void Promise.resolve(pending).then(update).catch(reportError);
       } catch (error) {
         reportError(error);
@@ -609,13 +507,12 @@ export function mountTransport(
     }) as EventListener);
   }
 
-  const mountSeekSurface = (): void => {
-    if (seekControl !== 'surface') return;
+  if (seekControl === 'surface') {
     // Pointer capture, keyboard and the whole ARIA value contract come from the
     // kit's own slider lifecycle. The domain is 0…100 so `aria-valuemax` stays
     // '100' and `aria-valuenow` stays a rounded percentage, exactly as before;
     // `commitOn: 'release'` keeps one seek per scrub rather than one per move.
-    const slider = mountSurfaceSlider(
+    surfaceSlider = mountSurfaceSlider(
       track,
       {
         snapshot: () => {
@@ -623,7 +520,7 @@ export function mountTransport(
           return {
             minimum: 0,
             maximum: 100,
-            value: (dragging ? surfaceProgress : progressOf(state)) * 100,
+            value: (dragging ? surfaceProgress : clamp01(state.progress)) * 100,
             disabled: state.disabled === true,
           };
         },
@@ -634,13 +531,13 @@ export function mountTransport(
           paintProgress(surfaceProgress);
         },
         commit: (value) => {
-          if (destroyed || readState().disabled || destroyed) return;
+          if (readState().disabled) return;
           dragging = false;
           const fraction = clamp01(value / 100);
           surfaceProgress = fraction;
           paintProgress(fraction);
           try {
-            const pending = binding.seekFraction?.(fraction);
+            const pending = binding.seekFraction(fraction);
             void Promise.resolve(pending).then(update).catch(reportError);
           } catch (error) {
             reportError(error);
@@ -655,22 +552,15 @@ export function mountTransport(
         formatValue: () => {
           const state = readState();
           const duration = Math.max(0, finite(state.duration));
-          const progress = progressOf(state);
+          const progress = clamp01(state.progress);
           const seconds = Math.max(0, finite(state.seconds, progress * duration));
-          const describedDuration = state.duration === undefined ? undefined : duration;
-          const describedSeconds = dragging
-            ? describedDuration === undefined ? undefined : surfaceProgress * duration
-            : state.seconds !== undefined || (state.progress !== undefined && describedDuration !== undefined) ? seconds : undefined;
-          return positionText(readText(options.getText, reportError), dragging ? surfaceProgress : progress, describedSeconds, describedDuration, dragging);
+          return duration > 0
+            ? `${formatClock(seconds)} of ${formatClock(duration)}`
+            : `${Math.round(progress * 100)}%`;
         },
         onError: (error) => reportError(error),
       },
     );
-    if (destroyed) {
-      runCleanups([() => slider.destroy()], reportError);
-      return;
-    }
-    surfaceSlider = slider;
     // The slider owns the drag; the presenter only needs to know when one ends,
     // so a snapshot repaint cannot fight a pointer that is still down.
     const endDrag = () => {
@@ -679,7 +569,7 @@ export function mountTransport(
     };
     listen(track, 'pointerup', endDrag as EventListener);
     listen(track, 'pointercancel', endDrag as EventListener);
-  };
+  }
 
   // Tracked apart from `listeners`, because swapping the control has to drop
   // exactly these three and nothing else.
@@ -711,6 +601,7 @@ export function mountTransport(
     volumeFader?.element.remove();
     volumeFader = undefined;
   };
+  if (volumeFader) wireVolume(volumeFader);
 
   let unsubscribe: (() => void) | undefined;
 
@@ -733,16 +624,8 @@ export function mountTransport(
     setVolumeControl(kind: false | TransportVolumeControl): void {
       if (destroyed || kind === volumeKind) return;
       releaseVolume();
-      if (destroyed) return;
       volumeKind = kind;
-      if (kind) {
-        const control = buildVolume(kind);
-        if (destroyed) {
-          runCleanups([() => control?.destroy()], reportError);
-          return;
-        }
-        volumeFader = control;
-      }
+      if (kind) volumeFader = buildVolume(kind);
       if (!volumeFader) {
         volumeKind = false;
         return;
@@ -755,49 +638,64 @@ export function mountTransport(
     destroy() {
       if (destroyed) return;
       destroyed = true;
-      updateLoop.cancel();
-      const releaseBinding = unsubscribe;
+      let cleanupError: unknown;
+      for (const remove of listeners.splice(0)) {
+        try {
+          remove();
+        } catch (error) {
+          cleanupError ??= error;
+        }
+      }
+      try {
+        surfaceSlider?.destroy();
+      } catch (error) {
+        cleanupError ??= error;
+      }
+      try {
+        volumeFader?.destroy();
+      } catch (error) {
+        cleanupError ??= error;
+      }
+      try {
+        unsubscribe?.();
+      } catch (error) {
+        cleanupError ??= error;
+      }
       unsubscribe = undefined;
-      runCleanups([
-        ...listeners.splice(0),
-        ...volumeListeners.splice(0),
-        () => surfaceSlider?.destroy(),
-        () => volumeFader?.destroy(),
-        releaseBinding,
-        () => root.remove(),
-        () => style?.remove(),
-        () => claim.release(),
-      ], reportError);
+      try {
+        root.remove();
+      } catch (error) {
+        cleanupError ??= error;
+      }
+      try {
+        style?.remove();
+      } catch (error) {
+        cleanupError ??= error;
+      }
+      claim.release();
+      if (cleanupError !== undefined) reportError(cleanupError);
     },
   };
   // Claim the host before destroying the previous mount: its cleanup may mount
   // a replacement, and that replacement must win.
   const claim = claimHost(mountedTransports, host, handle);
   claim.destroyPrevious();
-  if (!claim.isCurrent()) {
-    handle.destroy();
-    return handle;
-  }
+  if (!claim.isCurrent()) return handle;
 
   if (style) host.append(style, root);
   else host.append(root);
   if (!claim.isCurrent()) {
     // A re-entrant mount took the host while this one was appending; leave it
     // exactly as that mount left it.
-    handle.destroy();
+    root.remove();
+    style?.remove();
     return handle;
   }
 
   // Subscribe and paint only once this mount owns the host, so the previous
   // transport's unsubscribe always runs before this one subscribes.
-  mountSeekSurface();
-  if (destroyed) return handle;
-  if (initialVolumeKind) handle.setVolumeControl(initialVolumeKind);
-  if (destroyed) return handle;
   try {
-    const release = binding.subscribe?.(update);
-    if (destroyed) runCleanups([release], reportError);
-    else unsubscribe = release;
+    unsubscribe = binding.subscribe(update);
   } catch (error) {
     reportError(error);
   }

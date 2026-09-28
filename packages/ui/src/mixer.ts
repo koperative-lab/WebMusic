@@ -1,10 +1,9 @@
-import {claimHost, createErrorSink, createUpdateLoop, runCleanups} from './internal/lifecycle';
+import {claimHost} from './internal/lifecycle';
 import {createFader, faderStyle} from './fader';
 import {installStyle} from './internal/style';
 import {addClassNames, clamp01, setParts} from './internal/dom';
 import {componentSurfaceCss, controlBorderFallback} from './internal/surface';
 import {controlHeight, controlRadius} from './internal/control';
-import {formatPercent, readText, textValue, type UITextValue, type UIValueFormatters} from './text';
 
 export interface MixerChannel {
   id: string;
@@ -54,23 +53,7 @@ export interface MixerClassNames {
 
 export type MixerParts = MixerClassNames;
 
-export interface MixerText {
-  master?: string;
-  channels?: string;
-  volume?: UITextValue<{label: string}>;
-  mute?: UITextValue<{label: string}>;
-  solo?: UITextValue<{label: string}>;
-  muteText?: string;
-  soloText?: string;
-  play?: string;
-  pause?: string;
-  stop?: string;
-}
-
 export interface MixerOptions {
-  /** Read application-provided text on each update. */
-  getText?: () => MixerText;
-  formatters?: UIValueFormatters;
   classNames?: MixerClassNames;
   parts?: MixerParts;
   onError?: (error: unknown) => void;
@@ -106,7 +89,7 @@ ${componentSurfaceCss('mixer', {
   radius: 'var(--wm-mixer-radius, var(--wm-control-radius, 0))',
   background: 'var(--wm-mixer-background, var(--wm-surface, #fff))',
 })}
-inline-size:100%; min-inline-size:0; max-inline-size:100%; color:var(--wm-mixer-text,var(--wm-foreground,#444)); font:.8rem/1.35 var(--wm-font-family,var(--wm-font,system-ui,sans-serif)); }
+inline-size:100%; min-inline-size:0; max-inline-size:100%; color:var(--wui-mixer-text,var(--wm-mixer-text,var(--wm-foreground,#444))); font:.8rem/1.35 var(--wm-font-family,var(--wm-font,system-ui,sans-serif)); }
 :where(.wui-mixer__board,.wui-mixer__channels) { display:flex; gap:.75rem; align-items:flex-start; min-inline-size:0; }
 :where(.wui-mixer__transport) { display:flex; flex-wrap:wrap; gap:.35rem; margin-bottom:.65rem; }
 /* Leave room inside the scroller for the shared fader's focus outline. */
@@ -116,13 +99,13 @@ inline-size:100%; min-inline-size:0; max-inline-size:100%; color:var(--wm-mixer-
 :where(.wui-mixer__master .wui-mixer__label) { font-weight:700; }
 :where(.wui-mixer__label) { font-size:.8rem; color:inherit; max-inline-size:7rem; min-block-size:2.7em; overflow-wrap:anywhere; text-align:center; }
 :where(.wui-mixer__actions) { display:flex; gap:.25rem; }
-:where(.wui-mixer__button) { appearance:none; box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center; border:1px solid var(--wm-mixer-button-border,var(--wm-mixer-border,${controlBorderFallback})); background:var(--wm-mixer-button,var(--wm-surface,#fff)); color:var(--wm-mixer-text,var(--wm-foreground,#444)); font:inherit; min-inline-size:2rem; min-block-size:${controlHeight('mixer')}; padding:.25rem; border-radius:${controlRadius('mixer')}; cursor:pointer; }
-:where(.wui-mixer__button[aria-pressed="true"]) { background:var(--wm-mixer-fill,var(--wm-accent,#111)); color:var(--wm-mixer-active-text,var(--wm-accent-foreground,#fff)); }
+:where(.wui-mixer__button) { appearance:none; box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center; border:1px solid var(--wm-mixer-button-border,var(--wm-mixer-border,${controlBorderFallback})); background:var(--wm-mixer-button,var(--wm-surface,#fff)); color:var(--wui-mixer-text,var(--wm-mixer-text,var(--wm-foreground,#444))); font:inherit; min-inline-size:2rem; min-block-size:${controlHeight('mixer')}; padding:.25rem; border-radius:${controlRadius('mixer')}; cursor:pointer; }
+:where(.wui-mixer__button[aria-pressed="true"]) { background:var(--wui-mixer-active-background,var(--wm-mixer-fill,var(--wm-accent,#111))); color:var(--wm-mixer-active-text,var(--wm-accent-foreground,#fff)); }
 :where(.wui-mixer__button:focus-visible,.wui-mixer__channels:focus-visible) { outline:2px solid var(--wm-focus,var(--wm-foreground,#111)); outline-offset:2px; }
 :where(.wui-mixer__button:disabled) { opacity:.45; cursor:default; }
 :where(.wui-mixer__fader) { display:block; }
 /* The strip's own tokens, handed to the shared fader that paints the track. */
-:where(.wui-mixer__input) { --wm-fader-width:var(--wm-mixer-fader-width,2rem); --wm-fader-height:var(--wm-mixer-fader-height,96px); --wm-fader-track:var(--wm-mixer-track,var(--wm-surface-muted,#f3f3f3)); --wm-fader-track-border:var(--wm-mixer-track-border,${controlBorderFallback}); --wm-fader-fill:var(--wm-mixer-fill,var(--wm-accent,#999)); --wm-fader-thumb:var(--wm-mixer-thumb,var(--wm-foreground,#111)); --wm-fader-handle:var(--wm-mixer-handle,.7rem); --wm-fader-radius:var(--wm-mixer-radius,var(--wm-control-radius,0)); }
+:where(.wui-mixer__input) { --wm-fader-width:var(--wm-mixer-fader-width,2rem); --wm-fader-height:var(--wm-mixer-fader-height,96px); --wm-fader-track:var(--wui-mixer-track,var(--wm-mixer-track,var(--wm-surface-muted,#f3f3f3))); --wm-fader-track-border:var(--wui-mixer-track-border,var(--wm-mixer-track-border,${controlBorderFallback})); --wm-fader-fill:var(--wui-mixer-fill,var(--wm-mixer-fill,var(--wm-accent,#999))); --wm-fader-thumb:var(--wm-mixer-thumb,var(--wm-foreground,#111)); --wm-fader-handle:var(--wm-mixer-handle,.7rem); --wm-fader-radius:var(--wm-mixer-radius,var(--wm-control-radius,0)); }
 `;
 
 export function mountMixer(
@@ -138,18 +121,12 @@ export function mountMixer(
   setParts(root, ["root"], options.parts?.root);
 
   let destroyed = false;
-  let ownsHost = false;
   let unsubscribe: (() => void) | undefined;
-  let texts: MixerText | undefined;
-  const report = createErrorSink(options.onError);
   const command = (work: () => Promise<void> | void): void => {
-    if (destroyed) return;
     try {
-      void Promise.resolve(work()).then(update, (error) => {
-        if (!destroyed) report(error);
-      });
+      void Promise.resolve(work()).then(update, options.onError);
     } catch (error) {
-      if (!destroyed) report(error);
+      options.onError?.(error);
     }
   };
 
@@ -191,8 +168,7 @@ export function mountMixer(
     // carries BOTH documented hooks: `fader` for the track, `input` for the
     // control that was inside it.
     const control = createFader(document, {
-      label: textValue(texts?.volume, `${initial.label} volume`, {label: initial.label}, options.onError),
-      formatValue: (value) => formatPercent(ownsHost ? options.formatters : undefined, value, undefined, options.onError),
+      label: `${initial.label} volume`,
       value: clamp01(initial.value),
       orientation: "vertical",
       disabled: initial.disabled === true,
@@ -205,7 +181,7 @@ export function mountMixer(
       onInput: (value) => command(() => master
         ? binding.setMaster(value)
         : binding.setChannel(current.id, value)),
-      onError: report,
+      onError: (error) => options.onError?.(error),
     });
 
     const label = document.createElement("div");
@@ -228,6 +204,7 @@ export function mountMixer(
         addClassNames(mute, options.classNames?.button);
         addClassNames(mute, options.classNames?.mute);
         setParts(mute, ["button", "mute"], options.parts?.button, options.parts?.mute);
+        mute.textContent = "M";
         mute.addEventListener("click", () =>
           command(() => binding.setMuted!(current.id, current.muted !== true)));
         actions.append(mute);
@@ -239,6 +216,7 @@ export function mountMixer(
         addClassNames(solo, options.classNames?.button);
         addClassNames(solo, options.classNames?.solo);
         setParts(solo, ["button", "solo"], options.parts?.button, options.parts?.solo);
+        solo.textContent = "S";
         solo.addEventListener("click", () =>
           command(() => binding.setSolo!(current.solo ? null : current.id)));
         actions.append(solo);
@@ -252,21 +230,19 @@ export function mountMixer(
       if (label.textContent !== channel.label) {
         label.title = channel.label;
         label.textContent = channel.label;
+        // `mountSurfaceSlider` only names a slider that has no name yet, so a
+        // renamed channel needs its accessible name written here.
+        control.element.setAttribute("aria-label", `${channel.label} volume`);
       }
-      control.updateLabel(textValue(texts?.volume, `${channel.label} volume`, {label: channel.label}, options.onError));
-      if (destroyed) return;
       control.paint(clamp01(channel.value), disabled);
-      if (destroyed) return;
       if (mute) {
         mute.disabled = disabled;
-        mute.textContent = textValue(texts?.muteText, 'M', {}, options.onError);
-        mute.setAttribute("aria-label", textValue(texts?.mute, `Mute ${channel.label}`, {label: channel.label}, options.onError));
+        mute.setAttribute("aria-label", `Mute ${channel.label}`);
         mute.setAttribute("aria-pressed", String(channel.muted === true));
       }
       if (solo) {
         solo.disabled = disabled;
-        solo.textContent = textValue(texts?.soloText, 'S', {}, options.onError);
-        solo.setAttribute("aria-label", textValue(texts?.solo, `Solo ${channel.label}`, {label: channel.label}, options.onError));
+        solo.setAttribute("aria-label", `Solo ${channel.label}`);
         solo.setAttribute("aria-pressed", String(channel.solo === true));
       }
     };
@@ -281,7 +257,7 @@ export function mountMixer(
   transport.className = "wui-mixer__transport transport";
   addClassNames(transport, options.classNames?.transport);
   setParts(transport, ["transport"], options.parts?.transport);
-  const actionButtons: Array<{button: HTMLButtonElement; kind: MixerAction; label: string}> = [];
+  const actionButtons: HTMLButtonElement[] = [];
   const action = (
     kind: MixerAction,
     label: string,
@@ -295,10 +271,10 @@ export function mountMixer(
     addClassNames(button, options.classNames?.button);
     addClassNames(button, options.classNames?.[kind]);
     setParts(button, ["button", kind], options.parts?.button, options.parts?.[kind]);
-    button.setAttribute("aria-label", textValue(texts?.[kind], label, {}, options.onError));
+    button.setAttribute("aria-label", label);
     button.textContent = text;
     button.addEventListener("click", () => command(work));
-    actionButtons.push({button, kind, label});
+    actionButtons.push(button);
     transport.append(button);
   };
   action("play", "Play", "▶", binding.play);
@@ -313,31 +289,29 @@ export function mountMixer(
   channelsBox.className = "wui-mixer__channels strips";
   channelsBox.tabIndex = 0;
   channelsBox.setAttribute("role", "group");
-  channelsBox.setAttribute("aria-label", textValue(texts?.channels, 'Mixer channels', {}, options.onError));
+  channelsBox.setAttribute("aria-label", "Mixer channels");
   addClassNames(channelsBox, options.classNames?.channels);
   setParts(channelsBox, ["channels"], options.parts?.channels);
   const showMaster = options.master !== false;
-  const masterStrip = showMaster ? createStrip({id: "master", label: textValue(texts?.master, 'master', {}, options.onError), value: 0}, true) : undefined;
+  const masterStrip = showMaster ? createStrip({id: "master", label: "master", value: 0}, true) : undefined;
   board.append(...(masterStrip ? [masterStrip.element] : []), channelsBox);
   root.replaceChildren(...(transport.childNodes.length ? [transport, board] : [board]));
 
   const strips = new Map<string, Strip>();
-  const paintSnapshot = (): void => {
+  const releaseStrips = (): void => {
+    for (const strip of strips.values()) strip.destroy();
+    strips.clear();
+    masterStrip?.destroy();
+  };
+
+  const update = (): void => {
     if (destroyed) return;
     try {
       const state = binding.snapshot();
-      if (destroyed || !claim.isCurrent()) return;
-      texts = readText(options.getText, options.onError);
-      if (destroyed || !claim.isCurrent()) return;
       const disabled = state.disabled === true;
       channelsBox.tabIndex = state.channels.length ? 0 : -1;
-      channelsBox.setAttribute('aria-label', textValue(texts?.channels, 'Mixer channels', {}, options.onError));
-      for (const {button, kind, label} of actionButtons) {
-        button.disabled = disabled;
-        button.setAttribute('aria-label', textValue(texts?.[kind], label, {}, options.onError));
-      }
-      masterStrip?.paint({id: "master", label: textValue(texts?.master, 'master', {}, options.onError), value: state.master}, disabled);
-      if (destroyed || !claim.isCurrent()) return;
+      for (const button of actionButtons) button.disabled = disabled;
+      masterStrip?.paint({id: "master", label: "master", value: state.master}, disabled);
 
       const seen = new Set<string>();
       const order: HTMLElement[] = [];
@@ -351,14 +325,9 @@ export function mountMixer(
         let strip = strips.get(key);
         if (!strip) {
           strip = createStrip(merged);
-          if (destroyed || !claim.isCurrent()) {
-            runCleanups([strip.destroy], report);
-            return;
-          }
           strips.set(key, strip);
         }
         strip.paint(merged, merged.disabled);
-        if (destroyed || !claim.isCurrent()) return;
         order.push(strip.element);
       }
       for (const [key, strip] of [...strips]) {
@@ -376,15 +345,9 @@ export function mountMixer(
       });
       while (channelsBox.children.length > order.length) channelsBox.lastElementChild?.remove();
     } catch (error) {
-      report(error);
+      options.onError?.(error);
     }
   };
-
-  const updateLoop = createUpdateLoop({
-    name: 'Mixer', pass: paintSnapshot,
-    isCurrent: () => !destroyed && claim.isCurrent(), report,
-  });
-  const update = (): void => updateLoop.run();
 
   const handle: MixerHandle = {
     element: root,
@@ -392,21 +355,11 @@ export function mountMixer(
     destroy() {
       if (destroyed) return;
       destroyed = true;
-      ownsHost = false;
-      updateLoop.cancel();
-      const stop = unsubscribe;
-      unsubscribe = undefined;
-
-      const ownedStrips = [...strips.values()];
-      strips.clear();
-      runCleanups([
-        stop,
-        ...ownedStrips.map((strip) => () => strip.destroy()),
-        () => masterStrip?.destroy(),
-        () => claim.release(),
-        () => root.remove(),
-        () => style?.remove(),
-      ], report);
+      unsubscribe?.();
+      releaseStrips();
+      claim.release();
+      root.remove();
+      style?.remove();
     },
   };
   // Claim the host before destroying the previous mount: its cleanup may mount
@@ -423,20 +376,7 @@ export function mountMixer(
     style?.remove();
     return handle;
   }
-  ownsHost = true;
   update();
-  if (destroyed || !claim.isCurrent()) return handle;
-  if (binding.subscribe) {
-    try {
-      const stop = binding.subscribe(update);
-      // A synchronous notification may destroy or replace this mount before
-      // registration returns its disposer. Do not retain that late resource.
-      if (destroyed || !claim.isCurrent()) runCleanups([stop], report);
-      else unsubscribe = stop;
-    } catch (error) {
-      report(error);
-    }
-  }
-
+  if (binding.subscribe) unsubscribe = binding.subscribe(update);
   return handle;
 }

@@ -99,6 +99,12 @@ handle.update();  // re-read binding.snapshot() and repaint
 handle.destroy(); // remove this presenter's nodes, listeners and subscription
 ```
 
+This is the common binding shape. `level-analyzer` and `transient-analyzer`
+take action callbacks and `update(state)` because the caller already owns
+each sampled frame. `oscilloscope` uses snapshot, commands and optional
+subscriptions; the one-shot `analysis` helpers document their own smaller
+contract.
+
 ### The binding is a port, not a model
 
 ```ts
@@ -142,31 +148,8 @@ to `onError`.
 Bindings are minimal by design and optional members change what renders: a
 timeline without `seek` hides its seek control, a mixer without `setMuted`
 renders no M/S row, a recorder without `togglePlayback` renders no play button.
-Subscriptions are optional wherever exposed. Without one, call the retained
-handle's update method after external state changes. Transport requires only
-snapshot/play/pause; missing seek or time data does not produce a fake control.
-Meter accepts a level-only or spectrum-only reader for its selected mode.
-
-### External presentation inputs
-
-WebMusic consumes final text and formatting callbacks. Translation frameworks,
-language selection, resource loading, interpolation, plural rules and change
-subscriptions belong to the application and its existing tools.
-
-Text-producing presenters accept a typed `getText()` callback. It returns final
-strings or contextual render callbacks defined by that presenter's `*Text`
-interface. The applicable `formatters` callbacks receive raw numbers, fractional
-percentages and seconds. Existing explicit label/formatter options retain
-precedence. Strings are literal; WebMusic never interprets translation keys or
-substitutes tokens. The [presentation reference][docs-presentation] owns the
-shared boundary, while each presenter page lists its fields and refresh method.
-
-On an external change, the application calls `update()`, Meter `redraw()`, or
-the retained painter's documented method. Text refresh preserves existing
-controls and focus. WebMusic does not observe the application's translation
-system or maintain another copy of its state. Machine attributes, geometry,
-musical spelling, input units and caller-owned snapshot data retain their
-existing contracts. One-shot analysis output is rerendered by its owner.
+Only `TransportBinding` requires `subscribe`; every other first-release binding
+that exposes a subscription treats it as optional.
 
 ### The handle owns nodes, never domain objects
 
@@ -475,10 +458,7 @@ They establish the behavior callers should account for, not a prioritized backlo
   subset suited to their input and rendering model. Notably transport has no
   command revisions, so an out-of-order settlement repaints unconditionally;
   stage and minimap do own their resize observers, subscriptions and animation
-  cleanup. Mixer, Macro (including MacroRack) and Recorder contain subscription
-  failures and finish releasing their owned resources even when a disposer or
-  error callback throws. A subscription returned after synchronous replacement
-  is released immediately; destroyed handles ignore pending command results.
+  cleanup.
 - **Optimistic isolation is an lfo guarantee, not a package guarantee.** In eq
   and parameter any update repaints every control from the authoritative
   snapshot, discarding a sibling's in-flight optimistic paint.
@@ -505,7 +485,7 @@ change the npm subpath or require a Score Element consumer.
 
 | Entry | Purpose |
 |---|---|
-| `@webmusic/ui` | complete stable surface (barrel over all 21 published subpaths) |
+| `@webmusic/ui` | complete stable surface (barrel over published subpaths) |
 | **Transport and navigation** | |
 | `@webmusic/ui/transport` | play/pause/seek presenter with named controls |
 | `@webmusic/ui/timeline` | domain-neutral ruler, regions, loop, selection, playhead |
@@ -528,6 +508,10 @@ change the npm subpath or require a Score Element consumer.
 | `@webmusic/ui/analysis` | analysis cards, timelines, summaries and playhead controller |
 | `@webmusic/ui/pitch` | keyboard, grand stave and fretboard read-outs coloured by caller-supplied tone roles |
 | `@webmusic/ui/harmony` | flow lane, nameplate, chip strip and wheel: read-outs for material that is still arriving |
+| `@webmusic/ui/level-analyzer` | sampled dBFS RMS and peak history with threshold, hold and freeze controls |
+| `@webmusic/ui/oscilloscope` | trigger-aligned time-domain window with timebase, freeze and probe controls |
+| `@webmusic/ui/spectrum-analyzer` | inspectable log-frequency spectrum with freeze and peak hold |
+| `@webmusic/ui/transient-analyzer` | caller-supplied attack-strength history with sensitivity, freeze and clear actions |
 | **Layout and feedback** | |
 | `@webmusic/ui/panel` | compound section/slot skeleton for composing specialized presenters |
 | `@webmusic/ui/stage` | generic surface, DPR/resize/rAF-owned canvas stage, status overlay and reusable surface-slider interaction |
@@ -574,7 +558,6 @@ MIT
 
 [docs]: ../../apps/doc/webmusic/src/content/docs/uikit/index.mdx
 [docs-presenters]: ../../apps/doc/webmusic/src/content/docs/uikit/catalog.mdx
-[docs-presentation]: ../../apps/doc/webmusic/src/content/docs/uikit/api.mdx#external-presentation-inputs
 
 For source contributions and release verification, see the
 [contribution guide](https://github.com/koperative-lab/WebMusic/blob/main/CONTRIBUTING.md).

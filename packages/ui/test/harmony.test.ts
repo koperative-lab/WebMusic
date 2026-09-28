@@ -218,6 +218,19 @@ describe('mountNameplate', () => {
     live.destroy();
   });
 
+  it('exposes and refreshes an opted-in alternate pressed state', () => {
+    let pressed = false;
+    const handle = mountNameplate(host(), {
+      snapshot: () => ({alternates: [{symbol: 'C major', pressed}]}),
+      selectAlternate: vi.fn(),
+    });
+    expect(handle.element.querySelector('button')?.getAttribute('aria-pressed')).toBe('false');
+    pressed = true;
+    handle.update();
+    expect(handle.element.querySelector('button')?.getAttribute('aria-pressed')).toBe('true');
+    handle.destroy();
+  });
+
   it('does not take a reader’s focus away every time the chord changes', () => {
     // `replaceChildren` destroys and re-creates every alternate `<button>`, and
     // a chord change is exactly the moment a reader is deciding between those
@@ -559,7 +572,7 @@ describe('harmony read-out regressions', () => {
     handle.destroy();
   });
 
-  it('gives an inert alternate the chip’s class and NOT the pointer', () => {
+  it('renders an inert alternate as plain text below the symbol', () => {
     // A focusable node with no behaviour is a trap; a pointer cursor over a
     // node that does nothing is the same lie said with a cursor.
     const readings = [{symbol: 'Em/C', note: 'rootless'}];
@@ -572,6 +585,11 @@ describe('harmony read-out regressions', () => {
     expect(item.tagName).toBe('LI');
     expect(item.className).toBe('wui-harmony-nameplate__alternate');
     expect(item.style.cursor).toBe('');
+    expect(item.style.border).toBe('');
+    expect(item.style.padding).toBe('');
+    expect(item.style.flexBasis).toBe('100%');
+    const symbol = inert.element.querySelector('.wui-harmony-nameplate__symbol')!;
+    expect(symbol.compareDocumentPosition(item) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     inert.destroy();
 
     const pressable = mountNameplate(
@@ -584,7 +602,9 @@ describe('harmony read-out regressions', () => {
     );
     const button = pressable.element.querySelector<HTMLElement>('button')!;
     expect(button.style.cursor).toBe('pointer');
+    expect(button.style.border).toContain('1px');
     pressable.destroy();
+    expect(harmonyPresenterStyle).toContain('li.wui-harmony-nameplate__alternate');
     expect(harmonyPresenterStyle).toContain('button.wui-harmony-nameplate__alternate');
   });
 
@@ -667,6 +687,57 @@ describe('harmony read-out regressions', () => {
 
 
 describe('mountNameplate responsive content', () => {
+  it.each([true, false])('holds a stable live reading through rest, notes and chord (stylesheet=%s)', (stylesheet) => {
+    let state: NameplateState = {emptyLabel: '—'};
+    const handle = mountNameplate(host(), {snapshot: () => state}, {stableLayout: true, stylesheet});
+    const plate = handle.element;
+    const voicing = plate.querySelector<HTMLElement>('.wui-harmony-nameplate__voicing')!;
+    const alternates = plate.querySelector<HTMLElement>('.wui-harmony-nameplate__alternates')!;
+    const empty = plate.querySelector<HTMLElement>('.wui-harmony-nameplate__empty')!;
+    const live = handle.symbol.parentElement;
+    const height = getComputedStyle(plate).height;
+
+    expect(plate.dataset.layout).toBe('stable');
+    expect(plate.dataset.reading).toBe('rest');
+    expect(handle.symbol.textContent).toBe('—');
+    expect(handle.symbol.tabIndex).toBe(0);
+    expect(empty.hidden).toBe(true);
+    expect(voicing.hidden).toBe(false);
+    expect(alternates.hidden).toBe(false);
+    expect(voicing.style.visibility).toBe('hidden');
+    expect(alternates.style.visibility).toBe('hidden');
+
+    state = {voicing: [{label: 'A4'}, {label: 'A5'}], emptyLabel: '—'};
+    handle.update();
+    expect(plate.dataset.reading).toBe('notes');
+    expect(handle.symbol.textContent).toBe('A4 · A5');
+    expect(voicing.textContent).toBe('');
+    expect(empty.textContent).toBe('');
+    expect(getComputedStyle(plate).height).toBe(height);
+
+    state = {
+      primary: {symbol: 'Am', full: 'A minor'},
+      voicing: [{label: 'A4'}, {label: 'C5'}, {label: 'E5'}],
+      alternates: [{symbol: 'C6', note: 'inversion'}],
+      emptyLabel: '—',
+    };
+    handle.update();
+    expect(plate.dataset.reading).toBe('chord');
+    expect(handle.symbol.textContent).toBe('Am');
+    expect(handle.symbol.parentElement).toBe(live);
+    expect(voicing.textContent).toBe('A4  C5  E5');
+    expect(voicing.style.visibility).toBe('visible');
+    expect(alternates.style.visibility).toBe('visible');
+    expect(alternates.querySelector('button')).toBeNull();
+    expect(getComputedStyle(plate).height).toBe(height);
+
+    state = {emptyLabel: '—'};
+    handle.update();
+    expect(handle.symbol.textContent).toBe('—');
+    expect(getComputedStyle(plate).height).toBe(height);
+    handle.destroy();
+  });
+
   it.each([true, false])('collapses missing content and restores its layout without replacing the live region (stylesheet=%s)', (stylesheet) => {
     let state: NameplateState = {caption: 'Sounding now', emptyLabel: 'Waiting for notes'};
     const handle = mountNameplate(host(), {snapshot: () => state}, {stylesheet});

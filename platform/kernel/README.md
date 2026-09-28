@@ -1,63 +1,37 @@
 # @webmusic/kernel
 
-The domain-neutral contracts and runtime utilities used by `@webmusic/score`
-and custom WebMusic integrations. It knows nothing about scores or clips —
+The zero-domain shared kernel of the WebMusic ecosystem: the contracts and
+pure logic that both `@webmusic/score` (symbolic music) and `@webmusic/audio`
+(digital audio) build on. It knows nothing about scores or clips —
 no `Note`, no `Score`, no `AudioClip`, no `BeatGrid`.
 
 ```text
-@webmusic/score ── required peer ──→ @webmusic/kernel
-                                         ↑
-custom players, effects and timelines ────┘
+@webmusic/score ─┐
+                 ├─ required peer ─→ @webmusic/kernel   (no dependencies at all)
+@webmusic/audio ─┘                        ↑
+                                          │
+                     @webmusic/bridge ────┘  (peer-depends on both families)
 ```
 
 Zero dependencies, zero peer dependencies, ESM + CJS, `sideEffects: false`,
-one subpath export per module. Score declares it as a required
+one subpath export per module. Score, Audio and Bridge declare it as a required
 peer so applications select a compatible shared implementation. UI does not depend
 on Kernel. Package resolution does not allocate shared runtime objects: a shared
 Kernel package, an AudioContext and a session TransportClock are three distinct
-things. See the [session-clock design boundary](https://github.com/koperative-lab/WebMusic/blob/main/platform/shared-clock-injection.md).
-
-The first-release packages are Kernel, UI and Score. Audio and Bridge continue
-on the [`dev` branch](https://github.com/mrsteamedbun/WebMusic/tree/dev);
-the cross-domain examples below describe those shared contracts.
-
-## Install and use
-
-```sh
-npm install @webmusic/kernel
-```
-
-Node.js 22 or later is supported. Import a subpath for the capability you need;
-the root re-exports all ten modules. CommonJS uses the same paths with `require()`.
-Importing the package creates no context, worker, timer or custom-element
-registration. Browser operations still require their corresponding Web APIs.
-
-```ts
-import {TransportClock} from '@webmusic/kernel/transport';
-
-const clock = new TransportClock();
-clock.start(0, 4);            // Reference time 0, content position 4.
-clock.setRate(2, 1);          // Position remains 5 at reference time 1.
-console.log(clock.positionAt(2)); // 7
-clock.pause(2);              // Position now holds at 7.
-```
-
-The clock allocates no resource and needs no disposal. In contrast, owners of
-tick sources, transport groups and analyser taps must call their `dispose()`.
-TypeScript declarations for browser contracts use DOM types; pure `/events`
-and `/transport` imports also work with an ES-only TypeScript `lib`.
+things. See the [time model](../../dev/ARCHITECTURE.md) and
+[session-clock design boundary](../shared-clock-injection.md).
 
 ## What qualifies as kernel code
 
 The admission rule, enforced by review against the ledger in
-[`platform/README.md`](https://github.com/koperative-lab/WebMusic/blob/main/platform/README.md):
+[`platform/README.md`](../README.md):
 
 > Code qualifies for the kernel only if **two drifting copies of it already
 > exist**, or it is a **contract both domains must implement**.
 
 Review new work against existing modules before adding another shared mechanism.
 The ledger records the extraction boundary, including the role-contract basis for
-`kernel/sync`. Keep an extraction's justification and retained domain policies in that ledger.
+`kernel/sync`. Decision reasons belong in [DECISIONS.md](../../dev/DECISIONS.md).
 
 The counterpart rule matters as much: **policy that legitimately differs
 between the families stays with the families.** The kernel carries the
@@ -316,7 +290,7 @@ settlement, background reconciliation and errors. Existing controls remain
 migration surfaces. Strict dispatch checks observable failures and distinguishes
 superseded commands; the engines cancel and re-arm through their existing methods,
 retaining their private clocks. See the complete
-[command contract](https://github.com/koperative-lab/WebMusic/blob/main/apps/doc/webmusic/src/content/docs/kernel/api.mdx).
+[command contract](../../apps/doc/webmusic/src/content/docs/kernel/api.mdx).
 
 `FollowerOptions.positionScale` adds a positive constant local-axis scale to the
 offset, applied to both positions and rates. Optional `loop` metadata maps into
@@ -329,11 +303,13 @@ audio warping. Group-level loop re-entry still waits for a delivered watcher tic
 
 A transport with no readable clock is adapted into the required-clock role by
 dead-reckoning a mirror `TransportClock` across the command surface and
-reconciling it against the transport's actual position on every drift check:
+reconciling it against the transport's actual position on drift checks, or on
+periodic lifecycle samples when follower drift checks are disabled:
 
-- two identical position samples while the mirror advanced past tolerance
-  mean the transport stopped on its own (ended, clamped, paused out of band):
-  pause the mirror and report `'stalled'`;
+- after observing forward motion, a stationary interval whose expected advance
+  exceeds the largest reported position step plus tolerance suggests the
+  transport stopped: pause the mirror and report `'stalled'`. Without a prior
+  moving sample, repeated positions alone cannot establish a stop;
 - a moving transport that diverged re-anchors the mirror — **slope as well as
   intercept**. Correcting only the position leaves a transport that refused or
   clamped the shared rate drifting away again before the next check, which is
@@ -349,8 +325,7 @@ own failures: a diagnostic hook must never become a second path out of a
 scheduler callback. Both snapshot their subscribers at dispatch start, so a
 listener registered mid-dispatch is not delivered the in-flight event (with
 live-set iteration, the ordinary self-rearming `once` idiom is an infinite
-loop). `once` also stays single-fire when a listener recursively dispatches the
-same event before the outer subscriber snapshot reaches it.
+loop).
 
 **Generations bound every asynchronous lifetime.** `WebMusicElement` gives
 each connected lifetime a fresh cleanup scope, so a cleanup returned by an
@@ -380,7 +355,7 @@ Recorded so the boundaries are visible rather than discovered:
   no event surface. `TransportGroup` now publishes command invalidation and
   settlement, but each engine still owns its clock; direct mutations outside
   the group are not automatically versioned. See
-  [`platform/shared-clock-injection.md`](https://github.com/koperative-lab/WebMusic/blob/main/platform/shared-clock-injection.md).
+  [`platform/shared-clock-injection.md`](../shared-clock-injection.md).
 - **No nonlinear mapped alignment.** `TimelineMapping` is published and both
   families ship adapters. The group consumes constant offset/scale and optional
   native-loop phase, not nonlinear rubato or audio-warp mappings.
@@ -407,29 +382,26 @@ To take part in synchronized playback, implement `SyncFollowerTransport`
 
 ## Gates
 
-The multi-entry build explicitly enables code splitting for both module formats.
-This keeps root/subpath re-exports identical within ESM and within CommonJS,
-including the `TransportClock` created by `MirrorClockMaster`. ESM and CommonJS
-remain separate module instances; cross-format constructor identity is not promised.
+The multi-entry build enables code splitting for both module formats. Root and
+subpath re-exports therefore use the same constructor within ESM and within
+CommonJS, including the `TransportClock` used by `MirrorClockMaster`. ESM and
+CommonJS remain separate module instances.
 
 The kernel is a first-class checked package: its policy declares zero
 workspace dependencies, so any domain import inside `platform/kernel` fails
 the architecture gate. Public entries are verified against the export map,
 and the whole repository runs `npm run check`. The current command graph is in
-[root package.json](https://github.com/koperative-lab/WebMusic/blob/main/package.json); development instructions are in
-[CONTRIBUTING.md](https://github.com/koperative-lab/WebMusic/blob/main/CONTRIBUTING.md). The executable architecture sources
-include [package-policy.mjs](https://github.com/koperative-lab/WebMusic/blob/main/scripts/package-policy.mjs),
-[element-composition-policy.mjs](https://github.com/koperative-lab/WebMusic/blob/main/scripts/element-composition-policy.mjs) and
-[check-architecture.mjs](https://github.com/koperative-lab/WebMusic/blob/main/scripts/check-architecture.mjs), each with a distinct
-scope. Check the exported contracts and relevant behavioral tests when changing them.
+[root package.json](../../package.json); development instructions are in
+[dev/DEVELOPMENT.md](../../dev/DEVELOPMENT.md). The executable architecture sources
+include [package-policy.mjs](../../scripts/package-policy.mjs),
+[element-composition-policy.mjs](../../scripts/element-composition-policy.mjs) and
+[check-architecture.mjs](../../scripts/check-architecture.mjs), each with a distinct
+scope. Current delivery gaps belong in [STATUS.md](../../dev/STATUS.md).
 
 The extraction ledger — what moved here, from where, what it replaced, and
 what deliberately stayed per-family — lives in
-[`platform/README.md`](https://github.com/koperative-lab/WebMusic/blob/main/platform/README.md).
+[`platform/README.md`](../README.md).
 
 ## License
 
 MIT
-
-For source contributions and release verification, see the
-[contribution guide](https://github.com/koperative-lab/WebMusic/blob/main/CONTRIBUTING.md).

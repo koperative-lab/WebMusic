@@ -1,5 +1,4 @@
-import {claimHost, createErrorSink, createUpdateLoop, runCleanups} from './internal/lifecycle';
-import {formatPercent, readText, textValue, type UITextValue, type UIValueFormatters} from './text';
+import {claimHost} from './internal/lifecycle';
 import {installStyle} from './internal/style';
 import {addClassNames, clamp01, finite, setParts} from './internal/dom';
 import {componentSurfaceCss} from './internal/surface';
@@ -19,16 +18,10 @@ export interface MeterLevelState {
   peakHold?: number;
 }
 
-export interface LevelMeterBinding {
+export interface MeterBinding {
   readLevel(): MeterLevelState;
-}
-
-export interface SpectrumMeterBinding {
   readSpectrum(bars: number): ArrayLike<number>;
 }
-
-/** Full port retained for callers whose mode is selected at runtime. */
-export interface MeterBinding extends LevelMeterBinding, SpectrumMeterBinding {}
 
 export interface MeterClassNames {
   root?: string;
@@ -48,17 +41,7 @@ export interface MeterParts {
   bar?: string;
 }
 
-export interface MeterText {
-  level?: string;
-  spectrum?: string;
-  levelValue?: UITextValue<{value: string; level: number; peak?: number; peakHold?: number}>;
-  spectrumValue?: UITextValue<{value: string; maximum: number}>;
-}
-
 export interface MeterOptions {
-  /** Application-supplied final text; call redraw() after external text changes. */
-  getText?: () => MeterText;
-  formatters?: UIValueFormatters;
   mode?: 'level' | 'spectrum';
   bars?: number;
   label?: string;
@@ -100,7 +83,7 @@ ${componentSurfaceCss('meter', {
   min-width: 0;
   height: var(--wui-meter-height, var(--wameter-height, var(--wm-meter-height, 48px)));
   overflow: hidden;
-  color: var(--wui-meter-fill, var(--wameter-fill, var(--wm-meter-fill, var(--wm-accent, #4ea1ff))));
+  color: var(--wui-meter-fill, var(--wameter-fill, var(--wm-meter-fill, var(--wm-accent, #999))));
 }
 .wui-meter, .wui-meter * { box-sizing: border-box; }
 .wui-meter__track {
@@ -109,7 +92,7 @@ ${componentSurfaceCss('meter', {
   height: 100%;
   overflow: hidden;
   border-radius: max(0px, calc(var(--wm-meter-radius, var(--wm-control-radius, 0)) - 2px));
-  background: var(--wameter-track, var(--wm-meter-track, var(--wm-surface-muted, #1d1d1d)));
+  background: var(--wameter-track, var(--wm-meter-track, var(--wm-surface-muted, #f3f3f3)));
 }
 .wui-meter__fill {
   position: absolute;
@@ -155,25 +138,12 @@ function cssLength(value: string | number): string {
 /** Mount a live, accessible meter into an element or open shadow root. */
 export function mountMeter(
   host: MeterHost,
-  binding: LevelMeterBinding,
-  options?: MeterOptions & {mode?: 'level'},
-): MeterHandle;
-export function mountMeter(
-  host: MeterHost,
-  binding: SpectrumMeterBinding,
-  options: MeterOptions & {mode: 'spectrum'},
-): MeterHandle;
-export function mountMeter(host: MeterHost, binding: MeterBinding, options?: MeterOptions): MeterHandle;
-export function mountMeter(
-  host: MeterHost,
-  binding: LevelMeterBinding | SpectrumMeterBinding,
+  binding: MeterBinding,
   options: MeterOptions = {},
 ): MeterHandle {
 
   const document = host.ownerDocument;
   const mode = options.mode === 'spectrum' ? 'spectrum' : 'level';
-  const formatters = options.formatters;
-  let labelOverride = options.label;
   const defaultLabel = mode === 'spectrum' ? 'Spectrum' : 'Audio level';
   const barCount = countBars(options.bars);
   const style = installStyle(document, 'meter', meterStyle, options.stylesheet);
@@ -232,68 +202,41 @@ export function mountMeter(
 
   let destroyed = false;
   let rafId: number | null = null;
-  const reportError = createErrorSink(options.onError);
-  const textLabel = (copy: MeterText | undefined): string => labelOverride ?? textValue(
-    mode === 'spectrum' ? copy?.spectrum : copy?.level, defaultLabel, {}, reportError,
-  );
+  const reportError = (error: unknown): void => options.onError?.(error);
+
   const updateLabel = (label?: string): void => {
     if (destroyed) return;
-    labelOverride = label;
+    root.setAttribute('aria-label', label ?? defaultLabel);
+  };
+
+  const redraw = (): void => {
+    if (destroyed) return;
     try {
-      const text = textLabel(readText(options.getText, reportError));
-      if (!destroyed) root.setAttribute('aria-label', text);
+      if (mode === 'spectrum') {
+        const values = binding.readSpectrum(barCount);
+        let maximum = 0;
+        for (let index = 0; index < bars.length; index += 1) {
+          const value = clamp01(values[index]);
+          maximum = Math.max(maximum, value);
+          bars[index]!.style.height = `${Math.max(1, value * 100)}%`;
+        }
+        const percentage = Math.round(maximum * 100);
+        root.setAttribute('aria-valuenow', String(percentage));
+        root.setAttribute('aria-valuetext', `${percentage}% spectrum peak`);
+      } else {
+        const state = binding.readLevel();
+        const level = clamp01(state.level);
+        const held = clamp01(state.peakHold ?? state.peak ?? level);
+        fill!.style.width = `${level * 100}%`;
+        peak!.style.left = `${held * 100}%`;
+        const percentage = Math.round(level * 100);
+        root.setAttribute('aria-valuenow', String(percentage));
+        root.setAttribute('aria-valuetext', `${percentage}% level`);
+      }
     } catch (error) {
       reportError(error);
     }
   };
-
-  const redrawLoop = createUpdateLoop({
-    name: 'Meter',
-    isCurrent: () => !destroyed,
-    report: reportError,
-    pass: () => {
-      if (destroyed) return;
-      try {
-        const copy = readText(options.getText, reportError);
-        const label = textLabel(copy);
-        if (destroyed) return;
-        if (mode === 'spectrum') {
-          if (!('readSpectrum' in binding) || typeof binding.readSpectrum !== 'function') {
-            throw new TypeError('Spectrum meter requires readSpectrum(bars)');
-          }
-          const samples = binding.readSpectrum(barCount);
-          if (destroyed) return;
-          const values = bars.map((_bar, index) => clamp01(samples[index]));
-          const maximum = values.reduce((largest, value) => Math.max(largest, value), 0);
-          const value = formatPercent(formatters, maximum, undefined, reportError);
-          const text = textValue(copy?.spectrumValue, `${value} spectrum peak`, {value, maximum}, reportError);
-          if (destroyed) return;
-          bars.forEach((bar, index) => { bar.style.height = `${Math.max(1, values[index]! * 100)}%`; });
-          root.setAttribute('aria-valuenow', String(Math.round(maximum * 100)));
-          root.setAttribute('aria-valuetext', text);
-        } else {
-          if (!('readLevel' in binding) || typeof binding.readLevel !== 'function') {
-            throw new TypeError('Level meter requires readLevel()');
-          }
-          const state = binding.readLevel();
-          if (destroyed) return;
-          const level = clamp01(state.level);
-          const held = clamp01(state.peakHold ?? state.peak ?? level);
-          const value = formatPercent(formatters, level, undefined, reportError);
-          const text = textValue(copy?.levelValue, `${value} level`, {value, level, peak: state.peak, peakHold: state.peakHold}, reportError);
-          if (destroyed) return;
-          fill!.style.width = `${level * 100}%`;
-          peak!.style.left = `${held * 100}%`;
-          root.setAttribute('aria-valuenow', String(Math.round(level * 100)));
-          root.setAttribute('aria-valuetext', text);
-        }
-        root.setAttribute('aria-label', label);
-      } catch (error) {
-        reportError(error);
-      }
-    },
-  });
-  const redraw = redrawLoop.run;
 
   const requestFrame =
     typeof requestAnimationFrame === 'function'
@@ -309,6 +252,8 @@ export function mountMeter(
     if (destroyed) return;
     rafId = requestFrame?.(tick) ?? null;
   };
+  if (options.animate === false) redraw();
+  else if (requestFrame) rafId = requestFrame(tick);
 
   const handle: MeterHandle = {
     element: root,
@@ -317,37 +262,38 @@ export function mountMeter(
     destroy(): void {
       if (destroyed) return;
       destroyed = true;
-      redrawLoop.cancel();
-      const frame = rafId;
+      let cleanupError: unknown;
+      if (rafId != null) {
+        try {
+          cancelFrame?.(rafId);
+        } catch (error) {
+          cleanupError ??= error;
+        }
+      }
       rafId = null;
+      try {
+        root.remove();
+      } catch (error) {
+        cleanupError ??= error;
+      }
+      try {
+        style?.remove();
+      } catch (error) {
+        cleanupError ??= error;
+      }
       bars = [];
       fill = undefined;
       peak = undefined;
-      runCleanups([
-        () => { if (frame != null) cancelFrame?.(frame); },
-        () => root.remove(),
-        () => style?.remove(),
-        () => claim.release(),
-      ], reportError);
+      claim.release();
+      if (cleanupError !== undefined) reportError(cleanupError);
     },
   };
   // Claim the host before destroying the previous mount: its cleanup may mount
   // a replacement, and that replacement must win.
   const claim = claimHost(mountedMeters, host, handle);
   claim.destroyPrevious();
-  if (!claim.isCurrent()) {
-    handle.destroy();
-    return handle;
-  }
+  if (!claim.isCurrent()) return handle;
 
   host.append(...(style ? [style] : []), root);
-  if (!claim.isCurrent()) {
-    handle.destroy();
-    return handle;
-  }
-  updateLabel(labelOverride);
-  if (destroyed) return handle;
-  if (options.animate === false) redraw();
-  else if (requestFrame) rafId = requestFrame(tick);
   return handle;
 }

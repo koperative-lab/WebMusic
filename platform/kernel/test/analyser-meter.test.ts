@@ -247,3 +247,64 @@ describe('aggregateSpectrumBars', () => {
     expect([...aggregateSpectrumBars([0, 255], {bars: 5})]).toEqual([0, 0, 0, 1, 1]);
   });
 });
+
+describe('AnalyserMeter.configure', () => {
+  it('updates an owned analyser without replacing ports or external connections', () => {
+    const fixture = fakeContext({time: [192, 192, 192, 192]});
+    const meter = createAnalyserMeter({context: fixture.context, fftSize: 64, levelScale: 1});
+    const input = meter.input, output = meter.output;
+    const connections = [...fixture.connections];
+    meter.configure({fftSize: 128, smoothingTimeConstant: 0.25, levelScale: 2, minimumBars: 4});
+    expect(meter.input).toBe(input); expect(meter.output).toBe(output);
+    expect(fixture.connections).toEqual(connections);
+    expect(fixture.disconnects).toEqual([]);
+    expect(fixture.analyser.fftSize).toBe(128);
+    expect(fixture.analyser.smoothingTimeConstant).toBe(0.25);
+    expect(meter.readSpectrum(1)).toHaveLength(4);
+    meter.dispose();
+  });
+
+  it('validates all analyser settings before committing display tuning', () => {
+    const fixture = fakeContext({time: new Array(64).fill(192)});
+    const meter = createAnalyserMeter({context: fixture.context, fftSize: 64, levelScale: 1});
+    expect(() => meter.configure({fftSize: 1000, levelScale: 0})).toThrow(/fftSize/);
+    expect(() => meter.configure({fftSize: 128, smoothingTimeConstant: Number.NaN})).toThrow(/smoothing/);
+    expect(fixture.analyser.fftSize).toBe(64);
+    expect(fixture.analyser.smoothingTimeConstant).toBe(0.8);
+    expect(meter.readLevel().level).toBe(0.5);
+    expect(fixture.disconnects).toEqual([]);
+    meter.dispose();
+  });
+
+  it('rolls back analyser settings when a host setter rejects the candidate', () => {
+    const fixture = fakeContext();
+    const meter = createAnalyserMeter({context: fixture.context, fftSize: 64});
+    let smoothing = fixture.analyser.smoothingTimeConstant;
+    Object.defineProperty(fixture.analyser, 'smoothingTimeConstant', {
+      get: () => smoothing,
+      set: (value: number) => {
+        if (value === 0.25) throw new Error('host setter rejected');
+        smoothing = value;
+      },
+    });
+    expect(() => meter.configure({fftSize: 128, smoothingTimeConstant: 0.25})).toThrow('host setter rejected');
+    expect(fixture.analyser.fftSize).toBe(64);
+    expect(smoothing).toBe(0.8);
+    expect(fixture.disconnects).toEqual([]);
+    meter.dispose();
+  });
+
+  it('never configures a borrowed analyser and preserves the shared hold semantics', () => {
+    const fixture = fakeContext({time: new Array(64).fill(192)});
+    fixture.analyser.fftSize = 64;
+    fixture.analyser.smoothingTimeConstant = 0.25;
+    const meter = createAnalyserMeter({analyser: fixture.analyser as unknown as AnalyserNode, levelScale: 1});
+    meter.configure({fftSize: 1000, smoothingTimeConstant: 2, levelScale: 0.5, peakDecay: 0.1});
+    expect(fixture.analyser.fftSize).toBe(64);
+    expect(fixture.analyser.smoothingTimeConstant).toBe(0.25);
+    expect(meter.readLevel()).toEqual({rms: 0.5, peak: 0.25, level: 0.25, peakHold: 0.25});
+    meter.dispose();
+    expect(fixture.disconnects).toEqual([]);
+    expect(() => meter.configure({levelScale: 1})).toThrow('disposed');
+  });
+});

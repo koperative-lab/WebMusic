@@ -261,6 +261,38 @@ describe('mountFlowLane geometry', () => {
     handle.destroy();
   });
 
+  it.each([true, false])('reserves a silent readout line through gaps (stylesheet=%s)', (stylesheet) => {
+    let now = 0;
+    const handle = lane({}, {
+      snapshot: () => ({
+        bands: [
+          {id: 'first', start: 0, end: 1, primary: 'M1'},
+          {id: 'repeat', start: 3, end: 4, primary: 'M1'},
+        ],
+        span: {start: 0, end: 4},
+        now,
+      }),
+    }, {stylesheet, reservePinned: true, animate: false});
+    const pinned = handle.element.querySelector<HTMLElement>('.wui-harmony-flow__pinned')!;
+    expect(pinned.textContent).toBe('M1');
+    expect(pinned.hidden).toBe(false);
+    expect(pinned.style.minHeight).toBe('1.1em');
+
+    now = 2;
+    handle.update();
+    expect(pinned.textContent).toBe('');
+    expect(pinned.style.visibility).toBe('hidden');
+    expect(pinned.hidden).toBe(false);
+    expect(getComputedStyle(pinned).display).not.toBe('none');
+    expect(pinned.style.minHeight).toBe('1.1em');
+
+    now = 3;
+    handle.update();
+    expect(pinned.textContent).toBe('M1');
+    expect(pinned.style.visibility).toBe('');
+    handle.destroy();
+  });
+
   it('survives a layout engine that answers zero, instead of dividing by it', () => {
     // No `fallbackWidth`, no `ResizeObserver`, and jsdom measures every box as
     // zero: the lane must still place itself and must never write a NaN.
@@ -785,6 +817,42 @@ describe('mountFlowLane accessibility and input', () => {
     handle.destroy();
   });
 
+  it('selects the pressed band when pointer capture retargets the click to the viewport', () => {
+    const seek = vi.fn();
+    const selectBand = vi.fn();
+    const handle = lane({}, {seek, selectBand});
+    const pointer = (type: string): MouseEvent => {
+      const event = new MouseEvent(type, {bubbles: true, cancelable: true, button: 0});
+      Object.defineProperty(event, 'pointerId', {value: 7});
+      return event;
+    };
+    handle.band('b')!.dispatchEvent(pointer('pointerdown'));
+    handle.viewport.dispatchEvent(pointer('pointerup'));
+    handle.viewport.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+    expect(selectBand).toHaveBeenCalledOnce();
+    expect(selectBand).toHaveBeenCalledWith('b', expect.objectContaining({id: 'b'}), {additive: false});
+    expect(seek).toHaveBeenCalledWith(4, 'commit');
+    handle.destroy();
+  });
+
+  it('keeps the pressed band when a captured click lands on another band', () => {
+    const seek = vi.fn();
+    const selectBand = vi.fn();
+    const handle = lane({}, {seek, selectBand});
+    const pointer = (type: string): MouseEvent => {
+      const event = new MouseEvent(type, {bubbles: true, cancelable: true, button: 0});
+      Object.defineProperty(event, 'pointerId', {value: 7});
+      return event;
+    };
+    handle.band('b')!.dispatchEvent(pointer('pointerdown'));
+    handle.viewport.dispatchEvent(pointer('pointerup'));
+    handle.band('c')!.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+    expect(selectBand).toHaveBeenCalledOnce();
+    expect(selectBand).toHaveBeenCalledWith('b', expect.objectContaining({id: 'b'}), {additive: false});
+    expect(seek).toHaveBeenCalledWith(4, 'commit');
+    handle.destroy();
+  });
+
   it('zooms on a modified wheel and re-places every band from the same fields', () => {
     const handle = lane({}, {}, {scale: 10, fallbackWidth: 300});
     const before = boxes(handle.element);
@@ -1261,6 +1329,30 @@ describe('mountFlowLane responsive layout', () => {
 
 
 describe('mountFlowLane contour labels', () => {
+  it.each([true, false])('keeps a narrow band readable through its title and semantic index (stylesheet=%s)', (stylesheet) => {
+    const handle = lane({
+      bands: [{id: 'r2', start: 0, end: 0.2, primary: 'R2', secondary: 'recurring rhythm'}],
+      tracks: [{id: 'r2', label: 'R2'}],
+      span: {start: 0, end: 10},
+    }, {}, {stylesheet, visibleSpan: 12, animate: false});
+    const band = handle.band('r2')!;
+    expect(band.style.width).toBe('2%');
+    expect(band.title).toBe('R2 — recurring rhythm');
+    expect(handle.index.textContent).toBe('R2 — recurring rhythm');
+    expect(handle.element.querySelector('.wui-harmony-flow__gutter')?.textContent).toBe('R2');
+    expect(band.querySelector('.wui-harmony-flow__label')?.textContent).toBe('R2');
+    expect(band.querySelector('.wui-harmony-flow__note')?.textContent).toBe('recurring rhythm');
+    expect(band.querySelector('.wui-harmony-flow__label')?.hasAttribute('hidden')).toBe(false);
+    handle.destroy();
+  });
+
+  it('suppresses internal labels below 32px without hiding the band or its semantic text', () => {
+    expect(harmonyPresenterStyle).toContain('container-type: inline-size');
+    expect(harmonyPresenterStyle).toContain('container-name: wui-harmony-band');
+    expect(harmonyPresenterStyle).toContain('@container wui-harmony-band (max-width: 31px)');
+    expect(harmonyPresenterStyle).toContain('.wui-harmony-flow__label, .wui-harmony-flow__note { display: none; }');
+  });
+
   it.each([true, false])('reserves label space and keeps contour strokes independent of the axis scale (stylesheet=%s)', (stylesheet) => {
     const handle = lane({
       bands: [{id: 'voice', start: 0, end: 10, primary: 'Voice 1', secondary: 'Upper part', points: [{at: 0, y: 0.2}, {at: 1, y: 0.8}]}],

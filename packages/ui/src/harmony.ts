@@ -1,4 +1,3 @@
-import {formatNumber, formatPercent, readText, textValue, type UITextValue, type UIValueFormatters} from './text';
 import {
   harmonyValues,
   harmonyInline,
@@ -44,7 +43,7 @@ import {
   type FrameTick,
   type MotionMode,
 } from './internal/frame';
-import {claimHost, createErrorSink, createUpdateLoop, runCleanups} from './internal/lifecycle';
+import {claimHost, createErrorSink} from './internal/lifecycle';
 import {restampActiveStyle, stampIdleStyle, stampSpans} from './internal/spans';
 import {installStyle, paint} from './internal/style';
 import {componentSurfaceDeclarations, embeddedSurfaceDeclarations} from './internal/surface';
@@ -313,6 +312,8 @@ const flowParts = {
   band: {
     position: 'absolute',
     'box-sizing': 'border-box',
+    'container-type': 'inline-size',
+    'container-name': 'wui-harmony-band',
     display: 'flex',
     'flex-direction': 'column',
     'justify-content': 'center',
@@ -546,26 +547,28 @@ const nameplateParts = {
     margin: '0',
     padding: '0',
   },
-  // The chip an alternate reading is drawn as, whether or not it can be pressed.
-  // `cursor` is deliberately NOT in here: a reading the caller gave no
-  // `selectAlternate` for renders as an inert `<li>`, and a pointer cursor over
-  // a node that does nothing is the same lie as a focusable node with no
-  // behaviour — the one this module already refuses to ship two lines below.
+  // The shared typography for alternate readings. Only selectable readings
+  // receive the framed control treatment below.
   alternate: {
     'box-sizing': 'border-box',
     'min-width': '0',
     'max-width': '100%',
     'white-space': 'normal',
     'overflow-wrap': 'anywhere',
-    border: `1px solid ${LINE}`,
-    background: 'transparent',
-    color: 'inherit',
     font: 'inherit',
     'font-size': SIZE_LABEL,
-    padding: '.15rem .45rem',
+  },
+  alternateText: {
+    'flex-basis': '100%',
+    color: INK_MUTED,
+    'line-height': '1.35',
   },
   /** Only where there is something to press. */
   alternateButton: {
+    border: `1px solid ${LINE}`,
+    background: 'transparent',
+    color: 'inherit',
+    padding: '.15rem .45rem',
     cursor: 'pointer',
     'min-height': controlHeight('harmony'),
     'border-radius': controlRadius('harmony'),
@@ -578,6 +581,48 @@ const nameplateParts = {
     'min-height': '1.4rem',
   },
   empty: {margin: '0', 'font-size': SIZE_LABEL, color: INK_MUTED},
+  // A live performance readout keeps the same three rows as the note set
+  // changes. The rows scroll horizontally when a spelling is unusually long.
+  stableRoot: {
+    display: 'grid',
+    'grid-template-rows': '3.5rem 1.25rem 1.25rem',
+    gap: '.25rem',
+    height: '6.5rem',
+    overflow: 'hidden',
+  },
+  stableLive: {'min-width': '0', overflow: 'hidden'},
+  stableSymbol: {
+    display: 'flex',
+    'align-items': 'center',
+    height: '100%',
+    'min-height': '0',
+    'font-size': SIZE_DISPLAY,
+    'white-space': 'nowrap',
+    'overflow-wrap': 'normal',
+    'overflow-x': 'auto',
+    'overflow-y': 'hidden',
+  },
+  stableNotes: {'font-size': `calc(${SIZE_DISPLAY} * .7)`},
+  stableVoicing: {
+    margin: '0',
+    'min-height': '0',
+    'line-height': '1.25rem',
+    'white-space': 'nowrap',
+    'overflow-x': 'auto',
+    'overflow-y': 'hidden',
+  },
+  stableAlternates: {
+    'min-width': '0',
+    'flex-wrap': 'nowrap',
+    'align-items': 'center',
+    'overflow-x': 'auto',
+    'overflow-y': 'hidden',
+  },
+  stableAlternate: {
+    flex: '0 0 auto',
+    'max-width': 'none',
+    'white-space': 'nowrap',
+  },
 } satisfies Readonly<Record<string, Declarations>>;
 
 const chipParts = {
@@ -771,6 +816,9 @@ export const harmonyPresenterStyle = [
   harmonyRule('.wui-harmony-flow__role', flowParts.role),
   harmonyRule('.wui-harmony-flow__label', flowParts.label),
   harmonyRule('.wui-harmony-flow__note', flowParts.note),
+  // A 21px occurrence cannot carry an honest `R2` label; its full reading
+  // remains on the band title and in the semantic index beside the gutter.
+  '@container wui-harmony-band (max-width: 31px) { .wui-harmony-flow__label, .wui-harmony-flow__note { display: none; } }',
   harmonyRule('.wui-harmony-flow__bead', flowParts.bead),
   harmonyRule('.wui-harmony-flow__glyph', flowParts.glyph),
   harmonyRule('.wui-harmony-flow__now', flowParts.now),
@@ -833,11 +881,19 @@ export const harmonyPresenterStyle = [
   harmonyRule('.wui-harmony-nameplate__alternates', nameplateParts.alternates),
   harmonyRule('.wui-harmony-nameplate__alternates > li', nameplateParts.alternateItem),
   harmonyRule('.wui-harmony-nameplate__alternate', nameplateParts.alternate),
+  harmonyRule('li.wui-harmony-nameplate__alternate', nameplateParts.alternateText),
   harmonyRule('button.wui-harmony-nameplate__alternate', nameplateParts.alternateButton),
   harmonyRule('.wui-harmony-nameplate__history', nameplateParts.history),
   harmonyRule('.wui-harmony-nameplate__chip', harmonyParts.historyChip),
   harmonyRule('.wui-harmony-nameplate__chip[data-current="true"]', harmonyParts.historyChipActive),
   harmonyRule('.wui-harmony-nameplate__empty', nameplateParts.empty),
+  harmonyRule('.wui-harmony-nameplate[data-layout="stable"]', nameplateParts.stableRoot),
+  harmonyRule('.wui-harmony-nameplate[data-layout="stable"] .wui-harmony-nameplate__live', nameplateParts.stableLive),
+  harmonyRule('.wui-harmony-nameplate[data-layout="stable"] .wui-harmony-nameplate__symbol', nameplateParts.stableSymbol),
+  harmonyRule('.wui-harmony-nameplate[data-layout="stable"][data-reading="notes"] .wui-harmony-nameplate__symbol', nameplateParts.stableNotes),
+  harmonyRule('.wui-harmony-nameplate[data-layout="stable"] .wui-harmony-nameplate__voicing', nameplateParts.stableVoicing),
+  harmonyRule('.wui-harmony-nameplate[data-layout="stable"] .wui-harmony-nameplate__alternates', nameplateParts.stableAlternates),
+  harmonyRule('.wui-harmony-nameplate[data-layout="stable"] li.wui-harmony-nameplate__alternate', nameplateParts.stableAlternate),
 
   harmonyRule('.wui-harmony-chip', HARMONY_MOTION.full, chipParts.root),
   harmonyRule('.wui-harmony-chip__list', chipParts.list),
@@ -971,9 +1027,8 @@ function dressing(
 }
 
 /** The label a read-out announces when the caller supplies none. */
-function describe(override: UITextValue<{names: string}> | undefined, subject: string, names: readonly string[], onError?: (error: unknown) => void): string {
-  const joined = names.join(', ');
-  return textValue(override, names.length > 0 ? `${subject}: ${joined}` : subject, {names: joined}, onError);
+function describe(subject: string, names: readonly string[]): string {
+  return names.length > 0 ? `${subject}: ${names.join(', ')}` : subject;
 }
 
 /**
@@ -1134,16 +1189,7 @@ export interface FlowLaneParts {
   reel?: string;
 }
 
-export interface FlowLaneText {
-  description?: UITextValue<{names: string}>;
-  position?: string;
-  positionValue?: UITextValue<{value: string; position: number; label: string}>;
-}
-
 export interface FlowLaneOptions {
-  /** Final text from application-owned presentation state; refreshed by update(). */
-  getText?: () => FlowLaneText;
-  formatters?: UIValueFormatters;
   /** Outer surface, or no frame/background when a containing presenter owns it. Defaults to 'default'. */
   surface?: 'default' | 'none';
   label?: string;
@@ -1160,6 +1206,8 @@ export interface FlowLaneOptions {
    * use scale. Resize preserves the current position and zoom.
    */
   visibleSpan?: number;
+  /** Keep one line of readout space when the now line crosses an unlabeled gap. Defaults to false. */
+  reservePinned?: boolean;
   /**
    * What the lane assumes it is wide when nothing can measure it — no
    * `ResizeObserver`, or a layout engine that answers `0`. Without it a lane in
@@ -1310,6 +1358,7 @@ export function mountFlowLane(
   pinned.className = 'wui-harmony-flow__pinned';
   pinned.setAttribute('aria-hidden', 'true');
   dress(pinned, flowParts.pinned);
+  if (options.reservePinned) pinned.style.minHeight = '1.1em';
   const pinnedName = document.createElement('span');
   pinnedName.className = 'wui-harmony-flow__pinned-name';
   const pinnedNote = document.createElement('span');
@@ -1364,7 +1413,6 @@ export function mountFlowLane(
   let primaryTrack = 0;
   let pulse: Animation | undefined;
   let destroyed = false;
-  let text: FlowLaneText | undefined;
   let unsubscribe: (() => void) | undefined;
   let leaveLoop: (() => void) | undefined;
   let resizeObserver: ResizeObserver | undefined;
@@ -1458,7 +1506,7 @@ export function mountFlowLane(
       viewport,
       'aria-valuetext',
       options.formatPosition?.(position) ??
-        (current?.primary ? textValue(text?.positionValue, `${formatNumber(options.formatters, position, coordinate(position), options.onError)} — ${current.primary}`, {value: formatNumber(options.formatters, position, coordinate(position), options.onError), position, label: current.primary}, options.onError) : formatNumber(options.formatters, position, coordinate(position), options.onError)),
+        (current?.primary ? `${coordinate(position)} — ${current.primary}` : coordinate(position)),
     );
   };
 
@@ -1543,7 +1591,9 @@ export function mountFlowLane(
 
     setText(pinnedName, state.pinned?.primary ?? current?.primary ?? '');
     setText(pinnedNote, state.pinned?.secondary ?? current?.secondary ?? '');
-    setHidden(pinned, !pinnedName.textContent && !pinnedNote.textContent);
+    const emptyPinned = !pinnedName.textContent && !pinnedNote.textContent;
+    if (options.reservePinned) setStyleValue(pinned, 'visibility', emptyPinned ? 'hidden' : undefined);
+    else setHidden(pinned, emptyPinned);
     setStyleValue(nowLine, 'width', current ? '2px' : '1px');
     if (forced || changed) announce();
     painted = position;
@@ -1922,13 +1972,10 @@ export function mountFlowLane(
     laneWidth = finitePositive(viewport.clientWidth || root.clientWidth, fallbackWidth);
   };
 
-  const pass = (): void => {
+  const update = (): void => {
     if (destroyed) return;
-    text = readText(options.getText, options.onError);
-    if (destroyed || !claim.isCurrent()) return;
     try {
       state = binding.snapshot();
-      if (destroyed || !claim.isCurrent()) return;
       ordered = (state.bands ?? []).filter(
         (band): band is FlowBand =>
           Boolean(band) && Number.isFinite(band.start) && Number.isFinite(band.end),
@@ -1984,7 +2031,6 @@ export function mountFlowLane(
       // Only where the viewport is actually a slider. A range on a node with no
       // role is a promise to a reader that nothing keeps.
       if (binding.seek) {
-        setLabel(viewport, options.label ?? text?.position ?? 'Position');
         setAttr(viewport, 'aria-valuemin', coordinate(axis.start));
         setAttr(viewport, 'aria-valuemax', coordinate(axis.end));
         setAttr(viewport, 'aria-disabled', state.disabled ? 'true' : undefined);
@@ -1999,11 +2045,11 @@ export function mountFlowLane(
         root,
         options.label ??
           describe(
-            text?.description, 'Flow lane',
+            'Flow lane',
             ordered
               .slice(0, 4)
               .map((band) => band.primary)
-              .filter((label): label is string => Boolean(label)), options.onError,
+              .filter((label): label is string => Boolean(label)),
           ),
       );
       // `state.now` seeds the FIRST placement and nothing after it: once a
@@ -2018,14 +2064,6 @@ export function mountFlowLane(
       report(error);
     }
   };
-
-  const updates = createUpdateLoop({
-    name: 'FlowLane',
-    pass,
-    isCurrent: () => !destroyed && claim.isCurrent(),
-    report,
-  });
-  const update = updates.run;
 
   // -------------------------------------------------------------------------
   // Pointer, wheel and keyboard. The lane takes a callback; turning it into an
@@ -2046,6 +2084,8 @@ export function mountFlowLane(
 
   const onPointerDown = (event: PointerEvent): void => {
     if (!binding.seek || state.disabled || event.button !== 0) return;
+    const pressed = (event.target as Element | null)?.closest?.('.wui-harmony-flow__band');
+    pressedBandId = (pressed as HTMLElement | null)?.dataset?.band;
     const bounds = viewport.getBoundingClientRect?.();
     drag = {
       pointerId: event.pointerId,
@@ -2082,12 +2122,15 @@ export function mountFlowLane(
     const moved = drag.moved;
     viewport.releasePointerCapture?.(drag.pointerId);
     drag = undefined;
+    if (moved || event.type === 'pointercancel') pressedBandId = undefined;
     if (moved) emit(position, 'commit');
   };
 
+  let pressedBandId: string | undefined;
   const onClick = (event: MouseEvent): void => {
     const target = (event.target as Element | null)?.closest?.('.wui-harmony-flow__band');
-    const id = (target as HTMLElement | null)?.dataset?.band;
+    const id = pressedBandId ?? (target as HTMLElement | null)?.dataset?.band;
+    pressedBandId = undefined;
     const node = id ? bands.get(id) : undefined;
     if (!node) return;
     if (binding.selectBand) {
@@ -2159,7 +2202,7 @@ export function mountFlowLane(
     viewport.tabIndex = 0;
     viewport.setAttribute('role', 'slider');
     viewport.setAttribute('aria-orientation', 'horizontal');
-    setLabel(viewport, options.label ?? text?.position ?? 'Position');
+    setLabel(viewport, options.label ?? 'Position');
     viewport.addEventListener('pointerdown', onPointerDown);
     viewport.addEventListener('pointermove', onPointerMove);
     viewport.addEventListener('pointerup', onPointerUp);
@@ -2223,7 +2266,6 @@ export function mountFlowLane(
     destroy(): void {
       if (destroyed) return;
       destroyed = true;
-      updates.cancel();
       partLoop();
       pulse?.cancel();
       if (wheelTimer !== undefined) clearTimeout(wheelTimer);
@@ -2241,10 +2283,8 @@ export function mountFlowLane(
       }
       resizeObserver?.disconnect();
       intersectionObserver?.disconnect();
-      const stop = unsubscribe;
-      unsubscribe = undefined;
       try {
-        stop?.();
+        unsubscribe?.();
       } catch (error) {
         report(error);
       }
@@ -2307,18 +2347,14 @@ export function mountFlowLane(
 
   measure();
   update();
-  if (destroyed || !claim.isCurrent()) return handle;
   joinLoop();
   if (options.clock) {
     try {
-      const stop = options.clock.subscribe(tickAt);
-      if (destroyed || !claim.isCurrent()) stop();
-      else unsubscribe = stop;
+      unsubscribe = options.clock.subscribe(tickAt);
     } catch (error) {
       report(error);
     }
   }
-  if (destroyed || !claim.isCurrent()) return handle;
   if (binding.subscribe) {
     const chained = unsubscribe;
     try {
@@ -2330,8 +2366,10 @@ export function mountFlowLane(
       // with no symptom a caller could see. The other three mounts already call
       // it this way; this one is the odd file out.
       const stop = binding.subscribe(update);
-      if (destroyed || !claim.isCurrent()) stop();
-      else unsubscribe = (): void => runCleanups([chained, stop], options.onError);
+      unsubscribe = (): void => {
+        chained?.();
+        stop();
+      };
     } catch (error) {
       report(error);
     }
@@ -2351,6 +2389,8 @@ export interface ChordNameCandidate {
   /** How this reading differs — 'inversion', 'rootless', 'enharmonic'. */
   note?: string;
   weight?: number;
+  /** Optional pressed state for a selectable reading. Omit for a plain command. */
+  pressed?: boolean;
   /**
    * The opaque identity of this naming. A change pops, even when `symbol` is
    * byte-identical — which is how "C, G, C" and "the same chord struck again"
@@ -2397,15 +2437,11 @@ export interface NameplateParts {
   symbol?: string;
 }
 
-export interface NameplateText {
-  description?: UITextValue<{names: string}>;
-}
-
 export interface NameplateOptions {
-  /** Final text from application-owned presentation state; refreshed by update(). */
-  getText?: () => NameplateText;
   /** Outer surface, or no frame/background when a containing presenter owns it. Defaults to 'default'. */
   surface?: 'default' | 'none';
+  /** Reserve the symbol, voicing and alternate rows through changing live note sets. */
+  stableLayout?: boolean;
   label?: string;
   motion?: MotionMode;
   /** The pop, in ms. Defaults to 180, and to 0 in a reduced motion mode. */
@@ -2453,9 +2489,10 @@ export function mountNameplate(
   root.className = 'wui-harmony-nameplate';
   root.setAttribute('role', 'group');
   root.dataset.motion = motion;
+  if (options.stableLayout) root.dataset.layout = 'stable';
   addClassNames(root, options.classNames?.root);
   setParts(root, 'root', options.parts?.root);
-  dress(root, nameplateParts.root);
+  dress(root, nameplateParts.root, options.stableLayout ? nameplateParts.stableRoot : {});
   if (options.surface === 'none') paint(root, embeddedSurfaceDeclarations);
   dressMotion(root, stepped);
 
@@ -2472,13 +2509,14 @@ export function mountNameplate(
   live.setAttribute('role', 'status');
   live.setAttribute('aria-live', 'polite');
   live.setAttribute('aria-atomic', 'true');
-  dress(live, nameplateParts.live);
+  dress(live, nameplateParts.live, options.stableLayout ? nameplateParts.stableLive : {});
 
   const symbol = document.createElement('div');
   symbol.className = 'wui-harmony-nameplate__symbol';
   addClassNames(symbol, options.classNames?.symbol);
   setParts(symbol, 'symbol', options.parts?.symbol);
-  dress(symbol, nameplateParts.symbol);
+  dress(symbol, nameplateParts.symbol, options.stableLayout ? nameplateParts.stableSymbol : {});
+  if (options.stableLayout) symbol.tabIndex = 0;
 
   const full = document.createElement('span');
   full.className = 'wui-harmony-nameplate__full';
@@ -2494,12 +2532,12 @@ export function mountNameplate(
   const voicing = document.createElement('div');
   voicing.className = 'wui-harmony-nameplate__voicing';
   voicing.hidden = true;
-  dress(voicing, nameplateParts.voicing);
+  dress(voicing, nameplateParts.voicing, options.stableLayout ? nameplateParts.stableVoicing : {});
 
   const alternates = document.createElement('ul');
   alternates.className = 'wui-harmony-nameplate__alternates';
   alternates.hidden = true;
-  dress(alternates, nameplateParts.alternates);
+  dress(alternates, nameplateParts.alternates, options.stableLayout ? nameplateParts.stableAlternates : {});
 
   // Out of the live region on purpose: a history that announced itself would
   // read every chord twice, once as the nameplate and once as its own echo.
@@ -2532,7 +2570,6 @@ export function mountNameplate(
   let state: NameplateState = {};
   let animation: Animation | undefined;
   let destroyed = false;
-  let text: NameplateText | undefined;
   let unsubscribe: (() => void) | undefined;
   let leaveLoop: (() => void) | undefined;
   const report = createErrorSink(options.onError);
@@ -2587,17 +2624,22 @@ export function mountNameplate(
     }
   };
 
-  const pass = (): void => {
+  const update = (): void => {
     if (destroyed) return;
-    text = readText(options.getText, options.onError);
-    if (destroyed || !claim.isCurrent()) return;
     try {
       state = binding.snapshot();
-      if (destroyed || !claim.isCurrent()) return;
       const primary = state.primary;
+      const voices = state.voicing ?? [];
+      const voiceLabels = voices
+        .map((voice) => voice.label ?? voice.mark ?? (voice.role ? toneMark(voice.role) : ''))
+        .filter(Boolean);
+      const unnamedNotes = options.stableLayout && !primary ? voiceLabels.join(' · ') : '';
+      const displayedSymbol = primary?.symbol ?? (options.stableLayout ? unnamedNotes || state.emptyLabel || '' : '');
       const identity = primary ? (primary.key ?? primary.symbol) : undefined;
-      setText(symbol, primary?.symbol ?? '');
-      setHidden(symbol, !primary);
+      setText(symbol, displayedSymbol);
+      setHidden(symbol, displayedSymbol === '');
+      if (options.stableLayout)
+        setData(root, 'reading', primary ? 'chord' : unnamedNotes ? 'notes' : 'rest');
       setText(full, primary?.full ?? '');
       setHidden(full, !primary?.full);
       // With a spoken form present the symbol is hidden from the reader, so the
@@ -2621,7 +2663,9 @@ export function mountNameplate(
         setStyleValue(
           symbol,
           'font-size',
-          state.emphasis === 'hero' ? `calc(${SIZE_DISPLAY} * 1.35)` : undefined,
+          options.stableLayout
+            ? unnamedNotes ? nameplateParts.stableNotes['font-size'] : SIZE_DISPLAY
+            : state.emphasis === 'hero' ? `calc(${SIZE_DISPLAY} * 1.35)` : undefined,
         );
       setData(
         root,
@@ -2629,20 +2673,28 @@ export function mountNameplate(
         Number.isFinite(state.confidence) ? String(clamp01(state.confidence)) : undefined,
       );
 
-      const voices = state.voicing ?? [];
-      setText(
-        voicing,
-        voices
-          .map((voice) => voice.label ?? voice.mark ?? (voice.role ? toneMark(voice.role) : ''))
-          .filter(Boolean)
-          .join('  '),
-      );
-      setHidden(voicing, voices.length === 0);
+      setText(voicing, options.stableLayout && !primary ? '' : voiceLabels.join('  '));
+      setHidden(voicing, !options.stableLayout && voices.length === 0);
+      if (options.stableLayout)
+        setStyleValue(voicing, 'visibility', primary && voiceLabels.length > 0 ? 'visible' : 'hidden');
 
       const readings = state.alternates ?? [];
-      // Labels, weights and opaque candidate keys can change without replacing
-      // the focused control. Commands read the current candidate at click time.
-      const readingKey = JSON.stringify([binding.selectAlternate !== undefined, readings.length]);
+      // `key` and `weight` belong in the signature even though neither is drawn.
+      // The guard exists to keep a focused `<button>` alive across a chord
+      // change, and every button closes over the candidate object it was built
+      // from — so any field the guard omits is a field `selectAlternate` can be
+      // handed a stale copy of. `key` is documented as "the opaque identity of
+      // this naming", which makes it precisely the field a caller looks at.
+      const readingKey = JSON.stringify([
+        binding.selectAlternate !== undefined,
+        readings.map((candidate) => [
+          candidate.symbol,
+          candidate.note ?? null,
+          candidate.key ?? null,
+          candidate.weight ?? null,
+          candidate.pressed ?? null,
+        ]),
+      ]);
       const items: HTMLLIElement[] = [];
       if (readingKey !== readingSignature)
         readings.forEach((candidate, at) => {
@@ -2654,14 +2706,16 @@ export function mountNameplate(
             const button = document.createElement('button');
             button.type = 'button';
             button.className = 'wui-harmony-nameplate__alternate';
+            if (candidate.key !== undefined) button.dataset.candidateKey = candidate.key;
             button.textContent = candidate.note
               ? `${candidate.symbol} (${candidate.note})`
               : candidate.symbol;
+            if (candidate.pressed !== undefined)
+              button.setAttribute('aria-pressed', String(candidate.pressed));
             dress(button, nameplateParts.alternate, nameplateParts.alternateButton);
             button.addEventListener('click', () => {
               try {
-                const current = state.alternates?.[at];
-                if (current) void Promise.resolve(binding.selectAlternate!(at, current)).catch(report);
+                void Promise.resolve(binding.selectAlternate!(at, candidate)).catch(report);
               } catch (error) {
                 report(error);
               }
@@ -2669,15 +2723,17 @@ export function mountNameplate(
             });
             item.append(button);
           } else {
-            // The class as well as the record. Without it the inert reading was
-            // the only alternate on the page with no sheet rule to land on — a
-            // bare run of text next to a row of bordered chips, on exactly the
-            // path a host that installed the sheet is using.
+            // Keep a static reading under the symbol as text, never a control.
             item.className = 'wui-harmony-nameplate__alternate';
             item.textContent = candidate.note
               ? `${candidate.symbol} (${candidate.note})`
               : candidate.symbol;
-            dress(item, nameplateParts.alternate);
+            dress(
+              item,
+              nameplateParts.alternate,
+              nameplateParts.alternateText,
+              options.stableLayout ? nameplateParts.stableAlternate : {},
+            );
           }
           items.push(item);
         });
@@ -2685,13 +2741,9 @@ export function mountNameplate(
         readingSignature = readingKey;
         alternates.replaceChildren(...items);
       }
-      readings.forEach((candidate, at) => {
-        const item = alternates.children[at];
-        if (!item) return;
-        const target = item.querySelector('button') ?? item;
-        setText(target, candidate.note ? `${candidate.symbol} (${candidate.note})` : candidate.symbol);
-      });
-      setHidden(alternates, readings.length === 0);
+      setHidden(alternates, !options.stableLayout && readings.length === 0);
+      if (options.stableLayout)
+        setStyleValue(alternates, 'visibility', readings.length > 0 ? 'visible' : 'hidden');
 
       const historyKey = JSON.stringify([state.history ?? [], primary?.symbol ?? null]);
       if (historyKey !== historySignature) {
@@ -2715,25 +2767,17 @@ export function mountNameplate(
       setHidden(history, !state.history?.length);
 
       const message = state.emptyLabel ?? '';
-      const showEmpty = !primary && message !== '';
+      const showEmpty = !primary && !unnamedNotes && message !== '';
       setText(empty, showEmpty ? message : '');
-      setHidden(empty, !showEmpty);
+      setHidden(empty, options.stableLayout || !showEmpty);
       setLabel(
         root,
-        options.label ?? describe(text?.description, 'Chord', primary ? [primary.full ?? primary.symbol] : [], options.onError),
+        options.label ?? describe('Chord', primary ? [primary.full ?? primary.symbol] : []),
       );
     } catch (error) {
       report(error);
     }
   };
-
-  const updates = createUpdateLoop({
-    name: 'Nameplate',
-    pass,
-    isCurrent: () => !destroyed && claim.isCurrent(),
-    report,
-  });
-  const update = updates.run;
 
   const handle: NameplateHandle = {
     element: root,
@@ -2746,14 +2790,11 @@ export function mountNameplate(
     destroy(): void {
       if (destroyed) return;
       destroyed = true;
-      updates.cancel();
       leaveLoop?.();
       leaveLoop = undefined;
       animation?.cancel();
-      const stop = unsubscribe;
-      unsubscribe = undefined;
       try {
-        stop?.();
+        unsubscribe?.();
       } catch (error) {
         report(error);
       }
@@ -2775,7 +2816,6 @@ export function mountNameplate(
   }
 
   update();
-  if (destroyed || !claim.isCurrent()) return handle;
   const animate = options.clock ? false : (options.animate ?? binding.approach !== undefined);
   if (animate && !stepped) {
     leaveLoop = joinFrameLoop(view, (at, degraded) =>
@@ -2784,20 +2824,19 @@ export function mountNameplate(
   }
   if (options.clock) {
     try {
-      const stop = options.clock.subscribe(tickAt);
-      if (destroyed || !claim.isCurrent()) stop();
-      else unsubscribe = stop;
+      unsubscribe = options.clock.subscribe(tickAt);
     } catch (error) {
       report(error);
     }
   }
-  if (destroyed || !claim.isCurrent()) return handle;
   if (binding.subscribe) {
     const chained = unsubscribe;
     try {
       const stop = binding.subscribe(update);
-      if (destroyed || !claim.isCurrent()) stop();
-      else unsubscribe = (): void => runCleanups([chained, stop], options.onError);
+      unsubscribe = (): void => {
+        chained?.();
+        stop();
+      };
     } catch (error) {
       report(error);
     }
@@ -2862,15 +2901,7 @@ export interface ChipStripParts {
   list?: string;
 }
 
-export interface ChipStripText {
-  description?: UITextValue<{names: string}>;
-  occurrences?: UITextValue<{count: number; value: string}>;
-}
-
 export interface ChipStripOptions {
-  /** Final text from application-owned presentation state; refreshed by update(). */
-  getText?: () => ChipStripText;
-  formatters?: UIValueFormatters;
   /** Outer surface, or no frame/background when a containing presenter owns it. Defaults to 'default'. */
   surface?: 'default' | 'none';
   label?: string;
@@ -2935,17 +2966,13 @@ export function mountChipStrip(
    */
   const boxes = new WeakMap<HTMLLIElement, string>();
   let destroyed = false;
-  let text: ChipStripText | undefined;
   let unsubscribe: (() => void) | undefined;
   const report = createErrorSink(options.onError);
 
-  const pass = (): void => {
+  const update = (): void => {
     if (destroyed) return;
-    text = readText(options.getText, options.onError);
-    if (destroyed || !claim.isCurrent()) return;
     try {
       const state = binding.snapshot();
-      if (destroyed || !claim.isCurrent()) return;
       const layout = state.layout ?? 'flow';
       setData(list, 'layout', layout);
       if (inline) {
@@ -2970,9 +2997,7 @@ export function mountChipStrip(
         items.delete(id);
         node.remove();
       }
-      ordered.forEach((node, index) => {
-        if (list.children[index] !== node) list.insertBefore(node, list.children[index] ?? null);
-      });
+      list.replaceChildren(...ordered);
 
       const message = state.emptyLabel ?? '';
       const showEmpty = ordered.length === 0 && message !== '';
@@ -2982,22 +3007,14 @@ export function mountChipStrip(
         root,
         options.label ??
           describe(
-            text?.description, 'Read-out',
-            rows.slice(0, 4).map((item) => item.primary), options.onError,
+            'Read-out',
+            rows.slice(0, 4).map((item) => item.primary),
           ),
       );
     } catch (error) {
       report(error);
     }
   };
-
-  const updates = createUpdateLoop({
-    name: 'ChipStrip',
-    pass,
-    isCurrent: () => !destroyed && claim.isCurrent(),
-    report,
-  });
-  const update = updates.run;
 
   const paintChip = (node: HTMLLIElement, item: ChipItem, layout: string): void => {
     node.className = 'wui-harmony-chip__item';
@@ -3088,7 +3105,7 @@ export function mountChipStrip(
     if (item.trailing !== undefined || item.occurrences?.length) {
       const trailing = document.createElement('span');
       trailing.className = 'wui-harmony-chip__trailing';
-      trailing.textContent = item.trailing ?? textValue(text?.occurrences, `x${formatNumber(options.formatters, item.occurrences?.length ?? 0, undefined, options.onError)}`, {count: item.occurrences?.length ?? 0, value: formatNumber(options.formatters, item.occurrences?.length ?? 0, undefined, options.onError)}, options.onError);
+      trailing.textContent = item.trailing ?? `x${item.occurrences?.length ?? 0}`;
       dress(trailing, chipParts.trailing);
       children.push(trailing);
     }
@@ -3122,11 +3139,8 @@ export function mountChipStrip(
     destroy(): void {
       if (destroyed) return;
       destroyed = true;
-      updates.cancel();
-      const stop = unsubscribe;
-      unsubscribe = undefined;
       try {
-        stop?.();
+        unsubscribe?.();
       } catch (error) {
         report(error);
       }
@@ -3148,12 +3162,9 @@ export function mountChipStrip(
   }
 
   update();
-  if (destroyed || !claim.isCurrent()) return handle;
   if (binding.subscribe) {
     try {
-      const stop = binding.subscribe(update);
-      if (destroyed || !claim.isCurrent()) stop();
-      else unsubscribe = stop;
+      unsubscribe = binding.subscribe(update);
     } catch (error) {
       report(error);
     }
@@ -3214,15 +3225,7 @@ export interface WheelParts {
   svg?: string;
 }
 
-export interface WheelText {
-  description?: UITextValue<{names: string}>;
-  share?: UITextValue<{label: string; value: string; fraction: number}>;
-}
-
 export interface WheelOptions {
-  /** Final text from application-owned presentation state; refreshed by update(). */
-  getText?: () => WheelText;
-  formatters?: UIValueFormatters;
   /** Outer surface, or no frame/background when a containing presenter owns it. Defaults to 'default'. */
   surface?: 'default' | 'none';
   label?: string;
@@ -3342,7 +3345,6 @@ export function mountWheel(
   let ringSignature = '';
   let angle = 0;
   let destroyed = false;
-  let text: WheelText | undefined;
   let unsubscribe: (() => void) | undefined;
   const report = createErrorSink(options.onError);
 
@@ -3386,21 +3388,18 @@ export function mountWheel(
       // is worse than the ring saying nothing about strength at all. A share is
       // said only where there is a denominator to say it against.
       const share =
-        total > 0 ? Math.max(0, finite(segment.weight, 0)) / total : undefined;
-      label.textContent = share === undefined ? segment.label : textValue(text?.share, `${segment.label} ${formatPercent(options.formatters, share, undefined, options.onError)}`, {label: segment.label, value: formatPercent(options.formatters, share, undefined, options.onError), fraction: share}, options.onError);
+        total > 0 ? Math.round((Math.max(0, finite(segment.weight, 0)) / total) * 100) : undefined;
+      label.textContent = share === undefined ? segment.label : `${segment.label} ${share}%`;
       label.dataset.segment = segment.id;
       label.dataset.ring = ring;
       entries.push(label);
     });
   };
 
-  const pass = (): void => {
+  const update = (): void => {
     if (destroyed) return;
-    text = readText(options.getText, options.onError);
-    if (destroyed || !claim.isCurrent()) return;
     try {
       const state = binding.snapshot();
-      if (destroyed || !claim.isCurrent()) return;
       const outer: readonly WheelSegment[] =
         (state.outer?.length ?? 0) > 0
           ? state.outer
@@ -3425,20 +3424,6 @@ export function mountWheel(
           drawRing(inner, RING_MIDDLE - 2, RING_INNER, 'inner', shapes, entries);
         rings.replaceChildren(...shapes);
         index.replaceChildren(...entries);
-      }
-
-      // Geometry can stay cached while the human-readable share changes language.
-      let labelIndex = 0;
-      for (const segments of [outer, inner]) {
-        const total = segments.reduce((sum, segment) => sum + Math.max(0, finite(segment.weight, 0)), 0);
-        for (const segment of segments) {
-          const label = index.children[labelIndex++];
-          if (!label) continue;
-          const share = total > 0 ? Math.max(0, finite(segment.weight, 0)) / total : undefined;
-          setText(label, share === undefined ? segment.label : textValue(text?.share, `${segment.label} ${formatPercent(options.formatters, share, undefined, options.onError)}`, {
-            label: segment.label, value: formatPercent(options.formatters, share, undefined, options.onError), fraction: share,
-          }, options.onError));
-        }
       }
 
       const onInner = state.needle?.ring === 'inner' && inner.length > 0;
@@ -3529,20 +3514,12 @@ export function mountWheel(
         root,
         options.label ??
           state.needle?.label ??
-          describe(text?.description, 'Wheel', state.centre?.primary ? [state.centre.primary] : [], options.onError),
+          describe('Wheel', state.centre?.primary ? [state.centre.primary] : []),
       );
     } catch (error) {
       report(error);
     }
   };
-
-  const updates = createUpdateLoop({
-    name: 'Wheel',
-    pass,
-    isCurrent: () => !destroyed && claim.isCurrent(),
-    report,
-  });
-  const update = updates.run;
 
   const onClick = (event: MouseEvent): void => {
     if (!binding.selectSegment) return;
@@ -3572,11 +3549,8 @@ export function mountWheel(
     destroy(): void {
       if (destroyed) return;
       destroyed = true;
-      updates.cancel();
-      const stop = unsubscribe;
-      unsubscribe = undefined;
       try {
-        stop?.();
+        unsubscribe?.();
       } catch (error) {
         report(error);
       }
@@ -3598,12 +3572,9 @@ export function mountWheel(
   }
 
   update();
-  if (destroyed || !claim.isCurrent()) return handle;
   if (binding.subscribe) {
     try {
-      const stop = binding.subscribe(update);
-      if (destroyed || !claim.isCurrent()) stop();
-      else unsubscribe = stop;
+      unsubscribe = binding.subscribe(update);
     } catch (error) {
       report(error);
     }

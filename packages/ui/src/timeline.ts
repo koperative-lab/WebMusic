@@ -1,6 +1,5 @@
-import {readText, textValue, type UITextValue, formatNumber, type UIValueFormatters} from './text';
 import {installStyle} from './internal/style';
-import {claimHost, createErrorSink, createUpdateLoop} from './internal/lifecycle';
+import {claimHost, createErrorSink} from './internal/lifecycle';
 import {addClassNames, clamp, finite, setParts} from './internal/dom';
 import {componentSurfaceCss, controlBorderFallback} from './internal/surface';
 import {surfaceHeight} from './internal/control';
@@ -84,17 +83,7 @@ export interface TimelineParts {
   seek?: string;
 }
 
-export interface TimelineText {
-  label?: UITextValue;
-  playhead?: UITextValue<{label: string}>;
-  region?: UITextValue<{id: string; start: number; end?: number}>;
-  marker?: UITextValue<{id: string; start: number; end?: number}>;
-}
-
 export interface TimelineOptions {
-  /** Read application-resolved text once per paint; call update() after external changes. */
-  getText?: () => TimelineText;
-  formatters?: UIValueFormatters;
   label?: string;
   /** Fixed major-tick interval. By default a readable interval is derived. */
   majorStep?: number;
@@ -202,9 +191,9 @@ ${componentSurfaceCss('timeline')}
   padding: 0;
   overflow: hidden;
   border: 0;
-  box-shadow: inset 0 0 0 1px var(--wm-timeline-region-border, color-mix(in srgb, var(--wui-timeline-region-color, var(--wm-accent, #4869d8)) 70%, #000));
+  box-shadow: inset 0 0 0 1px var(--wm-timeline-region-border, color-mix(in srgb, var(--wui-timeline-region-color, var(--wm-accent, #111)) 70%, #000));
   border-radius: var(--wm-timeline-region-radius, var(--wm-control-radius, 0));
-  background: var(--wui-timeline-region-color, var(--wm-timeline-region, var(--wm-accent, #4869d8)));
+  background: var(--wui-timeline-region-color, var(--wm-timeline-region, var(--wm-accent, #111)));
   color: var(--wm-timeline-region-foreground, var(--wm-accent-foreground, #fff));
   cursor: pointer;
 }
@@ -235,8 +224,8 @@ ${componentSurfaceCss('timeline')}
   position: absolute;
   z-index: 2;
   inset-block: 0;
-  border-inline: 1px solid var(--wm-selection, #4869d8);
-  background: var(--wm-selection-fill, rgba(72, 105, 216, .18));
+  border-inline: 1px solid var(--wm-selection, var(--wm-foreground, #111));
+  background: var(--wm-selection-fill, rgba(127, 127, 127, .18));
   pointer-events: none;
 }
 
@@ -387,6 +376,7 @@ export function mountTimeline(
   let rulerSignature = '';
   let resizeObserver: ResizeObserver | undefined;
   let rulerLabels: Array<{tick: HTMLElement; label: HTMLElement; fraction: number; major: boolean}> = [];
+  let regionSignature = '';
   const regionElements = new Map<string, HTMLButtonElement>();
 
   const reportError = createErrorSink(options.onError);
@@ -399,9 +389,13 @@ export function mountTimeline(
 
   const runCommand = (command: () => Promise<void> | void): void => {
     try {
-      void Promise.resolve(command()).then(scheduleUpdate).catch(reportError);
+      void Promise.resolve(command()).then(scheduleUpdate).catch((error) => {
+        reportError(error);
+        scheduleUpdate();
+      });
     } catch (error) {
       reportError(error);
+      scheduleUpdate();
     }
   };
 
@@ -448,7 +442,7 @@ export function mountTimeline(
 
   const renderRuler = (state: TimelineState): void => {
     const tickNodes: HTMLElement[] = [];
-    const formatPosition = options.formatPosition ?? ((position: number) => formatNumber(options.formatters, position, defaultFormatPosition(position), options.onError));
+    const formatPosition = options.formatPosition ?? defaultFormatPosition;
     const tickState: TimelineTick[] = [];
 
     if (state.ticks !== undefined) {
@@ -477,15 +471,9 @@ export function mountTimeline(
       }
     }
 
-    // Text callbacks may read external settings even when geometry is unchanged.
-    const resolved = tickState.map(item => ({...item, label: item.label ?? formatPosition(item.position)}));
-    if (destroyed || !claim.isCurrent()) return;
-    const signature = JSON.stringify([viewport, resolved]);
-    if (signature === rulerSignature) return;
-    rulerSignature = signature;
     resizeObserver?.disconnect();
     rulerLabels = [];
-    for (const item of resolved) {
+    for (const item of tickState) {
       const tick = document.createElement('span');
       tick.className = 'wui-timeline__tick';
       tick.dataset.tickId = item.id;
@@ -496,7 +484,7 @@ export function mountTimeline(
 
       const label = document.createElement('span');
       label.className = 'wui-timeline__tick-label';
-      label.textContent = item.label;
+      label.textContent = item.label ?? formatPosition(item.position);
       tick.title = label.textContent;
       addClassNames(label, options.classNames?.tickLabel);
       setParts(label, 'tick-label', options.parts?.tickLabel);
@@ -510,9 +498,10 @@ export function mountTimeline(
     observeRuler();
   };
 
-  const renderRegions = (state: TimelineState, text: TimelineText | undefined): void => {
+  const renderRegions = (state: TimelineState): void => {
     const nodes: HTMLElement[] = [];
     const ids = new Set<string>();
+    regionElements.clear();
 
     for (const region of state.regions ?? []) {
       if (!region.id || ids.has(region.id)) continue;
@@ -531,19 +520,8 @@ export function mountTimeline(
         continue;
       }
 
-      let button = regionElements.get(region.id);
-      if (!button) {
-        button = document.createElement('button');
-        button.type = 'button';
-        const id = region.id;
-        const ownButton = button;
-        button.addEventListener('click', (event) => {
-          event.stopPropagation();
-          if (!binding.selectRegion || ownButton.disabled || regionElements.get(id) !== ownButton) return;
-          const pointer = event as MouseEvent;
-          runCommand(() => binding.selectRegion!(id, {additive: pointer.metaKey || pointer.ctrlKey}));
-        });
-      }
+      const button = document.createElement('button');
+      button.type = 'button';
       button.className = `wui-timeline__region${marker ? ' wui-timeline__marker' : ''}`;
       button.dataset.regionId = region.id;
       button.dataset.kind = marker ? 'marker' : 'region';
@@ -553,7 +531,7 @@ export function mountTimeline(
         : `${positionPercent(visibleEnd) - positionPercent(visibleStart)}%`;
       if (region.color) {
         button.style.setProperty('--wui-timeline-region-color', region.color);
-      } else button.style.removeProperty('--wui-timeline-region-color');
+      }
       button.disabled =
         state.disabled === true ||
         region.disabled === true ||
@@ -561,9 +539,7 @@ export function mountTimeline(
       button.setAttribute('aria-pressed', String(region.selected === true));
       button.setAttribute(
         'aria-label',
-        region.label ?? textValue(marker ? text?.marker : text?.region, `${marker ? 'Marker' : 'Region'} ${region.id}`, {
-          id: region.id, start: region.start, end: region.end,
-        }, options.onError),
+        region.label ?? `${marker ? 'Marker' : 'Region'} ${region.id}`,
       );
       addClassNames(button, options.classNames?.region);
       if (marker) addClassNames(button, options.classNames?.marker);
@@ -576,42 +552,35 @@ export function mountTimeline(
         ].filter(Boolean).join(' '),
       );
 
-      const label = button.firstElementChild ?? document.createElement('span');
+      const label = document.createElement('span');
       label.className = 'wui-timeline__region-label';
       label.textContent = region.label ?? region.id;
       addClassNames(label, options.classNames?.label);
       setParts(label, 'label', options.parts?.label);
-      if (!label.parentNode) button.append(label);
+      button.append(label);
+
+      button.addEventListener('click', (event) => {
+        event.stopPropagation();
+        if (!binding.selectRegion || button.disabled) return;
+        const pointer = event as MouseEvent;
+        runCommand(() =>
+          binding.selectRegion!(region.id, {
+            additive: pointer.metaKey || pointer.ctrlKey,
+          }),
+        );
+      });
       nodes.push(button);
       regionElements.set(region.id, button);
     }
 
-    const visible = new Set(nodes);
-    for (const [id, node] of regionElements) {
-      if (visible.has(node)) continue;
-      node.remove();
-      regionElements.delete(id);
-    }
-    // Do not detach unchanged controls: language and value updates retain focus.
-    for (const [index, node] of nodes.entries()) {
-      const before = lane.children[index];
-      if (before !== node) lane.insertBefore(node, before ?? null);
-    }
+    lane.replaceChildren(...nodes);
   };
 
-  const paintSnapshot = (): void => {
+  const update = (): void => {
     if (destroyed) return;
 
     try {
       const state = binding.snapshot();
-      if (destroyed || !claim.isCurrent()) return;
-      const text = readText(options.getText, options.onError);
-      if (destroyed || !claim.isCurrent()) return;
-      const label = options.label ?? textValue(text?.label, 'Timeline', {}, options.onError);
-      const playheadLabel = textValue(text?.playhead, `${label} playhead`, {label}, options.onError);
-      if (destroyed || !claim.isCurrent()) return;
-      root.setAttribute('aria-label', label);
-      seek.setAttribute('aria-label', playheadLabel);
       duration = Math.max(Number.EPSILON, finite(state.duration, 1));
       viewport = normalizeRange(state.viewport, 0, duration) ?? {
         start: 0,
@@ -625,10 +594,40 @@ export function mountTimeline(
           ? options.majorStep
           : derivedStep;
 
-      renderRuler(state);
-      if (destroyed || !claim.isCurrent()) return;
-      renderRegions(state, text);
-      if (destroyed || !claim.isCurrent()) return;
+      const nextRulerSignature = JSON.stringify({
+        viewport,
+        majorStep,
+        ticks: state.ticks?.map((tick) => [
+          tick.id,
+          tick.position,
+          tick.label,
+          tick.level,
+        ]),
+      });
+      if (nextRulerSignature !== rulerSignature) {
+        renderRuler(state);
+        rulerSignature = nextRulerSignature;
+      }
+
+      const nextRegionSignature = JSON.stringify({
+        duration,
+        viewport,
+        disabled: state.disabled === true,
+        selectable: binding.selectRegion !== undefined,
+        regions: (state.regions ?? []).map((region) => [
+          region.id,
+          region.start,
+          region.end,
+          region.label,
+          region.color,
+          region.selected,
+          region.disabled,
+        ]),
+      });
+      if (nextRegionSignature !== regionSignature) {
+        renderRegions(state);
+        regionSignature = nextRegionSignature;
+      }
 
       const normalizedLoop = normalizeRange(
         state.loop,
@@ -687,7 +686,7 @@ export function mountTimeline(
         seek.value = String(position);
         seek.setAttribute(
           'aria-valuetext',
-          options.formatPosition?.(position) ?? formatNumber(options.formatters, position, defaultFormatPosition(position), options.onError),
+          (options.formatPosition ?? defaultFormatPosition)(position),
         );
       } else {
         seek.hidden = true;
@@ -698,12 +697,6 @@ export function mountTimeline(
       reportError(error);
     }
   };
-
-  const updates = createUpdateLoop({
-    name: 'Timeline', pass: paintSnapshot,
-    isCurrent: () => !destroyed && claim.isCurrent(), report: reportError,
-  });
-  const update = updates.run;
 
   scheduleUpdate = (): void => {
     if (destroyed || animationFrame !== undefined) return;
@@ -746,7 +739,6 @@ export function mountTimeline(
     destroy(): void {
       if (destroyed) return;
       destroyed = true;
-      updates.cancel();
       resizeObserver?.disconnect();
       resizeObserver = undefined;
       view?.removeEventListener('resize', layoutRulerLabels);
