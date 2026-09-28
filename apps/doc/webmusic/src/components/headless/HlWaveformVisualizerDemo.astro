@@ -1,0 +1,64 @@
+---
+// Browser-renderer demo: the shared .wui-panel card chrome plus a body wired
+// client-side without a custom element.
+// Here: load the bundled Arabesque No.1 WAV, compute a peaks pyramid with
+// computePeaks (@webmusic/audio/analyze), then render a static waveform into a
+// .wui-surface div via renderWaveformVisualizer (@webmusic/audio/view/render).
+import LiveDemoCanvas from '../LiveDemoCanvas.astro';
+
+const SRC = `${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`;
+---
+
+<div class="wui-panel wui-panel--flow not-content">
+  <div class="wui-panel__title">
+    <span>@webmusic/audio/view/render</span>
+    <strong>renderWaveformVisualizer</strong>
+  </div>
+  <LiveDemoCanvas label="Waveform renderer">
+    <div class="wui-row" data-hl-waveform data-src={SRC} style="flex-direction: column; align-items: stretch;">
+      <div class="wui-surface" data-surface></div>
+      <span class="wui-readout" data-readout>loading…</span>
+    </div>
+  </LiveDemoCanvas>
+</div>
+
+<script>
+  import {mountDemos, type DemoScope} from '../demo-lifecycle';
+  import { loadClipFromUrl } from '@webmusic/audio/play';
+  import { computePeaks } from '@webmusic/audio/analyze';
+  import { renderWaveformVisualizer } from '@webmusic/audio/view/render';
+
+  const setup = async (root: HTMLElement, scope: DemoScope) => {
+    const surface = root.querySelector<HTMLElement>('[data-surface]')!;
+    const readout = root.querySelector<HTMLElement>('[data-readout]')!;
+
+    const clip = await loadClipFromUrl(root.dataset.src!, {signal: scope.signal});
+    if (!scope.active) return;
+    const channels = clip.channels();
+    if (!channels) {
+      readout.textContent = 'no channel data';
+      return;
+    }
+
+    // Multi-resolution min/max peaks pyramid from the decoded float channels.
+    const peaks = computePeaks(channels, clip.sampleRate);
+
+    // Static waveform — no buttons, no playhead movement. The renderer owns its
+    // own canvas/overlay scaffold inside the surface div.
+    const viz = renderWaveformVisualizer(surface, peaks, {
+      pixelsPerSecond: 12,
+      height: 96,
+      waveColor: '#4a9eff',
+    });
+    scope.add(() => viz.dispose());
+
+    readout.textContent = `${clip.duration.toFixed(1)}s · ${peaks.channels} ch · ${peaks.levels.length} levels`;
+  };
+
+  mountDemos('[data-hl-waveform]', setup);
+</script>
+
+<style>
+  /* `not-content` drops Starlight's sibling margin, so the card carries its own. */
+  .hl-demo { margin-block: 1rem 1.5rem; }
+</style>

@@ -1,0 +1,54 @@
+---
+import LiveDemoCanvas from '../LiveDemoCanvas.astro';
+---
+<section class="composition-demo not-content" data-bridge-composition>
+  <LiveDemoCanvas size="tall" label="Score and Audio playback composition">
+    <div class="composition-demo__body">
+      <div class="composition-demo__actions">
+        <button type="button" data-load>Load example</button>
+        <button type="button" data-replace disabled>Replace source</button>
+        <button type="button" data-attach disabled>Attach Score views</button>
+        <button type="button" data-dispose disabled>Dispose session</button>
+      </div>
+      <output role="status" data-status>Load an example to enable audio and prepare a matched score and recording.</output>
+      <div data-transport></div>
+      <div class="composition-demo__actions">
+        <label>Rate
+          <select data-rate disabled>
+            <option value="0.5">0.5×</option>
+            <option value="1" selected>1×</option>
+            <option value="2">2×</option>
+          </select>
+        </label>
+        <label><input type="checkbox" data-loop disabled /> Repeat the group</label>
+      </div>
+      <output data-position>No active session</output>
+      <p>Rendered audio provides the sound. Score views borrow the muted score player's data and current state.</p>
+      <div data-wave-surface role="img" aria-label="Rendered backing track and its playback position"></div>
+      <div data-playback-owner hidden></div>
+      <div class="composition-demo__views" data-score-views></div>
+      <details>
+        <summary>Recent completed commands</summary>
+        <pre data-events aria-label="Last six command results">No commands yet.</pre>
+      </details>
+    </div>
+  </LiveDemoCanvas>
+</section>
+<script>
+  import {mountDemos} from '../demo-lifecycle';
+  import {mountBridgeComposition} from './bridge-composition-client';
+  mountDemos('[data-bridge-composition]', mountBridgeComposition);
+</script>
+<style>
+  .composition-demo__body { width: 100%; min-width: 0; padding: 0.8rem; }
+  .composition-demo__actions { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; margin: 0.7rem 0; }
+  .composition-demo__actions button, .composition-demo__actions select { font: inherit; padding: 0.4rem 0.6rem; }
+  .composition-demo__actions label { display: inline-flex; gap: 0.4rem; align-items: center; }
+  .composition-demo__actions :focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+  .composition-demo__body output { display: block; margin: 0.5rem 0; font-size: 0.85rem; }
+  .composition-demo__body p { font-size: 0.85rem; }
+  .composition-demo__body details { margin-top: 0.8rem; }
+  .composition-demo__body pre { overflow-x: auto; white-space: pre; font-size: 0.75rem; }
+  .composition-demo__views { min-width: 0; overflow-x: auto; }
+  .composition-demo__views :global(score-view), .composition-demo__views :global(score-chord-analysis) { margin-top: 0.7rem; }
+</style>

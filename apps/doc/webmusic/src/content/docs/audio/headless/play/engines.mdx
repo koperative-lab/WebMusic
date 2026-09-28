@@ -1,0 +1,158 @@
+---
+title: 'BufferEngine and MediaEngine'
+description: 'Buffer and host-adapted media engines for low-level audio transport.'
+sidebar:
+  order: 6
+---
+
+Audio Play uses two low-level engines for decoded-buffer and streaming playback.
+Monitoring is owned separately by [AudioMeterController](/audio/headless/view/audio-meter/)
+in View.
+
+Both engines implement `PlaybackEngine`.
+[`AudioClipPlayer`](/audio/headless/play/audio-clip-player/) picks between
+them and owns the one it built, so constructing an engine yourself is for
+hosting a transport of your own.
+
+## BufferEngine — sample-accurate, resident
+
+Plays a decoded `AudioBuffer` through an `AudioBufferSourceNode`. It schedules
+against the audio clock through `play(offsetSeconds, when)` and what the
+bridge's synchronized playback is built on; it also exposes a
+`TransportClockReader`, so a follower can read its position without sampling.
+Its source can loop natively; reported currentTime wraps while its clock remains
+unwrapped. Native looping is distinct from the Bridge group loop contract.
+A seek during pre-roll replaces the pending source at the original absolute
+start time. Once sound has begun, seeking replaces it immediately. A failed
+replacement leaves the engine paused at the requested position.
+
+The cost is memory: the whole clip is resident. `play(offset)` positions a
+**start** and folds an offset past the loop end back into the window — before
+that fold, a native `start` would run to the buffer's end and never re-enter
+the loop, leaving the engine reporting "playing" over silence.
+
+## MediaEngine — host-backed streaming
+
+Plays through a media element via a host adapter. It avoids requiring a fully decoded PCM clip; buffering and memory policy belong
+to the host adapter/browser. `preservesPitch` is supported through that adapter. It polls rather than
+scheduling, so there is no sample-accurate join and no transport clock; it
+guards a loop range by watching position instead of looping natively.
+
+On either engine, `play(offsetSeconds, when)` is a no-op while already playing,
+including its offset argument. Use `seek(seconds)` to relocate running playback.
+MediaEngine accepts and ignores `when`; it has no Kernel clock reader.
+
+Range bounds must be finite. Negative starts clamp to zero; an empty or reversed
+range throws `RangeError` before replacing an accepted option. Engines copy the
+range, so mutating the caller's object does not change a running loop. BufferEngine
+also rejects ranges with no span inside its known clip duration. MediaEngine
+clamps the end when metadata arrives; if the start is then beyond the media,
+it stops watching that unusable range and reports the ordinary natural end.
+A later explicit `setLoop` or `play` re-evaluates the available duration.
+
+Disposal is terminal for both engines: it releases their sources/adapters and
+output connections, and later transport/preparation calls cannot recreate them.
+The borrowed AudioContext remains open.
+
+## Import
+
+```ts
+import {BufferEngine} from '@webmusic/audio/play/headless';
+
+// context is caller-owned; clip already contains decoded PCM.
+const engine = new BufferEngine(context, clip);
+engine.output.connect(context.destination);
+engine.prepare();
+await engine.play(0, context.currentTime + 0.06);
+const dispose = () => engine.dispose();
+// The context owner retains its eventual cleanup path.
+```
+
+## Time, ownership and contract source
+
+Engine position is audio media time. Only a buffer reader maps it against the
+audio reference. Retain and dispose the engine while separately respecting
+context ownership.
+
+The public barrel and `packages/audio/src/play/headless/engines/{buffer-engine,media-engine}.ts` define the value, option, state and event
+contracts described below. The reference does not turn private implementation
+fields into public API.
+
+<details class="component-section">
+<summary>API</summary>
+
+**Engine construction and options**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `new BufferEngine(context, clip, options?)` | constructor | BaseAudioContext and decoded AudioClip are required; the context is borrowed. |
+| `BufferEngineOptions.loop` | option | Boolean or finite `{start, end}` clip seconds; default false. Ranges must overlap the clip with positive span. |
+| `BufferEngineOptions.rate` | option | Playback multiplier, default 1. |
+| `BufferEngineOptions.preservesPitch` | option | Accepted but not implemented by buffer rate changes. |
+| `new MediaEngine(context, clip, options?)` | constructor | Requires clip.sourceUrl and a borrowed BaseAudioContext. |
+| `MediaEngineOptions.adapterFactory` | option | MediaPlaybackAdapterFactory required before preparation, seeking or playback. |
+| `MediaEngineOptions.loop` | option | Default false; full-stream flag or finite positive watcher-controlled range. Actual metadata may later make a range unusable. |
+| `MediaEngineOptions.rate` | option | Default 1. |
+| `MediaEngineOptions.preservesPitch` | option | Default true, forwarded to the host adapter. |
+
+**PlaybackEngine commands and state**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `output` | AudioNode | Owned engine output for caller routing; no engine setVolume method. |
+| `currentTime` | number | Clip position in seconds; 0 before media readiness. |
+| `duration` | number | Clip duration, or valid media metadata once available. |
+| `playing` | boolean | Engine running state. |
+| `play(offsetSeconds?, when?)` | void or `Promise<void>` | Start offset in clip seconds, optional absolute reference time; no-op while running. |
+| `pause()` | void | Hold position and stop sounding. |
+| `stop()` | void | Stop and return to start. |
+| `seek(seconds)` | void | Relocate a paused or running playhead; BufferEngine preserves an armed future start. |
+| `setRate(rate)` | void | Change playback multiplier; implementations clamp normal finite rates to 0.25–4. |
+| `setLoop(loop)` | void | Change full/range looping live; invalid range edits throw before replacing the accepted range. |
+| `onEnded(callback)` | void | Register the natural-end callback; this is not an EventEmitter subscription API. |
+| `prepare()` | void or `Promise<void>` | Optional in PlaybackEngine, implemented by both engines; creates needed resources without playing. |
+| `dispose()` | void | Terminal and idempotent; releases owned source/adapter/output and loop work without closing the borrowed context. |
+| `clock` | optional TransportClockReader | BufferEngine provides it; MediaEngine omits it. |
+| `MediaEngine.setPreservesPitch(flag)` | void | Changes the streaming adapter; not a BufferEngine method. |
+
+**MediaPlaybackAdapter and factory**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `MediaPlaybackAdapterFactory(context, sourceUrl)` | function type | Returns the host adapter; host code owns DOM integration outside Headless. |
+| `duration` | readonly number | Media duration in seconds. |
+| `paused` | readonly boolean | Paused state. |
+| `ended` | readonly boolean | Natural-end state. |
+| `currentTime` | number | Readable/writable media seconds. |
+| `playbackRate` | number | Readable/writable multiplier. |
+| `preservesPitch` | optional boolean | Host pitch-preservation switch. |
+| `loop` | boolean | Native full-stream loop switch. |
+| `onended` | callback or null | End callback slot assigned by engine. |
+| `play()` | void or `Promise<void>` | Start the host media. |
+| `pause()` | void | Pause host media. |
+| `connect(destination)` | void | Route host audio into the engine output. |
+| `disconnect()` | optional void method | Detach routing during engine cleanup. |
+| `dispose()` | optional void method | Release adapter-owned host resources. |
+
+**Public types**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `PlaybackEngine` | type | Common engine protocol above. |
+| `BufferEngineOptions` | type | Buffer settings above. |
+| `MediaEngineOptions` | type | Streaming settings above. |
+| `MediaPlaybackAdapter` | type | Host contract above. |
+
+</details>
+
+<div class="component-section">
+
+**Composed by.** The engines are what
+[`<audio-player>`](/audio/element/play/audio-player/) and
+[`<audio-mixer>`](/audio/element/play/audio-mixer/) drive.
+
+</div>
+
+## Related
+
+[AudioClipPlayer](/audio/headless/play/audio-clip-player/) · [AudioMeterController](/audio/headless/view/audio-meter/) · [Realtime analysis](/audio/headless/analyze/realtime-analyzer/) · [View models](/audio/headless/view/view-models/)

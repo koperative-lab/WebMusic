@@ -27,5 +27,15 @@
     "notes": "Google copyright and W3C license URL are retained from the installed polyfill source header. Complete notice text is transcribed from that exact official 2015 license.",
     "sha256": "fa6d1572e5179ed7eb6cfcf7271a029e675c49448cae9fbaa093b1923889f35d",
     "artifactSha256": "43c4e5ad4850cd4d89aca8062ca82c1edb9ce56a2494e508c4f352414c70ea93"
+  },
+  "fft.js@4.0.4": {
+    "license": "MIT",
+    "repository": "git+ssh://git@github.com/indutny/fft.js.git",
+    "file": "fft.js-4.0.4-MIT.txt",
+    "source": "Installed npm tarball fft.js@4.0.4, README.md, LICENSE section.",
+    "artifact": "lib/fft.js",
+    "notes": "The package README contains the complete MIT text; this is its unmodified LICENSE section. The tarball has no separate license file.",
+    "sha256": "2587ff6443c524b3427871376cbf7d755bbd0512b9e8142e601f9e447c599f75",
+    "artifactSha256": "4092b92cec888377666265b724d676628d377d4d5f56b03b76d9c2c27fd061ea"
   }
 }

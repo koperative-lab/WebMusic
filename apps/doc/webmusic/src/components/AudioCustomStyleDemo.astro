@@ -1,0 +1,40 @@
+---
+// A single <audio-player> re-skinned entirely from page CSS: the element's
+// `--wap-*` custom properties pierce its Shadow DOM, so a red accent, light
+// surface, rounded corners and a taller transport come from outside — no fork.
+import LiveDemoCanvas from './LiveDemoCanvas.astro';
+
+const SRC = `${import.meta.env.BASE_URL}mp3/Arabesque%20No.1.mp3`;
+---
+
+<div class="wui-panel wui-panel--flow not-content acs-demo">
+  <div class="wui-panel__title">
+    <span>@webmusic/audio/play/element</span>
+    <strong>Custom style · &lt;audio-player&gt;</strong>
+  </div>
+  <LiveDemoCanvas size="compact">
+    <audio-player data-cs-player src={SRC} controls></audio-player>
+  </LiveDemoCanvas>
+</div>
+
+<script>
+  import { defineAudioPlayerElement } from '@webmusic/audio/play/element';
+  defineAudioPlayerElement();
+</script>
+
+<style>
+  /* The custom theme — <audio-player>'s `--wap-*` custom properties pierce
+     its Shadow DOM, so the whole transport is re-skinned from outside. This skin
+     is intentionally fixed (independent of the page's light/dark theme) to show
+     that a component can be re-skinned entirely from page CSS. */
+  .acs-demo audio-player {
+    --wap-bg: #fff;
+    --wap-fg: #111;
+    --wap-accent: #e23b3b;
+    --wap-track: #ececec;
+    --wap-radius: 12px;
+    --wap-height: 3rem;
+    --wm-audio-player-surface-border: 1px solid var(--wa-edge);
+    display: block;
+  }
+</style>

@@ -1,0 +1,374 @@
+---
+title: '@webmusic/audio/analyze'
+description: Audio analysis — peaks, loudness, spectrogram, onsets, key, tempo, pitch and Meyda features, plus an incremental session, a Web Worker, and audio→score transcription.
+---
+
+`@webmusic/audio/analyze` is the **analysis** capability of the `@webmusic/audio` package. It reads decoded samples (the `Float32Array` channels of an `AudioClip` from [`@webmusic/audio`](/audio/api/)) and returns plain data — a multi-resolution peaks pyramid, loudness, an STFT spectrogram, onsets, musical key, tempo, a pitch track, and frame-level timbral features — and it adds an incremental analysis **session**, a **Web Worker** client, and an optional audio→score **transcriber**.
+
+The APIs are headless and have no DOM dependency, so they run in Node, workers, browsers, tests, and batch jobs. Importing this entry never touches the DOM, audio globals, or any optional peer. The capability does not decode audio, draw anything, or play — those live in [`@webmusic/audio/play`](/audio/api/play/) and [`@webmusic/audio/view`](/audio/api/view/). For live level, spectrum or tuning interaction over an existing audio graph, use the separate [Analyze Web Components](/audio/element/#analyze).
+
+## Install
+
+`npm install @webmusic/audio` — use an available published version or the local workspace; [Install](/audio/#install) has the full setup.
+
+The root model and this capability ship in that one package. The default engines are bundled and dependency-light: `fft.js` (spectrogram FFT), `music-tempo` (tempo), `pitchy` (pitch), and `meyda` (frame features). Everything else is an **optional peer** reached only through guarded dynamic `import()` — nothing extra is installed by default, and the build and typecheck pass without any of them:
+
+```txt
+essentia.js / aubiojs / realtime-bpm-analyzer   advanced tempo engines
+pitchfinder / aubiojs                            advanced pitch engines
+webfft                                           high-performance FFT backend
+@spotify/basic-pitch + @tensorflow/tfjs          default transcription engine
+@magenta/music + @tensorflow/tfjs                Onsets & Frames transcription
+```
+
+When an advanced engine's peer is missing the analyzer falls back to its bundled default with a `console.warn`; the AGPL/GPL-licensed peers are dynamic-import only and are never bundled.
+
+The analysis capability has several entry points — the [package subpath table](/audio/api/#package-subpaths) lists them with every other `@webmusic/audio` entry:
+
+The `@webmusic/audio/analyze` root is the stateless API; `/element` is the opt-in styled Web Component entry. The Worker runtime remains isolated, so code-only imports stay free of DOM and worker-global side effects.
+
+## Choose an analysis surface
+
+Whole-clip key, tempo, loudness, chroma, summary and pitch-track results are
+static data. Compute them here and render a custom report with application UI or
+the [UI Kit analysis presenter](/uikit/views-analysis/analysis/). A cached
+[analysis session](/audio/headless/analyze/audio-analysis-session/) supports
+repeated work after edits, and the [Worker client](#analysis-in-a-worker) moves
+large offline jobs away from the UI thread. For a live signal with custom UI,
+use the [realtime analyzer](/audio/headless/analyze/realtime-analyzer/).
+
+The [Analyze Elements](/audio/element/#analyze) instead inspect a live signal:
+sampled level dynamics, probeable FFT bins, or a sounding note against an A4
+reference. They do not replace these report APIs. To show estimated beat
+positions without a dedicated Analyze Element, convert a Headless session's
+`tempo.grid.beats` to point regions for
+[`<audio-view>.regions`](/audio/element/view/audio-view/#annotate).
+
+---
+
+Every analyzer takes decoded samples and returns plain data. The single-channel analyzers (`computeSpectrogram`, `detectOnsets`, `trackPitch`, `extractFeatures`) take one `Float32Array`; the whole-clip analyzers (`computePeaks`, `measureLoudness`, `detectAudioKey`, `detectTempo`) take the channel array. The examples below assume a decoded `clip` from `@webmusic/audio/play`:
+
+```ts
+import {loadClipFromUrl} from '@webmusic/audio/play';
+
+const clip = await loadClipFromUrl('/wav/Arabesque%20No.1.wav');
+const channels = clip.channels()!;        // Float32Array[] — null for a streaming-only clip
+const mono = clip.channelData(0)!;        // Float32Array of the first channel
+```
+
+## Peaks pyramid
+
+`computePeaks` builds a multi-resolution min/max peaks pyramid in one pass: the finest level summarizes every `baseSamplesPerPeak` source samples into a min/max pair per channel, and each coarser level is a 2:1 reduction of the one below, so any zoom is an O(1) read. The result is quantized to 8-bit (`Int8Array`), structured-clone / transfer friendly, and laid out exactly as `@webmusic/audio`'s `readPeak` (and `renderWaveformVisualizer` in `@webmusic/audio/view`) expect.
+
+```ts
+import {computePeaks} from '@webmusic/audio/analyze';
+
+const peaks = computePeaks(channels, clip.sampleRate, {baseSamplesPerPeak: 256});
+// peaks.levels[0] is the finest level; peaks.levels[n] is the coarsest.
+```
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `baseSamplesPerPeak` | `256` | Source samples summarized by one min/max pair at the finest level. Smaller = finer detail and larger output. |
+| `minPeaksPerLevel` | `1` | Stop coarsening once a level has fewer than this many peaks. |
+
+The returned [`AudioPeaks`](/audio/api/) carries `sampleRate`, `channels`, `baseSamplesPerPeak`, and the `levels` array.
+
+## Loudness
+
+`measureLoudness` returns RMS, a peak dBFS field named `truePeakDb`, and integrated loudness in LUFS. The current `truePeakDb` implementation uses the largest decoded sample, without oversampling, so it does **not** establish inter-sample true peak. Integrated loudness follows ITU-R BS.1770 / EBU R128: per-channel K-weighting (a two-stage IIR re-derived for the clip's sample rate), then mean-square gating over 400 ms blocks (100 ms hop) with an absolute gate at −70 LUFS and a relative gate 10 LU below the ungated mean.
+
+```ts
+import {measureLoudness} from '@webmusic/audio/analyze';
+
+const {rms, truePeakDb, integratedLufs, momentary} = measureLoudness(channels, clip.sampleRate);
+```
+
+| Field | Description |
+| --- | --- |
+| `rms` | Linear root-mean-square amplitude over the whole clip, in `[0, 1]`. |
+| `truePeakDb` | Largest decoded sample in dBFS (`0` dB = full scale; `-Infinity` for digital silence). The field name does not imply inter-sample true-peak measurement. |
+| `integratedLufs` | Integrated loudness in LUFS (`-Infinity` for digital silence). |
+| `momentary` | `Float32Array` momentary-loudness curve, one gated 400 ms value per 100 ms hop. |
+
+## Spectrogram
+
+`computeSpectrogram` runs a self-built STFT (framing → Hann window → hop → magnitude) over a pluggable `FFTBackend` for one channel. The default backend is `fft.js` (radix-4 real FFT); `webfft` can be slotted in behind the same interface. An optional triangular mel filterbank reduces the linear bins to `mel` mel bands.
+
+```ts
+import {computeSpectrogram} from '@webmusic/audio/analyze';
+
+const spec = computeSpectrogram(mono, clip.sampleRate, {fftSize: 1024, hopSize: 256});
+// magnitude of bin b in frame f:
+const value = spec.magnitudes[f * spec.binsPerFrame + b];
+```
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `fftSize` | `2048` | FFT window size (power of two recommended). |
+| `hopSize` | `fftSize / 4` | Samples between successive frames. |
+| `mel` | — | When set, project the linear bins onto this many mel bands. |
+| `backend` | `fft.js` | Override the `FFTBackend` (its `size` must equal `fftSize`). |
+
+The result is a [`SpectrogramData`](#shared-result-types): `times`, `frequencies`, the flat row-major `magnitudes`, and `binsPerFrame`. It is exactly the structural shape `renderSpectrogramVisualizer` in `@webmusic/audio/view` consumes.
+
+### Custom FFT backend
+
+`FFTBackend` is a one-method interface (`forward(frame)` returns the magnitude spectrum of length `size / 2 + 1`). `createFftJsBackend(size)` builds the default; pass your own to swap in `webfft` or a WASM kernel.
+
+```ts
+import {computeSpectrogram, createFftJsBackend, type FFTBackend} from '@webmusic/audio/analyze';
+
+const backend: FFTBackend = createFftJsBackend(2048);
+const spec = computeSpectrogram(mono, clip.sampleRate, {fftSize: 2048, backend});
+```
+
+## Onsets
+
+`detectOnsets` does spectral-flux onset detection with an adaptive threshold over a single channel: it reuses the STFT, sums the half-wave-rectified bin-to-bin magnitude increases per frame, then peak-picks above a local-mean threshold (with an energy-relative floor that suppresses the spectral-leakage "onsets" a sustained tone would otherwise trigger). It returns ascending onset times in seconds.
+
+```ts
+import {detectOnsets} from '@webmusic/audio/analyze';
+
+const onsets = detectOnsets(mono, clip.sampleRate, {thresholdFactor: 1.5});
+```
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `fftSize` | `1024` | STFT window size. |
+| `hopSize` | `fftSize / 2` | Samples between frames. |
+| `windowFrames` | `6` | Sliding-window radius (frames) for the adaptive threshold. |
+| `thresholdFactor` | `1.5` | Multiplier on the local mean flux. |
+| `delta` | auto | Absolute floor added to the local mean (auto-scaled from peak flux). |
+| `minIntervalSeconds` | `0.03` | Minimum gap between onsets. |
+
+For an offline onset-spacing report, `histogramOnsetIntervals` groups positive
+gaps between consecutive onset times. This is report data, not an Analyze
+Element or a playback cursor:
+
+```ts
+import {detectOnsets, histogramOnsetIntervals} from '@webmusic/audio/analyze';
+
+const onsets = detectOnsets(mono, clip.sampleRate);
+const bins = histogramOnsetIntervals(onsets);
+// Each OnsetIntervalBin has startSeconds, optional endSeconds and count.
+```
+
+`bucketSeconds` defaults to `0.05` seconds. Gaps from `overflowSeconds`
+(default `2` seconds) go into the final open-ended bin, whose
+`endSeconds` is absent. Non-finite or non-increasing adjacent gaps are skipped;
+invalid bucket or overflow options throw `RangeError`. Use
+`OnsetIntervalBin[]` in application-owned charts or tables.
+
+## Key
+
+`detectAudioKey` estimates the musical key: it folds every spectral bin onto its pitch class (a 12-bin chromagram, magnitude-weighted across frames) and correlates that histogram against all 24 rotated Krumhansl–Schmuckler major/minor key profiles. Channels are mixed to mono internally. The two building blocks are exported too — `computeChromagram` (channels → 12-bin `Float64Array`) and `keyFromChroma` (chroma → ranked result).
+
+```ts
+import {detectAudioKey, computeChromagram, keyFromChroma} from '@webmusic/audio/analyze';
+
+const {tonic, mode, confidence, scores} = detectAudioKey(channels, clip.sampleRate);
+
+// Or in two steps:
+const chroma = computeChromagram(channels, clip.sampleRate, {minFreq: 55, maxFreq: 5000});
+const key = keyFromChroma(chroma);
+```
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `fftSize` | `4096` | STFT window size. |
+| `hopSize` | `fftSize / 2` | Samples between frames. |
+| `minFreq` | `55` (A1) | Lowest frequency folded into the chromagram. |
+| `maxFreq` | `5000` | Highest frequency folded in (capped at Nyquist). |
+
+The [`AudioKeyResult`](#shared-result-types) carries `tonic`, `mode`, a `confidence` in `[0, 1]` (the gap between the best and runner-up candidate), and the full ranked `scores`.
+
+## Tempo
+
+`detectTempo` estimates BPM and a beat grid, returning a Promise. The default engine is `music-tempo` (offline); on silence or a signal with no detectable onsets it falls back to a synthetic 120-BPM grid so the call never rejects. The advanced engines dynamically import their optional peer and fall back to the default on a missing peer.
+
+```ts
+import {detectTempo} from '@webmusic/audio/analyze';
+
+const {bpm, confidence, grid} = await detectTempo(channels, clip.sampleRate);
+// grid is a @webmusic/audio BeatGrid → anchors looping / quantization.
+```
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `engine` | `'music-tempo'` | One of `TempoEngine`: `'music-tempo'`, `'essentia'`, `'aubio'`, `'realtime'`. |
+| `sampleRate` | — | Reserved option on `TempoOptions`. |
+
+`detectTempo` accepts either a channel array or a single mono `Float32Array`. The `'realtime'` engine (`realtime-bpm-analyzer`) is an AudioWorklet-based online analyzer with no offline buffer API, so it gracefully falls back to the offline default. The [`TempoResult`](#shared-result-types) carries `bpm`, a `confidence` in `[0, 1]` derived from beat-interval regularity, and the `grid`.
+
+## Pitch
+
+`trackPitch` does per-frame monophonic fundamental-frequency tracking over a single channel, returning a Promise. The default engine is `pitchy` (McLeod Pitch Method, pure TS); `'pitchfinder'` and `'aubio'` are optional peers with graceful fallback. Frames below the clarity threshold report a frequency of `0`.
+
+```ts
+import {trackPitch} from '@webmusic/audio/analyze';
+
+const {times, frequencies, confidences} = await trackPitch(mono, clip.sampleRate, {
+  clarityThreshold: 0.6,
+});
+// frequencies[f] is 0 for unvoiced / sub-threshold frames.
+```
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `engine` | `'pitchy'` | One of `PitchEngine`: `'pitchy'`, `'pitchfinder'`, `'aubio'`. |
+| `frameSize` | `2048` | Analysis window length in samples. |
+| `hopSize` | `frameSize / 4` | Samples between frames. |
+| `clarityThreshold` | `0.6` | Discard detections below this clarity (`0..1`). |
+
+The [`PitchTrackResult`](#shared-result-types) carries `times`, `frequencies`, and `confidences`, all `Float32Array`s of one value per frame.
+
+## Frame features
+
+`extractFeatures` computes offline frame-level audio features via Meyda over a single channel. Framing and hopping are done here (Meyda has no offline streaming); scalar features (e.g. `rms`, `spectralCentroid`) collect into one `Float32Array` per feature, while vector features (e.g. `mfcc`, `chroma`) collect into an array of per-frame `Float32Array`s. `DEFAULT_FEATURES` is a compact timbral fingerprint.
+
+```ts
+import {extractFeatures, DEFAULT_FEATURES} from '@webmusic/audio/analyze';
+
+const f = extractFeatures(mono, clip.sampleRate, ['rms', 'mfcc'], {bufferSize: 512});
+f.features.rms;   // Float32Array — one value per frame
+f.features.mfcc;  // Float32Array[] — one MFCC vector per frame
+
+DEFAULT_FEATURES; // ['rms', 'spectralCentroid', 'spectralRolloff', 'spectralFlatness', 'zcr', 'mfcc']
+```
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `bufferSize` | `512` | Analysis window length in samples (power of two). |
+| `hopSize` | `bufferSize` | Samples between frames (default: no overlap). |
+
+The [`AudioFeatureFrames`](#shared-result-types) carries `times`, the resolved `featureNames`, and the `features` record.
+
+## Clip summary
+
+`summarizeClip` is the cheap, headless overview of an `AudioClip` — duration, sample rate, channel count, length, and file-tag title/artist read straight off the clip. Integrated LUFS is included only when the clip actually carries decoded samples (a streaming-only clip has none).
+
+```ts
+import {summarizeClip} from '@webmusic/audio/analyze';
+
+const {durationSeconds, sampleRate, channels, integratedLufs} = summarizeClip(clip);
+```
+
+`ClipSummary` fields: `durationSeconds`, `sampleRate`, `channels`, `length`, optional `title` / `artist`, and optional `integratedLufs`.
+
+## The session and the realtime analyzer
+
+`createAudioAnalysisSession` and `createRealtimeAnalyzer` live on
+`@webmusic/audio/analyze/headless` and are documented under
+[Headless › Analyze](/audio/headless/#analyze). Everything on this page is
+one-shot: hand it a clip, get the numbers.
+
+## Analysis in a Worker
+
+Even incrementally, the session runs on the calling thread. To move peaks / loudness / STFT / tempo off the main thread, `createAnalysisWorker` spawns the bundled module worker (`@webmusic/audio/analyze/worker`), which hosts a worker-resident session and exposes the same results behind a Promise API. The worker is **stateful**: `analyze` first makes defensive channel copies, then transfers those copies without another copy. Later `update` calls re-analyze by `clipId` from a serializable list of edits — the big sample arrays do not cross the boundary again. `release` drops a clip's cache.
+
+```ts
+import {createAnalysisWorker} from '@webmusic/audio/analyze';
+
+const client = createAnalysisWorker();    // spawns @webmusic/audio/analyze/worker as a module worker
+const result = await client.analyze(clip, {tasks: ['peaks', 'loudness', 'onsets']});
+
+const updated = await client.update(clip, [
+  {op: 'gain', factor: 0.5, startSeconds: 1, endSeconds: 2},
+]);                                        // incremental, off-thread, replayed in the worker
+
+client.release(clip);                      // drop the worker-side cache for this clip
+client.dispose();                          // terminate the worker; in-flight requests reject
+```
+
+- **Register once, analyze by id.** `analyze` registers defensive copies of the clip's channels the first time it sees a `clipId`; later `update` calls ship only the `ClipEditDescriptor[]` and the worker replays them onto the cached samples, so the session's incremental caches still apply.
+- **Fallback.** When `Worker` is unavailable (Node, SSR) — or constructing one throws — the client transparently runs an in-process session behind the same Promise API.
+- **Custom bundling.** Pass your own Worker or factory — `createAnalysisWorker(worker)` or `createAnalysisWorker(() => worker)` — if the default `new Worker(new URL('./worker.js', import.meta.url), {type: 'module'})` does not suit your bundler.
+
+The wire protocol is exported for advanced use: `handleAnalyzeRequest(state, message)` is the pure, worker-global-free message handler (paired with `createAnalysisWorkerState()`), and the request/response shapes (`AnalyzeWorkerRequest`, `AnalyzeWorkerResponse`, and the per-message `RegisterRequest` / `AnalyzeRequest` / `UpdateRequest` / `ReleaseRequest`) describe the `@webmusic/audio/analyze/worker` boundary. `createRequestTracker()` is the pure id-correlation helper the client uses to match responses to pending promises.
+
+## Audio → Score transcription
+
+`transcribe` turns audio into **family-neutral note events** (audio → MIDI-style notes). It lives at its **own subpath** so consumers who never call it pay nothing, and all of its heavy dependencies are **optional peers** reached only through guarded dynamic `import()` — the build and typecheck pass with none installed, and calling it without them throws a clear, actionable error. Assembling the notes into an `@webmusic/score` `Score` is deliberately not this package's job — that cross-family step belongs to `@webmusic/bridge`.
+
+```ts
+import {transcribe} from '@webmusic/audio/analyze/transcribe';
+import {scoreFromTranscription} from '@webmusic/bridge';
+
+const {notes, confidence, bpm} = await transcribe(clip, {quantize: true});
+const score = scoreFromTranscription(notes, {bpm});
+```
+
+The default engine is `'basic-pitch'` (`@spotify/basic-pitch` + `@tensorflow/tfjs`, a CNN audio→MIDI model resampled to 22.05 kHz mono); `'magenta-oaf'` selects `@magenta/music`'s Onsets & Frames (narrow: solo piano). When `quantize` is on, note times snap to a sixteenth-note grid of the clip's `beatGrid` (or one you supply).
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `engine` | `'basic-pitch'` | `'basic-pitch'` or `'magenta-oaf'`. |
+| `onsetThreshold` | `0.5` | Note-onset probability threshold in `[0, 1]`. |
+| `frameThreshold` | `0.3` | Frame (sustain) probability threshold in `[0, 1]`. |
+| `minNoteLength` | `0.058` | Drop notes shorter than this (seconds). |
+| `quantize` | `true` | Snap note times to a beat grid. |
+| `beatGrid` | `clip.beatGrid` | The `BeatGrid` to quantize against. |
+
+The `TranscriptionResult` carries `notes` — an array of `TranscribedNote` (`startSeconds`, `endSeconds`, `midi`, `velocity`) — a `confidence` in `[0, 1]` (mean of note amplitudes), and `bpm` (the supplied beat-grid tempo when present, otherwise the clip beat-grid tempo, or `120` when neither exists). It does not contain a `Score`; pass `notes` and `bpm` to `scoreFromTranscription` from `@webmusic/bridge` when you need one.
+
+Install the optional engine peers to use transcription, and add the bridge when you want to assemble a `Score`:
+
+```bash
+npm i @spotify/basic-pitch @tensorflow/tfjs @webmusic/bridge
+```
+
+## Shared result types
+
+The result shapes are exported as types for typing your own pipelines (re-exported from `./types`):
+
+| Type | Description |
+| --- | --- |
+| `AudioAnalysisResult` | The full session result: `peaks`, `loudness`, and the optional `tempo` / `key` / `onsets` / `pitchTrack` / `spectrogram` / `features`. |
+| `AudioAnalysisTask` | A task name accepted by the session (`'peaks' \| 'loudness' \| 'tempo' \| 'key' \| 'onsets' \| 'pitch' \| 'spectrogram' \| 'features'`). |
+| `LoudnessResult` | `rms`, `truePeakDb`, `integratedLufs`, optional `momentary`. |
+| `TempoResult` | `bpm`, `confidence`, `grid` (a core `BeatGrid`). |
+| `AudioKeyResult` | `tonic`, `mode`, `confidence`, optional ranked `scores`. |
+| `PitchTrackResult` | `times`, `frequencies`, `confidences` (`Float32Array` each). |
+| `SpectrogramData` | `times`, `frequencies`, `magnitudes`, `binsPerFrame`. |
+| `AudioFeatureFrames` | `times`, `featureNames`, and the `features` record. |
+
+## API Reference — `@webmusic/audio/analyze`
+
+This table names exports of the capability root. The two stateful factories
+are values from [`/analyze/headless`](/audio/headless/#analyze), while
+`transcribe` and its result types are exclusive to
+[`/analyze/transcribe`](#audio--score-transcription).
+
+| API | Kind | Use it for |
+| --- | --- | --- |
+| `computePeaks(channels, sampleRate, opts?)` | Peaks | Build a multi-resolution min/max peaks pyramid for waveform rendering. |
+| `measureLoudness(channels, sampleRate)` | Loudness | RMS, true-peak (dBFS), integrated LUFS, and the momentary curve. |
+| `computeSpectrogram(channel, sampleRate, opts?)` | Spectrogram | STFT magnitude spectrogram (optionally mel-projected). |
+| `createFftJsBackend(size)` | Spectrogram | The default `fft.js` `FFTBackend`; swap for `webfft` or your own. |
+| `detectOnsets(channel, sampleRate, opts?)` | Onsets | Spectral-flux onset times in seconds. |
+| `histogramOnsetIntervals(onsets, opts?)` | Onsets | Static spacing distribution, with 50 ms bins and a 2 s overflow by default. |
+| `detectAudioKey(channels, sampleRate, opts?)` | Key | Krumhansl–Schmuckler key, mode, confidence, and candidates. |
+| `computeChromagram(channels, sampleRate, opts?)` | Key | The 12-bin pitch-class chromagram (`Float64Array`). |
+| `keyFromChroma(chroma)` | Key | Rank the 24 key profiles against a chroma histogram. |
+| `detectTempo(input, sampleRate, opts?)` | Tempo | Async BPM + `BeatGrid` (default `music-tempo`; optional engines). |
+| `trackPitch(channel, sampleRate, opts?)` | Pitch | Async per-frame monophonic f0 track (default `pitchy`). |
+| `extractFeatures(channel, sampleRate, names?, opts?)` | Features | Per-frame Meyda features (scalar + vector). |
+| `DEFAULT_FEATURES` | Features | The default Meyda feature set. |
+| `summarizeClip(clip)` | Summary | Duration, sample rate, channels, tags, and integrated LUFS. |
+| `createAnalysisWorker(workerOrFactory?)` | Worker | Off-main-thread analysis behind `analyze` / `update` promises, with an in-process fallback. |
+| `configureAnalysisWorkerScriptUrl(scriptUrl?)`, `resolveAnalysisWorkerUrl(moduleUrl?, classicScriptUrl?)` | Worker | Resolve or configure the shipped worker URL for classic-script hosting; see [Analysis in a Worker](#analysis-in-a-worker). |
+| `createRequestTracker()` | Worker | Pure request-id correlation helper used by the client. |
+| `createAnalysisWorkerState()`, `handleAnalyzeRequest(state, msg)` | Worker | The worker's mutable state and its pure, testable message handler. |
+| `ComputePeaksOptions`, `SpectrogramOptions`, `FFTBackend`, `OnsetOptions`, `OnsetIntervalHistogramOptions`, `OnsetIntervalBin`, `KeyOptions`, `TempoOptions`, `TempoEngine`, `PitchOptions`, `PitchEngine`, `ExtractFeaturesOptions` | Type | Analyzer option bags, interval bins and engine unions. |
+| `RealtimeAnalyzer`, `RealtimeAnalyzerOptions`, `RealtimeFrame`, `RealtimeSource` | Type | The realtime analyzer handle, options, frame, and source. |
+| `AudioAnalysisSession`, `AudioAnalysisSessionOptions` | Type | The incremental session interface and its options. |
+| `AnalysisWorkerClient`, `AnalysisWorkerLike`, `AnalysisWorkerFactory`, `AnalyzeCallOptions`, `RequestTracker` | Type | The worker client and the worker/factory shapes it accepts. |
+| `AnalyzeWorkerRequest`, `AnalyzeWorkerResponse`, `RegisterRequest`, `AnalyzeRequest`, `UpdateRequest`, `ReleaseRequest`, `AudioWorkerState` | Type | The `@webmusic/audio/analyze/worker` message protocol. |
+| `AudioAnalysisResult`, `AudioAnalysisTask`, `LoudnessResult`, `TempoResult`, `AudioKeyResult`, `PitchTrackResult`, `SpectrogramData`, `AudioFeatureFrames`, `ClipSummary` | Type | Shared analysis result and summary shapes. |
+
+The [`@webmusic/audio/analyze/headless`](/audio/headless/#analyze) entry owns
+`createAudioAnalysisSession` and `createRealtimeAnalyzer`.
+`@webmusic/audio/analyze/transcribe` exports `transcribe`, `TranscribeOptions`,
+`TranscribedNote` and `TranscriptionResult`; its options and conversion boundary
+are explained [above](#audio--score-transcription).

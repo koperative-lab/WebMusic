@@ -1,0 +1,158 @@
+---
+import LiveDemoCanvas from '../LiveDemoCanvas.astro';
+const SRC = `${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`;
+---
+
+<div class="wui-panel wui-panel--flow not-content">
+  <div class="wui-panel__title">
+    <span>@webmusic/audio/play/headless</span>
+    <strong>AudioPlayer</strong>
+  </div>
+  <LiveDemoCanvas size="compact" label="Headless audio player">
+    <div class="audio-player-demo" data-hl-audio-player data-src={SRC}>
+      <div class="wui-row">
+        <button class="wui-btn" data-load type="button">Load sample</button>
+        <label>Source
+          <select data-source disabled>
+            <option value="" disabled>Choose source</option>
+            <option value="clip" selected>Single clip</option>
+            <option value="queue">Two-pass playlist</option>
+          </select>
+        </label>
+        <button class="wui-btn" data-play type="button" disabled>Play</button>
+        <button class="wui-btn" data-stop type="button" disabled>Stop</button>
+        <button class="wui-btn" data-clear type="button" disabled>Clear source</button>
+      </div>
+      <label class="audio-player-demo__seek">Position
+        <input data-seek type="range" min="0" max="1" step="0.001" value="0" disabled />
+        <output class="wui-readout" data-time>0.0 / 0.0 s</output>
+      </label>
+      <div class="wui-row">
+        <label>Volume
+          <input data-volume type="range" min="0" max="1" step="0.01" value="0.7" />
+        </label>
+        <output class="wui-readout" data-state>Empty · source revision 0</output>
+      </div>
+      <p class="doc-status" data-status role="status">Load the sample, then play. Switching sources keeps this same AudioPlayer object.</p>
+    </div>
+  </LiveDemoCanvas>
+</div>
+
+<script>
+  import {loadClipFromUrl} from '@webmusic/audio/play';
+  import {AudioPlayer, AudioPlaylist} from '@webmusic/audio/play/headless';
+  import type {AudioClip} from '@webmusic/audio';
+  import {mountDemos, type DemoScope} from '../demo-lifecycle';
+
+  const setup = (root: HTMLElement, scope: DemoScope): void => {
+    const load = root.querySelector<HTMLButtonElement>('[data-load]')!;
+    const source = root.querySelector<HTMLSelectElement>('[data-source]')!;
+    const play = root.querySelector<HTMLButtonElement>('[data-play]')!;
+    const stop = root.querySelector<HTMLButtonElement>('[data-stop]')!;
+    const clear = root.querySelector<HTMLButtonElement>('[data-clear]')!;
+    const seek = root.querySelector<HTMLInputElement>('[data-seek]')!;
+    const volume = root.querySelector<HTMLInputElement>('[data-volume]')!;
+    const time = root.querySelector<HTMLOutputElement>('[data-time]')!;
+    const state = root.querySelector<HTMLOutputElement>('[data-state]')!;
+    const status = root.querySelector<HTMLElement>('[data-status]')!;
+    const player = new AudioPlayer(undefined, {volume: 0.7, cursorIntervalMs: 50});
+    let clip: AudioClip | undefined;
+    let queue: AudioPlaylist | undefined;
+    let revision = 0;
+    let loadRevision = 0;
+    let loadController: AbortController | undefined;
+    scope.add(() => player.dispose());
+    // The demo owns the queue; the facade only borrows it. Release it before
+    // the facade closes the context that decoding and both sources share.
+    scope.add(() => {loadRevision++; loadController?.abort(); queue?.dispose();});
+
+    const refresh = (): void => {
+      if (!scope.active) return;
+      const available = !!player.clip || !!player.transport;
+      play.disabled = stop.disabled = clear.disabled = !available;
+      source.disabled = !clip;
+      seek.disabled = !available || player.duration <= 0;
+      play.textContent = player.playing ? 'Pause' : 'Play';
+      seek.value = String(Math.max(0, Math.min(1, player.progress)));
+      seek.setAttribute('aria-valuetext', `${player.seconds.toFixed(1)} seconds`);
+      time.textContent = `${player.seconds.toFixed(1)} / ${player.duration.toFixed(1)} s`;
+      const backend = player.transport ? `Playlist · pass ${Math.max(0, (queue?.index ?? -1) + 1)}/2` : player.clip ? 'Clip' : 'Empty';
+      state.textContent = `${backend} · ${player.playing ? 'playing' : 'paused'} · source revision ${revision}`;
+    };
+    const failure = (error: unknown): void => {
+      if (!scope.active) return;
+      status.textContent = error instanceof Error ? error.message : String(error);
+      refresh();
+    };
+    const selectSource = (): void => {
+      if (!clip) return;
+      if (source.value === 'queue' && queue) player.setTransport(queue);
+      else {source.value = 'clip'; player.setClip(clip);}
+      refresh();
+    };
+    scope.add(player.on('sourcechange', (detail) => {revision = detail.revision; refresh();}));
+    scope.add(player.on('statechange', refresh));
+    scope.add(player.on('timeupdate', refresh));
+    scope.add(player.on('end', () => {if (scope.active) status.textContent = 'Playback complete.'; refresh();}));
+    scope.add(player.on('error', failure));
+
+    scope.listen(load, 'click', async () => {
+      const request = ++loadRevision;
+      loadController?.abort();
+      const controller = new AbortController();
+      loadController = controller;
+      load.disabled = true;
+      status.textContent = 'Loading sample…';
+      try {
+        const context = player.audioContext;
+        const loaded = await loadClipFromUrl(root.dataset.src!, {context, signal: controller.signal});
+        if (!scope.active || request !== loadRevision) return;
+        const previousQueue = queue;
+        clip = loaded;
+        queue = new AudioPlaylist({audioContext: context, entries: [
+          {id: 'first-pass', label: 'First pass', clip},
+          {id: 'second-pass', label: 'Second pass', clip},
+        ]});
+        selectSource();
+        previousQueue?.dispose();
+        status.textContent = 'Ready. Source switching pauses the previous backend; Play starts the selected one.';
+        load.textContent = 'Reload sample';
+      } catch (error) {
+        if (request === loadRevision) failure(error);
+      } finally {
+        if (scope.active && request === loadRevision) {loadController = undefined; load.disabled = false; refresh();}
+      }
+    });
+    scope.listen(source, 'change', () => {try {selectSource();} catch (error) {failure(error);}});
+    scope.listen(play, 'click', async () => {
+      try {
+        if (player.playing) player.pause();
+        else await player.play();
+        refresh();
+      } catch (error) {failure(error);}
+    });
+    scope.listen(stop, 'click', () => {player.stop(); refresh();});
+    scope.listen(clear, 'click', () => {
+      loadRevision++; loadController?.abort(); loadController = undefined; load.disabled = false;
+      player.stop();
+      player.setClip(undefined);
+      source.value = '';
+      status.textContent = 'Source cleared. Choose a source to reuse this same player.';
+      refresh();
+    });
+    scope.listen(seek, 'input', () => {player.seekFraction(Number(seek.value)); refresh();});
+    scope.listen(volume, 'input', () => {player.setVolume(Number(volume.value)); refresh();});
+    refresh();
+  };
+
+  const unregister = mountDemos('[data-hl-audio-player]', setup);
+  if (import.meta.hot) import.meta.hot.dispose(unregister);
+</script>
+
+<style>
+  .audio-player-demo { display: grid; grid-template-columns: minmax(0, 1fr); gap: .5rem; min-width: 0; }
+  .audio-player-demo label { display: inline-flex; align-items: center; gap: .5rem; }
+  .audio-player-demo__seek { display: flex; flex-wrap: wrap; }
+  .audio-player-demo__seek input { flex: 1; min-width: 6rem; }
+  .audio-player-demo p { margin: 0; }
+</style>

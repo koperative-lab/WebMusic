@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // ============================================================================
-// Source-based documentation gates. Optional local guidance in
-// .dev/docs/DOCS-CONVENTIONS.md describes coverage and manual acceptance.
+// Source-based documentation gates. dev/docs/DOCS-CONVENTIONS.md describes their
+// exact coverage; templates also contain manual acceptance requirements.
 //
 //   1. params catalog  ==  each element's `static observedAttributes`
 //   2. catalog integrity — every tag has a page, an entry and a live href
-//   3. selected element page structure, Headless leaf/demo shape and exported names
+//   3. selected element page structure, shared Score Headless leaf/demo shape and exports
 //   4. live demo integration — every rendered demo uses LiveDemoCanvas
 //   5. plan rules — both family form inventories exist and carry no demos, dense
 //      element order, UI Kit labels mirror the catalog, root API entry coverage
@@ -20,9 +20,9 @@
 import {existsSync, readFileSync, readdirSync, statSync} from 'node:fs';
 import {join, relative, dirname} from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
-import {domainFamilies, packageDirectories} from './package-policy.mjs';
 import {headlessDocProblems} from './headless-docs-policy.mjs';
 import {declaredAgentContextPaths} from '../apps/doc/webmusic/scripts/agent-context.mjs';
+import {audioBridgeContext} from '../apps/doc/webmusic/scripts/agent-context-audio-bridge.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DOCS = 'apps/doc/webmusic/src/content/docs';
@@ -78,12 +78,23 @@ function resolveList(source, name) {
 
 /**
  * The element's observed attributes, with every `...spread` resolved. An
- * element with no getter observes nothing — `<rack-control>` is driven only by
+ * element with no getter observes nothing — `<score-rack-control>` is driven only by
  * `.rack` — which is an empty list, not a failure.
  */
-function observedAttributes(source, file) {
+function observedAttributes(source, file, seen = new Set()) {
   const body = /static get observedAttributes\(\)[^{]*\{\s*return\s*\[([\s\S]*?)\];/.exec(source);
-  if (!body) return /static get observedAttributes/.test(source) ? null : [];
+  if (!body) {
+    if (/static get observedAttributes/.test(source)) return null;
+    const adapter = /export\s*\{[^}]*\}\s*from\s*['"](\.[^'"]+)['"]/.exec(source);
+    if (adapter && !seen.has(file)) {
+      const target = join(dirname(file), `${adapter[1]}.ts`);
+      if (existsSync(abs(target))) {
+        seen.add(file);
+        return observedAttributes(read(target), target, seen);
+      }
+    }
+    return [];
+  }
   const names = [];
   for (const line of body[1].split(',')) {
     const literal = /['"]([a-z][a-z0-9-]*)['"]/.exec(line);
@@ -105,7 +116,7 @@ function observedAttributes(source, file) {
 
 function elementSources() {
   const byTag = {};
-  for (const family of domainFamilies) {
+  for (const family of ['score', 'audio']) {
     for (const capability of ['play', 'view', 'analyze']) {
       const dir = `packages/${family}/src/${capability}/element`;
       for (const name of readdirSync(abs(dir))) {
@@ -119,7 +130,7 @@ function elementSources() {
 }
 
 async function checkParams(sources) {
-  const groups = domainFamilies.flatMap((family) => ['play', 'view', 'analyze'].map((capability) => `${family}-${capability}`));
+  const groups = ['score-play', 'score-view', 'score-analyze', 'audio-play', 'audio-view', 'audio-analyze'];
   const catalog = {};
   for (const group of groups) {
     const module = await load(`apps/doc/webmusic/src/lib/params/${group}.ts`);
@@ -245,7 +256,7 @@ function checkTitles(files) {
     }
     const title = raw.replace(/^['"]|['"]$/g, '');
 
-    const api = /^(score)\/api\/([a-z-]+)\.mdx$/.exec(page);
+    const api = /^(score|audio)\/api\/([a-z-]+)\.mdx$/.exec(page);
     if (api) {
       const entry = api[2] === 'index' ? `@webmusic/${api[1]}` : `@webmusic/${api[1]}/${api[2]}`;
       if (title !== entry) fail('title', `${page}: title is "${title}", expected '${entry}'`);
@@ -260,6 +271,9 @@ function checkTitles(files) {
     // its title is the entry as imported.
     if (page === 'uikit/api.mdx' && title !== '@webmusic/ui') {
       fail('title', `${page}: title is "${title}", expected '@webmusic/ui'`);
+    }
+    if (page === 'bridge/api.mdx' && title !== '@webmusic/bridge') {
+      fail('title', `${page}: title is "${title}", expected '@webmusic/bridge'`);
     }
   }
 }
@@ -278,7 +292,7 @@ function checkTitles(files) {
 function checkCapabilityGroups(files) {
   const groups = {};
   for (const file of files) {
-    const match = /^(score)\/element\/(play|analyze|view)\/([a-z-]+)\.mdx$/.exec(relative(DOCS, file));
+    const match = /^(score|audio)\/element\/(play|analyze|view)\/([a-z-]+)\.mdx$/.exec(relative(DOCS, file));
     if (!match) continue;
     const [, family, capability, name] = match;
     if (name === 'index') {
@@ -302,7 +316,7 @@ function checkCapabilityGroups(files) {
 
   // Both form inventories are required, and for the same reason: each is the
   // only page that lists its whole form for the family.
-  for (const family of domainFamilies) {
+  for (const family of ['score', 'audio']) {
     for (const [form, what] of [['element', 'Web Components'], ['headless', 'Headless']]) {
       const inventory = `${DOCS}/${family}/${form}/index.mdx`;
       if (!existsSync(abs(inventory))) {
@@ -580,7 +594,7 @@ function publicAssets() {
     for (const name of readdirSync(abs(dir))) {
       const path = `${dir}/${name}`;
       if (statSync(abs(path)).isDirectory()) scan(path, `${prefix}${name}/`);
-      else assets.add(`/${prefix}${name}`);
+      else assets.add(`/${prefix}${encodeURIComponent(name)}`);
     }
   };
   scan('apps/doc/webmusic/public', '');
@@ -691,7 +705,7 @@ function checkDocumentedCssVariables(files) {
       else if (name.endsWith('.ts')) sources.push(read(path));
     }
   };
-  for (const pkg of packageDirectories.filter((directory) => directory.startsWith('packages/')).map((directory) => `${directory}/src`)) collect(pkg);
+  for (const pkg of ['packages/score/src', 'packages/audio/src', 'packages/ui/src']) collect(pkg);
   const source = sources.join('\n');
   const live = (name) =>
     source.includes(`var(${name}`) ||
@@ -722,7 +736,7 @@ const pages = collectPages(files);
 await checkCatalogs(pages, paramsCatalog);
 checkElementPages(files, paramsCatalog);
 for (const message of headlessDocProblems({
-  pages: files.map((file) => ({file, source: read(file)})),
+  pages: files.filter((file) => file.startsWith(`${DOCS}/score/headless/`)).map((file) => ({file, source: read(file)})),
   readFile: read,
   frameFile: 'apps/doc/webmusic/src/components/HeadlessDemoFrame.astro',
 })) fail('headless-page', message);
@@ -736,20 +750,24 @@ checkEntrySections(
   /^## [a-z-]+ — @webmusic\/kernel\/([a-z-]+)$/gm,
 );
 checkRootEntryCoverage(`${DOCS}/kernel/api.mdx`, 'platform/kernel/package.json', '@webmusic/kernel');
-for (const family of domainFamilies) {
-  checkRootEntryCoverage(`${DOCS}/${family}/api/index.mdx`, `packages/${family}/package.json`, `@webmusic/${family}`);
-}
+checkRootEntryCoverage(`${DOCS}/score/api/index.mdx`, 'packages/score/package.json', '@webmusic/score');
+checkRootEntryCoverage(`${DOCS}/audio/api/index.mdx`, 'packages/audio/package.json', '@webmusic/audio');
 checkRootEntryCoverage(`${DOCS}/uikit/api.mdx`, 'packages/ui/package.json', '@webmusic/ui');
-for (const family of domainFamilies) {
+// The bridge is a single-entry package: its export map has nothing but the
+// root and ./package.json, so coverage is vacuous and the page is held to the
+// title rule instead. Every root EXPORT is listed in its API Reference table,
+// which no check verifies yet — the same gap the other API pages have.
+checkRootEntryCoverage(`${DOCS}/bridge/api.mdx`, 'bridges/score-audio/package.json', '@webmusic/bridge');
+for (const family of ['score', 'audio']) {
   for (const capability of ['play', 'analyze', 'view']) {
     checkHeadlessExports(family, capability);
   }
 }
 checkDocsCssNamespace();
 checkDocumentedCssVariables(files);
-// Generated routes come from the same manifest used by the site integration;
-// the build verifies that these files are emitted with their expected bytes.
-const generatedAssets = await declaredAgentContextPaths({root: ROOT});
+// Use the same Audio/Bridge additions as the docs integration. Built-output
+// verification checks emitted files; this source gate checks declared routes.
+const generatedAssets = await declaredAgentContextPaths({root: ROOT, extension: audioBridgeContext});
 checkLinks(files, pages, astroRedirects(), new Set([...publicAssets(), ...generatedAssets]));
 
 notes.push(`${files.length} pages · ${Object.keys(paramsCatalog).length} elements · ${pages.size} routes`);

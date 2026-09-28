@@ -1,57 +1,52 @@
 ---
 title: Kernel
-description: Domain-neutral contracts and runtime utilities for Score and custom WebMusic integrations.
+description: The zero-domain runtime kernel every WebMusic package builds on — shared contracts and pure logic, with no Score and no AudioClip.
 ---
 
-`@webmusic/kernel` supplies domain-neutral contracts and runtime logic for
-WebMusic players and custom integrations. It contains event emitters,
-custom-element and worker lifecycle helpers, AudioContext construction,
-playback and effect contracts, and transport math. It imports no Score model.
+`@webmusic/kernel` is the foundation of the WebMusic ecosystem: the contracts
+and pure runtime logic that both families build on. It is deliberately
+**zero-domain** — it knows nothing about scores or clips. No `Note`, no
+`Score`, no `AudioClip`, no `BeatGrid`. What lives here is only what both
+families genuinely share: event emitters, custom-element plumbing, worker
+plumbing, AudioContext construction, playback and effect contracts, and
+transport math.
 
-## Install
+## The five packages
 
-```sh
-npm install @webmusic/kernel
-```
+WebMusic ships five lock-stepped packages. The kernel sits at the bottom of
+the dependency graph and publishes first:
 
-Kernel has no runtime or peer dependencies. Node.js 22 or later is supported;
-ES modules and CommonJS use the same public import paths. Browser-specific
-operations require the relevant Web APIs, while imports remain safe during SSR.
-
-## First-release packages
-
-The first release contains these packages. Kernel provides the shared runtime
-contracts used by Score:
-
-| Package | Role | Workspace peer dependencies |
+| Package | Role | Peer dependencies |
 | --- | --- | --- |
-| `@webmusic/kernel` | Domain-neutral runtime contracts and pure logic | — |
+| `@webmusic/kernel` | Zero-domain runtime contracts and pure logic | — |
 | [`@webmusic/ui`](/uikit/) | Dependency-free DOM presenters and styling hooks | — |
-| [`@webmusic/score`](/score/) | Symbolic music — MIDI, MusicXML, MXL, ABC | Kernel required; UI optional |
+| [`@webmusic/score`](/score/) | Symbolic music — MIDI, MusicXML, MXL, ABC | kernel, ui |
+| [`@webmusic/audio`](/audio/) | Digital audio — decoding, playback, MIR analysis | kernel, ui |
+| [`@webmusic/bridge`](/bridge/) | Code that must know both domains | kernel, score, audio |
 
-Audio and Bridge development continue on the
-[`dev` branch](https://github.com/mrsteamedbun/WebMusic/tree/dev).
+Score and Audio never depend on each other. Anything that needs both —
+synchronized playback, score-to-clip rendering, transcription assembly —
+lives only in the [bridge](/bridge/).
 
-## Shared contracts and explicit instances
+## One shared instance
 
-Score declares Kernel as a required peer so the application resolves a
-compatible runtime contract. UI is optional for code-only Score use and is
-required by Score Elements and UI-backed renderers.
-
-A compatible dependency version does not allocate or share an AudioContext,
-player or transport group. Applications explicitly create, pass and release
-those runtime instances according to the owning API. A custom player can
-implement `PlayerLike` structurally, and Element authors can reuse
-`WebMusicElement` for connected-lifetime cleanup.
+Every consumer declares the kernel (and ui) as a **required peer**, so npm
+installs exactly one copy and version skew fails loudly at install time
+instead of silently duplicating the kernel. At runtime the whole ecosystem
+shares **one** kernel instance. Contracts keep a single identity: a
+`PlayerLike` implemented by a score player is the same interface a transport
+UI checks against, and `instanceof WebMusicElement` works across packages.
+(npm 7+ installs non-optional peers automatically — `npm install
+@webmusic/score` still brings everything it needs.)
 
 ## The admission rule
 
 Code qualifies for the kernel only if:
 
-1. existing duplicated implementations demonstrate a reusable need, or
-2. it is a domain-neutral contract shared by compatible participants.
+1. two drifting copies of it already exist in the families, or
+2. it is a contract both domains must implement.
 
-Domain behavior stays with its owning package. The extraction ledger — what
+Everything else deliberately stays per-family. The extraction ledger — what
 moved here, from where, and what stayed behind — lives in the repository's
 `platform/README.md`.
 
@@ -62,5 +57,5 @@ depending on `@webmusic/kernel` directly and implementing its structural
 contracts — no domain package required. Element authors can subclass
 `WebMusicElement` for connected-lifetime cleanup with SSR-safe imports.
 
-See the [API reference](/kernel/api/) for the ten capability subpaths and their
+See the [API reference](/kernel/api/) for the nine entries and their
 contracts.

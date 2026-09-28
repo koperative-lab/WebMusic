@@ -4,7 +4,7 @@ description: Score visualization — stateless layout APIs, code-only view and n
 ---
 
 
-`@webmusic/score/view` turns `Score` objects into layout data and visual renderings. Its three Web Components are `<score-view>` for score-position views, `<pitch-view>` for sounding pitches, and `<sheet-view>` for optional full engraving.
+`@webmusic/score/view` turns `Score` objects into layout data and visual renderings. Its three Web Components are `<score-view>` for score-position views, `<score-pitch-view>` for sounding pitches, and `<score-sheet-view>` for optional full engraving.
 
 Playback lives in [`@webmusic/score/play`](/score/api/play/). Views borrow player data or events according to their owning contracts; the thumbnail is a passive whole-score preview. Imperative renderers expose `redraw` for application-driven highlighting.
 
@@ -31,50 +31,18 @@ The browser renderer implementation is also separated by responsibility: shared 
 
 ## Web Components
 
-`<score-view>`, `<pitch-view>` and `<sheet-view>` live on `@webmusic/score/view/element`. Their owning pages under [Web Components › View](/score/element/#view) document each tag’s types, attributes, events, player binding and styling. This page owns the code-facing APIs they compose.
+`<score-view>`, `<score-pitch-view>` and `<score-sheet-view>` live on `@webmusic/score/view/element`. Their owning pages under [Web Components › View](/score/element/#view) document each tag’s types, attributes, events, player binding and styling. This page owns the code-facing APIs they compose.
 
 The code-only APIs below let you maintain view state or build your own renderer; the explicit `/render` adapters draw into browser elements. The examples assume a `score` built with `@webmusic/score`.
 
 ## Prepare a score
 
-Score layout APIs work from a `Score`; current-pitch projections below instead accept MIDI values. This page uses a small score built with `@webmusic/score`.
+Score layout APIs work from a `Score`; current-pitch projections below instead accept MIDI values. The live view demos use an opening excerpt of the same Arabesque No. 1 MXL file used by the Score view elements.
 
 ```ts
-import { Duration, MeasureId, PartId, Pitch, Rational, ScoreBuilder, VoiceId } from '@webmusic/score';
+import {loadScoreFromUrl} from '@webmusic/score/io';
 
-const builder = new ScoreBuilder();
-const timeSignature = { numerator: 4, denominator: 4 };
-const partId = PartId('piano');
-const voice = VoiceId('piano-v1');
-
-builder
-  .setMetadata({ title: 'View API Study' })
-  .addTempo({ atQuarters: Rational.ZERO, bpm: 120 })
-  .addMeter({ atQuarters: Rational.ZERO, measureNumber: 1, timeSignature });
-
-builder.addPart({ id: partId, name: 'Piano', staves: 2, midiProgram: 0 });
-builder.addMeasure({
-  id: MeasureId('m1'),
-  number: 1,
-  onsetQuarters: Rational.ZERO,
-  durationQuarters: new Rational(4),
-  timeSignature,
-  keySignature: { fifths: 0, mode: 'major' },
-});
-
-['C4', 'E4', 'G4', 'C5', 'E3', 'G3', 'C4', 'E4'].forEach((name, index) => {
-  const pitch = Pitch.parse(name);
-  builder.addNote(partId, {
-    id: builder.newNoteId(),
-    pitch,
-    onsetQuarters: new Rational(index, 2),
-    duration: Duration.eighth(),
-    voice,
-    staff: pitch.midi < 60 ? 2 : 1,
-  });
-});
-
-const score = builder.build();
+const score = await loadScoreFromUrl('/mxl/Arabesque%20No.1.mxl');
 ```
 
 ## Create a code-only score view
@@ -134,39 +102,16 @@ The render helpers return `RenderedScoreVisualizer<TVisualizer>`:
 | `noteSequence` | Read-only sequence used by this renderer. |
 | `visualizer` | The underlying renderer instance. |
 | `redraw(activeNote?, scrollIntoView?)` | Existing note-driven drawing entry. Exact-time-capable renderers use the nominated note’s onset; OSMD moves its engraving cursor. Returns a renderer coordinate or `null`. |
-| `redrawAtTime?(nominalSeconds, scrollIntoView?)` | Optional position-driven drawing entry. SVG/Canvas piano rolls, waterfall and scrolling staff highlight spans where `startTime <= nominalSeconds < endTime`; OSMD advances its discrete notation cursor. Returns a renderer coordinate or `null`. |
+| `redrawAtTime?(nominalSeconds, scrollIntoView?)` | Optional exact-time drawing entry, implemented by the built-in SVG and Canvas piano rolls, waterfall and scrolling staff. Highlights notes where `startTime <= nominalSeconds < endTime`; it does not snap to a selected note’s onset. Returns a renderer coordinate or `null`. |
 | `clearActiveNotes()` | Clear current highlights and the applicable cursor display. |
 | `dispose?()` | Release owned rendering resources and DOM. Supplied by all package renderers and safe to repeat. |
 
-`redrawAtTime` rejects non-finite time with `RangeError`. After disposal it is inert and returns `null`. Use nominal score seconds, without playback-rate scaling. `scrollIntoView: false` updates the position without requesting follow scrolling. Coordinate orientation and default following behavior belong to the selected renderer. OSMD retains its discrete cursor positions rather than interpolating a playhead between them.
+`redrawAtTime` rejects non-finite time with `RangeError`. After disposal it is inert and returns `null`. Use nominal score seconds, without playback-rate scaling. `scrollIntoView: false` updates highlighting without requesting follow scrolling. Coordinate orientation and default following behavior belong to the selected renderer. OSMD retains `redraw` and does not implement `redrawAtTime`.
 
 ```ts
 // On a caller-owned clock or position notification:
 rendered.redrawAtTime?.(1.25, false);
 ```
-
-### Presentation state
-
-The [React score views](/score/api/react/) and
-[`<score-view>`](/score/element/view/score-view/) expose `ScoreViewRenderState`
-from `@webmusic/score/view/render` (also exported by their respective entries).
-This describes the view's presentation independently of playback readiness.
-Bare renderer factories retain their synchronous return/throw or asynchronous
-Promise contracts; they do not create a separate state subscription.
-
-| Member | Meaning |
-| --- | --- |
-| `status` | `empty`, `loading`, `rendering`, `ready`, `error`, or `disposed`. |
-| `phase` | `source` for borrowed data, `load` for local loading, `render` for presentation, or `null` when no phase applies. |
-| `revision` | Increasing notification revision within this view. |
-| `generation` | Current source/render attempt; old asynchronous results cannot mark a replacement ready. |
-| `score?` | Score associated with this state, when available. |
-| `cause?` | Original failure when status is `error`; the host chooses its user-facing message. |
-
-`ready` means the current presentation has been constructed. It does not mean
-audio is ready or that the browser has painted a frame. A data-only view skips
-loading; no synthetic parsing progress is emitted. Follow the owning component
-reference for notifications, replacement and teardown behavior.
 
 ## Render annotations
 
@@ -353,7 +298,7 @@ rendered.redraw(rendered.noteSequence.notes[0], true);
 it has no keyboard presenter port. `whiteNoteHeight` and `blackNoteHeight` are
 not supported render options and `configure()` rejects them. Applications that
 also need a keyboard compose a separate
-[`<pitch-view type="keyboard">`](/score/element/view/pitch-view/) or UIKit pitch
+[`<score-pitch-view type="keyboard">`](/score/element/view/score-pitch-view/) or UIKit pitch
 presenter around the same borrowed player state.
 
 `VisualizerRenderOptions.noteColor` and `activeNoteColor` accept full CSS colors, including custom-property expressions. They override the corresponding `noteRGB` / `activeNoteRGB` channel strings. The imperative renderers retain neutral defaults: `noteRGB: '96, 96, 96'` and `activeNoteRGB: '32, 32, 32'`.
@@ -614,7 +559,7 @@ For an owned OSMD instance, the adapter reflows when its container width changes
 
 For this adapter, `redraw(undefined, false)` cancels queued cursor scrolling without moving or clearing the cursor. `clearActiveNotes()` and disposal also invalidate pending scrolling. An explicit `redraw(note, true)` still requests scrolling when the default `followCursor` option is false.
 
-Backward cursor moves reset and replay OSMD’s iterator, reacquiring the replacement iterator created by `reset()` before applying checkpoints. Both note-driven `redraw` and nominal-second `redrawAtTime` share that cursor machinery. Position-driven updates work while paused with no active note event; they retain OSMD's discrete notation positions and return `null`. `redrawAtTime(seconds, false)` cancels pending cursor scrolling without hiding the cursor.
+Backward cursor moves reset and replay OSMD’s iterator, reacquiring the replacement iterator created by `reset()` before applying checkpoints. This adapter continues to expose note-driven `redraw`, rather than `redrawAtTime`.
 
 ```ts
 import { renderOSMDStaffVisualizer } from '@webmusic/score/view/render';
@@ -643,8 +588,8 @@ Score + MusicXML + OSMD constructor -> RenderedScoreVisualizer<OSMDLike>
 | API | Kind | Use it for |
 | --- | --- | --- |
 | `defineScoreViewElement(tag?)` | Web Component | Register `<score-view>` with piano-roll, staff, waterfall, map and thumbnail types. |
-| `definePitchViewElement(tag?)` | Web Component | Register `<pitch-view>` with keyboard, current staff and fretboard types. |
-| `defineSheetViewElement(tag?)` | Web Component | Register `<sheet-view>` with its optional OSMD renderer. |
+| `definePitchViewElement(tag?)` | Web Component | Register `<score-pitch-view>` with keyboard, current staff and fretboard types. |
+| `defineSheetViewElement(tag?)` | Web Component | Register `<score-sheet-view>` with its optional OSMD renderer. |
 | `defineAllViewElements()` | Web Component | Register the three default View tags. |
 | `ScoreViewElement`, `PitchViewElement`, `SheetViewElement` | Web Component | Classes from `@webmusic/score/view/element`; owning [Element references](/score/element/#view) describe properties, attributes and lifecycle. |
 | `ScoreViewElementType` | Type | Five-value Element type: `piano-roll`, `staff`, `waterfall`, `map`, `thumbnail`. |
@@ -659,8 +604,6 @@ Score + MusicXML + OSMD constructor -> RenderedScoreVisualizer<OSMDLike>
 | `renderWaterfallVisualizer(score, container, config?)` | Visualizer | Render falling notes on piano-style pitch columns, without an embedded keyboard (from `@webmusic/score/view/render`). |
 | `renderScoreThumbnail(surface, notes, options?)` | Renderer | Append a static fitted note preview with optional original Score directions; returns its SVG (from `@webmusic/score/view/render`). |
 | `ScoreThumbnailRenderOptions` | Render type | Thumbnail color, accessible label, original Score and annotation visibility (from `@webmusic/score/view/render`). |
-| `ScoreViewRenderState` | Render type | Immutable presentation status, phase, revision, generation, Score and original failure; see [Presentation state](#presentation-state). |
-| `ScoreViewRenderStatus`, `ScoreViewRenderPhase` | Render types | Presentation lifecycle and work/failure owner, exported by `@webmusic/score/view/render`. |
 | `WaterfallVisualizerConfig` | Render type | Falling-note geometry plus opt-in container fitting. |
 | `renderOSMDStaffVisualizer(score, container, options?)` | Visualizer | Render full staff engraving through OpenSheetMusicDisplay (from `@webmusic/score/view/render`). |
 | `createPianoRollLayout(score, opts?)` | Layout | Return serializable piano-roll note rectangles. |

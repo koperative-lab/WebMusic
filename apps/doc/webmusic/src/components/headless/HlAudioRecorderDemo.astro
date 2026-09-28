@@ -1,0 +1,131 @@
+---
+// CANONICAL headless-demo pattern. Each demo: the shared .wui-panel card chrome
+// (title bar: package · class) + a body whose UI is wired client-side to a
+// HEADLESS class from @webmusic/audio/<pkg>/headless — no custom element involved.
+// AudioRecorder taps the microphone (getUserMedia runs inside the Record click)
+// and assembles an immutable AudioClip on stop(); we then play it back with an
+// AudioClipPlayer that owns + resumes its own AudioContext on play().
+import LiveDemoCanvas from '../LiveDemoCanvas.astro';
+---
+
+<div class="wui-panel wui-panel--flow not-content">
+  <div class="wui-panel__title">
+    <span>@webmusic/audio/play/headless</span>
+    <strong>AudioRecorder</strong>
+  </div>
+  <LiveDemoCanvas label="Audio recorder">
+    <div class="wui-row" data-hl-recorder>
+      <button class="wui-btn" data-record type="button">● Record</button>
+      <button class="wui-btn" data-variant="ghost" data-play type="button" disabled>▶ Play</button>
+      <div class="wui-track"><div class="wui-track__fill" data-fill></div></div>
+      <span class="wui-readout" data-time>0.0s</span>
+      <span class="doc-status hl-recorder__status" data-status>Ready — click Record.</span>
+    </div>
+  </LiveDemoCanvas>
+</div>
+
+<script>
+  import {mountDemos, type DemoScope} from '../demo-lifecycle';
+  import { AudioRecorder, AudioClipPlayer } from '@webmusic/audio/play/headless';
+  import type { AudioClip } from '@webmusic/audio';
+
+  const setup = async (root: HTMLElement, scope: DemoScope) => {
+    const recBtn = root.querySelector<HTMLButtonElement>('[data-record]')!;
+    const playBtn = root.querySelector<HTMLButtonElement>('[data-play]')!;
+    const fill = root.querySelector<HTMLElement>('[data-fill]')!;
+    const time = root.querySelector<HTMLElement>('[data-time]')!;
+    const status = root.querySelector<HTMLElement>('[data-status]')!;
+
+    const recorder = new AudioRecorder();
+    scope.add(() => recorder.dispose());
+    let recording = false;
+    let player: AudioClipPlayer | null = null;
+    scope.add(() => player?.dispose());
+    let playing = false;
+
+    // Live input level → reuse the progress bar as a VU meter while recording.
+    recorder.on('level', (rms) => {
+      if (recording) fill.style.width = `${Math.min(100, rms * 320)}%`;
+    });
+
+    const buildPlayer = (clip: AudioClip) => {
+      player?.dispose();
+      // Timer-based cursor (vs the default rAF) so timeupdate keeps firing even
+      // when the tab is backgrounded.
+      player = new AudioClipPlayer(clip, { cursorIntervalMs: 100 });
+      player.on('timeupdate', ({ seconds, progress }) => {
+        fill.style.width = `${Math.min(100, progress * 100)}%`;
+        time.textContent = `${seconds.toFixed(1)}s`;
+      });
+      player.on('end', () => { playing = false; playBtn.textContent = '▶ Play'; });
+      playBtn.disabled = false;
+    };
+
+    scope.listen(recBtn, 'click', async () => {
+      recBtn.disabled = true;
+      try {
+        if (recording) {
+          // stop() resolves with the assembled AudioClip.
+          recording = false;
+          recBtn.textContent = '● Record';
+          recBtn.dataset.on = 'false';
+          const clip = await recorder.stop();
+          if (!scope.active) return;
+          fill.style.width = '0%';
+          status.textContent = `Recorded ${clip.duration.toFixed(1)}s — press Play.`;
+          buildPlayer(clip);
+          return;
+        }
+        // getUserMedia runs inside start(); handle denial/absence gracefully.
+        player?.dispose();
+        player = null;
+        playing = false;
+        playBtn.disabled = true;
+        playBtn.textContent = '▶ Play';
+        try {
+          await recorder.start();
+        } catch (e) {
+          if (!scope.active) return;
+          status.textContent = 'microphone unavailable';
+          console.error('[HlAudioRecorderDemo]', e);
+          return;
+        }
+        if (!scope.active) return;
+        recording = true;
+        playing = false;
+        player = null;
+        playBtn.disabled = true;
+        playBtn.textContent = '▶ Play';
+        recBtn.textContent = '■ Stop';
+        recBtn.dataset.on = 'true';
+        time.textContent = '0.0s';
+        status.textContent = 'Recording… speak into the mic.';
+      } finally {
+        if (scope.active) recBtn.disabled = false;
+      }
+    });
+
+    scope.listen(playBtn, 'click', () => {
+      if (!player) return;
+      // Player resumes its own AudioContext inside play().
+      if (playing) { player.pause(); playBtn.textContent = '▶ Play'; }
+      else {
+        const current = player;
+        scope.run(current.play(), () => {
+          if (current !== player) return;
+          playing = false;
+          playBtn.textContent = '▶ Play';
+        });
+        playBtn.textContent = '⏸ Pause';
+      }
+      playing = !playing;
+    });
+  };
+
+  mountDemos('[data-hl-recorder]', setup);
+</script>
+
+<style>
+  /* The status line takes a row of its own; the controls share the one above. */
+  .hl-recorder__status { flex: 1 0 100%; }
+</style>

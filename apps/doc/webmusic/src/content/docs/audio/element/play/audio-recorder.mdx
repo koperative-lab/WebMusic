@@ -1,0 +1,108 @@
+---
+title: '<audio-recorder>'
+description: 'A record button with a live level bar — opens the microphone, captures the take into an AudioClip, and dispatches it on stop via webaudio:recorded.'
+sidebar:
+  order: 4
+---
+
+import AudioRecorderDemo from '../../../../../components/AudioRecorderDemo.astro';
+
+`<audio-recorder>` is a **record button with a live level bar**. Press it to open the microphone through an [`AudioRecorder`](/audio/api/play/) (the button turns square while armed and the bar tracks the input level); press again to stop, at which point it assembles the captured PCM into an `AudioClip` and dispatches `webaudio:recorded` with it. It needs **microphone permission** — the browser prompts on first record — and never auto-starts. Opening remains busy until the capture context is running. The current [ScriptProcessor backend](/audio/headless/play/audio-recorder/#capture-backend-and-measurement) captures fixed stereo blocks; stop has no final partial-block flush.
+
+For symbolic note performances, use the corresponding
+[`<score-recorder>`](/score/element/play/score-recorder/), which produces a `Score`
+and exports MIDI / MusicXML.
+
+<AudioRecorderDemo />
+
+## Import
+
+```html
+<script type="module">
+  import { defineAudioRecorderElement, defineAudioPlayerElement } from '@webmusic/audio/play/element';
+  defineAudioPlayerElement();
+  defineAudioRecorderElement();
+</script>
+<audio-player id="session"></audio-player>
+<audio-recorder player="#session"></audio-recorder>
+```
+
+```ts
+import { defineAudioPlayerElement } from '@webmusic/audio/play/element';
+import type {
+  AudioPlayerElement,
+  AudioRecorderElement,
+  AudioRecorderRecordedDetail,
+} from '@webmusic/audio/play/element';
+defineAudioPlayerElement();
+
+const recorder = document.querySelector<AudioRecorderElement>('audio-recorder')!;
+const player = document.querySelector<AudioPlayerElement>('audio-player')!;
+recorder.addEventListener('webaudio:recorded', (e) => {
+  const { clip } = (e as CustomEvent<AudioRecorderRecordedDetail>).detail;
+  player.clip = clip; // play the take straight back
+});
+```
+
+<details class="component-section">
+<summary>API</summary>
+
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `player` | attribute | Unique selector for the central player used for take audition. Late insertion/upgrade and replacement are observed. |
+| `.player` | property | Assign/read the borrowed central `AudioPlayer` or its Element; explicit assignment overrides the selector. |
+| `device-id` | attribute | Capture from a specific input device (a `MediaDeviceInfo.deviceId`). |
+| `echo-cancellation` | attribute | Boolean constraint passed to `getUserMedia`. Absent leaves the engine default. |
+| `sample-rate` | attribute | Requested capture rate. |
+| `max-seconds` | attribute | A **memory** ceiling, converted to a frame limit using — in order — the rate the last take actually resolved to, the `sample-rate` you asked for, or the recorder's own `44100` fallback. Breaching it discards the unfinished take and surfaces as `webaudio:error`; it is not a timed stop that returns a clip. |
+| `auto-export` | attribute | Export each take to WAV on stop and emit `webaudio:exported`. |
+| `.recording` / `.playing` / `.level` | property (get) | Live state: capturing, playing the take back, and the raw input level. |
+| `.recorder` / `.take` | property (get) | The underlying `AudioRecorder` and the last captured `AudioClip`. |
+| `.start()` / `.stop()` / `.toggle()` | method | Drive capture from code instead of the button. `stop()` resolves with the take. |
+| `.playTake()` / `.stopPlayback()` / `.togglePlayback()` | method | Select and audition the take through the linked player. Stop affects that audition only while the player still selects this take. |
+| `.exportTake(options?)` / `.downloadTake(fileName?)` | method | Encode the take as WAV, and hand it to the browser as a download. |
+| `webaudio:recordingstart` | event | Capture actually began — the microphone is open and running. |
+| `webaudio:recorded` | event | `detail = { clip }` — the captured `AudioClip` — after a successful stop. |
+| `webaudio:level` | event | `detail = { level }` — the live input level — while recording. |
+| `webaudio:exported` | event | `detail = { blob, format, clip }` after an export. |
+| `webaudio:error` | event | `detail` is the `Error` if the microphone can't be opened, or a limit is breached. |
+
+The element's class is `AudioRecorderElement` and its factory is
+`defineAudioRecorderElement()`. The `webaudio:recorded` event carries
+`AudioRecorderRecordedDetail`.
+
+A failure releases the failed engine and commits idle state before `webaudio:error` is dispatched, so an error listener may call `start()` to retry. Live `level` is linear RMS over all retained channels, not a left-channel-only reading or a loudness measurement.
+
+With `player="#session"`, take audition delegates to the central player instead
+of creating an independent playback engine. Capture remains recorder-owned.
+Disconnecting does not dispose the borrowed player; a take already handed to it
+remains player-owned. Without a connection, the recorder owns its audition player.
+
+Wire `webaudio:recorded` to do something else with the take — feed it to an [`<audio-player>`](/audio/element/play/audio-player/), queue it in an [`<audio-playlist>`](/audio/element/play/audio-playlist/), export it via [`clipToBlob`](/audio/api/play/), or add it to an [`<audio-mixer>`](/audio/element/play/audio-mixer/).
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+The host fills its container width by default, can shrink inside flex/grid
+layouts, and respects `hidden`. Set host width in your application for a narrower
+control; spacing between components belongs to their composition.
+
+The default surface uses the same neutral UI tokens as Score. These optional legacy aliases
+demonstrate an explicit dark customization; they do not define the default palette.
+
+```css
+audio-recorder {
+  --war-bg: #15171c;      /* surface background */
+  --war-fg: #eef;         /* text */
+  --war-accent: #e0445b;  /* record button + level fill */
+  --war-track: #2a2e37;   /* level-bar track */
+}
+```
+
+`--war-button-border` controls the idle action-button line and, when omitted, follows
+`--wm-control-border` → `--wm-border` → `#d8d8d8`.
+
+</details>

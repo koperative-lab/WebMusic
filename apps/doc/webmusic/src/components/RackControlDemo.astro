@@ -2,8 +2,8 @@
 // The three-level composition, written the way a reader would write it.
 //
 //   <score-player>               the only transport, for every part at once
-//     <rack-control>             the desk, and the rack's owner
-//       <rack-part>              one voice: a score and a sound, no player
+//     <score-rack-control>             the desk, and the rack's owner
+//       <score-rack-part>              one voice: a score and a sound, no player
 //
 // The editor below is structural rather than a one-off pair of Add/Remove
 // buttons: every child gets the same catalog-generated parameter controls as a
@@ -13,27 +13,28 @@ import ElementPlayground from './ElementPlayground.astro';
 import EffectChainEditor from './EffectChainEditor.astro';
 import RackPartEditor from './RackPartEditor.astro';
 
+const SOURCE = `${import.meta.env.BASE_URL}midi/Arabesque%20No.1.mid`;
 const PARTS = [
-  {id: 'lead', src: '/midi/demo.mid', sound: 'triangle'},
-  {id: 'bass', src: '/midi/demo.mid', sound: 'sawtooth'},
-  {id: 'pad', src: '/midi/demo.mid', sound: 'sine'},
+  {id: 'lead', src: SOURCE, sound: 'triangle'},
+  {id: 'bass', src: SOURCE, sound: 'sawtooth'},
+  {id: 'pad', src: SOURCE, sound: 'sine'},
 ];
 
 const keyFor = (index: number) => `rack-part-${index + 1}`;
 ---
 
-<ElementPlayground tag="rack-control" markup="[data-rc-master]" class="rc-demo">
+<ElementPlayground tag="score-rack-control" markup="[data-rc-master]" class="rc-demo">
   <score-player data-rc-master>
-    <rack-control data-rc-desk>
+    <score-rack-control data-rc-desk>
       {PARTS.map((part, index) => (
-        <rack-part
+        <score-rack-part
           data-pg-child-key={keyFor(index)}
           id={part.id}
           src={part.src}
           sound={part.sound}
-        ></rack-part>
+        ></score-rack-part>
       ))}
-    </rack-control>
+    </score-rack-control>
   </score-player>
 
   <div slot="controls" data-rc-controls>
@@ -55,7 +56,7 @@ const keyFor = (index: number) => `rack-part-${index + 1}`;
       </div>
 
       <p class="wm-pg__collection-help">
-        Each nested <code>&lt;rack-part&gt;</code> declares one channel. Expand a part to edit its
+        Each nested <code>&lt;score-rack-part&gt;</code> declares one channel. Expand a part to edit its
         name, score source, format and sound.
       </p>
 
@@ -79,7 +80,7 @@ const keyFor = (index: number) => `rack-part-${index + 1}`;
 
     <EffectChainEditor
       target="[data-rc-desk]"
-      setupSelector="rack-control"
+      setupSelector="score-rack-control"
       setupIdentifier="rackControl"
     />
   </div>
@@ -108,5 +109,5 @@ const keyFor = (index: number) => `rack-part-${index + 1}`;
 
 <style>
   /* This gap belongs to the composition, not either component's own surface. */
-  .rc-demo :global(rack-control) { margin-top: 0.5rem; }
+  .rc-demo :global(score-rack-control) { margin-top: 0.5rem; }
 </style>

@@ -123,9 +123,7 @@ function mountTransportDemo(host: HTMLElement): UiPresenterDemoHandle {
   const binding = {
     snapshot: () => state,
     play: () => {
-      const atEnd = (state.progress ?? 0) >= 1 ||
-        (typeof state.duration === 'number' && state.duration > 0 && (state.seconds ?? 0) >= state.duration);
-      state = atEnd
+      state = state.progress >= 1
         ? {...state, playing: true, progress: 0, seconds: 0}
         : {...state, playing: true};
       notifier.notify();

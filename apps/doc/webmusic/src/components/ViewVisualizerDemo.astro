@@ -21,54 +21,25 @@ const { demo = 'piano-roll' } = Astro.props;
 </div>
 
 <script>
-  import { Duration, MeasureId, PartId, Pitch, Rational, ScoreBuilder, VoiceId } from '@webmusic/score';
   import { renderPianoRollVisualizer, renderStaffVisualizer, renderWaterfallVisualizer } from '@webmusic/score/view/render';
+  import { arabesqueExcerpt, loadArabesqueScore } from './headless/arabesque-score';
 
-  const q = (value: number) => new Rational(value, 1);
+  const demoScore = loadArabesqueScore('mxl').then((score) => arabesqueExcerpt(score, 16));
 
-  const createScore = () => {
-    const builder = new ScoreBuilder();
-    const timeSignature = { numerator: 4, denominator: 4 };
-    const partId = PartId('piano');
-    const voice = VoiceId('piano-v1');
-
-    builder
-      .setMetadata({ title: 'View API Study' })
-      .addTempo({ atQuarters: Rational.ZERO, bpm: 120 })
-      .addMeter({ atQuarters: Rational.ZERO, measureNumber: 1, timeSignature });
-
-    builder.addPart({ id: partId, name: 'Piano', staves: 2, midiProgram: 0 });
-    builder.addMeasure({
-      id: MeasureId('m1'),
-      number: 1,
-      onsetQuarters: Rational.ZERO,
-      durationQuarters: q(4),
-      timeSignature,
-      keySignature: { fifths: 0, mode: 'major' },
-    });
-
-    ['C4', 'E4', 'G4', 'C5', 'E3', 'G3', 'C4', 'E4'].forEach((name, index) => {
-      const pitch = Pitch.parse(name);
-      builder.addNote(partId, {
-        id: builder.newNoteId(),
-        pitch,
-        onsetQuarters: new Rational(index, 2),
-        duration: Duration.eighth(),
-        voice,
-        staff: pitch.midi < 60 ? 2 : 1,
-      });
-    });
-
-    return builder.build();
-  };
-
-  const renderDemo = (root: HTMLElement) => {
+  const renderDemo = async (root: HTMLElement) => {
     if (root.dataset.initialized) return;
     root.dataset.initialized = 'true';
     const surface = root.querySelector<HTMLDivElement>('[data-view-demo-surface]')!;
     const title = root.querySelector<HTMLElement>('[data-view-demo-title]')!;
-    const score = createScore();
     const demo = root.dataset.viewDemo;
+    let score: Awaited<typeof demoScore>;
+    try {
+      score = await demoScore;
+    } catch {
+      surface.textContent = 'Could not load the Arabesque score.';
+      return;
+    }
+    if (!root.isConnected) return;
 
     if (demo === 'piano-roll') {
       title.textContent = 'Piano roll visualizer';

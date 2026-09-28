@@ -1,5 +1,5 @@
 ---
-// One live composition exposes every synth-panel section and the property
+// One live composition exposes every score-synth-panel section and the property
 // graph that feeds it. Attribute controls still come from ElementPlayground;
 // JavaScript-only configuration is handled by the structured editors below.
 import EffectChainEditor from './EffectChainEditor.astro';
@@ -8,18 +8,18 @@ import SynthPanelPropertyEditor from './SynthPanelPropertyEditor.astro';
 ---
 
 <ElementPlayground
-  tag="synth-panel"
+  tag="score-synth-panel"
   target="[data-syp]"
   markup="[data-syp-composition]"
   class="syp-demo"
-  companions={[{tag: 'note-input', target: '[data-syp-input]'}]}
+  companions={[{tag: 'score-note-input', target: '[data-syp-input]'}]}
 >
   <div class="syp-demo__composition" data-syp-composition data-pg-fragment>
-    <note-input data-syp-input layout="piano" start="48" end="71"></note-input>
-    <synth-panel
+    <score-note-input data-syp-input layout="piano" start="48" end="71"></score-note-input>
+    <score-synth-panel
       data-syp
       sections="sound,envelope"
-    ></synth-panel>
+    ></score-synth-panel>
   </div>
 
   <SynthPanelPropertyEditor slot="controls" />
@@ -29,7 +29,7 @@ import SynthPanelPropertyEditor from './SynthPanelPropertyEditor.astro';
     assignment="effects"
     initial={['reverb']}
     target="[data-syp]"
-    setupSelector="synth-panel"
+    setupSelector="score-synth-panel"
     setupIdentifier="synthPanelEffects"
   />
 

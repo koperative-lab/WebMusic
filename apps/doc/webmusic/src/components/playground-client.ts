@@ -69,7 +69,7 @@ const PLUMBING = /^(?:class|style|part|slot|role|tabindex|data-|aria-)/;
  * On the root it is the demo naming its own element so its own wiring can find
  * it — `<score-view id="score-view">` beside `player="#score-player"` — and it is
  * not part of what the element does. Nested, it is how a composition tells its
- * children apart: `<rack-part id="lead">` is the name of the fader the desk
+ * children apart: `<score-rack-part id="lead">` is the name of the fader the desk
  * draws for it, and a reader copying the markup needs it.
  */
 const hidden = (name: string, root: boolean): boolean =>
@@ -136,7 +136,7 @@ function readout(panel: HTMLElement, root: Element): void {
   const out = panel.querySelector<HTMLElement>('[data-pg-markup]');
   if (!out) return;
   // A live composition can consist of sibling custom elements connected by a
-  // property (for example note-input + score-recorder.source). A native stage
+  // property (for example score-note-input + score-recorder.source). A native stage
   // wrapper marked as a fragment is layout-only: copy the public components,
   // never the documentation div around them.
   const fragment = root.hasAttribute('data-pg-fragment');
@@ -247,7 +247,7 @@ function wire(panel: HTMLElement): PlaygroundMount {
 
   const markupRoot = (): Element | null => {
     // The readout may root ABOVE the element the controls drive: a page about
-    // `<rack-control>` still has to hand the reader the player it lives inside.
+    // `<score-rack-control>` still has to hand the reader the player it lives inside.
     const selector = panel.dataset.markup;
     return (selector ? queryStage(selector) : null) ?? findTarget();
   };

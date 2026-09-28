@@ -1,0 +1,254 @@
+---
+// miniMeter-style waveform: the amplitude waveform tinted by its spectral
+// content (bass → red, mid → green, treble → blue), with a control panel:
+//   Channel 1 / Channel 2 — pick Left / Right / Mid / Side; a second channel
+//     stacks a stereo split, each half coloured by its own spectrum.
+//   Color Mode — Static / Multi-Band / Color Map (the `color-mode` attribute).
+//   History     — a recent-history glow that follows the playhead while playing.
+//   Loop / Speed — drive the bound player.
+// The SHAPE is amplitude peaks; the COLOUR is a spectrogram, recomputed per
+// channel.
+//
+// The device panel already owns `color-mode`, `channel-layout` and `history`, so
+// the parameter strip below shows the knobs it does NOT own — the same element,
+// driven from the other side. The main playground owns the complete surface.
+import ElementPlayground from './ElementPlayground.astro';
+
+const ONLY = [
+  'pixels-per-second', 'height', 'amplitude', 'bands', 'color-map', 'wave-color',
+  'progress-color', 'playhead-color', 'background-color', 'drag-mode', 'follow', 'scrollable',
+];
+---
+
+<ElementPlayground
+  tag="audio-view"
+  only={ONLY}
+  markup="[data-mm]"
+>
+  <div class="mm-device" data-mm>
+    <audio-player id="mm-player" controls></audio-player>
+    <audio-view id="mm-view" player="#mm-player" type="waveform" pixels-per-second="90" height="160" interactive drag-mode="scrub" color-mode="multiband"></audio-view>
+
+    <p class="mm-help" data-drag-help>The playhead stays centered. Drag left forward or right backward to scratch; release coasts, then restores the previous playback state.</p>
+    <p role="status" data-mm-status>Audio loads when this example is visible.</p>
+    <div class="mm-panel">
+      <div class="mm-row">
+        <span class="mm-label">Channel 1:</span>
+        <div class="mm-seg" data-group="ch1" role="group" aria-label="Channel 1 source">
+          <button type="button" data-val="left" class="active" aria-pressed="true">Left</button>
+          <button type="button" data-val="right" aria-pressed="false">Right</button>
+          <button type="button" data-val="mid" aria-pressed="false">Mid</button>
+          <button type="button" data-val="side" aria-pressed="false">Side</button>
+        </div>
+        <label class="mm-toggle"><span>Loop</span><input type="checkbox" data-ctl="loop" /></label>
+      </div>
+      <div class="mm-row">
+        <span class="mm-label">Channel 2:</span>
+        <div class="mm-seg" data-group="ch2" role="group" aria-label="Channel 2 source">
+          <button type="button" data-val="off" class="active" aria-pressed="true">Off</button>
+          <button type="button" data-val="left" aria-pressed="false">Left</button>
+          <button type="button" data-val="right" aria-pressed="false">Right</button>
+          <button type="button" data-val="mid" aria-pressed="false">Mid</button>
+          <button type="button" data-val="side" aria-pressed="false">Side</button>
+        </div>
+      </div>
+      <div class="mm-row">
+        <span class="mm-label">Color Mode:</span>
+        <div class="mm-seg" data-group="colormode" role="group" aria-label="Color mode">
+          <button type="button" data-val="static" aria-pressed="false">Static</button>
+          <button type="button" data-val="multiband" class="active" aria-pressed="true">Multi-Band</button>
+          <button type="button" data-val="colormap" aria-pressed="false">Color Map</button>
+        </div>
+      </div>
+      <div class="mm-row">
+        <span class="mm-label">History:</span>
+        <div class="mm-seg" data-group="history" role="group" aria-label="History trail">
+          <button type="button" data-val="0" class="active" aria-pressed="true">Off</button>
+          <button type="button" data-val="0.6" aria-pressed="false">Fast</button>
+          <button type="button" data-val="2.5" aria-pressed="false">Slow</button>
+        </div>
+      </div>
+      <div class="mm-row">
+        <span class="mm-label">Speed:</span>
+        <input class="wui-range" type="range" data-ctl="speed" min="0.25" max="2" step="0.05" value="1" aria-label="Playback speed" />
+        <output class="mm-num" data-speed>1.00</output>
+      </div>
+    </div>
+  </div>
+</ElementPlayground>
+
+<script>
+  import {defineAudioPlayerElement, type AudioPlayerElement} from '@webmusic/audio/play/element';
+  import {defineAudioViewElement, type AudioViewElement} from '@webmusic/audio/view/element';
+  import {mountDemos} from './demo-lifecycle';
+  import {acquireAudioViewFixture, whenDemoVisible, type DemoChannel} from './audio-view-fixture';
+  import {PLAYGROUND_RESET_EVENT} from './playground-client';
+
+  defineAudioPlayerElement();
+  defineAudioViewElement();
+
+  mountDemos('[data-mm]', (device, scope) => {
+    const view = device.querySelector<AudioViewElement>('audio-view')!;
+    const player = device.querySelector<AudioPlayerElement>('audio-player')!;
+    const status = device.querySelector<HTMLElement>('[data-mm-status]')!;
+    const fixture = acquireAudioViewFixture(`${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`);
+    const help = device.querySelector<HTMLElement>('[data-drag-help]');
+    const updateHelp = (): void => {
+      if (!help) return;
+      const mode = view.getAttribute('drag-mode');
+      if (mode === 'pan') help.textContent = /^(false|0|no|off)$/i.test(view.getAttribute('scrollable')?.trim() ?? '')
+        ? 'Panning is disabled. Enable scrollable to move this viewport.'
+        : 'Drag left to see later audio, or right to see earlier audio. Arrow keys move the window. Playback is unchanged; following is suspended in pan mode.';
+      else if (mode === 'scrub') help.textContent = 'Centered scrub: drag left toward later audio, or right toward earlier audio. Decoded players scratch at your speed; release coasts in position and sound, then restores the previous playback state. Other players move position only.';
+      else if (mode === 'none') help.textContent = 'Click or use arrow keys to seek. Dragging does not move playback.';
+      else help.textContent = 'Drag or click to seek to the time under the pointer. Arrow keys seek too.';
+    };
+    updateHelp();
+    const helpObserver = new MutationObserver(updateHelp);
+    helpObserver.observe(view, {attributes: true, attributeFilter: ['drag-mode', 'scrollable']});
+    scope.add(() => helpObserver.disconnect());
+    scope.add(() => fixture.release());
+    scope.add(() => { player.stop(); player.clip = undefined; view.peaks = undefined; view.frequencyData = undefined; });
+    let ch1: DemoChannel = 'left';
+    let ch2: DemoChannel | 'off' = 'off';
+    let ready = false;
+    let generation = 0;
+    const applyView = async (): Promise<void> => {
+      const current = ++generation;
+      if (!ready) return;
+      const selected = ch2 === 'off' ? [ch1] : [ch1, ch2];
+      const coloured = view.getAttribute('color-mode') !== 'static';
+      status.textContent = coloured ? 'Preparing channel colour…' : 'Preparing channels…';
+      try {
+        const peaks = await fixture.peaks(selected);
+        if (!scope.active || current !== generation) return;
+        view.setAttribute('channel-layout', ch2 === 'off' ? 'merge' : 'split');
+        view.frequencyData = undefined;
+        view.peaks = peaks;
+        if (coloured) {
+          const spectra = await Promise.all(selected.map((key) => fixture.spectrum(key)));
+          if (!scope.active || current !== generation) return;
+          view.frequencyData = spectra.length === 1 ? spectra[0] : spectra;
+        }
+        status.textContent = '';
+      } catch (error) {
+        if (scope.active && current === generation) status.textContent = 'Channel data could not be prepared. Choose a channel to retry.';
+        throw error;
+      }
+    };
+    const setActive = (seg: Element, value: string): void => {
+      for (const button of seg.querySelectorAll<HTMLButtonElement>('button')) {
+        const active = button.dataset.val === value;
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-pressed', String(active));
+      }
+    };
+    for (const seg of device.querySelectorAll<HTMLElement>('.mm-seg')) {
+      scope.listen(seg, 'click', (event) => {
+        const button = (event.target as HTMLElement).closest<HTMLButtonElement>('button');
+        if (!button || !seg.contains(button)) return;
+        const value = button.dataset.val!;
+        setActive(seg, value);
+        switch (seg.dataset.group) {
+          case 'ch1': ch1 = value as DemoChannel; scope.run(applyView()); break;
+          case 'ch2': ch2 = value as DemoChannel | 'off'; scope.run(applyView()); break;
+          case 'colormode': view.setAttribute('color-mode', value); scope.run(applyView()); break;
+          case 'history': view.setAttribute('history', value); break;
+        }
+      });
+    }
+    const loop = device.querySelector<HTMLInputElement>('[data-ctl="loop"]')!;
+    scope.listen(loop, 'change', () => player.toggleAttribute('loop', loop.checked));
+    const speed = device.querySelector<HTMLInputElement>('[data-ctl="speed"]')!;
+    const speedOut = device.querySelector('[data-speed]')!;
+    scope.listen(speed, 'input', () => {
+      player.setAttribute('rate', speed.value);
+      speedOut.textContent = Number(speed.value).toFixed(2);
+    });
+    const panel = device.closest<HTMLElement>('[data-wm-pg]');
+    if (panel) scope.listen(panel, PLAYGROUND_RESET_EVENT, () => {
+      player.stop();
+      ch1 = 'left'; ch2 = 'off';
+      view.setAttribute('color-mode', 'multiband');
+      view.removeAttribute('history');
+      player.removeAttribute('loop'); player.removeAttribute('rate');
+      loop.checked = false; speed.value = '1'; speedOut.textContent = '1.00';
+      const defaults: Record<string, string> = {ch1: 'left', ch2: 'off', colormode: 'multiband', history: '0'};
+      for (const seg of device.querySelectorAll<HTMLElement>('.mm-seg')) setActive(seg, defaults[seg.dataset.group!]);
+      scope.run(applyView());
+    });
+    whenDemoVisible(device, scope, async () => {
+      status.textContent = 'Loading audio…';
+      try {
+        // Awaiting the shared pyramid prevents the player binding deriving a duplicate.
+        const [clip, peaks] = await Promise.all([fixture.clip(), fixture.peaks(['left'])]);
+        if (!scope.active) return;
+        view.peaks = peaks;
+        player.clip = clip;
+        ready = true;
+        await applyView();
+      } catch (error) {
+        if (scope.active) status.textContent = 'Audio could not be loaded. Reload this page to retry.';
+        throw error;
+      }
+    });
+  });
+</script>
+
+<style>
+  .mm-device {
+    background: #0b0d12;
+    border: 1px solid #2a2e37;
+    padding: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+  }
+  .mm-device :global(audio-player) { display: block; --wap-bg: #15171c; }
+  .mm-device :global(audio-view) {
+    --wm-audio-view-surface-background: #000;
+    --wm-audio-view-surface-border: 1px solid #20242c;
+    display: block;
+    min-height: 160px;
+  }
+  .mm-help { margin: 0; color: #c9d2e3; font-size: 0.8rem; }
+  .mm-panel { display: flex; flex-direction: column; gap: 0.5rem; }
+  .mm-row { display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap; }
+  .mm-label {
+    color: #8b93a3;
+    font-family: var(--sl-font-mono, monospace);
+    font-size: 0.74rem;
+    min-width: 5.5rem;
+  }
+  .mm-seg { display: inline-flex; gap: 0.25rem; }
+  .mm-seg button {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: #8b93a3;
+    font-family: var(--sl-font-mono, monospace);
+    font-size: 0.76rem;
+    padding: 0.2rem 0.55rem;
+    cursor: pointer;
+    line-height: 1.4;
+  }
+  .mm-seg button:hover { color: #d7dbe3; }
+  .mm-seg button.active { background: #c9d2e3; color: #11141a; font-weight: 600; }
+  .mm-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: #8b93a3;
+    font-family: var(--sl-font-mono, monospace);
+    font-size: 0.74rem;
+    margin-left: auto;
+    cursor: pointer;
+  }
+  .mm-row input[type='range'] { accent-color: #c9d2e3; max-width: 240px; flex: 1 1 160px; }
+  .mm-num {
+    color: #c9d2e3;
+    font-family: var(--sl-font-mono, monospace);
+    font-size: 0.74rem;
+    min-width: 2.6rem;
+  }
+</style>

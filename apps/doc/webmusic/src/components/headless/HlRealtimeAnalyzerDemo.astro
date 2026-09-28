@@ -1,0 +1,82 @@
+---
+// Live frame analysis over a PLAYING clip — no mic. We build an AudioClipPlayer,
+// tap its `.analyser` AnalyserNode, and feed that to createRealtimeAnalyzer,
+// which polls the node on its own timer and emits RealtimeFrame readings
+// (RMS / peak / spectral centroid) we render into a level bar + readout.
+import LiveDemoCanvas from '../LiveDemoCanvas.astro';
+
+const SRC = `${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`;
+---
+
+<div class="wui-panel wui-panel--flow not-content">
+  <div class="wui-panel__title">
+    <span>@webmusic/audio/analyze/headless</span>
+    <strong>createRealtimeAnalyzer</strong>
+  </div>
+  <LiveDemoCanvas size="compact" label="Realtime audio analyzer">
+    <div class="wui-row" data-hl-realtimeanalyzer data-src={SRC}>
+      <button class="wui-btn" data-toggle type="button">▶ Start</button>
+      <div class="wui-track"><div class="wui-track__fill" data-fill></div></div>
+      <span class="wui-readout" data-rms>—</span>
+      <div class="doc-status ra-frame" data-readout>Press Start to analyze the playing clip.</div>
+    </div>
+  </LiveDemoCanvas>
+</div>
+
+<script>
+  import {mountDemos, type DemoScope} from '../demo-lifecycle';
+  import { loadClipFromUrl } from '@webmusic/audio/play';
+  import { AudioClipPlayer } from '@webmusic/audio/play/headless';
+  import { createRealtimeAnalyzer } from '@webmusic/audio/analyze/headless';
+
+  const setup = async (root: HTMLElement, scope: DemoScope) => {
+    const btn = root.querySelector<HTMLButtonElement>('[data-toggle]')!;
+    const fill = root.querySelector<HTMLElement>('[data-fill]')!;
+    const rmsOut = root.querySelector<HTMLElement>('[data-rms]')!;
+    const readout = root.querySelector<HTMLElement>('[data-readout]')!;
+
+    const clip = await loadClipFromUrl(root.dataset.src!, {signal: scope.signal});
+    if (!scope.active) return;
+    // Timer-based cursor (vs the default rAF) so the player keeps advancing
+    // even when the tab is backgrounded.
+    const player = new AudioClipPlayer(clip, { cursorIntervalMs: 100 });
+    scope.add(() => player.dispose());
+    // Tap the player's AnalyserNode (lazily builds the player's audio graph),
+    // then poll it on a 50ms timer for live RMS / peak / spectral centroid.
+    const analyzer = createRealtimeAnalyzer(player, { intervalMs: 50 });
+    scope.add(() => analyzer.stop());
+    let running = false;
+
+    scope.listen(btn, 'click', () => {
+      if (running) {
+        analyzer.stop();
+        player.pause();
+        running = false;
+        btn.textContent = '▶ Start';
+        readout.textContent = 'Stopped.';
+        return;
+      }
+      running = true;
+      btn.textContent = '⏸ Stop';
+      scope.run(player.play(), () => {
+        analyzer.stop();
+        running = false;
+        btn.textContent = '▶ Start';
+      });
+      analyzer.start((frame) => {
+        const level = Math.min(100, frame.rms * 100);
+        fill.style.width = `${level}%`;
+        rmsOut.textContent = `${frame.rms.toFixed(3)}`;
+        readout.textContent =
+          `rms ${frame.rms.toFixed(3)} · peak ${frame.peak.toFixed(3)} · centroid ${Math.round(frame.centroid)} Hz`;
+      });
+    });
+  };
+
+  mountDemos('[data-hl-realtimeanalyzer]', setup);
+</script>
+
+<style>
+  /* The frame line reports rather than controls, so it breaks onto its own row. */
+  .ra-frame { flex: 1 0 100%; }
+</style>

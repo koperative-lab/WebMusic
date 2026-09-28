@@ -1,0 +1,165 @@
+---
+title: '<score-recorder>'
+description: 'Capture note events as a Score, replay the completed take, and export MIDI or MusicXML.'
+sidebar:
+  order: 4
+---
+
+import ScoreRecorderDemo from '../../../../../components/ScoreRecorderDemo.astro';
+
+`<score-recorder>` captures a note performance as a `Score`, then offers take
+playback and MIDI / MusicXML download. It is the symbolic-music counterpart of
+[`<audio-recorder>`](/audio/element/play/audio-recorder/): supply note events from
+[`<score-note-input>`](/score/element/play/score-note-input/) or another input instead of
+opening a microphone.
+
+The input surface and recorder are independent components. The demo captures a
+sibling note input through `.source`, with a separate `InteractivePlayer` for
+live monitoring. Record starts a fresh take, Stop completes it, and Play auditions
+it. Release held notes before stopping to include them.
+
+<ScoreRecorderDemo />
+
+## Import
+
+```html
+<script type="module">
+  import {
+    defineNoteInputElement, defineScoreRecorderElement,
+    NoteInputElement, ScoreRecorderElement,
+  } from '@webmusic/score/play/element';
+  defineNoteInputElement();
+  defineScoreRecorderElement();
+
+  const input = document.querySelector('#recorder-input');
+  const recorder = document.querySelector('#recorder');
+  if (input instanceof NoteInputElement && recorder instanceof ScoreRecorderElement) {
+    input.onNote = recorder.input;
+  }
+</script>
+
+<score-note-input id="recorder-input" layout="piano" start="48" end="71"></score-note-input>
+<score-recorder id="recorder" bpm="120"></score-recorder>
+```
+
+`@webmusic/score/play/auto` and `/global` register the Play elements together;
+see [Score setup](/score/#drop-in-web-components).
+
+## Connect a note source
+
+Choose one feed path for each input:
+
+- `.input(midi, velocity, on)` monitors the note through the recorder's synth
+  and captures it while recording. Assign it to a note input's `.onNote`, as
+  above, for live sound and recording together.
+- `.source = eventTarget` subscribes to `webscore:noteon` / `webscore:noteoff`
+  events while connected. This path only records; it leaves an input's existing
+  `.onNote` sound callback intact. Use it when the input already has monitoring.
+
+The event detail is `{midi: number, velocity?: number}`; omitted velocity is
+`100`. The recorder also accepts these events on itself. A single bubbling
+event reaching both itself and its assigned source is captured once, but
+feeding both `.input()` and the event path would capture the same performance
+twice. Keep visible components as siblings: the recorder has no slot that
+projects a nested input surface.
+
+```ts
+import type {NoteInputElement, ScoreRecorderElement} from '@webmusic/score/play/element';
+
+const input = document.querySelector<NoteInputElement>('score-note-input')!;
+const recorder = document.querySelector<ScoreRecorderElement>('score-recorder')!;
+recorder.source = input; // capture only; retain the input's existing sound callback
+```
+
+## Timing, takes and ownership
+
+Capture measures elapsed seconds from `.record()` with a monotonic clock. Stop
+converts completed notes to notation through `notesToScore`; `bpm` and
+`quantize` are read at that moment. The default `quantize="0"` preserves
+performed timing. `0.25` snaps to sixteenth notes measured in quarter-note
+units.
+
+Overlapping presses of the same MIDI pitch pair with releases in attack order.
+Completed notes have a minimum captured duration of `0.02` seconds. Stop keeps
+completed notes and discards presses that have not received a release. An empty
+take produces no `Score` and no recorded event. Starting again clears the
+previous take; stopping while idle returns the last completed take.
+
+Changing `.source` discards unmatched presses while preserving completed notes
+and the recording time origin. Disconnect cancels the active recording, removes
+subscriptions, stops take playback and disposes the recorder's monitoring and
+playback objects. The assigned source and last completed take survive reconnect;
+call `.record()` to begin another recording.
+
+Sources, supplied sounds and supplied AudioContexts are borrowed and are not
+disposed by the recorder. The recorder releases its own routes and resources.
+Live monitoring and take playback alternate use of a supplied sound's route:
+input, access to `.player`, a new recording, or replacing `.sound` /
+`.audioContext` stops take playback. This recorder owns its take audition; its
+`.player` is the monitoring `InteractivePlayer`, not an external player binding.
+
+<details class="component-section">
+<summary>API</summary>
+
+The element class is `ScoreRecorderElement`; register it with
+`defineScoreRecorderElement(tag = 'score-recorder')`. Missing, blank or nonfinite
+numeric attributes use their defaults; finite values below the minimum clamp
+to it.
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `bpm` | attribute / property | Notation tempo in beats per minute; default `120`, minimum `1`. Read when a take stops. |
+| `quantize` | attribute / property | Notation grid in quarter notes; default and minimum `0` (performed timing). For example, `0.25` means sixteenths. Read when a take stops. |
+| `.source` | property | Borrowed `EventTarget \| undefined` for capture-only note events. No default source. Replacement discards unmatched presses; assignment survives reconnect. |
+| `.input(midi, velocity, on)` | method | Monitor a note and, while recording, capture its press (`true`) or release (`false`). Returns `void`. |
+| `.record()` | method | Start a fresh recording, stop take playback and discard the previous completed take. Returns `void`. |
+| `.stop()` | method | Finish capture and return `Score \| undefined`; empty recordings return `undefined`. When already idle, return the last completed take. |
+| `.sound` | property | Borrowed `HeadlessSynth \| undefined` used for monitoring and take playback. Live monitoring defaults to an owned triangle oscillator. Replacing it stops playback and releases the old monitoring route. |
+| `.audioContext` | property | Borrowed `AudioContext \| undefined` shared by monitoring and take playback. Replacing it stops playback and releases the old monitoring route. |
+| `.player` | property (get) | Lazily creates the internal monitoring `InteractivePlayer`. Reading it stops take playback so monitoring can reclaim its route. |
+| `.take` | property (get) | Last completed `Score \| undefined`; cleared when a fresh recording starts. |
+| `.recordingActive` | property (get) | Whether recording is active. |
+| `webscore:recorded` | event | Bubbling, composed `CustomEvent<ScoreRecorderRecordedDetail>` with `{score}` after a nonempty take stops. |
+| `webscore:error` | event | Bubbling, composed `CustomEvent<ScoreRecorderErrorDetail>` with `{operation: 'play', error}` on failed take playback or a failed presenter command. |
+
+The **Record** button toggles recording; **Play** toggles take audition. **MIDI**
+and **MusicXML** download through `serializeMIDI` / `serializeMusicXML`. Playback
+and exports remain disabled until a take exists. A rejected playback request
+releases that playback and clears its playing state before reporting the error;
+late rejection from a replaced playback is ignored.
+
+**Accessibility:** the presenter is a group named “Recorder”. Its native buttons
+support Tab, Enter and Space with visible focus; recording and playback expose
+`aria-pressed`. The Record name changes to “Stop recording” while armed. Export
+buttons are named “Download MIDI” and “Download MusicXML”. A polite, atomic status
+region announces recording/take counts. This note recorder exposes no audio level
+meter.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+The host follows its available width and respects native `hidden`. The
+[UIKit Recorder](/uikit/mixing-capture/recorder/) wraps controls and export buttons
+within that width; long status text breaks across lines. Resizing does not change
+the take or playback state. Use its public `--wm-recorder-*` tokens and
+`::part(root)`, `::part(record)`, `::part(play)`, `::part(exports)`,
+`::part(export)` and `::part(status)`.
+
+`--wm-component-background`, `--wm-component-border` and `--wm-component-radius`
+style the outer frame; `--wm-control-radius` styles buttons. The recording accent
+falls back from `--wm-recorder-accent` to `--wm-accent` and then red, with
+`--wm-accent-foreground` for its text. Explicit legacy `--rec-*` values take
+precedence over their corresponding UIKit tokens.
+
+```css
+score-recorder {
+  --wm-component-background: transparent;
+  --wm-component-radius: 0;
+  --wm-control-radius: 0;
+  --wm-recorder-accent: #c0392b;
+}
+```
+
+</details>

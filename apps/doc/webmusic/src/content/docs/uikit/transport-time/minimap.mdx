@@ -55,22 +55,6 @@ keeps only the newest command revision, then returns to authoritative snapshot s
 fulfillment or rejection. `seek()` may also return a promise, but it has no presenter-owned
 optimistic playhead; the binding must notify when its visible draw state changes.
 
-## Display text and values
-
-`getText()` returns application-resolved `MinimapText` once per brush paint. Call `handle.update()`
-after external settings change; focus remains on the brush. See
-[application-owned text](/uikit/api/#external-presentation-inputs) for external translation-package
-composition. Fields accept literal strings or callbacks returning final strings, with no template
-interpolation. Failures reach `onError` and use defaults.
-
-| `MinimapText` field | Default / callback context |
-|---|---|
-| `label` | `Visible range`; no context values. An explicit `label` option takes precedence. |
-| `range` | Formatted start and end joined by ` to `; `{start: string, end: string, rawStart: number, rawEnd: number}`. |
-
-`formatters.number` receives positions in the caller's units. Numeric ARIA attributes and
-range commands retain their original values.
-
 <details class="component-section">
 <summary>API</summary>
 
@@ -101,8 +85,6 @@ range commands retain their original values.
 
 | Member | Kind | Default | Description |
 |---|---|---|---|
-| `getText` | `() => MinimapText` | — | Reads application-resolved display text once per paint; call `update()` after external changes. |
-| `formatters` | `UIValueFormatters` | — | Pure numeric display callbacks; explicit presenter formatters take precedence. |
 | `label` | `string` | `'Visible range'` | Accessible name of the brush slider. |
 | `fallbackWidth` | `number` | `320` | CSS-pixel canvas width used only when neither root nor canvas reports a positive width. |
 | `fallbackHeight` | `number` | `40` | CSS-pixel canvas height used only when neither root nor canvas reports a positive height. |
@@ -152,8 +134,8 @@ or `--wm-minimap-surface-*` for a minimap-only override. The full-bleed inner vi
 | `--wm-minimap-foreground` | `--wm-waveform` → `--wm-foreground` | `#444` | Foreground inherited by caller drawing code. |
 | `--wm-minimap-border` | Literal | `0` | Inner viewport border shorthand. |
 | `--wm-minimap-radius` | `--wm-control-radius` | `0` | Inner viewport clipping and corners. |
-| `--wm-minimap-brush-border` | `--wm-selection` | `#4869d8` | Brush border. |
-| `--wm-minimap-brush` | `--wm-selection-fill` | `rgba(72, 105, 216, .18)` | Brush fill. |
+| `--wm-minimap-brush-border` | `--wm-selection` → `--wm-foreground` | `#111` | Brush border. |
+| `--wm-minimap-brush` | `--wm-selection-fill` | `rgba(127, 127, 127, .18)` | Brush fill. |
 | `--wm-focus` | `currentColor` | Current text color | Brush keyboard focus outline. |
 
 **Classes**

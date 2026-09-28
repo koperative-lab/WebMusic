@@ -1,0 +1,53 @@
+---
+// Canonical demo pattern: drop the tag and register it. The recorder captures
+// the microphone, so it only does anything after the browser grants mic
+// permission — we never auto-start it. A small listener logs the captured clip's
+// duration when a take finishes.
+//
+// Three of the attributes shape the getUserMedia constraints for the NEXT take
+// and the fourth needs a finished take, so on a page whose reader may never
+// grant the microphone they are wired but silent. `max-seconds` is not: the
+// status line shows the pending limit with no permission at all.
+import ElementPlayground from './ElementPlayground.astro';
+import AudioPlayStage from './AudioPlayStage.astro';
+
+const MIC = 'shapes the getUserMedia request for the next take — invisible until you grant microphone permission and record';
+
+const INERT = {
+  'device-id': MIC,
+  'echo-cancellation': MIC,
+  'sample-rate': MIC,
+  'auto-export': 'there is nothing to serialize until a take exists, which again needs the microphone',
+};
+---
+
+<ElementPlayground
+  tag="audio-recorder"
+  class="wa-demo"
+  inert={INERT}
+  markup="[data-audio-play-stage]"
+>
+  <AudioPlayStage>
+    <audio-player id="recorder-session"></audio-player>
+    <audio-recorder player="#recorder-session" id="wa-recorder-demo"></audio-recorder>
+    <p class="wa-demo__note">Press Record to start; press again to stop. Needs microphone permission.</p>
+  </AudioPlayStage>
+</ElementPlayground>
+
+<script>
+  import { defineAudioRecorderElement, defineAudioPlayerElement } from '@webmusic/audio/play/element';
+  import type { AudioRecorderRecordedDetail } from '@webmusic/audio/play/element';
+
+  defineAudioPlayerElement();
+  defineAudioRecorderElement();
+
+  const el = document.getElementById('wa-recorder-demo');
+  el?.addEventListener('webaudio:recorded', ((event: CustomEvent<AudioRecorderRecordedDetail>) => {
+    const clip = event.detail?.clip;
+    if (clip) console.log('[audio-recorder demo] captured', clip.duration, 's');
+  }) as EventListener);
+</script>
+
+<style>
+  .wa-demo__note { color: var(--wm-foreground-muted, #666); font-size: 0.78rem; margin: 0; }
+</style>

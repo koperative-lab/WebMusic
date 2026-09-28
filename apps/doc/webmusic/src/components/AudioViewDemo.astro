@@ -1,0 +1,142 @@
+---
+// One visible view; data is shared with the optional examples below it.
+// Spectral analysis starts only when the selected representation needs it.
+import ElementPlayground from './ElementPlayground.astro';
+
+// "Wired, but nothing visible changes HERE" — honest rather than flattering.
+// Only demo-scoped reasons belong here: an attribute that merely applies to one
+// `type` is not inert, because `type` is one control away — that scoping lives in
+// the catalog note instead.
+const PEAKS_WIN = 'the demo assigns .peaks, which wins over both loaders';
+const INERT: Record<string, string> = {
+  src: PEAKS_WIN,
+  'peaks-src': PEAKS_WIN,
+  format: 'only qualifies src, which this demo does not use',
+  virtualization: 'a culling switch: the drawing is identical either way, only the work differs',
+};
+---
+
+<ElementPlayground
+  tag="audio-view"
+  class="wa-demo"
+  inert={INERT}
+  markup="[data-audio-view-demo]"
+>
+  <div data-audio-view-demo>
+  <audio-player id="wa-v-player" controls></audio-player>
+  <audio-view
+    id="wa-v-view"
+    player="#wa-v-player"
+    type="waveform"
+    pixels-per-second="90"
+    height="96"
+    amplitude="1.6"
+    interactive
+    drag-mode="scrub"
+    data-view-demo
+  ></audio-view>
+  <p class="wa-help" data-drag-help>The playhead stays centered. Drag left forward or right backward to scratch; release coasts, then restores the previous playback state.</p>
+  <p role="status" data-view-status>Loading waveform…</p>
+  </div>
+</ElementPlayground>
+
+<script>
+  import {defineAudioPlayerElement, type AudioPlayerElement} from '@webmusic/audio/play/element';
+  import {defineAudioViewElement, type AudioViewElement} from '@webmusic/audio/view/element';
+  import {mountDemos} from './demo-lifecycle';
+  import {acquireAudioViewFixture} from './audio-view-fixture';
+  import {PLAYGROUND_RESET_EVENT} from './playground-client';
+
+  defineAudioPlayerElement();
+  defineAudioViewElement();
+
+  mountDemos('[data-audio-view-demo]', (root, scope) => {
+    const view = root.querySelector<AudioViewElement>('audio-view')!;
+    const player = root.querySelector<AudioPlayerElement>('audio-player')!;
+    const status = root.querySelector<HTMLElement>('[data-view-status]')!;
+    const fixture = acquireAudioViewFixture(`${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`);
+    scope.add(() => fixture.release());
+    scope.add(() => { player.stop(); player.clip = undefined; view.peaks = undefined; view.spectrogram = undefined; });
+    let generation = 0;
+    let ready = false;
+    let prepared = false;
+    const needsSpectrum = (): boolean => view.type === 'spectrogram' ||
+      (view.type === 'waveform' && ['multiband', 'colormap'].includes(view.getAttribute('color-mode') ?? ''));
+    const update = async (): Promise<void> => {
+      const current = ++generation;
+      if (!ready) return;
+      if (!needsSpectrum()) { status.textContent = ''; return; }
+      if (prepared) { status.textContent = ''; return; }
+      status.textContent = 'Preparing spectrum…';
+      try {
+        const spectrum = await fixture.spectrum('left', true);
+        if (!scope.active || current !== generation || !needsSpectrum()) return;
+        view.spectrogram = spectrum;
+        prepared = true;
+        status.textContent = '';
+      } catch (error) {
+        if (scope.active && current === generation) status.textContent = 'Spectrum could not be prepared. Change the view type to retry.';
+        throw error;
+      }
+    };
+    const help = root.querySelector<HTMLElement>('[data-drag-help]');
+    const updateHelp = (): void => {
+      if (!help) return;
+      help.hidden = view.type === 'meter';
+      const enabled = (name: string, fallback = false): boolean => view.hasAttribute(name)
+        ? !/^(false|0|no|off)$/i.test(view.getAttribute(name)?.trim() ?? '') : fallback;
+      if (enabled('annotate')) help.textContent = 'Drag to create a region. Annotation takes priority over the drag mode.';
+      else if (view.getAttribute('drag-mode') === 'pan') help.textContent = enabled('scrollable', true)
+        ? 'Drag left to see later audio, or right to see earlier audio. Arrow keys move the window. Playback is unchanged; following is suspended in pan mode.'
+        : 'Panning is disabled. Enable scrollable to move this viewport.';
+      else if (!enabled('interactive')) help.textContent = 'Enable interactive for click, keyboard and seek/scrub controls.';
+      else if (view.getAttribute('drag-mode') === 'scrub') help.textContent = 'Centered scrub: drag left toward later audio, or right toward earlier audio. Decoded players scratch at your speed; release coasts in position and sound, then restores the previous playback state. Other players move position only.';
+      else if (view.getAttribute('drag-mode') === 'none') help.textContent = 'Click or use arrow keys to seek. Dragging does not move playback.';
+      else help.textContent = 'Drag or click to seek to the time under the pointer. Arrow keys seek too.';
+    };
+    updateHelp();
+    const observer = new MutationObserver((records) => {
+      updateHelp();
+      if (records.some((record) => record.attributeName === 'type' || record.attributeName === 'color-mode')) scope.run(update());
+    });
+    observer.observe(view, {attributes: true, attributeFilter: ['type', 'color-mode', 'drag-mode', 'interactive', 'annotate', 'scrollable']});
+    scope.add(() => observer.disconnect());
+    const tap = (): void => {
+      if (view.type === 'meter' && player.analyser) view.type = 'meter';
+    };
+    scope.listen(player, 'webaudio:loaded', tap);
+    let tapFrame = 0;
+    scope.listen(player, 'click', () => {
+      cancelAnimationFrame(tapFrame);
+      tapFrame = requestAnimationFrame(() => { if (scope.active) tap(); });
+    });
+    scope.add(() => cancelAnimationFrame(tapFrame));
+    const panel = root.closest<HTMLElement>('[data-wm-pg]');
+    if (panel) scope.listen(panel, PLAYGROUND_RESET_EVENT, () => { player.stop(); });
+    scope.run((async () => {
+      status.textContent = 'Loading audio…';
+      const clip = await fixture.clip();
+      if (!scope.active) return;
+      status.textContent = 'Preparing waveform…';
+      const peaks = await fixture.peaks();
+      if (!scope.active) return;
+      // Explicit peaks arrive first so the player binding need not derive them.
+      view.peaks = peaks;
+      player.clip = clip;
+      ready = true;
+      status.textContent = '';
+      await update();
+    })(), () => { status.textContent = 'Audio could not be loaded. Reload this page to retry.'; });
+  });
+</script>
+
+<style>
+  .wa-help { color: var(--wa-muted); font-size: 0.8rem; }
+  .wa-demo :global(audio-player) {
+    display: block;
+    margin-bottom: 0.6rem;
+  }
+  .wa-demo :global(audio-view) {
+    display: block;
+  }
+</style>

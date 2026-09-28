@@ -1,0 +1,59 @@
+---
+// <audio-live-view> — it draws what an AnalyserNode hears right now, so the demo
+// ships the thing making the sound: an <audio-player> next to it.
+//
+// `source="#id"` is resolved once, at connect. The player has no engine — and
+// therefore no `.analyser` — until its clip lands, so the script re-resolves the
+// source on `webaudio:loaded`. It re-sets the attribute rather than assigning
+// `.analyser`, because an assigned node would override `source` and leave that
+// control with nothing to do. The node is borrowed either way.
+import ElementPlayground from '../ElementPlayground.astro';
+
+const SRC = `${import.meta.env.BASE_URL}mp3/Arabesque%20No.1.mp3`;
+const PLAYER_ID = 'pg-live-view-player';
+---
+
+<ElementPlayground
+  tag="audio-live-view"
+  class="pg-live-view"
+>
+  <audio-player id={PLAYER_ID} src={SRC} controls></audio-player>
+  <audio-live-view
+    source={`#${PLAYER_ID}`}
+    type="waveform"
+    window-seconds="4"
+    height="120"
+    data-pg-live
+  ></audio-live-view>
+</ElementPlayground>
+
+<script>
+  import type { AudioPlayerElement } from '@webmusic/audio/play/element';
+  import type { AudioLiveViewElement } from '@webmusic/audio/view/element';
+  import { defineAudioPlayerElement } from '@webmusic/audio/play/element';
+  import { defineAudioLiveViewElement } from '@webmusic/audio/view/element';
+
+  defineAudioPlayerElement();
+  defineAudioLiveViewElement();
+
+  for (const live of document.querySelectorAll<AudioLiveViewElement>('audio-live-view[data-pg-live]')) {
+    const selector = live.getAttribute('source');
+    const player = selector ? document.querySelector<AudioPlayerElement>(selector) : null;
+    if (!player) continue;
+    // Re-resolve once the player has an engine to read an analyser off. Setting
+    // the attribute to the value it already has is a no-op, so it has to be
+    // cleared first.
+    player.addEventListener('webaudio:loaded', () => {
+      live.removeAttribute('source');
+      live.setAttribute('source', selector!);
+    });
+  }
+</script>
+
+<style>
+  /* :global — the tags carry no Astro scope class of their own. */
+  .pg-live-view :global(audio-player) {
+    display: block;
+    margin-bottom: 0.6rem;
+  }
+</style>

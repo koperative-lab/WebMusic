@@ -1,0 +1,67 @@
+---
+title: Bridge
+description: "The only package allowed to import both families: what @webmusic/bridge is for, the rule that defines it, and where its sync object and stateless functions are documented."
+---
+
+`@webmusic/bridge` is the one package in the repository allowed to import
+**both** domain families. That is not a convenience — it is the rule that
+defines it. `@webmusic/score` and `@webmusic/audio` never depend on each
+other, so anything that must know a `Score` _and_ an `AudioClip` at the same
+time has exactly one home, and this is it.
+
+## When you need it
+
+These jobs need both domains:
+
+- **Play a score and a recording together**, using one shared `AudioContext`
+  reference, one group command authority and drift correction —
+  `ScoreAudioSync` and its two factories. Each engine still owns its transport
+  clock.
+- **Turn a score into audio**, offline — `renderScoreToClip`.
+- **Convert between the two notions of time** — a Score `TimeMap` and an
+  Audio `BeatGrid`, in either direction.
+- **Assemble a transcription into a `Score`** — `scoreFromTranscription`
+  over the family-neutral note events `@webmusic/audio/analyze/transcribe`
+  emits. Transcription itself stays in Audio precisely so that Audio never
+  needs to know what a `Score` is.
+
+## Where it sits
+
+```text
+@webmusic/score ─┐
+                 ├─▶ @webmusic/bridge
+@webmusic/audio ─┘
+```
+
+Both families are **peer dependencies**, along with `@webmusic/kernel`: the
+bridge borrows the score and audio instances your application already has
+rather than bundling its own. It publishes last, after both families.
+
+## The smallest example
+
+```ts
+import { createSyncedPlayback } from "@webmusic/bridge";
+
+const { sync } = createSyncedPlayback(score, clip);
+await sync.play();
+// … sync.seek(seconds), sync.setLoop({startSeconds, endSeconds})
+sync.dispose();
+```
+
+One call builds both players on one shared context and returns them alongside
+the sync that owns them. What each option does, and what `dispose()` releases, is on the
+pages below.
+
+## Documentation
+
+|                                                        |                                                                                                              |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| [Playback composition](/bridge/composition/)           | A runnable score/audio session, borrowed views, source replacement and independent native loops.             |
+| [`ScoreAudioSync`](/bridge/headless/score-audio-sync/) | The stateful sync object: construction, commands, state, the error channel, and what it owns versus borrows. |
+| [`@webmusic/bridge`](/bridge/api/)                     | The entry reference — every root export, including the stateless conversion and rendering functions.         |
+
+## What's next here
+
+Event and element bindings, so a `<score-view>` can follow an
+`<audio-player>` declaratively rather than through code. The bridge
+gets no Web Components group until it ships an element.

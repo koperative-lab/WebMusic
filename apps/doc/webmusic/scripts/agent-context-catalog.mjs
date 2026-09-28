@@ -23,7 +23,7 @@ const themeSources = ['styles', 'internal/palette', 'internal/surface', 'interna
   .map((name) => `packages/ui/src/${name}.ts`);
 
 /** Public catalog records derive from the same reviewed catalogs as the site. */
-export function componentCatalog(pages, presenters, composition) {
+export function componentCatalog(pages, presenters, composition, extension) {
   const byRoute = new Map(pages.map((page) => [page.route, page]));
   const requirePage = (route) => {
     const page = byRoute.get(route);
@@ -54,11 +54,12 @@ export function componentCatalog(pages, presenters, composition) {
   for (const entry of presenters) {
     components.push(record(`ui/${entry.presenter}`, 'ui', requirePage(`/uikit/${entry.classSlug}/${entry.presenter}/`), [`packages/ui/src/${entry.presenter}.ts`], {description: entry.summary}));
   }
+  components.push(...(extension?.components(pages, record) ?? []));
   components.sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
   if (new Set(components.map(({id}) => id)).size !== components.length) throw new Error('Agent component catalog contains duplicate IDs.');
   return {
     schemaVersion: 1,
-    sourceScope: 'Selected owning implementation files at the verified release; imports and internal selectors are not public entry points.',
+    sourceScope: extension?.sourceScope ?? 'Selected owning implementation files at the verified release; imports and internal selectors are not public entry points.',
     license: {id: 'MIT', output: licenseOutput},
     stylesFormat: 'public-documentation',
     components,
@@ -86,8 +87,8 @@ export const patternSelection = [
   {title: 'Own a player from custom UI', page: 'score/headless/play/score-player.mdx', sections: ['Import', 'Borrow data and playback state', 'Time and resource roles']},
   {title: 'Connect a view to playback', page: 'score/element/view/score-view.mdx', sections: ['Data and playback']},
   {title: 'Follow analysis and navigate musical positions', page: 'score/headless/analyze/analysis-follower.mdx', sections: ['Import', 'Data and time ownership', 'Navigation outcomes']},
-  {title: 'Compose React state and components', page: 'score/api/react.mdx', sections: ['Install', 'Customize With Provider', 'Customize With Hooks', 'Customize Individual Components', 'Static views and external playback', 'Render readiness and failures']},
-  {title: 'Bind an independent presenter', page: 'uikit/api.mdx', sections: ['The shared presenter shape', 'External presentation inputs']},
+  {title: 'Compose React state and components', page: 'score/api/react.mdx', sections: ['Install', 'Customize With Provider', 'Customize With Hooks', 'Customize Individual Components']},
+  {title: 'Bind an independent presenter', page: 'uikit/api.mdx', sections: ['The shared presenter shape']},
   {title: 'Style a custom music interface', page: 'uikit/index.mdx', sections: ['Use UI Kit directly', 'Theme with CSS custom properties', 'Customization depth']},
   {title: 'Load, convert and parse music in a worker', page: 'score/api/io.mdx', sections: ['Install', 'Load and detect formats', 'Parse and serialize directly', 'Parse in a Worker']},
 ];

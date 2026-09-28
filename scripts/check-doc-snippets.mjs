@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 // Compile documented examples against built package declarations. Extraction
 // includes supported fences, inline HTML scripts and literal MDX code exports.
-// Optional local .dev/docs/DOCS-CONVENTIONS.md notes describe selection and
-// fragment-input limitations; the checker does not require that directory.
+// See dev/docs/DOCS-CONVENTIONS.md for selection and fragment-input limitations.
 
 import {mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync} from 'node:fs';
 import {dirname, join, relative, resolve} from 'node:path';

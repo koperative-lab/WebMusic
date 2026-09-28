@@ -44,22 +44,6 @@ element with slider semantics and delegates domain hit-testing to `valueAt(point
 the only write port. All three follow the
 [shared presenter ownership contract](/uikit/api/#the-shared-presenter-shape).
 
-## External presentation inputs
-
-Surface sliders already expose `formatValue(value, state)` and
-`handle.updateLabel(label?)`. Supply final value text through the callback and
-call `update()` after changing application display state. `updateLabel(text)`
-changes the accessible name without moving focus; omitting its argument
-restores the option/default name (`Value`). It intentionally takes ownership of
-that attribute and restores its original value on cleanup, provided the caller
-has not overwritten it afterward. Existing caller-owned ARIA names are preserved
-until this explicit call. Machine value attributes remain numeric.
-
-Canvas status messages come from the existing `binding.status()` result;
-`update()` refreshes them. Plain stage labels, content and error explanations
-remain caller-owned. Stage has no translation engine or translation subscription.
-See the [shared presentation contract](/uikit/api/#external-presentation-inputs).
-
 <details class="component-section">
 <summary>API</summary>
 
@@ -109,7 +93,8 @@ State because its caller draws each frame directly.
 | Member | Kind | Description |
 |---|---|---|
 | `snapshot()` | `() => SurfaceSliderState` | Required authoritative slider state. |
-| `valueAt(point)` | `(SurfaceSliderPoint) => number` | Required domain hit-test. The point includes client and local coordinates, pointer id, bounds, and pointer surface. |
+| `gesture?(phase)` | `('start' \| 'end' \| 'cancel') => void` | Pointer lifecycle: start before commands, end after the final release commit, cancel when pending work must be discarded. Keyboard commands do not start a pointer gesture. |
+| `valueAt(point)` | `(SurfaceSliderPoint) => number` | Required domain mapping. The point includes client/local coordinates, pointer id, bounds and surface. During a pointer gesture, `point.gesture` supplies the stable press origin and relative travel described below. |
 | `commit(value)` | `(number) => void` | Required write port receiving a finite, clamped pointer or keyboard value. |
 | `preview(value)` | `(number) => void` | Optional. With `commitOn: 'release'` this receives every in-flight drag position, so the caller can paint the scrub while the domain sees exactly one write. |
 | `subscribe?(notify)` | `(notify: () => void) => () => void` | Publishes authoritative State changes. |
@@ -121,6 +106,9 @@ State because its caller draws each frame directly.
 | `label` | `string` | `'Value'` | Accessible name when the element has neither `aria-label` nor `aria-labelledby`. |
 | `orientation` | `'horizontal' \| 'vertical'` | `'horizontal'` | Sets ARIA orientation and Arrow-key direction. |
 | `pointerTarget` | `HTMLElement` | mounted element | Receives pointer listeners and capture while ARIA remains on the mounted element. |
+| `pointerMode` | `'absolute' \| 'drag' \| 'click' \| 'none'` | `'absolute'` | Absolute commits on press and movement. Drag waits for 4 CSS pixels of travel; a stationary release remains a click. Click commits only a stationary release. None retains keyboard/ARIA without pointer listeners or touch styling. |
+| `cursor` | `string` | — | Idle pointer cursor, such as `grab`. Ignored in pointer none mode. |
+| `dragCursor` | `string` | `cursor` | Cursor during an active pointer gesture, such as `grabbing`. |
 | `keyboardStep` | `number \| (state, event) => number` | span ÷ 100, or `1` | Amount committed for each Arrow key. The callback receives the keyboard event too, so a modifier can select a coarser step — the transport uses `Shift` for a long seek. |
 | `commitOn` | `'move' \| 'release'` | `'move'` | When a pointer drag reaches `commit()`. `'release'` previews the drag and commits once, on pointerup — one seek per scrub rather than one per move. A cancelled drag repaints from the owner's state and commits nothing. |
 | `formatValue` | `(value, state) => string \| undefined` | — | Supplies `aria-valuetext`; `undefined` removes it. |
@@ -132,9 +120,40 @@ State because its caller draws each frame directly.
 |---|---|---|
 | `element` | `HTMLElement` | Caller element carrying role, focus, and ARIA. |
 | `surface` | `HTMLElement` | Pointer surface: `pointerTarget` or the mounted element. |
-| `update()` | `() => void` | Re-reads State and applies ARIA values. |
-| `updateLabel(label?)` | `(label?: string) => void` | Updates the accessible name in place; undefined uses the option/default. |
+| `update()` | `() => void` | Re-reads State and applies ARIA values; disabling cancels an active gesture. |
+| `cancelGesture()` | `() => void` | Cancels active pointer work and discards a release-only preview. Idempotent; leaves keyboard and future gestures available. |
 | `destroy()` | `() => void` | Removes listeners and restores attributes and touch behavior that the presenter assigned. |
+
+A pointer point's optional `gesture` is a readonly snapshot with `startClientX`,
+`startClientY`, `startValue`, `deltaX`, `deltaY` and `moved`. Origins use the current
+State at press; movement uses CSS client pixels and stays independent of later
+layout, viewport or State changes. `moved` becomes true after 4 CSS pixels of
+travel and stays true even if the pointer returns to its origin. The presenter
+owns that geometry; the caller owns its units and direction. For example, an
+Audio caller can return `point.gesture.startValue - point.gesture.deltaX / zoom`
+from `valueAt` to move earlier as a track is dragged right. Snapshot the intended
+zoom at gesture start if it may change while dragging.
+
+Only one primary pointer owns a gesture. Additional pointers cannot steal it.
+Pointer cancellation, lost capture, host/window blur, disable, explicit
+`cancelGesture()`, destruction and same-host replacement cancel pending work.
+A cancel does not undo values already committed by a continuous gesture; it
+prevents a later release from committing and lets the caller discard queued
+work. Release-only preview always maps the actual release coordinates before
+its single commit. Continuous input commits a changed final coordinate without
+repeating an unchanged final point. Errors from borrowed callbacks reach
+`onError`; reentrant destruction stops remaining pointer commands.
+
+`commit()` is optimistic only until the owner publishes State: a synchronous
+`update()` during the callback preserves the owner's accepted value, including
+clamping or wraparound, instead of overwriting it with the requested value.
+A caller scheduling writes on animation frames can flush its last pending value
+in `gesture('end')` and drop it in `gesture('cancel')`; the presenter creates no
+musical clock or playback commands.
+
+Configured cursors are restored on gesture completion/cancellation and release.
+A caller replacing the inline cursor while mounted keeps that override.
+Pointer none mode never takes cursor or touch-action ownership.
 
 The presenter manages `tabindex` only when it assigned one: a disabled slider leaves the tab order
 and rejoins it when re-enabled. An author-supplied `tabindex` is that author's focus policy and is

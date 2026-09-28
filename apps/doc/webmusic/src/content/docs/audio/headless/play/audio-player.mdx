@@ -1,0 +1,126 @@
+---
+title: AudioPlayer
+description: 'A stable playback owner over a replaceable clip or borrowed queue/mix transport.'
+sidebar:
+  order: 1
+---
+
+import HlAudioPlayerDemo from '../../../../../components/headless/HlAudioPlayerDemo.astro';
+
+`AudioPlayer` is the central Audio command surface. It retains one identity while
+its clip changes, or delegates to an existing queue/mix backend. It creates no
+second transport clock. Use [`AudioClipPlayer`](/audio/headless/play/audio-clip-player/)
+when an immutable single-clip engine is all the application needs.
+
+The demo constructs one nonvisual player and controls it with plain inputs. Load
+the Arabesque No.1 WAV, switch between a clip and a two-pass queue, or clear and reselect the
+source. Its readouts follow the object's events; the demo owns decoding and queue
+cleanup, while the facade owns its context and clip engine.
+
+<HlAudioPlayerDemo />
+
+## Import
+
+```ts
+import {AudioPlayer, AudioPlaylist, AudioMixer} from '@webmusic/audio/play/headless';
+import {loadClipFromUrl} from '@webmusic/audio/play';
+
+const player = new AudioPlayer();
+const clip = await loadClipFromUrl('/wav/Arabesque%20No.1.wav', {context: player.audioContext});
+player.setClip(clip);
+await player.play();
+player.pause();
+
+const queue = new AudioPlaylist({
+  audioContext: player.audioContext, entries: [{id: 'take', clip}],
+});
+player.setTransport(queue); // borrow the queue without disposing it
+await player.play();
+
+const mix = new AudioMixer({audioContext: player.audioContext});
+mix.add({id: 'stem', clip});
+player.setTransport(mix.transport);
+await player.play();
+
+const dispose = () => {
+  player.setTransport(undefined); // detach the borrowed backend
+  queue.dispose();
+  mix.dispose();
+  player.dispose(); // release its owned context after the borrowers
+};
+```
+
+## Ownership and source selection
+
+`setClip` selects an owned low-level clip engine, stopped at zero. The engine is
+created lazily. Replacing it releases only that owned engine, preserving facade
+identity and its output tap/context. Assigning the same selected clip is a no-op.
+`setTransport` selects a borrowed backend and preserves its state. Selecting a
+new nonempty clip or transport pauses the previous backend first, preserving its
+position and preventing hidden overlap. Clearing a connection only detaches it. The facade
+never stops or disposes a borrowed backend merely because it is detached.
+
+The backend supplies all position/state readback. A queue uses seconds within its
+active entry and exposes that clip. A mix uses its group axis and has no single
+clip or aggregate analyser. Unsupported analyser/clock/scratch capabilities are absent; unsupported live control setters throw rather than silently succeeding.
+Sharing this facade does not complete shared-clock injection across mix members.
+
+<details class="component-section">
+<summary>API</summary>
+
+### Construction and selection
+
+| Member | Contract |
+| --- | --- |
+| `new AudioPlayer(clip?, options?)` / `createAudioPlayer(clip?, options?)` | Empty by default. `AudioPlayerOptions` uses the [clip engine options](/audio/headless/play/audio-clip-player/): context/destination, engine, media adapter, rate, volume, pan, loop, pitch preservation and effects. |
+| `setClip(clip \| undefined)` | Replace the selected source; undefined clears it. Source replacement invalidates the old owned playback and scratch work. |
+| `setTransport(transport \| undefined)` | Borrow an `AudioPlayerTransport`; undefined detaches the selected borrowed backend. Direct and indirect facade borrowing cycles are rejected. |
+| `clip` / `transport` | Readonly selected clip or borrowed transport; a mix returns no clip. |
+
+### Commands and state
+
+| Member | Contract |
+| --- | --- |
+| `play(when?)` | Promise resolves after start/preparation, not at natural completion. `when` is absolute AudioContext seconds, supported according to the selected backend. Empty/disposed instances do nothing. |
+| `pause()` / `stop()` | Delegate to the current backend. Pause retains position; stop resets according to that backend. |
+| `seek(seconds)` / `seekFraction(fraction)` / `scrub(deltaSeconds)` | Delegate seeks on the selected content axis. Fraction clamps to 0–1; scrub is a relative seek, not scratch audio. |
+| `preload()` | Prepare the selected backend without starting sound, when supported. |
+| `setVolume(value)` / `setRate(value)` / `setPan(value)` | Set clip controls; rate clamps to 0.25–4, pan to −1–1, volume is nonnegative. Nonfinite input throws. A selected borrowed backend must expose the requested setter or the command throws without committing a new retained setting. |
+| `setLoop(loop)` / `setPreservesPitch(value)` | Clip configuration. Queue loop belongs to the queue's list policy; do not infer group loop/pan/pitch support. |
+| `beginScratch()` / `scratching` | Borrow the selected backend's optional scratch session. See [scratch sessions](/audio/headless/play/audio-clip-player/#scratch-sessions). |
+| `seconds` / `currentTime` / `duration` / `progress` | Live position, duration and fraction; zero for empty input. |
+| `playing` | Selected backend's playback state. |
+| `volume` / `rate` / `pan` | Facade's retained clip settings; a backend can expose narrower control support. |
+| `audioContext` | Lazily creates or returns the borrowed AudioContext for shared decoding/owned playback. Throws after disposal. A borrowed group may own a different context; sharing must be configured explicitly. |
+| `clock` | Selected engine's optional read-only transport clock; the facade owns no clock. |
+| `analyser` | Stable owned clip-output analyser or a borrowed backend's optional analyser. Empty input does not create a graph. |
+
+### Events and lifecycle
+
+`on`, `once` and `off` use `AudioPlayerEvents`; `on`/`once` return an unsubscribe.
+`sourcechange` carries `{clip, revision}`, `statechange` carries `{playing}`, and
+`timeupdate` carries `{seconds, duration, progress}`. Notifications are synchronous;
+read current state again after reentrant callbacks. Source observation does not
+start playback. `load` carries `{duration}`; `end` carries the clip or undefined
+for a backend without one. `regionenter`, `regionleave` and `beat` forward clip
+annotations. `error` carries an Error from the selected backend.
+
+`dispose()` is terminal and idempotent. It releases subscriptions, observation,
+owned engine/output and only an internally created context. A supplied context
+and borrowed transport remain caller-owned. Dispose owners separately in their
+application lifetime. Cleanup must not reclaim a source selected by a callback.
+
+`AudioPlayerTransport` requires seconds/duration/playing, play/pause/stop/seek.
+Optional clip/currentClip, analyser, clock, configuration, preload/scratch and
+subscribe/onEnd/onError ports expose backend capabilities without DOM. An
+`AudioPlaylist` implements this contract; use `AudioMixer.transport` for a mix.
+
+</details>
+
+## Related
+
+[`<audio-player>`](/audio/element/play/audio-player/) ·
+[AudioClipPlayer](/audio/headless/play/audio-clip-player/) ·
+[AudioPlaylist](/audio/headless/play/audio-playlist/) ·
+[AudioMixer](/audio/headless/play/audio-mixer/) ·
+[AudioMeterController](/audio/headless/view/audio-meter/)

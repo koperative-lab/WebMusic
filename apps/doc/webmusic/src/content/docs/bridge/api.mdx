@@ -1,0 +1,202 @@
+---
+title: '@webmusic/bridge'
+description: 'Every root export of the bridge: timeline conversion, offline score rendering, the role adapters, transcription assembly, and the sync object documented under Headless.'
+sidebar:
+  label: '@webmusic/bridge'
+  order: 2
+---
+
+`@webmusic/bridge` is a **single-entry package**: the root is the whole API.
+It is the only package allowed to import both families, and both are peer
+dependencies alongside `@webmusic/kernel` — the bridge borrows the score and
+audio instances your application already has.
+
+It does not decode audio, parse notation, or draw anything. Those live in
+[`@webmusic/audio`](/audio/api/) and [`@webmusic/score`](/score/api/); what is
+here is only the work that needs *both*.
+
+## Install
+
+`npm install @webmusic/bridge` — use an available published version or the local workspace. It has no optional peers of its own; it inherits whatever the two families need.
+
+## Entry map
+
+| Subpath | Form | What is there |
+| --- | --- | --- |
+| `@webmusic/bridge` | root · the whole API | Everything below. |
+| — | [Headless](/bridge/headless/) | `ScoreAudioSync` and its two factories are root exports, documented under the headless contract because they are constructed and disposed rather than called. |
+
+There is no `/headless` subpath, no `/element`, and no `/auto`: the bridge
+ships no Web Components. It gets none until it has one to ship.
+
+## Synchronized playback
+
+The stateful half of the package. `ScoreAudioSync` drives a master and a
+follower transport as one unit, and the two factories build both players on a
+shared `AudioContext` first. All three are documented on
+[its page](/bridge/headless/score-audio-sync/) rather than here, because
+construction, commands, state and disposal are what a reader needs and a
+function list cannot carry them.
+
+`clipAsMaster` and `scoreAsFollower` are the role adapters underneath: they
+wrap a clip player and a score player in the `SyncMasterTransport` /
+`SyncFollowerTransport` shapes the sync consumes. Reach for them when you are
+assembling a pairing by hand instead of through a factory.
+
+## Timeline conversions
+
+The two families deliberately keep different musical time models — Score's
+exact `TimeMap` (rational quarters → seconds) and Audio's `BeatGrid`
+(beats[] in seconds). Both project onto the same seconds ruler, so they
+convert:
+
+```ts
+import {beatGridFromTimeMap, timeMapFromBeatGrid} from '@webmusic/bridge';
+
+// Exact at the sampled positions; intervening tempo changes can be lost.
+const grid = beatGridFromTimeMap(score.timeMap, {durationQuarters: 64});
+
+// Approximate: each inter-beat interval becomes one tempo segment.
+const map = timeMapFromBeatGrid(gridFromTempoDetection);
+```
+
+Use `beatGridFromTimeMap` to hand a score's tempo curve to audio-side tools
+(beat-synced effects, waveform beat markers); use `timeMapFromBeatGrid` to
+carry a detected tempo grid (e.g. from `@webmusic/audio/analyze`'s tempo detection)
+into score-side quantization. `DEFAULT_MAX_MAPPED_BEATS` is the ceiling that
+keeps a pathological tempo map from generating an unbounded grid.
+
+`timeMapFromBeatGrid` maps each grid beat to one quarter note, sets quarter
+zero to second zero, and supplies a default 4/4 meter. Retain the original
+`grid.beats[0]` offset separately when aligning a recording. It does not recover
+the original meter or the subdivision factor used to create a grid. These
+functions therefore do not form a lossless round trip.
+
+### Mapping contract
+
+| Member | Default | Contract |
+| --- | --- | --- |
+| `beatGridFromTimeMap(map, options): BeatGrid` | — | Samples a Score `TimeMap` at uniform quarter subdivisions, returning Audio beat positions in seconds. The final sample rounds up to the next subdivision if needed. |
+| `options.durationQuarters` | Required | Finite number greater than zero; requested span on the quarter axis. |
+| `options.beatsPerQuarter` | `1` | Positive safe integer; samples per quarter. The resulting grid's beat index is a subdivision index. |
+| `options.maxBeats` | `DEFAULT_MAX_MAPPED_BEATS` (`1_000_000`) | Safe integer at least 2. The allocation includes the zero-position sample; excessive spans throw `RangeError`. |
+| `timeMapFromBeatGrid(grid): TimeMap` | — | Each positive inter-beat interval becomes a tempo segment; zero/nonpositive intervals throw `RangeError`. With fewer than two beats, uses `grid.bpm`. |
+
+`BeatGridFromTimeMapOptions` is the options shape above. Both operations return
+data, own no running transport or audio resources, and need no disposal.
+
+## Offline rendering
+
+`renderScoreToClip(score, options?)` plays a score into an `OfflineAudioContext`
+and returns the result as an `AudioClip` — a matched backing track, without a
+speaker or a user gesture. This is what lets the sync demo make the clip the
+sounding source while a silent score transport drives the visuals.
+
+The renderer includes an effect/release tail by default. Use the
+audio-mastered pairing to play that tail through the clip's end. The live
+Score-mastered demo renders with `tailSeconds: 0`; passing a Bridge-rendered
+clip with a positive tail back to `createSyncedPlayback` is rejected before
+creating players. Both pair factories require the original Score instance used
+for that render. A `tempo` override that differs from the Score's base tempo
+changes the clip's time axis; neither pair factory accepts that rendered clip.
+Render at the Score's base tempo for synchronized playback and change speed with
+`sync.setRate()`. These guards recognize the original AudioClip object from
+one render call; copying or serializing it loses that in-memory provenance.
+
+For repeated notation, call `expandRepeats(score)` first, then render and pair
+the expanded Score instance. Passing `scoreOptions.expandRepeats` with a
+Bridge-rendered clip would expand only the live player, so the factories reject
+it before allocating playback resources.
+
+Its signature is `renderScoreToClip(score: Score, options?: RenderOptions):
+Promise<AudioClip>`. Options and synth ownership follow
+[Score's offline render helpers](/score/headless/play/score-player/).
+An `OfflineAudioContext` implementation and an offline-compatible synth are
+required; self-routing Tone/Spessa synths do not route into that capture graph.
+Rendering rejects on preparation/render failures. The returned clip is data,
+with the renderer's sample rate and channel count, and has no playback lifetime
+until supplied to a player. Timbre, effects, tempo, and rendering tails are
+choices made during rendering, not information recoverable from the clip's
+original notation.
+
+## Audio → Score assembly
+
+`@webmusic/audio/analyze/transcribe` emits family-neutral note events; the bridge
+turns them into a real `Score`:
+
+```ts
+import {transcribe} from '@webmusic/audio/analyze/transcribe';
+import {scoreFromTranscription} from '@webmusic/bridge';
+
+const {notes, bpm} = await transcribe(clip, {quantize: true});
+const score = scoreFromTranscription(notes, {bpm, quantizeGrid: 4});
+```
+
+Notation snaps to the grid (default sixteenths; `quantizeGrid: 0` still rounds
+to a 1/480-quarter tick). Accepted notes retain their supplied onset and
+duration in `performed.onsetSec` / `durationSec`; velocity is converted to
+integer MIDI units. Pitches are rounded and out-of-range results are dropped.
+This preserves supplied timing alongside notation but cannot recover material
+the transcriber did not represent. Note that
+`transcribe` itself needs its optional peers installed
+(`@spotify/basic-pitch`, `@tensorflow/tfjs`); `scoreFromTranscription` is
+pure and always available. `DEFAULT_MAX_TRANSCRIPTION_MEASURES` and
+`DEFAULT_MAX_TRANSCRIPTION_NOTES` bound what one call will assemble.
+
+### Assembly contract
+
+`scoreFromTranscription(notes: readonly TranscribedNote[], options?:
+ScoreFromTranscriptionOptions): Score` is synchronous. It creates one part,
+one voice, a constant tempo, and enough measures to cover the accepted notes
+(at least one measure for empty input). It does not detect instruments,
+voices, meter, or a variable tempo map.
+
+| Option | Default | Contract |
+| --- | --- | --- |
+| `bpm` | `120` | Finite, positive output tempo. Pass the desired interpretation explicitly. |
+| `timeSignature` | `{numerator: 4, denominator: 4}` | Positive safe-integer numerator and denominator; defines measure duration. |
+| `quantizeGrid` | `4` | Nonnegative safe integer subdivisions per quarter. Zero uses 480 ticks per quarter; rounded durations have at least one grid unit. |
+| `title` | `'Transcription'` | Score title. |
+| `partName` | `'Transcribed'` | The single part's name. |
+| `maxNotes` | `DEFAULT_MAX_TRANSCRIPTION_NOTES` (`100_000`) | Positive safe integer limiting input count, before pitch filtering. |
+| `maxMeasures` | `DEFAULT_MAX_TRANSCRIPTION_MEASURES` (`4_096`) | Positive safe integer limiting materialized measures. |
+
+For each input note, `midi` must be finite; its rounded pitch outside 0–127
+is skipped. For an accepted pitch, seconds must be finite, nonnegative, and
+ordered, and velocity must be finite. Velocity is multiplied by 127, rounded,
+and clamped to 1–127. Invalid options, accepted-note values, unsafe timing
+arithmetic, or resource-limit violations throw `RangeError`. Assembly owns
+no context, subscription, or running clock and has no disposal step.
+
+## API Reference
+
+Every export of the root, exactly once.
+
+| Export | Kind | Use it for |
+| --- | --- | --- |
+| `ScoreAudioSync` | class | [Synchronized playback](/bridge/headless/score-audio-sync/) — the transport pair as one unit. |
+| `createSyncedPlayback` | factory | [Score as master](/bridge/headless/score-audio-sync/#score-as-master) — builds both players and the sync. |
+| `createAudioMasteredPlayback` | factory | [Audio as master](/bridge/headless/score-audio-sync/#audio-as-master) — the same, with the recording driving. |
+| `clipAsMaster` | adapter | Wrap a clip player as the sync's master role. |
+| `scoreAsFollower` | adapter | Wrap a score player as the sync's follower role. |
+| `beatGridFromTimeMap` | function | Sample a score's exact tempo map onto an audio `BeatGrid`. |
+| `timeMapFromBeatGrid` | function | Carry a detected beat grid into a score `TimeMap`. |
+| `renderScoreToClip` | function | Render a score offline into an `AudioClip`. |
+| `scoreFromTranscription` | function | Assemble transcribed note events into a `Score`. |
+| `DEFAULT_MAX_MAPPED_BEATS` | constant | The beat ceiling `beatGridFromTimeMap` will not exceed. |
+| `DEFAULT_MAX_TRANSCRIPTION_MEASURES` | constant | Measure ceiling for one assembly. |
+| `DEFAULT_MAX_TRANSCRIPTION_NOTES` | constant | Note ceiling for one assembly. |
+| `TransportCommand`, `TransportCommit`, `TransportEvent`, `TransportSnapshot` | types | Re-exported Kernel command/observation contracts used by `ScoreAudioSync`; see [session commands](/kernel/api/#session-commands-and-observation). |
+| `ScoreAudioSyncOptions` | type | Construction options for the sync. |
+| `CreateSyncedPlaybackOptions` | type | Options for the score-as-master factory. |
+| `CreateAudioMasteredPlaybackOptions` | type | Options for the audio-as-master factory. |
+| `AudioMasterAdapterOptions` | type | Offset options for `scoreAsFollower`. |
+| `BeatGridFromTimeMapOptions` | type | Options for `beatGridFromTimeMap`. |
+| `ScoreFromTranscriptionOptions` | type | Options for `scoreFromTranscription`. |
+| `SyncScoreTransport` | type | The score side of a pairing. |
+| `SyncClipTransport` | type | The clip side of a pairing. |
+| `SyncMasterTransport` | type | The clock-owning role. |
+| `SyncFollowerTransport` | type | The following role. |
+| `SyncTransportClockView` | type | Read-only view of the master clock. |
+| `SyncLoopRegion` | type | A loop region in master seconds. |
+| `SyncTransportContract` | type | The structural contract both roles satisfy. |

@@ -1,0 +1,95 @@
+---
+title: '@webmusic/ui/spectrum-analyzer'
+description: 'An inspectable log-frequency spectrum with a probe, freeze, and peak hold over caller-supplied dB bins.'
+sidebar:
+  label: 'spectrum-analyzer'
+  order: 5
+---
+
+import UiPresenterLiveDemo from '../../../../components/UiPresenterLiveDemo.astro';
+import UiPresenterRelated from '../../../../components/UiPresenterRelated.astro';
+
+`mountSpectrumAnalyzer()` turns a live frequency frame into an inspectable spectrum. An operator can point to a frequency, move the probe by keyboard, freeze the trace, hold maxima, and reset those held peaks. The kit draws and owns these interactions; the application owns FFT sampling and source identity.
+
+Unlike [`meter mode="spectrum"`](/uikit/mixing-capture/meter/), this is a log-frequency investigation surface with a frequency/dB readout, not a bank of normalized bars. The live demo generates harmonic dB bins to exercise the real controls; it does not sample the user's audio device.
+
+<UiPresenterLiveDemo presenter="spectrum-analyzer" />
+
+## Import
+
+```ts
+import {mountSpectrumAnalyzer} from '@webmusic/ui/spectrum-analyzer';
+
+const handle = mountSpectrumAnalyzer(host, {
+  snapshot: () => state,
+  setFrozen: (value) => setFrozen(value),
+  setPeakHold: (value) => setPeakHold(value),
+  probe: (hertz, db) => inspect(hertz, db),
+  subscribe: (notify) => store.subscribe(notify),
+});
+// Call handle.destroy() when this surface leaves the application.
+```
+
+The caller supplies `host`, `state`, a notification store and commands. The presenter subscribes to state changes and also exposes `handle.update()` for a caller-paced repaint. `setFrozen()` changes caller state; the caller decides whether to stop replacing `frame`. `peakHold` is presentation-local and can be reset without changing the FFT source.
+
+## Frame and source identity
+
+`frame.bins` contains dB values for the `fftSize / 2` frequency bins. The presenter's frequency mapping uses `sampleRate / fftSize` Hz per bin; `minDb` and `maxDb` set the vertical axis. A new `sourceRevision` clears held maxima, so a trace from an old deck does not contaminate the next one. The caller increments that revision when the observed source changes and avoids publishing stale frames after replacement. No `AudioContext`, analyser or transport is created here.
+
+<details class="component-section">
+<summary>API</summary>
+
+**State and frame**
+
+| Member | Kind | Default | Description |
+|---|---|---|---|
+| `frame` | `SpectrumAnalyzerFrame?` | absent | Current FFT `bins`, `sampleRate`, `fftSize`, `minDb` and `maxDb`; absent leaves the plot empty. Bin values are dB, not normalized bytes. |
+| `sourceRevision` | `number` | required | Invalidate locally held peaks when the source changes. |
+| `frozen` | `boolean` | required | Freeze button state; the caller retains the selected frame. |
+| `peakHold` | `boolean` | required | Overlay maximum dB per bin while enabled. |
+| `minFrequency` / `maxFrequency` | `number` (Hz) | required | Visible log-frequency range, clamped to the frame's Nyquist frequency. |
+| `status` | `'waiting' \| 'live' \| 'paused' \| 'unavailable' \| 'frozen'` | required | Visible signal state. |
+
+**Binding, options and handle**
+
+| Member | Kind | Default | Description |
+|---|---|---|---|
+| `snapshot()` | `() => SpectrumAnalyzerState` | required | Reads the current frame and interaction state. |
+| `setFrozen(value)` / `setPeakHold(value)` | `(boolean) => void` | required | Commands from the corresponding native buttons; update state and notify. |
+| `probe(hertz, db)` | `(number, number \| undefined) => void` | optional | Fires only when the user selects a new frequency. The dB value comes from the nearest current bin. |
+| `subscribe(notify)` | `(callback) => () => void` | optional | Supplies caller-paced repaint notifications. |
+| `label` | `string` | `'Spectrum analyzer'` | Accessible group name. |
+| `onError` | `(unknown) => void` | absent | Receives snapshot, probe, resize, paint or cleanup failures. |
+| `stylesheet` | `boolean` | `true` | Install the exported stylesheet in this host. |
+| `element` | `HTMLElement` | mounted root | Root with `part="root surface"`. |
+| `selectedFrequency` | `number` (Hz) | `1000` before range clamp | Read-only selected probe frequency. |
+| `update()` | `() => void` | — | Read `snapshot()` and redraw. |
+| `resetPeaks()` | `() => void` | — | Drop presenter-owned maxima without changing source state. |
+| `destroy()` | `() => void` | — | Release listener, subscription, resize observer, owned nodes and stylesheet. |
+
+See the [shared presenter shape](/uikit/api/#the-shared-presenter-shape) for host ownership. The callback never receives decoded PCM or a player. Replacing or disposing a borrowed audio graph belongs to the caller.
+
+**Accessibility.** The plot is a focusable frequency slider with `aria-valuemin`, `aria-valuemax`, `aria-valuenow` in Hz and a frequency/dB `aria-valuetext`. Arrow keys move a semitone, Shift+Arrow moves an octave, and Home/End select the range limits. Pointer down or movement probes the plot. Freeze and Peak hold use native `aria-pressed` buttons; Reset peaks is a native button. The current probe and signal status remain readable outside the canvas.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+The root is `.wui-spectrum-analyzer`. Public parts are `root surface`, `toolbar`, `freeze`, `peak-hold`, `reset-peaks`, `readout`, `plot` and `status`. There is no `classNames` or `parts` option. `stylesheet:false` skips installing this mount's stylesheet; it does not erase caller CSS.
+
+| Token | Fallback | Controls |
+|---|---|---|
+| `--wm-spectrum-foreground` | `--wm-foreground`, then dark ink | Root text. |
+| `--wm-spectrum-muted` | `--wm-foreground-muted`, then gray | Probe readout and status. |
+| `--wm-spectrum-height` | `11rem` | Plot height, minimum `7rem`. |
+| `--wm-spectrum-plot-background` | dark ink | Canvas CSS background. |
+| `--wm-spectrum-border` | `--wm-border`, then gray | Button borders. |
+| `--wm-spectrum-control-background` | `--wm-surface`, then white | Buttons. |
+| `--wm-spectrum-selected-background` / `--wm-spectrum-selected-border` | mint / teal | Pressed buttons. |
+
+The canvas drawing currently uses fixed axis and trace colors; the tokens above style the surrounding DOM and canvas background, not those drawn pixels. Internal `.wui-spectrum-analyzer__*` classes are structural selectors. Focus uses the shared `--wm-focus` token.
+
+</details>
+
+<UiPresenterRelated presenter="spectrum-analyzer" />

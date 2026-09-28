@@ -1,4 +1,4 @@
-// @webmusic/score/play/element — five interactive roles plus the nonvisual rack-part declaration.
+// @webmusic/score/play/element — five interactive roles plus the nonvisual score-rack-part declaration.
 // Checked against `static get observedAttributes()` in
 // packages/score/src/play/element/*.ts.
 
@@ -39,7 +39,7 @@ export const SCORE_PLAY_PARAMS: ElementParamCatalog = {
         step: 0.05,
         placeholder: '1',
         fallback: '1 — unchanged',
-        note: 'Native player volume, applied live and clamped to >= 0; ignored once .volume is assigned. Inert in Rack/controller modes; use rack-control for Rack mixing.',
+        note: 'Native player volume, applied live and clamped to >= 0; ignored once .volume is assigned. Inert in Rack/controller modes; use score-rack-control for Rack mixing.',
       },
       {
         name: 'rate',
@@ -114,8 +114,8 @@ export const SCORE_PLAY_PARAMS: ElementParamCatalog = {
     ],
   },
 
-  'rack-part': {
-    tag: 'rack-part',
+  'score-rack-part': {
+    tag: 'score-rack-part',
     entry: ENTRY,
     // A declaration, so every attribute names a piece of the member it declares
     // — never anything about playback, which belongs to the rack that builds it.
@@ -157,8 +157,8 @@ export const SCORE_PLAY_PARAMS: ElementParamCatalog = {
       {name: 'webscore:error', note: '{operation: "rack-part", error} when loading the score or reading the sound fails.'},
     ],
   },
-  'rack-control': {
-    tag: 'rack-control',
+  'score-rack-control': {
+    tag: 'score-rack-control',
     entry: ENTRY,
     // Every attribute is about what the desk SHOWS. What it mixes is the rack's
     // business, and the rack's members are headless — a member is a score and a
@@ -192,8 +192,8 @@ export const SCORE_PLAY_PARAMS: ElementParamCatalog = {
     ],
   },
 
-  'note-input': {
-    tag: 'note-input',
+  'score-note-input': {
+    tag: 'score-note-input',
     entry: ENTRY,
     params: [
       {
@@ -283,21 +283,22 @@ export const SCORE_PLAY_PARAMS: ElementParamCatalog = {
     properties: [
       {name: 'input()', note: '(midi, velocity, on) — monitor a note live and, when armed, capture it. The usual way to feed a note surface in.'},
       {name: 'source', note: 'Borrowed EventTarget for note events while connected. Assignment survives reconnect; replacement discards unmatched presses and preserves completed notes.'},
-      {name: 'sound', note: 'Borrowed HeadlessSynth for live monitoring and take playback; defaults to a triangle oscillator.'},
+      {name: 'sound', note: 'Borrowed HeadlessSynth for monitoring and take playback; live monitoring defaults to an owned triangle oscillator.'},
       {name: 'audioContext', note: 'Share an AudioContext with monitoring and take playback.'},
-      {name: 'record()', note: 'Arm a fresh take and discard the previous one. stop() notates the take and returns it.'},
+      {name: 'record()', note: 'Arm a fresh take and discard the previous one.'},
+      {name: 'stop()', note: 'Notate completed notes and return the Score, or undefined for an empty take. When idle, return the last take.'},
       {name: 'take', note: 'Read-only: the last notated Score, or undefined before the first stop.'},
       {name: 'recordingActive', note: 'Read-only: whether a take is currently armed.'},
-      {name: 'player', note: 'Read-only InteractivePlayer used for live monitoring.'},
+      {name: 'player', note: 'Read-only monitoring InteractivePlayer, created on access. Reading it stops take playback.'},
     ],
     events: [
-      {name: 'webscore:recorded', note: '{score} once a take has been stopped and notated.'},
+      {name: 'webscore:recorded', note: '{score} after a nonempty take is stopped and notated; bubbles and crosses the shadow boundary.'},
       {name: 'webscore:error', note: '{operation: "play", error} when take playback fails.'},
     ],
   },
 
-  'synth-panel': {
-    tag: 'synth-panel',
+  'score-synth-panel': {
+    tag: 'score-synth-panel',
     entry: ENTRY,
     params: [
       {

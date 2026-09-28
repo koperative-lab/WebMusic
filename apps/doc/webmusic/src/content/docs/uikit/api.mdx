@@ -1,6 +1,6 @@
 ---
 title: '@webmusic/ui'
-description: 'The @webmusic/ui root: the twenty-one published presenter entries, their shared contracts and deliberate differences, and the release boundary.'
+description: 'The @webmusic/ui root: the twenty-five published presenter entries, their shared contracts and deliberate differences, and the release boundary.'
 sidebar:
   label: '@webmusic/ui'
   order: 6
@@ -33,7 +33,7 @@ headless-only install does not pull it in.
 
 ## Package subpaths
 
-The root re-exports all twenty-one; import a subpath to keep the rest out of
+The root re-exports all twenty-five; import a subpath to keep the rest out of
 your bundle.
 
 | Entry | Class | What it presents |
@@ -42,12 +42,14 @@ your bundle.
 | [`@webmusic/ui/envelope`](/uikit/parameters-gestures/envelope/) | Parameters and modulation | Accessible ADSR editor over a structural envelope binding. |
 | [`@webmusic/ui/eq`](/uikit/parameters-gestures/eq/) | Parameters and modulation | Accessible graphic-EQ presenter over a structural band/response binding. |
 | [`@webmusic/ui/harmony`](/uikit/views-analysis/harmony/) | Views and analysis | Flow lane, nameplate, chip strip and wheel: read-outs that show an analysis happening. |
+| [`@webmusic/ui/level-analyzer`](/uikit/views-analysis/level-analyzer/) | Views and analysis | Live RMS and sample-peak history with threshold, freeze and peak-hold controls. |
 | [`@webmusic/ui/lfo`](/uikit/parameters-gestures/lfo/) | Parameters and modulation | Accessible LFO controls and waveform over a structural modulation binding. |
 | [`@webmusic/ui/macro`](/uikit/parameters-gestures/macro/) | Parameters and modulation | Macro control with target readouts, composed over the parameter rack. |
 | [`@webmusic/ui/meter`](/uikit/mixing-capture/meter/) | Mixing and capture | Level/spectrum presenter and structural meter binding; pulls and `redraw()`s. |
 | [`@webmusic/ui/minimap`](/uikit/transport-time/minimap/) | Transport and navigation | DPR-aware overview canvas with an accessible viewport range brush. |
 | [`@webmusic/ui/mixer`](/uikit/mixing-capture/mixer/) | Mixing and capture | Master/channel fader presenter over a structural mixer binding. |
 | [`@webmusic/ui/note`](/uikit/notes/note/) | Note input | Piano/grid/chord note-surface presenter over a structural note binding. |
+| [`@webmusic/ui/oscilloscope`](/uikit/views-analysis/oscilloscope/) | Views and analysis | Trigger-aligned time-domain waveform with timebase, freeze and probe controls. |
 | [`@webmusic/ui/panel`](/uikit/layout-feedback/panel/) | Layout and feedback | Semantic section panel that owns section and presenter-slot hosts. |
 | [`@webmusic/ui/parameter`](/uikit/parameters-gestures/parameter/) | Parameters and modulation | `mountParameterRack()`, its structural binding and side-effect-free style text. |
 | [`@webmusic/ui/pitch`](/uikit/views-analysis/pitch/) | Views and analysis | Keyboard, grand stave and fretboard read-outs coloured by the role each pitch is given. |
@@ -55,12 +57,14 @@ your bundle.
 | [`@webmusic/ui/recorder`](/uikit/mixing-capture/recorder/) | Mixing and capture | Record/playback/export presenter over a structural recorder binding. |
 | [`@webmusic/ui/stage`](/uikit/layout-feedback/stage/) | Layout and feedback | Framed rendering surface whose binding paints a caller-owned view. |
 | [`@webmusic/ui/status`](/uikit/layout-feedback/status/) | Layout and feedback | Generic loading, empty and error status surface over structural state. |
+| [`@webmusic/ui/spectrum-analyzer`](/uikit/views-analysis/spectrum-analyzer/) | Views and analysis | Log-frequency FFT plot with a probe, freeze and peak hold. |
 | [`@webmusic/ui/timeline`](/uikit/transport-time/timeline/) | Transport and navigation | Numeric ruler, regions, ranges, playhead and seek surface. |
 | [`@webmusic/ui/track-list`](/uikit/transport-time/track-list/) | Transport and navigation | Accessible named-row index with one current item. |
+| [`@webmusic/ui/transient-analyzer`](/uikit/views-analysis/transient-analyzer/) | Views and analysis | Caller-supplied attack strength and hit history with sensitivity, freeze and clear actions. |
 | [`@webmusic/ui/transport`](/uikit/transport-time/transport/) | Transport and navigation | Structural transport binding plus `mountTransport()` and its named `controls`. |
 | [`@webmusic/ui/workbench`](/uikit/layout-feedback/workbench/) | Layout and feedback | The shell an analysis view sits in: tabs, a stage, docks, a status bar, one clock. |
 
-`@webmusic/ui` (the root) is the stable aggregate of the twenty-one. Presenter
+`@webmusic/ui` (the root) is the stable aggregate of the twenty-five. Presenter
 styles are exported by their owning entries; there is no separate stylesheet subpath.
 
 ## The shared presenter shape
@@ -84,17 +88,17 @@ For ordinary snapshot-based mounts:
 - **Structural binding.** The binding is a plain object the caller writes: `snapshot()` returns
   current state, commands such as `setValue()` or `play()` perform changes and may return
   `void` or a `Promise`, and `subscribe(notify)` returns an unsubscribe function. The presenter
-  repaints from a fresh snapshot after each command settles. `subscribe` is optional;
-  without it the application calls `update()` for external changes. Transport can expose
-  just play/pause, and Meter requires only the reader for its selected mode.
+  repaints from a fresh snapshot after each command settles. `subscribe` is optional on most
+  bindings; `TransportBinding` requires it.
 - **One presenter per host, per entry.** Each module keeps a `WeakMap` from host to handle.
   Mounting the same kind of presenter on a host again destroys the previous handle first, so a
   host never accumulates duplicate racks or transports.
 - **Idempotent destroy.** `destroy()` is safe to call repeatedly; cleanup failures are collected
   and reported instead of thrown.
-- **`onError`.** Options accept `onError?: (error: unknown) => void`. Snapshot, command,
-  subscription and cleanup failures are routed there; without it they are dropped after the
-  presenter restores a consistent paint. Presenters do not throw from event handlers.
+- **`onError`.** Where supported, options accept `onError?: (error: unknown) => void`.
+  Snapshot, command, subscription and cleanup failures handled by that presenter are
+  routed there; entries without this option leave caller actions responsible for their
+  own failures. Check the owning entry before relying on this callback.
 - **DOM-safe at import.** Every entry evaluates in Node/SSR: importing reads no browser global,
   and mounting uses `host.ownerDocument` — including `@webmusic/ui/analysis`, whose render
   helpers create nodes in the caller-supplied root's owner document
@@ -106,100 +110,15 @@ interchangeable bindings:
 | Entry | Difference |
 | --- | --- |
 | [meter](/uikit/mixing-capture/meter/) | Pulls frame data through `readLevel` or `readSpectrum`; exposes `redraw()` and optional animation. |
+| [level-analyzer](/uikit/views-analysis/level-analyzer/) | Receives action callbacks and caller-paced `update(state)` rather than a snapshot/subscription binding. |
 | [note](/uikit/notes/note/) | Uses a note-surface snapshot and optional synchronous interaction ports for note holds and release. |
+| [oscilloscope](/uikit/views-analysis/oscilloscope/) | Uses a snapshot and commands, with optional subscription; the caller supplies each sampled trace and source identity. |
+| [transient-analyzer](/uikit/views-analysis/transient-analyzer/) | Accepts an `HTMLElement` and action callbacks, then caller-paced `update(state)`; it has no mount options, subscription or `onError` callback. |
 | [analysis](/uikit/views-analysis/analysis/) | Renders caller-owned report output through one-shot helpers; the caller replaces/removes it and updates any retained painter or playhead. |
 | [stage](/uikit/layout-feedback/stage/) | Uses `render(surface)` for retained DOM or `draw(frame)` for canvas; its surface-slider helper augments an existing element. |
 | [panel](/uikit/layout-feedback/panel/) | Receives section descriptors rather than a state binding; returns stable slots whose child mounts the caller owns. |
 
 Each owning page describes its complete state, cleanup and styling contract.
-
-## External presentation inputs
-
-WebMusic supplies music behavior and its presentation hooks. The application
-keeps its existing translation, state-management and UI tools. WebMusic has no
-translation engine, message catalog, language selector or translation-change
-subscription. It consumes final strings and synchronous rendering callbacks.
-
-Text-producing presenters expose `getText?: () => PresenterText`, with the
-concrete type and fields defined on their leaf reference. The callback is read
-when that presenter paints. Simple fields contain final strings; contextual
-fields accept a `UITextValue<Values>`: a literal string or `(values) => string`.
-WebMusic passes the documented context and inserts the returned string as text.
-It does not interpret keys, interpolate templates or apply plural rules.
-
-Where numeric display is generated, `formatters?: UIValueFormatters` accepts
-application-owned functions:
-
-| Callback | Input |
-|---|---|
-| `number(value)` | The raw number, retaining the presenter's existing units. |
-| `percent(fraction)` | A fraction: `1` means 100 percent. |
-| `time(seconds)` | Seconds, never a timestamp or preformatted string. |
-
-The root exports only the shared `UITextValue` and `UIValueFormatters` types.
-No controller or factory is required. Missing fields preserve existing defaults;
-existing explicit label and formatter options retain precedence. Callback
-failures fall back to the default and use the presenter's `onError` sink.
-Machine values (`input.value`, `aria-valuenow`) and geometry stay numeric.
-
-This example accepts already-resolved application text. Its text can come from
-any translation library, a framework, a preference store or ordinary props:
-
-```ts
-import {mountTransport} from '@webmusic/ui/transport';
-import {mountMeter} from '@webmusic/ui/meter';
-
-let display = {
-  play: 'Play', pause: 'Pause', meter: 'Audio level',
-  describeLevel: (value: string) => `${value} level`,
-  percent: (fraction: number) => `${Math.round(fraction * 100)}%`,
-};
-let playing = false;
-const transport = mountTransport(transportHost, {
-  snapshot: () => ({playing}),
-  play: () => { playing = true; },
-  pause: () => { playing = false; },
-}, {getText: () => ({play: display.play, pause: display.pause})});
-const meter = mountMeter(meterHost, {
-  readLevel: () => ({level: 0.42}),
-}, {
-  animate: false,
-  getText: () => ({level: display.meter, levelValue: ({value}) => display.describeLevel(value)}),
-  formatters: {percent: fraction => display.percent(fraction)},
-});
-
-// The application handles its external tool's change notification.
-function refreshDisplay(next: typeof display) {
-  display = next;
-  transport.update();
-  meter.redraw();
-}
-refreshDisplay({
-  play: '播放', pause: '暂停', meter: '音频电平',
-  describeLevel: value => `电平 ${value}`,
-  percent: fraction => `${Math.round(fraction * 100)}%`,
-});
-
-// Also unsubscribe the application's own external listener when removing it.
-transport.destroy();
-meter.destroy();
-```
-
-`transportHost` and `meterHost` are application-owned DOM hosts. The binding
-needs no placeholder seek, progress, subscription or spectrum methods.
-
-The application decides when to refresh: ordinary mounts use `update()`, Meter
-uses `redraw()` (including `animate: false`), live analysis uses `paint(state)`
-and a retained histogram exposes `update()`. One-shot analysis helpers read
-inputs when invoked; the application clears/replaces its own report output
-before rendering again. Surface sliders use their existing `updateLabel(text)`
-and `formatValue`/`update()` ports. Canvas status text comes from the status
-binding. Plain stage content and panel section descriptors remain caller-owned.
-
-Translate snapshot labels, choices, musical descriptions and application error
-messages before supplying them, retaining stable IDs. Set HTML `lang`/`dir` in
-the application. Changing display text does not create a new player, replace a
-focused control or subscribe WebMusic to a translation service.
 
 ## Release boundary
 

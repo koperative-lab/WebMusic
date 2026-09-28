@@ -1,0 +1,34 @@
+---
+import ElementPlayground from '../ElementPlayground.astro';
+import ElementComposition from '../ElementComposition.astro';
+
+interface Props {
+  tag: 'audio-meter' | 'audio-level-analyzer' | 'audio-spectrum-analyzer' | 'audio-oscilloscope' | 'audio-transient-analyzer';
+}
+
+const {tag} = Astro.props;
+const playerId = `pg-${tag}-player`;
+const SRC = `${import.meta.env.BASE_URL}mp3/Arabesque%20No.1.mp3`;
+---
+
+<ElementPlayground
+  tag={tag}
+  markup="[data-demo-composition]"
+  companions={[{tag: 'audio-player', target: `#${playerId}`}]}
+>
+  <ElementComposition>
+    <audio-player id={playerId} src={SRC} controls></audio-player>
+    {tag === 'audio-meter' && <audio-meter player={`#${playerId}`}></audio-meter>}
+    {tag === 'audio-level-analyzer' && <audio-level-analyzer player={`#${playerId}`}></audio-level-analyzer>}
+    {tag === 'audio-spectrum-analyzer' && <audio-spectrum-analyzer player={`#${playerId}`}></audio-spectrum-analyzer>}
+    {tag === 'audio-oscilloscope' && <audio-oscilloscope player={`#${playerId}`}></audio-oscilloscope>}
+    {tag === 'audio-transient-analyzer' && <audio-transient-analyzer player={`#${playerId}`}></audio-transient-analyzer>}
+  </ElementComposition>
+</ElementPlayground>
+
+<script>
+  import {defineAudioPlayerElement} from '@webmusic/audio/play/element';
+  import {defineAllAudioElements} from '@webmusic/audio/analyze/element';
+  defineAudioPlayerElement();
+  defineAllAudioElements();
+</script>

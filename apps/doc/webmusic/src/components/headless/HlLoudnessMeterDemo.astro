@@ -1,0 +1,80 @@
+---
+// Browser-renderer demo: the shared .wui-panel card chrome plus a body wired
+// client-side without a custom element.
+// Clips load from the bundled Arabesque No.1 WAV; the player owns + resumes its
+// AudioContext when play() is called inside the click handler.
+import LiveDemoCanvas from '../LiveDemoCanvas.astro';
+
+const SRC = `${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`;
+---
+
+<div class="wui-panel wui-panel--flow not-content">
+  <div class="wui-panel__title">
+    <span>@webmusic/audio/view/render</span>
+    <strong>renderLoudnessMeter</strong>
+  </div>
+  <LiveDemoCanvas label="Live loudness meter">
+    <div class="lm-body" data-hl-loudnessmeter data-src={SRC}>
+      <div class="wui-row">
+        <button class="wui-btn" data-play type="button">▶ Play</button>
+        <span class="wui-readout" data-time>0.0s</span>
+      </div>
+      <div class="wui-surface" data-meter></div>
+      <div class="wui-track"><div class="wui-track__fill" data-fill></div></div>
+    </div>
+  </LiveDemoCanvas>
+</div>
+
+<script>
+  import {mountDemos, type DemoScope} from '../demo-lifecycle';
+  import { loadClipFromUrl } from '@webmusic/audio/play';
+  import { AudioClipPlayer } from '@webmusic/audio/play/headless';
+  import { renderLoudnessMeter } from '@webmusic/audio/view/render';
+
+  const setup = async (root: HTMLElement, scope: DemoScope) => {
+    const btn = root.querySelector<HTMLButtonElement>('[data-play]')!;
+    const time = root.querySelector<HTMLElement>('[data-time]')!;
+    const fill = root.querySelector<HTMLElement>('[data-fill]')!;
+    const surface = root.querySelector<HTMLElement>('[data-meter]')!;
+
+    const clip = await loadClipFromUrl(root.dataset.src!, {signal: scope.signal});
+    if (!scope.active) return;
+    // Timer-based cursor (vs the default rAF) so timeupdate keeps firing even
+    // when the tab is backgrounded.
+    const player = new AudioClipPlayer(clip, { cursorIntervalMs: 100 });
+    scope.add(() => player.dispose());
+
+    // The player exposes an AnalyserNode tapping its live output — feed it
+    // straight into the meter as an AnalyserSource. Reading `analyser` also
+    // lazily builds + warms the audio graph before the first play().
+    const viz = renderLoudnessMeter(surface, player.analyser, {
+      mode: 'level',
+      height: 54,
+      color: 'var(--wa-accent, #4caf50)',
+      peakColor: 'var(--wa-peak, #c0392b)',
+      backgroundColor: 'var(--wa-track, #111)',
+    });
+    scope.add(() => viz.dispose());
+
+    let playing = false;
+
+    player.on('timeupdate', ({ seconds, progress }) => {
+      fill.style.width = `${Math.min(100, progress * 100)}%`;
+      time.textContent = `${seconds.toFixed(1)}s`;
+    });
+    player.on('end', () => { playing = false; btn.textContent = '▶ Play'; });
+
+    scope.listen(btn, 'click', () => {
+      if (playing) { player.pause(); btn.textContent = '▶ Play'; }
+      else { scope.run(player.play(), () => { playing = false; btn.textContent = '▶ Play'; }); btn.textContent = '⏸ Pause'; }
+      playing = !playing;
+    });
+  };
+
+  mountDemos('[data-hl-loudnessmeter]', setup);
+</script>
+
+<style>
+  /* This body stacks — controls, meter, progress — instead of sitting on one row. */
+  .lm-body > * + * { margin-top: var(--wui-gap-lg); }
+</style>

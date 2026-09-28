@@ -24,7 +24,7 @@ const demoComponents = new Set([
   'ProgrammaticLoopPlayerDemo', 'ScorePlayerPlayground', 'ProgrammaticMetronomeDemo',
   'ProgrammaticInteractivePlayerDemo', 'ScoreWindowPlayground', 'PlaybackFollowersPlayground',
   'ProgrammaticAbPlayerDemo', 'ProgrammaticEffectDemo', 'ProgrammaticSoundDemo',
-  'AnalysisFeaturePlayground', 'NoteInputDemo', 'SheetViewPlayground', 'RackControlDemo',
+  'AnalysisFeaturePlayground', 'AudioAnalyzeFeaturePlayground', 'NoteInputDemo', 'ScoreRecorderDemo', 'SheetViewPlayground', 'RackControlDemo',
   'SynthPanelDemo', 'LiveTrackersPlayground', 'AnalysisSessionPlayground',
   'PitchViewPlayground', 'ReactPresetShowcase', 'ScoreViewDemo', 'WaterfallKeyboardDemo',
   'UiPresenterLiveDemo', 'ScoreReportPlayground', 'ProgrammaticTransportDriverDemo',
@@ -63,9 +63,9 @@ async function walkFiles(directory, prefix = '') {
   return files;
 }
 
-async function publicPages(root) {
+async function publicPages(root, extension) {
   return (await walkFiles(path.join(root, docsDirectory))).filter((relative) =>
-    /\.(md|mdx)$/.test(relative) && /^(?:index\.mdx?|quick-start\.mdx?|(?:agent-toolkit|score|uikit|kernel)\/)/.test(relative));
+    /\.(md|mdx)$/.test(relative) && (/^(?:index\.mdx?|quick-start\.mdx?|(?:agent-toolkit|score|uikit|kernel)\/)/.test(relative) || extension?.pageRoots.some((prefix) => relative.startsWith(`${prefix}/`))));
 }
 
 function pageRoute(relative) {
@@ -75,11 +75,11 @@ function pageRoute(relative) {
 function pageOutput(relative) { return `agent-context/${relative.replace(/\.mdx?$/, '.md')}`; }
 
 /** Declared generated routes, relative to the site's base, for source checks. */
-export async function declaredAgentContextPaths({root = defaultRoot} = {}) {
-  const pages = (await publicPages(root)).map((relative) => ({route: pageRoute(relative), output: pageOutput(relative)}));
+export async function declaredAgentContextPaths({root = defaultRoot, extension} = {}) {
+  const pages = (await publicPages(root, extension)).map((relative) => ({route: pageRoute(relative), output: pageOutput(relative)}));
   const presenters = await catalogValues(root, 'apps/doc/shared/ui-presenter-catalog.ts', ['UI_PRESENTER_CATALOG']);
   const composition = await catalogValues(root, 'apps/doc/shared/ui-catalog.ts', ['UI_COMPOSITION_CATALOG']);
-  const catalog = componentCatalog(pages, presenters.UI_PRESENTER_CATALOG, composition.UI_COMPOSITION_CATALOG);
+  const catalog = componentCatalog(pages, presenters.UI_PRESENTER_CATALOG, composition.UI_COMPOSITION_CATALOG, extension);
   return new Set([
     ...Object.values(contextFiles).map((output) => `/${output}`),
     '/agent-context/manifest.json', `/${catalogOutput}`, `/${licenseOutput}`,
@@ -162,7 +162,7 @@ function table(headers, rows) {
 /** Parse MDX without executing it; preserve original Markdown and code spans. */
 export async function extractAgentMarkdown(source, {
   filename = 'fixture.mdx', root = defaultRoot, canonical = 'https://example.test/',
-  resolveLink = (value) => value, inputs = new Map(), catalogs,
+  resolveLink = (value) => value, inputs = new Map(), catalogs, extension,
 } = {}) {
   let tree;
   try { tree = mdxToMdast(source); } catch (error) { throw new Error(`${filename}: cannot parse MDX: ${error.message}`, {cause: error}); }
@@ -183,7 +183,7 @@ export async function extractAgentMarkdown(source, {
         if (target.endsWith('?raw')) {
           if (!clause?.name || clause.namedBindings) throw new Error(`${location(node)}: raw imports must have one default binding`);
           const relative = slash(path.relative(root, path.resolve(root, path.dirname(filename), target.slice(0, -4))));
-          if (!rawInputs.has(relative)) throw new Error(`${location(node)}: raw input is outside the public allowlist: ${relative}`);
+          if (!rawInputs.has(relative) && !extension?.rawInputs.includes(relative)) throw new Error(`${location(node)}: raw input is outside the public allowlist: ${relative}`);
           values.set(clause.name.text, await readPublic(root, relative, inputs));
         } else if (clause?.name) {
           if (!target.endsWith('.astro') || !target.startsWith('.')) throw new Error(`${location(node)}: unsupported MDX component import ${target}`);
@@ -236,7 +236,7 @@ export async function extractAgentMarkdown(source, {
     }
     if (node.type === 'definition') return `[${node.label ?? node.identifier}]: <${resolveLink(node.url)}>${node.title ? ` ${JSON.stringify(node.title)}` : ''}`;
     if (node.type === 'mdxJsxFlowElement' || node.type === 'mdxJsxTextElement') {
-      if (!node.name || htmlElements.has(node.name)) {
+      if (!node.name || htmlElements.has(node.name) || extension?.htmlElements.includes(node.name)) {
         if (node.attributes.some((attribute) => attribute.type !== 'mdxJsxAttribute' || (typeof attribute.value === 'object' && attribute.value !== null))) {
           throw new Error(`${location(node)}: HTML attributes must be literal strings`);
         }
@@ -259,7 +259,7 @@ export async function extractAgentMarkdown(source, {
         return fence(attrs.code, attrs.lang ?? 'ts');
       }
       if (node.children.length) throw new Error(`${location(node)}: ${node.name} children require an explicit renderer`);
-      if (demoComponents.has(node.name)) return `[Interactive example on the documentation page](${canonical})`;
+      if (demoComponents.has(node.name) || extension?.demoComponents.includes(node.name)) return `[Interactive example on the documentation page](${canonical})`;
       if (node.name === 'UiPresenterCatalog' && catalogs) {
         return table(['Presenter', 'Group', 'Purpose'], catalogs.presenters.map((entry) => [`[\`@webmusic/ui/${entry.presenter}\`](${resolveLink(`/uikit/${entry.classSlug}/${entry.presenter}/`)})`, entry.classSlug, entry.summary]));
       }
@@ -330,24 +330,9 @@ export function patternSections(markdown, names, filename) {
   }).join('\n\n');
 }
 
-async function developmentSnapshot(root) {
-  const packages = [];
-  for (const directory of packageDirectories) {
-    const manifest = await readPublic(root, `${directory}/package.json`);
-    const {name, version} = JSON.parse(manifest);
-    const source = [];
-    for (const relative of await walkFiles(path.join(root, directory, 'src'))) {
-      source.push([relative, digest(await readPublic(root, `${directory}/src/${relative}`))]);
-    }
-    packages.push({name, version, directory, manifestSha256: digest(manifest), sourceSha256: digest(json(source))});
-  }
-  return {commit: null, revision: digest(json(packages)), packages};
-}
-
-export async function generateAgentContext({root = defaultRoot, site = 'https://koperative-lab.github.io', base = '/', mode = 'release'} = {}) {
-  if (mode !== 'release' && mode !== 'development') throw new Error(`Unknown agent context mode: ${mode}`);
+export async function generateAgentContext({root = defaultRoot, site = 'https://koperative-lab.github.io', base = '/', extension} = {}) {
   root = path.resolve(root);
-  const release = mode === 'release' ? await verifyReleaseBaseline({root}) : await developmentSnapshot(root);
+  const release = extension ? await extension.inspectSources(root) : await verifyReleaseBaseline({root});
   const url = urls(site, base);
   const inputs = new Map();
   // Curated membership and extraction logic change the documentation product
@@ -358,30 +343,27 @@ export async function generateAgentContext({root = defaultRoot, site = 'https://
     'apps/doc/webmusic/scripts/agent-context-catalog.mjs',
     'apps/doc/webmusic/scripts/agent-context-release.mjs',
     'scripts/element-composition-policy.mjs', 'scripts/package-policy.mjs',
+    ...(extension?.inputs ?? []),
   ]) await readPublic(root, source, inputs);
   const presenters = await catalogValues(root, 'apps/doc/shared/ui-presenter-catalog.ts', ['UI_PRESENTER_CATALOG'], inputs);
   const composition = await catalogValues(root, 'apps/doc/shared/ui-catalog.ts', ['UI_COMPOSITION_CATALOG'], inputs);
   const files = new Map();
   const pages = [];
   const packageVersions = Object.fromEntries(release.packages.map(({name, version}) => [name, version]));
-  for (const relative of await publicPages(root)) {
+  for (const relative of await publicPages(root, extension)) {
     const filename = `${docsDirectory}/${relative}`;
     const canonical = url.absolute(pageRoute(relative));
     const page = await extractAgentMarkdown(await readPublic(root, filename, inputs), {
-      filename, root, canonical, resolveLink: url.link, inputs,
+      filename, root, canonical, resolveLink: url.link, inputs, extension,
       catalogs: {presenters: presenters.UI_PRESENTER_CATALOG, composition: composition.UI_COMPOSITION_CATALOG},
     });
-    const owner = relative.startsWith('score/') ? '@webmusic/score' : relative.startsWith('uikit/') ? '@webmusic/ui' : relative.startsWith('kernel/') ? '@webmusic/kernel' : null;
+    const owner = relative.startsWith('score/') ? '@webmusic/score' : relative.startsWith('uikit/') ? '@webmusic/ui' : relative.startsWith('kernel/') ? '@webmusic/kernel' : extension?.owner(relative) ?? null;
     const output = pageOutput(relative);
     const record = {title: page.title, description: page.description, source: filename, route: pageRoute(relative), canonical, output, url: url.absolute(output), package: owner, version: owner ? packageVersions[owner] : null};
     pages.push(record);
-    const provenance = mode === 'release'
-      ? `Release compatibility: ${Object.entries(owner ? {[owner]: packageVersions[owner]} : packageVersions).map(([name, version]) => `${name}@${version}`).join(', ')}. Source baseline: ${release.commit}.`
-      : `UNRELEASED DEVELOPMENT SNAPSHOT: ${release.revision}. These APIs describe this source checkout; declared package versions do not establish published compatibility.`;
-    files.set(output, `# ${page.title}\n\n${page.description ? `> ${page.description}\n\n` : ''}Canonical documentation: ${canonical}\n\n${provenance}\n\n${page.body}`);
+    files.set(output, `# ${page.title}\n\n${page.description ? `> ${page.description}\n\n` : ''}Canonical documentation: ${canonical}\n\n${extension ? extension.provenance(release, owner) : `Release compatibility: ${Object.entries(owner ? {[owner]: packageVersions[owner]} : packageVersions).map(([name, version]) => `${name}@${version}`).join(', ')}. Source baseline: ${release.commit}.`}\n\n${page.body}`);
   }
-  const catalog = componentCatalog(pages, presenters.UI_PRESENTER_CATALOG, composition.UI_COMPOSITION_CATALOG);
-  if (mode === 'development') catalog.sourceScope = 'Selected owning implementation files in an unreleased development snapshot; imports and internal selectors are not public entry points.';
+  const catalog = componentCatalog(pages, presenters.UI_PRESENTER_CATALOG, composition.UI_COMPOSITION_CATALOG, extension);
   for (const source of catalogSourcePaths(catalog)) {
     assertPublicRuntimeSource(source, release);
     files.set(sourceOutput(source), await readPublic(root, source, inputs));
@@ -393,27 +375,27 @@ export async function generateAgentContext({root = defaultRoot, site = 'https://
   files.set(licenseOutput, await readPublic(root, 'LICENSE', inputs));
   const inputsList = [...inputs].sort(([a], [b]) => compare(a, b)).map(([source, sha256]) => ({source, sha256}));
   const documentationRevision = digest(json(inputsList));
-  const compatibility = mode === 'release'
-    ? `This context covers ${Object.entries(packageVersions).map(([name, version]) => `${name}@${version}`).join(', ')}. Runtime sources and package manifests match release ${release.commit}; documentation revision ${documentationRevision}. Check installed exports and declarations before coding. This is the current verified release, not an archive of arbitrary versions.`
-    : `UNRELEASED DEVELOPMENT SNAPSHOT: ${release.revision}; documentation revision ${documentationRevision}. This context describes the current source checkout. Declared manifest versions (${Object.entries(packageVersions).map(([name, version]) => `${name}@${version}`).join(', ')}) are not a compatibility claim for published packages. The release Skill refuses this preview; use the verified published context for installed releases.`;
+  const compatibility = extension ? `${extension.provenance(release)} Documentation revision ${documentationRevision}.` : `This context covers ${Object.entries(packageVersions).map(([name, version]) => `${name}@${version}`).join(', ')}. Runtime sources and package manifests match release ${release.commit}; documentation revision ${documentationRevision}. Check installed exports and declarations before coding. This is the current verified release, not an archive of arbitrary versions.`;
+  const groupFor = (page) => extension?.functionalIndexGroup(page) ?? functionalIndexGroup(page);
   const selection = new Map();
   // Put orientation first, followed by task groups in a stable order.
-  for (const page of [...pages].sort((a, b) => (functionalIndexGroup(a) === 'Start here and choose an integration' ? -1 : 0) - (functionalIndexGroup(b) === 'Start here and choose an integration' ? -1 : 0))) {
-    const group = functionalIndexGroup(page);
+  for (const page of [...pages].sort((a, b) => (groupFor(a) === 'Start here and choose an integration' ? -1 : 0) - (groupFor(b) === 'Start here and choose an integration' ? -1 : 0))) {
+    const group = groupFor(page);
     if (!selection.has(group)) selection.set(group, []);
     selection.get(group).push(page);
   }
   const index = `# WebMusic\n\n> Music interaction toolkit: Web Components, Headless objects, and API + UI composition.\n\n${compatibility}\n\nStart with this index to locate a task, then fetch its linked Markdown reference. Select Web Components for ready-made controls, Headless for custom UI, or API + UI for explicit bindings. Interactive demo controls are linked; static examples and reference tables are preserved.\n\n## Choose a context file\n\n- [llms-full.txt](${url.absolute(contextFiles.full)}): All public documentation in one file.\n- [llms-components.txt](${url.absolute(contextFiles.components)}): Web Component, Headless and UI presenter references.\n- [llms-patterns.txt](${url.absolute(contextFiles.patterns)}): Focused setup, composition, playback-following, React, styling and I/O patterns.\n- [Context manifest](${url.absolute('agent-context/manifest.json')}): Release, content checksums, pages and bundle membership.\n- [Component catalog](${url.absolute(catalogOutput)}): Stable query IDs and verified documentation/source paths for the Skill scripts.\n\n${[...selection].map(([label, entries]) => `## ${label}\n\n${entries.map((page) => `- [${page.title.replace(/\[/g, '\\[').replace(/\]/g, '\\]')}](${page.url}): ${page.description || `Reference for ${page.title}`}`).join('\n')}`).join('\n\n')}\n`;
   files.set(contextFiles.index, index);
+  const patterns = [...patternSelection, ...(extension?.patterns ?? [])];
   const componentOutputs = new Set(catalog.components.flatMap(({docs}) => docs));
-  const componentPages = pages.filter((page) => componentOutputs.has(page.output) || ['/score/element/', '/score/headless/', '/uikit/catalog/'].includes(page.route));
+  const componentPages = pages.filter((page) => componentOutputs.has(page.output) || ['/score/element/', '/score/headless/', '/uikit/catalog/', ...(extension?.componentInventories ?? [])].includes(page.route));
   const bundles = [
     {id: 'full', output: contextFiles.full, title: 'WebMusic complete documentation', description: 'All public documentation pages, including setup, API, components and Agent Toolkit guidance.', pages: pages.map(({output}) => output)},
     {id: 'components', output: contextFiles.components, title: 'WebMusic component references', description: 'Web Component, Headless and UI presenter contracts, examples, lifecycle and styling.', pages: componentPages.map(({output}) => output)},
-    {id: 'patterns', output: contextFiles.patterns, title: 'WebMusic composition and usage patterns', description: 'Curated task sections from the owning public references. Follow the source links for complete API tables.', pages: patternSelection.map(({page}) => pageOutput(page)), sections: patternSelection.map(({title, page, sections}) => ({title, page: pageOutput(page), headings: sections ?? null}))},
+    {id: 'patterns', output: contextFiles.patterns, title: 'WebMusic composition and usage patterns', description: 'Curated task sections from the owning public references. Follow the source links for complete API tables.', pages: patterns.map(({page}) => pageOutput(page)), sections: patterns.map(({title, page, sections}) => ({title, page: pageOutput(page), headings: sections ?? null}))},
   ];
   for (const bundle of bundles) {
-    const body = bundle.id === 'patterns' ? patternSelection.map(({title, page: relative, sections}) => {
+    const body = bundle.id === 'patterns' ? patterns.map(({title, page: relative, sections}) => {
       const page = pages.find((entry) => entry.output === pageOutput(relative));
       if (!page) throw new Error(`Missing pattern source: ${relative}`);
       const source = files.get(page.output);
@@ -422,9 +404,7 @@ export async function generateAgentContext({root = defaultRoot, site = 'https://
     files.set(bundle.output, `# ${bundle.title}\n\n> ${bundle.description}\n\n${compatibility}\n\n[Documentation index](${url.absolute(contextFiles.index)})\n\n${body}\n`);
   }
   const manifest = {
-    schemaVersion: 1, mode,
-    release: mode === 'release' ? {commit: release.commit, packages: packageVersions, verification: 'runtime-source-and-manifest-sha256'} : null,
-    ...(mode === 'development' ? {development: {revision: release.revision, packages: packageVersions, fingerprints: release.packages}} : {}),
+    schemaVersion: 1, ...(extension ? {sourceSnapshot: release.sourceSnapshot} : {release: {commit: release.commit, packages: packageVersions, verification: 'runtime-source-and-manifest-sha256'}}),
     documentationRevision, site: new URL(site).origin, base: url.prefix,
     extraction: {interactiveDemos: 'canonical-page-link', staticCode: 'preserved', mdxExpressions: 'literal-only', catalogComponents: 'static-tables'},
     inputs: inputsList, pages, bundles, catalog: catalogOutput, license: catalog.license,
@@ -462,16 +442,17 @@ export async function verifyAgentContextOutput(directory, generated) {
   }
 }
 
-export function agentContext({mode = 'release'} = {}) {
-  if (mode !== 'release' && mode !== 'development') throw new Error(`Unknown agent context mode: ${mode}`);
+export function agentContext({extension} = {}) {
   let root = defaultRoot;
   let site = 'https://koperative-lab.github.io';
   let base = '/';
+  let configuredSite = false;
   return {
     name: 'webmusic-agent-context',
     hooks: {
       'astro:config:done': ({config}) => {
         root = path.resolve(fileURLToPath(config.root), '../../..');
+        configuredSite = Boolean(config.site);
         site = config.site || site;
         base = config.base;
       },
@@ -486,7 +467,8 @@ export function agentContext({mode = 'release'} = {}) {
           const relative = pathname.startsWith(prefix) ? pathname.slice(prefix.length) : pathname.replace(/^\//, '');
           if (!Object.values(contextFiles).includes(relative) && !relative.startsWith('agent-context/')) return next();
           try {
-            const generated = await generateAgentContext({root, site, base, mode: 'development'});
+            const origin = !configuredSite && extension?.serverOrigin ? extension.serverOrigin(server, request) : site;
+            const generated = await generateAgentContext({root, site: origin, base, extension});
             const contents = generated.files.get(relative);
             if (contents === undefined) return next();
             response.setHeader('Content-Type', relative.endsWith('.json') ? 'application/json; charset=utf-8' : 'text/plain; charset=utf-8');
@@ -497,13 +479,13 @@ export function agentContext({mode = 'release'} = {}) {
       },
       'astro:build:done': async ({dir, logger}) => {
         const directory = fileURLToPath(dir);
-        const generated = await generateAgentContext({root, site, base, mode});
+        const generated = await generateAgentContext({root, site, base, extension});
         for (const [relative, contents] of generated.files) {
           await mkdir(path.dirname(path.join(directory, relative)), {recursive: true});
           await writeFile(path.join(directory, relative), contents);
         }
         await verifyAgentContextOutput(directory, generated);
-        logger.info(`Agent context (${mode}) verified ${generated.manifest.pages.length} public Markdown references, four llms files and the catalog.`);
+        logger.info(`Agent context verified ${generated.manifest.pages.length} public Markdown references, four llms files and the Skill catalog.`);
       },
     },
   };

@@ -1,7 +1,7 @@
 export type UiCompositionStatus = 'composed' | 'partial' | 'extract' | 'behavior';
 
 export interface UiCompositionEntry {
-  family: 'Score';
+  family: 'Score' | 'Audio';
   capability: 'Play' | 'Analyze' | 'View';
   tag: string;
   headless: string;
@@ -19,21 +19,30 @@ export interface UiCompositionEntry {
  */
 export const UI_COMPOSITION_CATALOG: readonly UiCompositionEntry[] = [
   {family: 'Score', capability: 'Play', tag: 'score-player', headless: 'ScorePlayer / RackTransportController', ui: '@webmusic/ui transport · seek · preset/rack shell', status: 'composed', publishedUi: true, href: '/score/element/play/score-player/'},
-  {family: 'Score', capability: 'Play', tag: 'rack-control', headless: 'Rack', ui: '@webmusic/ui mixer · master/member faders · labels', status: 'composed', publishedUi: true, href: '/score/element/play/rack-control/'},
-  {family: 'Score', capability: 'Play', tag: 'rack-part', headless: 'Rack member (score + Sound)', ui: 'Declaration only; renders nothing — documented on the desk it belongs to', status: 'behavior', href: '/score/element/play/rack-control/'},
-  {family: 'Score', capability: 'Play', tag: 'score-recorder', headless: 'ScoreRecorderSession + recordedNotesToScore', ui: '@webmusic/ui recorder · record/play/export · status', status: 'composed', publishedUi: true, href: '/score/element/play/note-input/#score-recorder'},
-  {family: 'Score', capability: 'Play', tag: 'note-input', headless: 'note-input-model · piano/grid/chord/QWERTY pitch mapping', ui: '@webmusic/ui note surface · presenter-owned pointer/chord/QWERTY interaction', status: 'composed', publishedUi: true, href: '/score/element/play/note-input/'},
-  {family: 'Score', capability: 'Play', tag: 'synth-panel', headless: 'LfoController + EqController + SynthPanelAudioGraph + parameter descriptors', ui: '@webmusic/ui section panel · parameter rack · macro rack · envelope · EQ · LFO', status: 'composed', publishedUi: true, href: '/score/element/play/synth-panel/'},
+  {family: 'Score', capability: 'Play', tag: 'score-rack-control', headless: 'Rack', ui: '@webmusic/ui mixer · master/member faders · labels', status: 'composed', publishedUi: true, href: '/score/element/play/score-rack-control/'},
+  {family: 'Score', capability: 'Play', tag: 'score-rack-part', headless: 'Rack member (score + Sound)', ui: 'Declaration only; renders nothing — documented on the desk it belongs to', status: 'behavior', href: '/score/element/play/score-rack-control/'},
+  {family: 'Score', capability: 'Play', tag: 'score-recorder', headless: 'ScoreRecorderSession + recordedNotesToScore', ui: '@webmusic/ui recorder · record/play/export · status', status: 'composed', publishedUi: true, href: '/score/element/play/score-recorder/'},
+  {family: 'Score', capability: 'Play', tag: 'score-note-input', headless: 'note-input-model · piano/grid/chord/QWERTY pitch mapping', ui: '@webmusic/ui note surface · presenter-owned pointer/chord/QWERTY interaction', status: 'composed', publishedUi: true, href: '/score/element/play/score-note-input/'},
+  {family: 'Score', capability: 'Play', tag: 'score-synth-panel', headless: 'LfoController + EqController + SynthPanelAudioGraph + parameter descriptors', ui: '@webmusic/ui section panel · parameter rack · macro rack · envelope · EQ · LFO', status: 'composed', publishedUi: true, href: '/score/element/play/score-synth-panel/'},
 
   {family: 'Score', capability: 'View', tag: 'score-view', headless: 'createScoreView + createScoreMap + createPianoRollLayout + player binding', ui: '@webmusic/ui stage · timeline · five score surfaces', status: 'composed', publishedUi: true, href: '/score/element/view/score-view/'},
-  {family: 'Score', capability: 'View', tag: 'pitch-view', headless: 'ActiveNoteTracker + pitch projections + player binding', ui: '@webmusic/ui pitch · keyboard/staff/fretboard', status: 'composed', publishedUi: true, href: '/score/element/view/pitch-view/'},
-  {family: 'Score', capability: 'View', tag: 'sheet-view', headless: 'OSMD renderer binding + MusicXML serializer', ui: '@webmusic/ui stage · status; optional OSMD engraving surface', status: 'composed', publishedUi: true, href: '/score/element/view/sheet-view/'},
+  {family: 'Score', capability: 'View', tag: 'score-pitch-view', headless: 'ActiveNoteTracker + pitch projections + player binding', ui: '@webmusic/ui pitch · keyboard/staff/fretboard', status: 'composed', publishedUi: true, href: '/score/element/view/score-pitch-view/'},
+  {family: 'Score', capability: 'View', tag: 'score-sheet-view', headless: 'OSMD renderer binding + MusicXML serializer', ui: '@webmusic/ui stage · status; optional OSMD engraving surface', status: 'composed', publishedUi: true, href: '/score/element/view/score-sheet-view/'},
 
-  {family: 'Score', capability: 'Analyze', tag: 'key-analysis', headless: 'AnalysisSession + live trackers + transport reader + key projection', ui: '@webmusic/ui harmony · one analysis surface', status: 'composed', publishedUi: true, href: '/score/element/analyze/key-analysis/'},
-  {family: 'Score', capability: 'Analyze', tag: 'chord-analysis', headless: 'AnalysisSession + live trackers + transport reader + chords projection', ui: '@webmusic/ui harmony · one analysis surface', status: 'composed', publishedUi: true, href: '/score/element/analyze/chord-analysis/'},
-  {family: 'Score', capability: 'Analyze', tag: 'roman-analysis', headless: 'AnalysisSession + live trackers + transport reader + roman projection', ui: '@webmusic/ui harmony · one analysis surface', status: 'composed', publishedUi: true, href: '/score/element/analyze/roman-analysis/'},
-  {family: 'Score', capability: 'Analyze', tag: 'voice-leading-analysis', headless: 'AnalysisSession + live trackers + transport reader + voice-leading projection', ui: '@webmusic/ui harmony · one analysis surface', status: 'composed', publishedUi: true, href: '/score/element/analyze/voice-leading-analysis/'},
-  {family: 'Score', capability: 'Analyze', tag: 'live-chord-analysis', headless: 'AnalysisSession + live trackers + transport reader + live-chord projection', ui: '@webmusic/ui harmony · one analysis surface', status: 'composed', publishedUi: true, href: '/score/element/analyze/live-chord-analysis/'},
+  {family: 'Score', capability: 'Analyze', tag: 'score-live-chord-analysis', headless: 'LiveChordTracker + sounding chord spelling', ui: '@webmusic/ui harmony · current-chord interpretation', status: 'composed', publishedUi: true, href: '/score/element/analyze/score-live-chord-analysis/'},
+  {family: 'Score', capability: 'Analyze', tag: 'score-chord-analysis', headless: 'AnalysisSession + chord segmentation + key-relative probe', ui: '@webmusic/ui harmony · selectable harmonic lane', status: 'composed', publishedUi: true, href: '/score/element/analyze/score-chord-analysis/'},
+
+  {family: 'Audio', capability: 'Play', tag: 'audio-player', headless: 'AudioPlayer + selected clip/queue/mix backend', ui: '@webmusic/ui transport · seek · time · status', status: 'composed', publishedUi: true, href: '/audio/element/play/audio-player/'},
+  {family: 'Audio', capability: 'Play', tag: 'audio-playlist', headless: 'AudioPlaylist', ui: '@webmusic/ui playlist · queue selection · per-entry state', status: 'composed', publishedUi: true, href: '/audio/element/play/audio-playlist/'},
+  {family: 'Audio', capability: 'Play', tag: 'audio-mixer', headless: 'AudioMixer', ui: '@webmusic/ui mixer · master/member strips · mute/solo', status: 'composed', publishedUi: true, href: '/audio/element/play/audio-mixer/'},
+  {family: 'Audio', capability: 'Play', tag: 'audio-recorder', headless: 'AudioRecorder', ui: '@webmusic/ui recorder · record · live meter · status', status: 'composed', publishedUi: true, href: '/audio/element/play/audio-recorder/'},
+  {family: 'Audio', capability: 'View', tag: 'audio-view', headless: 'AudioTimeline + renderer binding', ui: '@webmusic/ui stage · SurfaceSlider · status; waveform/spectrogram/meter surface', status: 'composed', publishedUi: true, href: '/audio/element/view/audio-view/'},
+  {family: 'Audio', capability: 'View', tag: 'audio-live-view', headless: 'LiveViewController + LiveScrollBuffer over a borrowed analyser', ui: '@webmusic/ui CanvasStage · RAF/DPR/status; live render adapter', status: 'composed', publishedUi: true, href: '/audio/element/view/audio-live-view/'},
+  {family: 'Audio', capability: 'Analyze', tag: 'audio-level-analyzer', headless: 'createRealtimeAnalyzer + borrowed player analyser', ui: '@webmusic/ui level-analyzer · sampled dynamics · threshold · freeze', status: 'composed', publishedUi: true, href: '/audio/element/analyze/audio-level-analyzer/'},
+  {family: 'Audio', capability: 'Analyze', tag: 'audio-meter', headless: 'AudioMeterController + owned/borrowed analyser', ui: '@webmusic/ui meter · quick level/peak/spectrum monitor', status: 'composed', publishedUi: true, href: '/audio/element/analyze/audio-meter/'},
+  {family: 'Audio', capability: 'Analyze', tag: 'audio-oscilloscope', headless: 'createRealtimeAnalyzer + borrowed player analyser', ui: '@webmusic/ui oscilloscope · trigger · timebase · freeze · probe', status: 'composed', publishedUi: true, href: '/audio/element/analyze/audio-oscilloscope/'},
+  {family: 'Audio', capability: 'Analyze', tag: 'audio-spectrum-analyzer', headless: 'createRealtimeAnalyzer + borrowed player analyser', ui: '@webmusic/ui spectrum-analyzer · log FFT · frequency probe · peak hold', status: 'composed', publishedUi: true, href: '/audio/element/analyze/audio-spectrum-analyzer/'},
+  {family: 'Audio', capability: 'Analyze', tag: 'audio-transient-analyzer', headless: 'createTransientDetector + borrowed player analyser', ui: '@webmusic/ui transient-analyzer · attack strength · threshold · freeze', status: 'composed', publishedUi: true, href: '/audio/element/analyze/audio-transient-analyzer/'},
 ] as const;
 
 export const UI_STATUS_LABELS: Readonly<Record<UiCompositionStatus, string>> = {

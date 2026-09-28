@@ -1,0 +1,142 @@
+---
+title: '<score-note-input>'
+description: 'Play notes from piano, grid, chord or QWERTY surfaces through one shared note-event contract.'
+sidebar:
+  order: 3
+---
+
+import NoteInputDemo from '../../../../../components/NoteInputDemo.astro';
+
+**`<score-note-input>`** is the discrete-note performance surface. Set `layout` to pick the rendering and interaction model; all layouts share multi-touch, drag glissando, per-note reference counting, and the same output contract (`webscore:noteon` / `webscore:noteoff` + `.onNote`). Every layout also accepts the boolean `keyboard` attribute for QWERTY musical typing (see **Keyboard** below).
+
+Its implementation keeps mapping rules and layout templates separate from DOM lifecycle and held-note interaction state, while the public element API remains unchanged.
+
+## Live demo
+
+The three layouts now share one live `<score-note-input>`. Change **layout** in Parameters to move between Piano, Grid and Chords without leaving the demo; the remaining rows always edit that same element. The Grid option starts with a playable pad map, while the Piano range and default chord set remain available when their layouts are selected.
+
+To capture a performance as a `Score`, connect this input to a
+[`<score-recorder>`](/score/element/play/score-recorder/). Its own page covers
+recording, take playback and MIDI / MusicXML export.
+
+<NoteInputDemo />
+
+## Piano
+
+An on-screen piano keyboard. Hold and drag across keys to glissando. Set `start` and `end` to choose its MIDI range.
+
+## Grid
+
+A **10×3 Launchpad** laid out like the physical keyboard — **Q–P**, **A–;**, **Z–/** — for triggering samples or a percussion SoundFont. Map cells with the `map` attribute (`z1=35,a1=50,…`) or assign `.pads` (`{ midi, label? }` per cell, bottom-left = index `0`); only mapped cells are playable — the rest render dimmed and ignore pointer input. Row letters are **`q`** (top), **`a`** (middle), **`z`** (bottom); columns **`1`–`10`** left to right. Add `keyboard` for QWERTY musical typing.
+
+## Chords
+
+Buttons that each trigger a **whole chord** — diatonic triads of C major by default; override with `.chords`. Notes shared between held chords are reference-counted, so overlapping presses don't cut each other off.
+
+## Keyboard
+
+Add the boolean `keyboard` attribute on **any** layout — Piano, Grid, or Chords — for QWERTY **musical typing**: click **▸ Click to start** to focus the surface, then `A S D F …` play white keys, `W E T Y …` black keys, **Z** / **X** shift the octave, and **Esc** blurs. Blurring releases every held note and stops listening. Enable it in the same live demo by entering a value in the **keyboard** row; clear the field to turn it off.
+
+## Import
+
+```html
+<script type="module">
+  import { defineNoteInputElement } from '@webmusic/score/play/element';
+  defineNoteInputElement();
+</script>
+<score-note-input layout="piano" start="48" end="71"></score-note-input>
+<score-note-input layout="grid"></score-note-input>
+<score-note-input layout="grid" map="z1=35,a1=50,a7=75"></score-note-input>
+<score-note-input layout="chords"></score-note-input>
+<score-note-input layout="piano" keyboard start="48" end="71"></score-note-input>
+<score-note-input layout="grid" keyboard></score-note-input>
+<score-note-input layout="chords" keyboard></score-note-input>
+```
+
+<details class="component-section">
+<summary>API</summary>
+
+
+```ts
+import { InteractivePlayer, Sound } from '@webmusic/score/play/headless';
+import type { NoteInputElement } from '@webmusic/score/play/element';
+
+const player = new InteractivePlayer();
+player.addVoice('kbd', Sound.oscillator({ type: 'triangle' }));
+
+const el = document.querySelector<NoteInputElement>('score-note-input')!;
+el.setAttribute('map', 'a1=35,a2=36,z3=42'); // or el.pads = [{ midi: 35, label: 'BD' }, …]
+el.onNote = (midi, velocity, on) => {
+  if (on) player.noteOn('kbd', midi, velocity, 3600); // sustain until release
+  else player.noteOff('kbd', midi);
+};
+```
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `layout` | attribute / property | `piano` (default) / `grid` / `chords`. Switching at runtime releases held notes first. |
+| `keyboard` | attribute | Boolean — adds QWERTY musical typing on any layout (`piano`, `grid`, `chords`). |
+| `start` / `end` | attribute | MIDI range (piano without `keyboard`: `48`–`71`; with `keyboard`, the visible keys span the QWERTY row from `start` and shift with Z / X). Grid uses `map` / `.pads` only — `start` applies only with `keyboard` (octave anchor, default `48`). |
+| `map` | attribute / property | Compact grid map for `layout="grid"` — comma-separated `ref=midi` pairs such as `a1=35,z2=42` (`q` / `a` / `z` row, column `1`–`10`). Unmapped cells stay idle. Ignored when `.pads` is set. |
+| `velocity` | attribute | Velocity for triggered notes, 1–127 (default `100`; grid `110`). |
+| `row-interval` | attribute | Used by the exported `gridCellMidi` helper for custom isomorphic UIs (not the built-in `grid` layout). |
+| `.pads` | property | Override the grid pad map — `{ midi, label? }[]` (layout `grid`). Bottom-left = index `0`; only cells with `midi` play (blank / idle pads). Takes precedence over `map`. |
+| `.chords` | property | Override the chord set — `{ label, notes }[]` (layout `chords`). |
+| `.onNote(midi, velocity, on)` | property | Callback fired on every press (`on=true`) and release (`on=false`). |
+| `.releaseHeld()` | method | Release every held note (pointer, chord, and QWERTY holds). |
+| `webscore:noteon` / `webscore:noteoff` | event | Bubbling `CustomEvent`s with `detail = { midi, velocity }`. |
+
+Disconnecting or changing layout releases held notes and removes the old
+presenter's input listeners. Events and `.onNote` callbacks preserve attack
+before release even when a listener synchronously removes the element or
+changes its layout. Each callback receives the velocity captured for the same
+event; changing `velocity` during event delivery does not change that callback's
+payload. Reconnecting mounts fresh interaction state with no held notes.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+The host follows its available width and respects native `hidden`. Piano and grid layouts keep
+readable key sizes in an internal horizontal viewport; chord buttons wrap into rows. In
+`keyboard` mode, Left/Right scroll that viewport without releasing held notes. Without it,
+focus the viewport for native keyboard scrolling. Changing container width does not remount
+the surface.
+
+The element uses the [UIKit Note tokens and parts](/uikit/notes/note/), including
+`--wm-note-key-min-width` (default `2.25rem`), `--wm-note-cell-min-width` (default `2.5rem`),
+and `::part(viewport)`. Inherited `--wm-note-*` and shared theme tokens remain available;
+explicit legacy `--note-input-*` values below take precedence over their UIKit equivalents.
+
+For a transparent frame with rounded keys, set `--wm-component-background: transparent`,
+`--wm-component-radius: 12px` and `--wm-control-radius: 6px` on the element or its ancestor.
+Key fills resolve through `--wm-note-key` / `--wm-surface` and
+`--wm-note-key-alt` / `--wm-surface-inverse`; held notes use `--wm-note-active` /
+`--wm-accent`, with independent `--wm-note-label-active` / `--wm-accent-foreground`.
+These variables remain live when the layout changes.
+
+After the explicit legacy border override, neutral key and pad outlines resolve through
+`--wm-note-border` → `--wm-control-border` → `--wm-border` → `#d8d8d8`. Black piano keys retain their separate
+`--wm-note-key-alt-border` outline.
+
+```css
+score-note-input {
+  --note-input-bg: #fff;
+  --note-input-surface: #f3f3f3;       /* grid cells */
+  --note-input-key: #fff;              /* white keys */
+  --note-input-key-alt: #222;          /* black keys / chord buttons */
+  --note-input-active: #444;           /* held highlight */
+  --note-input-border: #d8d8d8;
+  --note-input-height: 120px;          /* piano height */
+  --note-input-cell-height: 42px;      /* grid / chords */
+  --note-input-gap: 0.4rem;
+  --note-input-radius: 0;
+  --note-input-focus: #444;           /* keyboard-mode focus ring */
+  --note-input-overlay: rgba(255, 255, 255, 0.82); /* keyboard click-to-start veil */
+  --note-input-accent: #111;           /* keyboard start button */
+  --note-input-accent-color: #fff;
+}
+```
+
+</details>

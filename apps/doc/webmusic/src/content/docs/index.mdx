@@ -1,6 +1,6 @@
 ---
 title: Introduction
-description: Documentation for WebMusic Score, UI and Kernel — symbolic music, interactive presentation and shared runtime contracts.
+description: Documentation for the five WebMusic packages — Score for notation, Audio for digital audio, the Bridge that syncs them, and the shared UI and kernel foundations.
 sidebar:
   label: Introduction
   order: 0
@@ -16,22 +16,36 @@ Online music workstations and expressive installations are long-term
 application goals. Project models, undo, persistence, and collaboration remain
 application responsibilities to design on top of the toolkit.
 
-The first release focuses on symbolic music and its shared foundations:
+Five TypeScript packages organize these capabilities. Two domain families —
+[Score](/score/) for symbolic music and [Audio](/audio/) for digital audio —
+never depend on each other; what they share lives below them, and what needs
+both lives above:
 
 | Package | Role |
 | --- | --- |
 | [`@webmusic/score`](/score/) | Symbolic music — MIDI, MusicXML, MXL, ABC: playback, views, analysis. |
-| [`@webmusic/ui`](/uikit/) | Dependency-free DOM presenters and styling hooks for Score or application-owned behavior. |
-| [`@webmusic/kernel`](/kernel/) | Domain-neutral runtime contracts, lifecycle helpers and timing logic. |
+| [`@webmusic/audio`](/audio/) | Digital audio — decoding, playback, waveforms, MIR analysis. |
+| [`@webmusic/bridge`](/bridge/) | The only package that knows both domains — synchronized playback, score→clip rendering, transcription. |
+| [`@webmusic/ui`](/uikit/) | Dependency-free DOM presenters and styling hooks both families compose. |
+| [`@webmusic/kernel`](/kernel/) | The zero-domain runtime kernel — contracts and pure logic everything builds on. |
 
-**Web Components** document the `/element` form, **Headless** documents
+Inside each family the docs follow the package's own vocabulary: **Web
+Components** document the `/element` form, **Headless** documents
 `/headless`, **API** documents the package root and its capability subpaths,
-and **UI Kit** documents `@webmusic/ui`. Score works with notation and note
-events, including sound synthesis and offline WAV export.
+and **UI Kit** documents `@webmusic/ui`. Pick the family that matches your
+source material: notation — MIDI, MusicXML, MXL, ABC — is Score; recorded
+sound is Audio.
 
-Audio-file processing and cross-domain Bridge development continue on the
-[`dev` branch](https://github.com/mrsteamedbun/WebMusic/tree/dev).
+Participants performing together should follow one session time authority,
+with explicit mappings between musical positions and audio time. The current
+[Bridge](/bridge/) coordinates separate clocks; shared-instance injection is
+further work. Rendering chooses a sound realization, while transcription
+estimates notes: conversion does not imply a lossless round trip.
 
-Start with **[Quick Start](/quick-start/)** for one player and its controls.
-The [Score page](/score/) covers installation and registration, and
-routes to playback, analysis, views and custom interfaces.
+Start with **[Quick Start](/quick-start/)**: a Score player with synchronized notation and keyboard, plus a compact Audio
+example. [Score](/score/) owns setup and registration; [Audio](/audio/) includes
+its setup and walkthrough. [Agent Toolkit](/agent-toolkit/) supplies coding-agent
+references, skills and project instructions.
+
+Search covers every package at once, so a term from one family will find the
+other.

@@ -1,0 +1,97 @@
+---
+// Optional configurations share the page fixture and start only on approach.
+import LiveDemoCanvas from './LiveDemoCanvas.astro';
+---
+
+<div class="wui-panel wui-panel--flow not-content wa-demo" data-wave-examples>
+  <div class="wui-panel__title">
+    <span>@webmusic/audio/view</span>
+    <strong>Waveform — example configurations</strong>
+  </div>
+
+  <LiveDemoCanvas size="tall">
+    <div class="wx-grid">
+      <p role="status" data-wave-status>Waveforms load when this example is visible.</p>
+      <div class="wx-item">
+        <div class="wx-cap"><strong>Custom colours</strong> · <code>wave-color · progress-color · playhead-color</code></div>
+        <audio-view type="waveform" data-wave-ex wave-color="#22c55e" progress-color="#15803d" playhead-color="#f59e0b"></audio-view>
+      </div>
+
+      <div class="wx-item">
+        <div class="wx-cap"><strong>Taller, zoomed in, boosted</strong> · <code>height="180" pixels-per-second="240" amplitude="1.3"</code></div>
+        <audio-view type="waveform" data-wave-ex height="180" pixels-per-second="240" amplitude="1.3" wave-color="#a78bfa"></audio-view>
+      </div>
+
+      <div class="wx-item">
+        <div class="wx-cap"><strong>Compact, on a panel</strong> · <code>height="64" background-color="#0b0d12"</code></div>
+        <audio-view type="waveform" data-wave-ex height="64" background-color="#0b0d12" wave-color="#38bdf8"></audio-view>
+      </div>
+
+      <div class="wx-item">
+        <div class="wx-cap"><strong>Colour map</strong> · <code>color-mode="colormap" color-map="magma"</code></div>
+        <audio-view type="waveform" data-wave-ex data-wave-spec height="120" background-color="#000" color-mode="colormap" color-map="magma"></audio-view>
+      </div>
+    </div>
+  </LiveDemoCanvas>
+</div>
+
+<script>
+  import {defineAudioViewElement, type AudioViewElement} from '@webmusic/audio/view/element';
+  import {mountDemos} from './demo-lifecycle';
+  import {acquireAudioViewFixture, whenDemoVisible} from './audio-view-fixture';
+
+  defineAudioViewElement();
+  mountDemos('[data-wave-examples]', (root, scope) => {
+    const fixture = acquireAudioViewFixture(`${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`);
+    const views = [...root.querySelectorAll<AudioViewElement>('audio-view')];
+    const status = root.querySelector<HTMLElement>('[data-wave-status]')!;
+    scope.add(() => fixture.release());
+    scope.add(() => { for (const view of views) { view.peaks = undefined; view.spectrogram = undefined; } });
+    whenDemoVisible(root, scope, async () => {
+      status.textContent = 'Loading waveforms…';
+      try {
+        const peaks = await fixture.peaks();
+        if (!scope.active) return;
+        for (const view of views) view.peaks = peaks;
+        status.textContent = 'Preparing colour map…';
+        const spectrum = await fixture.spectrum();
+        if (!scope.active) return;
+        for (const view of views) if (view.hasAttribute('data-wave-spec')) view.spectrogram = spectrum;
+        status.textContent = '';
+      } catch (error) {
+        if (scope.active) status.textContent = 'These examples could not be prepared. Reload this page to retry.';
+        throw error;
+      }
+    });
+  });
+</script>
+
+<style>
+  .wx-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+  .wx-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    /* Let the item shrink to the column width instead of its (very wide) canvas
+       content — otherwise the waveform's full-clip surface blows the layout up. */
+    min-width: 0;
+  }
+  .wx-cap {
+    color: var(--wa-muted);
+    font-size: 0.74rem;
+  }
+  .wx-cap code {
+    font-size: 0.7rem;
+  }
+  .wx-item :global(audio-view) {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    min-height: 48px;
+  }
+</style>

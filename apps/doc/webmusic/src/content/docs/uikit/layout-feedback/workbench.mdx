@@ -100,19 +100,6 @@ shell.update(); // re-read the snapshot. The clock never calls this.
 shell.destroy();
 ```
 
-## External presentation inputs
-
-`WorkbenchOptions.getText?: () => WorkbenchText` returns the final `views` and
-`analysis` strings (defaults `Views` and `Analysis`). An explicit `label` option
-retains precedence. Change application display state and call `shell.update()`:
-tabs, focus and child slots remain intact. Workbench does not subscribe to a
-translation library or forward presentation state to children; the application
-supplies each child mount's own inputs.
-
-View names, dock labels, titles and status text remain snapshot data. Keep
-stable IDs when changing them. See the
-[shared presentation contract](/uikit/api/#external-presentation-inputs).
-
 <details class="component-section">
 <summary>API</summary>
 
@@ -165,7 +152,7 @@ nothing. `empty` and `error` additionally print `status.message` over the stage.
 | `navigation` | `boolean` | `true` | Set `false` to omit view tabs in an application-owned layout; full-chrome dock controls and status remain available. The stage uses a named region instead of tab-panel semantics. |
 | `motion` | `MotionMode` | `'auto'` | `'auto'` follows `prefers-reduced-motion` **live**: an OS toggle lands at once, because no media query can stop a transform a frame loop is writing. |
 | `label` | `string` | — | Names the shell as a `role="group"` and names its tablist. |
-| `classNames` / `parts` | | — | `{root?, header?, tablist?, tab?, stage?, rail?, strip?, status?, index?}`. `parts` additionally accepts `frame?` for the painted box. |
+| `classNames` / `parts` | | — | `{root?, header?, tablist?, tab?, stage?, rail?, strip?, status?, index?}`. `parts` additionally accepts `frame?` for the painted box and `note?` for its empty/error sentence. |
 | `onDockVisibility` | `(id, visible) => void` | — | A dock started or stopped answering — `dock(id)` flipping between a node and `undefined`, whatever the reason. Reports only a **change**, and never before `mountWorkbench` has returned. |
 | `onError` | `(error) => void` | — | A faulty snapshot, a throwing `now()` or `epoch()`, a dock dropped with a presenter still in it, and anything a slot's own draw callback throws. |
 | `stylesheet` | `boolean` | `true` | Install the exported sheet, or paint the identical declarations onto the nodes. |

@@ -1,0 +1,203 @@
+---
+title: 'AudioPlaylist'
+description: 'Ordered entries played in sequence on one shared context, prefetching the next while the current one plays.'
+sidebar:
+  order: 3
+---
+
+`AudioPlaylist` is the third cardinality: one clip is a
+[player](/audio/headless/play/audio-clip-player/), N at once is a
+[mixer](/audio/headless/play/audio-mixer/), N in order is this. It owns an
+ordered list of entries, advances when one ends, and resolves the next
+entry's clip while the current one is still playing.
+
+It creates or borrows one context and constructs an owned player for the selected
+entry, releasing the previous player on replacement. Each player keeps its input
+clip privately; the queue does not swap clips into one shared player. A supplied
+context remains caller-owned.
+
+An AudioPlaylist can be borrowed by the central
+[AudioPlayer](/audio/headless/play/audio-player/) through
+`player.setTransport(queue)`. `subscribe`, `onEnd` and `onError` provide the
+structural connection; `clip` aliases the current resolved clip, and `clock`
+reads the active entry's clock when available. The queue keeps ownership of its
+entry engines and context; detaching the facade does not dispose it.
+
+## Import
+
+```ts
+import {AudioPlaylist} from '@webmusic/audio/play/headless';
+
+const playlist = new AudioPlaylist({
+  entries: [
+    {id: 'a', label: 'Take 1', clip: firstTake},
+    {id: 'b', label: 'Take 2', clip: decoded},
+  ],
+  loop: true,
+});
+
+await playlist.play();
+// Keep the playlist until the owning view/session is removed.
+const dispose = () => playlist.dispose();
+```
+
+## Loading is injected
+
+`headless` may not import `play/api`, so the playlist does not know how to
+fetch or decode: the caller supplies a loader, exactly as the media engine
+takes its adapter factory. The element passes `loadClipFromUrl`. An entry with
+a ready `clip` needs no loader at all.
+
+`prefetch` (default on) covers **fetch and decode** for the next entry — the
+dominant cost — but not its audio graph, which is still built when that entry
+starts.
+
+## List loop, not track loop
+
+When failed entries are skipped, one play request attempts at most one pass
+through the queue. If no entry loads, playback stops even with `loop: true`;
+call `play()` again to retry after resolving the load error. Concurrent play
+requests share the same pending start.
+
+`loop` restarts the list after the last entry, and it must live here rather
+than on the players: a looping *player* never emits `end`, so forwarding the
+setting downward would stall the queue forever. This is also why the events
+are distinct names — `trackchange` and `playlistend` rather than an overloaded
+`end`, which already means "one clip finished".
+
+## Live queue policies and selection
+
+`setLoop`, `setPrefetch` and `setSkipFailed` update queue policy in place. They
+preserve the current selection, player, position, playback intent and resolved
+clips. Enabling prefetch while playing starts the next missing load; disabling it
+prevents future prefetches but does not cancel a load already in flight. Its result
+may still enter the cache. The latest skip-failed policy applies when a pending
+load fails; with skipping disabled the queue stops at that entry.
+
+`select(idOrIndex)` requires an existing id or an integer index in range. Invalid
+selection rejects with `RangeError` before changing the active entry, position or
+pending work. Previous/next keep their separate endpoint and loop behavior.
+
+## Time, ownership and contract source
+
+The playlist owns selection and list progression. Clip positions reset on entry
+changes; it does not expose a continuous session clock across the entire queue.
+If the selected entry has no player yet, `seek` and `seekFraction` retain the
+requested position and apply it when that entry starts. A later selection or
+`stop()` clears that pending position.
+Prefetching uses the injected loader and does not imply sample-accurate gapless
+transitions.
+
+The public barrel and `packages/audio/src/play/headless/playlist.ts` define the value, option, state and event
+contracts described below. The reference does not turn private implementation
+fields into public API.
+
+<details class="component-section">
+<summary>API</summary>
+
+**Construction**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `new AudioPlaylist(options?)` | constructor | Constructs an ordered queue. |
+| `createAudioPlaylist(options?)` | factory | Returns an AudioPlaylist with identical lifetime semantics. |
+
+**AudioPlaylistOptions**
+
+| Member | Kind | Default | Description |
+| --- | --- | --- | --- |
+| `entries` | option | `[]` | Readonly AudioPlaylistEntry inputs. |
+| `audioContext` | option | lazy creation | Shared by created entry players and supplied to loadEntry. |
+| `destination` | option | context destination | Routing for created players. |
+| `loop` | option | `false` | Repeat the list, not each clip. |
+| `prefetch` | option | `true` | Resolve the next clip early. |
+| `skipFailed` | option | `true` | Attempt later entries after failure; one pass per start request. |
+| `volume` | option | `1` | Initial entry-player volume. |
+| `rate` | option | `1` | Initial entry-player rate. |
+| `engine` | option | `'auto'` | PlayerEngineKind for created players. |
+| `mediaAdapterFactory` | option | none | Host adapter for streaming entries. |
+| `loadEntry(entry, context)` | option | none | `Promise<AudioClip>`; required to resolve src entries, not called for ready clips. |
+
+**AudioPlaylistEntry**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `id` | string | Required unique identifier. |
+| `label` | optional string | Display label. |
+| `clip` | optional AudioClip | Ready material; avoids the loader. |
+| `src` | optional string | Source understood by the injected loader. |
+| `streaming` | optional boolean | Loader hint to retain URL-based media. |
+| `format` | optional AudioFormat | Explicit format hint passed to the loader. |
+
+**Commands**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `setEntries(entries)` | void | Reconciles by id/source; changed current material replaces its player, removal stops it. |
+| `play()` | `Promise<void>` | Starts/resumes selected entry; concurrent starts share pending work, resolution is not playlist completion. |
+| `pause()` | void | Holds current playback. |
+| `stop()` | void | Stops current playback. |
+| `toggle()` | `Promise<void>` | Pause or play according to current state. |
+| `next()` | `Promise<void>` | Select next entry. |
+| `previous()` | `Promise<void>` | Select previous entry. |
+| `select(idOrIndex)` | `Promise<void>` | Select by existing id or integer index; invalid inputs reject with RangeError without changing state. |
+| `seek(seconds)` | void | Seek within current entry, in seconds. |
+| `seekFraction(fraction)` | void | Seek within current entry by normalized fraction. |
+| `setVolume(volume)` | void | Retain/apply entry-player volume. |
+| `setRate(rate)` | void | Retain/apply entry-player rate. |
+| `setLoop(loop)` | void | Change list-loop policy without resetting selection or playback. |
+| `setPrefetch(prefetch)` | void | Change future prefetch policy; enabling while playing may begin the next load. In-flight loads can still finish and cache. |
+| `setSkipFailed(skipFailed)` | void | Choose whether the next load failure advances; applies to pending loads too. |
+
+**State**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `entries` | readonly AudioPlaylistEntry[] | Current queue. |
+| `index` | number | Selected entry index; may be −1 without selection. |
+| `current` | entry or undefined | Selected queue entry. |
+| `statusOf(id)` | AudioPlaylistEntryStatus | idle, loading, ready or error. |
+| `clipOf(id)` | AudioClip or undefined | Resolved clip for an entry. |
+| `currentClip` | AudioClip or undefined | Resolved current material. |
+| `activePlayer` | AudioClipPlayer or undefined | Current player; caller may inspect but must not dispose it. |
+| `playing` | boolean | Current playback state. |
+| `seconds` | number | Position in current clip, not total queue elapsed time. |
+| `duration` | number | Current clip duration. |
+| `progress` | number | Current clip progress. |
+
+**Events**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `on(event, listener)` | unsubscribe function | Typed subscription; this class has no once method. |
+| `off(event, listener)` | void | Remove the matching listener. |
+| `trackchange` | object | `{id, index, entry}` when current selection changes. |
+| `trackend` | object | `{id, index}` at natural end before advancement. |
+| `playlistend` | void payload | Final entry ends without list looping. |
+| `timeupdate` | object | `{seconds, duration, progress}` for the active entry. |
+| `statuschange` | object | `{id, status}` when load state changes. |
+| `error` | Error | Entry loading or playback failure. |
+
+**Lifecycle and types**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `dispose()` | void | Idempotently invalidates work, disposes its current player/listeners and closes only its own context. |
+| `AudioPlaylistOptions` | type | Construction options above. |
+| `AudioPlaylistEntry` | type | Queue input above. |
+| `AudioPlaylistEntryStatus` | type | Four load states above. |
+| `AudioPlaylistEvents` | type | Event payload map above. |
+
+</details>
+
+<div class="component-section">
+
+**Composed by.** [`<audio-playlist>`](/audio/element/play/audio-playlist/) —
+Audio / Play, which supplies `loadClipFromUrl` as the loader and composes
+[`mountPlaylist`](/uikit/transport-time/playlist/).
+
+</div>
+
+## Related
+
+[AudioClipPlayer](/audio/headless/play/audio-clip-player/) · [Loader API](/audio/api/play/) · [Playlist presenter](/uikit/transport-time/playlist/)

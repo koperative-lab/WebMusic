@@ -1,0 +1,103 @@
+---
+title: '<audio-oscilloscope>'
+description: 'Inspect a trigger-aligned live waveform window with timebase, freeze and time-amplitude probing.'
+sidebar:
+  order: 4
+---
+
+import AudioAnalyzeFeaturePlayground from '../../../../../components/elements/AudioAnalyzeFeaturePlayground.astro';
+
+The oscilloscope inspects the most recent time-domain window from a live
+signal. Adjust the trigger edge and level, narrow the timebase, freeze a frame,
+and probe its time and linear sample amplitude. Unlike the scrolling
+[`<audio-live-view>`](/audio/element/view/audio-live-view/), it is a short-window
+inspection tool, not a history or transport timeline.
+
+<AudioAnalyzeFeaturePlayground tag="audio-oscilloscope" />
+
+## Import
+
+```html
+<script type="module">
+  import {defineAudioPlayerElement} from '@webmusic/audio/play/element';
+  import {defineAudioOscilloscopeElement} from '@webmusic/audio/analyze/element';
+  defineAudioPlayerElement();
+  defineAudioOscilloscopeElement();
+</script>
+
+<audio-player id="session" src="/mp3/Arabesque%20No.1.mp3" controls></audio-player>
+<audio-oscilloscope player="#session" timebase-ms="10" trigger-edge="rising"></audio-oscilloscope>
+```
+
+The demo pairs one player with the scope. Start playback for live samples;
+the tool's trigger, timebase, Freeze and pointer/keyboard probe work on its
+current frame. Copy includes both Elements, and Reset restores the demo
+settings.
+
+## Signal and lifetime
+
+The scope borrows the bound player's `AnalyserNode` while the player is
+playing. A caller can assign `.analyser` for another live graph; that explicit
+node takes precedence and is sampled while connected. The `player` selector
+must resolve uniquely in the current Document or ShadowRoot, including after
+late insertion or upgrade. Invalid or ambiguous targets leave it unbound.
+The scope never starts playback, creates an `AudioContext`, or retunes a
+borrowed node's FFT settings.
+
+About every 50 ms it copies one `getFloatTimeDomainData()` window. Timebase is
+clamped to the samples available from that analyser; a trigger chooses a
+matching threshold crossing in that bounded window, or the latest available
+window when no edge matches. The displayed time axis starts at the selected
+window's left edge, **not** at the player's clip position. Freeze stops this
+tool's polling and holds a copied frame. When following a player, pause, seek
+and source replacement clear stale readings; replacing an explicit analyser,
+document hiding and graph loss also clear them. A stopped frame source reports
+unavailable and is retried. Disconnect stops only this tool's poller, observers
+and presenter, never the borrowed player or graph.
+
+<details class="component-section">
+<summary>API</summary>
+
+| Member | Kind | Behavior |
+| --- | --- | --- |
+| `player` | attribute | Unique selector for a playback owner whose analyser is borrowed while playing; default absent. |
+| `frozen` | boolean attribute | Stop this tool's polling and retain its current display; default absent. Transport/source changes release the freeze. |
+| `timebase-ms` | attribute | Requested visible window in milliseconds, default `10`; invalid or non-positive values use `10`. The effective value is clamped to the analyser's sampled window. |
+| `trigger-level` | attribute | Threshold in linear sample amplitude, clamped to `-1..1`; default `0`. Invalid values use `0`. |
+| `trigger-edge` | attribute | `rising` (default), `falling` or `off`; other values use rising. `off` displays the latest untriggered window. |
+| `aria-label` | attribute | Accessible group name; default `Oscilloscope`. |
+| `.analyser` | property | Explicit caller-owned `AnalyserNode`, preferred over the bound player's node; getter exposes the current node. |
+| `.frozen`, `.timebaseMs`, `.triggerLevel`, `.triggerEdge` | properties | Reflected display controls with the parsing and bounds above. |
+| `.trace` | read-only property | Latest `{samples, timebaseMs, triggered, silent}` copied display window, or `undefined` without a frame. `silent` distinguishes a sampled quiet window from missing input. |
+| `.selectedTimeMs` | read-only property | Probe position in milliseconds from the left edge of the displayed window. |
+| `webaudio:oscilloscopeprobe` | event | `{timeMs, amplitude?}` after a pointer or keyboard probe; time is relative to the displayed window. Bubbles and is composed. |
+| `webaudio:error` | event | `{error: Error}` for input, frame or presenter failures; bubbles and is composed. |
+
+The trigger is visual alignment within sampled data, not sample-accurate
+synchronization with playback or an external signal. The probe reports a
+nearest displayed sample when one exists; its amplitude is omitted while the
+trace is unavailable.
+
+**Accessibility.** The canvas is a focusable slider named "Inspect waveform
+time", with its selected time and amplitude in `aria-valuetext`. Arrow keys
+move the probe by one percent of the visible window, Shift+Arrow by ten
+percent, and Home/End select its ends. Native range controls set timebase and
+trigger level; the edge select and Freeze button remain keyboard-operable.
+The current probe and status are also text outside the canvas.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+The full-width host honors native `hidden` and uses the shared
+`--wm-component-*` outer-surface tokens, with
+`--wm-audio-oscilloscope-surface-*` overrides. The
+[oscilloscope presenter](/uikit/views-analysis/oscilloscope/) exposes
+`--wm-oscilloscope-height`, foreground, muted, border, control-background and
+selection tokens. Its public parts are `root surface`, `header`, `readout`,
+`plot`, `controls`, `freeze`, `timebase`, `trigger-level`, `trigger-edge` and
+`status`. The canvas trace and axis colors are currently fixed drawing
+colors; changing CSS background tokens alone does not recolor those pixels.
+
+</details>

@@ -1,0 +1,85 @@
+---
+title: '<audio-level-analyzer>'
+description: 'Inspect sampled RMS, sample peak, crest and a peak threshold from a live audio graph.'
+sidebar:
+  order: 2
+---
+
+import AudioAnalyzeFeaturePlayground from '../../../../../components/elements/AudioAnalyzeFeaturePlayground.astro';
+
+The level analyzer is a live dynamics tool beside an
+[`<audio-player>`](/audio/element/play/audio-player/). Its recent-sample display,
+peak hold and adjustable threshold help inspect the signal while it sounds.
+For offline loudness estimates over a decoded clip, use
+[`measureLoudness`](/audio/api/analyze/#loudness). Neither this tool nor the
+current API establishes inter-sample true peak.
+
+<AudioAnalyzeFeaturePlayground tag="audio-level-analyzer" />
+
+## Import
+
+```html
+<script type="module">
+  import {defineAudioPlayerElement} from '@webmusic/audio/play/element';
+  import {defineAudioLevelAnalyzerElement} from '@webmusic/audio/analyze/element';
+  defineAudioPlayerElement();
+  defineAudioLevelAnalyzerElement();
+</script>
+
+<audio-player id="session" src="/mp3/Arabesque%20No.1.mp3" controls></audio-player>
+<audio-level-analyzer player="#session" threshold-dbfs="-12"></audio-level-analyzer>
+```
+
+The demo pairs one player with this tool. Start playback for live samples;
+the tool's Freeze, Reset hold and Peak threshold controls operate on its own
+display. Copy includes both elements, and Reset restores their demo settings.
+
+## Signal and lifetime
+
+The element borrows the bound player's `AnalyserNode` while that player is
+playing. Assign `.analyser` to inspect a caller-owned graph instead; an
+explicit analyser takes precedence and is sampled while the element remains
+connected. The element does not create an `AudioContext`, decode a clip, seek,
+or own the borrowed node. It samples about every 50 ms, so the RMS and peak
+describe sampled windows, not continuous loudness or inter-sample true peak.
+The crest value is sample peak minus RMS in dB.
+
+Freeze holds the current display while sampling continues. Reset hold starts
+the held peak again from the current sample. A pause, seek, source change or
+missing live input clears stale samples; a frame stall marks the signal
+unavailable. The element stops its own polling and subscriptions on rebind or
+disconnect without stopping the player. `player` must resolve uniquely in
+the current Document or ShadowRoot; invalid or ambiguous selectors remain
+unbound, and later target changes are observed.
+
+<details class="component-section">
+<summary>API</summary>
+
+| Member | Kind | Behavior |
+| --- | --- | --- |
+| `player` | attribute | Unique selector for the playback owner whose analyser is borrowed while playing. |
+| `threshold-dbfs` | attribute | Sample-peak comparison threshold in dBFS, clamped to `-60..0`; default `-12`. Invalid values use `-12`. |
+| `.analyser` | property | Caller-owned `AnalyserNode`; takes precedence over the player's analyser. |
+| `.thresholdDbfs` | property | Reflected peak threshold in dBFS. |
+| `.sample` | read-only property | Latest `{rmsDbfs, peakDbfs}` sample, or `undefined` without a live sample. |
+| `.heldPeakDbfs` | read-only property | Greatest sampled peak since the latest reset, or `undefined` before a sample. |
+| `.frozen` | read-only property | Whether the display is frozen; the tool's Freeze control changes it. |
+| `webaudio:levelchange` | event | `{rmsDbfs, peakDbfs, crestDb, heldPeakDbfs, thresholdDbfs}` for an accepted sample; bubbles and is composed. |
+| `webaudio:error` | event | `{error: Error}` for a live-input or frame failure; bubbles and is composed. |
+
+The threshold is visual feedback against the sampled peak; crossing it does
+not mute, compress or otherwise change the signal.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+The full-width host honors native `hidden`. Its outer surface uses
+`--wm-component-background`, `--wm-component-border`,
+`--wm-component-padding` and `--wm-component-radius`; the
+`--wm-audio-level-analyzer-surface-*` tokens override this tag. The
+[level presenter](/uikit/) exposes `--wm-level-analyzer-rms`,
+`--wm-level-analyzer-peak` and `--wm-level-analyzer-threshold` for its graph.
+
+</details>

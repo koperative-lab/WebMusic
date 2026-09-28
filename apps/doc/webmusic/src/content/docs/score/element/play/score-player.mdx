@@ -12,10 +12,10 @@ import ScorePlayerPlayground from '../../../../../components/elements/ScorePlaye
 In native score mode, View and Analyze companions resolve this player with
 `player="#id"` and borrow its score, state and note events. One player can drive
 [`<score-view>`](/score/element/view/score-view/),
-[`<pitch-view>`](/score/element/view/pitch-view/) and
-[`<chord-analysis>`](/score/element/analyze/chord-analysis/) together.
-For several Rack members, nest a [`<rack-control>`](/score/element/play/rack-control/)
-desk with nonvisual `<rack-part>` declarations inside this player. Applications
+[`<score-pitch-view>`](/score/element/view/score-pitch-view/) and
+[`<score-chord-analysis>`](/score/element/analyze/score-chord-analysis/) together.
+For several Rack members, nest a [`<score-rack-control>`](/score/element/play/score-rack-control/)
+desk with nonvisual `<score-rack-part>` declarations inside this player. Applications
 that already own an engine can use [the borrowed controller mode](#four-ways-to-drive-it).
 
 <ScorePlayerPlayground />
@@ -27,7 +27,7 @@ Use **Effects** in the demo's Parameters panel to add reverb, a three-band equal
 An effect is an object graph, not an HTML attribute. The editor therefore assigns the real `.effect` property and adds a **JavaScript setup** block beside the live markup. **Copy** includes both blocks. Committing an effect edit stops and rebuilds the player's audio graph, so playback returns to the start; **Reset** clears the chain back to dry output.
 
 That property belongs to the element's single-score mode. When `.rack` is the
-active source (including a nested `<rack-control>` composition), the Rack owns
+active source (including a nested `<score-rack-control>` composition), the Rack owns
 the shared audio graph; put the chain on `rack.effect` or
 `rackControl.effect` instead. The Rack editor uses this same stack UI and the
 same `Effect.chain(...)` recipes on its summed master bus.
@@ -51,14 +51,12 @@ if (player) player.effect = Effect.chain(
   defineScorePlayerElement();
 </script>
 
-<score-player src="song.mid"></score-player>
+<score-player src="/midi/Arabesque%20No.1.mid"></score-player>
 ```
 
 That is the whole setup. To see what any attribute does to a live element, use the control strip on the demo above — it writes to the real tag and shows you the resulting markup.
 
 `@webmusic/score/play/auto` registers this element (and the other Score elements) on import instead; `@webmusic/score/play/global` is the prebuilt `<script>`-tag bundle for pages with no build step.
-
-**Legacy compatibility.** `<simple-score-player>`, `SimpleScorePlayerElement` and `defineSimpleScorePlayerElement()` remain available as deprecated aliases, and the auto/global bundles register both tags. Existing pages can migrate without an immediate break, but new code should use the canonical names above.
 
 ## Four ways to drive it
 
@@ -67,7 +65,7 @@ The element resolves exactly one source of music, in a fixed order of precedence
 | Precedence | Source | What the element owns |
 | --- | --- | --- |
 | 1 | `.controller` | Nothing. Chrome only — no score is loaded, and the borrowed [`PlayerController`](/score/headless/play/player-controller/) outlives the element. |
-| 2 | `.rack`, else the first nested `<rack-control>`'s Rack | A transport binding over the borrowed [`Rack`](/score/headless/play/rack/). Commands reach its members; the seek bar follows the longest built timeline member. An explicit `.rack` wins over the desk. |
+| 2 | `.rack`, else the first nested `<score-rack-control>`'s Rack | A transport binding over the borrowed [`Rack`](/score/headless/play/rack/). Commands reach its members; the seek bar follows the longest built timeline member. An explicit `.rack` wins over the desk. |
 | 3 | `.score` | The transport and the audio graph, over a `Score` you already parsed. |
 | 4 | `src` | All of the above, plus the fetch and parse. |
 
@@ -103,7 +101,7 @@ Companions can borrow that data without repeating `src`:
 ```html
 <score-player id="shared-player" src="/example.musicxml"></score-player>
 <score-view player="#shared-player"></score-view>
-<chord-analysis player="#shared-player"></chord-analysis>
+<score-chord-analysis player="#shared-player"></score-chord-analysis>
 ```
 
 Register each tag through its owning `/element` entry. A follower borrows the
@@ -155,7 +153,7 @@ The source attributes are read only while a source is being resolved; assigning 
 | Member | Kind | Default | Description |
 | --- | --- | --- | --- |
 | `rate` / `.rate` | attribute + property | `1` | Native playback speed, applied live; non-finite or non-positive values fall back to `1`. Explicit `.rate` writes also reach a borrowed controller. Inert for Rack members. |
-| `volume` / `.volume` | attribute + property | `1` | Native linear volume, applied live and clamped to `>= 0`. Rack mixing belongs to `<rack-control>`; inert in Rack/controller mode. |
+| `volume` / `.volume` | attribute + property | `1` | Native linear volume, applied live and clamped to `>= 0`. Rack mixing belongs to `<score-rack-control>`; inert in Rack/controller mode. |
 | `pan` / `.pan` | attribute + property | `0` | Native stereo pan, applied live and clamped to `[-1, 1]`. Inert in Rack/controller mode. |
 | `loop` / `.loop` | attribute + property | `false` | Native whole-piece looping. A bare `loop` is on; `loop="false"` (also `0` / `no` / `off`) is off. Inert in Rack/controller mode. |
 | `time-control` | attribute | `off` | Add the clock to the chrome: `simple` is the elapsed time (`0:12`), `full` adds the total (`0:12 / 3:40`). Works in every mode. |
@@ -181,9 +179,9 @@ settings on mount and accepts explicit `.rate` writes.
 Dragging either volume control updates `.volume` without pinning it, because the reader moving a control is not the same as your code assigning the property.
 
 ```html
-<score-player src="song.mid" volume="0.5" rate="0.8" pan="-1" loop></score-player>
-<score-player src="song.mid" time-control="full" volume-control="fader"></score-player>
-<score-player src="song.mid" time-control="simple" volume-control="knob"></score-player>
+<score-player src="/midi/Arabesque%20No.1.mid" volume="0.5" rate="0.8" pan="-1" loop></score-player>
+<score-player src="/midi/Arabesque%20No.1.mid" time-control="full" volume-control="fader"></score-player>
+<score-player src="/midi/Arabesque%20No.1.mid" time-control="simple" volume-control="knob"></score-player>
 ```
 
 **Events** — bubbling `CustomEvent`s; `webscore:error` is composed, while the
@@ -234,7 +232,7 @@ Set `--wm-component-background: transparent`, `--wm-component-border: none`
 and `--wm-component-radius: 12px` to style the outer surface. Use
 `--wm-control-radius` for button, seek-track and volume-control rounding;
 `--wm-accent` and `--wm-accent-foreground` recolor the button and active fill.
-The same variables work on `<simple-score-player>` and the demo wrappers.
+The same variables work on the demo wrappers.
 For structural overrides, select public light-DOM parts such as
 `score-player [part~="play"]`; this element has no Shadow DOM for `::part()`.
 

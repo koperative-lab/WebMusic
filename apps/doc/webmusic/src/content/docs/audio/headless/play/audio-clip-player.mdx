@@ -1,0 +1,227 @@
+---
+title: 'AudioClipPlayer'
+description: 'Single-clip transport over a buffer or a media element, with regions, a beat grid, looping and a metering tap.'
+sidebar:
+  order: 2
+---
+
+`AudioClipPlayer` plays one `AudioClip`. It picks an engine, owns the audio
+graph between the source and the destination, and emits the events a transport
+UI needs — `timeupdate` while playing, `end` at the finish, `regionenter` and
+`regionleave` as the playhead crosses the clip's own annotations.
+
+The input clip is bound at construction and exposed as the readonly `clip`
+property. Reading it allocates no playback resources; followers borrow this same
+immutable data alongside the player's position. There is no clip-replacement
+command, so a new clip means a new player. That is why [`AudioPlaylist`](/audio/headless/play/audio-playlist/)
+builds one player per entry rather than swapping a clip into a shared one.
+
+It **owns** the `AudioContext` only when it created one. Pass `audioContext`
+and the player borrows it — `dispose()` then tears down its own graph and
+leaves the context open. Applications can share a context deliberately without
+assuming a fixed browser-wide context limit.
+
+## Import
+
+```ts
+import {AudioClipPlayer} from '@webmusic/audio/play/headless';
+
+const player = new AudioClipPlayer(clip, {volume: 0.8});
+await player.play();
+player.seek(12.5);
+// Retain the player until the owning session/view is removed.
+const dispose = () => player.dispose();
+```
+
+## Two engines, one contract
+
+`engine: 'auto'` selects BufferEngine for decoded clips up to ten minutes.
+Otherwise it selects MediaEngine when a source URL is available, and falls back to
+BufferEngine without one. Force an engine with `engine: 'buffer'` or `'media'`.
+Only the buffer path honors absolute future starts; media playback delegates
+buffering and memory policy to its host adapter rather than promising flat memory.
+
+`preservesPitch` is a media-engine property. The buffer engine changes pitch
+whenever it changes speed, because that is what varying a buffer's playback
+rate does; the option is a documented no-op there rather than a silent one.
+
+## Ownership and the tap
+
+`analyser` exposes an `AnalyserNode` in the player's own graph. Meters and
+realtime analyzers **borrow** it: a borrower must not disconnect or
+reconfigure it, since every other reader of the same tap would see the change.
+`clock` is present only once the buffer engine has built its transport clock,
+which can happen during `play()`, `preload()` or access to `analyser`. The bridge
+reads it live rather than snapshotting it. Reading `analyser` materializes the graph
+and throws after disposal; it is not a resource-free inspection.
+
+## Scratch sessions
+
+`beginScratch()` optionally borrows a scratch session over the player's decoded
+PCM. It captures the current playing/paused state and suspends ordinary playback.
+It returns `undefined` without changing playback for a disposed player, a zero-duration clip or unavailable decoded samples. Callers must check that result; a legacy structural player may not
+provide the method at all. A nonempty decoded clip supports this independently
+of its normal buffer/media engine selection; media still needs its existing
+`mediaAdapterFactory`.
+
+An `AudioScratchSession` (type exported from `/play/headless` and `/play`) exposes:
+
+| Member | Contract |
+| --- | --- |
+| `active` | Whether this session owns scratching, including release inertia. It stays active during the coast; a superseded, canceled or completed session is inactive. |
+| `moveToSeconds(seconds, audible = true)` | Move to a finite absolute clip-second position, clamped/wrapped by the active engine. Successive signed position changes determine scratch direction/speed through the player's existing volume, pan and effect route. `false` moves silently. Calling this during a coast settles that completion and retakes the same session. |
+| `end(resume = true)` | `Promise<void>`; normal end coasts from the signed release speed toward the configured playback rate if previously playing, or zero if previously paused, then restores that state. It resolves after completion or cancellation, and rejects on coast/restoration failure. `false` cancels immediately without resume. |
+
+The caller owns ending the session. Repeated `end(true)` during a coast awaits
+its existing completion without restarting it; ending a stale/completed session
+is a no-op. Retain the handle until completion so `end(false)` can still cancel.
+The player owns its AudioContext, playback engine and shared route; ending a
+gesture never disposes the player. External `play`, `pause`, `stop`, `seek`
+(including `seekFraction` and legacy `scrub`) and disposal invalidate the session
+and settle its pending coast. A newer session replaces it and inherits the
+original playing intent, including when re-grabbing during release inertia.
+Late readiness/end cannot resume obsolete work.
+
+The current release transition lasts about **280 ms on the AudioContext clock**.
+Both accepted position and scratch sound follow that signed velocity transition;
+a previously paused source decelerates to rest, while a playing source converges
+to its configured forward rate before ordinary playback resumes. A silent click
+or release after motion has stopped restores directly, without a stale fling.
+Context suspension cancels a pending coast. Volume/pan changes retain the session.
+Rate/loop changes retain a held gesture, but finish an active coast at its current
+accepted position and restore the prior state with the new configuration.
+
+The backend retains native playback phase through bounded local PCM windows,
+with smooth rate changes and short crossfades for direction changes, refills or
+large position corrections. Pointer updates do not restart a separate audio grain.
+Signed scratch speed is capped at 8 times sample speed; the audio-clock watchdog
+brakes and silences stationary input. Reverse windows copy only local PCM and
+never modify the original clip. Speed also changes pitch; this is not
+pitch-preserving time stretching. Cancellation, external transport commands and
+disposal stop scratch output immediately. With a range loop, pre-loop lead-in
+remains available and windows respect the active loop edges; seamless scratch
+loop wrapping is not promised. The existing `scrub(deltaSeconds)` is a separate
+relative-seek convenience and does not start an audible scratch session.
+[`<audio-view drag-mode="scrub">`](/audio/element/view/audio-view/#dragging-and-seeking)
+composes this capability with centered geometry and pointer lifecycle.
+
+## Time, ownership and contract source
+
+The player owns playback state on the clip-seconds axis. Its context is the audio
+reference; it is not automatically the authority for every player on the page.
+Views follow its notifications or reader. Under native looping, `seconds` wraps
+while `clock.positionAt(t)` remains unwrapped. A seek before a buffer's scheduled
+start retains that absolute start time and relocates the held position.
+
+A `load` listener can pause or stop the pending start. Seeking from that listener
+changes the start position without cancelling the play intent. Region events use
+the engine's actual clamped/wrapped position. A transport command from a
+`timeupdate`, region or beat listener invalidates the remaining notifications
+from the interrupted observation batch; committed region membership prevents
+seeking within the same region from recursively entering it again.
+
+Range-loop options must have finite bounds and a positive span after clamping a
+negative start to zero. Invalid ranges throw `RangeError`; rejected live edits
+preserve the accepted loop. Buffer ranges must overlap the known clip duration.
+For media, later metadata can leave no playable span: the watcher stops and the
+stream finishes normally. See [engine range rules](/audio/headless/play/engines/).
+
+The public barrel and `packages/audio/src/play/headless/player.ts` define the value, option, state and event
+contracts described below. The reference does not turn private implementation
+fields into public API.
+
+<details class="component-section">
+<summary>API</summary>
+
+**Construction**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `new AudioClipPlayer(clip, options?)` | constructor | Binds one immutable AudioClip; exposes it as readonly `.clip`. |
+| `createAudioClipPlayer(clip, options?)` | factory | Returns a new AudioClipPlayer with the same ownership rules. |
+
+**AudioClipPlayerOptions**
+
+| Member | Kind | Default | Description |
+| --- | --- | --- | --- |
+| `audioContext` | option | created lazily | Borrowed if supplied; never closed by player disposal. |
+| `destination` | option | context destination | Must belong to the selected context. |
+| `engine` | option | `'auto'` | PlayerEngineKind: auto, buffer or media; selection described above. |
+| `effect` | option | none | Lazy Effect recipe inserted in the player graph. |
+| `mediaAdapterFactory` | option | none | Required host adapter when the media engine needs one. |
+| `preservesPitch` | option | engine default | Media behavior; BufferEngine does not preserve pitch on rate changes. |
+| `loop` | option | `false` | Boolean or finite `{start, end}` in clip seconds; ranges require a positive playable span. |
+| `cursorIntervalMs` | option | `50` | Polling cadence in milliseconds; not audio scheduling precision. |
+| `volume` | option | `1` | Initial gain. |
+| `pan` | option | `0` | Initial stereo position. |
+| `rate` | option | `1` | Initial playback multiplier. |
+
+**Commands**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `play(when?)` | `Promise<void>` | Starts/resumes; when is absolute AudioContext seconds for BufferEngine. Resolution means start preparation completed, not clip completion. |
+| `pause()` | void | Holds position and invalidates a pending start. |
+| `stop()` | void | Stops and returns to the start. |
+| `seek(seconds)` | void | Clip-second position; clamped/wrapped by the selected engine. Buffer pre-roll retains its scheduled start. |
+| `seekFraction(fraction)` | void | Clamps the fraction to 0–1 and seeks within duration. |
+| `scrub(deltaSeconds)` | void | Seeks relative to current clip seconds; does not start audible scratching. |
+| `beginScratch()` | AudioScratchSession or undefined | Begin the optional decoded-PCM gesture session described [above](#scratch-sessions); unsupported clips leave playback untouched. |
+| `setRate(rate)` | void | Clamps to 0.25–4; pass finite numbers. |
+| `setVolume(volume)` | void | Clamps below at zero; pass finite gain. |
+| `setPan(pan)` | void | Clamps to −1…1; pass a finite value. |
+| `setLoop(loop)` | void | Validates/stores before readiness and updates an existing engine; rejected ranges leave the accepted option intact. |
+| `setPreservesPitch(flag)` | void | Stores before readiness; changes the media engine when active. |
+| `preload()` | `Promise<void>` | Builds/prepares the graph without starting sound or bypassing later resume/readiness requirements. |
+
+**State**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `clip` | readonly AudioClip | Immutable constructor input; resource-free to read, remains available after disposal. |
+| `seconds` | number | Engine clip position; 0 before an engine exists. |
+| `duration` | number | Engine duration or input clip duration, in seconds. |
+| `progress` | number | seconds / duration, or 0 for zero duration. |
+| `playing` | boolean | Ordinary engine running state; false before readiness and while a scratch session suspends it. |
+| `scratching` | readonly boolean | Whether an exclusive scratch session currently owns audible playback, including readiness and release inertia. |
+| `clock` | TransportClockReader or undefined | Buffer engine only, after graph creation; unwrapped under native looping. |
+| `analyser` | AnalyserNode | Materializes and exposes the player-owned tap; borrowers must not disconnect it. |
+
+**Events and subscriptions**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `on(event, listener)` | unsubscribe function | Typed AudioClipPlayerEvents subscription. |
+| `once(event, listener)` | unsubscribe function | One delivery. |
+| `off(event, listener)` | void | Remove the matching listener. |
+| `timeupdate` | PlayerTimeUpdate | `{seconds, duration, progress}` at cursor polling cadence and applicable transport changes. |
+| `end` | AudioClip | Natural end of the input clip. |
+| `regionenter` | Region | Entered a clip annotation. |
+| `regionleave` | Region | Left a clip annotation. |
+| `beat` | object | `{index, seconds}` from BeatGrid crossings. |
+| `load` | object | `{duration}` when graph setup completes. |
+| `error` | Error | Playback failure; await operations to handle their Promise failures too. |
+
+**Lifecycle and related types**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `dispose()` | void | Idempotent; invalidates pending work, stops timers, releases graph/listeners, and closes only its own context. Release failures may throw after cleanup attempts. |
+| `PlayerEngineKind` | type | `'auto'`, `'buffer'` or `'media'`. |
+| `PlayerTimeUpdate` | type | Numeric seconds, duration and progress fields. |
+| `AudioClipPlayerEvents` | type | Payload map listed above. |
+| `PlayerLike` | type | Shared structural control contract; optional capabilities must be checked before use. |
+| `AudioScratchSession` | type | Optional scratch-session active state, movement and asynchronous end contract; see [Scratch sessions](#scratch-sessions). |
+
+</details>
+
+<div class="component-section">
+
+**Composed by.** [`<audio-player>`](/audio/element/play/audio-player/)
+— Audio / Play.
+
+</div>
+
+## Related
+
+[Load/decode API](/audio/api/play/) · [Engines and metering](/audio/headless/play/engines/) · [Synchronized playback](/bridge/headless/score-audio-sync/)

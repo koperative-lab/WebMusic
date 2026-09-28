@@ -70,22 +70,36 @@ export function getBreadcrumbs({pathname, base, title, sidebar = []}: Breadcrumb
   const current = (label = title): Breadcrumb[] => [...crumbs, {label}];
   const [, section, form, capability] = path.split('/');
 
-  if (section === 'score') {
-    if (path === '/score') return current('Score');
-    const isInventory = path === '/score/element' || path === '/score/headless';
-    if (!trail && !isInventory && path !== '/score/api') return current();
-    ancestor(groupLabels[0] ?? 'Score', '/score/');
+  if (section === 'score' || section === 'audio') {
+    const label = section === 'score' ? 'Score' : 'Audio';
+    if (path === `/${section}`) return current(label);
+    const isInventory = path === `/${section}/element` || path === `/${section}/headless`;
+    if (!trail && !isInventory && path !== `/${section}/api`) return current();
+    ancestor(groupLabels[0] ?? label, `/${section}/`);
     if (form === 'element' || form === 'headless') {
       const formLabel = groupLabels[1] ?? (form === 'element' ? 'Web Components' : 'Headless');
       if (isInventory) return current(formLabel);
-      ancestor(formLabel, `/score/${form}/`);
+      ancestor(formLabel, `/${section}/${form}/`);
       if (capability && capabilities[capability]) {
-        ancestor(groupLabels[2] ?? capabilities[capability], `/score/${form}/#${capability}`);
+        ancestor(groupLabels[2] ?? capabilities[capability], `/${section}/${form}/#${capability}`);
       }
     } else if (form === 'api') {
       const apiLabel = groupLabels[1] ?? 'API';
-      if (path === '/score/api') return current(apiLabel);
-      ancestor(apiLabel, '/score/api/');
+      if (path === `/${section}/api`) return current(apiLabel);
+      ancestor(apiLabel, `/${section}/api/`);
+    }
+    return current();
+  }
+
+  if (section === 'bridge') {
+    if (path === '/bridge') return current('Bridge');
+    const isInventory = path === '/bridge/headless';
+    if (!trail && !isInventory) return current();
+    ancestor(groupLabels[0] ?? 'Bridge', '/bridge/');
+    if (form === 'headless') {
+      const formLabel = groupLabels[1] ?? 'Headless';
+      if (isInventory) return current(formLabel);
+      ancestor(formLabel, '/bridge/headless/');
     }
     return current();
   }

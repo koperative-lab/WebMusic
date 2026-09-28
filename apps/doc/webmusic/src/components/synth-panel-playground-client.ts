@@ -110,8 +110,8 @@ export function synthPanelSetupCode(values: DemoValues): string {
     'defineNoteInputElement();',
     'defineSynthPanelElement();',
     '',
-    "const input = document.querySelector('note-input');",
-    "const panel = document.querySelector('synth-panel');",
+    "const input = document.querySelector('score-note-input');",
+    "const panel = document.querySelector('score-synth-panel');",
     'const context = new AudioContext();',
     'const synth = new OscillatorSynth(context, {',
     `  type: ${quoted(values.voice.wave)},`,
@@ -194,8 +194,8 @@ function mountSynthPanelPlayground(editor: HTMLElement, scope: DemoScope): void 
   if (editor.dataset.sypWired === '1') return;
   const playground = editor.closest<HTMLElement>('[data-wm-pg]');
   const stage = playground?.querySelector<HTMLElement>('[data-pg-stage]');
-  const panel = stage?.querySelector<SynthPanel>('synth-panel[data-syp]');
-  const input = stage?.querySelector<NoteInput>('note-input[data-syp-input]');
+  const panel = stage?.querySelector<SynthPanel>('score-synth-panel[data-syp]');
+  const input = stage?.querySelector<NoteInput>('score-note-input[data-syp-input]');
   const code = playground?.querySelector<HTMLElement>('[data-syp-code]');
   const status = editor.querySelector<HTMLElement>('[data-syp-status]');
   if (!playground || !panel || !input) return;

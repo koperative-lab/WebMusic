@@ -1,0 +1,489 @@
+---
+title: '<audio-view>'
+description: 'The Audio projection stage — one element and three drawings under a type attribute: a min/max waveform, an STFT spectrogram heatmap and a live level meter, on one geometry model.'
+sidebar:
+  order: 1
+---
+
+import AudioViewDemo from '../../../../../components/AudioViewDemo.astro';
+import WaveformExamplesDemo from '../../../../../components/WaveformExamplesDemo.astro';
+import MultibandWaveformDemo from '../../../../../components/MultibandWaveformDemo.astro';
+
+`<audio-view>` is the Audio **projection stage** — one element that draws decoded audio onto a canvas and follows a player. The three drawings are the *same* tag with a different `type` attribute (and the matching data property). Switching `type` at runtime disposes the old visualizer and re-renders; unknown values fall back to `waveform`.
+
+| `type` | Draws | Needs |
+| --- | --- | --- |
+| **`waveform`** (default) | Min/max waveform with a playhead. | `.peaks` — an `AudioPeaks` pyramid from [`computePeaks`](/audio/api/analyze/), a `peaks-src` JSON file, a `.clip` or a bound player. |
+| **`spectrogram`** | STFT magnitude heatmap (time × frequency). | `.spectrogram` — `SpectrogramData` from [`computeSpectrogram`](/audio/api/analyze/). |
+| **`meter`** | Live RMS / spectrum level bars, with no time axis. | An `AnalyserNode`, tapped from the bound player. |
+
+<AudioViewDemo />
+
+The examples on this page share one decoded clip and peaks pyramid. The first
+waveform does not wait for a spectrogram: spectra are prepared through the
+analysis worker when a spectral mode is selected. The lower examples activate
+when they approach the viewport or receive keyboard/pointer interaction, and
+reuse their prepared data. Loading and failures appear beside the relevant demo.
+The demos start in `drag-mode="scrub"`: the playhead stays centered while the
+track moves underneath. Drag left toward later audio, or right toward earlier
+audio. Their decoded player sounds the movement at your gesture speed, then
+coasts in both position and sound before restoring its previous playing/paused
+state. Parameters can switch
+to viewport-only `pan`.
+
+The main demo authors `height="96"` and `amplitude="1.6"` for a compact, fuller
+waveform. This fixed visual gain can crop tall peaks; it changes neither PCM nor
+playback volume. Parameters, copied markup and Reset use those authored values.
+Switching drawing type retains the explicit height; the library defaults remain
+128 px for waveform, 256 px for spectrogram and amplitude 1.
+
+## Import
+
+```html
+<script type="module">
+  import { defineAudioViewElement } from '@webmusic/audio/view/element';
+  import { defineAudioPlayerElement } from '@webmusic/audio/play/element';
+  defineAudioViewElement();
+  defineAudioPlayerElement();
+</script>
+
+<audio-player id="p" src="/wav/Arabesque%20No.1.wav" controls></audio-player>
+<audio-view id="v" player="#p" type="waveform" pixels-per-second="100" interactive drag-mode="scrub"></audio-view>
+
+<script type="module">
+  import { loadClipFromUrl } from '@webmusic/audio/play';
+  import { computePeaks } from '@webmusic/audio/analyze';
+  const clip = await loadClipFromUrl('/wav/Arabesque%20No.1.wav');
+  const view = /** @type {import('@webmusic/audio/view/element').AudioViewElement | null} */ (document.getElementById('v'));
+  const channels = clip.channels();
+  if (view && channels) view.peaks = computePeaks(channels, clip.sampleRate);
+</script>
+```
+
+`defineAudioViewElement(tag?)` registers the one element; `defineAllAudioElements()` (also from `@webmusic/audio/view/element`) registers all View tags at their default names. Import `@webmusic/audio/view/auto` to register on module evaluation, or `@webmusic/audio/view/global` for a prebuilt `<script>`-tag bundle.
+
+## What each drawing needs
+
+**Waveform** — the default. Give it a multi-resolution `AudioPeaks` pyramid and it draws a min/max waveform; with a bound `player` and `interactive`, it follows the playhead and turns clicks into `webaudio:seek`. Build the peaks once from the decoded channels with [`computePeaks`](/audio/api/analyze/):
+
+```ts
+const clip = await loadClipFromUrl('/wav/Arabesque%20No.1.wav'); // @webmusic/audio/play
+view.peaks = computePeaks(clip.channels()!, clip.sampleRate); // @webmusic/audio/analyze
+```
+
+**Spectrogram** — a short-time Fourier transform drawn as a heatmap: time on the x-axis, frequency on the y, magnitude as colour. Feed it `SpectrogramData` from [`computeSpectrogram`](/audio/api/analyze/) (one channel in, column-major magnitudes out) and tune the look with `color-map`, `min-freq` and `max-freq`:
+
+```html
+<audio-view player="#p" type="spectrogram" color-map="viridis"></audio-view>
+```
+
+```ts
+import { computeSpectrogram } from '@webmusic/audio/analyze';
+view.spectrogram = computeSpectrogram(clip.channelData(0)!, clip.sampleRate, {
+  fftSize: 1024,
+  hopSize: 256,
+});
+```
+
+This drawing is **precomputed only**: `src`, `peaks-src` and a bound player supply no spectrogram, so `.spectrogram` is the one way in. Until it is assigned the view says so — `No spectrogram to draw — assign .spectrogram` — instead of leaving a blank box, and draws normally as soon as the data arrives. Everything time-axis-shaped is exactly what a waveform gets: `player` + `follow` move the playhead, `interactive` seeks, `annotate` drags out regions, and `pixels-per-second` / `setZoom()` / `panTo()` / `visibleRange()` / `webaudio:viewportchange` are the same [one geometry model](#one-geometry-model).
+
+**Meter** — a live RMS-level (or `spectrum`) meter. It has no time axis and needs no precomputed data — instead it taps the **`AnalyserNode` of the player it is bound to**, reading it every animation frame. Resolution is structural: `<audio-view type="meter">` reads `.analyser` off the element named by `player="#id"` (or off that element's `.player`), so the target must expose an `AnalyserNode` — an [`AudioClipPlayer`](/audio/api/play/) has one at `.analyser`. **A meter only moves while audio is flowing — press play to see it react.**
+
+```html
+<audio-player id="p" src="/wav/Arabesque%20No.1.wav" controls></audio-player>
+<audio-view player="#p" type="meter" mode="level"></audio-view>
+```
+
+With no analyser to read, the view says `No analyser to meter — bind a player with an analyser` rather than rendering nothing; binding a player that has one draws it immediately.
+
+:::note
+There are two meter surfaces. The `meter` **type** above is a passive drawing
+of the consolidated `<audio-view>` element; the standalone
+[`<audio-meter>`](/audio/element/analyze/audio-meter/) is a compact live Analyze
+monitor with its own analyser/context wiring and needs no view host. Its former
+`view/element` registration remains available for compatibility.
+:::
+
+:::caution[Instantaneous, not historical]
+A meter shows the level **now**. It has no time axis, no playhead, no seek and no viewport, so it cannot show what happened a second ago. For a scrolling history of a live signal — waveform or spectrogram — use [`<audio-live-view>`](/audio/element/view/audio-live-view/). For a triggered inspection of the current sample window, use [`<audio-oscilloscope>`](/audio/element/analyze/audio-oscilloscope/).
+:::
+
+When bound to `<audio-player>`, the view reads its resolved clip immediately
+and refreshes on `webaudio:sourcechange`, including borrowed-player replacement
+and clearing. `webaudio:loaded` remains supported for legacy graph-ready event
+sources. Rebinding releases the old subscriptions; the view never disposes its
+borrowed player. Explicit `.clip` / `.peaks` or loaded View data takes precedence
+over borrowed data.
+
+## Three ways in
+
+```html
+<!-- 1. Decode: the element loads and decodes through @webmusic/audio/play -->
+<audio-view type="waveform" src="/wav/Arabesque%20No.1.wav" interactive></audio-view>
+
+<!-- 2. No decode: BBC audiowaveform v2 JSON, hydrated straight into the pyramid -->
+<audio-view type="waveform" peaks-src="song.json" interactive></audio-view>
+
+<!-- 3. Bring your own: a player supplies the clip, or you assign .peaks -->
+<audio-player id="p" src="/wav/Arabesque%20No.1.wav" controls></audio-player>
+<audio-view player="#p" type="waveform" interactive pixels-per-second="100"></audio-view>
+```
+
+`peaks-src` is the path that draws a long file with **no decode at all**: no `AudioContext`, no samples and no `@webmusic/audio/play` import. Its duration comes from the pyramid, since there is no clip to ask. A failed request surfaces as `webaudio:error`; while either loader is in flight the element carries `aria-busy`.
+
+## Dragging and seeking
+
+`drag-mode` chooses how a pointer drag behaves on a waveform or spectrogram.
+The element default is `seek`; these demos explicitly select `scrub`.
+
+| `drag-mode` | Drag behavior | Requires |
+| --- | --- | --- |
+| `seek` (default) | Seek continuously to the absolute time under the pointer. | `interactive` |
+| `scrub` | Keep the playhead centered and move the track: left advances, right reverses. A supported player pauses normal playback and sounds the movement at gesture speed. Release coasts in position and sound, then restores its previous playing/paused state. | `interactive`; decoded PCM and a scratch-capable player for sound |
+| `pan` | Move the visible window without changing the playback position. Left reveals later audio; right reveals earlier audio. | `scrollable`; works without `interactive` or a player |
+| `none` | No drag action. Click and keyboard seeking remain available. | `interactive` for seeking |
+
+```html
+<audio-view player="#p" interactive drag-mode="scrub"></audio-view>
+<audio-view peaks-src="song.json" drag-mode="pan"></audio-view>
+```
+
+With `interactive`, `seek`, `scrub` and `none` retain click and keyboard seeking.
+In `pan`, pointer and keyboard input operate only the viewport: a click does not
+seek. `annotate` takes priority over every drag mode; a meter ignores `drag-mode`.
+An absent or unrecognized value falls back to `seek`. The matching JavaScript
+property is `view.dragMode`; its `AudioViewDragMode` union is exported from
+`@webmusic/audio/view/element`.
+
+With annotation off, `pan` suspends auto-follow for the entire mode so playback
+does not pull the window away from the place being inspected. `scrub` uses a
+fixed center playhead independently of `follow` and `scrollable`, even at zero
+or the clip's end. Blank space fills the area outside the clip. Hit-testing that
+padding clamps to zero/end; `visibleRange()` reports only the real clip portion.
+Native panning and `panTo()` are ignored while centered; choose `pan` to browse another window.
+
+### Audible scratch support and fallback
+
+For a bound player exposing `beginScratch()`, pointer press borrows a scratch
+session. The native decoded player suspends normal playback and maintains
+continuous forward/reverse audio through bounded PCM windows on its existing
+volume, pan and effect route. Left means forward; right means reverse; speed and
+pitch follow movement. Holding still brakes scratch output and does not keep
+normal playback running. This is sample-speed scratching, not pitch-preserving
+time stretching.
+
+Normal release applies the final coordinate, then coasts for about 280 ms on the
+player's AudioContext clock. Position and sound transition together from the
+signed release speed toward the configured playback rate for a previously
+playing source, or toward zero for a paused source. Ordinary playback resumes
+only after that transition; a paused source settles to rest. A stationary click
+changes position silently and restores directly. Releasing after motion has
+stopped does not reuse an old fling velocity.
+
+The View retains the session through release inertia so another press can take
+over while preserving the original playing intent. Cancellation (pointer cancel,
+lost capture, blur, mode/zoom/source change or removal) stops it without resuming,
+including after pointer release. A later transport command or replacement source
+invalidates older session work so late readiness cannot restart it. Rendering
+follows the player's accepted position throughout; it has no separate momentum
+animation or scratch clock.
+
+The capability is optional. A legacy player without `beginScratch()`, or a player
+that returns no session because decoded PCM is unavailable, keeps position-only
+scrubbing. It does not promise scratch sound, release inertia or playback-state restoration; the
+unsupported request itself has no player side effects. `pan` never needs this
+capability. A failed supported session is reported through `webaudio:error`.
+See [AudioClipPlayer scratch sessions](/audio/headless/play/audio-clip-player/#scratch-sessions)
+for the public nonvisual API; the existing `scrub(deltaSeconds)` method remains
+a relative seek helper.
+
+## Annotate
+
+`annotate` connects drag-to-create. A drag across the surface creates a `Region` and the element emits `webaudio:regionchange` carrying its **whole** region list — the ones it already had plus the new one, so a first drag can never silently drop a clip's existing regions:
+
+```html
+<audio-view id="v" type="waveform" src="/wav/Arabesque%20No.1.wav" annotate></audio-view>
+```
+
+```ts
+v.addEventListener('webaudio:regionchange', (event) => {
+  clip = clip.withRegions(event.detail.regions);   // detail.regions is the whole list
+});
+```
+
+`annotate` overrides `drag-mode`, including `none` and `pan`. With `interactive` as well, a **click** seeks and a **drag** draws a
+region; dragging a region neither seeks nor pans the viewport. The element owns the
+whole gesture in that mode — the kit's slider is already capturing the pointer on that node, so the
+drag-to-create path is not bound a second time.
+
+Editing existing regions is deliberately **not** part of this contract — only creation. A created region carries an empty label, so an index shows its id until you name it. Annotation needs no player: the drag path binds for `annotate` alone.
+
+## One geometry model
+
+Zoom, offset and the visible window live in **one** headless `AudioTimeline` the element owns, kept in step with what the renderer actually painted. `zoom`, `visibleRange()` and `panTo()` therefore use the same numbers the surface is drawn from:
+
+```ts
+view.visibleRange();            // { startSeconds, endSeconds } — or undefined
+view.panTo(30);                 // scroll so the window starts at 0:30
+view.setZoom(240);              // live re-zoom, keeping scroll + playhead
+view.zoom;                      // the scale actually drawn at — never 0
+view.addEventListener('webaudio:viewportchange', (event) => {
+  const {startSeconds, endSeconds} = event.detail;
+});
+```
+
+`webaudio:viewportchange` fires once per distinct window, for a user pan (scrollbar, wheel or drag) and a programmatic `panTo()` / `setZoom()` alike — the first paint is not a pan, and putting a window back after an in-place repaint is not one either.
+
+### Playback presentation cadence
+
+With a live player exposing `seconds` (or `currentTime`) and optional `playing` /
+`scratching` state, the view reads the borrowed position on visible display
+frames. The renderer, timeline, slider value and viewport follow that same read,
+including scratch release inertia. Unchanged positions skip repainting; paused
+changes still update, hidden pages stop frame observation, and reappearing views
+read the current player position. The terminal reset to zero survives visibility
+changes until a new time update. No visual clock or predicted position is added.
+
+Legacy event-only targets keep their `webaudio:timeupdate` cadence. For example,
+the native player's default event interval is 50 ms, while its live getters let
+the view observe movement between those events.
+
+## Nothing to draw is still something to say
+
+Each `type` mounts the shared `@webmusic/ui/status` presenter when its data is missing, rather than
+a zero-height unlabelled box or Element-private placeholder:
+
+| `type` | Placeholder |
+| --- | --- |
+| `waveform` | `No audio to draw — assign .clip or .peaks` |
+| `spectrogram` | `No spectrogram to draw — assign .spectrogram` |
+| `meter` | `No analyser to meter — bind a player with an analyser` |
+
+Nothing is disposed or latched there: assign the missing data and the view draws.
+
+<details class="component-section">
+<summary>API</summary>
+
+Renderer paint and geometry options are exposed as kebab-case HTML attributes and camelCase fields on `.options`. Element interaction settings use their own properties: `interactive`, `dragMode`, `annotate`, `follow` and `scrollable`; `dragMode` does not belong in `.options`. Attribute parsing is NaN-/empty-safe — an absent, empty or non-numeric value falls back to the default rather than poisoning the render; tri-state booleans read `false` / `0` / `no` / `off` as false and anything else present as true. Where both an attribute and `.options` are set, **`.options` wins**.
+
+Members that only apply to one drawing are marked in the Description; everything else works under every `type`.
+
+```ts
+const view = document.querySelector('audio-view');
+view.peaks = computePeaks(clip.channels(), clip.sampleRate); // draw a waveform
+view.zoom = 200;                                             // live zoom (keeps scroll + playhead)
+view.follow = false;                                         // stop auto-scrolling with playback
+view.scrollable = false;                                     // disable scrollbar/wheel and pan-mode dragging
+view.interactive = true;                                     // click + keyboard seeking
+view.dragMode = 'scrub';                                     // centered track + optional scratch sound
+view.options = { amplitude: 1.3, virtualization: { bufferScreens: 2 } }; // advanced bag
+view.type = 'spectrogram';                                   // switch the drawing live
+```
+
+**Data**
+
+| Member | Kind | Default | Description |
+| --- | --- | --- | --- |
+| `type` | attribute / property | `waveform` | `waveform`, `spectrogram` or `meter`; unknown values fall back to `waveform`. Switching disposes the old visualizer and re-renders. |
+| `.peaks` | property | — | **Waveform only.** Multi-resolution `AudioPeaks` from [`computePeaks`](/audio/api/analyze/) — the waveform's shape. |
+| `peaks-src` | attribute | — | **Waveform only.** URL of BBC `audiowaveform` **v2 JSON**, hydrated into the pyramid with **no decode** — no `AudioContext`, no samples, no play import. |
+| `src` | attribute | — | URL of an audio file, decoded through the sibling [`@webmusic/audio/play`](/audio/api/play/) capability (resolved dynamically). |
+| `format` | attribute | — | Force a decoder when the extension is missing or ambiguous; an unsupported value surfaces as `webaudio:error`. |
+| `.clip` | property | — | An `AudioClip` you already have; the element derives peaks from it, and takes its regions and duration. |
+| `.spectrogram` | property | — | **Spectrogram only, and required there.** Column-major `SpectrogramData` from [`computeSpectrogram`](/audio/api/analyze/) — `{ times, frequencies, magnitudes, binsPerFrame }`. Any source matching that shape works; view never imports analyze. |
+| `.frequencyData` | property | — | **Waveform only.** `SpectrogramData` (or one per channel, for `split`) driving the `multiband` / `colormap` colour modes. Falls back to `.spectrogram`, the same payload seen from the other drawing's point of view. |
+| `.regions` | property | `clip.regions` | `readonly Region[]` overlaid on the surface; defaults to the clip's own. Assigning updates the surface without a full rebuild. On a waveform, regions with no `color` are tinted `rgba(0, 0, 0, 0.12)`; on a spectrogram they are outlined `rgba(255,255,255,0.7)` on their own canvas, so editing one never re-rasterizes the image. |
+| `.options` | property | — | The render-options bag for the current `type` (`WaveformRenderOptions` / `SpectrogramRenderOptions` / `MeterRenderOptions`) — wins over the attributes, and the only way to reach options with no attribute (a custom `colorMap` function, `frequencyData`). |
+
+**Binding and interaction**
+
+| Member | Kind | Default | Description |
+| --- | --- | --- | --- |
+| `player` | attribute | — | CSS selector of an [`<audio-player>`](/audio/element/play/audio-player/) to follow (`webaudio:timeupdate`, `webaudio:loaded`). Borrows live position/activity for visible display-frame updates when available; legacy targets remain event-driven. Binding pulls in no play-package code. **Required for `meter`**, which reads `.analyser` from the target (or from its `.player`). |
+| `interactive` | attribute / property | `false` | Enable seeking in `seek`, `scrub` and `none` modes (waveform · spectrogram), and the **default** for `follow`. The property setter writes `"true"` / `"false"`. Never wired on a meter. |
+| `drag-mode` / `.dragMode` | attribute / property | `seek` | `seek` follows the pointer; `scrub` centers the playhead and uses an optional audible scratch session with release inertia; `pan` changes only the viewport with pointer and keyboard input; `none` keeps click/keyboard seeking. See [Dragging and seeking](#dragging-and-seeking) for prerequisites, annotation priority and follow behavior. Unknown values fall back to `seek`. |
+| `annotate` | attribute / property | `false` | Drag to create a region (waveform · spectrogram), overriding every `drag-mode`. Has no effect on a meter. |
+| `follow` | attribute / property | = `interactive` | Auto-scroll in position mode; `follow="false"` opts out. `pan` suspends it while selected; `scrub` centers the playhead independently of this setting. Annotation overrides those track modes. |
+| `scrollable` | attribute / property | `true` | Allow scrollbar/wheel panning and `drag-mode="pan"` on waveform and spectrogram. `false` disables those user actions. Centered scrub disables native panning regardless of this setting; its track gesture still works. |
+| `virtualization` | attribute | on | **Spectrogram only.** Tri-state boolean, or a number setting the buffer-screens window. On, only the visible stripe (± the buffer) is rasterized and it repaints on scroll; `false` gives one full-clip paint and no scroll cost, which is the better trade only for short clips. The waveform always paints only the columns in view, so this is the spectrogram's knob. |
+
+**Geometry**
+
+| Member | Kind | Default | Description |
+| --- | --- | --- | --- |
+| `pixels-per-second` | attribute / `.zoom` | `100` | Horizontal **zoom**. Changing it re-scales the existing surface in place, keeping the scroll position and playhead. |
+| `.zoom` | property | `100` | The scale the surface is actually drawn at: the attribute, else `.options.pixelsPerSecond`, else the renderers' default. Never `0` for a view that is being drawn. The setter calls `setZoom()`. |
+| `setZoom(pps)` | method | — | Live re-zoom keeping scroll + playhead; ignores anything not finite and `> 0`. Reflects `pixels-per-second`. |
+| `visibleRange()` | method | — | The real clip-time intersection currently painted, `{ startSeconds, endSeconds }`, excluding centered-mode blank padding; `undefined` without a time axis or on a meter. |
+| `panTo(startSeconds)` | method | — | Scroll so the window starts there, clamped to the clip; ignored while scrub centers the playhead. Select pan mode for independent browsing. |
+| `width` | attribute | fills container | Element width — a bare number is `px`, or any CSS length (`80%`). |
+| `height` | attribute | `128` waveform · `256` spectrogram · `54` meter | Canvas height in CSS px. |
+| `amplitude` | attribute | `1` | **Waveform only.** Visual gain applied to the `[-1, 1]` peaks; may crop tall peaks without changing audio volume. |
+| `device-pixel-ratio` | attribute | `window.devicePixelRatio` | Canvas backing-resolution override. |
+
+**Paint**
+
+| Member | Kind | Default | Description |
+| --- | --- | --- | --- |
+| `wave-color` | attribute | `--wm-waveform` → `#999` | **Waveform only.** Min/max column colour (`static` mode). |
+| `progress-color` | attribute | `--wm-waveform-progress` → `--wm-foreground` → `#444` | **Waveform only.** Played portion, left of the playhead (`static` mode). |
+| `playhead-color` | attribute | `--wm-playhead` → `#c0392b` | Playhead line colour (waveform · spectrogram). |
+| `background-color` | attribute | transparent | Canvas background fill. |
+| `color-mode` | attribute | `static` | **Waveform only.** `static` / `multiband` / `colormap` — see [Colour modes](#colour-modes); the latter two read `.frequencyData`. |
+| `bands` | attribute | `3` | **Waveform only.** Band count for `color-mode="multiband"` (clamped 1–12). |
+| `color-map` | attribute | `viridis` | Palette for the waveform's `color-mode="colormap"` and for the spectrogram heatmap (`viridis` · `magma` · `grayscale` · `gray`); an unknown name falls back to `viridis`. A custom `t ∈ [0,1] → [r, g, b]` function goes through `.options`. |
+| `channel-layout` | attribute | `merge` | **Waveform only.** `merge` folds every channel into one centred wave; `split` stacks the first two as a stereo pair. |
+| `history` | attribute | `0` | **Waveform only.** Seconds of recent-history glow trailing the playhead during playback; columns outside the window dim. |
+| `min-freq` / `max-freq` | attribute | `0` / Nyquist of the data | **Spectrogram only.** Frequency range drawn, bottom to top (Hz). |
+| `min-db` / `max-db` | attribute | `-100` / `0` | **Spectrogram only.** dB floor and ceiling for the magnitude-to-colour mapping. |
+| `mode` | attribute | `level` | **Meter only.** `level` (RMS + peak-hold) or `spectrum` (FFT bars). |
+| `bars` | attribute | `28` | **Meter only.** Spectrum bar count, minimum `4`. |
+| `color` / `peak-color` | attribute | shared meter fill / `--wm-danger` → `#c0392b` | **Meter only.** Bar fill and peak-hold tick colours. |
+
+**Events** — all `{ bubbles, composed }`
+
+| Event | Detail | Fires when |
+| --- | --- | --- |
+| `webaudio:seek` | `{ seconds, region? }` | Keyboard input, ordinary clicks and absolute `seek` dragging announce requested clip seconds **before** the bound player's seek command. This includes clicks in `seek`/`none`, annotation clicks and position-only `scrub` fallback clicks. A click using a supported scratch session moves silently and emits **after** the command, as does a relative `scrub` drag; these report accepted clip seconds when readable. Keyboard input cancels any held scratch gesture before ordinary seeking. `pan` never emits this event. `region` is present when the seek hit-test identified one. A bound player announces its own transport seeks itself; this element never re-emits those. |
+| `webaudio:regionchange` | `{ regions }` | An `annotate` drag created a region. `regions` is the element's **whole** list, not just the new one. Nothing else emits it. |
+| `webaudio:viewportchange` | `{ startSeconds, endSeconds }` | The visible window moved — user pan or zoom, and programmatic `panTo()` / `setZoom()` alike. Once per distinct window; the first paint is not a pan. |
+| `webaudio:error` | `{ error }` | A `src` or `peaks-src` load, or a render, failed. |
+
+**The meter is the exception.** It reads no precomputed data — it samples the analyser every animation frame, borrows that node and never disposes it. The time-axis members do nothing there, and do nothing quietly: `visibleRange()` returns `undefined`, `panTo()` moves nothing and announces no `webaudio:viewportchange`, click-to-seek is never wired, and the drag binding is not created at all — so `annotate` and `drag-mode` have no effect and `webaudio:regionchange` cannot fire. `webaudio:error` is the one event left.
+
+**Accessibility.** An `interactive` surface — waveform or spectrogram — is a `role="slider"` named `Audio position`, with `tabindex="0"` and live `aria-valuemin` / `aria-valuemax` / `aria-valuenow` in seconds; `←` / `→` step by a hundredth of the duration (at least one second) and `Home` / `End` jump to the ends. In `drag-mode="pan"` with annotation off and `scrollable` enabled, the slider is instead named `Audio viewport` and its value is the window start: arrows move a quarter-window (minimum 0.05 seconds), Shift+arrows move a whole window, and Home/End move to the first/last window. It works without `interactive`; no pan key seeks playback. Display-only, a waveform is a `role="img"` named `Audio waveform` and a spectrogram a `role="img"` named `Audio spectrogram`. A rendered meter is a `role="group"` labelled `Audio level meter` — a group rather than an `img` so the presenter's own `role="meter"` stays exposed to a screen reader. Your own `role`, `aria-label`, `aria-labelledby` or `tabindex` is never overwritten, and anything the element assigned is removed again when it no longer applies.
+
+`.clip` returns the clip assigned to this Element, and `.peaks` returns assigned
+or fetched peaks. These getters do not publish the player-borrowed clip or
+internally derived peaks.
+
+**Subclassing.** `AudioViewElement` exposes four protected hooks: `createTimeline()` (seed a subclass's own geometry — a fixed window, a shared one), `renderOptions()` (add or override options without re-implementing the attribute mirroring), `renderStage()` (render another visualization while keeping the stage, binding and accessibility) and `onViewError()` (the one observable failure channel).
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+The element already owns the shared neutral outer surface (`--wm-component-background`,
+`--wm-component-border`, `--wm-component-padding`, `--wm-component-radius`). The **drawing** paints
+onto an inner canvas. Its default palette follows the public waveform, playhead and meter tokens
+below, so Score and Audio can share one theme. Render attributes or camelCase `.options` fields
+supply explicit paint overrides; `.options` takes precedence over attributes. Sizes and zoom remain
+render attributes or options.
+
+The shared surface applies the same padding on all four sides; the waveform adds
+no extra vertical inset. `height` sets the drawing area, while `amplitude` scales
+the supplied peaks within it. At the default gain of `1`, quieter PCM naturally
+leaves more space above and below the waveform, consistently across viewports.
+
+```css
+audio-view {
+  --wm-waveform: #999;
+  --wm-waveform-progress: #444;
+  --wm-playhead: #c0392b;
+  --wm-component-radius: 8px;
+}
+```
+
+An explicit custom palette can replace those defaults:
+
+```html
+<audio-view type="waveform" height="180"
+  wave-color="#4a9eff" progress-color="#1f6fd4"
+  playhead-color="#ff3b30" background-color="#15171c"></audio-view>
+
+<audio-view type="spectrogram" height="256"
+  color-map="magma" min-db="-80" max-db="0"></audio-view>
+
+<audio-view type="meter" height="54" color="#4ea1ff" peak-color="#e0445b"
+  background-color="#15171c"></audio-view>
+```
+
+```ts
+view.options = {
+  height: 180,
+  waveColor: '#4a9eff',
+  progressColor: '#1f6fd4',
+  playheadColor: '#ff3b30',
+};
+```
+
+| Attribute (`.options` field) | Default | Controls |
+| --- | --- | --- |
+| `wave-color` (`waveColor`) | `--wm-waveform` → `#999` | **Waveform.** Min/max column colour (`static` mode) |
+| `progress-color` (`progressColor`) | `--wm-waveform-progress` → `--wm-foreground` → `#444` | **Waveform.** Played portion, left of the playhead |
+| `playhead-color` (`playheadColor`) | `--wm-playhead` → `#c0392b` | **Waveform · spectrogram.** Playhead line |
+| `background-color` (`backgroundColor`) | transparent | Internal canvas background fill; it does not change the shared component surface |
+| `height` | `128` waveform · `256` spectrogram · `54` meter | Surface height (px) |
+| `width` | fills container | Element width (px / CSS length) |
+| `amplitude` | `1` | **Waveform.** Vertical gain on the peaks |
+| `device-pixel-ratio` (`devicePixelRatio`) | display dpr | Backing render resolution |
+| `color-mode` (`colorMode`) | `static` | **Waveform.** `static` / `multiband` / `colormap` |
+| `bands` | `3` | **Waveform.** Multi-band band count (1–12) |
+| `color-map` (`colorMap`) | `viridis` | **Waveform (`colormap` mode) · spectrogram.** Palette / heatmap palette |
+| `channel-layout` (`channelLayout`) | `merge` | **Waveform.** `merge` or `split` (stacked stereo) |
+| `history` (`historyTrail`) | `0` | **Waveform.** Playhead glow-trail length (seconds) |
+| `min-freq` / `max-freq` | `0` / Nyquist | **Spectrogram.** Y-axis range |
+| `min-db` / `max-db` | `-100` / `0` | **Spectrogram.** Magnitude mapping |
+| `color` | shared `--wm-meter-fill` / `--wm-accent` | **Meter.** Bar / fill colour, inherited from the same presenter as `<audio-meter>` |
+| `peak-color` | `--wm-danger` → `#c0392b` | **Meter.** Peak-hold tick |
+
+Those colours style the **inner drawing**, independently of the component-owned outer surface. The waveform renderer retains neutral black defaults for direct callers; the meter shares the UI presenter's semantic color tokens. See the [API page](/audio/api/view/) for those render contracts. Theme-token changes repaint the default waveform palette without replacing its timeline; explicit paint options remain authoritative.
+
+Changing a colour, size or zoom attribute rebuilds into the **same** stage surface: the scroll position, the window and anything you mounted beside the canvas survive. Changing the *data* (`.peaks`, `.clip`, `.spectrogram`, `.options`) is a real rebuild and does not.
+
+The spectrogram image is rasterized through a 256-entry colormap lookup table and lands in one `putImageData`, so the palette is resolved once per render rather than per pixel.
+
+The placeholder shown when there is no data is the kit's `role="status"` presenter. In this embedded state it is deliberately transparent and unframed because the surrounding stage owns the component surface; its text still follows `--wm-status-foreground` and `--wm-font-family`. A standalone status presenter keeps its own full surface.
+
+</details>
+
+## Dressing the same peaks
+
+Every knob is an HTML attribute, so the *same* peaks can be dressed many ways — recolour the columns, make it taller and zoom in, give the inner canvas a dark fill, or map the colours through a palette. These four share one decoded clip:
+
+<WaveformExamplesDemo />
+
+```html
+<!-- recoloured -->
+<audio-view type="waveform" wave-color="#22c55e" progress-color="#15803d" playhead-color="#f59e0b"></audio-view>
+<!-- taller, zoomed in, gain-boosted -->
+<audio-view type="waveform" height="180" pixels-per-second="240" amplitude="1.3"></audio-view>
+<!-- compact, with a dark inner canvas -->
+<audio-view type="waveform" height="64" background-color="#0b0d12"></audio-view>
+<!-- colour-mapped (needs .frequencyData) -->
+<audio-view type="waveform" color-mode="colormap" color-map="magma" background-color="#000"></audio-view>
+```
+
+For frequency-tinted **multi-band** colouring, **split** stereo, channel selection (L/R/M/S) and a **history** glow, see [Colour modes](#colour-modes).
+
+## Colour modes
+
+The waveform's **shape** is always the amplitude peaks, but its **colour** can read the audio's frequency content — the `color-mode` attribute works like a multi-band meter:
+
+- **`static`** (default) — one flat colour (`wave-color` / `progress-color`).
+- **`multiband`** — each column is tinted by its spectral balance: bass → red, mids → green, treble → blue, blended additively (so a bass-and-air column reads magenta, a full-range hit reads white). `bands` sets the band count (default `3`, clamped 1–12).
+- **`colormap`** — each column's spectral centroid is mapped through `color-map` (`viridis` · `magma` · `grayscale` · `gray`).
+
+The two frequency modes need STFT data (from [`computeSpectrogram`](/audio/api/analyze/)) computed from the **same channel** as the `.peaks`. Assign it to `.frequencyData` — a first-class property — or to `.spectrogram`, which is the same payload seen from the other mode's point of view. The resolution order is `.options.frequencyData`, then `.frequencyData`, then `.spectrogram`. Two more knobs complete the meter feel: `channel-layout="split"` stacks the first two peaks channels as a stereo display (each half coloured by its own spectrum, from a `.frequencyData` array), and `history` glows a recent-history window that trails the playhead during playback. The demo caches peaks + spectrogram on first request per channel for Left / Right / Mid / Side (Channel 1 and an optional Channel 2), and flips `color-mode` / `history` live:
+
+<MultibandWaveformDemo />
+
+```html
+<audio-view type="waveform" color-mode="multiband"></audio-view>
+```
+```ts
+view.peaks = computePeaks([channel], sampleRate);                 // shape
+view.frequencyData = computeSpectrogram(channel, sampleRate, {}); // colour source
+view.setAttribute('color-mode', 'multiband');                     // bass→red · mid→green · treble→blue
+```
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `color-mode` | attribute | `multiband` or `colormap` (default `static`). |
+| `bands` | attribute | Band count for `multiband` (default `3`, clamped 1–12). |
+| `channel-layout` | attribute | `split` stacks L/R with per-channel spectra. |
+| `history` | attribute | Playhead glow window in seconds. |
+| `.frequencyData` | property | The STFT the two frequency modes read; an array colours a `split` display per channel. |
+
+Multiband mode tints columns additively; `history` dims columns outside the trailing window. All other colour knobs are the ordinary waveform paint attributes in the Styling block above.

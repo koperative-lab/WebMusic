@@ -1,0 +1,90 @@
+---
+title: '<audio-spectrum-analyzer>'
+description: 'Probe a live log-frequency FFT spectrum, freeze a frame and hold peaks.'
+sidebar:
+  order: 3
+---
+
+import AudioAnalyzeFeaturePlayground from '../../../../../components/elements/AudioAnalyzeFeaturePlayground.astro';
+
+The spectrum analyzer is an inspectable live frequency plot beside one
+[`<audio-player>`](/audio/element/play/audio-player/). Hover or use the
+keyboard to probe a frequency, freeze the visual frame, or compare held
+per-bin peaks. For a
+time-axis spectrogram of a decoded clip, use
+[`computeSpectrogram`](/audio/api/analyze/#spectrogram) with
+[`<audio-view type="spectrogram">`](/audio/element/view/audio-view/).
+
+<AudioAnalyzeFeaturePlayground tag="audio-spectrum-analyzer" />
+
+## Import
+
+```html
+<script type="module">
+  import {defineAudioPlayerElement} from '@webmusic/audio/play/element';
+  import {defineAudioSpectrumAnalyzerElement} from '@webmusic/audio/analyze/element';
+  defineAudioPlayerElement();
+  defineAudioSpectrumAnalyzerElement();
+</script>
+
+<audio-player id="session" src="/mp3/Arabesque%20No.1.mp3" controls></audio-player>
+<audio-spectrum-analyzer player="#session" min-frequency="20" max-frequency="20000" peak-hold></audio-spectrum-analyzer>
+```
+
+The demo pairs one player with the plot. Start playback for live frames;
+Freeze, Peak hold, Reset peaks and the focusable frequency probe act on the
+real tool. Copy includes both elements, and Reset restores their demo settings.
+The probe accepts pointer movement, Arrow keys, Home/End for range ends, and
+Shift+Arrow for octave steps.
+
+## Signal and lifetime
+
+The element borrows the bound player's `AnalyserNode` while playing, or uses
+a caller-supplied `.analyser` in preference to it. It samples about every
+50 ms and maps that node's existing FFT bins onto a logarithmic frequency
+axis. The display ranges do not change the borrowed node's `fftSize`,
+`smoothingTimeConstant` or other FFT settings. Its values are
+`getByteFrequencyData()` bins converted through the borrowed node's current
+`minDecibels`/`maxDecibels` range; they are not calibrated sound-pressure
+levels.
+
+Freezing stops frame polling and keeps the inspected frame until unfreeze
+or a transport/source change. Peak hold retains the largest displayed bin
+values until Reset peaks or a source change. Pause, seek, source replacement
+and missing input clear the current frame; a stalled frame source is reported as
+unavailable. Disconnect stops only this element's polling and subscriptions,
+not the player or its graph. `player` must resolve uniquely in the current
+Document or ShadowRoot, including when a target appears later.
+
+<details class="component-section">
+<summary>API</summary>
+
+| Member | Kind | Behavior |
+| --- | --- | --- |
+| `player` | attribute | Unique selector for the playback owner whose analyser is borrowed while playing. |
+| `frozen` | boolean attribute | Hold the current frame and stop this tool's polling; default absent. |
+| `peak-hold` | boolean attribute | Show held spectrum peaks alongside the live bins; default absent. |
+| `min-frequency` | attribute | Lower displayed frequency in Hz; default `20`. Invalid or below-1 values use `20`. |
+| `max-frequency` | attribute | Upper displayed frequency in Hz; default `20000`. Invalid or at-most-1 values use `20000`. Display is limited by the input's Nyquist frequency. |
+| `aria-label` | attribute | Accessible group name; default `Spectrum analyzer`. |
+| `.analyser` | property | Explicit caller-owned `AnalyserNode` takes precedence over the player input. |
+| `.frozen`, `.peakHold` | properties | Reflected booleans for frame freeze and peak hold. |
+| `.minFrequency`, `.maxFrequency` | properties | Reflected displayed frequency limits in Hz. |
+| `.selectedFrequency` | read-only property | Last probed frequency in Hz; initial value `1000`. |
+| `.frame` | read-only property | Latest `{bins, sampleRate, fftSize, minDb, maxDb}` frame, or `undefined` when unavailable. |
+| `.resetPeaks()` | method | Clear held spectrum peaks without changing the audio source. |
+| `webaudio:spectrumprobe` | event | `{frequency, decibels?}` after a pointer or keyboard probe; bubbles and is composed. |
+| `webaudio:error` | event | `{error: Error}` for an input, frame or presenter failure; bubbles and is composed. |
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+The full-width host honors native `hidden`. Its outer surface uses the
+`--wm-component-*` tokens, with `--wm-audio-spectrum-analyzer-surface-*`
+overrides for this tag. The [spectrum presenter](/uikit/) exposes
+`--wm-spectrum-height`, `--wm-spectrum-plot-background` and related
+`--wm-spectrum-*` colors for the plot and controls.
+
+</details>

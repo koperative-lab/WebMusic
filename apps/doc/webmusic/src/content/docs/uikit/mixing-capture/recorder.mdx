@@ -16,7 +16,8 @@ creation, and persistence.
 
 Use [meter](/uikit/mixing-capture/meter/) for continuous level or spectrum monitoring without a
 capture workflow, or [mixer](/uikit/mixing-capture/mixer/) for channel gain and routing controls.
-The [`<score-recorder>`](/score/element/play/note-input/#score-recorder) element composes this
+The [`<score-recorder>`](/score/element/play/score-recorder/) and
+[`<audio-recorder>`](/audio/element/play/audio-recorder/) elements compose this
 presenter; mount it directly around a custom recorder state machine.
 
 <UiPresenterLiveDemo presenter="recorder" />
@@ -36,16 +37,18 @@ const handle = mountRecorder(host, {
 ## Async capture commands
 
 Every command may return a promise. The presenter invokes it without owning a competing state
-machine, then repaints after fulfillment; a synchronous throw or rejection goes to `onError`.
+machine, then repaints after settlement. A synchronous throw or rejection from the current command goes
+to `onError`; an older command can refresh accepted state but cannot report over a newer command.
+Settlement after destruction or replacement is ignored. Errors from `onError` are contained.
 Publish intermediate `busy`, `recording`, `playing`, level, and status snapshots through
 `subscribe()` when the UI must change while work is pending. The common binding ownership and
 same-host lifecycle are documented in the
 [shared presenter shape](/uikit/api/#the-shared-presenter-shape).
 
-`togglePlayback` controls whether the Play button exists. `exportFormats` controls which export
-buttons exist, while the optional `export(format)` binding supplies their behavior; provide both
-together for operative exports. `busy` disables only the record toggle. Playback and export
-availability are independently controlled by `canPlay` and `canExport`.
+`togglePlayback` controls whether the Play button exists. Export buttons require both nonempty
+`exportFormats` and an `export(format)` binding. `busy` or `disabled` blocks all commands.
+Playback and export additionally use `canPlay` and `canExport`; an active take remains stoppable
+even when `canPlay` becomes false. The presenter borrows all recorder state and resources.
 
 <details class="component-section">
 <summary>API</summary>
@@ -58,17 +61,19 @@ availability are independently controlled by `canPlay` and `canExport`.
 | Member | Kind | Description |
 |---|---|---|
 | `recording` | `boolean` | Required. Selects Record versus Stop text, label, pressed state, and generated recording status. |
-| `busy?` | `boolean` | Strict `true` disables the record button and sets its `aria-busy` value to true. |
-| `playing?` | `boolean` | Strict `true` applies the playback modifier and pressed state; truthy state selects Stop text and generated playback status. |
+| `busy?` | `boolean` | Strict `true` blocks every command and sets root/record `aria-busy`. |
+| `playing?` | `boolean` | Strict `true` applies the playback modifier, pressed state, Stop text and generated playback status. |
 | `level?` | `number` | Normalized input level written to `--wui-recorder-level`. Omission hides the meter. |
 | `recordedCount?` | `number` | Count printed by the generated `● recording… <count>` status; defaults there to `0`. |
 | `takeCount?` | `number` | Count printed by generated captured/playback status. When explicit availability is absent, any defined value enables play and export, including `0`. |
 | `status?` | `string` | Overrides every generated status string. |
 | `canPlay?` | `boolean` | Explicit playback availability. When absent, falls back to whether `takeCount` is defined. |
 | `canExport?` | `boolean` | Explicit availability for every export button. When absent, falls back to whether `takeCount` is defined. |
+| `disabled?` | `boolean` | Strict `true` blocks all commands and applies root `aria-disabled`. |
 
 Without `status`, the fallback order is recording count, playing-take text, captured-take text
-when `takeCount` is defined, then `Ready`.
+when `takeCount` is defined, then `Ready`. Finite counts become nonnegative integers; invalid
+counts are omitted. Finite levels clamp to 0–1 and invalid supplied levels paint as 0.
 
 **Binding**
 
@@ -78,16 +83,22 @@ when `takeCount` is defined, then `Ready`.
 | `toggleRecording()` | `() => void \| Promise<void>` | Required command called by the record toggle in both directions. |
 | `togglePlayback?()` | `() => void \| Promise<void>` | Optional command. Its presence creates the playback toggle. |
 | `export?(format)` | `(string) => void \| Promise<void>` | Optional command receiving the clicked `exportFormats` id. |
-| `subscribe?(notify)` | `(notify: () => void) => () => void` | Optional subscription. Its disposer is called once during destroy or same-host replacement, including when registration returns after a synchronous replacement. |
+| `subscribe?(notify)` | `(notify: () => void) => () => void` | Optional subscription. Its disposer is called during destroy or same-host replacement. |
 
 **Options**
 
 | Member | Kind | Default | Description |
 |---|---|---|---|
-| `getText` | `() => RecorderText` | — | Supplies one application-owned text snapshot per update. After external text changes, call `update()`. |
-| `formatters` | `UIValueFormatters` | — | The `number` callback formats recorded and captured counts. Other fields are unused by this presenter. |
-| `exportFormats` | `readonly {id: string; label: string}[]` | `[]` | Creates one export button per record. `id` is passed to `export()` and added as a class; `label` supplies visible and accessible text. |
-| `onError` | `(error: unknown) => void` | — | Receives snapshot, text/formatter, command, subscription and cleanup failures. Error callback throws/rejections are contained. A failed subscription leaves the mounted handle available for explicit `update()` calls. |
+| `exportFormats` | `readonly RecorderExportFormat[]` | `[]` | Snapshotted `{id, label}` strings. With `export()`, creates one button per format; its id reaches the command and its label names the download. |
+| `label` | `string` | `Recorder` | Accessible root group name. |
+| `recordLabel` / `stopRecordingLabel` | `string` | `Record` / `Stop recording` | Accessible record-toggle names. |
+| `playLabel` | `string` | `Play take` | Accessible playback-toggle name. |
+| `stopPlaybackLabel` | `string` | `playLabel` | Optional name while playing. Set it explicitly, for example to `Stop playback`, to enable a distinct stop label. |
+| `meterLabel` | `string` | `Input level` | Accessible progressbar name. |
+| `exportsLabel` | `string` | `Export take` | Accessible export-group name. |
+| `statusLabel` | `string` | `Recorder status` | Accessible live-status name. |
+| `classNames` / `parts` | `RecorderClassNames` / `RecorderParts` | `{}` | Add classes or part tokens for `root`, `record`, `play`, `meter`, `level`, `exports`, `export`, and `status`, preserving canonical hooks. |
+| `onError` | `(error: unknown) => void` | — | Receives snapshot/current-command errors and errors retiring a prior mount. Callback faults are contained. Current mount setup and final cleanup failures can throw after best-effort rollback or release. |
 | `stylesheet` | `boolean` | `true` | Installs the presenter's stylesheet unless explicitly `false`, for a light-DOM host that cannot inject CSS into its page. |
 
 **Handle**
@@ -96,38 +107,15 @@ when `takeCount` is defined, then `Ready`.
 |---|---|---|
 | `element` | `HTMLElement` | Presenter-owned `.wui-recorder` root. |
 | `update()` | `() => void` | Re-reads state and repaints every control; becomes a no-op after destruction. |
-| `destroy()` | `() => void` | Releases the subscription, root and style; attempts every cleanup even if one fails, then reports the first failure. Later calls and pending command results are ignored. Recording/playback resources remain caller-owned. |
+| `destroy()` | `() => void` | Idempotently retires commands, removes listeners, disposes the subscription and removes root/style. Attempts every cleanup before rethrowing the first failure; retains borrowed recorder resources. |
 
-**Text and formatting.** `getText()` supplies a `RecorderText` snapshot for one
-update. The application owns translation and calls `handle.update()` when its display settings
-change. Updates preserve focused controls and issue no capture/playback commands. The `number`
-formatter handles counts; status callbacks receive numeric `count` and `formattedCount` so the
-application can apply its existing plural rules. Explicit `state.status` and export format labels
-remain caller text. See the [shared text hooks](/uikit/api/); no language observer is installed.
-
-| `RecorderText` field | Type | Default / callback values |
-|---|---|---|
-| `record` | `string` | `Record` |
-| `stopRecording` | `string` | `Stop recording` |
-| `stop` / `play` | `string` | `Stop` / `Play` |
-| `playTake` / `stopPlayback` | `string` | `Play take` / `Stop take` |
-| `exports` | `string` | `Export take` |
-| `download` | `UITextValue<{label: string}>` | `Download ` followed by export `label`. |
-| `downloadText` | `UITextValue<{label: string}>` | `⬇ ` followed by export `label`. |
-| `recordingStatus` | `UITextValue<{count: number; formattedCount: string}>` | `● recording… ` followed by `formattedCount`. |
-| `playingStatus` | `string` | `playing take…` |
-| `capturedStatus` | `UITextValue<{count: number; formattedCount: string}>` | `captured ` followed by `formattedCount`. |
-| `readyStatus` | `string` | `Ready` |
-
-All fields are optional. Strings are final text and are not interpolated. Callbacks return the
-complete message; translation lookup and plural selection belong to the application.
-
-**Accessibility.** Record is a native button whose dynamic `aria-label`, `aria-pressed`, and
-`aria-busy` mirror capture state. Playback is a native button named `Play take` or `Stop take` according to
-playback state, with dynamic `aria-pressed`; each export button is named `Download <label>`. Disabled state is reflected on
-the corresponding native controls. The compact level bar is visual only, and the status is
-ordinary text: this presenter does not install a `meter` role or live region, so applications that
-need announced progress should expose that separately.
+**Accessibility.** The root is a named group. Record and playback are native buttons whose
+pressed state follows capture/playback. Recording has a dynamic accessible name; playback
+uses `playLabel` unless an explicit `stopPlaybackLabel` supplies its playing name. Export buttons
+are named `Download <label>`.
+The optional input level uses `role="progressbar"`, bounds 0–1 and a percentage value text;
+its decorative fill is hidden from accessibility. Status is a named, atomic, polite live region.
+Busy/disabled state blocks every native command; keyboard focus remains visible.
 
 </details>
 
@@ -169,13 +157,13 @@ CSS and do not remount the recorder or alter recording/playback state.
 | `--wm-control-radius` | literal fallback | `0` | Shared corner fallback. |
 | `--wm-recorder-button-border` | `--wm-control-border` → `--wm-border` | `#d8d8d8` | Record, playback, and export button border. |
 | `--wm-recorder-button` | `--wm-surface` | `#fff` | Unpressed button background. |
-| `--wm-recorder-accent` | `--wm-accent` | `#c0392b` | Pressed record background and level fill. |
-| `--wm-recorder-accent-text` | `--wm-accent-foreground` | `#fff` | Pressed record text. |
-| `--wm-recorder-track` | `--wm-surface-muted` | `#ddd` | Compact level track background. |
+| `--wm-recorder-accent` | literal | `#c0392b` | Pressed record background and level fill. |
+| `--wm-recorder-accent-text` | literal | `#fff` | Pressed record text. |
+| `--wm-recorder-track` | literal | `#ddd` | Compact level track background. |
 | `--wm-recorder-status-font` | `.76rem var(--wm-font-mono, ui-monospace, monospace)` | `.76rem ui-monospace, monospace` | Complete status font shorthand. |
 | `--wm-font-mono` | literal | `ui-monospace, monospace` | Status font family when no complete shorthand is supplied. |
-| `--wm-focus` | `currentColor` | Current text color | 2px keyboard-focus outline on record, playback and export buttons. |
-| `--wm-recorder-muted` | `--wm-foreground-muted` → `--wm-foreground` | `#666` | Status text color. |
+| `--wm-focus` | `--wm-focus-ring` | `Highlight` | 2px keyboard-focus outline on record, playback and export buttons. |
+| `--wm-recorder-muted` | `--wm-foreground-muted` | `#666` | Status text color. |
 | `--wm-foreground-muted` | literal fallback | `#666` | Shared muted-text fallback. |
 
 **Classes**
@@ -188,7 +176,7 @@ CSS and do not remount the recorder or alter recording/playback state.
 | Playback | `.wui-recorder__play` | `togglePlayback` exists | `.play`; `.on` while playing |
 | Meter track | `.wui-recorder__meter` | Always, hidden when level is absent | `.meter` |
 | Level fill | `.wui-recorder__level` | Always | `.level` |
-| Export container | `.wui-recorder__exports` | Always; may be empty | — |
+| Export container | `.wui-recorder__exports` | Export binding and formats exist | — |
 | Status | `.wui-recorder__status` | Always | `.status` |
 
 **Parts**
@@ -200,11 +188,12 @@ CSS and do not remount the recorder or alter recording/playback state.
 | Playback button | `play` | `togglePlayback` exists |
 | Meter track | `meter` | Always, possibly hidden |
 | Level fill | `level` | Always |
-| Export group | `exports` | Always, hidden when empty |
+| Export group | `exports` | Export binding and formats exist |
+| Export button | `export` | One per configured export format |
 | Status | `status` | Always |
 
-The export container is named **Export take** with `role="group"`; its generated buttons do
-not expose separate part tokens.
+`classNames` adds classes beside these canonical classes. `parts` adds tokens beside each
+canonical part, with duplicate tokens removed. Accessible names use the corresponding label options.
 
 </details>
 

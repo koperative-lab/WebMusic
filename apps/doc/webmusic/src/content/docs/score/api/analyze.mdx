@@ -6,7 +6,7 @@ description: Score analysis — stateless algorithms, code-only sessions and liv
 import ScoreReportPlayground from '../../../../components/headless/ScoreReportPlayground.astro';
 
 
-`@webmusic/score/analyze` is the **analysis** capability of the `@webmusic/score` package. It reads `Score` objects from `@webmusic/score` and returns plain data — a score summary, chord timelines, key detection, chord segmentation, roman numerals, motif search, rhythm patterns, and voice-leading checks. Its interactive Web Components compose those results around a player; the [Analyze overview](/score/element/#analyze) selects the component for each task.
+`@webmusic/score/analyze` is the **analysis** capability of the `@webmusic/score` package. It reads `Score` objects from `@webmusic/score` and returns plain data — a score summary, chord timelines, key detection, chord segmentation, intervals, meter-aligned rhythm inspection, roman numerals, motif search, rhythm patterns, and voice-leading checks. Its interactive Web Components compose those results around a player; the [Analyze overview](/score/element/#analyze) selects the component for each task.
 
 The capability root and `/headless` entry have no DOM dependency, so they run in Node, workers, browsers, tests, import pipelines, and batch jobs. It does not play audio, render notation, or own a framework — those live in [`@webmusic/score/play`](/score/api/play/), [`@webmusic/score/view`](/score/api/view/), and [`@webmusic/score/react`](/score/api/react/).
 
@@ -24,9 +24,9 @@ The `@webmusic/score/analyze` root is the canonical stateless surface. `/headles
 
 ## Web Components
 
-Five live surfaces are exported by `@webmusic/score/analyze/element`: chord progression, current chord, key changes, Roman harmony and voice leading. Each owning page under [Web Components › Analyze](/score/element/#analyze) explains its attributes, events, player binding and styling.
+Two inspection surfaces are exported by `@webmusic/score/analyze/element`: passage harmony and the current sounding chord. Each owning page under [Web Components › Analyze](/score/element/#analyze) explains its attributes, events, player binding and styling.
 
-Whole-score summaries, histograms and rhythm reports use the [report workflow](/score/api/analyze/#reports). Candidate rankings, tonal comparisons, pitch evidence and history can be composed in code through the [live trackers and projections](/score/headless/analyze/live-trackers/#key-diagnostics). Motif search and the other score algorithms remain available below.
+Whole-score summaries, histograms and rhythmic-vocabulary reports use the [report workflow](/score/api/analyze/#reports). Tonal estimation, selected intervals, metrical placement, specialist Roman and voice-leading displays, pitch diagnostics and retained chord history can be composed from the code-only results below or the [live trackers and projections](/score/headless/analyze/live-trackers/#key-diagnostics). Motif and recurring-rhythm algorithms remain code-only building blocks for application-owned displays.
 
 The score algorithms below take a `Score` (from an importer, or built with `@webmusic/score`) and return plain data. The following examples assume a `score` that holds a I–IV–V–I progression in C major.
 
@@ -213,6 +213,39 @@ root. The direct functions return only the preferred label; the Headless
 spelling projection also exposes alternatives and optional rootless readings.
 No staff or fretboard projection is computed to obtain a label.
 
+## Inspect selected intervals
+
+`analyzeIntervals(score, selection, options?)` relates authored notes rather
+than guessing an interval from a whole-score pitch histogram. Select note IDs,
+a part/voice, a half-open quarter-note range, or a combination. Consecutive
+pitched onsets in one voice form melodic intervals; concurrently sounding
+pairs form vertical intervals. Explicit rests break melodic continuity.
+
+```ts
+import {analyzeIntervals} from '@webmusic/score/analyze';
+
+const inspection = analyzeIntervals(score, {
+  fromQuarters: 0,
+  toQuarters: 4,
+});
+const intervals = inspection.intervals.map((entry) => ({
+  kind: entry.kind,
+  label: entry.label,
+  semitones: entry.semitones,
+  notes: entry.evidence.map((note) => note.noteId),
+}));
+```
+
+The default `pitchMode: 'written'` uses stored notation. Set
+`{pitchMode: 'sounding'}` to apply each part's declared transposition;
+chromatic-only transpositions fall back to MIDI-derived spelling. Each result
+has a stable note-pair ID, kind, spelled label such as `3M`, direction, signed
+melodic or non-negative vertical semitones, quarter-note span, and two evidence
+records with note/part/voice IDs and written/analyzed pitches. A range must
+include both finite, ordered bounds. Dense chords produce pairwise vertical
+results, so use a narrow selection when presenting them interactively. The
+function does not edit notes, create a player, or own resources.
+
 ## Roman numerals
 
 `romanNumerals` takes a key and expresses the chord progression relative to that key.
@@ -264,6 +297,7 @@ boundaries. At least two occurrences sharing no note are required, although
 returned occurrences include all matching overlapping windows. Repeated-pitch
 patterns (including length `1`) are omitted. IDs identify this scan's grouping;
 `partId` and `noteIndexes` identify each occurrence's source notes.
+An application can project these results into its own occurrence display.
 
 This example assumes `melodyScore` contains `C D E G | C D E G` as quarter notes.
 
@@ -301,6 +335,8 @@ including rests, simultaneous notes and overlapping windows. It is a rhythmic
 vocabulary rather than a per-voice motif search, and a pattern occurring once
 is still returned. Its `length` is a positive safe integer (default `4`);
 invalid values throw `RangeError` before scanning even an empty score.
+For voice-local phrases with exact attack spacing and source-note identities,
+use [`findRhythmPatternOccurrences`](#find-recurring-rhythmic-phrases) instead.
 
 ```ts
 import { rhythmPatterns } from '@webmusic/score/analyze';
@@ -325,6 +361,74 @@ Output:
   }
 ]
 ```
+
+## Find recurring rhythmic phrases
+
+`findRhythmPatternOccurrences(score, options?)` finds exact written rhythm
+recurrences within each part and voice. It keys each phrase by note durations
+and distances between successive attacks, both represented exactly before
+returning quarter-note numbers. Pitch does not participate. The result keeps
+each occurrence's part, voice, source note IDs, attack positions and span so an
+application can highlight or navigate the repetitions in its own display.
+
+```ts
+import {findRhythmPatternOccurrences} from '@webmusic/score/analyze';
+
+const groups = findRhythmPatternOccurrences(score, {
+  length: 4,
+  minOccurrences: 2,
+});
+const locations = groups.map(({durations, onsetGaps, occurrences}) => ({
+  durations,
+  onsetGaps,
+  starts: occurrences.map(({partId, voiceId, startQuarters}) =>
+    `${partId}/${voiceId} at ${startQuarters}`),
+}));
+```
+
+`length` defaults to `4` attacks and must be a positive safe integer.
+`minOccurrences` defaults to `2`; it must be a positive safe integer and is
+effectively at least `2` non-overlapping written spans. All matching windows,
+including overlapping ones, remain in `occurrences`. `partId` filters one
+existing Score part; an unknown ID throws `RangeError`. Explicit rests split
+phrases, while an unnotated silent gap becomes part of the onset-gap signature.
+Simultaneous chord members form one attack with the longest member duration;
+a tied continuation is not a new attack. Group IDs are stable only within one
+scan, not across score edits or changed options. The function is pure and does
+not infer performed groove, accents or syncopation.
+
+## Inspect rhythmic placement
+
+`inspectScoreRhythm(score, options?)` compares written attacks with the
+score's meter-aware beat grid. `startQuarters` is inclusive and `endQuarters`
+exclusive; both default to the full score. `partId` limits the attacks but not
+the shared beat grid. `subdivision` chooses 1, 2, 3 or 4 equal divisions of a
+notated denominator beat, defaulting to 2.
+
+```ts
+import {inspectScoreRhythm} from '@webmusic/score/analyze';
+
+const inspection = inspectScoreRhythm(score, {
+  startQuarters: 0,
+  endQuarters: 4,
+  subdivision: 3,
+});
+const placements = inspection.onsets.map((onset) => ({
+  notes: onset.noteIds,
+  beat: `${onset.measure}:${onset.beat}`,
+  offbeat: onset.offbeat,
+  syncopationCue: onset.syncopationCue,
+}));
+```
+
+The result separates `beats`, `subdivisions`, onset groups and a summary.
+Each onset retains part/voice/note IDs, exact subbeat, authored accent,
+nominal seconds and optional per-note performed timing/deviation. Its
+`syncopationCue` is deliberately narrow: an authored accent or marcato on an
+offbeat attack, not a complete syncopation or groove inference. A denominator
+beat in 6/8 is an eighth note; the function does not infer compound-meter
+accent groups. No notes are quantized or changed. Invalid ranges,
+subdivisions and unknown part IDs throw; the function owns no resources.
 
 ## Voice leading
 
@@ -522,7 +626,7 @@ In React, `useScoreAnalysisAsync` from [`@webmusic/score/react`](/score/api/reac
 
 `createScoreReport(score)` returns formatted summary rows for a whole score. Pair it with the existing `distributions` and `rhythmPatterns` APIs when building a statistics report. These calculations return data; the application chooses when to recompute it and how to display it.
 
-Choose a report and sample score below. Histogram mode exposes all three distributions; rhythm mode exposes pattern length. Returned data shows the actual function result. The demo owns its controls and optional UI presenters; it creates no analysis Element or playback resources.
+Choose a report and an Arabesque No. 1 import below. MIDI and MXL expose different preserved notation while keeping the musical source aligned. Histogram mode exposes all three distributions; rhythm mode exposes pattern length. Returned data shows the actual function result. The demo owns its controls and optional UI presenters; it creates no analysis Element or playback resources.
 
 <ScoreReportPlayground />
 
@@ -607,6 +711,9 @@ Use the [Analyze API](/score/api/analyze/) for one-shot algorithms and [live Ana
 | `identifyChord(notes)`, `identifyChordFromMidi(midis)` | Harmony analysis | Name a supplied sounding set, retaining notated spelling or using the fixed MIDI spelling. |
 | `romanNumerals(score, key, opts?)`, `romanNumeralForChord(symbol, key)` | Harmony analysis | Convert chord segments or one symbol into coarse key-relative Roman labels. |
 | `findMotifs(score, opts?)` | Motif analysis | Find repeated interval/rhythm patterns in each part. |
+| `findRhythmPatternOccurrences(score, opts?)` | Rhythm analysis | Find exact voice-local onset-gap and duration recurrences with source identities and quarter-note spans. |
+| `analyzeIntervals(score, selection, options?)` | Interval inspection | Inspect spelled melodic and overlapping vertical note relationships with note provenance; supports written or transposed sounding pitch. |
+| `inspectScoreRhythm(score, options?)` | Rhythm inspection | Inspect meter-aligned beats, subdivisions, note onsets and explicit accent/offbeat cues in a quarter-note region. |
 | `rhythmPatterns(score, length?)` | Rhythm analysis | Count repeated duration patterns and their onset positions. |
 | `voiceLeading(score)` | Voice-leading analysis | Report large leaps and simple parallel-motion issues. |
 | `createScoreReport(score)`, `ScoreReport` | Headless helper / type | [Whole-score formatted reports](#reports); exported from `@webmusic/score/analyze/headless`. |
@@ -626,6 +733,9 @@ Use the [Analyze API](/score/api/analyze/) for one-shot algorithms and [live Ana
 | `ChordWindowOptions` | Type | `{ windowQuarters? }` for `segmentChords` / `romanNumerals`. |
 | `RomanNumeralOptions` | Type | Chord window options plus optional precomputed `segments`. |
 | `MotifOptions` | Type | `{ length?, minOccurrences? }` for `findMotifs`. |
+| `RhythmPatternOccurrenceOptions`, `RhythmPatternOccurrenceGroup`, `RhythmPatternOccurrence` | Type | Phrase length, repeat threshold and optional part filter; each group retains a signature and provenance-rich occurrences. |
+| `IntervalPitchMode`, `IntervalSelection`, `IntervalAnalysisOptions`, `IntervalEvidence`, `AnalyzedInterval`, `IntervalAnalysis` | Type | Written/sounding pitch choice, note selection and provenance-rich interval results. |
+| `RhythmInspectionOptions`, `RhythmBeat`, `RhythmSubdivision`, `RhythmPerformedOnset`, `RhythmOnset`, `RhythmInspection` | Type | Meter grid, subdivision, authored/performed onset evidence and rhythm-inspection result. |
 | `Key`, `KeyResult` | Type | A `{ tonic, mode }` target, and a key result with confidence and candidates. |
 | `ChordSegment` | Type | A chord window (in quarters) with pitch classes and chord label. |
 | `RNAResult` | Type | A roman-numeral entry (in quarters) with chord and roman labels. |
@@ -640,10 +750,10 @@ exports of the stateless capability root. They return data without mounting UI.
 
 The **projections** turn a result into the shapes a read-out draws: marks for a
 keyboard, columns for a stave, dots for a fretboard, bands for a scrolling lane,
-segments for a wheel. The five [live Analyze components](/score/element/#analyze)
-use only the projections needed by their musical surfaces. Diagnostic and motif
-projections remain available for application-owned markup without dedicated
-Element wrappers; see [key diagnostics and history](/score/headless/analyze/live-trackers/#key-diagnostics).
+segments for a wheel. The two [live Analyze components](/score/element/#analyze)
+use only the projections needed by their musical surfaces. All projections
+remain available for application-owned markup; see
+[key diagnostics and history](/score/headless/analyze/live-trackers/#key-diagnostics).
 
 A projection is a pure data operation, not another live object. Keep one
 analysis result and recompute its relevant projection when that input or its
@@ -657,6 +767,8 @@ configuration changes; the owning UI chooses how and when to draw it.
 | `projectProgression(result, score, mode, options?)` | Returns `FlowLaneView` for `'chords'` or `'roman'`; `FlowProjectionOptions.roll` defaults to `true` and applies to chord mode. |
 | `projectKeyFlow(score, options?)` | Returns a key `FlowLaneView`; `windowQuarters` defaults to `8`, with a minimum of `1`. |
 | `projectMotifFlow(result, score)` | Returns motif occurrence bands and contours; four leading motif tracks are shown individually and remaining motifs share a folded track. |
+| `projectMotifOccurrences(motifs, score)` | Returns the same motif lane from an existing `Motif[]`, without requiring a combined `AnalysisResult`. |
+| `projectRhythmPatternFlow(patterns, score)` | Returns recurrence bands, attack flags and measure marks from `RhythmPatternOccurrenceGroup[]`; four leading pattern tracks are shown individually and the rest share a folded track. |
 | `projectVoiceFlow(result, score)` | Returns voice bands and issue brackets for up to six voice tracks; issues without unambiguous rendered voices have no bracket. Full results remain in `AnalysisResult.issues`. |
 | `projectTonality(key, options?)` | Returns `TonalityView` with outer/inner wheel segments, optional needle and centre labels. `key` may be `undefined`; options accept a reference `Key` and spelling preference. |
 | `projectKeyCandidates(key, options?)` | Returns ranked `ChipItemView[]`; `limit` defaults to `5`. Undefined key produces no chips. |
@@ -683,7 +795,8 @@ chord spelling into only nameplate data. Use it with `spellChord()` when a
 current-name display does not need staff, keyboard or fretboard projections.
 
 The lane projections — `projectProgression(result, score, mode, options?)`,
-`projectKeyFlow`, `projectMotifFlow`, `projectVoiceFlow` — return bands carrying
+`projectKeyFlow`, `projectMotifFlow`, `projectMotifOccurrences`,
+`projectRhythmPatternFlow`, `projectVoiceFlow` — return bands carrying
 **two rulers**: `start`/`end` in nominal seconds, which is what a conveyor is
 drawn on, and `stampStart`/`stampEnd` in quarters, which is what a playhead is
 fed. `projectTonality`, `projectKeyCandidates` and `projectPitchClassMeters`
