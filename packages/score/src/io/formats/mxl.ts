@@ -86,38 +86,36 @@ export async function parseMXLDetailed(
   // size cap) — never inflate the whole archive.
   const entryNames: string[] = [];
   let containerOriginalSize = 0;
-  let containerFiles = unzipSync(data, {
-    filter: (file) => {
-      inspectEntry(file.name, entryNames, limits);
-      if (file.name !== 'META-INF/container.xml') return false;
-      assertEntrySize(file.name, file.originalSize, limits, 0);
-      containerOriginalSize = file.originalSize;
-      return true;
-    },
-  });
-
-  let container: Uint8Array | undefined = containerFiles['META-INF/container.xml'];
   let scorePath: string | undefined;
-  if (container) {
-    const parser = new XMLParser({
-      ignoreAttributes: false,
-      attributeNamePrefix: '',
-      // Disabled to block DTD entity expansion; decodeXmlEntities restores
-      // only the predefined entities and numeric character references.
-      processEntities: false,
-      tagValueProcessor: (_name, value) => decodeXmlEntities(value),
-      attributeValueProcessor: (_name, value) => decodeXmlEntities(value),
+  {
+    const containerFiles = unzipSync(data, {
+      filter: (file) => {
+        inspectEntry(file.name, entryNames, limits);
+        if (file.name !== 'META-INF/container.xml') return false;
+        assertEntrySize(file.name, file.originalSize, limits, 0);
+        containerOriginalSize = file.originalSize;
+        return true;
+      },
     });
-    const parsed = parser.parse(strFromU8(container));
-    const rootfiles = parsed.container?.rootfiles?.rootfile;
-    const rootfile = Array.isArray(rootfiles) ? rootfiles[0] : rootfiles;
-    scorePath = rootfile?.['full-path'];
+    const container = containerFiles['META-INF/container.xml'];
+    if (container) {
+      const parser = new XMLParser({
+        ignoreAttributes: false,
+        attributeNamePrefix: '',
+        // Disabled to block DTD entity expansion; decodeXmlEntities restores
+        // only the predefined entities and numeric character references.
+        processEntities: false,
+        tagValueProcessor: (_name, value) => decodeXmlEntities(value),
+        attributeValueProcessor: (_name, value) => decodeXmlEntities(value),
+      });
+      const parsed = parser.parse(strFromU8(container));
+      const rootfiles = parsed.container?.rootfiles?.rootfile;
+      const rootfile = Array.isArray(rootfiles) ? rootfiles[0] : rootfiles;
+      scorePath = rootfile?.['full-path'];
+    }
   }
-  // The manifest is no longer needed before extracting the score entry. Drop
-  // its reference so a large (but valid) manifest is not retained alongside
-  // the MusicXML body.
-  container = undefined;
-  containerFiles = {};
+  // The first-pass manifest references leave scope before extracting the score
+  // entry, so a large valid manifest is not retained alongside the score body.
 
   // Fallback: pick a score entry directly — never the META-INF index itself.
   scorePath ??= entryNames.find(

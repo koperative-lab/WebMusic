@@ -1492,7 +1492,7 @@ export function mountWorkbench(
       return;
     }
 
-    let to = from;
+    let to: number;
     if (event.key === 'ArrowRight') to = (from + 1) % ordered.length;
     else if (event.key === 'ArrowLeft') to = (from - 1 + ordered.length) % ordered.length;
     else if (event.key === 'Home') to = 0;
