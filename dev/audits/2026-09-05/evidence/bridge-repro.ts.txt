@@ -1,0 +1,14 @@
+import {createSyncedPlayback} from '/Users/mamingchen/GitHub/WebMusic/bridges/score-audio/src/sync.ts';
+import {createAudioMasteredPlayback,scoreAsFollower} from '/Users/mamingchen/GitHub/WebMusic/bridges/score-audio/src/audio-master.ts';
+import {ScoreAudioSync} from '/Users/mamingchen/GitHub/WebMusic/bridges/score-audio/src/sync.ts';
+import {TransportClock} from '/Users/mamingchen/GitHub/WebMusic/platform/kernel/src/transport.ts';
+import {createAudioClip} from '/Users/mamingchen/GitHub/WebMusic/packages/audio/src/core/index.ts';
+import {ScoreBuilder} from '/Users/mamingchen/GitHub/WebMusic/packages/score/dist/index.js';
+let created=0,closed=0;
+globalThis.AudioContext=class {state='running';currentTime=0;sampleRate=44100;destination={};constructor(){created++}async close(){closed++}} as any;
+const score=new ScoreBuilder().build();const clip=createAudioClip({sampleRate:1000,channelData:[new Float32Array(1000)]});
+for(const factory of [createSyncedPlayback,createAudioMasteredPlayback]){const pair=factory(score,clip,{driftCheckIntervalMs:0});pair.sync.dispose();pair.scorePlayer.dispose();pair.clipPlayer.dispose();console.log('factory context cleanup',JSON.stringify({factory:factory.name,created,closed}));}
+let now=0;const masterClock=new TransportClock(()=>now);let scoreStarts=0;const scoreClock=new TransportClock(()=>now);
+const master={play(when){masterClock.startAt(when??now,masterClock.position)},pause(){masterClock.pause(now)},stop(){masterClock.pause(now)},seekNominal(pos){masterClock.seekTo(pos,now)},get nominalSeconds(){return masterClock.position},get clock(){return masterClock}};
+const scoreStub={dispose(){},play(when){scoreStarts++;scoreClock.startAt(when??now,scoreClock.position)},pause(){scoreClock.pause(now)},stop(){scoreClock.pause(now)},seekNominal(pos){scoreClock.seekTo(Math.max(0,pos),now)},setRate(rate){scoreClock.setRate(rate,now)},get rate(){return scoreClock.rate},get nominalSeconds(){return scoreClock.position},isPlaying(){return !scoreClock.paused},get clock(){return scoreClock}};
+const errors=[];const sync=new ScoreAudioSync(master as any,scoreAsFollower(scoreStub as any,{clipOffsetSeconds:2}),{get currentTime(){return now}} as any,{driftCheckIntervalMs:0,onOperationError:(op,e)=>errors.push([op,String(e)])});await sync.play();for(let i=1;i<=5;i++){now=i*0.25;const drift=sync.checkDrift();for(let j=0;j<10;j++)await Promise.resolve();console.log('lead-in drift',JSON.stringify({now,drift,scoreStarts,scoreScheduledOrigin:scoreClock.state.originTime}));}console.log('lead-in false errors',JSON.stringify(errors));sync.dispose();

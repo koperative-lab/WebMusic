@@ -1,0 +1,41 @@
+const assert = require('node:assert/strict');
+const root = '/Users/mamingchen/GitHub/public/WebMusic-dev-review/packages/audio/dist/';
+const {createAudioClip} = require(root + 'index.cjs');
+const {AudioClipPlayer} = require(root + 'play/headless/index.cjs');
+const param = () => ({value: 1, setValueAtTime() {}, linearRampToValueAtTime() {}, cancelScheduledValues() {}});
+const node = () => ({connect() {}, disconnect() {}});
+const sources = [];
+const context = {
+  state: 'running', currentTime: 0, destination: node(),
+  createGain: () => ({...node(),gain:param()}),
+  createStereoPanner: () => ({...node(),pan:param()}),
+  createAnalyser: () => ({...node(),fftSize:2048}),
+  createBuffer(channels,length,sampleRate) {
+    const data = Array.from({length:channels},() => new Float32Array(length));
+    return {length,numberOfChannels:channels,sampleRate,duration:length/sampleRate,getChannelData:c=>data[c]};
+  },
+  createBufferSource() {
+    const source = {...node(),playbackRate:param(),start() {},stop() {},onended:null};
+    sources.push(source); return source;
+  }
+};
+(async () => {
+  const pcm = Float32Array.from({length:32000},(_,i)=>i/32000);
+  const clip = createAudioClip({sampleRate:8000,channelData:[pcm]});
+  const player = new AudioClipPlayer(clip,{audioContext:context});
+  try {
+    player.seek(1);
+    const scratch = player.beginScratch();
+    assert(scratch && scratch.active);
+    context.currentTime = 0.02;
+    scratch.moveToSeconds(1.02);
+    assert.equal(sources.length,1);
+    const samples = sources[0].buffer.getChannelData(0);
+    assert(samples[0] > 0.25 && samples[0] < 0.26);
+    assert(samples.at(-1) > samples[0]);
+    assert(samples.length <= 16002);
+    await scratch.end(false);
+    assert.equal(scratch.active,false);
+    console.log('PASS: CJS root AudioClip -> CJS Headless player creates bounded, nonzero scratch PCM.');
+  } finally {player.dispose();}
+})().catch(error=>{console.error(error);process.exitCode=1;});

@@ -15,10 +15,10 @@ not register a tag. `@webmusic/score/play/auto` registers Play elements; it does
 not register View or Analyze elements.
 
 For one piece with notation and a keyboard readout, follow the Quick Start's
-`score-player`, `score-view` and `pitch-view` composition. Views can use their
+`score-player`, `score-view` and `score-pitch-view` composition. Views can use their
 documented `player` binding to follow the owner; do not assign duplicate `src`
 URLs to each view. A keyboard readout is not a playable input: use
-[note-input](https://koperative-lab.github.io/WebMusic/score/element/play/note-input/)
+[score-note-input](https://koperative-lab.github.io/WebMusic/score/element/play/score-note-input/)
 when the task needs input interaction.
 
 Use attributes for documented scalar configuration and properties for `Score`,

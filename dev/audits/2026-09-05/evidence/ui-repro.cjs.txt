@@ -1,0 +1,86 @@
+// Read-only focused audit reproductions for the current workspace source.
+// Run: node /private/tmp/webmusic-ui-audit-repro.cjs
+const path = require('node:path');
+const {createRequire} = require('node:module');
+const requireWorkspace = createRequire('/Users/mamingchen/GitHub/WebMusic/package.json');
+const {JSDOM} = requireWorkspace('jsdom');
+requireWorkspace('esbuild').buildSync({
+  entryPoints: ['/Users/mamingchen/GitHub/WebMusic/packages/ui/src/index.ts'],
+  bundle: true,
+  platform: 'node',
+  format: 'cjs',
+  outfile: '/private/tmp/webmusic-ui-audit.cjs',
+});
+const {mountNoteSurface, mountMacro, mountMacroRack, mountCanvasStage, mountStage} = require('/private/tmp/webmusic-ui-audit.cjs');
+const dom = new JSDOM('<body></body>');
+const {document, KeyboardEvent, MouseEvent} = dom.window;
+dom.window.HTMLCanvasElement.prototype.getContext = () => ({setTransform() {}, clearRect() {}});
+const newHost = () => {
+  const host = document.createElement('div');
+  document.body.append(host);
+  return host;
+};
+const pointer = (type, id) => {
+  const event = new MouseEvent(type, {bubbles: true, clientX: 1, clientY: 1});
+  Object.defineProperty(event, 'pointerId', {value: id});
+  return event;
+};
+
+// 1. Two independent light-DOM piano presenters: QWERTY paints the wrong one.
+const eventsA = [], eventsB = [];
+const pianoBinding = (events) => ({
+  snapshot: () => ({layout: 'piano', keyboard: true, piano: [{midi: 60, left: 0, width: 100}]}),
+  interaction: {setNote: (...args) => events.push(args), midiForKey: () => 60},
+});
+const first = mountNoteSurface(newHost(), pianoBinding(eventsA));
+const second = mountNoteSurface(newHost(), pianoBinding(eventsB));
+second.element.focus();
+second.element.dispatchEvent(new KeyboardEvent('keydown', {code: 'KeyA', bubbles: true}));
+console.log('QWERTY across two light-DOM pianos:', JSON.stringify({
+  eventsA, eventsB,
+  firstPressed: first.element.querySelector('[data-midi]').classList.contains('down'),
+  secondPressed: second.element.querySelector('[data-midi]').classList.contains('down'),
+}));
+second.releaseAll();
+
+// 2. Browser pointer capture continues delivering moves to the first board.
+// Once the physical pointer crosses the other board, document.elementFromPoint
+// returns that other board's key. Hit testing must reject that external node.
+const externalKey = second.element.querySelector('[data-midi]');
+externalKey.dataset.midi = '72';
+let hit = first.element.querySelector('[data-midi]');
+Object.defineProperty(document, 'elementFromPoint', {configurable: true, value: () => hit});
+first.board.dispatchEvent(pointer('pointerdown', 1));
+hit = externalKey;
+first.board.dispatchEvent(pointer('pointermove', 1));
+first.board.dispatchEvent(pointer('pointerup', 1));
+console.log('Pointer drag from first board over second:', JSON.stringify({eventsA, eventsB}));
+first.destroy(); second.destroy();
+
+// 3. Composite presenters ignore stylesheet opt-out for their child mounts.
+const macro = {snapshot: () => ({label: 'Macro', value: 0.5, targets: []}), setValue() {}};
+for (const [name, mount] of [
+  ['macro', host => mountMacro(host, macro, {stylesheet: false})],
+  ['macroRack', host => mountMacroRack(host, [macro], {stylesheet: false})],
+  ['canvasStage', host => mountCanvasStage(host, {draw() {}, status: () => ({kind: 'loading'})}, {stylesheet: false})],
+]) {
+  const host = newHost();
+  const handle = mount(host);
+  console.log(name + ' stylesheet:false:', JSON.stringify([...host.querySelectorAll('style')].map(style => style.dataset.webmusicUi)));
+  handle.destroy();
+}
+
+// 4. Additional boundary risk: a render that mounts its same-host replacement
+// leaves its returned render cleanup and later subscription cleanup uncalled.
+let oldCleanup = 0, oldUnsubscribe = 0, oldSubscriptions = 0;
+const host = newHost();
+let newer;
+const older = mountStage(host, {
+  render() {
+    newer = mountStage(host, {render(surface) {surface.textContent = 'Replacement';}});
+    return () => oldCleanup++;
+  },
+  subscribe() {oldSubscriptions++; return () => oldUnsubscribe++;},
+});
+older.destroy(); newer.destroy();
+console.log('Stage remount inside render:', JSON.stringify({oldSubscriptions, oldCleanup, oldUnsubscribe, remainingChildren: host.childElementCount}));

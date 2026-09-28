@@ -1,0 +1,867 @@
+[
+  {
+    "path": "ARCHITECTURE.md",
+    "sha256": "0ea342fdddd3029c347e4be40aa6250e564bfdec36f1c9c2c3a1a5fd5a91fcbd",
+    "lines": 302
+  },
+  {
+    "path": "PUBLISHING.md",
+    "sha256": "d252131773f699006dd247a7844e0c47e6e7da5e151f20aeec8f83e2385dea0f",
+    "lines": 163
+  },
+  {
+    "path": "README.md",
+    "sha256": "3e28565a594ea55405e55f1065c1433629b5c104398cb0c31f677c7e98509e46",
+    "lines": 82
+  },
+  {
+    "path": "RELEASING.md",
+    "sha256": "5bd496197dc06e64e7f779307aa177a6771c8819aee5fb0467f8e65e6ddd41d6",
+    "lines": 219
+  },
+  {
+    "path": "apps/README.md",
+    "sha256": "4e5a05a5b618777deb16016329cc1ab2a26103c03598ce036d5fbc8f1137dce4",
+    "lines": 73
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/audio/api/analyze.mdx",
+    "sha256": "6636318ceb25fd818e43ff4650a4c731455c5b45bb233b32a73b1984e8eed50a",
+    "lines": 329
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/audio/api/index.mdx",
+    "sha256": "ff864186404813e51d2aca2e9c0439fd0e5ee97641b0969a47c39b7f48b7e809",
+    "lines": 370
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/audio/api/play.mdx",
+    "sha256": "e9023856600ec137dae06fc83d15a39e939688c83f799429f2dad7f6b03a330b",
+    "lines": 207
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/audio/api/react.mdx",
+    "sha256": "1098da02a0da427525b77e12d015b53d6383eb988e02d55dcd5cddd5dbfef03a",
+    "lines": 251
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/audio/api/view.mdx",
+    "sha256": "eb4441e9d231d96846cded850ba56d233f218890e3cdc1123ce464711bd0f892",
+    "lines": 336
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/audio/element/analyze/audio-analysis-timeline.mdx",
+    "sha256": "7f19db4fcd591c1e913982faf17a33859ad5b449d04a9d10f373f3d4e710d2de",
+    "lines": 90
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/audio/element/analyze/audio-analysis-view.mdx",
+    "sha256": "24a6201211483ec41c947bd63a4a336e873875ddc2ada2082a156b2fc9f41caa",
+    "lines": 219
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/audio/element/analyze/audio-analysis.mdx",
+    "sha256": "543c954aea2c0ecdc2778eb067d650625f97932b676ef29a48cbfc8ac8f5dc0b",
+    "lines": 119
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/audio/element/analyze/audio-clip-summary.mdx",
+    "sha256": "127addaf774f9edd3837d939ae3868e3e8767aca4e4f36487efb2baaa4c2386e",
+    "lines": 77
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/audio/element/analyze/audio-histogram.mdx",
+    "sha256": "ccad39ee0d713b72ad65dc2a9d7f4f4ddbe39d7adb7f4f38da08d8a1b8845103",
+    "lines": 91
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/audio/element/analyze/index.mdx",
+    "sha256": "25d5a8c817f000fcea6754ee0d603e04afd9503a51370ac701758251a0e6f5aa",
+    "lines": 106
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/audio/element/index.mdx",
+    "sha256": "0e8297debd2b00593987e78385b5958b1ccc222544a1ca3ad699d810caa2498a",
+    "lines": 12
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/audio/element/play/audio-clip-player.mdx",
+    "sha256": "4ab7ef114e461d6a8bb755ae13df9f8b9c9cff144454d8d2d2049ef377ecc507",
+    "lines": 112
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/audio/element/play/audio-clip-recorder.mdx",
+    "sha256": "6513dc9efaa306eba520112f59ae341bc6afcff9fa40d48a52964d63c60b0887",
+    "lines": 85
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/audio/element/play/audio-meter.mdx",
+    "sha256": "e4fabc4ac18e23994e5d58d93aca5ffce153fe736a4f76580e9f221a8e9e9159",
+    "lines": 81
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/audio/element/play/audio-mixer.mdx",
+    "sha256": "14330fc157f3dabca79827cd5b01b2e8cb0dd861e8e9bf6c15cc71d1d59b95ba",
+    "lines": 86
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/audio/element/play/audio-playlist.mdx",
+    "sha256": "1902ece273ba3e22ad4864f55649609765e4736fd6428931b198a20221436db4",
+    "lines": 107
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/audio/element/play/index.mdx",
+    "sha256": "7283555ed06ba2a2655a25a9379bc80c76eaf20609b6c6f520b28f8792a5cd53",
+    "lines": 72
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/audio/element/view/audio-clip-thumbnail.mdx",
+    "sha256": "5f543c1e32407dff15fc21d264247529f1bb4fa920a70cef36fd0d4169cdb308",
+    "lines": 96
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/audio/element/view/audio-live-view.mdx",
+    "sha256": "557d6e003968d25b2be979336db96a89be7ee5ea6899289b7d3cb1a1c43a0ccc",
+    "lines": 115
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/audio/element/view/audio-minimap.mdx",
+    "sha256": "a6505bf666a9026d5c7d208592465a38eb1c6000c1483d535679118fc536c947",
+    "lines": 111
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/audio/element/view/audio-region-list.mdx",
+    "sha256": "08d09cb5dfe31bd8077912fd2365dad91d9ee0db790b44b5d3cc98df47137674",
+    "lines": 108
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/audio/element/view/audio-view.mdx",
+    "sha256": "8ef93751e5d46363ea7b8c93ef4548e07d7b049daad0579c5ae5bc80756d7a9c",
+    "lines": 362
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/audio/element/view/index.mdx",
+    "sha256": "b3952fd093a96883fbe712d86c45af9e390520b18e103f2f34d916211e70f333",
+    "lines": 42
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/audio/getting-started.mdx",
+    "sha256": "a8cb0c6758168aaab131755c3294927c5e438fc43cb934ba6f34bacad5c2ae24",
+    "lines": 187
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/audio/headless/analyze/audio-analysis-session.mdx",
+    "sha256": "4a94d456b560a540f69e0896e3ddfa4e248038117e46ff94503f93b4550ef28a",
+    "lines": 123
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/audio/headless/analyze/index.mdx",
+    "sha256": "52a2217ab3be8ca8be36ef5a932a73cf2487cab5068dbf00e1b2635e675549b2",
+    "lines": 48
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/audio/headless/analyze/realtime-analyzer.mdx",
+    "sha256": "616b8a5c353b58830b81a8b6fd5aa1f906afb61152529b0f3c00938c69ef9ed2",
+    "lines": 124
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/audio/headless/index.mdx",
+    "sha256": "993d49c7ea257cde322e419d978ce9a25427b7d5e15478925856bb6ea0f0e3c6",
+    "lines": 28
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/audio/headless/play/audio-clip-player.mdx",
+    "sha256": "2f003df3ab402309899d092803a20850c0cfe07390d3d5bb6335cc93dcb00e5a",
+    "lines": 157
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/audio/headless/play/audio-mixer.mdx",
+    "sha256": "29c5c8be56d5c5521aad0613bfd7c6aa534fb06ba8a982e6d98c9293656fd03b",
+    "lines": 138
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/audio/headless/play/audio-playlist.mdx",
+    "sha256": "5d1f0ae7d7ac25d3de95d0ae921c0b0b98ab7cd87139c02af5da55443824e9b0",
+    "lines": 177
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/audio/headless/play/audio-recorder.mdx",
+    "sha256": "fe246a4d95ba741ada8f3c4d5afe03ff3c1ac5aaf4fbe8cf60741dbf33ab5ac4",
+    "lines": 126
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/audio/headless/play/effects.mdx",
+    "sha256": "51fcc8ec3cbb1d1a56e01ab7a17f7fa0d272c547fb7ea27d9854627dc1081f85",
+    "lines": 135
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/audio/headless/play/engines.mdx",
+    "sha256": "ec4a3533879554df85e4caf0b3a6d884c1bc9c4f56898689fa183537da7247c4",
+    "lines": 192
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/audio/headless/play/index.mdx",
+    "sha256": "834b93a0daa396a76a02bde41257c584ba889e68230bd30aab0bf16fa0a2a7aa",
+    "lines": 66
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/audio/headless/view/audio-timeline.mdx",
+    "sha256": "c4c9ea0402ac6b06e5fa1fb01915071a7fa66931acf8f5065c7e12035098a692",
+    "lines": 147
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/audio/headless/view/index.mdx",
+    "sha256": "fdc9b20c761a4791967df4c7b725d52559ea2a49d2e526b751bd2046de9c67b3",
+    "lines": 57
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/audio/headless/view/live-projection.mdx",
+    "sha256": "e5f2be048222cdd612378592f2ecbedd1c0c2211e728f0a85e24a42392fa05a9",
+    "lines": 160
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/audio/headless/view/peaks.mdx",
+    "sha256": "9f390f9366f4097b390098c03636297fd39a735df1dce9ffb6367c02ab7ddc00",
+    "lines": 84
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/audio/headless/view/view-models.mdx",
+    "sha256": "ae9d34b3e298a06901e0ff95b09f68df4adf902899791694df3e63b39ad95e83",
+    "lines": 130
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/audio/index.mdx",
+    "sha256": "0fa93f19c410c62b1ec914031d1149f35f6424f58b09898e202e4977ac163a23",
+    "lines": 50
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/bridge/api.mdx",
+    "sha256": "5e2e991828871b13dc80f481ca72d0b3d9abcf15e1267fe84fd87ef31e1209f5",
+    "lines": 185
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/bridge/headless/index.mdx",
+    "sha256": "2565cbbf1a32edea5618df94af411a80e15db3902fdfa7dda598c147cbd8d1b7",
+    "lines": 44
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/bridge/headless/score-audio-sync.mdx",
+    "sha256": "f0504e7cf96f758775b75aebb73f07feb1c4dd1bb0181f2ea86312d4fef6f3f7",
+    "lines": 221
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/bridge/index.mdx",
+    "sha256": "066444d0675da1932742eefac22fba6d0a56e45ab736d21eddf833967ae19b29",
+    "lines": 64
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/index.mdx",
+    "sha256": "7567503c27c92744268bc129f0951746a9b618ff60b876a27ca280ac3a67b163",
+    "lines": 51
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/kernel/api.mdx",
+    "sha256": "0bb0f8a44b220777aeaa2b496c33e047f70d4fc9d13cf0da6f56d5692dc50758",
+    "lines": 209
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/kernel/index.mdx",
+    "sha256": "a3e978bcae5a82e299264d77fa2775732ed69733f3ecfeaba99fa79f77ce10a5",
+    "lines": 61
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/quick-start.mdx",
+    "sha256": "a343df16a2ca0092c5bd176ae6eb2f7e8c6a6eb383c5f607dbb8ec9862d28f1c",
+    "lines": 82
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/api/analyze.mdx",
+    "sha256": "e0ec5439edbc82a9a5bbc37966798b49ec24a0cfb400f5d20626fb3746e6080c",
+    "lines": 456
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/api/index.mdx",
+    "sha256": "a973116c3103db88e98c6f70e23bc951d38289f73ccdd4cf0f8b8b2ac7b7a1a1",
+    "lines": 376
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/api/io.mdx",
+    "sha256": "b0911f75f264ab4b342e073468d13eec2ff2769bb05a6f1cf97b2674f0d161ec",
+    "lines": 121
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/api/play.mdx",
+    "sha256": "a152a9b6cb48a970f036175a36d6103f2887c43d7ba81c73bfb9ff2277af49b7",
+    "lines": 424
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/api/react.mdx",
+    "sha256": "d58a22133f726816888aa2cecc5144bdd7e2d7cac93b96d587dac2e882ce11fb",
+    "lines": 392
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/api/view.mdx",
+    "sha256": "306562e9be4543142a793c2f20820c59da3035510b6a228195493ff3726cc25d",
+    "lines": 361
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/element/analyze/analysis-histogram.mdx",
+    "sha256": "376cd4827970802e0a28709bbca55f22c5774d5204be779589593347b75ec5d5",
+    "lines": 44
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/element/analyze/analysis-timeline.mdx",
+    "sha256": "99b24fddec6eef77048b286ce1dde041e319db84e467555f2930fdd727c657df",
+    "lines": 50
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/element/analyze/analysis-view.mdx",
+    "sha256": "adde72b3e7e7671c2db63518aec5f3c2b024b29dece0a8ec8a160d9772e0cdfa",
+    "lines": 70
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/element/analyze/index.mdx",
+    "sha256": "f6db8a49f474e8d81e4bf04015c217afede50cba02bafd05e408000b3dfdedd6",
+    "lines": 42
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/element/analyze/rhythm-patterns.mdx",
+    "sha256": "25f34b3773b57e6b3ef0c0c86c42ecc3ac93109b2d3e1330ff985df283b1edb8",
+    "lines": 56
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/element/analyze/score-analysis.mdx",
+    "sha256": "6184bdf09c4b51f9fc35203e5019638ee937651d829b2c22a9c3e8c79d63b400",
+    "lines": 44
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/element/index.mdx",
+    "sha256": "1a8b07eb028fb6f7d485d09f36f1d17e7ccf166be3ea96ba1acf42c1417a34c6",
+    "lines": 12
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/element/play/index.mdx",
+    "sha256": "5b2c4f453ef90d57972e3048a36f9e713bd9063be51f2964e5db31b57f66ef76",
+    "lines": 59
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/element/play/note-input.mdx",
+    "sha256": "81f933e8c423462ecde402e1483c87b8e104ec824b44ea6632aa95a877a64f7f",
+    "lines": 186
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/element/play/rack-control.mdx",
+    "sha256": "0f870736f98039fb07bf37d404bb792b58683ca758054e463ba2d03bbefe7ea8",
+    "lines": 153
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/element/play/score-player.mdx",
+    "sha256": "4341ff67a216ebfba75c89b995e5d4c1ee4164d33a0a56dfaa4c8d32d7172a16",
+    "lines": 177
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/element/play/synth-panel.mdx",
+    "sha256": "d0d2eb97c5112cde3dba31ab60955d71283d8ca20bab5079d4770a728c3d075c",
+    "lines": 179
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/element/view/index.mdx",
+    "sha256": "eceb0e6b501d6768a83e24a7ea9be31001e89103a0191d953580ddc4c5a3ae11",
+    "lines": 46
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/element/view/keyboard-view.mdx",
+    "sha256": "d73e917c6216e27a910fdb676d164544bf8469e782c48916a84495bfa6984f26",
+    "lines": 48
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/element/view/score-map.mdx",
+    "sha256": "83ca962a916474bbf8e581abe7ed9a497554a1debaee3dee9643012e2d6710b4",
+    "lines": 58
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/element/view/score-thumbnail.mdx",
+    "sha256": "7e63225d76e18c2d674332213b30dd2f72f53a55f8e0a0ab526a77a2373237ce",
+    "lines": 49
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/element/view/score-view.mdx",
+    "sha256": "97ae418aeef0d591c75651ec9bc9a95010c7ab304f45055ebf09c37ccc4cf450",
+    "lines": 204
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/element/view/sheet-view.mdx",
+    "sha256": "6d532edd27bf8bbca8227c9134c56a8ab856dacbce064a0cd0c251815891c6df",
+    "lines": 63
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/getting-started.mdx",
+    "sha256": "339c7647d66f3440a15b2b9a528835bc1782a7f7486c542d0571ddc17230bb57",
+    "lines": 190
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/headless/analyze/analysis-session.mdx",
+    "sha256": "9fd0d00874d02d5bd05b74dbeb8f84a6e12dbf4fda9c098640f880ab87d7f32e",
+    "lines": 174
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/headless/analyze/index.mdx",
+    "sha256": "e138a0326a45bcea3023c5b6d2fae2fda99f2d3fd16d44c814ccf0a5d1a888d1",
+    "lines": 51
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/headless/analyze/live-trackers.mdx",
+    "sha256": "7c137cf567e722ca1c8485146b68438acc100683d4f6b4fdb21fc8435f57096b",
+    "lines": 123
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/headless/analyze/score-report.mdx",
+    "sha256": "7204e5b9392c6acc6a67449c9621e7db73b1690d4063c4132f0949f9e3c7d5aa",
+    "lines": 73
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/headless/index.mdx",
+    "sha256": "46c64d50670eb05144e4ef41f7139ce4b01fbbe602fb7d6d96e7cc81aa24d402",
+    "lines": 23
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/headless/play/ab-player.mdx",
+    "sha256": "e09b364e5b8d27acb7332bfebac13db44624fb03ca865160b109fd99e107a5cf",
+    "lines": 82
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/headless/play/effect.mdx",
+    "sha256": "5fd94d5dac7837ff7ba95014c080ffc43d92717c8a365f3231be2399a1f14416",
+    "lines": 180
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/headless/play/index.mdx",
+    "sha256": "11c4cff0d5dbb585dec87baee5e9f2cfa15d5d482fd7b8a80da81b22f5cfc362",
+    "lines": 94
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/headless/play/interactive-player.mdx",
+    "sha256": "c93615d5262a847dfc538c8cbdb6b1bec85e21d02babfdd58701291d9fa981b6",
+    "lines": 206
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/headless/play/loop-player.mdx",
+    "sha256": "8e4aa0cc542407e98ab80ebf6aefb983e837ad06f4b2d13fbbecf63165a9a76c",
+    "lines": 92
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/headless/play/metronome.mdx",
+    "sha256": "8512afce7c9b9a71ad89f03ad01eb5fef7ac5941f2da2edb0a2e07da384ab07f",
+    "lines": 128
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/headless/play/player-controller.mdx",
+    "sha256": "da28ecaace88ff886b2e5e02ab26ee04d0db997f6b9d58a678e29bc308770801",
+    "lines": 101
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/headless/play/rack.mdx",
+    "sha256": "a2c169f47aec694b377a1632752f20b9b16cf8305d69511adbabdee7eda7e8e8",
+    "lines": 216
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/headless/play/score-player.mdx",
+    "sha256": "e81792add6bf95d70016cc618c5421ecc63b5ef211ae5cb7a78d009a59ec1657",
+    "lines": 182
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/headless/play/sound.mdx",
+    "sha256": "04ca4c4db33092dc153761aabe91d9f3d4f152484b1dca24f6fe19c47fc9985b",
+    "lines": 147
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/headless/play/synth-backends.mdx",
+    "sha256": "266d99de888dad0a427dbccb5b253b5cd4276667c67dc96688913027da5dc75f",
+    "lines": 295
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/headless/play/tone-player.mdx",
+    "sha256": "61bf5fb3ac99a342c945535a3c6493c249ee9fe044c5e14ad7fa1c8afac09817",
+    "lines": 136
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/headless/play/transport-drivers.mdx",
+    "sha256": "e9aaba3714489464780b758e192bc10d268b9319a7ee85c9963654dd64cf9ca2",
+    "lines": 89
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/headless/play/web-midi.mdx",
+    "sha256": "fd783f3e3f467d5bb94e0515bac8865e270cd61c76049cd3695d5bffc9b1f7dc",
+    "lines": 91
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/headless/view/active-note-tracker.mdx",
+    "sha256": "cf200807d8f9ec1dcaa25cdf654eed52275722ca19385939f9372d4bc811b24c",
+    "lines": 94
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/headless/view/index.mdx",
+    "sha256": "92309f2d39142d03c345de4df59967cb260e6a8f82625287ec794bedca279718",
+    "lines": 43
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/headless/view/score-view.mdx",
+    "sha256": "5348a7889ee553be814584cc6858f0efeb518f682c179ff6be21f087309c8c69",
+    "lines": 148
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/score/index.mdx",
+    "sha256": "610b2c3750371c33d837034fc0d707ec41f2029517dba2fdf017627464ec0790",
+    "lines": 43
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/uikit/api.mdx",
+    "sha256": "10bfdde8d0468d31a5c8349070ced938706aa7c3fff861a39067c9554261b392",
+    "lines": 109
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/uikit/catalog.mdx",
+    "sha256": "36eff0342f75f4cc817e3e4c6063e304b72d338193af5ca8fa1e918b79ac2e98",
+    "lines": 23
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/uikit/index.mdx",
+    "sha256": "8e388f827ade7d7cfcb07a3e7e03f12b72cc421ec8d3ca82773718195d9fbf04",
+    "lines": 230
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/uikit/mixing-capture/meter.mdx",
+    "sha256": "4647c70a6e73095f0f9748c9d0113c26f9036bdd27198377fcf55ee727feefd0",
+    "lines": 158
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/uikit/mixing-capture/mixer.mdx",
+    "sha256": "2e8564bbcf8df74b069b14de42a95eb5eb8679383486bb748b10591c3cf18725",
+    "lines": 200
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/uikit/mixing-capture/recorder.mdx",
+    "sha256": "ecc0dbc2563813fdf002e185d3f41ab8250681286662d9d9d4f0fbd54f10f1e7",
+    "lines": 171
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/uikit/notes/note.mdx",
+    "sha256": "b9ad1d44c1879e9f09ddef2a5b2fd39d3b4f4d6bab508d93e392f1aa87d12f86",
+    "lines": 235
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/uikit/parameters-gestures/envelope.mdx",
+    "sha256": "48ce7a6f56bc7c7dba854c7402a38146c7dcd905ad377ff368d948ed4dd5b580",
+    "lines": 161
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/uikit/parameters-gestures/eq.mdx",
+    "sha256": "e17596004f75f5d93fcef02bbc66210c9bdff3e3b4b62d9380cfeeac2c35dfbd",
+    "lines": 165
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/uikit/parameters-gestures/lfo.mdx",
+    "sha256": "0b44e1e377472acb6ab23b7cffd7956b33fc0809b09dc28bd4b64fe889ee2a40",
+    "lines": 197
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/uikit/parameters-gestures/macro.mdx",
+    "sha256": "2f90fb9310ddb9b998195930354b5565670e874941c883cbea19a6a12ab64d77",
+    "lines": 159
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/uikit/parameters-gestures/panel.mdx",
+    "sha256": "9f2073c6807ecf63b46c886b7cc9d3fbd32a023b3ee766d806761e8c44807356",
+    "lines": 146
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/uikit/parameters-gestures/parameter.mdx",
+    "sha256": "4b18e5bf78cdbacd8a76b183812d63eb9d880385b6b0bd9f93c88d4ad00bddfe",
+    "lines": 186
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/uikit/transport-time/minimap.mdx",
+    "sha256": "4e082f1b0ac364bbc92e7664aee7093059fc76a8f1994fa93b8d1a44d1e80484",
+    "lines": 166
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/uikit/transport-time/playlist.mdx",
+    "sha256": "659630403252f9bffd2822d418f8983e3d2caabe7543e78d443a57b47bc2c31f",
+    "lines": 194
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/uikit/transport-time/timeline.mdx",
+    "sha256": "0aeb23acc65aa9699baafbaa0763aa72558bc16290d251b612997b6696783d3f",
+    "lines": 214
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/uikit/transport-time/transport.mdx",
+    "sha256": "95b95e14bdd567677b0c7c92c672b931a7e6b7d3c09c8865512614ba9e412794",
+    "lines": 243
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/uikit/views-analysis/analysis.mdx",
+    "sha256": "ba238f63544601f9107a932c9937335df8de8b7387a5f989b2fd545500525f3f",
+    "lines": 175
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/uikit/views-analysis/stage.mdx",
+    "sha256": "c9ff0098436ebe811d82c3ca7774770add78271a6fd49116ad97e20fd92bf9c6",
+    "lines": 212
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/uikit/views-analysis/status.mdx",
+    "sha256": "16452c924fbbc1d81cc115ce4ff4c8be2bc3038f061621198deaf827ffac3e9d",
+    "lines": 129
+  },
+  {
+    "path": "apps/doc/webmusic/src/content/docs/uikit/views-analysis/track-list.mdx",
+    "sha256": "107b9219beec6910c3839743630fe20af77e268b683c881496d35f0172ee8f91",
+    "lines": 153
+  },
+  {
+    "path": "bridges/README.md",
+    "sha256": "5694eec5952811e16ba4cbaa01c475a8a4076fbe6d27e6c60ecbaf974b0d4b48",
+    "lines": 366
+  },
+  {
+    "path": "bridges/score-audio/README.md",
+    "sha256": "4a04fb816916bb90342636d16758d62b8171ee1fa33c31957b91627840b7371a",
+    "lines": 66
+  },
+  {
+    "path": "dev/API-PAGE-TEMPLATE.md",
+    "sha256": "23482bf09391548ea6a1c4826460e85b6b51f003fd6fab6077159b40fd2f900d",
+    "lines": 211
+  },
+  {
+    "path": "dev/COMPONENT-DESIGN.md",
+    "sha256": "7034eba8d20d5ed1d373460748d23a9c80e5bdd341a6b00ddcaae04c6a58aa0c",
+    "lines": 100
+  },
+  {
+    "path": "dev/COMPONENT-PAGE-TEMPLATE.md",
+    "sha256": "7e789d586ab2c657bac664415d82a6eced49ec4601218787066f7fe02d2b6e1b",
+    "lines": 234
+  },
+  {
+    "path": "dev/COMPONENTS.md",
+    "sha256": "37bfd56ab1ea8409f64f971658f9e83a0e6e365fb0eca5e24adc319c3a0b0bb8",
+    "lines": 520
+  },
+  {
+    "path": "dev/DECISIONS.md",
+    "sha256": "5806695da93c961743cd9927e09300b8b56810e3ffa71901f10526970b51d811",
+    "lines": 107
+  },
+  {
+    "path": "dev/DESIGN-PRINCIPLES.md",
+    "sha256": "6c7f383df018ae7bc5ff2ac33a5e200e739af4808549f969c8275eb8191e9b24",
+    "lines": 79
+  },
+  {
+    "path": "dev/DEVELOPMENT.md",
+    "sha256": "277332f7af8bddee94437c4bd2e6a4f1a516e5b8628604523c84b46bf714dd38",
+    "lines": 138
+  },
+  {
+    "path": "dev/DOCS-CONVENTIONS.md",
+    "sha256": "1270d83151deabfca55664d511b7f813736212e4c33610fbe0823aa017ce5b87",
+    "lines": 250
+  },
+  {
+    "path": "dev/DOCS-SITE-PLAN.md",
+    "sha256": "212c7870f22b1c1a6b39052d785a69edf1fe768103adf2080705c21ecdf6bc6c",
+    "lines": 279
+  },
+  {
+    "path": "dev/DOCUMENTATION-MAP.md",
+    "sha256": "d2b3ee8165c6b2ccb38c9a7fdb00d1e40e40d7080c0a19f3e17cdc0f0f1f5d8c",
+    "lines": 183
+  },
+  {
+    "path": "dev/HEADLESS-PAGE-TEMPLATE.md",
+    "sha256": "8a0cee31f82527c85cdc483481a2ae092b32462a6d66115220670042a4140f01",
+    "lines": 251
+  },
+  {
+    "path": "dev/PRODUCT.md",
+    "sha256": "f13ff9e2cdaa15e6bf0a82791efc7f81ead2beb9361ae2a83685e9514c22ce63",
+    "lines": 77
+  },
+  {
+    "path": "dev/README.md",
+    "sha256": "dffa248954229a528483e70019e7e3bdd64f849252cbcf2490c099b739e86496",
+    "lines": 50
+  },
+  {
+    "path": "dev/STATUS.md",
+    "sha256": "8ccd17871fec905869bd9de0a53a2b113268af837a1aba0abdb2ff7421ab01d1",
+    "lines": 42
+  },
+  {
+    "path": "dev/UIKIT-PAGE-TEMPLATE.md",
+    "sha256": "277e4339be1c42edcbbbd0cceb44dc767e8277df849fa828d2219d82a43b0077",
+    "lines": 239
+  },
+  {
+    "path": "dev/audits/2026-09-05/DEV-DOCS-REVIEW.md",
+    "sha256": "9bcbba2a84acfc751254ac16f1c9d3e4ae81330b1a54e887a5661966ba05bca7",
+    "lines": 199
+  },
+  {
+    "path": "dev/audits/2026-09-05/DOCUMENTATION-REORGANIZATION.md",
+    "sha256": "81aa4372a1f5915cac8e9a52d796478811c4a6fa5e81404f4c8d24c3f4cb1a9b",
+    "lines": 122
+  },
+  {
+    "path": "dev/audits/2026-09-05/FIXES.md",
+    "sha256": "c9ec4c39da81e8e47fe5e85f425877ad28139b1a7b2575fe4acdd886e767819d",
+    "lines": 61
+  },
+  {
+    "path": "dev/audits/2026-09-05/README.md",
+    "sha256": "a56aa96632355c33d71d7bc44bf51c105f2ab38c00dfdff410e440de908a2ae6",
+    "lines": 275
+  },
+  {
+    "path": "dev/plans/audio-analyze-elements.md",
+    "sha256": "9ccc8cf6f1d357dfde35278c4ae14762eb1a8dfebcd747bc3cb58104e2b993d5",
+    "lines": 489
+  },
+  {
+    "path": "dev/plans/audio-play-elements.md",
+    "sha256": "bd57bc293d2f00e9b852ce25cc0d76f3a9c3b265f054bdf0e192e3bce50cd5b7",
+    "lines": 559
+  },
+  {
+    "path": "dev/plans/audio-view-elements.md",
+    "sha256": "cf437c95c158c2419b420ae21181ce1f28c62d70fa82060e90daf36f520fd312",
+    "lines": 528
+  },
+  {
+    "path": "dev/plans/docs-site-backlog.md",
+    "sha256": "f075ee5f43b6c79cc3e4188d5812799230332e78c596f021c2e41b71bd2bb97a",
+    "lines": 288
+  },
+  {
+    "path": "dev/plans/repo-review-2026-08-22.md",
+    "sha256": "041c0d1115bbbcc63eae53e211d64e860b3c9fa075b1a03297f4e4276b839b27",
+    "lines": 390
+  },
+  {
+    "path": "dev/plans/score-analyze-elements.md",
+    "sha256": "0d73ba3a2c0470c5d2062f6c364ae3b3d16d32d2e20cc1d562551e211f9a0f87",
+    "lines": 477
+  },
+  {
+    "path": "dev/plans/score-view-elements.md",
+    "sha256": "d7ac13704cfbd0bcf63564ca460798da907752ef5eca2dbb19bf2fd6c5bc21c6",
+    "lines": 538
+  },
+  {
+    "path": "packages/audio/README.md",
+    "sha256": "3f9b3dfb4001bff7e7985a5c849fe5279ebd1670a6ea2bb158b05cdee680adf0",
+    "lines": 493
+  },
+  {
+    "path": "packages/audio/docs/README-analyze.md",
+    "sha256": "9d37d5aa60ad3c69a5219ee603b661557cd7ad2996a1403c658c825977371aa8",
+    "lines": 43
+  },
+  {
+    "path": "packages/audio/docs/README-core.md",
+    "sha256": "e698e6981802182ec21fae1c60bf59353b09dc7dae4ece18aef1b036e8500c93",
+    "lines": 35
+  },
+  {
+    "path": "packages/audio/docs/README-play.md",
+    "sha256": "10005f104b04acdab85581e80beaa26b41d4828de4a2c731b67e290f2928cabc",
+    "lines": 44
+  },
+  {
+    "path": "packages/audio/docs/README-react.md",
+    "sha256": "8f70973ddf6b6e887668117ca21fe0cf31999188d458b0f72f8bfbada3308282",
+    "lines": 41
+  },
+  {
+    "path": "packages/audio/docs/README-view.md",
+    "sha256": "9d78f9a178b00c1a045291e6fca53a925304ef897502a9a913d1dfe8c2061d64",
+    "lines": 47
+  },
+  {
+    "path": "packages/audio/docs/README.md",
+    "sha256": "96ced62e5a2db13504930352d9ca6dabd1920201d1461c61ddf181db106091ac",
+    "lines": 29
+  },
+  {
+    "path": "packages/score/ARCHITECTURE.md",
+    "sha256": "deb6670aa7285d992efac1f7775a21f16fcda8e77781f376ce675df6eda681f7",
+    "lines": 456
+  },
+  {
+    "path": "packages/score/README.md",
+    "sha256": "383d58c4e8ebe22541be679ec5431090e84382ab61f8cd15e7948cdefc6eabc1",
+    "lines": 769
+  },
+  {
+    "path": "packages/score/docs/README-analyze.md",
+    "sha256": "88c23f196ad5a241ad6809e119059825dd6dfafcc2bd654419e3981c3d16db18",
+    "lines": 217
+  },
+  {
+    "path": "packages/score/docs/README-core.md",
+    "sha256": "50dbb768d140e995455989be7abf1aaf62f692a153798cf85bd2b241f35996a1",
+    "lines": 127
+  },
+  {
+    "path": "packages/score/docs/README-io.md",
+    "sha256": "2d92ed426406129cb5c59f17befad742eb8858727b92aa103db1a3522309e61d",
+    "lines": 157
+  },
+  {
+    "path": "packages/score/docs/README-play.md",
+    "sha256": "02374a9d74ad2e5c198c5d106df461cc18512e57a3a464716bda7c7a0b51b137",
+    "lines": 550
+  },
+  {
+    "path": "packages/score/docs/README-react.md",
+    "sha256": "b0da1339f441f461cf03d8c7540b00b35fc5ccd40321cb74912829b95f8064b6",
+    "lines": 106
+  },
+  {
+    "path": "packages/score/docs/README-view.md",
+    "sha256": "ee369552cde5de0c18dec8b66875958af1d68881be9b3c2edf194f19ef9c16aa",
+    "lines": 132
+  },
+  {
+    "path": "packages/score/docs/README.md",
+    "sha256": "c280d2a91a03270553066a2fe4a9609e03f89b638116edb5e77c43e26d699a57",
+    "lines": 30
+  },
+  {
+    "path": "packages/ui/README.md",
+    "sha256": "ca70ed169d787431b0be0696c0bd5973748ba8502b94733f145067e2a633fdca",
+    "lines": 513
+  },
+  {
+    "path": "platform/README.md",
+    "sha256": "23a83f399c434bd69d7d76a68359aadc53992de6329a15e66d7f921134889735",
+    "lines": 90
+  },
+  {
+    "path": "platform/kernel/README.md",
+    "sha256": "fe09067db0c75b00beda57f98147c5e6144b04db666f32c8a2532751b7fe0aaa",
+    "lines": 387
+  },
+  {
+    "path": "platform/shared-clock-injection.md",
+    "sha256": "467acf18e177d934f999cb202ad4a46215853c9f8cb7cf4100123fa18758696c",
+    "lines": 151
+  },
+  {
+    "path": "scripts/release-pipeline/README.md",
+    "sha256": "ca309718fe4a4e07ccee6d495bf50e1502800454165ba57ae5bec36d2c9e85c0",
+    "lines": 33
+  }
+]

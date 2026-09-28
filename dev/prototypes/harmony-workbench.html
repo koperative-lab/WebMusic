@@ -1,0 +1,3224 @@
+<!doctype html>
+<html lang="zh-CN" data-scheme="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Harmony Workbench — live</title>
+<style>
+/* ==========================================================================
+   Harmony Workbench —— 会动的原型（dev/prototypes/harmony-workbench.html）
+   单文件、零构建、零网络、零依赖。双击即开，开了就自己走带。
+
+   本文件对应 dev/plans/analysis-workbench-design.md 的 live 转向：
+   固定 now 线、材料从右往左滚过它（D2），六个视图各自在内部变活（D1），
+   四个坞位吃同一次 projectSounding()（§1）。
+
+   下面每个 --wui-* / --wm-* 变量名都与 packages/ui/src/harmony-style.ts
+   逐字对应，色值也是那份文件里的字面量，不是重新调过的颜色。
+   ========================================================================== */
+
+*, *::before, *::after { box-sizing: border-box }
+
+:root {
+  color-scheme: light dark;
+
+  /* 宿主页面的 token 层。真实实现里卡片 **继承** 宿主的 color-scheme 与这些
+     --wm-* 值（harmony-style.ts §2.4），所以这一层写在页面上，不写在卡片上。 */
+  --wm-harmony-foreground: light-dark(#14161a, #e8eaed);
+  --wm-harmony-background: light-dark(#ffffff, #16181d);
+  --wm-harmony-muted:      light-dark(#5c6470, #9aa3b2);
+  --wm-harmony-rule:       light-dark(#d8d8d8, #2b3039);
+  --wm-harmony-accent:     light-dark(#111111, #e8eaed);
+  --wm-harmony-track:      light-dark(#eeeeee, #23272f);
+
+  --proto-ground:  light-dark(#f4f5f7, #101216);
+  --proto-panel:   light-dark(#ffffff, #191c22);
+  --proto-ink:     light-dark(#14161a, #e8eaed);
+  --proto-muted:   light-dark(#5c6470, #9aa3b2);
+  --proto-rule:    light-dark(#dfe3e8, #2b3039);
+  --proto-focus:   light-dark(#2563eb, #7aa2f7);
+}
+html[data-scheme="light"] { color-scheme: light }
+html[data-scheme="dark"]  { color-scheme: dark }
+
+body {
+  margin: 0;
+  background: var(--proto-ground);
+  color: var(--proto-ink);
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+img { max-width: 100% }
+[hidden] { display: none !important }
+
+/* ==========================================================================
+   1. 原型外框（不是设计的一部分，只是承载它的桌面）
+   ========================================================================== */
+
+.page { max-width: 1240px; margin: 0 auto; padding: 24px 20px 64px }
+.spec-head { margin-bottom: 16px }
+.spec-eyebrow {
+  display: inline-block; font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--proto-muted); margin-bottom: 6px;
+}
+.spec-head h1 { margin: 0 0 8px; font-size: 26px; letter-spacing: -.01em }
+.spec-head p { margin: 0 0 6px; max-width: 78ch; color: var(--proto-muted); font-size: 13px }
+.spec-head .fact { color: var(--proto-ink) }
+.spec-head code { font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace }
+
+.toolbar {
+  display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center;
+  padding: 10px 12px; margin-bottom: 12px;
+  background: var(--proto-panel); border: 1px solid var(--proto-rule); border-radius: 8px;
+}
+.tool { display: flex; align-items: center; gap: 6px }
+.tool-label { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--proto-muted) }
+.seg { display: inline-flex; border: 1px solid var(--proto-rule); border-radius: 6px; overflow: hidden }
+.seg button {
+  appearance: none; border: 0; background: transparent; color: var(--proto-ink);
+  font: inherit; font-size: 12px; padding: 4px 9px; cursor: pointer;
+  border-left: 1px solid var(--proto-rule);
+}
+.seg button:first-child { border-left: 0 }
+.seg button[aria-pressed="true"] { background: var(--proto-ink); color: var(--proto-panel) }
+.tool input[type="range"] { width: 132px; accent-color: var(--proto-focus) }
+.tool output { font: 12px/1 ui-monospace, monospace; color: var(--proto-muted); min-width: 5.5ch }
+:focus-visible { outline: 2px solid var(--proto-focus); outline-offset: 2px }
+
+.frame { display: flex; justify-content: center }
+.frame-inner {
+  width: 100%; max-width: 100%;
+  border: 1px dashed var(--proto-rule); border-radius: 10px; padding: 12px; background: var(--proto-ground);
+  transition: width 160ms ease-out;
+}
+
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; margin-top: 20px }
+.note-card {
+  background: var(--proto-panel); border: 1px solid var(--proto-rule); border-radius: 8px; padding: 12px 14px;
+}
+.note-card h2 { margin: 0 0 8px; font-size: 13px; letter-spacing: .04em; text-transform: uppercase; color: var(--proto-muted) }
+.note-card table { border-collapse: collapse; width: 100%; font-size: 12.5px }
+.note-card td { border-top: 1px solid var(--proto-rule); padding: 5px 6px 5px 0; vertical-align: top }
+.note-card td:first-child { white-space: nowrap; color: var(--proto-muted); width: 8.5rem }
+.note-card p { margin: 0 0 8px; font-size: 12.5px }
+.note-card code { font: 11.5px/1.4 ui-monospace, monospace; background: var(--proto-ground); padding: 1px 4px; border-radius: 3px }
+
+/* ==========================================================================
+   2. token 层 —— harmony-style.ts 的形状与字面量
+   ========================================================================== */
+
+.wui-harmony {
+  /* A 组：界面骨架。亮侧字面量 = harmony-style.ts 里那一侧的字节。 */
+  --wui-harmony-ink:        var(--wm-harmony-foreground, inherit);
+  --wui-harmony-surface:    var(--wm-harmony-background, transparent);
+  --wui-harmony-on-accent:  var(--wm-harmony-on-accent, light-dark(#fff, #14161a));
+  --wui-harmony-ink-muted:  var(--wm-harmony-muted, light-dark(#777, #9aa3b2));
+  --wui-harmony-line:       var(--wm-harmony-rule, light-dark(#d8d8d8, #2b3039));
+  --wui-harmony-border:     var(--wm-harmony-border, 1px solid var(--wui-harmony-line));
+  --wui-harmony-pad:        var(--wm-harmony-padding, .75rem);
+  --wui-harmony-accent:     var(--wm-harmony-accent, light-dark(#111, #e8eaed));
+  --wui-harmony-track:      var(--wm-harmony-track, light-dark(#eee, #23272f));
+  --wui-harmony-danger:     var(--wm-harmony-danger, light-dark(#c0392b, #f87171));
+  --wui-harmony-warning:    var(--wm-harmony-warning, light-dark(#a86a00, #fbbf24));
+  --wui-harmony-info:       var(--wm-harmony-info, light-dark(#888, #9aa3b2));
+  --wui-harmony-focus:      var(--wm-harmony-focus, var(--proto-focus));
+  --wui-harmony-radius:     var(--wm-harmony-radius, 0);
+
+  --wui-harmony-font:        var(--wm-harmony-font, inherit);
+  --wui-harmony-font-mono:   var(--wm-harmony-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  --wui-harmony-font-display:var(--wm-harmony-font-display, var(--wui-harmony-font));
+
+  --wui-harmony-space-1: 4px;
+  --wui-harmony-space-2: 8px;
+  --wui-harmony-space-3: 12px;
+  --wui-harmony-space-4: 16px;
+  --wui-harmony-space-5: 24px;
+  --wui-harmony-motion-ease: ease-out;
+
+  /* B 组：音级角色。这八个色对逐字节来自 harmony-style.ts 的 DEGREE 表。 */
+  --wui-degree-root:      light-dark(#c2410c, #fb923c);
+  --wui-degree-third:     light-dark(#0369a1, #38bdf8);
+  --wui-degree-fifth:     light-dark(#15803d, #4ade80);
+  --wui-degree-seventh:   light-dark(#6d28d9, #a78bfa);
+  --wui-degree-extension: light-dark(#a16207, #facc15);
+  --wui-degree-bass:      light-dark(#9f1239, #fb7185);
+  --wui-degree-other:     light-dark(#6b7280, #94a3b8);
+  --wui-degree-ghost:     light-dark(rgba(20, 22, 26, .1), rgba(232, 234, 237, .14));
+  --wui-degree-ink:       light-dark(#ffffff, #14161a);
+
+  /* 十二槽进行色盘（PROGRESSION 表），按音级索引，不按名字哈希。 */
+  --wui-progression-tone-0:  light-dark(#b91c1c, #f87171);
+  --wui-progression-tone-1:  light-dark(#c2410c, #fb923c);
+  --wui-progression-tone-2:  light-dark(#a16207, #facc15);
+  --wui-progression-tone-3:  light-dark(#4d7c0f, #a3e635);
+  --wui-progression-tone-4:  light-dark(#15803d, #4ade80);
+  --wui-progression-tone-5:  light-dark(#0f766e, #2dd4bf);
+  --wui-progression-tone-6:  light-dark(#0369a1, #38bdf8);
+  --wui-progression-tone-7:  light-dark(#1d4ed8, #60a5fa);
+  --wui-progression-tone-8:  light-dark(#4338ca, #818cf8);
+  --wui-progression-tone-9:  light-dark(#6d28d9, #a78bfa);
+  --wui-progression-tone-10: light-dark(#a21caf, #e879f9);
+  --wui-progression-tone-11: light-dark(#9f1239, #fb7185);
+
+  /* 密度：comfortable（harmonyDensity.comfortable 的九个值）。 */
+  --wui-harmony-size-display: 2.75rem;
+  --wui-harmony-size-title:   1.0625rem;
+  --wui-harmony-size-body:    .875rem;
+  --wui-harmony-size-label:   .75rem;
+  --wui-harmony-size-micro:   .6875rem;
+  --wui-harmony-keyboard-height:  92px;
+  --wui-harmony-staff-space:      9px;
+  --wui-harmony-fretboard-height: 104px;
+
+  /* 传送带的四个新 token（设计 §3.6.5）。scale 的单位是 px / 四分音符。 */
+  --wui-harmony-flow-scale:  44px;
+  --wui-harmony-flow-height: 96px;
+  --wui-harmony-lane-height: 48px;
+  --wui-harmony-flow-now:    var(--wui-harmony-accent);
+
+  /* 七个 motion token（设计 §2.5.2）。C.2 只落了前两条，其余五条是本轮新增。 */
+  --wui-harmony-motion-tone:    90ms;
+  --wui-harmony-motion-chip:    120ms;
+  --wui-harmony-motion-flow:    120ms;
+  --wui-harmony-motion-pop:     180ms;
+  --wui-harmony-motion-release: 140ms;
+  --wui-harmony-motion-column:  200ms;
+  --wui-harmony-motion-turn:    320ms;
+
+  /* 🔴 容器查询**永远不能**给自己的容器写样式。所以 container 是卡片根，
+     被查询到的规则写在 .wui-workbench 上 —— 反过来写会静默失效。 */
+  container-type: inline-size;
+  font-family: var(--wui-harmony-font);
+  font-size: var(--wui-harmony-size-body);
+  line-height: 1.45;
+  color: var(--wui-harmony-ink);
+  background: var(--wui-harmony-surface);
+  border: var(--wui-harmony-border);
+  padding: var(--wui-harmony-pad);
+}
+
+.wui-harmony[data-density="compact"] {
+  --wui-harmony-size-display: 1.75rem;
+  --wui-harmony-size-title:   .9375rem;
+  --wui-harmony-size-body:    .8125rem;
+  --wui-harmony-size-label:   .6875rem;
+  --wui-harmony-size-micro:   .625rem;
+  --wui-harmony-keyboard-height:  68px;
+  --wui-harmony-staff-space:      7px;
+  --wui-harmony-fretboard-height: 80px;
+  --wui-harmony-flow-scale:  32px;
+  --wui-harmony-flow-height: 72px;
+  --wui-harmony-lane-height: 36px;
+}
+
+/* 减动效 = harmonyMotion.reduced。**布局逐像素不变**，只是时长归零，
+   而位置改由 20Hz 的域事件步进（JS 侧 data-motion="stepped"）。 */
+.wui-harmony[data-motion="stepped"],
+.wui-harmony[data-motion="none"] {
+  --wui-harmony-motion-tone: 0s;
+  --wui-harmony-motion-chip: 0s;
+  --wui-harmony-motion-flow: 0s;
+  --wui-harmony-motion-pop: 0s;
+  --wui-harmony-motion-release: 0s;
+  --wui-harmony-motion-column: 0s;
+  --wui-harmony-motion-turn: 0s;
+}
+.wui-harmony[data-motion="stepped"] *,
+.wui-harmony[data-motion="stepped"] *::before,
+.wui-harmony[data-motion="stepped"] *::after {
+  transition: none !important;
+  animation: none !important;
+}
+
+.wui-harmony :focus-visible { outline: 2px solid var(--wui-harmony-focus); outline-offset: 2px }
+.wui-harmony ::selection { background: color-mix(in srgb, var(--wui-harmony-accent) 22%, transparent) }
+
+/* 视觉隐藏但仍可被读屏与「无 CSS」读到（clip，不是 display:none）。 */
+.wui-vh {
+  position: absolute !important; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0;
+}
+
+/* ==========================================================================
+   3. 外壳 mountWorkbench
+   ========================================================================== */
+
+.wui-workbench {
+  display: grid;
+  grid-template-areas: "header header" "main rail" "strip strip" "status status";
+  grid-template-columns: minmax(0, 1fr) clamp(228px, 28%, 312px);
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  gap: var(--wui-harmony-space-3);
+}
+.wui-workbench__header { grid-area: header; display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--wui-harmony-space-3) }
+.wui-workbench__title { font-size: var(--wui-harmony-size-title); font-weight: 700; margin: 0 }
+.wui-workbench__subtitle { color: var(--wui-harmony-ink-muted); font-size: var(--wui-harmony-size-label); margin: 0 }
+.wui-workbench__tabs { display: flex; gap: 2px; margin-left: auto; overflow-x: auto; scrollbar-width: thin }
+.wui-workbench__tab {
+  appearance: none; border: 1px solid transparent; border-bottom: 2px solid transparent;
+  background: transparent; color: var(--wui-harmony-ink-muted); cursor: pointer;
+  font: inherit; font-size: var(--wui-harmony-size-label); padding: 4px 9px; white-space: nowrap;
+}
+.wui-workbench__tab[aria-selected="true"] {
+  color: var(--wui-harmony-ink); font-weight: 600;
+  border-bottom-color: var(--wui-harmony-accent);
+}
+.wui-workbench__main { grid-area: main; min-width: 0 }
+.wui-workbench__stage { min-width: 0; display: flex; flex-direction: column; gap: var(--wui-harmony-space-2) }
+.wui-workbench__rail { grid-area: rail; min-width: 0; display: flex; flex-direction: column; gap: var(--wui-harmony-space-3) }
+.wui-workbench__strip { grid-area: strip; min-width: 0 }
+.wui-workbench__dock { min-width: 0 }
+.wui-workbench__dock-label {
+  display: block; font-size: var(--wui-harmony-size-micro); letter-spacing: .07em;
+  text-transform: uppercase; color: var(--wui-harmony-ink-muted); margin-bottom: 4px;
+}
+.wui-workbench__status {
+  grid-area: status; display: flex; align-items: center; gap: var(--wui-harmony-space-2);
+  border-top: 1px solid var(--wui-harmony-line); padding-top: var(--wui-harmony-space-2);
+  font-size: var(--wui-harmony-size-label);
+}
+.wui-workbench__beacon { width: .55rem; height: .55rem; border-radius: 50%; background: var(--wui-harmony-ink-muted); flex: 0 0 auto }
+.wui-harmony[data-phase="playing"] .wui-workbench__beacon { background: var(--wui-harmony-accent) }
+.wui-harmony[data-phase="error"] .wui-workbench__beacon { background: var(--wui-harmony-danger) }
+.wui-harmony[data-phase="listening"] .wui-workbench__beacon {
+  background: var(--wui-harmony-accent); animation: wui-breathe 1.6s ease-in-out infinite;
+}
+@keyframes wui-breathe { 0%, 100% { opacity: .3 } 50% { opacity: 1 } }
+.wui-workbench__status-detail { color: var(--wui-harmony-ink-muted); font-family: var(--wui-harmony-font-mono); font-variant-numeric: tabular-nums }
+.wui-workbench__status-motion { margin-left: auto; color: var(--wui-harmony-ink-muted); font-family: var(--wui-harmony-font-mono); font-size: var(--wui-harmony-size-micro) }
+
+@container (max-width: 719px) {
+  .wui-workbench { grid-template-areas: "header" "main" "rail" "strip" "status"; grid-template-columns: minmax(0, 1fr) }
+  .wui-workbench__rail { flex-direction: row; overflow-x: auto; gap: var(--wui-harmony-space-3) }
+  .wui-workbench__rail > * { flex: 0 0 min(280px, 78%) }
+}
+@container (max-width: 439px) {
+  .wui-workbench__header { flex-direction: column; align-items: stretch }
+  .wui-workbench__tabs { margin-left: 0 }
+  .wui-workbench__subtitle { display: none }
+}
+
+.wui-workbench__card {
+  border: 1px solid var(--wui-harmony-line); padding: var(--wui-harmony-space-3);
+  font-size: var(--wui-harmony-size-body);
+}
+.wui-workbench__card[data-tone="error"] { border-color: var(--wui-harmony-danger); color: var(--wui-harmony-danger) }
+.wui-workbench__empty { color: var(--wui-harmony-ink-muted); font-size: var(--wui-harmony-size-label); margin: 0 }
+
+/* ==========================================================================
+   4. mountFlowLane —— 传送带
+   ========================================================================== */
+
+.wui-harmony-flow { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0 var(--wui-harmony-space-2) }
+.wui-harmony-flow__gutter {
+  display: flex; flex-direction: column; justify-content: flex-start;
+  padding-top: var(--gutter-offset, 0px);
+}
+.wui-harmony-flow__gutter-item {
+  height: var(--item-height, var(--wui-harmony-lane-height)); display: flex; flex-direction: column; justify-content: center;
+  font-size: var(--wui-harmony-size-micro); color: var(--wui-harmony-ink-muted); white-space: nowrap;
+  padding-right: 2px; min-width: 4.4rem;
+}
+.wui-harmony-flow__gutter-item b { color: var(--wui-harmony-ink); font-size: var(--wui-harmony-size-label) }
+.wui-harmony-flow__gutter-item[data-focus="true"] b { color: var(--wui-harmony-accent) }
+.wui-harmony-flow__gutter-item svg { display: block; height: 12px; width: 46px; overflow: visible }
+
+/* 🔴 两条 overflow 都写：老引擎取第一条，clip 根本不产生滚动盒，
+   于是 createAnalysisPlayhead 的 scrollIntoView 在这里是空操作（设计 §3.6.4）。 */
+.wui-harmony-flow__viewport {
+  position: relative;
+  overflow: hidden;
+  overflow: clip;
+  contain: layout paint;
+  min-height: var(--wui-harmony-flow-height);
+  background: color-mix(in srgb, var(--wui-harmony-track) 45%, transparent);
+  cursor: grab;
+  touch-action: none;
+}
+.wui-harmony-flow__viewport[data-grabbing="true"] { cursor: grabbing }
+
+/* 每帧唯一被写的节点。will-change 只给它一个，绝不给 band。 */
+.wui-harmony-flow__reel {
+  position: absolute; inset-block: 0; left: 0;
+  will-change: transform;
+  transform: translate3d(0, 0, 0);
+}
+.wui-harmony-flow[data-motion="stepped"] .wui-harmony-flow__reel { transition: none }
+
+.wui-harmony-flow__ruler { position: absolute; inset-inline: 0; top: 0; height: 18px }
+.wui-harmony-flow__tick {
+  position: absolute; top: 0; bottom: 0; border-left: 1px solid var(--wui-harmony-line);
+  padding-left: 3px; font-size: var(--wui-harmony-size-micro); color: var(--wui-harmony-ink-muted);
+  font-family: var(--wui-harmony-font-mono); line-height: 18px; white-space: nowrap;
+}
+.wui-harmony-flow__tick[data-major="true"] { border-left-color: color-mix(in srgb, var(--wui-harmony-ink) 32%, transparent) }
+
+.wui-harmony-flow__lanes { position: absolute; inset-inline: 0; top: 18px; bottom: 8px }
+.wui-harmony-flow__lane { position: absolute; inset-inline: 0; height: var(--wui-harmony-lane-height) }
+.wui-harmony-flow__lane[data-kind="ribbon"] { height: 8px }
+.wui-harmony-flow__lane[data-muted="true"] { opacity: .45 }
+.wui-harmony-flow__lane-bed {
+  position: absolute; inset: 4px 0; background: color-mix(in srgb, var(--wui-harmony-ink) 8%, transparent);
+}
+
+/* 🔴 band 自己的 `background` **必须留空**。createAnalysisPlayhead 的 activeSpan
+   写的是内联 `background: var(--wui-harmony-track)`，内联赢过任何选择器 ——
+   直接把 tone 填在 band 上，会让抵达 now 线的那一个（唯一重要的那一个）
+   变成一块中性灰。所以填充住在一个子节点里，playhead 的底色画在它后面。 */
+.wui-harmony-flow__band {
+  position: absolute; top: 3px; bottom: 3px;
+  border-left: 2px solid transparent;
+  content-visibility: auto;
+  contain-intrinsic-size: 60px 44px;
+  overflow: hidden;
+  transition:
+    opacity var(--wui-harmony-motion-chip) var(--wui-harmony-motion-ease),
+    box-shadow 160ms var(--wui-harmony-motion-ease);
+}
+.wui-harmony-flow__band-fill {
+  position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background: color-mix(in srgb, var(--tone, var(--wui-harmony-accent)) 18%, transparent);
+  transition: background var(--wui-harmony-motion-chip) var(--wui-harmony-motion-ease);
+}
+.wui-harmony-flow__band[data-zone="ahead"] .wui-harmony-flow__band-fill { background: color-mix(in srgb, var(--tone) 32%, transparent) }
+.wui-harmony-flow__band[data-zone="now"]   .wui-harmony-flow__band-fill { background: var(--tone) }
+.wui-harmony-flow__band[data-zone="wake"]  .wui-harmony-flow__band-fill { background: color-mix(in srgb, var(--tone) 12%, transparent) }
+.wui-harmony-flow__band[data-role] { border-left-color: var(--role, transparent) }
+.wui-harmony-flow__band > *:not(.wui-harmony-flow__band-fill) { position: relative; z-index: 1 }
+.wui-harmony-flow__band[data-dim="true"] { opacity: .25 }
+.wui-harmony-flow__band[data-echo="true"] { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--tone) 62%, transparent) }
+.wui-harmony-flow__band[data-lane-kind="ribbon"] { top: 0; bottom: 0 }
+/* 4px 的调带太薄，吃不起 32% 的填充：细长的东西需要饱和度才读得出来。 */
+.wui-harmony-flow__band[data-lane-kind="ribbon"] .wui-harmony-flow__band-fill { background: color-mix(in srgb, var(--tone) 72%, transparent) }
+.wui-harmony-flow__band[data-lane-kind="ribbon"][data-zone="wake"] .wui-harmony-flow__band-fill { background: color-mix(in srgb, var(--tone) 40%, transparent) }
+.wui-harmony-flow__band[data-lane-kind="ribbon"] .wui-harmony-flow__band-primary,
+.wui-harmony-flow__band[data-lane-kind="ribbon"] .wui-harmony-flow__band-secondary { display: none }
+
+.wui-harmony-flow__band-primary {
+  display: block; padding: 3px 5px 0; font-family: var(--wui-harmony-font-display); font-weight: 700;
+  font-size: var(--wui-harmony-size-body); white-space: nowrap;
+  transition: color var(--wui-harmony-motion-chip) linear;
+}
+.wui-harmony-flow__band[data-zone="now"] .wui-harmony-flow__band-primary { color: var(--wui-degree-ink) }
+.wui-harmony-flow__band[data-zone="wake"] .wui-harmony-flow__band-primary { font-size: var(--wui-harmony-size-micro); color: var(--wui-harmony-ink-muted) }
+.wui-harmony-flow__band-secondary {
+  display: block; padding: 0 5px; font-size: var(--wui-harmony-size-micro);
+  color: var(--wui-harmony-ink-muted); white-space: nowrap;
+}
+.wui-harmony-flow__band[data-zone="now"] .wui-harmony-flow__band-secondary { color: color-mix(in srgb, var(--wui-degree-ink) 82%, transparent) }
+.wui-harmony-flow__band-mark {
+  position: absolute; right: 4px; bottom: 2px; font-size: var(--wui-harmony-size-micro);
+  font-family: var(--wui-harmony-font-mono); color: var(--role, var(--wui-harmony-ink-muted));
+}
+.wui-harmony-flow__band-glyph { position: absolute; inset: auto 4px 3px 4px; height: 15px; overflow: visible }
+.wui-harmony-flow__band-glyph polyline { fill: none; stroke: var(--tone); stroke-width: 1.4; vector-effect: non-scaling-stroke }
+.wui-harmony-flow__band[data-zone="now"] .wui-harmony-flow__band-glyph polyline { stroke: var(--wui-degree-ink) }
+
+.wui-harmony-flow__contour { position: absolute; inset: 4px 0; width: 100%; height: calc(100% - 8px); overflow: visible }
+.wui-harmony-flow__contour polyline { fill: none; stroke: var(--tone, var(--wui-harmony-accent)); stroke-width: 1.6; vector-effect: non-scaling-stroke }
+.wui-harmony-flow__lane[data-dim="true"] { opacity: .25; transition: opacity var(--wui-harmony-motion-chip) linear }
+
+.wui-harmony-flow__bracket {
+  position: absolute; border: 2px solid var(--sev, var(--wui-harmony-info));
+  border-bottom-width: 0; opacity: .4;
+  transition: opacity var(--wui-harmony-motion-chip) linear;
+}
+.wui-harmony-flow__bracket[data-zone="now"] { opacity: 1 }
+.wui-harmony-flow__bracket-label {
+  position: absolute; left: 2px; top: -1.05em; font-size: var(--wui-harmony-size-micro);
+  color: var(--sev); white-space: nowrap; font-family: var(--wui-harmony-font-mono);
+}
+.wui-harmony-flow__tickmark { position: absolute; width: 3px; border-radius: 1px; background: var(--role, var(--wui-harmony-ink-muted)); opacity: .8 }
+.wui-harmony-flow__arcs { position: absolute; inset: 0; overflow: visible }
+.wui-harmony-flow__arcs path { fill: none; stroke: var(--wui-degree-root); stroke-width: 1.3; opacity: 0; transition: opacity var(--wui-harmony-motion-chip) linear }
+.wui-harmony-flow__arcs path[data-seen="true"] { opacity: .85 }
+
+/* 排空：停止点钉在 now 线上。整条只有一个节点，且它不是 band。 */
+.wui-harmony-flow__drain {
+  position: absolute; inset: 0; pointer-events: none; z-index: 2;
+  background: linear-gradient(
+    90deg,
+    transparent 0 var(--drain-x, 0px),
+    color-mix(in srgb, var(--wui-harmony-surface) 30%, transparent) var(--drain-x, 0px)
+  );
+}
+.wui-harmony-flow[data-future="false"] .wui-harmony-flow__drain {
+  background: linear-gradient(
+    90deg,
+    transparent 0 var(--drain-x, 0px),
+    color-mix(in srgb, var(--wui-harmony-surface) 88%, transparent) var(--drain-x, 0px)
+  );
+}
+.wui-harmony-flow[data-motion="stepped"] .wui-harmony-flow__drain { display: none }
+
+/* now 线：固定在 anchor·W 上，全设计里唯一会「闪」的东西，而且闪的是线。 */
+.wui-harmony-flow__now {
+  position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; z-index: 3;
+  background: var(--wui-harmony-flow-now); pointer-events: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--wui-harmony-flow-now) 16%, transparent);
+  transition: width var(--wui-harmony-motion-tone) linear, opacity var(--wui-harmony-motion-tone) linear;
+}
+.wui-harmony-flow__now[data-pulse="true"] { width: 3px; margin-left: -1.5px }
+.wui-harmony-flow__now[data-listening="true"] {
+  background: repeating-linear-gradient(180deg, var(--wui-harmony-flow-now) 0 3px, transparent 3px 6px);
+}
+.wui-harmony-flow[data-idle="true"] .wui-harmony-flow__now { opacity: .4 }
+
+.wui-harmony-flow__pin {
+  position: absolute; bottom: 2px; z-index: 4; transform: translateX(4px);
+  pointer-events: none; max-width: 62%;
+}
+.wui-harmony-flow__pin-primary {
+  display: block; font-family: var(--wui-harmony-font-display); font-weight: 700;
+  font-size: var(--wui-harmony-size-title); line-height: 1.1; white-space: nowrap;
+}
+.wui-harmony-flow__pin-secondary { display: block; font-size: var(--wui-harmony-size-micro); color: var(--wui-harmony-ink-muted); white-space: nowrap }
+
+.wui-harmony-flow__hero {
+  position: absolute; top: 20px; z-index: 4; transform: translateX(6px); pointer-events: none; max-width: 60%;
+}
+.wui-harmony-flow__hero-symbol {
+  display: block; font-family: var(--wui-harmony-font-display); font-weight: 700;
+  font-size: calc(var(--wui-harmony-size-display) * .78); line-height: 1.05; white-space: nowrap;
+}
+.wui-harmony-flow__hero-caption { display: block; font-size: var(--wui-harmony-size-micro); color: var(--wui-harmony-ink-muted); font-family: var(--wui-harmony-font-mono) }
+
+.wui-harmony-flow__empty {
+  position: absolute; top: 50%; transform: translate(6px, -50%);
+  font-size: var(--wui-harmony-size-label); color: var(--wui-harmony-ink-muted); max-width: 58%;
+}
+
+/* ==========================================================================
+   5. 坞位图元
+   ========================================================================== */
+
+.wui-pitch-keyboard { }
+.wui-pitch-keyboard__board {
+  position: relative; height: var(--wui-harmony-keyboard-height);
+  border: 1px solid var(--wui-harmony-line); background: light-dark(#fff, #1c1f26);
+}
+.wui-pitch-keyboard__key { position: absolute; top: 0 }
+.wui-pitch-keyboard__key--white {
+  bottom: 0; border-right: 1px solid var(--wui-harmony-line);
+  background: light-dark(#fff, #f2f4f7);
+}
+.wui-pitch-keyboard__key--black {
+  height: 62%; background: light-dark(#23262c, #0c0e12); z-index: 2; border-radius: 0 0 2px 2px;
+}
+.wui-pitch-keyboard__key { transition: background var(--wui-harmony-motion-tone) linear }
+.wui-pitch-keyboard__key[data-active="true"] { background: var(--role) }
+.wui-pitch-keyboard__key[data-phase="release"] { background: color-mix(in srgb, var(--role) 34%, transparent) }
+.wui-pitch-keyboard__key[data-ghost="true"] { background: var(--wui-degree-ghost) }
+.wui-pitch-keyboard__label {
+  position: absolute; inset-inline: 0; bottom: 3px; text-align: center;
+  font-size: var(--wui-harmony-size-micro); font-family: var(--wui-harmony-font-mono);
+  color: var(--wui-degree-ink); pointer-events: none;
+}
+.wui-pitch-keyboard__key--white:not([data-active="true"]) .wui-pitch-keyboard__label { color: var(--wui-harmony-ink-muted) }
+.wui-pitch-keyboard__ruler { position: relative; height: 1.1em; font-size: var(--wui-harmony-size-micro); color: var(--wui-harmony-ink-muted) }
+.wui-pitch-keyboard__ruler span { position: absolute; transform: translateX(-50%); font-family: var(--wui-harmony-font-mono) }
+
+.wui-pitch-staff__svg { display: block; width: 100%; height: auto; max-height: 156px }
+.wui-pitch-staff__line, .wui-pitch-staff__ledger { stroke: var(--wui-harmony-ink); stroke-width: 1; opacity: .55 }
+.wui-pitch-staff__brace { stroke: var(--wui-harmony-ink); stroke-width: 1.6; fill: none; opacity: .55 }
+.wui-pitch-staff__clef { fill: var(--wui-harmony-ink); opacity: .8 }
+.wui-pitch-staff__head { fill: var(--role, var(--wui-harmony-ink)); transition: fill var(--wui-harmony-motion-tone) linear, opacity 120ms linear }
+.wui-pitch-staff__head[data-when="next"] { opacity: .3 }
+.wui-pitch-staff__head[data-when="past"] { opacity: .3 }
+.wui-pitch-staff__accidental { fill: var(--role, var(--wui-harmony-ink)); transition: fill var(--wui-harmony-motion-tone) linear }
+.wui-pitch-staff__mark { fill: var(--role, var(--wui-harmony-ink)); font-size: 7px; font-family: var(--wui-harmony-font-mono) }
+.wui-pitch-staff__reel { transition: transform var(--wui-harmony-motion-column) var(--wui-harmony-motion-ease) }
+
+.wui-pitch-fretboard__svg { display: block; width: 100%; height: auto; max-height: var(--wui-harmony-fretboard-height) }
+.wui-pitch-fretboard__wire { stroke: var(--wui-harmony-line); stroke-width: 1 }
+.wui-pitch-fretboard__nut { stroke: var(--wui-harmony-ink); stroke-width: 2.6 }
+.wui-pitch-fretboard__string { stroke: var(--wui-harmony-ink); stroke-width: .8; opacity: .5 }
+.wui-pitch-fretboard__inlay { fill: var(--wui-harmony-ink); opacity: .16 }
+.wui-pitch-fretboard__label, .wui-pitch-fretboard__mute, .wui-pitch-fretboard__fret-number {
+  fill: var(--wui-harmony-ink-muted); font-size: 6.5px; font-family: var(--wui-harmony-font-mono);
+}
+.wui-pitch-fretboard__dot circle { fill: var(--role); transition: fill var(--wui-harmony-motion-tone) linear }
+.wui-pitch-fretboard__dot text { fill: var(--wui-degree-ink); font-size: 6px; text-anchor: middle; font-family: var(--wui-harmony-font-mono) }
+.wui-pitch-fretboard__dot[data-open="true"] circle { fill: none; stroke: var(--role); stroke-width: 1.6 }
+.wui-pitch-fretboard__neck { transition: transform var(--wui-harmony-motion-column) var(--wui-harmony-motion-ease) }
+
+.wui-harmony-nameplate { }
+.wui-harmony-nameplate__symbol {
+  display: block; font-family: var(--wui-harmony-font-display); font-weight: 700;
+  font-size: var(--wui-harmony-size-display); line-height: 1.15; min-height: 1.2em;
+}
+.wui-harmony-nameplate[data-emphasis="hero"] .wui-harmony-nameplate__symbol { font-size: calc(var(--wui-harmony-size-display) * 1.6) }
+.wui-harmony-nameplate__full { display: block; font-size: var(--wui-harmony-size-label); color: var(--wui-harmony-ink-muted) }
+.wui-harmony-nameplate__next {
+  display: block; font-size: var(--wui-harmony-size-label); font-family: var(--wui-harmony-font-mono);
+  color: var(--wui-harmony-ink-muted);
+  opacity: calc(.18 + var(--wui-harmony-approach, 0) * .72);
+}
+.wui-harmony-nameplate__voicing { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0; padding: 0; list-style: none }
+.wui-harmony-nameplate__voicing li {
+  display: inline-flex; align-items: baseline; gap: 3px; padding: 1px 5px;
+  background: var(--role); color: var(--wui-degree-ink);
+  font-family: var(--wui-harmony-font-mono); font-size: var(--wui-harmony-size-micro);
+  transition: background var(--wui-harmony-motion-tone) linear;
+}
+.wui-harmony-nameplate__caption { margin: 4px 0 6px; font-size: var(--wui-harmony-size-label); color: var(--wui-harmony-ink-muted) }
+.wui-harmony-nameplate__alternates { display: flex; flex-wrap: wrap; gap: 4px; margin: 0; padding: 0; list-style: none }
+.wui-harmony-nameplate__alternates button {
+  appearance: none; border: 1px solid var(--wui-harmony-line); background: transparent; color: inherit;
+  font: inherit; font-size: var(--wui-harmony-size-micro); padding: 2px 6px; cursor: pointer;
+  display: inline-flex; gap: 5px; align-items: baseline;
+}
+.wui-harmony-nameplate__alternates button[aria-pressed="true"] { background: var(--wui-harmony-accent); color: var(--wui-harmony-on-accent) }
+.wui-harmony-nameplate__alt-note { color: var(--wui-harmony-ink-muted); font-size: var(--wui-harmony-size-micro) }
+.wui-harmony-nameplate__alternates button[aria-pressed="true"] .wui-harmony-nameplate__alt-note { color: inherit; opacity: .75 }
+
+.wui-harmony-strip__list { display: flex; flex-direction: column; gap: 3px; margin: 0; padding: 0; list-style: none }
+.wui-harmony-strip__row {
+  display: grid; grid-template-columns: 3.2rem 1fr 3.2rem; align-items: center; gap: 6px;
+  font-size: var(--wui-harmony-size-label);
+}
+.wui-harmony-strip__label { font-family: var(--wui-harmony-font-mono); font-variant-numeric: tabular-nums }
+.wui-harmony-strip__value { text-align: right; font-family: var(--wui-harmony-font-mono); font-variant-numeric: tabular-nums; color: var(--wui-harmony-ink-muted) }
+.wui-harmony-strip__meter { position: relative; height: .55rem; background: var(--wui-harmony-track) }
+.wui-harmony-strip__ghost {
+  position: absolute; inset-block: 0; left: 0;
+  border-right: 1px solid color-mix(in srgb, var(--wui-harmony-ink) 45%, transparent);
+  background: color-mix(in srgb, var(--wui-harmony-ink) 9%, transparent);
+}
+.wui-harmony-strip__fill {
+  position: absolute; inset-block: 0; left: 0; background: var(--tone, var(--wui-harmony-accent));
+  transition: width var(--wui-harmony-motion-tone) linear;
+}
+.wui-harmony-strip__row[data-current="true"] .wui-harmony-strip__label { font-weight: 700; color: var(--wui-harmony-accent) }
+
+.wui-harmony-wheel { display: flex; gap: var(--wui-harmony-space-3); align-items: center; flex-wrap: wrap }
+.wui-harmony-wheel__svg { width: 176px; height: 176px; flex: 0 0 auto; overflow: visible }
+.wui-harmony-wheel__ring { transition: transform var(--wui-harmony-motion-turn) var(--wui-harmony-motion-ease) }
+.wui-harmony-wheel__seg { stroke: var(--wui-harmony-surface); stroke-width: .6; transition: fill-opacity var(--wui-harmony-motion-turn) linear }
+.wui-harmony-wheel__seg-label { font-size: 6.4px; text-anchor: middle; fill: var(--wui-harmony-ink); font-family: var(--wui-harmony-font-mono) }
+.wui-harmony-wheel__needle { fill: var(--wui-harmony-accent); opacity: .28 }
+.wui-harmony-wheel__centre-primary { font-size: 13px; text-anchor: middle; fill: var(--wui-harmony-ink); font-weight: 700 }
+.wui-harmony-wheel__centre-secondary { font-size: 6.4px; text-anchor: middle; fill: var(--wui-harmony-ink-muted); font-family: var(--wui-harmony-font-mono) }
+.wui-harmony-wheel__side { flex: 1 1 190px; min-width: 0 }
+
+.wui-harmony-note {
+  font-size: var(--wui-harmony-size-micro); color: var(--wui-harmony-ink-muted);
+  margin: 0; font-family: var(--wui-harmony-font-mono);
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="spec-head">
+    <span class="spec-eyebrow">&lt;analysis-view&gt; · 设计原型 · 非实现 · <strong>它自己在走</strong></span>
+    <h1>Harmony Workbench</h1>
+    <p class="fact">
+      <strong>页面一打开就在播。</strong>now 线钉在视口 33% 处不动，和弦带、级数、动机从右往左流过它——
+      你看得见下一个和弦正在逼近，这就是这次转向的全部理由（设计 D2）。
+      六个 tab 各自在内部变活（D1）；四个坞位（键盘 / 谱表 / 指板 / 名牌）吃<strong>同一次</strong>
+      <code>projectSounding()</code>，所以同一个音在四个面上永远是同一个颜色、同一个角色。
+    </p>
+    <p>
+      <strong>假的：</strong>和弦命名 / 拼写 / 把位是内联的最小替身表（实现里是 score 的四个 core 模块）；
+      没有 <code>Score</code> 解析、没有 worker、没有增量 session；「播放器」是一个 50ms 的
+      <code>setInterval</code> 假事件源；样式是一个 <code>&lt;style&gt;</code> 块，不是 token-as-data 的双路径；
+      没有 <code>destroy()</code> / <code>claimHost</code> / SSR；谱号用 Unicode 字形（实现里由 score 传入）。
+      <br>
+      <strong>真的：</strong>运动模型（固定 now 线 + 单节点 <code>transform</code> + 三区穿越 + 排空）、
+      版面与容器查询三档、<code>harmony-style.ts</code> 的<strong>真实</strong>色盘与七个 motion token、
+      「一次投影喂四个坞位」的纪律、三层时钟（20Hz 事件 → headless 预测 → 每帧一次读数）、
+      <code>data-start-quarters</code> 跨度契约与跑在它上面的 <code>createAnalysisPlayhead</code> 复刻、
+      以及减动效档下<strong>逐像素相同</strong>的布局。
+      和声分析（调判定 / 动机 / 平行五度）也是当场算的，不是写死的结论。
+    </p>
+  </header>
+
+  <div class="toolbar" role="group" aria-label="原型控制">
+    <div class="tool">
+      <div class="seg" id="ctl-transport">
+        <button type="button" data-value="play" aria-pressed="true">⏸ Pause</button>
+        <button type="button" data-value="restart" aria-pressed="false">⏮ Restart</button>
+      </div>
+    </div>
+    <div class="tool"><span class="tool-label">Seek</span>
+      <input type="range" id="ctl-seek" min="0" max="1000" step="1" value="0" aria-label="Seek">
+      <output id="ctl-seek-out">0:00</output>
+    </div>
+    <div class="tool"><span class="tool-label">Speed</span>
+      <div class="seg" id="ctl-rate">
+        <button type="button" data-value="0.25" aria-pressed="false">.25×</button>
+        <button type="button" data-value="0.5" aria-pressed="false">.5×</button>
+        <button type="button" data-value="1" aria-pressed="true">1×</button>
+        <button type="button" data-value="2" aria-pressed="false">2×</button>
+      </div>
+    </div>
+    <div class="tool"><span class="tool-label">Motion</span>
+      <div class="seg" id="ctl-motion">
+        <button type="button" data-value="auto" aria-pressed="true">Auto</button>
+        <button type="button" data-value="continuous" aria-pressed="false">Continuous</button>
+        <button type="button" data-value="stepped" aria-pressed="false">Reduced</button>
+      </div>
+    </div>
+    <div class="tool"><span class="tool-label">Clock</span>
+      <div class="seg" id="ctl-clock">
+        <button type="button" data-value="predicted" aria-pressed="true">Predicted</button>
+        <button type="button" data-value="raw" aria-pressed="false">Raw 20Hz</button>
+      </div>
+    </div>
+    <div class="tool"><span class="tool-label">Density</span>
+      <div class="seg" id="ctl-density">
+        <button type="button" data-value="comfortable" aria-pressed="true">Comfortable</button>
+        <button type="button" data-value="compact" aria-pressed="false">Compact</button>
+      </div>
+    </div>
+    <div class="tool"><span class="tool-label">Scheme</span>
+      <div class="seg" id="ctl-scheme">
+        <button type="button" data-value="auto" aria-pressed="true">System</button>
+        <button type="button" data-value="light" aria-pressed="false">Light</button>
+        <button type="button" data-value="dark" aria-pressed="false">Dark</button>
+      </div>
+    </div>
+    <div class="tool"><span class="tool-label">Spelling</span>
+      <div class="seg" id="ctl-spelling">
+        <button type="button" data-value="auto" aria-pressed="true">Auto</button>
+        <button type="button" data-value="sharp" aria-pressed="false">♯</button>
+        <button type="button" data-value="flat" aria-pressed="false">♭</button>
+      </div>
+    </div>
+    <div class="tool"><span class="tool-label">Tuning</span>
+      <div class="seg" id="ctl-tuning">
+        <button type="button" data-value="standard" aria-pressed="true">Standard</button>
+        <button type="button" data-value="drop-d" aria-pressed="false">Drop D</button>
+        <button type="button" data-value="ukulele" aria-pressed="false">Ukulele</button>
+      </div>
+    </div>
+    <div class="tool"><span class="tool-label">Phase</span>
+      <div class="seg" id="ctl-phase">
+        <button type="button" data-value="auto" aria-pressed="true">Auto</button>
+        <button type="button" data-value="idle" aria-pressed="false">Idle (docked)</button>
+        <button type="button" data-value="listening" aria-pressed="false">Listening</button>
+        <button type="button" data-value="empty" aria-pressed="false">Empty</button>
+        <button type="button" data-value="error" aria-pressed="false">Error</button>
+      </div>
+    </div>
+    <div class="tool"><span class="tool-label">Host width</span>
+      <input type="range" id="ctl-width" min="320" max="1180" step="20" value="1180">
+      <output id="ctl-width-out">full</output>
+    </div>
+  </div>
+
+  <div class="frame"><div class="frame-inner" id="frame-inner"><div id="host"></div></div></div>
+
+  <section class="notes">
+    <div class="note-card">
+      <h2>这一屏在验证什么</h2>
+      <p><strong>now 线不动，材料动。</strong>整条传送带每帧只有一个节点被写样式（<code>__reel</code> 的
+        <code>transform</code>），band 的 <code>left</code>/<code>width</code> 是它自己字段的纯函数、
+        与 <code>now</code> 无关——因为 <code>createAnalysisPlayhead</code> 会整条覆写 band 的
+        <code>style.cssText</code>，任何逐帧写在 band 上的东西都会在它抵达 now 线的那一刻被抹掉。</p>
+      <p><strong>一个音只有一套读数。</strong>点右栏任意一个备选命名，键盘、谱表、指板、名牌的角色配色<strong>整体重算</strong>——
+        四个坞位吃的是同一次 <code>projectSounding()</code>。指板画的是<strong>能按下去的</strong>把位，
+        所以它按<strong>音级与角色</strong>与其余三个一致，不按八度。</p>
+      <p><strong>减动效不是另一个视图。</strong>把 Motion 拨到 Reduced：帧循环<strong>根本不开</strong>，
+        位置改由 20Hz 的域事件一格一格步进，而<strong>布局逐像素相同</strong>——你依然看得见下一个和弦在逼近。
+        预期是布局的属性，不是补间的属性。</p>
+      <p><strong>三层时钟。</strong>把 Clock 拨到 Raw 20Hz：预测层被摘掉，传送带立刻变成「停两帧、第三帧跳 6px」。
+        这就是加了滚动之后「静态」长什么样。</p>
+      <p><strong>停靠不是空白。</strong>Phase → Idle：走带停了，但整首曲子已经画完、可以拖、可以按
+        <code>←/→</code>、<code>[</code>/<code>]</code> 走和弦边界，线下读到什么四个坞位就报什么。</p>
+    </div>
+    <div class="note-card">
+      <h2>键盘与指针</h2>
+      <table>
+        <tr><td>拖传送带</td><td>材料在固定线下滑动（<strong>永远不拖那条线</strong>）；拖拽中 <code>seek(p,'drag')</code>，松手 <code>seek(p,'commit')</code></td></tr>
+        <tr><td>滚轮 / 触控板</td><td>横向滚 = seek；<code>⌘/Ctrl</code> + 滚轮 = 缩放 0.5×–4×</td></tr>
+        <tr><td>点 band</td><td>seek 到该 band 起点</td></tr>
+        <tr><td><code>←</code> / <code>→</code></td><td>±1 拍；<code>⇧</code> 加成 ±1 小节</td></tr>
+        <tr><td><code>[</code> / <code>]</code></td><td>上一个 / 下一个 <strong>band 边界</strong>——按和声走，不按时间走。这是列表给不了的导航</td></tr>
+        <tr><td><code>Home</code> / <code>End</code></td><td>曲首 / 曲尾</td></tr>
+        <tr><td>tab 条</td><td><strong>手动激活</strong>：<code>←/→</code> 只移焦点，<code>Enter</code>/<code>Space</code> 才切换</td></tr>
+        <tr><td>空格</td><td>播放 / 暂停（焦点在传送带上时）</td></tr>
+      </table>
+    </div>
+    <div class="note-card">
+      <h2>建它的时候，设计被推翻的地方</h2>
+      <table>
+        <tr><td>band 的底色</td><td><strong>band 自己的 <code>background</code> 必须留空。</strong><code>harmonyParts.activeSpan</code> 写的是<strong>内联</strong> <code>background: var(--wui-harmony-track)</code>，内联赢过任何选择器——所以直接把 tone 填在 band 上，抵达 now 线的那一个（唯一重要的那一个）会变成一块中性灰。填充必须住在子节点 <code>__band-fill</code> 里。设计 §3.6.4 只写了「lane 不许逐帧写 band 的内联样式」，没写反方向</td></tr>
+        <tr><td>容器查询</td><td><strong>容器查询永远不能给自己的容器写样式。</strong><code>container-type</code> 必须落在 <code>.wui-harmony</code> 上，而 <code>grid-template-areas</code> 落在 <code>.wui-workbench</code> 上。两者同节点时三档断点<strong>静默失效</strong>——原型第一版就是这样，440px 下 rail 没有下沉</td></tr>
+        <tr><td>帧循环停了谁来推</td><td>标签页被藏起来 / 离屏 / 降频时，<strong>lane 仍然必须被域事件推进</strong>，否则坞位在 20Hz 更新而传送带冻住——同一屏上两个读数互相打架。设计 §3.0.2 只说了「hidden 退出循环」，没说这时谁负责位置</td></tr>
+        <tr><td>2 列谱表</td><td>设计 §5.0 让 <code>voice-leading</code> 的 staff 吃 2 列并钉 <code>activeColumn = 1</code>。<strong>那会让谱表与其余三个坞位对不上</strong>：播放头在边界之前时，第 1 列不是正在响的那一组。<code>activeColumn</code> 必须跟着 now 走，另一列做 <code>past</code> / <code>next</code> 的 ghost</td></tr>
+        <tr><td>多轨的钉住读数</td><td><code>FlowLaneState</code> 需要一个 <code>pinTrack</code>：多轨时「钉住的大字读哪一条」推不出来——<code>roman</code> 必须钉级数，不能钉最上面那条调带</td></tr>
+        <tr><td>轨高与视口高</td><td>轨高一旦不齐（ribbon 8px、刻痕轨 2×），视口高度就不能由 <code>data-rows × lane-height</code> 得到，只能在内容变化时按累计偏移写一次。<code>FlowTrack</code> 因此需要 <code>heightScale</code></td></tr>
+        <tr><td>细带的填充</td><td>4–8px 的调带吃不起 <code>ahead</code> 的 32% 填充：细长的东西需要饱和度。三区的百分比对 48px 的 band 成立，对 ribbon 不成立</td></tr>
+        <tr><td>七个 motion token</td><td>设计 §2.5.2 列的七条里，<code>harmony-style.ts</code> 今天只有两条。另外五条（<code>-flow</code> / <code>-pop</code> / <code>-release</code> / <code>-column</code> / <code>-turn</code>）本原型全部用到了，确实都需要</td></tr>
+      </table>
+    </div>
+    <div class="note-card">
+      <h2>原型 vs 真实实现</h2>
+      <table>
+        <tr><td>和弦命名</td><td>原型：15 段的查找表 + 真实的角色算术；实现：<code>@tonaljs/chord-detect</code> 的全部候选 + <code>spellChord()</code></td></tr>
+        <tr><td>调判定</td><td>原型：当场算的 Krumhansl 相关（时值加权直方图）；实现：<code>detectKey()</code> / <code>createLiveKeyTracker()</code></td></tr>
+        <tr><td>动机</td><td>原型：当场跑的重复音程搜索 + 贪心去重叠；实现：<code>findMotifs(score, {length, minOccurrences})</code></td></tr>
+        <tr><td>声部问题</td><td>原型：当场跑的平行五 / 八度 + 大跳检测；实现：<code>voiceLeading(score)</code></td></tr>
+        <tr><td>时钟</td><td>原型：50ms 假 <code>timeupdate</code> + coast 预测；实现：<code>score-player</code> 的真事件 + <code>headless/transport-clock.ts</code></td></tr>
+        <tr><td>帧循环</td><td>原型：一个 rAF、按订阅者计数自停、离屏退出；实现：<code>packages/ui/src/internal/frame.ts</code></td></tr>
+        <tr><td>跨度契约</td><td>原型：<code>data-start-quarters</code> + <code>data-webscore-idle-style</code> 与 playhead 复刻俱在；实现：<code>internal/spans.ts</code> + 白名单里的 <code>internal/playhead.ts</code></td></tr>
+      </table>
+    </div>
+  </section>
+</div>
+<script>
+/* ===========================================================================
+ * Harmony Workbench —— 会动的原型
+ *
+ * 分层，与设计一一对应：
+ *   §A  曲例（faked：实现里由 @webmusic/score 从 Score 解析）
+ *   §B  乐理替身（faked：实现里是 score 的 core/* 四个模块）
+ *   §C  离线分析（真算：调判定 / 动机 / 声部问题）
+ *   §D  kit internals —— internal/frame.ts + internal/motion.ts
+ *   §E  kit mounts —— flow lane / 四个坞位 / chip strip / wheel / workbench
+ *   §F  createAnalysisPlayhead 复刻（跨度契约的另一端）
+ *   §G  headless/transport-clock.ts + 假播放器（20Hz）
+ *   §H  元素层接线：六个视图 + 一次投影喂四个坞位
+ *   §I  原型工具条与测试缝
+ * =========================================================================== */
+
+'use strict';
+
+// ---------------------------------------------------------------------------
+// 小工具
+// ---------------------------------------------------------------------------
+const SVGNS = 'http://www.w3.org/2000/svg';
+const el = (tag, cls, text) => {
+  const node = document.createElement(tag);
+  if (cls) node.className = cls;
+  if (text != null) node.textContent = text;
+  return node;
+};
+const svgEl = (tag, attrs = {}) => {
+  const node = document.createElementNS(SVGNS, tag);
+  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, String(v));
+  return node;
+};
+const clamp = (value, low, high) => (value < low ? low : value > high ? high : value);
+const mod = (value, n) => ((value % n) + n) % n;
+const round3 = (value) => Math.round(value * 1000) / 1000;
+
+// ===========================================================================
+// §A 曲例 —— 16 小节 4/4，第 9 小节由 C 大调重解释为 G 大调。
+//     和设计 §5 的样例同源：F→G7 上 T 与 B 的平行五度就在这里面。
+// ===========================================================================
+
+const BPM = 120;
+const SECONDS_PER_QUARTER = 60 / BPM;
+const TOTAL_QUARTERS = 64;
+const TOTAL_SECONDS = TOTAL_QUARTERS * SECONDS_PER_QUARTER;
+const qToSec = (q) => q * SECONDS_PER_QUARTER;
+const secToQ = (s) => s / SECONDS_PER_QUARTER;
+
+/** 每小节一段（末段两小节）。roman / fn 由调用方（score）给，kit 不认识它们。 */
+const SEGMENTS = [
+  {q: 0,  symbol: 'C',   full: 'C major',            rootPc: 0,  quality: 'maj',  roman: 'I',     fn: 'T', key: 'C major'},
+  {q: 4,  symbol: 'Am',  full: 'A minor',            rootPc: 9,  quality: 'min',  roman: 'vi',    fn: 'T', key: 'C major'},
+  {q: 8,  symbol: 'F',   full: 'F major',            rootPc: 5,  quality: 'maj',  roman: 'IV',    fn: 'S', key: 'C major'},
+  {q: 12, symbol: 'G7',  full: 'G dominant seventh', rootPc: 7,  quality: 'dom7', roman: 'V7',    fn: 'D', key: 'C major'},
+  {q: 16, symbol: 'C',   full: 'C major',            rootPc: 0,  quality: 'maj',  roman: 'I',     fn: 'T', key: 'C major'},
+  {q: 20, symbol: 'A7',  full: 'A dominant seventh', rootPc: 9,  quality: 'dom7', roman: 'V7/ii', fn: 'D', key: 'C major'},
+  {q: 24, symbol: 'Dm',  full: 'D minor',            rootPc: 2,  quality: 'min',  roman: 'ii',    fn: 'S', key: 'C major'},
+  {q: 28, symbol: 'G7',  full: 'G dominant seventh', rootPc: 7,  quality: 'dom7', roman: 'V7',    fn: 'D', key: 'C major'},
+  {q: 32, symbol: 'C',   full: 'C major',            rootPc: 0,  quality: 'maj',  roman: 'IV',    fn: 'S', key: 'G major'},
+  {q: 36, symbol: 'D7',  full: 'D dominant seventh', rootPc: 2,  quality: 'dom7', roman: 'V7',    fn: 'D', key: 'G major'},
+  {q: 40, symbol: 'G',   full: 'G major',            rootPc: 7,  quality: 'maj',  roman: 'I',     fn: 'T', key: 'G major'},
+  {q: 44, symbol: 'Em',  full: 'E minor',            rootPc: 4,  quality: 'min',  roman: 'vi',    fn: 'T', key: 'G major'},
+  {q: 48, symbol: 'Am7', full: 'A minor seventh',    rootPc: 9,  quality: 'min7', roman: 'ii7',   fn: 'S', key: 'G major'},
+  {q: 52, symbol: 'D7',  full: 'D dominant seventh', rootPc: 2,  quality: 'dom7', roman: 'V7',    fn: 'D', key: 'G major'},
+  {q: 56, symbol: 'G',   full: 'G major',            rootPc: 7,  quality: 'maj',  roman: 'I',     fn: 'T', key: 'G major'},
+];
+SEGMENTS.forEach((segment, index) => {
+  segment.index = index;
+  segment.endQ = index + 1 < SEGMENTS.length ? SEGMENTS[index + 1].q : TOTAL_QUARTERS;
+  segment.id = `seg-${index}`;
+});
+
+/** 备选读法。全部是同一组音级的真实再读法 —— 角色由投影当场重算。 */
+const ALTERNATE_TABLE = {
+  'C':   [{symbol: 'Am/C',  full: 'A minor over C',      note: 'inversion', rootPc: 9}],
+  'Am':  [{symbol: 'C6/A',  full: 'C major sixth over A', note: 'inversion', rootPc: 0}],
+  'F':   [{symbol: 'Dm7/F', full: 'D minor seventh over F', note: 'inversion', rootPc: 2}],
+  'G7':  [{symbol: 'Bø/G', full: 'B half-diminished over G', note: 'rootless', rootPc: 11}],
+  'A7':  [{symbol: 'C♯°/A', full: 'C sharp diminished over A', note: 'rootless', rootPc: 1}],
+  'Dm':  [{symbol: 'F6/D',  full: 'F major sixth over D', note: 'inversion', rootPc: 5}],
+  'D7':  [{symbol: 'F♯°/D', full: 'F sharp diminished over D', note: 'rootless', rootPc: 6}],
+  'G':   [{symbol: 'Em/G',  full: 'E minor over G',      note: 'inversion', rootPc: 4}],
+  'Em':  [{symbol: 'G6/E',  full: 'G major sixth over E', note: 'inversion', rootPc: 7}],
+  'Am7': [{symbol: 'C6/A',  full: 'C major sixth over A', note: 'inversion', rootPc: 0}],
+};
+
+/** 旋律：一拍一音，末小节一个全音符。动机就长在这上面。 */
+const MELODY_PITCHES = [
+  76, 74, 72, 74,   69, 72, 76, 79,   77, 76, 74, 72,   71, 74, 77, 79,
+  76, 74, 72, 74,   69, 73, 76, 79,   77, 74, 76, 74,   72, 74, 71, 74,
+  72, 76, 79, 76,   74, 78, 76, 74,   74, 71, 69, 71,   71, 76, 79, 76,
+  69, 72, 76, 79,   79, 78, 76, 74,   74, 71, 69, 71,   79,
+];
+const MELODY = MELODY_PITCHES.map((midi, index) => ({
+  index,
+  q: index,
+  dur: index === MELODY_PITCHES.length - 1 ? 4 : 1,
+  midi,
+}));
+
+/** 内声部与低音：每段一次。 */
+const INNER = [
+  {a: 67, t: 64, b: 48}, {a: 69, t: 60, b: 45}, {a: 69, t: 60, b: 41}, {a: 71, t: 62, b: 43},
+  {a: 67, t: 64, b: 48}, {a: 69, t: 61, b: 45}, {a: 69, t: 65, b: 50}, {a: 71, t: 62, b: 43},
+  {a: 67, t: 64, b: 48}, {a: 69, t: 66, b: 50}, {a: 71, t: 62, b: 43}, {a: 71, t: 64, b: 52},
+  {a: 69, t: 64, b: 57}, {a: 69, t: 66, b: 50}, {a: 71, t: 62, b: 43},
+];
+
+const VOICE_IDS = ['S', 'A', 'T', 'B'];
+
+/** 某一 quarter 上四个声部在响的 MIDI。这是全曲唯一的「发声事实」。 */
+const MELODY_BY_QUARTER = (() => {
+  const table = new Array(TOTAL_QUARTERS).fill(MELODY[0].midi);
+  for (const note of MELODY) {
+    for (let step = 0; step < note.dur; step += 1) {
+      if (note.q + step < TOTAL_QUARTERS) table[note.q + step] = note.midi;
+    }
+  }
+  return table;
+})();
+function voicesAtQuarter(q) {
+  const clamped = clamp(Math.floor(q), 0, TOTAL_QUARTERS - 1);
+  const inner = INNER[segmentAtQuarter(clamped).index];
+  return {S: MELODY_BY_QUARTER[clamped], A: inner.a, T: inner.t, B: inner.b};
+}
+function segmentAtQuarter(q) {
+  const clamped = clamp(q, 0, TOTAL_QUARTERS - 0.000001);
+  for (let index = SEGMENTS.length - 1; index >= 0; index -= 1) {
+    if (clamped >= SEGMENTS[index].q) return SEGMENTS[index];
+  }
+  return SEGMENTS[0];
+}
+function soundingAtQuarter(q) {
+  const voices = voicesAtQuarter(q);
+  return [voices.S, voices.A, voices.T, voices.B];
+}
+
+const TUNINGS = {
+  'standard': {midis: [40, 45, 50, 55, 59, 64], labels: ['E', 'A', 'D', 'G', 'B', 'E']},
+  'drop-d':   {midis: [38, 45, 50, 55, 59, 64], labels: ['D', 'A', 'D', 'G', 'B', 'E']},
+  'ukulele':  {midis: [67, 60, 64, 69],         labels: ['G', 'C', 'E', 'A']},
+};
+
+// ===========================================================================
+// §B 乐理替身 —— 实现里这一节整个住在 packages/score 的四个 core 模块里。
+//     kit 永远收不到这里的任何一个概念，只收到「第 3 根弦第 5 品有个 role:'third'」。
+// ===========================================================================
+
+const SHARP_STEPS = ['C', 'C', 'D', 'D', 'E', 'F', 'F', 'G', 'G', 'A', 'A', 'B'];
+const SHARP_ALTER = [0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0];
+const FLAT_STEPS  = ['C', 'D', 'D', 'E', 'E', 'F', 'G', 'G', 'A', 'A', 'B', 'B'];
+const FLAT_ALTER  = [0, -1, 0, -1, 0, 0, -1, 0, -1, 0, -1, 0];
+const LETTER_INDEX = {C: 0, D: 1, E: 2, F: 3, G: 4, A: 5, B: 6};
+const FLAT_ROOT_PCS = new Set([3, 5, 8, 10]);
+
+function spellMidi(midi, preference) {
+  const pc = mod(midi, 12);
+  const flat = preference === 'flat';
+  const step = flat ? FLAT_STEPS[pc] : SHARP_STEPS[pc];
+  const alter = flat ? FLAT_ALTER[pc] : SHARP_ALTER[pc];
+  const octave = Math.floor(midi / 12) - 1;
+  const glyph = alter === 1 ? '♯' : alter === -1 ? '♭' : '';
+  return {
+    midi, pc, step, alter, octave,
+    accidental: alter === 1 ? 'sharp' : alter === -1 ? 'flat' : undefined,
+    name: `${step}${glyph}${octave}`,
+    shortName: `${step}${glyph}`,
+    // 全音阶阶数：由**拼写**决定，不由音高决定。C4 = 28。
+    diatonic: octave * 7 + LETTER_INDEX[step],
+  };
+}
+function resolvePreference(setting, rootPc) {
+  if (setting !== 'auto') return setting;
+  return FLAT_ROOT_PCS.has(rootPc) ? 'flat' : 'sharp';
+}
+
+const ROLE_BY_SEMITONE = {
+  0: 'root', 1: 'extension', 2: 'extension', 3: 'third', 4: 'third', 5: 'extension',
+  6: 'fifth', 7: 'fifth', 8: 'fifth', 9: 'extension', 10: 'seventh', 11: 'seventh',
+};
+const CHORD_PCS = {
+  maj: [0, 4, 7], min: [0, 3, 7], dom7: [0, 4, 7, 10], min7: [0, 3, 7, 10],
+};
+/** toneMark()：ASCII only。ui 源码里不许出现乐谱字形，所以缩写也保持 ASCII。 */
+const ROLE_MARK = {root: 'R', third: '3', fifth: '5', seventh: '7', extension: '9', bass: 'B', other: '.', ghost: '.'};
+
+/**
+ * 全套设计的枢纽。一次调用，喂饱四个坞位。
+ * 真实签名：projectSounding(midis, {key, tuning, spelling}) → SoundingProjection
+ */
+function projectSounding(midis, naming, spellingSetting, tuningName) {
+  const preference = resolvePreference(spellingSetting, naming ? naming.rootPc : 0);
+  const sorted = [...new Set(midis)].sort((a, b) => a - b);
+  const lowest = sorted[0];
+  // `quality: 'any'` = 一次备选读法：所有响着的音级都算成员，角色按新根音重算。
+  const chordPcs = !naming ? null
+    : naming.quality === 'any'
+      ? new Set(sorted.map((midi) => mod(midi, 12)))
+      : new Set((CHORD_PCS[naming.quality] ?? CHORD_PCS.maj).map((step) => mod(naming.rootPc + step, 12)));
+  const marks = sorted.map((midi) => {
+    const spelled = spellMidi(midi, preference);
+    let role = 'other';
+    if (naming && chordPcs.has(spelled.pc)) {
+      role = ROLE_BY_SEMITONE[mod(spelled.pc - naming.rootPc, 12)] ?? 'other';
+    }
+    if (naming && midi === lowest && spelled.pc !== naming.rootPc && chordPcs.has(spelled.pc)) role = 'bass';
+    return {...spelled, role, mark: ROLE_MARK[role]};
+  });
+  const roleByPc = new Map(marks.map((mark) => [mark.pc, mark.role]));
+  const spellingByPc = new Map(marks.map((mark) => [mark.pc, mark.shortName]));
+  return {
+    naming,
+    marks,
+    roleByPc,
+    spellingByPc,
+    staff: marks,
+    fret: fretShape(marks, TUNINGS[tuningName] ?? TUNINGS.standard),
+    description: marks.length ? `Sounding: ${marks.map((m) => m.name).join(', ')}` : 'Nothing sounding',
+  };
+}
+
+/**
+ * 4 品窗口内的贪心指法搜索 —— 算术，不是乐理。
+ * 它给出的是**能按下去的**把位，所以它与其余三个坞位按**音级与角色**一致，不按八度。
+ */
+function fretShape(marks, tuning) {
+  if (!marks.length) return {marks: [], muted: [], firstFret: 0, label: ''};
+  const byPc = new Map();
+  for (const mark of marks) if (!byPc.has(mark.pc)) byPc.set(mark.pc, mark);
+  let best = null;
+  for (let base = 0; base <= 12; base += 1) {
+    const shape = [];
+    const muted = [];
+    const covered = new Set();
+    let open = 0;
+    for (let stringIndex = 0; stringIndex < tuning.midis.length; stringIndex += 1) {
+      let chosen = null;
+      const low = base === 0 ? 0 : base;
+      for (let fret = low; fret <= base + 4; fret += 1) {
+        const pc = mod(tuning.midis[stringIndex] + fret, 12);
+        if (byPc.has(pc)) { chosen = {stringIndex, fret, pitch: byPc.get(pc)}; break; }
+      }
+      if (chosen) {
+        shape.push(chosen);
+        covered.add(chosen.pitch.pc);
+        if (chosen.fret === 0) open += 1;
+      } else muted.push(stringIndex);
+    }
+    const hasRoot = shape.some((m) => m.pitch.role === 'root' || m.pitch.role === 'bass');
+    if (shape.length < 3 || !hasRoot) continue;
+    const score = covered.size * 10 + shape.length * 3 + open * 2 - base * 0.6 - muted.length * 2;
+    if (!best || score > best.score) best = {score, marks: shape, muted, firstFret: base};
+  }
+  if (!best) return {marks: [], muted: [], firstFret: 0, label: 'no shape in reach'};
+  const label = Array.from({length: tuning.midis.length}, (_, stringIndex) => {
+    const found = best.marks.find((m) => m.stringIndex === stringIndex);
+    return found ? String(found.fret) : 'x';
+  }).join('-');
+  return {marks: best.marks, muted: best.muted, firstFret: best.firstFret, label};
+}
+
+// ===========================================================================
+// §C 离线分析 —— 这三件事是**当场算的**，不是写死的结论。
+//     实现里它们分别是 detectKey / findMotifs / voiceLeading。
+// ===========================================================================
+
+const MAJOR_PROFILE = [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88];
+const MINOR_PROFILE = [6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17];
+const PC_NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
+
+function correlate(histogram, profile, rotation) {
+  const total = histogram.reduce((sum, value) => sum + value, 0);
+  if (total <= 0) return 0;
+  const normalised = histogram.map((value) => value / total);
+  let meanX = 0, meanY = 0;
+  for (let index = 0; index < 12; index += 1) {
+    meanX += normalised[index] / 12;
+    meanY += profile[index] / 12;
+  }
+  let num = 0, dx = 0, dy = 0;
+  for (let index = 0; index < 12; index += 1) {
+    const x = normalised[mod(index + rotation, 12)] - meanX;
+    const y = profile[index] - meanY;
+    num += x * y; dx += x * x; dy += y * y;
+  }
+  return dx > 0 && dy > 0 ? num / Math.sqrt(dx * dy) : 0;
+}
+function rankKeys(histogram) {
+  const ranked = [];
+  for (let tonic = 0; tonic < 12; tonic += 1) {
+    ranked.push({tonic, mode: 'major', label: `${PC_NAMES[tonic]} major`, score: correlate(histogram, MAJOR_PROFILE, tonic)});
+    ranked.push({tonic, mode: 'minor', label: `${PC_NAMES[tonic]} minor`, score: correlate(histogram, MINOR_PROFILE, tonic)});
+  }
+  ranked.sort((a, b) => b.score - a.score);
+  return ranked;
+}
+/** 时值加权的音级直方图 —— 音级条读的就是这一份，一拍算一份。 */
+function histogramForRange(fromQ, toQ) {
+  const histogram = new Array(12).fill(0);
+  for (let q = Math.max(0, Math.floor(fromQ)); q < Math.min(TOTAL_QUARTERS, Math.ceil(toQ)); q += 1) {
+    for (const midi of soundingAtQuarter(q)) histogram[mod(midi, 12)] += 1;
+  }
+  return histogram;
+}
+/** 判调用的那一份：低音多算 4 倍，因为低音才是调的证人。 */
+const KEY_BASS_WEIGHT = 4;
+function keyHistogram(fromQ, toQ) {
+  const histogram = new Array(12).fill(0);
+  for (let q = Math.max(0, Math.floor(fromQ)); q < Math.min(TOTAL_QUARTERS, Math.ceil(toQ)); q += 1) {
+    const voices = voicesAtQuarter(q);
+    histogram[mod(voices.S, 12)] += 1;
+    histogram[mod(voices.A, 12)] += 1;
+    histogram[mod(voices.T, 12)] += 1;
+    histogram[mod(voices.B, 12)] += KEY_BASS_WEIGHT;
+  }
+  return histogram;
+}
+
+/**
+ * 逐段稳定的调判定。三件事，缺一不可：
+ *   · **拖尾窗口**（只用已经听过的 24 拍）—— 居中窗口会让转调**提前**发生，那是撒谎；
+ *   · 低音加权 —— C 大调与 a 小调的音级集合完全相同，分开它们的是低音；
+ *   · 迟滞 —— 新调必须赢现任 0.06 才换，否则整条 lane 会在关系大小调之间频闪。
+ */
+const KEY_WINDOW_QUARTERS = 24;
+const KEY_HYSTERESIS = 0.06;
+function detectKeyBands() {
+  const bands = [];
+  let incumbent = null;
+  for (let q = 0; q < TOTAL_QUARTERS; q += 1) {
+    const ranked = rankKeys(keyHistogram(q - KEY_WINDOW_QUARTERS, q + 1));
+    const top = ranked[0];
+    if (!incumbent) incumbent = top;
+    else {
+      const held = ranked.find((entry) => entry.label === incumbent.label);
+      if (!held || top.score >= held.score + KEY_HYSTERESIS) incumbent = top;
+    }
+    const confidence = clamp((top.score - ranked[1].score) * 3.2, 0, 1);
+    const last = bands[bands.length - 1];
+    if (last && last.label === incumbent.label) {
+      last.endQ = q + 1;
+      last.confidence = Math.max(last.confidence, confidence);
+    } else {
+      bands.push({label: incumbent.label, tonic: incumbent.tonic, q, endQ: q + 1, confidence});
+    }
+  }
+  return bands;
+}
+
+/** 重复音程序列搜索 + 贪心去重叠（去掉同一个图形的移位副本）。 */
+function findMotifs(noteCount = 4, minOccurrences = 2) {
+  const intervalCount = noteCount - 1;
+  const buckets = new Map();
+  for (let start = 0; start + noteCount <= MELODY.length; start += 1) {
+    const intervals = [];
+    for (let step = 0; step < intervalCount; step += 1) {
+      intervals.push(MELODY[start + step + 1].midi - MELODY[start + step].midi);
+    }
+    const key = intervals.join(',');
+    if (!buckets.has(key)) buckets.set(key, {intervals, starts: []});
+    buckets.get(key).starts.push(start);
+  }
+  const candidates = [...buckets.values()]
+    .filter((bucket) => bucket.starts.length >= minOccurrences)
+    .sort((a, b) => b.starts.length - a.starts.length || a.starts[0] - b.starts[0]);
+  const claimed = new Set();
+  const motifs = [];
+  for (const candidate of candidates) {
+    const free = candidate.starts.filter((start) => {
+      for (let step = 0; step < noteCount; step += 1) if (claimed.has(start + step)) return false;
+      return true;
+    });
+    if (free.length < minOccurrences) continue;
+    for (const start of free) for (let step = 0; step < noteCount; step += 1) claimed.add(start + step);
+    motifs.push({
+      id: `m${motifs.length + 1}`,
+      intervals: candidate.intervals,
+      occurrences: free.map((start) => ({
+        startQ: MELODY[start].q,
+        endQ: MELODY[start + noteCount - 1].q + MELODY[start + noteCount - 1].dur,
+        pitches: Array.from({length: noteCount}, (_, step) => MELODY[start + step].midi),
+      })),
+    });
+  }
+  return motifs.sort((a, b) => b.occurrences.length - a.occurrences.length);
+}
+
+/** 平行五 / 八度、大跳、声部交叉 —— 全部从声部数据里当场检出。 */
+function detectVoiceIssues() {
+  const issues = [];
+  const boundaries = SEGMENTS.slice(1).map((segment) => segment.q);
+  for (const boundary of boundaries) {
+    const before = voicesAtQuarter(boundary - 1);
+    const after = voicesAtQuarter(boundary);
+    for (let upper = 0; upper < VOICE_IDS.length; upper += 1) {
+      for (let lower = upper + 1; lower < VOICE_IDS.length; lower += 1) {
+        const upperId = VOICE_IDS[upper];
+        const lowerId = VOICE_IDS[lower];
+        const moveUpper = after[upperId] - before[upperId];
+        const moveLower = after[lowerId] - before[lowerId];
+        if (moveUpper === 0 || moveLower === 0) continue;
+        if (Math.sign(moveUpper) !== Math.sign(moveLower)) continue;
+        const gapBefore = mod(before[upperId] - before[lowerId], 12);
+        const gapAfter = mod(after[upperId] - after[lowerId], 12);
+        if (gapBefore !== gapAfter) continue;
+        if (gapAfter !== 7 && gapAfter !== 0) continue;
+        issues.push({
+          id: `vl-${issues.length}`,
+          type: gapAfter === 7 ? 'parallel fifth' : 'parallel octave',
+          severity: 'error',
+          voices: [upperId, lowerId],
+          startQ: boundary - 1,
+          endQ: boundary + 1,
+          detail: `${upperId} ${before[upperId]}→${after[upperId]} · ${lowerId} ${before[lowerId]}→${after[lowerId]}`,
+        });
+      }
+    }
+    for (const id of VOICE_IDS) {
+      const leap = after[id] - before[id];
+      if (Math.abs(leap) >= 9) {
+        issues.push({
+          id: `vl-${issues.length}`,
+          type: 'large leap',
+          severity: 'warning',
+          voices: [id],
+          startQ: boundary - 1,
+          endQ: boundary + 1,
+          detail: `${id} ${before[id]}→${after[id]} (${leap > 0 ? '+' : ''}${leap})`,
+        });
+      }
+    }
+  }
+  // 交叉：低声部盖过高声部。相邻拍合并成一段。
+  let open = null;
+  for (let q = 0; q <= TOTAL_QUARTERS; q += 1) {
+    const voices = q < TOTAL_QUARTERS ? voicesAtQuarter(q) : null;
+    let crossed = null;
+    if (voices) {
+      for (let index = 1; index < VOICE_IDS.length; index += 1) {
+        if (voices[VOICE_IDS[index]] > voices[VOICE_IDS[index - 1]]) {
+          crossed = [VOICE_IDS[index - 1], VOICE_IDS[index]];
+          break;
+        }
+      }
+    }
+    const key = crossed ? crossed.join('/') : null;
+    if (open && open.key === key) { open.issue.endQ = q + 1; continue }
+    if (open) { issues.push(open.issue); open = null }
+    if (crossed) {
+      open = {
+        key,
+        issue: {
+          id: `vl-x-${q}`, type: 'voice crossing', severity: 'info', voices: crossed,
+          startQ: q, endQ: q + 1, detail: `${crossed[1]} above ${crossed[0]}`,
+        },
+      };
+    }
+  }
+  return issues.sort((a, b) => a.startQ - b.startQ);
+}
+
+const KEY_BANDS = detectKeyBands();
+const MOTIFS = findMotifs(4, 2);
+const ISSUES = detectVoiceIssues();
+const WHOLE_HISTOGRAM = histogramForRange(0, TOTAL_QUARTERS);
+
+// ===========================================================================
+// §D kit internals —— internal/frame.ts 与 internal/motion.ts
+// ===========================================================================
+
+/**
+ * 每个 view 一个 rAF 循环。六个订阅者是一个 rAF 里的六个回调，不是六次注册；
+ * 订阅者为 0 时循环自己停掉，一个闲置页面一分钱都不花。
+ * 循环自己**绝不碰 DOM**：它只发 atMs。这让它可以拿一个假 view 测。
+ */
+function createFrameLoop(view) {
+  const listeners = new Set();
+  let handle = null;
+  let slowFrames = 0;
+  let sampled = 0;
+  let degraded = false;
+  let parity = 0;
+  const onDegrade = new Set();
+
+  let running = false;
+  const step = (atMs) => {
+    handle = null;
+    if (listeners.size === 0) { running = false; return }
+    if (view.document && view.document.visibilityState === 'hidden') { running = false; schedule(); return }
+    running = true;
+    parity += 1;
+    if (!degraded || parity % 2 === 0) {
+      const started = view.performance && view.performance.now ? view.performance.now() : atMs;
+      for (const listener of [...listeners]) listener(atMs);
+      const cost = (view.performance && view.performance.now ? view.performance.now() : atMs) - started;
+      sampled += 1;
+      if (cost > 4) slowFrames += 1;
+      if (sampled >= 60) {
+        const next = slowFrames >= 30;
+        if (next !== degraded) { degraded = next; for (const notify of onDegrade) notify(degraded) }
+        sampled = 0; slowFrames = 0;
+      }
+    }
+    schedule();
+  };
+  const schedule = () => {
+    if (handle != null || listeners.size === 0) return;
+    handle = typeof view.requestAnimationFrame === 'function'
+      ? view.requestAnimationFrame(step)
+      : view.setTimeout(() => step(Date.now()), 16);
+  };
+  return {
+    join(listener) {
+      listeners.add(listener);
+      schedule();
+      return () => {
+        listeners.delete(listener);
+        if (listeners.size === 0 && handle != null && typeof view.cancelAnimationFrame === 'function') {
+          view.cancelAnimationFrame(handle);
+          handle = null;
+          running = false;
+        }
+      };
+    },
+    onDegrade(notify) { onDegrade.add(notify); return () => onDegrade.delete(notify) },
+    get degraded() { return degraded },
+    get running() { return running },
+    get size() { return listeners.size },
+  };
+}
+
+/**
+ * prefers-reduced-motion 只能由 JS 去问：`light-dark()` 之所以成立是因为
+ * color-scheme 是一个可继承的 CSS 属性，而 prefers-reduced-motion 没有属性镜像。
+ */
+function watchReducedMotion(view, onChange) {
+  if (typeof view.matchMedia !== 'function') return {matches: false, destroy() {}};
+  const query = view.matchMedia('(prefers-reduced-motion: reduce)');
+  const handler = () => onChange(query.matches);
+  if (typeof query.addEventListener === 'function') query.addEventListener('change', handler);
+  return {
+    get matches() { return query.matches },
+    destroy() { if (typeof query.removeEventListener === 'function') query.removeEventListener('change', handler) },
+  };
+}
+
+const toneVar = (tone) => `var(--wui-progression-tone-${mod(Math.trunc(tone), 12)})`;
+const roleVar = (role) => `var(--wui-degree-${role ?? 'other'})`;
+const severityVar = (severity) =>
+  severity === 'error' ? 'var(--wui-harmony-danger)'
+  : severity === 'warning' ? 'var(--wui-harmony-warning)'
+  : 'var(--wui-harmony-info)';
+
+// ===========================================================================
+// §E kit mounts
+// ===========================================================================
+
+const LAYOUT_FALLBACK_WIDTH = 720;   // jsdom 没有排版，量不到宽度时用它。
+
+/* --- §E.1 mountFlowLane —— 传送带，六个舞台的同一台机器 ------------------ */
+
+/**
+ * 几何（设计 §3.6.1）：
+ *   x(u) = (u - now) * pxPerUnit + anchor*W
+ *   reel.transform = translate3d(anchor*W - now*pxPerUnit, 0, 0)
+ *
+ * 不变式：**一个 band 节点的内联样式，是它自己字段的纯函数，永远不是 now 的函数。**
+ * 因为 createAnalysisPlayhead 会用 data-webscore-idle-style 整条覆写 style.cssText。
+ */
+function mountFlowLane(host, binding, options = {}) {
+  const anchor = options.anchor ?? 0.33;
+  const root = el('div', 'wui-harmony-flow');
+  const gutter = el('div', 'wui-harmony-flow__gutter');
+  const viewport = el('div', 'wui-harmony-flow__viewport');
+  const reel = el('div', 'wui-harmony-flow__reel');
+  const ruler = el('div', 'wui-harmony-flow__ruler');
+  const lanes = el('div', 'wui-harmony-flow__lanes');
+  const drain = el('div', 'wui-harmony-flow__drain');
+  const nowLine = el('div', 'wui-harmony-flow__now');
+  const pin = el('div', 'wui-harmony-flow__pin');
+  const pinPrimary = el('strong', 'wui-harmony-flow__pin-primary');
+  const pinSecondary = el('span', 'wui-harmony-flow__pin-secondary');
+  const emptyNote = el('p', 'wui-harmony-flow__empty');
+  pin.append(pinPrimary, pinSecondary);
+  reel.append(ruler, lanes, drain);
+  viewport.append(reel, nowLine, pin, emptyNote);
+  root.append(gutter, viewport);
+  viewport.tabIndex = 0;
+  viewport.setAttribute('role', 'slider');
+  viewport.setAttribute('aria-label', options.label ?? 'Analysis transport');
+  host.append(root);
+
+  const index = options.index ?? el('ol', 'wui-vh');
+  index.setAttribute('aria-label', options.label ?? 'Analysis transport');
+
+  let state = binding.snapshot();
+  let bandNodes = new Map();
+  let laneNodes = [];
+  let bracketNodes = new Map();
+  let zones = new Map();
+  let currentBandId = null;
+  let echoUntil = 0;
+  let pulseUntil = 0;
+  let scale = options.scale ?? 44;
+  let position = state.now ?? 0;
+  let destroyed = false;
+
+  const spanStart = () => state.span?.start ?? 0;
+  const spanEnd = () => state.span?.end ?? 1;
+  const spanLength = () => Math.max(0.001, spanEnd() - spanStart());
+  const pxPerUnit = () => scale / SECONDS_PER_QUARTER;      // scale 是 px/quarter，轴是名义秒
+  const width = () => viewport.clientWidth || LAYOUT_FALLBACK_WIDTH;
+  const anchorPx = () => width() * anchor;
+
+  // ---- 内容：只在域事件时跑，绝不每帧跑 --------------------------------
+  function renderContent() {
+    state = binding.snapshot();
+    root.dataset.future = String(state.future !== false);
+    root.dataset.rows = String(Math.max(1, (state.tracks ?? [{}]).length));
+    root.dataset.idle = String(!state.playing);
+    reel.style.width = `${spanLength() * pxPerUnit()}px`;
+
+    // 刻度尺
+    ruler.replaceChildren();
+    if (state.future !== false) {
+      for (const tick of state.ruler ?? []) {
+        const node = el('span', 'wui-harmony-flow__tick', tick.label ?? '');
+        node.style.left = `${((tick.at - spanStart()) / spanLength()) * 100}%`;
+        if (tick.major) node.dataset.major = 'true';
+        ruler.append(node);
+      }
+    }
+
+    // 轨
+    lanes.replaceChildren();
+    gutter.replaceChildren();
+    gutter.style.setProperty('--gutter-offset', '18px');
+    laneNodes = [];
+    const tracks = state.tracks ?? [{id: 'default'}];
+    let offset = 0;
+    for (const track of tracks) {
+      const lane = el('div', 'wui-harmony-flow__lane');
+      lane.dataset.track = track.id;
+      lane.dataset.kind = track.kind ?? 'bands';
+      if (track.muted) lane.dataset.muted = 'true';
+      lane.style.top = `${offset}px`;
+      const height = track.kind === 'ribbon' ? 8 : Math.round(laneHeight() * (track.heightScale ?? 1));
+      lane.style.height = `${height}px`;
+      lane.append(el('div', 'wui-harmony-flow__lane-bed'));
+      lanes.append(lane);
+      laneNodes.push({track, node: lane, top: offset, height});
+      offset += height;
+      viewport.style.height = `${offset + 26}px`;
+
+      const label = el('div', 'wui-harmony-flow__gutter-item');
+      label.dataset.track = track.id;
+      if (track.label) label.append(el('b', null, track.label));
+      if (track.sublabel) label.append(el('span', null, track.sublabel));
+      if (track.glyph) {
+        const svg = svgEl('svg', {viewBox: '0 0 46 12', 'aria-hidden': 'true'});
+        svg.append(svgEl('polyline', {points: track.glyph, fill: 'none', stroke: 'currentColor', 'stroke-width': '1.2'}));
+        label.append(svg);
+      }
+      label.style.setProperty('--item-height', `${height}px`);
+      gutter.append(label);
+    }
+
+    // band
+    bandNodes = new Map();
+    zones = new Map();
+    for (const band of state.bands ?? []) {
+      const laneIndex = clamp(band.track ?? 0, 0, laneNodes.length - 1);
+      const lane = laneNodes[laneIndex];
+      const node = el('div', 'wui-harmony-flow__band');
+      node.dataset.bandId = band.id;
+      node.dataset.laneKind = lane.track.kind ?? 'bands';
+      if (band.group) node.dataset.group = band.group;
+      if (band.role) node.dataset.role = band.role;
+      // 只有几何与 band 自己的字段进内联样式 —— 与 now 无关，所以 playhead 覆写它是安全的。
+      const left = ((band.start - spanStart()) / spanLength()) * 100;
+      const bandWidth = ((band.end - band.start) / spanLength()) * 100;
+      let css = `left:${round3(left)}%;width:${round3(bandWidth)}%;`;
+      if (band.tone != null) css += `--tone:${toneVar(band.tone)};`;
+      if (band.role) css += `--role:${roleVar(band.role)};`;
+      node.style.cssText = css;
+      node.append(el('i', 'wui-harmony-flow__band-fill'));
+      if (band.primary) node.append(el('strong', 'wui-harmony-flow__band-primary', band.primary));
+      if (band.secondary) node.append(el('span', 'wui-harmony-flow__band-secondary', band.secondary));
+      if (band.mark) node.append(el('span', 'wui-harmony-flow__band-mark', band.mark));
+      if (band.glyph) {
+        const svg = svgEl('svg', {class: 'wui-harmony-flow__band-glyph', viewBox: '0 0 40 12', preserveAspectRatio: 'none', 'aria-hidden': 'true'});
+        svg.append(svgEl('polyline', {points: band.glyph}));
+        node.append(svg);
+      }
+      // 跨度契约。stampIdleStyle **最后**调用，并保证末尾有 `;`。
+      if (options.spans !== false) {
+        node.dataset.startQuarters = String(band.stampStart ?? secToQ(band.start));
+        node.dataset.endQuarters = String(band.stampEnd ?? secToQ(band.end));
+      }
+      const idle = node.style.cssText;
+      node.dataset.webscoreIdleStyle = idle.endsWith(';') || idle === '' ? idle : `${idle};`;
+      lane.node.append(node);
+      bandNodes.set(band.id, {band, node, laneIndex});
+    }
+
+    // 声部折线（几何，不是乐理）
+    for (const lane of laneNodes) {
+      if (!lane.track.points) continue;
+      const points = lane.track.points
+        .map((point) => `${round3(((point.at - spanStart()) / spanLength()) * 1000)},${round3((1 - point.y) * 100)}`)
+        .join(' ');
+      const svg = svgEl('svg', {class: 'wui-harmony-flow__contour', viewBox: '0 0 1000 100', preserveAspectRatio: 'none', 'aria-hidden': 'true'});
+      svg.style.setProperty('--tone', toneVar(lane.track.tone ?? 6));
+      svg.append(svgEl('polyline', {points}));
+      lane.node.append(svg);
+    }
+
+    // 刻痕（chords 视图的发声证据）
+    for (const tick of state.ticks ?? []) {
+      const lane = laneNodes[clamp(tick.track ?? 0, 0, laneNodes.length - 1)];
+      const node = el('span', 'wui-harmony-flow__tickmark');
+      node.style.cssText =
+        `left:${round3(((tick.at - spanStart()) / spanLength()) * 100)}%;` +
+        `top:${round3(tick.y * 100)}%;height:4px;--role:${roleVar(tick.role)};`;
+      lane.node.append(node);
+    }
+    // 根音运动弧（几何：kit 只收 fromY / toY / atX）
+    if (state.arcs?.length) {
+      const lane = laneNodes[clamp(state.arcs[0].track ?? 0, 0, laneNodes.length - 1)];
+      const svg = svgEl('svg', {class: 'wui-harmony-flow__arcs', viewBox: '0 0 1000 100', preserveAspectRatio: 'none', 'aria-hidden': 'true'});
+      for (const arc of state.arcs) {
+        const x = ((arc.at - spanStart()) / spanLength()) * 1000;
+        const y1 = arc.fromY * 100;
+        const y2 = arc.toY * 100;
+        const lift = Math.min(46, Math.abs(y2 - y1) * 1.1 + 6);
+        const path = svgEl('path', {d: `M${round3(x - 16)} ${round3(y1)} Q${round3(x)} ${round3(Math.min(y1, y2) - lift)} ${round3(x + 16)} ${round3(y2)}`});
+        path.dataset.arcAt = String(arc.at);
+        svg.append(path);
+      }
+      lane.node.append(svg);
+    }
+
+    // 括号（跨 track 的问题标记）
+    bracketNodes = new Map();
+    for (const bracket of state.brackets ?? []) {
+      const from = laneNodes[clamp(bracket.from, 0, laneNodes.length - 1)];
+      const to = laneNodes[clamp(bracket.to, 0, laneNodes.length - 1)];
+      const top = Math.min(from.top, to.top) + 6;
+      const height = Math.abs(to.top - from.top) + Math.min(from.height, to.height) - 12;
+      const node = el('div', 'wui-harmony-flow__bracket');
+      node.dataset.bracketId = bracket.id;
+      node.style.cssText =
+        `left:${round3(((bracket.start - spanStart()) / spanLength()) * 100)}%;` +
+        `width:${round3(((bracket.end - bracket.start) / spanLength()) * 100)}%;` +
+        `top:${top}px;height:${Math.max(10, height)}px;--sev:${severityVar(bracket.severity)};`;
+      if (bracket.label) node.append(el('span', 'wui-harmony-flow__bracket-label', bracket.label));
+      lanes.append(node);
+      bracketNodes.set(bracket.id, {bracket, node});
+    }
+
+    emptyNote.textContent = (state.bands ?? []).length === 0 ? (state.emptyLabel ?? '') : '';
+    nowLine.dataset.listening = String(state.listening === true);
+    renderIndex();
+    tick();
+  }
+
+  /** 语义孪生体：视觉隐藏、不滚动、没有 CSS 时这个视图仍然可读。 */
+  function renderIndex() {
+    index.replaceChildren();
+    for (const band of state.bands ?? []) {
+      const item = el('li');
+      item.dataset.bandId = band.id;
+      item.setAttribute('role', 'option');
+      const bar = Math.floor(secToQ(band.start) / 4) + 1;
+      const beat = Math.floor(secToQ(band.start) % 4) + 1;
+      item.textContent = [band.primary, band.secondary, `bar ${bar} · beat ${beat}`]
+        .filter(Boolean).join(' · ');
+      index.append(item);
+    }
+  }
+
+  function laneHeight() {
+    const raw = readLength(root, '--wui-harmony-lane-height');
+    return raw || 48;
+  }
+
+  // ---- 位置：每帧一次，只写 reel 一个节点 -------------------------------
+  function tick(atMs) {
+    if (destroyed) return;
+    // 拖拽期间 lane 持本地权威：否则 player 20Hz 的回声会跟手指打架、lane 橡皮筋。
+    if (dragging) { /* position 由 pointermove 写 */ }
+    else if (binding.position) position = binding.position(atMs);
+    else position = state.now ?? 0;
+    const nowPx = (position - spanStart()) * pxPerUnit();
+    reel.style.transform = `translate3d(${round3(anchorPx() - nowPx)}px, 0, 0)`;
+    reel.style.setProperty('--drain-x', `${round3(nowPx)}px`);
+    nowLine.style.left = `${round3(anchorPx())}px`;
+    pin.style.left = `${round3(anchorPx())}px`;
+    viewport.setAttribute('aria-valuenow', String(round3(secToQ(position))));
+
+    const pinTrack = state.pinTrack ?? 0;
+    const stampNow = atMs ?? (typeof performance !== 'undefined' ? performance.now() : 0);
+    let active = null;
+    for (const entry of bandNodes.values()) {
+      const {band, node} = entry;
+      const zone = position < band.start ? 'ahead' : position < band.end ? 'now' : 'wake';
+      if (zones.get(band.id) !== zone) {
+        const arriving = zone === 'now';
+        zones.set(band.id, zone);
+        node.dataset.zone = zone;
+        // 复现即事件：一次出现越线，同 group 的**每一次**出现同时描边 160ms，
+        // 包括还在右边、还没发生的那些。没有任何东西移动，只有描边的 alpha 在变。
+        if (arriving && band.group) {
+          for (const other of bandNodes.values()) {
+            if (other.band.group === band.group) other.node.dataset.echo = 'true';
+          }
+          echoUntil = stampNow + 160;
+        }
+      }
+      if (zone === 'now' && (active == null || (band.track === pinTrack && active.band.track !== pinTrack))) active = entry;
+    }
+    for (const entry of bracketNodes.values()) {
+      const zone = position >= entry.bracket.start && position < entry.bracket.end ? 'now' : 'off';
+      if (entry.node.dataset.zone !== zone) entry.node.dataset.zone = zone;
+    }
+    for (const path of reel.querySelectorAll('.wui-harmony-flow__arcs path')) {
+      const seen = String(position >= Number(path.dataset.arcAt));
+      if (path.dataset.seen !== seen) path.dataset.seen = seen;
+    }
+
+    const nextId = active?.band.id ?? null;
+    if (nextId !== currentBandId) {
+      currentBandId = nextId;
+      onBandChange(active, stampNow);
+    }
+    if (pulseUntil && stampNow > pulseUntil) { pulseUntil = 0; nowLine.dataset.pulse = 'false' }
+    if (echoUntil && stampNow > echoUntil) {
+      echoUntil = 0;
+      for (const entry of bandNodes.values()) entry.node.dataset.echo = 'false';
+    }
+    // 声部注意力收窄：括号在线上时，无关的轨降到 25%
+    const focus = [...bracketNodes.values()].find((entry) => entry.node.dataset.zone === 'now');
+    for (const lane of laneNodes) {
+      const dim = focus ? String(!(lane.track.id === focus.bracket.fromId || lane.track.id === focus.bracket.toId)) : 'false';
+      if (lane.node.dataset.dim !== dim) lane.node.dataset.dim = dim;
+    }
+  }
+
+  function onBandChange(entry, atMs) {
+    pinPrimary.textContent = entry?.band.primary ?? state.pinned?.primary ?? '';
+    pinSecondary.textContent = entry?.band.secondary ?? state.pinned?.secondary ?? '';
+    nowLine.dataset.pulse = 'true';
+    pulseUntil = (atMs || (typeof performance !== 'undefined' ? performance.now() : 0)) + 90;
+    for (const item of index.children) {
+      if (item.dataset.bandId === entry?.band.id) item.setAttribute('aria-current', 'true');
+      else item.removeAttribute('aria-current');
+    }
+    binding.onBandChange?.(entry?.band ?? null);
+  }
+
+  // ---- 交互 -------------------------------------------------------------
+  let dragging = false;
+  let dragFrom = 0;
+  let dragBase = 0;
+  let lastDrag = 0;
+  const seek = (value, phase) => binding.seek?.(clamp(value, spanStart(), spanEnd()), phase);
+
+  viewport.addEventListener('pointerdown', (event) => {
+    if (!binding.seek) return;
+    dragging = true;
+    dragFrom = event.clientX;
+    dragBase = position;
+    viewport.dataset.grabbing = 'true';
+    viewport.setPointerCapture?.(event.pointerId);
+    binding.hold?.(true);
+  });
+  viewport.addEventListener('pointermove', (event) => {
+    if (!dragging) return;
+    const next = dragBase - (event.clientX - dragFrom) / pxPerUnit();
+    const stamp = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    if (stamp - lastDrag >= 120) { lastDrag = stamp; seek(next, 'drag') }
+    position = clamp(next, spanStart(), spanEnd());
+    tick();
+  });
+  const endDrag = (event) => {
+    if (!dragging) return;
+    dragging = false;
+    viewport.dataset.grabbing = 'false';
+    viewport.releasePointerCapture?.(event.pointerId);
+    seek(position, 'commit');
+    binding.hold?.(false);
+  };
+  viewport.addEventListener('pointerup', endDrag);
+  viewport.addEventListener('pointercancel', endDrag);
+  viewport.addEventListener('click', (event) => {
+    const node = event.target.closest?.('.wui-harmony-flow__band');
+    if (!node || dragging) return;
+    const entry = bandNodes.get(node.dataset.bandId);
+    if (entry) seek(entry.band.start, 'commit');
+  });
+  viewport.addEventListener('wheel', (event) => {
+    if (event.ctrlKey || event.metaKey) {
+      event.preventDefault();
+      scale = clamp(scale * (event.deltaY > 0 ? 0.9 : 1.1), 22, 176);
+      renderContent();
+      return;
+    }
+    const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
+    if (!delta) return;
+    event.preventDefault();
+    seek(position + delta / pxPerUnit(), 'commit');
+  }, {passive: false});
+  viewport.addEventListener('keydown', (event) => {
+    const beat = SECONDS_PER_QUARTER;
+    const boundaries = (state.bands ?? []).map((band) => band.start).sort((a, b) => a - b);
+    let next = null;
+    if (event.key === 'ArrowRight') next = position + (event.shiftKey ? beat * 4 : beat);
+    else if (event.key === 'ArrowLeft') next = position - (event.shiftKey ? beat * 4 : beat);
+    else if (event.key === ']') next = boundaries.find((at) => at > position + 0.01) ?? spanEnd();
+    else if (event.key === '[') next = [...boundaries].reverse().find((at) => at < position - 0.01) ?? spanStart();
+    else if (event.key === 'Home') next = spanStart();
+    else if (event.key === 'End') next = spanEnd();
+    else if (event.key === ' ') { event.preventDefault(); binding.toggle?.(); return }
+    else return;
+    event.preventDefault();
+    seek(next, 'commit');
+  });
+
+  renderContent();
+  return {
+    element: root, viewport, reel, nowLine, index,
+    band: (id) => bandNodes.get(id)?.node,
+    get position() { return position },
+    get scale() { return scale },
+    setScale(next) { scale = next; renderContent() },
+    tick,
+    update: renderContent,
+    destroy() { destroyed = true; root.remove() },
+  };
+}
+
+function readLength(node, name) {
+  try {
+    const raw = getComputedStyle(node).getPropertyValue(name);
+    const parsed = Number.parseFloat(raw);
+    return Number.isFinite(parsed) ? parsed : 0;
+  } catch { return 0 }
+}
+
+/* --- §E.2 mountKeyboard ------------------------------------------------- */
+
+function pianoKeyLayout(low, high) {
+  const isBlack = (midi) => [1, 3, 6, 8, 10].includes(mod(midi, 12));
+  const whites = [];
+  for (let midi = low; midi <= high; midi += 1) if (!isBlack(midi)) whites.push(midi);
+  const unit = 100 / whites.length;
+  const keys = [];
+  let index = 0;
+  for (let midi = low; midi <= high; midi += 1) {
+    if (!isBlack(midi)) { keys.push({midi, black: false, left: index * unit, width: unit}); index += 1 }
+    else keys.push({midi, black: true, left: index * unit - unit * 0.32, width: unit * 0.64});
+  }
+  return keys;
+}
+
+function mountKeyboard(host, options = {}) {
+  const low = options.low ?? 36;
+  const high = options.high ?? 84;
+  const root = el('div', 'wui-pitch-keyboard');
+  root.setAttribute('role', 'img');
+  const board = el('div', 'wui-pitch-keyboard__board');
+  const keyNodes = new Map();
+  for (const key of pianoKeyLayout(low, high)) {
+    const node = el('div', `wui-pitch-keyboard__key wui-pitch-keyboard__key--${key.black ? 'black' : 'white'}`);
+    node.style.left = `${round3(key.left)}%`;
+    node.style.width = `${round3(key.width)}%`;
+    node.dataset.midi = String(key.midi);
+    const label = el('span', 'wui-pitch-keyboard__label');
+    node.append(label);
+    board.append(node);
+    keyNodes.set(key.midi, {node, label});
+  }
+  const ruler = el('div', 'wui-pitch-keyboard__ruler');
+  ruler.setAttribute('aria-hidden', 'true');
+  for (const key of pianoKeyLayout(low, high)) {
+    if (key.black || mod(key.midi, 12) !== 0) continue;
+    const mark = el('span', null, `C${Math.floor(key.midi / 12) - 1}`);
+    mark.style.left = `${round3(key.left + key.width / 2)}%`;
+    ruler.append(mark);
+  }
+  root.append(board, ruler);
+  host.append(root);
+
+  // R3：相位由 kit 从集合差集推出来，调用方一个字段都不用多给。
+  let sounding = new Map();
+  let releaseTimer = null;
+
+  function update(state) {
+    root.setAttribute('aria-label', state.description ?? 'Keyboard');
+    const next = new Map(state.marks.map((mark) => [mark.midi, mark]));
+    const ghosts = new Set(state.ghostPitchClasses ?? []);
+    for (const [midi, entry] of keyNodes) {
+      const mark = next.get(midi);
+      if (mark) {
+        const fresh = !sounding.has(midi);
+        entry.node.dataset.active = 'true';
+        entry.node.dataset.role = mark.role;
+        entry.node.dataset.phase = fresh ? 'attack' : 'sustain';
+        entry.node.style.setProperty('--role', roleVar(mark.role));
+        entry.label.textContent = mark.mark;
+        entry.node.dataset.ghost = 'false';
+      } else if (sounding.has(midi)) {
+        entry.node.dataset.active = 'false';
+        entry.node.dataset.phase = 'release';
+      } else {
+        entry.node.dataset.active = 'false';
+        entry.node.removeAttribute('data-phase');
+        entry.node.dataset.ghost = String(ghosts.has(mod(midi, 12)));
+        entry.label.textContent = '';
+        entry.node.style.removeProperty('--role');
+      }
+    }
+    sounding = next;
+    // 余音清扫是**一个**定时器扫全表，不是每键一个。
+    if (releaseTimer) clearTimeout(releaseTimer);
+    releaseTimer = setTimeout(() => {
+      for (const [midi, entry] of keyNodes) {
+        if (sounding.has(midi)) continue;
+        entry.node.removeAttribute('data-phase');
+        entry.node.style.removeProperty('--role');
+        entry.label.textContent = '';
+      }
+    }, 140);
+  }
+  return {element: root, key: (midi) => keyNodes.get(midi)?.node, update};
+}
+
+/* --- §E.3 mountStaff ---------------------------------------------------- */
+// 几何约定：大谱表是一条连续的全音阶梯子，y = (38 - diatonic) * 半线间。
+// 高音谱线 38/36/34/32/30，低音谱线 26/24/22/20/18，中央 C(28) 正落在正中并带一条加线。
+
+const STAFF_TOP_DIATONIC = 38;
+const STAFF_LINES = [38, 36, 34, 32, 30, 26, 24, 22, 20, 18];
+
+function accidentalGlyph(kind, x, y) {
+  if (kind === 'sharp') {
+    return `M${x - 2.4} ${y - 5.2} L${x - 2.4} ${y + 4.6} L${x - 1.5} ${y + 4.9} L${x - 1.5} ${y - 4.9} Z
+            M${x + 1.2} ${y - 6.0} L${x + 1.2} ${y + 3.8} L${x + 2.1} ${y + 4.1} L${x + 2.1} ${y - 5.7} Z
+            M${x - 3.6} ${y - 1.3} L${x + 3.2} ${y - 2.5} L${x + 3.2} ${y - 0.8} L${x - 3.6} ${y + 0.4} Z
+            M${x - 3.6} ${y + 2.6} L${x + 3.2} ${y + 1.4} L${x + 3.2} ${y + 3.1} L${x - 3.6} ${y + 4.3} Z`;
+  }
+  if (kind === 'flat') {
+    return `M${x - 1.9} ${y - 8} L${x - 1.0} ${y - 8} L${x - 1.0} ${y + 3.4}
+            C${x + 2.6} ${y - 1.4} ${x + 3.6} ${y + 2.6} ${x - 1.0} ${y + 4.6} Z
+            M${x - 1.0} ${y + 3.0} C${x + 1.6} ${y + 1.2} ${x + 1.4} ${y - 0.9} ${x - 1.0} ${y + 0.9} Z`;
+  }
+  return `M${x - 2.0} ${y - 5.6} L${x - 1.2} ${y - 5.6} L${x - 1.2} ${y + 4.4} L${x - 2.0} ${y + 4.4} Z
+          M${x + 1.4} ${y - 4.4} L${x + 2.2} ${y - 4.4} L${x + 2.2} ${y + 5.6} L${x + 1.4} ${y + 5.6} Z
+          M${x - 2.0} ${y - 1.8} L${x + 2.2} ${y - 2.8} L${x + 2.2} ${y - 1.4} L${x - 2.0} ${y - 0.4} Z
+          M${x - 2.0} ${y + 1.6} L${x + 2.2} ${y + 0.6} L${x + 2.2} ${y + 2.0} L${x - 2.0} ${y + 3.0} Z`;
+}
+
+function mountStaff(host, options = {}) {
+  const half = 5;
+  const yFor = (diatonic) => (STAFF_TOP_DIATONIC - diatonic) * half;
+  const root = el('div', 'wui-pitch-staff');
+  host.append(root);
+  const anchor = options.anchor ?? 0.35;
+
+  function update(state) {
+    const marks = state.marks ?? [];
+    const columns = Math.max(1, state.columns ?? 1);
+    const leftPad = 34;
+    const colWidth = 58;
+    const width = leftPad + columns * colWidth + 34;
+    const ys = marks.map((mark) => yFor(mark.diatonic));
+    const top = Math.min(yFor(40), ...ys) - 14;
+    const bottom = Math.max(yFor(16), ...ys) + 14;
+    const svg = svgEl('svg', {
+      class: 'wui-pitch-staff__svg',
+      viewBox: `0 ${round3(top)} ${width} ${round3(bottom - top)}`,
+      preserveAspectRatio: 'xMidYMid meet',
+      role: 'img',
+      'aria-label': state.description ?? 'Staff',
+    });
+    for (const diatonic of STAFF_LINES) {
+      svg.append(svgEl('line', {class: 'wui-pitch-staff__line', x1: 16, y1: yFor(diatonic), x2: width - 4, y2: yFor(diatonic)}));
+    }
+    svg.append(svgEl('path', {class: 'wui-pitch-staff__brace', d: `M16 ${yFor(38)} C9 ${yFor(38)} 9 ${yFor(18)} 16 ${yFor(18)}`}));
+    // 谱号是调用方给的**字形串**；kit 只定位。缺省则不画。
+    if (state.clefs?.upper) {
+      const node = svgEl('text', {class: 'wui-pitch-staff__clef', x: 19, y: yFor(32) + 8, 'font-size': 30});
+      node.textContent = state.clefs.upper;
+      svg.append(node);
+    }
+    if (state.clefs?.lower) {
+      const node = svgEl('text', {class: 'wui-pitch-staff__clef', x: 19, y: yFor(24) + 4, 'font-size': 22});
+      node.textContent = state.clefs.lower;
+      svg.append(node);
+    }
+
+    const reel = svgEl('g', {class: 'wui-pitch-staff__reel'});
+    const activeColumn = state.activeColumn ?? 0;
+    if (state.follow === 'anchor' && columns > 1) {
+      reel.setAttribute('transform', `translate(${round3((leftPad + anchor * (width - leftPad)) - (leftPad + activeColumn * colWidth + 22))} 0)`);
+    }
+    const byColumn = new Map();
+    for (const mark of marks) {
+      const column = mark.column ?? 0;
+      if (!byColumn.has(column)) byColumn.set(column, []);
+      byColumn.get(column).push(mark);
+    }
+    for (const [column, group] of byColumn) {
+      const ordered = [...group].sort((a, b) => a.diatonic - b.diatonic);
+      const baseX = leftPad + column * colWidth + 22;
+      // data-when 是 kit 从 column 与 activeColumn 相减推出来的，调用方不用给。
+      const when = column === activeColumn ? 'now' : column < activeColumn ? 'past' : column === activeColumn + 1 ? 'next' : 'far';
+      let accidentalSlot = 0;
+      let shiftedPrevious = false;
+      ordered.forEach((mark, position) => {
+        const y = yFor(mark.diatonic);
+        const previous = ordered[position - 1];
+        const shifted = Boolean(previous) && mark.diatonic - previous.diatonic === 1 && !shiftedPrevious;
+        shiftedPrevious = shifted;
+        const x = baseX + (shifted ? 5.6 : 0);
+        const ledgers = [];
+        if (mark.diatonic >= 40) for (let d = 40; d <= mark.diatonic; d += 2) ledgers.push(d);
+        if (mark.diatonic <= 16) for (let d = 16; d >= mark.diatonic; d -= 2) ledgers.push(d);
+        if (mark.diatonic === 28) ledgers.push(28);
+        for (const diatonic of ledgers) {
+          reel.append(svgEl('line', {class: 'wui-pitch-staff__ledger', x1: x - 7, y1: yFor(diatonic), x2: x + 7, y2: yFor(diatonic)}));
+        }
+        const head = svgEl('ellipse', {
+          class: 'wui-pitch-staff__head', cx: round3(x), cy: round3(y), rx: 4.3, ry: 3.1,
+          transform: `rotate(-20 ${round3(x)} ${round3(y)})`,
+        });
+        head.dataset.midi = String(mark.midi);
+        head.dataset.role = mark.role;
+        head.dataset.when = when;
+        head.style.setProperty('--role', roleVar(mark.role));
+        reel.append(head);
+        if (mark.accidental) {
+          accidentalSlot += 1;
+          const glyph = svgEl('path', {class: 'wui-pitch-staff__accidental', d: accidentalGlyph(mark.accidental, x - 9 - (accidentalSlot % 2) * 8, y)});
+          glyph.dataset.midi = String(mark.midi);
+          glyph.style.setProperty('--role', roleVar(mark.role));
+          reel.append(glyph);
+        }
+        if (options.marks !== false) {
+          const text = svgEl('text', {class: 'wui-pitch-staff__mark', x: round3(x + 6.5), y: round3(y - 4)});
+          text.textContent = mark.mark;
+          text.style.setProperty('--role', roleVar(mark.role));
+          reel.append(text);
+        }
+      });
+    }
+    svg.append(reel);
+    root.replaceChildren(svg);
+  }
+  return {element: root, update};
+}
+
+/* --- §E.4 mountFretboard ------------------------------------------------ */
+
+function mountFretboard(host, options = {}) {
+  const root = el('div', 'wui-pitch-fretboard');
+  host.append(root);
+  let currentWindow = 0;
+
+  function update(state) {
+    const tuning = TUNINGS[state.tuning] ?? TUNINGS.standard;
+    const strings = tuning.midis.length;
+    const fretCount = 5;
+    const width = 142;
+    const height = 18 + strings * 13;
+    const left = 24;
+    const right = width - 8;
+    const spacing = (right - left) / fretCount;
+    const yFor = (index) => 11 + (strings - 1 - index) * 13;
+    // 窗口滞回：边界上来回给 mark 时不来回换把位。
+    const wanted = state.shape.firstFret;
+    if (Math.abs(wanted - currentWindow) >= 1) currentWindow = wanted;
+    const base = currentWindow;
+
+    const svg = svgEl('svg', {
+      class: 'wui-pitch-fretboard__svg', viewBox: `0 0 ${width} ${height}`,
+      role: 'img', 'aria-label': `${state.label ?? 'Fretboard'}: ${state.shape.label || 'no shape'}`,
+    });
+    for (let fret = 0; fret <= fretCount; fret += 1) {
+      const x = left + fret * spacing;
+      svg.append(svgEl('line', {
+        class: base === 0 && fret === 0 ? 'wui-pitch-fretboard__nut' : 'wui-pitch-fretboard__wire',
+        x1: x, y1: yFor(strings - 1) - 4, x2: x, y2: yFor(0) + 4,
+      }));
+    }
+    for (let index = 0; index < strings; index += 1) {
+      svg.append(svgEl('line', {class: 'wui-pitch-fretboard__string', x1: left, y1: yFor(index), x2: right, y2: yFor(index)}));
+      const label = svgEl('text', {class: 'wui-pitch-fretboard__label', x: 13, y: yFor(index) + 2.4, 'text-anchor': 'middle'});
+      label.textContent = tuning.labels[index];
+      svg.append(label);
+    }
+    for (let fret = 1; fret <= fretCount; fret += 1) {
+      const absolute = base + fret;
+      if ([3, 5, 7, 9].includes(mod(absolute, 12))) {
+        svg.append(svgEl('circle', {
+          class: 'wui-pitch-fretboard__inlay', cx: left + (fret - 0.5) * spacing,
+          cy: (yFor(0) + yFor(strings - 1)) / 2, r: 2,
+        }));
+      }
+    }
+    const neck = svgEl('g', {class: 'wui-pitch-fretboard__neck'});
+    for (const mark of state.shape.marks) {
+      const open = mark.fret === 0;
+      const x = open ? left - 9 : left + (mark.fret - base - 0.5) * spacing;
+      const group = svgEl('g', {class: 'wui-pitch-fretboard__dot'});
+      group.dataset.midi = String(mark.pitch.midi);
+      group.dataset.pc = String(mark.pitch.pc);
+      group.dataset.role = mark.pitch.role;
+      group.dataset.open = String(open);
+      group.dataset.fret = String(mark.fret);
+      group.dataset.string = String(mark.stringIndex);
+      group.style.setProperty('--role', roleVar(mark.pitch.role));
+      group.append(svgEl('circle', {cx: round3(x), cy: yFor(mark.stringIndex), r: 4.6}));
+      if (!open) {
+        const text = svgEl('text', {x: round3(x), y: yFor(mark.stringIndex) + 2.4});
+        text.textContent = mark.pitch.mark;
+        group.append(text);
+      }
+      neck.append(group);
+    }
+    for (const stringIndex of state.shape.muted) {
+      const text = svgEl('text', {class: 'wui-pitch-fretboard__mute', x: left - 11, y: yFor(stringIndex) + 2.4, 'text-anchor': 'middle'});
+      text.textContent = 'x';
+      neck.append(text);
+    }
+    if (base > 0) {
+      const text = svgEl('text', {class: 'wui-pitch-fretboard__fret-number', x: left + spacing / 2, y: height - 2, 'text-anchor': 'middle'});
+      text.textContent = `${base + 1}fr`;
+      neck.append(text);
+    }
+    svg.append(neck);
+    root.replaceChildren(svg);
+  }
+  return {element: root, update};
+}
+
+/* --- §E.5 mountNameplate ------------------------------------------------ */
+
+const DEFAULT_POP_MS = 180;
+
+function mountNameplate(host, options = {}) {
+  const root = el('div', 'wui-harmony-nameplate');
+  root.setAttribute('role', 'group');
+  if (options.emphasis) root.dataset.emphasis = options.emphasis;
+  const live = el('div');
+  live.setAttribute('role', 'status');
+  live.setAttribute('aria-live', 'polite');
+  live.setAttribute('aria-atomic', 'true');
+  // 主符号节点身份**终身不变** —— 换节点会让读屏漏播。
+  const symbol = el('strong', 'wui-harmony-nameplate__symbol');
+  const full = el('span', 'wui-harmony-nameplate__full');
+  live.append(symbol, full);
+  const next = el('span', 'wui-harmony-nameplate__next');
+  next.setAttribute('aria-hidden', 'true');
+  const voicing = el('ul', 'wui-harmony-nameplate__voicing');
+  const caption = el('p', 'wui-harmony-nameplate__caption');
+  const alternates = el('ul', 'wui-harmony-nameplate__alternates');
+  alternates.setAttribute('aria-label', 'Other readings');
+  root.append(live, next, voicing, caption, alternates);
+  host.append(root);
+
+  let showing = null;
+  function update(state) {
+    const primary = state.primary;
+    const key = primary ? (primary.key ?? primary.symbol) : null;
+    symbol.textContent = primary ? primary.symbol : (state.emptyLabel ?? '—');
+    full.textContent = primary ? (primary.full ?? '') : (state.emptySubLabel ?? 'waiting for playback…');
+    if (primary?.full) symbol.setAttribute('aria-hidden', 'true');
+    else symbol.removeAttribute('aria-hidden');
+    next.textContent = state.next ? `next · ${state.next.symbol}` : '';
+    voicing.replaceChildren();
+    for (const mark of state.voicing ?? []) {
+      const item = el('li');
+      item.dataset.midi = String(mark.midi);
+      item.dataset.pc = String(mark.pc);
+      item.dataset.role = mark.role;
+      item.style.setProperty('--role', roleVar(mark.role));
+      item.append(el('span', null, mark.name), el('b', null, mark.mark));
+      voicing.append(item);
+    }
+    caption.textContent = state.caption ?? '';
+    alternates.replaceChildren();
+    (state.alternates ?? []).forEach((candidate, index) => {
+      const item = el('li');
+      const button = el('button');
+      button.type = 'button';
+      button.setAttribute('aria-pressed', String(Boolean(candidate.selected)));
+      button.append(
+        el('span', 'wui-harmony-nameplate__alt-symbol', candidate.symbol),
+        el('span', 'wui-harmony-nameplate__alt-note', candidate.note ?? ''),
+      );
+      button.addEventListener('click', () => state.selectAlternate?.(index, candidate));
+      item.append(button);
+      alternates.append(item);
+    });
+    if (key !== showing) { showing = key; pop() }
+  }
+  /** pop 是 WAAPI，keyframes 只许写 opacity：这是用户唯一真的在读的那行字。 */
+  function pop() {
+    if (typeof symbol.animate !== 'function') return;
+    const duration = options.popDuration ?? DEFAULT_POP_MS;
+    if (duration <= 0) return;
+    symbol.animate([{opacity: 1}, {opacity: 0.18}, {opacity: 1}], {duration, easing: 'ease-out'});
+  }
+  function approach(value) {
+    root.style.setProperty('--wui-harmony-approach', String(round3(clamp(value, 0, 1))));
+  }
+  return {element: root, symbol, update, pop, approach};
+}
+
+/* --- §E.6 mountChipStrip ------------------------------------------------ */
+// 保留，服务**没有时间轴**的读数：调候选榜、双轨音级条。它不假装自己在演出。
+
+function mountChipStrip(host, options = {}) {
+  const root = el('div', 'wui-harmony-strip');
+  const list = el('ol', 'wui-harmony-strip__list');
+  root.append(list);
+  host.append(root);
+  const rows = new Map();
+
+  function update(state) {
+    // 🔴 行永不重排：bin 顺序在首次渲染时定死，播放中互换位置的条形图读不了。
+    for (const item of state.items) {
+      let row = rows.get(item.id);
+      if (!row) {
+        const node = el('li', 'wui-harmony-strip__row');
+        node.dataset.itemId = item.id;
+        const label = el('span', 'wui-harmony-strip__label', item.primary);
+        const meter = el('div', 'wui-harmony-strip__meter');
+        const ghost = el('i', 'wui-harmony-strip__ghost');
+        const fill = el('i', 'wui-harmony-strip__fill');
+        meter.append(ghost, fill);
+        const value = el('span', 'wui-harmony-strip__value');
+        node.append(label, meter, value);
+        list.append(node);
+        row = {node, label, ghost, fill, value};
+        rows.set(item.id, row);
+      }
+      row.label.textContent = item.primary;
+      row.fill.style.width = `${round3(clamp(item.meter ?? 0, 0, 1) * 100)}%`;
+      row.fill.style.setProperty('--tone', item.tone != null ? toneVar(item.tone) : 'var(--wui-harmony-accent)');
+      row.ghost.style.width = `${round3(clamp(item.meterGhost ?? 0, 0, 1) * 100)}%`;
+      row.ghost.hidden = item.meterGhost == null;
+      row.value.textContent = item.trailing ?? '';
+      row.node.dataset.current = String(Boolean(item.current));
+    }
+    for (const [id, row] of rows) {
+      if (!state.items.some((item) => item.id === id)) { row.node.remove(); rows.delete(id) }
+    }
+  }
+  return {element: root, update};
+}
+
+/* --- §E.7 mountWheel ---------------------------------------------------- */
+
+function polar(cx, cy, radius, degrees) {
+  const rad = ((degrees - 90) * Math.PI) / 180;
+  return [cx + radius * Math.cos(rad), cy + radius * Math.sin(rad)];
+}
+function annulus(cx, cy, inner, outer, from, to) {
+  const [x1, y1] = polar(cx, cy, outer, from);
+  const [x2, y2] = polar(cx, cy, outer, to);
+  const [x3, y3] = polar(cx, cy, inner, to);
+  const [x4, y4] = polar(cx, cy, inner, from);
+  const large = to - from > 180 ? 1 : 0;
+  return `M${round3(x1)} ${round3(y1)} A${outer} ${outer} 0 ${large} 1 ${round3(x2)} ${round3(y2)} ` +
+         `L${round3(x3)} ${round3(y3)} A${inner} ${inner} 0 ${large} 0 ${round3(x4)} ${round3(y4)} Z`;
+}
+
+function mountWheel(host, options = {}) {
+  const root = el('div', 'wui-harmony-wheel');
+  const svg = svgEl('svg', {class: 'wui-harmony-wheel__svg', viewBox: '0 0 200 200', 'aria-hidden': 'true'});
+  const ring = svgEl('g', {class: 'wui-harmony-wheel__ring'});
+  const needle = svgEl('path', {class: 'wui-harmony-wheel__needle'});
+  const centrePrimary = svgEl('text', {class: 'wui-harmony-wheel__centre-primary', x: 100, y: 99});
+  const centreSecondary = svgEl('text', {class: 'wui-harmony-wheel__centre-secondary', x: 100, y: 111});
+  svg.append(needle, ring, centrePrimary, centreSecondary);
+  const side = el('div', 'wui-harmony-wheel__side');
+  const live = el('div');
+  live.setAttribute('role', 'status');
+  live.setAttribute('aria-live', 'polite');
+  const twin = el('ol', 'wui-vh');
+  root.append(svg, side);
+  side.append(live, twin);
+  host.append(root);
+
+  // unwrap：从第 11 段走到第 0 段要转 +1 段，不是 -11 段。
+  let unwrapped = 0;
+  let previous = null;
+  let built = false;
+  const segNodes = [];
+
+  function update(state) {
+    const outer = state.outer;
+    const step = 360 / outer.length;
+    if (!built) {
+      built = true;
+      outer.forEach((segment, index) => {
+        const path = svgEl('path', {class: 'wui-harmony-wheel__seg', d: annulus(100, 100, 62, 84, index * step - step / 2, index * step + step / 2)});
+        const [lx, ly] = polar(100, 100, 73, index * step);
+        const label = svgEl('text', {class: 'wui-harmony-wheel__seg-label', x: round3(lx), y: round3(ly + 2.2)});
+        label.textContent = segment.label;
+        ring.append(path, label);
+        segNodes.push({path, label, ring: 'outer'});
+      });
+      (state.inner ?? []).forEach((segment, index) => {
+        const path = svgEl('path', {class: 'wui-harmony-wheel__seg', d: annulus(100, 100, 40, 60, index * step - step / 2, index * step + step / 2)});
+        const [lx, ly] = polar(100, 100, 50, index * step);
+        const label = svgEl('text', {class: 'wui-harmony-wheel__seg-label', x: round3(lx), y: round3(ly + 2.2)});
+        label.textContent = segment.label;
+        ring.append(path, label);
+        segNodes.push({path, label, ring: 'inner'});
+      });
+    }
+    const all = [...outer, ...(state.inner ?? [])];
+    all.forEach((segment, index) => {
+      const node = segNodes[index];
+      if (!node) return;
+      node.path.setAttribute('fill', toneVar(segment.tone ?? index));
+      node.path.setAttribute('fill-opacity', String(round3(0.1 + clamp(segment.weight ?? 0, 0, 1) * 0.8)));
+      node.path.dataset.active = String(Boolean(segment.active));
+    });
+    const at = state.needle?.at ?? 0;
+    const target = at * step;
+    if (previous == null) unwrapped = target;
+    else {
+      let delta = target - mod(unwrapped, 360);
+      while (delta > 180) delta -= 360;
+      while (delta < -180) delta += 360;
+      unwrapped += delta;
+    }
+    previous = target;
+    ring.setAttribute('transform', `rotate(${round3(-unwrapped)} 100 100)`);
+    const spread = Math.max(1.4, (state.needle?.spread ?? 0) * step);
+    needle.setAttribute('d', annulus(100, 100, 34, 92, -spread / 2, spread / 2));
+    centrePrimary.textContent = state.centre?.primary ?? '';
+    centreSecondary.textContent = state.centre?.secondary ?? '';
+    live.textContent = state.centre ? `${state.centre.primary} · ${state.centre.secondary ?? ''}` : '';
+    twin.replaceChildren();
+    for (const segment of all) {
+      const item = el('li', null, `${segment.label} ${Math.round((segment.weight ?? 0) * 100)}%`);
+      if (segment.active) item.setAttribute('aria-current', 'true');
+      twin.append(item);
+    }
+  }
+  return {element: root, update, get angle() { return unwrapped }};
+}
+
+/* --- §E.8 mountWorkbench ------------------------------------------------ */
+
+function mountWorkbench(host, binding, options = {}) {
+  const root = el('div', 'wui-harmony');
+  root.dataset.density = 'comfortable';
+  root.dataset.phase = 'idle';
+  root.dataset.motion = 'continuous';
+  // 语义索引是**宿主的直接子节点**，与工作台框架同级（设计 §3.6.7）。
+  const index = el('ol', 'wui-vh');
+  const frame = el('div', 'wui-workbench');
+  const header = el('div', 'wui-workbench__header');
+  const title = el('h2', 'wui-workbench__title');
+  const subtitle = el('p', 'wui-workbench__subtitle');
+  const tabs = el('div', 'wui-workbench__tabs');
+  tabs.setAttribute('role', 'tablist');
+  const main = el('div', 'wui-workbench__main');
+  const stage = el('div', 'wui-workbench__stage');
+  main.append(stage);
+  const rail = el('div', 'wui-workbench__rail');
+  const strip = el('div', 'wui-workbench__strip');
+  const status = el('div', 'wui-workbench__status');
+  const beacon = el('span', 'wui-workbench__beacon');
+  const statusMessage = el('span');
+  statusMessage.setAttribute('role', 'status');
+  statusMessage.setAttribute('aria-live', 'polite');
+  const statusDetail = el('span', 'wui-workbench__status-detail');
+  const statusMotion = el('span', 'wui-workbench__status-motion');
+  status.append(beacon, statusMessage, statusDetail, statusMotion);
+  header.append(title, subtitle, tabs);
+  frame.append(header, main, rail, strip, status);
+  root.append(index, frame);
+  host.append(root);
+
+  const dockNodes = new Map();
+  const tabNodes = new Map();
+
+  function buildChrome(state) {
+    title.textContent = state.title ?? '';
+    subtitle.textContent = state.subtitle ?? '';
+    if (tabNodes.size === 0) {
+      state.views.forEach((view) => {
+        const tab = el('button', 'wui-workbench__tab', view.label);
+        tab.type = 'button';
+        tab.id = `wb-tab-${view.id}`;
+        tab.setAttribute('role', 'tab');
+        tab.dataset.viewId = view.id;
+        tab.addEventListener('click', () => binding.activateView?.(view.id));
+        tab.addEventListener('keydown', (event) => {
+          const ids = state.views.map((entry) => entry.id);
+          const at = ids.indexOf(view.id);
+          // 手动激活：←/→ 只移焦点，Enter/Space 才切换。
+          if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+            event.preventDefault();
+            const nextId = ids[mod(at + (event.key === 'ArrowRight' ? 1 : -1), ids.length)];
+            tabNodes.get(nextId)?.focus();
+          } else if (event.key === 'Home') { event.preventDefault(); tabNodes.get(ids[0])?.focus() }
+          else if (event.key === 'End') { event.preventDefault(); tabNodes.get(ids[ids.length - 1])?.focus() }
+          else if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); binding.activateView?.(view.id) }
+        });
+        tabs.append(tab);
+        tabNodes.set(view.id, tab);
+      });
+    }
+    for (const [id, tab] of tabNodes) {
+      const selected = id === state.activeViewId;
+      tab.setAttribute('aria-selected', String(selected));
+      tab.tabIndex = selected ? 0 : -1;
+    }
+    // 坞位宿主节点**身份终身不变**：每帧被重建的插槽会静默卸载子 presenter。
+    for (const dock of state.docks) {
+      let node = dockNodes.get(dock.id);
+      if (!node) {
+        node = el('div', 'wui-workbench__dock');
+        node.dataset.dockId = dock.id;
+        node.append(el('span', 'wui-workbench__dock-label', dock.label));
+        (dock.placement === 'strip' ? strip : rail).append(node);
+        dockNodes.set(dock.id, node);
+      }
+      node.hidden = state.dockVisibility?.[dock.id] === false;
+    }
+    root.dataset.phase = state.phase ?? 'idle';
+    root.dataset.density = state.density ?? 'comfortable';
+    statusMessage.textContent = state.status?.message ?? '';
+    statusDetail.textContent = state.status?.detail ?? '';
+  }
+
+  return {
+    element: root, stage, index, statusMessage, statusDetail, statusMotion,
+    dock: (id) => (dockNodes.get(id)?.hidden ? undefined : dockNodes.get(id)),
+    dockHost: (id) => dockNodes.get(id),
+    update: buildChrome,
+  };
+}
+
+// ===========================================================================
+// §F createAnalysisPlayhead 复刻 —— 跨度契约的另一端。
+//     它是任何带 data-start-quarters 的节点上「活动态」的唯一所有者：
+//     lane 只画几何与色调，绝不加 active class、绝不写 aria-current。
+// ===========================================================================
+
+const ANALYSIS_SPAN_SELECTOR = '[data-start-quarters],[data-spans]';
+const ANALYSIS_ACTIVE_STYLE =
+  'background:var(--wui-harmony-track, #eee);outline:2px solid var(--wui-harmony-accent, #111);outline-offset:-2px;';
+
+function createAnalysisPlayhead(root, options = {}) {
+  let active = new Set();
+  const apply = (next) => {
+    const nextSet = new Set(next);
+    let changed = false;
+    for (const node of active) {
+      if (nextSet.has(node)) continue;
+      node.style.cssText = node.dataset.webscoreIdleStyle ?? '';
+      node.removeAttribute('aria-current');
+      changed = true;
+    }
+    for (const node of nextSet) {
+      if (active.has(node)) continue;
+      node.style.cssText = `${node.dataset.webscoreIdleStyle ?? ''}${ANALYSIS_ACTIVE_STYLE}`;
+      node.setAttribute('aria-current', 'true');
+      changed = true;
+    }
+    active = nextSet;
+    // 工作台传 scroll:false。第一道保险是 viewport 的 `overflow: clip`。
+    if (changed && options.scroll !== false) next[0]?.scrollIntoView?.({block: 'nearest', inline: 'nearest'});
+  };
+  return {
+    update(quarters) {
+      const position = Number.isFinite(quarters) ? quarters : 0;
+      const matches = [];
+      for (const node of root.querySelectorAll(ANALYSIS_SPAN_SELECTOR)) {
+        const start = Number(node.dataset.startQuarters);
+        const end = Number(node.dataset.endQuarters);
+        if (Number.isFinite(start) && Number.isFinite(end) && position >= start && position < end) matches.push(node);
+      }
+      apply(matches);
+    },
+    clear() { apply([]) },
+    get activeCount() { return active.size },
+  };
+}
+
+// ===========================================================================
+// §G headless/transport-clock.ts + 假播放器
+//     全部预测住在这里：时间进、时间出，不读任何浏览器全局。
+// ===========================================================================
+
+function createTransportClock() {
+  let sample = {position: 0, atMs: 0, rate: 1, playing: false};
+  let epoch = 0;
+  let interval = 50;        // EWMA 跟踪，而不是写死 50
+  let lastAtMs = null;
+  let held = null;
+  let mode = 'predicted';
+
+  return {
+    get epoch() { return epoch },
+    get rate() { return sample.rate },
+    set mode(value) { mode = value },
+    get mode() { return mode },
+    /** 20Hz 的 timeupdate 落在这里。 */
+    sample(next) {
+      if (lastAtMs != null) {
+        const observed = next.atMs - lastAtMs;
+        if (observed > 4 && observed < 1000) interval = interval * 0.8 + observed * 0.2;
+      }
+      lastAtMs = next.atMs;
+      sample = {...next};
+    },
+    /** 任何不连续（seek / 回卷 / stop / scrub）都让 epoch +1：变了就吸附，没变就滑。 */
+    discontinuity(position, atMs, playing, rate) {
+      epoch += 1;
+      lastAtMs = null;
+      sample = {position, atMs, rate: rate ?? sample.rate, playing: playing ?? sample.playing};
+    },
+    hold(position) { held = position },
+    release() { held = null },
+    /** 每帧一次。coast：一个间隔内线性外推，之后速度线性衰减到 cap 处归零。 */
+    readAt(atMs) {
+      if (held != null) return held;
+      if (mode === 'raw' || !sample.playing) return sample.position;
+      const dt = Math.max(0, atMs - sample.atMs);
+      const cap = clamp(interval * 2, 60, 140);
+      let effective;
+      if (dt <= interval) effective = dt;
+      else if (dt >= cap) effective = interval + (cap - interval) / 2;
+      else {
+        const over = dt - interval;
+        const span = cap - interval;
+        effective = interval + over - (over * over) / (2 * span);
+      }
+      return sample.position + (effective / 1000) * sample.rate;
+    },
+  };
+}
+
+/**
+ * 假播放器：20Hz 的 cursor，暂停**不发**任何事件（真 score-player 就是这样），
+ * seek / 回卷 **立刻**发一个。预测层的 coast 正是为这两条而存在。
+ */
+function createFakePlayer(onCursor) {
+  let position = 0;
+  let rate = 1;
+  let playing = false;
+  let timer = null;
+  const emit = () => onCursor({seconds: position, rate, playing, atMs: now()});
+  const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  const step = () => {
+    position += 0.05 * rate;
+    if (position >= TOTAL_SECONDS) { position -= TOTAL_SECONDS; onWrap?.() }
+    emit();
+  };
+  let onWrap = null;
+  return {
+    get position() { return position },
+    get playing() { return playing },
+    get rate() { return rate },
+    onWrap(handler) { onWrap = handler },
+    play() {
+      if (playing) return;
+      playing = true;
+      emit();
+      timer = setInterval(step, 50);
+    },
+    pause() {
+      if (!playing) return;
+      playing = false;
+      clearInterval(timer);
+      timer = null;
+      // 故意不发事件 —— pause() 是不可见的，只是 tick 停了。
+    },
+    seek(seconds) {
+      position = clamp(seconds, 0, TOTAL_SECONDS);
+      emit();                       // seek 立刻发一个 cursor
+    },
+    setRate(next) {
+      rate = next;
+      emit();                       // retune 在变速处立刻发一个 cursor
+    },
+    tickForTest() { step() },
+  };
+}
+
+// ===========================================================================
+// §H 元素层接线 —— 六个视图 + 一次投影喂四个坞位
+//     这一层在实现里是 packages/score 的 element/internal/recipes.ts。
+// ===========================================================================
+
+const ANCHOR = 0.33;
+const RULER = [];
+for (let q = 0; q <= TOTAL_QUARTERS; q += 1) {
+  RULER.push({at: qToSec(q), label: q % 4 === 0 ? `bar ${q / 4 + 1}` : '', major: q % 4 === 0});
+}
+const PITCH_LOW = 38;
+const PITCH_HIGH = 82;
+const pitchY = (midi) => 1 - clamp((midi - PITCH_LOW) / (PITCH_HIGH - PITCH_LOW), 0, 1);
+const FUNCTION_TONE = {T: 4, S: 2, D: 0};
+
+function roleOf(midi, segment) {
+  const pcs = new Set(CHORD_PCS[segment.quality].map((step) => mod(segment.rootPc + step, 12)));
+  const pc = mod(midi, 12);
+  if (!pcs.has(pc)) return 'other';
+  return ROLE_BY_SEMITONE[mod(pc - segment.rootPc, 12)] ?? 'other';
+}
+
+const VIEWS = [
+  {id: 'key',           label: 'key',           needsFretboard: true},
+  {id: 'chords',        label: 'chords',        needsFretboard: true},
+  {id: 'roman',         label: 'roman',         needsFretboard: false},
+  {id: 'motifs',        label: 'motifs',        needsFretboard: false},
+  {id: 'voice-leading', label: 'voice-leading', needsFretboard: false},
+  {id: 'live-chord',    label: 'live-chord',    needsFretboard: true},
+];
+
+const LEFT_THE_STAGE = {
+  key: 'Ranked candidates and “confidence 78 %” left the stage — detectKey(score).scores returns all 24, sorted.',
+  chords: 'The “chord name + beat N” <ol> left the stage — chordTimeline(score) returns strictly more than it printed.',
+  roman: 'The whole numeral chip wall left the stage — romanNumerals(score) returns it as data.',
+  motifs: 'The “×N + intervals[…]” row left the stage — findMotifs(score, {length}) has partId and noteIndexes too.',
+  'voice-leading': 'The severity-dot table left the stage — voiceLeading(score) returns every issue as data.',
+  'live-chord': 'The eight equal-width history chips left the stage — they are now a wake of real durations.',
+};
+
+/** 每个视图的 lane 内容。**内容是域率的**：只在视图切换或和弦推进时重算。 */
+function buildLaneState(viewId, options) {
+  const span = {start: 0, end: TOTAL_SECONDS};
+  const base = {span, ruler: RULER, now: 0, playing: options.playing};
+
+  if (viewId === 'chords') {
+    const ticks = [];
+    for (let q = 0; q < TOTAL_QUARTERS; q += 1) {
+      const segment = segmentAtQuarter(q);
+      for (const midi of soundingAtQuarter(q)) {
+        ticks.push({at: qToSec(q) + 0.02, y: pitchY(midi), track: 1, role: roleOf(midi, segment)});
+      }
+    }
+    const arcs = SEGMENTS.slice(1).map((segment, index) => ({
+      at: qToSec(segment.q), track: 1,
+      fromY: pitchY(INNER[index].b), toY: pitchY(INNER[index + 1].b),
+    }));
+    return {
+      ...base,
+      tracks: [{id: 'chords', label: 'chords', heightScale: 1.3}, {id: 'onsets', label: 'onsets', sublabel: 'sounding', heightScale: 2.4}],
+      bands: SEGMENTS.map((segment) => ({
+        id: segment.id, start: qToSec(segment.q), end: qToSec(segment.endQ),
+        stampStart: segment.q, stampEnd: segment.endQ,
+        track: 0, tone: segment.rootPc, primary: segment.symbol, secondary: segment.roman,
+      })),
+      ticks, arcs,
+    };
+  }
+
+  if (viewId === 'roman') {
+    const keyBands = [];
+    for (const segment of SEGMENTS) {
+      const last = keyBands[keyBands.length - 1];
+      if (last && last.primary === segment.key) { last.end = qToSec(segment.endQ); last.stampEnd = segment.endQ; continue }
+      keyBands.push({
+        id: `key-${segment.index}`, start: qToSec(segment.q), end: qToSec(segment.endQ),
+        stampStart: segment.q, stampEnd: segment.endQ, track: 0,
+        tone: segment.key.startsWith('C') ? 6 : 9, primary: segment.key,
+      });
+    }
+    const functions = [];
+    for (const segment of SEGMENTS) {
+      const last = functions[functions.length - 1];
+      if (last && last.primary === segment.fn) { last.end = qToSec(segment.endQ); last.stampEnd = segment.endQ; continue }
+      functions.push({
+        id: `fn-${segment.index}`, start: qToSec(segment.q), end: qToSec(segment.endQ),
+        stampStart: segment.q, stampEnd: segment.endQ, track: 1,
+        tone: FUNCTION_TONE[segment.fn], primary: segment.fn,
+        secondary: segment.fn === 'T' ? 'tonic' : segment.fn === 'S' ? 'subdominant' : 'dominant',
+      });
+    }
+    return {
+      ...base,
+      tracks: [
+        {id: 'key', label: 'key', kind: 'ribbon'},
+        {id: 'function', label: 'function', sublabel: 'T / S / D', heightScale: 1.3},
+        {id: 'numerals', label: 'numerals', heightScale: 1.3},
+      ],
+      bands: [
+        ...keyBands,
+        ...functions,
+        ...SEGMENTS.map((segment) => ({
+          id: segment.id, start: qToSec(segment.q), end: qToSec(segment.endQ),
+          stampStart: segment.q, stampEnd: segment.endQ, track: 2,
+          tone: segment.rootPc, primary: segment.roman, secondary: segment.symbol,
+        })),
+      ],
+      pinTrack: 2,
+    };
+  }
+
+  if (viewId === 'key') {
+    return {
+      ...base,
+      tracks: [{id: 'key', label: 'key', sublabel: 'windowed', heightScale: 1.6}],
+      bands: KEY_BANDS.map((band, index) => ({
+        id: `kb-${index}`, start: qToSec(band.q), end: qToSec(band.endQ),
+        stampStart: band.q, stampEnd: band.endQ, track: 0, tone: band.tonic,
+        primary: band.label, secondary: `${Math.round(clamp(band.confidence, 0, 1) * 100)}%`,
+      })),
+    };
+  }
+
+  if (viewId === 'motifs') {
+    const shown = MOTIFS.slice(0, 4);
+    const contour = (pitches) => {
+      const low = Math.min(...pitches);
+      const high = Math.max(...pitches);
+      const range = Math.max(1, high - low);
+      return pitches.map((midi, index) => `${round3((index / (pitches.length - 1)) * 40)},${round3(12 - ((midi - low) / range) * 11)}`).join(' ');
+    };
+    const bands = [];
+    shown.forEach((motif, track) => {
+      motif.occurrences.forEach((occurrence, index) => {
+        bands.push({
+          id: `${motif.id}-${index}`, start: qToSec(occurrence.startQ), end: qToSec(occurrence.endQ),
+          stampStart: occurrence.startQ, stampEnd: occurrence.endQ, track,
+          tone: track * 3 + 1, group: motif.id,
+          primary: motif.id.toUpperCase(),
+          glyph: contour(occurrence.pitches),
+        });
+      });
+    });
+    return {
+      ...base,
+      tracks: shown.map((motif, track) => ({
+        id: motif.id, label: `${motif.id.toUpperCase()} ×${motif.occurrences.length}`,
+        sublabel: `[${motif.intervals.join(', ')}]`,
+        glyph: contour(motif.occurrences[0].pitches).split(' ').map((point) => {
+          const [x, y] = point.split(',');
+          return `${round3((Number(x) / 40) * 46)},${y}`;
+        }).join(' '),
+        tone: track * 3 + 1,
+      })),
+      bands,
+      emptyLabel: 'No figure repeats at 4 notes. Try motif-length 3.',
+    };
+  }
+
+  if (viewId === 'voice-leading') {
+    const tracks = [{id: 'harmony', label: 'chords', kind: 'ribbon'}];
+    VOICE_IDS.forEach((id, index) => {
+      const points = [];
+      for (let q = 0; q < TOTAL_QUARTERS; q += 1) {
+        const midi = voicesAtQuarter(q)[id];
+        points.push({at: qToSec(q), y: pitchY(midi) * -1 + 1}, {at: qToSec(q + 1), y: pitchY(midi) * -1 + 1});
+      }
+      tracks.push({id, label: id, sublabel: 'voice', points, tone: [9, 6, 4, 0][index]});
+    });
+    return {
+      ...base,
+      tracks,
+      bands: SEGMENTS.map((segment) => ({
+        id: segment.id, start: qToSec(segment.q), end: qToSec(segment.endQ),
+        stampStart: segment.q, stampEnd: segment.endQ, track: 0,
+        tone: segment.rootPc, primary: segment.symbol,
+      })),
+      brackets: ISSUES.map((issue) => ({
+        id: issue.id, start: qToSec(issue.startQ), end: qToSec(issue.endQ),
+        from: VOICE_IDS.indexOf(issue.voices[0]) + 1,
+        to: VOICE_IDS.indexOf(issue.voices[issue.voices.length - 1]) + 1,
+        fromId: issue.voices[0], toId: issue.voices[issue.voices.length - 1],
+        severity: issue.severity, label: issue.type,
+      })),
+      emptyLabel: 'No parallel motion, crossings or leaps over an octave — clean.',
+    };
+  }
+
+  // live-chord：未来是空的，而且要看得出来。材料从线里流**出去**。
+  const upto = options.segmentIndex ?? 0;
+  return {
+    ...base,
+    future: false,
+    listening: options.listening === true,
+    tracks: [{id: 'wake', label: 'wake', sublabel: 'heard', heightScale: 2.4}],
+    bands: SEGMENTS.slice(0, upto).map((segment) => ({
+      id: segment.id, start: qToSec(segment.q), end: qToSec(segment.endQ),
+      track: 0, tone: segment.rootPc, primary: segment.symbol, secondary: segment.roman,
+    })),
+    emptyLabel: 'sounding now — nothing has finished yet',
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 应用状态
+// ---------------------------------------------------------------------------
+
+const app = {
+  viewId: 'chords',
+  spelling: 'auto',
+  tuning: 'standard',
+  density: 'comfortable',
+  motionSetting: 'auto',
+  motionMode: 'continuous',
+  phaseSetting: 'auto',
+  clockMode: 'predicted',
+  rate: 1,
+  playing: false,
+  scrubbing: false,
+  position: 0,
+  steppedPosition: 0,
+  segmentIndex: 0,
+  alternates: new Map(),
+  frames: 0,
+};
+
+const host = document.getElementById('host');
+const clock = createTransportClock();
+const loop = createFrameLoop(window);
+const player = createFakePlayer(onCursor);
+
+const shell = mountWorkbench(host, {
+  activateView: (id) => setView(id),
+});
+let keyboard = null;
+let staff = null;
+let fretboard = null;
+let nameplate = null;
+let lane = null;
+let playhead = null;
+let wheel = null;
+let meters = null;
+let heroPlate = null;
+let stageNote = null;
+let unjoin = null;
+
+// 坞位宿主节点身份终身不变 —— 先建骨架，再往里 mount。
+shell.update({
+  title: 'Harmony workbench',
+  subtitle: '16 bars · 4/4 · C major ⇢ G major',
+  views: VIEWS,
+  activeViewId: app.viewId,
+  docks: [
+    {id: 'nameplate', label: 'naming', placement: 'rail'},
+    {id: 'staff', label: 'staff', placement: 'rail'},
+    {id: 'fretboard', label: 'fretboard', placement: 'rail'},
+    {id: 'keyboard', label: 'keyboard', placement: 'strip'},
+  ],
+  density: app.density,
+  phase: 'idle',
+  status: {message: 'idle', detail: 'bar 1 · beat 1'},
+});
+keyboard = mountKeyboard(shell.dockHost('keyboard'), {low: 36, high: 84});
+nameplate = mountNameplate(shell.dockHost('nameplate'), {});
+staff = mountStaff(shell.dockHost('staff'), {});
+fretboard = mountFretboard(shell.dockHost('fretboard'), {});
+
+// ---------------------------------------------------------------------------
+// 舞台
+// ---------------------------------------------------------------------------
+
+function selectedNaming(segment) {
+  const chosen = app.alternates.get(segment.index);
+  if (chosen) return {...chosen, quality: 'any', key: `${segment.index}:${chosen.symbol}`};
+  return {
+    symbol: segment.symbol, full: segment.full, rootPc: segment.rootPc,
+    quality: segment.quality, key: `${segment.index}:${segment.symbol}`,
+  };
+}
+
+function buildStage() {
+  shell.stage.replaceChildren();
+  lane = null; wheel = null; meters = null; heroPlate = null; playhead = null;
+
+  const phase = resolvePhase();
+  if (phase === 'empty' || phase === 'error') {
+    const card = el('div', 'wui-workbench__card');
+    if (phase === 'error') {
+      card.dataset.tone = 'error';
+      card.append(el('strong', null, 'Analysis failed'), el('p', 'wui-workbench__empty', 'TypeError: cannot read notes of undefined'));
+    } else {
+      card.append(el('p', 'wui-workbench__empty', 'No result for this view — the score has no notes in range.'));
+    }
+    shell.stage.append(card);
+    shell.index.replaceChildren();
+    return;
+  }
+
+  if (app.viewId === 'key') {
+    const row = el('div');
+    row.style.cssText = 'display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start;';
+    const wheelHost = el('div');
+    wheelHost.style.cssText = 'flex:0 0 auto;';
+    const metersHost = el('div');
+    metersHost.style.cssText = 'flex:1 1 220px;min-width:0;';
+    metersHost.append(el('span', 'wui-workbench__dock-label', 'pitch-class weight · heard vs whole piece'));
+    row.append(wheelHost, metersHost);
+    shell.stage.append(row);
+    wheel = mountWheel(wheelHost, {});
+    meters = mountChipStrip(metersHost, {});
+  }
+
+  const laneHost = el('div');
+  shell.stage.append(laneHost);
+  lane = mountFlowLane(laneHost, laneBinding, {
+    anchor: ANCHOR,
+    label: `${app.viewId} transport`,
+    index: shell.index,
+    scale: app.density === 'compact' ? 32 : 44,
+    spans: app.viewId !== 'live-chord',
+  });
+  lane.element.dataset.motion = app.motionMode;
+  // playhead 是「活动态」的唯一所有者：lane 只画几何与色调。
+  playhead = createAnalysisPlayhead(lane.element, {scroll: false});
+
+  if (app.viewId === 'live-chord') {
+    const hero = el('div', 'wui-harmony-flow__hero');
+    hero.style.left = `${ANCHOR * 100}%`;
+    lane.viewport.append(hero);
+    heroPlate = mountNameplate(hero, {emphasis: 'hero'});
+  }
+
+  stageNote = el('p', 'wui-harmony-note', LEFT_THE_STAGE[app.viewId]);
+  shell.stage.append(stageNote);
+
+  const showFretboard = VIEWS.find((view) => view.id === app.viewId)?.needsFretboard !== false;
+  shell.dockHost('fretboard').hidden = !showFretboard;
+  shell.dockHost('nameplate').hidden = app.viewId === 'live-chord';
+  syncAll(app.position, true);
+}
+
+const laneBinding = {
+  snapshot: () => buildLaneState(app.viewId, {
+    playing: app.playing,
+    segmentIndex: app.segmentIndex,
+    listening: resolvePhase() === 'listening',
+  }),
+  position: () => (app.motionMode === 'stepped' ? app.steppedPosition : app.position),
+  seek: (seconds, phase) => {
+    player.seek(seconds);
+    clock.discontinuity(seconds, nowMs(), player.playing, app.rate);
+    if (phase === 'commit') syncAll(seconds, false);
+  },
+  hold: (on) => { app.scrubbing = on; if (!on) clock.release() },
+  toggle: () => setPlaying(!app.playing),
+};
+
+function setView(id) {
+  if (app.viewId === id) return;
+  app.viewId = id;
+  shell.update({
+    title: 'Harmony workbench',
+    subtitle: '16 bars · 4/4 · C major ⇢ G major',
+    views: VIEWS, activeViewId: id,
+    docks: [
+      {id: 'nameplate', label: 'naming', placement: 'rail'},
+      {id: 'staff', label: 'staff', placement: 'rail'},
+      {id: 'fretboard', label: 'fretboard', placement: 'rail'},
+      {id: 'keyboard', label: 'keyboard', placement: 'strip'},
+    ],
+    density: app.density, phase: resolvePhase(),
+    status: {message: statusMessage(), detail: statusDetail(app.position)},
+  });
+  buildStage();
+}
+
+// ---------------------------------------------------------------------------
+// 投影：一次调用，喂饱四个坞位。R3 的差集在 kit 里，不在这里。
+// ---------------------------------------------------------------------------
+
+let projectionKey = null;
+let projection = null;
+
+function syncDocks(seconds) {
+  const q = secToQ(seconds);
+  const segment = segmentAtQuarter(q);
+  const midis = soundingAtQuarter(q);
+  const naming = selectedNaming(segment);
+  const key = `${midis.join(',')}|${naming.key}|${app.spelling}|${app.tuning}`;
+  if (key === projectionKey) return projection;
+  projectionKey = key;
+  projection = projectSounding(midis, naming, app.spelling, app.tuning);
+
+  keyboard.update({
+    marks: projection.marks,
+    description: projection.description,
+    ghostPitchClasses: CHORD_PCS[segment.quality].map((step) => mod(segment.rootPc + step, 12)),
+  });
+  staff.update(staffState(projection, seconds));
+  fretboard.update({tuning: app.tuning, shape: projection.fret, label: naming.symbol});
+  const plateState = nameplateState(projection, segment, naming, seconds);
+  nameplate.update(plateState);
+  heroPlate?.update(plateState);
+  return projection;
+}
+
+function staffState(current, seconds) {
+  const q = Math.floor(secToQ(seconds));
+  if (app.viewId === 'voice-leading') {
+    const issue = ISSUES.find((entry) => q >= entry.startQ && q < entry.endQ);
+    if (issue) {
+      // 两列：问题涉及的前后两个和声位置。**当前正在响的那一列永远是 activeColumn**,
+      // 所以四个坞位仍然对同一组发声音高说同一件事；另一列是 past / next 的 ghost。
+      const boundary = Math.min(issue.startQ + 1, TOTAL_QUARTERS - 1);
+      const quarters = [issue.startQ, boundary];
+      const marks = [];
+      quarters.forEach((at, column) => {
+        const voices = voicesAtQuarter(at);
+        const segment = segmentAtQuarter(at);
+        const seen = new Set();
+        for (const id of VOICE_IDS) {
+          if (seen.has(voices[id])) continue;
+          seen.add(voices[id]);
+          const role = roleOf(voices[id], segment);
+          marks.push({
+            ...spellMidi(voices[id], resolvePreference(app.spelling, segment.rootPc)),
+            column, role, mark: ROLE_MARK[role],
+          });
+        }
+      });
+      return {
+        marks, columns: 2, activeColumn: q < boundary ? 0 : 1, follow: 'anchor',
+        clefs: {upper: '\u{1D11E}', lower: '\u{1D122}'},
+        description: `${issue.type}: ${issue.detail}`,
+      };
+    }
+  }
+  return {
+    marks: current.staff.map((mark) => ({...mark, column: 0})),
+    columns: 1, activeColumn: 0,
+    clefs: {upper: '\u{1D11E}', lower: '\u{1D122}'},
+    description: current.description,
+  };
+}
+
+function nameplateState(current, segment, naming, seconds) {
+  const next = SEGMENTS[segment.index + 1];
+  const alternates = (ALTERNATE_TABLE[segment.symbol] ?? []).map((candidate) => ({
+    ...candidate, selected: app.alternates.get(segment.index)?.symbol === candidate.symbol,
+  }));
+  if (app.alternates.has(segment.index)) {
+    alternates.unshift({symbol: segment.symbol, full: segment.full, rootPc: segment.rootPc, note: 'primary', selected: false});
+  }
+  return {
+    primary: {symbol: naming.symbol, full: naming.full, key: naming.key},
+    voicing: current.marks,
+    caption: `${segment.roman} in ${segment.key}`,
+    next: next ? {symbol: next.symbol} : undefined,
+    alternates,
+    emptyLabel: '—',
+    emptySubLabel: 'waiting for playback…',
+    selectAlternate: (index, candidate) => {
+      if (candidate.note === 'primary') app.alternates.delete(segment.index);
+      else app.alternates.set(segment.index, candidate);
+      projectionKey = null;
+      syncAll(app.position, false);
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 时钟接线：20Hz 事件 → headless 预测 → 每帧一次读数
+// ---------------------------------------------------------------------------
+
+const nowMs = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+
+function onCursor(detail) {
+  clock.sample({position: detail.seconds, atMs: detail.atMs, rate: detail.rate, playing: detail.playing});
+  onSample(detail.seconds);
+}
+player.onWrap(() => clock.discontinuity(player.position, nowMs(), true, app.rate));
+
+/** 20Hz：域率。坞位、状态条、轮盘、音级条都在这里更新，**不在帧里**。 */
+function onSample(seconds) {
+  app.position = seconds;
+  const segment = segmentAtQuarter(secToQ(seconds));
+  const changed = segment.index !== app.segmentIndex;
+  app.segmentIndex = segment.index;
+  syncDocks(seconds);
+  playhead?.update(secToQ(seconds));
+  updateStatus(seconds);
+  updateKeyPanels(seconds);
+  if (app.viewId === 'live-chord' && changed) lane?.update();
+  if (app.motionMode === 'stepped') {
+    // 减动效：只在**当前 band 变更**时重锚，让它的前缘落在 now 线上。
+    if (changed || app.steppedPosition === 0) {
+      app.steppedPosition = qToSec(segment.q);
+      lane?.tick();
+    }
+  } else if (!loop.running) {
+    // 连续档但帧循环没在跑（标签页被藏起来、离屏、暂停）：位置仍然要对，
+    // 只是它由域事件推进。位置是 atMs 的纯函数，所以循环回来时一帧就追上。
+    lane?.tick();
+  }
+}
+
+/** 每帧：外壳读**一次** binding.now()，插槽图元共享这一个数。 */
+function onFrame(atMs) {
+  app.frames += 1;
+  app.position = clock.readAt(atMs);
+  lane?.tick(atMs);
+  const segment = segmentAtQuarter(secToQ(app.position));
+  const untilNext = qToSec(segment.endQ) - app.position;
+  const approach = 1 - clamp(untilNext / 2, 0, 1);
+  nameplate?.approach(approach);
+  heroPlate?.approach(approach);
+}
+
+function syncAll(seconds, rebuild) {
+  app.position = seconds;
+  app.segmentIndex = segmentAtQuarter(secToQ(seconds)).index;
+  app.steppedPosition = qToSec(SEGMENTS[app.segmentIndex].q);
+  if (rebuild) projectionKey = null;
+  syncDocks(seconds);
+  playhead?.update(secToQ(seconds));
+  lane?.tick();
+  updateStatus(seconds);
+  updateKeyPanels(seconds);
+}
+
+function updateKeyPanels(seconds) {
+  if (!wheel && !meters) return;
+  const heard = histogramForRange(0, Math.max(1, secToQ(seconds)));
+  // 轮盘与判定流必须**读同一份判读**，否则同一屏上两个读数会互相打架。
+  // 权重来自和 lane 一样的拖尾窗口；被检出的那个调直接取 lane 当前那条 band（含迟滞）。
+  const windowQ = secToQ(seconds);
+  const ranked = rankKeys(keyHistogram(windowQ - KEY_WINDOW_QUARTERS, windowQ + 1));
+  const band = KEY_BANDS.find((entry) => windowQ >= entry.q && windowQ < entry.endQ) ?? KEY_BANDS[0];
+  const best = ranked.find((entry) => entry.label === band.label) ?? ranked[0];
+  const confidence = clamp(band.confidence, 0, 1);
+  const scoreOf = (tonic, mode) => ranked.find((entry) => entry.tonic === tonic && entry.mode === mode)?.score ?? 0;
+  const lowest = Math.min(...ranked.map((entry) => entry.score));
+  const highest = Math.max(...ranked.map((entry) => entry.score));
+  const norm = (value) => (highest > lowest ? (value - lowest) / (highest - lowest) : 0);
+  const OUTER = [0, 7, 2, 9, 4, 11, 6, 1, 8, 3, 10, 5];
+  const INNER_PCS = OUTER.map((pc) => mod(pc + 9, 12));
+  const needleIndex = best.mode === 'major'
+    ? OUTER.indexOf(best.tonic)
+    : INNER_PCS.indexOf(best.tonic);
+  if (wheel) {
+    wheel.update({
+      outer: OUTER.map((pc) => ({
+        label: PC_NAMES[pc], tone: pc, weight: norm(scoreOf(pc, 'major')),
+        active: best.mode === 'major' && best.tonic === pc,
+      })),
+      inner: INNER_PCS.map((pc) => ({
+        label: PC_NAMES[pc].toLowerCase(), tone: pc, weight: norm(scoreOf(pc, 'minor')),
+        active: best.mode === 'minor' && best.tonic === pc,
+      })),
+      centre: {primary: best.label, secondary: `${Math.round(confidence * 100)}% · last 6 bars`},
+      needle: {at: Math.max(0, needleIndex), spread: (1 - confidence) * 2},
+    });
+  }
+  if (meters) {
+    const maxHeard = Math.max(1, ...heard);
+    const maxWhole = Math.max(1, ...WHOLE_HISTOGRAM);
+    const soundingPcs = new Set(soundingAtQuarter(secToQ(seconds)).map((midi) => mod(midi, 12)));
+    meters.update({
+      items: PC_NAMES.map((name, pc) => ({
+        id: `pc-${pc}`, primary: name, tone: pc,
+        meter: heard[pc] / maxHeard,
+        meterGhost: WHOLE_HISTOGRAM[pc] / maxWhole,
+        trailing: String(heard[pc]),
+        current: soundingPcs.has(pc),
+      })),
+    });
+  }
+}
+
+function resolvePhase() {
+  if (app.phaseSetting !== 'auto') return app.phaseSetting;
+  return app.playing ? 'playing' : 'idle';
+}
+function statusMessage() {
+  const phase = resolvePhase();
+  if (phase === 'error') return 'Analysis failed';
+  if (phase === 'empty') return 'No result for this view';
+  if (phase === 'listening') return 'live — waiting for the first note';
+  if (phase === 'idle') return 'docked — drag, or press ← → [ ] Home End';
+  return 'playing';
+}
+function statusDetail(seconds) {
+  const q = secToQ(seconds);
+  return `bar ${Math.floor(q / 4) + 1} · beat ${Math.floor(q % 4) + 1}`;
+}
+function updateStatus(seconds) {
+  shell.element.dataset.phase = resolvePhase();
+  shell.statusMessage.textContent = statusMessage();
+  shell.statusDetail.textContent = statusDetail(seconds);
+  shell.statusMotion.textContent =
+    `motion: ${app.motionMode}${loop.degraded ? ' (degraded)' : ''} · clock: ${clock.mode} · ${app.rate}×`;
+  const seek = document.getElementById('ctl-seek');
+  if (seek && document.activeElement !== seek) seek.value = String(Math.round((seconds / TOTAL_SECONDS) * 1000));
+  const out = document.getElementById('ctl-seek-out');
+  if (out) out.textContent = `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
+}
+
+// ---------------------------------------------------------------------------
+// 帧循环闸门：phase 不是 playing / listening 就**停钟**。
+// ---------------------------------------------------------------------------
+
+function refreshLoop() {
+  const wants = app.motionMode === 'continuous' && (app.playing || resolvePhase() === 'listening');
+  if (wants && !unjoin) unjoin = loop.join(onFrame);
+  else if (!wants && unjoin) { unjoin(); unjoin = null }
+  shell.element.dataset.motion = loop.degraded ? 'degraded' : app.motionMode;
+  if (lane) lane.element.dataset.motion = app.motionMode;
+}
+
+function setPlaying(next) {
+  app.playing = next;
+  if (next) player.play(); else player.pause();
+  shell.element.dataset.phase = resolvePhase();
+  refreshLoop();
+  updateStatus(app.position);
+  syncPlayButton();
+}
+
+function resolveMotion() {
+  if (app.motionSetting !== 'auto') return app.motionSetting;
+  return reducedMotion.matches ? 'stepped' : 'continuous';
+}
+
+const reducedMotion = watchReducedMotion(window, () => applyMotion());
+function applyMotion() {
+  app.motionMode = resolveMotion();
+  refreshLoop();
+  if (app.motionMode === 'stepped') {
+    app.steppedPosition = qToSec(SEGMENTS[app.segmentIndex].q);
+    lane?.tick();
+  }
+  updateStatus(app.position);
+}
+loop.onDegrade(() => refreshLoop());
+
+// ===========================================================================
+// §I 原型工具条与测试缝
+// ===========================================================================
+
+function wireSegmented(id, apply) {
+  const group = document.getElementById(id);
+  if (!group) return;
+  group.addEventListener('click', (event) => {
+    const button = event.target.closest('button');
+    if (!button) return;
+    for (const other of group.querySelectorAll('button')) other.setAttribute('aria-pressed', String(other === button));
+    apply(button.dataset.value);
+  });
+}
+
+function syncPlayButton() {
+  const button = document.querySelector('#ctl-transport button[data-value="play"]');
+  if (!button) return;
+  button.textContent = app.playing ? '⏸ Pause' : '▶ Play';
+  button.setAttribute('aria-pressed', String(app.playing));
+}
+
+document.getElementById('ctl-transport')?.addEventListener('click', (event) => {
+  const button = event.target.closest('button');
+  if (!button) return;
+  if (button.dataset.value === 'play') setPlaying(!app.playing);
+  else { player.seek(0); clock.discontinuity(0, nowMs(), player.playing, app.rate); syncAll(0, false) }
+});
+document.getElementById('ctl-seek')?.addEventListener('input', (event) => {
+  const seconds = (Number(event.target.value) / 1000) * TOTAL_SECONDS;
+  player.seek(seconds);
+  clock.discontinuity(seconds, nowMs(), player.playing, app.rate);
+  syncAll(seconds, false);
+});
+wireSegmented('ctl-rate', (value) => { app.rate = Number(value); player.setRate(app.rate); updateStatus(app.position) });
+wireSegmented('ctl-motion', (value) => { app.motionSetting = value; applyMotion() });
+wireSegmented('ctl-clock', (value) => { clock.mode = value; updateStatus(app.position) });
+wireSegmented('ctl-density', (value) => {
+  app.density = value;
+  shell.element.dataset.density = value;
+  lane?.setScale(value === 'compact' ? 32 : 44);
+});
+wireSegmented('ctl-scheme', (value) => {
+  document.documentElement.dataset.scheme = value === 'auto' ? 'auto' : value;
+});
+wireSegmented('ctl-spelling', (value) => { app.spelling = value; syncAll(app.position, true) });
+wireSegmented('ctl-tuning', (value) => { app.tuning = value; syncAll(app.position, true) });
+wireSegmented('ctl-phase', (value) => {
+  app.phaseSetting = value;
+  if (value === 'idle' || value === 'empty' || value === 'error') setPlaying(false);
+  buildStage();
+  refreshLoop();
+  updateStatus(app.position);
+});
+document.getElementById('ctl-width')?.addEventListener('input', (event) => {
+  const width = Number(event.target.value);
+  const frame = document.getElementById('frame-inner');
+  const out = document.getElementById('ctl-width-out');
+  if (frame) frame.style.width = width >= 1180 ? '100%' : `${width}px`;
+  if (out) out.textContent = width >= 1180 ? 'full' : `${width}px`;
+});
+
+// ---- 启动：它自己就走 ------------------------------------------------------
+applyMotion();
+buildStage();
+syncAll(0, true);
+setPlaying(true);
+
+// ---- 测试缝：jsdom 不必依赖 rAF，也不必依赖排版 ----------------------------
+window.harmonyWorkbench = {
+  app, clock, player, loop,
+  get lane() { return lane },
+  get shell() { return shell },
+  views: VIEWS.map((view) => view.id),
+  setView,
+  setMotion: (value) => { app.motionSetting = value; applyMotion() },
+  setClockMode: (value) => { clock.mode = value; updateStatus(app.position) },
+  /** 走带 ms（带 rate），完全绕开 rAF 与 setInterval。 */
+  advance(ms, {frames = 1} = {}) {
+    const steps = Math.max(1, Math.round(ms / 50));
+    for (let step = 0; step < steps; step += 1) player.tickForTest();
+    for (let frame = 0; frame < frames; frame += 1) onFrame(nowMs());
+  },
+  seekTo(seconds) {
+    player.seek(seconds);
+    clock.discontinuity(seconds, nowMs(), player.playing, app.rate);
+    syncAll(seconds, false);
+  },
+  frame(atMs) { onFrame(atMs ?? nowMs()) },
+  /** 四个坞位当前各自认为在响的是什么。 */
+  docks() {
+    const keys = [...keyboard.element.querySelectorAll('[data-active="true"]')];
+    const heads = [...(staff.element.querySelectorAll('.wui-pitch-staff__head[data-when="now"]') ?? [])];
+    const dots = [...fretboard.element.querySelectorAll('.wui-pitch-fretboard__dot')];
+    const chips = [...nameplate.element.querySelectorAll('.wui-harmony-nameplate__voicing li')];
+    const read = (nodes) => nodes.map((node) => ({
+      midi: Number(node.dataset.midi),
+      pc: mod(Number(node.dataset.midi), 12),
+      role: node.dataset.role,
+    }));
+    return {keyboard: read(keys), staff: read(heads), fretboard: read(dots), nameplate: read(chips)};
+  },
+  projection: () => projection,
+  sounding: () => soundingAtQuarter(secToQ(app.position)),
+  analysis: {keyBands: KEY_BANDS, motifs: MOTIFS, issues: ISSUES},
+};
+
+</script>
+</body>
+</html>

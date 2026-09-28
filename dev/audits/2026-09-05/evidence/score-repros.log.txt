@@ -1,0 +1,28 @@
+
+ RUN  v3.2.7 /private/tmp/webmusic-score-audit
+
+stdout | audit.test.ts > score audit reproduction > reproduces controller rate overwritten during element mount
+controller before/after mount 1.5 1
+
+stdout | audit.test.ts > score audit reproduction > reproduces leaked effect node after second build throws
+previous effect disposed/new first effect disposed 1 0
+
+stdout | audit.test.ts > reproduces future JIT attack firing while AudioContext suspended
+suspended JIT attack before audio reaches intended onset 0.1s: [ [ 62, 80, 0, 0.5 ] ]
+
+stdout | audit.test.ts > reproduces missing rack transport forwarding
+rack element time/duration/seek calls 0 0 0
+
+stdout | audit.test.ts > reproduces composed rack remaining selected after desk removal
+removed desk blocks fallback score with disposed rack
+
+stdout | audit.test.ts > confirms missing rack forwarding with real Rack and ScorePlayer
+real rack member seconds/duration versus element 0.5 2 0 0 seek calls 0
+
+ ✓ audit.test.ts (6 tests) 43ms
+
+ Test Files  1 passed (1)
+      Tests  6 passed (6)
+   Start at  10:33:25
+   Duration  954ms (transform 305ms, setup 0ms, collect 432ms, tests 43ms, environment 300ms, prepare 35ms)
+

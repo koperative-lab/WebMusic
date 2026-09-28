@@ -1,0 +1,5 @@
+PASS: stale generated inventory; expected rejection observed (exit 1).
+- dev/COMPONENTS.md: stale or missing; run npm run docs:sync
+PASS: broken same-page fragment; expected rejection observed (exit 1).
+  kernel/api.mdx: → #documentation-regression-probe-missing — no heading #documentation-regression-probe-missing on that page
+Original file bytes restored in finally blocks.

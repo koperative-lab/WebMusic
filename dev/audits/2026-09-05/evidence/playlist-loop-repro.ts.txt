@@ -1,0 +1,6 @@
+import {AudioPlaylist} from '/Users/mamingchen/GitHub/WebMusic/packages/audio/src/play/headless/playlist.ts';
+let errors=0;
+const q=new AudioPlaylist({loop:true,entries:[{id:'missing',src:'missing.mp3'}],audioContext:{} as AudioContext,loadEntry:async()=>{throw new Error('404')}});
+q.on('error',()=>{errors++;if(errors===1000)process.stdout.write('1000 errors before event loop yielded\n')});
+setTimeout(()=>{process.stdout.write('timer fired; stopping\n');q.stop()},10);
+void q.play().then(()=>process.stdout.write('play settled\n'));

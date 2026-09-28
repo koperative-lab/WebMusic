@@ -1,13 +1,10 @@
 # Platform: shared contracts and implementation ownership
 
-For local setup, bug reports and pull requests, start with the
-[contribution guide](../CONTRIBUTING.md).
-
 `platform/kernel` is the source and build boundary of `@webmusic/kernel`. This
 ledger records extracted capabilities, their consumers and policies that remain
-with the domains. Package usage belongs in [kernel/README.md](kernel/README.md).
-The [Score architecture](../packages/score/ARCHITECTURE.md) describes the domain's
-composition and timing boundaries; the policies linked below enforce package edges.
+with the domains. Package usage belongs in [kernel/README.md](kernel/README.md),
+cross-package rules in [ARCHITECTURE.md](../dev/ARCHITECTURE.md), decision reasons in
+[DECISIONS.md](../dev/DECISIONS.md), and delivery gaps in [STATUS.md](../dev/STATUS.md).
 
 ## Admission and extension
 
@@ -60,12 +57,12 @@ Objects that need a shared shape rather than a shared base class use type-only
 `*-contract.ts` assertions:
 
 - [Score playerlike-contract](../packages/score/src/play/headless/playerlike-contract.ts)
-  and [Audio playerlike-contract](https://github.com/mrsteamedbun/WebMusic/blob/dev/packages/audio/src/play/headless/playerlike-contract.ts)
+  and [Audio playerlike-contract](../packages/audio/src/play/headless/playerlike-contract.ts)
   pin the capability tiers implemented by real players.
-- [Bridge transport-contracts](https://github.com/mrsteamedbun/WebMusic/blob/dev/bridges/score-audio/src/transport-contracts.ts)
+- [Bridge transport-contracts](../bridges/score-audio/src/transport-contracts.ts)
   pins ScorePlayer/TonePlayer's master interface and AudioClipPlayer's follower interface.
 - Reverse composition adapts domain positions in
-  [audio-master.ts](https://github.com/mrsteamedbun/WebMusic/blob/dev/bridges/score-audio/src/audio-master.ts); real-player
+  [audio-master.ts](../bridges/score-audio/src/audio-master.ts); real-player
   integration tests cover the behavior.
 
 Public type imports/exports keep these assertions in the checked reachability
@@ -90,5 +87,4 @@ Same-instance injection, invalidation/rescheduling of committed audio, and
 sample-accurate loop wrap are specified as technical gaps in
 [shared-clock-injection.md](shared-clock-injection.md). They are implementation
 and acceptance gaps within the accepted direction, not a reason to describe that
-direction as undecided. The source contracts and behavioral tests establish what
-this checkout implements.
+direction as undecided. Progress belongs in [STATUS.md](../dev/STATUS.md).

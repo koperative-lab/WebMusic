@@ -1,0 +1,63 @@
+---
+---
+<html lang="en"><head><meta charset="utf-8"/><title>Waveform frame cadence QA</title></head><body>
+<h1>Live player waveform cadence</h1><button id="run">Compare event and live frames</button><div id="plot" style="width:600px"></div><pre id="result">Ready</pre>
+<script>
+import {createAudioClip} from '../../../../../packages/audio/src/core';
+import {AudioClipPlayer} from '../../../../../packages/audio/src/play/headless/player';
+import {renderWaveformVisualizer} from '../../../../../packages/audio/src/view/render/waveform';
+import {bindPlayerToWaveform} from '../../../../../packages/audio/src/view/render/binding';
+import {defineAudioViewElement, type AudioViewElement} from '../../../../../packages/audio/src/view/element/audio-view';
+import {defineAudioClipPlayerElement, type AudioClipPlayerElement} from '../../../../../packages/audio/src/play/element/audio-clip-player';
+defineAudioViewElement();defineAudioClipPlayerElement();
+const button=document.querySelector<HTMLButtonElement>('#run')!;
+const result=document.querySelector<HTMLElement>('#result')!;
+const plot=document.querySelector<HTMLElement>('#plot')!;
+button.addEventListener('click',async()=>{
+ button.disabled=true;
+ const results=[];
+ for(const mode of ['event-only','live-clock','element']) {
+ const context=new AudioContext();
+ const mute=context.createGain();mute.gain.value=0;mute.connect(context.destination);
+ const pcm=Float32Array.from({length:48000*8},(_,i)=>Math.sin(i/48000*440*Math.PI*2)*0.4);
+ const player=new AudioClipPlayer(createAudioClip({sampleRate:48000,channelData:[pcm]}),{audioContext:context,destination:mute});
+ const peaks={sampleRate:48000,channels:1,baseSamplesPerPeak:480,levels:[{samplesPerPeak:480,data:Int8Array.from({length:1600},(_,i)=>i%2?64:-64)}]};
+ let element:AudioViewElement|undefined;
+ let playerElement:AudioClipPlayerElement|undefined;
+ if(mode==='element'){
+   playerElement=document.createElement('audio-clip-player') as AudioClipPlayerElement;playerElement.id='cadence-player';playerElement.player=player;plot.append(playerElement);
+   element=document.createElement('audio-view') as AudioViewElement;element.setAttribute('player','#cadence-player');element.setAttribute('height','96');element.setAttribute('amplitude','1.6');element.setAttribute('pixels-per-second','90');element.setAttribute('interactive','');element.setAttribute('drag-mode','scrub');element.peaks=peaks;plot.append(element);
+ }
+ const view=mode==='element'?undefined:renderWaveformVisualizer(plot,peaks,{pixelsPerSecond:90,height:96,playheadMode:'center'});
+ const canvas=plot.querySelector('canvas')!;
+ const ctx=canvas.getContext('2d')!;
+ const draw=ctx.drawImage.bind(ctx);
+ const paints:number[]=[];
+ ctx.drawImage=((...args:Parameters<CanvasRenderingContext2D['drawImage']>)=>{paints.push(performance.now());draw(...args);}) as CanvasRenderingContext2D['drawImage'];
+ let ticks=0;
+ const off=player.on('timeupdate',()=>{ticks++;});
+ const eventOnly={on:(event:string,listener:(payload:unknown)=>void)=>player.on(event as 'timeupdate',listener),seek:(seconds:number)=>player.seek(seconds),get seconds(){return player.seconds;},get duration(){return player.duration;}};
+ const binding=view?bindPlayerToWaveform(mode==='event-only'?eventOnly:player,view,{surface:plot,seekOnClick:false}):undefined;
+ try{
+   await context.resume();await player.play();
+   paints.length=0;ticks=0;
+   const start=performance.now();const frames:number[]=[];
+   await new Promise<void>(resolve=>{
+     const frame=(now:number)=>{frames.push(now);if(now-start<2000)requestAnimationFrame(frame);else resolve();};
+     requestAnimationFrame(frame);
+   });
+   const elapsed=performance.now()-start;
+   player.pause();
+   const count=paints.length;
+   await new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve())));
+   const afterPause=paints.length-count;
+   const intervals=paints.slice(1).map((t,i)=>t-paints[i]);
+   const sorted=intervals.toSorted((a,b)=>a-b);
+   results.push({mode,elapsedMs:elapsed,screenFrames:frames.length,paintCount:count,paintFps:count/(elapsed/1000),timeupdateCount:ticks,medianPaintIntervalMs:sorted[Math.floor(sorted.length/2)],extraPaintsAfterPause:afterPause,sampleSeconds:player.seconds});
+ }catch(e){results.push({mode,error:String(e)});}
+ finally{binding?.unsubscribe();off();view?.dispose();element?.remove();playerElement?.remove();player.dispose();mute.disconnect();await context.close();}
+ }
+ result.textContent=JSON.stringify({browser:navigator.userAgent,results},null,2);
+ button.disabled=false;
+});
+</script></body></html>

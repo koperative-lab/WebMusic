@@ -1,0 +1,23 @@
+{
+  "scope": "Repository Markdown/MDX excluding hidden, dependency, build, and coverage directories; raw evidence unchanged",
+  "documents": 173,
+  "baseline_documents": 162,
+  "modified_existing_documents": 103,
+  "new_documents": [
+    "dev/COMPONENT-DESIGN.md",
+    "dev/COMPONENTS.md",
+    "dev/DECISIONS.md",
+    "dev/DESIGN-PRINCIPLES.md",
+    "dev/DOCUMENTATION-MAP.md",
+    "dev/PRODUCT.md",
+    "dev/README.md",
+    "dev/STATUS.md",
+    "dev/audits/2026-09-05/DOCUMENTATION-REORGANIZATION.md",
+    "packages/audio/docs/README.md",
+    "packages/score/docs/README.md"
+  ],
+  "removed_documents": [],
+  "han_characters_in_markdown": 0,
+  "headless_leaf_pages_with_one_ordered_import_api_related": 31,
+  "limits": "Section presence and a Han-character scan do not prove semantic completeness or language quality; prose and contracts were also reviewed."
+}

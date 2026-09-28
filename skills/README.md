@@ -110,9 +110,7 @@ the skill does not require upgrading the application's runtime dependencies.
 
 For persistent project guidance, copy the relevant section from
 [the public project-instruction page](https://koperative-lab.github.io/WebMusic/agent-toolkit/agents-md/)
-into the application's
-existing `AGENTS.md` or `CLAUDE.md`, according to its agent client. Preserve its
-other rules and any symlink. This is
+into the application's existing `AGENTS.md`, preserving its other rules. This is
 an independent manual option; installing the skill does not rewrite project
 instructions.
 
@@ -128,3 +126,13 @@ instructions.
 
 See the [Agent Toolkit documentation source](../apps/doc/webmusic/src/content/docs/agent-toolkit/index.mdx)
 for the corresponding user-facing guide.
+
+## Audio and Bridge additions
+
+The main Skill and six lookup commands remain the baseline. For Audio/Bridge
+source-checkout work, use the existing `--base-url URL` or `--context-dir PATH`
+options and the [Audio/Bridge reference](webmusic/references/audio-bridge.md).
+The additive context adapter records the real five-package source fingerprints
+and compares them with main's unchanged release baseline. It makes no claim that
+unreleased sources match installed packages. Default published-context lookup,
+release version checks and per-output hash checks retain their main behavior.

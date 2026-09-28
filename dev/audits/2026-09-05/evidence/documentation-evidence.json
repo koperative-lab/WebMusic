@@ -1,0 +1,47 @@
+[
+  {
+    "path": "documentation-after.json",
+    "bytes": 30736,
+    "sha256": "5b6f6c255964cbc596f75c7aa53c87eae11eb95b33e0bbdc3b5ab2c3b10fb03f"
+  },
+  {
+    "path": "documentation-before.json",
+    "bytes": 29108,
+    "sha256": "99a0879ca5d5000d1317f79d4a01e797fbe0d6ef16d1592b68c65b572d7608e6"
+  },
+  {
+    "path": "documentation-structure-review.json",
+    "bytes": 862,
+    "sha256": "1ee92edd402124dfb0d2e79d5534c08e86fb514b6080453a3c00abf8c5b1204b"
+  },
+  {
+    "path": "webmusic-documentation-check.txt",
+    "bytes": 131886,
+    "sha256": "60d851cbffc060eb54c83f9f74f9e7390164f2cb672ccd1e8f9cd6182e494111"
+  },
+  {
+    "path": "webmusic-documentation-docs-build.txt",
+    "bytes": 32399,
+    "sha256": "5e27a7a74b5b551271205feae2002900876aff8ce6c7395e55a49351927f21d5"
+  },
+  {
+    "path": "webmusic-documentation-final-snippets.txt",
+    "bytes": 139,
+    "sha256": "8b3aec4870495b9baf03ba508cd4c5ce43426e8e74f7bfde7f86dd338b7b9bd7"
+  },
+  {
+    "path": "webmusic-documentation-final-static.txt",
+    "bytes": 467,
+    "sha256": "cd2eff9bce1f17d9773ae66289bada11f5cd91f19f1b059896a6ed9d1b7ead92"
+  },
+  {
+    "path": "webmusic-documentation-link-probes.txt",
+    "bytes": 49,
+    "sha256": "3aa8c7ddd8967afb5b157897334479c07aacf366e04ce2175e6a5302fc557a9f"
+  },
+  {
+    "path": "webmusic-documentation-negative-checks.txt",
+    "bytes": 381,
+    "sha256": "006fcf2c4c4bfac8c1cbf8c663ce0a65fc10e5572a54514ef6ab38d0fe5a9953"
+  }
+]

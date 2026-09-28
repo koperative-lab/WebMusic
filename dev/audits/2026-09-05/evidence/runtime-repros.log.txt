@@ -1,0 +1,18 @@
+playlist concurrent play {"sources":2,"changes":["a","a"],"stopped":[false,true],"leakedCursorTimers":1}
+playlist stale removed entry {"current":"new","currentClipDuration":3,"activePlayerDuration":1,"sources":1}
+playlist rerender during load {"status":"loading","currentClip":false,"playing":true}
+playlist changed source {"currentClipDuration":3,"activePlayerDuration":1}
+playlist looping failed entry {"failuresBeforeManualStop":20,"status":"error"}
+mixer play then immediate stop {"sources":1,"playingAfterStop":true}
+mixer seek then immediate stop {"sources":2,"playingAfterStop":true}
+
+factory context cleanup {"factory":"createSyncedPlayback","created":1,"closed":0}
+factory context cleanup {"factory":"createAudioMasteredPlayback","created":2,"closed":0}
+lead-in drift {"now":0.25,"drift":1.81,"scoreStarts":2,"scoreScheduledOrigin":2.06}
+lead-in drift {"now":0.5,"drift":1.56,"scoreStarts":3,"scoreScheduledOrigin":2.06}
+lead-in drift {"now":0.75,"drift":1.31,"scoreStarts":4,"scoreScheduledOrigin":2.06}
+lead-in drift {"now":1,"drift":1.06,"scoreStarts":4,"scoreScheduledOrigin":2.06}
+lead-in drift {"now":1.25,"drift":0.81,"scoreStarts":4,"scoreScheduledOrigin":2.06}
+lead-in false errors [["drift re-join","Error: TransportGroup: 4 consecutive drift corrections failed to converge (drift 1.0600s, master rate 1). The follower cannot follow the master rate; automatic re-joins are paused until they agree again."]]
+
+loop reproduction: {"status":null,"signal":"SIGTERM","error":"ETIMEDOUT","stdout":"1000 errors before event loop yielded\n","stderr":""}

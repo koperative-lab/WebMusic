@@ -3,11 +3,9 @@
 **Accepted direction: one music session has one authoritative timeline, shared by
 Score and Audio; multiple sessions may remain independent.** This note defines
 the gap between current coordination and a same-instance clock contract. It is
-not documentation for an already callable injection API. The
-[platform ledger](README.md) records shared ownership; the
-[Score architecture](../packages/score/ARCHITECTURE.md) and the unit definitions
-below explain the timing boundaries. Source contracts and tests establish the
-implemented behavior in this checkout.
+not documentation for an already callable injection API. Decisions and reasons
+belong in [DECISIONS.md](../dev/DECISIONS.md), implementation and acceptance status in
+[STATUS.md](../dev/STATUS.md), and unit definitions in [ARCHITECTURE.md](../dev/ARCHITECTURE.md).
 
 ## Current implementation
 
@@ -23,8 +21,8 @@ implemented behavior in this checkout.
 Source entry points:
 [transport.ts](kernel/src/transport.ts), [sync.ts](kernel/src/sync.ts),
 [score-player-scheduler.ts](../packages/score/src/play/headless/score-player-scheduler.ts),
-[buffer-engine.ts](https://github.com/mrsteamedbun/WebMusic/blob/dev/packages/audio/src/play/headless/engines/buffer-engine.ts),
-and [Bridge sync.ts](https://github.com/mrsteamedbun/WebMusic/blob/dev/bridges/score-audio/src/sync.ts).
+[buffer-engine.ts](../packages/audio/src/play/headless/engines/buffer-engine.ts),
+and [Bridge sync.ts](../bridges/score-audio/src/sync.ts).
 
 Same-instance injection would let both engines consume one session anchor instead
 of private anchors requiring coordination. Current construction and scheduling
@@ -126,9 +124,9 @@ These are design and acceptance requirements, not methods already provided by
 
 A conductor/group wrapper around the pure clock can carry these responsibilities;
 changing the clock itself is another implementation option whose effect on purity,
-tests and public types must be assessed. Record the selected shared protocol and
-its rationale alongside the owning public contract; keep domain integrations
-consistent with that protocol.
+tests and public types must be assessed. Record the selected design and reasons in
+[DECISIONS.md](../dev/DECISIONS.md), rather than inventing incompatible session classes
+inside each domain.
 
 ## The two loop problems
 
@@ -158,7 +156,7 @@ Both `createSyncedPlayback` and `createAudioMasteredPlayback` reject defined
 `clipOptions.loop` and `clipOptions.rate` before acquiring resources. Use the
 group's `setLoop()` and `setRate()` controls. This validation does not establish
 a shared injected clock or sample-accurate cross-domain loops; see the
-[Bridge usage boundary](https://github.com/mrsteamedbun/WebMusic/blob/dev/bridges/README.md).
+[Bridge usage boundary](../bridges/README.md).
 
 ## Implementation impact and acceptance evidence
 

@@ -1,0 +1,5 @@
+
+> check:packages
+> node scripts/check-package-exports.mjs
+
+Package export check passed for 86 public entries.

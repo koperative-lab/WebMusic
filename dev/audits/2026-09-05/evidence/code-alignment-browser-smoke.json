@@ -1,0 +1,34 @@
+{
+  "date": "2026-09-05",
+  "environment": "Codex in-app browser; locally served static documentation on 127.0.0.1:4321",
+  "method": "UI actions and accessibility/DOM observations through CUA; console inspection through the tab developer log API",
+  "observations": [
+    {
+      "route": "/score/headless/play/rack/",
+      "result": "Initial smoke found stale RackMember snapshot use: Play changed to Pause but the readout stayed at 0.0s. Fixed source and added a regression, then reran the full check and rebuilt the site."
+    },
+    {
+      "route": "/score/headless/play/rack/",
+      "result": "Final build: Play changed to Pause and the readout advanced to 0.2s. A subsequent pause showed Play, 0.4s and width: 7.44444% on the progress fill. Mute toggled its data-on state. No captured warning/error logs during the checked actions."
+    },
+    {
+      "route": "/score/headless/play/interactive-player/",
+      "result": "Advance beat changed the readout from beat 0 / 0 to beat 1 / 8. No captured warning/error logs."
+    },
+    {
+      "route": "/score/headless/play/score-player/",
+      "result": "Mounted a 4.80s score; Play advanced the readout and emitted cursor, timeupdate and noteOn feedback. Setting tempo to 80 recreated a stopped player at 0.00s with duration 6.00s. Navigation back from the API page mounted the default 4.80s player. No captured warning/error logs."
+    },
+    {
+      "route": "/score/api/play/",
+      "result": "Scrolling the offline-render sandbox into view mounted one CodeMirror editor with data-api-sandbox-state initialized. Preview remained false; dependency keys contained only @webmusic/score. The offscreen sandbox remained unmounted. No captured warning/error logs."
+    }
+  ],
+  "limits": [
+    "No auditory or signal-level validation",
+    "No microphone or MIDI permission/device test",
+    "No timing accuracy, background throttling, cross-browser or full accessibility acceptance",
+    "No external sandbox preview execution"
+  ],
+  "cleanup": "Agent-created browser tab closed and temporary localhost server stopped."
+}

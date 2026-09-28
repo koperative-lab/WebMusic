@@ -1,0 +1,116 @@
+// @vitest-environment jsdom
+import {afterEach, describe, expect, it, vi} from 'vitest';
+import {SynthPanelAudioGraph} from '/Users/mamingchen/GitHub/WebMusic/packages/score/src/play/headless/synth-panel-audio';
+import {ScorePlayerElement} from '/Users/mamingchen/GitHub/WebMusic/packages/score/src/play/element/score-player';
+import {PlayerController} from '/Users/mamingchen/GitHub/WebMusic/packages/score/src/play/headless/controller';
+import {ScorePlayer} from '/Users/mamingchen/GitHub/WebMusic/packages/score/src/play/headless/score-player';
+import {ScoreBuilder, Rational, PartId, VoiceId, Pitch, Duration} from '/Users/mamingchen/GitHub/WebMusic/packages/score/src/core';
+
+customElements.define('audit-score-player', ScorePlayerElement);
+const flush = async () => {await Promise.resolve(); await Promise.resolve();};
+function score() {
+ const builder = new ScoreBuilder();
+ const part = builder.addPart({id: PartId('part'), name: 'Part', staves:1});
+ builder.addNote(part, {id:builder.newNoteId(), pitch:Pitch.parse('C4'), onsetQuarters:Rational.ZERO, duration:Duration.whole(), voice:VoiceId('voice')});
+ return builder.build();
+}
+afterEach(() => document.body.replaceChildren());
+
+describe('score audit reproduction', () => {
+ it('reproduces controller rate overwritten during element mount', async () => {
+  const s = score(); const player = new ScorePlayer(s);
+  const controller = new PlayerController(player, s); controller.setRate(1.5);
+  const before = controller.rate;
+  const el = document.createElement('audit-score-player') as ScorePlayerElement;
+  el.controller = controller;
+  document.body.append(el); await flush();
+  console.log('controller before/after mount', before, controller.rate);
+  expect(before).toBe(1.5); expect(controller.rate).toBe(1);
+  el.remove(); controller.destroy(); player.dispose();
+ });
+ it('reproduces leaked effect node after second build throws', () => {
+  const node = () => ({connect: vi.fn(),disconnect:vi.fn()});
+  const context = {createGain: () => node()} as unknown as AudioContext;
+  const oldDispose=vi.fn(); const leakedDispose=vi.fn();
+  const old = {build:()=>({input:node(),output:node(),dispose:oldDispose})};
+  const first = {build:()=>({input:node(),output:node(),dispose:leakedDispose})};
+  const failure = {build:()=>{throw new Error('custom build failure');}};
+  const graph = new SynthPanelAudioGraph();
+  const options = {context, bands:[], sections:['effects'] as any, effectValues:[]};
+  graph.rebuild({...options, effects:[old] as any});
+  expect(()=>graph.rebuild({...options,effects:[first,failure] as any})).toThrow('custom build failure');
+  graph.teardown();
+  console.log('previous effect disposed/new first effect disposed', oldDispose.mock.calls.length, leakedDispose.mock.calls.length);
+  expect(oldDispose).toHaveBeenCalledTimes(1);
+  expect(leakedDispose).not.toHaveBeenCalled();
+ });
+});
+
+import {ScorePlayerScheduler} from '/Users/mamingchen/GitHub/WebMusic/packages/score/src/play/headless/score-player-scheduler';
+it('reproduces future JIT attack firing while AudioContext suspended', async () => {
+ vi.useFakeTimers();
+ const b = new ScoreBuilder(); const part = b.addPart({id:PartId('p'),name:'p',staves:1});
+ b.addNote(part,{id:b.newNoteId(),pitch:Pitch.parse('D4'),onsetQuarters:new Rational(1,5),duration:Duration.quarter(),voice:VoiceId('v')});
+ const context = {state:'running',currentTime:0,resume:vi.fn()} as unknown as AudioContext;
+ const synth = {noteOn:vi.fn(()=>1),noteOff:vi.fn()} as any;
+ const noteOn=vi.fn();
+ const scheduler = new ScorePlayerScheduler(b.build(),{
+  ensureAudio:()=>({context,synth}),getContext:()=>context,getSynth:()=>synth,
+  onCursor:vi.fn(),onNoteOn:noteOn,onNoteOff:vi.fn(),onEnd:vi.fn(),
+ },{cursorIntervalMs:30,lookaheadSeconds:0.2,schedulerIntervalMs:25,createTickSource:()=>({start:vi.fn(),stop:vi.fn(),dispose:vi.fn()})});
+ await scheduler.play();
+ expect(synth.noteOn).not.toHaveBeenCalled();
+ (context as any).state='suspended';
+ await vi.advanceTimersByTimeAsync(150);
+ console.log('suspended JIT attack before audio reaches intended onset 0.1s:',synth.noteOn.mock.calls);
+ expect(context.currentTime).toBe(0); expect(synth.noteOn).toHaveBeenCalledTimes(1);
+ expect(synth.noteOn.mock.calls[0][2]).toBe(0);
+ scheduler.dispose(); vi.useRealTimers();
+});
+
+it('reproduces missing rack transport forwarding', async () => {
+ const memberPlayer = {seconds:2, durationSeconds:8, progress:0.25, seek:vi.fn()};
+ const rack = {on:()=>()=>{},list:()=>[{id:'p',player:memberPlayer}],play:vi.fn(),pause:vi.fn(),stop:vi.fn()} as any;
+ const el=document.createElement('audit-score-player') as ScorePlayerElement;
+ el.rack=rack; document.body.append(el); await flush();
+ el.seek(4); el.seekFraction(0.5);
+ console.log('rack element time/duration/seek calls',el.currentTime,el.duration,memberPlayer.seek.mock.calls.length);
+ expect(el.currentTime).toBe(0); expect(el.duration).toBe(0); expect(memberPlayer.seek).not.toHaveBeenCalled();
+});
+
+import {RackControlElement} from '/Users/mamingchen/GitHub/WebMusic/packages/score/src/play/element/rack-control';
+import {RackPartElement} from '/Users/mamingchen/GitHub/WebMusic/packages/score/src/play/element/rack-part';
+customElements.define('rack-control', RackControlElement);
+customElements.define('rack-part', RackPartElement);
+it('reproduces composed rack remaining selected after desk removal', async () => {
+ const el=document.createElement('audit-score-player') as ScorePlayerElement;
+ const desk=document.createElement('rack-control') as RackControlElement;
+ const part=document.createElement('rack-part') as RackPartElement;
+ part.score=score(); desk.append(part); el.append(desk); document.body.append(el); await flush();
+ expect(desk.rack).toBeDefined(); desk.remove(); await flush();
+ el.score=score(); await flush();
+ await expect(el.play()).rejects.toThrow('Rack has been disposed');
+ console.log('removed desk blocks fallback score with disposed rack');
+});
+
+import {Rack} from '/Users/mamingchen/GitHub/WebMusic/packages/score/src/play/headless/rack';
+it('confirms missing rack forwarding with real Rack and ScorePlayer', async () => {
+ const param=()=>({value:1,setValueAtTime(){return this;},cancelScheduledValues(){return this;}});
+ const context:any={state:'running',currentTime:0,sampleRate:44100,resume:async()=>{}};
+ const node=()=>({context,gain:param(),connect(){},disconnect(){}});
+ context.destination=node(); context.createGain=node;
+ context.createStereoPanner=()=>({...node(),pan:param()});
+ const rack=new Rack({audioContext:context});
+ rack.add({id:'part',score:score(),sound:{connect(){},disconnect(){},noteOn(){},noteOff(){}}});
+ await rack.preload();
+ const member=rack.get('part')!.player as ScorePlayer;
+ await member.seek(0.5);
+ const seekSpy=vi.spyOn(member,'seek');
+ const el=document.createElement('audit-score-player') as ScorePlayerElement;
+ el.rack=rack; document.body.append(el); await flush();
+ el.seek(1); el.seekFraction(0.5);
+ console.log('real rack member seconds/duration versus element',member.seconds,member.durationSeconds,el.currentTime,el.duration,'seek calls',seekSpy.mock.calls.length);
+ expect(member.seconds).toBe(0.5); expect(member.durationSeconds).toBe(2);
+ expect(el.currentTime).toBe(0); expect(el.duration).toBe(0); expect(seekSpy).not.toHaveBeenCalled();
+ el.remove(); rack.dispose();
+});

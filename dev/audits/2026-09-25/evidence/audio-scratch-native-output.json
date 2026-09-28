@@ -1,0 +1,45 @@
+{
+  "date": "2026-09-25",
+  "environment": "Codex IAB Chrome/154.0.0.0 macOS",
+  "sampleRate": 48000,
+  "method": "Native OfflineAudioContext renders a two-channel opposite-polarity ramp through final ScratchEngine source; forward/reverse slopes and stereo alignment are measured, with silence after 70ms. This is output-sample evidence, not physical-device listening.",
+  "rows": [
+    {
+      "mode": "forward",
+      "passed": true,
+      "early": 0.4583750000068297,
+      "late": 0.4954563801487289,
+      "energy": 623.2000852147614,
+      "tailPeak": 0,
+      "stereoError": 0
+    },
+    {
+      "mode": "reverse",
+      "passed": true,
+      "early": 0.3816166666802019,
+      "late": 0.34234780810462945,
+      "energy": 313.5274694693171,
+      "tailPeak": 0,
+      "stereoError": 0
+    },
+    {
+      "mode": "silent",
+      "passed": true,
+      "early": 0,
+      "late": 0,
+      "energy": 0,
+      "tailPeak": 0,
+      "stereoError": 0
+    },
+    {
+      "mode": "disposed",
+      "passed": true,
+      "early": 0,
+      "late": 0,
+      "energy": 0,
+      "tailPeak": 0,
+      "stereoError": 0
+    }
+  ],
+  "reproduce": "Copy audio-scratch-native-probe.astro.txt to apps/doc/webmusic/src/pages/scratch-qa.astro temporarily, run documentation dev server, open /scratch-qa/ and press Render PCM checks. Remove the temporary route afterwards."
+}

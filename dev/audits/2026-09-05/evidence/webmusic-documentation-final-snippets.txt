@@ -1,0 +1,5 @@
+
+> check:doc-snippets
+> node scripts/check-doc-snippets.mjs
+
+Doc snippet check passed: 167 snippets compile against the built .d.ts files.
