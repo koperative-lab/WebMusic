@@ -558,7 +558,6 @@ export function serializeABCDetailed(score: Score): ScoreSerializeResult<string>
       }
       if (note.onsetQuarters.gt(cursor)) {
         tokens.push(`z${abcLengthSuffix(note.onsetQuarters.sub(cursor))}`);
-        cursor = note.onsetQuarters;
       }
       tokens.push(`${note.rest ? 'z' : pitchToAbc(note.pitch)}${abcLengthSuffix(note.duration.quarters)}`);
       cursor = note.offsetQuarters;

@@ -101,11 +101,6 @@ export function useOptionalScore(): Score | null {
   return useContext(ScoreContext);
 }
 
-/** Internal optional seam for views that also support static or borrowed data. */
-export function useOptionalPlayer(): Player | null {
-  return useContext(PlayerContext);
-}
-
 export function useScore(): Score {
   const score = useContext(ScoreContext);
   if (!score) {

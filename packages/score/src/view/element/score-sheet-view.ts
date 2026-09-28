@@ -18,7 +18,7 @@ interface NoteEventDetail {
 }
 
 /**
- * `<sheet-view>` — real engraved sheet music, via the optional
+ * `<score-sheet-view>` — real engraved sheet music, via the optional
  * OpenSheetMusicDisplay peer. `<score-view type="staff">` draws a compact
  * playback staff with beams, tuplets and source notation; this separate
  * renderer adds OSMD's page and system layout.
@@ -32,7 +32,7 @@ interface NoteEventDetail {
  * engine's own install hint rather than failing silently.
  *
  * ```html
- * <sheet-view src="song.musicxml" player="#p" follow-cursor></sheet-view>
+ * <score-sheet-view src="song.musicxml" player="#p" follow-cursor></score-sheet-view>
  * ```
  */
 export class SheetViewElement extends HTMLElementBase {
@@ -274,13 +274,13 @@ export class SheetViewElement extends HTMLElementBase {
       });
     } catch (error) {
       if (signal.aborted) return undefined;
-      console.error('[WebScore] <sheet-view> failed to load', src, error);
+      console.error('[WebScore] <score-sheet-view> failed to load', src, error);
       return undefined;
     }
   }
 }
 
-/** Register `<sheet-view>` (or a custom tag). Idempotent, SSR-safe. */
-export function defineSheetViewElement(tag = 'sheet-view'): void {
+/** Register `<score-sheet-view>` (or a custom tag). Idempotent, SSR-safe. */
+export function defineSheetViewElement(tag = 'score-sheet-view'): void {
   defineOnce(tag, SheetViewElement);
 }

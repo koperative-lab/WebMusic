@@ -21,10 +21,10 @@ const OSCILLATORS = new Set<OscillatorType>(['sine', 'square', 'sawtooth', 'tria
  * One voice of a {@link RackControlElement} desk, declared in markup.
  *
  * ```html
- * <rack-control>
- *   <rack-part id="lead" src="lead.mid" sound="triangle"></rack-part>
- *   <rack-part id="bass" src="bass.mid" sound="sawtooth"></rack-part>
- * </rack-control>
+ * <score-rack-control>
+ *   <score-rack-part id="lead" src="lead.mid" sound="triangle"></score-rack-part>
+ *   <score-rack-part id="bass" src="bass.mid" sound="sawtooth"></score-rack-part>
+ * </score-rack-control>
  * ```
  *
  * It is a DECLARATION, not a player: it renders nothing, owns no engine, and
@@ -33,7 +33,7 @@ const OSCILLATORS = new Set<OscillatorType>(['sine', 'square', 'sawtooth', 'tria
  * was never an element, and this is how one is written down without pretending
  * otherwise. The player wrapping the desk moves every part in lockstep.
  *
- * Outside a `<rack-control>` it does nothing at all, quietly. There is no
+ * Outside a `<score-rack-control>` it does nothing at all, quietly. There is no
  * standalone meaning for one voice of a desk that is not there.
  */
 export class RackPartElement extends WebMusicElement {
@@ -122,7 +122,7 @@ export class RackPartElement extends WebMusicElement {
     }
     if (this.voiced?.name === named) return this.voiced.synth;
     if (!OSCILLATORS.has(named as OscillatorType)) {
-      this.reportError(new Error(`<rack-part sound="${named}"> is not an oscillator type.`));
+      this.reportError(new Error(`<score-rack-part sound="${named}"> is not an oscillator type.`));
       return undefined;
     }
     this.voiced = {name: named, synth: Sound.oscillator({type: named as OscillatorType})};
@@ -193,7 +193,7 @@ export class RackPartElement extends WebMusicElement {
   }
 }
 
-export function defineRackPartElement(tag = 'rack-part'): void {
+export function defineRackPartElement(tag = 'score-rack-part'): void {
   if (typeof customElements !== 'undefined' && !customElements.get(tag)) {
     customElements.define(tag, RackPartElement);
   }

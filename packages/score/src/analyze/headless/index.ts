@@ -41,3 +41,4 @@ export {
 // consumer rendering its own markup can call these instead of mounting an
 // element, and gets exactly what the element draws.
 export * from './workbench';
+export {projectRhythmPatternFlow} from './rhythm-pattern-flow';

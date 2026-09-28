@@ -3,7 +3,7 @@ import type { Effect, EffectNode } from "../../src/play/headless/effects";
 import {
   lfoWave as facadeLfoWave,
   parseSections as facadeParseSections,
-} from "../../src/play/element/synth-panel";
+} from "../../src/play/element/score-synth-panel";
 import {SynthPanelAudioGraph} from '../../src/play/headless';
 import {
   lfoWave,

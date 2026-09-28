@@ -210,7 +210,7 @@ export class PitchViewElement extends HTMLElementBase {
   }
 }
 
-/** Register <pitch-view> (or a custom tag). Idempotent and SSR-safe. */
-export function definePitchViewElement(tag = 'pitch-view'): void {
+/** Register <score-pitch-view> (or a custom tag). Idempotent and SSR-safe. */
+export function definePitchViewElement(tag = 'score-pitch-view'): void {
   defineOnce(tag, PitchViewElement);
 }

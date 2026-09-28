@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {Duration, Pitch, Rational, ScoreBuilder, VoiceId} from '../../src/core';
-import {defineSimpleScorePlayerElement, type SimpleScorePlayerElement} from '../../src/play/element/score-player';
+import {defineScorePlayerElement, type ScorePlayerElement} from '../../src/play/element/score-player';
 import {ScorePlayer} from '../../src/play/headless/score-player';
 import type {PlayerController} from '../../src/play/headless/controller';
 import type {Rack} from '../../src/play/headless/rack';
 
-defineSimpleScorePlayerElement();
+defineScorePlayerElement();
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 afterEach(() => { document.body.replaceChildren(); vi.restoreAllMocks(); });
 
@@ -25,7 +25,7 @@ function mountRack() {
     list: () => members, on: () => () => {},
     stop: vi.fn(), pause: vi.fn(), play: vi.fn(async () => {}),
   } as unknown as Rack;
-  const owner = document.createElement('simple-score-player') as SimpleScorePlayerElement;
+  const owner = document.createElement('score-player') as ScorePlayerElement;
   owner.rack = rack;
   document.body.append(owner);
   return {owner, members};
@@ -51,7 +51,7 @@ describe('Play transport mode contracts', () => {
   it('preserves authored children across mode switches and releases a removed nested desk', async () => {
     const {owner} = mountRack();
     const rack = owner.rack;
-    const desk = Object.assign(document.createElement('rack-control'), {rack});
+    const desk = Object.assign(document.createElement('score-rack-control'), {rack});
     const note = document.createElement('span');
     note.textContent = 'Authored content';
     owner.append(desk, note);
@@ -78,8 +78,8 @@ describe('Play transport mode contracts', () => {
   it('does not let a second desk take over the selected nested Rack', async () => {
     const {owner} = mountRack();
     const firstRack = owner.rack;
-    const first = Object.assign(document.createElement('rack-control'), {rack: firstRack});
-    const second = Object.assign(document.createElement('rack-control'), {rack: {list: () => []}});
+    const first = Object.assign(document.createElement('score-rack-control'), {rack: firstRack});
+    const second = Object.assign(document.createElement('score-rack-control'), {rack: {list: () => []}});
     owner.append(first, second);
     owner.rack = undefined;
     await flush();
@@ -92,7 +92,7 @@ describe('Play transport mode contracts', () => {
       currentTime: 1, duration: 6, progress: 1 / 6, playing: false, rate: 1.5,
       on: () => () => {}, setRate: vi.fn(),
     } as unknown as PlayerController;
-    const owner = document.createElement('simple-score-player') as SimpleScorePlayerElement;
+    const owner = document.createElement('score-player') as ScorePlayerElement;
     owner.controller = controller;
     owner.setAttribute('rate', '2');
     document.body.append(owner);
@@ -116,7 +116,7 @@ describe('Play transport mode contracts', () => {
     builder.addPart({id: part, name: 'Piano'});
     builder.addNote(part, {id: builder.newNoteId(), pitch: Pitch.parse('C4'), onsetQuarters: Rational.ZERO,
       duration: Duration.quarter(), voice: VoiceId('v')});
-    const owner = document.createElement('simple-score-player') as SimpleScorePlayerElement;
+    const owner = document.createElement('score-player') as ScorePlayerElement;
     owner.score = builder.build();
     document.body.append(owner);
     await flush();

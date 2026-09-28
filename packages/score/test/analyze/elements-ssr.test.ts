@@ -23,11 +23,11 @@
 
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {
-  KeyAnalysisElement,
   ChordAnalysisElement,
+  LiveChordAnalysisElement,
   defineAllAnalysisElements,
-  defineKeyAnalysisElement,
   defineChordAnalysisElement,
+  defineLiveChordAnalysisElement,
 } from '../../src/analyze/element/index';
 import * as elements from '../../src/analyze/element/index';
 import {ScoreBuilder} from '../../src/core';
@@ -37,10 +37,8 @@ import {createScoreReport} from '../../src/analyze/headless';
 describe('elements module (SSR safety)', () => {
   it('does not export retired Element classes or registration helpers', () => {
     expect(Object.keys(elements).sort()).toEqual([
-      'ChordAnalysisElement', 'KeyAnalysisElement', 'LiveChordAnalysisElement',
-      'RomanAnalysisElement', 'VoiceLeadingAnalysisElement', 'defineAllAnalysisElements',
-      'defineChordAnalysisElement', 'defineKeyAnalysisElement', 'defineLiveChordAnalysisElement',
-      'defineRomanAnalysisElement', 'defineVoiceLeadingAnalysisElement',
+      'ChordAnalysisElement', 'LiveChordAnalysisElement', 'defineAllAnalysisElements',
+      'defineChordAnalysisElement', 'defineLiveChordAnalysisElement',
     ].sort());
   });
 
@@ -53,15 +51,15 @@ describe('elements module (SSR safety)', () => {
 
   it('imports and constructs in Node without document/customElements', () => {
     expect(typeof ChordAnalysisElement).toBe('function');
-    expect(typeof KeyAnalysisElement).toBe('function');
+    expect(typeof LiveChordAnalysisElement).toBe('function');
     expect(() => new ChordAnalysisElement()).not.toThrow();
-    expect(() => new KeyAnalysisElement()).not.toThrow();
+    expect(() => new LiveChordAnalysisElement()).not.toThrow();
   });
 
   it('define functions are no-ops without customElements', () => {
     expect((globalThis as Record<string, unknown>).customElements).toBeUndefined();
     expect(() => defineChordAnalysisElement()).not.toThrow();
-    expect(() => defineKeyAnalysisElement()).not.toThrow();
+    expect(() => defineLiveChordAnalysisElement()).not.toThrow();
     expect(() => defineAllAnalysisElements()).not.toThrow();
   });
 });
@@ -87,14 +85,15 @@ describe('define functions', () => {
 
     defineChordAnalysisElement();
     defineChordAnalysisElement();
-    defineKeyAnalysisElement();
+    defineLiveChordAnalysisElement();
+    defineLiveChordAnalysisElement();
 
     expect(define).toHaveBeenCalledTimes(2);
-    expect(registry.get('chord-analysis')).toBe(ChordAnalysisElement);
-    expect(registry.get('key-analysis')).toBe(KeyAnalysisElement);
+    expect(registry.get('score-chord-analysis')).toBe(ChordAnalysisElement);
+    expect(registry.get('score-live-chord-analysis')).toBe(LiveChordAnalysisElement);
   });
 
-  it('registers only the five supported capabilities through defineAllAnalysisElements', () => {
+  it('registers only the two supported capabilities through defineAllAnalysisElements', () => {
     const registry = new Map<string, CustomElementConstructor>();
     const define = vi.fn((tag: string, ctor: CustomElementConstructor) => registry.set(tag, ctor));
     globals.customElements = {
@@ -105,13 +104,12 @@ describe('define functions', () => {
     defineAllAnalysisElements();
     defineAllAnalysisElements();
 
-    expect([...registry.keys()].sort()).toEqual([
-      'chord-analysis', 'key-analysis', 'live-chord-analysis', 'roman-analysis', 'voice-leading-analysis',
-    ]);
-    expect(define).toHaveBeenCalledTimes(5);
+    expect([...registry.keys()].sort()).toEqual(['score-chord-analysis', 'score-live-chord-analysis']);
+    expect(define).toHaveBeenCalledTimes(2);
     for (const tag of [
       'score-analysis', 'analysis-histogram', 'rhythm-patterns', 'analysis-view', 'analysis-timeline',
-      'motif-analysis', 'key-wheel', 'key-candidates', 'pitch-evidence', 'chord-history',
+      'key-analysis', 'interval-analysis', 'rhythm-analysis', 'motif-analysis', 'rhythm-pattern-analysis',
+      'key-wheel', 'key-candidates', 'pitch-evidence', 'chord-history',
     ]) expect(registry.has(tag)).toBe(false);
   });
 });

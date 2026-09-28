@@ -3,16 +3,16 @@
 //
 //   @webmusic/score/analyze           — this root entry, the stateless API:
 //                                 one-shot analysis functions (detectKey,
-//                                 segmentChords, romanNumerals, findMotifs,
+//                                 segmentChords, analyzeIntervals,
+//                                 inspectScoreRhythm, romanNumerals, findMotifs,
 //                                 voiceLeading, summarizeScore, …).
 //                                 Pure data in / data out, no DOM. `./api` is
 //                                 the internal source directory backing it.
 //   @webmusic/score/analyze/headless  — code-only stateful analysis components:
 //                                 createAnalysisSession, live chord/key
 //                                 trackers and the Worker client. No UI/DOM.
-//   @webmusic/score/analyze/element  — live musical surfaces: score-following
-//                                 key/chord/Roman/voice-leading lanes,
-//                                 and current chord names.
+//   @webmusic/score/analyze/element  — live musical inspection surfaces for
+//                                 chord names and harmony.
 //                                 Whole-score reports remain data APIs.
 //
 // Element implementation details live under src/element/internal and are not

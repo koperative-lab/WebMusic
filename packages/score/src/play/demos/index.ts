@@ -7,7 +7,7 @@
 //
 //   import {defineNoteInputDemoElement} from '@webmusic/score/play/demos';
 //   defineNoteInputDemoElement();
-//   // <note-input-demo layout="piano"></note-input-demo>
+//   // <score-note-input-demo layout="piano"></score-note-input-demo>
 //
 // These exist for documentation / getting-started use; production apps wire the
 // real elements (`@webmusic/score/play/element`) with their own scores. Everything is
@@ -19,8 +19,8 @@ import {defineScoreRecorderElement} from '../element/score-recorder';
 import {
   DEFAULT_TR808_GRID_MAP,
   defineNoteInputElement,
-} from '../element/note-input';
-import {defineSynthPanelElement, type SoundParam, type Envelope} from '../element/synth-panel';
+} from '../element/score-note-input';
+import {defineSynthPanelElement, type SoundParam, type Envelope} from '../element/score-synth-panel';
 import {InteractivePlayer} from '../headless/interactive-player';
 import {OscillatorSynth} from '../headless/oscillator-synth';
 import {Sound} from '../headless/sound';
@@ -28,8 +28,8 @@ import {defineSinglePurposeDemoElements} from './single-purpose';
 
 export {sampleScore, sampleRack, type SampleScoreOptions} from './samples';
 
-// The single-purpose demo elements (`<simple-score-player-demo>`,
-// `<rack-control-demo>`, …) round out the flat demo set alongside the
+// The single-purpose demo elements (`<score-simple-player-demo>`,
+// `<score-rack-control-demo>`, …) round out the flat demo set alongside the
 // consolidated `*-demo` elements declared below.
 export * from './single-purpose';
 
@@ -59,14 +59,14 @@ function wireInputSoundFont(
   return player;
 }
 
-/** `<score-recorder-demo>` — a piano `<note-input>` feeding a `<score-recorder>`. */
+/** `<score-recorder-demo>` — a piano `<score-note-input>` feeding a `<score-recorder>`. */
 export class ScoreRecorderDemoElement extends HTMLElementBase {
   connectedCallback(): void {
     if (this.dataset.mounted) return;
     this.dataset.mounted = 'true';
     defineNoteInputElement();
     defineScoreRecorderElement();
-    const kb = document.createElement('note-input') as HTMLElement & {
+    const kb = document.createElement('score-note-input') as HTMLElement & {
       onNote?: (midi: number, velocity: number, on: boolean) => void;
     };
     kb.setAttribute('layout', 'piano');
@@ -85,7 +85,7 @@ export class ScoreRecorderDemoElement extends HTMLElementBase {
 
 
 /**
- * `<note-input-demo>` — a `<note-input>` wired to a triangle synth. The demo's
+ * `<score-note-input-demo>` — a `<score-note-input>` wired to a triangle synth. The demo's
  * `layout` attribute (piano | grid | chords, default piano)
  * is forwarded to the inner element.
  */
@@ -96,7 +96,7 @@ export class NoteInputDemoElement extends HTMLElementBase {
     this.dataset.mounted = 'true';
     defineNoteInputElement();
     const layout = this.getAttribute('layout') ?? 'piano';
-    const el = document.createElement('note-input') as HTMLElement & {onNote?: (m: number, v: number, on: boolean) => void};
+    const el = document.createElement('score-note-input') as HTMLElement & {onNote?: (m: number, v: number, on: boolean) => void};
     el.setAttribute('layout', layout);
     if (layout === 'piano' || this.hasAttribute('keyboard')) {
       el.setAttribute('start', '48');
@@ -122,8 +122,8 @@ export class NoteInputDemoElement extends HTMLElementBase {
 
 
 /**
- * `<synth-panel-demo>` — a piano `<note-input>` played through a live
- * oscillator synth, with a `<synth-panel>` (sound + envelope sections) that
+ * `<score-synth-panel-demo>` — a piano `<score-note-input>` played through a live
+ * oscillator synth, with a `<score-synth-panel>` (sound + envelope sections) that
  * retunes the timbre as you turn the knobs / drag the envelope.
  */
 export class SynthPanelDemoElement extends HTMLElementBase {
@@ -147,7 +147,7 @@ export class SynthPanelDemoElement extends HTMLElementBase {
     player.addVoice('kbd', synth);
     this.player = player;
 
-    const keyboard = document.createElement('note-input') as HTMLElement & {
+    const keyboard = document.createElement('score-note-input') as HTMLElement & {
       onNote?: (midi: number, velocity: number, on: boolean) => void;
     };
     keyboard.setAttribute('layout', 'piano');
@@ -160,7 +160,7 @@ export class SynthPanelDemoElement extends HTMLElementBase {
     };
 
     const WAVES: OscillatorType[] = ['sine', 'square', 'sawtooth', 'triangle'];
-    const panel = document.createElement('synth-panel') as HTMLElement & {
+    const panel = document.createElement('score-synth-panel') as HTMLElement & {
       sound?: SoundParam[];
       apply?: (e: Envelope) => void;
     };
@@ -192,10 +192,10 @@ export class SynthPanelDemoElement extends HTMLElementBase {
 export function defineScoreRecorderDemoElement(tag = 'score-recorder-demo'): void {
   defineOnce(tag, ScoreRecorderDemoElement);
 }
-export function defineNoteInputDemoElement(tag = 'note-input-demo'): void {
+export function defineNoteInputDemoElement(tag = 'score-note-input-demo'): void {
   defineOnce(tag, NoteInputDemoElement);
 }
-export function defineSynthPanelDemoElement(tag = 'synth-panel-demo'): void {
+export function defineSynthPanelDemoElement(tag = 'score-synth-panel-demo'): void {
   defineOnce(tag, SynthPanelDemoElement);
 }
 

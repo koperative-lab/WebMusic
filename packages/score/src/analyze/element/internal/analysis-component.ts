@@ -1,6 +1,8 @@
-import {Rational, type Score, type ScorePlaybackSource} from '../../../core';
+import {Rational, isPitchedNote, noteMidi, type Score, type ScorePlaybackSource} from '../../../core';
 import {
+  romanNumeralForChord,
   spellChord,
+  spellChordNotes,
   type Key,
   type SpellingPreference,
 } from '../../core';
@@ -8,10 +10,8 @@ import {createAnalysisSession, type AnalysisResult, type AnalysisSession} from '
 import {createTransportClock, rateFromDurations, type TransportClock} from '../../headless/transport-clock';
 import {
   formatMetricalPosition,
-  projectKeyFlow,
   projectProgression,
   projectNameplate,
-  projectVoiceFlow,
   type FlowBandView,
   type FlowLaneView,
   type NameplateView,
@@ -31,6 +31,7 @@ import {
 } from './index';
 import {HTMLElementBase, upgradeProperties} from '../base';
 import {seekAnalysisPlayer, type AnalysisTimeUpdate} from './player-binding';
+import {projectChordCells} from './chord-cells';
 import {
   mountFlowLane,
   mountNameplate,
@@ -51,6 +52,32 @@ export type {AnalysisViewType} from './recipes';
 export interface AnalysisViewSeekDetail {
   quarters: number;
   seconds: number;
+}
+
+export interface AnalysisSelection {
+  readonly id: string;
+  readonly startQuarters: number;
+  readonly endQuarters: number;
+}
+
+export interface AnalysisViewSelectDetail extends AnalysisSelection {
+  readonly kind: 'chord';
+}
+
+export interface AnalysisInspectionCandidate {
+  readonly id: string;
+  readonly label: string;
+  readonly detail?: string;
+  readonly selected: boolean;
+}
+
+export interface AnalysisInspection {
+  readonly kind: AnalysisViewSelectDetail['kind'];
+  readonly selection: AnalysisSelection;
+  readonly headline: string;
+  readonly detail: string;
+  readonly evidence: readonly string[];
+  readonly candidates: readonly AnalysisInspectionCandidate[];
 }
 
 /**
@@ -79,7 +106,7 @@ const REPORTED = new Set<string>();
 // ---------------------------------------------------------------------------
 
 /** `window="auto"`: this many bars of the piece in view at once. */
-const AUTO_WINDOW_BARS = 8;
+const AUTO_WINDOW_BARS = 2;
 
 /** A field of view outside this is not a reading of the attribute, it is a typo. */
 const MIN_WINDOW_SECONDS = 0.5;
@@ -133,6 +160,7 @@ interface ViewModel {
   phase: WorkbenchPhase;
   message: string;
   detail: string;
+  inspection?: AnalysisInspection;
 }
 
 /** The half of the model that only a new analysis can change. Memoised on it. */
@@ -174,6 +202,8 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
   #clock: TransportClock = createTransportClock();
 
   #root?: HTMLElement;
+  #evidenceStatus?: HTMLElement;
+  #renderedInspection?: AnalysisInspection;
   #workbench?: WorkbenchHandle;
   #presenter?: Tenant;
   #rows = new Map<string, HTMLLIElement>();
@@ -190,10 +220,9 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
   #player?: Element;
   /** `window`, resolved once per (spec, score) — `auto` allocates Rationals. */
   #windowCache?: {raw: string | null; score?: Score; seconds?: number};
-  /** The naming the reader picked off the plate, until the sounding set changes. */
-  #prefer?: string;
-  /** Which sounding set that pick was made on. */
-  #preferFor?: string;
+  #selection?: AnalysisSelection;
+  #selectionScore?: Score;
+  #inspectionCache?: {score: Score; selection: AnalysisSelection; signature: string; value: AnalysisInspection | undefined};
   /** What the clock was built for, so it is only rebuilt when that changes. */
   #clockDuration = 0;
 
@@ -206,10 +235,13 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
   #seekOrigin?: number;
   #revision = 0;
   #seekRequest = 0;
+  #skipNextBandSeek = false;
   #timeRevision = 0;
   #playing = false;
   #epoch = 0;
   #soundingMidis: readonly number[] = [];
+  #chordChangeTimer?: ReturnType<typeof setTimeout>;
+  #lastEmittedChord?: string;
 
   /** Derived presentation activity; the player remains the transport owner. */
   #moving = false;
@@ -221,12 +253,7 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
     onUpdate: (state) => {
       this.#soundingMidis = state.midis;
       this.#apply();
-    },
-    onChordChange: (chord, midis) => {
-      if (this.analysisType !== 'live-chord') return;
-      this.dispatchEvent(
-        new CustomEvent('webscore:chordchange', {detail: {chord, midis}, bubbles: true, composed: true}),
-      );
+      this.#scheduleChordChange();
     },
   });
 
@@ -241,6 +268,9 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
       'spelling',
       'motion',
       'window',
+      'analysisWindow',
+      'key',
+      'stabilityMs',
     ]);
     this.#mount();
     this.#bindPlayer();
@@ -264,12 +294,18 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
       this.#remount();
       return;
     }
+    if (name === 'stability-ms') {
+      this.#scheduleChordChange();
+      return;
+    }
     // Everything else is content the presenters pull. Routing it through the
     // loader would re-fetch and re-parse `src` every time a reader touched a
     // display parameter would otherwise repeat the source request.
     if (name !== 'src' && name !== 'format') {
       this.#cache = undefined;
+      this.#inspectionCache = undefined;
       this.#apply();
+      if (name === 'spelling') this.#scheduleChordChange();
       return;
     }
     void this.#refresh();
@@ -285,9 +321,58 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
     return this.#source.score;
   }
 
-  /** The nameplate's current chord, or `undefined` for silence. */
+  /** The named chord, or `undefined` for silence or an unnamed note set. */
   get chord(): string | undefined {
     return this.#model?.sounding?.naming.primary?.symbol;
+  }
+
+  /** Delay for a new displayed chord before `webscore:chordchange`, in milliseconds. */
+  get stabilityMs(): number {
+    const raw = this.getAttribute('stability-ms');
+    if (raw === null) return 80;
+    const value = Number(raw);
+    if (Number.isFinite(value) && value >= 0 && value <= 1000) return value;
+    this.#warn(`stability-ms="${raw}" must be 0 to 1000 ms — using 80.`);
+    return 80;
+  }
+
+  set stabilityMs(value: number) { this.setAttribute('stability-ms', String(value)); }
+
+  /** The inspected quarter-note region. This is local UI state, not a score edit. */
+  get selection(): AnalysisSelection | undefined {
+    return this.#selection ? {...this.#selection} : undefined;
+  }
+
+  /** Detailed evidence for the current score-lane selection. */
+  get analysis(): AnalysisInspection | undefined {
+    const inspection = this.#model?.inspection;
+    return inspection && {
+      ...inspection,
+      selection: {...inspection.selection},
+      evidence: [...inspection.evidence],
+      candidates: inspection.candidates.map((candidate) => ({...candidate})),
+    };
+  }
+
+  /** Inspect a score region without commanding the bound player. */
+  selectRegion(startQuarters: number, endQuarters: number): void {
+    if (!Number.isFinite(startQuarters) || !Number.isFinite(endQuarters) || endQuarters <= startQuarters) {
+      throw new RangeError('Analysis selection requires a finite increasing quarter-note range');
+    }
+    const score = this.#score;
+    if (!score || this.analysisType === 'live-chord') return;
+    const end = score.durationQuarters.toFloat();
+    const start = Math.max(0, Math.min(end, startQuarters));
+    const stop = Math.max(0, Math.min(end, endQuarters));
+    if (stop <= start) throw new RangeError('Analysis selection is outside the score');
+    this.#setSelection({id: `region:${start}:${stop}`, startQuarters: start, endQuarters: stop}, true);
+  }
+
+  /** Return to the first available band after a local selection. */
+  clearSelection(): void {
+    this.#selection = undefined;
+    this.#inspectionCache = undefined;
+    this.#apply();
   }
 
   /** Reflects `density`; anything unreadable falls back to `comfortable`. */
@@ -399,7 +484,8 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
     // and grid compositions a fluid basis; siblings may still shrink it.
     hostStyle.textContent = `:where(${selector}) { box-sizing: border-box; inline-size: 100%; min-inline-size: 0; }
 :where(${selector}:not([hidden])) { display: block; }
-:where(.webscore-analyze) { min-inline-size: 0; }`;
+:where(.webscore-analyze) { min-inline-size: 0; }
+:where(.webscore-analyze__evidence-status) { position: absolute; inline-size: 1px; block-size: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }`;
     root.append(hostStyle);
     this.replaceChildren(root);
     this.#root = root;
@@ -429,7 +515,7 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
         navigation: false,
         // Display configuration belongs to the application's Parameters UI.
         chrome: 'bare',
-        parts: {root: 'presentation', frame: 'surface', stage: 'content', index: 'index'},
+        parts: {root: 'presentation', frame: 'surface', stage: 'content', note: 'status-note', index: 'index'},
         // `auto` is passed as `undefined` ON PURPOSE. It is not a synonym for
         // `continuous`: it is the element declining to answer, so the shell
         // asks the nearest `data-motion` ancestor and then the viewer's own
@@ -438,6 +524,24 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
         onError: (error) => this.#report(error),
       },
     );
+    // Bare chrome removes configuration UI; the Element still owns one complete
+    // component surface. Style the public frame hook rather than wrapping an
+    // already painted presenter or changing the reusable workbench's defaults.
+    // Read public tokens without publishing host-local defaults, so inherited
+    // application themes remain authoritative across updates and remounts.
+    const surface = this.#workbench.element.querySelector<HTMLElement>(':scope > [part~="surface"]');
+    if (surface) {
+      surface.style.padding = 'var(--wm-workbench-surface-padding, var(--wm-component-padding, var(--cp-padding, var(--wm-harmony-padding, var(--wm-analysis-padding, var(--webscore-analyze-padding, .6rem))))))';
+      surface.style.border = 'var(--wm-workbench-surface-border, var(--wm-component-border, var(--cp-border, var(--wm-harmony-border, var(--wm-analysis-border, var(--webscore-analyze-border, 1px solid var(--wm-border, light-dark(#d8d8d8, #333))))))))';
+      surface.style.background = 'var(--wm-workbench-surface-background, var(--wm-component-background, var(--cp-background, var(--wm-harmony-background, var(--wm-analysis-background, var(--webscore-analyze-bg, var(--wm-surface, light-dark(#fff, #111))))))))';
+    }
+    if (this.analysisType !== 'live-chord') {
+      const status = owner.createElement('div');
+      status.className = 'webscore-analyze__evidence-status';
+      status.setAttribute('aria-label', 'Analysis evidence');
+      this.#evidenceStatus = status;
+      this.#workbench.stage.append(status);
+    }
   }
 
   /** Rebuild motion-dependent presentation while retaining score and player state. */
@@ -453,6 +557,8 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
     this.#notify = undefined;
     this.#root?.remove();
     this.#root = undefined;
+    this.#evidenceStatus = undefined;
+    this.#renderedInspection = undefined;
     // The lane's material has to be reconciled onto the new nodes, so the
     // "nothing changed" shortcut in `#apply` must not fire on the first pass.
     this.#laneKey = '';
@@ -501,13 +607,16 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
     this.#notify = undefined;
     this.#root?.remove();
     this.#root = undefined;
+    this.#evidenceStatus = undefined;
+    this.#renderedInspection = undefined;
     // Release derived caches when the component disconnects.
     this.#session = undefined;
     this.#model = undefined;
     this.#cache = undefined;
     this.#soundingCache = undefined;
-    // Presentation choices are local to the current source.
-    this.#prefer = undefined;
+    this.#selection = undefined;
+    this.#selectionScore = undefined;
+    this.#inspectionCache = undefined;
   }
 
   async #refresh(): Promise<void> {
@@ -525,6 +634,13 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
     const {score, stale, error} = await this.#source.load();
     if (stale || !this.isConnected) return;
     this.#score = score;
+    if (this.#selectionScore !== score) {
+      this.#selection = undefined;
+      this.#selectionScore = score;
+      this.#inspectionCache = undefined;
+      this.#clearChordChange();
+      this.#lastEmittedChord = undefined;
+    }
     const native = (this.#player as (Element & {playback?: ScorePlaybackSource}) | undefined)?.playback?.snapshot();
     if (native && native.readiness !== 'unavailable' && native.score && score && score !== native.score) {
       this.#resetPlayerState();
@@ -579,6 +695,7 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
     // per-frame work this whole arrangement exists to avoid.
     this.#laneKey = model.laneKey;
     if (this.#presenter && (!settled || this.#presenter.kind !== 'flow')) this.#presenter.update();
+    this.#renderInspection();
     // Last, and only after every slot holds the new material: the shell turns
     // this into one reading and one `tick` for every slot at once. Under
     // continuous motion the loop would have done it a frame later anyway; under
@@ -591,8 +708,11 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
     const recipe = this.#recipe();
     this.#moving = this.#animating(this.#now());
     const score = recipe.needsScore ? this.#score : undefined;
-    const result = score ? this.#analyze(score) : undefined;
+    const result = score && type === 'chords'
+      ? this.#analyze(score) : undefined;
     const material = this.#material(recipe, result, score);
+    const lane = material.lane;
+    this.#syncSelection(lane, score);
     const index = material.index;
     const message = this.#error
       ?? (recipe.needsScore && !score ? 'Waiting for a score — set player, src or .score.'
@@ -600,15 +720,20 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
     return {
       recipe,
       score,
-      lane: {...material.lane, playing: this.#playing},
+      lane: {
+        ...lane,
+        playing: this.#playing,
+        focusGroup: material.lane.bands.find((band) => band.id === this.#selection?.id)?.group ?? this.#selection?.id,
+      },
       sounding: type === 'live-chord' ? this.#sounding(this.#liveKey.result()) : undefined,
       index,
-      laneKey: `${material.revision}|${this.#playing ? 1 : 0}`,
+      laneKey: `${material.revision}|${this.#playing ? 1 : 0}|${this.#selection?.id ?? ''}`,
       phase: this.#error ? 'error'
         : this.#moving ? 'playing'
         : recipe.slot.kind === 'flow' && index.length === 0 ? 'empty' : 'idle',
       message,
       detail: score ? formatMetricalPosition(score, this.#quartersNow(score)) : '',
+      inspection: score && this.#selection ? this.#inspect(score, this.#selection, result) : undefined,
     };
   }
 
@@ -628,7 +753,7 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
       score,
       result,
       lane,
-      index: this.#indexFor(recipe, lane, score),
+      index: this.#indexFor(lane, score),
     };
     this.#cache = material;
     return material;
@@ -638,56 +763,45 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
   #sounding(key: Key | undefined): Pick<SoundingProjection, 'spelling' | 'naming'> {
     const midis = this.#soundingMidis;
     const held = midis.join(',');
-    if (this.#prefer !== undefined && this.#preferFor !== held) {
-      this.#prefer = undefined;
-      this.#preferFor = undefined;
-    }
-    const signature = `${held}|${key ? `${key.tonic} ${key.mode}` : ''}|${this.#prefer ?? ''}|${this.spelling}`;
+    const signature = `${held}|${key ? `${key.tonic} ${key.mode}` : ''}|${this.spelling}`;
     const cached = this.#soundingCache;
     if (cached?.signature === signature) return cached.projection;
-    const spelling = spellChord(midis, {key, spelling: this.spelling, prefer: this.#prefer});
+    const spelling = spellChord(midis, {key, spelling: this.spelling});
     const projection = {spelling, naming: projectNameplate(spelling)};
     this.#soundingCache = {signature, projection};
     return projection;
   }
 
-  /**
-   * The reader picked another reading of the same notes.
-   *
-   * This is local interpretation state. Sibling pitch views keep reflecting
-   * the player's actual notes; selecting a name never changes playback.
-   */
-  #pickNaming(candidate: {symbol?: string; note?: string}): void {
-    const symbol = candidate.symbol;
-    if (!symbol) return;
-    this.#prefer = symbol;
-    this.#preferFor = (this.#model?.sounding?.spelling.pitches ?? [])
-      .map((pitch) => pitch.midi)
-      .join(',');
-    this.#soundingCache = undefined;
-    this.#apply();
-    this.dispatchEvent(
-      new CustomEvent('webscore:chordpick', {
-        detail: {
-          symbol,
-          kind: candidate.note ?? 'primary',
-          midis: (this.#model?.sounding?.spelling.pitches ?? []).map((pitch) => pitch.midi),
-        },
-        bubbles: true,
-        composed: true,
-      }),
-    );
+  #clearChordChange(): void {
+    if (this.#chordChangeTimer !== undefined) clearTimeout(this.#chordChangeTimer);
+    this.#chordChangeTimer = undefined;
   }
 
-  /**
-   * The nameplate snapshot, configured by the external `alternates` attribute.
-   *
-   * The other readings are the plate's second half — a `Cmaj7/E` beside an
-   * `Em7b13` is the honest answer to a set that really is both — and a reader
-   * who only wants the headline turns them off here rather than by styling the
-   * buttons away. Dropped from the SNAPSHOT, so the kit renders no button at
-   * all: a focusable node nobody can use is worse than a missing one.
-   */
+  #scheduleChordChange(): void {
+    if (this.analysisType !== 'live-chord') return;
+    this.#clearChordChange();
+    const chord = this.chord;
+    if (!chord) {
+      this.#lastEmittedChord = undefined;
+      return;
+    }
+    if (chord === this.#lastEmittedChord) return;
+    const midis = [...this.#soundingMidis];
+    const revision = this.#revision;
+    const publish = (): void => {
+      this.#chordChangeTimer = undefined;
+      if (!this.isConnected || revision !== this.#revision || this.chord !== chord) return;
+      this.#lastEmittedChord = chord;
+      this.dispatchEvent(new CustomEvent('webscore:chordchange', {
+        detail: {chord, midis}, bubbles: true, composed: true,
+      }));
+    };
+    const delay = this.stabilityMs;
+    if (delay === 0) publish();
+    else this.#chordChangeTimer = setTimeout(publish, delay);
+  }
+
+  /** The nameplate snapshot, configured by the external `alternates` attribute. */
   #nameplate(extra: Partial<NameplateView> = {}): NameplateView {
     const naming: NameplateView = {...(this.#model?.sounding?.naming ?? {}), ...extra};
     if (this.getAttribute('alternates') === 'hide') {
@@ -699,10 +813,9 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
   /**
    * `window` in seconds; UIKit resolves it against the measured container width.
    *
-   * `auto` is eight bars of the piece — the field of view a reader can read a
-   * phrase in — and it is a duration, not a count of bands: a ritardando makes
-   * the same eight bars wider on the reel, which is the whole reason the lane's
-   * axis is seconds.
+   * `auto` is two bars for the chord lane.
+   * It is a duration, not a band count: a ritardando makes the same bars wider
+   * on the reel, which is why the lane's axis is seconds.
    */
   #laneSpan(): number | undefined {
     const raw = this.getAttribute('window');
@@ -739,8 +852,8 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
   ): FlowLaneView {
     const source = recipe.slot.source;
     if (!score) return {...EMPTY_LANE, disabled: true};
-    if (!result) return {...EMPTY_LANE, disabled: true};
     if (source === 'progression') {
+      if (!result) return {...EMPTY_LANE, disabled: true};
       // The projection pins the position under the name for a PARKED lane. It
       // is dropped here rather than refreshed, because refreshing it means
       // reconciling every band on the reel twenty times a second to move one
@@ -748,52 +861,113 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
       // on the cursor's own rate and deliberately outside the live region. What
       // stays pinned is the crossing band's own name, which is what the line is
       // there to answer.
-      return {...projectProgression(result, score, 'chords', {roll: false}), pinned: undefined};
+      const lane = projectChordCells(score, projectProgression(result, score, 'chords', {roll: false}), {
+        spelling: this.spelling,
+        key: this.#chordKey(result).key,
+      });
+      return {...lane, bands: lane.bands.map((band) => ({...band, group: band.id})), pinned: undefined};
     }
-    if (source === 'roman') {
-      const lane = projectProgression(result, score, 'roman');
-      // Row 1 of the roman reel is the merged `T—S—D—T` phrase. It is the row
-      // that turns a wall of numerals into a shape, and it is also the row a
-      // reader analysing counterpoint does not want — so it is a switch, and a
-      // switch has to actually take the row off the reel rather than empty it.
-      return this.getAttribute('function') === 'hide' ? withoutTrack(lane, 'function') : lane;
-    }
-    if (source === 'key-flow') return projectKeyFlow(score);
-    if (source === 'voice-flow') return projectVoiceFlow(result, score);
     return EMPTY_LANE;
   }
 
-  /** Semantic rows share the intervals drawn by the visible lane. */
-  #indexFor(
-    recipe: ViewRecipe,
-    lane: FlowLaneView,
-    score: Score | undefined,
-  ): readonly IndexRow[] {
-    const source = recipe.slot.source;
-    if (!score) return [];
-    if (source === 'voice-flow') {
-      // Read off the BRACKETS the lane actually drew, not off the issue list.
-      // The two can differ — an issue between voices past the lane's row budget
-      // has no bracket — and a row describing a mark nobody can see is a
-      // promise the picture does not keep. The bracket already carries the row
-      // names, so the list and the drawing cannot disagree about which voices
-      // are implicated.
-      return (lane.brackets ?? []).map((bracket) => ({
-        id: bracket.id,
-        text: `${bracket.label ?? ''} · ${formatMetricalPosition(score, bracket.stampStart ?? 0)}`,
-        span:
-          bracket.stampStart !== undefined && bracket.stampEnd !== undefined
-            ? {start: bracket.stampStart, end: bracket.stampEnd}
-            : undefined,
+  #syncSelection(lane: FlowLaneView, score: Score | undefined): void {
+    const type = this.analysisType;
+    if (!score || type === 'live-chord') return;
+    const selected = this.#selection;
+    if (selected?.id.startsWith('region:')) return;
+    const band = lane.bands.find((item) => item.id === selected?.id)
+      ?? lane.bands.find((item) => Boolean(item.primary));
+    if (!band) {
+      this.#selection = undefined;
+      return;
+    }
+    const next = stampOf(band);
+    if (!next) return;
+    if (selected?.id === band.id && selected.startQuarters === next.start && selected.endQuarters === next.end) return;
+    this.#selection = {id: band.id, startQuarters: next.start, endQuarters: next.end};
+    this.#inspectionCache = undefined;
+  }
+
+  #setSelection(selection: AnalysisSelection, emit: boolean): void {
+    const kind = this.#inspectionKind();
+    if (!kind) return;
+    const prior = this.#selection;
+    if (prior?.id === selection.id && prior.startQuarters === selection.startQuarters
+      && prior.endQuarters === selection.endQuarters) return;
+    this.#selection = selection;
+    this.#inspectionCache = undefined;
+    this.#apply();
+    if (emit) {
+      this.dispatchEvent(new CustomEvent<AnalysisViewSelectDetail>('webscore:analysisselect', {
+        detail: {...selection, kind}, bubbles: true, composed: true,
       }));
     }
-    // Only ONE row is stamped, though, and that is the point of `primaryTrack`.
-    // The roman lane stacks a whole-piece key strip, a merged function row and
-    // the numerals on one reel; stamping all three hands one instant three
-    // owners, and a screen reader hears three `aria-current` answers — one of
-    // them, the key strip, unchanged for the entire piece. The other rows keep
-    // their text and lose their span: still readable, no longer claiming to be
-    // where the playhead is.
+  }
+
+  #inspectionKind(): AnalysisViewSelectDetail['kind'] | undefined {
+    return this.analysisType === 'chords' ? 'chord' : undefined;
+  }
+
+  #inspect(score: Score, selection: AnalysisSelection, result: AnalysisResult | undefined): AnalysisInspection | undefined {
+    const kind = this.#inspectionKind();
+    if (!kind) return undefined;
+    const signature = `${kind}|${selection.id}|${selection.startQuarters}|${selection.endQuarters}|${this.spelling}|${this.getAttribute('key') ?? ''}`;
+    const cached = this.#inspectionCache;
+    if (cached?.score === score && cached.selection === selection && cached.signature === signature) return cached.value;
+    const value = this.#chordInspection(score, selection, result);
+    this.#inspectionCache = {score, selection, signature, value};
+    return value;
+  }
+
+  #chordInspection(score: Score, selection: AnalysisSelection, result: AnalysisResult | undefined): AnalysisInspection {
+    const cell = selection.id.startsWith('chord-cell-');
+    const at = (selection.startQuarters + selection.endQuarters) / 2;
+    const evidence = score.parts.flatMap((part) => part.notes
+      .filter((note) => isPitchedNote(note)
+        && (cell
+          ? note.onsetQuarters.toFloat() < selection.endQuarters
+            && note.offsetQuarters.toFloat() > selection.startQuarters
+          : note.onsetQuarters.toFloat() <= at && note.offsetQuarters.toFloat() > at))
+      .map((note) => ({note, partId: String(part.id)})));
+    const {key, explicit} = this.#chordKey(result);
+    const spelling = spellChordNotes(evidence.map((item) => item.note), {
+      key, spelling: this.spelling,
+    });
+    const symbol = spelling.primary?.symbol ?? spelling.label;
+    const degree = key && spelling.primary ? romanNumeralForChord(symbol, key) : undefined;
+    const context = key ? `Degree ${degree ?? 'unknown'} in ${key.tonic} ${key.mode}${explicit ? ' (chosen)' : ' (score-wide estimate)'}`
+      : 'No reliable key context';
+    const pitches = new Map(spelling.pitches.map((pitch) => [pitch.midi, pitch]));
+    return {
+      kind: 'chord', selection,
+      headline: symbol,
+      detail: cell
+        ? `Notes across ${formatMetricalPosition(score, selection.startQuarters)} to ${formatMetricalPosition(score, selection.endQuarters)} · ${context}`
+        : `Sampled at ${formatMetricalPosition(score, at)} within the selected region · ${context}`,
+      evidence: evidence.map(({note, partId}) => {
+        const spelled = pitches.get(noteMidi(note));
+        return `${spelled?.name ?? note.pitch?.toString() ?? 'pitch'} ${spelled?.degreeLabel ?? ''} · ${partId}/${String(note.voice)} · ${String(note.id)}`;
+      }),
+      candidates: spelling.namings.map((name) => ({
+        id: name.symbol, label: name.symbol, detail: name.kind,
+        selected: name.symbol === spelling.primary?.symbol,
+      })),
+    };
+  }
+
+  #chordKey(result: AnalysisResult | undefined): {key?: Key; explicit: boolean} {
+    const keyAttribute = this.getAttribute('key');
+    const explicitKey = parseKey(keyAttribute);
+    if (keyAttribute && !explicitKey) {
+      this.#warn(`key="${keyAttribute}" must name a tonic and major or minor mode — using the detected key.`);
+    }
+    const detected = result?.key.scores.length && result.key.confidence > 0 ? result.key : undefined;
+    return {key: explicitKey ?? detected, explicit: Boolean(explicitKey)};
+  }
+
+  /** Semantic rows share the intervals drawn by the visible lane. */
+  #indexFor(lane: FlowLaneView, score: Score | undefined): readonly IndexRow[] {
+    if (!score) return [];
     const stamped = lane.primaryTrack;
     return lane.bands
       .filter((band) => Boolean(band.primary))
@@ -859,6 +1033,16 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
           // calls `selectBand` AND `seek` for one click — so binding both
           // would announce the same gesture twice.
           seek: (position: number, phase: 'drag' | 'commit') => this.#seek(position, phase),
+          ...(this.#inspectionKind() ? {
+            selectBand: (id: string, band: FlowBandView) => {
+              const span = stampOf(band);
+              if (span) {
+                const revision = this.#revision;
+                this.#setSelection({id, startQuarters: span.start, endQuarters: span.end}, true);
+                if (revision !== this.#revision) this.#skipNextBandSeek = true;
+              }
+            },
+          } : {}),
         },
         {
           label: spec.label,
@@ -869,6 +1053,7 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
           clock: workbench.clock,
           // The playhead owns the semantic index instead; see the class note.
           spans: false,
+          reservePinned: this.analysisType === 'chords',
           // The caller owns seconds; UIKit owns responsive pixel geometry.
           visibleSpan: this.#laneSpan(),
           formatPosition: (position) => this.#describePosition(position),
@@ -886,20 +1071,30 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
     const handle: NameplateHandle = mountNameplate(
       host,
       {
-        snapshot: () => this.#nameplate({caption: 'sounding now', emphasis: 'hero'}),
-        // Given this, the kit renders the alternates as real `<button>`s
-        // instead of prose — a focusable node with no behaviour is a trap, so
-        // the affordance and the handler arrive together or not at all.
-        selectAlternate: (_index, candidate) => this.#pickNaming(candidate),
+        snapshot: () => this.#nameplate({emphasis: 'hero'}),
       },
       {
         label: spec.label,
         surface: 'none',
+        stableLayout: true,
         parts: {root: 'nameplate', symbol: 'symbol'},
         onError: (error) => this.#report(error),
       },
     );
     return {kind: spec.kind, host, update: () => handle.update(), destroy: () => handle.destroy()};
+  }
+
+  #renderInspection(): void {
+    const inspection = this.#model?.inspection;
+    if (this.#renderedInspection === inspection) return;
+    this.#renderedInspection = inspection;
+    if (this.#evidenceStatus) {
+      if (inspection) this.#evidenceStatus.setAttribute('role', 'status');
+      else this.#evidenceStatus.removeAttribute('role');
+      this.#evidenceStatus.textContent = inspection
+        ? [inspection.headline, inspection.detail, ...inspection.evidence].join('. ')
+        : '';
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -993,6 +1188,10 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
 
   /** Announce the seek and drive the bound player, which does not listen. */
   #seek(position: number, phase: 'drag' | 'commit'): void {
+    if (this.#skipNextBandSeek) {
+      this.#skipNextBandSeek = false;
+      return;
+    }
     const score = this.#model?.score;
     if (!score) return;
     if (!Number.isFinite(position)) return;
@@ -1121,6 +1320,8 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
     // subscription. A disconnect or selector replacement starts a fresh
     // ownership domain instead of mixing events from two players.
     if (this.analysisType === 'live-chord') {
+      this.#clearChordChange();
+      this.#lastEmittedChord = undefined;
       this.#liveKey.reset();
       this.#liveChord.reset();
     }
@@ -1131,7 +1332,7 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
     this.#rate = 1;
     this.#lastUpdate = undefined;
     this.#seekOrigin = undefined;
-    this.#prefer = undefined;
+    this.#skipNextBandSeek = false;
     // A fresh clock, unconditionally: a new player is a new time domain, and
     // the old one's anchor, epoch and measured interval belong to a transport
     // that is no longer answering.
@@ -1140,38 +1341,6 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
       this.#clockDuration > 0 ? {durationSeconds: this.#clockDuration} : {},
     );
   }
-}
-
-/**
- * Take one row off a lane, and renumber everything that pointed past it.
- *
- * A track number is an INDEX, so removing a row from the middle is not a filter
- * — the rows below it move up, and every band, bracket and `primaryTrack` that
- * named one of them has to move with it. Leaving the row in place and emptying
- * it instead would put a labelled blank stripe on the reel, which is the static
- * this redesign exists to remove.
- */
-function withoutTrack(lane: FlowLaneView, id: string): FlowLaneView {
-  const tracks = lane.tracks;
-  const at = tracks?.findIndex((track) => track.id === id) ?? -1;
-  if (!tracks || at < 0) return lane;
-  const shift = (track: number | undefined): number => {
-    const value = Math.max(0, Math.round(track ?? 0));
-    return value > at ? value - 1 : value;
-  };
-  const brackets = lane.brackets
-    ?.filter((bracket) => bracket.from !== at && bracket.to !== at)
-    .map((bracket) => ({...bracket, from: shift(bracket.from), to: shift(bracket.to)}));
-  return {
-    ...lane,
-    tracks: tracks.filter((_, index) => index !== at),
-    bands: lane.bands
-      .filter((band) => Math.max(0, Math.round(band.track ?? 0)) !== at)
-      .map((band) => ({...band, track: shift(band.track)})),
-    flags: lane.flags?.map((flag) => ({...flag, track: shift(flag.track)})),
-    brackets,
-    primaryTrack: lane.primaryTrack === undefined ? undefined : shift(lane.primaryTrack),
-  };
 }
 
 /**
@@ -1222,4 +1391,11 @@ function stampRow(node: HTMLLIElement, row: IndexRow): void {
   }
   node.dataset.startQuarters = String(row.span.start);
   node.dataset.endQuarters = String(row.span.end);
+}
+
+function parseKey(raw: string | null): Key | undefined {
+  if (!raw) return undefined;
+  const match = /^([A-Ga-g](?:#|b)?)\s+(major|minor)$/i.exec(raw.trim());
+  if (!match) return undefined;
+  return {tonic: `${match[1][0].toUpperCase()}${match[1].slice(1)}`, mode: match[2].toLowerCase() as Key['mode']};
 }

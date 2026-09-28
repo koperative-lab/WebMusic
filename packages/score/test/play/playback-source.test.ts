@@ -4,9 +4,8 @@ import {Duration, PartId, Pitch, Rational, ScoreBuilder, VoiceId, type ScorePlay
 import {ScorePlayer} from '../../src/play/headless/score-player';
 import {ScorePlayerElement} from '../../src/play/element/score-player';
 import {createScoreView} from '../../src/view/headless/score-view';
-import {ChordAnalysisElement} from '../../src/analyze/element/chord-analysis';
+import {ChordAnalysisElement} from '../../src/analyze/element/score-chord-analysis';
 class AnalysisLaneElement extends ChordAnalysisElement {}
-import {VoiceLeadingAnalysisElement} from '../../src/analyze/element/voice-leading-analysis';
 import {ScoreViewElement as PreviewScoreViewElement} from '../../src/view/element/score-view';
 class ScorePreviewElement extends PreviewScoreViewElement {
   override connectedCallback(): void { this.type = 'map'; super.connectedCallback(); }
@@ -17,7 +16,6 @@ import {ScoreViewElement} from '../../src/view/element/score-view';
 
 customElements.define('binding-score-player', ScorePlayerElement);
 customElements.define('binding-chord-analysis', AnalysisLaneElement);
-customElements.define('binding-voice-analysis', VoiceLeadingAnalysisElement);
 customElements.define('binding-score-preview', ScorePreviewElement);
 customElements.define('binding-score-view', ScoreViewElement);
 
@@ -239,7 +237,7 @@ describe('shared native playback source', () => {
     expect(end).toHaveBeenCalledOnce();
   });
 
-  it.each(['binding-score-view', 'binding-score-preview', 'binding-chord-analysis', 'binding-voice-analysis'])('releases an initial subscription when %s is removed before subscribe returns', (tag) => {
+  it.each(['binding-score-view', 'binding-score-preview', 'binding-chord-analysis'])('releases an initial subscription when %s is removed before subscribe returns', (tag) => {
     const {player} = engine();
     const follower = document.createElement(tag);
     follower.setAttribute('player', '#owner');
@@ -254,7 +252,7 @@ describe('shared native playback source', () => {
     expect(cleanup).toHaveBeenCalledOnce();
   });
 
-  it.each(['binding-voice-analysis', 'binding-score-preview'])('seeks %s in nominal seconds at rate 2 using a real player', async (tag) => {
+  it.each(['binding-chord-analysis', 'binding-score-preview'])('seeks %s in nominal seconds at rate 2 using a real player', async (tag) => {
     const {player} = engine();
     player.setRate(2);
     owner(player.playback);
@@ -262,7 +260,7 @@ describe('shared native playback source', () => {
     follower.setAttribute('player', '#owner');
     document.body.append(follower);
     await flush();
-    if (tag === 'binding-voice-analysis') {
+    if (tag === 'binding-chord-analysis') {
       const surface = follower.querySelector('[role="slider"]');
       expect(surface).not.toBeNull();
       surface!.dispatchEvent(new KeyboardEvent('keydown', {key: 'End', bubbles: true}));

@@ -18,4 +18,3 @@ export {
   renderScoreVisualizer,
   type ScoreVisualizerRenderOptions,
 } from './score-visualizer';
-export type {ScoreViewRenderStatus, ScoreViewRenderPhase, ScoreViewRenderState} from './state';

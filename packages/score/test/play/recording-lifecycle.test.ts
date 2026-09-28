@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {ScoreRecorderElement} from '../../src/play/element/score-recorder';
-import {NoteInputElement} from '../../src/play/element/note-input';
+import {NoteInputElement} from '../../src/play/element/score-note-input';
 
 customElements.define('lifecycle-score-recorder', ScoreRecorderElement);
 customElements.define('lifecycle-note-input', NoteInputElement);

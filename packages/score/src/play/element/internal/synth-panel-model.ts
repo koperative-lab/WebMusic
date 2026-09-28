@@ -19,7 +19,7 @@ export interface SoundParam {
 }
 
 /**
- * The ADSR shape is the kit's, re-exported under the names `<synth-panel>`
+ * The ADSR shape is the kit's, re-exported under the names `<score-synth-panel>`
  * publishes. Two verbatim redeclarations of one structural contract — and one
  * of them, `EnvelopeRanges`, already carried the kit's own name.
  */

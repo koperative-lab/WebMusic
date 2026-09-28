@@ -2,12 +2,12 @@
 
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {Duration, Pitch, Rational, ScoreBuilder, VoiceId, type Score} from '../../src/core';
-import {defineSimpleScorePlayerElement, type SimpleScorePlayerElement} from '../../src/play/element/score-player';
+import {defineScorePlayerElement, type ScorePlayerElement} from '../../src/play/element/score-player';
 import {mountPresetPlayer, type PresetPlayerHandle} from '../../src/play/element/internal/preset-player';
-import {defineChordAnalysisElement} from '../../src/analyze/element/chord-analysis';
+import {defineChordAnalysisElement} from '../../src/analyze/element/score-chord-analysis';
 import * as playbackEvents from '../../src/play/headless/playback-events';
 
-defineSimpleScorePlayerElement();
+defineScorePlayerElement();
 defineChordAnalysisElement();
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 const handles: PresetPlayerHandle[] = [];
@@ -26,12 +26,12 @@ function music(): Score {
 }
 
 async function nativePlayer() {
-  const owner = document.createElement('simple-score-player') as SimpleScorePlayerElement;
+  const owner = document.createElement('score-player') as ScorePlayerElement;
   owner.id = 'native-seek-owner';
   owner.score = music();
   owner.rate = 2;
   document.body.append(owner);
-  const follower = document.createElement('chord-analysis');
+  const follower = document.createElement('score-chord-analysis');
   follower.setAttribute('player', '#native-seek-owner');
   follower.setAttribute('motion', 'stepped');
   document.body.append(follower);

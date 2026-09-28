@@ -2,15 +2,15 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {Duration, Pitch, Rational, ScoreBuilder, VoiceId, type Score} from '../../src/core';
 import {
-  defineSimpleScorePlayerElement,
-  type SimpleScorePlayerElement,
+  defineScorePlayerElement,
+  type ScorePlayerElement,
 } from '../../src/play/element/score-player';
 import {defineAllAnalysisElements, type ChordAnalysisElement} from '../../src/analyze/element';
 
 const io = vi.hoisted(() => ({load: vi.fn()}));
 vi.mock('../../src/io/load', () => ({loadScoreFromUrl: io.load}));
 
-defineSimpleScorePlayerElement();
+defineScorePlayerElement();
 defineAllAnalysisElements();
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -26,7 +26,7 @@ function music(): Score {
 }
 
 async function nativePlayer() {
-  const source = document.createElement('simple-score-player') as SimpleScorePlayerElement;
+  const source = document.createElement('score-player') as ScorePlayerElement;
   source.id = 'source';
   source.setAttribute('src', 'piece.mid');
   document.body.append(source);
@@ -35,7 +35,7 @@ async function nativePlayer() {
 }
 
 async function follower(feature: string) {
-  const node = document.createElement(`${feature}-analysis`) as ChordAnalysisElement;
+  const node = document.createElement(`score-${feature}-analysis`) as ChordAnalysisElement;
   node.setAttribute('player', '#source');
   node.setAttribute('motion', 'stepped');
   document.body.append(node);
@@ -60,18 +60,18 @@ describe('native single-score player with independent Analyze components', () =>
     source.rate = 2;
     await source.seekNominal(1);
     const chord = await follower('chord');
-    const roman = await follower('roman');
+    const sibling = await follower('chord');
     expect(source.resolvedScore).toBe(score);
     expect(io.load).toHaveBeenCalledTimes(1);
     expect(source.currentTime).toBeCloseTo(0.5);
     expect(source.getPlaybackSnapshot()).toMatchObject({nominalSeconds: 1, rate: 2, playing: false});
     expect(position(chord)).toBeCloseTo(1);
-    expect(position(roman)).toBeCloseTo(1);
+    expect(position(sibling)).toBeCloseTo(1);
 
     source.rate = 0.5;
     expect(source.currentTime).toBeCloseTo(2);
     expect(position(chord)).toBeCloseTo(1);
-    expect(position(roman)).toBeCloseTo(1);
+    expect(position(sibling)).toBeCloseTo(1);
     expect(io.load).toHaveBeenCalledTimes(1);
   });
 
@@ -81,7 +81,7 @@ describe('native single-score player with independent Analyze components', () =>
     source.rate = 2;
     await source.seekNominal(1);
     const chord = await follower('chord');
-    const roman = await follower('roman');
+    const sibling = await follower('chord');
     const seek = vi.spyOn(source.playback, 'seekNominal');
     const legacyNominal = vi.spyOn(source, 'seekNominal');
     const fallback = vi.spyOn(source, 'seek');
@@ -96,11 +96,11 @@ describe('native single-score player with independent Analyze components', () =>
     expect(source.getPlaybackSnapshot()).toMatchObject({nominalSeconds: intended, playing: false});
     expect(source.currentTime).toBeCloseTo(intended / 2);
     expect(position(chord)).toBeCloseTo(intended);
-    expect(position(roman)).toBeCloseTo(intended);
+    expect(position(sibling)).toBeCloseTo(intended);
 
     source.stop();
     expect(position(chord)).toBe(0);
-    expect(position(roman)).toBe(0);
+    expect(position(sibling)).toBe(0);
     expect(source.getPlaybackSnapshot()).toMatchObject({nominalSeconds: 0, playing: false, activeNotes: []});
   });
 
@@ -108,24 +108,24 @@ describe('native single-score player with independent Analyze components', () =>
     io.load.mockResolvedValueOnce(music());
     const source = await nativePlayer();
     const chord = await follower('chord');
-    const roman = await follower('roman');
+    const sibling = await follower('chord');
     let resolve!: (score: Score) => void;
     io.load.mockImplementationOnce(() => new Promise<Score>((done) => { resolve = done; }));
     source.setAttribute('src', 'replacement.mid');
     expect(source.resolvedScore).toBeUndefined();
     await flush();
-    for (const companion of [chord, roman]) {
+    for (const companion of [chord, sibling]) {
       expect(companion.textContent).toContain('Waiting for a score');
       expect(companion.querySelector('[role="slider"]')?.getAttribute('aria-disabled')).toBe('true');
     }
     expect(position(chord)).toBe(0);
-    expect(position(roman)).toBe(0);
+    expect(position(sibling)).toBe(0);
     const replacement = music();
     resolve(replacement);
     await flush();
     expect(source.resolvedScore).toBe(replacement);
     expect(chord.querySelector('[role="slider"]')).not.toBeNull();
-    expect(roman.querySelector('[role="slider"]')).not.toBeNull();
+    expect(sibling.querySelector('[role="slider"]')).not.toBeNull();
     expect(io.load).toHaveBeenCalledTimes(2);
   });
 });

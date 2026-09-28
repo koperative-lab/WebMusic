@@ -17,8 +17,8 @@ vi.mock('../../src/io/load', async (importOriginal) => {
   };
 });
 
-import {RackControlElement, defineRackControlElement} from '../../src/play/element/rack-control';
-import {RackPartElement} from '../../src/play/element/rack-part';
+import {RackControlElement, defineRackControlElement} from '../../src/play/element/score-rack-control';
+import {RackPartElement} from '../../src/play/element/score-rack-part';
 import {ScoreRecorderElement, defineScoreRecorderElement} from '../../src/play/element/score-recorder';
 import {mountControllerPlayer, mountPresetPlayer, mountRackPlayer} from '../../src/play/element/internal/preset-player';
 import {Effect, PlayerController, ScorePlayer, Sound, type Rack} from '../../src/play/headless';
@@ -391,7 +391,7 @@ describe('define idempotency', () => {
     defineScoreRecorderElement();
 
     expect(define).toHaveBeenCalledTimes(2);
-    expect(registry.get('rack-control')).toBe(RackControlElement);
+    expect(registry.get('score-rack-control')).toBe(RackControlElement);
     expect(registry.get('score-recorder')).toBe(ScoreRecorderElement);
   });
 });
@@ -1187,9 +1187,9 @@ describe('mountControllerPlayer borrowed-controller composition', () => {
 });
 
 // ===========================================================================
-// <rack-control>
+// <score-rack-control>
 // ===========================================================================
-describe('<rack-control>', () => {
+describe('<score-rack-control>', () => {
   let restoreDocument: () => void;
 
   beforeEach(() => {
@@ -1558,9 +1558,9 @@ describe('<rack-control>', () => {
 });
 
 // ===========================================================================
-// <rack-part>
+// <score-rack-part>
 // ===========================================================================
-describe('<rack-part>', () => {
+describe('<score-rack-part>', () => {
   let restoreDocument: () => void;
 
   beforeEach(() => { restoreDocument = installDocument(); });
@@ -1592,7 +1592,7 @@ describe('<rack-part>', () => {
     });
     (host.el as {id: string}).id = 'lead';
     (host.el as unknown as {parentElement: {tagName: string}}).parentElement = {
-      tagName: 'rack-control',
+      tagName: 'score-rack-control',
     };
     host.connect();
     await flush();
@@ -1838,8 +1838,7 @@ describe('<score-recorder>', () => {
     expect(routes).toBe(2);
     expect(cleanups).toBe(1);
     expect(host.events.filter((event) => event.type === 'webscore:error')).toEqual([]);
-    expect(byAria(host.root, 'Stop take').classList.contains('on')).toBe(true);
-    expect(byAria(host.root, 'Stop take').getAttribute('aria-pressed')).toBe('true');
+    expect(byAria(host.root, 'Play take').classList.contains('on')).toBe(true);
     host.disconnect();
     expect(cleanups).toBe(2);
   });

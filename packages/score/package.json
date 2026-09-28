@@ -354,7 +354,7 @@
     "web-components",
     "react"
   ],
-  "author": "mrsteamedbun",
+  "author": "Koperative",
   "engines": {
     "node": ">=22"
   }

@@ -36,12 +36,12 @@ export interface RackControlErrorDetail { operation: "rack-control"; error: unkn
  *
  * ```html
  * <score-player>                     <!-- the transport -->
- *   <rack-control></rack-control>    <!-- the desk over the same rack -->
+ *   <score-rack-control></score-rack-control>    <!-- the desk over the same rack -->
  * </score-player>
  * ```
  *
  * A rack member is HEADLESS — a score and a sound, and the rack builds the
- * `ScorePlayer` that plays it — but it can be written down. `<rack-part>`
+ * `ScorePlayer` that plays it — but it can be written down. `<score-rack-part>`
  * declares one, and this element turns the parts inside it into members. A rack
  * assigned to `.rack` works the same way and needs no markup at all.
  *
@@ -249,7 +249,7 @@ export class RackControlElement extends WebMusicElement {
     }
     const duplicateIds = new Set([...counts].filter(([, count]) => count > 1).map(([id]) => id));
     for (const id of duplicateIds) {
-      this.reportError(new Error(`More than one <rack-part> declares id "${id}".`));
+      this.reportError(new Error(`More than one <score-rack-part> declares id "${id}".`));
     }
 
     const currentOwner = new Map<string, RackPartElementLike>();
@@ -408,6 +408,6 @@ export class RackControlElement extends WebMusicElement {
   }
 }
 
-export function defineRackControlElement(tag = "rack-control"): void {
+export function defineRackControlElement(tag = "score-rack-control"): void {
   if (typeof customElements !== "undefined" && !customElements.get(tag)) customElements.define(tag, RackControlElement);
 }

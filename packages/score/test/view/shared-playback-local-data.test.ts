@@ -3,7 +3,7 @@ import {afterEach, describe, expect, it, vi} from 'vitest';
 import {Duration, Pitch, Rational, ScoreBuilder, VoiceId, type Score} from '../../src/core';
 import {ScorePlayer} from '../../src/play/headless/score-player';
 import {ScoreViewElement} from '../../src/view/element/score-view';
-import {ChordAnalysisElement} from '../../src/analyze/element/chord-analysis';
+import {ChordAnalysisElement} from '../../src/analyze/element/score-chord-analysis';
 
 const io = vi.hoisted(() => ({load: vi.fn()}));
 vi.mock('../../src/io/load', () => ({loadScoreFromUrl: io.load}));

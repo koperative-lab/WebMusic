@@ -1,5 +1,5 @@
 // ============================================================================
-// <synth-panel> — ONE control panel for a synth voice. The `sections`
+// <score-synth-panel> — ONE control panel for a synth voice. The `sections`
 // attribute (comma list, default "sound,effects") picks which blocks render,
 // in order:
 //
@@ -1187,8 +1187,8 @@ export class SynthPanelElement extends WebMusicElement {
   }
 }
 
-/** Register `<synth-panel>`. Call once in the browser. */
-export function defineSynthPanelElement(tag = "synth-panel"): void {
+/** Register `<score-synth-panel>`. Call once in the browser. */
+export function defineSynthPanelElement(tag = "score-synth-panel"): void {
   if (typeof customElements !== "undefined" && !customElements.get(tag)) {
     customElements.define(tag, SynthPanelElement);
   }

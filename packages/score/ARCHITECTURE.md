@@ -333,10 +333,9 @@ a separate per-component adapter module is not an architectural layer here.
 
 Composition contracts are explicit in
 [element-composition-policy.mjs](../../scripts/element-composition-policy.mjs).
-Play retains five interactive roles: `<score-player>`, `<synth-panel>`,
-`<rack-control>`, `<note-input>` and `<score-recorder>`. The existing
-`<simple-score-player>` compatibility tag reuses the same transport implementation.
-`<rack-part>` is a nonvisual declaration, not another player. One transport
+Play retains five interactive roles: `<score-player>`, `<score-synth-panel>`,
+`<score-rack-control>`, `<score-note-input>` and `<score-recorder>`.
+`<score-rack-part>` is a nonvisual declaration, not another player. One transport
 supports a native Score, a borrowed Rack or a borrowed Headless
 `PlayerController`; built-in facades share seek/readback without adding a clock.
 Borrowed controllers retain their rate and are not disposed on unmount.

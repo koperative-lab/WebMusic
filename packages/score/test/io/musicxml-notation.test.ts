@@ -1,9 +1,9 @@
-import {readFileSync} from 'node:fs';
 import {describe, expect, it} from 'vitest';
 import {
   Duration, PartId, Pitch, Rational, ScoreBuilder, VoiceId, scoreFromJSON,
 } from '../../src/core';
 import {parseMusicXML, parseMusicXMLDetailed, serializeMusicXML} from '../../src/io';
+import {loadArabesqueMxlFixture} from '../arabesque-fixture';
 
 function document(notes: string, divisions = 6): string {
   return `<score-partwise version="4.0"><part-list><score-part id="P1"><part-name>Piano</part-name></score-part></part-list>
@@ -114,16 +114,15 @@ describe('MusicXML notation preservation', () => {
     expect(parseMusicXML(xml).parts[0].notes.map((note) => note.tie)).toEqual(['start', 'stop', undefined]);
   });
 
-  it('retains the original study notation instead of turning triplets into dotted flags', () => {
-    const xml = readFileSync(new URL('../../../../apps/doc/webmusic/public/xml/demo.xml', import.meta.url), 'utf8');
-    const score = parseMusicXML(xml);
+  it('retains Arabesque notation instead of turning triplets into dotted flags', async () => {
+    const score = await loadArabesqueMxlFixture();
     for (const value of [score, parseMusicXML(serializeMusicXML(score))]) {
       const notes = [...value.allNotes()];
-      expect(notes.filter((note) => note.duration.tuplet[0] !== note.duration.tuplet[1])).toHaveLength(384);
-      expect(notes.reduce((count, note) => count + (note.beams?.length ?? 0), 0)).toBe(384);
-      expect(notes.reduce((count, note) => count + (note.tupletMarks?.length ?? 0), 0)).toBe(256);
-      expect(notes.filter((note) => note.stem)).toHaveLength(384);
-      expect(notes.reduce((count, note) => count + (Array.isArray(note.slur) ? note.slur.length : note.slur ? 1 : 0), 0)).toBe(32);
+      expect(notes.filter((note) => note.duration.tuplet[0] !== note.duration.tuplet[1])).toHaveLength(681);
+      expect(notes.reduce((count, note) => count + (note.beams?.length ?? 0), 0)).toBe(1028);
+      expect(notes.reduce((count, note) => count + (note.tupletMarks?.length ?? 0), 0)).toBe(454);
+      expect(notes.filter((note) => note.stem)).toHaveLength(1522);
+      expect(notes.reduce((count, note) => count + (Array.isArray(note.slur) ? note.slur.length : note.slur ? 1 : 0), 0)).toBe(418);
       expect(notes.filter((note) => note.onsetQuarters.lt(new Rational(4))).every((note) => note.duration.dots === 0)).toBe(true);
       expect(value.measures[0].clefs).toEqual({1: {sign: 'G', line: 2}, 2: {sign: 'G', line: 2}});
       expect(notes.find((note) => note.staff === 2 && !note.rest)?.duration.toJSON()).toEqual({base: [1, 2], dots: 0, tuplet: [3, 2]});

@@ -352,7 +352,7 @@ describe('<score-view type="map">', () => {
   });
 });
 
-describe('<pitch-view type=keyboard>', () => {
+describe('<score-pitch-view type=keyboard>', () => {
   const tag = define(PitchViewElement);
 
   it('draws the requested key range', async () => {
@@ -396,7 +396,7 @@ describe('<pitch-view type=keyboard>', () => {
     source.dispatchEvent(new CustomEvent('webscore:noteon', {detail: {midi: 60, startTime: 0}}));
     expect(keyboard.active).toEqual([60]);
     expect(waterfall.querySelectorAll('.waterfall-notes [data-index]')).not.toHaveLength(0);
-    expect(waterfall.querySelector('.waterfall-piano, [data-midi], pitch-view')).toBeNull();
+    expect(waterfall.querySelector('.waterfall-piano, [data-midi], score-pitch-view')).toBeNull();
     expect(keyboard.querySelector('[data-midi="60"]')?.getAttribute('data-active')).toBe('true');
     waterfall.remove();
     expect(keyboard.isConnected).toBe(true);
@@ -457,7 +457,7 @@ describe('<score-view type="thumbnail">', () => {
   });
 });
 
-describe('<sheet-view>', () => {
+describe('<score-sheet-view>', () => {
   const tag = define(SheetViewElement);
 
   it("surfaces the engine's own message instead of failing silently", async () => {

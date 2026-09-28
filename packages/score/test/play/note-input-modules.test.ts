@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import {describe, expect, it} from 'vitest';
-import * as facade from '../../src/play/element/note-input';
+import * as facade from '../../src/play/element/score-note-input';
 import * as api from '../../src/play/api';
 import * as model from '../../src/play/core/note-input-model';
 import {mountNoteSurface, pianoKeyLayout} from '@webmusic/ui/note';

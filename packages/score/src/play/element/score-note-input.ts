@@ -1,5 +1,5 @@
 // ============================================================================
-// <note-input> — discrete-note performance surface.
+// <score-note-input> — discrete-note performance surface.
 //
 // The custom element owns host lifecycle, headless mapping and event dispatch.
 // The UI presenter owns DOM, focus, pointer/key holding, pressed state and ARIA.
@@ -308,8 +308,8 @@ export class NoteInputElement extends HTMLElementBase {
   }
 }
 
-/** Register `<note-input>`. Call once in the browser. */
-export function defineNoteInputElement(tag = 'note-input'): void {
+/** Register `<score-note-input>`. Call once in the browser. */
+export function defineNoteInputElement(tag = 'score-note-input'): void {
   if (typeof customElements !== 'undefined' && !customElements.get(tag)) {
     customElements.define(tag, NoteInputElement);
   }
