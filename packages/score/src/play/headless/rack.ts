@@ -616,7 +616,6 @@ export class Rack {
     let replacementDispose: (() => void) | undefined;
     let insertionAttempted = false;
     let overlapsPrevious = false;
-    let committed = false;
     try {
       replacementNode = effect?.build(audio.context);
       overlapsPrevious = effectNodesOverlap(previousNode, replacementNode);
@@ -647,7 +646,6 @@ export class Rack {
       this.effectValue = effect;
       this.effectNode = replacementNode;
       this.effectDispose = replacementDispose;
-      committed = true;
     } catch (error) {
       if (replacementDispose) {
         this.tryCleanup('failed replacement effect.dispose', replacementDispose);
@@ -665,7 +663,7 @@ export class Rack {
     // The new route is already authoritative. Cleanup faults are reported on
     // Rack's operation channel rather than rolling back to a graph whose
     // teardown may itself have only partially succeeded.
-    if (committed && previousDispose) {
+    if (previousDispose) {
       this.tryCleanup('replaced effect.dispose', previousDispose);
     }
     return this;

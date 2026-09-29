@@ -1,7 +1,7 @@
-import {readFileSync} from 'node:fs';
 import {describe, expect, it} from 'vitest';
 import {scoreFromJSON} from '../../src/core';
 import {parseMusicXML, parseMusicXMLDetailed, serializeMusicXML} from '../../src/io';
+import {loadArabesqueMxlFixture} from '../arabesque-fixture';
 
 const opening = '<attributes><divisions>8</divisions><time><beats>4</beats><beat-type>4</beat-type></time><staves>2</staves><clef number="1"><sign>G</sign><line>2</line></clef><clef number="2"><sign>F</sign><line>4</line></clef></attributes>';
 const note = '<note><pitch><step>C</step><octave>4</octave></pitch><duration>16</duration><voice>1</voice><type>half</type><staff>1</staff></note>';
@@ -70,19 +70,18 @@ describe('MusicXML timed notation', () => {
     expect(diagnostics).toContainEqual(expect.objectContaining({code: 'musicxml-direction-unsupported'}));
   });
 
-  it('round-trips every clef and supported direction from the original study', () => {
-    const xml = readFileSync(new URL('../../../../apps/doc/webmusic/public/xml/demo.xml', import.meta.url), 'utf8');
-    const score = parseMusicXML(xml);
+  it('round-trips every clef and supported direction from Arabesque No. 1', async () => {
+    const score = await loadArabesqueMxlFixture();
     const expected = score.toJSON().parts[0];
     for (const restored of [score, parseMusicXML(serializeMusicXML(score)), scoreFromJSON(score.toJSON())]) {
       const part = restored.parts[0];
-      expect(part.clefChanges).toHaveLength(5);
-      expect(Object.fromEntries(['pedal', 'wedge', 'words', 'dynamics'].map((kind) => [kind, part.directions?.filter((value) => value.kind === kind).length]))).toEqual({pedal: 16, wedge: 4, words: 4, dynamics: 2});
+      expect(part.clefChanges).toHaveLength(23);
+      expect(Object.fromEntries(['pedal', 'wedge', 'words', 'dynamics'].map((kind) => [kind, part.directions?.filter((value) => value.kind === kind).length]))).toEqual({pedal: 212, wedge: 93, words: 87, dynamics: 50});
       expect(part.toJSON().clefChanges).toEqual(expected.clefChanges);
       expect(part.toJSON().directions).toEqual(expected.directions);
-      expect(part.notes.flatMap((value) => value.tupletMarks ?? []).filter((mark) => mark.showNumber === 'none')).toHaveLength(128);
-      expect(Object.fromEntries(['staccato', 'tenuto', 'accent'].map((type) => [type, part.notes.flatMap((value) => value.articulations ?? []).filter((mark) => mark === type).length]))).toEqual({staccato: 4, tenuto: 16, accent: 2});
-      expect(restored.measures.filter((measure) => measure.barlineEnd).map((measure) => [measure.number, measure.barlineEnd])).toEqual([[4, 'light-light'], [8, 'light-light'], [12, 'light-light'], [16, 'light-heavy']]);
+      expect(part.notes.flatMap((value) => value.tupletMarks ?? []).filter((mark) => mark.showNumber === 'none')).toHaveLength(186);
+      expect(Object.fromEntries(['staccato', 'tenuto', 'accent'].map((type) => [type, part.notes.flatMap((value) => value.articulations ?? []).filter((mark) => mark === type).length]))).toEqual({staccato: 8, tenuto: 20, accent: 2});
+      expect(restored.measures.filter((measure) => measure.barlineEnd).map((measure) => [measure.number, measure.barlineEnd])).toEqual([[38, 'light-light'], [70, 'light-light'], [107, 'light-heavy']]);
       expect(part.notes.filter((value) => value.restDisplay).map((value) => value.restDisplay)).toEqual([{step: 'E', octave: 4}, {step: 'F', octave: 5}, {step: 'F', octave: 5}]);
     }
   });

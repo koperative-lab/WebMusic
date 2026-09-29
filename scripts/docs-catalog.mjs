@@ -3,7 +3,7 @@ import {execFileSync} from 'node:child_process';
 import {existsSync, lstatSync, readFileSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
-import {domainFamilies, packageDirectories} from './package-policy.mjs';
+import {packageDirectories} from './package-policy.mjs';
 import {elementCompositionPolicy} from './element-composition-policy.mjs';
 import {UI_COMPOSITION_CATALOG} from '../apps/doc/shared/ui-catalog.ts';
 import {UI_PRESENTER_CATALOG} from '../apps/doc/shared/ui-presenter-catalog.ts';
@@ -69,6 +69,7 @@ function elementPurpose(entry, page) {
 function referenceForEntry(manifest, entry) {
   const family = manifest.name.split('/')[1];
   if (family === 'kernel') return `${DOCS}/kernel/api.mdx`;
+  if (family === 'bridge') return `${DOCS}/bridge/api.mdx`;
   if (family === 'ui') {
     const presenter = UI_PRESENTER_CATALOG.find((p) => `./${p.presenter}` === entry);
     return presenter ? `${DOCS}/uikit/${presenter.classSlug}/${presenter.presenter}.mdx` : `${DOCS}/uikit/api.mdx`;
@@ -78,7 +79,7 @@ function referenceForEntry(manifest, entry) {
   // The `/element` and `/headless` forms are inventoried per family rather than
   // per capability: one page lists every tag or every exported value, with a
   // section per capability, and routes each to its owning leaf page. The
-  // capability anchor is what keeps the element entries and the three
+  // capability anchor is what keeps the six element entries and the three
   // headless entries distinguishable from one another in the generated map.
   if (form === 'headless') return `${DOCS}/${family}/headless/index.mdx#${capability}`;
   if (['element', 'auto', 'global'].includes(form)) return `${DOCS}/${family}/element/index.mdx#${capability}`;
@@ -88,7 +89,7 @@ function referenceForEntry(manifest, entry) {
 async function componentIndex(files) {
   const output = OUTPUTS[0];
   const params = {};
-  for (const family of domainFamilies) {
+  for (const family of ['score', 'audio']) {
     for (const capability of ['play', 'analyze', 'view']) {
       const file = path.join(ROOT, `apps/doc/webmusic/src/lib/params/${family}-${capability}.ts`);
       const module = await import(pathToFileURL(file).href);
@@ -107,7 +108,7 @@ async function componentIndex(files) {
     'Static data has no running clock. The component design contract requires each scheduling participant, follower, or interaction driver to declare its timing and resource ownership. Shared workflow pages are intentional for declarations and companions.', '',
     '## Web Components', '',
   ];
-  for (const family of domainFamilies.map((family) => family[0].toUpperCase() + family.slice(1))) {
+  for (const family of ['Score', 'Audio']) {
     for (const capability of ['Play', 'Analyze', 'View']) {
       lines.push(`### ${family} / ${capability}`, '');
       for (const entry of UI_COMPOSITION_CATALOG.filter((e) => e.family === family && e.capability === capability)) {
@@ -134,7 +135,7 @@ async function componentIndex(files) {
   for (const file of headlessPages) {
     const source = read(file);
     const segments = file.slice(DOCS.length + 1).split('/');
-    const barrel = `packages/${segments[0]}/src/${segments[2]}/headless/index.ts`;
+    const barrel = segments[0] === 'bridge' ? 'bridges/score-audio/src/index.ts' : `packages/${segments[0]}/src/${segments[2]}/headless/index.ts`;
     lines.push(`| ${link(output, file, clean(frontmatter(source, 'title')))} | ${clean(frontmatter(source, 'description'))} | ${link(output, barrel, 'Barrel and contracts')} |`);
   }
   lines.push('', '## API and resource entry map', '', 'This manifest-derived map includes worker, driver, render, registration, framework, and metadata entries. The referenced page owns usage; each manifest remains authoritative for resolution and packaging. Some entries have import side effects or optional runtime requirements.', '', '| Import | Manifest | Owning reference |', '|---|---|---|');

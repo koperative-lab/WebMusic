@@ -245,7 +245,7 @@ const dispose = () => {
 #### Synth backends SynthPanelAudioGraph
 
 `SynthPanelAudioGraph` owns the audio graph
-[`<synth-panel>`](/score/element/play/synth-panel/) assembles: effect recipes and
+[`<score-synth-panel>`](/score/element/play/score-synth-panel/) assembles: effect recipes and
 an optional EQ, wired between stable boundary gains. `rebuild()` constructs a
 replacement before retiring the previous graph. A failed construction preserves
 the previous graph; same-context rebuilds retain `input` and `output`, so caller
@@ -440,7 +440,7 @@ the playback-operation diagnostic path without undoing the replacement.
 
 #### Synth backends Related
 
-[`<synth-panel>`](/score/element/play/synth-panel/) controls supplied timbres and
+[`<score-synth-panel>`](/score/element/play/score-synth-panel/) controls supplied timbres and
 composes `LfoController` and `SynthPanelAudioGraph`;
 [`Sound`](/score/headless/play/sound/) composes the synth backends.
 [`Effect` and `EqController`](/score/headless/play/effect/) own post-processing
@@ -453,5 +453,5 @@ and polled by any UI without introducing another musical clock.
 
 [`ScorePlayer`](/score/headless/play/score-player/),
 [`InteractivePlayer`](/score/headless/play/interactive-player/), and
-[`<synth-panel>`](/score/element/play/synth-panel/).
+[`<score-synth-panel>`](/score/element/play/score-synth-panel/).
 Use [`Effect`](/score/headless/play/effect/) for processing after the timbre.

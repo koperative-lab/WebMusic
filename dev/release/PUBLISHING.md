@@ -60,9 +60,9 @@ npm run check:external-install
 
 `check` builds the packages and checks their source, tests, export maps,
 licenses and release metadata. `docs:build` validates the documentation
-build. The production audit is a manual release check outside CI. The
-external-install check runs in CI and remains required when validating the
-reviewed release checkout.
+build. Repeat the production audit and external install against the release
+checkout. CI also runs external-install and a full dependency audit; the separate
+production audit command remains a manual release check.
 
 The external-install check packs the built packages and installs all tarballs
 in a temporary project outside every workspace. It enumerates the installed
@@ -71,7 +71,8 @@ under `node16` and `bundler` resolution. Optional React peers are installed
 for those entries. Kernel additionally checks ESM and CommonJS declarations
 under `node16` and `nodenext` with `skipLibCheck: false`, and its pure event/clock
 subpaths without DOM types. Both runtime formats check that Kernel's root and
-subpaths re-export identical values within that format. This catches packaging faults hidden by workspace links;
+subpaths re-export identical values within that format. This catches packaging
+faults hidden by workspace links;
 it is not a registry-publication or provenance check. It requires network
 access. Add `-- --keep` to retain its temporary project for diagnosis.
 
@@ -89,9 +90,11 @@ Use the order owned by
 | 1 | `@webmusic/kernel` | `platform/kernel` |
 | 2 | `@webmusic/ui` | `packages/ui` |
 | 3 | `@webmusic/score` | `packages/score` |
+| 4 | `@webmusic/audio` | `packages/audio` |
+| 5 | `@webmusic/bridge` | `bridges/score-audio` |
 
-Audio and Bridge are outside this first release and this checkout.
-Publish Score after Kernel and UI. Check registry
+Score and Audio may publish in parallel once their prerequisites are
+available. Publish the bridge after its peer prerequisites. Check registry
 visibility of each prerequisite version before publishing its consumers.
 
 ## Per package
@@ -107,7 +110,8 @@ worker/facade and declaration targets. The intended content is `dist/`,
 `README.md`, `LICENSE` and the npm-provided `package.json`. Cross-package
 references must be the reviewed registry semver ranges, not local `file:`
 links. The UI package has no dependency on the domain packages or kernel;
-Score declares Kernel as a required peer and UI as an optional visual peer. The package and
+Score and Audio declare Kernel as a required peer and UI as an optional visual
+peer; Bridge declares Kernel, Score and Audio as required peers. The package and
 release-manifest checks verify the corresponding policy and metadata.
 
 Publish the validated package:

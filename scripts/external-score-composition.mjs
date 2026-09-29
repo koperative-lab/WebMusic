@@ -9,6 +9,8 @@ const abc = 'X:1\nT:Package composition\nM:4/4\nL:1/4\nK:C\nCDEF|';
 for (const format of ['esm', 'cjs']) {
   const load = (specifier) => format === 'esm' ? import(specifier) : require(specifier);
   const core = await load('@webmusic/score');
+  const analyze = await load('@webmusic/score/analyze');
+  assert.equal(analyze.identifyChordFromMidi([60, 64, 67]), 'CM', `${format}: bundled chord analysis runs`);
   for (const specifier of ['@webmusic/score/io', '@webmusic/score/io/formats']) {
     const io = await load(specifier);
     const score = io.parseABC(abc);
@@ -27,4 +29,4 @@ for (const format of ['esm', 'cjs']) {
   }
 }
 
-console.log('  Score IO results compose with root models in ESM and CommonJS');
+console.log('  Score IO and chord analysis run from installed tarballs in ESM and CommonJS');

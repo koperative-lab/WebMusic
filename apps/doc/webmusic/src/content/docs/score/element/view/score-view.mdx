@@ -22,11 +22,11 @@ import WaterfallKeyboardDemo from '../../../../../components/WaterfallKeyboardDe
   defineScoreViewElement();
 </script>
 
-<score-player id="piece" src="/xml/demo.xml"></score-player>
+<score-player id="piece" src="/mxl/Arabesque%20No.1.mxl"></score-player>
 <score-view player="#piece" type="staff"></score-view>
 ```
 
-The demo starts in staff mode with `public/xml/demo.xml`: *WebMusic Study No. 1*, an original notation fixture containing one piano part with two explicitly assigned staves. The player loads the MusicXML once and the view borrows the parsed score.
+The demo starts in staff mode with `public/mxl/Arabesque No.1.mxl`, a notation source for Debussy's *Arabesque No. 1* with one piano part and two staves. The player loads the MXL once and the view borrows the parsed score.
 
 The demo contains one player and one score view. Expand the player’s Parameters group to configure playback. Copy includes both tags; Reset restores their initial attributes. The thumbnail type can borrow the player’s loaded score while remaining a static preview.
 
@@ -70,7 +70,7 @@ length does not change its duration or playback rate.
 | Keyboard key width / length | PitchView `white-key-width`, `black-key-width` / `white-key-height`, `black-key-height` | Independent pixel widths and heights for a separately composed keyboard. |
 | Fretboard width / string layout | PitchView `fret-width`, `string-spacing`, `string-width` | Fret spacing, distance between strings and string stroke thickness. |
 
-[`<pitch-view>`](/score/element/view/pitch-view/) owns the keyboard and fretboard
+[`<score-pitch-view>`](/score/element/view/score-pitch-view/) owns the keyboard and fretboard
 settings. To align a separate keyboard with waterfall notes, match their pitch
 range and column widths and use one shared horizontal scroller, as below.
 
@@ -139,7 +139,7 @@ These visual directions do not introduce playback automation.
 Cross-staff and cross-measure beams, nested tuplet layout, complete grace-note
 engraving, lyrics and page/system justification remain outside
 this scrolling renderer's supported subset.
-[`<sheet-view>`](/score/element/view/sheet-view/) retains the optional OSMD
+[`<score-sheet-view>`](/score/element/view/score-sheet-view/) retains the optional OSMD
 page-engraving workflow. The staff type needs no separate engine option or
 additional installation.
 
@@ -159,13 +159,13 @@ available viewport for the notes. The [imperative renderer](/score/api/view/#ren
 retains its explicit pitch-width defaults.
 
 When an application also needs a keyboard, compose a separate
-[`<pitch-view>`](/score/element/view/pitch-view/) around the same player.
+[`<score-pitch-view>`](/score/element/view/score-pitch-view/) around the same player.
 
 #### Align a waterfall and keyboard
 
-This two-bar example uses one ScoreBuilder-generated score and one player.
-Both views use MIDI 48–71 (C3–B4), 32px natural columns and 20px accidental
-columns. The fourteen natural notes make a 448px track. Change **Pitch width**
+This demo uses the opening passage of Arabesque No. 1 and one player.
+Both views use MIDI 48–83 (C3–B5), 32px natural columns and 20px accidental
+columns. The 21 natural notes make a 672px track. Change **Pitch width**
 to resize both views together, **Note length** to change only the waterfall's
 time scale, and **Key height** to change only the keyboard. A narrow container
 pans their shared track. Press Play to see the held keys follow the notes.
@@ -183,21 +183,21 @@ Use the same structure with a score file in your application:
   definePitchViewElement();
 </script>
 
-<score-player id="falling-piece" src="song.mid"></score-player>
+<score-player id="falling-piece" src="/midi/Arabesque%20No.1.mid"></score-player>
 <div class="shared-pan">
   <div class="pitch-track">
     <score-view type="waterfall" player="#falling-piece"
-      min-pitch="48" max-pitch="71" white-note-width="32" black-note-width="20"
+      min-pitch="48" max-pitch="83" white-note-width="32" black-note-width="20"
       pixels-per-second="64" note-spacing="0" show-annotations="false" height="180"></score-view>
-    <pitch-view type="keyboard" player="#falling-piece" low="48" high="71"
+    <score-pitch-view type="keyboard" player="#falling-piece" low="48" high="83"
       white-key-width="32" black-key-width="20" white-key-height="80" black-key-height="50"
-      follow="none"></pitch-view>
+      follow="none"></score-pitch-view>
   </div>
 </div>
 
 <style>
   .shared-pan { max-width: 100%; overflow-x: auto; }
-  .pitch-track { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; width: 448px; }
+  .pitch-track { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; width: 672px; }
   .pitch-track > * {
     width: 100%; min-width: 0; margin: 0;
     --wm-component-padding: 0;
@@ -256,7 +256,7 @@ but time changes do not redraw the thumbnail.
 
 ```html
 <a href="/songs/1">
-  <score-view type="thumbnail" src="song.mid" width="180" height="48"></score-view>
+  <score-view type="thumbnail" src="/midi/Arabesque%20No.1.mid" width="180" height="48"></score-view>
 </a>
 ```
 
@@ -340,7 +340,7 @@ The component fits its containing block. Size the host with `width` / `height` o
 
 Idle notes inherit `--wm-foreground` through `--wm-score-view-note`, with neutral `#333` / `#ddd` defaults for light / dark schemes. Active notes use `--wm-score-view-active-note`, then the shared `--wm-accent`, then the existing red default `rgb(240, 84, 119)`. Explicit `note-color` / `active-note-color` attributes or `.options.noteRGB` / `.options.activeNoteRGB` override those defaults; `.options.noteColor` / `.options.activeNoteColor` accept full CSS colors, including variables. The [imperative renderers](/score/api/view/) retain their separate neutral RGB defaults.
 
-Map uses [timeline](/uikit/transport-time/timeline/) tokens such as `--wm-timeline-lane-height`, `--wm-timeline-background`, `--wm-accent` and `--wm-playhead`. [Status](/uikit/layout-feedback/status/) owns the waiting, empty and error appearance. A separately composed PitchView uses its own [pitch tokens](/score/element/view/pitch-view/).
+Map uses [timeline](/uikit/transport-time/timeline/) tokens such as `--wm-timeline-lane-height`, `--wm-timeline-background`, `--wm-accent` and `--wm-playhead`. [Status](/uikit/layout-feedback/status/) owns the waiting, empty and error appearance. A separately composed PitchView uses its own [pitch tokens](/score/element/view/score-pitch-view/).
 
 The stage/timeline frame accepts `--wm-component-background`, `--wm-component-border` (a complete border shorthand) and `--wm-component-radius`; the presenter's `--wm-stage-surface-*` or `--wm-timeline-surface-*` tokens take precedence. Set `--wm-surface: transparent` as well when clearing nested drawing surfaces. Staff, piano-roll and thumbnail SVGs have transparent drawing backgrounds.
 
@@ -365,4 +365,4 @@ score-view {
 
 ## Related
 
-[Current sounding pitches](/score/element/view/pitch-view/) · [Engraved sheet music](/score/element/view/sheet-view/) · [View API and renderers](/score/api/view/) · [Headless ScoreView](/score/headless/view/score-view/) · [Headless map navigation](/score/headless/view/score-map-view/)
+[Current sounding pitches](/score/element/view/score-pitch-view/) · [Engraved sheet music](/score/element/view/score-sheet-view/) · [View API and renderers](/score/api/view/) · [Headless ScoreView](/score/headless/view/score-view/) · [Headless map navigation](/score/headless/view/score-map-view/)

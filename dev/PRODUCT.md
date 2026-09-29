@@ -4,13 +4,12 @@
 
 ## Release scope
 
-The first release from `main` contains Kernel, UI Kit and Score. Score keeps its
-Web Components, Headless and API + UI integration choices, including sound
-playback. Audio and Bridge are deferred from this checkout; their implementation
-and public references have not yet been migrated into the new repository's
-published `dev` branch. The cross-domain scenarios below remain the long-term
-product direction, outside this release. [STATUS](STATUS.md) owns the current
-delivery boundary.
+DEC-021 describes the original three-package release of Kernel, UI Kit and
+Score. DEC-046 accepts integration of the current five-package source tree into
+`main`, including Audio and Bridge. This changes the repository's development
+surface; registry publication of changed or additional packages is a separate
+manual release. [STATUS](STATUS.md) records this checkout's verification and
+remaining delivery gaps.
 
 ## Product promise
 
@@ -80,16 +79,14 @@ Current integration references are organized by the resource being connected:
 |---|---|
 | Symbolic formats and score import/export | [Score I/O](../apps/doc/webmusic/src/content/docs/score/api/io.mdx) |
 | Timbres, effects, and musical input | [Score playback](../apps/doc/webmusic/src/content/docs/score/api/play.mdx) and its Headless/driver links |
-| Audio files, decoding, playback, and capture | [Architecture](ARCHITECTURE.md) and [status](STATUS.md); no Audio public entry in this checkout |
-| Analysis engines and transcription | [Product direction](#one-sessions-time-and-data) and [status](STATUS.md); no Audio analysis reference in this checkout |
-| Custom visuals and controls | [UI contracts](../packages/ui/README.md) and [Score views](../apps/doc/webmusic/src/content/docs/score/api/view.mdx); Audio view references await migration |
-| Coordination and cross-domain conversion | [Shared-clock design](../platform/shared-clock-injection.md) and [Architecture](ARCHITECTURE.md); Bridge reference awaits migration |
+| Audio files, decoding, playback, and capture | [Audio playback](../apps/doc/webmusic/src/content/docs/audio/api/play.mdx) and its Headless links |
+| Analysis engines and transcription | [Audio analysis](../apps/doc/webmusic/src/content/docs/audio/api/analyze.mdx) |
+| Custom visuals and controls | [UI contracts](../packages/ui/README.md), [Score views](../apps/doc/webmusic/src/content/docs/score/api/view.mdx), and [Audio views](../apps/doc/webmusic/src/content/docs/audio/api/view.mdx) |
+| Coordination and cross-domain conversion | [Bridge](../bridges/score-audio/README.md) |
 
-For packages present in this checkout, public references and manifests own the
-supported entries and dependency details. The Audio and Bridge rows describe
-design direction, not callable entries here. An additional format, engine, or
-sensor becomes supported through an implemented adapter and verified example;
-the product ambition alone does not make it available.
+Those references and manifests own the supported entries and dependency details.
+An additional format, engine, or sensor becomes supported through an implemented
+adapter and verified example; the product ambition alone does not make it available.
 
 ## What improvement means
 

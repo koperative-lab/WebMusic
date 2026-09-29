@@ -1,6 +1,4 @@
 import {installStyle} from './internal/style';
-import {claimHost, createErrorSink} from './internal/lifecycle';
-import {addClassNames, clamp01, setParts} from './internal/dom';
 import {componentSurfaceCss, controlBorderFallback} from './internal/surface';
 import {controlHeight, controlRadius, controlThumbRadius} from './internal/control';
 // ============================================================================
@@ -45,26 +43,47 @@ export interface PlaylistBinding {
 export interface PlaylistClassNames {
   root?: string;
   bar?: string;
+  /** Added to all three transport buttons. */
   button?: string;
+  previous?: string;
+  play?: string;
+  next?: string;
   seek?: string;
   list?: string;
   item?: string;
+  number?: string;
+  label?: string;
+  duration?: string;
 }
 
 export interface PlaylistParts {
   root?: string;
   bar?: string;
+  /** Added to all three transport buttons. */
   button?: string;
+  previous?: string;
+  play?: string;
+  next?: string;
   seek?: string;
   list?: string;
   item?: string;
+  number?: string;
+  label?: string;
+  duration?: string;
 }
 
 export interface PlaylistOptions {
+  /** Show the transport bar. False leaves selection to this list and transport to its owner. Default true. */
+  transport?: boolean;
   /** Accessible name of the list. Defaults to 'Playlist'. */
   label?: string;
   /** Install the exported stylesheet into the host. Defaults to true. */
   stylesheet?: boolean;
+  previousLabel?: string;
+  playLabel?: string;
+  pauseLabel?: string;
+  nextLabel?: string;
+  seekLabel?: string;
   /** Compatibility classes added alongside the canonical `wui-*` classes. */
   classNames?: PlaylistClassNames;
   /** Additional CSS part tokens added alongside the canonical part names. */
@@ -96,16 +115,35 @@ export interface PlaylistHandle {
 
 type Host = HTMLElement | ShadowRoot;
 
+/** A snapshot with every optional field resolved, so painting stays total. */
+interface NormalizedItem {
+  id: string;
+  label: string;
+  duration: string;
+  active: boolean;
+  status?: 'loading' | 'error';
+}
+
+interface NormalizedState {
+  playing: boolean;
+  progress: number;
+  disabled: boolean;
+  items: NormalizedItem[];
+}
+
 const mounted = new WeakMap<Host, PlaylistHandle>();
 
 export const playlistStyle = String.raw`
+.wui-playlist,
+.wui-playlist * { box-sizing: border-box; }
+
 .wui-playlist {
 ${componentSurfaceCss('playlist', {
   border: '1px solid var(--wm-playlist-border, var(--wm-border, #d8d8d8))',
-  radius: 'var(--wm-playlist-radius, var(--wm-control-radius, 0))',
+  radius: 'var(--wui-playlist-radius, var(--wm-playlist-radius, var(--wm-control-radius, 0)))',
   background: 'var(--wm-playlist-background, var(--wm-surface, #fff))',
 })}
-  color: var(--wm-playlist-text, var(--wm-foreground, #444));
+  color: var(--wui-playlist-text, var(--wm-playlist-text, var(--wm-foreground, #444)));
   font: .85rem var(--wm-font-family, var(--wm-font, system-ui, sans-serif));
 }
 
@@ -116,11 +154,11 @@ ${componentSurfaceCss('playlist', {
 }
 
 .wui-playlist__button {
-  box-sizing: border-box;
   width: ${controlHeight('playlist')};
   height: ${controlHeight('playlist')};
+  padding: 0;
   border: 1px solid var(--wm-playlist-button-border, ${controlBorderFallback});
-  border-radius: var(--wm-playlist-radius, var(--wm-control-radius, 0));
+  border-radius: var(--wui-playlist-radius, var(--wm-playlist-radius, var(--wm-control-radius, 0)));
   background: var(--wm-playlist-button, var(--wm-surface, #fff));
   color: var(--wm-playlist-button-text, var(--wm-foreground, #444));
   font: inherit;
@@ -128,14 +166,20 @@ ${componentSurfaceCss('playlist', {
 }
 
 .wui-playlist__button.play {
-  border-color: var(--wm-playlist-primary-border, var(--wm-playlist-button-border, var(--wm-accent, #111)));
-  background: var(--wm-playlist-primary-background, var(--wm-playlist-button, var(--wm-accent, #111)));
-  color: var(--wm-playlist-primary-foreground, var(--wm-playlist-button-text, var(--wm-accent-foreground, #fff)));
+  border-color: var(--wui-playlist-primary-border, var(--wm-playlist-primary-border, var(--wm-playlist-button-border, var(--wm-accent, #111))));
+  background: var(--wui-playlist-primary-background, var(--wm-playlist-primary-background, var(--wm-playlist-button, var(--wm-accent, #111))));
+  color: var(--wui-playlist-primary-foreground, var(--wm-playlist-primary-foreground, var(--wm-playlist-button-text, var(--wm-accent-foreground, #fff))));
 }
 
 .wui-playlist__button:disabled {
   cursor: default;
   opacity: .5;
+}
+
+.wui-playlist__button:focus-visible,
+.wui-playlist__seek:focus-visible {
+  outline: 2px solid var(--wm-focus, currentColor);
+  outline-offset: 2px;
 }
 
 .wui-playlist__seek {
@@ -147,11 +191,11 @@ ${componentSurfaceCss('playlist', {
   height: ${controlHeight('playlist')};
   margin: 0;
   border: 0;
-  border-radius: ${controlRadius('playlist')};
+  border-radius: var(--wui-playlist-radius, ${controlRadius('playlist')});
   background: linear-gradient(
     to right,
-    var(--wm-playlist-accent, var(--wm-accent, #111)) 0,
-    var(--wm-playlist-accent, var(--wm-accent, #111)) var(--wui-playlist-progress, 0%),
+    var(--wui-playlist-accent, var(--wm-playlist-accent, var(--wm-accent, #111))) 0,
+    var(--wui-playlist-accent, var(--wm-playlist-accent, var(--wm-accent, #111))) var(--wui-playlist-progress, 0%),
     var(--wm-playlist-track, var(--wm-surface-muted, #f3f3f3)) var(--wui-playlist-progress, 0%)
   );
   cursor: pointer;
@@ -185,16 +229,20 @@ ${componentSurfaceCss('playlist', {
   list-style: none;
 }
 
+/* A linked queue omits the transport bar; its first row needs no reserved gap. */
+.wui-playlist__items:first-child { margin-top: 0; }
+
 .wui-playlist__item {
   display: flex;
+  align-items: baseline;
   gap: .6rem;
   padding: .35rem .4rem;
-  border-radius: var(--wm-playlist-radius, var(--wm-control-radius, 0));
+  border-radius: var(--wui-playlist-radius, var(--wm-playlist-radius, var(--wm-control-radius, 0)));
   cursor: pointer;
 }
 
 .wui-playlist__item[aria-current="true"] {
-  background: var(--wm-playlist-active, rgba(17, 17, 17, .08));
+  background: var(--wui-playlist-active, var(--wm-playlist-active, rgba(17, 17, 17, .08)));
   font-weight: 600;
 }
 
@@ -207,12 +255,6 @@ ${componentSurfaceCss('playlist', {
   cursor: default;
 }
 
-.wui-playlist__button:focus-visible,
-.wui-playlist__seek:focus-visible {
-  outline: 2px solid var(--wm-focus, currentColor);
-  outline-offset: 2px;
-}
-
 .wui-playlist__item:focus-visible {
   outline: 2px solid var(--wm-focus, currentColor);
   outline-offset: -2px;
@@ -220,13 +262,89 @@ ${componentSurfaceCss('playlist', {
 
 .wui-playlist__label {
   flex: 1;
+  min-width: 0;
 }
 
 .wui-playlist__duration {
-  color: var(--wm-playlist-muted, var(--wm-foreground-muted, var(--wm-foreground, #666)));
+  color: var(--wui-playlist-muted, var(--wm-playlist-muted, var(--wm-foreground-muted, var(--wm-foreground, #666))));
   font-variant-numeric: tabular-nums;
 }
+
+/* Rows are list items, so they cannot carry :disabled themselves. */
+.wui-playlist[aria-disabled="true"] .wui-playlist__item {
+  opacity: .5;
+  cursor: default;
+}
+
+.wui-playlist__number {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (forced-colors: active) {
+  .wui-playlist { border-color: CanvasText; background: Canvas; color: CanvasText; }
+  .wui-playlist__button { border-color: ButtonText; background: ButtonFace; color: ButtonText; }
+  .wui-playlist__item[aria-current="true"] { outline: 2px solid Highlight; }
+}
 `;
+
+function addClassNames(element: Element, names: string | undefined): void {
+  for (const name of names?.trim().split(/\s+/) ?? []) {
+    if (name) element.classList.add(name);
+  }
+}
+
+function setParts(
+  element: Element,
+  canonical: readonly string[],
+  ...additional: Array<string | undefined>
+): void {
+  const tokens = [
+    ...canonical,
+    ...additional.flatMap((value) => value?.trim().split(/\s+/) ?? []),
+  ].filter(Boolean);
+  element.setAttribute('part', [...new Set(tokens)].join(' '));
+}
+
+function text(value: unknown): string {
+  return value === undefined || value === null ? '' : String(value);
+}
+
+function clamp01(value: unknown): number {
+  const numeric = typeof value === 'number' && Number.isFinite(value) ? value : 0;
+  return Math.max(0, Math.min(1, numeric));
+}
+
+function isThenable(value: unknown): value is PromiseLike<unknown> {
+  return (
+    value !== null &&
+    (typeof value === 'object' || typeof value === 'function') &&
+    typeof (value as {then?: unknown}).then === 'function'
+  );
+}
+
+function normalizeSnapshot(snapshot: PlaylistState): NormalizedState {
+  const items = Array.from(snapshot?.items ?? [], (item): NormalizedItem => {
+    const status = item?.status;
+    return {
+      id: text(item?.id),
+      label: text(item?.label),
+      duration: text(item?.duration),
+      active: item?.active === true,
+      ...(status === 'loading' || status === 'error' ? {status} : {}),
+    };
+  });
+  for (const item of items) {
+    // Rows are addressed by id — `controls.item(id)`, selection, focus
+    // restoration — so a blank one would make an entry unreachable.
+    if (!item.id.trim()) throw new TypeError('Playlist item ids must not be empty');
+  }
+  return {
+    playing: snapshot?.playing === true,
+    progress: clamp01(snapshot?.progress),
+    disabled: snapshot?.disabled === true,
+    items,
+  };
+}
 
 /**
  * Mount a queue: previous / play-pause / next, a seek bar over the current
@@ -242,43 +360,49 @@ export function mountPlaylist(
   binding: PlaylistBinding,
   options: PlaylistOptions = {},
 ): PlaylistHandle {
-
   const document = host.ownerDocument;
   const style = installStyle(document, 'playlist', playlistStyle, options.stylesheet);
 
   const root = document.createElement('div');
   root.className = 'wui-playlist wrap';
   addClassNames(root, options.classNames?.root);
-  setParts(root, 'root', options.parts?.root);
+  setParts(root, ['root'], options.parts?.root);
 
   const bar = document.createElement('div');
   bar.className = 'wui-playlist__bar bar';
   addClassNames(bar, options.classNames?.bar);
-  setParts(bar, 'bar', options.parts?.bar);
+  setParts(bar, ['bar'], options.parts?.bar);
 
-  const button = (modifier: string, label: string, text: string): HTMLButtonElement => {
+  const button = (
+    modifier: 'prev' | 'play' | 'next',
+    kind: 'previous' | 'play' | 'next',
+    label: string,
+    icon: string,
+  ): HTMLButtonElement => {
     const node = document.createElement('button');
     node.type = 'button';
     node.className = `wui-playlist__button t ${modifier}`;
     node.setAttribute('aria-label', label);
-    node.textContent = text;
+    node.textContent = icon;
     addClassNames(node, options.classNames?.button);
-    setParts(node, `button ${modifier}`, options.parts?.button);
+    addClassNames(node, options.classNames?.[kind]);
+    setParts(node, ['button', modifier], options.parts?.button, options.parts?.[kind]);
     return node;
   };
 
-  const previous = button('prev', 'Previous', '⏮');
-  const toggle = button('play', 'Play', '▶');
-  const next = button('next', 'Next', '⏭');
+  const previous = button('prev', 'previous', options.previousLabel ?? 'Previous', '⏮');
+  const toggle = button('play', 'play', options.playLabel ?? 'Play', '▶');
+  const next = button('next', 'next', options.nextLabel ?? 'Next', '⏭');
 
   const seek = document.createElement('input');
   seek.type = 'range';
   seek.min = '0';
   seek.max = '1000';
+  seek.step = '1';
   seek.className = 'wui-playlist__seek seek';
-  seek.setAttribute('aria-label', 'Seek');
+  seek.setAttribute('aria-label', options.seekLabel ?? 'Seek');
   addClassNames(seek, options.classNames?.seek);
-  setParts(seek, 'seek', options.parts?.seek);
+  setParts(seek, ['seek'], options.parts?.seek);
 
   bar.append(previous, toggle, next, seek);
 
@@ -286,115 +410,236 @@ export function mountPlaylist(
   list.className = 'wui-playlist__items';
   list.setAttribute('aria-label', options.label ?? 'Playlist');
   addClassNames(list, options.classNames?.list);
-  setParts(list, 'list', options.parts?.list);
+  setParts(list, ['list'], options.parts?.list);
 
-  root.append(bar, list);
+  if (options.transport !== false) root.append(bar);
+  root.append(list);
 
   let destroyed = false;
   let unsubscribe: (() => void) | undefined;
+  let current: NormalizedState | undefined;
+  let updating = false;
+  let pendingUpdate = false;
+  let commandRevision = 0;
   let listSignature = '';
   const rows = new Map<string, HTMLLIElement>();
+  const cleanups: Array<() => void> = [];
 
-  const report = createErrorSink(options.onError);
+  const isCurrent = (): boolean => !destroyed && mounted.get(host) === handle;
 
-  let update = (): void => {};
-
-  const command = (work: () => Promise<void> | void): void => {
+  const report = (error: unknown): void => {
     try {
-      void Promise.resolve(work())
-        .then(() => update())
-        .catch(report);
-    } catch (error) {
-      report(error);
+      const result = options.onError?.(error);
+      if (isThenable(result)) void Promise.resolve(result).catch(() => undefined);
+    } catch {
+      // Error reporting must not break the presenter's own update path.
     }
   };
 
-  const renderRow = (item: PlaylistItem, index: number): HTMLLIElement => {
+  const listen = (target: EventTarget, type: string, listener: EventListener): void => {
+    target.addEventListener(type, listener);
+    cleanups.push(() => target.removeEventListener(type, listener));
+  };
+
+  const focusedRowId = (): string | undefined => {
+    const tree = list.getRootNode() as Document | ShadowRoot;
+    const active = tree.activeElement ?? document.activeElement;
+    if (!active || !list.contains(active)) return undefined;
+    const id = active.getAttribute('data-i');
+    return id?.trim() ? id : undefined;
+  };
+
+  const renderRow = (item: NormalizedItem, index: number): HTMLLIElement => {
     const row = document.createElement('li');
     row.className = 'wui-playlist__item item';
     row.dataset.i = item.id;
     row.tabIndex = 0;
     row.setAttribute('role', 'button');
     addClassNames(row, options.classNames?.item);
-    setParts(row, 'item', options.parts?.item);
+    setParts(row, ['item'], options.parts?.item);
 
     const ordinal = document.createElement('span');
-    ordinal.className = 'num';
+    ordinal.className = 'wui-playlist__number num';
     ordinal.textContent = String(index + 1);
+    // The row's accessible name is its contents; the ordinal is already
+    // conveyed by the list itself.
+    ordinal.setAttribute('aria-hidden', 'true');
+    addClassNames(ordinal, options.classNames?.number);
+    setParts(ordinal, ['number'], options.parts?.number);
 
     const label = document.createElement('span');
     label.className = 'wui-playlist__label ttl';
     label.textContent = item.label;
+    addClassNames(label, options.classNames?.label);
+    setParts(label, ['label'], options.parts?.label);
 
     const duration = document.createElement('span');
     duration.className = 'wui-playlist__duration dur';
-    duration.textContent = item.duration ?? '';
-
-    const select = (): void => command(() => binding.select(item.id));
-    row.addEventListener('click', select);
-    row.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
-        select();
-      }
-    });
+    duration.textContent = item.duration;
+    addClassNames(duration, options.classNames?.duration);
+    setParts(duration, ['duration'], options.parts?.duration);
 
     row.append(ordinal, label, duration);
     return row;
   };
 
   /** Patch the mutable parts of a row: active, per-entry status, duration. */
-  const paintRow = (row: HTMLLIElement, item: PlaylistItem): void => {
-    row.classList.toggle('on', item.active === true);
-    row.setAttribute('aria-current', String(item.active === true));
+  const paintRow = (row: HTMLLIElement, item: NormalizedItem): void => {
+    row.classList.toggle('on', item.active);
+    row.setAttribute('aria-current', String(item.active));
     if (item.status) row.dataset.status = item.status;
     else delete row.dataset.status;
     const duration = row.querySelector<HTMLElement>('.wui-playlist__duration');
-    if (duration) duration.textContent = item.duration ?? '';
+    if (duration) duration.textContent = item.duration;
   };
 
-  update = (): void => {
-    if (destroyed) return;
+  const paint = (state: NormalizedState): void => {
+    toggle.textContent = state.playing ? '⏸' : '▶';
+    toggle.setAttribute(
+      'aria-label',
+      state.playing ? (options.pauseLabel ?? 'Pause') : (options.playLabel ?? 'Play'),
+    );
+    toggle.setAttribute('aria-pressed', String(state.playing));
+    root.classList.toggle('is-playing', state.playing);
+    root.classList.toggle('is-disabled', state.disabled);
+    root.setAttribute('aria-disabled', String(state.disabled));
+    for (const control of [previous, toggle, next, seek]) {
+      control.disabled = state.disabled;
+    }
+    seek.value = String(Math.round(state.progress * 1000));
+    seek.defaultValue = seek.value;
+    seek.style.setProperty('--wui-playlist-progress', `${state.progress * 100}%`);
+    seek.setAttribute('aria-valuetext', `${Math.round(state.progress * 100)}%`);
+
+    // Only the identity and order of the entries force a rebuild; label,
+    // duration, active and status are patched onto the existing rows.
+    const signature = JSON.stringify(state.items.map((item) => [item.id, item.label]));
+    if (signature !== listSignature) {
+      const refocus = focusedRowId();
+      rows.clear();
+      const nodes = state.items.map((item, index) => {
+        const row = renderRow(item, index);
+        rows.set(item.id, row);
+        return row;
+      });
+      list.replaceChildren(...nodes);
+      listSignature = signature;
+      if (refocus !== undefined) rows.get(refocus)?.focus();
+    }
+    for (const item of state.items) {
+      const row = rows.get(item.id);
+      if (row) paintRow(row, item);
+    }
+    current = state;
+  };
+
+  const performUpdate = (): void => {
+    if (!isCurrent()) return;
     try {
-      const state = binding.snapshot();
-      const items = state.items ?? [];
-
-      toggle.textContent = state.playing ? '⏸' : '▶';
-      toggle.setAttribute('aria-label', state.playing ? 'Pause' : 'Play');
-      for (const control of [previous, toggle, next, seek]) {
-        control.toggleAttribute('disabled', state.disabled === true);
-      }
-      seek.value = String(Math.round(clamp01(state.progress) * 1000));
-      seek.style.setProperty('--wui-playlist-progress', `${clamp01(state.progress) * 100}%`);
-
-      // Only the identity and order of the entries force a rebuild; label,
-      // duration, active and status are patched onto the existing rows.
-      const signature = JSON.stringify(items.map((item) => [item.id, item.label]));
-      if (signature !== listSignature) {
-        rows.clear();
-        const nodes = items.map((item, index) => {
-          const row = renderRow(item, index);
-          rows.set(item.id, row);
-          return row;
-        });
-        list.replaceChildren(...nodes);
-        listSignature = signature;
-      }
-      for (const item of items) {
-        const row = rows.get(item.id);
-        if (row) paintRow(row, item);
-      }
+      const state = normalizeSnapshot(binding.snapshot());
+      if (isCurrent()) paint(state);
     } catch (error) {
-      report(error);
+      if (isCurrent()) report(error);
     }
   };
 
-  previous.addEventListener('click', () => command(() => binding.previous()));
-  toggle.addEventListener('click', () => command(() => binding.toggle()));
-  next.addEventListener('click', () => command(() => binding.next()));
-  seek.addEventListener('input', () =>
-    command(() => binding.seek(Number(seek.value) / 1000)),
+  const update = (): void => {
+    if (!isCurrent()) return;
+    if (updating) {
+      // A notify raised while painting cannot recurse; it runs one more pass.
+      pendingUpdate = true;
+      return;
+    }
+    updating = true;
+    let passes = 0;
+    try {
+      do {
+        pendingUpdate = false;
+        performUpdate();
+        passes += 1;
+      } while (pendingUpdate && isCurrent() && passes < 32);
+      if (pendingUpdate && isCurrent()) {
+        report(new Error('Playlist update did not stabilize after 32 passes'));
+      }
+    } finally {
+      pendingUpdate = false;
+      updating = false;
+    }
+  };
+
+  const command = (work: () => Promise<void> | void): void => {
+    if (!isCurrent() || current?.disabled !== false) return;
+    const revision = ++commandRevision;
+    const isLatest = (): boolean => isCurrent() && revision === commandRevision;
+    const settle = (): void => {
+      // An older command may still have changed the authoritative snapshot.
+      if (isCurrent()) update();
+    };
+    const reject = (error: unknown): void => {
+      if (!isCurrent()) return;
+      const reportable = isLatest();
+      update();
+      if (reportable && isLatest()) report(error);
+    };
+    try {
+      void Promise.resolve(work()).then(settle, reject);
+    } catch (error) {
+      reject(error);
+    }
+  };
+
+  const rowFrom = (target: EventTarget | null): HTMLLIElement | undefined => {
+    const node = (target as Element | null)?.closest?.('[data-i]');
+    if (!node || !list.contains(node)) return undefined;
+    const id = (node as HTMLElement).dataset.i;
+    return id ? rows.get(id) : undefined;
+  };
+
+  listen(previous, 'click', () => command(() => binding.previous()));
+  listen(toggle, 'click', () => command(() => binding.toggle()));
+  listen(next, 'click', () => command(() => binding.next()));
+  listen(seek, 'input', () =>
+    command(() => binding.seek(clamp01(Number(seek.value) / 1000))),
   );
+  // Rows are delegated: they are replaced whenever the entries change, and a
+  // per-row listener would then have to be unbound one node at a time.
+  listen(list, 'click', (event) => {
+    const row = rowFrom(event.target);
+    if (row) command(() => binding.select(row.dataset.i!));
+  });
+  listen(list, 'keydown', (event) => {
+    const key = (event as KeyboardEvent).key;
+    if (key !== 'Enter' && key !== ' ') return;
+    const row = rowFrom(event.target);
+    if (!row) return;
+    event.preventDefault();
+    command(() => binding.select(row.dataset.i!));
+  });
+
+  /** Release everything this mount owns, keeping the first failure to report. */
+  const teardown = (): {failed: boolean; error: unknown} => {
+    let failed = false;
+    let error: unknown;
+    const attempt = (work: () => void): void => {
+      try {
+        work();
+      } catch (thrown) {
+        if (!failed) error = thrown;
+        failed = true;
+      }
+    };
+    for (const cleanup of cleanups.splice(0)) attempt(cleanup);
+    const off = unsubscribe;
+    unsubscribe = undefined;
+    if (off) attempt(off);
+    attempt(() => root.remove());
+    attempt(() => style?.remove());
+    current = undefined;
+    rows.clear();
+    listSignature = '';
+    if (mounted.get(host) === handle) mounted.delete(host);
+    return {failed, error};
+  };
 
   const handle: PlaylistHandle = {
     element: root,
@@ -408,42 +653,60 @@ export function mountPlaylist(
         return rows.get(id);
       },
     },
-    update: () => update(),
+    update,
     destroy(): void {
       if (destroyed) return;
       destroyed = true;
-      try {
-        unsubscribe?.();
-      } catch (error) {
-        report(error);
-      }
-      claim.release();
-      root.remove();
-      style?.remove();
+      pendingUpdate = false;
+      commandRevision += 1;
+      const {failed, error} = teardown();
+      if (failed) report(error);
     },
   };
 
-  // Claim the host before destroying the previous mount: its cleanup may mount
-  // a replacement, and that replacement must win.
-  const claim = claimHost(mounted, host, handle);
-  claim.destroyPrevious();
-  if (!claim.isCurrent()) return handle;
-
-  host.append(...(style ? [style] : []), root);
-  if (!claim.isCurrent()) {
-    // A re-entrant mount took the host while this one was appending; leave it
-    // exactly as that mount left it.
-    root.remove();
-    style?.remove();
-    return handle;
-  }
-  update();
-  if (binding.subscribe) {
+  // Claim the host before releasing its previous presenter. Cleanup and error
+  // callbacks may mount another playlist; this attempted handle then stays
+  // inert and must never append over or later delete that replacement.
+  const previousHandle = mounted.get(host);
+  mounted.set(host, handle);
+  try {
     try {
-      unsubscribe = binding.subscribe(() => update());
+      previousHandle?.destroy();
     } catch (error) {
-      report(error);
+      if (isCurrent()) report(error);
     }
+    if (!isCurrent()) return handle;
+
+    host.append(...(style ? [style] : []), root);
+    if (!isCurrent()) return handle;
+
+    update();
+    if (!isCurrent()) return handle;
+
+    try {
+      const off = binding.subscribe?.(update);
+      if (off !== undefined && typeof off !== 'function') {
+        throw new TypeError('Playlist subscribe() must return a function');
+      }
+      if (off) {
+        if (isCurrent()) unsubscribe = off;
+        else {
+          try {
+            off();
+          } catch {
+            // Superseded mounts do not publish stale cleanup failures.
+          }
+        }
+      }
+    } catch (error) {
+      if (isCurrent()) report(error);
+    }
+  } catch (error) {
+    destroyed = true;
+    pendingUpdate = false;
+    commandRevision += 1;
+    teardown();
+    throw error;
   }
   return handle;
 }

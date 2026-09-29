@@ -14,7 +14,7 @@ piano keys, code-addressable grid cells, or chord buttons. It paints `NoteSurfac
 binding supplies `interaction`, the presenter also owns focus, pointer capture, drag glissando,
 QWERTY holds, chord holds, and guaranteed note-off cleanup.
 
-[`<note-input>`](/score/element/play/note-input/) already composes this presenter. Passive [`<pitch-view>`](/score/element/view/pitch-view/) uses the [pitch presenter](/uikit/views-analysis/pitch/) instead. Mount it
+[`<score-note-input>`](/score/element/play/score-note-input/) already composes this presenter. Passive [`<score-pitch-view>`](/score/element/view/score-pitch-view/) uses the [pitch presenter](/uikit/views-analysis/pitch/) instead. Mount it
 directly when musical intent comes from a custom mapping or when the surface must share a layout
 with caller-owned controls.
 

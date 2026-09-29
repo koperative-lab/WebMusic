@@ -1,0 +1,160 @@
+---
+title: 'createAudioAnalysisSession'
+description: 'A memoized analysis over a clip that survives edits: sample-local tasks reuse cached frames over the untouched head and tail.'
+sidebar:
+  order: 1
+---
+
+`createAudioAnalysisSession(clip, options?)` remembers analysis results across
+`analyze()` and `update(editedClip)`. Updates compare channel samples, reuse
+sample-identical results, and selectively reuse peak blocks/onset ranges when
+possible. Several other requested analyses are recomputed in full; incremental
+does not mean every task costs only the size of the edit.
+
+Reach for it when a clip is being cut, faded or normalized and the display has
+to keep up. For a single measurement, `analyzeAudioClip` on
+[`@webmusic/audio/analyze`](/audio/api/analyze/) does the same work without
+the object.
+
+It **borrows** the clip — clips are immutable, so an edit produces a new one
+and the session swaps to it — and owns only its frame caches. No `dispose()`.
+
+## Import
+
+```ts
+import {createAudioAnalysisSession} from '@webmusic/audio/analyze/headless';
+
+const session = createAudioAnalysisSession(clip, {
+  tasks: ['peaks', 'loudness', 'onsets'],
+});
+
+const result = await session.analyze();
+const next = await session.update(editedClip); // reuse is task-dependent
+```
+
+Both calls return Promises and are serialized in call order. A Promise does not
+guarantee that CPU-heavy analysis yields to rendering; use a worker when isolation
+from the main thread is required. A failed update leaves the previous committed
+clip/cache available.
+
+## Show a beat grid in a view
+
+The session returns beat positions as data. Convert them to point `Region`s
+for [`<audio-view>.regions`](/audio/element/view/audio-view/#annotate) when the
+tempo estimate has positive confidence. A zero-confidence result can contain
+a synthetic fallback grid, which should not be presented as detected beats.
+
+```html
+<audio-view id="beat-view" type="waveform"></audio-view>
+
+<script type="module">
+  import {createRegion} from '@webmusic/audio';
+  import {loadClipFromUrl} from '@webmusic/audio/play';
+  import {createAudioAnalysisSession} from '@webmusic/audio/analyze/headless';
+  import {AudioViewElement, defineAudioViewElement} from '@webmusic/audio/view/element';
+
+  defineAudioViewElement();
+  const clip = await loadClipFromUrl('/wav/Arabesque%20No.1.wav');
+  const {tempo} = await createAudioAnalysisSession(clip, {tasks: ['tempo']}).analyze();
+  const view = document.querySelector('#beat-view');
+  if (!(view instanceof AudioViewElement)) throw new Error('Beat view is unavailable');
+  view.clip = clip;
+  view.regions = tempo && tempo.confidence > 0
+    ? tempo.grid.beats.map((startSeconds, index) => createRegion({
+        label: `Beat ${index + 1}`,
+        startSeconds,
+      }))
+    : [];
+</script>
+```
+
+These markers are a view overlay, not a second transport or clock. Bind the
+view to an [`<audio-player>`](/audio/element/play/audio-player/) if playback
+following or seeking is needed.
+
+## Which tasks reuse, and which do not
+
+| Task/path | Current `update` behavior |
+| --- | --- |
+| Sample-identical input | Reuses the cached result. Sample comparison itself can scan the channels. |
+| Changed sample rate or channel count | Runs full analysis: cached time/frequency axes and peaks layout cannot be reused. |
+| `peaks` | Reuses unchanged base blocks for suitable length-preserving edits; rebuilds other levels or the pyramid as needed. |
+| `onsets` | Reuses unaffected ranges and recomputes around the edit window. |
+| `spectrogram`, `pitch`, `features` | Recomputed in full when requested. |
+| `loudness`, `tempo`, `key` | Whole-signal recomputation; current result always includes loudness. |
+| No cache / unavailable samples | Falls back to full analysis. |
+
+`analyze()` is memoized, so calling it twice without an edit returns the same
+result rather than repeating the work.
+
+## Off the main thread
+
+The separate `@webmusic/audio/analyze/worker-client` API supports worker analysis
+and registered clip/session operations. Its transfer and disposal contracts belong
+to the [Analyze API reference](/audio/api/analyze/). Do not infer zero-copy behavior
+or automatic background execution from this Headless session alone.
+
+## Time, ownership and contract source
+
+This is a result-cache owner over static clip samples, not a playback clock.
+Positions in its outputs are clip-relative seconds or sample/frame indices as
+declared by each algorithm. It owns no context, DOM, stream or scheduler; release
+retained data by dropping the session after pending work settles.
+
+The public barrel and `packages/audio/src/analyze/headless/session.ts and analyze/core/analyze-clip.ts` define the value, option, state and event
+contracts described below. The reference does not turn private implementation
+fields into public API.
+
+<details class="component-section">
+<summary>API</summary>
+
+**Construction**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `createAudioAnalysisSession(clip, options?)` | AudioAnalysisSession | Retains an immutable clip and memoized result. Options are AudioAnalysisSessionOptions, an alias of AudioAnalysisOptions. |
+
+**Options**
+
+| Member | Kind | Default | Description |
+| --- | --- | --- | --- |
+| `tasks` | option | `['peaks', 'loudness']` | peaks, loudness, tempo, key, onsets, pitch, spectrogram or features. |
+| `fftSize` | option | `2048` | STFT window size. |
+| `hopSize` | option | `fftSize / 4` | STFT hop in samples. |
+| `peaks` | option | algorithm default | ComputePeaksOptions, including baseSamplesPerPeak. |
+| `tempo` | option | algorithm default | TempoOptions for the full-analysis path; current incremental recomputation does not forward this option. |
+| `onsets` | option | algorithm default | OnsetOptions for full analysis; incremental onset recomputation uses its own window configuration. |
+| `pitch` | option | algorithm default | PitchOptions passed to tracking. |
+| `features` | option | algorithm default | ExtractFeaturesOptions plus optional names; forwarded to feature extraction. |
+
+**Commands and state**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `analyze()` | `Promise<AudioAnalysisResult>` | Memoized full result, serialized with updates; resolution may reuse object identity. |
+| `update(editedClip)` | `Promise<AudioAnalysisResult>` | Commits the new clip/cache only after successful task completion; reuse is described above. |
+| `clip` | readonly AudioClip | Last successfully committed input. |
+
+**Events, lifetime and types**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `AudioAnalysisSession` | type | analyze, update and clip only; no events, timer, stop or dispose. |
+| `AudioAnalysisSessionOptions` | type | Alias of AudioAnalysisOptions; detailed nested algorithm options and result/task types belong to the Analyze API. |
+| `AudioAnalysisResult` | result type | Peaks/loudness and requested analysis outputs; use their named units and optional fields. |
+| `AudioAnalysisTask` | related API type | Task union listed above; chromagram and summary are not task literals. |
+
+</details>
+
+<div class="component-section">
+
+**Composed by.** The worker runtime can construct this session for registered
+offline analysis work. The [live Analyze Elements](/audio/element/#analyze)
+inspect an audio graph; they do not expose this session's cache or worker
+protocol.
+
+</div>
+
+## Related
+
+[Analyze API and workers](/audio/api/analyze/) · [Realtime analyzer](/audio/headless/analyze/realtime-analyzer/) · [View models](/audio/headless/view/view-models/)

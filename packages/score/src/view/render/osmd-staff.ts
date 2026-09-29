@@ -485,9 +485,12 @@ async function loadOSMD(): Promise<OSMDStaffOptions['OpenSheetMusicDisplay']> {
     if (!Ctor) throw new Error('OpenSheetMusicDisplay export not found');
     return Ctor;
   } catch (cause) {
-    throw new Error(
-      'Could not load opensheetmusicdisplay. Install the optional peer dependency, ' +
-        `or pass \`OpenSheetMusicDisplay\`/\`osmd\` to renderOSMDStaffVisualizer. (${String(cause)})`,
+    throw Object.assign(
+      new Error(
+        'Could not load opensheetmusicdisplay. Install the optional peer dependency, ' +
+          `or pass \`OpenSheetMusicDisplay\`/\`osmd\` to renderOSMDStaffVisualizer. (${String(cause)})`,
+      ),
+      {cause},
     );
   }
 }

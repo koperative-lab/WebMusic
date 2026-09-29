@@ -1,0 +1,165 @@
+---
+title: Playback composition
+description: Load once, coordinate Score and Audio, and attach views without creating another transport.
+---
+
+import { Code } from "astro:components";
+import ScoreAudioSyncDemo from "../../../components/bridges/ScoreAudioSyncDemo.astro";
+import IndependentLoopsDemo from "../../../components/bridges/IndependentLoopsDemo.astro";
+import compositionSource from "../../../components/bridges/bridge-composition-client.ts?raw";
+import loopsSource from "../../../components/bridges/independent-loops-client.ts?raw";
+
+A complete composition has one command authority and several borrowers. This
+example builds a short score, renders a matching recording, and gives both to
+Bridge. Audio supplies the sound; the muted Score player supplies musical data,
+position and note activity. The waveform, piano roll and chord analysis each use
+that existing session.
+
+This Score-mastered example renders with `tailSeconds: 0` so its clip ends on
+the Score timeline. For an offline render with an effect or release tail, use
+`createAudioMasteredPlayback` so the clip can continue through that tail.
+
+<ScoreAudioSyncDemo />
+
+## Try the transitions
+
+1. Click **Load example**, then **Play**. Loading resumes an application-owned
+   AudioContext from your click and renders the backing track offline. No network
+   asset, SoundFont or optional decoder is required.
+2. Click **Attach Score views** during playback. The piano roll and analysis
+   borrow the already loaded score; they do not fetch a second source. Detach
+   them, pause, and attach again to inspect the paused snapshot.
+3. Choose **2×**, pause, and seek with the transport slider. The position stays
+   on the original score-seconds axis: the midpoint of this eight-second phrase
+   is four score seconds at either rate. Resume to hear the changed speed.
+4. Enable **Repeat the group** to exercise coordinated seeking at the end.
+   This is a tick-detected group loop, with scheduling lead-in; it is not a
+   claim of an exact or gapless audio loop boundary.
+5. Click **Replace source**. The old group pauses while a new score and recording
+   are prepared. Successful replacement disposes the previous group and replaces
+   its views. A preparation failure retains the previous source, visibly paused.
+6. Click **Dispose session**, including while loading. Pending work cannot install
+   a new group after disposal. Load again to create a fresh session.
+
+The chord panel presents score-derived chord analysis. It does not implement the
+proposed `score-chord` playback-preview mode. Two equal-looking positions on this
+page are UI observations, not measurements of audible timing. The
+[ScoreAudioSync reference](/bridge/headless/score-audio-sync/) owns the supported
+coordination and error semantics.
+
+## Setup in your application
+
+Install the five packages used by this composition:
+
+```bash
+npm install @webmusic/score @webmusic/audio @webmusic/bridge @webmusic/kernel @webmusic/ui
+```
+
+Use published versions that are available, or this repository's local workspaces.
+The implementation below is compiled by the documentation site against its
+workspace packages. Browser audio requires a user gesture and Web Audio support;
+this example also requires OfflineAudioContext. Unsupported environments and
+loading/command failures appear in the status output.
+
+The composition is ordinary application code: `ScoreBuilder` produces the score,
+`renderScoreToClip` produces its audio, `createSyncedPlayback` creates the paired
+players, and a UI transport dispatches group commands. The application closes
+its context when the session is disposed. Bridge releases the players it creates;
+removing a view releases only that view's borrowed connection and own resources.
+
+## Three integration choices in one session
+
+| Choice         | Used here                                                        | State and ownership                                                    |
+| -------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| Web Components | `score-view` and `score-chord-analysis`                                 | Borrow a public playback source; no repeated `src` and no new player.  |
+| Headless       | `ScorePlayer`, `AudioClipPlayer`, `ScoreAudioSync`               | Own playback behavior and participate in the selected group authority. |
+| API + UI       | Offline rendering, peaks, waveform renderer and `mountTransport` | Produce data or display state supplied by the application.             |
+
+A player selector is a browser convenience around the same nonvisual source
+protocol. The owner host in this demo exposes a public `playback` value. Its
+snapshot and subscription delegate to the native Score player, while its seek
+command delegates to the **group**, so an interactive follower cannot move only
+one participant:
+
+```ts
+import type { ScorePlaybackSource } from "@webmusic/score";
+import { createSyncedPlayback } from "@webmusic/bridge";
+
+export function groupPlaybackSource(
+  pair: ReturnType<typeof createSyncedPlayback>,
+): ScorePlaybackSource {
+  return {
+    snapshot: () => pair.scorePlayer.playback.snapshot(),
+    subscribe: (listener) => pair.scorePlayer.playback.subscribe(listener),
+    seekNominal: async (position) => {
+      const result = await pair.sync.dispatch({ type: "seek", position });
+      if (result.status !== "committed") throw new Error("Seek superseded.");
+    },
+  };
+}
+```
+
+New companions receive their initial data and state through that protocol.
+Application drawing uses animation frames to read current positions; it does not
+advance musical time. Command completion comes from `dispatch`, not from an
+optimistic button label. The last six command results are bounded diagnostics,
+not an unbounded event history.
+
+<details>
+<summary>Complete Score/Audio demo implementation</summary>
+
+This is the actual client module used by the live demo. `DemoScope` is a small
+site lifecycle helper; in an application, register its cleanup with your framework
+and release it on host removal or navigation. It is not a package API.
+
+<Code code={compositionSource} lang="ts" />
+
+</details>
+
+## Independent loop lengths
+
+A group loop repeats the master's timeline. A local native loop repeats one
+participant's content while the master keeps advancing. The following separate
+session uses a continuous application-owned master and two native Audio buffer
+loops: one second and one-and-a-half seconds. Both derive timing from the same
+AudioContext; each has its own local phase.
+
+<IndependentLoopsDemo />
+
+Click **Play loops**, then **Pause** and **Seek master to 4.25 s**. The expected
+local positions are **0.25 s** for the one-second loop and **1.25 s** for the
+one-and-a-half-second loop. At **2×**, the content positions retain those meanings
+while the loops run faster. The progress bars read actual player positions; they
+do not schedule the sound.
+
+The implementation configures each `AudioClipPlayer` with its native
+`loop: {start, end}` option and registers the same local bounds as
+`TransportGroup.addFollower(..., {loop: {startSeconds, endSeconds}})` metadata.
+The group maps joins, seeks and drift checks into each local phase. Metadata
+alone does not turn a player into a native looping engine.
+
+This uses the Kernel group directly with structural adapters. The default
+`createSyncedPlayback` factory continues to reject clip-side loop overrides;
+its group-loop option has a different responsibility. The demo does not claim
+nonlinear tempo warping, time stretching that preserves pitch, or a shared
+writable clock instance.
+
+<details>
+<summary>Complete independent-loop implementation</summary>
+
+<Code code={loopsSource} lang="ts" />
+
+</details>
+
+## What this reference establishes
+
+The code makes ownership, command units, late attachment, source replacement and
+cleanup inspectable. Automated checks cover the declared contracts and lifecycle
+ordering; actual browser, device and audible behavior needs its own recorded
+acceptance. The examples are small application compositions, not a project file
+format, undo system, or complete music workstation.
+
+Continue with [Kernel synchronization](/kernel/api/#sync--webmusickernelsync),
+[Score views](/score/element/view/score-view/),
+[score-chord-analysis](/score/element/analyze/score-chord-analysis/) and
+[Transport](/uikit/transport-time/transport/) for the owning APIs.

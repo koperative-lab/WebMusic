@@ -12,7 +12,7 @@ import LiveDemoCanvas from '../LiveDemoCanvas.astro';
   </div>
   <LiveDemoCanvas>
     <div class="wui-row">
-      <button class="wui-btn" data-mutate type="button">Mutate score ▸</button>
+      <button class="wui-btn" data-mutate type="button">Extend passage ▸</button>
       <div class="programmatic-demo__stack">
         <span class="wui-readout" data-key>key: —</span>
         <span class="wui-readout" data-chords>chords: —</span>
@@ -24,53 +24,19 @@ import LiveDemoCanvas from '../LiveDemoCanvas.astro';
 
 <script>
   import {mountDemos} from '../demo-lifecycle';
-  import { Duration, MeasureId, PartId, Pitch, Rational, ScoreBuilder, VoiceId } from '@webmusic/score';
   import { createAnalysisSession } from '@webmusic/score/analyze/headless';
+  import {arabesqueExcerpt, loadArabesqueScore} from '../headless/arabesque-score';
 
-  // A clear diatonic phrase. `variant` swaps in a different mode/contour so the
-  // mutated score re-analyzes to a new key + chords.
-  function sampleScore(variant: 0 | 1) {
-    const b = new ScoreBuilder();
-    const partId = PartId('piano');
-    const voice = VoiceId('v1');
-    const timeSignature = { numerator: 4, denominator: 4 };
-    b.setMetadata({ title: 'Phrase' })
-      .addTempo({ atQuarters: Rational.ZERO, bpm: 100 })
-      .addMeter({ atQuarters: Rational.ZERO, measureNumber: 1, timeSignature });
-    b.addPart({ id: partId, name: 'Piano', staves: 1 });
-    // variant 0: C major (I–IV–V–I outline). variant 1: A minor / G-leaning.
-    const pitches = variant === 0
-      ? ['C4','E4','G4','C5','F4','A4','C5','F5','G4','B4','D5','G5','C5','G4','E4','C4']
-      : ['A3','C4','E4','A4','D4','F4','A4','D5','E4','G4','B4','E5','A4','E4','C4','A3'];
-    pitches.forEach((name, i) => {
-      const measureNumber = Math.floor(i / 8) + 1;
-      if (i % 8 === 0) {
-        b.addMeasure({
-          id: MeasureId(`m${measureNumber}`),
-          number: measureNumber,
-          onsetQuarters: new Rational((measureNumber - 1) * 4, 1),
-          durationQuarters: new Rational(4, 1),
-          timeSignature,
-        });
-      }
-      b.addNote(partId, {
-        id: b.newNoteId(),
-        pitch: Pitch.parse(name),
-        onsetQuarters: new Rational(i, 2),
-        duration: Duration.eighth(),
-        voice,
-      });
-    });
-    return b.build();
-  }
-
-  mountDemos('[data-programmatic-analysissession]', (root, scope) => {
+  mountDemos('[data-programmatic-analysissession]', async (root, scope) => {
+    const source = await loadArabesqueScore();
+    if (!scope.active) return;
+    const passages = [arabesqueExcerpt(source, 16), arabesqueExcerpt(source, 24)] as const;
     const btn = root.querySelector('[data-mutate]') as HTMLButtonElement;
     const keyEl = root.querySelector('[data-key]') as HTMLElement;
     const chordsEl = root.querySelector('[data-chords]') as HTMLElement;
     const romanEl = root.querySelector('[data-roman]') as HTMLElement;
 
-    const session = createAnalysisSession(sampleScore(0), { windowQuarters: 2 });
+    const session = createAnalysisSession(passages[0], { windowQuarters: 2 });
 
     const render = () => {
       const r = session.result;
@@ -86,10 +52,10 @@ import LiveDemoCanvas from '../LiveDemoCanvas.astro';
     let variant: 0 | 1 = 0;
     scope.listen(btn, 'click', () => {
       variant = variant === 0 ? 1 : 0;
-      // Incremental re-analysis: feed the next score to the live session.
-      session.update(sampleScore(variant));
+      // Re-analysis uses another immutable excerpt of the same piece.
+      session.update(passages[variant]);
       render();
-      btn.textContent = variant === 0 ? 'Mutate score ▸' : 'Revert score ▸';
+      btn.textContent = variant === 0 ? 'Extend passage ▸' : 'Opening passage ▸';
     });
   });
 </script>

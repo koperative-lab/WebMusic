@@ -5,7 +5,7 @@ import type {Rack} from '../../headless/rack';
  *
  * ```html
  * <score-player>              <!-- the transport -->
- *   <rack-control></rack-control>   <!-- the desk, over a headless Rack -->
+ *   <score-rack-control></score-rack-control>   <!-- the desk, over a headless Rack -->
  * </score-player>
  * ```
  *
@@ -15,13 +15,13 @@ import type {Rack} from '../../headless/rack';
  *
  * The desk announces, and the player also pulls at its own mount. Both, because
  * custom-element upgrade is grouped by tag rather than by tree position: this
- * package's demo defines `score-player` before `rack-control`, so
+ * package's demo defines `score-player` before `score-rack-control`, so
  * whichever half of the exchange happens depends on which tag was defined
  * first, and neither half is guaranteed to be the one that lands.
  */
 
 /** Tag a player looks for below it. */
-export const RACK_DESK_TAG = 'rack-control';
+export const RACK_DESK_TAG = 'score-rack-control';
 
 /** Bubbles from a desk when its rack changes. */
 export const RACK_SHARE_EVENT = 'webscore:rack';

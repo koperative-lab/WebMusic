@@ -270,7 +270,7 @@ console.log('loaders ready');`;
 
 `@webmusic/score/play` is the **playback** capability of the `@webmusic/score` package. It owns the playback engines, audio graph, interaction drivers and playback UI. MIDI, MusicXML, MXL and ABC import/export live exclusively in [`@webmusic/score/io`](/score/api/io/).
 
-This page is the **reference** for that surface — the **push** (`ScorePlayer`) and **pull** (`InteractivePlayer`) engines, the `Sound` timbre wrapper, the `Effect` chain, the `Rack` ensemble, DOM-free `LfoController`, offline **WAV render**, live **recording** back to a Score, and **clock / Web MIDI** input drivers — with linked object references and editable examples for offline rendering and file input. For the same objects introduced through live running demos, see **[Headless Components › Play](/score/headless/#play)**; for the drop-in custom elements — `<score-player>`, `<rack-control>`, `<note-input>`, `<score-recorder>`, `<synth-panel>` — see **[Web Component › Play](/score/element/#play)**.
+This page is the **reference** for that surface — the **push** (`ScorePlayer`) and **pull** (`InteractivePlayer`) engines, the `Sound` timbre wrapper, the `Effect` chain, the `Rack` ensemble, DOM-free `LfoController`, offline **WAV render**, live **recording** back to a Score, and **clock / Web MIDI** input drivers — with linked object references and editable examples for offline rendering and file input. For the same objects introduced through live running demos, see **[Headless Components › Play](/score/headless/#play)**; for the drop-in custom elements — `<score-player>`, `<score-rack-control>`, `<score-note-input>`, `<score-recorder>`, `<score-synth-panel>` — see **[Web Component › Play](/score/element/#play)**.
 
 It does not render notation, piano rolls, analysis, or framework views — those live in [`@webmusic/score/view`](/score/api/view/), [`@webmusic/score/analyze`](/score/api/analyze/), and [`@webmusic/score/react`](/score/api/react/).
 
@@ -328,11 +328,11 @@ Every stateful object this capability publishes lives on
 [Web MIDI](/score/headless/play/interactive-player/#web-midi-input) adapters.
 
 [`SynthPanelAudioGraph`](/score/headless/play/sound/#synth-backends-synthpanelaudiograph)
-is the reusable effects/EQ graph coordinator behind `<synth-panel>`. It retains
+is the reusable effects/EQ graph coordinator behind `<score-synth-panel>`. It retains
 same-context routing ports across successful DSP replacements and keeps the old
 usable chain after a failed candidate build. Its Headless reference owns the
 options, dormant-port behavior and cleanup contract; the
-[Element reference](/score/element/play/synth-panel/#audio-routing-and-parameter-updates)
+[Element reference](/score/element/play/score-synth-panel/#audio-routing-and-parameter-updates)
 owns section controls and asynchronous sound-parameter feedback.
 
 This page owns stateless functions and browser transport adapters. Headless
@@ -508,9 +508,8 @@ target elements remain caller-owned.
 | `bindScroll`, `bindPointer`, `bindOrientation`, `bindValue` | Driver (`@webmusic/score/play/drivers`) | Bind scroll / pointer / orientation / value to a `PlaybackTransport` (e.g. a `ScorePlayer`). |
 | `Metronome`, `bindClock`, `bindMidiInput` | Live input | Drive the pull engine's `advance()` from a clock or Web MIDI. |
 | `defineScorePlayerElement`, `ScorePlayerElement` | Web Component | Register / the class behind `<score-player>`. |
-| `defineSimpleScorePlayerElement`, `SimpleScorePlayerElement` | Deprecated compatibility | Legacy names for `<simple-score-player>`; use the canonical score-player exports for new code. |
-| `defineRackControlElement`, `defineScoreRecorderElement` | Web Component | Register `<rack-control>` (Rack mixer with a master `.effect` proxy) / `<score-recorder>`. |
-| `defineNoteInputElement`, `defineSynthPanelElement` | Web Component | Register `<note-input>` / `<synth-panel>`. |
+| `defineRackControlElement`, `defineScoreRecorderElement` | Web Component | Register `<score-rack-control>` (Rack mixer with a master `.effect` proxy) / `<score-recorder>`. |
+| `defineNoteInputElement`, `defineSynthPanelElement` | Web Component | Register `<score-note-input>` / `<score-synth-panel>`. |
 | `defineAllElements` | Web Component | Register every element in the flat set at its default tag (the `/auto` entry calls this). |
 | `loadScore`, `loadScoreFromUrl`, `detectFormat` | IO (`@webmusic/score/io`) | Parse / fetch+parse / sniff format. |
 | `createParserWorker`, `handleParseRequest` | IO (`@webmusic/score/io/worker-client`, `/worker-protocol`) | Parse off the main thread in a Web Worker (with in-process fallback). |

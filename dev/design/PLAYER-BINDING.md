@@ -9,15 +9,15 @@
 Accepted on 2026-09-06 under [DEC-011](../DECISIONS.md).
 
 On this checkout, DEC-015 consolidates the implemented View tags into
-`score-view`, `pitch-view` and `sheet-view`; see [View families](VIEW-COMPONENTS.md).
+`score-view`, `score-pitch-view` and `score-sheet-view`; see [View families](VIEW-COMPONENTS.md).
 The proposed composition below retains its original target vocabulary and is
 not the current registration or attribute reference.
 
-Implementation observations in this specification refer to the main baseline
-recorded in [STATUS](../STATUS.md). Another branch may expose different bindings
-only when its tracked source, reference pages and status establish them. The
-accepted composition direction applies across branches without implying
-identical delivered APIs.
+Implementation observations in this specification must be read against this
+checkout's [STATUS](../STATUS.md), tracked source and public reference pages.
+Other maintained branches may expose different bindings; their own source,
+references and status establish those differences. The accepted composition
+direction applies across branches without implying identical delivered APIs.
 
 ## Purpose and accepted direction
 
@@ -315,16 +315,16 @@ compatibility review; they do not independently define the target contract:
 | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Score player and its current data/events/commands | [Play Element sources](../../packages/score/src/play/element/), [Play references](../../apps/doc/webmusic/src/content/docs/score/element/index.mdx#play); use this branch's exported player tag and owning leaf page |
 | Analyze attachment and score loading              | [Player binding](../../packages/score/src/analyze/element/internal/player-binding.ts), [score source](../../packages/score/src/analyze/element/internal/score-source.ts), [Analyze reference](../../apps/doc/webmusic/src/content/docs/score/element/index.mdx#analyze) |
-| Interactive analysis position                     | [Analyze lane source](../../packages/score/src/analyze/element/internal/analysis-component.ts), [chord-analysis reference](../../apps/doc/webmusic/src/content/docs/score/element/analyze/chord-analysis.mdx)                                                                         |
+| Interactive analysis position                     | [Analyze lane source](../../packages/score/src/analyze/element/internal/analysis-component.ts), [score-chord-analysis reference](../../apps/doc/webmusic/src/content/docs/score/element/analyze/score-chord-analysis.mdx)                                                                         |
 | Score and keyboard views                          | [View Elements](../../packages/score/src/view/element/), [View reference](../../apps/doc/webmusic/src/content/docs/score/element/index.mdx#view)                                                                                                                     |
 | Nonvisual behavior and custom composition         | [Play API](../../apps/doc/webmusic/src/content/docs/score/api/play.mdx), [Analyze API](../../apps/doc/webmusic/src/content/docs/score/api/analyze.mdx), [View API](../../apps/doc/webmusic/src/content/docs/score/api/view.mdx)                                         |
-| Shared timing and cross-domain boundaries         | [Architecture](../ARCHITECTURE.md), [shared-clock design](../../platform/shared-clock-injection.md), [current migration status](../STATUS.md#first-release-boundary)                                                                                                                     |
+| Shared timing and cross-domain boundaries         | [Architecture](../ARCHITECTURE.md), [shared-clock design](../../platform/shared-clock-injection.md), [Bridge contracts](../../bridges/README.md)                                                                                                                     |
 
-Audio counterparts require their own component-specific connection contracts.
-Their source and public references are not in this checkout; use
-[Architecture](../ARCHITECTURE.md) for the accepted boundary and
-[STATUS](../STATUS.md) for migration state. Review the target branch's tracked
-source and references before describing Audio behavior as implemented.
+For Audio counterparts, start with the
+[View Elements](../../packages/audio/src/view/element/),
+[View reference](../../apps/doc/webmusic/src/content/docs/audio/element/index.mdx#view)
+and [Analyze reference](../../apps/doc/webmusic/src/content/docs/audio/element/index.mdx#analyze).
+Those references own their current, component-specific connection contracts.
 
 When implementation changes a public contract, update its owning reference and
 demo using the applicable [page template](../docs/README.md).

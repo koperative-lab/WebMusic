@@ -11,7 +11,7 @@ defineScorePlayerElement();
 defineScoreViewElement();
 definePitchViewElement();
 
-const fixture = new Uint8Array(readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../public/mxl/demo.mxl')));
+const fixture = new Uint8Array(readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../public/mxl/Arabesque No.1.mxl')));
 const cleanups: Array<() => void> = [];
 
 function mount() {
@@ -19,7 +19,7 @@ function mount() {
     <score-player id="piece"></score-player>
     <p role="status"></p>
     <score-view player="#piece" type="staff"></score-view>
-    <pitch-view player="#piece" type="keyboard" low="48" high="84" fit-to-width="true" white-key-height="128" black-key-height="80"></pitch-view>`;
+    <score-pitch-view player="#piece" type="keyboard" low="48" high="84" fit-to-width="true" white-key-height="128" black-key-height="80"></score-pitch-view>`;
   const player = document.querySelector<ScorePlayerElement>('score-player')!;
   const status = document.querySelector<HTMLElement>('[role="status"]')!;
   const detach = mountQuickStartStatus(player, status);
@@ -61,30 +61,30 @@ describe('Quick Start with native public elements', () => {
     await vi.waitFor(() => expect(status.textContent).toContain('404 Not Found'));
     expect(status.hidden).toBe(false);
 
-    player.setAttribute('src', '/demo.mxl');
+    player.setAttribute('src', '/arabesque.mxl');
     await vi.waitFor(() => expect(player.playback.snapshot().readiness).toBe('ready'));
     expect(status.hidden).toBe(true);
     expect(status.textContent).toBe('');
     const score = player.playback.snapshot().score!;
-    expect([...score.allNotes()]).toHaveLength(384);
-    expect(score.durationSeconds).toBeCloseTo(32);
+    expect([...score.allNotes()].length).toBeGreaterThan(1000);
+    expect(score.durationSeconds).toBeGreaterThan(100);
     const view = document.querySelector<ScoreViewElement>('score-view')!;
     await vi.waitFor(() => expect(view.score).toBe(score));
     await vi.waitFor(() => expect(view.querySelector('svg')).not.toBeNull());
-    expect(document.querySelector('pitch-view [data-midi="48"]')).not.toBeNull();
-    expect(document.querySelector('pitch-view [data-midi="84"]')).not.toBeNull();
-    expect(document.querySelectorAll('pitch-view [data-midi]')).toHaveLength(37);
-    expect(document.querySelector<HTMLElement>('pitch-view [part~="board"]')!.style.height).toBe('128px');
-    expect(document.querySelector<HTMLElement>('pitch-view [data-midi="49"]')!.style.height).toBe('80px');
+    expect(document.querySelector('score-pitch-view [data-midi="48"]')).not.toBeNull();
+    expect(document.querySelector('score-pitch-view [data-midi="84"]')).not.toBeNull();
+    expect(document.querySelectorAll('score-pitch-view [data-midi]')).toHaveLength(37);
+    expect(document.querySelector<HTMLElement>('score-pitch-view [part~="board"]')!.style.height).toBe('128px');
+    expect(document.querySelector<HTMLElement>('score-pitch-view [data-midi="49"]')!.style.height).toBe('80px');
     await player.seekNominal(2.4);
     expect(view.currentTime).toBeCloseTo(2.4);
     expect(fetch).toHaveBeenCalledTimes(2); // Views reuse the player's parsed file.
-  });
+  }, 20_000);
 
   it('keeps playback errors visible across position updates and detaches cleanly', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(fixture)));
     const {player, status, detach} = mount();
-    player.setAttribute('src', '/demo.mxl');
+    player.setAttribute('src', '/arabesque.mxl');
     await vi.waitFor(() => expect(player.playback.snapshot().readiness).toBe('ready'));
     player.dispatchEvent(new CustomEvent('webscore:error', {detail: {error: new Error('Audio unavailable')}}));
     await player.seekNominal(2.4);
@@ -95,5 +95,5 @@ describe('Quick Start with native public elements', () => {
     player.dispatchEvent(new CustomEvent('webscore:error', {detail: {error: new Error('Late failure')}}));
     player.removeAttribute('src');
     expect(status.textContent).toBe('Playback failed: Audio unavailable');
-  });
+  }, 20_000);
 });

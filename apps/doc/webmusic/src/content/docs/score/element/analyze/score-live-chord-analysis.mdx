@@ -1,0 +1,104 @@
+---
+title: '<score-live-chord-analysis>'
+description: 'A current-chord nameplate driven by the selected player’s sounding notes.'
+sidebar:
+  order: 2
+---
+
+import AnalysisFeaturePlayground from '../../../../../components/elements/AnalysisFeaturePlayground.astro';
+
+This component displays the chord named from the selected player's currently held MIDI notes. Optional alternate interpretations appear as secondary text beneath the main symbol, not as commands. Applications that need past transitions can retain timestamped [Headless tracker updates](/score/headless/analyze/live-trackers/#chord-history).
+
+<AnalysisFeaturePlayground tag="score-live-chord-analysis" />
+
+## Import
+
+```html
+<script type="module">
+  import {defineScorePlayerElement} from '@webmusic/score/play/element';
+  import {defineLiveChordAnalysisElement} from '@webmusic/score/analyze/element';
+  defineScorePlayerElement();
+  defineLiveChordAnalysisElement();
+</script>
+
+<score-player id="piece" src="/midi/Arabesque%20No.1.mid"></score-player>
+<score-live-chord-analysis player="#piece"></score-live-chord-analysis>
+```
+
+The live demo pairs this component with one `<score-player>` using the same `/midi/Arabesque%20No.1.mid` source as the other Score Analyze demos. Parameters configures those two elements; Copy includes their markup and Reset restores their original attributes and connection. For optional supporting views, see [Compose a performance](/score/element/#compose-a-performance). `defineLiveChordAnalysisElement(tag?)` is idempotent and SSR-safe; `defineAllAnalysisElements()` registers the Analyze family from the same entry.
+
+## Behavior and lifetime
+
+The nameplate and `.chord` update immediately as held notes change. When a single note or another set has no defensible chord name, the main reading shows its actual pitch names; `.chord` remains undefined and no chord-change event is invented. The symbol, voicing and alternate rows keep their height through rests and note changes. Alternate readings, when shown, are noninteractive text below the primary chord. Display configuration stays in the external Parameters section. `webscore:chordchange` waits for a stable, nonempty chord symbol; a changed note set or reset cancels an outstanding notification. The component has no history lane, score seek, keyboard, staff, fretboard, tabs or settings strip.
+
+This tag uses the selected player’s held notes and note/state events. When available, the player’s `.playback` [shared source](/score/api/#shared-playback-observation) supplies current activity and subsequent updates; the event path remains a compatibility fallback. It has no score-loading attributes. A native snapshot initializes current held notes, while a structural event-only source begins with incoming notes. Without note input it waits. Late or replaced targets are rebound.
+
+The selector must match exactly one target in the current Document or ShadowRoot. Invalid or ambiguous matches remain unbound. Native single-score player mode supplies complete initial data/state; Rack/controller modes do not promise that snapshot. Disconnect cancels owned work, releases subscriptions/observation and destroys presenters, while the borrowed player keeps its own lifetime.
+
+<details class="component-section">
+<summary>API</summary>
+
+### Attributes
+
+| Attribute | Values / default | Behavior |
+| --- | --- | --- |
+| `player` | selector, absent | Exactly one source in the component’s Document or ShadowRoot; borrow held notes, state and note events. |
+| `density` | `comfortable` / `compact`, `comfortable` | Type and spacing defaults for this surface. |
+| `scheme` | `light` / `dark`, inherited | Pin this surface’s palette; removing it follows the page. |
+| `spelling` | `auto` / `sharp` / `flat`, `auto` | Pitch-name spelling from the available key context or an explicit preference. |
+| `alternates` | `show` / `hide`, `show` | Include or omit noninteractive alternate readings below the primary symbol. |
+| `stability-ms` | milliseconds `0`–`1000`, `80` | Delay a nonempty `webscore:chordchange` until the displayed symbol remains stable; `0` emits immediately. Invalid values use `80`. Does not delay the nameplate. |
+
+Unknown display values fall back to the documented default. This fixed component has no `type`, `show`, `shell`, `range` or `tuning` control; configure sibling pitch views on their own tags.
+
+### Properties
+
+| Property | Type | Behavior |
+| --- | --- | --- |
+| `.density` | `comfortable \| compact` | Reflected density. |
+| `.scheme` | `light \| dark \| undefined` | Reflected palette; undefined removes the override. |
+| `.spelling` | `auto \| sharp \| flat` | Reflected pitch spelling. |
+| `.chord` | read-only `string \| undefined` | Named chord symbol; undefined for silence or a note set without a defensible chord name. |
+| `.stabilityMs` | `number` | Reflected notification delay in milliseconds. |
+
+`LiveChordAnalysisElement` is exported from `@webmusic/score/analyze/element`. Inherited `.selection` and `.analysis` are undefined on this note-only component. Inherited `selectRegion()` and `clearSelection()` have no effect on this tag; assigning inherited `.score` does not turn it into a score lane. There are no public playback methods.
+
+### Events
+
+All emitted events bubble and are composed.
+
+| Event | Detail | Trigger |
+| --- | --- | --- |
+| `webscore:chordchange` | `{chord, midis}` | The displayed nonempty chord remains unchanged for `stability-ms`; silence, reset, source replacement and changed notes cancel pending notification. |
+
+### Accessibility
+
+The nameplate exposes the current chord or literal pitch names, pitches and optional alternate readings as text. Its main and secondary rows retain their size as the interpretation changes, with horizontal scrolling for unusually long readings. It has no alternate-choice button, slider or transport command. Automatic motion respects reduced-motion preference on moving surfaces; display controls remain outside the component.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+The component uses light DOM. Its block host fills the available width and can shrink in flex/grid layouts; application CSS can override its layout. Set public tokens on this host or any ancestor. The component does not install host-local theme defaults that mask inherited values.
+
+One outer surface owns background, border, padding and radius. The inner musical presenter stays unframed, so translucent backgrounds are painted once. Use `--wm-component-background`, `--wm-component-border` (a complete CSS border), `--wm-component-radius` and `--wm-component-padding`; the corresponding `--wm-workbench-surface-*` tokens provide a specific override. By default it has a neutral surface, a 1px border and `.6rem` padding on all sides, matching the player. Its light/dark colors follow the inherited scheme or the explicit `scheme` attribute. Set the component border and padding to `0` and its background to `transparent` for a frameless composition. `--wm-surface`, `--wm-foreground`, `--wm-accent`, `--wm-border` (a color) and `--wm-control-radius` supply shared palette and control defaults. Existing `--wm-analysis-*` and `--wm-harmony-*` palette overrides remain supported.
+
+```css
+score-live-chord-analysis {
+  --wm-component-background: transparent;
+  --wm-component-border: 1px solid #94a3b8;
+  --wm-component-radius: .75rem;
+  --wm-foreground: #0f172a;
+  --wm-accent: #7c3aed;
+  --wm-accent-foreground: #fff;
+}
+```
+
+Nameplate text follows `--wm-foreground`; `--wm-harmony-foreground` can override only this presenter family. Alternate names are static secondary text and wrap within the available width.
+
+Stable part tokens are `root` on the direct child wrapper, `presentation`, `surface`, `content`, `index`, and `nameplate` and `symbol`. Use selectors such as `score-live-chord-analysis [part~="surface"]` in application CSS. These are light-DOM hooks, not Shadow DOM `::part()` selectors; private `.wui-*` classes are not an API. The same hooks remain available after configuration changes and reconnects.
+
+The [harmony presenter](/uikit/views-analysis/harmony/) and [workbench presenter](/uikit/layout-feedback/workbench/) own the complete token references. No header, tabs, dock controls or sibling pitch views are embedded in this component.
+
+</details>

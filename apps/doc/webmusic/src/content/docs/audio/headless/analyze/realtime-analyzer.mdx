@@ -1,0 +1,178 @@
+---
+title: 'createRealtimeAnalyzer'
+description: 'Sample a borrowed AnalyserNode for level, spectrum or time-domain frames, and derive approximate live transient cues.'
+sidebar:
+  order: 2
+---
+
+`createRealtimeAnalyzer(source, options?)` polls an `AnalyserNode` and reports
+what is passing through it — level, brightness, and optionally pitch — as a
+frame per interval. It is the live counterpart of everything on
+[`@webmusic/audio/analyze`](/audio/api/analyze/): those functions measure a
+clip you have, this one measures a signal you are hearing.
+
+`source` is either an `AnalyserNode` or anything exposing one as `.analyser`,
+which is why an `AudioClipPlayer` can be passed directly.
+
+It borrows the analyser and never disconnects or disposes it. However, an explicit
+`fftSize` currently changes that borrowed analyser on start; omit the option when
+its configuration belongs to another owner.
+`stop()` ends the poll loop and is idempotent; there is nothing else to
+release.
+
+## Import
+
+```ts
+import {createRealtimeAnalyzer} from '@webmusic/audio/analyze/headless';
+
+const analyzer = createRealtimeAnalyzer(player, {pitch: true});
+
+analyzer.start((frame) => {
+  paint(frame.rms, frame.peak, frame.centroid, frame.pitch);
+});
+
+// … later
+analyzer.stop();
+```
+
+## Frames, and what may be missing
+
+Every frame carries `time`, `rms`, `peak` and `centroid`. Three payloads are
+conditional, and a UI has to handle their absence rather than treat it as an
+error:
+
+- `pitch` and `clarity` need `pitch: true` and the package's `pitchy`
+  dependency, which is imported dynamically. The first frames after `start()` can
+  arrive before that import settles — that is the resting state, not a
+  failure, so distinguish pending/unavailable pitch from a measured silent signal.
+- `frequencyData` is present only with `includeSpectrum: true`, since copying
+  the byte spectrum every interval is a real cost when nothing draws it.
+- `timeDomainData` is present only with `includeTimeDomain: true`. It is a fresh
+  `Float32Array` copy of the sampled window, so retaining one frame does not
+  change when the next interval reuses the analyser's scratch buffer. An
+  oscilloscope can inspect this window without retuning the borrowed FFT size.
+
+`fftSize` is applied to the resolved analyser when explicitly supplied. This
+implementation creates no analyser of its own and does not restore the previous
+FFT size on stop. With the option omitted, the borrowed node keeps its setting.
+
+## Live transient cues
+
+`createTransientDetector()` is a separate Headless state machine for the
+relative attack strength of successive realtime frames. Feed it the
+sampler's optional `frequencyData`, `rms` and monotonic `time`; it compares
+positive FFT-bin rises with RMS growth. The first observation establishes a
+baseline and cannot be a hit. `observe(input, sensitivity?, minIntervalMs?)`
+returns `{strength, threshold, hit, intervalMs?}`. `intervalMs` appears on a
+hit after an earlier hit, not on every frame. Call `reset()` when playback
+seeks, the source changes, or a frozen inspection resumes.
+
+```ts
+import {createRealtimeAnalyzer, createTransientDetector} from '@webmusic/audio/analyze/headless';
+
+declare const analyser: AnalyserNode;
+const detector = createTransientDetector();
+const sampler = createRealtimeAnalyzer(analyser, {includeSpectrum: true});
+sampler.start((frame) => {
+  if (!frame.frequencyData) return;
+  const cue = detector.observe({
+    time: frame.time,
+    rms: frame.rms,
+    frequencyData: frame.frequencyData,
+  }, 0.55, 160);
+  if (cue.hit) console.log(cue.strength, cue.intervalMs);
+});
+// On teardown:
+sampler.stop();
+detector.reset();
+```
+
+Sensitivity is clamped to `0..1` (default `0.55`); minimum hit spacing is
+clamped to `50..1000` ms (default `160`). The detector rejects nonfinite time
+or RMS and an empty FFT frame. Its output is a **polled attack cue**, not a
+beat/BPM estimate, clip-relative timestamp or sample-accurate onset. The
+borrowed analyser's smoothing and the poll interval can blur or miss attacks.
+
+## Time, ownership and contract source
+
+This analyzer observes live signal windows. Its interval timestamp is observation
+time, not musical position or a session authority. It does not schedule sound,
+seek the source or attach to a worker. A failed pitchy import omits pitch fields; source
+resolution/setup can throw, while per-frame failures are swallowed.
+
+The public barrel and `packages/audio/src/analyze/headless/realtime.ts` define the value, option, state and event
+contracts described below. The reference does not turn private implementation
+fields into public API.
+
+<details class="component-section">
+<summary>API</summary>
+
+**Construction**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `createRealtimeAnalyzer(source, options?)` | RealtimeAnalyzer | Accepts an AnalyserNode or RealtimeSource; source is resolved when start is called. |
+| `RealtimeSource.analyser` | optional AnalyserNode | Borrowed tap; start throws if no analyser can be resolved. |
+
+**RealtimeAnalyzerOptions**
+
+| Member | Kind | Default | Description |
+| --- | --- | --- | --- |
+| `intervalMs` | option | `50` | Floored and lower-bounded at 1 ms for normal finite input. |
+| `pitch` | option | `false` | Dynamically load the package's pitchy dependency and attach pitch/clarity if available. |
+| `includeSpectrum` | option | `false` | Copy the raw byte frequency array into each frame. |
+| `includeTimeDomain` | option | `false` | Copy the float time-domain sample window into each frame. |
+| `fftSize` | option | unchanged | When supplied, assigns the borrowed analyser. No owned-analyser creation path exists. |
+
+**RealtimeAnalyzer commands and state**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `start(onFrame)` | void | Starts a main-thread interval; repeated start while running is a no-op, retaining the existing callback. |
+| `stop()` | void | Idempotently stops the interval; may later start again. |
+| `running` | readonly boolean | Whether polling is active. |
+
+**RealtimeFrame callback payload**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `time` | number | Milliseconds from performance.now(), falling back to Date.now(); not AudioContext time. |
+| `rms` | number | RMS of float time-domain samples; no explicit output clamp. |
+| `peak` | number | Maximum absolute float sample; no explicit output clamp. |
+| `centroid` | number | Byte-spectrum-weighted centroid in Hz; 0 for no spectral energy. |
+| `pitch` | optional number | Fundamental Hz when pitchy is available. |
+| `clarity` | optional number | Pitch detector confidence paired with pitch. |
+| `frequencyData` | optional Uint8Array | Owned copy of the byte spectrum when includeSpectrum is true. |
+| `timeDomainData` | optional Float32Array | Owned copy of the float sample window when includeTimeDomain is true. |
+
+**Transient detector**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `createTransientDetector()` | factory | Creates a detector with no graph, timer or DOM. |
+| `observe({time, rms, frequencyData}, sensitivity?, minIntervalMs?)` | command | Returns relative `strength` in `0..1`, the active `threshold`, `hit`, and an optional elapsed `intervalMs` between hits. |
+| `reset()` | command | Drops prior FFT/RMS evidence and the last-hit timestamp. |
+| `TransientDetector`, `TransientInput`, `TransientObservation` | types | Detector contract, sample input and observation result. |
+
+**Errors, lifecycle and types**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `onFrame(frame)` | callback | Only delivery interface; there is no on/off emitter or error event. Per-frame reads and callback exceptions are contained. |
+| `stop()` | cleanup | Stops polling but does not change the borrowed graph. Drop the analyzer reference to release retained scratch state; no dispose method. |
+| `RealtimeAnalyzer`, `RealtimeAnalyzerOptions`, `RealtimeSource`, `RealtimeFrame` | types | Object, construction source/options and callback shape owned by this page. |
+
+</details>
+
+<div class="component-section">
+
+**Composed by.** The [live Analyze Elements](/audio/element/#analyze) use this
+sampler with the selected player's borrowed tap while playback is active, or
+with a caller-supplied `AnalyserNode`. The transient tool also uses the
+detector. Use these Headless contracts directly for application-owned live UI.
+
+</div>
+
+## Related
+
+[Metering](/audio/headless/play/engines/) · [Live projection](/audio/headless/view/live-projection/) · [Clip analysis](/audio/headless/analyze/audio-analysis-session/)

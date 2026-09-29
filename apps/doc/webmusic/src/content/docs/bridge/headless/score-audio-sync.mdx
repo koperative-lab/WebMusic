@@ -1,0 +1,281 @@
+---
+title: 'ScoreAudioSync'
+description: 'The stateful transport that coordinates a score player and a clip player using a shared AudioContext reference and group commands, correcting drift as it goes.'
+sidebar:
+  order: 1
+---
+
+import ScoreAudioSyncDemo from '../../../../components/bridges/ScoreAudioSyncDemo.astro';
+
+`ScoreAudioSync` drives two transports as one. One participant owns the clock
+(the **master**) and the other follows it, with a drift monitor reseeking the
+follower whenever the two diverge. It is defined by **role, not by family**:
+the same object backs both a score-driven and an audio-driven pairing, which
+is why swapping the roles is a different factory rather than a different
+class.
+
+`dispose()` stops the drift monitor and calls each participant's optional
+`dispose()` method. Both factory-created players are therefore released with
+the sync. The factories also close any `AudioContext` they created; an existing
+context passed by the caller remains open. If an application must retain a
+transport after disposing a manually constructed sync, pass a transport adapter
+that omits `dispose()`.
+
+<ScoreAudioSyncDemo />
+
+## Import
+
+```ts
+import {createAudioMasteredPlayback, renderScoreToClip} from '@webmusic/bridge';
+
+const clip = await renderScoreToClip(score);         // includes its rendering tail
+const {sync, scorePlayer} = createAudioMasteredPlayback(score, clip);
+scorePlayer.setVolume(0);                            // the clip is the sounding source
+
+await sync.play();
+await sync.seek(12.5);
+// Keep the pair until the owning session/view is removed.
+const dispose = () => sync.dispose();
+```
+
+Both factories build the two players on one shared `AudioContext` and hand
+back the sync that drives them, so a caller never has to match contexts by
+hand. `sync.dispose()` releases both players and closes a factory-created
+context; a context supplied through `options.context` stays open for its owner.
+Constructing `new ScoreAudioSync(master, follower, context, options)` directly is
+the path when you already own both transports.
+
+The factories use the audio buffer engine for scheduled starts. Changing the
+shared playback rate changes the clip's pitch; `clipOptions.preservesPitch` is a
+media-engine option and has no effect on this buffer path. Use a different
+transport composition when pitch-preserving time stretch is required.
+
+## Score as master
+
+`createSyncedPlayback(score, clip)` builds a `ScorePlayer` and an
+`AudioClipPlayer` on one shared `AudioContext` and returns a `ScoreAudioSync`
+that drives them as a unit. The score is the master clock; `play()` proposes a
+shared audio-clock origin that the score player arms via its scheduled
+`play(when)` and the clip joins at the very same instant through the buffer
+engine's scheduled `play(when)`. That aligns a transport origin when preparation
+finishes in time; rests, backend capability and output latency determine the first
+audible samples.
+A master without scheduled starts ignores the proposal and the clip joins a
+lead-in later. A drift monitor reseeks the clip if the transports ever
+diverge.
+
+The demo above renders the score **offline** into a backing track
+(`renderScoreToClip`), then plays that clip as the sounding source while a
+muted score master drives the piano-roll. This remains score-mastered even though
+the clip provides the audible material. The displayed score and clip positions
+are model observations; they are not a benchmark or proof of audible sample accuracy.
+
+The demo renders with `tailSeconds: 0` so its Score-mastered clip ends with the
+score. The import example uses Audio as master to play the full default rendering
+tail. `createSyncedPlayback` rejects a Bridge-rendered clip with a positive tail;
+use `createAudioMasteredPlayback` with the original Score for that clip
+or render with `tailSeconds: 0` when Score must remain master.
+For repeats, use `expandRepeats(score)` from `@webmusic/score` before rendering,
+then pair that expanded Score instance. `scoreOptions.expandRepeats` changes
+only the ScorePlayer timeline and is rejected for Bridge-rendered clips.
+
+For an **external** backing track (a real recording), pass
+`clipOffsetSeconds` — the clip time corresponding to score-seconds zero — and
+read the [timeline conversion contracts](/bridge/api/) when preparing alignment
+data. The current sync itself consumes a fixed offset, not a nonlinear tempo map.
+
+## Audio as master
+
+To follow a real recording rather than a rendered backing track, swap the
+roles: `createAudioMasteredPlayback` makes the clip's clock the master and the
+score the follower.
+
+```ts
+import {createAudioMasteredPlayback} from '@webmusic/bridge';
+
+const {sync, scorePlayer} = createAudioMasteredPlayback(score, recording, {
+  clipOffsetSeconds: 2.4,   // score-zero sits 2.4s into the recording
+});
+scorePlayer.setVolume(0);   // the recording is the sounding source
+
+await sync.play();          // transport positions use the recording axis
+const dispose = () => sync.dispose(); // eventual owner cleanup
+```
+
+Positions are on the **recording's** seconds axis here. The score is held out
+of the recording's lead-in — a count-in, an anacrusis, room tone — and enters
+when the recording reaches score-zero, rather than starting alongside it and
+running that much early.
+
+The same factory is the appropriate master for an offline-rendered clip with a
+tail: the clip continues until its own end after the Score player finishes.
+
+## Operational errors
+
+Legacy controls and background reconciliation report asynchronous failures
+through `operation-error` events and `onOperationError`. Revisioned `dispatch()`
+commands also expose failures through their returned promise. A failure that
+still owns the current authority attempts to pause participants; an older failure
+cannot override a newer command. Cleanup continues if an adapter throws, without
+guaranteeing that the failing participant paused. Observer exceptions are
+contained rather than re-thrown into the queue.
+
+## Revisioned commands
+
+The Bridge root exports `TransportCommand`, `TransportCommit`, `TransportEvent`
+and `TransportSnapshot` from Kernel. Their complete field and event contract is
+owned by [Kernel session commands](/kernel/api/#session-commands-and-observation).
+`ScoreAudioSync` delegates to that existing group rather than owning another clock.
+
+```ts
+import type {ScoreAudioSync} from '@webmusic/bridge';
+
+async function moveSession(sync: ScoreAudioSync): Promise<void> {
+  const detach = sync.subscribe((event) => {
+    if (event.type === 'error' || event.type === 'operation-error') {
+      console.error(event.error);
+    }
+  });
+  try {
+    await sync.dispatch({type: 'rate', rate: 2});
+    const result = await sync.dispatch({type: 'seek', position: 12.5});
+    if (result.status === 'committed') console.log(result.snapshot.position);
+  } finally {
+    detach();
+  }
+}
+```
+
+A committed seek reports the actual clamped position; it does not mean playback
+has finished. A master that fails to resume is rejected by `dispatch` even if its
+legacy seek method resolved. The older methods remain available with their
+compatibility behavior; applications needing awaited rate/seek failure should
+use dispatch. Direct mutations on the returned players bypass group commands
+and are observed only where drift/stop reconciliation supports them.
+
+For independent native clip loops, use explicit Kernel follower adapters and
+[participant-local mappings](/kernel/api/#participant-local-time-and-native-loops).
+The two Bridge factories continue to reject `clipOptions.loop`; their top-level
+loop controls a coordinated group loop, not independent clip loops.
+
+## Time, ownership and contract source
+
+One group has one selected position and command authority. `dispatch` publishes
+revisioned invalidation and waits for engine command/re-entry settlement. The
+engines retain private clocks and share an AudioContext reference; same-instance
+writable-clock injection is not implemented. Independent sessions may use separate groups. Synchronization
+uses fixed offsets and tick-detected loop boundaries; model conversions have their
+separate information limits on the [Bridge API page](/bridge/api/).
+
+The public barrel and `bridges/score-audio/src/sync.ts, audio-master.ts and platform/kernel/src/sync.ts` define the value, option, state and event
+contracts described below. The reference does not turn private implementation
+fields into public API.
+
+<details class="component-section">
+<summary>API</summary>
+
+**Construction and factories**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `new ScoreAudioSync(master, follower, context, options?)` | constructor | Uses structural participants and a BaseAudioContext reference; caller must supply compatible clocks. Disposal calls each optional participant disposer. |
+| `createSyncedPlayback(score, clip, options?)` | factory | Creates ScorePlayer, AudioClipPlayer and sync; returns `{sync, scorePlayer, clipPlayer}` with nominal score seconds as master axis. |
+| `createAudioMasteredPlayback(score, clip, options?)` | factory | Returns the same objects with clip seconds as master axis; uses axis/lead-in adapters. |
+
+**ScoreAudioSyncOptions**
+
+| Member | Kind | Default | Description |
+| --- | --- | --- | --- |
+| `leadInSeconds` | option | `0.06` | Nonnegative scheduling headroom in reference seconds. |
+| `clipOffsetSeconds` | option | `0` | Finite, nonnegative clip seconds at score zero; positive recording lead-in. Both factories reject invalid values with `RangeError` before acquiring a context or constructing players. The reverse adapter absorbs the offset. |
+| `driftToleranceSeconds` | option | `0.03` | Tolerance for follower divergence. |
+| `driftCheckIntervalMs` | option | `250` | Drift cadence; 0 disables follower drift checks and re-joins, while the active-session watcher still handles natural master completion and group loops. |
+| `loop` | option | `null` | SyncLoopRegion on the master axis. |
+| `tick` | option | Kernel default | TickSourceOptions; nominal interval 25 ms with worker fallback. |
+| `onOperationError` | option | none | `(operation, error) => void` observer for background command failures; observer throws are contained. |
+
+**Factory-specific options**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `context` | optional AudioContext | Shared by the two factory-created players; borrowed if supplied, created/owned otherwise. |
+| `scoreOptions` | ScorePlayer options | Forwarded with the chosen context; see the ScorePlayer page for the full engine/backend option contract. The Score-master factory validates an initial `tempo` as a finite positive BPM whose ratio to the Score base tempo is within 0.25–4×. The audio-master factory rejects a defined initial `tempo` because its master clock would replace that rate. Both factories reject `expandRepeats: true` for a Bridge-rendered clip. Use `sync.setRate()` for later coordinated changes. |
+| `clipOptions` | Restricted AudioClipPlayer options | Both factories enforce the chosen context and buffer engine, reject conflicting engine/media-adapter choices, and require decoded samples. Defined clip-side `loop` / `rate` overrides are rejected, including `false` / `1`. These guards run before context/player construction. |
+| `CreateSyncedPlaybackOptions` | type | Extends sync options with context and player options; clip options omit `loop`, `rate`, and `mediaAdapterFactory`, and permit only `engine: 'buffer'`. |
+| `CreateAudioMasteredPlaybackOptions` | type | The reverse factory uses the same restricted clip option shape and runtime validation. Use top-level `loop` or `sync.setLoop()` for group loops, and `sync.setRate()` for shared rate changes. |
+
+**Commands**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `dispatch(command)` | `Promise<TransportCommit>` | Await a revisioned play/pause/stop/seek/rate/loop command; `seek.position` and loop bounds use the stable master axis. Shared rate is 0.25–4. Current-operation failures reject; newer authority returns `superseded`. |
+| `play()` | `Promise<void>` | Starts both; resolves startup work, not playback completion. |
+| `pause()` | void | Pauses participants, retaining position and authoritative pause intent. |
+| `stop()` | void | Stops participants and resets transport according to their contract. |
+| `seek(seconds)` | `Promise<void>` | Finite nonnegative position on the current master axis; awaits master transition and follower join. |
+| `setRate(rate)` | void | Finite 0.25–4 inclusive; invalid values throw RangeError. Rejoins followers through group coordination. |
+| `setLoop(regionOrNull)` | void | Sets/clears a master-axis range; tick-detected wrap is not sample-accurate boundary scheduling. |
+| `checkDrift()` | number | Runs a check and returns follower divergence in seconds; may enqueue correction. |
+
+**State and lifecycle**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `snapshot` | TransportSnapshot | One frozen coherent observation: revision/referenceTime/position/rate/paused/holding/loop/pending/disposed. Position uses the master axis and is independent of rate-scaled duration. |
+| `subscribe(listener)` | unsubscribe function | Synchronously delivers the initial snapshot, then command invalidation/settlement/errors, background reconciliation and disposal. Unsubscribe never disposes playback. |
+| `seconds` | readonly number | Master-axis position, nominal Score seconds or clip seconds according to factory. |
+| `clock` | SyncTransportClockView | Read-through master reader, or mirror fallback; not a shared writable instance. |
+| `loop` | SyncLoopRegion or null | Current loop region. |
+| `dispose()` | void | Idempotent; stops group work, invokes optional participant disposers, closes only a factory-created context. pause/stop after disposal are no-ops; active commands such as play/seek/setRate/checkDrift reject or throw. |
+| `onOperationError` | observer option | Background failures also appear as `operation-error` subscription events. Read current snapshot/clock for animation; subscriptions do not emit frame-by-frame position ticks. |
+
+**Master protocol: SyncScoreTransport / SyncMasterTransport**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `play(when?)` | void or `Promise<void>` | Optional absolute reference-time start proposal. |
+| `pause()` | void | Hold position. |
+| `stop()` | void | Stop/reset. |
+| `seekNominal(position, when?)` | void or `Promise<void>` | Settling seek on this master axis; returning paused after an attempted running seek is treated as failed resume. |
+| `setRate(rate)` | optional method | Apply group rate. |
+| `nominalSeconds` | readonly number | Master-axis position; reverse adapter exposes clip seconds through this member. |
+| `clock` | optional reader | Preferred affine map; absent readers use MirrorClockMaster. |
+| `dispose()` | optional method | Called by group disposal. |
+
+**Follower protocol: SyncClipTransport / SyncFollowerTransport**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `play(when?)` | void or `Promise<void>` | Must honor future reference time for scheduled alignment. |
+| `pause()` | void | Retract/hold playback before joining. |
+| `stop()` | void | Stop/reset. |
+| `seek(seconds)` | void | Synchronous positioning while paused, before play. |
+| `setRate(rate)` | optional method | Align slope before offset. |
+| `seconds` | readonly number | Follower-axis position. |
+| `playing` | optional boolean | Running state for drift checks without a reader. |
+| `clock` | optional reader | Used instead of sampling when available. |
+| `dispose()` | optional method | Called by group disposal. |
+
+**Adapters and related public types**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `clipAsMaster(clipPlayer)` | SyncMasterTransport | Adapts existing AudioClipPlayer; scheduled running seek uses pause → seek → play(when). Wrapper disposer forwards to the player. |
+| `scoreAsFollower(scorePlayer, options?)` | SyncFollowerTransport | Adapts nominal Score time, retains requested offset state and defers entry before score zero. Wrapper disposer forwards to the player. |
+| `AudioMasterAdapterOptions.clipOffsetSeconds` | option | Default 0; finite and nonnegative, with invalid values rejected by `scoreAsFollower` before creating an adapter. |
+| `SyncLoopRegion` | type | `{startSeconds, endSeconds}` on the chosen master axis; finite valid increasing range. |
+| `SyncTransportClockView` | type | Alias of Kernel TransportClockReader: state, rate, paused, holding, positionAt and timeAt. |
+| `SyncTransportContract` | type-only assertion | Pins the real players to Bridge roles; it adds no runtime validation. |
+
+</details>
+
+<div class="component-section">
+
+**Composed by.** The demo above constructs this object directly. No current
+custom element owns a declarative ScoreAudioSync composition.
+
+</div>
+
+## Related
+
+[ScorePlayer](/score/headless/play/score-player/) · [AudioClipPlayer](/audio/headless/play/audio-clip-player/) · [Bridge conversions](/bridge/api/) · [Kernel contracts](/kernel/api/)

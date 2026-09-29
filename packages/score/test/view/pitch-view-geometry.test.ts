@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import {afterEach, describe, expect, it, vi} from 'vitest';
 vi.mock('@webmusic/ui/pitch', () => import('../../../ui/src/pitch'));
-import {PitchViewElement} from '../../src/view/element/pitch-view';
+import {PitchViewElement} from '../../src/view/element/score-pitch-view';
 
 customElements.define('sized-pitch-view', PitchViewElement);
 afterEach(() => { document.body.replaceChildren(); vi.restoreAllMocks(); });

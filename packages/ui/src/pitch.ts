@@ -875,7 +875,8 @@ export function mountKeyboard(
   // A range that begins or ends on a black key used to be handled here, by
   // insetting the ROOT with padding. `pianoKeyLayout` now reserves the half
   // white key itself, which is the one place the fix reaches all three callers
-  // of the helper — this surface, `<keyboard-view>` and `<note-input>`. The two
+  // of the helper — this surface, `<score-pitch-view type="keyboard">` and
+  // `<score-note-input>`. The two
   // compensations are alternatives, never both: padding on top of the reserve
   // insets a black-ended board twice.
   const rebuild = (lo: number, hi: number): void => {

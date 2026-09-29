@@ -27,10 +27,7 @@ vi.mock('../../src/io/load', () => ({
   }),
 }));
 
-import {
-  KeyAnalysisElement,
-  ChordAnalysisElement,
-} from '../../src/analyze/element/index';
+import {ChordAnalysisElement} from '../../src/analyze/element/index';
 import {createScoreSource} from '../../src/analyze/element/internal/score-source';
 
 afterEach(() => {
@@ -64,8 +61,7 @@ describe('analysis element URL cancellation', () => {
   });
 
   it.each([
-    ['chord-analysis', ChordAnalysisElement],
-    ['key-analysis', KeyAnalysisElement],
+    ['score-chord-analysis', ChordAnalysisElement],
   ])('%s aborts its owned load when disconnected', async (_name, Ctor) => {
     const element = new Ctor() as InstanceType<typeof Ctor> & Record<string, unknown>;
     // The DOM lib declares these readonly or with Node-generic signatures;

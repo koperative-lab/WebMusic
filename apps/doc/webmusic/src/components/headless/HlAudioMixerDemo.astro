@@ -1,0 +1,115 @@
+---
+// HEADLESS demo: AudioMixer — several clips on ONE shared clock. Here both
+// members share the bundled demo clip; the mixer owns master/per-member volume
+// + mute, while transport (play/pause) fans out to every member at once.
+import LiveDemoCanvas from '../LiveDemoCanvas.astro';
+
+const SRC = `${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`;
+---
+
+<div class="wui-panel wui-panel--flow not-content">
+  <div class="wui-panel__title">
+    <span>@webmusic/audio/play/headless</span>
+    <strong>AudioMixer</strong>
+  </div>
+  <LiveDemoCanvas label="Audio mixer">
+    <div data-hl-mixer data-src={SRC}>
+      <!-- Also a wui-row: the kit's row + row rule is what spaces the strips below. -->
+      <div class="wui-row doc-transport">
+        <button class="wui-btn" data-play type="button">▶ Play</button>
+        <div class="wui-track"><div class="wui-track__fill" data-fill></div></div>
+        <span class="doc-transport__time" data-time>0.0s</span>
+      </div>
+
+      <div class="wui-row" data-member="track A">
+        <span class="wui-label">track A</span>
+        <input class="wui-range" type="range" min="0" max="1" step="0.05" value="1" data-vol aria-label="track A volume" />
+        <button class="wui-btn" data-variant="ghost" data-mute type="button">Mute</button>
+      </div>
+
+      <div class="wui-row" data-member="track B">
+        <span class="wui-label">track B</span>
+        <input class="wui-range" type="range" min="0" max="1" step="0.05" value="0.4" data-vol aria-label="track B volume" />
+        <button class="wui-btn" data-variant="ghost" data-mute type="button">Mute</button>
+      </div>
+
+      <p class="doc-status" data-status></p>
+    </div>
+  </LiveDemoCanvas>
+</div>
+
+<script>
+  import {mountDemos, type DemoScope} from '../demo-lifecycle';
+  import { loadClipFromUrl } from '@webmusic/audio/play';
+  import { AudioClipPlayer, createAudioMixer } from '@webmusic/audio/play/headless';
+
+  const setup = async (root: HTMLElement, scope: DemoScope) => {
+
+    const btn = root.querySelector<HTMLButtonElement>('[data-play]')!;
+    const fill = root.querySelector<HTMLElement>('[data-fill]')!;
+    const time = root.querySelector<HTMLElement>('[data-time]')!;
+    const status = root.querySelector<HTMLElement>('[data-status]')!;
+
+    const clip = await loadClipFromUrl(root.dataset.src!, {signal: scope.signal});
+    if (!scope.active) return;
+
+    // Two members share the one clip. We build the players ourselves so we can
+    // read timeupdate/progress for the bar; the mixer drives transport + gains.
+    // Timer cursor (vs default rAF) keeps timeupdate firing in a backgrounded tab.
+    const playerA = new AudioClipPlayer(clip, { cursorIntervalMs: 100, volume: 1 });
+    scope.add(() => playerA.dispose());
+    const playerB = new AudioClipPlayer(clip, { cursorIntervalMs: 100, volume: 0.4 });
+    scope.add(() => playerB.dispose());
+
+    const mixer = createAudioMixer({ masterVolume: 1 });
+    scope.add(() => mixer.dispose());
+    mixer.add({ id: 'track A', player: playerA, volume: 1 });
+    mixer.add({ id: 'track B', player: playerB, volume: 0.4 });
+
+    let playing = false;
+    playerA.on('timeupdate', ({ seconds, progress }) => {
+      fill.style.width = `${Math.min(100, progress * 100)}%`;
+      time.textContent = `${seconds.toFixed(1)}s`;
+    });
+    mixer.on('end', () => {
+      playing = false;
+      btn.textContent = '▶ Play';
+      fill.style.width = '0%';
+      time.textContent = '0.0s';
+    });
+
+    scope.listen(btn, 'click', () => {
+      if (playing) {
+        mixer.pause();
+        btn.textContent = '▶ Play';
+      } else {
+        scope.run(mixer.play(), () => { playing = false; btn.textContent = '▶ Play'; });
+        btn.textContent = '⏸ Pause';
+      }
+      playing = !playing;
+    });
+
+    root.querySelectorAll<HTMLElement>('[data-member]').forEach((row) => {
+      const id = row.dataset.member!;
+      const vol = row.querySelector<HTMLInputElement>('[data-vol]')!;
+      const mute = row.querySelector<HTMLButtonElement>('[data-mute]')!;
+      let muted = false;
+
+      scope.listen(vol, 'input', () => {
+        mixer.setVolume(id, Number(vol.value));
+        status.textContent = `${id} volume ${Number(vol.value).toFixed(2)}`;
+      });
+
+      scope.listen(mute, 'click', () => {
+        muted = !muted;
+        if (muted) mixer.mute(id);
+        else mixer.unmute(id);
+        mute.dataset.on = String(muted);
+        mute.textContent = muted ? 'Unmute' : 'Mute';
+        status.textContent = `${id} ${muted ? 'muted' : 'live'}`;
+      });
+    });
+  };
+
+  mountDemos('[data-hl-mixer]', setup);
+</script>

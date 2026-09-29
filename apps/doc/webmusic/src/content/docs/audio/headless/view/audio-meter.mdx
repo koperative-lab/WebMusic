@@ -1,0 +1,82 @@
+---
+title: AudioMeterController
+description: 'Read live level and spectrum frames from a borrowed analyser or an owned transparent tap.'
+sidebar:
+  order: 6
+---
+
+`AudioMeterController` remains in the **View Headless** entry: it provides
+measurements for a caller-owned presentation loop and owns no playback state,
+transport or timer. The standalone [`<audio-meter>`](/audio/element/analyze/audio-meter/)
+is now cataloged as a compact live Analyze tool and reuses this controller;
+the original View entry remains available for code-only consumers.
+
+## Import
+
+```ts
+import {createAudioMeterController} from '@webmusic/audio/view/headless';
+
+const meter = createAudioMeterController({analyser});
+const level = meter.readLevel();
+const spectrum = meter.readSpectrum(28);
+meter.dispose(); // the borrowed analyser stays connected
+```
+
+## API
+
+### Options and state
+
+| Member | Contract |
+| --- | --- |
+| `context?: BaseAudioContext` | Creates an owned input → analyser → output tap. Mutually exclusive with `analyser`. |
+| `analyser?: AnalyserNode` | Borrows a node without configuring or disconnecting it. Omit both source options for a zero-valued meter. |
+| `fftSize?: number` | Owned FFT size; power of two 32–32768, default 1024. |
+| `smoothingTimeConstant?: number` | Owned FFT smoothing, 0–1; default 0.8. |
+| `levelScale?: number` | Nonnegative display gain; default 1.8. |
+| `peakDecay?: number` | Nonnegative scaled-RMS peak-hold decrement per read; default 0.012. |
+| `analyser`, `input`, `output` | Read-only active analyser and owned splice ports. Borrowed mode has no input/output ports. |
+| `ownsGraph` | Whether this controller owns a transparent tap. |
+
+`AudioMeterControllerOptions`, `AudioMeterConfiguration` and
+`AudioMeterLevelFrame` are exported from the same entry. Configuration excludes
+source options: replacement means constructing a new controller.
+
+### Commands and returned frames
+
+| Method | Result |
+| --- | --- |
+| `configure(options)` | Changes tuning in place. Omitted values persist; invalid settings leave previous tuning and graph intact. Borrowed nodes retain their own FFT/smoothing configuration. |
+| `readLevel()` | Returns `{rms, peak, peakHold, level}`. `level` is clamped scaled RMS; the live held marker retains scaled RMS with the per-read decrement. |
+| `readSpectrum(bars = 28)` | Returns normalized FFT bars as a `Float32Array`. |
+| `dispose()` | Releases every owned node, even if one disconnect fails, then rethrows the first error. Repeated disposal is safe. |
+
+The pure helpers `calculateLevelMeter(samples, {previousPeak?, peakDecay?})` and
+`calculateSpectrumBars(spectrum, {bars?, normalizeBytes?})` share this entry.
+The PCM helper returns unscaled `{rms, peak, peakHold}`, ignores nonfinite
+samples as zero, and retains the previous sample peak by a multiplicative
+`peakDecay` in 0–1 (default 0.96). It differs intentionally from the live scaled
+RMS hold. Spectrum byte normalization defaults to true. Types
+`LevelMeterFrame`, `LevelMeterOptions` and `SpectrumBarsOptions` describe these
+pure calls.
+
+### Lifecycle and measurement limits
+
+The controller emits no events and schedules no frames. A caller chooses the
+read cadence and rebuilds on source replacement; several monitors may borrow the
+same analyser. A context is borrowed even when its tap nodes are owned: disposal
+never closes it. The values are normalized display readings, not dBFS, LUFS or
+true-peak measurements. Peak decay depends on reads, not elapsed time.
+
+### Migration
+
+Import the controller and pure helpers from `@webmusic/audio/view/headless`.
+Their former `play/headless` exports have been removed so Play does not depend on
+View. The Element's Analyze catalog placement does not move these Headless exports
+or rename the tag; `view/element` and `view/auto` retain compatibility registration.
+
+## Related
+
+- [Audio Meter Element](/audio/element/analyze/audio-meter/)
+- [Audio Player](/audio/headless/play/audio-player/)
+- [View API](/audio/api/view/)
+- [Headless inventory](/audio/headless/)

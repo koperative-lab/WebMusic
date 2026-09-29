@@ -2,10 +2,10 @@
 
 > Current decision register. The product direction was confirmed by the maintainer on 2026-09-05. “Accepted” describes a design choice, not implementation completion. [STATUS](STATUS.md) tracks the remaining work; source and technical contracts are linked by [Architecture](ARCHITECTURE.md).
 
-Decision entries retain their dated wording. In the current checkout, Audio and
-Bridge are accepted design directions without local source or public references.
-Read [STATUS](STATUS.md) and the target branch's tracked files before making a
-delivery claim.
+Decision entries retain their dated wording. DEC-046 supersedes DEC-021's
+three-package branch split for source integration; it does not change what was
+published in the first npm release. Read [STATUS](STATUS.md) and the target
+branch's tracked files before making a delivery claim.
 
 ## DEC-001 — A toolkit that grows from demos to music applications
 
@@ -55,9 +55,7 @@ delivery claim.
 
 **Consequence:** document units, offsets, tempo/BeatGrid assumptions, sample rate, engine requirements, and what is inferred or lost. Keep family-neutral note events in Audio and Score construction in Bridge.
 
-**Owner:** [Architecture](ARCHITECTURE.md#bridge-conversion-boundaries-deferred)
-until a migrated Bridge package has its own public contract; delivery is tracked
-in [STATUS](STATUS.md).
+**Owner:** [Bridge](../bridges/score-audio/README.md).
 
 ## DEC-006 — Reuse through explicit resource ports
 
@@ -222,13 +220,16 @@ Old report URLs redirect to the Headless workflow. Tag-owned live demos continue
 to contain only their player and current component, configured by Parameters.
 
 **Owner:** [Analyze component design](design/ANALYZE-COMPONENTS.md) and the
-[score report reference](../apps/doc/webmusic/src/content/docs/score/api/analyze.mdx#reports).
+[Score report reference](../apps/doc/webmusic/src/content/docs/score/api/analyze.mdx#reports).
 
 **Verification implications:** retired tags are absent from exports,
 registration, catalogs and navigation; retained live evidence updates from note
 events and clears appropriately; report APIs, demos and redirects remain usable.
 
 ## DEC-014 — Five task-specific Analyze Elements
+
+DEC-038 supersedes this five-tag Element inventory; its distinction between
+task-specific surfaces and code-only specialist algorithms remains relevant.
 
 **Date / status:** 2026-09-08; accepted.
 
@@ -636,6 +637,967 @@ projection, variable meters, beam groups and note identity. Check built renderer
 imports, synchronous teardown, source replacement, responsive scrolling,
 highlighting, themes and actual notation in the browser. Keep unsupported and
 unverified behavior in STATUS and the owning public pages.
+
+## DEC-025 — Audio Play keeps state and stable resource ports with their owners
+
+**Date / status:** 2026-09-25; accepted for dev following the Audio Play review.
+
+**Problem:** Audio Elements duplicated mixer state, borrowed playback data could
+remain stale, and changing meter parameters destroyed caller-owned routes.
+Callback reentry and queue updates also lost newer intent or current position.
+
+**Decision:** retain the five Audio Play responsibilities. Expose readonly clip
+data and an Element source-change notification; make Headless mixer snapshots
+and change notifications authoritative; update playlist policy without replacing
+its queue; preserve meter ports through tuning; commit readiness/state before
+callbacks and invalidate stale work. Group seeking distinguishes naturally ended
+members from independently paused ones. Recorder level uses multichannel mean
+square; context readiness precedes capture success.
+
+**Alternatives considered:** merging unrelated Play tasks; copying Headless
+values into each Element; rebuilding resources for every parameter; adopting
+Score-specific payloads or silently claiming a new shared clock/capture backend.
+
+**Consequences:** existing tags and entry paths stay stable. Additive readback and
+configuration APIs support custom UI. Invalid selection/ranges fail before
+mutating working state. Existing meter scaling/decay and ScriptProcessor capture
+limits remain explicit; future precision improvements require their own contract.
+Main's first-release package scope is unchanged.
+
+**Owner:** [Audio Play design](design/AUDIO-PLAY-COMPONENTS.md), the applicable
+Headless/Element references and shared Kernel meter contract.
+
+**Verification implications:** regress callback reentry, future starts, source
+replacement, multiple observers, cleanup failure, queue-preserving edits, capture
+resume/cancellation and stable meter routes. Device and audible timing acceptance
+remain separate from source and build checks.
+
+## DEC-026 — Audio track gestures preserve transport and viewport authority
+
+**Date / status:** 2026-09-25; accepted for dev following the maintainer's request
+for switchable DJ-style seeking and independent waveform browsing.
+
+**Follow-up:** [DEC-027](#dec-027--centered-audible-scrubbing-borrows-a-player-session)
+supersedes the position-only scrub and no-pause policy below. The original
+choice and its dated verification remain available as historical context.
+
+**Problem:** an absolute position slider cannot move a track relatively without
+jumping on press; a second pointer listener would conflict with annotation and
+follow. Continuous high-rate pointer seeks also cause unnecessary engine work.
+
+**Decision:** extend the existing neutral surface slider with gesture geometry,
+lifecycle, thresholded drag/click modes and cancellation. AudioView adds explicit
+seek/scrub/pan/none modes, retains absolute seek as its default, and keeps annotation
+priority. Audio converts stable CSS deltas to content seconds and coalesces track
+commands per frame. Playback owns accepted time; viewport-only panning never seeks.
+Pan suspends follow while selected; scrub suspends it during the gesture.
+
+**Alternatives considered:** creating a second DJ component or clock; installing
+competing Element pointer handlers; silently replacing default seek behavior;
+pausing and resuming borrowed playback; claiming ordinary seeks implement vinyl
+sound processing.
+
+**Consequences:** configuration and accessible labels describe the actual command.
+New modes are opt-in, reusable UIKit behavior remains domain-neutral, and all
+cancellation/replacement paths release capture and pending presentation work.
+Main's first-release package scope is unchanged.
+
+**Owner:** [Audio View design](design/AUDIO-VIEW-COMPONENTS.md), AudioView's public
+reference and the [Stage presenter](../apps/doc/webmusic/src/content/docs/uikit/layout-feedback/stage.mdx).
+
+**Verification implications:** exercise defaults, both directions, final release,
+clamps/loops, coalescing, pointer ownership, follow, annotation, mode/source/zoom
+changes and disconnect. Keep browser/device and audible behavior evidence separate.
+
+## DEC-027 — Centered audible scrubbing borrows a player session
+
+**Date / status:** 2026-09-25; accepted for dev after the maintainer clarified
+that scrub must hold the playhead at the center, pause normal playback while
+held, sound forward/reverse movement at gesture speed, and restore the prior
+playing/paused state on release. This supersedes DEC-026's position-only scrub
+and no-pause policy; its seek/pan/none compatibility remains accepted.
+
+**Follow-up:** [DEC-028](#dec-028--scratch-inertia-and-continuous-phase-stay-with-play)
+adds continuous audio phase and release inertia. The original grain-based
+implementation and its dated verification remain historical evidence.
+
+**Problem:** repeatedly seeking a running transport gives position navigation,
+but does not produce a held, centered track or audible reverse motion. A View
+must not create a second audio engine or dispose a borrowed player to supply it.
+
+**Decision:** Audio Play owns an optional scratch session over decoded PCM and
+its existing gain/pan/effect route. Beginning the session suspends ordinary
+playback. Signed gesture movement produces bounded forward/reverse audio grains;
+normal release ends the session and restores the state captured at its start.
+Cancellation ends without automatic resume. External transport commands and
+source/session replacement invalidate obsolete restoration work.
+
+Audio View borrows that capability and keeps the renderer in centered-playhead
+mode whenever scrub is selected and annotation is off. The waveform/spectrogram
+moves beneath the line, including blank padding at either clip boundary. The
+visible-range contract reports only its intersection with real clip time.
+No-PCM or legacy players without the capability retain position-only scrubbing
+without a playback-state promise. Pan remains viewport-only; default seek and
+click/keyboard compatibility remain intact.
+
+**Alternatives considered:** replacing the playback engine inside View;
+pretending repeated seek commands provide reverse audio; requiring every player
+backend to support decoded-buffer scratching; resuming a stale or replaced
+source; centering only away from clip boundaries.
+
+**Consequences:** the optional session is explicit and owned by Play. Gesture
+speed affects sample playback speed and pitch; this is not pitch-preserving
+time stretching or an independently synchronized clock. Centered rendering and
+the scratch capability remain reusable outside the documentation demos. The
+first-release main package scope does not change.
+
+**Owner:** [Audio View design](design/AUDIO-VIEW-COMPONENTS.md), the owning
+AudioView and AudioClipPlayer public references, and the shared timeline
+renderer contract.
+
+**Verification implications:** exercise center geometry at zero/end and on short
+clips, signed/silent movement, prior paused/playing states, normal release versus
+cancellation, pending context readiness, external invalidation, unsupported
+players, resource teardown and two concurrent views. Automated DSP/graph checks,
+rendered browser evidence and audible/device acceptance remain separate.
+
+## DEC-028 — Scratch inertia and continuous phase stay with Play
+
+**Date / status:** 2026-09-25; accepted for dev after the maintainer reported
+spectrogram flicker and requested release inertia in both track motion and sound,
+with a more continuous DJ-style response. This follows DEC-027 without changing
+the public scratch-session method names or the seek/pan/none defaults.
+
+**Problem:** restarting a short audio grain at each pointer update makes pointer
+cadence audible. Ending sound and motion immediately on release lacks the
+requested inertia. A separate View animation would diverge from audible position,
+and native scrolling can displace layers between cached spectrogram paints.
+
+**Decision:** Audio Play retains continuous native sample phase through bounded
+local PCM windows, smooth rate changes and phase-aligned crossfades. Its scratch
+session owns the release transition using AudioContext time: signed velocity
+converges toward the configured normal rate if previously playing, or zero if
+paused. Accepted position and sound share that transition, then restore the
+captured playing intent. Silent clicks and stationary releases do not fling.
+
+`end(true)` remains pending and the session remains active during the coast.
+Cancellation stops it immediately and settles the pending completion. View keeps
+the borrowed handle until completion; cancellation, replacement and re-grabbing
+cannot allow obsolete restoration or detach the current owner. A new session
+inherits the original playing intent. Legacy/no-PCM fallback remains positional.
+
+Spectrogram image, region and playhead layers move as one viewport. Cached ticks
+retain their backing pixels, and stripe replacement preserves overlap colors.
+Native scroll remains a position-mode input, not a second presentation offset.
+
+**Alternatives considered:** View-owned easing; event-by-event grain retriggering;
+whole-clip reverse copies; ending the session before its release animation;
+removing virtualization or repainting every spectral tick.
+
+**Consequences:** Play owns all audible state and release time; View stays a
+borrower. Scratch speed changes pitch. Local windows and visual stripes keep
+resource use bounded. This contract does not promise pitch-preserving stretching,
+seamless loop scratching, physical turntable equivalence or device latency.
+
+**Owner:** [Audio View design](design/AUDIO-VIEW-COMPONENTS.md), AudioClipPlayer's
+scratch-session reference, AudioView's gesture reference and the shared
+spectrogram renderer contract.
+
+**Verification implications:** cover uninterrupted sample phase, reversals,
+refills, idle braking, release motion and sound, prior playing/paused states,
+stationary clicks/holds, re-grabbing, cancellation/configuration changes,
+context suspension and resource cleanup. Check spectrogram layer alignment and
+cached/overlap pixel stability. Preserve the prior audit and record new automated,
+native-output, browser and device evidence separately.
+
+## DEC-029 — Audio Player controls playback and Play companions attach to it
+
+**Date / status:** 2026-09-25; accepted following the maintainer's Audio Play
+composition request. Supersedes DEC-025's tag/entry stability for the player and
+meter organization; its algorithm and lifecycle requirements remain applicable.
+
+**Follow-up:** DEC-030 removes the temporary Element compatibility surface at
+the maintainer's request; the composition and ownership decision remains active.
+
+**Problem:** the clip, queue and mixer Elements each presented transport controls,
+while recorder audition created another player. Metering was classified as Play
+although it only observes a signal. This obscured the session command owner.
+
+**Decision:** expose `AudioPlayer` and `audio-player` as the stable central
+transport over one selected clip, queue or mix. Retain tested clip/queue/mixer
+engines underneath it. Playlist and mixer attach their backend to this owner;
+their linked surfaces focus on selection and mix controls. Recorder owns capture
+and sends take audition to the linked player. A selector or explicit object links
+companions, with late binding, replacement and identity-checked detachment.
+Meter controller, PCM helpers and Element belong to View; Play never imports View.
+
+**Alternatives considered:** renaming only the tag; copying queue and mixer
+algorithms into a monolithic player; keeping multiple linked transport bars;
+removing low-level standalone APIs. The selected facade keeps the distinct
+resource lifetimes and current low-level integration choices.
+
+**Consequences:** `audio-clip-player` remains a compatibility registration;
+`AudioClipPlayer` remains the single-clip engine. Meter imports migrate from Play
+to View. Selecting a new nonempty source pauses the previous backend; detachment alone
+does not stop borrowed playback. Borrowed transports are never disposed by the facade. A mixer has no
+single-clip snapshot; a queue exposes its active clip. The facade adds no clock
+and makes no new sample-accurate group scheduling claim. Main Score and Agent
+Toolkit remain authoritative and unchanged.
+
+**Owner:** [Audio Play design](design/AUDIO-PLAY-COMPONENTS.md),
+[Audio View design](design/AUDIO-VIEW-COMPONENTS.md) and the owning public pages.
+
+**Verification implications:** cover empty/clip/queue/mix transitions, stale async
+work, callback reentry, ownership on detach/reconnect, no duplicate linked
+transport, recorder source handoff, meter exports, and the rendered compositions.
+
+## DEC-030 — Audio Elements expose only their current component names
+
+**Date / status:** 2026-09-26; accepted at the maintainer's request. Supersedes
+DEC-029's temporary old-player registration policy.
+
+**Follow-up:** DEC-031 makes AudioRecorder the canonical Element name after the
+maintainer simplified the tag. Its symbols are current definitions, not aliases.
+
+**Problem:** retaining retired Element names, aliases, styling fallbacks and
+page redirects creates parallel entry points for a development migration that
+has no compatibility requirement.
+
+**Decision:** remove the `audio-clip-player` registration, its Element class,
+registration function and detail aliases; use `audio-player` and AudioPlayerElement.
+Remove deprecated AudioRecorderElement, defineAudioRecorderElement and
+AudioRecorderRecordedDetail aliases; use their AudioClipRecorder equivalents.
+Remove old player-name surface tokens and the former player/Play-meter route
+redirects. Current references and demos use the canonical component names.
+
+**Alternatives considered:** maintaining aliases indefinitely or deleting the
+underlying playback engines. AudioClipPlayer, AudioPlaylist, AudioMixer and
+AudioRecorder remain real nonvisual capabilities with their existing ownership
+contracts. Independent component usage and structural bindings remain supported.
+
+**Consequences:** applications using retired Element symbols or tags must adopt
+the current names; no deprecated registration is shipped by Element, auto or
+global entries. Meter is registered through View. Dated evidence keeps the old
+names as historical context. Main Score and Toolkit behavior remain unchanged.
+
+**Owner:** [Audio Play design](design/AUDIO-PLAY-COMPONENTS.md) and the public
+Audio Element references.
+
+**Verification implications:** exercise canonical registration and playback,
+assert retired exports/registrations are absent, validate built public entries,
+and compile the updated examples.
+
+## DEC-031 — Audio Recorder uses the task name and Play layouts follow Score
+
+**Date / status:** 2026-09-26; accepted at the maintainer's request. Updates
+DEC-030's recorder naming choice without restoring compatibility aliases.
+
+**Problem:** the clip-qualified recorder tag is unnecessarily specific, while
+Audio Play demonstrations differ from Score in component gaps and host sizing.
+
+**Decision:** name the Element `audio-recorder`, with AudioRecorderElement,
+defineAudioRecorderElement and AudioRecorder detail types. Remove the previous
+clip-qualified Element, source/page paths and registration. Keep recording and
+player ownership unchanged. Audio Play hosts fill their parent width, shrink
+inside flex/grid layouts and respect hidden. Compositions use Score's 0.5rem
+component gap; AudioPlayer uses the same 0.75rem default control gap. A queue
+without its own transport has no reserved space above its first row.
+
+**Alternatives considered:** keeping both recorder names or applying corrective
+widths only inside demos. The canonical Element owns sizing; demo wrappers own
+component spacing and preserve complete composed markup for Copy/Reset.
+
+**Consequences:** imports, tags, styling tokens and page links use AudioRecorder
+names. Historical evidence keeps its recorded baseline. Main Score and shared UI
+defaults remain authoritative; the queue spacing change affects only the option
+that omits its transport.
+
+**Owner:** [Audio Play design](design/AUDIO-PLAY-COMPONENTS.md) and public Play pages.
+
+**Verification implications:** canonical registration and recorder lifecycle;
+rendered full-width layouts and equal gaps at ordinary and narrow widths;
+connected playback, selection, reset and copied composition.
+
+## DEC-032 — Score Recorder owns an independent recording page
+
+**Date / status:** 2026-09-26; accepted at the maintainer's request.
+
+**Problem:** the independently usable Score Recorder was nested in Note Input's
+reference and optional demo editor, making the recording task harder to discover
+than its Audio counterpart.
+
+**Decision:** `/score/element/play/score-recorder/` owns the complete
+`<score-recorder>` contract and a live sibling note-input/recorder composition.
+Note Input owns its input surfaces and links to that recording page. Catalogs,
+Toolkit demo mappings and related references point to the standalone owner.
+
+**Alternatives considered:** keeping the optional recorder editor under Note
+Input, or duplicating its contract across both pages.
+
+**Consequences:** this is an explicit documentation/demo exception to the main
+Score reference baseline. Runtime APIs, package tests and Toolkit behavior retain
+main's authority. The new demo captures through `.source` once, with separately
+owned input monitoring; it releases subscriptions and monitoring on navigation.
+
+**Owner:** [Site plan](docs/DOCS-SITE-PLAN.md),
+[component page template](docs/COMPONENT-PAGE-TEMPLATE.md) and the public recorder
+reference.
+
+**Verification implications:** canonical links, page order, copied source setup,
+scoped parameters, recording/playback and disposal/remount after navigation.
+
+## DEC-033 — Analyze demos use the common component composition
+
+**Date / status:** 2026-09-26; accepted at the maintainer's request to align all
+Analyze component demos with the existing demo design.
+
+**Problem:** Score Analyze used a different sibling gap and player height, while
+Audio Analyze mixed local margins, incomplete copied compositions and repeated
+per-type panels.
+
+**Decision:** use the shared ElementPlayground and ElementComposition with one
+main demo per page, full-width sibling components and a `0.5rem` gap. Keep player
+geometry at its package default. Configure types and supporting runners/players
+through scoped Parameters; Copy includes the complete real composition and Reset
+restores its attributes and bindings. Hidden runners reserve no visible space.
+
+**Alternatives considered:** separate CSS corrections in each page, or keeping
+multiple panels that only change the component's `type`.
+
+**Consequences:** this explicitly updates Score demo layout from main's baseline;
+Score analysis algorithms and runtime APIs retain main's authority. The initial
+bare-surface interpretation was corrected by DEC-034 after rendered review. Audio host sizing/native visibility
+belongs to the owning Element, not corrective documentation CSS.
+
+**Owner:** [Component page template](docs/COMPONENT-PAGE-TEMPLATE.md) and the
+owning Score/Audio Analyze references.
+
+**Verification implications:** every Analyze page at normal and narrow widths,
+mode changes, real player seeking, complete copied markup, scoped Parameters,
+Reset and runner result/error lifecycle.
+
+## DEC-034 — Score Analyze owns one standard component surface
+
+**Date / status:** 2026-09-26; accepted at the maintainer's explicit correction
+that Score Analyze still lacked borders and spacing after DEC-033.
+
+**Problem:** the demo alignment changed sibling gaps, but both the workbench
+and musical presenters remained bare. The result lacked the component border,
+background and interior spacing used by Score Play.
+
+**Decision:** all five Score Analyze Elements use one outer component surface
+with the shared neutral background, border, radius and equal padding defaults.
+Public component/workbench surface tokens and the existing `surface` part
+remain the customization contract. Inner lanes/nameplates stay unframed; bare
+workbench chrome continues to omit configuration controls. Demo composition
+retains full-width siblings and a `0.5rem` gap.
+
+**Alternatives considered:** adding a frame only around documentation demos,
+or independently framing each internal presenter.
+
+**Consequences:** this is a scoped Score runtime styling and regression-test
+exception to main's baseline. It supersedes DEC-033's bare-surface interpretation;
+analysis algorithms, transport authority and public behavior remain as before.
+
+**Owner:** [Analyze design](design/ANALYZE-COMPONENTS.md) and the public Score
+Analyze Styling references.
+
+**Verification implications:** inspect the actual frame/padding, not only host
+width and sibling gap, on every Analyze page. Check normal/narrow containers,
+single background painting, inherited themes, caller overrides, native hidden,
+reconfiguration/remount, and keyboard seeking against the same framed layout.
+
+## DEC-035 — Audio Analyze Elements are performance tasks, not clip reports
+
+**Date / status:** 2026-09-26; accepted for the dev Audio checkout at the
+maintainer's request. Browser/audio acceptance remains in STATUS.
+
+**Problem:** the five Audio Analyze tags mostly expose a hidden offline runner,
+whole-clip metrics, file facts and distributions. A playhead on the generic
+timeline does not make those reports useful musical performance surfaces, and
+its dependency on a second clip load splits ownership from the player.
+
+**Decision:** publish three task-specific Analyze Elements:
+`audio-onset-analysis` for attack navigation, `audio-beat-analysis` for pulse
+navigation, and `audio-pitch-analysis` for current sounding fundamental. The
+lanes borrow the selected player's clip, position and seek command; the pitch
+surface borrows its active analyser. Each owns only its derived state,
+presenter and subscriptions. Retire the five previous Audio Analyze tags and
+registration helpers without aliases. Keep whole-clip key, tempo, loudness,
+pitch tracks, summaries, chroma, rankings and distributions in the existing
+API/Headless and application-owned UI workflow.
+
+**Alternatives considered:** leaving static cards in Element beside new live
+tags; keeping a hidden runner that loads the same URL as Play; or treating a
+cursor over a complete report as sufficient performance behavior. Those
+retain the wrong responsibility or duplicate data ownership.
+
+**Consequences:** Audio Element imports, catalogs, demos and routes move to the
+three tasks; old bookmarks redirect to the relevant API/Headless or new task
+reference. This narrows the public Audio Element contract before release while
+preserving nonvisual algorithms and worker/session entries. DEC-033's shared
+demo composition still applies, but its hidden-runner Audio clause is superseded.
+DEC-013/014 retain their Score-specific inventory and are not rewritten.
+
+**Owner:** [Audio Analyze design](design/AUDIO-ANALYZE-COMPONENTS.md) and the
+public [Audio Analyze API](../apps/doc/webmusic/src/content/docs/audio/api/analyze.mdx)
+and Element references.
+
+**Verification implications:** exact registration/export inventory, no hidden
+runner or report tags, one live surface per task, player snapshot/source
+replacement, clip-second seek and actual accepted position, late async result
+invalidation, realtime pause/seek/end cleanup, standalone data use, two
+followers per owner, Copy/Reset and browser/keyboard/audio acceptance.
+
+## DEC-036 — Audio Analyze Elements are live inspection tools
+
+**Date / status:** 2026-09-26; accepted for the dev Audio checkout. This
+supersedes DEC-035's three-tag Element inventory; nonvisual analysis ownership
+and the player-borrowing rule remain. Browser and device acceptance remain in
+STATUS.
+
+**Problem:** replacing static reports with onset/beat navigation lanes and a
+current-pitch readout still describes analysis as event display around a player.
+It does not provide the concrete listening tools needed while adjusting a
+signal: measuring levels against a threshold, probing a live spectrum, or
+tuning to a reference. Beat and onset positions can remain Headless/API data
+and be composed with the existing audio View surface.
+
+**Decision:** publish `audio-level-analyzer`, `audio-spectrum-analyzer` and
+`audio-tuner` as the three Audio Analyze Elements. Each is one live tool over
+a borrowed player analyser or explicit caller-owned analyser. Level shows
+sampled RMS/sample peak/crest with threshold, freeze and peak hold. Spectrum
+provides log-frequency FFT inspection, freeze and peak hold. Tuner exposes
+current note, frequency and cents against a configurable A4 reference.
+Retire `audio-onset-analysis`, `audio-beat-analysis` and
+`audio-pitch-analysis` from Element exports/registration/catalogs/pages,
+without removing their underlying Analyze API or Headless capabilities.
+
+**Alternatives considered:** retaining the navigation lanes as extra Analyze
+tags, merging all measurements into a generic dashboard, or making a passive
+View meter claim the same tool responsibility. Those obscure component choice
+or place inspection/calibration controls in the wrong layer.
+
+**Consequences:** the three tools borrow graph and playback state without
+creating an AudioContext, player, microphone request or separate transport.
+Their visual measurements are deliberately bounded: sampled level is not
+integrated LUFS or true peak, FFT magnitudes are not calibrated SPL, and a
+tuner cannot prove a unique note from ambiguous audio. Static tempo, onset,
+key, loudness and pitch-track data stay in API/Headless. Applications can
+convert a Headless/API beat grid into point regions for `audio-view.regions`
+when they need performance markers. DEC-033's one-player, one-component demo
+composition still applies, without a hidden runner.
+
+**Owner:** [Audio Analyze design](design/AUDIO-ANALYZE-COMPONENTS.md), the
+[Audio Analyze Element inventory](../apps/doc/webmusic/src/content/docs/audio/element/index.mdx#analyze)
+and the owning tag references.
+
+**Verification implications:** exact public tag inventory, independent tools
+sharing one owner, explicit-analyser precedence, threshold/freeze/hold/probe/A4
+interaction, play/pause/seek/source replacement, graph loss and cleanup,
+Copy/Reset, keyboard/focus and browser/device measurements. Use actual API
+members and units in each leaf reference; a static page or test cannot certify
+acoustic precision.
+
+## DEC-037 — Audio Analyze offers five distinct live tools
+
+**Date / status:** 2026-09-26; accepted for the dev Audio checkout. This
+supersedes DEC-036's three-tag Element inventory and its exclusion of the
+independent meter. The API/Headless ownership of static reports and the
+player-borrowing rule remain in force. Browser and device acceptance remain in
+STATUS.
+
+**Problem:** level and spectrum inspection are useful, but a dedicated tuner is
+not a broadly useful analysis surface for the intended music-software workflow.
+A compact meter is still needed alongside detailed inspection, and musicians
+also need to examine short waveform structure and the attack evidence of a
+live signal. Neither an offline report nor another generic dashboard serves
+those operational tasks.
+
+**Decision:** publish exactly five Audio Analyze tags: `audio-meter`,
+`audio-level-analyzer`, `audio-spectrum-analyzer`, `audio-oscilloscope` and
+`audio-transient-analyzer`. The existing meter is a compact normalized RMS/FFT
+monitor with level/spectrum mode and caller-configured scale/hold; it does not
+claim the dBFS history or threshold of the level analyzer. The oscilloscope
+offers a trigger-aligned time-domain window, adjustable timebase, freeze and
+time/amplitude probe. The transient analyzer uses successive spectral-flux and
+energy observations, sensitivity and a refractory interval to expose recent
+onset cues. It does not infer BPM or a beat grid. Remove `audio-tuner` from
+Element exports, registration, catalogs and current pages while retaining
+nonvisual pitch analysis.
+
+**Compatibility boundary:** `audio-meter` is canonically exported and
+registered by Analyze. Existing View Element imports and auto-registration
+remain valid for the same tag and underlying implementation. The Analyze
+Element facade has one explicit adapter to that implementation and its existing
+View meter controller; this exception does not license a general
+Analyze-to-View dependency, a duplicate custom element, or a new transport.
+The `audio-view type="meter"` projection remains in View.
+
+**Alternatives considered:** retaining the tuner as a sixth tool, removing the
+meter or folding it into the level analyzer, calling a passive View projection
+the independent meter, or surfacing whole-clip BPM/beat-grid results as a live
+transient tool. These either blur the five tasks, break the compact monitor
+workflow, or overstate what a borrowed live analyser can establish.
+
+**Consequences:** level, spectrum, oscilloscope and transient tools borrow a
+player analyser or explicit caller-owned analyser; the meter retains its
+documented optional caller-supplied context tap. None creates a player,
+transport or microphone request. Oscilloscope history is bounded by the
+analyser's available sample window and cannot promise a sample-accurate
+trigger. Transient events are sampling-cadence cues, not a stable clip-time
+onset map. Whole-clip pitch, onset, tempo, key, loudness and beat-grid output
+remain API/Headless data; applications can still compose a beat grid with
+`audio-view.regions`. DEC-033's one-player, one-component demo rule applies to
+all five tools.
+
+**Owner:** [Audio Analyze design](design/AUDIO-ANALYZE-COMPONENTS.md),
+[Audio View design](design/AUDIO-VIEW-COMPONENTS.md), the
+[Audio Analyze Element inventory](../apps/doc/webmusic/src/content/docs/audio/element/index.mdx#analyze)
+and each owning tag reference.
+
+**Verification implications:** assert an exact five-tag Analyze inventory and
+the absence of tuner, with idempotent legacy View meter registration. Cover
+player/explicit-analyser binding, owned meter-tap cleanup, source replacement,
+pause/seek/end and missing graphs; threshold, hold and freeze; spectrum and
+time-domain probes, trigger/timebase bounds, transient sensitivity/refractory
+behavior and false-cue limits; Copy/Reset, keyboard/focus, responsive browser
+layouts and real audio/device checks. Static tests cannot certify acoustic
+precision or sample-accurate onset timing.
+
+## DEC-038 — Score Analyze exposes five inspection tools
+
+**Date / status:** 2026-09-26; accepted for this `dev` checkout by the
+maintainer's Score Analyze redesign request. This supersedes DEC-014's Element
+inventory, not its one-surface composition rule or DEC-013's API/Headless report
+ownership. Score remains main-owned under the current branch synchronization
+policy; promote this explicit product change to main before treating it as a
+shared baseline.
+
+**Problem:** four Score Analyze Elements primarily display precomputed labels
+alongside a playback cursor. Seeking a label is useful, but music-software
+users also need to choose a passage, inspect the notes and rhythmic evidence,
+and compare plausible interpretations. A separate Roman lane duplicates the
+chord progression while applying one estimated key to the entire score. The
+limited voice-leading rules are valuable in specialist work but do not justify
+one of the default five tools.
+
+**Decision:** publish exactly five independent Score Analyze Elements:
+`live-chord-analysis` for sounding-note chord interpretation,
+`chord-analysis` for passage-level chord and key-relative harmony inspection,
+`key-analysis` for passage-level tonal and scale evidence,
+`interval-analysis` for selected melodic and vertical note relationships, and
+`rhythm-analysis` for meter-aligned onset and subdivision inspection. Each
+Element owns one core surface and may reveal contextual evidence for its own
+selection. Its inspection controls and results do not edit the Score. The
+caller-owned player remains the only playback and timeline authority; standalone
+Score input remains supported.
+
+`roman-analysis` and `voice-leading-analysis` leave the public Element
+inventory, registration, catalogs and current pages. `romanNumerals`,
+`voiceLeading`, their Headless projections and session results remain available
+for application-owned or specialist UI. The chord inspector may show a coarse
+Roman degree relative to an explicit or estimated key, but must not call it
+contextual harmonic-function, modulation, inversion or cadence inference. The
+new interval and rhythm algorithms are API/Headless data, not calculations
+hidden in the DOM presenter. Whole-score reports and motif search keep their
+existing API/Headless ownership.
+
+**Alternatives considered:** retaining seven public tags, renaming the four
+seekable lanes without changing their interactions, or combining all theory
+questions into a single configurable workbench. These increase selection cost
+or leave the user unable to test an analysis hypothesis. Voice-leading can still
+be composed from its algorithm when that specialist task is needed.
+
+**Consequences:** selection and its evidence are local to each tool unless the
+application supplies an explicit source selection. Analysis parameters use
+musical quarters or declared note identities; the existing `window` attribute
+continues to mean visible duration in seconds. Current computed results must
+be distinguishable from the user's chosen reading. Missing score, no notes,
+ambiguous results and unsupported score context remain visible states, not
+apparently confident labels. Chord, key and interval pitch basis must state
+whether written or sounding notes are analyzed, especially for transposing
+parts. Retiring a default Element does not remove its code-only analysis.
+
+**Owner:** [Score Analyze design](design/ANALYZE-COMPONENTS.md), the
+[Score Analyze Element inventory](../apps/doc/webmusic/src/content/docs/score/element/index.mdx#analyze),
+and each owning Element/API reference.
+
+**Verification implications:** assert the exact five public tags and retired
+redirects; exercise selected evidence, keyboard/pointer inspection, local
+interpretation changes, score/part/range replacement, player seek and reset,
+and API/Headless reuse. Check note and part provenance, meter changes, empty
+and ambiguous cases, late player attachment, multiple companions, cleanup and
+responsive browser behavior. Static tests cannot establish music-theory
+correctness for every style or audible/device timing.
+
+## DEC-039 — Score Analyze lanes omit the visible evidence block
+
+**Date / status:** 2026-09-26; accepted at the maintainer's correction to the
+four rendered Score Analyze lanes. This changes DEC-038's visual treatment,
+not its five-tool inventory, analysis data or local selection contract.
+
+**Problem:** the chord, key, interval and rhythm lanes append an always-visible
+text evidence section beneath the musical timeline. The repeated headline,
+provenance and explanation read as an introduction below the component's main
+interaction, crowding the performance surface.
+
+**Decision:** remove that visible under-lane evidence section from all four
+lanes. The selected band and current readout remain visual; chord and key
+candidate buttons move into a compact control row above their lane. The
+read-only `.analysis` result and selection events retain the detailed evidence
+for application-owned inspectors. Selection details remain available to screen
+readers through a nonvisual status, without adding a visible prose block or
+announcing every passive playback tick. Candidate choice, local pinning and
+player seeking retain their existing behavior.
+
+**Alternatives considered:** shortening the evidence paragraphs, hiding the
+section with CSS while leaving its focusable buttons beneath the lane, or
+removing the selected evidence data altogether. These either keep the extra
+panel, create inaccessible controls, or discard useful analysis contracts.
+
+**Consequences:** the visual component no longer provides a persistent
+provenance report; applications that need one compose it from `.analysis` and
+`webscore:analysisselect`. The stable `inspection` part is retired with the
+visible section; styling references must identify the candidate row and
+remaining surface parts accurately. DEC-038 continues to govern the tools,
+selection, API/Headless ownership and failure states. DEC-034's single outer
+component surface remains unchanged.
+
+**Owner:** [Score Analyze design](design/ANALYZE-COMPONENTS.md) and the four
+owning Score Analyze Element pages.
+
+**Verification implications:** inspect every lane at desktop and narrow widths
+for no visible under-lane text, preserved current readout and candidate access,
+keyboard/focus and screen-reader selection feedback, correct `.analysis` data
+and events, and no regression to seeking or source replacement.
+
+## DEC-040 — Score Analyze favors recurring musical patterns
+
+**Date / status:** 2026-09-27; accepted for this `dev` checkout by the
+maintainer's request to replace the three less useful Score Analyze Elements.
+This supersedes DEC-038's five-tag inventory and DEC-014's retired-motif rule,
+while retaining their one-surface composition and API/Headless boundaries.
+
+**Problem:** the `key-analysis`, `interval-analysis` and `rhythm-analysis`
+lanes expose valid algorithms, but their default visual tasks are less useful
+for making and testing musical decisions. A tonal label can be unstable over a
+short passage; an interval label or beat grid alone does not reveal recurring
+material. The user needs to locate a musical idea elsewhere in a piece and
+compare rhythmic phrases in time.
+
+**Decision:** publish four independent Score Analyze Elements:
+`live-chord-analysis` and `chord-analysis` remain, while `motif-analysis`
+shows repeated melodic interval-and-duration phrases and
+`rhythm-pattern-analysis` shows repeated voice-local onset-and-duration
+phrases. Their interactive surfaces follow the selected player's score and
+position, support standalone score inspection, and let the user select and
+navigate occurrences without editing notes or creating another transport.
+Motif matching is transposition-invariant but duration-sensitive; rhythm
+pattern matching ignores pitch and must preserve note/part/voice provenance.
+Neither tool claims to detect performed groove, syncopation, harmonic function
+or a composer's intended theme.
+
+Retire the three former Element tags from registration, catalogs and current
+pages without compatibility aliases. Keep `detectKey`, `analyzeIntervals` and
+`inspectScoreRhythm` as code-only analysis, along with applicable Headless
+projections. Preserve `findMotifs` and `rhythmPatterns` as API results:
+the new Elements are live, selectable projections, not relabelings of static
+whole-score motif or rhythmic-vocabulary reports. The old `rhythm-patterns`
+report bookmark continues to lead to the report workflow; the newly revived
+`motif-analysis` URL leads directly to its Element page.
+
+**Alternatives considered:** keep five tags by inventing a third replacement,
+retain all three old lanes alongside the new tools, or turn the static
+`rhythm-patterns` report tag into the new tool. Those choices add redundant
+navigation or conflate a report with interactive phrase inspection.
+
+**Consequences:** the two pattern tools must make recurrence and occurrence
+identity visible while keeping detailed evidence available through their
+nonvisual analysis contracts. Phrase length, overlap, rests, polyphony and
+meter changes require explicit semantics and truthful empty/ambiguous states.
+Their selections are local; seeking a match uses the existing player's nominal
+score-time mapping. DEC-039's prohibition on an always-visible prose block
+beneath a lane still applies. Existing callers of retired tags migrate to the
+new tools or compose the retained code-only algorithms themselves.
+
+**Owner:** [Score Analyze design](design/ANALYZE-COMPONENTS.md), the
+[Score Analyze Element inventory](../apps/doc/webmusic/src/content/docs/score/element/index.mdx#analyze),
+and the owning Element/API references.
+
+**Verification implications:** assert exactly four registered Analyze tags
+and three retired redirects; verify repeated transposed motifs and voice-local
+rhythms against authored rests, overlaps and meter changes, plus selected
+occurrence seeking, keyboard/pointer access, source replacement, stale-load
+cleanup and responsive layout. Browser and musical judgment remain separate
+from algorithm unit tests.
+
+## DEC-041 — Score Analyze readings avoid false controls and layout shifts
+
+**Date / status:** 2026-09-27; accepted for this `dev` checkout by the
+maintainer's review of the four DEC-040 Analyze tools. This refines their
+presentation and does not change the four-tag inventory or the underlying
+analysis algorithms.
+
+**Problem:** chord candidate and alternate readings look like commands even
+when choosing one has no useful effect on the score or playback. The live
+nameplate also repeats an uninformative temporal caption. Motif and rhythm
+lanes show both a recurrence ID and a multiplication count, while an empty
+current readout can collapse and shift the surface during playback.
+
+**Decision:** the chord-progression Element keeps its selectable, seekable
+bands but omits its candidate-button row. Detailed chord candidates remain
+available through `.analysis` for application-owned inspectors. The live-chord
+Element displays alternate interpretations as noninteractive secondary text
+below the primary chord symbol and omits the temporal caption. Neither Element
+offers a user-triggered `webscore:chordpick` interaction. Motif and
+rhythm-pattern lanes retain recurrence IDs on their occurrences, omit the
+separate `×` repetition count, and reserve the top readout's space when its
+text is temporarily empty.
+
+**Alternatives considered:** preserve buttons and make their effect more
+prominent, hide all alternate readings, or display a placeholder word in an
+empty top readout. The selected presentation keeps useful interpretation data
+without implying a command, and reserves geometry without invented text.
+
+**Consequences:** documentation and parameter catalogs no longer advertise
+chord-pick events or candidate controls. The live nameplate remains readable
+at narrow widths, and the pattern lanes remain stable across empty/active
+transitions. Applications needing to choose or compare an alternate reading
+use the available nonvisual analysis data and own that interaction.
+
+**Owner:** [Score Analyze design](design/ANALYZE-COMPONENTS.md), the four
+owning [Score Analyze Element pages](../apps/doc/webmusic/src/content/docs/score/element/index.mdx#analyze),
+and the corresponding Score/UI presenters.
+
+**Verification implications:** inspect normal and narrow live demos for no
+inert candidate controls, noninteractive alternate text below the primary
+symbol, no redundant caption, recurrence IDs without a count, and a steady
+lane position while the top readout appears or clears. Check source-facing
+`.analysis` candidate data, event catalogs and keyboard/focus behavior.
+
+## DEC-042 — Dense Score Analyze passages use stable, readable projections
+
+**Date / status:** 2026-09-27; accepted for this `dev` checkout by the
+maintainer's review of all four Score Analyze demos with the full Arabesque No.1
+score. This refines DEC-038, DEC-040 and DEC-041 without changing their four-tag
+inventory or the underlying analysis algorithms.
+
+**Problem:** a complete score can generate many short chord changes and dozens
+of recurring phrase groups. Drawing every result in one small lane makes the
+bands too narrow to read, while an aggregated overflow row piles unrelated
+occurrences on top of each other. The live-chord nameplate also changes shape
+as playback moves among silence, unnamed pitch sets and named chords.
+
+**Decision:** Score Analyze Elements use display projections sized for musical
+inspection. The chord-progression Element groups the score into two
+measure-aligned harmonic cells per bar; each cell summarizes its notes and is
+selectable and seekable as one interval. The underlying Headless/API chord
+segments remain available unchanged. Motif and rhythm-pattern Elements show a
+bounded number of distinct recurrence tracks relevant to the current view,
+without combining remaining groups into a crowded visual row; their full
+results and selected evidence remain nonvisual data. Pattern lanes reserve a
+fixed row/readout footprint across playback and use a four-bar automatic view
+to keep short phrases legible. The live-chord Element reserves
+its symbol, voicing and alternate-reading rows even when they are empty;
+unnamed held sets show their literal pitch names as the main readout without
+inventing a chord identity or event.
+An empty passage is named in the reserved pattern readout; its live status
+remains available to assistive technology without adding a visible row.
+
+**Alternatives considered:** shrinking typography, drawing every event or
+group at once, or hiding overflow behind a visually merged band. Those choices
+either leave text unreadable or imply a relationship the analysis did not find.
+
+**Consequences:** the chord surface reports an interval-level harmonic summary,
+not every instantaneous note-set change. Its selection evidence must describe
+the same interval; applications requiring event-level timing use Headless/API.
+Pattern tracks may change identity with the visible passage, but their geometry
+must stay steady and every displayed occurrence keeps its own selection/seek
+identity. Detailed analysis must not be discarded merely because it is not
+drawn. Silence, ambiguous material and unnamed pitch sets remain distinct from
+a named chord.
+
+**Owner:** [Score Analyze design](design/ANALYZE-COMPONENTS.md), the four
+owning Score Analyze Element pages, and the Score/UI presenters.
+
+**Verification implications:** test cell and pattern projections against dense
+and sparse scores, meter changes, interval evidence, selection and seek;
+inspect all four demos during playback at desktop and narrow widths for
+unoverlapped labels and unchanging component height. Confirm `.analysis` and
+Headless/API outputs keep their documented provenance.
+
+## DEC-043 — Park recurrence Elements while retaining their algorithms
+
+**Date / status:** 2026-09-27; accepted for this `dev` checkout by the
+maintainer's request to move the two recurrence components to a research
+branch. This supersedes DEC-040's four-tag inventory and the pattern-Element
+portions of DEC-041 and DEC-042; their dated rationale remains historical.
+
+**Problem:** the `motif-analysis` and `rhythm-pattern-analysis` lanes require
+more study before their occurrence IDs and visual projections are useful to
+musicians. Keeping them in the current Element inventory would present
+unfinished interaction choices as settled product surfaces.
+
+**Decision:** publish only `chord-analysis` and `live-chord-analysis` as Score
+Analyze Web Components in `dev`. Remove the two recurrence tags, their
+registration, demos, parameter catalogs and Element pages from the current
+checkout. Retain their implementation snapshot on the local
+`codex/score-pattern-analysis-research` branch for later exploration. Keep
+`findMotifs`, `findRhythmPatternOccurrences`, `rhythmPatterns` and applicable
+Headless projections in the API/Headless layers; callers may analyze those
+results without a bundled recurrence UI. Old Element URLs redirect to the
+corresponding API analysis sections.
+
+**Alternatives considered:** leave the current lanes in `dev` while hiding
+their documentation, or remove the recurrence algorithms as well. The first
+leaves accidental public tags; the second discards useful nonvisual analysis
+outside the requested component scope.
+
+**Consequences:** the Score Analyze Element contract and composition policy
+have exactly two tags. Chord progression selection and live-chord display
+retain the applicable DEC-041/042 layout refinements. Recurrence UI is no
+longer a supported Element workflow on `dev`, while algorithm contracts and
+tests remain independently verifiable. The research branch is local until
+explicitly published; it is not a second active checkout.
+
+**Owner:** [Score Analyze design](design/ANALYZE-COMPONENTS.md), the
+[Score Analyze Element inventory](../apps/doc/webmusic/src/content/docs/score/element/index.mdx#analyze),
+and the owning API/Headless references.
+
+**Verification implications:** assert the exact two-tag registration and no
+pattern Element entry; verify old-page redirects and retained API/Headless
+exports. Check chord and live-chord visual behavior independently. Future
+recurrence UI work requires a new decision and browser/music usability review.
+
+## DEC-044 — Retire three narrow Audio View Web Components
+
+**Date / status:** 2026-09-27; accepted for this `dev` checkout by the
+maintainer's request to remove the three components.
+
+**Problem:** `<audio-clip-thumbnail>`, `<audio-minimap>` and
+`<audio-region-list>` add separate public tags, parameters, demos and lifecycle
+contracts without enough value in the current Audio View workflow.
+
+**Decision:** remove these three tags and their Element classes, registration,
+catalog entries and standalone demos. Audio View exposes `<audio-view>` for
+waveform, spectrogram, meter and region display, plus `<audio-live-view>` for
+rolling observations. Retain the existing clip/region models, viewport APIs,
+Headless/Render operations and independent UI Kit presenters for applications
+that compose their own overview or region controls. Redirect the retired Element
+documentation URLs to the current `<audio-view>` reference.
+
+**Alternatives considered:** keep the three tags while removing only their
+demos, or remove the lower-layer data and presenter capabilities as well. The
+first would leave unsupported public components available; the second would
+remove reusable capabilities outside the requested Web Component scope.
+
+**Consequences:** Audio View auto/global registration and the Element export
+surface contain only the two retained View tags, plus the existing legacy
+`audio-meter` registration alias. Existing users of the retired tags must move
+to `<audio-view>` or compose the lower-layer APIs and UI presenters directly.
+The late-binding gap formerly tracked as AUDIO-VIEW-01 for Minimap and
+RegionList no longer applies to the supported Element inventory.
+
+**Owner:** [Audio View design](design/AUDIO-VIEW-COMPONENTS.md), the
+[Audio Web Component inventory](../apps/doc/webmusic/src/content/docs/audio/element/index.mdx#view),
+and the Audio View source and export policy.
+
+**Verification implications:** assert the exact current View tag set and the
+absence of retired exports/registration; verify the old documentation redirects
+and retained AudioView/LiveView, clip/region, and UI Kit capabilities. Build the
+site and check its demos and prefixed routes.
+
+## DEC-045 — Prefix every Score Web Component tag with its domain
+
+**Date / status:** 2026-09-27; accepted for this `dev` checkout by the
+maintainer's request to unify Score and Audio Web Component names. This
+supersedes the tag-stability and `simple-score-player` compatibility portions of
+DEC-016; its behavior, ownership and resource decisions remain in force.
+
+**Problem:** all current Audio Element tags begin with `audio-`, while eight of
+the eleven Score Element tags and five publicly exported Score demo tags lack a
+`score-` prefix. The mixed HTML names make registration and composition less
+predictable across the two domain packages.
+
+**Decision:** keep `score-player`, `score-recorder` and `score-view`. Rename the
+other canonical tags to `score-rack-control`, `score-rack-part`,
+`score-note-input`, `score-synth-panel`, `score-chord-analysis`,
+`score-live-chord-analysis`, `score-pitch-view` and `score-sheet-view`. Apply the
+same prefix rule to the five formerly unprefixed tags in the public
+`@webmusic/score/play/demos` entry. Retire the deprecated
+`simple-score-player` tag, constructor, registration and export; use
+`score-player`. Element, auto and global registration expose only current tags.
+Keep Audio's existing `audio-` names. Move Score Element reference pages to
+their tag-named routes and redirect old page URLs to the matching current pages.
+
+**Scope:** the HTML custom-element tag names, demo tags, their registration,
+composition selectors, catalogs, examples and documentation routes change.
+Existing Score Element class and `define*Element` symbol names, Headless names,
+event operation values, CSS parts and UI presenter identifiers are separate
+contracts and remain stable, apart from the retired simple-player alias.
+
+**Alternatives considered:** remove Audio's prefix or retain all old Score tags
+as aliases. Removing the Audio prefix would change an already consistent family;
+retaining old registrations would preserve two competing naming conventions.
+
+**Consequences:** callers using the eight old Score tags or the retired
+simple-player alias must update markup or registration calls. Old reference
+bookmarks still navigate to the new pages, but redirects do not register old
+custom elements. Demo-only tag users must adopt their prefixed names. The change
+is a user-approved Score exception in this `dev` checkout, not an automatic
+change to `main`.
+
+**Owner:** [Score Play](design/PLAY-COMPONENTS.md),
+[Score Analyze](design/ANALYZE-COMPONENTS.md),
+[Score View](design/VIEW-COMPONENTS.md), and the
+[Score Element inventory](../apps/doc/webmusic/src/content/docs/score/element/index.mdx).
+
+**Verification implications:** assert exact default registrations for Play,
+Analyze, View, auto/global and the public demo entry; assert old tags do not
+register. Check Rack declaration lookup, package exports, catalogs, live demos,
+new documentation pages and redirects at the normal and prefixed site base.
+
+## DEC-046 — Integrate the five-package development surface into main
+
+**Date / status:** 2026-09-28; accepted by the maintainer's request to merge
+the current `dev` source into `main`. This supersedes DEC-021's ongoing branch
+split while preserving the historical scope of the first release.
+
+**Problem:** a separate Audio/Bridge checkout and main-only fixes now require
+repeated synchronization, and the maintainer wants one maintained source tree.
+
+**Decision:** `main` will contain Kernel, UI Kit, Score, Audio and Bridge,
+including their source, tests, public references and demos. The five-package
+policy and dependency order describe the integrated source and the packages
+eligible for a future reviewed release. Keep Score and Audio independent, with
+cross-domain behavior in Bridge and neutral foundations in Kernel and UI.
+Retain the accepted Score changes from DEC-032 through DEC-045 in this merge.
+
+**Alternatives considered:** continue the permanent branch split, or move only
+selected Audio/Bridge source files while leaving their tests, policies and
+documentation behind. Both would preserve duplicate synchronization work or
+an inconsistent package surface.
+
+**Consequences:** current guidance, package policy, manifests, build order,
+site navigation and checks must describe the same five-package source tree.
+The original three-package `0.1.0` npm release and its verified Agent Toolkit
+baseline remain historical facts; integrating changed source does not update
+that release, publish Audio/Bridge, create a tag or prove registry availability.
+Until a separate release is verified, generated Agent Toolkit material must
+identify this tree as a source snapshot. A push to the official `main` branch
+also triggers the current CI Pages deployment, so its site content and demo
+asset provenance require review before that push.
+
+**Owner:** [Architecture](ARCHITECTURE.md), [Status](STATUS.md),
+[Release policy](release/RELEASING.md) and the owning package/public references.
+
+**Verification implications:** resolve the main worktree changes without
+discarding uncommitted work; run the full local gate, documentation build,
+external consumer check and dependency audit on the merged tree. Check the
+five-package manifests, public exports and Agent Toolkit source-snapshot
+claims. Verify CI and deployment on the exact target commit separately; none
+of these checks establishes npm publication or live device/audio behavior.
 
 ## Recording the next decision
 

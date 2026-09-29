@@ -3,7 +3,7 @@ import {afterEach, describe, expect, it, vi} from 'vitest';
 import {Duration, Pitch, Rational, ScoreBuilder, VoiceId, type Score} from '../../src/core';
 import {ScoreViewElement, type ScoreViewElementType} from '../../src/view/element/score-view';
 import {createScoreView} from '../../src/view/headless/score-view';
-import {SimpleScorePlayerElement} from '../../src/play/element/score-player';
+import {ScorePlayerElement} from '../../src/play/element/score-player';
 
 const io = vi.hoisted(() => ({load: vi.fn()}));
 vi.mock('../../src/io/load', () => ({loadScoreFromUrl: io.load}));
@@ -12,7 +12,7 @@ vi.mock('../../src/view/headless/score-view', async (original) => {
   return {...actual, createScoreView: vi.fn(actual.createScoreView)};
 });
 customElements.define('mode-score-view', ScoreViewElement);
-customElements.define('mode-score-player', SimpleScorePlayerElement);
+customElements.define('mode-score-player', ScorePlayerElement);
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 function music(pitch = 'C4'): Score {
@@ -100,7 +100,7 @@ describe('score-view lightweight modes', () => {
   });
 
   it('borrows a paused native score once, seeks nominal time and keeps its cursor across mode switches', async () => {
-    const source = document.createElement('mode-score-player') as SimpleScorePlayerElement;
+    const source = document.createElement('mode-score-player') as ScorePlayerElement;
     source.id = 'player';
     source.score = music();
     document.body.append(source);

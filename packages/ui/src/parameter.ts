@@ -669,7 +669,7 @@ export function mountParameterRack(
 
   const performUpdate = (): void => {
     if (!isCurrent()) return;
-    let disabled = false;
+    let disabled: boolean;
     let next: NormalizedParameter[];
     let nextSignature: string;
     try {

@@ -1,0 +1,64 @@
+---
+// Canonical demo pattern: drop the tag, build a small AudioMixer in a client
+// script block and assign `.members` to the owning element. Two members share one clip and a scheduled start, which is what gives
+// the desk two strips — and gives `solo` an id to actually name.
+import ElementPlayground from './ElementPlayground.astro';
+import AudioPlayStage from './AudioPlayStage.astro';
+
+const SRC = `${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`;
+const SETUP = `import {loadClipFromUrl} from '@webmusic/audio/play';
+import {defineAudioPlayerElement, defineAudioMixerElement} from '@webmusic/audio/play/element';
+
+defineAudioPlayerElement();
+defineAudioMixerElement();
+const mixer = document.querySelector('audio-mixer');
+const clip = await loadClipFromUrl(${JSON.stringify(SRC)});
+if (mixer.isConnected) {
+  mixer.members = [
+    {id: 'track A', clip},
+    {id: 'track B', clip, volume: 0.6},
+  ];
+}`;
+---
+
+<ElementPlayground
+  tag="audio-mixer"
+  class="wa-demo"
+  markup="[data-audio-play-stage]"
+>
+  <AudioPlayStage>
+    <audio-player id="mixer-session"></audio-player>
+    <audio-mixer player="#mixer-session" id="wa-mixer-demo" data-src={SRC}></audio-mixer>
+  </AudioPlayStage>
+  <div class="wm-pg__code-extra" slot="setup">
+    <span class="wm-pg__code-label">JavaScript data setup</span>
+    <pre class="wm-pg__markup" data-pg-copy-source>{SETUP}</pre>
+  </div>
+</ElementPlayground>
+
+<script>
+  import { loadClipFromUrl } from '@webmusic/audio/play';
+  import { defineAudioMixerElement, defineAudioPlayerElement } from '@webmusic/audio/play/element';
+  import type { AudioMixerElement } from '@webmusic/audio/play/element';
+
+  defineAudioPlayerElement();
+  defineAudioMixerElement();
+
+  const setup = async (el: AudioMixerElement) => {
+    if (el.dataset.initialized) return;
+    el.dataset.initialized = 'true';
+    // The template always renders the tag with data-src.
+    const src = el.dataset.src!;
+    // Reuse one decoded clip for both members; the mixer plays them on a single
+    // context and propose a common future start for the two strips.
+    const clip = await loadClipFromUrl(src);
+    if (!el.isConnected) return;
+    el.members = [
+      {id: 'track A', clip},
+      {id: 'track B', clip, volume: 0.6},
+    ];
+  };
+
+  const el = document.getElementById('wa-mixer-demo') as AudioMixerElement | null;
+  if (el) setup(el).catch((e) => console.error('[audio-mixer demo]', e));
+</script>

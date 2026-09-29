@@ -1,0 +1,133 @@
+---
+title: '<audio-playlist>'
+description: 'A queue: play an ordered set of clips one after another, with auto-advance, previous/next/select, list loop and prefetch of the next entry — all through one shared AudioContext.'
+sidebar:
+  order: 2
+---
+
+import AudioPlaylistPlayground from '../../../../../components/elements/AudioPlaylistPlayground.astro';
+
+`<audio-playlist>` supplies queue selection and sequencing to a linked
+[`audio-player`](/audio/element/play/audio-player/). The player displays transport;
+the list displays entries and their loading/current state. The queue keeps one
+context across entries and reuses its tested auto-advance/prefetch behavior.
+
+<AudioPlaylistPlayground />
+
+## Import
+
+```html
+<script type="module">
+  import { defineAudioPlaylistElement, defineAudioPlayerElement } from '@webmusic/audio/play/element';
+  defineAudioPlayerElement();
+  defineAudioPlaylistElement();
+</script>
+
+<audio-player id="session"></audio-player>
+<audio-playlist player="#session" loop>
+  <li data-id="wav-1" data-src="/wav/Arabesque%20No.1.wav">Arabesque WAV · pass 1</li>
+  <li data-id="wav-2" data-src="/wav/Arabesque%20No.1.wav">Arabesque WAV · pass 2</li>
+  <li data-id="mp3" data-src="/mp3/Arabesque%20No.1.mp3" data-streaming>Arabesque MP3 · streamed</li>
+</audio-playlist>
+```
+
+The entries live in light DOM, so the markup degrades to a plain list without JavaScript. A comma-separated `src` works for the simple case, and `.entries` takes over from code:
+
+```html
+<audio-playlist player="#session" src="/wav/Arabesque%20No.1.wav, /mp3/Arabesque%20No.1.mp3"></audio-playlist>
+```
+
+```ts
+import {loadClipFromUrl} from '@webmusic/audio/play';
+import type {AudioPlaylistElement} from '@webmusic/audio/play/element';
+
+const list = document.querySelector<AudioPlaylistElement>('audio-playlist');
+if (!list) throw new Error('Audio playlist not found');
+const clip = await loadClipFromUrl('/wav/Arabesque%20No.1.wav');
+list.entries = [
+  { id: 'a', label: 'Arabesque WAV · loaded', clip },
+  { id: 'b', label: 'Arabesque WAV · queued', src: '/wav/Arabesque%20No.1.wav' },
+  { id: 'c', label: 'Arabesque MP3 · streamed', src: '/mp3/Arabesque%20No.1.mp3', streaming: true },
+];
+await list.play();
+```
+
+
+<details class="component-section">
+<summary>API</summary>
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `player` | attribute | Unique selector for the central `audio-player`; late insertion, upgrade and replacement are observed. |
+| `src` | attribute | A comma or whitespace separated list of URLs. Ignored when `.entries` is assigned. |
+| `loop` | attribute | Live list-loop policy: restart after the last entry and let previous/next wrap, without resetting the current entry. |
+| `autoplay` | attribute | Start on mount or when enabled, using the current selection. Disabling does not pause active playback. Browsers may still block playback. |
+| `volume` / `rate` | attribute | Applied live to the entry that is playing — changing them never interrupts it. |
+| `prefetch` | attribute | Live policy for resolving the next entry. On by default; disabling prevents future prefetches while an in-flight load may still finish and cache. |
+| `skip-failed` | attribute | Live policy for the next load failure, including pending loads. On by default; false stops at the failed entry. |
+| `engine` | attribute | `auto` (default) / `buffer` / `media`, forwarded to every entry's player. |
+| `.entries` | property | `AudioPlaylistEntry[]` — `{id, label?, clip?, src?, streaming?, format?}`. Overrides markup. |
+| `.playlist` | property | The underlying `AudioPlaylist` controller, for the full queue API. Borrowed — do not dispose it. |
+| `.player` | property | Assign/read the linked central `AudioPlayer` (or its Element). Explicit assignment takes precedence over the selector. |
+| `.activePlayer` | readonly property | The current entry's low-level `AudioClipPlayer`, borrowed from the queue and replaced on advance. |
+| `.index` | property | Index of the current entry, or `-1` when the queue is empty. |
+| `.play()` / `.pause()` / `.stop()` | method | Transport for the queue as a whole. |
+| `.next()` / `.previous()` / `.select(idOrIndex)` | method | Move between entries, retaining playback intent. Invalid select ids or non-integer/out-of-range indices reject with RangeError and preserve the old entry. |
+| `.seek(seconds)` | method | Seek within the current entry. |
+| `.clip` / `.seconds` / `.currentTime` / `.duration` / `.analyser` | property | The `PlayerLike` facade, so [`<audio-view player="#id">`](/audio/element/view/audio-view/) can visualize the queue itself rather than one entry. |
+| `webaudio:trackchange` | event | `detail = { id, index }` — a different entry became current, including the first. |
+| `webaudio:trackend` | event | `detail = { id, index }` — one entry played to its natural end. The queue advances next. |
+| `webaudio:playlistend` | event | The last entry ended and the list is not looping. |
+| `webaudio:timeupdate` | event | `detail = { seconds, duration, progress }` for the current entry. |
+| `webaudio:seek` | event | `detail = { seconds, progress }` when the user drags the seek bar. |
+| `webaudio:error` | event | A load or playback failure. A failed entry is marked in the list and skipped. |
+
+**The queue uses track-specific completion events.** That name already means "one clip finished" on `<audio-player>`; reusing it here would make the two impossible to tell apart on a page carrying both. A queue reports `trackend` per entry and `playlistend` once at the bottom.
+
+**Connection and ownership.** A linked list installs its queue as the central
+player's borrowed backend. Disconnect removes only that exact attachment and
+releases its owned queue; it never disposes the central player. Source replacement
+or a newer companion selection must not be undone by an older cleanup. An
+explicit unresolved selector remains detached. Without a connection, the
+playlist provides its own transport controls.
+
+**Loop is a list-level concept.** The queue never sets `loop` on the entry's player: the buffer engine suppresses its end callback while looping, so a looping track player would never let the queue advance. `loop` on this element loops the *list*.
+
+If every entry fails to load, the queue stops after one pass even with `loop`
+enabled. Press Play again to retry after resolving the error; it does not
+continuously retry failed entries in the background.
+
+**Live configuration.** Loop, prefetch and skip-failed changes retain the current player, position and cache. Autoplay does not rebuild the queue. Changing the engine still rebuilds it because it selects a different backend. Source-list changes reconcile entries by id/source; an explicit `.entries` assignment continues to take precedence.
+
+**What prefetch covers.** It fetches and decodes the next entry's clip — the dominant cost — while the current one plays. The per-entry audio graph is still built when that entry starts. A prefetch failure is not fatal: the entry is marked and retried when it actually becomes current.
+
+For the queue without a custom element, use `createAudioPlaylist(options)` from [`@webmusic/audio/play/headless`](/audio/api/play/). The element is that controller plus attribute plumbing and the shared UI-kit presenter — and it is the element that supplies the controller's `loadEntry`, since the headless layer may not reach the loading API itself.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+The host fills its container width by default, can shrink inside flex/grid
+layouts, and respects `hidden`. Set host width in your application for a narrower
+control; spacing between components belongs to their composition.
+
+The shared playlist presenter supplies the neutral `--wm-component-*` outer surface. The legacy
+`--wapl-*` aliases remain available for a playlist-specific skin:
+
+```css
+audio-playlist {
+  --wapl-bg: #fff;
+  --wapl-fg: #111;
+  --wapl-accent: #e23b3b;
+  --wapl-active: rgba(226, 59, 59, .12);
+  --wapl-radius: 12px;
+}
+```
+
+In linked mode, the transport bar is omitted. An independent playlist shows its
+transport, using `--wapl-accent` and `--wm-playlist-button-*`.
+
+Rows carry `aria-current="true"` for the entry playing and `data-status="loading" | "error"` while an entry is being fetched or after it failed, so a stylesheet can mark both. The presenter patches those in place rather than rebuilding the list, so a keyboard user's focus survives playback ticks.
+
+</details>

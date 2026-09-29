@@ -130,6 +130,7 @@ async function advanceReleaseDistTagsWithRollback(artifacts, initialSnapshots) {
       throw new AggregateError(
         [stagingError, ...rollbackErrors],
         'Staging promotion failed and automatic rollback was incomplete; freeze release operations.',
+        {cause: stagingError},
       );
     }
     throw new Error(

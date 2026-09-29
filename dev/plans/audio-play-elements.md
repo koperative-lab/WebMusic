@@ -15,9 +15,9 @@
 
 The original claims that the player has no public `setLoop` and that
 `preserves-pitch` cannot change at runtime describe an earlier implementation.
-[AudioClipPlayer](https://github.com/mrsteamedbun/WebMusic/blob/f074cd8b5f7cdf8f288c77d988384a359c873cfb/packages/audio/src/play/headless/player.ts) now exposes
+[AudioClipPlayer](../../packages/audio/src/play/headless/player.ts) now exposes
 `setLoop()` and `setPreservesPitch()`;
-[audio-clip-player](https://github.com/mrsteamedbun/WebMusic/blob/f074cd8b5f7cdf8f288c77d988384a359c873cfb/packages/audio/src/play/element/audio-clip-player.ts)
+[audio-clip-player](../../packages/audio/src/play/element/audio-player.ts)
 forwards the corresponding attributes to its existing player. These
 prerequisites are complete and should not be implemented again from the old
 phase list. Buffer-engine rate changes transpose pitch; the existing

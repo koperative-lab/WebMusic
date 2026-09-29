@@ -1,0 +1,52 @@
+---
+// Homepage workbench: a player driving a live waveform. Shows the cross-package
+// data flow — @webmusic/audio/play loads + decodes the clip, @webmusic/audio/analyze turns it
+// into a peaks pyramid, @webmusic/audio/view draws it, and the <audio-view> follows the
+// <audio-player> playhead purely through the `webaudio:timeupdate` DOM event
+// (view never imports play or analyze).
+import LiveDemoCanvas from './LiveDemoCanvas.astro';
+---
+
+<div class="wui-panel wui-panel--flow not-content" data-audio-workbench>
+  <div class="wui-panel__title">
+    <span>@webmusic/audio/play + analyze + view</span>
+    <strong>&lt;audio-player&gt; → &lt;audio-view&gt;</strong>
+  </div>
+  <LiveDemoCanvas>
+    <audio-player id="wa-wb-player" controls></audio-player>
+    <audio-view id="wa-wb-view" player="#wa-wb-player" type="waveform" pixels-per-second="90" interactive></audio-view>
+  </LiveDemoCanvas>
+</div>
+
+<script>
+  import type { AudioPlayerElement } from '@webmusic/audio/play/element';
+  import type { AudioViewElement } from '@webmusic/audio/view/element';
+  import { defineAudioPlayerElement } from '@webmusic/audio/play/element';
+  import { defineAudioViewElement } from '@webmusic/audio/view/element';
+  import { loadClipFromUrl } from '@webmusic/audio/play';
+  import { computePeaks } from '@webmusic/audio/analyze';
+
+  defineAudioPlayerElement();
+  defineAudioViewElement();
+
+  (async () => {
+    const clip = await loadClipFromUrl(`${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`);
+    const player = document.getElementById('wa-wb-player') as AudioPlayerElement | null;
+    const view = document.getElementById('wa-wb-view') as AudioViewElement | null;
+    if (player) player.clip = clip;                    // play the decoded clip
+    const channels = clip.channels();
+    if (view && channels) view.peaks = computePeaks(channels, clip.sampleRate); // draw it
+  })();
+</script>
+
+<style>
+  [data-audio-workbench] :global(audio-player) {
+    display: block;
+    margin-bottom: 0.6rem;
+  }
+
+  [data-audio-workbench] :global(audio-view) {
+    display: block;
+    min-height: 130px;
+  }
+</style>

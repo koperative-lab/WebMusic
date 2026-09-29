@@ -39,7 +39,7 @@ export interface RackMember {
    * The member's own level, `0…1`, as `setVolume` last left it.
    *
    * Readable because a mixing surface has to render FROM the rack rather than
-   * from a copy it keeps beside it: `<rack-control>` used to mirror every level
+   * from a copy it keeps beside it: `<score-rack-control>` used to mirror every level
    * in a private Map, which is a second source of truth that drifts the moment
    * anything else calls `setVolume`.
    */

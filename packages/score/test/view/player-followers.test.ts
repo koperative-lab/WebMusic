@@ -2,13 +2,13 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {Duration, Pitch, Rational, ScoreBuilder, VoiceId, type Score} from '../../src/core';
 import {PitchViewElement, ScoreViewElement} from '../../src/view/element';
-import {SimpleScorePlayerElement} from '../../src/play/element/score-player';
+import {ScorePlayerElement} from '../../src/play/element/score-player';
 
 const io = vi.hoisted(() => ({load: vi.fn()}));
 vi.mock('../../src/io/load', () => ({loadScoreFromUrl: io.load}));
 customElements.define('follower-keyboard', PitchViewElement);
 customElements.define('follower-score', ScoreViewElement);
-customElements.define('follower-player', SimpleScorePlayerElement);
+customElements.define('follower-player', ScorePlayerElement);
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 function music(pitches = ['C4', 'E4', 'G4', 'C5', 'C4', 'E4', 'G4', 'C5']): Score {
@@ -47,7 +47,7 @@ function keyboard(attributes: Record<string, string> = {player: '#source'}) {
 }
 
 async function nativePlayer(score = music()) {
-  const node = document.createElement('follower-player') as SimpleScorePlayerElement;
+  const node = document.createElement('follower-player') as ScorePlayerElement;
   node.id = 'source';
   node.score = score;
   document.body.append(node);
@@ -148,7 +148,7 @@ describe('composable View player followers', () => {
   it('borrows one loaded score and follows actual paused nominal time across rate, seek and end', async () => {
     const score = music();
     io.load.mockResolvedValueOnce(score);
-    const source = document.createElement('follower-player') as SimpleScorePlayerElement;
+    const source = document.createElement('follower-player') as ScorePlayerElement;
     source.id = 'source';
     source.setAttribute('src', 'piece.mid');
     document.body.append(source);

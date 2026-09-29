@@ -3,7 +3,7 @@
 //
 // A headless `EffectNode` reports each param's current value but not the range
 // a knob should sweep, so every element that renders effect params — the
-// standalone <effect-control> and <synth-panel>'s effects section — reads the
+// standalone <effect-control> and <score-synth-panel>'s effects section — reads the
 // sweep from here. Unknown names fall back to a plain 0…1.
 // ============================================================================
 

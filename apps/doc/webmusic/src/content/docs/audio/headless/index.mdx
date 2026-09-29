@@ -1,0 +1,167 @@
+---
+title: Audio Headless
+description: UI-free Audio transports, analysis sessions, projections and helpers — the purpose of each /headless entry, the reference page that owns every exported value, and explicit resource and time roles.
+sidebar:
+  hidden: true
+---
+
+Headless components are the code-only domain objects behind the elements:
+engines, runners, and renderers imported from
+`@webmusic/audio/<capability>/headless`. They never touch the DOM.
+
+| Capability | Contents |
+| --- | --- |
+| [Play](#play) | `AudioPlayer`, clip/queue/mix backends, `AudioRecorder` and engines. |
+| [Analyze](#analyze) | Cached analysis sessions, a main-thread realtime sampler and a streaming transient detector; worker clients use their own entry. |
+| [View](#view) | Timeline/view models and pure projection helpers; renderers use the separate /render entry. |
+
+## Roles and ownership
+
+A player may drive clip time, a playlist owns queue selection, a timeline projects
+another object's seconds, and a pure helper returns data without running anything.
+Do not infer a shared session clock, emitter or disposal method from the Headless
+label. Each owning page states its contract and related public types.
+
+The export tables below are a manual export-ownership map, checked against the
+public barrel. The Headless documentation gate searches recognized **value
+names** on this page and across the capability's pages; it does not prove that
+types, signatures, defaults, unique explanation ownership or lifecycle coverage
+are complete. Those require source review. Browser renderers belong to
+[API / View](/audio/api/view/), and application composition can use
+[UI Kit](/uikit/) without changing domain ownership.
+
+## Play
+
+`@webmusic/audio/play/headless` is everything that makes or captures sound
+without drawing any of it: the transports, the two engines beneath them, the
+recorder and the effect builders.
+
+No DOM, no styles. Import from `@webmusic/audio/play/headless`; the elements
+that wrap these objects are under
+[Web Components › Play](/audio/element/#play), and the loaders and decoders
+that produce a clip in the first place are on
+[`@webmusic/audio/play`](/audio/api/play/).
+
+| Export | Kind | Page |
+| --- | --- | --- |
+| `AudioPlayer` · `createAudioPlayer` | class · factory | [AudioPlayer](/audio/headless/play/audio-player/) |
+| `AudioClipPlayer` · `createAudioClipPlayer` | class · factory | [AudioClipPlayer](/audio/headless/play/audio-clip-player/) |
+| `AudioPlaylist` · `createAudioPlaylist` | class · factory | [AudioPlaylist](/audio/headless/play/audio-playlist/) |
+| `AudioMixer` · `createAudioMixer` | class · factory | [AudioMixer](/audio/headless/play/audio-mixer/) |
+| `AudioRecorder` · `createAudioRecorder` | class · factory | [AudioRecorder](/audio/headless/play/audio-recorder/) |
+| `BufferEngine` · `MediaEngine` | classes | [Engines](/audio/headless/play/engines/) |
+| `gain` · `filter` · `delay` · `compressor` · `customEffect` · `chainEffects` · `insertEffect` | effect builders and graph helpers | [Effects](/audio/headless/play/effects/) |
+
+**Type ownership**
+
+| Exported types | Explanation owner |
+| --- | --- |
+| `AudioPlayerOptions`, `AudioPlayerTransport`, `AudioPlayerEvents` | [AudioPlayer](/audio/headless/play/audio-player/) |
+| `AudioClipPlayerOptions`, `AudioClipPlayerEvents`, `AudioScratchSession`, `PlayerTimeUpdate`, `PlayerEngineKind`, `PlayerLike` | [AudioClipPlayer](/audio/headless/play/audio-clip-player/) |
+| `AudioPlaylistOptions`, `AudioPlaylistEvents`, `AudioPlaylistEntry`, `AudioPlaylistEntryStatus` | [AudioPlaylist](/audio/headless/play/audio-playlist/) |
+| `AudioMixerOptions`, `AudioMixerEvents`, `MixerMemberInit`, `AudioMixerSnapshot`, `AudioMixerMemberSnapshot` | [AudioMixer](/audio/headless/play/audio-mixer/) |
+| `AudioRecorderOptions`, `AudioRecorderEvents` | [AudioRecorder](/audio/headless/play/audio-recorder/) |
+| `PlaybackEngine`, `BufferEngineOptions`, `MediaEngineOptions`, `MediaPlaybackAdapter`, `MediaPlaybackAdapterFactory` | [Engines and metering](/audio/headless/play/engines/) |
+| `Effect`, `EffectNodes`, `GainOptions`, `FilterOptions`, `DelayOptions`, `CompressorOptions` | [Effect](/audio/headless/play/effects/) |
+
+The source barrel is `packages/audio/src/play/headless/index.ts`. Stateful
+transports own commands and lifetimes; lazy effect recipes and PCM helpers do not
+acquire an event emitter or dispose method merely by sharing this entry.
+
+### One clip, N at once, N in sequence
+
+The three transports are the three cardinalities, and choosing between them is
+usually the first decision:
+
+| You have | Reach for |
+| --- | --- |
+| one clip | [`AudioClipPlayer`](/audio/headless/play/audio-clip-player/) |
+| several clips whose start/seek commands should be coordinated | [`AudioMixer`](/audio/headless/play/audio-mixer/) |
+| several clips that should play **in order** | [`AudioPlaylist`](/audio/headless/play/audio-playlist/) |
+
+Contexts can be created or explicitly borrowed. Created mixer/playlist members
+reuse their owner's reference context, but independent players retain their own
+clocks. Borrowed arbitrary PlayerLike objects require compatible time and resource
+contracts; there is no fixed browser context-count promise.
+
+## Analyze
+
+`@webmusic/audio/analyze/headless` is the **stateful** half of audio analysis.
+The capability root measures a clip once and returns the numbers; these two
+objects keep something between calls — a cache of frames that survives an
+edit, a poll loop over a live signal, or state across successive attack observations.
+
+No DOM, no styles, no drawing: analysis produces facts, and
+[audio/view](#view) projects signals. Import from
+`@webmusic/audio/analyze/headless`.
+
+| Export | Kind | Page |
+| --- | --- | --- |
+| `createAudioAnalysisSession` | session | [createAudioAnalysisSession](/audio/headless/analyze/audio-analysis-session/) |
+| `createRealtimeAnalyzer` | analyzer | [createRealtimeAnalyzer](/audio/headless/analyze/realtime-analyzer/) |
+| `createTransientDetector` | detector | [Live transient cues](/audio/headless/analyze/realtime-analyzer/#live-transient-cues) |
+
+**Type ownership**
+
+| Exported types | Explanation owner |
+| --- | --- |
+| `AudioAnalysisSession`, `AudioAnalysisSessionOptions` | [createAudioAnalysisSession](/audio/headless/analyze/audio-analysis-session/) |
+| `RealtimeAnalyzer`, `RealtimeAnalyzerOptions`, `RealtimeFrame`, `RealtimeSource` | [createRealtimeAnalyzer](/audio/headless/analyze/realtime-analyzer/) |
+| `TransientDetector`, `TransientInput`, `TransientObservation` | [Live transient cues](/audio/headless/analyze/realtime-analyzer/#live-transient-cues) |
+
+The source barrel is `packages/audio/src/analyze/headless/index.ts`. Algorithm
+option/result types referenced by a session are owned by the [Analyze API](/audio/api/analyze/).
+The session owns cached results without a clock or event emitter; the realtime
+analyzer owns an interval and has callback delivery plus `stop()`. The transient
+detector retains preceding FFT/RMS evidence and provides `reset()`, but owns no
+timer or graph. None exposes a generic dispose method.
+
+The session analyses a **decoded clip** you already hold, and re-analyses it
+with task-dependent reuse after an edit. The realtime analyzer never sees a clip: it borrows an
+`AnalyserNode` and reports what is passing through it right now. Reach for the
+session when you have the recording and the analyzer when you have the signal.
+Pair the realtime analyzer's optional byte spectrum with the detector for
+approximate live attack cues, not a beat grid or sample-accurate onset track.
+
+## View
+
+`@webmusic/audio/view/headless` is the **geometry** half of drawing audio:
+where the viewport is, which columns fall inside it, what a click at *x*
+means. None of it paints. The canvas renderers that do are `/render` adapters
+on [`@webmusic/audio/view`](/audio/api/view/), by the same rule that keeps
+every imperative surface out of a `/headless` entry.
+
+Import from `@webmusic/audio/view/headless`. The models retain input data
+and geometry; a live controller borrows an analyser. A player binding owns
+subscriptions and returns unsubscribe(). None draws or creates a playback clock.
+
+| Export | Kind | Page |
+| --- | --- | --- |
+| `AudioMeterController` · `createAudioMeterController` · `calculateLevelMeter` · `calculateSpectrumBars` | controller · factory · helpers | [Metering](/audio/headless/view/audio-meter/) |
+| `AudioTimeline` · `createAudioTimeline` | class · factory | [AudioTimeline](/audio/headless/view/audio-timeline/) |
+| `bindPlayerToAudioTimeline` | binding | [AudioTimeline](/audio/headless/view/audio-timeline/) |
+| `WaveformViewModel` · `createWaveformViewModel` · `fitWaveformColumns` | class · factory · helper | [View models](/audio/headless/view/view-models/) |
+| `SpectrogramViewModel` · `createSpectrogramViewModel` | class · factory | [View models](/audio/headless/view/view-models/) |
+| `computeClipPeaks` · `peaksDuration` | functions | [Peaks](/audio/headless/view/peaks/) |
+| `LiveViewController` · `createLiveViewController` · `LiveScrollBuffer` | classes · factory | [Live projection](/audio/headless/view/live-projection/) |
+| `frequencyColumn` · `timeDomainColumn` | column builders | [Live projection](/audio/headless/view/live-projection/) |
+
+**Type ownership**
+
+| Exported types | Explanation owner |
+| --- | --- |
+| `AudioMeterControllerOptions`, `AudioMeterConfiguration`, `AudioMeterLevelFrame`, `LevelMeterFrame`, `LevelMeterOptions`, `SpectrumBarsOptions` | [Metering](/audio/headless/view/audio-meter/) |
+| `AudioTimelineOptions`, `AudioTimelineSnapshot`, `AudioTimelineHit`, `AudioTimelineGeometryUpdate`, `AudioTimelineSubscriber`, `AudioTimelineBinding`, `BindAudioTimelineOptions`, `PlayheadTarget` | [AudioTimeline](/audio/headless/view/audio-timeline/) |
+| `WaveformViewModelOptions`, `WaveformColumn`, `WaveformChannelPeak`, `SpectrogramViewModelOptions`, `SpectrogramFrameView` | [View models](/audio/headless/view/view-models/) |
+| `LiveColumn`, `LiveProjectionType`, `LiveScrollOptions`, `LiveViewControllerOptions` | [Live projection](/audio/headless/view/live-projection/) |
+
+The source barrel is `packages/audio/src/view/headless/index.ts`. AudioPeaks and
+Region input types belong to the [Audio core API](/audio/api/); SpectrogramData
+belongs to the [View API](/audio/api/view/). Pure functions such as computeClipPeaks
+and fitWaveformColumns have no lifecycle/events. Model query results do not imply
+an internal refresh timer.
+
+`AudioTimeline` and the view models describe a **clip you already have**;
+`LiveViewController` describes a signal arriving now. The split is the same
+one the analyze capability makes, for the same reason: a clip has a length and
+a live signal does not.

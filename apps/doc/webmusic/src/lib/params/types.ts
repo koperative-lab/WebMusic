@@ -1,7 +1,7 @@
 // ============================================================================
 // The parameter catalog behind <ElementPlayground>.
 //
-// One entry per Score web component. `params` is the element's COMPLETE
+// One entry per Score / Audio web component. `params` is the element's COMPLETE
 // observed-attribute surface — every name in its `static observedAttributes`,
 // including the ones no demo would normally set — so the docs can put a live
 // control on each of them instead of showing only the two or three a canned
@@ -67,7 +67,7 @@ export interface MemberSpec {
 }
 
 export interface ElementParamSpec {
-  /** Custom element tag, e.g. `chord-analysis`. */
+  /** Custom element tag, e.g. `score-chord-analysis`. */
   readonly tag: string;
   /** Public import entry, e.g. `@webmusic/score/analyze/element`. */
   readonly entry: string;

@@ -4,10 +4,7 @@ import {afterEach, describe, expect, it, vi} from 'vitest';
 import {Duration, Pitch, Rational, ScoreBuilder, VoiceId} from '../../src/core';
 import {
   ChordAnalysisElement,
-  KeyAnalysisElement,
   LiveChordAnalysisElement,
-  RomanAnalysisElement,
-  VoiceLeadingAnalysisElement,
 } from '../../src/analyze/element';
 
 // Exercise the actual sibling presenter source without requiring a dist build
@@ -16,11 +13,8 @@ vi.mock('@webmusic/ui/harmony', () => import('../../../ui/src/harmony'));
 vi.mock('@webmusic/ui/workbench', () => import('../../../ui/src/workbench'));
 
 const cases = [
-  ['chord-analysis', ChordAnalysisElement, 'lane'],
-  ['key-analysis', KeyAnalysisElement, 'lane'],
-  ['roman-analysis', RomanAnalysisElement, 'lane'],
-  ['voice-leading-analysis', VoiceLeadingAnalysisElement, 'lane'],
-  ['live-chord-analysis', LiveChordAnalysisElement, 'nameplate'],
+  ['score-chord-analysis', ChordAnalysisElement, 'lane'],
+  ['score-live-chord-analysis', LiveChordAnalysisElement, 'nameplate'],
 ] as const;
 
 for (const [tag, constructor] of cases) customElements.define(tag, constructor);
@@ -50,7 +44,7 @@ afterEach(() => document.body.replaceChildren());
 describe('Analyze Element styling composition', () => {
   for (const [tag, , contentPart] of cases) {
     it(`${tag} exposes one outer surface and an unpainted musical child`, async () => {
-      const host = document.createElement(tag) as KeyAnalysisElement;
+      const host = document.createElement(tag) as ChordAnalysisElement;
       if (contentPart === 'lane') host.score = score;
       document.body.append(host);
       await flush();
@@ -60,6 +54,17 @@ describe('Analyze Element styling composition', () => {
       expect(host.querySelectorAll('[part~="surface"]')).toHaveLength(1);
       expect(host.querySelector('[part~="presentation"]')).not.toBeNull();
       expect(host.querySelector('[part~="content"]')).not.toBeNull();
+
+      const surface = host.querySelector<HTMLElement>('[part~="surface"]')!;
+      // The Element must supply a real card even though its workbench omits
+      // configuration chrome. These declarations are on the sole outer frame;
+      // their variables are resolved by the browser, not by jsdom.
+      expect(surface.style.padding).toContain('--wm-component-padding');
+      expect(surface.style.padding).toContain('.6rem');
+      expect(surface.style.border).toContain('--wm-component-border');
+      expect(surface.style.border).toContain('1px solid');
+      expect(surface.style.background).toContain('--wm-component-background');
+      expect(surface.style.background).toContain('light-dark(#fff, #111)');
 
       const child = host.querySelector<HTMLElement>(`[part~="${contentPart}"]`)!;
       // This is the composition contract, not a computed-custom-property test:
@@ -81,7 +86,7 @@ describe('Analyze Element styling composition', () => {
     it(`${tag} preserves application styles and inherited token access after updates and remounts`, async () => {
       const parent = document.createElement('section');
       parent.style.cssText = '--wm-component-background:transparent;--wm-component-border:2px solid teal;--wm-control-radius:12px;--wm-foreground:navy;--wm-accent:purple;--wm-harmony-flow-tone:gold';
-      const host = document.createElement(tag) as KeyAnalysisElement;
+      const host = document.createElement(tag) as ChordAnalysisElement;
       host.style.cssText = 'width:85%;color:maroon;--wm-harmony-foreground:teal';
       const originalStyle = host.style.cssText;
       parent.append(host);
@@ -90,6 +95,7 @@ describe('Analyze Element styling composition', () => {
       await flush();
 
       const musicalChild = host.querySelector(`[part~="${contentPart}"]`);
+      const originalSurfaceStyle = host.querySelector<HTMLElement>('[part~="surface"]')!.style.cssText;
       parent.style.setProperty('--wm-component-background', 'rgba(0, 0, 0, .25)');
       parent.style.setProperty('--wm-harmony-flow-tone', 'pink');
       host.setAttribute('density', 'compact');
@@ -102,7 +108,7 @@ describe('Analyze Element styling composition', () => {
       await flush();
 
       expect(host.style.cssText).toBe(originalStyle);
-      expect(host.querySelector('[part~="surface"]')).not.toBeNull();
+      expect(host.querySelector<HTMLElement>('[part~="surface"]')!.style.cssText).toBe(originalSurfaceStyle);
       expect(host.querySelector(`[part~="${contentPart}"]`)).not.toBeNull();
       // Neither the Element nor its presenters may publish local defaults in
       // the application's public vocabulary and thereby mask ancestor themes.
@@ -112,6 +118,20 @@ describe('Analyze Element styling composition', () => {
       }
       const presentation = host.querySelector<HTMLElement>('[part~="presentation"]')!;
       expect(presentation.style.getPropertyValue('color-scheme')).toBe('');
+    });
+
+    it(`${tag} respects native hidden without replacing its surface`, async () => {
+      const host = document.createElement(tag);
+      host.hidden = true;
+      document.body.append(host);
+      await flush();
+      const surface = host.querySelector('[part~="surface"]');
+      expect(getComputedStyle(host).display).toBe('none');
+      host.hidden = false;
+      expect(getComputedStyle(host).display).toBe('block');
+      host.hidden = true;
+      expect(getComputedStyle(host).display).toBe('none');
+      expect(host.querySelector('[part~="surface"]')).toBe(surface);
     });
   }
 });

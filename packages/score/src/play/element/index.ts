@@ -6,12 +6,11 @@
 //
 // Elements cover the capability, one per job:
 //   <score-player>         play a Score back
-//   <simple-score-player>  deprecated compatibility alias
-//   <rack-control>         mix the members of a shared Rack
-//   <rack-part>            declare one member of the desk it sits in
-//   <note-input>           play notes by hand (piano / grid / chords / QWERTY)
+//   <score-rack-control>   mix the members of a shared Rack
+//   <score-rack-part>      declare one member of the desk it sits in
+//   <score-note-input>     play notes by hand (piano / grid / chords / QWERTY)
 //   <score-recorder>       capture a performance into a Score
-//   <synth-panel>          shape the sound (sections sound / effects / …)
+//   <score-synth-panel>    shape the sound (sections sound / effects / …)
 //
 // `defineAllElements()` registers every element below; the drop-in
 // `@webmusic/score/play/auto` entry just calls it for you.
@@ -50,7 +49,7 @@ export {
   type NoteInputDetail,
   type NoteInputChord,
   type NoteInputPad,
-} from "./note-input";
+} from "./score-note-input";
 
 
 export {
@@ -73,7 +72,7 @@ export {
   type SynthPanelLfoEventDetail,
   type SynthPanelLfoErrorDetail,
   type SynthPanelLfoState,
-} from "./synth-panel";
+} from "./score-synth-panel";
 
 
 
@@ -82,8 +81,6 @@ export {
 export {
   ScorePlayerElement,
   defineScorePlayerElement,
-  SimpleScorePlayerElement,
-  defineSimpleScorePlayerElement,
   type ScorePlayerPlaybackSnapshot,
   type ScorePlayerNoteEventDetail,
   type ScorePlayerTimeUpdateEventDetail,
@@ -92,14 +89,14 @@ export {
   RackControlElement,
   defineRackControlElement,
   type RackControlErrorDetail,
-} from "./rack-control";
+} from "./score-rack-control";
 export {
   RackPartElement,
   defineRackPartElement,
   type RackPartErrorDetail,
-} from "./rack-part";
+} from "./score-rack-part";
 
-// Note input — `<note-input layout="…">` covers every discrete-note layout.
+// Note input — `<score-note-input layout="…">` covers every discrete-note layout.
 
 // ---- Imperative widget mounters (build a player UI without a custom element) ----
 export {
@@ -119,14 +116,13 @@ export { formatTime } from "./internal/transport-format";
 
 // ---- Registration ----
 import { defineScoreRecorderElement } from "./score-recorder";
-import { defineNoteInputElement } from "./note-input";
-import { defineSynthPanelElement } from "./synth-panel";
+import { defineNoteInputElement } from "./score-note-input";
+import { defineSynthPanelElement } from "./score-synth-panel";
 import {
   defineScorePlayerElement,
-  defineSimpleScorePlayerElement,
 } from "./score-player";
-import { defineRackControlElement } from "./rack-control";
-import { defineRackPartElement } from "./rack-part";
+import { defineRackControlElement } from "./score-rack-control";
+import { defineRackPartElement } from "./score-rack-part";
 
 /**
  * Register every `@webmusic/score/play` custom element at its default tag — the
@@ -139,7 +135,6 @@ export function defineAllElements(): void {
   defineNoteInputElement();
   defineSynthPanelElement();
   defineScorePlayerElement();
-  defineSimpleScorePlayerElement();
   defineRackControlElement();
   defineRackPartElement();
 }

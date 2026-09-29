@@ -13,12 +13,17 @@ status or a second task list. The complete documentation routing map lives in
 
 ## Checkout and release boundary
 
-`main` prepares the first release: Kernel, UI Kit and Score. Audio and Bridge
-remain deferred. Their source and public references are absent from this
-checkout, and their migration must be checked against the target branch before
-claiming delivery. The cross-domain contracts below retain the accepted design;
-they are not additional packages or executable paths in this checkout. Shared
-guidance must preserve this release boundary. [STATUS](STATUS.md) owns readiness.
+DEC-021 records the original three-package first release. DEC-046 accepts
+Kernel, UI Kit, Score, Audio and Bridge in the source tree planned for `main`.
+The Score and Agent Toolkit baseline incorporates the approved Recorder and
+Analyze demo composition (DEC-032/033), component framing (DEC-034), two-tool
+Analyze inventory (DEC-043), and domain-prefixed tags (DEC-045). Shared
+Kernel/UI changes have explicit consumers and regression coverage.
+
+The five-package source tree and site routes describe implementation, not npm
+release readiness. [STATUS](STATUS.md) owns current verification. Historical
+migration records retain their original scope and results without authorizing
+extra public Score controllers, parked Elements or unrelated UI applications.
 
 ## Packages and deployment boundaries
 
@@ -33,16 +38,14 @@ boundary is not necessarily a separate npm package.
 | `platform/kernel` | `@webmusic/kernel`: domain-neutral events, lifecycle and worker utilities, playback/effect contracts, time math and synchronization. |
 | `packages/ui` | `@webmusic/ui`: DOM presenters, structural bindings and semantic styling hooks; no workspace dependencies. |
 | `packages/score` | `@webmusic/score`: immutable Score model, MIDI/MusicXML/MXL/ABC I/O, playback, analysis, views and React composition. |
-| `packages/audio` (deferred) | Intended `@webmusic/audio`: AudioClip, decoding, playback, recording, analysis, views and React composition; format support depends on the selected decoder. |
-| `bridges/score-audio` (deferred) | Intended `@webmusic/bridge`: Score/Audio synchronization, rendering and model conversion. |
-| `apps/doc/webmusic` | Astro Starlight documentation app; this checkout documents `kernel/`, `uikit/` and `score/`. Audio and Bridge documentation awaits migration. |
+| `packages/audio` | `@webmusic/audio`: AudioClip, decoding, playback, recording, analysis, views and React composition; format support depends on the selected decoder. |
+| `bridges/score-audio` | `@webmusic/bridge`: Score/Audio synchronization, rendering and model conversion. |
+| `apps/doc/webmusic` | Astro Starlight documentation app; content is organized under `kernel/`, `uikit/`, `bridge/`, `score/` and `audio/`. |
 | `apps/doc/shared` | Shared documentation `ui.css`, `ui.ts` and `ui-catalog.ts`; not a separate workspace package. |
 | `scripts/` | Package, source, component, documentation and release-manifest checks; `release-pipeline/` preserves historical release machinery. |
 
-The following table lists **workspace edges only**. Audio and Bridge rows
-describe their accepted dependency design, not installed workspaces in this
-checkout. Third-party dependencies are specified by each present package's
-manifest.
+The following table lists **workspace edges only**. Third-party dependencies are
+specified by each package manifest.
 
 | Package | Workspace dependencies | Workspace peer dependencies |
 |---|---|---|
@@ -66,7 +69,8 @@ compatible UI peer; static optional-peer exceptions are enumerated per entry.
 2. **Kernel knows no domain model.** No `Note`, `Score`, `TimeMap`, `AudioClip` or
    `BeatGrid`. Extraction requires existing duplicated implementations that drift,
    or a contract both domains implement. See the [platform ledger](../platform/README.md).
-3. **Reusable cross-domain library logic belongs in Bridge.** It is the development package on `dev` that depends on both domains. Applications, examples and
+3. **Reusable cross-domain library logic belongs in Bridge.** It is the current
+   source package that depends on both domains. Applications, examples and
    tests may compose both through public entries; this rule does not prohibit
    application-level workspaces.
 4. **UI owns presentation.** Its small structural bindings do not import domain
@@ -110,16 +114,14 @@ Technical adapters are separate; imperative code is not automatically Headless:
 
 - `/render`: DOM/canvas/SVG view renderers.
 - Score `/play/drivers`: browser scroll, pointer, orientation and similar input
-  mapped to transport; the deferred Audio design has no corresponding driver
-  entry.
+  mapped to transport; Audio has no corresponding driver entry.
 - `/worker-client`, `/worker-protocol`, `/worker`: client, protocol and runtime.
 - `/auto`, `/global`: Element registration and browser distribution forms.
 - `/demos`: explicitly published teaching material, checked against its actual
   reachable dependencies.
 
-The present package capability DAG is enforced by `capabilityDependencies` in
-[scripts/package-policy.mjs](../scripts/package-policy.mjs). The Audio rows below
-remain a design constraint to enforce when that workspace is migrated.
+The capability DAG is enforced by `capabilityDependencies` in
+[scripts/package-policy.mjs](../scripts/package-policy.mjs).
 
 | Score capability | May depend on |
 |---|---|
@@ -128,12 +130,26 @@ remain a design constraint to enforce when that workspace is migrated.
 | `view`, `play`, `analyze` | `core`, `io`; the three siblings do not import one another |
 | `react` | All Score capabilities |
 
-| Audio capability (deferred) | May depend on |
+| Audio capability | May depend on |
 |---|---|
 | `core` | None |
 | `play` | `core` |
 | `view`, `analyze` | `core`, `play` |
 | `react` | All Audio capabilities |
+
+Audio Play exposes a stable `AudioPlayer` command facade over its selected clip,
+queue or mix backend. Linked playlist/mixer/recorder Elements compose with that
+owner; they do not add another transport presenter or clock. View retains the
+nonvisual `AudioMeterController` and the `audio-view type="meter"` projection.
+The independent `audio-meter` tag is a compact Analyze monitor beside sampled
+level dynamics, frequency-spectrum probing, time-domain oscilloscope inspection
+and transient-cue inspection. These tools borrow the same player graph without
+creating another player or clock. The canonical Analyze meter Element facade
+may import the existing View meter implementation through one reviewed
+compatibility adapter; legacy View Element imports may still register the same
+tag. This is not a blanket Analyze-to-View dependency or permission for other
+Analyze layers to import View. See [Audio Play](design/AUDIO-PLAY-COMPONENTS.md),
+[Audio Analyze](design/AUDIO-ANALYZE-COMPONENTS.md), DEC-029 and DEC-037.
 
 ## Time: one authority per session
 
@@ -152,21 +168,19 @@ Four time layers must remain distinct:
 | Score musical time | Rational quarter positions, beats, `TimeMap`, nominal seconds | `TimeMap` maps musical positions through tempo/meter; playback rate then maps nominal seconds onto reference time. |
 | Audio media time | Clip seconds, sample index, `BeatGrid` | Sample indices need a sample rate; a BeatGrid beat index is not automatically a Score quarter position. |
 
-Implemented shared contracts in Kernel are `TransportClock`, its read-only
-reader, `TimelineMapping`, `TickSource` and `TransportGroup`. The retained Bridge
-design uses one `AudioContext` reference, selects a master reader as the group's
-position authority, and coordinates starts, rates, seeks and drift. Both
-Score-mastered and Audio-mastered pairings belong to that deferred design; this
-checkout does not provide those Bridge factories.
+Implemented shared contracts are `TransportClock`, its read-only reader,
+`TimelineMapping`, `TickSource` and `TransportGroup`. Bridge uses one
+`AudioContext` reference, selects a master reader as the group's position
+authority, and coordinates starts, rates, seeks and drift. Both Score-mastered
+and Audio-mastered pairings exist.
 
-**The implemented Score player retains its own `TransportClock` instance.** The
-[Score scheduler](../packages/score/src/play/headless/score-player-scheduler.ts)
-constructs one. Earlier Audio buffer-engine work also used a separate clock, but
-the Audio engine is not in this checkout. A reader provides neither shared write
-ownership nor invalidation notification or same-instance injection. The Kernel
-contracts support the accepted direction; they do not mean the complete
-shared-session-clock design has shipped. Injection and rescheduling requirements
-are specified in
+**Players currently retain separate `TransportClock` instances.** The
+[Score scheduler](../packages/score/src/play/headless/score-player-scheduler.ts) and
+[Audio buffer engine](../packages/audio/src/play/headless/engines/buffer-engine.ts)
+each construct one. A reader provides neither shared write ownership nor
+invalidation notification or same-instance injection. These implemented contracts
+support the accepted direction; they do not mean the complete shared-session-clock
+design has shipped. Injection and rescheduling requirements are specified in
 [platform/shared-clock-injection.md](../platform/shared-clock-injection.md), with
 delivery status in [STATUS.md](STATUS.md).
 
@@ -181,41 +195,35 @@ Pause holds position; `startAt` holds a scheduled origin until reference time re
 without accumulating JS ticks. `timeAt` rejects paused states and positions that
 cannot be mapped during a scheduled hold.
 
-Ticks wake schedulers. Score backends supporting future attacks and cancellation
-can submit absolute timestamps to Web Audio; the deferred Audio buffer-engine
-design has the corresponding scheduling role. Readers, worker timers and UI
-events alone do not guarantee sample accuracy. Workers reduce main-thread timer
-throttling effects, but browser suspension, message delivery and preparation can
-still delay scheduling. The earlier Bridge loop design detects a boundary on a
-tick before rejoining; sample-accurate cross-domain loop wrap is not an
-implemented guarantee in this checkout.
+Ticks wake schedulers. Score backends supporting future attacks and cancellation,
+and the Audio buffer engine, can submit absolute timestamps to Web Audio.
+Readers, worker timers and UI events alone do not guarantee sample accuracy.
+Workers reduce main-thread timer throttling effects, but browser suspension,
+message delivery and preparation can still delay scheduling. Synchronized loops
+currently detect a boundary on a tick before rejoining; sample-accurate loop wrap
+is not an implemented guarantee.
 
-## Bridge conversion boundaries (deferred)
+## Bridge conversion boundaries
 
 Bridge owns domain adaptation; Kernel owns domain-neutral roles and coordination:
 
 - `TransportGroup` provides revisioned commands, command FIFO, generations,
   intent recovery, multiple followers, affine offset/scale mapping, native-loop
   phase mapping and drift correction.
-- The retained `ScoreAudioSync` design selects domain axes and restricts the
-  shared rate; reverse adapters translate clip offsets and Score nominal seconds.
-- The deferred domain adapters `timeMapMapping` / `beatGridMapping` implement
-  `TimelineMapping`; Bridge pair adapters expose constant offsets. Kernel
-  follower mappings do not implement arbitrary nonlinear score-to-recording
-  alignment.
-- The retained `beatGridFromTimeMap` design evaluates sampled beat positions
-  exactly; tempo changes between those positions may not be recoverable.
-- The retained `timeMapFromBeatGrid` design reconstructs interval tempos without
-  preserving original meter or automatically retaining the grid's absolute start
-  offset.
-- The retained `renderScoreToClip` design produces samples;
-  `scoreFromTranscription` constructs notation from estimated note events. Neither
-  implies lossless Audio ↔ Score round-trips.
+- `ScoreAudioSync` selects domain axes and restricts the shared rate; reverse
+  adapters translate clip offsets and Score nominal seconds.
+- Domain adapters `timeMapMapping` / `beatGridMapping` implement `TimelineMapping`;
+  Bridge pair adapters expose constant offsets. Kernel follower mappings do not
+  implement arbitrary nonlinear score-to-recording alignment.
+- `beatGridFromTimeMap` evaluates sampled beat positions exactly; tempo changes
+  between those positions may not be recoverable.
+- `timeMapFromBeatGrid` reconstructs interval tempos without preserving original
+  meter or automatically retaining the grid's absolute start offset.
+- `renderScoreToClip` produces samples; `scoreFromTranscription` constructs notation
+  from estimated note events. Neither implies lossless Audio ↔ Score round-trips.
 
-These are design and historical implementation boundaries, not callable Bridge
-entries in this checkout. [Shared-clock design](../platform/shared-clock-injection.md)
-owns the timing protocol; a future Bridge public reference must own exact calls,
-axis translations, limits and errors after migration.
+Calls, axis translations, limits and error behavior are detailed in
+[bridges/README.md](../bridges/README.md).
 
 ## Ownership and lifetime
 
@@ -285,13 +293,12 @@ The presenter inventory belongs in [COMPONENTS.md](COMPONENTS.md) and the
 
 ## Public entries and build contracts
 
-Each present package exports `.` and `/package.json`. Score capability roots are
+Each package exports `.` and `/package.json`. Score/Audio capability roots are
 APIs; `/element` is the only element spelling. `/elements`, `/api` and `/session`
 are not public aliases. Kernel exports `/events`, `/element`, `/worker`,
 `/audio-context`, `/player`, `/effect`, `/meter`, `/transport`, `/tick` and `/sync`.
-Audio capability roots and Bridge root exports remain design for their deferred
-packages; exact entry sets must be reconciled between manifests and
-`expectedPublicEntries` when migrated.
+Bridge currently exports its capabilities from its package root. Exact entry sets
+are reconciled between manifests and `expectedPublicEntries`.
 
 Non-IIFE entries use nested conditions:
 
@@ -301,10 +308,9 @@ require: { types: *.d.cts, default: *.cjs }
 ```
 
 `/global` is a browser IIFE of `/auto`, with `types` + `default` only, not ESM/CJS
-conditions. Score play exposes `WebMusicScorePlay`. The deferred Audio design
-names `WebMusicAudioPlay`, `WebMusicAudioAnalyze` and `WebMusicAudioView`.
-Implemented registration entries register elements on evaluation and declare
-side effects. Worker runtimes also
+conditions. Score play exposes `WebMusicScorePlay`; Audio exposes
+`WebMusicAudioPlay`, `WebMusicAudioAnalyze` and `WebMusicAudioView`. These entries
+register elements on evaluation and declare side effects. Worker runtimes also
 declare registration effects, guarded by `dedicatedWorkerScope()` so SSR and
 main-thread imports register no worker handler. Other public entries remain free
 of import-time side effects.
@@ -312,9 +318,9 @@ of import-time side effects.
 Packages use composite TypeScript projects, with root solution references matching
 workspace dependencies. tsup builds the artifacts; family `moduleEntries` map
 source to output, with split ESM and unsplit CJS passes. CJS worker clients use the
-defined fallback without `import.meta.url`. Kernel splits both formats so root
-and capability imports share runtime class identity within each module format.
-Build entries and exports must match
+defined fallback without `import.meta.url`. Kernel explicitly splits both formats
+so its root and capability entries share runtime class identity within each
+module format. Build entries and exports must match
 in both directions. Relative source imports stay inside their package; cross-package
 imports use public subpaths.
 
@@ -327,11 +333,11 @@ without changing `package-policy.mjs`.
 |---|---|
 | Packages, entries, dependencies, layers, side effects, DOM-free/optional-peer reachability | [scripts/package-policy.mjs](../scripts/package-policy.mjs) |
 | Element-to-presenter composition and behavior-only exceptions | [scripts/element-composition-policy.mjs](../scripts/element-composition-policy.mjs) |
-| Element/catalog membership, UI information classes and AST rules | Composition policy, `uiPresenterClassPolicy` and checker implementations in [scripts/check-architecture.mjs](../scripts/check-architecture.mjs); counts are derived from reviewed membership |
+| Element/catalog membership, UI information classes and AST rules | Composition policy and [architecture checker](../scripts/check-architecture.mjs); reviewed membership determines the catalog |
 | Installed API and type/runtime paths | Each package's `exports`, dependencies/peers and `sideEffects` in `package.json` |
 | Output layout and source mapping | Package tsup configurations / build scripts; family `moduleEntries` |
 | Documentation structure, examples and component presentation | [scripts/check-docs.mjs](../scripts/check-docs.mjs), [scripts/check-doc-snippets.mjs](../scripts/check-doc-snippets.mjs), documentation catalog |
-| Demo assets and browser notices | [scripts/demo-assets.mjs](../scripts/demo-assets.mjs), [scripts/site-notices.mjs](../scripts/site-notices.mjs) and [scripts/bundle-notices.mjs](../scripts/bundle-notices.mjs) |
+| Demo and bundle notices | [scripts/site-notices.mjs](../scripts/site-notices.mjs) and [scripts/bundle-notices.mjs](../scripts/bundle-notices.mjs) |
 | Packed artifacts and release manifests | [scripts/check-package-exports.mjs](../scripts/check-package-exports.mjs), [scripts/package-artifacts.mjs](../scripts/package-artifacts.mjs), [scripts/bundle-notices.mjs](../scripts/bundle-notices.mjs), [scripts/release-manifests.mjs](../scripts/release-manifests.mjs) |
 
 `check:architecture` also checks cycles, orphan sources, the TypeScript solution,
@@ -344,3 +350,12 @@ IIFE globals/registration and worker fallbacks. The authoritative command graph 
 CI jobs are [package.json](../package.json) and
 [.github/workflows/ci.yml](../.github/workflows/ci.yml); operational guidance lives in
 [dev/DEVELOPMENT.md](DEVELOPMENT.md), without another copied command chain here.
+
+## Scope of shared compatibility changes
+
+Audio and Bridge use the existing domain-neutral public foundations. For a shared
+change, identify the concrete consumer, keep the main Score behavior compatible,
+and verify the consumer and the shared contract. A renderer gesture, lifecycle or
+numeric-axis capability belongs in its existing owning entry when reusable;
+it does not justify a second application framework or a broader export surface.
+The public UI reference follows the canonical `/uikit` routes and six groups.

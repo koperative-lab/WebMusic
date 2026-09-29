@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-// One bug, one file. `<chord-analysis>` computed NOMINAL seconds and handed
+// One bug, one file. `<score-chord-analysis>` computed NOMINAL seconds and handed
 // them to `player.seek()`, which takes RATE-SCALED TRANSPORT seconds. At rate 1
 // the two coincide, which is why every existing test passed and why clicking
 // bar 5 at rate 2 landed on bar 9.
@@ -74,7 +74,7 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
-describe('<chord-analysis> seeking at a rate other than 1', () => {
+describe('<score-chord-analysis> seeking at a rate other than 1', () => {
   it('seeks in transport seconds while the event still reports nominal ones', async () => {
     const score = melody();
     const player = stubPlayer();

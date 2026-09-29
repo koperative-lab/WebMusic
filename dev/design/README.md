@@ -13,9 +13,13 @@ choices; [STATUS](../STATUS.md) distinguishes delivery from target design.
 | [VIEW-COMPONENTS.md](VIEW-COMPONENTS.md) | Score's type-selected representations and separate engraving/view responsibilities |
 | [STAFF-NOTATION.md](STAFF-NOTATION.md) | Written-time staff projection, beam grouping, glyph rendering and the boundary with page engraving |
 | [PLAY-COMPONENTS.md](PLAY-COMPONENTS.md) | Score's playback, input and control roles with shared transport behavior |
+| [AUDIO-PLAY-COMPONENTS.md](AUDIO-PLAY-COMPONENTS.md) | Audio playback, sequencing, mixing, recording and monitoring state/resource contracts |
+| [AUDIO-ANALYZE-COMPONENTS.md](AUDIO-ANALYZE-COMPONENTS.md) | Audio performance analysis roles, borrowed playback and static report boundary |
+| [AUDIO-VIEW-COMPONENTS.md](AUDIO-VIEW-COMPONENTS.md) | Audio projection roles, bounded drawing, data caches and responsive demo preparation |
 
-The family records describe Score decisions; they are a comparison for an Audio
-review, not evidence that Audio has the same components or has passed review.
+The Score family records remain comparisons for Audio; the Audio Play, Analyze and View records
+own their separate tasks and accepted contracts. Neither transfers verification
+results between domains or branches.
 Use the [review workflow and Audio starting brief](../log/2026-09-09-score-review-workflow.md)
 to sequence algorithm, implementation, architecture and frontend acceptance.
 Inspect Audio's actual source and public contracts before accepting the same

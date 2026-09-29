@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {Duration, Pitch, Rational, ScoreBuilder, VoiceId, type Score} from '../../src/core';
-import {SheetViewElement} from '../../src/view/element/sheet-view';
+import {SheetViewElement} from '../../src/view/element/score-sheet-view';
 
 const source = vi.hoisted(() => ({load: vi.fn()}));
 vi.mock('../../src/io/load', () => ({loadScoreFromUrl: source.load}));

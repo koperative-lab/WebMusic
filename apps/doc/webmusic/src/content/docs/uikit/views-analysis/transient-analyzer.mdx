@@ -1,0 +1,140 @@
+---
+title: '@webmusic/ui/transient-analyzer'
+description: 'Present caller-supplied attack strength and hit history with sensitivity, freeze and clear actions.'
+sidebar:
+  label: 'transient-analyzer'
+  order: 7
+---
+
+import UiPresenterLiveDemo from '../../../../components/UiPresenterLiveDemo.astro';
+import UiPresenterRelated from '../../../../components/UiPresenterRelated.astro';
+
+`mountTransientAnalyzer()` presents the current attack strength, threshold,
+recent hit pattern and hit count. Its native Sensitivity, Freeze and Clear
+controls call into the application's actions. The caller owns signal sampling,
+the detection algorithm and the history; this presenter does not infer onsets,
+BPM or a beat grid. For a player-connected implementation, use
+[`<audio-transient-analyzer>`](/audio/element/analyze/audio-transient-analyzer/).
+
+<UiPresenterLiveDemo presenter="transient-analyzer" />
+
+## Import
+
+```ts
+import {mountTransientAnalyzer, type TransientAnalyzerState} from '@webmusic/ui/transient-analyzer';
+
+const state: TransientAnalyzerState = {
+  sample: {strength: 0.62, hit: true},
+  history: [{strength: 0.62, hit: true}],
+  sensitivity: 0.55,
+  threshold: 0.206,
+  frozen: false,
+  hitCount: 1,
+  status: 'Live',
+};
+const handle = mountTransientAnalyzer(host, {
+  onSensitivityChange: (value) => {
+    state.sensitivity = value;
+    state.threshold = 0.08 + (1 - value) * 0.28;
+    handle.update(state);
+  },
+  onFreezeChange: (value) => { state.frozen = value; handle.update(state); },
+  onClear: () => {
+    state.sample = undefined;
+    state.history = [];
+    state.hitCount = 0;
+    state.lastIntervalMs = undefined;
+    handle.update(state);
+  },
+});
+handle.update(state);
+// Call handle.destroy() when this surface leaves the application.
+```
+
+The caller supplies `host`, `state` and the action callbacks. It calls
+`update(state)` after each new observation or state change; this presenter
+has no `snapshot()` or `subscribe()` contract and does not sample an audio
+graph itself. The [shared presenter shape](/uikit/api/#the-shared-presenter-shape)
+covers one mounted presenter per host and cleanup.
+
+## Evidence and lifetime
+
+`sample.strength`, `history[*].strength`, `sensitivity` and `threshold` are
+normalized `0..1` values supplied by the caller. The most recent 64 history
+samples occupy fixed display columns, with `hit` coloring accepted cues.
+The presenter never calculates a threshold from sensitivity; the caller must
+keep those values consistent when Sensitivity changes. `lastIntervalMs`
+describes the gap between accepted cues when known, not a beat period.
+
+Replacing the underlying source requires the caller to discard stale
+observations before calling `update()`. `destroy()` releases native listeners,
+nodes and the stylesheet; it neither disposes a detector nor stops a player.
+Unlike presenters with an `onError` option, this entry does not catch errors
+thrown by caller actions; the caller should handle failures in its own action
+callbacks.
+
+<details class="component-section">
+<summary>API</summary>
+
+**State**
+
+| Member | Kind | Default | Description |
+|---|---|---|---|
+| `sample` | `TransientAnalyzerSample?` | absent | Latest `{strength, hit}` observation. Without one, the Strength readout is empty. |
+| `history` | `readonly TransientAnalyzerSample[]` | required | Ordered observations; the newest 64 are drawn. Each sample has normalized `strength` and boolean `hit`. |
+| `sensitivity` | `number` | required | Caller-provided `0..1` value shown by the labelled native range control. |
+| `threshold` | `number` | required | Caller-provided normalized threshold shown across the history plot. |
+| `frozen` | `boolean` | required | Freeze button state; the caller decides whether to keep supplying observations. |
+| `hitCount` | `number` | required | Number of accepted cues displayed since the caller's reset. |
+| `lastIntervalMs` | `number?` | absent | Most recent gap between accepted cues, in milliseconds. |
+| `status` | `string` | required | Text shown in the status region. |
+
+**Actions and handle**
+
+| Member | Kind | Default | Description |
+|---|---|---|---|
+| `onSensitivityChange(value)` | `(number) => void` | required | Called by the native range input with a `0..1` value. |
+| `onFreezeChange(value)` | `(boolean) => void` | required | Called by the Freeze button with its next state. |
+| `onClear()` | `() => void` | required | Called by the Clear button; the caller resets its evidence. |
+| `element` | `HTMLElement` | mounted root | Named section with `part="root surface"`. |
+| `update(state)` | `(TransientAnalyzerState) => void` | required for repaint | Replace readouts, threshold, bars and control state from caller-owned data. |
+| `destroy()` | `() => void` | - | Release listeners, nodes, installed style and host claim. |
+
+There are no mount options, subscription, automatic sampling or presenter
+events. The actions do not themselves alter the audio graph.
+
+**Accessibility.** Freeze and Clear are native buttons; Freeze reports its
+state with `aria-pressed`. Sensitivity is a labelled range input with a
+numeric output. The plot has an `img` role and a text alternative for current
+strength, threshold and hit count. Numeric readouts and a `status` role remain
+available without reading the plot's colors.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+The root is `.wui-transient-analyzer`. Public parts are `root surface`,
+`plot`, `freeze`, `clear` and `sensitivity`; internal
+`.wui-transient-analyzer__*` classes are structural. This presenter has no
+`classNames`, `parts` or `stylesheet` option: mounting installs its stylesheet
+and `destroy()` removes the style node it owns.
+
+| Token | Fallback | Controls |
+|---|---|---|
+| `--wm-transient-analyzer-foreground` | `--wm-foreground`, then dark ink | Root text. |
+| `--wm-transient-analyzer-background` | `--wm-surface`, then white | Root background. |
+| `--wm-transient-analyzer-border` | `--wm-border`, then gray | Root border. |
+| `--wm-transient-analyzer-padding` | `.85rem` | Root inset. |
+| `--wm-transient-analyzer-strength` | teal | Strength bars and range accent. |
+| `--wm-transient-analyzer-hit` | orange | Accepted-hit bars. |
+| `--wm-transient-analyzer-threshold` | dark ink | Dashed threshold line. |
+| `--wm-muted`, `--wm-border`, `--wm-surface-muted`, `--wm-surface`, `--wm-accent`, `--wm-control-radius` | stylesheet fallbacks | Secondary text, plot/control surfaces, pressed button and corners. |
+
+Bar height and threshold position come from the supplied state, not CSS
+variables. Forced-colors mode uses system colors for bars and the threshold
+line.
+
+</details>
+
+<UiPresenterRelated presenter="transient-analyzer" />

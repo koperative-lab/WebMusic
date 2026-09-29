@@ -5,10 +5,12 @@ They are not connected to the root `npm run check` chain or to an active
 publication workflow in this checkout. This describes local wiring, not the
 outcome of any remote release or the availability of packages on npm.
 
-Use the [manual release instructions](../../CONTRIBUTING.md#releasing)
-for the current version policy and publishing procedure.
+Use the [manual publishing procedure](../../dev/release/PUBLISHING.md) and
+[current version policy](../../dev/release/RELEASING.md) for releases.
 [DESIGN.md](DESIGN.md) preserves the archived candidate/staging/promotion and
-deployment design alongside these scripts.
+deployment design alongside these scripts. Current work is tracked only in
+[STATUS](../../dev/STATUS.md); accepted decisions belong in
+[DECISIONS](../../dev/DECISIONS.md).
 
 Before reusing any of this code, review these concrete mismatches:
 

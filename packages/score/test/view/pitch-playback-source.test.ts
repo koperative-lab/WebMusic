@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import type {ScorePlaybackNote, ScorePlaybackSnapshot, ScorePlaybackSource} from '../../src/core';
-import {definePitchViewElement, type PitchViewElement, type PitchViewType} from '../../src/view/element/pitch-view';
+import {definePitchViewElement, type PitchViewElement, type PitchViewType} from '../../src/view/element/score-pitch-view';
 
 definePitchViewElement();
 afterEach(() => { document.body.replaceChildren(); vi.restoreAllMocks(); });
@@ -40,7 +40,7 @@ function player(initial: ScorePlaybackSnapshot) {
 }
 
 function mount(type: PitchViewType = 'keyboard') {
-  const element = document.createElement('pitch-view') as PitchViewElement;
+  const element = document.createElement('score-pitch-view') as PitchViewElement;
   element.setAttribute('player', '#pitch-owner');
   element.setAttribute('type', type);
   element.setAttribute('data-motion', 'none');

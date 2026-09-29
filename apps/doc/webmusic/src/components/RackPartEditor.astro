@@ -39,13 +39,13 @@ const sound = part.sound || 'default sound';
   >
     <div class="wm-pg__collection-draft-title">
       <strong>New rack part</strong>
-      <code>&lt;rack-part&gt;</code>
+      <code>&lt;score-rack-part&gt;</code>
     </div>
     <p class="wm-pg__collection-draft-note">
       Name the channel, then choose the score and voice it should contribute.
     </p>
     <div class="wm-pg__collection-fields">
-      <ParamRows tag="rack-part" />
+      <ParamRows tag="score-rack-part" />
     </div>
     <p class="wm-pg__collection-error" data-rc-name-error role="alert"></p>
     <div class="wm-pg__collection-item-actions">
@@ -60,12 +60,12 @@ const sound = part.sound || 'default sound';
     data-rc-key={childKey}
   >
     <summary class="wm-pg__collection-summary" data-rc-summary>
-      <code>&lt;rack-part&gt;</code>
+      <code>&lt;score-rack-part&gt;</code>
       <strong data-rc-summary-name>{part.id || 'Unnamed part'}</strong>
       <span data-rc-summary-meta>{`${source} · ${sound}`}</span>
     </summary>
     <div class="wm-pg__collection-fields">
-      <ParamRows tag="rack-part" scope={scope} />
+      <ParamRows tag="score-rack-part" scope={scope} />
     </div>
     <p class="wm-pg__collection-error" data-rc-name-error role="alert"></p>
     <div class="wm-pg__collection-item-actions">

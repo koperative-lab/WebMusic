@@ -168,6 +168,7 @@ a perfectly good pair of numbers and dropping it out of the playhead's reach for
 | `anchor` | `number` | `.33` | Where the now line is pinned, `0…1`. |
 | `scale` | `number` | `44` | Pixels per axis unit before zoom; used when `visibleSpan` is absent or invalid. |
 | `visibleSpan` | `number` | — | Axis units visible across the measured plot before zoom. A finite positive value takes precedence over `scale`; resizing keeps this window and the current position. |
+| `reservePinned` | `boolean` | `false` | Reserve one line above the plot when no band is sounding, so the readout can appear without shifting the lane. The empty slot has no visible text. |
 | `fallbackWidth` | `number` | `640` | What the lane assumes it is wide when nothing can measure it. |
 | `animate` | `boolean` | whether `position` exists | Run a frame loop. A `clock` forces it `false`. |
 | `clock` | `FrameClock` | — | Somebody else's clock. Given one, the mount opens no loop and becomes a passenger. |
@@ -189,21 +190,23 @@ width. No layout measurements run in the frame callback.
 The current readout wraps above the clipped plot. The label gutter has its own column, and ruler
 labels have their own line above the tracks. The viewport grows to fit all rows even when the flow
 height token is smaller; a third or fourth track is never clipped by the default two-row height.
-Labels inside short bands use ellipsis, with the complete text in the band title and semantic twin.
+Labels inside short bands use ellipsis; below 32px of band width, the inner label and note are
+hidden instead of showing clipped fragments. The complete reading remains in the band title and
+semantic twin, while a track label stays in the separate gutter.
 Ticks, flags and brackets do not intercept a band click or drag. A contour occupies the remaining
 row height below its labels, and its stroke keeps the same pixel width when the time axis stretches
 or zooms.
 
 **The nameplate**
 
-`ChordNameCandidate` is `{symbol, full?, note?, weight?, key?}`. `key` is opaque identity: a change
+`ChordNameCandidate` is `{symbol, full?, note?, weight?, pressed?, key?}`. `key` is opaque identity: a change
 pops even when `symbol` is byte-identical, which is how *"C, G, C"* and *"the same chord struck
 again"* are told apart. The kit only ever compares it with `!==`.
 
 | `NameplateState` | Description |
 |---|---|
 | `primary` | The reading. `full` is announced instead of the symbol, and the symbol is then hidden from the reader so the pair is not read as an abbreviation and its expansion. |
-| `alternates` | Other readings. With `binding.selectAlternate` each is a real button; without it, plain text. |
+| `alternates` | Other or selectable readings. With `binding.selectAlternate` each is a real button; without it, plain text. Optional `pressed` supplies `aria-pressed` for a selectable reading. |
 | `voicing` | `readonly HarmonyVoice[]`, printed as one line. |
 | `caption`, `history`, `confidence`, `emphasis`, `emptyLabel` | `emphasis` is `'display'` or `'hero'`. `history` is `aria-hidden`: a history that announced itself would read every chord twice. |
 | `next` | The naming that is coming. Drawn as a ghost, never announced. |
@@ -212,6 +215,11 @@ again"* are told apart. The kit only ever compares it with `!==`.
 rate, the metre and on what the caller thinks *near* means, so it is a number the caller returns
 rather than one the kit infers from a lane it cannot see. `NameplateOptions` adds `popDuration`
 (default `180`, `0` in any reduced mode), `animate` and `clock` to the shared six.
+Set `stableLayout: true` for a live nameplate without `caption`, `next` or `history`:
+it reserves fixed symbol, voicing and alternate rows through note changes. When no
+primary reading exists, literal `voicing` labels occupy the main row; this is
+not a newly inferred chord. Long lines scroll horizontally instead of changing
+the surface height. The default is `false` and keeps the natural layout.
 
 **The chip strip**
 
@@ -278,9 +286,10 @@ cannot describe two different read-outs. Every colour is a chain ending in a lit
 `var()`: a bare custom property is invalid at computed-value time on a host carrying no tokens,
 which paints a band invisible — the one failure a colour system may not have.
 
-Nameplate symbols and alternate names wrap within the available width. Optional rows with no
-content collapse instead of reserving height, and revealing them restores their flex or block
-layout. The live-region nodes remain mounted throughout these changes.
+By default, nameplate symbols and alternate names wrap within the available width. Optional
+rows with no content collapse instead of reserving height, and revealing them restores their
+flex or block layout. With `stableLayout`, those rows remain mounted at fixed heights and
+long readings scroll horizontally. The live-region nodes remain mounted in either mode.
 
 Numeric geometry is deliberately **not** tokenised where JavaScript has to read it back. `scale` is
 an option with a documented default rather than a custom property, because reading a length out of
@@ -350,7 +359,7 @@ of the `--wm-degree-*` names a theme sets — and a band's block colour from the
 | A band's parts | `.wui-harmony-flow__fill`, `__role`, `__label`, `__note`, `__bead`, `__glyph` | The fill carries the tone and the drain. |
 | Current readout / now line / gutter | `.wui-harmony-flow__pinned`, `__now`, `__gutter`, `__gutter-row`, `__gutter-label` | None rides the reel; the readout sits above the plot and the gutter beside it. |
 | Decorations / semantic twin | `.wui-harmony-flow__decorations`, `__tick`, `__tick-label`, `__flag`, `__bracket`, `__index` | The twin is an `<ol>`, `aria-current` on the sounding entry. |
-| Nameplate | `.wui-harmony-nameplate`, `__live`, `__symbol`, `__full`, `__next`, `__voicing`, `__alternates`, `__history`, `__chip` | `data-emphasis`, `data-confidence` on the root; `data-current` on a history chip. |
+| Nameplate | `.wui-harmony-nameplate`, `__live`, `__symbol`, `__full`, `__next`, `__voicing`, `__alternates`, `__history`, `__chip` | `data-emphasis`, `data-confidence`, opt-in `data-layout="stable"` and current `data-reading="chord|notes|rest"` on the root; `data-current` on a history chip. |
 | Chip strip | `.wui-harmony-chip`, `__list`, `__item`, `__primary`, `__secondary`, `__meter`, `__ghost`, `__fill`, `__trailing`, `__bead` | `data-layout` on the list; `data-chip`, `data-selectable` on an item. |
 | Wheel | `.wui-harmony-wheel`, `__svg`, `__sector`, `__needle`, `__trail`, `__mark`, `__centre`, `__index` | `data-segment`, `data-ring`, `data-current` on a sector. |
 

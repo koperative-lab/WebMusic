@@ -1,0 +1,219 @@
+---
+title: '@webmusic/audio/play'
+description: Audio playback and I/O — decode and load (WAV/MP3/FLAC/Ogg/Opus/AAC…), the dual-engine AudioClipPlayer, the AudioPlaylist queue, the AudioMixer, the AudioRecorder, a composable Effect chain, offline WAV export, and an off-main-thread decode worker.
+---
+
+`@webmusic/audio/play` is the **decode + load + playback** capability for Audio. Its root turns audio bytes, Blobs, Files, URLs, and `AudioBuffer`s into immutable `AudioClip`s and handles export/worker calls; `/headless` owns the player, mixer, recorder, and effect engines; `/element` supplies the styled controls.
+
+This page covers the **programmatic API**. For the drop-in custom elements (`<audio-player>` and friends) with live demos, see **[Web Component › Play](/audio/element/#play)**, and the **[Audio setup](/audio/)** guide for a first end-to-end example. The custom elements live on the `@webmusic/audio/play/element` subpath so this main entry tree-shakes free of DOM code.
+
+## Install
+
+`npm install @webmusic/audio` — use an available published version or the local workspace; [Install](/audio/#install) has the full setup.
+
+The root model and this capability ship in that one package. The pure-JS WAV path, native `decodeAudioData`, the player, mixer, recorder, effects, and export work with **no extra dependencies**. The WASM codec peers (`mpg123-decoder`, `@wasm-audio-decoders/flac`, `@wasm-audio-decoders/ogg-vorbis`, `ogg-opus-decoder`), the tag reader (`music-metadata`), and time-stretch peers (`signalsmith-stretch`, `@soundtouchjs/audio-worklet`) are all **optional** — dynamically imported only when used (see [Optional peer dependencies](#optional-peer-dependencies)).
+
+The root re-exports the worker client, so `createDecoderWorker` is importable
+either way; the dedicated `/worker-client` and `/worker-protocol` entries
+exist for bundlers and custom hosts that want exactly one seam.
+
+## Load & decode
+
+Players take an `AudioClip`, not a file. Conversion lives in one place so the same parsed clip feeds a player, a mixer, an exporter, and a waveform view. `loadClip` accepts raw bytes, a `Blob`/`File`, or an already-decoded `AudioBuffer`; `loadClipFromUrl` fetches for decoded clips and skips the fetch when `streaming: true`. For bytes, an explicit `format` wins, followed by **magic bytes** (`detectAudioFormat`) and then a file hint. For URLs, an explicit `format` wins, followed by the **extension** (`formatFromExtension`) and then byte sniffing after fetch.
+
+```ts
+import { loadClip, loadClipFromUrl, detectAudioFormat, formatFromExtension } from '@webmusic/audio/play';
+
+// Bytes / Blob / File you already have. WAV uses the pure-JS path; compressed
+// formats need an AudioContext (native decodeAudioData) or a WASM codec peer.
+const ctx = new AudioContext();
+const clip = await loadClip(bytes, { context: ctx, metadata: true });
+
+// Fetch + decode in one call (format inferred from the extension, then bytes).
+const fromUrl = await loadClipFromUrl('/track.flac', { context: ctx });
+
+// Stream instead of fetching or decoding up front: the clip holds only sourceUrl. A
+// headless player also needs a host-provided mediaAdapterFactory (see below);
+// <audio-player> supplies the browser adapter automatically.
+const streamed = await loadClipFromUrl('/mp3/Arabesque%20No.1.mp3', { streaming: true });
+
+detectAudioFormat(bytes);              // 'wav' | 'mp3' | 'flac' | 'ogg' | 'opus' | 'aac' | 'm4a' | 'webm' | 'aiff' | undefined
+formatFromExtension('/song.opus');     // 'opus'
+```
+
+| Format | Extensions | Decode path |
+| --- | --- | --- |
+| WAV | `.wav` `.wave` | Pure-JS (`parseWav`) — Node / worker / main thread, zero deps |
+| AIFF | `.aif` `.aiff` `.aifc` | Native `decodeAudioData` (needs a context) |
+| MP3 | `.mp3` | Native, or `mpg123-decoder` (WASM peer) |
+| FLAC | `.flac` | Native, or `@wasm-audio-decoders/flac` |
+| Ogg Vorbis | `.ogg` `.oga` | Native, or `@wasm-audio-decoders/ogg-vorbis` |
+| Opus | `.opus` | Native, or `ogg-opus-decoder` |
+| AAC / M4A | `.aac` `.m4a` `.mp4` `.m4b` | Native `decodeAudioData` |
+| WebM | `.webm` `.weba` | Native `decodeAudioData` |
+
+`decodeAudio` is the lower-level entry behind `loadClip`. WAV bytes take the pure-JS path; otherwise it prefers a provided context's native `decodeAudioData` (hardware-accelerated, broad coverage), then falls back to the matching optional WASM decoder — throwing a clear error naming the peer to install when neither is available. `decodeAudioChunked` is the streaming generator variant used by streaming-peaks call sites.
+
+```ts
+import { decodeAudio } from '@webmusic/audio/play';
+
+const { sampleRate, channelData } = await decodeAudio(bytes, { context: ctx });
+// channelData: Float32Array[] — deinterleaved float channels, the AudioClip currency.
+```
+
+| Function | Signature (abridged) | Notes |
+| --- | --- | --- |
+| `loadClip` | `(input, opts?) → Promise<AudioClip>` | `input`: `ArrayBuffer` \| `Blob`/`File` \| `AudioBuffer`. Opts: `format`, `context`, `metadata`, `sourceUrl`. |
+| `loadClipFromUrl` | `(url, opts?) → Promise<AudioClip>` | Adds `streaming` (skip fetch and decode, keep `sourceUrl`). |
+| `detectAudioFormat` | `(buffer) → AudioFormat \| undefined` | Sniff from leading magic bytes. |
+| `formatFromExtension` | `(url) → AudioFormat \| undefined` | Infer from the path extension. |
+| `decodeAudio` | `(bytes, opts?) → Promise<DecodedAudio>` | `{ sampleRate, channelData }`. WAV pure-JS → native → WASM. |
+| `decodeAudioChunked` | `(bytes, opts?) → AsyncGenerator<DecodedAudio>` | ~1 s windows; `chunkFrames` to tune. |
+
+## WAV — the pure-JS byte core
+
+`parseWav` / `serializeWav` are a dependency-free RIFF/WAVE codec that runs in Node, workers, and the main thread alike — which is why WAV is the byte-level fast path for `decodeAudio` (native `decodeAudioData` is only reachable on a thread with an `AudioContext`). Reads 8/16/24/32-bit integer PCM and 32-bit IEEE float, any channel count; walks chunks by their RIFF size fields so `LIST` / `bext` metadata is skipped rather than misread.
+
+```ts
+import { parseWav, serializeWav, type DecodedWav } from '@webmusic/audio/play';
+
+const decoded: DecodedWav = parseWav(wavBytes); // { sampleRate, channelData: Float32Array[] }
+
+// Encode deinterleaved float channels back to WAV bytes.
+const pcm16 = serializeWav(decoded.channelData, decoded.sampleRate);            // 16-bit PCM (default)
+const pcm24 = serializeWav(decoded.channelData, decoded.sampleRate, 24);        // 24-bit PCM
+const f32 = serializeWav(decoded.channelData, decoded.sampleRate, 32, { float: true }); // 32-bit float
+```
+
+`WavBitDepth` is `16 | 24 | 32`; a bare `32` means 32-bit **integer** PCM — pass `{ float: true }` for IEEE float. Integer paths clamp samples to `[-1, 1]`.
+
+## The transports and the recorder
+
+`AudioPlayer`, `AudioClipPlayer`, `AudioPlaylist`, `AudioMixer`, `AudioRecorder`, the two
+engines and the effect builders live on `@webmusic/audio/play/headless` and
+are documented one page each under
+[Headless › Play](/audio/headless/#play). This page documents the stateless
+half — decoding, loading, WAV bytes and the offline export.
+
+## Export — render to WAV (and offline effects)
+
+`clipToWav` turns a decoded clip back into WAV bytes via the same pure-JS serializer (Node / worker safe); `clipToBlob` wraps that as an `audio/wav` `Blob` for download or object-URL playback. `renderClipWithEffect` runs a clip through an effect chain **offline** via an `OfflineAudioContext` (browser-only, guarded) and returns a fresh, effected clip — the bounce/print step.
+
+```ts
+import { clipToWav, clipToBlob, renderClipWithEffect } from '@webmusic/audio/play';
+import { delay } from '@webmusic/audio/play/headless';
+
+// Serialize and download.
+const blob = clipToBlob(clip, { bitDepth: 24 }); // or { bitDepth: 32, float: true }
+const a = document.createElement('a');
+a.href = URL.createObjectURL(blob);
+a.download = 'clip.wav';
+a.click();
+
+// Print an effect into the samples (reverb/delay tails kept via tailSeconds).
+const wet = await renderClipWithEffect(clip, delay({ delaySeconds: 0.3, feedback: 0.4 }), { tailSeconds: 1.5 });
+const wetBytes = clipToWav(wet);
+```
+
+| Function | Description |
+| --- | --- |
+| `clipToWav(clip, opts?)` | Serialize a decoded clip to a WAV `ArrayBuffer` (throws for a streaming clip). |
+| `clipToBlob(clip, opts?)` | Same, wrapped as an `audio/wav` `Blob`. |
+| `renderClipWithEffect(clip, effect, opts?)` | Offline-render through an effect → new clip (browser; `tailSeconds` for tails). |
+
+`ClipToWavOptions` is `{ bitDepth?: 16 | 24 | 32; float?: boolean }`.
+
+## Decode worker — off the main thread
+
+Decoding a large compressed file can block the main thread. `createDecoderWorker()` moves mp3/flac/ogg/wav decoding into a Web Worker: the worker transfers decoded float channels back, and the client copies them into an immutable `AudioClip`. The client first copies caller-owned input bytes into a private buffer so transferring it does not detach the caller's data. Where `Worker` is unavailable (Node, SSR, very old browsers) — or constructing one throws — calls fall back to in-process decoding behind the **same Promise API**.
+
+```ts
+import { createDecoderWorker } from '@webmusic/audio/play';
+
+const worker = createDecoderWorker();
+
+// Bytes you already have — the client copies before transferring.
+const clip = await worker.decodeClip(bytes); // format sniffed; or decodeClip(bytes, { format: 'mp3' })
+
+// Fetch on the main thread (cookies, relative URLs), decode in the worker.
+const fromUrl = await worker.decodeFromUrl('/track.flac');
+
+// Just the channels, no AudioClip:
+const { sampleRate, channelData } = await worker.decode(bytes);
+
+worker.dispose(); // terminate the worker; in-flight requests reject
+```
+
+By default the worker is spawned with the bundler-friendly `new Worker(new URL('./decoder-worker.js', import.meta.url), { type: 'module' })`; the build emits that worker asset beside the spawn site. For a custom host, pass a `Worker` instance or factory. Make a local worker entry that imports the published **`@webmusic/audio/play/worker`** subpath:
+
+```ts
+// In your application module:
+import { createDecoderWorker } from '@webmusic/audio/play';
+
+const worker = createDecoderWorker(
+  () => new Worker(new URL('./audio-decode.worker.ts', import.meta.url), { type: 'module' }),
+);
+```
+
+```ts
+// In audio-decode.worker.ts:
+import '@webmusic/audio/play/worker';
+```
+
+The worker protocol itself is exported too — `DecodeRequest` / `DecodeResponse` and the pure, unit-testable `handleDecodeRequest` (plus `transferablesOf` for the zero-copy post) — in case you want to host the handler in your own worker. `createRequestTracker` is the pure id-correlation registry behind the client.
+
+| Member | Description |
+| --- | --- |
+| `worker.decode(data, format?)` | Decode bytes → `{ sampleRate, channelData }`. |
+| `worker.decodeClip(data, opts?)` | Decode and wrap into an `AudioClip` (`{ format?, sourceUrl? }`). |
+| `worker.decodeFromUrl(url, format?)` | Fetch on the main thread, decode in the worker → `AudioClip`. |
+| `worker.dispose()` | Terminate; pending requests reject. Idempotent. |
+| `handleDecodeRequest`, `transferablesOf`, `createRequestTracker` | Pure protocol pieces for a custom worker host. |
+
+## Optional peer dependencies
+
+Several capabilities load an **optional peer** via dynamic `import` only when first used — none are installed by default, and the build/typecheck pass without them:
+
+| Capability | Peer(s) | When |
+| --- | --- | --- |
+| MP3 decode (no context) | `mpg123-decoder` | `decodeAudio` with no `AudioContext` |
+| FLAC decode (no context) | `@wasm-audio-decoders/flac` | same |
+| Ogg Vorbis decode (no context) | `@wasm-audio-decoders/ogg-vorbis` | same |
+| Opus decode (no context) | `ogg-opus-decoder` | same |
+| Tag reading | `music-metadata` | `loadClip` with `metadata: true` |
+| Time-stretch | `signalsmith-stretch`, `@soundtouchjs/audio-worklet`, `mediabunny` | high-quality rate/pitch (where wired) |
+
+When a required decoder peer is absent, compressed decoding throws an error naming the package to `npm install` or suggests using native `decodeAudioData` with an `AudioContext`. Tag reading is best effort: if `music-metadata` is absent, `loadClip({metadata: true})` still loads the clip without those tags.
+
+## API Reference — `@webmusic/audio/play`
+
+The table below lists exports of this exact entry. Stateful constructors and
+effect builders are values from
+[`@webmusic/audio/play/headless`](/audio/headless/#play); the root re-exports
+selected option and result **types**, not those runtime values. The worker
+client and protocol also have dedicated subpaths in the
+[package entry map](/audio/api/#package-subpaths).
+
+| API | Kind | Use it for |
+| --- | --- | --- |
+| `loadClip`, `loadClipFromUrl` | Loader | Bytes / Blob / File / URL → `AudioClip` (auto-detect, streaming). |
+| `detectAudioFormat`, `formatFromExtension` | Loader | Sniff format from magic bytes / file extension. |
+| `decodeAudio`, `decodeAudioChunked` | Decode | Bytes → float channels (WAV pure-JS → native → WASM); chunked variant. |
+| `parseWav`, `serializeWav` | WAV | Dependency-free RIFF/WAVE decode / encode (8/16/24/32-bit, float). |
+| `clipToWav`, `clipToBlob`, `renderClipWithEffect` | Export | Clip → WAV bytes / Blob; offline-render through an effect. |
+| `createDecoderWorker` | Worker | Decode off the main thread (with in-process fallback). |
+| `handleDecodeRequest`, `transferablesOf`, `createRequestTracker` | Worker | Pure protocol pieces for hosting the handler yourself. |
+| `formatTime`, `parseLoopAttr` | UI helper | Transport-time formatting and `loop` attribute parsing (shared with custom UIs). |
+| `DEFAULT_MAX_INPUT_BYTES`, `DEFAULT_MAX_DECODED_FRAMES`, `DEFAULT_MAX_DECODED_BYTES`, `DEFAULT_MAX_CHANNELS`, `DEFAULT_REQUEST_TIMEOUT_MS` | Constants | Default resource ceilings: 128 MiB input, 30 million frames per channel, 256 MiB decoded PCM, 32 channels, and 30 seconds per request. |
+| `AudioResourceLimits`, `AudioFetchOptions` | Types | Size/cancellation limits and fetch timeout; `timeoutMs: 0` disables the fetch timeout. |
+| `PlayerLike`, `PlaybackEngine`, `MediaPlaybackAdapter`, `MediaPlaybackAdapterFactory` | Types | Structural player, engine and injected media-host contracts; see [Headless Play](/audio/headless/#play). |
+| `AudioClipPlayerOptions`, `AudioClipPlayerEvents`, `AudioScratchSession`, `PlayerTimeUpdate`, `PlayerEngineKind` | Types | Player option / event / engine and [scratch-session](/audio/headless/play/audio-clip-player/#scratch-sessions) shapes. |
+| `AudioMixerOptions`, `AudioMixerEvents`, `MixerMemberInit` | Types | Mixer option / event / member shapes. |
+| `AudioRecorderOptions`, `AudioRecorderEvents` | Types | Recorder option / event shapes. |
+| `BufferEngineOptions`, `MediaEngineOptions` | Types | Buffer and media engine options. |
+| `Effect`, `EffectNodes`, `GainOptions`, `FilterOptions`, `DelayOptions`, `CompressorOptions` | Types | Effect contract and built-in option shapes. |
+| `DecodedAudio`, `DecodeOptions`, `DecodedWav`, `WavBitDepth`, `LoadClipOptions`, `LoadClipFromUrlOptions`, `ClipToWavOptions` | Types | Decode / load / WAV / export option shapes. |
+| `DecoderWorker`, `DecodedResult`, `DecoderRequestOptions`, `DecoderWorkerOptions`, `DecodeClipOptions`, `WorkerLike`, `RequestTracker`, `DecodeRequest`, `DecodeResponse`, `DecodeWorkerFormat` | Types | Decode-worker client and protocol shapes. |
+
+The playlist's runtime values and types, the meter controller, both engines,
+and effect builders are documented under [Headless Play](/audio/headless/#play).

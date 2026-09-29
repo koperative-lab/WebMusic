@@ -72,8 +72,8 @@ function render(): {
   document.body.innerHTML = `
     <div data-wm-pg data-target="[data-syp]">
       <div data-pg-stage>
-        <note-input data-syp-input></note-input>
-        <synth-panel data-syp sections="sound,effects,envelope,eq,lfo,macros"></synth-panel>
+        <score-note-input data-syp-input></score-note-input>
+        <score-synth-panel data-syp sections="sound,effects,envelope,eq,lfo,macros"></score-synth-panel>
       </div>
       <section data-syp-properties>
         ${propertyControls()}
@@ -111,7 +111,7 @@ function change(key: string, value: string): void {
   item.dispatchEvent(new Event('change', {bubbles: true}));
 }
 
-describe('synth-panel property playground', () => {
+describe('score-synth-panel property playground', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     document.body.replaceChildren();

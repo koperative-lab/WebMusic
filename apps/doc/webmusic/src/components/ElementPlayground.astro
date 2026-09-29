@@ -1,5 +1,5 @@
 ---
-// The demo card every Score element page uses: the house `wui-panel`
+// The demo card every Score / Audio element page uses: the house `wui-panel`
 // chrome (import entry + tag), the live element in the slot, and — below it —
 // one control per observed attribute, INCLUDING the ones the demo itself never
 // sets. Flip a control and it lands on the real element, so the page documents
@@ -26,7 +26,7 @@ interface Props {
   markup?: string;
   /** Explicit sibling elements with their own external parameter controls. */
   companions?: Array<{tag: string; target: string; visibility?: boolean; inert?: Record<string, string>}>;
-  /** Title override, e.g. `<score-view type="piano-roll">`. Defaults to `<tag>`. */
+  /** Title override, e.g. `<audio-view type="waveform">`. Defaults to `<tag>`. */
   /** Render only these attributes (order preserved from the catalog). */
   only?: string[];
   /** Drop these attributes — use when a demo's wiring owns them. */

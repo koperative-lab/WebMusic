@@ -1,0 +1,167 @@
+---
+title: Audio Web Components
+description: Every drop-in Audio element by capability — what each tag is for, how the groups compose, the registration entries and the shared theming variables.
+sidebar:
+  hidden: true
+---
+
+The drop-in custom elements of `@webmusic/audio` — place a tag on the page, no
+JavaScript wiring required. Each capability ships its elements from its
+`/element` subpath, so the capability root tree-shakes free of DOM code. To load
+and register them — via a CDN script, a bundler, or individual `define*` calls —
+see [Audio setup](/audio/#drop-in-web-components).
+
+| Capability | Elements |
+| --- | --- |
+| [Play](#play) | A central player, attached queue/mix controls and recording. |
+| [Analyze](#analyze) | Five live signal tools for metering, waveform, spectrum and transient inspection. |
+| [View](#view) | Drawing audio: a multi-view stage for clips and regions, plus a live signal strip. |
+
+## Play
+
+Use one [`audio-player`](/audio/element/play/audio-player/) for transport and
+connect the task-specific controls through `player="#session"` or `.player`.
+The player delegates to one clip, queue or mix backend. The linked playlist and
+mixer display selection and mix controls without a duplicate transport bar.
+
+| Element | Register | Purpose |
+| --- | --- | --- |
+| [`<audio-player>`](/audio/element/play/audio-player/) | `defineAudioPlayerElement(tag?)` | Core play/pause, seek and time control over the selected backend. |
+| [`<audio-playlist>`](/audio/element/play/audio-playlist/) | `defineAudioPlaylistElement(tag?)` | Queue selection, auto-advance, list loop and prefetch, attached to the player. |
+| [`<audio-mixer>`](/audio/element/play/audio-mixer/) | `defineAudioMixerElement(tag?)` | Master/member volume, mute and solo for the player's mix backend. |
+| [`<audio-recorder>`](/audio/element/play/audio-recorder/) | `defineAudioRecorderElement(tag?)` | Capture microphone input and audition the finished take through the player. |
+| — | `defineAllAudioElements()` | Register all four Play tags. |
+
+Imports come from `@webmusic/audio/play/element`; `/play/auto` registers them on
+import.
+
+Play events use `webaudio:*` CustomEvents with `bubbles: true` and `composed: true`.
+Queues keep their sequencing policy and mixers keep their member state. The
+central facade does not add a clock or promise sample-accurate group playback.
+The compact meter is an [Analyze tool](#analyze), not another transport.
+
+## Analyze
+
+The five Analyze Elements are live tools. They borrow the graph of one
+[`<audio-player>`](/audio/element/play/audio-player/) while it plays, without
+loading another URL or adding a transport. Choose the measurement or playing
+task and place the surface beside the player:
+
+| Element | Live task |
+| --- | --- |
+| [`<audio-level-analyzer>`](/audio/element/analyze/audio-level-analyzer/) | Inspect sampled RMS, sample peak, crest and a peak threshold; freeze or reset the hold. |
+| [`<audio-meter>`](/audio/element/analyze/audio-meter/) | Monitor normalized level or FFT bars at a glance beside playback. |
+| [`<audio-oscilloscope>`](/audio/element/analyze/audio-oscilloscope/) | Inspect a sampled waveform with trigger edge, level, timebase, freeze and a time probe. |
+| [`<audio-spectrum-analyzer>`](/audio/element/analyze/audio-spectrum-analyzer/) | Probe a live log-frequency FFT; freeze the frame or hold peaks. |
+| [`<audio-transient-analyzer>`](/audio/element/analyze/audio-transient-analyzer/) | Inspect approximate live attack strength and adjust detection sensitivity. |
+
+These tools work on a borrowed live `AnalyserNode`, including when a caller
+supplies `.analyser` directly. A stream can feed them without decoded clip
+samples, but an `AudioContext` and signal graph must already exist. They do
+not seek the player. The sampled level is not integrated LUFS or true peak;
+FFT bins are not calibrated acoustic SPL. A streaming transient cue is not a
+beat-grid or sample-accurate onset result. The compact meter may also build a
+transparent tap in a caller-supplied context; see its resource contract.
+
+Whole-clip key, tempo, loudness and onset estimates, beat grids, clip summaries,
+chroma, distributions and offline pitch tracks are data workflows under the
+[Analyze API](/audio/api/analyze/). Use an [analysis session](/audio/headless/analyze/audio-analysis-session/)
+for repeated or incremental work, the [realtime analyzer](/audio/headless/analyze/realtime-analyzer/)
+for custom live UI, or the API's Worker client for off-main-thread clip analysis.
+For visible beat positions, convert a Headless session's `tempo.grid.beats` to
+point regions and assign them to [`<audio-view>.regions`](/audio/element/view/audio-view/#annotate).
+
+### Compose live tools
+
+```html
+<script type="module">
+  import '@webmusic/audio/play/auto';
+  import '@webmusic/audio/analyze/auto';
+</script>
+
+<audio-player id="session" src="/wav/Arabesque%20No.1.wav" controls></audio-player>
+<audio-level-analyzer player="#session"></audio-level-analyzer>
+<audio-meter player="#session"></audio-meter>
+<audio-oscilloscope player="#session"></audio-oscilloscope>
+<audio-spectrum-analyzer player="#session"></audio-spectrum-analyzer>
+<audio-transient-analyzer player="#session"></audio-transient-analyzer>
+```
+
+`import '@webmusic/audio/analyze/auto'` registers the five tags at their default
+names. `defineAllAudioElements()` does the same from the tree-shakeable
+`@webmusic/audio/analyze/element` entry, which does not auto-register. Individual
+registration helpers allow a smaller selected surface.
+
+| Element | Register | Surface |
+| --- | --- | --- |
+| `<audio-level-analyzer>` | `defineAudioLevelAnalyzerElement(tag?)` | Sampled dynamics inspector. |
+| `<audio-meter>` | `defineAudioMeterElement(tag?)` | Compact normalized level or spectrum monitor. |
+| `<audio-oscilloscope>` | `defineAudioOscilloscopeElement(tag?)` | Triggered time-domain inspection. |
+| `<audio-spectrum-analyzer>` | `defineAudioSpectrumAnalyzerElement(tag?)` | Probeable live spectrum. |
+| `<audio-transient-analyzer>` | `defineAudioTransientAnalyzerElement(tag?)` | Approximate streaming attack inspection. |
+| — | `defineAllAudioElements()` | Register all five default tags. |
+
+## View
+
+The **visualization** elements of [`@webmusic/audio/view`](/audio/api/view/). `<audio-view>` provides three drawings of the same audio under one `type` attribute, including waveform regions. `<audio-live-view>` shows a scrolling strip of a live signal.
+
+| Element | Purpose |
+| --- | --- |
+| [`<audio-view>`](/audio/element/view/audio-view/) | The projection stage — waveform, spectrogram or meter, chosen with `type`; follows a bound player, seeks, zooms, pans and annotates. |
+| [`<audio-live-view>`](/audio/element/view/audio-live-view/) | A scrolling projection of a live `AnalyserNode` — waveform or spectrogram. The only live *time-axis* surface here. |
+
+Inputs are component-specific. `<audio-view>` binds to playback through `player`;
+`<audio-live-view>` borrows an analyser through `source` or `.analyser`.
+Use `<audio-view>`'s `.regions` and `annotate` support to display or create regions.
+
+Waveform views can use clip or peaks data, load clips through `src`, or draw
+precomputed `peaks-src` data without decoding audio.
+Analysis stays caller-owned: `<audio-view type="spectrogram">` requires
+`.spectrogram` data from [`@webmusic/audio/analyze`](/audio/api/analyze/) or another
+compatible producer. Binding a player supplies playback state, not that analysis.
+
+These Elements compose published UI Kit surfaces. `<audio-view>` uses stage + status;
+`<audio-live-view>` uses animated `CanvasStage`. Domain geometry and pixels remain
+in Audio Headless/render adapters; the presenters own generic DOM, canvas
+sizing/DPR, accessible interaction, status and cleanup.
+
+Point `<audio-view>` at an [`<audio-player>`](/audio/element/play/audio-player/) with `player="#id"` and the waveform and spectrogram **follow the playhead** as it plays; its `meter` type taps that player's analyser. This binding is event-based and uses no player-package imports. For browser renderers, code-only view models, colormaps and layout math behind the tags, see the [View API](/audio/api/view/). Existing `@webmusic/audio/view/element` and `/view/auto` imports still expose/register `<audio-meter>` for compatibility; the Analyze entry above is its canonical home.
+
+| Element | Register | Renders |
+| --- | --- | --- |
+| [`<audio-view type="waveform">`](/audio/element/view/audio-view/#what-each-drawing-needs) | `defineAudioViewElement(tag?)` | Min/max waveform with a playhead (default). |
+| [`<audio-view type="spectrogram">`](/audio/element/view/audio-view/#what-each-drawing-needs) | — | STFT magnitude heatmap (time × frequency). |
+| [`<audio-view type="meter">`](/audio/element/view/audio-view/#what-each-drawing-needs) | — | Live RMS / spectrum level meter. |
+| `<audio-live-view>` | `defineAudioLiveViewElement(tag?)` | A scrolling projection of a live `AnalyserNode`. |
+| `AudioViewElement`, `AudioLiveViewElement` | `defineAllAudioElements()` | The classes behind the tags — extend one to build a custom surface, or register every element at its default tag. |
+| [`AudioViewDragMode`](/audio/element/view/audio-view/#dragging-and-seeking) | type from `@webmusic/audio/view/element` | `seek`, `scrub`, `pan` or `none` for the AudioView Element's `dragMode` property. |
+
+## Theming
+
+Every visible element owns the same neutral outer component surface: `#fff`, a
+`1px solid #d8d8d8` border, `.6rem` padding and square corners. Override those defaults with
+`--wm-component-background`, `--wm-component-border`, `--wm-component-padding` and
+`--wm-component-radius`. The `--wap-*`, `--wapl-*`, `--wam-*`, `--war-*` and `--wameter-*`
+families remain compatibility and inner-control palettes, so the transport, meter track or record
+accent can be retuned independently of the outer surface:
+
+```css
+/* Keep the neutral surface, add rounding, and retune the transport controls. */
+audio-player {
+  --wm-component-radius: 12px;
+  --wap-fg: #111;
+  --wap-accent: #e23b3b;
+  --wap-track: #ececec;
+  --wap-height: 3rem;
+}
+```
+
+Each play element prefixes its variables distinctly — `--wap-*` (player), `--wapl-*` (playlist), `--wam-*` (mixer), `--war-*` (recorder), `--wameter-*` (meter) — and lists them under its own **Styling** heading. [`<audio-player>`](/audio/element/play/audio-player/#re-skinning) carries a live re-skin of the whole transport from page CSS.
+
+### Analysis variables
+
+Analyze hosts use the same neutral outer surface as Play: `--wm-component-background`,
+`--wm-component-border`, `--wm-component-padding` and `--wm-component-radius`.
+The level, oscilloscope, spectrum and transient tools use their respective
+[UI Kit presenters](/uikit/). Each tag's Styling section names its relevant
+public hooks.

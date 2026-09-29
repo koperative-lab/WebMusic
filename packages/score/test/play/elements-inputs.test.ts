@@ -20,13 +20,13 @@ import {
   parseGridMap,
   qwertyMidi,
   qwertyOffsetIsBlack,
-} from '../../src/play/element/note-input';
+} from '../../src/play/element/score-note-input';
 import {
   SynthPanelElement,
   defineSynthPanelElement,
   lfoWave,
   parseSections,
-} from '../../src/play/element/synth-panel';
+} from '../../src/play/element/score-synth-panel';
 
 describe('input element SSR safety', () => {
   it('imports and constructs without DOM globals', async () => {

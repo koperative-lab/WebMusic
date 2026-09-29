@@ -9,6 +9,7 @@ import {
   patternSections, verifyAgentContextOutput, verifyReleaseBaseline,
 } from '../scripts/agent-context.mjs';
 import {assertPublicRuntimeSource} from '../scripts/agent-context-catalog.mjs';
+import {audioBridgeContext} from '../scripts/agent-context-audio-bridge.mjs';
 
 const root = fileURLToPath(new URL('../../../../', import.meta.url));
 const temporary = [];
@@ -117,6 +118,10 @@ describe('agent context release and output contracts', () => {
     const routes = await declaredAgentContextPaths({root: directory});
     expect([...routes]).toEqual(expect.arrayContaining(['/llms.txt', '/llms-full.txt', '/llms-components.txt', '/llms-patterns.txt', '/agent-context/manifest.json', '/agent-context/catalog.json', '/agent-context/agent-toolkit/index.md', '/agent-context/index.md', '/agent-context/quick-start.md', '/agent-context/score/api/index.md']));
     expect([...routes].some((route) => /audio|bridge|private/.test(route))).toBe(false);
+    const development = await declaredAgentContextPaths({root: directory, extension: audioBridgeContext});
+    expect([...development]).toEqual(expect.arrayContaining(['/agent-context/audio/api.md', '/agent-context/bridge/index.md']));
+    expect([...development].some((route) => /private/.test(route))).toBe(false);
+    expect([...development]).not.toContain('/agent-context/ui/index.md');
   });
 
   it('refuses symlinked documentation instead of exposing another directory', async () => {
@@ -162,19 +167,45 @@ describe('agent context release and output contracts', () => {
   });
 
   it('generates deterministic references for root and Pages deployments', async () => {
-    const plain = await generateAgentContext({root, site: 'https://docs.example.test', base: '/'});
-    const repeated = await generateAgentContext({root, site: 'https://docs.example.test', base: '/'});
-    const pages = await generateAgentContext({root, site: 'https://docs.example.test', base: '/WebMusic/'});
+    const plain = await generateAgentContext({root, extension: audioBridgeContext, site: 'https://docs.example.test', base: '/'});
+    const repeated = await generateAgentContext({root, extension: audioBridgeContext, site: 'https://docs.example.test', base: '/'});
+    const pages = await generateAgentContext({root, extension: audioBridgeContext, site: 'https://docs.example.test', base: '/WebMusic/'});
     expect([...plain.files]).toEqual([...repeated.files]);
     expect(pages.files.get('llms.txt')).toContain('https://docs.example.test/WebMusic/agent-context/quick-start.md');
     expect(plain.files.get('llms.txt')).toContain('https://docs.example.test/agent-context/quick-start.md');
-    expect(pages.files.get('agent-context/quick-start.md')).toContain('https://docs.example.test/WebMusic/mxl/demo.mxl');
+    expect(pages.files.get('agent-context/quick-start.md')).toContain('https://docs.example.test/WebMusic/mxl/Arabesque%20No.1.mxl');
     expect(pages.files.get('agent-context/uikit/catalog.md')).toContain('| Presenter | Group | Purpose |');
     expect(pages.files.get('agent-context/uikit/catalog.md')).toContain('@webmusic/ui/transport');
     expect(pages.files.get('agent-context/score/api/play.md')).toContain('renderScoreToBuffer');
-    expect(pages.manifest.release.packages).toEqual({'@webmusic/kernel': '0.1.0', '@webmusic/ui': '0.1.0', '@webmusic/score': '0.1.0'});
+    for (const tag of ['audio-meter', 'audio-level-analyzer', 'audio-spectrum-analyzer', 'audio-oscilloscope', 'audio-transient-analyzer']) {
+      const page = pages.files.get(`agent-context/audio/element/analyze/${tag}.md`);
+      expect(page).toContain('[Interactive example on the documentation page]');
+      expect(page).not.toContain('<AudioAnalyzeFeaturePlayground');
+    }
+    expect(pages.manifest.sourceSnapshot.packages).toEqual({'@webmusic/kernel': '0.1.0', '@webmusic/ui': '0.1.0', '@webmusic/score': '0.1.0', '@webmusic/audio': '0.1.0', '@webmusic/bridge': '0.1.0'});
+    expect(pages.manifest.sourceSnapshot.adapter).toBe('audio-bridge');
+    expect(pages.manifest.mode).toBeUndefined();
+    expect(pages.manifest.release).toBeUndefined();
+    expect(pages.manifest.sourceSnapshot.revision).toMatch(/^[a-f0-9]{64}$/);
+    expect(pages.files.get('llms.txt')).toContain('Source snapshot');
+    expect(pages.files.get('llms.txt')).not.toContain('current verified release');
     expect(pages.manifest.inputs.every((input) => !input.source.includes('.dev/') && !input.source.endsWith('/AGENTS.md'))).toBe(true);
-    expect([...await declaredAgentContextPaths({root})].sort()).toEqual([...pages.files.keys()].map((name) => `/${name}`).sort());
+    expect([...await declaredAgentContextPaths({root, extension: audioBridgeContext})].sort()).toEqual([...pages.files.keys()].map((name) => `/${name}`).sort());
+  });
+
+  it('fingerprints unreleased source changes without accepting them as a release', async () => {
+    const directory = await temp();
+    const owners = ['platform/kernel', 'packages/ui', 'packages/score', 'packages/audio', 'bridges/score-audio'];
+    for (const owner of owners) {
+      await write(directory, `${owner}/package.json`, json({name: owner, version: '0.1.0'}));
+      await write(directory, `${owner}/src/index.ts`, 'export const value = 1;');
+    }
+    const before = await audioBridgeContext.inspectSources(directory);
+    await write(directory, 'packages/audio/src/index.ts', 'export const value = 2;');
+    const after = await audioBridgeContext.inspectSources(directory);
+    expect(after.sourceSnapshot.revision).not.toBe(before.sourceSnapshot.revision);
+    expect(after.packages.map(({version}) => version)).toEqual(before.packages.map(({version}) => version));
+    await expect(generateAgentContext({root: directory})).rejects.toThrow(/release mapping/);
   });
 
   it('generates from public inputs without Git history or private maintainer notes', async () => {
@@ -184,26 +215,29 @@ describe('agent context release and output contracts', () => {
       'apps/doc/webmusic/src/content/docs',
       'apps/doc/shared/ui-presenter-catalog.ts', 'apps/doc/shared/ui-catalog.ts',
       'apps/doc/webmusic/src/components/quick-start-player-client.ts',
+      'apps/doc/webmusic/src/components/bridges/bridge-composition-client.ts',
+      'apps/doc/webmusic/src/components/bridges/independent-loops-client.ts',
       'apps/doc/webmusic/scripts/agent-context.mjs',
       'apps/doc/webmusic/scripts/agent-context-catalog.mjs',
       'apps/doc/webmusic/scripts/agent-context-release.mjs',
+      'apps/doc/webmusic/scripts/agent-context-audio-bridge.mjs',
       'scripts/element-composition-policy.mjs', 'scripts/package-policy.mjs',
-      ...['platform/kernel', 'packages/ui', 'packages/score'].flatMap((name) => [`${name}/src`, `${name}/package.json`]),
+      ...['platform/kernel', 'packages/ui', 'packages/score', 'packages/audio', 'bridges/score-audio'].flatMap((name) => [`${name}/src`, `${name}/package.json`]),
     ];
     for (const source of sources) {
       await mkdir(path.dirname(path.join(directory, source)), {recursive: true});
       await cp(path.join(root, source), path.join(directory, source), {recursive: true});
     }
-    const generated = await generateAgentContext({root: directory});
+    const generated = await generateAgentContext({root: directory, extension: audioBridgeContext});
     expect(generated.files.get('agent-context/quick-start.md')).toContain('mountQuickStartStatus');
     expect(generated.files.has('llms.txt')).toBe(true);
     expect(generated.manifest.inputs.some((input) => input.source.startsWith('.'))).toBe(false);
     await write(directory, 'apps/doc/webmusic/scripts/agent-context-catalog.mjs', '// A reviewed recipe selection change.\n');
-    expect((await generateAgentContext({root: directory})).manifest.documentationRevision).not.toBe(generated.manifest.documentationRevision);
+    expect((await generateAgentContext({root: directory, extension: audioBridgeContext})).manifest.documentationRevision).not.toBe(generated.manifest.documentationRevision);
   });
 
   it('separates task discovery, complete references, components and focused patterns', async () => {
-    const {files, manifest} = await generateAgentContext({root});
+    const {files, manifest} = await generateAgentContext({root, extension: audioBridgeContext});
     const full = files.get('llms-full.txt');
     const patterns = files.get('llms-patterns.txt');
     const bundles = Object.fromEntries(manifest.bundles.map((bundle) => [bundle.id, bundle]));
@@ -231,7 +265,7 @@ describe('agent context release and output contracts', () => {
   });
 
   it('links stable component IDs to verified owning sources and contracts', async () => {
-    const {files, manifest} = await generateAgentContext({root});
+    const {files, manifest} = await generateAgentContext({root, extension: audioBridgeContext});
     const catalog = JSON.parse(files.get(manifest.catalog));
     expect(catalog.license).toEqual({id: 'MIT', output: 'agent-context/LICENSE.txt'});
     expect(files.get(catalog.license.output)).toBe(await readFile(path.join(root, 'LICENSE'), 'utf8'));
@@ -241,7 +275,15 @@ describe('agent context release and output contracts', () => {
     expect(player.source).toEqual(['agent-context/source/packages/score/src/play/element/score-player.ts.txt']);
     expect(files.get(player.source[0])).toBe(await readFile(path.join(root, 'packages/score/src/play/element/score-player.ts'), 'utf8'));
     expect(catalog.components.find(({id}) => id === 'headless/score-player').styles).toEqual([]);
-    expect(catalog.components.find(({id}) => id === 'element/rack-part').styles).toEqual([]);
+    expect(catalog.components.find(({id}) => id === 'headless/audio/audio-clip-player').source).toEqual(['agent-context/source/packages/audio/src/play/headless/player.ts.txt']);
+    expect(catalog.components.find(({id}) => id === 'headless/bridge/score-audio-sync').docs).toEqual(['agent-context/bridge/headless/score-audio-sync.md']);
+    expect(catalog.components.some(({id}) => id === 'headless/envelope-controller')).toBe(false);
+    expect(catalog.components.find(({id}) => id === 'element/audio-view').docs).toEqual(['agent-context/audio/element/view/audio-view.md']);
+    expect(catalog.components.find(({id}) => id === 'element/audio-meter')).toMatchObject({
+      docs: ['agent-context/audio/element/analyze/audio-meter.md'],
+      source: ['agent-context/source/packages/audio/src/analyze/element/audio-meter.ts.txt'],
+    });
+    expect(catalog.components.find(({id}) => id === 'element/score-rack-part').styles).toEqual([]);
     expect(catalog.components.find(({id}) => id === 'ui/transport').styles).toContain('agent-context/uikit/index.md');
     for (const output of manifest.outputs) expect(digest(files.get(output.path))).toBe(output.sha256);
     expect(() => assertPublicRuntimeSource('.dev/STATUS.md', {packages: [{directory: 'packages/ui'}]})).toThrow(/outside verified runtime/);
@@ -280,8 +322,31 @@ describe('agent context release and output contracts', () => {
     });
   });
 
+  it('uses only listening-server origins for local context when site is unset', async () => {
+    const integration = agentContext({extension: audioBridgeContext});
+    integration.hooks['astro:config:done']({config: {root: new URL('../', import.meta.url), base: '/WebMusic/', server: {port: 4321}}});
+    let middleware;
+    const server = {
+      resolvedUrls: {local: ['http://127.0.0.1:4322/', 'http://localhost:4322/'], network: []},
+      httpServer: {address: () => ({address: '127.0.0.1', port: 4322})},
+      middlewares: {use: (handler) => { middleware = handler; }},
+    };
+    await integration.hooks['astro:server:setup']({server});
+    const query = async (headers) => {
+      let result;
+      await middleware({url: '/WebMusic/llms.txt', headers}, {setHeader() {}, end: (value) => { result = value; }}, (error) => { throw error ?? new Error('Expected generated context'); });
+      return result;
+    };
+    expect(await query({host: 'localhost:4322'})).toContain('http://localhost:4322/WebMusic/agent-context/audio/index.md');
+    const hostile = await query({host: 'attacker.example/path', 'x-forwarded-host': 'attacker.example', 'x-forwarded-proto': 'https'});
+    expect(hostile).toContain('http://127.0.0.1:4322/WebMusic/agent-context/audio/index.md');
+    expect(hostile).not.toContain('attacker.example');
+    server.resolvedUrls = undefined;
+    expect(await query({host: 'attacker.example'})).toContain('http://localhost:4322/WebMusic/agent-context/audio/index.md');
+  });
+
   it('serves generated files in development with the configured base and no stale cache', async () => {
-    const integration = agentContext();
+    const integration = agentContext({extension: audioBridgeContext});
     integration.hooks['astro:config:done']({config: {root: new URL('../', import.meta.url), site: 'https://docs.example.test', base: '/WebMusic/'}});
     let middleware;
     await integration.hooks['astro:server:setup']({server: {middlewares: {use: (handler) => { middleware = handler; }}}});

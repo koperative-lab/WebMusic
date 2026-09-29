@@ -191,9 +191,9 @@ ${componentSurfaceCss('timeline')}
   padding: 0;
   overflow: hidden;
   border: 0;
-  box-shadow: inset 0 0 0 1px var(--wm-timeline-region-border, color-mix(in srgb, var(--wui-timeline-region-color, var(--wm-accent, #4869d8)) 70%, #000));
+  box-shadow: inset 0 0 0 1px var(--wm-timeline-region-border, color-mix(in srgb, var(--wui-timeline-region-color, var(--wm-accent, #111)) 70%, #000));
   border-radius: var(--wm-timeline-region-radius, var(--wm-control-radius, 0));
-  background: var(--wui-timeline-region-color, var(--wm-timeline-region, var(--wm-accent, #4869d8)));
+  background: var(--wui-timeline-region-color, var(--wm-timeline-region, var(--wm-accent, #111)));
   color: var(--wm-timeline-region-foreground, var(--wm-accent-foreground, #fff));
   cursor: pointer;
 }
@@ -224,8 +224,8 @@ ${componentSurfaceCss('timeline')}
   position: absolute;
   z-index: 2;
   inset-block: 0;
-  border-inline: 1px solid var(--wm-selection, #4869d8);
-  background: var(--wm-selection-fill, rgba(72, 105, 216, .18));
+  border-inline: 1px solid var(--wm-selection, var(--wm-foreground, #111));
+  background: var(--wm-selection-fill, rgba(127, 127, 127, .18));
   pointer-events: none;
 }
 
@@ -389,9 +389,13 @@ export function mountTimeline(
 
   const runCommand = (command: () => Promise<void> | void): void => {
     try {
-      void Promise.resolve(command()).then(scheduleUpdate).catch(reportError);
+      void Promise.resolve(command()).then(scheduleUpdate).catch((error) => {
+        reportError(error);
+        scheduleUpdate();
+      });
     } catch (error) {
       reportError(error);
+      scheduleUpdate();
     }
   };
 

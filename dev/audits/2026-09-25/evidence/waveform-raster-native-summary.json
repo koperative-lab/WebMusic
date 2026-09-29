@@ -1,0 +1,248 @@
+{
+  "browser": "Chrome 154 on macOS",
+  "fixture": "Actual waveform renderer, constant +/-0.5 amplitude, 200 x 40 CSS pixels, 100 px/s, dark/light progress boundary at 1.5 seconds",
+  "measurement": "Interior row alpha over 100 CSS pixels at each fractional scroll offset; values read from the native Canvas output.",
+  "before": {
+    "opaqueDpr1": {
+      "0": 255,
+      "0.125": 227,
+      "0.25": 208,
+      "0.375": 196,
+      "0.5": 192,
+      "0.75": 208
+    },
+    "opaqueDpr1_25Offset0": {
+      "minAlpha": 191,
+      "maxAlpha": 255
+    },
+    "opaqueDpr2Offset0_25": {
+      "minAlpha": 192,
+      "maxAlpha": 255
+    }
+  },
+  "after": [
+    {
+      "paint": "opaque",
+      "dpr": 1,
+      "samples": [
+        {
+          "offset": 0,
+          "minAlpha": 255,
+          "maxAlpha": 255
+        },
+        {
+          "offset": 0.125,
+          "minAlpha": 255,
+          "maxAlpha": 255
+        },
+        {
+          "offset": 0.25,
+          "minAlpha": 255,
+          "maxAlpha": 255
+        },
+        {
+          "offset": 0.375,
+          "minAlpha": 255,
+          "maxAlpha": 255
+        },
+        {
+          "offset": 0.5,
+          "minAlpha": 255,
+          "maxAlpha": 255
+        },
+        {
+          "offset": 0.75,
+          "minAlpha": 255,
+          "maxAlpha": 255
+        }
+      ],
+      "pass": true
+    },
+    {
+      "paint": "opaque",
+      "dpr": 1.25,
+      "samples": [
+        {
+          "offset": 0,
+          "minAlpha": 255,
+          "maxAlpha": 255
+        },
+        {
+          "offset": 0.125,
+          "minAlpha": 255,
+          "maxAlpha": 255
+        },
+        {
+          "offset": 0.25,
+          "minAlpha": 255,
+          "maxAlpha": 255
+        },
+        {
+          "offset": 0.375,
+          "minAlpha": 255,
+          "maxAlpha": 255
+        },
+        {
+          "offset": 0.5,
+          "minAlpha": 255,
+          "maxAlpha": 255
+        },
+        {
+          "offset": 0.75,
+          "minAlpha": 255,
+          "maxAlpha": 255
+        }
+      ],
+      "pass": true
+    },
+    {
+      "paint": "opaque",
+      "dpr": 2,
+      "samples": [
+        {
+          "offset": 0,
+          "minAlpha": 255,
+          "maxAlpha": 255
+        },
+        {
+          "offset": 0.125,
+          "minAlpha": 255,
+          "maxAlpha": 255
+        },
+        {
+          "offset": 0.25,
+          "minAlpha": 255,
+          "maxAlpha": 255
+        },
+        {
+          "offset": 0.375,
+          "minAlpha": 255,
+          "maxAlpha": 255
+        },
+        {
+          "offset": 0.5,
+          "minAlpha": 255,
+          "maxAlpha": 255
+        },
+        {
+          "offset": 0.75,
+          "minAlpha": 255,
+          "maxAlpha": 255
+        }
+      ],
+      "pass": true
+    },
+    {
+      "paint": "translucent",
+      "dpr": 1,
+      "samples": [
+        {
+          "offset": 0,
+          "minAlpha": 128,
+          "maxAlpha": 128
+        },
+        {
+          "offset": 0.125,
+          "minAlpha": 128,
+          "maxAlpha": 128
+        },
+        {
+          "offset": 0.25,
+          "minAlpha": 128,
+          "maxAlpha": 128
+        },
+        {
+          "offset": 0.375,
+          "minAlpha": 128,
+          "maxAlpha": 128
+        },
+        {
+          "offset": 0.5,
+          "minAlpha": 128,
+          "maxAlpha": 128
+        },
+        {
+          "offset": 0.75,
+          "minAlpha": 128,
+          "maxAlpha": 128
+        }
+      ],
+      "pass": true
+    },
+    {
+      "paint": "translucent",
+      "dpr": 1.25,
+      "samples": [
+        {
+          "offset": 0,
+          "minAlpha": 128,
+          "maxAlpha": 128
+        },
+        {
+          "offset": 0.125,
+          "minAlpha": 128,
+          "maxAlpha": 128
+        },
+        {
+          "offset": 0.25,
+          "minAlpha": 128,
+          "maxAlpha": 128
+        },
+        {
+          "offset": 0.375,
+          "minAlpha": 128,
+          "maxAlpha": 128
+        },
+        {
+          "offset": 0.5,
+          "minAlpha": 128,
+          "maxAlpha": 128
+        },
+        {
+          "offset": 0.75,
+          "minAlpha": 128,
+          "maxAlpha": 128
+        }
+      ],
+      "pass": true
+    },
+    {
+      "paint": "translucent",
+      "dpr": 2,
+      "samples": [
+        {
+          "offset": 0,
+          "minAlpha": 128,
+          "maxAlpha": 128
+        },
+        {
+          "offset": 0.125,
+          "minAlpha": 128,
+          "maxAlpha": 128
+        },
+        {
+          "offset": 0.25,
+          "minAlpha": 128,
+          "maxAlpha": 128
+        },
+        {
+          "offset": 0.375,
+          "minAlpha": 128,
+          "maxAlpha": 128
+        },
+        {
+          "offset": 0.5,
+          "minAlpha": 128,
+          "maxAlpha": 128
+        },
+        {
+          "offset": 0.75,
+          "minAlpha": 128,
+          "maxAlpha": 128
+        }
+      ],
+      "pass": true
+    }
+  ],
+  "pass": true
+}

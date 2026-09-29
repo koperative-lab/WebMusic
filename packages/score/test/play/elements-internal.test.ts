@@ -94,13 +94,12 @@ describe('SSR safety', () => {
     const mod = await import('../../src/play/element/index');
     expect(typeof mod.defineAllElements).toBe('function');
     expect(typeof mod.ScorePlayerElement).toBe('function');
-    expect(typeof mod.SimpleScorePlayerElement).toBe('function');
     expect(typeof mod.NoteInputElement).toBe('function');
     // And registering is a safe no-op without customElements.
     expect(() => mod.defineAllElements()).not.toThrow();
   });
 
-  it('registers the canonical and deprecated player tags once with distinct constructors', async () => {
+  it('registers only the six prefixed Play tags, once each', async () => {
     const mod = await import('../../src/play/element/index');
     const target = globalThis as Record<string, unknown>;
     const previous = target.customElements;
@@ -117,11 +116,54 @@ describe('SSR safety', () => {
       mod.defineAllElements();
       mod.defineAllElements();
 
-      expect(mod.SimpleScorePlayerElement).not.toBe(mod.ScorePlayerElement);
+      expect([...registry.keys()].sort()).toEqual([
+        'score-note-input',
+        'score-player',
+        'score-rack-control',
+        'score-rack-part',
+        'score-recorder',
+        'score-synth-panel',
+      ]);
       expect(registry.get('score-player')).toBe(mod.ScorePlayerElement);
-      expect(registry.get('simple-score-player')).toBe(mod.SimpleScorePlayerElement);
-      expect(define.mock.calls.filter(([tag]) => tag === 'score-player')).toHaveLength(1);
-      expect(define.mock.calls.filter(([tag]) => tag === 'simple-score-player')).toHaveLength(1);
+      expect(registry.get('score-rack-control')).toBe(mod.RackControlElement);
+      expect(registry.get('score-rack-part')).toBe(mod.RackPartElement);
+      expect(registry.get('score-note-input')).toBe(mod.NoteInputElement);
+      expect(registry.get('score-recorder')).toBe(mod.ScoreRecorderElement);
+      expect(registry.get('score-synth-panel')).toBe(mod.SynthPanelElement);
+      expect(define).toHaveBeenCalledTimes(6);
+      expect(mod).not.toHaveProperty('SimpleScorePlayerElement');
+      expect(mod).not.toHaveProperty('defineSimpleScorePlayerElement');
+    } finally {
+      if (previous === undefined) delete target.customElements;
+      else target.customElements = previous;
+    }
+  });
+
+  it('registers six prefixed demo tags and no old demo names', async () => {
+    const demos = await import('../../src/play/demos');
+    const target = globalThis as Record<string, unknown>;
+    const previous = target.customElements;
+    const registry = new Map<string, CustomElementConstructor>();
+    const define = vi.fn((tag: string, constructor: CustomElementConstructor) => {
+      registry.set(tag, constructor);
+    });
+    target.customElements = {
+      define,
+      get: (tag: string) => registry.get(tag),
+    };
+
+    try {
+      demos.defineAllDemoElements();
+      demos.defineAllDemoElements();
+      expect([...registry.keys()].sort()).toEqual([
+        'score-note-input-demo',
+        'score-preset-player-demo',
+        'score-rack-control-demo',
+        'score-recorder-demo',
+        'score-simple-player-demo',
+        'score-synth-panel-demo',
+      ]);
+      expect(define).toHaveBeenCalledTimes(6);
     } finally {
       if (previous === undefined) delete target.customElements;
       else target.customElements = previous;

@@ -1,0 +1,39 @@
+---
+---
+<html lang="en"><head><meta charset="utf-8" /><title>Local scratch audio verification</title></head><body>
+<h1>Native Web Audio scratch verification</h1><button id="run">Render PCM checks</button><pre id="result">Ready</pre>
+<script>
+import {createAudioClip} from '../../../../../packages/audio/src/core';
+import {ScratchEngine} from '../../../../../packages/audio/src/play/headless/engines/scratch-engine';
+const button = document.querySelector<HTMLButtonElement>('#run')!;
+const result = document.querySelector<HTMLPreElement>('#result')!;
+button.addEventListener('click', async () => {
+  button.disabled = true;
+  try {
+    const rows = [];
+    for (const mode of ['forward', 'reverse', 'silent', 'disposed']) {
+      const sr = 48000;
+      const left = Float32Array.from({length: sr * 2}, (_, i) => 0.1 + 0.8 * i / (sr * 2));
+      const right = Float32Array.from(left, value => -value);
+      const clip = createAudioClip({sampleRate: sr, channelData: [left, right]});
+      const context = new OfflineAudioContext(2, sr / 5, sr);
+      const scratch = new ScratchEngine(context, clip, context.destination, mode === 'reverse' ? 0.9 : 0.7);
+      scratch.move(0.8, 0.8, mode !== 'silent', false);
+      if (mode === 'disposed') scratch.dispose();
+      const buffer = await context.startRendering();
+      const a = buffer.getChannelData(0), b = buffer.getChannelData(1);
+      const mean = (start: number, end: number) => a.slice(start * sr, end * sr).reduce((n,v) => n+v,0) / ((end-start)*sr);
+      const early = mean(0.012, 0.02), late = mean(0.028, 0.036);
+      const energy = a.reduce((n,v)=> n + v*v, 0);
+      const tailPeak = a.slice(Math.ceil(0.07*sr)).reduce((n,v)=> Math.max(n,Math.abs(v)),0);
+      const stereoError = a.reduce((n,v,i)=>Math.max(n,Math.abs(v+b[i])),0);
+      const pass = mode === 'forward' ? late > early && early > 0 : mode === 'reverse' ? early > late && late > 0 : energy === 0;
+      rows.push({mode,pass:pass && tailPeak===0 && stereoError<1e-6,early,late,energy,tailPeak,stereoError});
+      scratch.dispose();
+    }
+    result.textContent = JSON.stringify({browser: navigator.userAgent, sampleRate:48000, rows}, null, 2);
+  } catch (error) {result.textContent = String(error);}
+  button.disabled = false;
+});
+</script>
+</body></html>

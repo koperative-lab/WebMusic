@@ -1,6 +1,7 @@
 # Score View component families
 
-> Current design, accepted in DEC-015 and refined for staff notation in DEC-024. Source and public leaf pages own exact
+> Current design, accepted in DEC-015 and refined for staff notation in DEC-024.
+> DEC-045 owns the domain-prefixed tags. Source and public leaf pages own exact
 > members; STATUS owns delivery and verification gaps.
 
 ## Purpose and boundaries
@@ -13,8 +14,8 @@ they need simultaneous representations.
 | Component | Input and task | Types |
 |---|---|---|
 | `score-view` | A complete Score, optionally with a borrowed playback position | `piano-roll`, `staff`, `waterfall`, `map`, `thumbnail` |
-| `pitch-view` | Currently held MIDI pitches from one selected note source | `keyboard`, `staff`, `fretboard` |
-| `sheet-view` | Page engraving using an optional OSMD renderer | Separate engraving lifecycle; no type selector |
+| `score-pitch-view` | Currently held MIDI pitches from one selected note source | `keyboard`, `staff`, `fretboard` |
+| `score-sheet-view` | Page engraving using an optional OSMD renderer | Separate engraving lifecycle; no type selector |
 
 Score staff includes musical time. Pitch staff depicts only sounding notes.
 Map is a whole-score navigation surface. Thumbnail is a static, fitted preview;
@@ -55,7 +56,7 @@ the complete tempo map, including beat units. Staff rendering preserves source
 staff assignments within each part by default. The external `split-staves`
 setting can combine those staves for display without merging parts, mutating
 the source score or restarting playback. MusicXML is a supported source for
-this structure; the default demo uses the existing two-staff piano XML fixture.
+this structure; the default demo uses a two-staff piano MusicXML fixture.
 Staff notation reads the original Score's rational written time, rests,
 spelling, voices, measure boundaries and authored clefs rather than recovering
 them from a sounding-note sequence. Part `clefChanges` carry exact positions,

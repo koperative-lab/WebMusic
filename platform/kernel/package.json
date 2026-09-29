@@ -135,7 +135,7 @@
   "publishConfig": {
     "access": "public"
   },
-  "author": "mrsteamedbun",
+  "author": "Koperative",
   "engines": {
     "node": ">=22"
   },

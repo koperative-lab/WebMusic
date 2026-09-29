@@ -156,11 +156,11 @@ those before disposing. There is no built-in `play()` transport toggle,
 ### ScoreRecorderSession
 
 `ScoreRecorderSession` is the capture direction: live note events in — from
-[`<note-input>`](/score/element/play/note-input/), a MIDI device, this very
+[`<score-note-input>`](/score/element/play/score-note-input/), a MIDI device, this very
 player — and the recorded notes back out when you finish.
 `recordedNotesToScore()` is the second half, turning that flat list into a
 real `Score`. It is the model behind
-[`<score-recorder>`](/score/element/play/note-input/#score-recorder).
+[`<score-recorder>`](/score/element/play/score-recorder/).
 
 It owns no audio and no clock: you tell it when a note goes on or off, and it
 timestamps with the clock you gave the constructor — `recorderNow()`, a
@@ -354,5 +354,5 @@ on the [PlayerController page](/score/headless/play/player-controller/).
 
 - [ScorePlayer](/score/headless/play/score-player/) — autonomous score scheduling.
 - [Transport drivers](/score/headless/play/interactive-player/#clock-input) and [Web MIDI](/score/headless/play/interactive-player/#web-midi-input) — external beat sources.
-- [Note input and recorder elements](/score/element/play/note-input/) — browser composition.
+- [Note input and recorder elements](/score/element/play/score-note-input/) — browser composition.
 - [Sound](/score/headless/play/sound/) — voice recipes and ownership.

@@ -1,0 +1,387 @@
+---
+title: '@webmusic/audio/view'
+description: Audio visualization — retained visualizers, fitted overview and live-frame helpers, Headless view models/controllers, structural bindings, virtualization and colormaps.
+---
+
+`@webmusic/audio/view` is the **visualization** capability of the `@webmusic/audio` package. The capability root exports colormaps, viewport math and data contracts. Its `/render` subpath draws precomputed analysis data onto a Canvas — a min/max **waveform**, an STFT **spectrogram**, and a live **level/spectrum meter**. Two drop-in Web Components live under [Web Components → View](/audio/element/#view): `<audio-view>` and `<audio-live-view>`. The standalone [`<audio-meter>`](/audio/element/analyze/audio-meter/) is now listed with live Analyze tools; its existing `view/element` and `view/auto` entries remain compatibility paths.
+
+It is **bring-your-own-data**: the renderers consume the typed-array structures produced by [`@webmusic/audio/analyze`](/audio/api/analyze/) (the `AudioPeaks` pyramid and `SpectrogramData`), but `@webmusic/audio/view` does **not** depend on `@webmusic/audio/analyze` — the spectrogram payload is declared structurally here. Playback lives in [`@webmusic/audio/play`](/audio/api/play/), while the renderer binding talks to a structural `ViewPlayerBinding` interface and does not import the play capability. The optional `<audio-view src="…">` convenience resolves `@webmusic/audio/play` dynamically. All renderer DOM work is confined to call time, so importing the capability root or `/headless` remains safe in non-browser environments.
+
+## Install
+
+`npm install @webmusic/audio` — use an available published version or the local workspace; [Install](/audio/#install) has the full setup.
+
+The root model and this capability ship in that one package. `<audio-view src="…">` dynamically resolves the sibling `@webmusic/audio/play` capability; callers that provide clips, analysis data, or a structural player never load it.
+
+The view capability has these entry points — the [package subpath table](/audio/api/#package-subpaths) lists them with every other `@webmusic/audio` entry:
+
+The `@webmusic/audio/view` root is the stateless API; `/element` is the opt-in styled Web Component entry. These boundaries keep code-only consumers free of element registration and skin code.
+
+---
+
+The three retained renderer factories take a target `HTMLElement`, the data to draw and an options
+bag, then return the same `RenderedAudioVisualizer` handle. Two smaller `paint*` adapters instead
+draw into a caller/presenter-owned canvas frame and create no DOM. The examples below assume a
+decoded `clip` plus precomputed peaks / spectrogram from `@webmusic/audio/analyze`:
+
+```ts
+import {loadClipFromUrl} from '@webmusic/audio/play';
+import {computePeaks, computeSpectrogram} from '@webmusic/audio/analyze';
+
+const clip = await loadClipFromUrl('/wav/Arabesque%20No.1.wav');
+const peaks = computePeaks(clip.channels()!, clip.sampleRate);
+const spectrogram = computeSpectrogram(clip.channelData(0)!, clip.sampleRate, {fftSize: 1024});
+```
+
+## The RenderedAudioVisualizer contract
+
+Every `render*Visualizer` returns a `RenderedAudioVisualizer` — the digital-audio analogue of Score's `RenderedScoreVisualizer`. It lets you drive the playhead, zoom, regions, and hit-testing without knowing the concrete renderer.
+
+| Member | Signature | Description |
+| --- | --- | --- |
+| `redraw` | `(playheadSeconds?, scrollIntoView?) => void` | With an argument, move the playhead and optionally follow it. Waveform progress/history repaint is coalesced; spectrogram reuses its buffered image until new columns are exposed. With no argument, re-lay-out and repaint the current view. |
+| `redrawFrame?` | `(playheadSeconds, scrollIntoView?) => void` | Draw a position sampled in the current display frame without queuing another frame. Waveform implements this synchronous path; other visualizers retain the `redraw` fallback. |
+| `setZoom` | `(pixelsPerSecond) => void` | Change the horizontal scale and repaint. |
+| `setPlayheadMode?` | `(mode: 'position' \| 'center') => void` | Change time-axis cursor geometry without replacing the canvas; center keeps the line fixed while content moves. |
+| `setRegions` | `(regions) => void` | Replace the overlaid regions/markers and repaint the overlay. |
+| `hitTest` | `(x, y) => { seconds, region? }` | Map a pointer position (CSS px relative to the surface) to a time and, when inside one, the region under it. |
+| `setOffset?` | `(startSeconds) => void` | In position mode, scroll so the window starts there, clamped to the clip. Ignored in center mode. |
+| `viewport?` | `() => AudioViewport` | The real clip-time portion currently painted, `{ startSeconds, endSeconds }`; excludes centered-mode blank padding. |
+| `onViewportChange?` | `(listener) => () => void` | Observe pan and zoom. Fires for user scrolling and for programmatic `setOffset` / `setZoom` alike, so a bound overview stays in step either way; returns an unsubscribe function. |
+| `dispose` | `() => void` | Release DOM nodes, listeners, and animation frames. Safe to call twice. |
+
+The playhead is a separate, absolutely-positioned overlay moved with `transform: translateX`. Waveform cursor updates also recolor the played portion and history window. Ordinary `redraw` coalesces this painting onto one animation frame; `redrawFrame` paints immediately when a presentation observer already owns that frame. Spectrogram cursor updates reuse its buffered image; following repaints only after the visible window leaves that buffer. Zoom and bare `redraw()` explicitly repaint; spectrogram region updates repaint their separate overlay. A meter has no time axis, so its `setZoom` / `setRegions` / `hitTest` are inert but present to satisfy the contract.
+
+The optional `setPlayheadMode`, `setOffset`, `viewport` and `onViewportChange` members are implemented by the two time-axis renderers, not by the meter. Together they are the **viewport seam**: `<audio-view>` seats its headless `AudioTimeline` on whatever window the renderer reports, so `visibleRange()` and `panTo()` use the numbers the surface is actually drawn from. `AudioViewport` is the shape `{ startSeconds: number; endSeconds: number }`.
+
+In `playheadMode: 'center'`, cursor updates keep the line centered even when
+`redraw(seconds, false)` is used. Zero/end and short clips retain blank padding;
+the image is not stretched to hide the missing time. `viewport()` reports only
+the intersection with real clip time, and hit tests in padding clamp to zero or
+duration. Native panning and `setOffset()` are ignored in center mode. Zoom and
+resize retain the current time at the center. Returning to position mode removes
+padding and clamps the existing viewport offset while retaining DOM/canvas.
+AudioView selects this geometry for
+`drag-mode="scrub"` with annotation off, independently of `follow`; choose pan
+mode to browse freely. The renderers only draw this geometry: scratch audio and
+playback-state restoration belong to the player.
+
+## Render a waveform
+
+`renderWaveformVisualizer` draws a Canvas 2D min/max waveform from a precomputed `AudioPeaks` pyramid. It picks the pyramid level nearest the current `pixelsPerSecond` (via core's `peaksLevelForResolution`), then paints one vertical min→max column per CSS pixel, tinting the portion left of the playhead with `progressColor`. The canvas is viewport-sized and static: only the columns inside the scroll viewport are ever painted, and scrolling repaints them at a new offset rather than moving the layer.
+
+```ts
+import {renderWaveformVisualizer} from '@webmusic/audio/view/render';
+
+const rendered = renderWaveformVisualizer(document.querySelector('#wave')!, peaks, {
+  pixelsPerSecond: 100,
+  height: 128,
+  waveColor: '#4a9eff',
+  progressColor: '#1f6fd4',
+});
+
+rendered.redraw(12.5, true);     // move playhead to 12.5 s and scroll it into view
+rendered.setZoom(200);           // zoom in
+```
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `pixelsPerSecond` | `100` | Horizontal scale. |
+| `height` | `128` | Pixel height of the surface. |
+| `amplitude` | `1` | Vertical gain applied to the `[-1, 1]` peaks before drawing. |
+| `waveColor` | `#000000` | Waveform fill colour (min/max columns). |
+| `progressColor` | `#000000` | Colour of the portion already played (left of the playhead). |
+| `backgroundColor` | — | Background colour; transparent when omitted. |
+| `playheadColor` | `#000000` | Colour of the playhead overlay line. |
+| `durationSeconds` | from peaks | Total duration when not derivable from the data. |
+| `regions` | — | `Region`s/markers to tint behind the wave. |
+| `scrollable` | `true` | Allow native horizontal panning in position mode. Center mode disables native panning. Honoured by waveform and spectrogram. |
+| `playheadMode` | `position` | Shared `TimelineRenderOptions` setting: `position` moves the line over a scrollable timeline; `center` holds it at the viewport center and moves content underneath, including blank clip-edge padding. |
+| `devicePixelRatio` | `window.devicePixelRatio` | DPR override. |
+
+The colour defaults are deliberately **neutral**. A direct caller can supply a palette through these options. [`<audio-view>`](/audio/element/view/audio-view/) supplies shared semantic CSS tokens, with neutral gray waveform/progress fallbacks and a red playhead, so its default drawing follows the surrounding theme. Explicit color options remain authoritative. The waveform always paints only the columns in view, so it takes no `virtualization` switch — that option is the spectrogram's.
+
+## Render a spectrogram
+
+`renderSpectrogramVisualizer` draws a Canvas 2D spectrogram from a column-major `SpectrogramData` — exactly the shape `computeSpectrogram` returns. Each frame becomes one image column whose pixels are coloured by a colormap over a dB-scaled magnitude, restricted to `[minFreq, maxFreq]`. Like the waveform, it uses a separate translateX playhead overlay so ticking the playhead doesn't repaint the heavy image.
+
+```ts
+import {renderSpectrogramVisualizer} from '@webmusic/audio/view/render';
+
+const rendered = renderSpectrogramVisualizer(document.querySelector('#spec')!, spectrogram, {
+  pixelsPerSecond: 100,
+  height: 256,
+  colorMap: 'magma',
+  minDb: -90,
+  maxDb: -10,
+});
+
+rendered.redraw(4.0);
+```
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `pixelsPerSecond` | `100` | Horizontal scale. |
+| `height` | `256` | Pixel height of the surface. |
+| `colorMap` | `viridis` | A `ColormapName` (`'viridis'`, `'magma'`, `'grayscale'`, `'gray'`) or a custom mapper `t∈[0,1] → [r, g, b]`. |
+| `minFreq` | `0` | Lowest frequency drawn at the bottom. |
+| `maxFreq` | Nyquist | Highest frequency drawn at the top (defaults to the data's top bin). |
+| `minDb` | `-100` | dB floor for the magnitude → colour mapping. |
+| `maxDb` | `0` | dB ceiling for the magnitude → colour mapping. |
+| `playheadColor` | `#000000` | Playhead overlay colour (neutral by default; the Element supplies its semantic playhead token). |
+| `virtualization` | `true` | `true` allocates and rasterizes a buffered viewport stripe; `false` explicitly uses the full clip; `{bufferScreens}` sets a nonnegative margin in viewports. |
+| `durationSeconds`, `regions`, `devicePixelRatio`, `scrollable`, `playheadMode` | | Shared timeline options (see the waveform table). |
+
+A virtualized hidden or unmeasured host allocates no image and paints after resize or an explicit `redraw()`. A separate spacer retains the full scroll extent. Both image and region canvases keep only the buffered stripe, preserving device resolution for long clips. Panning within cached pixels and cursor movement do not resize, clear or rerasterize the backing canvases. Image, region and playhead layers move together; native scroll cannot independently displace them. Entering unpainted columns replaces the stripe while preserving overlapping spectral colors, including at fractional DPR or a canvas size cap.
+
+Supply sorted `times` and `frequencies`. The renderer chooses the nearest actual frame time and bin center, including irregular spacing; ties choose the later sample. Analyze STFT times name window centers.
+
+Because `SpectrogramData` is declared in `@webmusic/audio/view` itself (`times`, `frequencies`, the flat `magnitudes`, `binsPerFrame`), any source matching that shape works — you are not tied to `@webmusic/audio/analyze`.
+
+## Render a meter
+
+`renderLoudnessMeter` draws a **live** RMS/peak bar (default) or an FFT bar graph, driven by a Web Audio `AnalyserNode`. It accepts a bare `AnalyserNode` or anything exposing one (`AnalyserSource`, i.e. `{analyser}`, e.g. an `AudioClipPlayer`). It reads the analyser each animation frame; it is SSR-safe (without `requestAnimationFrame` it simply never starts the paint loop).
+
+```ts
+import {renderLoudnessMeter} from '@webmusic/audio/view/render';
+import {createAudioClipPlayer} from '@webmusic/audio/play/headless';
+
+const player = createAudioClipPlayer(clip);
+const meter = renderLoudnessMeter(document.querySelector('#meter')!, player, {
+  mode: 'level',
+  height: 54,
+});
+
+await player.play();
+// ...later
+meter.dispose();                 // stops the paint loop and removes the DOM
+```
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `mode` | `'level'` | `'level'` = RMS/peak bar with peak-hold; `'spectrum'` = FFT bar graph. |
+| `bars` | `28` | Bars to draw in spectrum mode. |
+| `height` | `54` | Pixel height of the surface. |
+| `color` | shared `--wm-meter-fill` / `--wm-accent` | Bar/fill colour; omitted values inherit the UI presenter palette. |
+| `peakColor` | shared `--wm-meter-peak` / `--wm-danger` | Peak-hold tick colour. |
+| `backgroundColor` | `transparent` | Background colour. |
+
+The meter uses the shared UI palette and transparent inner background. `<audio-view type="meter">` keeps those defaults and supplies a semantic red peak tick; explicit `color`, `peakColor` and `backgroundColor` options customize the drawing. The analyser is **borrowed** — `dispose()` tears down the presenter and its own controller, and never disconnects a node it did not create.
+
+## Bind a player to a visualizer
+
+`bindPlayerToWaveform` wires a structural player to any `RenderedAudioVisualizer`.
+The required `ViewPlayerBinding` members are `{ on, seek, seconds, duration }`;
+optional live `playing` / `scratching` flags enable display-frame observation.
+No play-capability import is required. With `seekOnClick`, a click hit-tests a
+position and calls `player.seek`; with `draggableRegions`, a drag creates a
+`Region` and publishes the new list through `onRegionChange`.
+
+When either activity flag is available and RAF is supported, the binding reads
+`player.seconds` on display frames while `playing === true` or
+`scratching === true`, including release inertia. It reads the player's current
+position directly, without predicting time or creating a transport clock.
+Finite, changed positions call `redrawFrame` when available, otherwise `redraw`.
+The initial visible bind reads once; `timeupdate` notifications wake or stop the
+observer when activity changes. Paused position changes still repaint.
+
+Frame observation stops while the page is hidden and resumes with a fresh read
+when visible. An `end` notification retains the existing reset to zero, including
+across visibility changes, until the next `timeupdate`. Native playback wakes
+observation through its next cursor notification; pause is observed on the next
+frame, which reads the final position before stopping. Unsubscribe cancels the
+frame and removes the visibility listener.
+Without live activity flags or RAF, the binding retains event-driven updates at
+the source's own cadence. AudioClipPlayer's default event interval is 50 ms
+(about 20 Hz); its native live getters allow visual observation between events.
+This is presentation scheduling, not a promised frame rate or audio timing API.
+
+```ts
+import {renderWaveformVisualizer, bindPlayerToWaveform} from '@webmusic/audio/view/render';
+import {createAudioClipPlayer} from '@webmusic/audio/play/headless';
+
+const container = document.querySelector<HTMLElement>('#wave')!;
+const rendered = renderWaveformVisualizer(container, peaks);
+const player = createAudioClipPlayer(clip);   // structurally a ViewPlayerBinding
+
+const binding = bindPlayerToWaveform(player, rendered, {
+  surface: container,          // the element pointer events attach to
+  followPlayhead: true,
+  seekOnClick: true,
+  draggableRegions: true,
+  onRegionChange: (regions) => console.log('regions', regions),
+});
+
+// ...later
+binding.unsubscribe();         // detach all listeners (idempotent)
+```
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `followPlayhead` | `false` | Auto-scroll the playhead into view as it advances. |
+| `seekOnClick` | `true` | Clicking the surface seeks the player. |
+| `draggableRegions` | `false` | Drag on the surface to create a region. |
+| `surface` | — | The DOM element pointer listeners attach to — pass the same `container` you gave the renderer. |
+| `onRegionChange` | — | Called with the updated region list after a drag creates one. |
+
+`bindPlayerToWaveform` returns a `WaveformBinding` with a single `unsubscribe()`. It subscribes to the player's `timeupdate` (and best-effort `end`) events; pointer listeners attach only when a `surface` is supplied and `seekOnClick` or `draggableRegions` is on.
+
+Ordinary primary-pointer seeking commits once on press. Annotation commits on release of the same pointer; cancellation or lost capture discards that pending gesture. Unsubscribe detaches every owned listener even if a borrowed cleanup throws, then rethrows its first failure; repeated cleanup is inert. Partial subscription setup rolls back before reporting the setup failure.
+
+Two details matter if you drive `draggableRegions` yourself. The accumulated list starts **empty** — `onRegionChange` reports only the regions this binding created, so a caller holding pre-existing regions must merge them itself (that is exactly what `<audio-view annotate>` does before it emits `webaudio:regionchange`). And a drag shorter than a millisecond of audio creates nothing and falls through to the click path instead.
+
+### The structural player contract
+
+`ViewPlayerBinding` is the whole coupling between view and play — implement it on anything to drive a visualizer:
+
+| Member | Description |
+| --- | --- |
+| `on(event, listener)` | Subscribe to a player event; returns an unsubscribe function. |
+| `seek(seconds)` | Seek to an absolute position in seconds. |
+| `seconds` | Current playback position in seconds (read-only). |
+| `duration` | Total duration in seconds (read-only). |
+| `playing?` | Optional read-only live Boolean activity flag. When either flag exists, a visible binding samples `seconds` on display frames while either is `true`. |
+| `scratching?` | Optional read-only live Boolean for held scratch or release inertia. Omit both flags to retain event-only observation. |
+
+`@webmusic/audio/play`'s `AudioClipPlayer` satisfies this (and `AnalyserSource`, via its `analyser` getter), so it drops straight into both `bindPlayerToWaveform` and `renderLoudnessMeter`. This is **not** the kernel's transport contract: `@webmusic/kernel/player` owns the name `PlayerLike` for play/pause/stop/seek, and a bare kernel `PlayerLike` does not satisfy this binding — only its `TimedPlayerLike` tier does.
+
+## Peaks without a decode
+
+`peaksFromWaveformData` hydrates BBC [`audiowaveform`](https://github.com/bbc/audiowaveform) **v2 JSON** straight into the `AudioPeaks` pyramid the waveform renderer reads. It is re-exported from this capability root so a code-only consumer reaches it without an element, and it is the same conversion `<audio-view peaks-src>` performs:
+
+```ts
+import {peaksFromWaveformData} from '@webmusic/audio/view';
+import {renderWaveformVisualizer} from '@webmusic/audio/view/render';
+
+const json = await (await fetch('/song.json')).json();
+renderWaveformVisualizer(container, peaksFromWaveformData(json), {pixelsPerSecond: 100});
+```
+
+No `AudioContext`, no samples, no decode: this is the path that draws a three-hour file on a page that never loads its audio.
+
+## Fit a static overview
+
+The `/headless` entry publishes data and geometry for a compact, caller-owned overview:
+
+```ts
+import {
+  computeClipPeaks,
+  fitWaveformColumns,
+  peaksDuration,
+} from '@webmusic/audio/view/headless';
+import {paintWaveformOverview} from '@webmusic/audio/view/render';
+
+const peaks = computeClipPeaks(clip)!;
+const seconds = peaksDuration(peaks);
+const columns = fitWaveformColumns(peaks, 240); // one merged min/max column per CSS pixel
+
+paintWaveformOverview({context, width: 240, height: 48}, peaks, {color: '#4a9eff'});
+```
+
+`computeClipPeaks` is the View capability's lightweight clip adapter; callers already using
+`@webmusic/audio/analyze` may pass that package's `computePeaks` result instead. `peaksDuration`
+is the one finest-level duration rule used by view models, retained waveform rendering and
+custom overviews. `fitWaveformColumns` delegates level selection and channel merging to
+`WaveformViewModel`. `paintWaveformOverview` is draw-only: it neither creates nor sizes a canvas.
+
+Applications can use this painter in a caller-owned canvas or with a UI Kit
+`CanvasStage`. It does not create a transport or viewport binding.
+
+## The geometry objects
+
+`AudioTimeline`, the two view models, the peaks helpers and the live
+projection controller live on `@webmusic/audio/view/headless` and are
+documented under [Headless › View](/audio/headless/#view). This page
+documents the `/render` adapters that paint what they describe.
+
+## Viewport virtualization & canvas sizing
+
+Waveforms and spectrograms can span hours, so painting every column per frame doesn't scale. The renderers virtualize using a small set of **pure, DOM-free** windowing helpers (also exported for building your own renderer). Unlike Score's note virtualization (binary search over time-sorted notes), audio data is a uniform grid of columns indexed by pixel, so the visible range is plain arithmetic.
+
+```ts
+import {
+  visibleColumnRange,
+  visibleTimeRange,
+  pixelToSeconds,
+  secondsToPixel,
+  clampCanvasBackingSize,
+  DEFAULT_BUFFER_SCREENS,
+  MAX_CANVAS_DIMENSION,
+} from '@webmusic/audio/view';
+
+const cols = visibleColumnRange(scrollLeft, viewportWidth, 1, totalColumns); // { start, end }
+const span = visibleTimeRange(scrollLeft, viewportWidth, pixelsPerSecond, durationSeconds);
+const backing = clampCanvasBackingSize(cssWidth, cssHeight, devicePixelRatio);
+```
+
+| Helper | Description |
+| --- | --- |
+| `bufferedScrollRange(scrollLeft, viewportWidth, bufferScreens)` | The visible pixel stripe widened by `bufferScreens` viewports on each side (`{ lo, hi }`; `lo` may be negative). |
+| `visibleColumnRange(scrollLeft, viewportWidth, columnWidth, totalColumns, bufferScreens?)` | The half-open `[start, end)` column index range to paint, clamped to `[0, totalColumns]`. |
+| `visibleTimeRange(scrollLeft, viewportWidth, pixelsPerSecond, durationSeconds, bufferScreens?)` | The visible `{ startSeconds, endSeconds }` window, clamped to the clip duration. |
+| `pixelToSeconds(x, pixelsPerSecond)` / `secondsToPixel(seconds, pixelsPerSecond)` | Convert between a horizontal CSS-pixel offset and seconds at a given zoom. |
+| `clampCanvasBackingSize(cssWidth, cssHeight, dpr, maxDimension?)` | A `CanvasBackingSize` (`width`, `height`, `scaleX`, `scaleY`) capped per dimension so the canvas never silently blanks past the browser limit; the effective scale shrinks below `dpr` when the cap kicks in. |
+| `DEFAULT_BUFFER_SCREENS` | Default extra viewports kept rendered on each side (`1`). |
+| `MAX_CANVAS_DIMENSION` | The largest broadly safe canvas dimension in device pixels (`16384`). |
+
+The helpers return `IndexRange` and `CanvasBackingSize` shapes, both exported.
+
+## Colormaps
+
+The spectrogram colours magnitudes through a `Colormap` — a function mapping `t ∈ [0, 1]` to an `RGB` triple (each channel `0..255`). The bundled maps are pure and DOM-free.
+
+```ts
+import {viridis, magma, grayscale, colormapByName, type Colormap} from '@webmusic/audio/view';
+
+const a: Colormap = viridis;                 // perceptually-uniform, dark blue → green → yellow
+const b = colormapByName('magma');           // resolve by name (unknown → viridis)
+const custom: Colormap = (t) => [t * 255, 0, (1 - t) * 255];
+```
+
+| Export | Description |
+| --- | --- |
+| `viridis(t)` | Perceptually-uniform, colour-blind-friendly: dark blue → green → yellow. |
+| `magma(t)` | Perceptually-uniform: black → purple → orange → cream. |
+| `grayscale(t)` | Linear luminance ramp (black → white). |
+| `colormapByName(name)` | Resolve a `ColormapName` (`'viridis'`, `'magma'`, `'grayscale'`, `'gray'`), falling back to `viridis` for an unknown/missing name. |
+
+Pass any of these (or a custom function) as the spectrogram's `colorMap` option. `RGB`, `Colormap`, and `ColormapName` are exported as types.
+
+## API Reference — `@webmusic/audio/view`
+
+The capability root exports these values and types. Retained renderers are
+runtime values of `/view/render`; view models and projection helpers are runtime
+values of [`/view/headless`](/audio/headless/#view).
+
+| Export | Kind | Use it for |
+| --- | --- | --- |
+| `peaksFromWaveformData` | Interop | Hydrate BBC `audiowaveform` v2 JSON into an `AudioPeaks` pyramid without decoding. |
+| `viridis`, `magma`, `grayscale`, `colormapByName` | Colormap functions | Built-in color maps and name lookup. |
+| `bufferedScrollRange`, `visibleColumnRange`, `visibleTimeRange` | Windowing functions | Compute virtualized pixel, column and time ranges. |
+| `pixelToSeconds`, `secondsToPixel`, `clampCanvasBackingSize` | Geometry functions | Convert CSS pixels and time; cap a canvas backing size. |
+| `DEFAULT_BUFFER_SCREENS`, `MAX_CANVAS_DIMENSION` | Constants | Virtualization buffer and canvas dimension cap. |
+| `RGB`, `Colormap`, `ColormapName`, `IndexRange`, `CanvasBackingSize` | Types | Color and geometry contracts. |
+| `AudioViewportSnapshot`, `AudioViewportUpdate`, `AudioViewportSubscriber`, `AudioViewportHandle`, `RenderedAudioVisualizer`, `ViewportAudioVisualizer` | Types | Observable viewport and visualizer contracts. `AudioViewport` is only a structural shape, not an exported type. |
+| `TimelineRenderOptions`, `WaveformRenderOptions`, `SpectrogramRenderOptions`, `SpectrogramData`, `MeterRenderOptions`, `AnalyserSource` | Types | Renderer inputs and options. |
+| `ViewPlayerBinding`, `PlayerLike` | Types | Structural player input; `PlayerLike` is the deprecated alias. |
+| `AudioTimelineOptions`, `AudioTimelineSnapshot`, `AudioTimelineHit`, `AudioTimelineGeometryUpdate`, `AudioTimelineSubscriber` | Types | Headless timeline contracts. |
+| `WaveformViewModelOptions`, `WaveformColumn`, `WaveformChannelPeak`, `SpectrogramViewModelOptions`, `SpectrogramFrameView` | Types | Headless waveform and spectrogram model contracts. |
+| `LevelMeterFrame`, `LevelMeterOptions`, `SpectrumBarsOptions` | Types | Metering data and options. |
+| `AudioTimelineBinding`, `BindAudioTimelineOptions`, `PlayheadTarget` | Types | Headless timeline binding contracts. |
+
+### `@webmusic/audio/view/render`
+
+| Export | Kind | Use it for |
+| --- | --- | --- |
+| `renderWaveformVisualizer`, `renderSpectrogramVisualizer`, `renderLoudnessMeter` | Renderers | Retained Canvas waveform, spectrogram and live meter surfaces. |
+| `paintWaveformOverview`, `paintLiveProjection` | Paint adapters | Draw into caller-owned frames without creating DOM. |
+| `bindPlayerToWaveform`, `bindAudioTimelineViewport` | Bindings | Follow player position or a timeline viewport; release their subscriptions on teardown. |
+| `mountAudioTimeline`, `createAudioTimelinePresenterBinding` | UI adapters | Mount or bind a UI Kit audio timeline presenter. |
+| `audioTimelineTicks`, `formatAudioTimelinePosition` | Helpers | Timeline tick placement and position labels. |
+| `AudioCanvasFrame`, `WaveformOverviewOptions`, `LiveProjectionRenderOptions`, `BindWaveformOptions`, `WaveformBinding`, `AudioTimelineViewportBinding` | Types | Paint and binding contracts. |
+| `AudioTimelineRange`, `AudioTimelinePresenterBindingOptions`, `MountAudioTimelineOptions`, `AudioTimelinePresenterHandle` | Types | Timeline presenter adapter contracts. |
+
+The `/view/headless` values have one explanation owner in the
+[Headless View inventory](/audio/headless/#view), including `AudioTimeline`,
+`WaveformViewModel`, `SpectrogramViewModel`, live projection helpers and peaks
+readers. The root only re-exports their **types** as listed above.

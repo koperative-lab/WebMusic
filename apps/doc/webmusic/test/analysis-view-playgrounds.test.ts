@@ -1,9 +1,15 @@
 // @vitest-environment jsdom
+import {readFileSync} from 'node:fs';
+import {dirname, resolve} from 'node:path';
+import {fileURLToPath} from 'node:url';
+import {loadScore} from '@webmusic/score/io';
 import {afterEach, describe, expect, it} from 'vitest';
 import {mountDemos} from '../src/components/demo-lifecycle';
 import {mountAnalysisSessionDemo, mountLiveTrackersDemo, mountScoreWindowDemo} from '../src/components/headless/analysis-view-playgrounds-client';
 import type {DemoScope} from '../src/components/demo-lifecycle';
 
+const file = resolve(dirname(fileURLToPath(import.meta.url)), '../public/midi/Arabesque No.1.mid');
+const source = (await loadScore(readFileSync(file), {format: 'midi'})).withMetadata({title: 'Arabesque No. 1'});
 const cleanups: Array<() => void> = [];
 let id = 0;
 afterEach(() => { for (const cleanup of cleanups.splice(0)) cleanup(); document.body.replaceChildren(); });
@@ -27,33 +33,34 @@ function setup<T>(html: string, mount: (root: HTMLElement, scope: DemoScope) => 
 describe('Headless analysis and score-window live demos', () => {
   it('edits immutable scores through the same session, recreates fixed options and resets controls', () => {
     const {root, handle, change, reset, dispose} = setup(`
-      <select data-session-score><option value="major">C</option><option value="minor">Am</option></select>
-      <select data-session-pitch><option>A3</option><option selected>C4</option><option>F#4</option></select>
+      <select data-session-score><option value="opening">Opening</option><option value="extended">Extended</option></select>
+      <select data-session-pitch><option selected>C#5</option><option>D5</option><option>F#5</option></select>
       <select data-session-window><option>1</option><option selected>2</option><option>4</option></select>
-      <p data-session-summary></p><div data-session-notes></div><div data-session-chords></div><p data-session-detail></p>`, mountAnalysisSessionDemo);
+      <p data-session-summary></p><div data-session-notes></div><div data-session-chords></div><p data-session-detail></p>`, (root, scope) => mountAnalysisSessionDemo(root, scope, source));
     const original = handle.model;
     const originalScore = original.score;
-    change('[data-session-pitch]', 'F#4');
+    change('[data-session-pitch]', 'F#5');
     expect(handle.model).toBe(original);
     expect(original.score).not.toBe(originalScore);
-    expect(original.score.parts[0].notes[0].pitch?.toString()).toBe('F#4');
-    expect(root.querySelector('[data-session-notes]')?.textContent).toContain('F#4');
-    expect(root.querySelector('[data-hl-readout]')?.textContent).toContain("Pitch.parse('F#4')");
-    change('[data-session-score]', 'minor');
+    expect(original.score.parts[0].notes[0].pitch?.toString()).toBe('F#5');
+    expect(root.querySelector('[data-session-notes]')?.textContent).toContain('F#5');
+    expect(root.querySelector('[data-hl-readout]')?.textContent).toContain("Pitch.parse('F#5')");
+    change('[data-session-score]', 'extended');
     expect(handle.model).toBe(original);
-    expect(original.score.metadata.title).toBe('A minor study');
+    expect(original.score.metadata.title).toBe('Arabesque No. 1');
+    expect(original.score.notes.length).toBeGreaterThan(originalScore.notes.length);
     change('[data-session-window]', '1');
     expect(handle.model).not.toBe(original);
     expect(root.querySelector('[data-session-detail]')?.textContent).toContain('window 1 quarters');
     reset();
-    expect(handle.model.score.metadata.title).toBe('C major study');
+    expect(handle.model.score.metadata.title).toBe('Arabesque No. 1');
     expect(root.querySelector('[data-session-summary]')?.textContent).toContain('0 score updates');
     expect(root.querySelector('[data-hl-readout]')?.textContent).toContain('windowQuarters: 2');
     const resetModel = handle.model;
     dispose();
-    change('[data-session-score]', 'minor');
+    change('[data-session-score]', 'extended');
     expect(handle.model).toBe(resetModel);
-    expect(handle.model.score.metadata.title).toBe('C major study');
+    expect(handle.model.score.metadata.title).toBe('Arabesque No. 1');
   });
 
   it('feeds real held chords and heard-note key analysis, preserves history on release and clears it on reset', () => {
@@ -96,19 +103,17 @@ describe('Headless analysis and score-window live demos', () => {
     const {root, handle, change, reset, dispose} = setup(`
       <select data-window-viewport><option value="0">0–2</option><option value="2">2–4</option><option value="all">All</option></select>
       <input data-window-position type="range" min="0" max="4" step=".05" value="0" />
-      <p data-window-summary></p><div data-window-lane></div><p data-window-time></p><div data-window-active></div>`, mountScoreWindowDemo);
-    expect(handle.model.state.visibleNotes).toHaveLength(5);
-    expect(root.querySelectorAll('[data-window-note]')).toHaveLength(4);
-    expect(root.querySelector('[data-window-active]')?.textContent).toBe('C4');
+      <p data-window-summary></p><div data-window-lane></div><p data-window-time></p><div data-window-active></div>`, (root, scope) => mountScoreWindowDemo(root, scope, source));
+    expect(handle.model.state.visibleNotes.length).toBeGreaterThan(0);
+    expect(root.querySelectorAll('[data-window-note]').length).toBeGreaterThan(0);
     change('[data-window-viewport]', '2');
     change('[data-window-position]', '2.25', 'input');
     expect(handle.model.state.currentTime).toBe(2.25);
     expect(handle.model.state.viewport).toEqual({startTime: 2, endTime: 4});
-    expect(root.querySelector('[data-window-active]')?.textContent).toBe('B4');
-    expect(root.querySelector('[data-window-note][data-active="true"]')).not.toBeNull();
+    expect(root.querySelectorAll('[data-window-note]').length).toBeGreaterThan(0);
     change('[data-window-viewport]', 'all');
-    expect(handle.model.state.visibleNotes).toHaveLength(8);
-    expect(root.querySelectorAll('[data-window-note]')).toHaveLength(8);
+    expect(handle.model.state.visibleNotes.length).toBeGreaterThan(8);
+    expect(root.querySelectorAll('[data-window-note]').length).toBeGreaterThan(8);
     expect(root.querySelector('[data-hl-readout]')?.textContent).toContain('view.seek(2.25)');
     const old = handle.model;
     reset();

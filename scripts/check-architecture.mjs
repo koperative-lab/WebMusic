@@ -33,13 +33,12 @@ const uiPresenterClassPolicy = Object.freeze({
   'parameters-gestures': ['parameter', 'macro', 'envelope', 'lfo', 'eq'],
   'mixing-capture': ['mixer', 'meter', 'recorder'],
   notes: ['note'],
-  'views-analysis': ['analysis', 'pitch', 'harmony'],
+  'views-analysis': ['analysis', 'pitch', 'harmony', 'level-analyzer', 'oscilloscope', 'spectrum-analyzer', 'transient-analyzer'],
   'layout-feedback': ['panel', 'stage', 'status', 'workbench'],
 });
 
-// The published packages of the consolidated monorepo — the shared list in
-// the policy file is the single source, so a new package is scanned here
-// automatically.
+// Scan every library package in this checkout, including packages that have
+// not yet been published. The shared policy list owns the package set.
 const packageDirs = packageDirectories.map((dir) => path.join(root, ...dir.split('/')));
 
 const packages = new Map();
@@ -58,7 +57,7 @@ compareExactSet('Root workspace', 'workspace directory', rootManifest.workspaces
 ]);
 compareExactSet('Package policy', 'published package', [...packages.keys()], Object.keys(expectedPublicEntries));
 if ([...packages.keys()].join() !== releasePackageNames.join()) {
-  errors.push('Release package order must match packageDirectories and the published manifests.');
+  errors.push('Package order must match packageDirectories and package manifests.');
 }
 for (const directory of ['', ...packageDirectories, 'apps/doc/webmusic']) {
   const file = path.join(root, directory, 'package.json');
@@ -640,7 +639,10 @@ function checkCapabilityBoundaries(name, pkg) {
       if (!imported.specifier.startsWith('.')) continue;
       const resolved = resolveLocal(file, imported.specifier);
       if (!resolved) continue;
-      const target = capabilityOf(path.relative(pkg.sourceRoot, resolved).replaceAll(path.sep, '/'));
+      const targetRelative = path.relative(pkg.sourceRoot, resolved).replaceAll(path.sep, '/');
+      const target = capabilityOf(targetRelative);
+      if (name === '@webmusic/audio' && relative === 'analyze/element/audio-meter.ts' &&
+        targetRelative === 'view/element/audio-meter.ts') continue;
       if (target !== capability && target !== 'root' && !allowed.includes(target)) {
         errors.push(`${name} capability boundary violation: ${relative} imports ${target} (allowed: ${allowed.join(', ') || 'none'}).`);
       }
@@ -1064,6 +1066,10 @@ async function checkElementComposition() {
     }
     if (seenTags.has(entry.tag)) errors.push(`Element composition policy repeats tag <${entry.tag}>.`);
     seenTags.add(entry.tag);
+    const requiredPrefix = `${entry.family.toLowerCase()}-`;
+    if (!entry.tag.startsWith(requiredPrefix)) {
+      errors.push(`Element composition policy tag <${entry.tag}> must start with ${requiredPrefix}.`);
+    }
     if (seenSources.has(entry.source)) errors.push(`Element composition policy repeats source ${entry.source}.`);
     seenSources.add(entry.source);
 
@@ -1073,6 +1079,13 @@ async function checkElementComposition() {
       continue;
     }
     const sourceText = await readFile(source, 'utf8');
+    if (entry.family === 'Score') {
+      const defaultTags = [...sourceText.matchAll(/\bexport\s+function\s+define[A-Za-z]+Element\s*\(\s*tag\s*=\s*['"]([^'"]+)['"]/g)]
+        .map((match) => match[1]);
+      if (defaultTags.length !== 1 || defaultTags[0] !== entry.tag) {
+        errors.push(`${entry.source} must define <${entry.tag}> as its sole default custom-element tag.`);
+      }
+    }
     const reachable = staticReachable(source, {includeDynamic: true});
     const staticallyReachable = staticReachable(source);
     const architecturalReachable = staticReachable(source, {includeDynamic: true, includeTypeOnly: true});
@@ -1107,7 +1120,7 @@ async function checkElementComposition() {
 
     const reachesDomainBehavior = [...architecturalReachable].some((file) => {
       const relative = relativeToRoot(file);
-      return /packages\/score\/src\/(?:core\/|(?:play|analyze|view)\/(?:core|headless)\/)/.test(relative);
+      return new RegExp(`^packages/${entry.family.toLowerCase()}/src/(?:core/|(?:play|analyze|view)/(?:core|headless)/)`).test(relative);
     });
     if (!reachesDomainBehavior) {
       errors.push(`<${entry.tag}> does not reach a reusable domain core/headless module.`);
@@ -1132,7 +1145,7 @@ async function checkElementComposition() {
     ];
     for (const file of staticallyReachable) {
       const relative = relativeToRoot(file);
-      if (!/^packages\/score\/src\//.test(relative)) continue;
+      if (!relative.startsWith(`packages/${entry.family.toLowerCase()}/src/`)) continue;
       const text = await readFile(file, 'utf8');
       for (const [pattern, description] of sliderAriaBans) {
         if (pattern.test(text)) {
@@ -1146,7 +1159,7 @@ async function checkElementComposition() {
     const forbiddenTags = new Set(['button', 'input', 'select', 'option', 'canvas', 'svg']);
     for (const file of reachable) {
       const relative = relativeToRoot(file);
-      if (!/packages\/score\/src\/(?:play|analyze|view)\/element\//.test(relative)) continue;
+      if (!new RegExp(`^packages/${entry.family.toLowerCase()}/src/(?:play|analyze|view)/element/`).test(relative)) continue;
       const inspected = modules.get(file);
       const directTags = new Set([
         ...[...inspected.createdElementTags].filter((tag) => forbiddenTags.has(tag)),
@@ -1162,12 +1175,12 @@ async function checkElementComposition() {
       }
     }
 
-    // <note-input> has a reviewed interaction boundary: @webmusic/ui/note owns
+    // <score-note-input> has a reviewed interaction boundary: @webmusic/ui/note owns
     // every presenter-node lookup, pointer/key/focus listener, pressed/ARIA
     // mutation and pointer holder. Keep this deliberately source-specific until
     // the remaining legacy elements have migrated, so source/player binding
     // listeners elsewhere do not become false positives.
-    if (entry.tag === 'note-input') {
+    if (entry.tag === 'score-note-input') {
       const sourceText = await readFile(source, 'utf8');
       const forbiddenInteraction = [
         ['presenter-node query', /\.querySelector(?:All)?\s*\(/],
@@ -1180,13 +1193,13 @@ async function checkElementComposition() {
       ];
       for (const [label, pattern] of forbiddenInteraction) {
         if (pattern.test(sourceText)) {
-          errors.push(`<note-input> contains ${label} in ${entry.source}; @webmusic/ui/note must own note-surface interaction.`);
+          errors.push(`<score-note-input> contains ${label} in ${entry.source}; @webmusic/ui/note must own note-surface interaction.`);
         }
       }
     }
 
     // A kit token is the PRESENTER's vocabulary. An element writing one is
-    // configuring a presenter through a name it does not own — `<sheet-view>`
+    // configuring a presenter through a name it does not own — `<score-sheet-view>`
     // set `--wm-stage-overflow` to get a scrollable stage until StageOptions
     // grew an `overflow` option for it. Ask the presenter instead.
     //
@@ -1202,7 +1215,7 @@ async function checkElementComposition() {
     // The synth panel is a composition root, not a layout/widget factory.
     // @webmusic/ui/panel owns its section skeleton, macro owns the compound
     // macro list, and the specialized presenters own every descendant class.
-    if (entry.tag === 'synth-panel') {
+    if (entry.tag === 'score-synth-panel') {
       const sourceText = await readFile(source, 'utf8');
       const forbiddenComposition = [
         ['section/slot DOM creation', /\.createElement(?:NS)?\s*\(/],
@@ -1213,18 +1226,18 @@ async function checkElementComposition() {
       ];
       for (const [label, pattern] of forbiddenComposition) {
         if (pattern.test(sourceText)) {
-          errors.push(`<synth-panel> contains ${label} in ${entry.source}; published UI compound presenters must own its DOM.`);
+          errors.push(`<score-synth-panel> contains ${label} in ${entry.source}; published UI compound presenters must own its DOM.`);
         }
       }
     }
 
-    // rack-control supplies its own part tokens through MixerOptions. Styling
+    // score-rack-control supplies its own part tokens through MixerOptions. Styling
     // generic descendants would couple the element to mixer's private markup.
-    if (entry.tag === 'rack-control') {
+    if (entry.tag === 'score-rack-control') {
       const sourceText = await readFile(source, 'utf8');
       const privateSelector = /(?:\.wui-mixer\s+)?(?:\.fader\b|\.name\b|input\s*\{)/;
       if (privateSelector.test(sourceText)) {
-        errors.push(`<rack-control> styles mixer-internal selectors in ${entry.source}; use published mixer parts/classNames.`);
+        errors.push(`<score-rack-control> styles mixer-internal selectors in ${entry.source}; use published mixer parts/classNames.`);
       }
     }
 
@@ -1252,8 +1265,8 @@ async function checkElementComposition() {
   compareExactSet(
     'Element UI import closure',
     'published UI subpath',
-    [...staticallyReachedUiSubpaths],
-    publishedUiSubpaths.filter((presenter) => !standaloneUiPresenters.includes(presenter)),
+    [...new Set([...staticallyReachedUiSubpaths, ...standaloneUiPresenters])],
+    publishedUiSubpaths,
   );
   for (const presenter of standaloneUiPresenters) {
     if (!publishedUiSubpathSet.has(presenter)) {

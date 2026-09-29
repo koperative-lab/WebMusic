@@ -1,0 +1,255 @@
+---
+title: '@webmusic/audio/react'
+description: React hooks and components for Audio
+---
+
+`@webmusic/audio/react` is the React binding capability of the `@webmusic/audio` package. It is deliberately thin: hooks own the lifecycles of the underlying objects (loader, `AudioClipPlayer`, analysis session, `AudioRecorder`) and a single component wraps the `@webmusic/audio/view` renderer. The actual audio work lives in sibling capabilities.
+
+It expects your app to provide audio sources (a URL, or an `AudioClip` you already have). It does not bundle an app shell.
+
+## Install
+
+`npm install @webmusic/audio react` — use an available published version or the local workspace; [Install](/audio/#install) has the full setup.
+
+React is a peer dependency:
+
+```txt
+react >= 18
+```
+
+## Full example
+
+A component that loads a clip, plays it, and renders a waveform that follows the playhead and seeks on click:
+
+```tsx
+import {
+  useAudioClip,
+  useAudioClipPlayer,
+  WaveformView,
+} from '@webmusic/audio/react';
+
+export function ClipPlayer({ src }: { src: string }) {
+  const { clip, loading, error } = useAudioClip(src);
+  const { player, playing, seconds, duration, play, pause, seek } =
+    useAudioClipPlayer(clip, { volume: 0.9 });
+
+  if (loading) return <p>Loading…</p>;
+  if (error) return <p>Failed: {error.message}</p>;
+  if (!clip) return null;
+
+  return (
+    <div>
+      <button type="button" onClick={() => (playing ? pause() : play())}>
+        {playing ? 'Pause' : 'Play'}
+      </button>
+      <span>
+        {seconds.toFixed(1)} / {duration.toFixed(1)}s
+      </span>
+      <input
+        type="range"
+        min={0}
+        max={duration || 0}
+        step={0.01}
+        value={seconds}
+        onChange={(e) => seek(Number(e.target.value))}
+      />
+      <WaveformView
+        clip={clip}
+        player={player}
+        followPlayhead
+        seekOnClick
+        options={{ height: 96, pixelsPerSecond: 100 }}
+      />
+    </div>
+  );
+}
+```
+
+## useAudioClip
+
+Load (and decode) a clip from a URL. Pass `null` to clear. Cancels in-flight loads on `src` change or unmount.
+
+```tsx
+import { useAudioClip } from '@webmusic/audio/react';
+
+function Cover({ src }: { src: string }) {
+  const { clip, loading, error } = useAudioClip(src);
+  if (loading) return <span>Loading…</span>;
+  if (error) return <span>{error.message}</span>;
+  return <span>{clip ? `${clip.duration.toFixed(1)}s` : 'No clip'}</span>;
+}
+```
+
+| Argument | Type | Description |
+| --- | --- | --- |
+| `src` | `string \| null` | URL to load via `loadClipFromUrl`, or `null` for no clip. |
+
+| Returns | Type | Description |
+| --- | --- | --- |
+| `clip` | `AudioClip \| null` | The decoded clip, or `null` while loading / when `src` is `null`. |
+| `loading` | `boolean` | `true` while a load is in flight. |
+| `error` | `Error \| null` | The load error, if any. |
+
+## useAudioClipPlayer
+
+Own an `AudioClipPlayer` for a clip and surface reactive transport state. The player is created when the clip changes and disposed on unmount; `timeupdate` and `end` events drive the returned state.
+
+```tsx
+import type { AudioClip } from '@webmusic/audio';
+import { useAudioClipPlayer } from '@webmusic/audio/react';
+
+function Transport({ clip }: { clip: AudioClip | null }) {
+  const { playing, progress, play, pause, stop, setRate } =
+    useAudioClipPlayer(clip);
+
+  return (
+    <>
+      <button type="button" onClick={() => (playing ? pause() : play())}>
+        {playing ? '⏸' : '▶'}
+      </button>
+      <button type="button" onClick={stop}>
+        ⏹
+      </button>
+      <button type="button" onClick={() => setRate(1.5)}>
+        1.5×
+      </button>
+      <progress value={progress} max={1} />
+    </>
+  );
+}
+```
+
+| Argument | Type | Description |
+| --- | --- | --- |
+| `clip` | `AudioClip \| null` | The clip to play. A `null` clip yields a `null` player and no transport. |
+| `options?` | `AudioClipPlayerOptions` | Player options (e.g. `volume`, `pan`, `rate`, `loop`, `engine`). Streaming/media clips also require a host `mediaAdapterFactory`. Captured once per player. |
+
+| Returns | Type | Description |
+| --- | --- | --- |
+| `player` | `AudioClipPlayer \| null` | The live player instance (e.g. to pass to `<WaveformView>`). |
+| `playing` | `boolean` | Whether playback is currently running. |
+| `seconds` | `number` | Current playhead position in seconds. |
+| `duration` | `number` | Clip duration in seconds. |
+| `progress` | `number` | Playback progress in `0..1`. |
+| `play()` | `() => void` | Start (or resume) playback. |
+| `pause()` | `() => void` | Pause at the current position. |
+| `stop()` | `() => void` | Stop and reset to the start. |
+| `seek(seconds)` | `(seconds: number) => void` | Jump to a position in seconds. |
+| `setRate(rate)` | `(rate: number) => void` | Set the playback rate. |
+| `setVolume(volume)` | `(volume: number) => void` | Set the output volume. |
+
+## useAudioAnalysis
+
+Run an incremental `AudioAnalysisSession` for a clip and surface the result. Re-runs when the clip or the task list changes.
+
+```tsx
+import type { AudioClip } from '@webmusic/audio';
+import { useAudioAnalysis } from '@webmusic/audio/react';
+
+function Summary({ clip }: { clip: AudioClip | null }) {
+  const { result, analyzing } = useAudioAnalysis(clip, ['loudness', 'tempo', 'key']);
+  if (analyzing || !result) return <span>Analyzing…</span>;
+  return (
+    <span>
+      {result.tempo?.bpm.toFixed(0)} BPM · {result.key?.tonic} {result.key?.mode} ·{' '}
+      {result.loudness.integratedLufs.toFixed(1)} LUFS
+    </span>
+  );
+}
+```
+
+| Argument | Type | Description |
+| --- | --- | --- |
+| `clip` | `AudioClip \| null` | The clip to analyze. A `null` clip clears the result. |
+| `tasks?` | `readonly AudioAnalysisTask[]` | Which tasks to run (e.g. `'peaks'`, `'loudness'`, `'tempo'`, `'key'`, `'onsets'`, `'pitch'`, `'spectrogram'`, `'features'`). Defaults to the session default (`peaks` + `loudness`). |
+| `options?` | `Omit<AudioAnalysisSessionOptions, 'tasks'>` | Session options other than `tasks` (e.g. `fftSize`, `hopSize`). |
+
+| Returns | Type | Description |
+| --- | --- | --- |
+| `result` | `AudioAnalysisResult \| null` | The latest analysis result. `result.tempo?.bpm`, `result.key?.tonic`/`mode`, and `result.loudness.integratedLufs` are present per the tasks you ran. |
+| `analyzing` | `boolean` | `true` while a session is running. |
+| `error` | `Error \| null` | The analysis error, if any. |
+
+## useAudioRecorder
+
+Capture microphone input into an `AudioClip`. Surfaces a live input level and the recorded clip.
+
+```tsx
+import { useAudioRecorder } from '@webmusic/audio/react';
+
+function Recorder() {
+  const { recording, level, clip, start, stop } = useAudioRecorder();
+  return (
+    <div>
+      <button type="button" onClick={() => (recording ? stop() : start())}>
+        {recording ? 'Stop' : 'Record'}
+      </button>
+      <meter value={level} min={0} max={1} />
+      {clip && <span>Captured {clip.duration.toFixed(1)}s</span>}
+    </div>
+  );
+}
+```
+
+| Returns | Type | Description |
+| --- | --- | --- |
+| `recording` | `boolean` | Whether capture is in progress. |
+| `level` | `number` | Live input level in `0..1` (from the recorder's `level` event). |
+| `clip` | `AudioClip \| null` | The most recently recorded clip, set when `stop()` resolves. |
+| `start()` | `() => Promise<void>` | Request the microphone and begin capture. |
+| `stop()` | `() => Promise<AudioClip \| null>` | Stop capture and resolve to the recorded clip. |
+
+## WaveformView
+
+Render a clip's waveform and (optionally) bind it to a player so it follows the playhead and seeks on click. Peaks are computed with `computePeaks` and drawn via `renderWaveformVisualizer`; when a `player` is passed it is wired up with `bindPlayerToWaveform`.
+
+```tsx
+import { WaveformView } from '@webmusic/audio/react';
+
+<WaveformView
+  clip={clip}
+  player={player}
+  followPlayhead
+  seekOnClick
+  options={{ height: 80, pixelsPerSecond: 120 }}
+  className="wave"
+/>;
+```
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `clip` | `AudioClip` | — | The clip to render (required). |
+| `player?` | `AudioClipPlayer \| null` | — | Player to follow. When set, the waveform tracks playback. |
+| `options?` | `WaveformRenderOptions` | — | Renderer options forwarded to `renderWaveformVisualizer` (e.g. `height`, `pixelsPerSecond`, `waveColor`). |
+| `followPlayhead?` | `boolean` | `true` | Move the playhead overlay with the bound player. |
+| `seekOnClick?` | `boolean` | `true` | Seek the bound player when the waveform is clicked. |
+| `className?` | `string` | — | Class for the root `<div>`. |
+| `style?` | `CSSProperties` | — | Inline styles for the root `<div>`. |
+
+The component renders a single `<div>` host; the canvas waveform is created inside it on mount and disposed on unmount.
+
+## Re-exported types
+
+For convenience the package re-exports the types you need when annotating props and state, so you can pull them from `@webmusic/audio/react` directly:
+
+```ts
+import type {
+  AudioClip,
+  AudioClipPlayerOptions,
+  AudioAnalysisResult,
+  AudioAnalysisTask,
+  WaveformRenderOptions,
+} from '@webmusic/audio/react';
+```
+
+## API Reference
+
+| API | Kind | Use it for |
+| --- | --- | --- |
+| `useAudioClip(src)` | Hook | Load and decode a clip from a URL into `{ clip, loading, error }`. |
+| `useAudioClipPlayer(clip, options?)` | Hook | Own an `AudioClipPlayer` and expose reactive transport + controls. |
+| `useAudioAnalysis(clip, tasks?, options?)` | Hook | Run an incremental analysis session into `{ result, analyzing, error }`. |
+| `useAudioRecorder()` | Hook | Capture the microphone into an `AudioClip` with a live level. |
+| `WaveformView` | Component | Render a clip's waveform, optionally bound to a player. |
+| `UseAudioClipResult`, `UseAudioClipPlayerResult`, `UseAudioAnalysisResult`, `UseAudioRecorderResult`, `WaveformViewProps` | Types | Return and prop contracts for the hooks and component above. |
+| `AudioClip`, `AudioClipPlayerOptions`, `AudioAnalysisResult`, `AudioAnalysisTask`, `WaveformRenderOptions` | Re-exported types | Annotate model, player, analysis and rendering inputs without importing another entry. |

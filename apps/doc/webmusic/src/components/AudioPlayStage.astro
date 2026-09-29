@@ -1,0 +1,17 @@
+---
+// Match Score composition spacing while keeping layout chrome out of copied markup.
+---
+
+<div class="audio-play-stage" data-audio-play-stage data-pg-fragment>
+  <slot />
+</div>
+
+<style>
+  .audio-play-stage {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.5rem;
+    width: 100%;
+    min-width: 0;
+  }
+</style>

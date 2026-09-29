@@ -1,0 +1,88 @@
+---
+// Browser-renderer demo: bindPlayerToWaveform (@webmusic/audio/view/render). Renders a
+// waveform (computePeaks → renderWaveformVisualizer) into a .wui-surface, builds
+// an AudioClipPlayer over the same clip, then binds the two so the playhead
+// follows playback and clicking the surface seeks. Card chrome is the shared
+// docs UI kit (apps/doc/shared/ui.css); clip loads from the bundled Arabesque WAV.
+import LiveDemoCanvas from '../LiveDemoCanvas.astro';
+
+const SRC = `${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`;
+---
+
+<div class="wui-panel wui-panel--flow not-content">
+  <div class="wui-panel__title">
+    <span>@webmusic/audio/view/render</span>
+    <strong>bindPlayerToWaveform</strong>
+  </div>
+  <LiveDemoCanvas size="tall" label="Bound waveform player">
+    <div class="wui-row" data-hl-bindwave data-src={SRC}>
+      <div class="wui-row" style="width: 100%;">
+        <button class="wui-btn" data-play type="button">▶ Play</button>
+        <span class="wui-readout" data-time>0.0s</span>
+        <span class="wui-readout" data-status>loading…</span>
+      </div>
+      <div class="wui-surface" data-surface></div>
+    </div>
+  </LiveDemoCanvas>
+</div>
+
+<script>
+  import {mountDemos, type DemoScope} from '../demo-lifecycle';
+  import { loadClipFromUrl } from '@webmusic/audio/play';
+  import { AudioClipPlayer } from '@webmusic/audio/play/headless';
+  import { computePeaks } from '@webmusic/audio/analyze';
+  import { renderWaveformVisualizer, bindPlayerToWaveform } from '@webmusic/audio/view/render';
+
+  const setup = async (root: HTMLElement, scope: DemoScope) => {
+    const btn = root.querySelector<HTMLButtonElement>('[data-play]')!;
+    const time = root.querySelector<HTMLElement>('[data-time]')!;
+    const status = root.querySelector<HTMLElement>('[data-status]')!;
+    const surface = root.querySelector<HTMLElement>('[data-surface]')!;
+
+    const clip = await loadClipFromUrl(root.dataset.src!, {signal: scope.signal});
+    if (!scope.active) return;
+    const channels = clip.channels();
+    if (!channels) {
+      status.textContent = 'clip has no decoded samples';
+      return;
+    }
+
+    // Multi-resolution peaks pyramid, then a Canvas waveform into the surface.
+    const peaks = computePeaks(channels, clip.sampleRate, { baseSamplesPerPeak: 512 });
+    const viz = renderWaveformVisualizer(surface, peaks, {
+      height: 96,
+      durationSeconds: clip.duration,
+    });
+    scope.add(() => viz.dispose());
+
+    // Timer-based cursor (vs the default rAF) so timeupdate keeps firing even
+    // when the tab is backgrounded — the long clip otherwise stalls there.
+    const player = new AudioClipPlayer(clip, { cursorIntervalMs: 100 });
+    scope.add(() => player.dispose());
+    let playing = false;
+
+    // Sync the rendered waveform to the player: follow the playhead on every
+    // timeupdate, and seek when the surface is clicked (binding hit-tests it).
+    const unbind = bindPlayerToWaveform(player, viz, {
+      followPlayhead: true,
+      seekOnClick: true,
+      surface,
+    });
+    scope.add(() => unbind.unsubscribe());
+
+    player.on('timeupdate', ({ seconds }) => {
+      time.textContent = `${seconds.toFixed(1)}s`;
+    });
+    player.on('end', () => { playing = false; btn.textContent = '▶ Play'; });
+
+    status.textContent = 'click the wave to seek';
+
+    scope.listen(btn, 'click', () => {
+      if (playing) { player.pause(); btn.textContent = '▶ Play'; }
+      else { scope.run(player.play(), () => { playing = false; btn.textContent = '▶ Play'; }); btn.textContent = '⏸ Pause'; }
+      playing = !playing;
+    });
+  };
+
+  mountDemos('[data-hl-bindwave]', setup);
+</script>

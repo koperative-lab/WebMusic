@@ -1,0 +1,33 @@
+{
+  "route": "http://localhost:4321/audio/element/view/audio-view/",
+  "hostCSSWidth": 565.3125,
+  "plotCSSWidth": 544.125,
+  "pixelsPerSecond": 90,
+  "waveformScrub": {
+    "beforeSeconds": 3.199811,
+    "left90PixelsSeconds": 4.199811,
+    "right90PixelsSeconds": 3.199811
+  },
+  "pan": {
+    "viewportBeforeSeconds": 0,
+    "viewportAfterLeft90Seconds": 1,
+    "playerSliderBefore": 10,
+    "playerSliderAfter": 10,
+    "playerSliderScale": 1000
+  },
+  "none": {
+    "beforeSeconds": 6.399623,
+    "afterDragSeconds": 6.399623,
+    "afterClickSeconds": 6.997539
+  },
+  "spectrogramScrub": {
+    "beforeSeconds": 10.197351,
+    "afterLeft45PixelsSeconds": 10.697351
+  },
+  "playingTrial": {
+    "afterScrubPressed": "true",
+    "afterExplicitPausePressed": "false"
+  },
+  "capturedWarningsAndErrors": [],
+  "boundary": "DOM, screenshots and mouse/keyboard interaction; no latency/screen-reader/touch measurement"
+}

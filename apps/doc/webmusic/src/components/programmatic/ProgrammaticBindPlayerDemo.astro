@@ -22,51 +22,20 @@ import LiveDemoCanvas from '../LiveDemoCanvas.astro';
 
 <script>
   import {mountDemos} from '../demo-lifecycle';
-  import { Duration, MeasureId, PartId, Pitch, Rational, ScoreBuilder, VoiceId, noteMidi, noteOnsetSeconds } from '@webmusic/score';
+  import {noteMidi, noteOnsetSeconds} from '@webmusic/score';
   import { ScorePlayer, Sound } from '@webmusic/score/play/headless';
   import { bindPlayerToVisualizer, renderPianoRollVisualizer } from '@webmusic/score/view/render';
-
-  function sampleScore() {
-    const b = new ScoreBuilder();
-    const partId = PartId('piano');
-    const voice = VoiceId('v1');
-    const timeSignature = { numerator: 4, denominator: 4 };
-    b.setMetadata({ title: 'Etude' })
-      .addTempo({ atQuarters: Rational.ZERO, bpm: 100 })
-      .addMeter({ atQuarters: Rational.ZERO, measureNumber: 1, timeSignature });
-    b.addPart({ id: partId, name: 'Piano', staves: 1 });
-    const pitches = ['C4','E4','G4','C5','B4','G4','E4','C4','D4','F4','A4','D5','C5','A4','F4','D4'];
-    pitches.forEach((name, i) => {
-      const measureNumber = Math.floor(i / 8) + 1;
-      if (i % 8 === 0) {
-        b.addMeasure({
-          id: MeasureId(`m${measureNumber}`),
-          number: measureNumber,
-          onsetQuarters: new Rational((measureNumber - 1) * 4, 1),
-          durationQuarters: new Rational(4, 1),
-          timeSignature,
-        });
-      }
-      b.addNote(partId, {
-        id: b.newNoteId(),
-        pitch: Pitch.parse(name),
-        onsetQuarters: new Rational(i, 2),
-        duration: Duration.eighth(),
-        voice,
-      });
-    });
-    return b.build();
-  }
+  import {arabesqueExcerpt, loadArabesqueScore} from '../headless/arabesque-score';
 
   const SVG_NS = 'http://www.w3.org/2000/svg';
 
-  mountDemos('[data-programmatic-bindplayer]', (root, scope) => {
+  mountDemos('[data-programmatic-bindplayer]', async (root, scope) => {
+    const score = arabesqueExcerpt(await loadArabesqueScore());
+    if (!scope.active) return;
     const btn = root.querySelector<HTMLButtonElement>('[data-play]')!;
     const fill = root.querySelector<HTMLElement>('[data-fill]')!;
     const time = root.querySelector<HTMLElement>('[data-time]')!;
     const surface = root.querySelector<HTMLElement>('[data-surface]')!;
-
-    const score = sampleScore();
 
     // Render a piano-roll into the surface (same wiring score-view.ts uses for
     // its default 'piano-roll' type): an <svg> handed to renderPianoRollVisualizer.

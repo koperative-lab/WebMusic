@@ -1,0 +1,401 @@
+{
+  "name": "@webmusic/audio",
+  "version": "0.1.0",
+  "description": "Digital audio for the web: immutable clip model, mp3/wav/ogg/flac decoding via optional WASM peers, playback, MIR analysis, transcription, views, Web Components and React bindings.",
+  "type": "module",
+  "sideEffects": [
+    "./src/play/worker.ts",
+    "./src/analyze/worker.ts",
+    "./src/view/element/auto.ts",
+    "./src/play/element/auto.ts",
+    "./src/analyze/element/auto.ts",
+    "./dist/play/worker.js",
+    "./dist/play/worker.cjs",
+    "./dist/analyze/worker.js",
+    "./dist/analyze/worker.cjs",
+    "**/decoder-worker.js",
+    "**/analysis-worker.js",
+    "**/auto.js",
+    "**/auto.cjs",
+    "**/auto.global.js"
+  ],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./view": {
+      "import": {
+        "types": "./dist/view/index.d.ts",
+        "default": "./dist/view/index.js"
+      },
+      "require": {
+        "types": "./dist/view/index.d.cts",
+        "default": "./dist/view/index.cjs"
+      }
+    },
+    "./view/headless": {
+      "import": {
+        "types": "./dist/view/headless/index.d.ts",
+        "default": "./dist/view/headless/index.js"
+      },
+      "require": {
+        "types": "./dist/view/headless/index.d.cts",
+        "default": "./dist/view/headless/index.cjs"
+      }
+    },
+    "./view/render": {
+      "import": {
+        "types": "./dist/view/render/index.d.ts",
+        "default": "./dist/view/render/index.js"
+      },
+      "require": {
+        "types": "./dist/view/render/index.d.cts",
+        "default": "./dist/view/render/index.cjs"
+      }
+    },
+    "./view/element": {
+      "import": {
+        "types": "./dist/view/element/index.d.ts",
+        "default": "./dist/view/element/index.js"
+      },
+      "require": {
+        "types": "./dist/view/element/index.d.cts",
+        "default": "./dist/view/element/index.cjs"
+      }
+    },
+    "./view/auto": {
+      "import": {
+        "types": "./dist/view/element/auto.d.ts",
+        "default": "./dist/view/element/auto.js"
+      },
+      "require": {
+        "types": "./dist/view/element/auto.d.cts",
+        "default": "./dist/view/element/auto.cjs"
+      }
+    },
+    "./play": {
+      "import": {
+        "types": "./dist/play/index.d.ts",
+        "default": "./dist/play/index.js"
+      },
+      "require": {
+        "types": "./dist/play/index.d.cts",
+        "default": "./dist/play/index.cjs"
+      }
+    },
+    "./play/headless": {
+      "import": {
+        "types": "./dist/play/headless/index.d.ts",
+        "default": "./dist/play/headless/index.js"
+      },
+      "require": {
+        "types": "./dist/play/headless/index.d.cts",
+        "default": "./dist/play/headless/index.cjs"
+      }
+    },
+    "./play/element": {
+      "import": {
+        "types": "./dist/play/element/index.d.ts",
+        "default": "./dist/play/element/index.js"
+      },
+      "require": {
+        "types": "./dist/play/element/index.d.cts",
+        "default": "./dist/play/element/index.cjs"
+      }
+    },
+    "./play/auto": {
+      "import": {
+        "types": "./dist/play/element/auto.d.ts",
+        "default": "./dist/play/element/auto.js"
+      },
+      "require": {
+        "types": "./dist/play/element/auto.d.cts",
+        "default": "./dist/play/element/auto.cjs"
+      }
+    },
+    "./play/worker-client": {
+      "import": {
+        "types": "./dist/play/worker-client.d.ts",
+        "default": "./dist/play/worker-client.js"
+      },
+      "require": {
+        "types": "./dist/play/worker-client.d.cts",
+        "default": "./dist/play/worker-client.cjs"
+      }
+    },
+    "./play/worker-protocol": {
+      "import": {
+        "types": "./dist/play/worker-protocol.d.ts",
+        "default": "./dist/play/worker-protocol.js"
+      },
+      "require": {
+        "types": "./dist/play/worker-protocol.d.cts",
+        "default": "./dist/play/worker-protocol.cjs"
+      }
+    },
+    "./play/worker": {
+      "import": {
+        "types": "./dist/play/worker.d.ts",
+        "default": "./dist/play/worker.js"
+      },
+      "require": {
+        "types": "./dist/play/worker.d.cts",
+        "default": "./dist/play/worker.cjs"
+      }
+    },
+    "./analyze": {
+      "import": {
+        "types": "./dist/analyze/index.d.ts",
+        "default": "./dist/analyze/index.js"
+      },
+      "require": {
+        "types": "./dist/analyze/index.d.cts",
+        "default": "./dist/analyze/index.cjs"
+      }
+    },
+    "./analyze/headless": {
+      "import": {
+        "types": "./dist/analyze/headless/index.d.ts",
+        "default": "./dist/analyze/headless/index.js"
+      },
+      "require": {
+        "types": "./dist/analyze/headless/index.d.cts",
+        "default": "./dist/analyze/headless/index.cjs"
+      }
+    },
+    "./analyze/element": {
+      "import": {
+        "types": "./dist/analyze/element/index.d.ts",
+        "default": "./dist/analyze/element/index.js"
+      },
+      "require": {
+        "types": "./dist/analyze/element/index.d.cts",
+        "default": "./dist/analyze/element/index.cjs"
+      }
+    },
+    "./analyze/auto": {
+      "import": {
+        "types": "./dist/analyze/element/auto.d.ts",
+        "default": "./dist/analyze/element/auto.js"
+      },
+      "require": {
+        "types": "./dist/analyze/element/auto.d.cts",
+        "default": "./dist/analyze/element/auto.cjs"
+      }
+    },
+    "./analyze/transcribe": {
+      "import": {
+        "types": "./dist/analyze/transcribe.d.ts",
+        "default": "./dist/analyze/transcribe.js"
+      },
+      "require": {
+        "types": "./dist/analyze/transcribe.d.cts",
+        "default": "./dist/analyze/transcribe.cjs"
+      }
+    },
+    "./analyze/worker-client": {
+      "import": {
+        "types": "./dist/analyze/worker-client.d.ts",
+        "default": "./dist/analyze/worker-client.js"
+      },
+      "require": {
+        "types": "./dist/analyze/worker-client.d.cts",
+        "default": "./dist/analyze/worker-client.cjs"
+      }
+    },
+    "./analyze/worker-protocol": {
+      "import": {
+        "types": "./dist/analyze/worker-protocol.d.ts",
+        "default": "./dist/analyze/worker-protocol.js"
+      },
+      "require": {
+        "types": "./dist/analyze/worker-protocol.d.cts",
+        "default": "./dist/analyze/worker-protocol.cjs"
+      }
+    },
+    "./analyze/worker": {
+      "import": {
+        "types": "./dist/analyze/worker.d.ts",
+        "default": "./dist/analyze/worker.js"
+      },
+      "require": {
+        "types": "./dist/analyze/worker.d.cts",
+        "default": "./dist/analyze/worker.cjs"
+      }
+    },
+    "./react": {
+      "import": {
+        "types": "./dist/react/index.d.ts",
+        "default": "./dist/react/index.js"
+      },
+      "require": {
+        "types": "./dist/react/index.d.cts",
+        "default": "./dist/react/index.cjs"
+      }
+    },
+    "./view/global": {
+      "types": "./dist/view/element/global.d.ts",
+      "default": "./dist/view/auto.global.js"
+    },
+    "./play/global": {
+      "types": "./dist/play/element/global.d.ts",
+      "default": "./dist/play/auto.global.js"
+    },
+    "./analyze/global": {
+      "types": "./dist/analyze/element/global.d.ts",
+      "default": "./dist/analyze/auto.global.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "node ../../scripts/clean-dist.mjs dist && tsup && node scripts/postbuild-worker-facade.mjs",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "fft.js": "^4.0.4",
+    "meyda": "^5.6.3",
+    "music-tempo": "^1.0.3",
+    "pitchy": "^4.1.0"
+  },
+  "peerDependencies": {
+    "@magenta/music": ">=1",
+    "@soundtouchjs/audio-worklet": ">=2",
+    "@spotify/basic-pitch": ">=1",
+    "@tensorflow/tfjs": ">=4",
+    "@wasm-audio-decoders/flac": ">=0.2",
+    "@wasm-audio-decoders/ogg-vorbis": ">=0.1",
+    "@webmusic/kernel": "^0.1.0",
+    "@webmusic/ui": "^0.1.0",
+    "aubiojs": ">=0.2",
+    "essentia.js": ">=0.1",
+    "mediabunny": ">=1",
+    "mpg123-decoder": ">=1",
+    "music-metadata": ">=11",
+    "ogg-opus-decoder": ">=1",
+    "pitchfinder": ">=2",
+    "react": ">=18",
+    "realtime-bpm-analyzer": ">=5",
+    "signalsmith-stretch": ">=1",
+    "webfft": ">=1"
+  },
+  "peerDependenciesMeta": {
+    "@webmusic/ui": {
+      "optional": true
+    },
+    "@magenta/music": {
+      "optional": true
+    },
+    "@soundtouchjs/audio-worklet": {
+      "optional": true
+    },
+    "@spotify/basic-pitch": {
+      "optional": true
+    },
+    "@tensorflow/tfjs": {
+      "optional": true
+    },
+    "@wasm-audio-decoders/flac": {
+      "optional": true
+    },
+    "@wasm-audio-decoders/ogg-vorbis": {
+      "optional": true
+    },
+    "aubiojs": {
+      "optional": true
+    },
+    "essentia.js": {
+      "optional": true
+    },
+    "mediabunny": {
+      "optional": true
+    },
+    "mpg123-decoder": {
+      "optional": true
+    },
+    "music-metadata": {
+      "optional": true
+    },
+    "ogg-opus-decoder": {
+      "optional": true
+    },
+    "pitchfinder": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    },
+    "realtime-bpm-analyzer": {
+      "optional": true
+    },
+    "signalsmith-stretch": {
+      "optional": true
+    },
+    "webfft": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "jsdom": "^30.1.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "tsup": "^8.5.0",
+    "typescript": "^5.4.0",
+    "vitest": "^5.0.0"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/koperative-lab/WebMusic.git",
+    "directory": "packages/audio"
+  },
+  "homepage": "https://github.com/koperative-lab/WebMusic",
+  "bugs": {
+    "url": "https://github.com/koperative-lab/WebMusic/issues"
+  },
+  "keywords": [
+    "webmusic",
+    "music",
+    "audio",
+    "web-audio",
+    "audio-decoding",
+    "mp3",
+    "wav",
+    "ogg",
+    "flac",
+    "playback",
+    "waveform",
+    "spectrogram",
+    "mir",
+    "music-analysis",
+    "transcription",
+    "web-components",
+    "react"
+  ],
+  "author": "Koperative",
+  "engines": {
+    "node": "^22.22.3 || ^24.16.0 || >=26.3.0"
+  }
+}

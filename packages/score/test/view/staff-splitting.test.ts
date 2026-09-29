@@ -4,12 +4,12 @@ import {Duration, Pitch, Rational, ScoreBuilder, VoiceId} from '../../src/core';
 import type {StaffRenderOptions} from '../../src/view/api';
 import {ScoreViewElement} from '../../src/view/element/score-view';
 import {renderScoreVisualizer, renderStaffVisualizer} from '../../src/view/render';
-import {SimpleScorePlayerElement} from '../../src/play/element/score-player';
+import {ScorePlayerElement} from '../../src/play/element/score-player';
 
 const io = vi.hoisted(() => ({load: vi.fn()}));
 vi.mock('../../src/io/load', () => ({loadScoreFromUrl: io.load}));
 customElements.define('split-score-view', ScoreViewElement);
-customElements.define('split-score-player', SimpleScorePlayerElement);
+customElements.define('split-score-player', ScorePlayerElement);
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 function music() {
@@ -99,7 +99,7 @@ describe('score staff splitting configuration', () => {
   });
 
   it('preserves the borrowed native score, paused nominal position and highlights while switching layouts', async () => {
-    const source = document.createElement('split-score-player') as SimpleScorePlayerElement;
+    const source = document.createElement('split-score-player') as ScorePlayerElement;
     source.id = 'split-player';
     source.score = music();
     document.body.append(source);

@@ -8,7 +8,7 @@ import {
   type SynthPanelLfoEventDetail,
   type SynthPanelLfoErrorDetail,
   type SynthPanelLfoState,
-} from '../../src/play/element/synth-panel';
+} from '../../src/play/element/score-synth-panel';
 
 let nextTag = 0;
 
@@ -118,7 +118,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('<synth-panel sections="lfo"> direct Headless + UI composition', () => {
+describe('<score-synth-panel sections="lfo"> direct Headless + UI composition', () => {
   it('mounts the canonical presenter behind the legacy LFO section and CSS hooks', () => {
     const panel = document.createElement(
       synthTag,

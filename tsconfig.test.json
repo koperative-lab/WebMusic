@@ -15,16 +15,22 @@
     ],
     "types": [
       "node",
-      "vitest/globals"
+      "vitest/globals",
+      "vite/client"
     ]
   },
   "include": [
     "platform/kernel/test/**/*.ts",
     "packages/ui/test/**/*.ts",
     "packages/ui/test/**/*.tsx",
+    "packages/audio/test/**/*.ts",
+    "packages/audio/test/**/*.tsx",
     "packages/score/test/**/*.ts",
     "packages/score/test/**/*.tsx",
-    "apps/doc/webmusic/test/**/*.ts"
+    "bridges/score-audio/test/**/*.ts",
+    "bridges/score-audio/test/**/*.tsx",
+    "apps/doc/webmusic/test/**/*.ts",
+    "packages/audio/src/analyze/shims.d.ts"
   ],
   "exclude": [
     "**/dist/**",

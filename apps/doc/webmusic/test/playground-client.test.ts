@@ -240,12 +240,12 @@ describe('element playground client', () => {
   it('flattens a native composition fragment and observes newly mounted sibling components', async () => {
     const panel = renderPanel(`
       <div data-pg-fragment>
-        <note-input layout="piano"></note-input>
+        <score-note-input layout="piano"></score-note-input>
         <span>documentation chrome</span>
         <score-recorder bpm="120"></score-recorder>
       </div>
     `);
-    panel.dataset.target = 'note-input';
+    panel.dataset.target = 'score-note-input';
     panel.dataset.markup = '[data-pg-fragment]';
 
     const writeText = vi.fn<(text: string) => Promise<void>>().mockResolvedValue();
@@ -257,20 +257,20 @@ describe('element playground client', () => {
 
     const markup = panel.querySelector<HTMLElement>('[data-pg-markup]')!;
     expect(markup.textContent).toBe(
-      '<note-input layout="piano"></note-input>\n' +
+      '<score-note-input layout="piano"></score-note-input>\n' +
       '<score-recorder bpm="120"></score-recorder>',
     );
     expect(markup.textContent).not.toContain('<div');
     expect(markup.textContent).not.toContain('documentation chrome');
 
-    const synth = document.createElement('synth-panel');
+    const synth = document.createElement('score-synth-panel');
     synth.setAttribute('sections', 'sound,effects');
     panel.querySelector<HTMLElement>('[data-pg-fragment]')!.append(synth);
 
     const expected =
-      '<note-input layout="piano"></note-input>\n' +
+      '<score-note-input layout="piano"></score-note-input>\n' +
       '<score-recorder bpm="120"></score-recorder>\n' +
-      '<synth-panel sections="sound,effects"></synth-panel>';
+      '<score-synth-panel sections="sound,effects"></score-synth-panel>';
     await vi.waitFor(() => expect(markup.textContent).toBe(expected));
 
     panel.querySelector<HTMLButtonElement>('[data-pg-copy]')!.click();
@@ -414,12 +414,12 @@ describe('type-specific Element playground parameters', () => {
     vi.useFakeTimers();
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, 'clipboard', {configurable: true, value: {writeText}});
-    const f = fixture('pitch-view'); mountPlaygrounds();
+    const f = fixture('score-pitch-view'); mountPlaygrounds();
     f.change('type', 'fretboard'); f.change('frets', '9');
     f.playerSrc.value = 'other.mid'; f.playerSrc.dispatchEvent(new Event('change', {bubbles: true}));
     f.change('type', 'staff'); f.copy.click(); await Promise.resolve();
     expect(writeText).toHaveBeenCalledWith(expect.stringContaining('<score-player id="owner" src="other.mid">'));
-    expect(writeText).toHaveBeenCalledWith(expect.stringContaining('<pitch-view player="#owner" type="staff" frets="9">'));
+    expect(writeText.mock.calls[0]?.[0]).toMatch(/<score-pitch-view\s+player="#owner"\s+type="staff"\s+frets="9"\s*>/);
     expect(f.row('frets').hidden).toBe(true);
     f.reset.click();
     expect(f.player.getAttribute('src')).toBe('demo.mid');
@@ -436,7 +436,7 @@ describe('type-specific Element playground parameters', () => {
     vi.useFakeTimers();
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, 'clipboard', {configurable: true, value: {writeText}});
-    const f = fixture('pitch-view'); mountPlaygrounds();
+    const f = fixture('score-pitch-view'); mountPlaygrounds();
     expect(f.row('fit-to-width').hidden).toBe(false);
     f.change('fit-to-width', 'on');
     expect(f.target.getAttribute('fit-to-width')).toBe('');
@@ -475,9 +475,9 @@ describe('type-specific Element playground parameters', () => {
 
   it('resolves conditional companion rows against their own scoped element', () => {
     const f = fixture('score-view');
-    const companion = document.createElement('pitch-view'); companion.setAttribute('type', 'fretboard');
-    f.composition.append(companion); f.addRows('pitch-view', 'pitch-view'); mountPlaygrounds();
-    const scopeRow = (name: string) => f.panel.querySelector<HTMLLabelElement>(`[data-pg-scope="pitch-view"]:has([data-pg-attr="${name}"])`)!;
+    const companion = document.createElement('score-pitch-view'); companion.setAttribute('type', 'fretboard');
+    f.composition.append(companion); f.addRows('score-pitch-view', 'score-pitch-view'); mountPlaygrounds();
+    const scopeRow = (name: string) => f.panel.querySelector<HTMLLabelElement>(`[data-pg-scope="score-pitch-view"]:has([data-pg-attr="${name}"])`)!;
     expect(scopeRow('frets').hidden).toBe(false);
     expect(scopeRow('low').hidden).toBe(true);
     f.change('type', 'map');
@@ -488,8 +488,8 @@ describe('type-specific Element playground parameters', () => {
 
 
 describe('Play demo parameter composition', () => {
-  it('updates note-input range/map controls when the live layout changes and resets', async () => {
-    const f = fixture('note-input');
+  it('updates score-note-input range/map controls when the live layout changes and resets', async () => {
+    const f = fixture('score-note-input');
     mountPlaygrounds();
     expect(f.row('map').hidden).toBe(true);
     expect(f.row('end').hidden).toBe(false);
@@ -507,13 +507,13 @@ describe('Play demo parameter composition', () => {
   });
 
   it('keeps a renamed Rack declaration addressable through its stable demo scope', () => {
-    const f = fixture('rack-control');
-    const part = document.createElement('rack-part');
+    const f = fixture('score-rack-control');
+    const part = document.createElement('score-rack-part');
     part.id = 'lead';
     part.dataset.rcPart = 'lead';
     part.setAttribute('src', 'lead.mid');
     f.target.append(part);
-    f.addRows('rack-part', '[data-rc-part="lead"]');
+    f.addRows('score-rack-part', '[data-rc-part="lead"]');
     mountPlaygrounds();
     f.change('id', 'melody');
     f.change('sound', 'triangle');

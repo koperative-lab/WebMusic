@@ -1,0 +1,179 @@
+---
+title: '<audio-player>'
+description: 'Central play/pause, seek and time controls for a selected audio clip, playlist or mix.'
+sidebar:
+  order: 1
+---
+
+import AudioPlayerDemo from '../../../../../components/AudioPlayerDemo.astro';
+import AudioCustomStyleDemo from '../../../../../components/AudioCustomStyleDemo.astro';
+
+`<audio-player>` is the central Audio transport. It owns a stable
+[`AudioPlayer`](/audio/headless/play/audio-player/) and controls one selected clip,
+playlist or mix. Connect playlist, mixer and recorder components using
+`player="#session"` or a `.player` object reference. The player supplies the shared
+play/pause, seek and time controls; companions supply their own tasks.
+
+A `src` URL or `.clip` selects one clip. Linked playlist/mixer components select
+their backend, preserving its state. A linked recorder auditions its take through
+this player. Views and meters follow the same owner.
+
+<AudioPlayerDemo />
+
+## Import
+
+```html
+<script type="module">
+  import { defineAudioPlayerElement } from '@webmusic/audio/play/element';
+  defineAudioPlayerElement();
+</script>
+
+<audio-player src="/wav/Arabesque%20No.1.wav" controls></audio-player>
+<audio-player src="/wav/Arabesque%20No.1.wav" format="wav"></audio-player>
+<audio-player src="/wav/Arabesque%20No.1.wav" loop></audio-player>           <!-- loop the whole clip -->
+<audio-player src="/wav/Arabesque%20No.1.wav" loop="2.5,8"></audio-player>   <!-- A–B region (seconds) -->
+<audio-player src="/mp3/Arabesque%20No.1.mp3" engine="media"></audio-player> <!-- stream instead of decode -->
+```
+
+## Linked composition
+
+```html
+<audio-player id="session"></audio-player>
+<audio-playlist player="#session" src="/wav/Arabesque%20No.1.wav, /mp3/Arabesque%20No.1.mp3"></audio-playlist>
+<audio-meter player="#session"></audio-meter>
+```
+
+Register Play tags from `@webmusic/audio/play/element` and the meter from
+`@webmusic/audio/analyze/element`. The former `view/element` meter import still
+works for compatibility. Use a mixer instead of the playlist for simultaneous
+stems. One player selects one backend: assigning a clip replaces the queue/mix
+connection. Separate sessions use separate player IDs.
+
+Use `AudioPlayerElement` and `defineAudioPlayerElement()` from the Play Element
+entry. Its `.player` property accepts the central `AudioPlayer`.
+[`AudioClipPlayer`](/audio/headless/play/audio-clip-player/) remains the low-level
+Headless engine for one clip.
+
+## Re-skinning
+
+Every visual knob is a CSS custom property, so the whole transport re-skins from
+the page's own stylesheet — no provider, no theme runtime, and no rebuild of the
+audio graph. The `--wap-*` names are listed under **Styling** below; setting the
+shared `--wm-*` tokens instead re-skins this element along with the rest of the
+capability. This one is restyled entirely from page CSS:
+
+<AudioCustomStyleDemo />
+
+<details class="component-section">
+<summary>API</summary>
+
+
+```ts
+import { loadClipFromUrl } from '@webmusic/audio/play';
+import { gain } from '@webmusic/audio/play/headless';
+import type { AudioPlayerElement } from '@webmusic/audio/play/element';
+
+const el = document.querySelector<AudioPlayerElement>('audio-player')!;
+el.clip = await loadClipFromUrl('/wav/Arabesque%20No.1.wav'); // drive a loaded AudioClip (skips src)
+el.effect = gain({ value: 0.8 });            // insert an effect into the graph
+el.setAttribute('volume', '0.8');            // master volume (live attribute)
+el.setAttribute('rate', '1.25');             // playback speed (live attribute)
+await el.load(arrayBuffer);                  // load a non-URL buffer / blob
+await el.player?.play();                     // stable AudioPlayer facade
+```
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `src` | attribute | URL of an audio file (format inferred from the extension). Optional if you assign `.clip` / `.player`. |
+| `format` | attribute | Force the decode format (e.g. `wav` / `mp3`) when the extension is missing or wrong. |
+| `controls` | attribute | Shown by default; `controls="false"` (also `0`/`no`/`off`) hides the transport, leaving a headless element. Toggling it never remounts the transport, so the playhead survives. |
+| `loop` | attribute | `loop` (whole clip) or `loop="a,b"` (an A–B region in seconds). Applied **live** — changing it keeps the playhead instead of rebuilding the player. |
+| `engine` | attribute | `auto` (default) / `buffer` (decoded) / `media` (streamed `<audio>`). |
+| `preserves-pitch` | attribute | Boolean — keep pitch constant when `rate` ≠ 1. Live on the media engine; a documented no-op on the buffer engine, whose `playbackRate` transposes by construction (this package ships no time-stretcher). |
+| `volume` | attribute | Master volume (linear, `0`–`4`, default `1`); applies live. |
+| `rate` | attribute | Playback rate (`0.25`–`4`, default `1`); applies live. |
+| `pan` | attribute | Stereo position, `-1`–`1`; applies live. |
+| `preload` | attribute | Warm the context, graph and decoded buffer on mount so the first play does not hitch. `preload="none"` opts out. |
+| `.clip` | property | Select an `AudioClip` without `src`; preserves the central player identity, replaces its owned clip engine and starts at zero. Reads the selected clip, including the queue's current clip; a mix has no single clip. |
+| `.audioContext` | property | Supply the context used for decoding and owned playback; otherwise one is created lazily. A supplied context is never closed by the element. |
+| `.player` | property | Inject/read the central `AudioPlayer`; an injected instance stays caller-owned. The mounted element creates an empty player when needed, so companions can attach before data is loaded. |
+| `.setClip(clip)` / `.setTransport(transport)` | method | Select a clip or borrowed queue/mix backend through the Element. Nonempty replacement pauses the old backend; detaching a borrowed backend does not dispose it. |
+| `.transport` | readonly property | Currently borrowed AudioPlayerTransport, if any. |
+| `.effect` | property | An `Effect` inserted into the graph; reassigning rebuilds the player. |
+| `.load(input)` | method | Load a non-URL `ArrayBuffer` / `Blob` imperatively. |
+| `.play(when?)` | method | Start playback. `when` is an absolute `AudioContext.currentTime`, sample-accurate on the buffer engine — the scheduling primitive a sync bridge needs. |
+| `.pause()` / `.stop()` | method | Transport. |
+| `.seek(seconds)` | method | Seek in content seconds (queue: current-entry seconds; mix: group axis). |
+| `.seconds` / `.currentTime` / `.duration` / `.playing` | readonly property | Read the active backend; empty input reports zero and false. |
+| `.seekFraction(f)` / `.scrub(deltaSeconds)` | method | Seek by fraction, or nudge relative to the playhead; this `scrub` helper does not produce scratch audio. |
+| `.beginScratch()` | method | Forward the current player's optional `AudioScratchSession`; `undefined` without a nonempty decoded clip. See [scratch sessions](/audio/headless/play/audio-clip-player/#scratch-sessions) for movement, restoration and cancellation. |
+| `.scratching` | readonly property | Whether the active player has an exclusive scratch session, including release inertia. |
+| `.preload()` | method | Warm the context, graph and decoded buffer without starting sound. |
+| `.clock` | property (get) | The engine's read-only `TransportClockReader`, for anchoring a bridge or view against the clip's position axis. `undefined` before the engine exists and on the media engine, which has no clock. |
+| `.analyser` | property (get) | The player's `AnalyserNode`, e.g. to feed a live [Analyze tool](/audio/element/#analyze) through its `.analyser` property. |
+| `webaudio:seek` | event | `detail = { seconds, region?, progress }` when the user drags the transport. Same shape [`<audio-view>`](/audio/element/view/audio-view/) established; `progress` is an additive extension. Programmatic `seek()` stays silent, so a bound view cannot echo its own event back. |
+| `webaudio:timeupdate` | event | `detail = { seconds, duration, progress }`, on the cursor cadence (~50 ms). |
+| `webaudio:sourcechange` | event | `AudioPlayerElementSourceDetail = { clip, revision }` after resolved data or player identity changes, including clearing. Revision increases per Element. Read `.clip` for initial attachment; this event does not require building the audio graph. |
+| `webaudio:playerchange` | event | `{player}` after central player identity changes; companions rebind to the new owner. |
+| `webaudio:statechange` | event | `{playing}` from the selected backend. |
+| `webaudio:loaded` | event | `detail = { duration }` once the selected backend is prepared. Source replacement is a separate `webaudio:sourcechange` notification. |
+| `webaudio:end` | event | `detail` is the finished `AudioClip`, or undefined for a group with no single clip. |
+| `webaudio:regionenter` / `webaudio:regionleave` | event | `detail` is the `Region` the playhead crossed. |
+| `webaudio:beat` | event | `detail = { index, seconds }` on each beat-grid crossing (when the clip carries a beat grid). |
+| `webaudio:error` | event | `detail` is the `Error` from a failed load, playback engine or presenter. |
+
+Compressed sources use native `decodeAudioData` when the supplied or lazily
+created context supports their format; optional decoders provide other paths.
+Use `engine="media"` to stream a browser-supported source without decoding it
+up front. A failed load preserves the current source. An explicit `.clip` or
+`.player` assignment supersedes an in-flight load.
+
+Source notifications are synchronous and committed before listeners run. A
+listener may select a newer source; consumers should reread current state when
+handling a notification. Bound `<audio-view>` elements follow source changes
+without creating another player; explicit View data remains an override.
+
+Clip loop, pan and pitch-preservation controls are unavailable on borrowed group
+backends unless their explicit contract supports them; queue list-loop policy
+belongs to the playlist. Selecting a new nonempty source pauses the previous
+backend before switching, so its audio cannot continue invisibly.
+
+A live attribute update that the player rejects emits `webaudio:error`; a rejected
+loop range preserves the previously accepted range. Disconnecting an owned player
+announces its release through `webaudio:sourcechange`, retaining clip data while
+allowing connected companion views to drop the old graph and command binding.
+
+The play button toggles `play()` / `pause()`; clicking the bar seeks via `seekFraction`.
+Those transport actions invalidate an active scratch session, so its later end
+cannot restore older playback intent. `<audio-view drag-mode="scrub">` borrows
+`beginScratch()` automatically; normal release coasts in position and sound before
+restoring the prior state. Its session remains active until that completion;
+cancellation stops the coast immediately and ends paused. The player owns the
+scratch route, clock and resources. For everything else (stop, `scrub`, `setPan`, events), reach the [`AudioPlayer`](/audio/headless/play/audio-player/) through `.player`.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+The host fills its container width by default, can shrink inside flex/grid
+layouts, and respects `hidden`. Set host width in your application for a narrower
+control; spacing between components belongs to their composition. The default
+transport gap is `0.75rem`, matching Score; override `--wm-transport-gap` or the
+shared `--wm-control-gap` token to change it.
+
+The default surface uses the same neutral UI tokens as Score. These optional legacy aliases
+demonstrate an explicit dark customization; they do not define the default palette.
+
+```css
+audio-player {
+  --wap-bg: #15171c;      /* transport background */
+  --wap-fg: #f2f4f8;      /* text + button glyphs */
+  --wap-accent: #4ea1ff;  /* played fill */
+  --wap-track: #2a2e37;   /* seek track */
+  --wap-radius: 8px;
+  --wap-height: 44px;
+}
+```
+
+</details>

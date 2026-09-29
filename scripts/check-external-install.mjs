@@ -91,11 +91,6 @@ try {
     consumer,
   );
 
-  for (const name of ['@webmusic/audio', '@webmusic/bridge']) {
-    if (existsSync(path.join(consumer, 'node_modules', ...name.split('/')))) {
-      fail(`first-release installation unexpectedly includes deferred package ${name}.`);
-    }
-  }
 
   // Enumerate from the *installed* manifests, so the surface under test is the
   // one that shipped rather than the one in the source tree.

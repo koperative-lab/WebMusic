@@ -766,9 +766,14 @@ export function projectKeyFlow(
  * you that you are about to hear bar 1 again.
  */
 export function projectMotifFlow(result: AnalysisResult, score: Score): FlowLaneView {
+  return projectMotifOccurrences(result.motifs, score);
+}
+
+/** Project only motif results, without computing unrelated analysis families. */
+export function projectMotifOccurrences(motifs: readonly Motif[], score: Score): FlowLaneView {
   const clock = secondsClock(score);
   const span = spanOf(score, clock);
-  const ranked = [...result.motifs].sort(
+  const ranked = [...motifs].sort(
     (left, right) => right.occurrences.length - left.occurrences.length,
   );
   const shown = ranked.slice(0, MAX_MOTIF_TRACKS);
@@ -777,7 +782,6 @@ export function projectMotifFlow(result: AnalysisResult, score: Score): FlowLane
   const tracks: FlowTrackView[] = shown.map((motif, index) => ({
     id: motif.id,
     label: `M${index + 1}`,
-    sublabel: `×${motif.occurrences.length}`,
   }));
   if (folded.length > 0) tracks.push({id: 'more', label: `+${folded.length} more`, muted: true});
 

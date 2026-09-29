@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import {afterEach, describe, expect, it} from 'vitest';
 import {Duration, Rational, ScoreBuilder, VoiceId, midiToPitch} from '../../src/core';
-import {PitchViewElement} from '../../src/view/element/pitch-view';
+import {PitchViewElement} from '../../src/view/element/score-pitch-view';
 import {ScoreViewElement} from '../../src/view/element/score-view';
 
 customElements.define('aligned-score-view', class extends ScoreViewElement {});

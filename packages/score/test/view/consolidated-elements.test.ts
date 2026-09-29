@@ -9,8 +9,10 @@ describe('consolidated View families', () => {
     elements.defineAllViewElements();
     elements.defineAllViewElements();
     expect(customElements.get('score-view')).toBe(elements.ScoreViewElement);
-    expect(customElements.get('pitch-view')).toBe(elements.PitchViewElement);
-    expect(customElements.get('sheet-view')).toBe(elements.SheetViewElement);
+    expect(customElements.get('score-pitch-view')).toBe(elements.PitchViewElement);
+    expect(customElements.get('score-sheet-view')).toBe(elements.SheetViewElement);
+    expect(customElements.get('pitch-view')).toBeUndefined();
+    expect(customElements.get('sheet-view')).toBeUndefined();
     for (const tag of ['keyboard-view', 'staff-view', 'fretboard-view', 'score-map', 'score-thumbnail']) {
       expect(customElements.get(tag)).toBeUndefined();
     }

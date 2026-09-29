@@ -1,0 +1,108 @@
+---
+title: '<audio-mixer>'
+description: 'A mixer companion for audio-player, with master/member volume, mute and solo.'
+sidebar:
+  order: 3
+---
+
+import AudioMixerDemo from '../../../../../components/AudioMixerDemo.astro';
+
+`<audio-mixer>` supplies a mixing desk to a linked
+[`audio-player`](/audio/element/play/audio-player/). The player handles transport;
+the mixer provides master/member volume, mute and solo. Its Headless `AudioMixer`
+coordinates simultaneous sources using their supported scheduling capabilities.
+Each member retains its own clock; linking does not create a new shared clock.
+
+Assign `.members` to let the component own the backend, or `.mixer` to borrow an
+existing backend. A borrowed mixer is never disposed by the Element.
+
+<AudioMixerDemo />
+
+## Import
+
+```html
+<script type="module">
+  import { defineAudioMixerElement, defineAudioPlayerElement } from '@webmusic/audio/play/element';
+  defineAudioPlayerElement();
+  defineAudioMixerElement();
+</script>
+<audio-player id="session"></audio-player>
+<audio-mixer player="#session"></audio-mixer>
+```
+
+<details class="component-section">
+<summary>API</summary>
+
+
+```ts
+import { loadClipFromUrl } from '@webmusic/audio/play';
+import { createAudioMixer } from '@webmusic/audio/play/headless';
+import type { AudioMixerElement } from '@webmusic/audio/play/element';
+
+const clip = await loadClipFromUrl('/wav/Arabesque%20No.1.wav');
+
+// Drive a shared mixer (never disposed by the element):
+const mixer = createAudioMixer();
+mixer.add({ id: 'layer-a', clip });
+mixer.add({ id: 'layer-b', clip, volume: 0.7 });
+document.querySelector<AudioMixerElement>('audio-mixer')!.mixer = mixer;
+
+// …or let the element build (and own) its own mixer from specs:
+document.querySelector<AudioMixerElement>('audio-mixer')!.members = [
+  { id: 'layer-a', clip },
+  { id: 'layer-b', clip, volume: 0.7 },
+];
+```
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `player` | attribute | Unique selector for the central player; observes late insertion, upgrade, replacement and removal. |
+| `.player` | property | Assign/read the central `AudioPlayer` or its Element; explicit assignment wins over the selector. |
+| `master-volume` | attribute | Master fader level, applied live. |
+| `autoplay` | attribute | Start the ensemble on mount. Browsers still gate audio until the user interacts. |
+| `solo` | attribute | Id of the member to solo, applied live. Solo is exclusive across strips. |
+| `.mixer` | property | An existing (shared) `AudioMixer` to drive — never disposed by the element. |
+| `.members` | property | `AudioMixerMemberSpec[]` — each `{ id, clip?, player?, effect?, volume? }`. `clip` is optional when you pass an existing `player` (any structural `PlayerLike`). Reads back the applied specs. |
+| `.audioContext` / `.destination` | property | Share the page's context and output node instead of letting the mixer mint its own. Re-mints only a mixer the element owns; a borrowed one is left alone. |
+| `.masterVolume` | property | Reads the attached mixer snapshot and writes its master level. Without a mixer, retains the next owned mixer's construction input. |
+| `.seek(seconds)` | method | Seek members to the same requested position. During a running group, eligible naturally ended stems rejoin with the running members; independently paused members stay paused. |
+| `.add(spec)` / `.remove(id)` | method | Add or remove a member live. `remove()` with no argument is still the DOM's own detach. |
+| `webaudio:end` | event | The whole ensemble finished (every member ended). |
+| `webaudio:memberend` | event | `detail = { id }` when one member's clip finishes. |
+| `webaudio:error` | event | An engine failure — a failed seek-restart, or a member spec carrying neither `clip` nor `player`. |
+
+The Headless mixer owns the mix state. The desk reads its frozen `snapshot()` and subscribes to `change`, so initial borrowed settings, direct mixer commands, membership edits and multiple desks sharing one mixer stay consistent. Assigning `.mixer` preserves that mix unless explicit `master-volume` or `solo` attributes override it. Removing the solo member through either API clears solo and restores other members' requested gains and mute flags.
+
+The linked player calls `play()` / `pause()` / `stop()`; the master and per-strip sliders drive `setMasterVolume` / `setVolume`, and **M** / **S** toggle `mute` / `solo` live (solo is exclusive across strips).
+
+A linked desk omits its transport bar. Removing it releases only its own backend
+connection; it never disposes the central player. Without a connection, the mixer
+shows its own transport. The latest explicit player source selection wins.
+A mix has no single clip or aggregate analyser: clip views/meter need a specific
+member or an explicitly routed signal.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+The host fills its container width by default, can shrink inside flex/grid
+layouts, and respects `hidden`. Set host width in your application for a narrower
+control; spacing between components belongs to their composition.
+
+The default surface uses the same neutral UI tokens as Score. These optional legacy aliases
+demonstrate an explicit dark customization; they do not define the default palette.
+
+```css
+audio-mixer {
+  --wam-bg: #15171c;      /* desk background */
+  --wam-fg: #eef;         /* labels + glyphs */
+  --wam-accent: #4ea1ff;  /* fader accent + engaged mute / solo */
+  --wam-track: #2a2e37;   /* fader track */
+}
+```
+
+`--wam-track-border` controls the fader outline and, when omitted, follows
+`--wm-control-border` → `--wm-border` → `#d8d8d8`.
+
+</details>

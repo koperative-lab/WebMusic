@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
 import {afterEach, describe, expect, it, vi} from 'vitest';
-import {NoteInputElement} from '../../src/play/element/note-input';
-import {SynthPanelElement} from '../../src/play/element/synth-panel';
+import {NoteInputElement} from '../../src/play/element/score-note-input';
+import {SynthPanelElement} from '../../src/play/element/score-synth-panel';
 import {Effect} from '../../src/play/headless/effects';
 
 let tagCounter = 0;
@@ -20,7 +20,7 @@ function pointer(type: string, pointerId = 1): Event {
 
 afterEach(() => document.body.replaceChildren());
 
-describe('<note-input> UI Kit composition', () => {
+describe('<score-note-input> UI Kit composition', () => {
   const tag = define(NoteInputElement, 'score-note-composition');
 
   it('mounts the published note surface for every layout', () => {
@@ -105,7 +105,7 @@ describe('<note-input> UI Kit composition', () => {
   });
 });
 
-describe('<synth-panel> UI Kit composition', () => {
+describe('<score-synth-panel> UI Kit composition', () => {
   const tag = define(SynthPanelElement, 'score-synth-composition');
 
   it('retains the working effect recipe and route after a failed property assignment', () => {

@@ -5,10 +5,10 @@ Use this handbook to prepare a checkout, implement a change and verify it.
 design, architecture, documentation and release policy. This file does not
 maintain a release-status ledger or a second backlog.
 
-The command and CI descriptions below document the first-release `main` baseline
-(Kernel, UI Kit and Score). Audio and Bridge are deferred from this checkout;
-their migration status belongs in [STATUS.md](STATUS.md). Other branches may
-carry a different toolchain or implementation. Inspect `npm run`, the
+The command and CI descriptions below document the integrated five-package
+source tree. The first npm release contained three packages; it does not set
+the current source or site scope. Retained branches may carry an earlier
+toolchain or implementation. Inspect `npm run`, the
 local manifest and workflow before running an optional command or claiming its
 coverage. Synchronizing this handbook does not install missing checkers or
 merge the runtime changes discussed in audit records.
@@ -36,9 +36,15 @@ its recorded commit and compare it with the checkout being changed.
 ## Prepare and inspect the checkout
 
 Use the Node version range declared by the root [package.json](../package.json).
-Run `npm ci` to install from the committed lockfile, then `npm run build`
-to prepare package outputs used by workspace consumers. Use `npm install`
-when intentionally changing dependencies, and review the lockfile diff.
+Select a supported Node release with your version manager and verify `node --version`
+and `npm --version` in the terminal that will run the commands. Node 24.21.0 is
+one supported version; the manifest remains authoritative for the supported range.
+Run `npm ci` at this checkout's root to install from the committed lockfile,
+including development dependencies, then `npm run build` to prepare package
+outputs used by workspace consumers. Each worktree needs its own installation;
+installing dependencies in another checkout does not prepare this worktree.
+Use `npm install` when intentionally changing dependencies, and review the
+lockfile diff.
 
 Before editing, inspect `git status --short` and the current branch. Preserve
 unrelated work. Do not infer publication from a manifest version, a branch
@@ -77,28 +83,31 @@ helps select commands; it does not define another execution chain.
 
 | Command | Use |
 | --- | --- |
-| `npm run build` | Build publishable packages in dependency order. |
-| `npm run build -w @webmusic/score` | Build one package; choose the workspace affected by the change. |
+| `npm run build` | Build publishable packages in dependency order and record source/output receipts. |
+| `npm run build -w @webmusic/audio` | Build one package; choose the workspace affected by the change. |
 | `npm run check` | Complete local source, license, built-export and release-manifest gate. |
-| `npm run check:source` | Format, lockfile, lint, architecture, docs, site notices, package builds, demo assets, doc snippets, source/test typechecks and workspace tests. |
+| `npm run check:source` | Format, lockfile, dev-server startup tests, lint, architecture, docs, dev-docs, site notices, package builds, doc snippets, source/test typechecks and workspace tests. |
 | `npm run check:format` | Check supported text files for LF, final newline, trailing whitespace and JSON validity. Includes tracked and non-ignored untracked files via `git ls-files -co --exclude-standard`; deleted files are skipped. |
 | `npm run check:lockfile` | Verify that declared optional dependencies have lockfile records, including other platforms' native packages. |
 | `npm run lint` | Run repository ESLint. |
 | `npm run check:architecture` | Check package boundaries and public-surface policy. |
 | `npm run check:docs` | Check the documentation contracts described in [DOCS-CONVENTIONS.md](docs/DOCS-CONVENTIONS.md). |
-| `npm run check:site-notices` | Test the generated browser-asset notice policy. |
 | `npm run docs:sync` | Regenerate the component index and repository documentation map from current catalogs, manifests and files. Run after adding/moving documentation or changing catalog descriptions. |
 | `npm run check:dev-docs` | Verify generated inventories, current Markdown local-file links and maintained routes from AGENTS to dev guidance and the .agent toolkit. This is part of `check:source`; semantic prose and historical examples still require review. |
 | `npm run check:doc-snippets` | Run scanner regression tests and compile supported TS/JS/JSX fences, inline scripts and literal MDX code exports against built declarations. Fragment inputs may use synthetic `any`; literal exports must be self-contained. See [DOCS-CONVENTIONS.md](docs/DOCS-CONVENTIONS.md) for selection and limits; no examples execute. |
-| `npm run check:assets` | Check demo asset inventory and its regression tests. |
 | `npm run typecheck` | Run workspace source typechecks where defined. |
-| `npm run typecheck:tests` | Typecheck the Kernel, UI, Score and documentation tests listed in [tsconfig.test.json](../tsconfig.test.json). |
+| `npm run typecheck:tests` | Typecheck the kernel, UI, Audio, Score, bridge and documentation tests listed in [tsconfig.test.json](../tsconfig.test.json). |
 | `npm test` | Run workspace test scripts, including kernel and documentation tests. |
 | `npm run check:licenses` | Check the dependency license/optional-peer policy. |
-| `npm run check:packages` | Validate built public exports, package artifacts and bundled notices against package policy. |
+| `npm run check:site-notices` | Test the main site notice collector; the site build separately verifies the actual bundled module inventory. |
+| `npm run check:packages` | Validate built exports, source/output receipts and bundled third-party notices using the main checks, extended to this checkout's five packages. |
 | `npm run check:release-manifests` | Validate the shared version, cross-package ranges and publication metadata. |
-| `npm run dev` | Build packages, then start the documentation site. |
-| `npm run docs:dev` | Start the documentation site without rebuilding packages. |
+| `npm run dev` | Reuse the running site, or build packages and start it. |
+| `npm run dev:restart` | Explicitly stop this checkout's server, rebuild packages and start it again. |
+| `npm run docs:dev` | Reuse or start this checkout's documentation server without rebuilding packages. |
+| `npm run check:dev-server` | Test startup reuse, explicit restart, build failure, and concurrent starts. |
+| `npm run docs:dev -- status` | Inspect the documentation server without restarting it or rebuilding packages. |
+| `npm run docs:dev -- stop` | Stop this checkout's documentation server without rebuilding packages. |
 | `npm run docs:build` | Build packages and the documentation site. |
 | `npm run pages:build` | Build the docs with the configured GitHub Pages site/base and validate the prefixed output; this command does not deploy it. |
 | `npm run audit:production` | Run the production dependency audit manually; it is outside `npm run check`. |
@@ -106,12 +115,51 @@ helps select commands; it does not define another execution chain.
 | `npm run check:external-install` | Pack and install packages into a fresh non-workspace consumer, then check imports and declarations; requires built outputs and network access. |
 | `npm run release:prepare -- <x.y.z>` | Prepare a shared release version; follow [RELEASING.md](release/RELEASING.md) and refresh the lockfile. |
 
+### Documentation server lifecycle
+
+[The startup script](../scripts/docs-dev.mjs) checks Astro's tracked server before
+building packages. Repeated `npm run dev` and `npm run docs:dev` calls reuse that
+server and print its URL; they do not stop it, clear its content cache or rebuild
+package output beneath a running consumer. An ordinary start does not apply new
+host/port flags when reusing an existing server.
+
+Use `npm run dev:restart` after changing package source: it explicitly stops the
+tracked server before package builds clean `dist/`, then starts the rebuilt site.
+`npm run docs:dev -- restart` restarts without rebuilding packages. A failed build
+leaves the server stopped and reports the failure. A per-checkout startup lock
+serializes starts, stops and restarts; do not bypass it with raw Astro commands
+or run package builds concurrently with the running site. Interrupted startup releases its lock after child cleanup; on macOS/Linux the
+package build runs in an owned process group so descendants are stopped before
+a retry can rebuild. The next start also recovers a lock whose owner process
+has exited.
+
+Normal terminals retain Astro's foreground watch output and Ctrl+C behavior.
+Astro may automatically background a server launched by an agent, and
+`npm run docs:dev -- --background` requests that behavior explicitly. A background
+start exits successfully once ready; use `npm run docs:dev -- logs --follow` to
+watch its output. `npm run docs:dev -- status` inspects either mode, and
+`npm run docs:dev -- stop` explicitly stops it. Stopping background log following
+does not stop the server.
+
+The old default `--force` takeover and `predev` stop hook could send SIGTERM to
+another terminal's running Astro process, producing npm exit code 143. Neither
+action occurs on an ordinary start now. Explicit stop/restart can still terminate
+an older foreground command; genuine child failures and signals are reported,
+not converted to success.
+
+Arguments reach Astro through the startup script; for example,
+`npm run dev -- --host localhost --port 4321` starts the site at that address when
+no server is already running. Use `npm run dev:restart -- --host localhost --port
+4321` to deliberately change a running server's address. `--force`, `--root` and
+`--ignore-lock` are rejected so the wrapper's ownership stays with this checkout.
+
 ## Continuous integration
 
 [.github/workflows/ci.yml](../.github/workflows/ci.yml) owns the active
 workflow. Its quality jobs run `npm ci`, `npm run check`,
-`npm run check:external-install` and `npm run audit:dependencies` on Node 22
-and 24. A separate Node 24 job runs `npm run pages:build`. It triggers on
+`npm run check:external-install` and `npm run audit:dependencies` on Node
+22.22.3 and 24. The official repository also verifies its publication metadata.
+A separate Node 24 job runs `npm run pages:build`. The workflow triggers on
 pushes to all branches, on pull requests and on manual dispatch. It sets
 `NODE_OPTIONS: --max-old-space-size=6144` for declaration builds.
 
@@ -137,6 +185,12 @@ of a remote run. Archived release automation is documented separately in
   the static production build. If unsupported, bypass the HTTP cache on reload
   or clear the localhost HTTP cache in the browser. Reinstalling packages does
   not clear browser redirects.
+- **`tsup: command not found`:** run `npm ci` from this worktree's root with a
+  supported Node version, then retry `npm run dev`. The package manifests and
+  lockfile already declare tsup as a development dependency. If the install
+  omitted development dependencies (for example through `NODE_ENV=production`
+  or npm's `omit` setting), run `npm ci --include=dev`. Use the workspace's
+  installed tools; a global tsup installation can hide an incomplete checkout.
 - **Missing platform-native optional dependency:** inspect the lockfile and
   run `npm run check:lockfile`. If it must be regenerated, use an isolated
   clean checkout without an existing `node_modules`, review the complete

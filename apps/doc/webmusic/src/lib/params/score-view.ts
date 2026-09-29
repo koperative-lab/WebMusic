@@ -190,8 +190,8 @@ export const SCORE_VIEW_PARAMS: ElementParamCatalog = {
     events: [{name: 'webscore:seek', note: 'Map only: {quarters, seconds}, with nominal seconds; bubbling and composed.'}],
   },
 
-  'sheet-view': {
-    tag: 'sheet-view',
+  'score-sheet-view': {
+    tag: 'score-sheet-view',
     entry: ENTRY,
     params: [
       SRC,
@@ -231,8 +231,8 @@ export const SCORE_VIEW_PARAMS: ElementParamCatalog = {
     ],
   },
 
-  'pitch-view': {
-    tag: 'pitch-view', entry: ENTRY,
+  'score-pitch-view': {
+    tag: 'score-pitch-view', entry: ENTRY,
     params: [
       {name: 'type', kind: 'enum', options: ['keyboard', 'staff', 'fretboard'], fallback: 'keyboard', note: 'One passive sounding-pitch surface; switching preserves the current held notes.'},
       {name: 'player', kind: 'text', placeholder: '#my-player', fallback: 'use source, else wait for notes', note: 'Borrow held-note snapshots and events from one selected player; no score load or playback commands.'},

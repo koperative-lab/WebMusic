@@ -4,7 +4,7 @@ description: Score visualization — stateless layout APIs, code-only view and n
 ---
 
 
-`@webmusic/score/view` turns `Score` objects into layout data and visual renderings. Its three Web Components are `<score-view>` for score-position views, `<pitch-view>` for sounding pitches, and `<sheet-view>` for optional full engraving.
+`@webmusic/score/view` turns `Score` objects into layout data and visual renderings. Its three Web Components are `<score-view>` for score-position views, `<score-pitch-view>` for sounding pitches, and `<score-sheet-view>` for optional full engraving.
 
 Playback lives in [`@webmusic/score/play`](/score/api/play/). Views borrow player data or events according to their owning contracts; the thumbnail is a passive whole-score preview. Imperative renderers expose `redraw` for application-driven highlighting.
 
@@ -31,50 +31,18 @@ The browser renderer implementation is also separated by responsibility: shared 
 
 ## Web Components
 
-`<score-view>`, `<pitch-view>` and `<sheet-view>` live on `@webmusic/score/view/element`. Their owning pages under [Web Components › View](/score/element/#view) document each tag’s types, attributes, events, player binding and styling. This page owns the code-facing APIs they compose.
+`<score-view>`, `<score-pitch-view>` and `<score-sheet-view>` live on `@webmusic/score/view/element`. Their owning pages under [Web Components › View](/score/element/#view) document each tag’s types, attributes, events, player binding and styling. This page owns the code-facing APIs they compose.
 
 The code-only APIs below let you maintain view state or build your own renderer; the explicit `/render` adapters draw into browser elements. The examples assume a `score` built with `@webmusic/score`.
 
 ## Prepare a score
 
-Score layout APIs work from a `Score`; current-pitch projections below instead accept MIDI values. This page uses a small score built with `@webmusic/score`.
+Score layout APIs work from a `Score`; current-pitch projections below instead accept MIDI values. The live view demos use an opening excerpt of the same Arabesque No. 1 MXL file used by the Score view elements.
 
 ```ts
-import { Duration, MeasureId, PartId, Pitch, Rational, ScoreBuilder, VoiceId } from '@webmusic/score';
+import {loadScoreFromUrl} from '@webmusic/score/io';
 
-const builder = new ScoreBuilder();
-const timeSignature = { numerator: 4, denominator: 4 };
-const partId = PartId('piano');
-const voice = VoiceId('piano-v1');
-
-builder
-  .setMetadata({ title: 'View API Study' })
-  .addTempo({ atQuarters: Rational.ZERO, bpm: 120 })
-  .addMeter({ atQuarters: Rational.ZERO, measureNumber: 1, timeSignature });
-
-builder.addPart({ id: partId, name: 'Piano', staves: 2, midiProgram: 0 });
-builder.addMeasure({
-  id: MeasureId('m1'),
-  number: 1,
-  onsetQuarters: Rational.ZERO,
-  durationQuarters: new Rational(4),
-  timeSignature,
-  keySignature: { fifths: 0, mode: 'major' },
-});
-
-['C4', 'E4', 'G4', 'C5', 'E3', 'G3', 'C4', 'E4'].forEach((name, index) => {
-  const pitch = Pitch.parse(name);
-  builder.addNote(partId, {
-    id: builder.newNoteId(),
-    pitch,
-    onsetQuarters: new Rational(index, 2),
-    duration: Duration.eighth(),
-    voice,
-    staff: pitch.midi < 60 ? 2 : 1,
-  });
-});
-
-const score = builder.build();
+const score = await loadScoreFromUrl('/mxl/Arabesque%20No.1.mxl');
 ```
 
 ## Create a code-only score view
@@ -330,7 +298,7 @@ rendered.redraw(rendered.noteSequence.notes[0], true);
 it has no keyboard presenter port. `whiteNoteHeight` and `blackNoteHeight` are
 not supported render options and `configure()` rejects them. Applications that
 also need a keyboard compose a separate
-[`<pitch-view type="keyboard">`](/score/element/view/pitch-view/) or UIKit pitch
+[`<score-pitch-view type="keyboard">`](/score/element/view/score-pitch-view/) or UIKit pitch
 presenter around the same borrowed player state.
 
 `VisualizerRenderOptions.noteColor` and `activeNoteColor` accept full CSS colors, including custom-property expressions. They override the corresponding `noteRGB` / `activeNoteRGB` channel strings. The imperative renderers retain neutral defaults: `noteRGB: '96, 96, 96'` and `activeNoteRGB: '32, 32, 32'`.
@@ -620,8 +588,8 @@ Score + MusicXML + OSMD constructor -> RenderedScoreVisualizer<OSMDLike>
 | API | Kind | Use it for |
 | --- | --- | --- |
 | `defineScoreViewElement(tag?)` | Web Component | Register `<score-view>` with piano-roll, staff, waterfall, map and thumbnail types. |
-| `definePitchViewElement(tag?)` | Web Component | Register `<pitch-view>` with keyboard, current staff and fretboard types. |
-| `defineSheetViewElement(tag?)` | Web Component | Register `<sheet-view>` with its optional OSMD renderer. |
+| `definePitchViewElement(tag?)` | Web Component | Register `<score-pitch-view>` with keyboard, current staff and fretboard types. |
+| `defineSheetViewElement(tag?)` | Web Component | Register `<score-sheet-view>` with its optional OSMD renderer. |
 | `defineAllViewElements()` | Web Component | Register the three default View tags. |
 | `ScoreViewElement`, `PitchViewElement`, `SheetViewElement` | Web Component | Classes from `@webmusic/score/view/element`; owning [Element references](/score/element/#view) describe properties, attributes and lifecycle. |
 | `ScoreViewElementType` | Type | Five-value Element type: `piano-roll`, `staff`, `waterfall`, `map`, `thumbnail`. |

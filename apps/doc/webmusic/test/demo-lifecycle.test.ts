@@ -34,6 +34,11 @@ function runDemo(file: string, modules: Record<string, unknown>): void {
   }).outputText;
   const require = (name: string): unknown => {
     if (name.endsWith('/demo-lifecycle')) return {mountDemos: mount};
+    if (name.endsWith('/arabesque-score')) return {
+      loadArabesqueScore: async () => fixtureScore,
+      arabesqueExcerpt: () => fixtureScore,
+      arabesqueUrl: () => '/midi/Arabesque%20No.1.mid',
+    };
     if (name.endsWith('/programmatic-demo-lifecycle')) return {
       mountProgrammaticDemo: (selector: string, setup: (root: HTMLElement, scope: DemoScope) => void | Promise<void>) => {
         const stop = mountProgrammaticDemo(selector, setup);
@@ -67,6 +72,10 @@ const scoreModule = {
   MeasureId: (id: string) => id,
   PartId: (id: string) => id,
   VoiceId: (id: string) => id,
+};
+const fixtureScore = {
+  parts: [{id: 'upper'}, {id: 'lower'}],
+  withoutPart() { return this; },
 };
 
 afterEach(async () => {
@@ -133,7 +142,7 @@ describe('demo resource scopes', () => {
 });
 
 describe('actual programmatic demo lifetimes', () => {
-  it('Rack owns its three created sounds and ignores a late play continuation', async () => {
+  it('Rack owns its two imported-part sounds and ignores a late play continuation', async () => {
     document.body.innerHTML = '<div data-programmatic-rack><button data-play></button><div data-fill></div><span data-time></span></div>';
     const pending = deferred<void>();
     const sounds: Array<{dispose: ReturnType<typeof vi.fn>}> = [];
@@ -155,13 +164,14 @@ describe('actual programmatic demo lifetimes', () => {
         Sound: {oscillator: () => { const sound = {dispose: vi.fn()}; sounds.push(sound); return sound; }},
       },
     });
+    await flush();
     document.querySelector<HTMLButtonElement>('[data-play]')!.click();
     document.body.replaceChildren();
     await flush();
     pending.resolve();
     await flush();
     expect(rack.dispose).toHaveBeenCalledOnce();
-    expect(sounds).toHaveLength(3);
+    expect(sounds).toHaveLength(2);
     for (const sound of sounds) expect(sound.dispose).toHaveBeenCalledOnce();
     expect(subscribe).not.toHaveBeenCalled();
   });
@@ -196,6 +206,7 @@ describe('actual programmatic demo lifetimes', () => {
         Sound: {oscillator: () => ({dispose: vi.fn()})},
       },
     });
+    await flush();
     document.querySelector<HTMLButtonElement>('[data-play]')!.click();
     expect(subscribe).not.toHaveBeenCalled();
     pending.resolve();
@@ -203,7 +214,7 @@ describe('actual programmatic demo lifetimes', () => {
     expect(subscribe).toHaveBeenCalledOnce();
     expect(subscribe.mock.calls[0][0]).toBe('cursor');
     cursor.get('cursor')!();
-    expect(rack.get).toHaveBeenCalledWith('melody');
+    expect(rack.get).toHaveBeenCalledWith('upper');
     expect(document.querySelector('[data-time]')!.textContent).toBe('2.0s');
     expect(document.querySelector<HTMLElement>('[data-fill]')!.style.width).toBe('25%');
     player.seconds = 4;
@@ -223,6 +234,7 @@ describe('actual programmatic demo lifetimes', () => {
       '@webmusic/score': scoreModule,
       '@webmusic/score/play/headless': {InteractivePlayer: class { constructor() { return player; } }, Sound: {oscillator: () => ({})}},
     });
+    await flush();
     document.querySelector<HTMLButtonElement>('[data-advance]')!.click();
     expect(player.preload).toHaveBeenCalledOnce();
     expect(player.advance).not.toHaveBeenCalled();
@@ -259,6 +271,56 @@ describe('actual programmatic demo lifetimes', () => {
     await flush();
     expect(sound.dispose).toHaveBeenCalledOnce();
     expect(audio.close).toHaveBeenCalledOnce();
+  });
+
+  it('does not construct an audio player after its clip finishes loading off-page', async () => {
+    document.body.innerHTML = '<div data-hl-clipplayer data-src="/demo.wav"><button data-play></button><div data-fill></div><span data-time></span></div>';
+    const pending = deferred<unknown>();
+    const load = vi.fn((_url: string, _options: {signal: AbortSignal}) => pending.promise);
+    const construct = vi.fn();
+    runDemo('headless/HlAudioClipPlayerDemo', {
+      '@webmusic/audio/play': {loadClipFromUrl: load},
+      '@webmusic/audio/play/headless': {AudioClipPlayer: class { constructor() { construct(); } }},
+    });
+    const signal = load.mock.calls[0][1].signal as AbortSignal;
+    document.body.replaceChildren();
+    await flush();
+    pending.resolve({});
+    await flush();
+    expect(signal.aborted).toBe(true);
+    expect(construct).not.toHaveBeenCalled();
+  });
+
+  it('Recorder releases old playback before another take and tears down a pending start', async () => {
+    document.body.innerHTML = '<div data-hl-recorder><button data-record></button><button data-play disabled></button><div data-fill></div><span data-time></span><span data-status></span></div>';
+    const permission = deferred<void>();
+    const recorder = {
+      start: vi.fn(() => permission.promise), stop: vi.fn(async () => ({duration: 1})),
+      on: vi.fn(), dispose: vi.fn(),
+    };
+    const player = {on: vi.fn(), play: vi.fn(async () => {}), dispose: vi.fn()};
+    runDemo('headless/HlAudioRecorderDemo', {
+      '@webmusic/audio/play/headless': {
+        AudioRecorder: class { constructor() { return recorder; } },
+        AudioClipPlayer: class { constructor() { return player; } },
+      },
+    });
+    const record = document.querySelector<HTMLButtonElement>('[data-record]')!;
+    record.click();
+    record.click(); // disabled while permission is pending
+    expect(recorder.start).toHaveBeenCalledOnce();
+    permission.resolve();
+    await flush();
+    record.click();
+    await flush();
+    document.querySelector<HTMLButtonElement>('[data-play]')!.click();
+    expect(player.play).toHaveBeenCalledOnce();
+    record.click();
+    expect(player.dispose).toHaveBeenCalledOnce();
+    document.body.replaceChildren();
+    await flush();
+    expect(recorder.dispose).toHaveBeenCalledOnce();
+    expect(player.dispose).toHaveBeenCalledOnce();
   });
 
   it('Sandbox disconnects visibility observation and ignores a late client import', async () => {
@@ -358,6 +420,7 @@ describe('programmatic Parameters reset', () => {
       '@webmusic/score/play/headless': {ScorePlayer: Player, Sound: {oscillator: () => ({})}},
       '@webmusic/score/play/drivers': {bindValue},
     });
+    await flush();
     const root = document.querySelector<HTMLElement>('[data-programmatic-transportdriver]')!;
     const input = root.querySelector<HTMLInputElement>('[data-interval]')!;
     input.value = '125';
@@ -366,6 +429,7 @@ describe('programmatic Parameters reset', () => {
     expect(bindValue.mock.calls[1]?.[1]).toMatchObject({interval: 125, mode: 'seek'});
     expect(root.querySelector('[data-hl-readout]')!.textContent).toContain('interval: 125');
     root.dispatchEvent(new CustomEvent('wm:headless-reset', {bubbles: true}));
+    await flush();
     expect(stops[1]).toHaveBeenCalledTimes(1);
     expect(players[0]!.dispose).toHaveBeenCalledTimes(1);
     expect(root.querySelector<HTMLInputElement>('[data-interval]')!.value).toBe('50');
@@ -399,11 +463,11 @@ describe('ScorePlayer playground ownership and feedback', () => {
       '@webmusic/score': scoreModule,
       '@webmusic/score/play/headless': {ScorePlayer: Player, Sound: {oscillator: () => synth}},
     });
-    const factory = (window as unknown as Record<string, (options: Record<string, unknown>, stage: HTMLElement) => {
+    const factory = (window as unknown as Record<string, (options: Record<string, unknown>, stage: HTMLElement) => Promise<{
       construction: string; dispose: () => void;
-    }>).__wmScorePlayerDemo!;
+    }>>).__wmScorePlayerDemo!;
     const stage = document.querySelector<HTMLElement>('[data-stage]')!;
-    const instance = factory({synthOwnership: ownership, loop: true}, stage);
+    const instance = await factory({synthOwnership: ownership, loop: true}, stage);
     expect(instance.construction).toContain('const synth = Sound.oscillator()');
     expect(instance.construction).toContain(`"synthOwnership": "${ownership}"`);
     expect(instance.construction).toContain('"loop": true');
@@ -441,11 +505,11 @@ describe('ScorePlayer playground ownership and feedback', () => {
       '@webmusic/score': scoreModule,
       '@webmusic/score/play/headless': {ScorePlayer: Player, Sound: {oscillator: () => synth}},
     });
-    const factory = (window as unknown as Record<string, (options: Record<string, unknown>, stage: HTMLElement) => {
+    const factory = (window as unknown as Record<string, (options: Record<string, unknown>, stage: HTMLElement) => Promise<{
       dispose: () => void;
-    }>).__wmScorePlayerDemo!;
+    }>>).__wmScorePlayerDemo!;
     const stage = document.querySelector<HTMLElement>('[data-stage]')!;
-    const instance = factory({synthOwnership: 'borrowed'}, stage);
+    const instance = await factory({synthOwnership: 'borrowed'}, stage);
     stage.querySelector<HTMLButtonElement>('button')!.click();
     instance.dispose();
     const feedback = document.querySelector<HTMLElement>('[data-hl-feedback]')!;

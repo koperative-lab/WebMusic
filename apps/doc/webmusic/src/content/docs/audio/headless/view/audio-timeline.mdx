@@ -1,0 +1,145 @@
+---
+title: 'AudioTimeline'
+description: 'Zoom, offset, playhead and hit testing for an audio view — the geometry every waveform and spectrogram surface shares, with nothing drawn.'
+sidebar:
+  order: 1
+---
+
+`AudioTimeline` owns where a view is looking. It converts between seconds and
+pixels, keeps the playhead, holds the clip's regions for hit testing, and
+answers the one question every renderer asks each frame: **which time range is
+visible**.
+
+It draws nothing and knows no canvas. That is what lets the same geometry back
+a waveform, a spectrogram or a caller-owned overview — and what makes it
+testable without a DOM.
+
+Copies the region list while retaining the immutable Region values. It owns
+geometry and playhead state, not a playback clock. It has no timer, events or
+dispose method; a separate player binding owns subscriptions.
+
+## Import
+
+```ts
+import {AudioTimeline, bindPlayerToAudioTimeline} from '@webmusic/audio/view/headless';
+
+const timeline = new AudioTimeline({
+  durationSeconds: clip.duration,
+  viewportWidth: 800,
+  regions: clip.regions,
+});
+
+const binding = bindPlayerToAudioTimeline(player, timeline, {followPlayhead: true});
+const {startSeconds, endSeconds} = timeline.visibleRange();
+// Keep the binding while the owning view exists.
+const dispose = () => binding.unsubscribe();
+```
+
+## Zoom anchors, it does not jump
+
+`setZoom(pixelsPerSecond, anchorSeconds)` keeps the anchor where it is on
+screen, defaulting to the playhead. Zooming without an anchor is the classic
+way to lose the listener's place: the number changes and the content leaps.
+
+`visibleRange(bufferScreens)` widens the answer by that many extra screens on
+each side, which is how a virtualizing renderer prepares columns just outside
+the viewport without drawing the whole clip.
+
+## Following, and clicking
+
+`followPlayhead(anchor)` scrolls so the playhead sits at that fraction of the
+viewport — `0.5` centres it. `bindPlayerToAudioTimeline` wires a player's
+`timeupdate` to `setPlayhead` and optionally to the follow, returning an
+object whose `unsubscribe()` you own.
+
+`hitTest(x)` turns a pixel into `{seconds, region?}` — the region is present
+when the point falls inside one, which is what lets a click seek *and* report
+which annotation it landed on.
+
+## Time, ownership and contract source
+
+A timeline is a view-state owner. The player/session remains authoritative for
+transport seconds; the binding projects those seconds at the player event cadence.
+Redraw after your own geometry commands because AudioTimeline publishes no change
+event. Bindings subscribe but do not own their player or target.
+
+The public barrel and `packages/audio/src/view/headless/timeline.ts and binding.ts` define the value, option, state and event
+contracts described below. The reference does not turn private implementation
+fields into public API.
+
+<details class="component-section">
+<summary>API</summary>
+
+**Construction**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `new AudioTimeline(options)` | constructor | Requires AudioTimelineOptions. |
+| `createAudioTimeline(options)` | factory | Returns an AudioTimeline with the same geometry behavior. |
+
+**AudioTimelineOptions**
+
+| Member | Kind | Default | Description |
+| --- | --- | --- | --- |
+| `durationSeconds` | option | required | Nonnegative timeline length; invalid values normalize to zero. |
+| `pixelsPerSecond` | option | `100` | Positive horizontal scale. |
+| `viewportWidth` | option | `0` | Visible width in CSS pixels. |
+| `offsetPixels` | option | `0` | Scroll offset, clamped to content bounds. |
+| `playheadSeconds` | option | `0` | Initial position, clamped to duration. |
+| `regions` | option | `[]` | Readonly Region list; its array is copied. |
+
+**Commands**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `setDuration(seconds)` | void | Normalizes duration and clamps dependent state. |
+| `setZoom(pixelsPerSecond, anchorSeconds?)` | void | Preserves the anchor screen position where bounds allow; default or nonfinite anchor uses the playhead. |
+| `setViewport(width)` | void | Changes visible CSS-pixel width. |
+| `setOffset(pixels)` | void | Sets/clamps scroll offset. |
+| `setPlayhead(seconds)` | void | Moves the displayed playhead only; does not seek a player. |
+| `setRegions(regions)` | void | Copies a replacement hit-test list. |
+| `followPlayhead(anchor = 0.5)` | void | Scrolls the playhead to a viewport fraction, clamped to 0–1 and content bounds. |
+
+**State and query results**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `snapshot` | AudioTimelineSnapshot | Fresh object with durationSeconds, pixelsPerSecond, viewportWidth, offsetPixels, playheadSeconds and contentWidth. |
+| `regions` | readonly Region[] | Current hit-test list. |
+| `visibleRange(bufferScreens = 0)` | object | `{startSeconds, endSeconds}` within duration, optionally padded on each side. |
+| `hitTest(x)` | AudioTimelineHit | Viewport-relative CSS x maps to `{seconds, region?}`. |
+
+**Player binding**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `bindPlayerToAudioTimeline(player, target, options?)` | AudioTimelineBinding | Reads timeupdate payload.seconds or player.seconds; updates a PlayheadTarget. It does not issue playback commands or perform an initial synchronization. |
+| `followPlayhead` | option | false by default; calls target.followPlayhead when updates arrive. |
+| `followAnchor` | option | undefined; target default applies (0.5 on AudioTimeline). |
+| `resetOnEnd` | option | true; subscribes to end and writes zero. |
+| `AudioTimelineBinding.unsubscribe()` | void | Idempotent; removes subscriptions without disposing player/target. |
+| `PlayheadTarget.setPlayhead(seconds)` | required method | Receives the projected position. |
+| `PlayheadTarget.followPlayhead(anchor?)` | optional method | Receives the requested scroll behavior. |
+
+**Types and lifecycle**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `AudioTimelineOptions` | type | Construction geometry above. |
+| `AudioTimelineSnapshot` | type | Six numeric fields listed under snapshot. |
+| `AudioTimelineHit` | type | seconds with optional Region. |
+| `BindAudioTimelineOptions` | type | followPlayhead, followAnchor and resetOnEnd. |
+| `AudioTimelineBinding` | type | Owns only unsubscribe(). |
+| `PlayheadTarget` | type | Structural write target; no event or dispose requirement. |
+
+</details>
+
+<div class="component-section">
+
+**Composed by.** [`<audio-view>`](/audio/element/view/audio-view/) — Audio / View.
+
+</div>
+
+## Related
+
+[View models](/audio/headless/view/view-models/) · [Render adapters](/audio/api/view/) · [AudioClipPlayer](/audio/headless/play/audio-clip-player/)

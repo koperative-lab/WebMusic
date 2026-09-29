@@ -16,42 +16,12 @@ import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
 
 <script>
   import {mountProgrammaticDemo, programmaticCode, programmaticFeedback} from './programmatic-demo-lifecycle';
-  import { Duration, MeasureId, PartId, Pitch, Rational, ScoreBuilder, VoiceId } from '@webmusic/score';
   import { PlayerController, ScorePlayer, Sound } from '@webmusic/score/play/headless';
+  import {arabesqueExcerpt, loadArabesqueScore} from '../headless/arabesque-score';
 
-  function sampleScore() {
-    const b = new ScoreBuilder();
-    const partId = PartId('piano');
-    const voice = VoiceId('v1');
-    const timeSignature = { numerator: 4, denominator: 4 };
-    b.setMetadata({ title: 'Controller Etude' })
-      .addTempo({ atQuarters: Rational.ZERO, bpm: 96 })
-      .addMeter({ atQuarters: Rational.ZERO, measureNumber: 1, timeSignature });
-    b.addPart({ id: partId, name: 'Piano', staves: 1 });
-    const pitches = ['C4','E4','G4','C5','G4','E4','C4','E4','D4','F4','A4','D5','A4','F4','D4','F4'];
-    pitches.forEach((name, i) => {
-      const measureNumber = Math.floor(i / 8) + 1;
-      if (i % 8 === 0) {
-        b.addMeasure({
-          id: MeasureId(`m${measureNumber}`),
-          number: measureNumber,
-          onsetQuarters: new Rational((measureNumber - 1) * 4, 1),
-          durationQuarters: new Rational(4, 1),
-          timeSignature,
-        });
-      }
-      b.addNote(partId, {
-        id: b.newNoteId(),
-        pitch: Pitch.parse(name),
-        onsetQuarters: new Rational(i, 2),
-        duration: Duration.eighth(),
-        voice,
-      });
-    });
-    return b.build();
-  }
-
-  mountProgrammaticDemo('[data-programmatic-playercontroller]', (root, scope) => {
+  mountProgrammaticDemo('[data-programmatic-playercontroller]', async (root, scope) => {
+    const score = arabesqueExcerpt(await loadArabesqueScore());
+    if (!scope.active) return;
     const playBtn = root.querySelector<HTMLButtonElement>('[data-play]')!;
     const pauseBtn = root.querySelector<HTMLButtonElement>('[data-pause]')!;
     const seekBtn = root.querySelector<HTMLButtonElement>('[data-seek]')!;
@@ -77,12 +47,12 @@ const controller = new PlayerController(player, score);
     if (scrubInput) scope.listen(scrubInput, 'input', updateCode);
     updateCode();
 
-    const player = new ScorePlayer(sampleScore(), {
+    const player = new ScorePlayer(score, {
       synth: Sound.oscillator({ type: 'triangle', gain: 0.2, releaseSeconds: 0.05 }),
       synthOwnership: 'owned',
     });
     scope.add(() => player.dispose());
-    const controller = new PlayerController(player, sampleScore());
+    const controller = new PlayerController(player, score);
     scope.add(() => controller.destroy());
 
     const paint = () => {
