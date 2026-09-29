@@ -83,7 +83,7 @@ ${componentSurfaceCss('meter', {
   min-width: 0;
   height: var(--wui-meter-height, var(--wameter-height, var(--wm-meter-height, 48px)));
   overflow: hidden;
-  color: var(--wui-meter-fill, var(--wameter-fill, var(--wm-meter-fill, var(--wm-accent, #4ea1ff))));
+  color: var(--wui-meter-fill, var(--wameter-fill, var(--wm-meter-fill, var(--wm-accent, #999))));
 }
 .wui-meter, .wui-meter * { box-sizing: border-box; }
 .wui-meter__track {
@@ -92,7 +92,7 @@ ${componentSurfaceCss('meter', {
   height: 100%;
   overflow: hidden;
   border-radius: max(0px, calc(var(--wm-meter-radius, var(--wm-control-radius, 0)) - 2px));
-  background: var(--wameter-track, var(--wm-meter-track, var(--wm-surface-muted, #1d1d1d)));
+  background: var(--wameter-track, var(--wm-meter-track, var(--wm-surface-muted, #f3f3f3)));
 }
 .wui-meter__fill {
   position: absolute;

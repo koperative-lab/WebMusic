@@ -131,7 +131,7 @@ export class ScorePlayerElement extends WebMusicElement {
   private explicitDestination?: AudioNode;
   private rateValue = 1;
   private volumeValue = 1;
-  /** The rack announced by a `<rack-control>` written inside this element. */
+  /** The rack announced by a `<score-rack-control>` written inside this element. */
   private composedRack?: Rack;
   private rackObserver?: MutationObserver;
   /** Where a rack transport is mounted, so it cannot replace the desk below it. */
@@ -189,7 +189,7 @@ export class ScorePlayerElement extends WebMusicElement {
     // Register lifetime teardown before property upgrades or mounts: an
     // inherited setter/hook may fail, but a partial player/load must not leak.
     this.own(() => this.teardown());
-    // A `<rack-control>` written inside this element announces its rack upward;
+    // A `<score-rack-control>` written inside this element announces its rack upward;
     // this is also PULLED below, because whichever of the two upgraded first
     // decides which half of that exchange happened at all.
     this.addEventListener(RACK_SHARE_EVENT, this.onRackShared);
@@ -280,7 +280,7 @@ export class ScorePlayerElement extends WebMusicElement {
   /**
    * Drive a whole {@link Rack} instead of a single score — the play head moves
    * every member in lockstep and the progress bar follows the longest one. The
-   * same `Rack` instance can be wired to a `<rack-control>` mixer, so the two
+   * same `Rack` instance can be wired to a `<score-rack-control>` mixer, so the two
    * elements stay in sync through the shared rack. Overrides `score` / `src`.
    */
   set rack(rack: Rack | undefined) {
@@ -619,7 +619,7 @@ export class ScorePlayerElement extends WebMusicElement {
    *
    * Never this element itself: the facade takes the container it is given and
    * calls `replaceChildren()` on it, which for a master would delete the
-   * `<rack-control>` written inside it — the very thing it is the transport for.
+   * `<score-rack-control>` written inside it — the very thing it is the transport for.
    */
   private ensureTransportHost(): HTMLElement {
     if (!this.rackHost || this.rackHost.parentElement !== this) {
@@ -969,26 +969,5 @@ export class ScorePlayerElement extends WebMusicElement {
 export function defineScorePlayerElement(tag = 'score-player'): void {
   if (typeof customElements !== 'undefined' && !customElements.get(tag)) {
     customElements.define(tag, ScorePlayerElement);
-  }
-}
-
-/**
- * Compatibility constructor for the former `<simple-score-player>` tag.
- *
- * @deprecated Use {@link ScorePlayerElement} and `<score-player>`.
- */
-export class SimpleScorePlayerElement extends ScorePlayerElement {}
-
-/**
- * Register the deprecated `<simple-score-player>` compatibility tag.
- *
- * A distinct subclass is required because the Custom Elements registry cannot
- * register one constructor under two names.
- *
- * @deprecated Use {@link defineScorePlayerElement}.
- */
-export function defineSimpleScorePlayerElement(tag = 'simple-score-player'): void {
-  if (typeof customElements !== 'undefined' && !customElements.get(tag)) {
-    customElements.define(tag, SimpleScorePlayerElement);
   }
 }

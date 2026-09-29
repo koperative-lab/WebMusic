@@ -18,10 +18,11 @@ described below.
 
 An independently usable element normally has a tag-named page: `score-view.mdx`
 documents `<score-view>`. A declarative child or an attached companion may belong
-to an explicit section on its host workflow page: `<rack-part>` belongs to
-`<rack-control>`, and `<score-recorder>` belongs to the `<note-input>` workflow
-that mounts it. The element catalog must point to its actual explanation;
-preserve an appropriate redirect when replacing a standalone page.
+to an explicit section on its host workflow page: `<score-rack-part>` belongs to
+`<score-rack-control>`. Independently usable recorders, including `<score-recorder>`
+and `<audio-recorder>`, own tag-named pages with their input/player compositions
+in the demo. The element catalog must point to the actual explanation; preserve
+an appropriate redirect when replacing a standalone page.
 
 Sharing a page does not hide a companion's API. Each tag's inputs, methods,
 events, lifecycle, and styling have one identifiable reference location. Catalogs
@@ -40,7 +41,8 @@ Here, `src/` paths are relative to `apps/doc/webmusic/`.
 | `src/components/elements/<PascalTag>Playground.astro` | Real elements/workflow, demo wiring, and local styles; use a descriptive workflow name for a composition |
 | `src/lib/params/<family>-<capability>.ts` | Attribute controls; reconcile names and order with source `static observedAttributes`, resolving spreads |
 | `src/components/ElementPlayground.astro` | Shared title, controls, markup readout, and Copy/Reset panel |
-| `src/components/LiveDemoCanvas.astro` | Shared stage background, spacing, and Live status frame |
+| `src/components/LiveDemoCanvas.astro` | Shared stage background, padding, and Live status frame |
+| `src/components/ElementComposition.astro` | Full-width sibling composition with a `0.5rem` gap; fragment Copy includes real elements without the layout wrapper |
 
 Catalog `fallback` describes actual behavior when the attribute is absent;
 `defaultOptionLabel` uses it for a short unset-option label. A `note` is one
@@ -103,7 +105,7 @@ complete API table.
 
 ### Frontmatter and introduction
 
-- `title` is the primary tag in angle brackets, such as `'<audio-minimap>'`.
+- `title` is the primary tag in angle brackets, such as `'<audio-view>'`.
   `description` is one plain sentence. A capability group expands straight to
   its element pages, so leaf `sidebar.order` is dense from 1.
 - Use 1–3 short paragraphs to explain what the element does, required input or
@@ -117,7 +119,11 @@ complete API table.
 
 Use `ElementPlayground`, whose stage reaches `LiveDemoCanvas`. The shared
 facilities own background, spacing, and Live status; the demo supplies the real
-components, wiring, and necessary local layout.
+components, wiring, and necessary local layout. Use `ElementComposition` for
+stacked sibling components: stretch to the available width with a `0.5rem` gap
+and set `markup="[data-demo-composition]"`. Preserve package control geometry;
+do not override a companion player's height just for its demo. Hidden/nonvisual
+companions remain part of copied markup without reserving a visible grid row.
 
 ```text
 @webmusic/<family>/<capability>/element                  <the-tag>

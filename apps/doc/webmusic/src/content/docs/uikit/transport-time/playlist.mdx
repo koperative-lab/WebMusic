@@ -44,12 +44,16 @@ selected; those are domain policies implemented by the binding.
 The row list is rebuilt only when item ids, labels, or order change. Active state, status, and
 duration are patched onto existing rows so frequent progress notifications do not steal focus
 or cancel an in-flight row click. Keep ids unique and stable if code uses `controls.item(id)`.
+Empty or whitespace-only ids reject the snapshot through `onError`; the prior DOM remains.
+A rebuilt row list restores focus to the same id when that entry remains present.
 
 ## Binding and command settlement
 
 All five user commands are required and may return promises. The presenter calls the requested
 command, then re-reads the authoritative snapshot after it fulfills; synchronous throws and
-promise rejections reach `onError`. Subscription notifications can repaint independently. See
+current-command rejections reach `onError`. Older settlement may refresh accepted state but
+cannot report over a newer command. Settlement after replacement/destruction is ignored, and
+error-callback faults are contained. Subscription notifications can repaint independently. See
 the [shared presenter shape](/uikit/api/#the-shared-presenter-shape) for common ownership and
 cleanup rules.
 
@@ -67,9 +71,9 @@ state to change.
 
 | Member | Kind | Description |
 |---|---|---|
-| `playing` | `boolean` | Chooses the pause glyph/label when truthy and the play glyph/label otherwise. |
+| `playing` | `boolean` | Strict `true` chooses the pause glyph/label; otherwise uses play. |
 | `progress` | `number` | Current-entry position. Finite values clamp to `0…1`; non-finite values paint as `0`. |
-| `disabled?` | `boolean` | Strict `true` disables previous, toggle, next, and seek controls. It does not disable list rows. |
+| `disabled?` | `boolean` | Strict `true` disables transport controls and blocks every command, including row selection; the root exposes `aria-disabled`. |
 | `items` | `readonly PlaylistItem[]` | Ordered entries. Absence at runtime is treated as an empty list. |
 
 `PlaylistItem` contains required `id` and `label`, optional preformatted `duration`, optional
@@ -95,8 +99,12 @@ text or mutate the item objects.
 |---|---|---|---|
 | `label` | `string` | `'Playlist'` | Accessible name of the ordered entry list. |
 | `stylesheet` | `boolean` | `true` | Installs `playlistStyle` unless explicitly `false`. |
-| `classNames` | `PlaylistClassNames` | `{}` | Adds compatibility classes for `root`, `bar`, `button`, `seek`, `list`, and `item`. |
-| `parts` | `PlaylistParts` | `{}` | Adds part tokens for the same six node roles. |
+| `transport` | `boolean` | `true` | False hides the transport bar for selection-only companion use; row selection remains available. |
+| `previousLabel` / `nextLabel` | `string` | `Previous` / `Next` | Accessible navigation names. |
+| `playLabel` / `pauseLabel` | `string` | `Play` / `Pause` | Accessible toggle names selected by playback state. |
+| `seekLabel` | `string` | `Seek` | Accessible range name. |
+| `classNames` | `PlaylistClassNames` | `{}` | Adds classes for `root`, `bar`, `button`, `previous`, `play`, `next`, `seek`, `list`, `item`, `number`, `label`, and `duration`. |
+| `parts` | `PlaylistParts` | `{}` | Adds part tokens for the same node roles, preserving canonical tokens. |
 | `onError` | `(error: unknown) => void` | — | Receives snapshot, command, subscription, and cleanup failures. |
 
 **Handle**
@@ -117,9 +125,8 @@ text or mutate the item objects.
 toggle name follows `playing`. Seek is a native range labelled `Seek`, and all four transport
 controls reflect `disabled` through the native attribute. The ordered list receives `label` as
 its accessible name. Each row is a focusable `role="button"` with click, Enter, and Space
-activation plus `aria-current` for the active item. Loading/error are visual data states rather
-than live announcements or disabled semantics, so the binding remains responsible for status
-messaging and whether selection is accepted. Caller nodes outside the presenter root are never
+activation plus `aria-current` for the active item. Root `disabled` blocks row selection as well as transport commands. Loading/error remain
+visual data states, so the binding owns status messaging and per-item selection policy. Caller nodes outside the presenter root are never
 rewritten.
 
 </details>
@@ -159,7 +166,7 @@ values and then literals.
 | `--wm-playlist-active` | Literal | `rgba(17, 17, 17, .08)` | Active-row background. |
 | `--wm-playlist-error` | `--wm-error` | `#c0392b` | Error-row text. |
 | `--wm-focus` | `currentColor` | Current text color | 2px keyboard-focus outline on rows, transport buttons and seek control. |
-| `--wm-playlist-muted` | `--wm-foreground-muted` → `--wm-foreground` | `#666` | Duration text. |
+| `--wm-playlist-muted` | `--wm-foreground-muted` | `#666` | Duration text. |
 
 **Classes**
 
@@ -174,8 +181,9 @@ roles. Labels and durations expose canonical classes but have no `classNames` ke
 | Seek range | `.wui-playlist__seek` | `seek` |
 | Ordered list | `.wui-playlist__items` | `list` |
 | Entry row | `.wui-playlist__item` | `item` |
-| Entry label | `.wui-playlist__label` | — |
-| Entry duration | `.wui-playlist__duration` | — |
+| Entry number | `.wui-playlist__number` | `number` |
+| Entry label | `.wui-playlist__label` | `label` |
+| Entry duration | `.wui-playlist__duration` | `duration` |
 
 **Parts**
 
@@ -186,12 +194,15 @@ carries its action modifier.
 |---|---|---|
 | Root | `root` | `root` |
 | Transport bar | `bar` | `bar` |
-| Previous button | `button prev` | `button` |
-| Toggle button | `button play` | `button` |
-| Next button | `button next` | `button` |
+| Previous button | `button prev` | `button`, `previous` |
+| Toggle button | `button play` | `button`, `play` |
+| Next button | `button next` | `button`, `next` |
 | Seek range | `seek` | `seek` |
 | Ordered list | `list` | `list` |
 | Entry row | `item` | `item` |
+| Entry number | `number` | `number` |
+| Entry label | `label` | `label` |
+| Entry duration | `duration` | `duration` |
 
 With `stylesheet: false`, the presenter installs no style node; the caller must style these
 classes and parts itself.

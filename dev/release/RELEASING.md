@@ -7,13 +7,15 @@ design decisions belong to [dev/STATUS.md](../STATUS.md) and
 [dev/DECISIONS.md](../DECISIONS.md); this runbook does not track npm availability,
 remote tags, repository archival or deployment status.
 
-## First-release lane
+## Source and release boundary
 
-The `main` release lane contains `@webmusic/kernel`, `@webmusic/ui` and
-`@webmusic/score`. UI supports Score visual integrations. Audio and Bridge are
-accepted expansion directions, but their packages are absent from this checkout
-and excluded from its release package policy, version preparation, tarballs and
-documentation build.
+The first npm release contained Kernel, UI Kit and Score. DEC-046 accepts
+Audio and Bridge into the maintained source tree and five-package policy.
+Neither that source integration nor a shared `0.1.0` manifest label publishes
+new artifacts or changes the verified first-release receipt. Inspect registry
+versions before preparing the next release; changed artifacts require a new
+version. Generated Agent Toolkit material for this source tree identifies a
+source snapshot until a separate release is verified.
 
 ## One release lane
 
@@ -64,18 +66,20 @@ a manual release check outside the active workflow.
 
 [.github/workflows/ci.yml](../../.github/workflows/ci.yml) runs the check gate on
 Node 22.22.3 and 24, followed by external-install and dependency-audit checks.
-A separate Node 24 job runs `pages:build`. The workflow pins v7 revisions of
-`actions/checkout` and `actions/setup-node` and sets a larger heap for declaration
-builds. Read the workflow for triggers and job details, and the root/package
-manifests for the supported Node range and toolchain.
-A workflow definition is not a record of its latest result.
+The official repository also verifies its publication metadata. A separate Node
+24 job runs `pages:build`. The workflow pins v7 revisions of `actions/checkout`
+and `actions/setup-node` and sets a larger heap for declaration builds. It runs
+on pushes to all branches, pull requests and manual dispatch. Read the workflow
+for job details, and the root/package manifests for the supported Node range
+and toolchain. A workflow definition is not a record of its latest result.
 
 No package publication or promotion job is wired into that workflow.
 `npm run pages:build` produces a configured documentation build; it does not
 deploy by itself. After successful quality and documentation jobs, the workflow
 deploys GitHub Pages only for a push or manual dispatch on the official
-repository's `main` branch. Registry/tag verification and manual release
-commands are in [PUBLISHING.md](PUBLISHING.md).
+repository's `main` branch. Other branches receive validation without deployment.
+Registry/tag verification and manual release commands are in
+[PUBLISHING.md](PUBLISHING.md).
 
 ## Archived workflow reference
 

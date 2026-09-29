@@ -1,8 +1,7 @@
 // Rewrite root-absolute internal HTML targets in the built docs site for a
 // non-root deploy base (e.g. GitHub Pages project sites). Astro's own generated
-// links and Markdown AST links respect `base`. This also covers literal HTML
-// targets emitted by components. After rewriting markup, scan all emitted
-// HTML/JS/CSS for resource URLs that would
+// links respect `base`, but absolute links written in MDX content do not. After
+// rewriting markup, scan all emitted HTML/JS/CSS for resource URLs that would
 // escape the project-site base. JavaScript asset URLs must be authored with
 // `import.meta.env.BASE_URL`; silently rewriting compiled JS would hide a source
 // regression and is unsafe around minified syntax.

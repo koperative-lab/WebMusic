@@ -51,6 +51,9 @@ export interface AnalyserMeterOptions {
   minimumBars?: number;
 }
 
+/** Live configuration; omitted fields retain their current values. Sources never change. */
+export type AnalyserMeterConfiguration = Omit<AnalyserMeterOptions, 'context' | 'analyser'>;
+
 /**
  * Aggregate an FFT vector into a fixed number of normalized bars. Each bar is
  * the mean of its contiguous slice. When there are at least as many bins as
@@ -89,9 +92,9 @@ export function aggregateSpectrumBars(
  * ownership is never ambiguous.
  */
 export class AnalyserMeter {
-  readonly #levelScale: number;
-  readonly #peakDecay: number;
-  readonly #minimumBars: number;
+  #levelScale: number;
+  #peakDecay: number;
+  #minimumBars: number;
   #analyser?: AnalyserNode;
   #input?: GainNode;
   #output?: GainNode;
@@ -131,6 +134,42 @@ export class AnalyserMeter {
   /** Whether this meter created and owns its tap graph. */
   get ownsGraph(): boolean {
     return this.#ownsGraph;
+  }
+
+  /**
+   * Update tuning without replacing the graph or its public input/output ports.
+   * Owned analyser settings are validated together and rolled back on failure;
+   * borrowed analysers are never reconfigured. Omitted fields stay unchanged.
+   */
+  configure(options: AnalyserMeterConfiguration = {}): void {
+    if (this.#disposed) throw new Error('AnalyserMeter has been disposed');
+    const analyser = this.#ownsGraph ? this.#analyser : undefined;
+    if (analyser) {
+      const fftSize = options.fftSize ?? analyser.fftSize;
+      const smoothing = options.smoothingTimeConstant ?? analyser.smoothingTimeConstant;
+      if (options.fftSize !== undefined &&
+          (!Number.isInteger(fftSize) || fftSize < 32 || fftSize > 32_768 ||
+           (fftSize & (fftSize - 1)) !== 0)) {
+        throw new RangeError('fftSize must be a power of two from 32 to 32768');
+      }
+      if (options.smoothingTimeConstant !== undefined &&
+          (!Number.isFinite(smoothing) || smoothing < 0 || smoothing > 1)) {
+        throw new RangeError('smoothingTimeConstant must be between 0 and 1');
+      }
+      const previousFft = analyser.fftSize;
+      const previousSmoothing = analyser.smoothingTimeConstant;
+      try {
+        if (options.fftSize !== undefined) analyser.fftSize = fftSize;
+        if (options.smoothingTimeConstant !== undefined) analyser.smoothingTimeConstant = smoothing;
+      } catch (error) {
+        try { analyser.fftSize = previousFft; } catch { /* preserve configuration failure */ }
+        try { analyser.smoothingTimeConstant = previousSmoothing; } catch { /* preserve configuration failure */ }
+        throw error;
+      }
+    }
+    if (options.levelScale !== undefined) this.#levelScale = finiteNonNegative(options.levelScale, 1.8);
+    if (options.peakDecay !== undefined) this.#peakDecay = finiteNonNegative(options.peakDecay, 0.012);
+    if (options.minimumBars !== undefined) this.#minimumBars = positiveBarCount(options.minimumBars, 1);
   }
 
   /** Read one time-domain frame and derive its level, peak and peak hold. */

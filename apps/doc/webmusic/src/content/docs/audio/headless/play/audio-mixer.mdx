@@ -1,0 +1,184 @@
+---
+title: 'AudioMixer'
+description: 'Coordinates clip/player starts and per-member volume, solo, mute and effect construction.'
+sidebar:
+  order: 4
+---
+
+`AudioMixer` coordinates several clips or structural players. Players it creates
+share a context and receive a common future start after preparation; they still
+retain their own engine clocks. Borrowed players must use a compatible reference
+and support scheduled starts for that alignment to hold. The mixer does not
+publish a TransportClock or run a Bridge-style drift monitor.
+
+A member is either a clip the mixer wraps in a player, or a `PlayerLike` you
+already own. The mixer **owns what it created and borrows what you passed**:
+`dispose()` disposes the players it built and leaves yours alone.
+
+Use `.transport` with the central [AudioPlayer](/audio/headless/play/audio-player/):
+`player.setTransport(mixer.transport)`. The adapter exposes group commands,
+seconds/duration/playing and subscriptions without claiming a single clip or
+aggregate analyser. The facade borrows it; the caller still disposes the mixer.
+
+## Import
+
+```ts
+import {AudioMixer} from '@webmusic/audio/play/headless';
+
+const mixer = new AudioMixer({masterVolume: 0.9});
+mixer.add({id: 'drums', clip: drums});
+mixer.add({id: 'bass', clip: bass, volume: 0.7});
+
+await mixer.play();
+mixer.solo('drums');
+// Keep the mixer while the session is active.
+const dispose = () => mixer.dispose();
+```
+
+## Solo is exclusive
+
+`solo(id)` mutes every other member, so an A/B comparison needs no second
+object. `solo(null)` clears the solo selection. Clearing the solo restores each
+member's own mute state. Removing the selected solo member also clears solo and
+recomputes the remaining gains.
+
+## One authoritative mix state
+
+`snapshot()` returns a detached, deeply frozen `AudioMixerSnapshot`: master gain,
+solo selection and each member's requested gain, mute, solo and effective gain.
+The mixer owns this state; Elements and custom presenters read it instead of
+maintaining separate channel values. `on('change', listener)` invalidates a
+presenter's view after membership or mix changes; call `snapshot()` inside the
+listener to read the latest state, including after a reentrant command. Removing
+the subscription releases only that observer.
+
+`effectiveVolume` is the requested linear multiplier sent to a member's optional
+`setVolume`; it is not a measurement of device output. A structural player
+without `setVolume` cannot apply this mix. Commands directly on a borrowed player
+also bypass the mixer's requested state; use mixer commands for shared controls.
+
+## Errors from two levels
+
+Members emit their own failures, and the mixer emits `error` for its own
+transport work — notably a seek-restart that fails partway. An element that
+forwards only `end` and `memberEnd` reports a mixer stuck mid-seek as silence;
+forward `error` as well.
+If one member fails during a group start, the mixer pauses every participant
+that started and retracts any later asynchronous start before rejecting the
+group command. A later `play()` call can retry the group.
+
+## Time, ownership and contract source
+
+The mixer issues commands; it is not a sampled position model. Start/seek
+alignment is best-effort for arbitrary PlayerLike implementations, and borrowing a
+player does not reroute that player into another context or audio graph.
+
+During a running group, seeking before a naturally ended member's end position
+rejoins that member with the still-playing members. Independently paused members
+stay paused. Duration is the end boundary when available, with the member's
+reported position as fallback; a structural player exposing neither cannot
+provide an end bound. Pausing/stopping the group or natural group completion
+clears its running intent, so a later seek alone does not start it. A restarted
+member can report completion again for the new pass.
+
+The public barrel and `packages/audio/src/play/headless/mixer.ts` define the value, option, state and event
+contracts described below. The reference does not turn private implementation
+fields into public API.
+
+<details class="component-section">
+<summary>API</summary>
+
+**Construction**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `new AudioMixer(options?)` | constructor | Creates a coordinator; context is allocated lazily unless supplied. |
+| `createAudioMixer(options?)` | factory | Returns an AudioMixer. |
+
+**AudioMixerOptions**
+
+| Member | Kind | Default | Description |
+| --- | --- | --- | --- |
+| `audioContext` | option | lazy creation | Borrowed when supplied; used by players constructed from clips. |
+| `masterVolume` | option | `1` | Applied with each member gain through its optional setVolume. |
+| `destination` | option | context destination | Destination for players created by the mixer. |
+| `mediaAdapterFactory` | option | none | Host streaming adapter for created players. |
+
+**MixerMemberInit**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `id` | string | Unique member key; a valid new member replaces the old one after its player and end subscription are prepared. Validation or subscription failure leaves the old member active; after a successful commit, cleanup failure does not restore the old member. |
+| `clip` | AudioClip, optional | Construct an owned AudioClipPlayer when no player is supplied. |
+| `player` | PlayerLike, optional | Borrow an existing player; takes precedence over clip. |
+| `effect` | Effect, optional | Used only when constructing a player from a clip. |
+| `volume` | number, default 1 | Member gain. There is no muted construction option. |
+
+**Commands**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `add(init)` | this | Requires clip or player; subscribes to member end. |
+| `remove(id)` | void | Detaches the member, clears its solo if selected, reapplies gains and releases owned resources. Attempts all cleanup before rethrowing the first synchronous failure. |
+| `play()` | `Promise<void>` | Prepares built-in members and proposes a shared start; does not await track completion. |
+| `pause()` | void | Pauses members and invalidates pending start intent. |
+| `stop()` | void | Stops members and clears ended tracking. |
+| `seek(seconds)` | void | Seeks in clip seconds; running members and eligible naturally ended stems rejoin on a future origin. Independently paused members stay paused. Async restart failures emit error. |
+| `setVolume(id, volume)` | void | Sets one member linear gain; finite values clamp below at zero, non-finite values use 1. |
+| `setMasterVolume(volume)` | void | Sets the multiplier applied to all members, using the same normalization as member gain. |
+| `mute(id)` | void | Mutes a member. |
+| `unmute(id)` | void | Clears that member mute. |
+| `solo(id)` | void | Exclusive solo; null clears it without clearing individual mute flags. |
+
+**State**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `ids()` | string[] | Snapshot of current member identifiers. |
+| `snapshot()` | AudioMixerSnapshot | Detached frozen mix state; it does not expose player objects or a group clock. Retain member references for playback readouts. |
+
+**Snapshot fields**
+
+| Member | Owner | Description |
+| --- | --- | --- |
+| `masterVolume` | AudioMixerSnapshot | Requested master linear gain. |
+| `soloId` | AudioMixerSnapshot | Selected exclusive solo id or null. |
+| `members` | AudioMixerSnapshot | Frozen array of frozen AudioMixerMemberSnapshot entries. |
+| `id` / `volume` | AudioMixerMemberSnapshot | Member key and requested channel linear gain. |
+| `muted` / `solo` | AudioMixerMemberSnapshot | Member mute flag and whether it is the selected solo. |
+| `effectiveVolume` | AudioMixerMemberSnapshot | Zero for mute/solo exclusion; otherwise volume × masterVolume. |
+
+**Events**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `on(event, listener)` | unsubscribe function | AudioMixerEvents subscription. |
+| `once(event, listener)` | unsubscribe function | One delivery. |
+| `off(event, listener)` | void | Remove listener. |
+| `change` | void payload | Membership or mix changed; reread snapshot. Listener failures are routed to error without blocking later readers. |
+| `end` | void payload | All tracked members have ended. |
+| `memberEnd` | object | `{id}` for one completed member. |
+| `error` | Error | Mixer-level failure, including asynchronous seek restart. Member errors are separate subscriptions. |
+
+**Lifecycle and types**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `dispose()` | void | Idempotent; detaches ownership first, attempts every subscription/player cleanup and owned-context close even after a failure, then rethrows the first synchronous cleanup failure. Borrowed players/context remain caller-owned. |
+| `AudioMixerOptions` | type | Coordinator options above. |
+| `MixerMemberInit` | type | Member construction inputs above. |
+| `AudioMixerEvents` | type | change, end, memberEnd and error payload map. |
+| `AudioMixerSnapshot` / `AudioMixerMemberSnapshot` | types | Readonly mix and member snapshots described above. |
+
+</details>
+
+<div class="component-section">
+
+**Composed by.** [`<audio-mixer>`](/audio/element/play/audio-mixer/) — Audio /
+Play, over [`mountMixer`](/uikit/mixing-capture/mixer/).
+
+</div>
+
+## Related
+
+[AudioClipPlayer](/audio/headless/play/audio-clip-player/) · [Effects](/audio/headless/play/effects/) · [Bridge synchronization](/bridge/headless/score-audio-sync/)

@@ -1,0 +1,148 @@
+---
+title: 'AudioRecorder'
+description: 'Microphone capture into an AudioClip, with a live level, a device selection and hard retention caps.'
+sidebar:
+  order: 5
+---
+
+`AudioRecorder` captures from an input device and hands back an `AudioClip` —
+the same immutable type every other object in the family consumes, so a take
+can be played, analysed or exported without conversion.
+
+It **owns** the media stream it opens and the buffers it accumulates;
+`dispose()` releases both and stops the device. A take that has already been
+emitted through `stop` belongs to the caller and survives disposal.
+
+## Import
+
+```ts
+import {AudioRecorder} from '@webmusic/audio/play/headless';
+
+const recorder = new AudioRecorder({echoCancellation: false});
+recorder.on('level', (rms) => paintMeter(rms));
+recorder.on('stop', (clip) => keep(clip));
+
+await recorder.start();
+// … later
+const clip = await recorder.stop(); // Promise resolves to the captured take
+recorder.dispose();
+```
+
+## The sample rate is not known until start
+
+`maxRecordedFrames` is a frame count, so converting a duration into one needs
+the rate — and the real context's rate is not known until `start()` opens the
+device. A supplied `sampleRate` requests the context rate; retained frames and the emitted
+clip use the context's actual sample rate. Compute duration from that rate rather
+than assuming a requested rate was honored.
+
+Both caps are hard: capture fails before retaining a block that exceeds
+`maxRecordedFrames` per channel or `maxRecordedBytes` across channels, whichever
+comes first. The unfinished take is discarded, `error` is emitted, and a later
+`stop()` rejects; a cap is not a timed stop that returns a shorter clip. The byte
+cap counts retained Float32 PCM, including channel padding, rather than the
+transient allocations used to assemble a completed clip.
+
+## Capture backend and measurement
+
+The current backend uses a `ScriptProcessorNode` with 4096-frame callbacks and
+fixed two-channel input/output. The browser upmixes mono input to stereo or
+mixes additional device channels into that stereo input; the returned clip does
+not preserve the device's original channel layout. No AudioWorklet backend is
+implemented here.
+
+`stop()` returns only completed callback blocks. It has no final partial-block
+flush and does not promise a sample-accurate stop boundary; 4096 frames span
+about 85 ms at 48 kHz, before main-thread scheduling delay. There is no pause
+command. `dispose()` cancels opening/capture and discards unfinished buffers.
+
+The live `level` is linear RMS over retained channels:
+`sqrt(sum(sample²) / (frames × channels))`. Channel energy is combined after
+squaring, so opposite phases do not cancel. It is not dBFS, LUFS or true peak.
+A context must reach `running` before `start()` resolves and emits `start`;
+permission and resume failures release the acquired device and context.
+
+## Selecting a device
+
+`deviceId` takes a
+`MediaDeviceInfo.deviceId`. Enumerating devices is the caller's job — the
+recorder does not open a picker, and there is no element for that yet.
+
+## Time, ownership and contract source
+
+This is a capture owner, not a session TransportClock driver. Its stream and
+capture context are created by the recorder; the options do not accept a borrowed
+context. A completed clip survives teardown. Input permission and device support
+remain browser responsibilities.
+
+The public barrel and `packages/audio/src/play/headless/recorder.ts` define the value, option, state and event
+contracts described below. The reference does not turn private implementation
+fields into public API.
+
+<details class="component-section">
+<summary>API</summary>
+
+**Construction**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `new AudioRecorder(options?)` | constructor | No permission request until start. |
+| `createAudioRecorder(options?)` | factory | Returns an AudioRecorder. |
+
+**AudioRecorderOptions**
+
+| Member | Kind | Default | Description |
+| --- | --- | --- | --- |
+| `deviceId` | option | system default | Input device identifier for getUserMedia. |
+| `echoCancellation` | option | `true` | Requested audio constraint. |
+| `sampleRate` | option | context-selected | Requested AudioContext rate; output uses actual context.sampleRate. |
+| `maxRecordedFrames` | option | `30_000_000` | Maximum retained frames per channel. |
+| `maxRecordedBytes` | option | 256 MiB | Maximum retained Float32 PCM bytes across channels. |
+
+**Commands**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `start()` | `Promise<void>` | Opens device/context, resumes it when needed and resolves once capture is ready. Rejects unavailable-device, permission, setup, resume or cancellation failures. Concurrent pending calls share one request. |
+| `stop()` | `Promise<AudioClip>` | Assembles and returns the take, emits stop and releases capture resources. Rejects when not recording or after a capture failure. |
+
+**State**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `isRecording` | boolean | Whether recording is active; there is no recording getter. |
+| `level` | number | Latest linear RMS across retained channels, initially zero. |
+| `inputAnalyser` | AnalyserNode or undefined | Borrowed read access to the live tap during capture; unavailable before start/after cleanup. |
+
+**Events**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `on(event, listener)` | unsubscribe function | Typed AudioRecorderEvents listener. |
+| `once(event, listener)` | unsubscribe function | One delivery. |
+| `off(event, listener)` | void | Remove matching listener. |
+| `start` | void payload | Capture became active. |
+| `stop` | AudioClip | Completed take, also returned by stop(). |
+| `level` | number | Latest input RMS across retained channels. |
+| `error` | Error | Capture processing, retention-cap or clip assembly failure. Device/permission/setup/resume failures reject `start()` without emitting this event; handle rejected commands as well. |
+
+**Lifecycle and types**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `dispose()` | void | Idempotently cancels pending setup, stops owned tracks/context, removes listeners and discards unfinished buffers; does not emit a completed take. |
+| `AudioRecorderOptions` | type | Construction options above. |
+| `AudioRecorderEvents` | type | Payload map above. |
+
+</details>
+
+<div class="component-section">
+
+**Composed by.** [`<audio-recorder>`](/audio/element/play/audio-recorder/)
+— Audio / Play, over [`mountRecorder`](/uikit/mixing-capture/recorder/).
+
+</div>
+
+## Related
+
+[AudioClipPlayer](/audio/headless/play/audio-clip-player/) · [Export API](/audio/api/play/) · [Live projection](/audio/headless/view/live-projection/)

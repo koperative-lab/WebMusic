@@ -3,8 +3,7 @@
 import {afterEach, describe, expect, it} from 'vitest';
 import {Duration, Pitch, Rational, ScoreBuilder, VoiceId, type Score} from '../../src/core';
 import {
-  KeyAnalysisElement, ChordAnalysisElement, RomanAnalysisElement, VoiceLeadingAnalysisElement,
-  LiveChordAnalysisElement,
+  ChordAnalysisElement, LiveChordAnalysisElement,
 } from '../../src/analyze/element/index';
 
 // ---------------------------------------------------------------------------
@@ -20,13 +19,10 @@ const define = (ctor: CustomElementConstructor): string => {
   customElements.define(tag, class extends ctor {});
   return tag;
 };
-const KEY = define(KeyAnalysisElement);
 const CHORDS = define(ChordAnalysisElement);
-const ROMAN = define(RomanAnalysisElement);
-const VOICE = define(VoiceLeadingAnalysisElement);
 const LIVE_CHORD = define(LiveChordAnalysisElement);
 const FEATURE_TAGS: Record<string, string> = {
-  key: KEY, chords: CHORDS, roman: ROMAN, 'voice-leading': VOICE, 'live-chord': LIVE_CHORD,
+  chords: CHORDS, 'live-chord': LIVE_CHORD,
 };
 
 const flush = (): Promise<unknown> => new Promise((resolve) => setTimeout(resolve, 0));
@@ -49,7 +45,6 @@ function melodyScore(pitches: string[]): Score {
 }
 
 const C_MAJOR = ['C4', 'D4', 'E4', 'F4', 'G4', 'A4', 'B4', 'C5', 'G4', 'E4', 'C4', 'G4', 'C4'];
-const LEAPING = ['C4', 'C6', 'C4', 'C6'];
 
 /** A stub player target; `emit` fires the fake CustomEvent the binding reads. */
 function stubPlayer() {
@@ -84,7 +79,7 @@ interface MountOptions {
 }
 
 async function mount(options: MountOptions = {}) {
-  const element = document.createElement(options.tag ?? FEATURE_TAGS[options.feature ?? 'key']) as ChordAnalysisElement;
+  const element = document.createElement(options.tag ?? FEATURE_TAGS[options.feature ?? 'chords']) as ChordAnalysisElement;
   for (const [name, value] of Object.entries(options.attrs ?? {})) element.setAttribute(name, value);
   if (options.player) {
     element.setAttribute('player', '#p');
@@ -156,47 +151,12 @@ afterEach(() => {
 });
 
 describe('atomic Analyze displays', () => {
-  it('mounts the key decision lane with one presenter', async () => {
-    const score = melodyScore(C_MAJOR);
-    const flow = await mount({feature: 'key', score});
-    expect(flow.slots()).toEqual(['flow']);
-    expect(flow.root.querySelector('.wui-harmony-wheel, .wui-harmony-chip')).toBeNull();
-    expect(flow.text()).toContain('C major');
-
-    expect(flow.root.querySelector('.wui-workbench__dock, .wui-workbench__tab, .wui-pitch-keyboard')).toBeNull();
-  });
-
   it('mounts the chord timeline as one named chord track', async () => {
     const host = await mount({feature: 'chords', score: melodyScore(C_MAJOR)});
     expect(host.slots()).toEqual(['flow']);
     expect(host.root.querySelectorAll('.wui-harmony-flow__lane')).toHaveLength(1);
     expect(host.root.querySelectorAll('.wui-harmony-flow__lane[data-track="0"] > *').length).toBeGreaterThan(0);
     expect(host.text()).toContain('bar 1 · beat 1');
-  });
-
-  it('mounts the roman view as three coupled rows on one reel', async () => {
-    const host = await mount({feature: 'roman', score: melodyScore(C_MAJOR)});
-    expect(host.slots()).toEqual(['flow']);
-    expect(host.root.querySelectorAll('.wui-harmony-flow__reel')).toHaveLength(1);
-    expect(host.root.querySelectorAll('.wui-harmony-flow__lane')).toHaveLength(3);
-    expect(host.text()).toContain('in C major');
-  });
-
-
-
-  it('draws voice-leading issues as brackets across the voices they implicate', async () => {
-    const host = await mount({feature: 'voice-leading', score: melodyScore(LEAPING)});
-    expect(host.root.querySelectorAll('.wui-harmony-flow__bracket').length).toBeGreaterThan(0);
-    const rows = [...host.index.children] as HTMLElement[];
-    expect(rows[0].textContent).toContain('large leap');
-    expect(rows[0].textContent).toContain('voice 1');
-  });
-
-  it('keeps the readable clean result when nothing is wrong', async () => {
-    const host = await mount({feature: 'voice-leading', score: melodyScore(C_MAJOR)});
-    expect(host.index.childElementCount).toBe(0);
-    expect(host.text()).toContain('No parallel motion, crossings or leaps over an octave — clean.');
-    expect(host.root.querySelector('.wui-workbench')?.getAttribute('data-phase')).toBe('empty');
   });
 
   it('keeps live naming focused on the currently sounding chord', async () => {
@@ -289,8 +249,8 @@ describe('focused Analyze displays — the shell survives what it is asked to do
 
     expect(host.seeks).toHaveLength(1);
     const detail = host.seeks[0].detail as {quarters: number; seconds: number};
-    expect(detail.quarters).toBeCloseTo(1, 6);
-    expect(detail.seconds).toBeCloseTo(0.5, 6);
+    expect(detail.quarters).toBeCloseTo(2, 6);
+    expect(detail.seconds).toBeCloseTo(1, 6);
     expect(calls).toHaveLength(1);
     expect(calls[0]).toBeCloseTo(detail.seconds / 2, 6);
   });
@@ -406,25 +366,24 @@ describe('focused Analyze displays — score boundaries', () => {
   });
 });
 
-describe('focused Analyze displays — the controls are controls', () => {
+describe('focused Analyze displays — readings and controls', () => {
 
-  it('promotes an alternate reading on the standalone nameplate', async () => {
+  it('shows alternate readings below the primary symbol without a button', async () => {
     const player = stubPlayer();
     const host = await mount({tag: LIVE_CHORD, player});
     for (const midi of [60, 64, 67, 69]) player.emit('webscore:noteon', {midi}); // C6 / Am7
-    const alternates = [...host.root.querySelectorAll<HTMLButtonElement>(
-      '.wui-harmony-nameplate__alternate',
-    )];
+    const nameplate = host.root.querySelector<HTMLElement>('.wui-harmony-nameplate')!;
+    const symbol = nameplate.querySelector<HTMLElement>('.wui-harmony-nameplate__symbol')!;
+    const alternateList = nameplate.querySelector<HTMLElement>('.wui-harmony-nameplate__alternates')!;
+    const alternates = [...alternateList.querySelectorAll<HTMLElement>('.wui-harmony-nameplate__alternate')];
     expect(alternates.length).toBeGreaterThan(0);
-    const wanted = alternates[0].textContent ?? '';
-
-    alternates[0].click();
-    expect(host.picks).toHaveLength(1);
-    const detail = host.picks[0].detail as {symbol: string; midis: number[]};
-    expect(wanted.startsWith(detail.symbol)).toBe(true);
-    expect(detail.midis).toEqual([60, 64, 67, 69]);
-    expect(host.element.chord).toBe(detail.symbol);
-    expect(host.root.querySelector('.wui-harmony-nameplate__symbol')?.textContent).toBe(detail.symbol);
+    expect(alternates.every((item) => item.tagName === 'LI')).toBe(true);
+    expect(alternateList.querySelector('button')).toBeNull();
+    expect([...nameplate.children].indexOf(alternateList)).toBeGreaterThan(
+      [...nameplate.children].indexOf(symbol.parentElement!),
+    );
+    expect(symbol.textContent).toBe(host.element.chord);
+    expect(host.picks).toHaveLength(0);
   });
 
 
@@ -471,30 +430,11 @@ describe('focused Analyze displays — the controls are controls', () => {
 
 describe('focused Analyze displays — every attribute reaches a surface', () => {
 
-  it('drops the merged function row out of the roman reel', async () => {
-    const withRow = await mount({feature: 'roman', score: melodyScore(C_MAJOR)});
-    expect(withRow.lanes()).toEqual(['key', 'function', 'roman']);
-
-    const without = await mount({
-      feature: 'roman',
-      score: melodyScore(C_MAJOR),
-      attrs: {function: 'hide'},
-    });
-    // The row is REMOVED, not emptied: a labelled blank stripe on the reel is
-    // the static this redesign exists to delete. Which means the numerals moved
-    // up a row, and the pinned read-out has to have moved with them.
-    expect(without.lanes()).toEqual(['key', 'roman']);
-    expect(without.root.querySelectorAll('.wui-harmony-flow__lane[data-track="1"] > *').length)
-      .toBeGreaterThan(0);
-    expect(without.text()).toContain('in C major');
-  });
-
   it('takes the other readings off the name plate', async () => {
     const player = stubPlayer();
     const host = await mount({tag: LIVE_CHORD, player, attrs: {alternates: 'hide'}});
     for (const midi of [60, 64, 67, 69]) player.emit('webscore:noteon', {midi});
-    // Dropped from the SNAPSHOT, so the kit renders no button at all — a
-    // focusable node with nothing behind it is a trap, not a tidier plate.
+    // Dropped from the snapshot rather than merely hidden as inert text.
     expect(host.root.querySelectorAll('.wui-harmony-nameplate__alternate')).toHaveLength(0);
     expect(host.root.querySelector('.wui-harmony-nameplate__symbol')?.textContent).toBeTruthy();
   });
@@ -585,11 +525,12 @@ describe('focused Analyze displays — every attribute reaches a surface', () =>
     // reel a four-second field is drawn on is eight times the width.
     expect(Number.parseFloat(reel(near))).toBeCloseTo(Number.parseFloat(reel(far)) * 8, 4);
 
-    // `auto` is eight bars of THIS piece — 13 quarters of 4/4 at 120 bpm — so
-    // it lands between the two rather than at either edge.
+    // The chord lane's `auto` field uses the opening two bars: four seconds
+    // for this 4/4 score at 120 bpm.
     const auto = await mount({feature: 'chords', score: melodyScore(C_MAJOR)});
     expect(Number.parseFloat(reel(auto))).toBeGreaterThan(Number.parseFloat(reel(far)));
-    expect(Number.parseFloat(reel(auto))).toBeLessThan(Number.parseFloat(reel(near)));
+    expect(Number.parseFloat(reel(auto))).toBeCloseTo(Number.parseFloat(reel(near)), 4);
+
   });
 
   it('rebuilds the lane in place when the field of view changes', async () => {
@@ -647,21 +588,22 @@ describe('focused Analyze displays — the events leave the element', () => {
     try {
       const player = stubPlayer();
       const host = await mount({feature: 'chords', score: melodyScore(C_MAJOR), player});
-      const nameplate = await mount({tag: LIVE_CHORD, player});
+      await mount({tag: LIVE_CHORD, player});
       for (const midi of [60, 64, 67, 69]) player.emit('webscore:noteon', {midi});
-      nameplate.root.querySelector<HTMLButtonElement>('.wui-harmony-nameplate__alternate')!.click();
       await flush();
       host.root
         .querySelector<HTMLElement>('.wui-harmony-flow__lane[data-track="0"] > *')!
         .dispatchEvent(new MouseEvent('click', {bubbles: true}));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       // Reached `document` at all, which is the half `bubbles` answers; and
       // `composed`, which is the half that matters the day a consumer puts this
       // card inside a shadow root.
       const types = seen.map((event) => event.type);
       expect(new Set(types)).toEqual(
-        new Set(['webscore:chordchange', 'webscore:chordpick', 'webscore:seek']),
+        new Set(['webscore:chordchange', 'webscore:seek']),
       );
+      expect(types).not.toContain('webscore:chordpick');
       expect(seen.every((event) => event.composed)).toBe(true);
       // The one shape that is frozen: existing consumers pin `{chord, midis}`.
       const change = seen.find((event) => event.type === 'webscore:chordchange')!;

@@ -13,15 +13,15 @@ The UI Kit publishes presenters, not Custom Elements. Pick a functional group
 below, then mount the presenter against any compatible Headless object, store,
 controller or binding. Each card links to the entry's own page.
 The groups describe UI responsibilities; they do not change npm import paths.
-Presenters with no current Score Element consumer are independently usable.
+Presenters with no current Score or Audio Element consumer are independently usable.
 
 <UiPresenterCatalog />
 
 <details class="component-section">
-<summary>How Score Elements compose these presenters</summary>
+<summary>How Score and Audio Elements compose these presenters</summary>
 
 These relationships show which presenter to reuse when replacing part of a
-Score Element. Declaration-only Elements have no visible UI, so the presenter
+Score or Audio Element. Declaration-only Elements have no visible UI, so the presenter
 column is not applicable to them.
 
 <UiCompositionCatalog />

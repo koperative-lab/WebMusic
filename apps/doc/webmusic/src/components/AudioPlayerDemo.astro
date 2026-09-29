@@ -1,0 +1,32 @@
+---
+// Canonical demo pattern: drop the tag and register it in a client script.
+// The element owns its sizing; the shared stage owns composition spacing.
+// The transport paints on mount, so the panel is alive before any gesture;
+// sound itself still waits for the play button, as every browser insists.
+import ElementPlayground from './ElementPlayground.astro';
+import AudioPlayStage from './AudioPlayStage.astro';
+
+const SRC = `${import.meta.env.BASE_URL}mp3/Arabesque%20No.1.mp3`;
+
+// The decoded clip uses the buffer engine, where pitch preservation is a no-op.
+const INERT = {
+  'preserves-pitch':
+    'this demo runs on the buffer engine, which transposes by construction — set engine=media first',
+};
+---
+
+<ElementPlayground
+  tag="audio-player"
+  class="wa-demo"
+  inert={INERT}
+  markup="[data-audio-play-stage]"
+>
+  <AudioPlayStage>
+    <audio-player src={SRC} controls></audio-player>
+  </AudioPlayStage>
+</ElementPlayground>
+
+<script>
+  import { defineAudioPlayerElement } from '@webmusic/audio/play/element';
+  defineAudioPlayerElement();
+</script>

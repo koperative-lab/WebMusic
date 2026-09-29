@@ -1,0 +1,84 @@
+---
+title: 'computeClipPeaks and peaksDuration'
+description: 'computeClipPeaks and peaksDuration: the compact min/max pyramid a waveform reads instead of the samples.'
+sidebar:
+  order: 3
+---
+
+`computeClipPeaks(clip, samplesPerPeak?)` reduces a clip's channel data to a
+**pyramid** of min/max pairs — a base level at the requested resolution, then
+progressively coarser levels above it. A waveform renderer picks the level
+that matches the current zoom, so rendering can use a suitable resolution without scanning raw samples on every
+frame. Computing the pyramid still scans the input and allocates output.
+
+`peaksDuration(peaks)` computes the represented block length from a pyramid, which
+is what lets a surface draw peaks it was handed without also being told the
+duration.
+
+Both are synchronous helpers with no events, clock or disposal. computeClipPeaks
+reads the clip through channels(), which supplies defensive PCM copies, and returns
+a new pyramid. peaksDuration reads an existing pyramid.
+
+## Import
+
+```ts
+import {computeClipPeaks, peaksDuration} from '@webmusic/audio/view/headless';
+
+const peaks = computeClipPeaks(clip, 256);
+if (peaks) console.log(peaksDuration(peaks));
+```
+
+`computeClipPeaks` returns `undefined` for a clip with no channel data — a
+streaming clip that was never decoded — rather than an empty pyramid, so a
+caller must handle the absence instead of drawing a flat line. A decoded clip
+with zero samples returns a pyramid with an empty base level; its represented
+duration is zero, and waveform projections return no columns.
+
+## Intentionally local
+
+This is a second implementation of peaks: the analyze capability computes them
+too. It is duplicated on purpose, because `view` may not import `analyze` —
+the projection surface would otherwise acquire an analysis dependency to draw
+a waveform. The same reasoning covers the BBC-compatible
+`peaksFromWaveformData` on the capability root, which hydrates a pyramid from
+`audiowaveform` JSON **without decoding audio at all**.
+
+## Time, ownership and contract source
+
+This page owns pure projection helpers, not a Headless lifecycle object. A peaks
+pyramid summarizes sample amplitude at a resolution; it is not a TransportClock or
+a reversible copy of PCM. Retain/drop the result as data.
+
+The public barrel and `packages/audio/src/view/headless/peaks.ts` define the value, option, state and event
+contracts described below. The reference does not turn private implementation
+fields into public API.
+
+<details class="component-section">
+<summary>API</summary>
+
+**API helpers**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `computeClipPeaks(clip, samplesPerPeak = 256)` | AudioPeaks or undefined | Positive finite samplesPerPeak is floored/lower-bounded at 1. Builds quantized Int8 min/max blocks and coarser levels; undefined without channel data. |
+| `peaksDuration(peaks)` | number | Base block count × samplesPerPeak / sampleRate, in seconds; 0 for no base level or nonpositive sample rate. The final block can pad beyond exact clip duration. |
+
+**Related data contract**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `AudioPeaks` | @webmusic/audio type | sampleRate, channels, baseSamplesPerPeak and levels. |
+| `PeaksLevel` | @webmusic/audio type | samplesPerPeak and packed Int8 min/max data; owned by the core API reference. |
+| `clip.duration` | authoritative source length | Use the clip duration when an exact playback/viewport boundary is required instead of assuming peaksDuration is exact. |
+
+</details>
+
+<div class="component-section">
+
+**Composed by.** [`<audio-view>`](/audio/element/view/audio-view/) — Audio / View.
+
+</div>
+
+## Related
+
+[View models](/audio/headless/view/view-models/) · [Core audio data](/audio/api/) · [View API](/audio/api/view/)

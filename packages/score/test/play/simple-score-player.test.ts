@@ -99,7 +99,6 @@ vi.mock('../../src/play/element/internal/preset-player', () => ({
 
 import {
   ScorePlayerElement,
-  SimpleScorePlayerElement,
   type ScorePlayerTimeUpdateEventDetail,
 } from '../../src/play/element/score-player';
 import {WebMusicElement} from '../../src/play/element/internal/base';
@@ -136,9 +135,9 @@ function mount(
   options: {
     attributes?: Record<string, string>;
     audioContext?: AudioContext;
-    /** A `<rack-control>` above this element, which makes it a part. */
+    /** A `<score-rack-control>` above this element, which makes it a part. */
     desk?: unknown;
-    /** A `<rack-control>` written inside it, which makes it the master. */
+    /** A `<score-rack-control>` written inside it, which makes it the master. */
     nestedDesk?: unknown;
   } = {},
   ElementCtor: typeof ScorePlayerElement = ScorePlayerElement,
@@ -169,7 +168,7 @@ function mount(
   // harness was written, so the surface it grafts on has to grow with it.
   element.addEventListener = vi.fn();
   element.removeEventListener = vi.fn();
-  element.closest = (selector: string) => (options.desk && selector === 'rack-control' ? options.desk : null);
+  element.closest = (selector: string) => (options.desk && selector === 'score-rack-control' ? options.desk : null);
   element.querySelector = () => options.nestedDesk ?? null;
   element.insertBefore = vi.fn(<T>(node: T) => node) as unknown as typeof element.insertBefore;
   Object.defineProperty(element, 'firstChild', {configurable: true, value: null});
@@ -202,13 +201,6 @@ afterEach(() => {
   state.setChrome.mockClear();
   vi.clearAllMocks();
   vi.restoreAllMocks();
-});
-
-describe('score player element compatibility', () => {
-  it('keeps the deprecated element as a distinct constructor', () => {
-    expect(SimpleScorePlayerElement).not.toBe(ScorePlayerElement);
-    expect(new SimpleScorePlayerElement()).toBeInstanceOf(ScorePlayerElement);
-  });
 });
 
 describe('<score-player> transport events', () => {

@@ -7,7 +7,7 @@
 //
 //   import {defineRackControlDemoElement} from '@webmusic/score/play/demos';
 //   defineRackControlDemoElement();
-//   // <rack-control-demo></rack-control-demo>
+//   // <score-rack-control-demo></score-rack-control-demo>
 //
 // These exist for documentation / getting-started use; production apps wire the
 // real elements (`@webmusic/score/play/element`) with their own scores. Everything is
@@ -17,7 +17,7 @@
 import type {Score} from '../../core';
 import {defineOnce, HTMLElementBase} from '../element/internal/base';
 import {defineScorePlayerElement} from '../element/score-player';
-import {defineRackControlElement} from '../element/rack-control';
+import {defineRackControlElement} from '../element/score-rack-control';
 import {mountPresetPlayer, type PresetPlayerHandle} from '../element/internal/preset-player';
 import type {Rack} from '../headless/rack';
 import {sampleScore, sampleRack} from './samples';
@@ -25,7 +25,7 @@ import {sampleScore, sampleRack} from './samples';
 type WithScore = HTMLElement & {score?: Score};
 type WithRack = HTMLElement & {rack?: Rack};
 
-/** `<simple-score-player-demo>` — a `<score-player>` playing a built-in etude. */
+/** `<score-simple-player-demo>` — a `<score-player>` playing a built-in etude. */
 export class SimpleScorePlayerDemoElement extends HTMLElementBase {
   connectedCallback(): void {
     if (this.dataset.mounted) return;
@@ -38,7 +38,7 @@ export class SimpleScorePlayerDemoElement extends HTMLElementBase {
   }
 }
 
-/** `<preset-player-demo>` — the imperative `mountPresetPlayer` over a sample score. */
+/** `<score-preset-player-demo>` — the imperative `mountPresetPlayer` over a sample score. */
 export class PresetPlayerDemoElement extends HTMLElementBase {
   private handle?: PresetPlayerHandle;
   connectedCallback(): void {
@@ -56,8 +56,8 @@ export class PresetPlayerDemoElement extends HTMLElementBase {
 
 
 /**
- * `<rack-control-demo>` — a `<score-player>` driving a two-instrument
- * `Rack`, with a `<rack-control>` mixer bound to the same rack.
+ * `<score-rack-control-demo>` — a `<score-player>` driving a two-instrument
+ * `Rack`, with a `<score-rack-control>` mixer bound to the same rack.
  */
 export class RackControlDemoElement extends HTMLElementBase {
   connectedCallback(): void {
@@ -69,7 +69,7 @@ export class RackControlDemoElement extends HTMLElementBase {
     const player = document.createElement('score-player') as WithRack;
     player.style.display = 'block';
     player.rack = rack;
-    const control = document.createElement('rack-control') as WithRack;
+    const control = document.createElement('score-rack-control') as WithRack;
     control.style.display = 'block';
     control.style.marginTop = '0.9rem';
     control.rack = rack;
@@ -79,13 +79,13 @@ export class RackControlDemoElement extends HTMLElementBase {
 
 
 
-export function defineSimpleScorePlayerDemoElement(tag = 'simple-score-player-demo'): void {
+export function defineSimpleScorePlayerDemoElement(tag = 'score-simple-player-demo'): void {
   defineOnce(tag, SimpleScorePlayerDemoElement);
 }
-export function definePresetPlayerDemoElement(tag = 'preset-player-demo'): void {
+export function definePresetPlayerDemoElement(tag = 'score-preset-player-demo'): void {
   defineOnce(tag, PresetPlayerDemoElement);
 }
-export function defineRackControlDemoElement(tag = 'rack-control-demo'): void {
+export function defineRackControlDemoElement(tag = 'score-rack-control-demo'): void {
   defineOnce(tag, RackControlDemoElement);
 }
 /** Register every single-purpose `*-demo` element at its default tag. */

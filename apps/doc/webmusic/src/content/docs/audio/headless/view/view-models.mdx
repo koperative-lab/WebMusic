@@ -1,0 +1,128 @@
+---
+title: 'WaveformViewModel and SpectrogramViewModel'
+description: 'Project AudioPeaks or SpectrogramData through a caller-controlled timeline into visible columns and frames.'
+sidebar:
+  order: 2
+---
+
+Two view models, one job: given a clip and a viewport, produce the **columns**
+a renderer paints — and only the columns in view. They share a page because a
+reader picks between them by asking what they want to see, not by learning two
+different objects.
+
+WaveformViewModel retains an AudioPeaks value; SpectrogramViewModel retains
+structured SpectrogramData. Each owns an AudioTimeline and calculates arrays on
+query. They do not read an AudioClip directly, own audio resources, schedule frames
+or publish events. No disposal method is needed.
+
+## Import
+
+```ts
+import {
+  createWaveformViewModel,
+  computeClipPeaks,
+} from '@webmusic/audio/view/headless';
+
+const peaks = computeClipPeaks(clip);
+if (!peaks) throw new Error("Decoded samples are required");
+const waveform = createWaveformViewModel(peaks, {durationSeconds: clip.duration});
+waveform.timeline.setViewport(800); // pixels
+waveform.timeline.setZoom(100);     // pixels per second
+const columns = waveform.columns(); // one column per visible timeline pixel
+```
+
+## WaveformViewModel
+
+Reads the peaks pyramid and emits one `{min, max}` per screen column, picking
+the pyramid level whose resolution matches the zoom. That level choice is why
+a waveform stays cheap at every zoom: each draw reads one coarse layer rather
+than the samples.
+
+`fitWaveformColumns(peaks, width)` is the whole-clip shortcut: one merged
+`{min, max}` column per pixel, fitting the entire pyramid into `width` with no
+timeline at all. A caller-owned compact preview can use that fit-to-box
+geometry and recompute it on resize.
+
+## SpectrogramViewModel
+
+Reads precomputed STFT frames and windows them to the visible range, with frequency-bin values retained for the renderer to map. The data contract is explicit: it
+takes **structured** `SpectrogramData`, because `view` may not import
+`analyze` — that boundary is what keeps a projection surface from acquiring an
+analysis dependency.
+
+Supply sorted frame times and frequencies, with frame-major magnitudes matching
+binsPerFrame. The Headless model selects bins; it does not map frequency to pixels. The
+packaged renderer uses its own frequency-axis policy. A custom renderer must map
+its labels and bins consistently rather than infer a mel scale from these values.
+
+## Time, ownership and contract source
+
+These models project existing data; they never advance a clock. A separate
+player binding updates their timeline and the caller chooses when to query and
+paint. Input changes require new models; view-model results are not an analysis
+cache or a sample-editing API.
+
+The public barrel and `packages/audio/src/view/headless/waveform.ts and spectrogram.ts` define the value, option, state and event
+contracts described below. The reference does not turn private implementation
+fields into public API.
+
+<details class="component-section">
+<summary>API</summary>
+
+**Construction**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `new WaveformViewModel(peaks, options?)` | constructor | Retains AudioPeaks; default duration is peaksDuration(peaks), which may include final block padding. |
+| `createWaveformViewModel(peaks, options?)` | factory | Returns WaveformViewModel. |
+| `new SpectrogramViewModel(data, options?)` | constructor | Retains SpectrogramData from /view API; default duration is inferred from the last time and final interval. |
+| `createSpectrogramViewModel(data, options?)` | factory | Returns SpectrogramViewModel. |
+
+**Shared timeline options**
+
+| Member | Kind | Default | Description |
+| --- | --- | --- | --- |
+| `durationSeconds` | option | inferred | Override material duration in seconds. |
+| `pixelsPerSecond` | option | `100` | Initial positive scale. |
+| `viewportWidth` | option | `0` | Visible CSS-pixel width; set before requesting useful columns. |
+| `offsetPixels` | option | `0` | Initial scroll offset. |
+| `playheadSeconds` | option | `0` | Initial displayed playhead. |
+| `regions` | option | `[]` | Annotations retained by the model timeline. |
+| `WaveformViewModelOptions.mergeChannels` | option | `false` | Merge channel ranges into one output peak. |
+| `SpectrogramViewModelOptions.minFrequency` | option | no lower limit | Inclusive lower Hz bound on selected bins. |
+| `SpectrogramViewModelOptions.maxFrequency` | option | no upper limit | Inclusive upper Hz bound on selected bins. |
+
+**State and queries**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `WaveformViewModel.timeline` | readonly AudioTimeline | Mutable geometry owner reached through a readonly reference. |
+| `WaveformViewModel.columns(bufferScreens = 0)` | readonly WaveformColumn[] | Visible columns, optionally buffered; empty for no visible width/range. |
+| `SpectrogramViewModel.timeline` | readonly AudioTimeline | Controls time viewport, not playback. |
+| `SpectrogramViewModel.frames(bufferScreens = 0)` | readonly SpectrogramFrameView[] | Visible frames and selected frequency bins. Magnitudes may be subarray views of input data; treat them as borrowed. |
+| `fitWaveformColumns(peaks, width)` | readonly WaveformColumn[] | Pure whole-clip projection, merging channels into width columns; recompute after resizing. |
+
+**Public result and option types**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `WaveformViewModelOptions` | type | AudioTimelineOptions with optional durationSeconds, plus mergeChannels. |
+| `SpectrogramViewModelOptions` | type | AudioTimelineOptions with optional durationSeconds, plus min/maxFrequency. |
+| `WaveformChannelPeak` | type | `{min, max}` sample range. |
+| `WaveformColumn` | type | `{x, seconds, peaks, region?}`; x is absolute timeline pixels, so account for scroll offset when drawing. |
+| `SpectrogramFrameView` | type | `{frameIndex, seconds, frequencies, magnitudes}`. |
+| `SpectrogramData` | related /view API type | times, frequencies, magnitudes and binsPerFrame; no Analyze import is required. |
+
+</details>
+
+<div class="component-section">
+
+**Composed by.** Applications can consume either model with a custom renderer.
+The shared `fitWaveformColumns` helper prepares overview columns for a
+caller-owned canvas without instantiating both model classes.
+
+</div>
+
+## Related
+
+[AudioTimeline](/audio/headless/view/audio-timeline/) · [Peaks](/audio/headless/view/peaks/) · [Analyze API](/audio/api/analyze/) · [Render adapters](/audio/api/view/)

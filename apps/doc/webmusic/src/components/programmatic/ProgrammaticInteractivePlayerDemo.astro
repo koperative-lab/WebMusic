@@ -16,43 +16,12 @@ import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
 
 <script>
   import {mountProgrammaticDemo, programmaticCode} from './programmatic-demo-lifecycle';
-  import { Duration, MeasureId, PartId, Pitch, Rational, ScoreBuilder, VoiceId } from '@webmusic/score';
   import { InteractivePlayer, Sound } from '@webmusic/score/play/headless';
+  import {arabesqueExcerpt, loadArabesqueScore} from '../headless/arabesque-score';
 
-  function sampleScore() {
-    const b = new ScoreBuilder();
-    const partId = PartId('piano');
-    const voice = VoiceId('v1');
-    const timeSignature = { numerator: 4, denominator: 4 };
-    b.setMetadata({ title: 'Pull engine' })
-      .addTempo({ atQuarters: Rational.ZERO, bpm: 100 })
-      .addMeter({ atQuarters: Rational.ZERO, measureNumber: 1, timeSignature });
-    b.addPart({ id: partId, name: 'Piano', staves: 1 });
-    // One note per quarter so each advance() pulls exactly one beat.
-    const pitches = ['C4', 'E4', 'G4', 'C5', 'B4', 'G4', 'D5', 'G4'];
-    pitches.forEach((name, i) => {
-      const measureNumber = Math.floor(i / 4) + 1;
-      if (i % 4 === 0) {
-        b.addMeasure({
-          id: MeasureId(`m${measureNumber}`),
-          number: measureNumber,
-          onsetQuarters: new Rational((measureNumber - 1) * 4, 1),
-          durationQuarters: new Rational(4, 1),
-          timeSignature,
-        });
-      }
-      b.addNote(partId, {
-        id: b.newNoteId(),
-        pitch: Pitch.parse(name),
-        onsetQuarters: new Rational(i, 1),
-        duration: Duration.quarter(),
-        voice,
-      });
-    });
-    return b.build();
-  }
-
-  mountProgrammaticDemo('[data-programmatic-interactiveplayer]', (root, scope) => {
+  mountProgrammaticDemo('[data-programmatic-interactiveplayer]', async (root, scope) => {
+    const score = arabesqueExcerpt(await loadArabesqueScore());
+    if (!scope.active) return;
     const btn = root.querySelector<HTMLButtonElement>('[data-advance]')!;
     const fill = root.querySelector<HTMLElement>('[data-fill]')!;
     const readout = root.querySelector<HTMLElement>('[data-readout]')!;
@@ -74,7 +43,7 @@ player.advance({secondsPerBeat: ${secondsPerBeat()}});
     const player = new InteractivePlayer();
     scope.add(() => player.dispose());
     player.addVoice('main', Sound.oscillator({ type: 'triangle', gain: 0.2, releaseSeconds: 0.05 }), {synthOwnership: 'owned'});
-    player.addSource('s', sampleScore());
+    player.addSource('s', score);
 
     player.on('beat', ({ beat, total }) => {
       fill.style.width = `${total ? ((beat + 1) / total) * 100 : 0}%`;

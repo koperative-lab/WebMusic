@@ -16,50 +16,20 @@ import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
 
 <script>
   import {mountProgrammaticDemo, programmaticCode} from './programmatic-demo-lifecycle';
-  import { Duration, MeasureId, PartId, Pitch, Rational, ScoreBuilder, VoiceId } from '@webmusic/score';
   import { ScorePlayer, Sound } from '@webmusic/score/play/headless';
   import { bindValue } from '@webmusic/score/play/drivers';
+  import {arabesqueExcerpt, loadArabesqueScore} from '../headless/arabesque-score';
 
-  function sampleScore() {
-    const b = new ScoreBuilder();
-    const partId = PartId('piano');
-    const voice = VoiceId('v1');
-    const timeSignature = { numerator: 4, denominator: 4 };
-    b.setMetadata({ title: 'Scrub' })
-      .addTempo({ atQuarters: Rational.ZERO, bpm: 100 })
-      .addMeter({ atQuarters: Rational.ZERO, measureNumber: 1, timeSignature });
-    b.addPart({ id: partId, name: 'Piano', staves: 1 });
-    const pitches = ['C4','E4','G4','C5','B4','G4','E4','C4','D4','F4','A4','D5','C5','A4','F4','D4'];
-    pitches.forEach((name, i) => {
-      const measureNumber = Math.floor(i / 8) + 1;
-      if (i % 8 === 0) {
-        b.addMeasure({
-          id: MeasureId(`m${measureNumber}`),
-          number: measureNumber,
-          onsetQuarters: new Rational((measureNumber - 1) * 4, 1),
-          durationQuarters: new Rational(4, 1),
-          timeSignature,
-        });
-      }
-      b.addNote(partId, {
-        id: b.newNoteId(),
-        pitch: Pitch.parse(name),
-        onsetQuarters: new Rational(i, 2),
-        duration: Duration.eighth(),
-        voice,
-      });
-    });
-    return b.build();
-  }
-
-  mountProgrammaticDemo('[data-programmatic-transportdriver]', (root, scope) => {
+  mountProgrammaticDemo('[data-programmatic-transportdriver]', async (root, scope) => {
+    const score = arabesqueExcerpt(await loadArabesqueScore());
+    if (!scope.active) return;
     const scrub = root.querySelector('[data-scrub]') as HTMLInputElement;
     const fill = root.querySelector('[data-fill]') as HTMLElement;
     const time = root.querySelector('[data-time]') as HTMLElement;
 
     // ScorePlayer satisfies PlaybackTransport directly. It stays paused — the
     // slider value (0..1) is the external source that drives the position.
-    const player = new ScorePlayer(sampleScore(), {
+    const player = new ScorePlayer(score, {
       synth: Sound.oscillator({ type: 'triangle', gain: 0.2, releaseSeconds: 0.05 }),
       synthOwnership: 'owned',
     });

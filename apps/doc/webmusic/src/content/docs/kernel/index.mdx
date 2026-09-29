@@ -1,12 +1,12 @@
 ---
 title: Kernel
-description: Domain-neutral contracts and runtime utilities for Score and custom WebMusic integrations.
+description: Domain-neutral contracts and runtime utilities for Score, Audio, Bridge and custom integrations.
 ---
 
 `@webmusic/kernel` supplies domain-neutral contracts and runtime logic for
 WebMusic players and custom integrations. It contains event emitters,
 custom-element and worker lifecycle helpers, AudioContext construction,
-playback and effect contracts, and transport math. It imports no Score model.
+playback and effect contracts, and transport math. It imports no Score or Audio model.
 
 ## Install
 
@@ -18,26 +18,28 @@ Kernel has no runtime or peer dependencies. Node.js 22 or later is supported;
 ES modules and CommonJS use the same public import paths. Browser-specific
 operations require the relevant Web APIs, while imports remain safe during SSR.
 
-## First-release packages
+## Source workspaces
 
-The first release contains these packages. Kernel provides the shared runtime
-contracts used by Score:
+The source tree contains five packages. Kernel provides shared runtime
+contracts for both domain families:
 
 | Package | Role | Workspace peer dependencies |
 | --- | --- | --- |
 | `@webmusic/kernel` | Domain-neutral runtime contracts and pure logic | — |
 | [`@webmusic/ui`](/uikit/) | Dependency-free DOM presenters and styling hooks | — |
 | [`@webmusic/score`](/score/) | Symbolic music — MIDI, MusicXML, MXL, ABC | Kernel required; UI optional |
+| [`@webmusic/audio`](/audio/) | Digital audio — clips, playback, analysis and views | Kernel required; UI optional |
+| [`@webmusic/bridge`](/bridge/) | Score/Audio coordination and conversion | Kernel, Score and Audio required |
 
-Audio and Bridge are part of the accepted longer-term architecture, but their
-packages and public reference pages have not been migrated into this
-first-release checkout.
+The earlier published release included Kernel, UI and Score. Source presence
+does not establish that Audio and Bridge are available in the npm registry.
 
 ## Shared contracts and explicit instances
 
-Score declares Kernel as a required peer so the application resolves a
-compatible runtime contract. UI is optional for code-only Score use and is
-required by Score Elements and UI-backed renderers.
+Score and Audio declare Kernel as a required peer so the application resolves a
+compatible runtime contract. UI is optional for code-only use and is required
+by Elements and UI-backed renderers. Bridge declares the domain packages and
+Kernel as required peers.
 
 A compatible dependency version does not allocate or share an AudioContext,
 player or transport group. Applications explicitly create, pass and release

@@ -10,6 +10,9 @@ const groups = [
   {family: 'Score', capability: 'Play'},
   {family: 'Score', capability: 'Analyze'},
   {family: 'Score', capability: 'View'},
+  {family: 'Audio', capability: 'Play'},
+  {family: 'Audio', capability: 'Analyze'},
+  {family: 'Audio', capability: 'View'},
 ] as const;
 
 const counts = UI_COMPOSITION_CATALOG.reduce<Record<UiCompositionStatus, number>>(

@@ -1,0 +1,88 @@
+---
+title: '@webmusic/ui/level-analyzer'
+description: 'A sampled dBFS level inspector with RMS and peak history, threshold, freeze, and hold reset.'
+sidebar:
+  label: 'level-analyzer'
+  order: 4
+---
+
+import UiPresenterLiveDemo from '../../../../components/UiPresenterLiveDemo.astro';
+import UiPresenterRelated from '../../../../components/UiPresenterRelated.astro';
+
+`mountLevelAnalyzer()` is a human-readable dynamics inspector for a caller's sampled signal. It shows current RMS, held sample peak and crest factor in dB, plus a bounded recent history. The operator can freeze that history, move a sample-peak alert threshold, or clear the held peak. It neither samples an audio graph nor claims calibrated LUFS or oversampled true peak.
+
+Use [`meter`](/uikit/mixing-capture/meter/) for a compact normalized level bar. Use this presenter when the decision is whether a sounding passage is too quiet, too peaky, or above an operator-selected dBFS threshold. The live demo supplies generated test samples, not device measurements.
+
+<UiPresenterLiveDemo presenter="level-analyzer" />
+
+## Import
+
+```ts
+import {mountLevelAnalyzer, type LevelAnalyzerState} from '@webmusic/ui/level-analyzer';
+
+const handle = mountLevelAnalyzer(host, {
+  onThresholdChange: (dbfs) => setThreshold(dbfs),
+  onFreezeChange: (frozen) => setFrozen(frozen),
+  onResetHold: () => resetPeakHold(),
+});
+handle.update(state satisfies LevelAnalyzerState);
+// Release the handle when its host is removed.
+```
+
+The application owns `host`, sampled `state`, the three command functions and the sampling schedule. Call `update()` for each new or changed state. Stopping updates is the caller's freeze behavior; the presenter does not retain an audio timer or source.
+
+## Measurement boundary
+
+`rmsDbfs` and `peakDbfs` are already measured values. The presenter derives only the displayed crest difference (`peakDbfs - rmsDbfs`), plot geometry and threshold indication. The caller decides the sample window and history cadence, caps the `history` array, maintains `heldPeakDbfs`, and clears it after `onResetHold()`. A silence value may be `-Infinity`; it renders as an empty numeric readout. The demo generates a bounded 64-sample window to exercise the real presenter commands.
+
+<details class="component-section">
+<summary>API</summary>
+
+**State and sample**
+
+| Member | Kind | Default | Description |
+|---|---|---|---|
+| `sample` | `LevelAnalyzerSample?` | absent | Current `rmsDbfs` and `peakDbfs` numbers, each in dBFS. The presenter does not read PCM. |
+| `heldPeakDbfs` | `number?` | absent | Caller-held sample peak in dBFS; Reset hold requests that the caller clear it. |
+| `history` | `readonly LevelAnalyzerSample[]` | required | Recent samples, in time order. The most recent 64 are plotted; older values are ignored. |
+| `thresholdDbfs` | `number` | required | Alert and slider position. The plot visually spans `-60` to `0` dBFS. |
+| `frozen` | `boolean` | required | Freeze button's pressed state; the caller stops accepting new samples. |
+| `status` | `string` | required | Visible status beside the title. |
+
+**Actions and handle**
+
+| Member | Kind | Default | Description |
+|---|---|---|---|
+| `onThresholdChange(value)` | `(number) => void` | required | Called as the native threshold range moves; the caller commits it and calls `update()`. |
+| `onFreezeChange(frozen)` | `(boolean) => void` | required | Requests the opposite of the last state supplied to `update()`. |
+| `onResetHold()` | `() => void` | required | Requests a held-peak reset; the caller supplies the next state. |
+| `element` | `HTMLElement` | mounted root | The one presenter surface. |
+| `update(state)` | `(LevelAnalyzerState) => void` | — | Paints the supplied state without replacing the surface. |
+| `destroy()` | `() => void` | — | Removes owned nodes, stylesheet and listeners; repeated calls are safe. |
+
+There is no `Binding` object or mount-options bag for this presenter; actions are passed directly as the second argument. It owns no subscription. See the [shared presenter shape](/uikit/api/#the-shared-presenter-shape) for the general host and cleanup model.
+
+**Accessibility.** Numeric readings use a definition list. The history plot has a descriptive image label updated from the current sample; it does not replace the numeric readouts. Freeze is a native button with `aria-pressed`, Reset hold is a native button, and the threshold is a native range input with a visible dBFS value. The status text uses `role="status"`.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+The stylesheet is installed into the supplied host and removed by `destroy()`. This presenter does not currently accept `stylesheet`, `classNames` or `parts` options.
+
+| Token | Fallback | Controls |
+|---|---|---|
+| `--wm-level-analyzer-background` | `--wm-surface`, then white | Surface background. |
+| `--wm-level-analyzer-foreground` | `--wm-foreground`, then dark ink | Text color. |
+| `--wm-level-analyzer-border` | `--wm-border`, then light gray | Surface border. |
+| `--wm-level-analyzer-padding` | `.85rem` | Surface inset. |
+| `--wm-level-analyzer-rms` | teal | Recent RMS columns. |
+| `--wm-level-analyzer-peak` | dark blue | Sample-peak ticks. |
+| `--wm-level-analyzer-threshold` | orange | Threshold line and slider accent. |
+
+The canonical root is `.wui-level-analyzer`, with one `part="root surface"`. Internal classes follow `.wui-level-analyzer__*`; they are implementation selectors, not a class-extension API. Shared `--wm-border`, `--wm-muted`, `--wm-surface` and `--wm-accent` tokens provide fallback colors for the plot and controls.
+
+</details>
+
+<UiPresenterRelated presenter="level-analyzer" />

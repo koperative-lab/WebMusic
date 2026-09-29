@@ -5,7 +5,7 @@ const code = "import {createAnalysisSession} from '@webmusic/score/analyze/headl
 ---
 
 <HeadlessDemoFrame entry="@webmusic/score/analyze/headless" name="createAnalysisSession" code={code}
-  hint="Change the score or its first note to compare real key and chord analysis. Chord-window changes create a new session."
+  hint="Compare two Arabesque excerpts or edit one note to inspect incremental analysis. Chord-window changes create a new session."
   rootAttrs={{'data-analysis-session-demo': ''}}>
   <section class="wm-hl-music" aria-label="Score analysis">
     <p class="wm-hl-music__summary" data-session-summary></p>
@@ -15,11 +15,11 @@ const code = "import {createAnalysisSession} from '@webmusic/score/analyze/headl
   </section>
   <div slot="parameters" class="wm-pg__grid">
     <label class="wm-pg__param"><span class="wm-pg__name">score</span>
-      <select class="wui-select" data-session-score aria-label="Score"><option value="major">C major study</option><option value="minor">A minor study</option></select>
+      <select class="wui-select" data-session-score aria-label="Score"><option value="opening">Arabesque · opening</option><option value="extended">Arabesque · extended</option></select>
       <span class="wm-pg__note">Replace the immutable score through session.update(score).</span>
     </label>
     <label class="wm-pg__param"><span class="wm-pg__name">first note</span>
-      <select class="wui-select" data-session-pitch aria-label="First note"><option>A3</option><option selected>C4</option><option>D4</option><option>F#4</option><option>B4</option></select>
+      <select class="wui-select" data-session-pitch aria-label="First note"><option selected>C#5</option><option>D5</option><option>E5</option><option>F#5</option></select>
       <span class="wm-pg__note">Edit one note, preserving the session and its reusable caches.</span>
     </label>
     <label class="wm-pg__param"><span class="wm-pg__name">windowQuarters</span>
@@ -32,5 +32,9 @@ const code = "import {createAnalysisSession} from '@webmusic/score/analyze/headl
 <script>
   import {mountDemos} from '../demo-lifecycle';
   import {mountAnalysisSessionDemo} from './analysis-view-playgrounds-client';
-  mountDemos('[data-analysis-session-demo]', (root, scope) => { mountAnalysisSessionDemo(root, scope); });
+  import {loadArabesqueScore} from './arabesque-score';
+  mountDemos('[data-analysis-session-demo]', async (root, scope) => {
+    const source = await loadArabesqueScore();
+    if (scope.active) mountAnalysisSessionDemo(root, scope, source);
+  });
 </script>

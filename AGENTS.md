@@ -17,18 +17,19 @@ live in `.agent/`. Read a matching resource when the task benefits from it;
 these route to `dev/` owners and do not replace their contracts. This directory
 does not automatically configure client skill discovery or command permissions.
 
-The first-release `main` checkout contains Kernel, UI Kit and Score. Audio and
-Bridge remain accepted product and architecture directions, but their source,
-tests and public references have not been migrated into this checkout. UI remains
-a separate package for Score visual composition. Do not restore deferred packages
-or their site navigation to `main` without an explicit scope change.
+The source tree contains Kernel, UI Kit, Score, Audio and Bridge. The earlier
+three-package `main` release remains a historical publication baseline; adding
+Audio and Bridge source does not publish new npm artifacts. Score and Agent
+Toolkit behavior retain their accepted contracts. The reviewed Score Recorder,
+Analyze demo and component-frame choices (DEC-032–034), two-tool Analyze
+inventory (DEC-043), and domain-prefixed Score tags (DEC-045) are part of this
+combined source tree. Keep Kernel and UI domain-neutral, with explicit contracts
+and tests for compatibility used by both domains.
 
-Guidance can be synchronized across maintained branches only after the target
-branch contains its own tracked files. Implementation status, generated inventories
-and available checks belong to each checkout: read its STATUS, manifests and source
-before treating a documented capability or verification result as delivered there.
-A documentation sync must preserve branch-specific code, plans and historical
-evidence.
+Preserve unrelated uncommitted work and dated evidence when synchronizing
+branches. Read [STATUS](dev/STATUS.md), manifests and source for the checkout's
+delivery and verification; an older branch's passing checks do not establish
+current results. Generated inventories must describe the actual tracked tree.
 
 ## Start every task
 
@@ -78,8 +79,8 @@ evidence.
 | Component design | [COMPONENT-DESIGN.md](dev/design/COMPONENT-DESIGN.md) | Design questions, copyable design template and acceptance scenarios |
 | Analyze/View attachment to Play | [PLAYER-BINDING.md](dev/design/PLAYER-BINDING.md) | Accepted data/state/time binding direction, target companion syntax, open contract choices and acceptance scenarios; STATUS owns delivery gaps |
 | Analyze component boundaries | [ANALYZE-COMPONENTS.md](dev/design/ANALYZE-COMPONENTS.md) | Live analysis surfaces, retained roles and API/Headless report ownership |
-| View component families | [VIEW-COMPONENTS.md](dev/design/VIEW-COMPONENTS.md) | Type-selected representations, independent views and notation boundaries |
-| Play component boundaries | [PLAY-COMPONENTS.md](dev/design/PLAY-COMPONENTS.md) | Playback/input/control roles, shared transport and lifecycle ownership |
+| View component families | [VIEW-COMPONENTS.md](dev/design/VIEW-COMPONENTS.md), [Audio View](dev/design/AUDIO-VIEW-COMPONENTS.md) | Type-selected representations, independent views and notation boundaries |
+| Play component boundaries | [Score Play](dev/design/PLAY-COMPONENTS.md), [Audio Play](dev/design/AUDIO-PLAY-COMPONENTS.md) | Domain-specific playback/input/control roles, shared transport and lifecycle ownership |
 | Component and export discovery | [COMPONENTS.md](dev/COMPONENTS.md) | Generated links to contracts, composition, catalogs and source |
 | All repository documentation | [DOCUMENTATION-MAP.md](dev/DOCUMENTATION-MAP.md) | Generated file inventory and current/historical reading roles |
 | Current delivery and verification gaps | [STATUS.md](dev/STATUS.md) | The single current work queue |
@@ -103,14 +104,15 @@ owning leaf page; do not copy a complete member table into another document.
 | Work area | Source | Technical and public references |
 |---|---|---|
 | Symbolic music: models, I/O, play, analysis, views, React | [packages/score/src/](packages/score/src/) | [Score README](packages/score/README.md), [Score architecture](packages/score/ARCHITECTURE.md), [Score docs](apps/doc/webmusic/src/content/docs/score/index.mdx) |
-| Digital audio design (deferred) | No source workspace in this checkout | [Product direction](dev/PRODUCT.md), [Architecture](dev/ARCHITECTURE.md), [current status](dev/STATUS.md); verify a target branch before using its implementation |
+| Digital audio: clips, decode, play, capture, analysis, views, React | [packages/audio/src/](packages/audio/src/) | [Audio README](packages/audio/README.md), [Audio docs](apps/doc/webmusic/src/content/docs/audio/index.mdx) |
 | Domain-neutral presenters and styles | [packages/ui/src/](packages/ui/src/) | [UI README](packages/ui/README.md), [generated presenter references](dev/COMPONENTS.md) |
 | Domain-neutral primitives and transport contracts | [platform/kernel/src/](platform/kernel/src/) | [Platform ledger](platform/README.md), [Kernel README](platform/kernel/README.md), [Kernel API](apps/doc/webmusic/src/content/docs/kernel/api.mdx) |
-| Score/Audio coordination and conversion (deferred) | No Bridge workspace in this checkout | [Shared-clock design](platform/shared-clock-injection.md), [Architecture](dev/ARCHITECTURE.md), [current status](dev/STATUS.md) |
-| Session-clock design or scheduling changes | Kernel and Score; deferred Audio/Bridge coordination | [Shared-clock design](platform/shared-clock-injection.md), [Architecture](dev/ARCHITECTURE.md) and current STATUS |
+| Score/Audio coordination and conversion | [bridges/score-audio/src/](bridges/score-audio/src/) | [Bridge contracts](bridges/README.md), [Bridge README](bridges/score-audio/README.md), [generated Bridge API reference](dev/COMPONENTS.md) |
+| Session-clock design or scheduling changes | Kernel, domain engines and Bridge | [Shared-clock design](platform/shared-clock-injection.md), [Architecture](dev/ARCHITECTURE.md) and current STATUS |
 | Player bindings, readouts, analysis followers and views | Domain Play/Analyze/View and neutral UI presenters | [Player binding design](dev/design/PLAYER-BINDING.md), DEC-011, current STATUS and the owning public leaf pages |
+| Audio Analyze performance surfaces and static reports | [Audio Analyze source](packages/audio/src/analyze/) | [Audio Analyze design](dev/design/AUDIO-ANALYZE-COMPONENTS.md), [Audio Analyze API](apps/doc/webmusic/src/content/docs/audio/api/analyze.mdx) and owning Element pages |
 | Documentation site and demos | [apps/doc/webmusic/src/](apps/doc/webmusic/src/), [shared catalogs](apps/doc/shared/) | [apps README](apps/README.md), Site Plan, Conventions and the applicable page template |
-| A systematic Score review, or Audio review after migration | Owning domain, UI presenters and demos | [Score review workflow and Audio starting brief](dev/log/2026-09-09-score-review-workflow.md); use current design and STATUS to scope algorithm/architecture work before frontend acceptance |
+| A systematic Score or Audio review | Owning domain, UI presenters and demos | [Score review workflow and Audio starting brief](dev/log/2026-09-09-score-review-workflow.md); use current design and STATUS to scope algorithm/architecture work before frontend acceptance |
 
 Tests normally live in each owning workspace's `test/` directory. Read the
 workspace's manifest for its commands. `apps/doc/shared/` is shared site code,
@@ -183,8 +185,9 @@ alternative specification:
 [package.json](package.json) owns command definitions;
 [DEVELOPMENT.md](dev/DEVELOPMENT.md) owns the full workflow. Use its declared
 Node range and the committed lockfile. On a fresh checkout, run `npm ci`, then
-`npm run build:packages`. `npm run dev` builds packages and starts the docs site;
-`npm run docs:dev` uses existing package output.
+`npm run build:packages`. `npm run dev` reuses the running site, or builds
+packages and starts it when absent. Use `npm run dev:restart` to explicitly stop,
+rebuild and restart; `npm run docs:dev` reuses or starts with existing output.
 
 - During implementation, run the relevant workspace tests/typecheck and focused
   architecture/documentation checks. Add regression coverage that exercises the
@@ -210,8 +213,8 @@ Node range and the committed lockfile. On a fresh checkout, run `npm ci`, then
 [workflow logs](dev/log/README.md) and [prototypes](dev/prototypes/README.md)
 have separate reading roles. Their README files are maintained navigation;
 dated bodies and raw evidence retain their original baseline. The
-[Score notes index](packages/score/docs/README.md), the
-[Audio proposal index](dev/plans/README.md), and the
+[Score notes index](packages/score/docs/README.md),
+[Audio notes index](packages/audio/docs/README.md), and
 [release-pipeline archive](scripts/release-pipeline/README.md) explain how to
 read their older material. Use these for context and recorded outcomes, not as
 another current implementation plan.

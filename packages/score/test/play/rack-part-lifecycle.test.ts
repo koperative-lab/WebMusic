@@ -5,13 +5,13 @@ const loads = vi.hoisted(() => [] as Array<{signal: AbortSignal; resolve(score: 
 vi.mock('../../src/io/load', () => ({loadScoreFromUrl: vi.fn((_src: string, {signal}: {signal: AbortSignal}) =>
   new Promise<Score>((resolve) => { loads.push({signal, resolve}); }))}));
 import {loadScoreFromUrl} from '../../src/io/load';
-import {defineRackPartElement, type RackPartElement} from '../../src/play/element/rack-part';
+import {defineRackPartElement, type RackPartElement} from '../../src/play/element/score-rack-part';
 defineRackPartElement();
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 afterEach(() => { document.body.replaceChildren(); loads.length = 0; vi.clearAllMocks(); });
 function mount() {
-  const desk = document.createElement('rack-control');
-  const part = document.createElement('rack-part') as RackPartElement;
+  const desk = document.createElement('score-rack-control');
+  const part = document.createElement('score-rack-part') as RackPartElement;
   part.setAttribute('src', '/first.mid');
   desk.append(part);
   document.body.append(desk);
@@ -48,7 +48,7 @@ describe('Rack part declaration lifetime', () => {
     expect(part.rackPartDeclaration()).toBeUndefined();
   });
   it('does not fetch a standalone declaration without a desk', async () => {
-    const part = document.createElement('rack-part');
+    const part = document.createElement('score-rack-part');
     part.setAttribute('src', '/unused.mid');
     document.body.append(part);
     await flush();

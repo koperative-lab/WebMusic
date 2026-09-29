@@ -1,0 +1,33 @@
+---
+import LiveDemoCanvas from '../LiveDemoCanvas.astro';
+---
+<section class="independent-loops not-content" data-independent-loops>
+  <LiveDemoCanvas label="Two native loops following a continuous master">
+    <div class="independent-loops__body">
+      <div class="independent-loops__controls">
+        <button type="button" data-start>Play loops</button>
+        <button type="button" data-pause disabled>Pause</button>
+        <button type="button" data-seek disabled>Seek master to 4.25 s</button>
+        <label>Rate <select data-rate disabled><option value="1">1×</option><option value="2">2×</option></select></label>
+        <button type="button" data-dispose disabled>Dispose loops</button>
+      </div>
+      <output role="status" data-status>Two quiet tones repeat every 1 and 1.5 content seconds.</output>
+      <label>Low tone · 1 s local loop <progress max="1" value="0"></progress></label>
+      <label>High tone · 1.5 s local loop <progress max="1.5" value="0"></progress></label>
+      <output data-timeline>No active session</output>
+    </div>
+  </LiveDemoCanvas>
+</section>
+<script>
+  import {mountDemos} from '../demo-lifecycle';
+  import {mountIndependentLoops} from './independent-loops-client';
+  mountDemos('[data-independent-loops]', mountIndependentLoops);
+</script>
+<style>
+  .independent-loops__body { width: 100%; min-width: 0; padding: 0.8rem; }
+  .independent-loops__controls { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+  .independent-loops__controls button, .independent-loops__controls select { padding: 0.35rem 0.55rem; font: inherit; }
+  .independent-loops__body > label, .independent-loops__body output { display: block; margin-top: 0.7rem; font-size: 0.85rem; }
+  .independent-loops__body progress { display: block; width: 100%; }
+  .independent-loops__controls :focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+</style>

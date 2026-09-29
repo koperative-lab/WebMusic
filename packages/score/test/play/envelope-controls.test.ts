@@ -69,7 +69,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("<synth-panel> envelope presenter composition", () => {
+describe("<score-synth-panel> envelope presenter composition", () => {
   it("mounts the same canonical presenter behind the legacy graph.env section", () => {
     const panel = document.createElement(
       synthTag,

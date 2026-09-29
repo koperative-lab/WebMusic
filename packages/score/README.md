@@ -88,7 +88,7 @@ state.
 | `@webmusic/score/view` | Stateless view API: layout geometry, note sequences, types. |
 | `@webmusic/score/view/headless` | Score windows, map navigation and held-pitch state with optional borrowed playback; no DOM. |
 | `@webmusic/score/view/render` | Imperative browser visualizers (SVG / canvas / OSMD). |
-| `@webmusic/score/view/element` | `<score-view>`, `<pitch-view>` and `<sheet-view>` Web Components. |
+| `@webmusic/score/view/element` | `<score-view>`, `<score-pitch-view>` and `<score-sheet-view>` Web Components. |
 | `@webmusic/score/play` | Stateless playback API: SFZ data helpers, offline render types. |
 | `@webmusic/score/play/headless` | Players, synths, `Sound`, `Effect`, `Rack`, `LfoController`, offline rendering. |
 | `@webmusic/score/play/drivers` | Pointer / scroll / orientation / value transport adapters. |
@@ -98,7 +98,7 @@ state.
 | `@webmusic/score/play/demos` | Demo elements and sample scores. |
 | `@webmusic/score/analyze` | Stateless analysis: key, chords, Roman numerals, motifs, voice leading. |
 | `@webmusic/score/analyze/headless` | Sessions, playback followers, live trackers, worker clients and presentation prediction; no DOM. |
-| `@webmusic/score/analyze/element` | Interactive analysis components (`<key-analysis>`, `<chord-analysis>`, …). |
+| `@webmusic/score/analyze/element` | Interactive current-chord and chord-progression analysis components. |
 | `@webmusic/score/analyze/worker-client` | Main-thread analysis Worker client (`createAnalysisWorker`). |
 | `@webmusic/score/analyze/worker-protocol` | Pure analysis wire types and constants. |
 | `@webmusic/score/analyze/worker` | Self-registering analysis Worker runtime. |
@@ -296,7 +296,7 @@ defineAllViewElements();
 ```html
 <score-player id="p" src="song.mid"></score-player>
 <score-view type="piano-roll" player="#p"></score-view>
-<pitch-view type="keyboard" player="#p" low="48" high="84"></pitch-view>
+<score-pitch-view type="keyboard" player="#p" low="48" high="84"></score-pitch-view>
 ```
 
 - **`<score-view>`** selects `piano-roll` (default), `staff`, `waterfall`,
@@ -304,10 +304,10 @@ defineAllViewElements();
   selected player's score. Type changes reuse that data. Map provides density
   cells and rate-aware seeking; thumbnail is a static preview without active
   highlighting or interaction, even when borrowing a player's loaded score.
-- **`<pitch-view>`** selects `keyboard` (default), current-pitch `staff` or
+- **`<score-pitch-view>`** selects `keyboard` (default), current-pitch `staff` or
   `fretboard`. It borrows held notes through `player` (or legacy `source`), owns
   no Score, and sends no note or transport commands. Type changes retain activity.
-- **`<sheet-view>`** engraves an explicit `.score` or `src` through the optional
+- **`<score-sheet-view>`** engraves an explicit `.score` or `src` through the optional
   `opensheetmusicdisplay` peer. Its optional `player` connection follows note
   events; it does not borrow the player's score or native snapshot.
 
@@ -552,31 +552,29 @@ defineAllElements();              // …or the whole set (what './play/auto' cal
 ```html
 <score-player src="song.mid"></score-player>
 <score-player src="song.musicxml" sound-font="/samples/{midi}.m4a"></score-player>
-<rack-control></rack-control>
-<note-input layout="piano" keyboard start="48" end="71"></note-input>
+<score-rack-control></score-rack-control>
+<score-note-input layout="piano" keyboard start="48" end="71"></score-note-input>
 ```
 
 | Element | Purpose |
 |---|---|
 | `<score-player>` | One player: load a `src` or assign `.score`; transport plus live rate / volume / pan / loop. Assign `.controller` to present a headless `PlayerController` you already own. |
-| `<rack-control>` | Mixer for a shared `Rack`. |
+| `<score-rack-control>` | Mixer for a shared `Rack`. |
 | `<score-recorder>` | Capture a live performance into a `Score`; replay + MIDI / MusicXML export. |
-| `<note-input>` | Discrete note surface — `layout="piano\|grid\|chords"`, `keyboard` for QWERTY. |
-| `<synth-panel>` | Control panel — `sections="sound,effects,envelope,eq,lfo,macros"`. |
+| `<score-note-input>` | Discrete note surface — `layout="piano\|grid\|chords"`, `keyboard` for QWERTY. |
+| `<score-synth-panel>` | Control panel — `sections="sound,effects,envelope,eq,lfo,macros"`. |
 
 Assign `.score`, `.sound`, `.effect`, or `.rack` as properties to override
 attribute-driven defaults.
 
-Legacy compatibility: `<score-player>`, `SimpleScorePlayerElement`, and
-`defineSimpleScorePlayerElement()` remain deprecated aliases. The auto/global
-bundles and `defineAllElements()` register both tags, while new code should use
-the canonical `score-player` names.
+The former `<simple-score-player>` compatibility tag is retired; use
+`<score-player>` for transport.
 
-`<synth-panel>` directly composes reusable Score Headless
+`<score-synth-panel>` directly composes reusable Score Headless
 controllers with structural presenters from `@webmusic/ui`, with no standalone
 Element Adapter module between them. `<score-player>` reaches the same
 transport presenter through its existing public imperative mounter, whose
-signature remains a compatibility surface. Every `<synth-panel>` section uses a
+signature remains a compatibility surface. Every `<score-synth-panel>` section uses a
 published presenter, and its LFO section binds the same `LfoController`. Hiding
 the LFO section
 removes only its presenter, so an already-running modulation continues;
@@ -638,7 +636,7 @@ and terminated on `dispose()`. Structured remote failures reject with
 live at `@webmusic/score/analyze/worker-protocol`; the runtime at
 `@webmusic/score/analyze/worker`.
 
-Analysis Web Components expose focused workflows and a switchable analysis view:
+Analysis Web Components expose two focused inspection tools:
 
 ```ts
 import {defineAllAnalysisElements} from '@webmusic/score/analyze/element';
@@ -647,26 +645,25 @@ defineAllAnalysisElements();
 
 ```html
 <score-player id="p" src="song.mid"></score-player>
-<voice-leading-analysis player="#p"></voice-leading-analysis>
-<pitch-view type="keyboard" player="#p" low="48" high="84"></pitch-view>
-<pitch-view type="staff" player="#p"></pitch-view>
+<score-chord-analysis player="#p"></score-chord-analysis>
+<score-pitch-view type="keyboard" player="#p" low="48" high="84"></score-pitch-view>
+<score-pitch-view type="staff" player="#p"></score-pitch-view>
 ```
 
-The analysis lane and pitch views are explicit siblings. Register the View tags
+The analysis tool and pitch views are explicit siblings. Register the View tags
 with their `define*Element()` helpers from `@webmusic/score/view/element`.
 Each Analyze tag renders one core surface; display configuration belongs to its
 attributes, and supporting keyboards, staffs or fretboards remain reusable View
 components. They borrow the player's existing data or held-note state and own no
 playback graph.
 
-Five Analyze tags cover chord progression, the current chord, key changes,
-Roman harmony and voice leading. The
-[Analyze overview](https://github.com/koperative-lab/WebMusic/blob/main/apps/doc/webmusic/src/content/docs/score/element/index.mdx#analyze)
+The two tags cover current-chord interpretation and passage harmony. The
+[Analyze overview](../../apps/doc/webmusic/src/content/docs/score/element/index.mdx#analyze)
 selects and documents them. Each live demo contains its player and the current
 tag, with external Parameters.
 
-Candidate rankings, tonal comparisons, pitch weights and retained chord updates
-remain application-owned diagnostics using the
+Specialist Roman/voice-leading views and retained chord updates remain
+application-owned compositions using the API and
 [Headless trackers and projections](https://github.com/koperative-lab/WebMusic/blob/main/apps/doc/webmusic/src/content/docs/score/headless/analyze/live-trackers.mdx).
 Motif search remains an API/Headless result. Choose a fixed musical surface for
 live display; disconnecting it releases its resources and leaves playback with
@@ -734,7 +731,7 @@ registers every playback element and exposes the `WebMusicScorePlay` global:
 <script src="https://unpkg.com/@webmusic/score/dist/play/auto.global.js"></script>
 
 <score-player src="song.mid"></score-player>
-<note-input layout="piano" keyboard></note-input>
+<score-note-input layout="piano" keyboard></score-note-input>
 
 <script>
   // Element classes and define* helpers are on the global:

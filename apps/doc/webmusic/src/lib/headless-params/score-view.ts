@@ -60,6 +60,6 @@ export const SCORE_VIEW_HEADLESS: HeadlessObjectCatalog = {
       {name: 'dispose', kind: 'action',
         note: 'Release the subscription and clear local state. Reset reconstructs a usable view.'},
     ],
-    composedBy: ['pitch-view'],
+    composedBy: ['score-pitch-view'],
   },
 };

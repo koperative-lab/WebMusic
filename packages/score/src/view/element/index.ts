@@ -12,12 +12,12 @@ export {
   type ScoreViewConfiguration,
   type ScoreViewOptionsByType,
 } from './score-view';
-export {PitchViewElement, definePitchViewElement, type PitchViewType} from './pitch-view';
-export {SheetViewElement, defineSheetViewElement} from './sheet-view';
+export {PitchViewElement, definePitchViewElement, type PitchViewType} from './score-pitch-view';
+export {SheetViewElement, defineSheetViewElement} from './score-sheet-view';
 
 import {defineScoreViewElement} from './score-view';
-import {definePitchViewElement} from './pitch-view';
-import {defineSheetViewElement} from './sheet-view';
+import {definePitchViewElement} from './score-pitch-view';
+import {defineSheetViewElement} from './score-sheet-view';
 
 /** Register the three view families. Idempotent and SSR-safe. */
 export function defineAllViewElements(): void {

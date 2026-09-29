@@ -1,14 +1,14 @@
 ---
 import ElementPlayground from '../ElementPlayground.astro';
 const playerId = 'pg-pitch-view-player';
-const SRC = `${import.meta.env.BASE_URL}midi/demo.mid`;
+const SRC = `${import.meta.env.BASE_URL}midi/Arabesque%20No.1.mid`;
 const companions = [{tag: 'score-player', target: 'score-player'}];
 ---
 
-<ElementPlayground tag="pitch-view" markup="[data-pitch-composition]" companions={companions} class="pg-pitch-view">
+<ElementPlayground tag="score-pitch-view" markup="[data-pitch-composition]" companions={companions} class="pg-pitch-view">
   <div data-pitch-composition data-pg-fragment>
     <score-player id={playerId} src={SRC}></score-player>
-    <pitch-view player={`#${playerId}`}></pitch-view>
+    <score-pitch-view player={`#${playerId}`}></score-pitch-view>
   </div>
 </ElementPlayground>
 

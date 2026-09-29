@@ -89,7 +89,7 @@ ${componentSurfaceCss('mixer', {
   radius: 'var(--wm-mixer-radius, var(--wm-control-radius, 0))',
   background: 'var(--wm-mixer-background, var(--wm-surface, #fff))',
 })}
-inline-size:100%; min-inline-size:0; max-inline-size:100%; color:var(--wm-mixer-text,var(--wm-foreground,#444)); font:.8rem/1.35 var(--wm-font-family,var(--wm-font,system-ui,sans-serif)); }
+inline-size:100%; min-inline-size:0; max-inline-size:100%; color:var(--wui-mixer-text,var(--wm-mixer-text,var(--wm-foreground,#444))); font:.8rem/1.35 var(--wm-font-family,var(--wm-font,system-ui,sans-serif)); }
 :where(.wui-mixer__board,.wui-mixer__channels) { display:flex; gap:.75rem; align-items:flex-start; min-inline-size:0; }
 :where(.wui-mixer__transport) { display:flex; flex-wrap:wrap; gap:.35rem; margin-bottom:.65rem; }
 /* Leave room inside the scroller for the shared fader's focus outline. */
@@ -99,13 +99,13 @@ inline-size:100%; min-inline-size:0; max-inline-size:100%; color:var(--wm-mixer-
 :where(.wui-mixer__master .wui-mixer__label) { font-weight:700; }
 :where(.wui-mixer__label) { font-size:.8rem; color:inherit; max-inline-size:7rem; min-block-size:2.7em; overflow-wrap:anywhere; text-align:center; }
 :where(.wui-mixer__actions) { display:flex; gap:.25rem; }
-:where(.wui-mixer__button) { appearance:none; box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center; border:1px solid var(--wm-mixer-button-border,var(--wm-mixer-border,${controlBorderFallback})); background:var(--wm-mixer-button,var(--wm-surface,#fff)); color:var(--wm-mixer-text,var(--wm-foreground,#444)); font:inherit; min-inline-size:2rem; min-block-size:${controlHeight('mixer')}; padding:.25rem; border-radius:${controlRadius('mixer')}; cursor:pointer; }
-:where(.wui-mixer__button[aria-pressed="true"]) { background:var(--wm-mixer-fill,var(--wm-accent,#111)); color:var(--wm-mixer-active-text,var(--wm-accent-foreground,#fff)); }
+:where(.wui-mixer__button) { appearance:none; box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center; border:1px solid var(--wm-mixer-button-border,var(--wm-mixer-border,${controlBorderFallback})); background:var(--wm-mixer-button,var(--wm-surface,#fff)); color:var(--wui-mixer-text,var(--wm-mixer-text,var(--wm-foreground,#444))); font:inherit; min-inline-size:2rem; min-block-size:${controlHeight('mixer')}; padding:.25rem; border-radius:${controlRadius('mixer')}; cursor:pointer; }
+:where(.wui-mixer__button[aria-pressed="true"]) { background:var(--wui-mixer-active-background,var(--wm-mixer-fill,var(--wm-accent,#111))); color:var(--wm-mixer-active-text,var(--wm-accent-foreground,#fff)); }
 :where(.wui-mixer__button:focus-visible,.wui-mixer__channels:focus-visible) { outline:2px solid var(--wm-focus,var(--wm-foreground,#111)); outline-offset:2px; }
 :where(.wui-mixer__button:disabled) { opacity:.45; cursor:default; }
 :where(.wui-mixer__fader) { display:block; }
 /* The strip's own tokens, handed to the shared fader that paints the track. */
-:where(.wui-mixer__input) { --wm-fader-width:var(--wm-mixer-fader-width,2rem); --wm-fader-height:var(--wm-mixer-fader-height,96px); --wm-fader-track:var(--wm-mixer-track,var(--wm-surface-muted,#f3f3f3)); --wm-fader-track-border:var(--wm-mixer-track-border,${controlBorderFallback}); --wm-fader-fill:var(--wm-mixer-fill,var(--wm-accent,#999)); --wm-fader-thumb:var(--wm-mixer-thumb,var(--wm-foreground,#111)); --wm-fader-handle:var(--wm-mixer-handle,.7rem); --wm-fader-radius:var(--wm-mixer-radius,var(--wm-control-radius,0)); }
+:where(.wui-mixer__input) { --wm-fader-width:var(--wm-mixer-fader-width,2rem); --wm-fader-height:var(--wm-mixer-fader-height,96px); --wm-fader-track:var(--wui-mixer-track,var(--wm-mixer-track,var(--wm-surface-muted,#f3f3f3))); --wm-fader-track-border:var(--wui-mixer-track-border,var(--wm-mixer-track-border,${controlBorderFallback})); --wm-fader-fill:var(--wui-mixer-fill,var(--wm-mixer-fill,var(--wm-accent,#999))); --wm-fader-thumb:var(--wm-mixer-thumb,var(--wm-foreground,#111)); --wm-fader-handle:var(--wm-mixer-handle,.7rem); --wm-fader-radius:var(--wm-mixer-radius,var(--wm-control-radius,0)); }
 `;
 
 export function mountMixer(

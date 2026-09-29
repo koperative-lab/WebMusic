@@ -19,29 +19,29 @@ not replace the historical proposal or authorize new components.
 - **A beat axis does not depend on downbeats.** Original Section 7 rejected
   `units="beats"` as unavailable because no producer supplied
   `BeatGrid.downbeats`. That inference does not hold.
-  [BeatGrid](https://github.com/mrsteamedbun/WebMusic/blob/f074cd8b5f7cdf8f288c77d988384a359c873cfb/packages/audio/src/core/time/BeatGrid.ts) defines downbeats
+  [BeatGrid](../../packages/audio/src/core/time/BeatGrid.ts) defines downbeats
   as an optional subset marking bar starts; `secondsToBeat()` and
   `beatToSeconds()` use beats and bpm.
-  [Tempo analysis](https://github.com/mrsteamedbun/WebMusic/blob/f074cd8b5f7cdf8f288c77d988384a359c873cfb/packages/audio/src/analyze/core/tempo.ts) produces
+  [Tempo analysis](../../packages/audio/src/analyze/core/tempo.ts) produces
   ordinary beats, which
-  [audio-analysis-timeline](https://github.com/mrsteamedbun/WebMusic/blob/f074cd8b5f7cdf8f288c77d988384a359c873cfb/packages/audio/src/analyze/element/audio-analysis-timeline.ts)
-  already displays. Downbeats only add optional bar labels. The gap is
+  the former [audio-analysis-timeline](../design/AUDIO-ANALYZE-COMPONENTS.md)
+  displayed at that baseline. Downbeats only add optional bar labels. The gap is
   automatic downbeat/bar detection, not unavailable beat-axis data. Whether
   a separate ruler tag is useful remains a distinct design question.
 - **"All of them shipped" overstates delivery.** Original Section 7 describes
   all differentiators of the waveform/spectrogram split as delivered, but
   the original list includes `webaudio:probe {seconds, frequency, db}`. That
   event is absent from the
-  [audio-view implementation](https://github.com/mrsteamedbun/WebMusic/blob/f074cd8b5f7cdf8f288c77d988384a359c873cfb/packages/audio/src/view/element/audio-view.ts),
+  [audio-view implementation](../../packages/audio/src/view/element/audio-view.ts),
   and the `audio-color-scale` binding was not delivered. The paragraph's
   named features — `peaks-src`, `annotate`, waveform attributes,
   `.frequencyData` and empty states — are a delivered subset, not acceptance
   evidence for every item in the original list.
 - **Shared prerequisites landed.**
-  [LiveScrollBuffer / createLiveViewController](https://github.com/mrsteamedbun/WebMusic/blob/f074cd8b5f7cdf8f288c77d988384a359c873cfb/packages/audio/src/view/headless/live.ts)
-  and [AudioRecorder.inputAnalyser](https://github.com/mrsteamedbun/WebMusic/blob/f074cd8b5f7cdf8f288c77d988384a359c873cfb/packages/audio/src/play/headless/recorder.ts),
+  [LiveScrollBuffer / createLiveViewController](../../packages/audio/src/view/headless/live.ts)
+  and [AudioRecorder.inputAnalyser](../../packages/audio/src/play/headless/recorder.ts),
   marked absent in original Section 2, now exist and are used by
-  [audio-live-view](https://github.com/mrsteamedbun/WebMusic/blob/f074cd8b5f7cdf8f288c77d988384a359c873cfb/packages/audio/src/view/element/audio-live-view.ts).
+  [audio-live-view](../../packages/audio/src/view/element/audio-live-view.ts).
   The original statements describe the implementation before those additions.
 - **Counts and integration steps are historical.** The closing 30-element,
   five-per-capability count describes an earlier release surface. A later

@@ -372,6 +372,31 @@ describe('TransportGroup lifecycle hardening', () => {
     group.dispose();
   });
 
+  it('stops followers after a natural master stop with drift checks disabled', async () => {
+    const world = makeWorld();
+    const group = makeGroup(world, {
+      driftCheckIntervalMs: 0,
+      tick: {intervalMs: 25, createWorker: () => null},
+    });
+    await group.dispatch({type: 'play'});
+    expect(vi.getTimerCount()).toBe(1);
+
+    world.advance(1);
+    world.follower.seek(world.follower.position + 0.2);
+    await vi.advanceTimersByTimeAsync(25);
+    expect(world.follower.position - world.master.position).toBeCloseTo(0.2, 9);
+
+    world.masterClock.pause(world.now());
+    world.masterClock.seekTo(0, world.now());
+    group.setLoop(null); // an out-of-band stop must not lose its watcher
+    await vi.advanceTimersByTimeAsync(25);
+
+    expect(world.follower.running).toBe(false);
+    expect(group.snapshot).toMatchObject({paused: true, pending: false});
+    expect(vi.getTimerCount()).toBe(0);
+    group.dispose();
+  });
+
   it('contains watcher read failures and pauses participants before reporting them', async () => {
     const world = makeWorld();
     const master = Object.assign(world.master, {
@@ -392,6 +417,48 @@ describe('TransportGroup lifecycle hardening', () => {
     expect(world.follower.running).toBe(false);
     expect(vi.getTimerCount()).toBe(0);
     group.dispose();
+  });
+
+  it('reports a persistent clock-position failure after pausing the session', async () => {
+    const world = makeWorld();
+    let failReads = false;
+    const clock = world.masterClock;
+    Object.defineProperty(world.master, 'clock', {
+      get: () => ({
+        get state() { return clock.state; },
+        get rate() { return clock.rate; },
+        get paused() { return clock.paused; },
+        get holding() { return clock.holding; },
+        positionAt(t: number) {
+          if (failReads) throw new Error('position unavailable');
+          return clock.positionAt(t);
+        },
+        timeAt(position: number) { return clock.timeAt(position); },
+      }),
+    });
+    const failures: Array<{operation: string; error: unknown}> = [];
+    const group = new TransportGroup(world.master, world.now, {
+      driftCheckIntervalMs: 25,
+      tick: {createWorker: () => null},
+      onOperationError(operation, error) { failures.push({operation, error}); },
+    });
+    group.addFollower(world.follower);
+    const events: string[] = [];
+    group.subscribe((event) => events.push(event.type));
+    await group.dispatch({type: 'play'});
+    world.advance(0.1); // past the scheduled follower join
+    failReads = true;
+
+    await vi.advanceTimersByTimeAsync(25);
+    expect(failures).toHaveLength(1);
+    expect(failures[0]).toMatchObject({operation: 'transport monitor'});
+    expect((failures[0].error as Error).message).toBe('position unavailable');
+    expect(events).toContain('operation-error');
+    expect(world.masterClock.paused).toBe(true);
+    expect(world.follower.running).toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
+    expect(() => group.dispose()).not.toThrow();
+    expect(group.snapshot.disposed).toBe(true);
   });
 
   it('wraps a whole-piece loop even when the master finishes first', async () => {
@@ -415,6 +482,98 @@ describe('TransportGroup lifecycle hardening', () => {
     world.advance(0.06);
     expect(world.follower.running).toBe(true);
     expect(world.follower.position).toBeCloseTo(world.master.position, 9);
+  });
+
+  it('pauses a still-running follower before a naturally stopped master wraps', async () => {
+    const world = makeWorld();
+    const group = makeGroup(world, {
+      loop: {startSeconds: 0, endSeconds: 2},
+      tick: {intervalMs: 25, createWorker: () => null},
+    });
+    await group.play();
+    world.advance(2.001);
+    world.masterClock.pause(world.now());
+    world.masterClock.seekTo(0, world.now());
+    expect(world.follower.running).toBe(true);
+
+    const seek = world.follower.seek.bind(world.follower);
+    const runningAtSeek: boolean[] = [];
+    world.follower.seek = (position: number) => {
+      runningAtSeek.push(world.follower.running);
+      seek(position);
+    };
+    await vi.advanceTimersByTimeAsync(25);
+
+    expect(runningAtSeek[0]).toBe(false);
+    group.dispose();
+  });
+
+  it('does not let a failed old loop wrap pause a newer play command', async () => {
+    const world = makeWorld();
+    const group = makeGroup(world, {
+      loop: {startSeconds: 0, endSeconds: 2},
+      tick: {intervalMs: 25, createWorker: () => null},
+    });
+    await group.play();
+    world.advance(2.001);
+    world.masterClock.pause(world.now());
+    world.masterClock.seekTo(0, world.now());
+    let rejectWrap!: (error: Error) => void;
+    world.master.seekPosition = () => new Promise<void>((_resolve, reject) => {
+      rejectWrap = reject;
+    });
+    await vi.advanceTimersByTimeAsync(25);
+
+    group.pause();
+    const latestPlay = group.play();
+    rejectWrap(new Error('old wrap failed'));
+    await latestPlay;
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(group.snapshot.paused).toBe(false);
+    expect(world.follower.running).toBe(true);
+    group.dispose();
+  });
+
+  it('does not enqueue an extra play when an old loop wrap settles during a newer start', async () => {
+    const world = makeWorld();
+    const group = makeGroup(world, {
+      loop: {startSeconds: 0, endSeconds: 2},
+      tick: {intervalMs: 25, createWorker: () => null},
+    });
+    await group.play();
+    world.advance(2.001);
+    world.masterClock.pause(world.now());
+    world.masterClock.seekTo(0, world.now());
+    let finishWrap!: () => void;
+    world.master.seekPosition = () => new Promise<void>((resolve) => { finishWrap = resolve; });
+    await vi.advanceTimersByTimeAsync(25);
+
+    const start = world.master.play.bind(world.master);
+    let finishStart!: () => void;
+    let freshStarts = 0;
+    world.master.play = (when?: number) => {
+      freshStarts += 1;
+      if (freshStarts !== 1) return start(when);
+      return new Promise<void>((resolve) => {
+        finishStart = () => { void start(when).then(resolve); };
+      });
+    };
+    const playCommands: number[] = [];
+    group.subscribe((event) => {
+      if (event.type === 'invalidate' && event.command.type === 'play') {
+        playCommands.push(event.revision);
+      }
+    });
+    group.pause();
+    const latestPlay = group.play();
+    finishWrap();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(playCommands).toHaveLength(1);
+    finishStart();
+    await latestPlay;
+    group.dispose();
   });
 
   it('validates options and disposes every member even when one throws', () => {
@@ -598,14 +757,85 @@ describe('MirrorClockMaster (clockless fallback)', () => {
     group.addFollower(follower);
 
     await group.play();
-    world.advance(2.05); // sail past the transport's own end
-    await vi.advanceTimersByTimeAsync(100); // first check samples the pin
+    for (let step = 0; step < 20; step += 1) {
+      world.advance(0.1);
+      await vi.advanceTimersByTimeAsync(100); // observe motion before the end
+    }
     world.advance(0.1);
-    await vi.advanceTimersByTimeAsync(100); // second check: stalled → settle
+    await vi.advanceTimersByTimeAsync(100);
+    world.advance(0.1);
+    await vi.advanceTimersByTimeAsync(100); // pinned beyond the learned step → settle
 
     expect(follower.running).toBe(false);
     expect(group.clock.paused).toBe(true);
     expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('detects a clockless master ending with drift checks disabled', async () => {
+    const world = makeClocklessWorld(2);
+    const master = new MirrorClockMaster(world.inner, world.now);
+    master.setRate(0.1); // below the distance covered by one 250 ms sample
+    let running = false;
+    const group = new TransportGroup(master, world.now, {
+      driftCheckIntervalMs: 0,
+      tick: {intervalMs: 25, createWorker: () => null},
+    });
+    group.addFollower({
+      play() { running = true; },
+      pause() { running = false; },
+      stop() { running = false; },
+      seek() {},
+      get position() { return 0; },
+      get running() { return running; },
+    });
+    await group.play();
+    for (let step = 0; step < 80; step += 1) {
+      world.advance(0.25);
+      await vi.advanceTimersByTimeAsync(250); // collect moving samples
+    }
+    expect(running).toBe(true);
+    for (let step = 0; step < 3; step += 1) {
+      world.advance(0.25);
+      await vi.advanceTimersByTimeAsync(250);
+    }
+
+    expect(group.clock.paused).toBe(true);
+    expect(running).toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
+    group.dispose();
+  });
+
+  it('keeps a slow quantized clockless master playing through repeated positions', async () => {
+    const world = makeClocklessWorld();
+    const inner = world.inner;
+    const quantized: ClocklessMasterTransport = {
+      ...inner,
+      get position() { return Math.round(inner.position * 10) / 10; },
+    };
+    const master = new MirrorClockMaster(quantized, world.now);
+    master.setRate(0.1);
+    let running = false;
+    const group = new TransportGroup(master, world.now, {
+      driftCheckIntervalMs: 0,
+      tick: {intervalMs: 25, createWorker: () => null},
+    });
+    group.addFollower({
+      play() { running = true; },
+      pause() { running = false; },
+      stop() { running = false; },
+      seek() {},
+      get position() { return 0; },
+      get running() { return running; },
+    });
+    await group.play();
+
+    for (let step = 0; step < 20; step += 1) {
+      world.advance(0.25);
+      await vi.advanceTimersByTimeAsync(250);
+      expect(group.clock.paused).toBe(false);
+      expect(running).toBe(true);
+    }
+    group.dispose();
   });
 });
 

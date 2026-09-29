@@ -1,0 +1,137 @@
+---
+title: '@webmusic/ui/oscilloscope'
+description: 'An inspectable time-domain waveform with caller-supplied trace, trigger state and time-amplitude probe commands.'
+sidebar:
+  label: 'oscilloscope'
+  order: 6
+---
+
+import UiPresenterLiveDemo from '../../../../components/UiPresenterLiveDemo.astro';
+import UiPresenterRelated from '../../../../components/UiPresenterRelated.astro';
+
+`mountOscilloscope()` draws one bounded waveform window and owns the controls
+for timebase, trigger, freeze and probing. The caller supplies sampled data
+and chooses whether those controls alter capture or only the displayed frame.
+The presenter does not open an audio graph or know a player's clip position.
+For a ready player-connected composition, use
+[`<audio-oscilloscope>`](/audio/element/analyze/audio-oscilloscope/).
+
+<UiPresenterLiveDemo presenter="oscilloscope" />
+
+## Import
+
+```ts
+import {mountOscilloscope, type OscilloscopeState} from '@webmusic/ui/oscilloscope';
+
+const state: OscilloscopeState = {
+  trace: {samples: new Float32Array([0, 0.4, 0, -0.4, 0]), timebaseMs: 10, triggered: true, silent: false},
+  availableTimeMs: 50,
+  timebaseMs: 10,
+  triggerLevel: 0,
+  triggerEdge: 'rising',
+  frozen: false,
+  status: 'live',
+};
+const handle = mountOscilloscope(host, {
+  snapshot: () => state,
+  setFrozen: (value) => { state.frozen = value; handle.update(); },
+  setTimebaseMs: (value) => { state.timebaseMs = value; handle.update(); },
+  setTriggerLevel: (value) => { state.triggerLevel = value; handle.update(); },
+  setTriggerEdge: (value) => { state.triggerEdge = value; handle.update(); },
+  probe: (timeMs, amplitude) => inspect(timeMs, amplitude),
+});
+// Call handle.update() after replacing the trace; destroy on removal.
+```
+
+The caller owns `host`, `state`, the signal and `inspect()`. The commands
+above merely update demonstration state; a real caller projects a new trace
+from its own source and notifies the presenter. An optional `subscribe()`
+binding may call `update()` when that state changes.
+
+## Window and trigger
+
+`trace.samples` are linear sample amplitudes along `trace.timebaseMs`
+milliseconds. The presenter plots exactly that caller-provided window. It
+does not detect a crossing or retune an analyser: `triggerEdge`,
+`triggerLevel`, `availableTimeMs` and `timebaseMs` are caller state and command
+inputs. The [shared presenter shape](/uikit/api/#the-shared-presenter-shape)
+governs host replacement and cleanup. New source identity and obsolete trace
+rejection belong to the caller; `destroy()` removes this presenter's observer,
+subscription, listeners, nodes and installed style, not the audio source.
+
+<details class="component-section">
+<summary>API</summary>
+
+**State and trace**
+
+| Member | Kind | Default | Description |
+|---|---|---|---|
+| `trace` | `OscilloscopeTrace?` | absent | Current `{samples, timebaseMs, triggered}` window. With no trace, the plot has no waveform. |
+| `trace.samples` | `ArrayLike<number>` | required in trace | Linear amplitudes painted from left to right; the caller owns the data. |
+| `trace.timebaseMs` | `number` | required in trace | Elapsed milliseconds across the displayed sample window. |
+| `trace.triggered` | `boolean` | required in trace | Whether the caller found an eligible edge; controls the visible live-status wording. |
+| `trace.silent` | `boolean` | required in trace | Whether the sampled window is silent; displays "No signal" rather than a matching-edge message. |
+| `availableTimeMs` | `number` | required | Maximum sampled window available for the timebase control; invalid or non-positive values fall back to `100`. |
+| `timebaseMs` | `number` | required | Requested visible milliseconds, clamped in the control to the available window. |
+| `triggerLevel` | `number` | required | Linear amplitude threshold shown by the trigger line and native range input (`-1..1`). |
+| `triggerEdge` | `'off' \| 'rising' \| 'falling'` | required | Selected native edge control. `off` is free-run display. |
+| `frozen` | `boolean` | required | Freeze button state; the caller decides whether to keep replacing `trace`. |
+| `status` | `'waiting' \| 'live' \| 'paused' \| 'unavailable' \| 'frozen'` | required | Visible status message. |
+
+**Binding, options and handle**
+
+| Member | Kind | Default | Description |
+|---|---|---|---|
+| `snapshot()` | `() => OscilloscopeState` | required | Reads the latest caller-owned trace and controls. |
+| `setFrozen(value)` | `(boolean) => void` | required | Called by the native Freeze button. |
+| `setTimebaseMs(value)` | `(number) => void` | required | Called by the timebase range control, in milliseconds. |
+| `setTriggerLevel(value)` | `(number) => void` | required | Called by the trigger range control, in linear sample amplitude. |
+| `setTriggerEdge(value)` | `(OscilloscopeTriggerEdge) => void` | required | Called by the rising/falling/off select. |
+| `probe(timeMs, amplitude)` | `(number, number \| undefined) => void` | optional | Reports a changed probe position and nearest sample amplitude, if present. Time is relative to the displayed window. |
+| `subscribe(notify)` | `(callback) => () => void` | optional | Caller notifications for repaint; the handle also offers `update()`. |
+| `label` | `string` | `'Oscilloscope'` | Accessible group name. |
+| `onError` | `(unknown) => void` | absent | Receives snapshot, command, drawing, resize or cleanup failures. |
+| `stylesheet` | `boolean` | `true` | Install this presenter's stylesheet for this mount. |
+| `element` | `HTMLElement` | mounted root | Group root with `part="root surface"`. |
+| `selectedTimeMs` | `number` | `0` | Read-only current probe position from the displayed window's left edge. |
+| `update()` | `() => void` | - | Read `snapshot()` and redraw the display and native controls. |
+| `destroy()` | `() => void` | - | Release observer, subscription, controls, nodes and owned style. |
+
+**Accessibility.** The canvas is a focusable slider named "Inspect waveform
+time", with the selected time and optional amplitude in `aria-valuetext` and
+a matching text readout outside the canvas. Pointer movement probes the
+window. Arrow keys move by one percent, Shift+Arrow by ten percent, and
+Home/End select the ends. Freeze is a native `aria-pressed` button; trigger
+and timebase use labelled native controls. The status is a live status region.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+The public root class is `.wui-oscilloscope`. Public parts are `root surface`,
+`header`, `readout`, `plot`, `controls`, `freeze`, `timebase`,
+`trigger-level`, `trigger-edge` and `status`. There are no `classNames` or
+`parts` mount options; internal `.wui-oscilloscope__*` selectors describe
+implementation nodes. `stylesheet:false` skips this mount's stylesheet but
+does not remove caller-owned or previously installed CSS.
+
+| Token | Fallback | Controls |
+|---|---|---|
+| `--wm-oscilloscope-foreground` | `--wm-foreground`, then dark ink | Root text. |
+| `--wm-oscilloscope-muted` | gray | Readout and status text. |
+| `--wm-oscilloscope-height` | `11rem` | Plot height, minimum `7rem`. |
+| `--wm-oscilloscope-plot-background` | dark ink | Canvas CSS background. |
+| `--wm-oscilloscope-accent` | teal | Range-input accent. |
+| `--wm-oscilloscope-border` | `--wm-border`, then gray | Native select and button borders. |
+| `--wm-oscilloscope-control-background` | `--wm-surface`, then white | Select and button backgrounds. |
+| `--wm-oscilloscope-selected-background`, `--wm-oscilloscope-selected-border` | pale mint / teal | Pressed Freeze button. |
+| `--wm-focus` | browser Highlight | Focus outlines. |
+
+The canvas currently paints its trace, grid, trigger line and probe with fixed
+colors, so CSS tokens alone do not recolor those pixels. Its geometry follows
+the caller's trace and the rendered host width.
+
+</details>
+
+<UiPresenterRelated presenter="oscilloscope" />

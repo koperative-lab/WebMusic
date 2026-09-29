@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import {afterEach, describe, expect, it, vi} from 'vitest';
-import {PitchViewElement, definePitchViewElement, type PitchViewType} from '../../src/view/element/pitch-view';
+import {PitchViewElement, definePitchViewElement, type PitchViewType} from '../../src/view/element/score-pitch-view';
 import {currentFretMarks, currentStaffMarks, parseViewTuning} from '../../src/view/core/pitch-readout';
 
 definePitchViewElement();
@@ -21,7 +21,7 @@ function player(midis: readonly number[] = []) {
 }
 
 function mount(type: PitchViewType) {
-  const element = document.createElement('pitch-view') as PitchViewElement;
+  const element = document.createElement('score-pitch-view') as PitchViewElement;
   element.setAttribute('type', type);
   element.setAttribute('player', '#player');
   element.setAttribute('data-motion', 'none');
@@ -40,7 +40,7 @@ function drawn(element: Element): number[] {
 
 afterEach(() => { document.body.replaceChildren(); vi.restoreAllMocks(); });
 
-describe('passive pitch-view types', () => {
+describe('passive score-pitch-view types', () => {
   it('draws the same initial notes in three sibling surfaces without nesting controls', () => {
     const source = player([60, 64, 67]);
     const keyboard = mount('keyboard');
@@ -49,7 +49,7 @@ describe('passive pitch-view types', () => {
     for (const surface of [keyboard, staff, fretboard]) {
       expect(surface.active).toEqual([60, 64, 67]);
       expect(drawn(surface)).toEqual([60, 64, 67]);
-      expect(surface.querySelector('button, input, pitch-view, [role="tablist"]')).toBeNull();
+      expect(surface.querySelector('button, input, score-pitch-view, [role="tablist"]')).toBeNull();
       expect(surface.querySelector('[role="img"]')?.getAttribute('aria-label')).toContain('C4');
     }
     expect(staff.querySelectorAll('svg')).toHaveLength(1);
@@ -268,9 +268,9 @@ describe('pitch-view composition and lifetime', () => {
     const surface = mount('keyboard');
     expect(surface.style.display).toBe('');
     expect(surface.style.inlineSize).toBe('');
-    const layout = [...surface.querySelectorAll('style')].find((style) => style.textContent?.includes(':where(pitch-view)'))!;
+    const layout = [...surface.querySelectorAll('style')].find((style) => style.textContent?.includes(':where(score-pitch-view)'))!;
     expect(layout.textContent).toContain('inline-size: 100%; min-inline-size: 0;');
-    expect(layout.textContent).toContain(':where(pitch-view:not([hidden]))');
+    expect(layout.textContent).toContain(':where(score-pitch-view:not([hidden]))');
     surface.style.inlineSize = '240px';
     surface.style.display = 'inline-block';
     surface.setAttribute('type', 'staff');

@@ -36,19 +36,16 @@ Examples should make those entry points and their ownership boundaries visible.
 Longer-term DAW or music installation compositions are direction, not evidence
 that the repository already ships a finished application.
 
-First-release sidebar order: **Introduction · Quick Start · Agent Toolkit · Score ·
-UI Kit · Kernel**. Agent Toolkit provides consumer-facing context and instructions;
+Sidebar order: **Introduction · Quick Start · Agent Toolkit · Score · Audio · Bridge · UI Kit ·
+Kernel**. Score and Audio organize the domain material; Bridge joins the two;
 UI Kit provides presentation; Kernel exposes shared platform contracts.
-Audio and Bridge are deferred design scope. This `main` site has no Audio or
-Bridge pages, demos or navigation; the family conventions apply when that scope
-is introduced.
 
 | Section shape | Sections | Page groups |
 |---|---|---|
-| Site | Introduction, Quick Start, Agent Toolkit | Orientation, first working examples and agent context |
-| Domain family | Score | Family page, Web Components, Headless, API |
+| Site | Introduction, Quick Start, Agent Toolkit | Orientation, first working examples and main-owned agent integration guidance |
+| Domain family | Score, Audio | Family page, Web Components, Headless, API |
 | Presenter layer | UI Kit | Overview, Catalog, functional presenter classes, root API |
-| Platform package | Kernel | Overview and API |
+| Platform package | Bridge, Kernel | Overview, API; Bridge also has a domain Headless group |
 
 Within each family's Web Components and Headless groups, capabilities are ordered
 **Play, Analyze, View**. Score also has I/O API pages; React belongs to the API
@@ -67,7 +64,7 @@ directory; `sidebar.label` is navigation wording, while `title` names the thing.
 | Introduction | `/` | Product and package orientation; `index.mdx` |
 | Quick Start | `/quick-start/` | First useful interaction and onward routing |
 | Agent Toolkit | `/agent-toolkit/` | Context downloads, reusable skill and application instructions |
-| Family page | `/<family>/` | Scope, capability navigation, full setup and links to usage references |
+| Family page | `/<family>/` | Scope, capability navigation and full setup; Audio also owns its reviewed progressive workflow |
 | Web Components inventory | `/<family>/element/` | Every tag by capability, composition, registration and shared theming |
 | Element/workflow | `/<family>/element/<capability>/<tag>/` | Element template; dense order from 1 |
 | Headless inventory | `/<family>/headless/` | Export ownership and navigation, per capability |
@@ -75,23 +72,38 @@ directory; `sidebar.label` is navigation wording, while `title` names the thing.
 | Root API | `/<family>/api/` | Package root reference and complete subpath inventory |
 | Capability/API entry | `/<family>/api/<entry>/` | API template, including related sub-entries without separate pages |
 
+DEC-022 refines the **Score** family route: it owns orientation, capability
+navigation, installation and registration, while Quick Start owns the first
+composed player example and the owning references hold detailed walkthroughs.
+Score public pages and parameter catalogs use main as their baseline; DEC-032
+records the explicitly requested independent Score Recorder page and demo, and
+DEC-033 aligns Analyze demos with the shared composition layout. DEC-034
+adds the shared component frame and padding to Score Analyze itself; demos use
+those package defaults. DEC-045 gives Score Element page routes the same domain
+prefix as Audio while preserving redirects from the former tag-named paths.
+Site integration provides their canonical dependencies and routes. Agent Toolkit
+retains its established behavior and page organization. Audio and Bridge add their own references
+and workflows, with necessary shared UI contracts documented at the existing
+canonical presenter pages.
+
 An independent element normally owns a tag-named page. A declarative child or
 attached companion can be documented on its host workflow, with an explicit
-section and catalog destination. For example, `rack-part` belongs to
-`rack-control`, and `score-recorder` belongs to `note-input/#score-recorder`.
-Its complete contract remains discoverable there; sharing a page does not
-remove its API reference requirement.
+section and catalog destination. For example, `score-rack-part` belongs to
+`score-rack-control`. Score Recorder owns `/score/element/play/score-recorder/`, with
+a linked score-note-input demo, as the symbolic counterpart of Audio Recorder.
+Note Input owns input surfaces and links to that recording workflow. Each tag
+retains one complete API reference, whether standalone or shared.
 
 A consolidated element with several `type` values stays on one page with a
 mode control, not a page per drawing. The capability's anchor is ordered first
 where one exists, followed by other elements in useful reading order.
 
 Family-level `element/index.mdx` and `headless/index.mdx` are the inventories,
-with one section per capability. Each appears as an Overview link under its
-Web Components or Headless sidebar group; capability groups then expand straight
-to their owning pages. The family page and API pages also link the inventories
-where a reader needs the whole list. They carry selection, registration, export
-ownership and shared theming — not duplicated member reference.
+with one section per capability. They are hidden from the sidebar, so a
+capability group expands straight to its owning pages; the family page and the
+API pages link the inventory where a reader needs the whole list. They carry
+selection, registration, export ownership and shared theming — not duplicated
+member reference.
 
 ### UI Kit
 
@@ -106,6 +118,13 @@ ownership and shared theming — not duplicated member reference.
 | Views and analysis | `/uikit/views-analysis/<presenter>/` | Presenter pages |
 | Layout and feedback | `/uikit/layout-feedback/<presenter>/` | Presenter pages |
 | Root API | `/uikit/api/` | Root entry inventory and the shared presenter shape |
+
+DEC-023 accepts six functional UI groups: Transport and navigation, Parameters
+and modulation, Mixing and capture, Note input, Views and analysis, and Layout
+and feedback. The catalog, site navigation, public pages and moved-page
+redirects follow that classification. Panel, Stage, Status and Workbench belong
+to Layout and feedback; Track list belongs to Transport and navigation. Audio
+consumers extend composition references within these existing groups.
 
 `UI_PRESENTER_CLASSES` in `apps/doc/shared/ui-presenter-catalog.ts` owns display
 labels. The architecture classification policy constrains presenter membership;
@@ -125,18 +144,28 @@ Presenter classes expand directly to their pages, without a class Overview
 page. Per-presenter State/Binding/Options/Handle and styling live on that
 presenter's page; the shared contract is not copied into every leaf page.
 
-### Kernel
+### Bridge and Kernel
 
 | Page/group | URL | Responsibility |
 |---|---|---|
+| Bridge Overview | `/bridge/` | Cross-family role and when to use it |
+| Reference composition | `/bridge/composition/` | Runnable Score + Audio composition, shared transport, source replacement, late followers and explicit cleanup; links to owning member references |
+| Bridge Headless Overview | `/bridge/headless/` | Navigation to the domain sync object |
+| ScoreAudioSync | `/bridge/headless/score-audio-sync/` | Object and factory lifecycle under the Headless template |
+| Bridge root API | `/bridge/api/` | Every actual root export, linking to the object where appropriate |
 | Kernel Overview | `/kernel/` | Platform scope and admission boundary |
 | Kernel root API | `/kernel/api/` | Root and public sub-entry contracts, grouped by sub-entry |
 
-Bridge pages and navigation are deferred from this `main` checkout. The
-[Architecture](../ARCHITECTURE.md), [Decisions](../DECISIONS.md) and
-[shared-clock design](../../platform/shared-clock-injection.md) own its
-cross-domain boundaries; this plan must specify page routes when Bridge enters
-the site's release scope.
+Bridge has no published `/headless` subpath. Its sync class and factories are
+root exports: list them in the root API Reference and link to their full object
+page. Stateless conversions, role adapters, rendering bridges, and types remain
+on the API page. Do not create a Web Components navigation group without a
+published element.
+
+The Bridge object page can use working prose, links, and demos without assuming
+a catalog generator exists. Any proposed `headless-params/bridge.ts` integration
+is an implementation task until the file and wiring exist; STATUS records it.
+The Headless template defines the content requirement and supported fallback.
 
 Kernel's classes are platform contracts rather than domain objects, so it has
 no Headless documentation group. Its API page groups public sub-entries under
@@ -152,11 +181,10 @@ leaf pages, even when an overview names them as examples.
 ### Introduction — `/`
 
 Owns a short description of WebMusic consistent with PRODUCT, the package-role
-table, and the documentation vocabulary. Explain Score, Kernel and UI roles and
-route to Quick Start. When mentioning Audio and Bridge, distinguish their
-accepted design direction from the packages available in this checkout. Make
-the relationship among Web Components, Headless, and API + UI clear without
-duplicating their complete design rationale.
+table, and the documentation vocabulary. Explain how to choose Score or Audio
+from the source material and route to Quick Start. Make the relationship among
+Web Components, Headless, and API + UI clear without duplicating their complete
+design rationale.
 
 Do not maintain element or object lists, install instructions, or member
 reference here. Link the appropriate inventories and family pages.
@@ -164,7 +192,7 @@ reference here. Link the appropriate inventories and family pages.
 ### Quick Start — `/quick-start/`
 
 Owns the shortest useful interactions and enough setup to run them. Use a small
-Score example; show code-driven usage where it helps
+Score example and a small Audio example; show code-driven usage where it helps
 the reader choose. Route onward to the family pages and the three supported use
 paths rather than trying to demonstrate every layer and option in one page.
 
@@ -172,13 +200,12 @@ Specify required assets, dependencies, gesture entry points, and the actual
 import paths. Link full install details instead of copying the complete setup
 matrix. Model explanation and option walkthroughs belong elsewhere.
 
-### Family page — `/score/`
+### Family page — `/score/`, `/audio/`
 
 One page owns both what the family is and how to start using it. Scope first: a
 capability table giving each capability's purpose and links to its Web
 Components, Headless, and API forms where published. I/O and React route to
-their API references. Explain exclusions and Bridge's intended cross-domain
-role without implying it is available in this release lane.
+their API references. Explain exclusions and the role of Bridge.
 
 The same page then owns full installation and runtime setup for that family:
 bundler/ES modules, registration forms, workspace development, and CDN/global
@@ -186,11 +213,16 @@ use when available. Publication-dependent instructions must reflect verified
 release availability.
 
 The Score family page stays focused on orientation and setup. It has no live
-workbench or capability code walkthroughs. Quick Start owns the first working
-composition; Element, Headless, API and UI presenter pages own their detailed
-examples and member contracts. Link those owners directly from the family page.
-Installation commands and registration guidance remain here. See DEC-022 for
-this refinement of the original family-start decision.
+workbench or capability code walkthroughs under DEC-022. Quick Start owns the
+first working composition; Element, Headless, API and UI presenter pages own
+their detailed examples and member contracts. Link those owners directly from
+the family page. Installation commands and registration guidance remain here.
+
+The Audio family page retains a progressive walkthrough from a working
+component through loading data, playback, analysis, visualization and relevant
+framework or API + UI composition. One Audio workbench demo is appropriate.
+Link reference pages for every member used; keep complete API tables and
+per-capability member prose on their owning pages.
 
 ### Web Components inventory — `/<family>/element/`
 
@@ -202,7 +234,7 @@ reference (`define*`, `defineAll*` where present).
 The selection and registration columns can share one table instead of repeating
 the same tag inventory. Keep member details on the owning element/workflow page.
 The inventory has no live demo; a composition demo belongs in Quick Start or
-on the anchor's topic section.
+on the anchor's topic section. Audio may also use its family page's workbench.
 
 ### Headless inventory — `/<family>/headless/`
 
@@ -210,9 +242,8 @@ Owns each entry's purpose, the shared layer boundary, and export navigation, one
 section per capability. Each value export links to one semantic owner; associated
 types have an identified object/group rather than disappearing from the
 inventory. Explain borrowed and owned resources according to actual contracts,
-not a blanket claim that every object borrows everything. If Bridge gains a
-Headless documentation group, use this content shape for its capability Overview
-despite importing from its root.
+not a blanket claim that every object borrows everything. Bridge uses this
+content shape at its own capability Overview, despite importing from its root.
 
 No demos or complete object references here. The Headless template describes
 how authors reconcile the inventory; existing gates cover only part of that
@@ -234,7 +265,7 @@ Keep Element composition details secondary to presenter browsing. No current
 Element consumer does not mean an unsupported presenter; a behavior-only Element
 has no applicable UI, rather than a pending UI implementation.
 
-### Platform Overview — `/kernel/`
+### Platform Overview — `/bridge/`, `/kernel/`
 
 Owns package purpose, when it is needed, dependency placement, one minimal
 example, and routes to API and relevant Headless pages. Explain the architecture
@@ -281,9 +312,10 @@ does not establish that all anchors work.
 
 A main demo lives on the page owning the demonstrated element, object, or
 presenter. A justified composition/reskin example can live in a topic section.
-Inventories and the Score family page carry no demo; Quick Start provides
-compact working examples. Shared `LiveDemoCanvas` owns
-the stage chrome; templates own the detailed authoring contract.
+Inventories and the Score family page carry no demo; the Audio family page
+may carry its reviewed workbench. Quick Start provides compact working examples.
+Shared `LiveDemoCanvas` owns the stage chrome; templates own the detailed
+authoring contract. STATUS records page migrations still open on dev.
 
 The package root API page owns the complete published subpath inventory.
 Capability entry maps are local navigation derived from that inventory, with
@@ -299,3 +331,11 @@ content, missing generators, check improvements, and migration work belong in
 [plans/docs-site-backlog.md](../plans/docs-site-backlog.md) and audit records routed
 by [DOCUMENTATION-MAP.md](../DOCUMENTATION-MAP.md). Do not recreate Done/Open lists
 inside this plan or individual page templates.
+
+### Audio and Bridge additions
+
+Audio and Bridge own their extra public pages. Their use of shared presenters is
+listed in the canonical UI catalog; actual added State, Binding, Options, Handle
+and lifecycle contracts belong in the same presenter references. Keep main's
+shared orientation, six functional groups and import paths. Application gallery
+experiments do not define this site's package surface.

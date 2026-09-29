@@ -1,0 +1,378 @@
+---
+title: '@webmusic/audio'
+description: The thin, DOM-free Audio root — immutable AudioClip model, regions, beat grid, peaks types, a typed event emitter, and JSON serialization.
+---
+
+The `@webmusic/audio` root is the **foundation** of Audio: the immutable `AudioClip` model, `Region` markers, the `BeatGrid` time map, the `ClipEditSession` editing transaction, the `AudioPeaks` waveform pyramid type, a typed `EventEmitter`, and JSON serialization. This root entry touches no browser APIs (no `AudioContext`, no `AudioBuffer`), so it is safe in Node, workers, and SSR.
+
+It is intentionally thin. Functional APIs live in capability subpaths of the same package:
+
+- **Decode, loading, playback, mixing, recording, effects, and audio export** live in [`@webmusic/audio/play`](/audio/api/play/).
+- **Analysis** (peak computation, tempo/beat detection, …) lives in `@webmusic/audio/analyze`.
+- **Visualization** lives in `@webmusic/audio/view`; its Web Components and those from [`@webmusic/audio/play`](/audio/api/play/) live under each capability's `/element` subpath.
+
+Install `@webmusic/audio` once, then import the root model or a capability entry such as `@webmusic/audio/play` as needed.
+
+## Package subpaths
+
+Every published entry of `@webmusic/audio`, grouped by capability. A
+capability root is its API; `/headless` is code-only domain objects;
+`/element` is side-effect-free Web Component classes and `/auto` registers
+them; `/global` is the browser IIFE. This table is the package map — the
+capability pages below document what is inside each entry.
+
+| Entry | Form | What is there |
+| --- | --- | --- |
+| `@webmusic/audio` | package root | `AudioClip`, `Region`, `BeatGrid`, `ClipEditSession`, `AudioPeaks`, events, JSON — this page. |
+| `@webmusic/audio/play` | [capability root](/audio/api/play/) | Decoding and loading, playback engines, mixing, recording, effects, WAV export. |
+| `@webmusic/audio/play/headless` | [Headless](/audio/headless/#play) | `AudioClipPlayer`, `AudioMixer`, `AudioRecorder`, the playlist controller, `Effect`. |
+| `@webmusic/audio/play/element` | [Web Components](/audio/element/#play) | `<audio-player>`, `<audio-playlist>`, `<audio-mixer>`, `<audio-recorder>`. |
+| `@webmusic/audio/play/auto` | registration | Imports the play elements and registers them on evaluation. |
+| `@webmusic/audio/play/global` | browser IIFE | `<script>`-tag bundle exposing `WebMusicAudioPlay`. |
+| `@webmusic/audio/play/worker-client` · `@webmusic/audio/play/worker-protocol` · `@webmusic/audio/play/worker` | worker triple | Off-main-thread decoding: the client, the wire protocol, and the worker runtime. |
+| `@webmusic/audio/analyze` | [capability root](/audio/api/analyze/) | Peaks, loudness, tempo, key, onsets, pitch, chromagram, spectrogram, features, summaries. |
+| `@webmusic/audio/analyze/headless` | [Headless](/audio/headless/#analyze) | The analysis session, realtime analyzer and streaming transient detector. |
+| `@webmusic/audio/analyze/element` | [Web Components](/audio/element/#analyze) | `<audio-level-analyzer>`, `<audio-meter>`, `<audio-oscilloscope>`, `<audio-spectrum-analyzer>`, `<audio-transient-analyzer>`. |
+| `@webmusic/audio/analyze/auto` | registration | Imports the analyze elements and registers them on evaluation. |
+| `@webmusic/audio/analyze/global` | browser IIFE | `<script>`-tag bundle exposing `WebMusicAudioAnalyze`. |
+| `@webmusic/audio/analyze/transcribe` | code-only sub-entry | `transcribe()` — audio → family-neutral note events, behind an optional peer. |
+| `@webmusic/audio/analyze/worker-client` · `@webmusic/audio/analyze/worker-protocol` · `@webmusic/audio/analyze/worker` | worker triple | Off-main-thread analysis: the client, the wire protocol, and the worker runtime. |
+| `@webmusic/audio/view` | [capability root](/audio/api/view/) | Signal projection: waveform and spectrogram surfaces, colormaps, geometry. |
+| `@webmusic/audio/view/headless` | [Headless](/audio/headless/#view) | `AudioTimeline`, the view models, `LiveScrollBuffer`. |
+| `@webmusic/audio/view/render` | code-only sub-entry | Imperative canvas renderers and the player binding. |
+| `@webmusic/audio/view/element` | [Web Components](/audio/element/#view) | `<audio-view>` and `<audio-live-view>`; also retains `<audio-meter>` as a compatibility export. |
+| `@webmusic/audio/view/auto` | registration | Registers the View elements, including the retained meter compatibility tag. |
+| `@webmusic/audio/view/global` | browser IIFE | `<script>`-tag bundle exposing `WebMusicAudioView`. |
+| `@webmusic/audio/react` | [capability root](/audio/api/react/) | React components and hooks over the three capabilities; React is an optional peer. |
+
+Unlike Score, all three Audio capabilities ship `/auto` and `/global`, and
+Audio has no `/io` — decoding lives inside `play`.
+
+## Install
+
+`npm install @webmusic/audio` — use an available published version or the local workspace; [Install](/audio/#install) has the full setup.
+
+The package root never references `window`, `AudioContext`, or `AudioBuffer` (the one method that *realizes* an `AudioBuffer` takes the context as an argument), so that entry imports cleanly anywhere. Browser and optional-engine dependencies stay behind their capability subpaths.
+
+## The AudioClip Model
+
+`AudioClip` is the digital-audio analogue of Score's `Score`: an **immutable**, frozen container of decoded per-channel samples. It holds `Float32Array` channel data — never an `AudioBuffer`. Its sample arrays can be transferred across workers separately from its sample-free JSON description; transfer or reconstruct those values rather than relying on an `AudioClip` instance to retain its methods after structured cloning. Every "edit" returns a new clip; nothing mutates in place.
+
+```ts
+import { createAudioClip, AudioClipId } from '@webmusic/audio';
+
+// One second of a 440 Hz sine, stereo, at 48 kHz.
+const sampleRate = 48000;
+const left = new Float32Array(sampleRate);
+for (let i = 0; i < left.length; i++) left[i] = Math.sin((2 * Math.PI * 440 * i) / sampleRate);
+const right = left.slice();
+
+const clip = createAudioClip({
+  id: AudioClipId('sine'),
+  sampleRate,
+  channelData: [left, right],
+  metadata: { title: 'A440', artist: 'Audio' },
+});
+
+console.log({
+  duration: clip.duration,          // 1 (seconds: length / sampleRate)
+  length: clip.length,              // 48000 (samples per channel)
+  channels: clip.numberOfChannels,  // 2
+  hasSamples: clip.hasSamples,      // true
+});
+```
+
+A clip can also be **streaming-only** — no decoded samples, just a `sourceUrl` plus a declared `length` / `numberOfChannels`. `channelData(ch)` then returns `null`; the media playback engine in [`@webmusic/audio/play`](/audio/api/play/) can stream it through a host-injected `MediaPlaybackAdapter` (the styled player element supplies the browser adapter automatically):
+
+```ts
+const streaming = createAudioClip({
+  sampleRate: 44100,
+  length: 0,
+  numberOfChannels: 2,
+  sourceUrl: '/mp3/Arabesque%20No.1.mp3',
+});
+console.log(streaming.hasSamples);        // false
+console.log(streaming.channelData(0));    // null
+```
+
+### Reading and realizing samples
+
+```ts
+const mono = clip.channelData(0);   // Float32Array | null (defensive copy)
+const all = clip.channels();        // Float32Array[] | null (copies of every channel)
+
+// Realize a browser AudioBuffer for main-thread playback. Browser-only — it
+// needs a BaseAudioContext — and memoized for this clip's latest context.
+const ctx = new AudioContext();
+const buffer = clip.toAudioBuffer(ctx);
+```
+
+`toAudioBuffer` throws on a streaming clip (no samples) and caches the realized buffer in a module-level `WeakMap`. Consecutive calls for the same clip and context reuse it; using another context replaces that clip's cached buffer.
+
+### Functional updates
+
+All mutators return a new `AudioClip`; the original is untouched and stays frozen.
+
+```ts
+import { createRegion, BeatGrid } from '@webmusic/audio';
+
+// Zero-copy sub-range: channels are `subarray` views, regions are shifted/clipped.
+const middle = clip.slice(0.25, 0.75);
+
+const tagged = clip
+  .withMetadata({ album: 'Etudes' })                // shallow-merged onto existing tags
+  .withRegions([createRegion({ label: 'hook', startSeconds: 0.2, endSeconds: 0.6 })])
+  .withBeatGrid(BeatGrid.fromTempo(120, clip.duration));
+```
+
+`slice` is **zero-copy** for decoded clips: each output channel is a `Float32Array.subarray` into the parent buffer, so slicing a long clip allocates nothing for samples. For a streaming clip, the slice keeps the URL and stores the absolute source offset. Media playback then starts at that offset, reports clip-relative seconds and stops at the slice end. Nested slices retain the correct absolute offset. Regions are translated by the slice offset and dropped if they fall outside the window.
+
+### Serialization
+
+`toJSON()` emits a structured-clone-safe shape that carries **no samples** (they are large and transferable, not JSON). Pair it with `clipFromJSON` — passing the channel arrays alongside (e.g. the `Float32Array`s a decode worker transferred back):
+
+```ts
+import { clipFromJSON } from '@webmusic/audio';
+
+const json = clip.toJSON();          // { $schema, id, sampleRate, length, regions, ... } — NO samples
+const channels = clip.channels()!;    // defensive copies; transfer their buffers to a worker
+
+const rebuilt = clipFromJSON(json, channels);
+// Omit `channels` only for a URL-backed description when a media adapter will
+// stream it. JSON from this in-memory sine clip has no sourceUrl.
+```
+
+#### `AudioClip` members
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `id`, `sampleRate`, `numberOfChannels`, `length`, `duration` | Property | Identity, rate, channel count, samples-per-channel, and seconds (`length / sampleRate`). |
+| `metadata`, `regions`, `beatGrid?`, `sourceUrl?`, `sourceOffsetSeconds?` | Property | Frozen tags, region list, optional beat grid and source URL. The optional absolute source offset marks a bounded streaming slice. |
+| `hasSamples` | Getter | `true` when the clip carries decoded samples (vs. streaming-only). |
+| `channelData(channel)` | Method | A defensive copy of one channel, or `null` when streaming or missing. |
+| `channels()` | Method | Defensive copies of all channels, or `null` when streaming. |
+| `toAudioBuffer(context)` | Method | Realize an `AudioBuffer` (browser-only; throws if no samples); caches the latest context's buffer per clip. |
+| `slice(startSeconds, endSeconds)` | Method | Sub-range: zero-copy PCM views for decoded clips, or URL plus bounded source offset for streaming clips; shifts/clips regions. |
+| `withRegions(regions)` / `withBeatGrid(grid)` / `withMetadata(meta)` | Method | Return a new clip with that field replaced (metadata is merged). |
+| `toJSON()` | Method | Structured-clone-safe JSON **without** samples. |
+| `createAudioClip(init)` | Factory | Alias of the constructor (the `createX` convention). |
+
+## Region — markers and loops
+
+A `Region` is a labelled **point marker** (no `endSeconds`) or a **span** (region / loop) within a clip. Immutable and frozen.
+
+```ts
+import { Region, createRegion } from '@webmusic/audio';
+
+const marker = createRegion({ label: 'drop', startSeconds: 12.5 });          // point (no end)
+const loop = createRegion({ label: 'chorus', startSeconds: 16, endSeconds: 24, loop: true });
+
+console.log(marker.isMarker, marker.durationSeconds);   // true, 0
+console.log(loop.durationSeconds);                       // 8
+const moved = loop.shifted(-4);                          // both ends shift, clamped at 0
+const round = Region.fromJSON(loop.toJSON());            // RegionData ⇄ Region
+```
+
+| Member | Description |
+| --- | --- |
+| `id`, `label`, `startSeconds`, `endSeconds?`, `color?`, `loop?` | Frozen fields (`RegionData` shape). |
+| `isMarker` | `true` when there is no `endSeconds` (a zero-length cue). |
+| `durationSeconds` | `endSeconds - startSeconds`, or `0` for a marker. |
+| `shifted(deltaSeconds)` | New region with both ends moved (clamped at 0). |
+| `toJSON()` / `static fromJSON(data)` | Plain `RegionData` ⇄ `Region`. |
+| `createRegion(init)` | Factory that mints a fresh `RegionId` when omitted. |
+
+## BeatGrid — beat ↔ seconds
+
+`BeatGrid` is the digital-audio analogue of Score's `TimeMap`: once tempo/beats are detected, it anchors an mp3 to a beat grid so it can be looped on bars, scheduled against, or synchronized with a symbolic score. It maps continuous (fractional) **beat position ↔ seconds** and is immutable.
+
+```ts
+import { BeatGrid, beatGridMapping } from '@webmusic/audio';
+
+// Detected beats (seconds), with optional downbeats (bar starts).
+const grid = new BeatGrid({ bpm: 120, beats: [0, 0.5, 1.0, 1.5, 2.0], downbeats: [0, 2.0] });
+
+grid.secondsToBeat(0.75);     // 1.5  (interpolated between beats 1 and 2)
+grid.beatToSeconds(3);        // 1.5  (seconds at beat 3)
+grid.secondsPerBeat();        // 0.5
+const mapping = beatGridMapping(grid); // Kernel TimelineMapping, in beat units
+mapping.positionToSeconds(1.5);        // 0.75
+
+// Or synthesize a uniform grid straight from a constant tempo.
+const uniform = BeatGrid.fromTempo(96, /* durationSeconds */ 8, /* offsetSeconds */ 0);
+```
+
+| Member | Description |
+| --- | --- |
+| `bpm`, `beats`, `downbeats?` | Frozen tempo, ascending beat times (seconds), optional bar starts. |
+| `secondsToBeat(seconds)` | Continuous beat position (fractional, binary-searched + interpolated). |
+| `beatToSeconds(beat)` | Seconds at a possibly-fractional beat. |
+| `secondsPerBeat()` | `60 / bpm`. |
+| `static fromTempo(bpm, durationSeconds, offsetSeconds?)` | Build a uniform grid from a constant tempo. |
+| `toJSON()` / `static fromJSON(data)` | `BeatGridData` ⇄ `BeatGrid`. |
+
+`beatGridMapping(grid)` adapts the grid to Kernel's `TimelineMapping` shape:
+`positionToSeconds` takes beats, and `secondsToPosition` returns beats. The
+adapter borrows the immutable grid and creates no running clock.
+
+## ClipEditSession — buffered, non-destructive edits
+
+`ClipEditSession` buffers a chain of edits, then `apply()`s them in **one pass** to produce a new immutable `AudioClip`. Channels are reallocated only where samples actually change, and the ordered op list (`ClipEditDescriptor[]`) is serializable — it is the input to incremental re-analysis in `@webmusic/audio/analyze` and to the worker sync protocol, mirroring how Score's `ScoreEditSession` buffers operations. Every method is chainable; the base clip is never modified. Requires a clip with decoded samples.
+
+```ts
+import { createClipEditSession } from '@webmusic/audio';
+
+const out = createClipEditSession(clip)
+  .cut(3, 5)                 // remove [3s, 5s)
+  .gain(0.5, 0, 1)           // halve the first second (omit the range to scale the whole clip)
+  .fadeIn(0.25)              // 250 ms fade in   (curve: 'linear' | 'exp')
+  .fadeOut(2, 'exp')         // 2 s fade out
+  .insertSilence(0, 1)       // prepend 1 s of silence
+  .reverse()
+  .normalize(0.98)           // scale so the peak hits 0.98
+  .apply();
+
+const descriptors = createClipEditSession(clip).cut(0, 1).edits; // readonly ClipEditDescriptor[]
+```
+
+`ClipEditDescriptor` is the serializable union of one edit:
+
+```ts
+type ClipEditDescriptor =
+  | { op: 'cut'; startSeconds: number; endSeconds: number }
+  | { op: 'gain'; factor: number; startSeconds?: number; endSeconds?: number }
+  | { op: 'fade'; direction: 'in' | 'out'; seconds: number; curve?: 'linear' | 'exp' }
+  | { op: 'normalize'; targetPeak: number }
+  | { op: 'reverse' }
+  | { op: 'insertSilence'; atSeconds: number; seconds: number };
+```
+
+The pure per-op transform `applyOp(channels, sampleRate, descriptor)` is exported standalone (over a raw `Float32Array[]`) so the same edits can run in a worker or a test without constructing a clip.
+
+| Member | Description |
+| --- | --- |
+| `cut(start, end)` | Delete a time range. |
+| `gain(factor, start?, end?)` | Scale amplitude over a range (whole clip if omitted). |
+| `fadeIn(seconds, curve?)` / `fadeOut(seconds, curve?)` | Linear or `'exp'` fade at the head / tail. |
+| `normalize(targetPeak?)` | Scale so the absolute peak reaches `targetPeak` (default `1`). |
+| `reverse()` | Reverse every channel. |
+| `insertSilence(atSeconds, seconds)` | Splice in silence. |
+| `edits` | The buffered `ClipEditDescriptor[]` (serializable). |
+| `apply()` | Execute the ops; return a new clip (base untouched). |
+| `createClipEditSession(clip)` | Factory. |
+| `applyOp(channels, sr, op)` | Pure single-op transform over raw channels (exported for tests/workers). |
+
+## AudioPeaks — the waveform pyramid
+
+`AudioPeaks` is a **multi-resolution min/max pyramid** for waveform rendering: compute once, read in O(1) at any zoom level. Peaks are 8-bit (`Int8Array`) quantized, so an hour of stereo stays well under ~5 MB. The peaks **type** lives here; the **computation** (`computePeaks`) lives in `@webmusic/audio/analyze` (it is an analysis task), mirroring how Score splits the note-sequence type from its builder.
+
+The on-disk byte layout is **peak-major then channel then `[min, max]`** — `data[(peak * channels + channel) * 2 + (0|1)]` — which is byte-compatible with BBC `audiowaveform` / `waveform-data`. The interop adapters convert both ways **without ever depending on** the LGPL `waveform-data` package.
+
+```ts
+import {
+  peakCount,
+  readPeak,
+  peaksLevelForResolution,
+  peaksFromWaveformData,
+  peaksToWaveformData,
+  type AudioPeaks,
+} from '@webmusic/audio';
+
+declare const peaks: AudioPeaks; // from @webmusic/audio/analyze's computePeaks(clip)
+
+// Pick the coarsest level with at least one peak per pixel column, then read it.
+const samplesPerPixel = (peaks.sampleRate * clip.duration) / canvasWidth;
+const level = peaksLevelForResolution(peaks, samplesPerPixel);
+const count = peakCount(level, peaks.channels);
+for (let p = 0; p < count; p++) {
+  const { min, max } = readPeak(level, peaks.channels, /* channel */ 0, p); // floats in [-1, 1)
+  // draw a vertical bar from min..max
+}
+
+// Round-trip with a BBC audiowaveform JSON export (no `waveform-data` dependency).
+const exported = peaksToWaveformData(peaks);
+const imported = peaksFromWaveformData(exported);
+```
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `AudioPeaks` | Type | The pyramid: `sampleRate`, `channels`, `baseSamplesPerPeak`, `levels[]`. |
+| `PeaksLevel` | Type | One level: `samplesPerPeak` + interleaved 8-bit `data`. |
+| `peakCount(level, channels)` | Function | Number of min/max pairs per channel at a level. |
+| `readPeak(level, channels, channel, peakIndex)` | Function | One quantized peak as `{ min, max }` floats in `[-1, 1)`. |
+| `peaksLevelForResolution(peaks, target)` | Function | Coarsest level still ≥ one peak per pixel column. |
+| `peaksFromWaveformData(json)` / `peaksToWaveformData(peaks)` | Function | BBC `waveform-data` JSON ⇄ `AudioPeaks` (format only). |
+| `WaveformDataJSON` | Type | Minimal shape of a BBC `audiowaveform` v2 export. |
+
+## EventEmitter — typed pub/sub
+
+`EventEmitter` is a tiny typed pub/sub utility, mirroring Score's so both ecosystems share the same event semantics (independent implementation, no cross-dependency). The player, mixer, and recorder in [`@webmusic/audio/play`](/audio/api/play/) are all built on it. `on` / `once` return an unsubscribe function.
+
+```ts
+import { EventEmitter } from '@webmusic/audio';
+
+type ClipEvents = {
+  ready: { id: string };
+  peaks: { levels: number };
+};
+
+const events = new EventEmitter<ClipEvents>();
+const off = events.on('ready', ({ id }) => console.log('ready', id));
+events.once('peaks', ({ levels }) => console.log('peaks', levels));
+
+events.emit('ready', { id: clip.id });
+off();                       // unsubscribe
+events.removeAllListeners(); // or clear everything (alias: clear)
+```
+
+| Member | Description |
+| --- | --- |
+| `on(event, listener)` | Subscribe; returns an unsubscribe function. |
+| `once(event, listener)` | Subscribe for a single emit; returns an unsubscribe function. |
+| `off(event, listener)` | Unsubscribe a specific listener. |
+| `emit(event, data)` | Dispatch a typed payload to all listeners. |
+| `removeAllListeners(event?)` / `clear(event?)` | Drop listeners for one event or all events. |
+
+## Utilities, IDs & types
+
+```ts
+import {
+  makeId,
+  invariant,
+  clamp,
+  samplesToSeconds,
+  secondsToSamples,
+  AudioClipId,
+  RegionId,
+} from '@webmusic/audio';
+
+const id = makeId('clip');                  // 'clip-…' readable unique id
+invariant(clip.hasSamples, 'need samples'); // throws '[webaudio] need samples' when falsy
+clamp(1.4, 0, 1);                            // 1
+samplesToSeconds(48000, 48000);              // 1
+secondsToSamples(1, 48000);                  // 48000
+const cid = AudioClipId('sine');             // brand a string as an AudioClipId
+```
+
+## API Reference
+
+| API | Kind | Use it for |
+| --- | --- | --- |
+| `AudioClip` / `createAudioClip` | Model | Immutable per-channel sample container; the core currency. |
+| `Region` / `createRegion` | Model | Labelled point markers and span/loop regions. |
+| `ClipEditSession` / `createClipEditSession` | Editing | Buffer non-destructive edits, apply in one pass. |
+| `ClipEditDescriptor` | Type | Serializable description of one clip edit. |
+| `applyOp` | Editing | Pure single-op transform over raw `Float32Array[]`. |
+| `BeatGrid` | Time | Beat ↔ seconds mapping; anchor audio to a tempo grid. |
+| `beatGridMapping`, `TimelineMapping` | Time adapter and type | Adapt a `BeatGrid` to Kernel's position/seconds mapping contract; position units are beats. |
+| `AudioPeaks`, `PeaksLevel` | Peaks | Multi-resolution waveform pyramid type. |
+| `peakCount`, `readPeak`, `peaksLevelForResolution` | Peaks | Read peaks; pick a level for a render resolution. |
+| `peaksFromWaveformData`, `peaksToWaveformData`, `WaveformDataJSON` | Peaks | BBC `waveform-data` JSON interop (no dependency). |
+| `EventEmitter` | Events | Typed pub/sub for ready, peaks, status, cursor events. |
+| `clipFromJSON` | Serialization | Rehydrate an `AudioClip` from `clip.toJSON()` (+ channels). |
+| `AudioClipJSON`, `AudioClipInit`, `RegionData`, `BeatGridData` | Types | Init / JSON shapes for the model. |
+| `AudioFormat`, `AudioClipMetadata` | Types | Container/codec formats; ID3 / Vorbis tag shape. |
+| `samplesToSeconds`, `secondsToSamples` | Compatibility | Convert sample index ↔ seconds at a rate. |
+| `makeId` | Utility | Generate a readable local unique id. |
+| `invariant`, `clamp` | Utility | Assert a condition; clamp a number into a range. |
+| `AudioClipId`, `RegionId`, `Brand` | IDs | Brand strings so TypeScript distinguishes id types. |

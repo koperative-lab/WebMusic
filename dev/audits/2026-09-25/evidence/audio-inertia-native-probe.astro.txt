@@ -1,0 +1,90 @@
+---
+---
+<html lang="en"><head><meta charset="utf-8" /><title>Scratch continuity and inertia QA</title></head><body>
+<h1>Native scratch continuity and inertia</h1><button id="run">Run native checks</button><pre id="result">Ready</pre>
+<script>
+import {createAudioClip} from '../../../../../packages/audio/src/core';
+import {ScratchEngine} from '../../../../../packages/audio/src/play/headless/engines/scratch-engine';
+import {AudioClipPlayer} from '../../../../../packages/audio/src/play/headless/player';
+const button = document.querySelector<HTMLButtonElement>('#run')!;
+const result = document.querySelector<HTMLPreElement>('#result')!;
+button.addEventListener('click', async () => {
+  button.disabled = true;
+  const sampleRate = 48000;
+  const pcm = Float32Array.from({length: sampleRate * 8}, (_, i) => 0.1 + i / sampleRate * 0.08);
+  const clip = createAudioClip({sampleRate, channelData: [pcm, pcm.map(v => -v)]});
+  try {
+    const outputs = [];
+    for (const direction of [1, -1]) {
+      const context = new OfflineAudioContext(2, sampleRate / 2, sampleRate);
+      let sourceCount = 0;
+      const create = context.createBufferSource.bind(context);
+      context.createBufferSource = () => {sourceCount++; return create();};
+      const engine = new ScratchEngine(context, clip, context.destination, 3);
+      engine.drive(3, direction, false);
+      const updates = [0.016, 0.032, 0.048, 0.064, 0.080, 0.096, 0.112, 0.128, 0.144, 0.160, 0.176, 0.192];
+      const jobs = updates.map(time => context.suspend(time).then(() => {
+        engine.drive(3 + direction * context.currentTime, direction, false);
+        return context.resume();
+      }));
+      const rendered = await context.startRendering();
+      await Promise.all(jobs);
+      const a = rendered.getChannelData(0), b = rendered.getChannelData(1);
+      let maxError = 0, maxJump = 0, stereoError = 0, tailPeak = 0;
+      for (let i = Math.ceil(0.012 * sampleRate); i < 0.2 * sampleRate; i++) {
+        maxError = Math.max(maxError, Math.abs(a[i] - (0.1 + (3 + direction * i / sampleRate) * 0.08)));
+        maxJump = Math.max(maxJump, Math.abs(a[i] - a[i - 1]));
+        stereoError = Math.max(stereoError, Math.abs(a[i] + b[i]));
+      }
+      for (let i = Math.ceil(0.31 * sampleRate); i < a.length; i++) tailPeak = Math.max(tailPeak, Math.abs(a[i]));
+      outputs.push({direction,sourceCount,maxError,maxJump,stereoError,tailPeak,pass:sourceCount === 1 && maxError < 0.001 && maxJump < 0.001 && stereoError < 1e-6 && tailPeak === 0});
+      engine.dispose();
+    }
+    const glides = [];
+    for (const direction of [1, -1]) {
+      const context = new OfflineAudioContext(2, sampleRate / 2, sampleRate);
+      const engine = new ScratchEngine(context, clip, context.destination, 3);
+      engine.drive(3, direction * 2, false);
+      const updates = Array.from({length: 18}, (_, index) => (index + 1) * 0.016);
+      const jobs = updates.map(time => context.suspend(time).then(() => {
+        const t = Math.min(0.28, context.currentTime);
+        engine.drive(3 + direction * (2 * t - t * t / 0.28), direction * 2 * (1 - t / 0.28), false);
+        return context.resume();
+      }));
+      const rendered = await context.startRendering(); await Promise.all(jobs);
+      const samples = rendered.getChannelData(0);
+      const slope = (start:number,end:number) => (samples[Math.floor(end*sampleRate)]-samples[Math.floor(start*sampleRate)])/(end-start);
+      const earlySlope = slope(0.024,0.040), lateSlope = slope(0.216,0.232);
+      const tailPeak = samples.slice(Math.ceil(0.32*sampleRate)).reduce((peak,v)=>Math.max(peak,Math.abs(v)),0);
+      glides.push({direction,earlySlope,lateSlope,tailPeak,pass:direction*earlySlope>direction*lateSlope && direction*lateSlope>0 && tailPeak===0});
+      engine.dispose();
+    }
+    const context = new AudioContext();
+    await context.resume();
+    const muted = context.createGain(); muted.gain.value = 0; muted.connect(context.destination);
+    const player = new AudioClipPlayer(clip, {audioContext: context, destination: muted});
+    const cases = [];
+    try {
+      for (const direction of [1, -1]) {
+        player.seek(3);
+        const session = player.beginScratch()!;
+        await new Promise(resolve => setTimeout(resolve, 40));
+        session.moveToSeconds(3 + direction * 0.12);
+        const position = player.seconds;
+        const clock = context.currentTime;
+        const updates: {time:number;seconds:number}[] = [];
+        const off = player.on('timeupdate', value => updates.push({time:context.currentTime - clock,seconds:value.seconds}));
+        const end = session.end();
+        const activeAtRelease = session.active;
+        await end;
+        off();
+        const displacement = player.seconds - position;
+        cases.push({direction,activeAtRelease,activeAfter:session.active,playingAfter:player.playing,elapsed:context.currentTime-clock,displacement,updates,pass:activeAtRelease && !session.active && !player.playing && direction*displacement > 0.1 && direction*displacement <= 1.120001});
+      }
+    } finally {player.dispose(); muted.disconnect(); await context.close();}
+    result.textContent = JSON.stringify({browser:navigator.userAgent,sampleRate,outputs,glides,cases,pass:outputs.every(x=>x.pass) && glides.every(x=>x.pass) && cases.every(x=>x.pass)},null,2);
+  } catch(error) {result.textContent=String(error);}
+  button.disabled = false;
+});
+</script>
+</body></html>

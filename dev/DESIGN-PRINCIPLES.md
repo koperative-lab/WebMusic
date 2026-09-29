@@ -6,7 +6,7 @@
 
 Start with a user's task: play music, enter notes, inspect structure, change a parameter, or compare analysis results. A new tag or presenter should introduce an independent workflow, data/lifecycle contract, or reusable interaction. Prefer configuration or composition when the difference is a fixed type, color, or wrapper.
 
-An independently usable component has a complete usage path. A declaration or companion can share its workflow's page: rack-part belongs with rack-control, and score-recorder shares note-input's recording workflow. Every tag still has one documented owner and a real contract.
+An independently usable component has a complete usage path. A declaration or companion can share its workflow's page: score-rack-part belongs with score-rack-control. Independently usable Score and Audio recorders own their recording pages and demonstrate linked input/player composition (DEC-032). Every tag still has one documented owner and a real contract.
 
 ## 2. Give data, behavior, and presentation clear authority
 
@@ -72,6 +72,8 @@ Keep units clear and numeric readouts easy to compare. Distinguish selected, pla
 Presenters supply default structure and styling needed for their interaction. Applications customize through public --wm-* semantic tokens, parts, and named handle accessors, then may replace a surface, renderer, or entire UI. Internal --wui-* values, implementation class names, and node order are not automatically public contracts.
 
 Disabling stylesheet installation does not disable state machines, bindings, keyboard logic, or cleanup. A compound presenter propagates its styling choice to children it owns. Compatibility token precedence and entry-specific options are documented in the [UI package](../packages/ui/README.md), [style source](../packages/ui/src/styles.ts), and individual presenter pages.
+
+Score and Audio share the same neutral default palette, control geometry and component-surface tokens. A musical domain does not introduce its own brand skin. Color may encode musical data or semantic states such as recording and clipping, and explicit caller styling remains authoritative. Canonical demos show these defaults; a separately identified customization example may supply its own palette.
 
 Usable defaults do not impose one brand. A workstation may need dense controls; an installation may need one visual surface mapped to sound. They reuse interaction and timing contracts while expressing different aesthetics.
 

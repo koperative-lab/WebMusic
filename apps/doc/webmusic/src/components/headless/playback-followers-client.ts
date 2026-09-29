@@ -1,5 +1,6 @@
 import {type Score, type ScorePlaybackSource} from '@webmusic/score';
 import {followerDemoScore} from './demo-score';
+import {loadArabesqueScore} from './arabesque-score';
 import {renderNoteChips} from './musical-stage';
 import {createAnalysisFollower, type AnalysisFollower} from '@webmusic/score/analyze/headless';
 import {ScorePlayer} from '@webmusic/score/play/headless';
@@ -19,10 +20,11 @@ function record(value: unknown, label: string): Record<string, unknown> {
 }
 
 /** Real objects, with only fixture selection and DOM output adapted by the demo. */
-export function createPlaybackFollowerDemo(kind: Kind): HeadlessDemoFactory {
-  return (options, stage): HeadlessDemoInstance => {
-    const score = followerDemoScore();
-    const alternateScore = followerDemoScore(true);
+export function createPlaybackFollowerDemo(kind: Kind, fixture?: Score): HeadlessDemoFactory {
+  return (options, stage): HeadlessDemoInstance | Promise<HeadlessDemoInstance> => {
+    const start = (source: Score): HeadlessDemoInstance => {
+    const score = followerDemoScore(source);
+    const alternateScore = followerDemoScore(source, true);
     const player = new ScorePlayer(score);
     // Removing the optional command creates a genuine read-only source while
     // retaining the real player's snapshots and subscription ordering.
@@ -234,6 +236,8 @@ export function createPlaybackFollowerDemo(kind: Kind): HeadlessDemoFactory {
         if (errors.length) throw new AggregateError(errors, 'Follower demo cleanup failed');
       },
     };
+    };
+    return fixture ? start(fixture) : loadArabesqueScore().then(start);
   };
 }
 

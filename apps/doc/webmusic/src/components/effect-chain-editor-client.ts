@@ -23,7 +23,7 @@ type EffectAssignment = 'effect' | 'effects';
  * Mount one target-agnostic effect-chain editor.
  *
  * The editor requires either the usual singular `.effect` chain property or
- * the flat `.effects` array exposed by `<synth-panel>`. The owning demo declares
+ * the flat `.effects` array exposed by `<score-synth-panel>`. The owning demo declares
  * which stage element that is, so the controller stays component-agnostic.
  */
 function mountEffectChainEditor(editor: HTMLElement): void {

@@ -1,0 +1,66 @@
+{
+  "browser": "Chrome/154.0.0.0 on macOS",
+  "sampleRate": 48000,
+  "kind": "Summary of native browser output; the retained probe renders full observations into #result.",
+  "continuous": [
+    {
+      "direction": 1,
+      "sourceCount": 1,
+      "maxError": 1.4899571743054452e-08,
+      "maxJump": 1.6689300537109375e-06,
+      "stereoError": 0,
+      "tailPeak": 0,
+      "pass": true
+    },
+    {
+      "direction": -1,
+      "sourceCount": 1,
+      "maxError": 1.4899571743054452e-08,
+      "maxJump": 1.6689300537109375e-06,
+      "stereoError": 0,
+      "tailPeak": 0,
+      "pass": true
+    }
+  ],
+  "glides": [
+    {
+      "direction": 1,
+      "earlySlope": 0.14784932136535645,
+      "lateSlope": 0.03284588456153867,
+      "tailPeak": 0,
+      "pass": true
+    },
+    {
+      "direction": -1,
+      "earlySlope": -0.14785118401050568,
+      "lateSlope": -0.03284588456153867,
+      "tailPeak": 0,
+      "pass": true
+    }
+  ],
+  "liveCoast": [
+    {
+      "direction": 1,
+      "activeAtRelease": true,
+      "activeAfter": false,
+      "playingAfter": false,
+      "elapsedSeconds": 0.288,
+      "displacementSeconds": 0.3937500000000007,
+      "pass": true
+    },
+    {
+      "direction": -1,
+      "activeAtRelease": true,
+      "activeAfter": false,
+      "playingAfter": false,
+      "elapsedSeconds": 0.2933333333333333,
+      "displacementSeconds": -0.39375000000000027,
+      "pass": true
+    }
+  ],
+  "limitations": [
+    "Native OfflineAudioContext output establishes sample continuity and velocity reduction for the ramp fixture.",
+    "Real AudioContext coast uses a muted destination and does not establish physical-device sound quality or latency.",
+    "280ms audio-time model completion is published at the next observation tick."
+  ]
+}

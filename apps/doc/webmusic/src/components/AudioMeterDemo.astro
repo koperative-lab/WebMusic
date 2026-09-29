@@ -1,0 +1,46 @@
+---
+// One central player supplies both read-only monitors through their public
+// selector binding. Neither meter creates another player or audio route.
+import ElementPlayground from './ElementPlayground.astro';
+
+const SRC = `${import.meta.env.BASE_URL}mp3/Arabesque%20No.1.mp3`;
+
+const BORROWED = 'this meter borrows the player’s analyser, and a borrowed node keeps its own FFT settings — only an owned .context tap reads this';
+
+const INERT = {
+  'fft-size': BORROWED,
+  'smoothing-time-constant': BORROWED,
+};
+---
+
+<ElementPlayground
+  tag="audio-meter"
+  target="#wa-meter-level"
+  class="wa-demo"
+  inert={INERT}
+>
+  <audio-player id="wa-meter-player" src={SRC} controls></audio-player>
+  <div class="wa-demo__meters">
+    <audio-meter player="#wa-meter-player" id="wa-meter-level"></audio-meter>
+    <audio-meter player="#wa-meter-player" id="wa-meter-spectrum" mode="spectrum"></audio-meter>
+  </div>
+</ElementPlayground>
+
+<script>
+  import {defineAudioPlayerElement} from '@webmusic/audio/play/element';
+  import {defineAudioMeterElement} from '@webmusic/audio/view/element';
+
+  defineAudioPlayerElement();
+  defineAudioMeterElement();
+</script>
+
+<style>
+  .wa-demo__meters { display: grid; gap: 0.6rem; margin-top: 0.75rem; }
+
+  .wa-demo :global(audio-player) {
+    display: block;
+  }
+  .wa-demo :global(audio-meter) {
+    display: block;
+  }
+</style>

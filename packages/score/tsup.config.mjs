@@ -41,6 +41,10 @@ export const moduleEntries = [
 
 const globalDeclarationEntry = 'src/play/element/global.ts';
 const declarationEntries = moduleEntries.filter((entry) => entry !== globalDeclarationEntry);
+// Tonal's package metadata can drift from its published files across patch
+// versions. Bundle this internal music-theory implementation so Score's public
+// entries resolve from our built artifact alone in an external install.
+const bundledTonalDependencies = [/^@tonaljs\//];
 
 export default defineConfig([
   // ESM: code-split so the core model and other shared modules live in ONE
@@ -53,6 +57,7 @@ export default defineConfig([
     format: ['esm'],
     tsconfig: 'tsconfig.build.json',
     dts: {entry: declarationEntries},
+    noExternal: bundledTonalDependencies,
     sourcemap: true,
   },
   // tsup also splits CJS through Rollup. Keep one core implementation per
@@ -65,6 +70,7 @@ export default defineConfig([
     tsconfig: 'tsconfig.build.json',
     splitting: true,
     dts: {entry: declarationEntries},
+    noExternal: bundledTonalDependencies,
     sourcemap: true,
     define: {'import.meta.url': 'undefined'},
   },

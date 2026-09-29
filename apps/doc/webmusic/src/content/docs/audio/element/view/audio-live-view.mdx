@@ -1,0 +1,115 @@
+---
+title: '<audio-live-view>'
+description: 'A scrolling projection of a live AnalyserNode — waveform or spectrogram — with the newest column pinned to the right edge and history sliding left.'
+sidebar:
+  order: 2
+---
+
+import AudioLiveViewPlayground from '../../../../../components/elements/AudioLiveViewPlayground.astro';
+
+Draw what is being heard **right now**. The newest column sits at the right edge and history slides left, so the strip reads as "now" scrolling away.
+
+This is the capability's missing cardinality. Every other surface here draws data that already exists — a decoded clip, a peaks pyramid, a precomputed spectrogram. The only live path was [`<audio-view type="meter">`](/audio/element/view/audio-view/#what-each-drawing-needs), which is **instantaneous**: it has no time axis at all, so nothing could show what the microphone did a second ago. This element is the only live time-axis surface in the package.
+
+```html
+<script type="module">
+  import { defineAudioLiveViewElement } from '@webmusic/audio/view/element';
+  defineAudioLiveViewElement();
+</script>
+
+<audio-recorder id="rec"></audio-recorder>
+<audio-live-view source="#rec" type="waveform" window-seconds="4"></audio-live-view>
+<audio-live-view source="#rec" type="spectrogram" color-map="magma"></audio-live-view>
+```
+
+<AudioLiveViewPlayground />
+
+Two drawings live under one `type`, exactly as `<audio-view>` keeps waveform and spectrogram under one attribute: both are "append one column per frame and scroll", and they differ only in how a column is painted. `waveform` reduces each frame to a min/max band; `spectrogram` paints one bin per row, low frequencies at the bottom, coloured through `color-map`. An unknown `type` falls back to `waveform`.
+
+The Element itself owns none of the live canvas machinery. Headless `LiveViewController` owns the
+borrowed-analyser sampling, scratch arrays, clock and bounded history; `paintLiveProjection()` owns
+only waveform/spectrogram pixels; published `@webmusic/ui` `CanvasStage` owns canvas creation,
+DPR/resize, RAF, accessible label, status overlay and teardown. The Element resolves attributes and
+the analyser source, then composes those three ports.
+
+## The analyser is borrowed
+
+`source="#id"` looks for a tap on the target in this order: `.analyser`, `.inputAnalyser`, `.recorder?.inputAnalyser`, `.player?.analyser` — so a player, a meter and a recorder all resolve without demanding one spelling. You can also assign `.analyser` directly, which overrides `source`.
+
+The node is **borrowed**. This element never creates, mutates or disposes it, so several views can read the same tap and disconnecting one leaves the others (and the recording) untouched.
+
+<details class="component-section">
+<summary>API</summary>
+
+| Member | Kind | Default | Description |
+| --- | --- | --- | --- |
+| `type` | attribute / property | `waveform` | `waveform` or `spectrogram`; unknown values fall back to `waveform`. Changing it starts a fresh history. |
+| `source` | attribute | — | CSS selector of an element exposing an `AnalyserNode`. Changing it starts a fresh history. |
+| `window-seconds` | attribute / `.windowSeconds` | `5` | Seconds of history the strip holds, minimum `0.5`. Changing it starts a fresh history. |
+| `height` | attribute | `4rem` | Strip height — a bare number is `px`, or any CSS length. |
+| `wave-color` | attribute | `currentColor` | Column fill for `type="waveform"`. |
+| `color-map` | attribute | `viridis` | Palette for `type="spectrogram"` (`viridis` · `magma` · `grayscale` · `gray`; an unknown name falls back to `viridis`). |
+| `.analyser` | property | — | Borrow an `AnalyserNode` directly; overrides `source`. Never disposed here. |
+| `.live` | property (getter) | — | Whether an analyser is currently resolved. |
+| `webaudio:error` | event | — | `detail = { error }` if presenter sizing/animation or the draw adapter fails. `{ bubbles, composed }`. |
+
+The `CanvasStage` requests an initial draw and, when `requestAnimationFrame` is available, captures
+one column per frame while connected. It cancels its animation and resize observer on disconnect;
+hosts without RAF get the initial draw but no Element-owned timer fallback.
+
+With nothing to show, the shared status overlay says `No live source — set source or .analyser`
+until an analyser resolves, then `Waiting for signal…` until the first column arrives. Status text
+is accessible DOM rather than pixels painted into the canvas.
+
+</details>
+
+<details class="component-section">
+<summary>Headless</summary>
+
+The model behind the drawing is `LiveViewController` from `@webmusic/audio/view/headless`. It borrows
+the analyser and owns type/window configuration, capture clock, reusable byte/float scratch arrays
+and a [`LiveScrollBuffer`](/audio/api/view/) — a fixed-capacity ring covering the most recent
+`windowSeconds`. Capacity never grows, so a view that runs for hours has bounded history.
+
+```ts
+import {createLiveViewController} from '@webmusic/audio/view/headless';
+import {paintLiveProjection} from '@webmusic/audio/view/render';
+
+const live = createLiveViewController({analyser, type: 'waveform', windowSeconds: 4});
+
+function draw(frame) {
+  live.capture(frame.time);
+  paintLiveProjection(frame, live.buffer, live.type, {waveColor: '#4a9eff'});
+}
+```
+
+Changing analyser, type or window clears incompatible scratch/history state. The controller never
+schedules, mutates or disconnects the borrowed node. It is DOM-free and the painter accepts a
+structural canvas frame, so both halves are independently reusable without the Element.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+The `CanvasStage` root is the labelled image; its internal canvas is presentational and its status
+overlay remains accessible. Its outer box uses the shared neutral `--wm-component-*` surface (or
+`--wm-stage-surface-*` for this presenter alone). Set the host height through the attribute, the
+waveform colour through `wave-color` or inherited `color`, and the full-bleed drawing viewport and
+status through `--wm-stage-*` / `--wm-status-*`:
+
+```css
+audio-live-view {
+  color: #4a9eff;                    /* waveform columns, via currentColor */
+}
+```
+
+```html
+<audio-live-view source="#rec" type="spectrogram" height="120" color-map="magma"></audio-live-view>
+```
+
+Column width is the strip width divided by the ring's capacity, so a shorter `window-seconds` gives
+wider columns rather than a stretched history. `CanvasStage` owns device-pixel sizing and redraws
+after host resize.
+
+</details>

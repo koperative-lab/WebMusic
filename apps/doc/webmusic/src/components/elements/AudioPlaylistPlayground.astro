@@ -1,0 +1,56 @@
+---
+// <audio-playlist> — the queue. The demo ships its entries as light-DOM
+// children, which is the authoring form that degrades to a plain list without
+// JavaScript: the element renders its own UI in a shadow root and never slots
+// them, so the rows you see come from the queue, not from this markup.
+//
+// The same clip is queued twice under two ids (`data-id` — without it both rows
+// would collapse onto the src as their id) so auto-advance has somewhere to go,
+// and the MP3 is queued `data-streaming` to show the entry that is played
+// rather than decoded. Typing into the `src` control takes over from the
+// children, which is the one attribute swap worth watching here.
+import ElementPlayground from '../ElementPlayground.astro';
+import AudioPlayStage from '../AudioPlayStage.astro';
+
+const WAV = `${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`;
+const MP3 = `${import.meta.env.BASE_URL}mp3/Arabesque%20No.1.mp3`;
+const ENTRIES = [
+  {id: 'wav-1', src: WAV, label: 'Arabesque WAV · pass 1'},
+  {id: 'wav-2', src: WAV, label: 'Arabesque WAV · pass 2'},
+  {id: 'mp3', src: MP3, label: 'Arabesque MP3 · streamed', streaming: true},
+];
+const SETUP = `import {defineAudioPlayerElement, defineAudioPlaylistElement} from '@webmusic/audio/play/element';
+
+defineAudioPlayerElement();
+defineAudioPlaylistElement();
+const playlist = document.querySelector('audio-playlist');
+// A configured src attribute takes precedence over these demonstration entries.
+if (!playlist.getAttribute('src')?.trim()) {
+  playlist.entries = ${JSON.stringify(ENTRIES, null, 2)};
+}`;
+---
+
+<ElementPlayground
+  tag="audio-playlist"
+  class="pg-playlist"
+  markup="[data-audio-play-stage]"
+>
+  <AudioPlayStage>
+    <audio-player id="playlist-session"></audio-player>
+    <audio-playlist player="#playlist-session" loop>
+      {ENTRIES.map((entry) => (
+        <li data-id={entry.id} data-src={entry.src} data-label={entry.label} data-streaming={entry.streaming ? '' : undefined}>{entry.label}</li>
+      ))}
+    </audio-playlist>
+  </AudioPlayStage>
+  <div class="wm-pg__code-extra" slot="setup">
+    <span class="wm-pg__code-label">JavaScript data setup</span>
+    <pre class="wm-pg__markup" data-pg-copy-source>{SETUP}</pre>
+  </div>
+</ElementPlayground>
+
+<script>
+  import { defineAudioPlaylistElement, defineAudioPlayerElement } from '@webmusic/audio/play/element';
+  defineAudioPlayerElement();
+  defineAudioPlaylistElement();
+</script>

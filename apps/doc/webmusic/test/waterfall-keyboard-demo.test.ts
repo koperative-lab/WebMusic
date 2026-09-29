@@ -1,10 +1,26 @@
 // @vitest-environment jsdom
-import {afterEach, describe, expect, it, vi} from 'vitest';
+import {readFileSync} from 'node:fs';
+import {dirname, resolve} from 'node:path';
+import {fileURLToPath} from 'node:url';
+import {afterEach, beforeAll, describe, expect, it, vi} from 'vitest';
 import type {Score} from '@webmusic/score';
+import {loadScore} from '@webmusic/score/io';
 import type {DemoScope} from '../src/components/demo-lifecycle';
+import {loadArabesqueScore} from '../src/components/headless/arabesque-score';
 import {mountWaterfallKeyboardDemo} from '../src/components/waterfall-keyboard-client';
 
+vi.mock('../src/components/headless/arabesque-score', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../src/components/headless/arabesque-score')>(),
+  loadArabesqueScore: vi.fn(),
+}));
+
 const cleanups: Array<() => void | Promise<void>> = [];
+
+beforeAll(async () => {
+  const path = resolve(dirname(fileURLToPath(import.meta.url)), '../public/midi/Arabesque No.1.mid');
+  const score = await loadScore(readFileSync(path), {format: 'midi'});
+  vi.mocked(loadArabesqueScore).mockResolvedValue(score);
+});
 
 afterEach(() => {
   for (const cleanup of cleanups.splice(0).reverse()) void cleanup();
@@ -18,7 +34,7 @@ function mount() {
     <select data-aligned-width><option selected>32/20</option><option>40/25</option></select>
     <select data-aligned-time-scale><option selected>64</option><option>96</option></select>
     <select data-aligned-key-height><option selected>80</option><option>112</option></select>
-    <div data-aligned-track><score-view></score-view><pitch-view></pitch-view></div>`;
+    <div data-aligned-track><score-view></score-view><score-pitch-view></score-pitch-view></div>`;
   document.body.append(root);
   const player = root.querySelector('score-player') as HTMLElement & {score?: Score};
   const unsubscribe = vi.fn();
@@ -28,8 +44,10 @@ function mount() {
       return unsubscribe;
     },
   }});
+  const controller = new AbortController();
+  cleanups.push(() => controller.abort());
   const scope: DemoScope = {
-    active: true, signal: new AbortController().signal,
+    get active() { return !controller.signal.aborted; }, signal: controller.signal,
     add: (cleanup) => { cleanups.push(cleanup); },
     listen: (target, event, listener) => {
       const handler = (input: Event) => { listener(input); };
@@ -45,24 +63,25 @@ function mount() {
     control.dispatchEvent(new Event('change'));
   };
   return {player, unsubscribe, change,
-    view: root.querySelector('score-view')!, keyboard: root.querySelector('pitch-view')!,
+    view: root.querySelector('score-view')!, keyboard: root.querySelector('score-pitch-view')!,
     track: root.querySelector<HTMLElement>('[data-aligned-track]')!,
   };
 }
 
 describe('aligned waterfall and keyboard demo', () => {
-  it('changes the shared pitch scale without replacing its score or changing note time', () => {
+  it('uses an Arabesque excerpt while changing one shared pitch scale', async () => {
     const f = mount();
+    await vi.waitFor(() => expect(f.player.score).toBeDefined());
     const score = f.player.score!;
-    expect([...score.allNotes()]).toHaveLength(16);
-    expect(score.durationSeconds).toBeCloseTo(5);
-    expect(f.track.style.width).toBe('448px');
+    expect([...score.allNotes()].length).toBeGreaterThan(16);
+    expect(score.durationSeconds).toBeLessThan(20);
+    expect(f.track.style.width).toBe('672px');
     f.change('width', '40/25');
     expect(f.view.getAttribute('white-note-width')).toBe('40');
     expect(f.keyboard.getAttribute('white-key-width')).toBe('40');
     expect(f.view.getAttribute('black-note-width')).toBe('25');
     expect(f.keyboard.getAttribute('black-key-width')).toBe('25');
-    expect(f.track.style.width).toBe('560px');
+    expect(f.track.style.width).toBe('840px');
     f.change('time-scale', '96');
     expect(f.view.getAttribute('pixels-per-second')).toBe('96');
     expect(f.keyboard.getAttribute('white-key-width')).toBe('40');
@@ -72,12 +91,13 @@ describe('aligned waterfall and keyboard demo', () => {
     expect(f.player.score).toBe(score);
   });
 
-  it('releases the owned source and stops reacting to removed demo controls', () => {
+  it('releases the owned source and stops reacting to removed demo controls', async () => {
     const f = mount();
+    await vi.waitFor(() => expect(f.player.score).toBeDefined());
     for (const cleanup of cleanups.splice(0).reverse()) void cleanup();
     expect(f.player.score).toBeUndefined();
     expect(f.unsubscribe).toHaveBeenCalledOnce();
     f.change('width', '40/25');
-    expect(f.track.style.width).toBe('448px');
+    expect(f.track.style.width).toBe('672px');
   });
 });

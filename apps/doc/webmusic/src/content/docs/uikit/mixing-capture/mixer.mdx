@@ -20,7 +20,8 @@ viewport breakpoint, resize subscription or playback restart is involved.
 
 Use [meter](/uikit/mixing-capture/meter/) for read-only realtime levels or
 [recorder](/uikit/mixing-capture/recorder/) for capture workflow controls. The
-[`<rack-control>`](/score/element/play/rack-control/) element composes this presenter;
+[`<score-rack-control>`](/score/element/play/score-rack-control/) and
+[`<audio-mixer>`](/audio/element/play/audio-mixer/) elements compose this presenter;
 mount it directly when the caller owns channel state or needs the strips inside another layout.
 
 <UiPresenterLiveDemo presenter="mixer" />

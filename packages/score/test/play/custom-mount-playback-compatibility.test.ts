@@ -3,7 +3,7 @@ import {afterEach, describe, expect, it, vi} from 'vitest';
 import {Duration, Pitch, Rational, ScoreBuilder, VoiceId, locateSeconds, type Score} from '../../src/core';
 import {ScorePlayerElement} from '../../src/play/element/score-player';
 import type {PresetPlayerHandle, PresetPlayerOptions} from '../../src/play/element/internal/preset-player';
-import {VoiceLeadingAnalysisElement} from '../../src/analyze/element/voice-leading-analysis';
+import {ChordAnalysisElement} from '../../src/analyze/element/score-chord-analysis';
 import {bindAnalysisPlayer} from '../../src/analyze/element/internal/player-binding';
 import {ScoreViewElement as PreviewScoreViewElement} from '../../src/view/element/score-view';
 class ScorePreviewElement extends PreviewScoreViewElement {
@@ -49,7 +49,7 @@ class CustomMountPlayer extends ScorePlayerElement {
 }
 
 customElements.define('compat-custom-mount-player', CustomMountPlayer);
-customElements.define('compat-custom-mount-timeline', VoiceLeadingAnalysisElement);
+customElements.define('compat-custom-mount-timeline', ChordAnalysisElement);
 customElements.define('compat-custom-mount-map', ScorePreviewElement);
 customElements.define('compat-custom-mount-view', ScoreViewElement);
 
@@ -85,7 +85,7 @@ describe('ScorePlayerElement custom mount compatibility', () => {
     expect(player.playback.snapshot().readiness).toBe('unavailable');
     expect(player.callbacks).toBeDefined();
 
-    const timeline = document.createElement('compat-custom-mount-timeline') as VoiceLeadingAnalysisElement;
+    const timeline = document.createElement('compat-custom-mount-timeline') as ChordAnalysisElement;
     const map = document.createElement('compat-custom-mount-map') as ScorePreviewElement;
     const view = document.createElement('compat-custom-mount-view') as ScoreViewElement;
     for (const follower of [timeline, map, view]) {

@@ -9,25 +9,27 @@ const SCHEME = {name: 'scheme', kind: 'enum', options: ['light', 'dark'], fallba
 const SPELLING = {name: 'spelling', kind: 'enum', options: ['auto', 'sharp', 'flat'], fallback: 'auto', note: 'Pitch-name spelling; automatic uses the available key context.'} as const;
 const MOTION = {name: 'motion', kind: 'enum', options: ['auto', 'continuous', 'stepped', 'none'], fallback: 'auto', note: 'Lane motion; auto follows a data-motion ancestor and reduced-motion preference.'} as const;
 const WINDOW = {name: 'window', kind: 'text', placeholder: '8', fallback: 'auto', note: 'Visible duration across the available width, 0.5–600 seconds; auto uses score context.'} as const;
-const FUNCTION = {name: 'function', kind: 'enum', options: ['show', 'hide'], fallback: 'show', note: 'Show or hide the harmonic-function row in a Roman-numeral lane.'} as const;
-const ALTERNATES = {name: 'alternates', kind: 'enum', options: ['show', 'hide'], fallback: 'show', note: 'Show or hide alternate readings on the live chord nameplate.'} as const;
+const KEY = {name: 'key', kind: 'text', placeholder: 'C major', fallback: 'estimated score key', note: 'Local tonic and mode for the selected chord degree; does not edit the Score.'} as const;
+const ALTERNATES = {name: 'alternates', kind: 'enum', options: ['show', 'hide'], fallback: 'show', note: 'Show or hide static alternate readings below the live chord symbol.'} as const;
+const STABILITY = {name: 'stability-ms', kind: 'number', min: 0, max: 1000, step: 10, fallback: '80', note: 'Delay the chord-change event until a displayed name remains stable; 0 emits immediately.'} as const;
 const CORE: readonly ParamSpec[] = [SRC, FORMAT, PLAYER, DENSITY, SCHEME];
 const LANE: readonly ParamSpec[] = [...CORE, MOTION, WINDOW];
-const DISPLAY_PROPERTIES: readonly MemberSpec[] = [
-  {name: 'density', note: 'Reflects density.'},
-  {name: 'scheme', note: 'Reflects scheme; undefined removes the override.'},
-  {name: 'spelling', note: 'Reflects pitch spelling.'},
+const DISPLAY_PROPERTIES: readonly MemberSpec[] = [{name: 'density', note: 'Reflects density.'}, {name: 'scheme', note: 'Reflects scheme; undefined removes the override.'}];
+const LANE_PROPERTIES: readonly MemberSpec[] = [
+  {name: 'score', note: 'Explicit Score overrides src and player data.'},
+  ...DISPLAY_PROPERTIES,
+  {name: 'motion', note: 'Reflects motion.'},
+  {name: 'window', note: 'Visible duration in seconds or auto.'},
+  {name: 'selection', note: 'Read-only selected quarter-note region.'},
+  {name: 'analysis', note: 'Read-only evidence for the current local selection.'},
+  {name: 'selectRegion', note: 'Inspect a quarter-note region without commanding playback.'},
+  {name: 'clearSelection', note: 'Clear the local region selection.'},
 ];
-const SCORE_PROPERTIES: readonly MemberSpec[] = [{name: 'score', note: 'Explicit Score overrides src and player data.'}, ...DISPLAY_PROPERTIES.filter((property) => property.name !== 'spelling')];
-const LANE_PROPERTIES: readonly MemberSpec[] = [...SCORE_PROPERTIES, {name: 'motion', note: 'Reflects motion.'}, {name: 'window', note: 'Visible duration in seconds or auto.'}];
 const SEEK: readonly MemberSpec[] = [{name: 'webscore:seek', note: '{quarters, seconds} on score navigation; seconds are nominal.'}];
-const CHORD_CHANGE: MemberSpec = {name: 'webscore:chordchange', note: '{chord, midis} when the detected chord changes to a nonempty name; silence/reset clear the display without this event.'};
-const CHORD_PICK: MemberSpec = {name: 'webscore:chordpick', note: '{symbol, kind, midis} when an alternate current-chord reading is selected.'};
+const SELECT: MemberSpec = {name: 'webscore:analysisselect', note: '{kind, id, startQuarters, endQuarters} when local evidence is selected.'};
+const CHORD_CHANGE: MemberSpec = {name: 'webscore:chordchange', note: '{chord, midis} after a nonempty displayed chord remains stable; silence/reset cancel it.'};
 
 export const SCORE_ANALYZE_PARAMS: ElementParamCatalog = {
-  'key-analysis': {tag: 'key-analysis', entry: ENTRY, params: LANE, properties: LANE_PROPERTIES, events: SEEK},
-  'chord-analysis': {tag: 'chord-analysis', entry: ENTRY, params: LANE, properties: LANE_PROPERTIES, events: SEEK},
-  'voice-leading-analysis': {tag: 'voice-leading-analysis', entry: ENTRY, params: LANE, properties: LANE_PROPERTIES, events: SEEK},
-  'roman-analysis': {tag: 'roman-analysis', entry: ENTRY, params: [...LANE, FUNCTION], properties: LANE_PROPERTIES, events: SEEK},
-  'live-chord-analysis': {tag: 'live-chord-analysis', entry: ENTRY, params: [{...PLAYER, note: 'Borrow held notes, state and note events from one selected player; no score input is read.'}, DENSITY, SCHEME, SPELLING, ALTERNATES], properties: [...DISPLAY_PROPERTIES, {name: 'chord', note: 'Read-only current displayed chord symbol, or undefined for silence.'}], events: [CHORD_CHANGE, CHORD_PICK]},
+  'score-live-chord-analysis': {tag: 'score-live-chord-analysis', entry: ENTRY, params: [{...PLAYER, note: 'Borrow held notes, state and note events from one selected player; no score input is read.'}, DENSITY, SCHEME, SPELLING, ALTERNATES, STABILITY], properties: [...DISPLAY_PROPERTIES, {name: 'spelling', note: 'Reflects pitch spelling.'}, {name: 'stabilityMs', note: 'Reflected chord-change event delay in milliseconds.'}, {name: 'chord', note: 'Read-only current displayed chord symbol, or undefined for silence.'}], events: [CHORD_CHANGE]},
+  'score-chord-analysis': {tag: 'score-chord-analysis', entry: ENTRY, params: [...LANE, SPELLING, KEY], properties: [...LANE_PROPERTIES, {name: 'spelling', note: 'Reflects pitch spelling.'}, {name: 'key', note: 'Local tonic/mode interpretation, if assigned.'}], events: [...SEEK, SELECT]},
 };

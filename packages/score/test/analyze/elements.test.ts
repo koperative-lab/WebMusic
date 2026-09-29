@@ -2,7 +2,7 @@
 
 import {afterEach, describe, expect, it} from 'vitest';
 import {Duration, Pitch, Rational, ScoreBuilder, VoiceId, type Score} from '../../src/core';
-import {KeyAnalysisElement, ChordAnalysisElement, RomanAnalysisElement, VoiceLeadingAnalysisElement, LiveChordAnalysisElement} from '../../src/analyze/element/index';
+import {ChordAnalysisElement, LiveChordAnalysisElement} from '../../src/analyze/element/index';
 
 // ---------------------------------------------------------------------------
 // A real document, real custom elements, real CSSOM — the harness this
@@ -54,10 +54,7 @@ function define(ctor: CustomElementConstructor): string {
   return tag;
 }
 
-const KEY = define(KeyAnalysisElement);
 const CHORDS = define(ChordAnalysisElement);
-const ROMAN = define(RomanAnalysisElement);
-const VOICE = define(VoiceLeadingAnalysisElement);
 const LIVE_CHORD = define(LiveChordAnalysisElement);
 
 /**
@@ -94,7 +91,7 @@ interface PlayerRoot {
  * fires on itself is recorded **and** really dispatched, so `dispatched` is a
  * complete log, including the intermediate readings emitted as notes arrive.
  */
-function createHost<T extends KeyAnalysisElement | ChordAnalysisElement | RomanAnalysisElement | VoiceLeadingAnalysisElement | LiveChordAnalysisElement>(
+function createHost<T extends ChordAnalysisElement | LiveChordAnalysisElement>(
   tag: string,
   attrs: Record<string, string> = {},
   root?: PlayerRoot,
@@ -167,16 +164,6 @@ afterEach(() => {
 });
 
 describe('focused Analyze displays', () => {
-  it('renders the tonal lane in key-analysis', async () => {
-    const host = createHost<KeyAnalysisElement>(KEY);
-    host.el.score = melodyScore(C_MAJOR);
-    host.connect();
-    await flush();
-
-    expect(host.text()).toContain('C major');
-    expect(host.el.querySelector('.wui-harmony-flow__lane[data-lane="key"]')).toBeTruthy();
-  });
-
   it('chord-analysis renders the chord timeline', async () => {
     const host = createHost<ChordAnalysisElement>(CHORDS);
     host.el.score = melodyScore(C_MAJOR);
@@ -190,42 +177,9 @@ describe('focused Analyze displays', () => {
     expect(host.text()).toContain('beat 1');
   });
 
-  it('roman-analysis renders numerals in the detected key', async () => {
-    const host = createHost<RomanAnalysisElement>(ROMAN);
-    host.el.score = melodyScore(C_MAJOR);
-    host.connect();
-    await flush();
-    expect(host.text()).toContain('in C major');
-  });
-
-
-
-  it('voice-leading-analysis renders the clean note for a clean melody', async () => {
-    const host = createHost<VoiceLeadingAnalysisElement>(VOICE);
-    host.el.score = melodyScore(C_MAJOR);
-    host.connect();
-    await flush();
-    expect(host.text()).toContain('clean');
-  });
-
-
-
-  it('updates output across repeated .score assignments (incremental session)', async () => {
-    const host = createHost<KeyAnalysisElement>(KEY);
-    host.el.score = melodyScore(C_MAJOR);
-    host.connect();
-    await flush();
-    const keyRows = () => host.el.querySelector('.wui-harmony-flow__lane[data-lane="key"]')?.textContent;
-    expect(keyRows()).toContain('C major');
-
-    host.el.score = melodyScore(['A3', 'B3', 'C4', 'D4', 'E4', 'F4', 'G#4', 'A4', 'E4', 'C4', 'A3']);
-    await flush();
-    expect(keyRows()).toContain('A minor');
-    expect(keyRows()).not.toContain('C major');
-  });
 });
 
-describe('<live-chord-analysis> (dynamic, player-bound)', () => {
+describe('<score-live-chord-analysis> (dynamic, player-bound)', () => {
   function liveHost() {
     const player = stubPlayer();
     const host = createHost<LiveChordAnalysisElement>(
@@ -240,7 +194,10 @@ describe('<live-chord-analysis> (dynamic, player-bound)', () => {
     const {host} = liveHost();
     host.connect();
     await flush();
-    expect(host.text()).toContain('sounding now');
+    expect(host.text()).not.toContain('sounding now');
+    const caption = host.el.querySelector<HTMLElement>('.wui-harmony-nameplate__caption');
+    expect(caption?.hidden).toBe(true);
+    expect(caption?.textContent).toBe('');
     expect(host.el.querySelector('.wui-harmony-nameplate__empty')?.textContent).toBe('—');
     expect(host.el.chord).toBeUndefined();
     expect(host.text()).toContain('—');
@@ -272,16 +229,46 @@ describe('<live-chord-analysis> (dynamic, player-bound)', () => {
     expect(host.el.querySelector('.wui-harmony-nameplate__voicing')?.textContent).toContain('C4');
   });
 
-  it('dispatches webscore:chordchange when the detected chord changes', async () => {
+  it('shows literal pitches at a stable height when a held set has no chord name', async () => {
+    const {player, host} = liveHost();
+    host.connect();
+    await flush();
+    const plate = host.el.querySelector<HTMLElement>('.wui-harmony-nameplate')!;
+    const symbol = host.el.querySelector<HTMLElement>('.wui-harmony-nameplate__symbol')!;
+    const height = getComputedStyle(plate).height;
+    expect(plate.dataset.layout).toBe('stable');
+
+    player.emit('webscore:noteon', {midi: 69});
+    player.emit('webscore:noteon', {midi: 81});
+    expect(symbol.textContent).toBe('A4 · A5');
+    expect(host.el.chord).toBeUndefined();
+    expect(plate.dataset.reading).toBe('notes');
+    expect(getComputedStyle(plate).height).toBe(height);
+
+    player.emit('webscore:noteoff', {midi: 69});
+    player.emit('webscore:noteoff', {midi: 81});
+    for (const midi of [60, 64, 67]) player.emit('webscore:noteon', {midi});
+    expect(symbol.textContent).toBe('CM');
+    expect(plate.dataset.reading).toBe('chord');
+    expect(getComputedStyle(plate).height).toBe(height);
+
+    for (const midi of [60, 64, 67]) player.emit('webscore:noteoff', {midi});
+    expect(symbol.textContent).toBe('—');
+    expect(plate.dataset.reading).toBe('rest');
+    expect(getComputedStyle(plate).height).toBe(height);
+  });
+
+  it('dispatches webscore:chordchange after the displayed chord settles', async () => {
     const {player, host} = liveHost();
     host.connect();
     await flush();
 
     for (const midi of [60, 64, 67]) player.emit('webscore:noteon', {midi});
-    // Notes arrive one at a time, so intermediate chords fire too — the final
-    // event carries the full triad.
+    // The display is immediate; the short stability window collapses the
+    // intermediate names before the external event.
+    await new Promise((resolve) => setTimeout(resolve, 100));
     const changes = host.dispatched.filter((event) => event.type === 'webscore:chordchange');
-    expect(changes.length).toBeGreaterThan(0);
+    expect(changes).toHaveLength(1);
     const last = changes[changes.length - 1]!.detail as {chord: string; midis: number[]};
     expect(last.chord).toBe('CM');
     expect(last.midis).toEqual([60, 64, 67]);
@@ -331,6 +318,7 @@ describe('live chord player ownership', () => {
 
     const changeCount = host.dispatched.filter((event) => event.type === 'webscore:chordchange').length;
     for (const midi of [62, 66, 69]) playerB.emit('webscore:noteon', {midi});
+    await new Promise((resolve) => setTimeout(resolve, 100));
     const changes = host.dispatched
       .filter((event) => event.type === 'webscore:chordchange')
       .slice(changeCount);
@@ -340,32 +328,7 @@ describe('live chord player ownership', () => {
   });
 });
 
-describe('<voice-leading-analysis> playhead follow', () => {
-
-
-  it('lights the voice-leading issue row under the playhead', async () => {
-    const player = stubPlayer();
-    const host = createHost<VoiceLeadingAnalysisElement>(
-      VOICE,
-      {player: '#p'},
-      {querySelector: (sel) => (sel === '#p' ? player : null)},
-    );
-    // Two-octave leaps → large-leap issues with known beat positions.
-    host.el.score = melodyScore(['C4', 'C6', 'C4', 'C6']);
-    host.connect();
-    await flush();
-
-    const rows = [...host.children[0].querySelectorAll<HTMLElement>('[data-start-quarters]')];
-    expect(rows.length).toBeGreaterThan(0);
-
-    const start = Number(rows[0].dataset.startQuarters);
-    // 120 bpm default → one quarter = 0.5 s; land just inside the first issue.
-    player.emit('webscore:timeupdate', {seconds: start * 0.5 + 0.05});
-    expect(rows[0].style.cssText).toContain('outline');
-  });
-});
-
-describe('<chord-analysis> playhead follow', () => {
+describe('<score-chord-analysis> playhead follow', () => {
   it('highlights the segment under the playhead on webscore:timeupdate', async () => {
     const player = stubPlayer();
     const host = createHost<ChordAnalysisElement>(

@@ -1,0 +1,101 @@
+---
+title: '<audio-transient-analyzer>'
+description: 'Inspect live attack cues with sensitivity, a refractory interval, freeze and clear controls.'
+sidebar:
+  order: 5
+---
+
+import AudioAnalyzeFeaturePlayground from '../../../../../components/elements/AudioAnalyzeFeaturePlayground.astro';
+
+The transient analyzer makes recent attacks visible while a signal sounds.
+It compares successive frequency and RMS snapshots, shows strength against a
+sensitivity threshold, and marks accepted cues in a short history. Freeze
+holds the display; Clear starts a fresh inspection. For a decoded clip's
+stable onset times or a DJ beat grid, use the
+[Analyze API](/audio/api/analyze/#onsets) and compose positions with
+[`<audio-view>.regions`](/audio/element/view/audio-view/#annotate). This live
+tool does not estimate BPM or align a beat grid.
+
+<AudioAnalyzeFeaturePlayground tag="audio-transient-analyzer" />
+
+## Import
+
+```html
+<script type="module">
+  import {defineAudioPlayerElement} from '@webmusic/audio/play/element';
+  import {defineAudioTransientAnalyzerElement} from '@webmusic/audio/analyze/element';
+  defineAudioPlayerElement();
+  defineAudioTransientAnalyzerElement();
+</script>
+
+<audio-player id="session" src="/mp3/Arabesque%20No.1.mp3" controls></audio-player>
+<audio-transient-analyzer player="#session" sensitivity="0.55" min-interval-ms="160"></audio-transient-analyzer>
+```
+
+The demo pairs one player with this tool. Start playback, then adjust the
+Sensitivity control or use Freeze and Clear on the real component. Copy
+includes both Elements, and Reset restores their demo settings.
+
+## Signal and lifetime
+
+The tool borrows the bound player's analyser while playing, or a caller-owned
+`.analyser` in preference to it. The `player` selector must resolve uniquely
+in the current Document or ShadowRoot; late targets and source replacement
+are observed. Neither the element nor its presenter starts playback, opens a
+microphone, creates an `AudioContext`, or changes borrowed analyser settings.
+
+Sampling is approximately every 50 ms. Positive FFT-bin change and rising
+RMS contribute to a normalized `0..1` strength; sensitivity changes its
+acceptance threshold, and `min-interval-ms` suppresses hits too close to a
+previous hit. Silence is shown separately from an unavailable analyser.
+The recent plot keeps at most 64 sampled observations, not a clip-wide event
+timeline. Freeze stops sampling but keeps the current history; unfreezing
+resets the detector's comparison frame before new cues. When following a
+player, pause, seek and source change invalidate old readings. Replacing an
+explicit analyser, graph loss, hiding the document or disconnect also releases
+old evidence and polling/subscriptions. A stalled source is reported and
+retried without disposing the borrowed graph.
+
+<details class="component-section">
+<summary>API</summary>
+
+| Member | Kind | Behavior |
+| --- | --- | --- |
+| `player` | attribute | Unique selector for a playback owner whose analyser is borrowed while playing; default absent. |
+| `sensitivity` | attribute | Detection sensitivity in `0..1`, default `0.55`; invalid values use the default. Higher sensitivity lowers the cue threshold. |
+| `min-interval-ms` | attribute | Minimum spacing between accepted cues in milliseconds, clamped to `50..1000`; default `160`. Invalid values use the default. |
+| `.analyser` | property | Explicit caller-owned `AnalyserNode`, preferred over player binding; getter returns the explicitly assigned node. |
+| `.sensitivity`, `.minIntervalMs` | properties | Reflected detection settings with the bounds above. |
+| `.sample` | read-only property | Latest `{strength, hit}` observation, or `undefined` before a frame. Strength is normalized `0..1`. |
+| `.hitCount` | read-only property | Accepted cues since the last reset or source/transport invalidation. |
+| `.frozen` | read-only property | Whether the tool's Freeze control holds its current history. |
+| `.reset()` | method | Clear current detector evidence, history and hit count without changing playback or the audio graph. |
+| `webaudio:transient` | event | `{timeMs, strength, threshold, intervalMs?}` for each accepted cue. `timeMs` is an approximate `performance.now()`-style capture timestamp, **not** clip seconds; `intervalMs` is the time since the prior accepted cue when available. Bubbles and is composed. |
+| `webaudio:error` | event | `{error: Error}` for input, sampling or stalled-frame failures; bubbles and is composed. |
+
+The detector reports **onset cues**, not exact onset positions. Its timing and
+strength depend on the borrowed analyser's FFT size, smoothing and this
+tool's polling cadence. The threshold is an internal visual/detection
+quantity, not a gain or playback control.
+
+**Accessibility.** Freeze and Clear are native buttons; Freeze exposes
+`aria-pressed`. Sensitivity is a labelled native range input. The plot has a
+text alternative reporting current strength, threshold and hit count; status
+and numeric readouts remain outside the visual bars.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+The host's neutral outer surface honors shared `--wm-component-*` tokens and
+`--wm-audio-transient-analyzer-surface-*` overrides. The
+[transient presenter](/uikit/views-analysis/transient-analyzer/) exposes
+`--wm-transient-analyzer-foreground`, `--wm-transient-analyzer-background`,
+`--wm-transient-analyzer-border`, `--wm-transient-analyzer-padding`,
+`--wm-transient-analyzer-strength`, `--wm-transient-analyzer-hit` and
+`--wm-transient-analyzer-threshold` tokens. Public parts are `root surface`,
+`plot`, `freeze`, `clear` and `sensitivity`; structural `wui-*` child classes
+are not additional styling contracts.
+
+</details>

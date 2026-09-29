@@ -72,7 +72,7 @@ is on [`@webmusic/score/play`](/score/api/play/).
 | --- | --- | --- |
 | `Rack` · `createRack` | class · factory | [Rack](/score/headless/play/rack/) |
 | `RackTransportController` · `createRackTransportController` | class · factory | [Rack](/score/headless/play/rack/) |
-| `SynthPanelAudioGraph` | class | [Synth backends](/score/headless/play/sound/#synth-backends) — the graph `<synth-panel>` owns |
+| `SynthPanelAudioGraph` | class | [Synth backends](/score/headless/play/sound/#synth-backends) — the graph `<score-synth-panel>` owns |
 
 **Controllers**
 
@@ -128,7 +128,7 @@ under [Web Components › Analyze](/score/element/#analyze).
 | `createLiveKeyTracker` | tracker | [Live trackers](/score/headless/analyze/live-trackers/) |
 | `createScoreReport` | report builder | [createScoreReport](/score/api/analyze/#reports) |
 | `createTransportClock` · `rateFromDurations` | predictor · helper | [createTransportClock](/score/headless/analyze/analysis-follower/#presentation-clock) |
-| `projectSounding` · `projectNameplate` · `soundingMidisAt` · `projectProgression` · `projectKeyFlow` · `projectMotifFlow` · `projectVoiceFlow` · `projectTonality` · `projectKeyCandidates` · `projectPitchClassMeters` · `keyPitchClasses` · `formatMetricalPosition` | projections | [The projections](/score/api/analyze/#the-projections) |
+| `projectSounding` · `projectNameplate` · `soundingMidisAt` · `projectProgression` · `projectKeyFlow` · `projectMotifFlow` · `projectMotifOccurrences` · `projectRhythmPatternFlow` · `projectVoiceFlow` · `projectTonality` · `projectKeyCandidates` · `projectPitchClassMeters` · `keyPitchClasses` · `formatMetricalPosition` | projections | [The projections](/score/api/analyze/#the-projections) |
 
 The worker row is one module rather than one object: the entry re-exports
 `./worker-client` wholesale, and `@webmusic/score/analyze/worker-client`

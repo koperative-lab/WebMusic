@@ -1,35 +1,45 @@
 /**
- * Reviewed Headless + UI Kit contract for the public Score
+ * Reviewed Headless + UI Kit contract for the public Score and Audio
  * Web Components. Keep this list explicit: adding an element is an
  * architecture decision, not something a directory glob should approve.
  *
  * `ui` names the published presenter subpaths the element is expected to
  * reach through static runtime imports. The union of the reviewed
- * closures plus the standalone presenters below must equal the public
- * `@webmusic/ui` subpaths in package-policy.mjs. Behavior-only elements
- * deliberately have no visible presenter.
+ * closures is checked against the public `@webmusic/ui` subpaths in
+ * package-policy.mjs. Behavior-only elements deliberately have no visible
+ * presenter.
  */
 export const elementCompositionPolicy = Object.freeze([
   entry('Score', 'Play', 'score-player', 'packages/score/src/play/element/score-player.ts', ['transport']),
-  entry('Score', 'Play', 'rack-control', 'packages/score/src/play/element/rack-control.ts', ['mixer']),
+  entry('Score', 'Play', 'score-rack-control', 'packages/score/src/play/element/score-rack-control.ts', ['mixer']),
   // Declaration only: it renders nothing, so it has no presenter to reach.
-  entry('Score', 'Play', 'rack-part', 'packages/score/src/play/element/rack-part.ts', [], true),
+  entry('Score', 'Play', 'score-rack-part', 'packages/score/src/play/element/score-rack-part.ts', [], true),
   entry('Score', 'Play', 'score-recorder', 'packages/score/src/play/element/score-recorder.ts', ['recorder']),
-  entry('Score', 'Play', 'note-input', 'packages/score/src/play/element/note-input.ts', ['note']),
-  entry('Score', 'Play', 'synth-panel', 'packages/score/src/play/element/synth-panel.ts', ['panel', 'parameter', 'macro', 'envelope', 'eq', 'lfo']),
+  entry('Score', 'Play', 'score-note-input', 'packages/score/src/play/element/score-note-input.ts', ['note']),
+  entry('Score', 'Play', 'score-synth-panel', 'packages/score/src/play/element/score-synth-panel.ts', ['panel', 'parameter', 'macro', 'envelope', 'eq', 'lfo']),
 
-  entry('Score', 'Analyze', 'key-analysis', 'packages/score/src/analyze/element/key-analysis.ts', ['analysis', 'harmony', 'workbench']),
-  entry('Score', 'Analyze', 'chord-analysis', 'packages/score/src/analyze/element/chord-analysis.ts', ['analysis', 'harmony', 'workbench']),
-  entry('Score', 'Analyze', 'roman-analysis', 'packages/score/src/analyze/element/roman-analysis.ts', ['analysis', 'harmony', 'workbench']),
-  entry('Score', 'Analyze', 'voice-leading-analysis', 'packages/score/src/analyze/element/voice-leading-analysis.ts', ['analysis', 'harmony', 'workbench']),
-  entry('Score', 'Analyze', 'live-chord-analysis', 'packages/score/src/analyze/element/live-chord-analysis.ts', ['analysis', 'harmony', 'workbench']),
+  entry('Score', 'Analyze', 'score-chord-analysis', 'packages/score/src/analyze/element/score-chord-analysis.ts', ['analysis', 'harmony', 'workbench']),
+  entry('Score', 'Analyze', 'score-live-chord-analysis', 'packages/score/src/analyze/element/score-live-chord-analysis.ts', ['analysis', 'harmony', 'workbench']),
 
   entry('Score', 'View', 'score-view', 'packages/score/src/view/element/score-view.ts', ['stage', 'timeline', 'status']),
-  entry('Score', 'View', 'sheet-view', 'packages/score/src/view/element/sheet-view.ts', ['stage', 'status']),
-  entry('Score', 'View', 'pitch-view', 'packages/score/src/view/element/pitch-view.ts', ['pitch']),
+  entry('Score', 'View', 'score-sheet-view', 'packages/score/src/view/element/score-sheet-view.ts', ['stage', 'status']),
+  entry('Score', 'View', 'score-pitch-view', 'packages/score/src/view/element/score-pitch-view.ts', ['pitch']),
+
+  entry('Audio', 'Play', 'audio-player', 'packages/audio/src/play/element/audio-player.ts', ['transport']),
+  entry('Audio', 'Play', 'audio-playlist', 'packages/audio/src/play/element/audio-playlist.ts', ['playlist']),
+  entry('Audio', 'Play', 'audio-mixer', 'packages/audio/src/play/element/audio-mixer.ts', ['mixer']),
+  entry('Audio', 'Play', 'audio-recorder', 'packages/audio/src/play/element/audio-recorder.ts', ['recorder']),
+  entry('Audio', 'Analyze', 'audio-level-analyzer', 'packages/audio/src/analyze/element/audio-level-analyzer.ts', ['level-analyzer']),
+  entry('Audio', 'Analyze', 'audio-meter', 'packages/audio/src/analyze/element/audio-meter.ts', ['meter']),
+  entry('Audio', 'Analyze', 'audio-oscilloscope', 'packages/audio/src/analyze/element/audio-oscilloscope.ts', ['oscilloscope']),
+  entry('Audio', 'Analyze', 'audio-spectrum-analyzer', 'packages/audio/src/analyze/element/audio-spectrum-analyzer.ts', ['spectrum-analyzer']),
+  entry('Audio', 'Analyze', 'audio-transient-analyzer', 'packages/audio/src/analyze/element/audio-transient-analyzer.ts', ['transient-analyzer']),
+
+  entry('Audio', 'View', 'audio-view', 'packages/audio/src/view/element/audio-view.ts', ['stage', 'status', 'meter']),
+  entry('Audio', 'View', 'audio-live-view', 'packages/audio/src/view/element/audio-live-view.ts', ['stage']),
 ]);
 
-/** Public presenters retained for custom composition without a Score Element. */
+/** Main presenters available without a domain Element consumer. */
 export const standaloneUiPresenters = Object.freeze(['minimap', 'playlist', 'meter', 'track-list']);
 
 function entry(family, capability, tag, source, ui, behaviorOnly = false) {

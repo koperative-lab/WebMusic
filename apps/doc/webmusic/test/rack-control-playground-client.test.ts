@@ -42,12 +42,12 @@ function fields(scope?: string): string {
 
 function partMarkup(part: PartRecipe): string {
   const format = part.format ? ` format="${part.format}"` : '';
-  return `<rack-part
+  return `<score-rack-part
     data-pg-child-key="${part.key}"
     id="${part.id}"
     src="${part.src}"
     sound="${part.sound}"${format}
-  ></rack-part>`;
+  ></score-rack-part>`;
 }
 
 function cardMarkup(part: PartRecipe): string {
@@ -73,9 +73,9 @@ function renderRackPanel(): HTMLElement {
     >
       <div data-pg-stage>
         <score-player data-rc-master>
-          <rack-control data-rc-desk>
+          <score-rack-control data-rc-desk>
             ${INITIAL_PARTS.map(partMarkup).join('')}
-          </rack-control>
+          </score-rack-control>
         </score-player>
       </div>
 
@@ -127,7 +127,7 @@ function desk(panel: HTMLElement): HTMLElement {
 
 function directParts(panel: HTMLElement): HTMLElement[] {
   return Array.from(desk(panel).children).filter(
-    (child): child is HTMLElement => child instanceof HTMLElement && child.localName === 'rack-part',
+    (child): child is HTMLElement => child instanceof HTMLElement && child.localName === 'score-rack-part',
   );
 }
 
@@ -171,7 +171,7 @@ function addPart(panel: HTMLElement, recipe: Omit<PartRecipe, 'key'>): void {
   submitDraft(panel);
 }
 
-describe('rack-control nested playground', () => {
+describe('score-rack-control nested playground', () => {
   beforeEach(() => {
     document.body.replaceChildren();
   });
@@ -181,22 +181,22 @@ describe('rack-control nested playground', () => {
     const addButton = panel.querySelector<HTMLButtonElement>('[data-rc-add]')!;
     addButton.click();
 
-    expect(draftControl(panel, 'src').value).toBe('/WebMusic/midi/demo.mid');
+    expect(draftControl(panel, 'src').value).toBe('/WebMusic/midi/Arabesque%20No.1.mid');
     type(draftControl(panel, 'id'), 'strings');
     submitDraft(panel);
 
-    expect(directParts(panel).at(-1)?.getAttribute('src')).toBe('/WebMusic/midi/demo.mid');
-    expect(cardControl(panel, 'rack-part-4', 'src').value).toBe('/WebMusic/midi/demo.mid');
+    expect(directParts(panel).at(-1)?.getAttribute('src')).toBe('/WebMusic/midi/Arabesque%20No.1.mid');
+    expect(cardControl(panel, 'rack-part-4', 'src').value).toBe('/WebMusic/midi/Arabesque%20No.1.mid');
     const copied = document.createElement('template');
     copied.innerHTML = panel.querySelector('[data-pg-markup]')?.textContent ?? '';
-    expect(copied.content.querySelector('rack-part#strings')?.getAttribute('src'))
-      .toBe('/WebMusic/midi/demo.mid');
+    expect(copied.content.querySelector('score-rack-part#strings')?.getAttribute('src'))
+      .toBe('/WebMusic/midi/Arabesque%20No.1.mid');
 
     addButton.click();
     type(draftControl(panel, 'src'), '/custom.mid');
     panel.querySelector<HTMLButtonElement>('[data-pg-reset]')!.click();
     addButton.click();
-    expect(draftControl(panel, 'src').value).toBe('/WebMusic/midi/demo.mid');
+    expect(draftControl(panel, 'src').value).toBe('/WebMusic/midi/Arabesque%20No.1.mid');
   });
 
   it('keeps draft controls inert, then creates a configured part and stable-scoped card', () => {
@@ -256,7 +256,7 @@ describe('rack-control nested playground', () => {
       .toBe('melody');
     const copied = document.createElement('template');
     copied.innerHTML = panel.querySelector('[data-pg-markup]')?.textContent ?? '';
-    const copiedPart = copied.content.querySelector('rack-part#melody');
+    const copiedPart = copied.content.querySelector('score-rack-part#melody');
     expect(copiedPart?.getAttribute('src')).toBe('/midi/melody.mid');
     expect(copiedPart?.getAttribute('sound')).toBe('square');
     expect(copiedPart?.getAttribute('format')).toBe('midi');

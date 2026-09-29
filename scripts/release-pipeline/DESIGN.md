@@ -5,8 +5,8 @@ historical implementation context. Its workflow names, package identities,
 commands and assumptions describe that design, not the active release process.
 Do not execute it as a current publishing runbook.
 
-Use the [manual release instructions](../../CONTRIBUTING.md#releasing)
-for the current version policy and publishing procedure. The
+Use the [manual publishing procedure](../../dev/release/PUBLISHING.md) and
+[current version policy](../../dev/release/RELEASING.md) for releases. The
 [archive index](README.md) explains the retained scripts and the work required
 before any reuse.
 

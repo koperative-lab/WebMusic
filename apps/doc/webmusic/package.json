@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "astro dev",
+    "dev": "node ../../../scripts/docs-dev.mjs",
     "build": "astro build",
     "typecheck": "astro check",
     "lint": "eslint src",
@@ -29,7 +29,9 @@
     "spessasynth_lib": "^4.3.6",
     "tone": "^15.0.4",
     "typescript": "^5.9.3",
-    "vitest": "^5.0.0"
+    "vitest": "^5.0.0",
+    "@webmusic/audio": "^0.1.0",
+    "@webmusic/bridge": "^0.1.0"
   },
-  "description": "Documentation site for WebMusic Score, UI and Kernel"
+  "description": "Documentation site for WebMusic Score, Audio, Bridge, UI and Kernel"
 }

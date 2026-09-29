@@ -3,16 +3,16 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {Duration, PartId, Pitch, Rational, ScoreBuilder, VoiceId} from '../../src/core';
 import {ScorePlayerElement} from '../../src/play/element/score-player';
-import {RackControlElement} from '../../src/play/element/rack-control';
-import {RackPartElement} from '../../src/play/element/rack-part';
+import {RackControlElement} from '../../src/play/element/score-rack-control';
+import {RackPartElement} from '../../src/play/element/score-rack-part';
 import {PlayerController} from '../../src/play/headless/controller';
 import {ScorePlayer} from '../../src/play/headless/score-player';
 import {Rack} from '../../src/play/headless/rack';
 import type {HeadlessSynth} from '../../src/play/headless/audio-contracts';
 
 customElements.define('score-player-lifecycle', ScorePlayerElement);
-customElements.define('rack-control', RackControlElement);
-customElements.define('rack-part', RackPartElement);
+customElements.define('score-rack-control', RackControlElement);
+customElements.define('score-rack-part', RackPartElement);
 
 const flush = async () => {
   for (let index = 0; index < 5; index += 1) await Promise.resolve();
@@ -112,8 +112,8 @@ describe('score-player lifecycle with real transport owners', () => {
     host.audioContext = audioContext();
     host.sound = synth();
     if (!assignImmediately) host.score = score();
-    const desk = document.createElement('rack-control') as RackControlElement;
-    const part = document.createElement('rack-part') as RackPartElement;
+    const desk = document.createElement('score-rack-control') as RackControlElement;
+    const part = document.createElement('score-rack-part') as RackPartElement;
     part.score = score();
     desk.append(part);
     host.append(desk);

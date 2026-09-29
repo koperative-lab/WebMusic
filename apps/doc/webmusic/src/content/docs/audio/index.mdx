@@ -1,0 +1,363 @@
+---
+title: Audio
+description: 'Digital audio — decoding, playback, projection and MIR analysis: what each Audio capability covers, how to install it, and a walkthrough from file to sound to screen.'
+---
+
+import AudioWorkbenchDemo from "../../../components/AudioWorkbenchDemo.astro";
+
+Audio is one package, `@webmusic/audio`, for **recorded sound**: decoded
+samples in an immutable `AudioClip`, played, drawn and measured. The
+play, analyze, and view capabilities support Web Components, Headless objects,
+and APIs. Combine the APIs with [UI presenters](/uikit/) or your own interface;
+integration entries such as React build on the same contracts.
+
+<AudioWorkbenchDemo />
+
+## Capabilities
+
+| Capability | What it covers | Forms |
+| --- | --- | --- |
+| **play** | Get sound in and out: decoding and loading, buffer and media playback, mixing, microphone recording, effects, WAV export. | [Web Components](/audio/element/#play) · [Headless](/audio/headless/#play) · [API](/audio/api/play/) |
+| **analyze** | Derive facts from a signal: peaks, loudness, tempo and beats, key, onsets, pitch, chromagram, spectrogram, Meyda features, transcription. | [Web Components](/audio/element/#analyze) · [Headless](/audio/headless/#analyze) · [API](/audio/api/analyze/) |
+| **view** | Project a signal onto a surface: waveforms, spectrograms, regions and live scrolling views; build custom overviews from the Headless data helpers. | [Web Components](/audio/element/#view) · [Headless](/audio/headless/#view) · [API](/audio/api/view/) |
+| **react** | The same capabilities as React components and hooks. | [API](/audio/api/react/) |
+
+The package root is the model itself — `AudioClip`, `Region`, `BeatGrid`,
+`ClipEditSession`, `AudioPeaks` and JSON. Importing it creates no audio
+context and is safe in Node, workers and SSR; explicit conversion methods may
+use an AudioContext supplied by the caller. See
+the [package subpath table](/audio/api/#package-subpaths) for every published
+entry.
+
+Audio has no `io` capability: decoding is part of **play**, because what a
+decoder produces is exactly what a player consumes.
+
+## What Audio is not
+
+Audio never reads notation: MIDI, MusicXML, MXL and ABC are
+[Score](/score/), and the two packages never depend on each other.
+`transcribe()` stops at family-neutral note events on purpose — assembling
+them into a `Score`, like anything else needing **both** families, lives in
+[Bridge](/bridge/).
+
+## Install
+
+:::note[Registry or local workspace]
+Use an available published `@webmusic/audio` version, or consume this repository's workspace locally with `npm install` at the root and a workspace link. CDN examples require the requested version and its dependencies to resolve; verify availability before deploying them.
+:::
+
+```bash
+npm install @webmusic/audio @webmusic/kernel @webmusic/ui
+```
+
+`play`, `analyze`, `view`, and `react` are export subpaths of that one installed package; import them as shown throughout this page rather than installing them separately.
+
+`@webmusic/kernel` is required. The heavy, format-specific engines are **optional peer dependencies** — installed only when you opt in, and selected by entry or feature. UI composition entries import the presenter peer statically: `@webmusic/ui` for the `/element` forms, and `react` for `/react`.
+
+- The [`@webmusic/audio/play`](/audio/api/play/) capability uses optional decoder peers (`mpg123-decoder` for mp3, `@wasm-audio-decoders/flac`, `@wasm-audio-decoders/ogg-vorbis`, `ogg-opus-decoder`, and `mediabunny` for AAC/containers), `music-metadata` for tags, and the time-stretch worklets (`signalsmith-stretch`, `@soundtouchjs/audio-worklet`). Each is needed only for the format or feature that uses it — WAV needs none of them.
+- The [`@webmusic/audio/analyze`](/audio/api/analyze/) capability uses the package's bundled DSP dependencies (`fft.js`, `meyda`, `music-tempo`, `pitchy`) and the optional MIR and transcription peers (`essentia.js`, `aubiojs`, `pitchfinder`, `realtime-bpm-analyzer`, `webfft`, plus `@spotify/basic-pitch`, `@magenta/music`, `@tensorflow/tfjs` behind the `./transcribe` entry).
+
+## Drop-in Web Components
+
+The fastest way to get audio on a page — no build step. `@webmusic/audio/play` ships ready-to-use custom elements (central player, playlist, mixer and recorder); drop a tag in and it works. `@webmusic/audio/view` adds `<audio-view>` and `<audio-live-view>`. `@webmusic/audio/analyze` adds five live tools, including `<audio-meter>`. Every tag and its owning page is on the [Web Components page](/audio/element/).
+
+### From a CDN
+
+The fastest path: load a prebuilt capability IIFE from a CDN and **every element in that capability registers itself**. No `npm`, no bundler, no `define*` calls — just put the tags on the page.
+
+```html
+<!-- registers <audio-player>, <audio-playlist>, <audio-mixer>, <audio-recorder> -->
+<script src="https://cdn.jsdelivr.net/npm/@webmusic/audio/dist/play/auto.global.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/@webmusic/audio/dist/analyze/auto.global.js"></script>
+<audio-player id="session" src="/wav/Arabesque%20No.1.wav" controls></audio-player>
+<audio-meter player="#session"></audio-meter>
+```
+
+Add the view and analysis elements the same way — each capability has its own bundle under the package's `dist` directory:
+
+```html
+<script src="https://cdn.jsdelivr.net/npm/@webmusic/audio/dist/play/auto.global.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@webmusic/audio/dist/view/auto.global.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@webmusic/audio/dist/analyze/auto.global.js"></script>
+
+<audio-player id="p" src="/wav/Arabesque%20No.1.wav" controls></audio-player>
+```
+
+Each bundle is the capability's `/global` entry and exposes one window
+global carrying its exports plus a `defineAllAudioElements()`:
+**`WebMusicAudioPlay`** (`dist/play/auto.global.js`),
+**`WebMusicAudioView`** (`dist/view/auto.global.js`), and
+**`WebMusicAudioAnalyze`** (`dist/analyze/auto.global.js`).
+
+`<audio-view>` is deliberately bring-your-own-data: registering it does not decode
+the player's `src` or compute a waveform. Assign its `.peaks` property as shown in
+[Visualize](#visualize) before expecting a waveform.
+
+For ES modules, use the [bundler setup](#with-a-bundler) below. The ESM output
+retains package imports that a plain browser module URL cannot resolve by itself.
+
+### With a bundler
+
+After the [install](#install) above, import each capability's **`auto`** entry
+once and its elements register on load:
+
+```ts
+import "@webmusic/audio/play/auto"; // <audio-player>, <audio-playlist>, <audio-mixer>, <audio-recorder>
+import "@webmusic/audio/view/auto"; // <audio-view>, <audio-live-view>
+import "@webmusic/audio/analyze/auto"; // <audio-level-analyzer>, <audio-meter>, <audio-oscilloscope>, <audio-spectrum-analyzer>, <audio-transient-analyzer>
+```
+
+### Custom registration
+
+For **tree-shaking** or **custom tag names**, skip `auto` and call the individual `define*` functions yourself from the `/element` subpath. Each is idempotent and one-time, so you ship only what you reference:
+
+```ts
+import {
+  defineAudioPlayerElement,
+} from "@webmusic/audio/play/element";
+import {defineAudioMeterElement} from "@webmusic/audio/analyze/element";
+
+defineAudioPlayerElement(); // registers <audio-player>
+defineAudioMeterElement("vu-meter"); // …or register under a custom tag
+```
+
+The original `view/element` and `view/auto` meter entries remain compatibility
+paths to the same `<audio-meter>` implementation; using both auto entries does
+not register a second class.
+
+Every capability also exports a `defineAllAudioElements()` aggregate from its `/element` subpath — exactly what each `/auto` entry calls for you:
+
+```ts
+import { defineAllAudioElements } from "@webmusic/audio/play/element";
+
+defineAllAudioElements(); // every element in @webmusic/audio/play, at default tags
+```
+
+Elements ship from the `/element` subpath, so each capability root tree-shakes free of DOM code. Every tag, its owning page and the shared theming variables are on the **[Web Components page](/audio/element/)**.
+
+## Load a clip
+
+```ts
+import { loadClipFromUrl } from "@webmusic/audio/play";
+
+const clip = await loadClipFromUrl("/wav/Arabesque%20No.1.wav");
+console.log(clip.sampleRate, clip.duration);
+```
+
+WAV follows the dependency-free decoder path. For compressed files, provide
+`{ context: new AudioContext() }` for native browser decoding or install the
+matching optional WASM decoder. To stream an MP3 without decoding it into an
+`AudioClip`, use `<audio-player src="/mp3/Arabesque%20No.1.mp3" engine="media">`.
+
+## Play
+
+The same clip can power your own buttons through `AudioClipPlayer`. Put this
+markup on a page and call `mountAudioButtons(host, '/wav/Arabesque%20No.1.wav')`.
+Use the [Arabesque No.1 WAV](/wav/Arabesque%20No.1.wav) from the demos or your own recording.
+
+```html
+<section id="audio-controls">
+  <button data-play disabled>Play / resume</button>
+  <button data-pause disabled>Pause</button>
+  <output data-status role="status">Loading audio…</output>
+</section>
+```
+
+```ts
+import { loadClipFromUrl } from "@webmusic/audio/play";
+import { AudioClipPlayer } from "@webmusic/audio/play/headless";
+
+export function mountAudioButtons(host: HTMLElement, src: string) {
+  const play = host.querySelector<HTMLButtonElement>("[data-play]")!;
+  const pause = host.querySelector<HTMLButtonElement>("[data-pause]")!;
+  const status = host.querySelector<HTMLOutputElement>("[data-status]")!;
+  const events = new AbortController();
+  let player: AudioClipPlayer | undefined;
+  const subscriptions: Array<() => void> = [];
+  let disposed = false;
+  const report = (error: unknown) => {
+    if (!disposed)
+      status.textContent =
+        error instanceof Error ? error.message : String(error);
+  };
+
+  void loadClipFromUrl(src)
+    .then((clip) => {
+      if (disposed) return;
+      player = new AudioClipPlayer(clip, { volume: 0.5 });
+      subscriptions.push(
+        player.on("end", () => {
+          if (!disposed) status.textContent = "Ended";
+        }),
+        player.on("error", report),
+      );
+      play.disabled = pause.disabled = false;
+      status.textContent = "Ready. Click Play to enable sound.";
+    })
+    .catch(report);
+
+  play.addEventListener(
+    "click",
+    async () => {
+      if (!player) return;
+      play.disabled = true;
+      try {
+        await player.play(); // creates/resumes its context inside the gesture
+        if (!disposed)
+          status.textContent = player.playing ? "Playing" : "Paused";
+      } catch (error) {
+        report(error);
+      } finally {
+        if (!disposed) play.disabled = false;
+      }
+    },
+    { signal: events.signal },
+  );
+  pause.addEventListener(
+    "click",
+    () => {
+      player?.pause();
+      status.textContent = "Paused";
+    },
+    { signal: events.signal },
+  );
+
+  const dispose = () => {
+    if (disposed) return;
+    disposed = true;
+    events.abort();
+    for (const unsubscribe of subscriptions) unsubscribe();
+    player?.dispose();
+    play.disabled = pause.disabled = true;
+    status.textContent = "Disposed";
+  };
+  window.addEventListener("pagehide", dispose, { signal: events.signal });
+  return dispose; // also call when your framework removes the host
+}
+
+const disposeControls = mountAudioButtons(
+  document.querySelector<HTMLElement>("#audio-controls")!,
+  "/wav/Arabesque%20No.1.wav",
+);
+// Call disposeControls() when this page section is removed.
+```
+
+This example loads a WAV before enabling playback, reports loading/start errors,
+and ignores a load that completes after disposal. The player owns its lazily
+created context. Retry a failed source by disposing and mounting again. See
+[AudioClipPlayer](/audio/headless/play/audio-clip-player/) for other engines,
+looping, effects and borrowed-context behavior.
+
+## API + UI
+
+The UI presenter can instead borrow an already created player. Its binding uses
+clip seconds and returns a cleanup that releases only the presentation resources.
+The application still owns and eventually disposes the player.
+
+```ts
+import type { AudioClipPlayer } from "@webmusic/audio/play/headless";
+import { mountTransport } from "@webmusic/ui/transport";
+
+export function mountAudioTransport(
+  host: HTMLElement,
+  player: AudioClipPlayer,
+  reportError: (error: unknown) => void,
+) {
+  const listeners = new Set<() => void>();
+  const notify = () => {
+    for (const listener of listeners) listener();
+  };
+  const ui = mountTransport(
+    host,
+    {
+      snapshot: () => ({
+        playing: player.playing,
+        seconds: player.seconds,
+        duration: player.duration,
+        progress: player.progress,
+      }),
+      play: async () => {
+        await player.play();
+        notify();
+      },
+      pause: () => {
+        player.pause();
+        notify();
+      },
+      seekFraction: (fraction) => {
+        player.seekFraction(fraction);
+        notify();
+      },
+      subscribe: (listener) => {
+        const offTime = player.on("timeupdate", listener);
+        const offEnd = player.on("end", listener);
+        listeners.add(listener);
+        return () => {
+          listeners.delete(listener);
+          offTime();
+          offEnd();
+        };
+      },
+    },
+    { label: "Audio", onError: reportError },
+  );
+  return () => {
+    ui.destroy();
+    listeners.clear();
+  };
+}
+```
+
+Commands issued through this binding refresh paused state immediately. If other
+application controls mutate this Audio player while paused, route those commands
+through the same application notification function. The renderer does not own a
+second transport. See [Transport](/uikit/transport-time/transport/) and the
+[Score/Audio composition](/bridge/composition/) for a coordinated group.
+
+## Analyze
+
+```ts
+import { createAudioAnalysisSession } from "@webmusic/audio/analyze/headless";
+
+const session = createAudioAnalysisSession(clip, {
+  tasks: ["loudness", "tempo", "key"],
+});
+const result = await session.analyze();
+
+console.log(result.tempo?.bpm); // beats per minute (undefined unless 'tempo' ran)
+console.log(result.key?.tonic, result.key?.mode); // e.g. "C" "major"
+console.log(result.loudness.integratedLufs); // ITU-R BS.1770 LUFS
+```
+
+## Visualize
+
+Compute a peaks pyramid with `@webmusic/audio/analyze`, then render it into a container with `@webmusic/audio/view`:
+
+```ts
+import { computePeaks } from "@webmusic/audio/analyze";
+import { renderWaveformVisualizer } from "@webmusic/audio/view/render";
+
+const peaks = computePeaks(clip.channels()!, clip.sampleRate);
+const viz = renderWaveformVisualizer(document.querySelector("#wave")!, peaks, {
+  height: 96,
+  pixelsPerSecond: 100,
+});
+```
+
+Or hand the same peaks to the `<audio-view>` element through its `.peaks` property:
+
+```ts
+const view = document.querySelector("audio-view")!;
+view.peaks = computePeaks(clip.channels()!, clip.sampleRate);
+```
+
+## Next Steps
+
+- [Web Components](/audio/element/) for every drop-in tag, its owning page and shared theming.
+- [Headless](/audio/headless/) for the code-only transports, sessions and their export ownership.
+- [Core API](/audio/api/) for the `AudioClip` model, `Region`, `BeatGrid`, `AudioPeaks`, and events.
+- [Play API](/audio/api/play/) for decoding/loading, `AudioClipPlayer`, `AudioMixer`, `AudioRecorder`, effects, and export.
+- [Analyze API](/audio/api/analyze/) for peaks, loudness, tempo, key, onsets, pitch, and the incremental analysis session.
+- [View API](/audio/api/view/) for canvas waveform / spectrogram / meter renderers and player binding.
+- [React API](/audio/api/react/) for hooks and the `<WaveformView>` component.

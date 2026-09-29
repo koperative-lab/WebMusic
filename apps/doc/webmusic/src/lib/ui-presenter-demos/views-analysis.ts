@@ -1,3 +1,4 @@
+import {mountAnalyzerToolsDemo} from './analyzer-tools';
 import {
   createAnalysisPlayhead,
   createAnalysisRoot,
@@ -2450,6 +2451,10 @@ export function mountViewsAnalysisDemo(
   presenter: string,
   host: HTMLElement,
 ): UiPresenterDemoMountResult {
+  if (presenter === 'level-analyzer') return mountAnalyzerToolsDemo(presenter, host);
+  if (presenter === 'oscilloscope') return mountAnalyzerToolsDemo(presenter, host);
+  if (presenter === 'spectrum-analyzer') return mountAnalyzerToolsDemo(presenter, host);
+  if (presenter === 'transient-analyzer') return mountAnalyzerToolsDemo(presenter, host);
   if (presenter === 'stage') return mountStageDemo(host);
   if (presenter === 'status') return mountStatusDemo(host);
   if (presenter === 'track-list') return mountTrackListDemo(host);

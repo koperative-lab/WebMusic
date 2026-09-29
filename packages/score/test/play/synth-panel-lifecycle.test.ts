@@ -3,7 +3,7 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import type {ParameterRackBinding} from '@webmusic/ui/parameter';
 import type {Effect, EffectNode} from '../../src/play/headless/effects';
-import {SynthPanelElement} from '../../src/play/element/synth-panel';
+import {SynthPanelElement} from '../../src/play/element/score-synth-panel';
 
 const captured = vi.hoisted(() => ({bindings: [] as unknown[]}));
 vi.mock('@webmusic/ui/parameter', () => ({

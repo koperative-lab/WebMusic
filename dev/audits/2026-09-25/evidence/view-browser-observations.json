@@ -1,0 +1,31 @@
+{
+  "route": "http://localhost:4321/audio/element/view/audio-view/",
+  "evidence": "DOM and accessibility interaction; screenshot unavailable; no browser timing measured",
+  "before": {
+    "hostCSSWidth": 572.8125,
+    "canvases": 2,
+    "backingWidth": 16384,
+    "backingHeight": 512,
+    "combinedRGBABytes": 67108864
+  },
+  "after": {
+    "hostCSSWidth": 565.3125,
+    "plotCSSWidth": 544,
+    "canvases": 2,
+    "backingWidth": 2176,
+    "backingHeight": 512,
+    "combinedRGBABytes": 8912896,
+    "endSeekSeconds": 319.981134,
+    "endStripeLeftCSS": 27710,
+    "endBackingWidth": 2178,
+    "optionalInitialCanvasCounts": [
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "multibandRateAfterArrowRight": "1.05",
+    "capturedWarningsAndErrors": []
+  }
+}

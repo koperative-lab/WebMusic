@@ -1,6 +1,7 @@
 import {createHash} from 'node:crypto';
 import {readFile, realpath} from 'node:fs/promises';
 import path from 'node:path';
+import {sourceContextReference} from './_source-context.mjs';
 
 const defaultBase = 'https://koperative-lab.github.io/WebMusic/';
 const packages = ['@webmusic/kernel', '@webmusic/ui', '@webmusic/score'];
@@ -80,7 +81,8 @@ export async function loadContext(settings) {
 
   const manifest = json(await read('agent-context/manifest.json'), 'Context manifest');
   if (manifest.schemaVersion !== 1 || !Array.isArray(manifest.outputs) || !Array.isArray(manifest.pages)) throw new Error('Unsupported context manifest. Update the skill and context together.');
-  for (const name of packages) {
+  const sourceReference = sourceContextReference(manifest, settings);
+  for (const name of sourceReference ? [] : packages) {
     if (manifest.release?.packages?.[name] !== '0.1.0') throw new Error(`Unsupported context version for ${name}: ${manifest.release?.packages?.[name] ?? 'missing'}. This skill supports 0.1.0; use matching context and installed package declarations.`);
   }
   const hashes = new Map();
@@ -119,7 +121,7 @@ export async function loadContext(settings) {
     if (!selected) throw new Error(`Unknown document: ${query}. Use index, full, components, patterns, or a route from llms.txt.`);
     return text(selected);
   }
-  return {manifest, text, catalog, component, document};
+  return {manifest, sourceReference, text, catalog, component, document};
 }
 
 async function documents(context, paths) {
@@ -165,12 +167,12 @@ export async function run(command, args = process.argv.slice(2)) {
     } else if (command === 'get_docs') result = await context.document(settings.values[0]);
     else if (command === 'get_theme') {
       const theme = (await context.catalog()).theme;
-      result = `${await documents(context, theme.docs)}\n\n# Theme implementation reference\n\nSelected source files at release ${context.manifest.release.commit}.\n\n${await sources(context, theme.source)}${await sourceLicense()}`;
+      result = `${await documents(context, theme.docs)}\n\n# Theme implementation reference\n\nSelected source files at ${context.sourceReference ?? `release ${context.manifest.release.commit}`}.\n\n${await sources(context, theme.source)}${await sourceLicense()}`;
     } else {
       const selected = await context.component(settings.values[0]);
       if (command === 'get_source') {
         if (!selected.source.length) throw new Error(`No source entries for ${selected.id}. Use get_component_docs.mjs for its public contract.`);
-        result = `# ${selected.title}: implementation reference\n\nSelected entry files at release ${context.manifest.release.commit}. Follow the component documentation for supported imports; this is not a complete transitive source tree.\n\n${await sources(context, selected.source)}${await sourceLicense()}`;
+        result = `# ${selected.title}: implementation reference\n\nSelected entry files at ${context.sourceReference ?? `release ${context.manifest.release.commit}`}. Follow the component documentation for supported imports; this is not a complete transitive source tree.\n\n${await sources(context, selected.source)}${await sourceLicense()}`;
       } else {
         const paths = command === 'get_styles' ? selected.styles : selected.docs;
         if (!paths.length) throw new Error(`No ${command === 'get_styles' ? 'visual styling contract' : 'reference'} for ${selected.id}. Use get_component_docs.mjs for its behavior or choose a ui/ presenter from list_components.mjs.`);

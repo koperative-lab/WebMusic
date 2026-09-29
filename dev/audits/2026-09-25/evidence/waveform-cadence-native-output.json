@@ -1,0 +1,38 @@
+{
+  "browser": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36",
+  "results": [
+    {
+      "mode": "event-only",
+      "elapsedMs": 2005.4000000059605,
+      "screenFrames": 243,
+      "paintCount": 40,
+      "paintFps": 19.946145407340737,
+      "timeupdateCount": 40,
+      "medianPaintIntervalMs": 50.10000002384186,
+      "extraPaintsAfterPause": 1,
+      "sampleSeconds": 1.9893333333333332
+    },
+    {
+      "mode": "live-clock",
+      "elapsedMs": 2000.699999988079,
+      "screenFrames": 242,
+      "paintCount": 234,
+      "paintFps": 116.95906432818227,
+      "timeupdateCount": 40,
+      "medianPaintIntervalMs": 8.300000011920929,
+      "extraPaintsAfterPause": 1,
+      "sampleSeconds": 1.9786666666666666
+    },
+    {
+      "mode": "element",
+      "elapsedMs": 2006.9000000059605,
+      "screenFrames": 242,
+      "paintCount": 236,
+      "paintFps": 117.59429966580252,
+      "timeupdateCount": 40,
+      "medianPaintIntervalMs": 8.300000011920929,
+      "extraPaintsAfterPause": 1,
+      "sampleSeconds": 1.9893333333333334
+    }
+  ]
+}

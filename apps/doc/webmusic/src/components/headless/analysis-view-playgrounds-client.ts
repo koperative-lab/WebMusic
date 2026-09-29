@@ -29,12 +29,12 @@ function controls(root: HTMLElement, scope: DemoScope) {
 
 
 /** The session keeps its cache while immutable score inputs are replaced. */
-export function mountAnalysisSessionDemo(root: HTMLElement, scope: DemoScope): {readonly model: AnalysisSession} {
+export function mountAnalysisSessionDemo(root: HTMLElement, scope: DemoScope, sourceScore: Score): {readonly model: AnalysisSession} {
   const ui = controls(root, scope);
   const source = ui.query<HTMLSelectElement>('[data-session-score]');
   const pitch = ui.query<HTMLSelectElement>('[data-session-pitch]');
   const window = ui.query<HTMLSelectElement>('[data-session-window]');
-  let score = followerDemoScore();
+  let score = followerDemoScore(sourceScore);
   let session = createAnalysisSession(score);
   let edits = 0;
   const paint = (): void => {
@@ -44,11 +44,11 @@ export function mountAnalysisSessionDemo(root: HTMLElement, scope: DemoScope): {
     renderNoteChips(ui.query('[data-session-notes]'), score.parts.flatMap((part) => part.notes.map((note) => note.pitch?.toString() ?? 'Rest')));
     renderNoteChips(ui.query('[data-session-chords]'), result.roman.map((entry) => `${entry.chord || '—'} (${entry.roman || '—'}) · q${entry.startQuarters}–${entry.endQuarters}`), 'No chord segments');
     ui.query('[data-session-detail]').textContent = `${result.motifs.length} repeated motif${result.motifs.length === 1 ? '' : 's'} · ${result.issues.length} voice-leading issue${result.issues.length === 1 ? '' : 's'} · window ${window.value} quarters`;
-    ui.code(`import {Pitch} from '@webmusic/score';\nimport {createAnalysisSession} from '@webmusic/score/analyze/headless';\n\n// score is your immutable ${source.value === 'minor' ? 'A minor' : 'C major'} Score.\nconst session = createAnalysisSession(score, {windowQuarters: ${window.value}});\nconst firstNote = score.parts[0].notes[0];\nconst next = score.edit((edit) => {\n  edit.updateNote(firstNote.id, {pitch: Pitch.parse('${pitch.value}')});\n});\nconst result = session.update(next);\n// Render result.key, result.roman, result.motifs and result.issues.\n// Session owns no external resources; release your references on teardown.`);
+    ui.code(`import {Pitch} from '@webmusic/score';\nimport {createAnalysisSession} from '@webmusic/score/analyze/headless';\n\n// score is an immutable Arabesque No. 1 ${source.value} excerpt.\nconst session = createAnalysisSession(score, {windowQuarters: ${window.value}});\nconst firstNote = score.parts[0].notes[0];\nconst next = score.edit((edit) => {\n  edit.updateNote(firstNote.id, {pitch: Pitch.parse('${pitch.value}')});\n});\nconst result = session.update(next);\n// Render result.key, result.roman, result.motifs and result.issues.\n// Session owns no external resources; release your references on teardown.`);
   };
   const replaceScore = (): void => {
-    score = followerDemoScore(source.value === 'minor');
-    pitch.value = source.value === 'minor' ? 'A3' : 'C4';
+    score = followerDemoScore(sourceScore, source.value === 'extended');
+    pitch.value = 'C#5';
     session.update(score);
     edits += 1;
     paint();
@@ -68,8 +68,8 @@ export function mountAnalysisSessionDemo(root: HTMLElement, scope: DemoScope): {
     ui.feedback('Updated the immutable score and re-analyzed it with the same session.');
   });
   scope.listen(root, 'wm:headless-reset', () => {
-    source.value = 'major'; pitch.value = 'C4'; window.value = '2'; edits = 0;
-    score = followerDemoScore(); session = createAnalysisSession(score);
+    source.value = 'opening'; pitch.value = 'C#5'; window.value = '2'; edits = 0;
+    score = followerDemoScore(sourceScore); session = createAnalysisSession(score);
     ui.feedback(''); paint();
   });
   paint();
@@ -134,9 +134,9 @@ export function mountLiveTrackersDemo(root: HTMLElement, scope: DemoScope) {
 }
 
 /** A tiny caller-owned renderer draws only the real model's visible notes. */
-export function mountScoreWindowDemo(root: HTMLElement, scope: DemoScope): {readonly model: ScoreView} {
+export function mountScoreWindowDemo(root: HTMLElement, scope: DemoScope, sourceScore: Score): {readonly model: ScoreView} {
   const ui = controls(root, scope);
-  const score: Score = followerDemoScore();
+  const score = followerDemoScore(sourceScore);
   const viewport = ui.query<HTMLSelectElement>('[data-window-viewport]');
   const position = ui.query<HTMLInputElement>('[data-window-position]');
   let view = createScoreView(score, {viewport: {startTime: 0, endTime: 2}});

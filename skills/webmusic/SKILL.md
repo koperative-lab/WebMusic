@@ -38,6 +38,9 @@ The compatibility target is `0.1.0` of Score, UI Kit and Kernel. Audio and Bridg
 are outside this skill's supported release surface. Headless means no UI DOM;
 it does not guarantee that an audio operation runs in Node or during SSR.
 
+For Audio/Bridge source-checkout work, use the same workflow and existing lookup
+options with the [Audio/Bridge context reference](references/audio-bridge.md).
+
 ## Build the requested interaction
 
 - **Choose the composition:** Web Components for ready-made interaction,

@@ -7,8 +7,7 @@ import {defineAllViewElements, type PitchViewElement} from '../../src/view/eleme
 defineAllAnalysisElements();
 defineAllViewElements();
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
-const panels = ['key-analysis', 'chord-analysis', 'roman-analysis',
-  'voice-leading-analysis', 'live-chord-analysis'];
+const panels = ['score-chord-analysis', 'score-live-chord-analysis'];
 
 function source() {
   const builder = new ScoreBuilder();
@@ -48,13 +47,13 @@ describe('atomic player-bound composition', () => {
     const element = panel(tag);
     await flush();
     expect(element.querySelectorAll('[data-slot]')).toHaveLength(1);
-    expect(element.querySelector('pitch-view, score-view')).toBeNull();
+    expect(element.querySelector('score-pitch-view, score-view')).toBeNull();
     expect(element.querySelector('.wui-pitch-keyboard, .wui-pitch-staff, .wui-pitch-fretboard')).toBeNull();
     expect(element.querySelector('[role="tablist"], [role="switch"], [part~="header"], [part~="dock"]')).toBeNull();
   });
 
   it('explains an empty standalone lane without a hidden workbench status bar', async () => {
-    const element = panel('voice-leading-analysis');
+    const element = panel('score-chord-analysis');
     await flush();
     const visible = [...element.querySelectorAll<HTMLElement>('[role="status"]')].filter((node) => !node.hidden);
     expect(visible.map((node) => node.textContent)).toEqual(['Waiting for a score — set player, src or .score.']);
@@ -62,17 +61,17 @@ describe('atomic player-bound composition', () => {
     expect(element.querySelector('[part~="header"], [part~="status"]')).toBeNull();
   });
 
-  it('composes voice analysis with independent keyboard, staff and fretboard listeners', async () => {
+  it('composes chord analysis with independent keyboard, staff and fretboard listeners', async () => {
     const player = source();
-    const voice = panel('voice-leading-analysis');
-    const keyboard = panel('pitch-view', 'keyboard') as PitchViewElement;
-    const staff = panel('pitch-view', 'staff') as PitchViewElement;
-    const frets = panel('pitch-view', 'fretboard') as PitchViewElement;
+    const chord = panel('score-chord-analysis');
+    const keyboard = panel('score-pitch-view', 'keyboard') as PitchViewElement;
+    const staff = panel('score-pitch-view', 'staff') as PitchViewElement;
+    const frets = panel('score-pitch-view', 'fretboard') as PitchViewElement;
     await flush();
     for (const midi of [60, 64, 67]) note(player, midi);
     for (const element of [keyboard, staff, frets]) expect(element.active).toEqual([60, 64, 67]);
-    expect(voice.querySelector('[data-slot="flow"]')).not.toBeNull();
-    expect(voice.contains(keyboard)).toBe(false);
+    expect(chord.querySelector('[data-slot="flow"]')).not.toBeNull();
+    expect(chord.contains(keyboard)).toBe(false);
     keyboard.remove();
     note(player, 64, false);
     expect(keyboard.active).toEqual([]);

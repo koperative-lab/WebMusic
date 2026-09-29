@@ -5,7 +5,7 @@ import LiveDemoCanvas from './LiveDemoCanvas.astro';
 <section class="aligned-demo not-content" data-waterfall-keyboard-demo>
   <LiveDemoCanvas label="Aligned waterfall and keyboard">
     <div class="aligned-demo__layout">
-      <score-player id="aligned-waterfall-player" time-control="full" aria-label="Two-bar alignment study"></score-player>
+      <score-player id="aligned-waterfall-player" time-control="full" aria-label="Arabesque No. 1 opening"></score-player>
       <p class="doc-status" data-aligned-status role="status">Preparing score…</p>
       <div class="aligned-demo__controls">
         <label>Pitch width
@@ -32,11 +32,11 @@ import LiveDemoCanvas from './LiveDemoCanvas.astro';
       </div>
       <div class="aligned-demo__pan" tabindex="0" role="region" aria-label="Pan waterfall and keyboard together">
         <div class="aligned-demo__track" data-aligned-track>
-          <score-view type="waterfall" player="#aligned-waterfall-player" min-pitch="48" max-pitch="71"
+          <score-view type="waterfall" player="#aligned-waterfall-player" min-pitch="48" max-pitch="83"
             white-note-width="32" black-note-width="20" pixels-per-second="64" note-spacing="0"
             show-annotations="false" height="180"></score-view>
-          <pitch-view type="keyboard" player="#aligned-waterfall-player" low="48" high="71"
-            white-key-width="32" black-key-width="20" white-key-height="80" black-key-height="50" follow="none"></pitch-view>
+          <score-pitch-view type="keyboard" player="#aligned-waterfall-player" low="48" high="83"
+            white-key-width="32" black-key-width="20" white-key-height="80" black-key-height="50" follow="none"></score-pitch-view>
         </div>
       </div>
     </div>
@@ -61,7 +61,7 @@ import LiveDemoCanvas from './LiveDemoCanvas.astro';
   .aligned-demo__controls { display: flex; flex-wrap: wrap; gap: .65rem 1rem; }
   .aligned-demo__controls label { display: grid; gap: .25rem; font-size: .75rem; }
   .aligned-demo__pan { max-width: 100%; overflow-x: auto; border: 1px solid var(--wm-border, #d8d8d8); }
-  .aligned-demo__track { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; width: 448px; }
+  .aligned-demo__track { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; width: 672px; }
   .aligned-demo__track > * {
     width: 100%; min-width: 0; margin: 0;
     --wm-component-padding: 0;

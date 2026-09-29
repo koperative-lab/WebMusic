@@ -279,7 +279,7 @@ describe('projectMotifFlow', () => {
 
     expect(lane.tracks?.length).toBeGreaterThan(0);
     expect(lane.tracks?.[0].label).toBe('M1');
-    expect(lane.tracks?.[0].sublabel).toMatch(/^×\d+$/);
+    expect(lane.tracks?.[0].sublabel).toBeUndefined();
 
     const group = lane.bands[0].group;
     const family = lane.bands.filter((band) => band.group === group);

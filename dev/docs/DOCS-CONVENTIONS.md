@@ -22,9 +22,9 @@ manual review requirement; do not describe it as enforced by CI.
 
 ## Running the checks
 
-The detailed gate coverage and demo implementations below describe the main
-development baseline. A maintained branch can share these authoring requirements
-while carrying earlier checks or demos. Its [STATUS.md](../STATUS.md) identifies
+The detailed gate coverage and demo implementations below describe this
+checkout. A maintained branch can share these authoring requirements while
+carrying different checks or demos. Its [STATUS.md](../STATUS.md) identifies
 that difference; the local scripts and package manifests establish which
 commands and checks actually exist. Missing automation remains manual acceptance
 work until implemented, and copying this document does not backport demo fixes.
@@ -57,16 +57,17 @@ covers `.md` and `.mdx` under `apps/doc/webmusic/src/content/docs/`.
 
 | Check | What it verifies | What it does not establish |
 |---|---|---|
-| `params` | Element source files and parameter catalogs correspond across the three Score capabilities; names and order match parsable `static observedAttributes`, with supported spread tables resolved | Defaults, behavior, property/method/event tables, or arbitrary JavaScript declaration forms |
+| `params` | Element source files and parameter catalogs correspond across the six Score/Audio capabilities; names and order match parsable `static observedAttributes`, with supported spread tables resolved | Defaults, behavior, property/method/event tables, or arbitrary JavaScript declaration forms |
 | `catalog` | Element hrefs resolve to pages or collected anchors; tags have params; presenters have classified pages; `consumerTags` are catalog tags | Whether each consumer actually composes that presenter, or whether descriptions are accurate |
 | `page` | Element leaf filenames name real tags, titles equal `'<tag>'`, at least one recognizable top-level Demo/Playground self-closing tag appears, and API/Styling summaries exist | Exactly one demo, complete member tables, or section order |
-| `title` | Every page has a title; the Score API, UI presenter and UI Kit root titles equal their entry specifier | Title form for any other page kind, including family pages, each family's Web Components and Headless inventories, Headless objects, and the Kernel API page; element leaf titles belong to the `page` check |
+| `title` | Every page has a title; the Score/Audio API, UI presenter, UI Kit root, and Bridge root titles equal their entry specifier | Title form for any other page kind, including family pages, each family's Web Components and Headless inventories, Headless objects, and the Kernel API page; element leaf titles belong to the `page` check |
 | `plan`: groups | No `index.mdx` remains in an element capability directory; every element leaf has an integer `sidebar.order` and the group's orders are dense from 1; both of a family's `element/index.mdx` and `headless/index.mdx` exist and carry no recognizable demo; UI Kit category labels match the catalog | A stray capability `index.mdx` under `headless/`, or Headless object order. Also what an inventory actually lists, whether it has a section per capability, a demo mounted in an unrecognized form, or whether a removed route gained a redirect |
-| `plan`: entries | The three release-package root API pages name every published sub-entry and no nonexistent sub-entry; Kernel also has a path-bearing section per sub-entry | Complete API Reference members, or a requirement that matched paths occur in a table |
-| `plan`: Headless | Recognizable value exports from the three Score `/headless` barrels occur as backticked names in the family `headless/index.mdx` read together with that capability's object pages; relative `export *` is followed, and a failure names the capability and its barrel | Types, unique ownership, whether the inventory rather than one leaf names an export, whether a name appears in its own capability's section, whether a name is linked to an explanation, or Bridge's root exports |
+| `plan`: entries | The five package root API pages name every published sub-entry and no nonexistent sub-entry; Kernel also has a path-bearing section per sub-entry | Complete API Reference members, or a requirement that matched paths occur in a table |
+| `plan`: Headless | Recognizable value exports from the six Score/Audio `/headless` barrels occur as backticked names in the family `headless/index.mdx` read together with that capability's object pages; relative `export *` is followed, and a failure names the capability and its barrel | Types, unique ownership, whether the inventory rather than one leaf names an export, whether a name appears in its own capability's section, whether a name is linked to an explanation, or Bridge's root exports |
+| Score Headless leaf shape | All Score Headless leaves checked by `scripts/headless-docs-policy.mjs` have the shared demo frame, ordered sections and compact controls; the frame has one copy/reset pair and no separate State/Events panels | Audio leaves retain their existing export/link checks until their demos migrate; source shape does not prove running interactions |
 | `live-demo` | Rendered Astro imports named with a Demo/Playground/Showcase/Sandbox suffix have a recursive import path to `LiveDemoCanvas.astro` | Browser rendering or successful mounting; this is static import reachability |
 | `docs-css` | `wui-*` classes in shared `apps/doc/shared/ui.css` do not collide with recognized UI package classes | Complete CSS isolation; pages may deliberately use a public class contract |
-| `css-variable` | Backticked non-`--wm-*` variables in site pages have a recognizable read, write, or declaration somewhere in Score/UI source | Whether the variable affects this particular component or demo |
+| `css-variable` | Backticked non-`--wm-*` variables in site pages have a recognizable read, write, or declaration somewhere in Score/Audio/UI source | Whether the variable affects this particular component or demo |
 | `link` | Markdown `](/...)` links resolve to a page or a public file directly; `](#...)` resolves against the current page, with fragments checked against collected anchors. A link that resolves only through a parsed redirect FAILS, naming the destination, because the redirect is for a bookmark and drops the fragment | Relative links, HTML hrefs, dynamic links, external URLs, redirects declared outside the parsed `redirects:` block, or whether a redirect target is itself sensible |
 
 Most checks use constrained text parsing. A matching string is not evidence of
@@ -74,10 +75,10 @@ complete AST validation, browser output, or runtime behavior.
 
 ### Root entry coverage
 
-First-release coverage includes `@webmusic/kernel`, `@webmusic/score` and
-`@webmusic/ui`. Audio and Bridge references and checks are outside this checkout;
-verify a target branch's tracked files before claiming their coverage.
-Sub-entry enumeration excludes the root `.` and `./package.json`.
+Coverage includes `@webmusic/kernel`, `@webmusic/score`, `@webmusic/audio`,
+`@webmusic/ui`, and `@webmusic/bridge`. Sub-entry enumeration excludes the root
+`.` and `./package.json`. Bridge has only a root entry, so its sub-entry coverage
+is vacuous; authors must still reconcile every root export with its API table.
 
 The package root API page owns the complete subpath inventory. Capability/API
 entry pages may link to it or show local navigation derived from the same manifest,
@@ -145,12 +146,14 @@ Implementation: [scripts/docs-catalog.mjs](../../scripts/docs-catalog.mjs).
 Regenerate after changing catalog inputs or adding/removing indexed documents,
 rather than editing generated lists by hand.
 
-The inventory walks regular repository Markdown/MDX files outside hidden
-directories, dependencies, build output, and coverage. The root `.agent/`
-directory is an explicit exception: its toolkit, skills, workflows and rule map
-are indexed and checked. Other hidden directories remain excluded, including
-client settings and worktrees. The root `AGENTS.md` is the canonical instruction
-entry. Other symlinks are not traversed.
+The inventory uses `git ls-files -co --exclude-standard` to include tracked and
+non-ignored untracked regular Markdown/MDX files. Ignored personal notes stay
+outside the inventory. Hidden directories, dependencies, build output and
+coverage are excluded. The root `.agent/` directory is an explicit exception:
+its toolkit, skills, workflows and rule map are indexed and checked. Other
+hidden directories remain excluded, including client settings and worktrees.
+The root `AGENTS.md` must be a regular file included in the inventory as the
+canonical instruction entry. Symlink targets are not traversed.
 
 The generated map groups current guidance, public references and historical
 material. Directory README files are maintained navigation even beside archived
@@ -189,11 +192,11 @@ inventories, use
 `node --experimental-strip-types --no-warnings scripts/docs-catalog.mjs --self-test`.
 
 The generated entry map routes every published subpath to one owning page. For
-the Score family: the `/element`, `/auto`, and `/global` forms to the
+the Score and Audio families: the `/element`, `/auto`, and `/global` forms to the
 family's `element/index.mdx`, the `/headless` form to its `headless/index.mdx`,
 and the remaining capability entries to their API pages, each with the capability
-anchor. UI presenter subpaths route to their presenter pages, Kernel
-entries to its root API page, and a `./package.json` entry to the manifest
+anchor. UI presenter subpaths route to their presenter pages, Kernel and Bridge
+entries to their root API pages, and a `./package.json` entry to the manifest
 rather than to a page. Generation throws when an owning page is missing, so
 removing a family inventory fails `docs:sync` and `check:dev-docs` rather than
 emitting a broken reference. Resolving to a page is not evidence that the page
@@ -274,7 +277,7 @@ above.
 
 ### Demo resource lifetime
 
-On the main baseline, standalone programmatic/Headless demos and the API sandbox
+In this checkout, standalone programmatic/Headless demos and the API sandbox
 bootstrap use `mountDemos` in the [demo components](../../apps/doc/webmusic/src/components/).
 Register
 cleanup as resources are acquired, bind controls through the scope, and check
@@ -311,12 +314,18 @@ cross-browser support guarantees.
 
 | Asset | Use | What the author checks |
 |---|---|---|
-| `midi/demo.mid` | Score playback and analysis | Dense input can be expensive for SVG rendering |
-| `mxl/demo.mxl` | Staff/sheet demos requiring notation semantics | MIDI does not preserve equivalent original layout, clef, and staff metadata; follow the renderer's actual input requirements |
+| `wav/Arabesque No.1.wav` | Decoded-audio demos | WAV takes the pure-JS decoder path, avoiding optional codec dependencies. The full recording is about 37 MB; avoid redundant decode and full-clip analysis |
+| `mp3/Arabesque No.1.mp3` | Native decode or media streaming | A supplied context supporting the format can use `decodeAudioData`; an optional WASM decoder is needed when no usable native path exists. Check peer installation and docs stubs in configuration |
+| `midi/Arabesque No.1.mid` | Score playback and analysis | Dense input can be expensive for SVG rendering |
+| `mxl/Arabesque No.1.mxl` | Staff/sheet demos requiring notation semantics | MIDI does not preserve equivalent original layout, clef, and staff metadata; follow the renderer's actual input requirements |
 | `soundfont/*.sf2` | Timbre demos | Large files; avoid redundant soundfont loads on one page |
 
-Audio decoding, streaming, waveform assets and related demo guidance remain
-on `dev`. Main demos retain the Score MIDI, notation and timbre assets.
+Native decoding, optional peers, and streaming are separate paths.
+`streaming:true` does not mean PCM samples are available to every analyzer. If a
+control requires extra data such as audiowaveform JSON for `peaks-src`, supply
+that data or explain why the control cannot work in this example.
+In browser links, percent-encode the space in the Arabesque filenames as `%20`;
+use `import.meta.env.BASE_URL` for site demo URLs so Pages subpaths resolve.
 
 ### Demo file ownership
 
@@ -330,6 +339,7 @@ apps/doc/webmusic/src/
   components/                    shared canvas, panels, and catalog renderers
   components/elements/           element or workflow demos
   components/headless/           Headless object demos
+  components/bridges/            cross-package composition demos
 ```
 
 Use these destinations when creating or aligning a demo; migration status lives
@@ -337,3 +347,13 @@ only in STATUS. Catalog notes are short control descriptions, while API tables
 own full semantics. Reconcile them with source. `LiveDemoCanvas` owns the stage
 background, spacing, and Live status frame; demos supply the actual components
 and wiring.
+
+### Agent Toolkit generated downloads
+
+`check:docs` recognizes the generator's declared Markdown, catalog, manifest,
+source-text and Skill archive paths; these are generated site assets rather
+than checked-in public files. Generation and Skill query tests verify their
+contents separately. Toolkit commands and the default release context follow main.
+The additive Audio/Bridge adapter describes this checkout as a source snapshot,
+selected through the existing `--base-url` or `--context-dir` options. It does not
+replace the release fingerprints or claim that modified source is published.

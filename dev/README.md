@@ -8,10 +8,10 @@ WebMusic is a toolkit for music software and installations, usable through
 Web Components, Headless objects, and API + UI composition. Accepted design
 describes the intended contracts; [STATUS.md](STATUS.md) describes this
 checkout's delivery and verification gaps. Sharing guidance between branches
-does not merge implementations or transfer old verification results. The first
-release on `main` contains Kernel, UI Kit and Score. Audio and Bridge remain
-accepted directions; their source and public references are not present in this
-checkout. Verify a target branch's tracked files before claiming delivery there.
+does not merge implementations or transfer old verification results. This
+checkout integrates Kernel, UI Kit, Score, Audio and Bridge for the planned
+`main` merge. The recorded first release remains a three-package npm release;
+source integration does not publish updated packages or verify registry delivery.
 
 ## Directory map
 
@@ -83,9 +83,9 @@ indexes all repository Markdown/MDX files, including historical material.
 | Area | Entry point |
 |---|---|
 | Symbolic music | [Score README](../packages/score/README.md) and [Score architecture](../packages/score/ARCHITECTURE.md) |
-| Digital audio (deferred) | [Product direction](PRODUCT.md), [Architecture](ARCHITECTURE.md) and [current status](STATUS.md); no current package reference in this checkout |
+| Digital audio | [Audio README](../packages/audio/README.md) |
 | Presentation | [UI README](../packages/ui/README.md) |
 | Neutral infrastructure | [Platform ledger](../platform/README.md), [Kernel README](../platform/kernel/README.md) and [shared-clock design](../platform/shared-clock-injection.md) |
-| Cross-domain coordination (deferred) | [Shared-clock design](../platform/shared-clock-injection.md), [Architecture](ARCHITECTURE.md) and [current status](STATUS.md) |
+| Cross-domain coordination | [Bridge contracts](../bridges/README.md) and [Bridge README](../bridges/score-audio/README.md) |
 | Public documentation and demos | [Apps README](../apps/README.md) and [site sources](../apps/doc/webmusic/src/content/docs/index.mdx) |
 | Historical release implementation | [Release pipeline archive](../scripts/release-pipeline/README.md) |

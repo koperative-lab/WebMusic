@@ -1,5 +1,5 @@
 ---
-// <note-input layout="grid"> — the mapped panel with built-in synthesized tones.
+// <score-note-input layout="grid"> — the mapped panel with built-in synthesized tones.
 // The real tag has always been in the markup here, so the playground strip can
 // resolve it; the map is shipped as an attribute rather than `.pads` so the
 // `map` control stays live.
@@ -14,16 +14,16 @@ const { keyboard = false } = Astro.props;
 ---
 
 <ElementPlayground
-  tag="note-input"
+  tag="score-note-input"
   class="ni-demo"
   omit={['row-interval']}
 >
-  <note-input
+  <score-note-input
     data-ni-grid
     layout="grid"
     map={DEFAULT_TR808_GRID_MAP}
     keyboard={keyboard || undefined}
-  ></note-input>
+  ></score-note-input>
 </ElementPlayground>
 
 <script>
@@ -34,7 +34,7 @@ const { keyboard = false } = Astro.props;
 
   defineNoteInputElement();
 
-  mountDemos('note-input[data-ni-grid]', (node, scope) => {
+  mountDemos('score-note-input[data-ni-grid]', (node, scope) => {
     const el = node as HTMLElement & {
       onNote?: (midi: number, velocity: number, on: boolean) => void;
     };

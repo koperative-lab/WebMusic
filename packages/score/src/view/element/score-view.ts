@@ -126,7 +126,7 @@ export function parseColorAttr(raw: string | null): string | undefined {
  *   the waterfall, `show-only-octaves-used` trims the columns to the octaves
  *   the score actually uses.
  * - **Pitch-column geometry** (waterfall) — `white-note-width` and
- *   `black-note-width`. Compose a separate `<pitch-view>` for a keyboard.
+ *   `black-note-width`. Compose a separate `<score-pitch-view>` for a keyboard.
  * - **Colours** — `note-color` / `active-note-color` (hex, `rgb()`, or a raw
  *   `r, g, b` triple).
  * - **Expressions** — `show-annotations` (default true) shows supported score

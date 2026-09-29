@@ -1,0 +1,135 @@
+---
+title: 'Effect'
+description: 'The effect builders and the two graph helpers: describe a chain as data, then let a player or the exporter wire it.'
+sidebar:
+  order: 7
+---
+
+An `Effect` here is a **description**, not a node: `gain(0.5)` or
+`filter({type: 'lowpass', frequency: 800})` returns a plain value that knows
+how to build itself against a context. The player, the mixer and the offline
+exporter all take one, which is what lets the same chain apply live and during
+a render.
+
+The builders own nothing. `chainEffects` only composes descriptions into one
+`Effect`; nodes exist once something builds it, and `insertEffect` — the one
+helper that does build — returns the disposer to whoever called it.
+
+## Import
+
+```ts
+import {AudioClipPlayer, chainEffects, delay, filter, gain} from '@webmusic/audio/play/headless';
+
+const player = new AudioClipPlayer(clip, {
+  effect: chainEffects(
+    filter({type: 'lowpass', frequency: 1200}),
+    delay({delaySeconds: 0.25, feedback: 0.3}),
+    gain(0.8),
+  ),
+});
+const dispose = () => player.dispose(); // when the owning session is removed
+```
+
+## Live parameters
+
+An individual built effect exposes `EffectNodes`, whose optional `params` map carries the
+live `AudioParam`s — `frequency`, `wet`, `feedback` — for a knob to drive.
+A built chain deliberately exposes only `{input, output, dispose}`: it does
+**not** forward the params of the effects it composed. A UI that needs them
+must capture each `createAudioNodes` result itself and recapture after a
+rebuild, rather than expecting the chain to surface them.
+
+`customEffect` accepts a factory or an existing EffectNodes pair. Prefer a factory
+for reusable recipes; an existing pair belongs to one context/graph and should not
+be concurrently installed elsewhere.
+
+## Where a chain attaches
+
+`effect` is an AudioClipPlayer construction option and a per-member MixerMemberInit
+option; AudioMixer has no master effect option or live setEffect command. Replacing
+these requires an explicit player/member replacement with caller-managed position
+and ownership. No effect recipe owns or moves a transport clock.
+
+`insertEffect(context, source, destination, effect)` is the low-level form:
+it wires `source → [effect] → destination` and returns the effective output
+node with an optional disposer. Both the
+player graph and offline exporter use the same structural contract. Custom effects
+remain responsible for supporting the supplied realtime/offline context and for
+releasing any internal nodes they create.
+
+## Time, ownership and contract source
+
+Recipes are reusable construction values. Realized nodes have context-specific
+identity; parameter references must be reacquired after rebuilding. Low-level
+chain/insert helpers do not provide a general transactional graph-replacement
+protocol, so callers must handle construction failures and their owned routing.
+
+The public barrel and `packages/audio/src/play/headless/effects.ts, play/core/effect.ts and platform/kernel/src/effect.ts` define the value, option, state and event
+contracts described below. The reference does not turn private implementation
+fields into public API.
+
+<details class="component-section">
+<summary>API</summary>
+
+**Lazy builders**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `gain(valueOrOptions?)` | Effect | Number or GainOptions; gain defaults to 1. Built params: gain. |
+| `filter(options?)` | Effect | FilterOptions; params: frequency, Q and gain. |
+| `delay(options?)` | Effect | DelayOptions; params: time, feedback and wet. |
+| `compressor(options?)` | Effect | CompressorOptions; params: threshold and ratio. |
+| `customEffect(factoryOrNodes, label?)` | Effect | Factory `(BaseAudioContext) => EffectNodes` or existing nodes; optional label. |
+
+**Builder option types**
+
+| Member | Kind | Default | Description |
+| --- | --- | --- | --- |
+| `GainOptions.value` | number | `1` | Gain multiplier. |
+| `FilterOptions.type` | BiquadFilterType | `'lowpass'` | Biquad type. |
+| `FilterOptions.frequency` | number | `1000` | Hz. |
+| `FilterOptions.Q` | number | `1` | Filter Q. |
+| `FilterOptions.gain` | number | node default | dB for filter types using gain. |
+| `DelayOptions.delaySeconds` | number | `0.25` | Delay seconds. |
+| `DelayOptions.feedback` | number | `0.3` | Feedback gain. |
+| `DelayOptions.wet` | number | `0.3` | Wet gain. |
+| `DelayOptions.dry` | number | `1` | Dry gain. |
+| `CompressorOptions.threshold` | number | node default | Threshold dB. |
+| `CompressorOptions.knee` | number | node default | Knee dB. |
+| `CompressorOptions.ratio` | number | node default | Compression ratio. |
+| `CompressorOptions.attack` | number | node default | Attack seconds. |
+| `CompressorOptions.release` | number | node default | Release seconds. |
+
+**Graph helpers**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `chainEffects(...effects)` | Effect | Skips null/undefined; lazily connects stages. Empty chain creates a gain pass-through. It does not merge params maps. |
+| `insertEffect(context, source, destination, effect)` | object | Connects source → effect → destination, or direct when effect is undefined; returns `{output, dispose?}`. |
+
+**Effect / EffectNodes contract and lifetime**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `Effect.label` | optional string | Recipe label. |
+| `Effect.createAudioNodes(context)` | EffectNodes | Builds on a BaseAudioContext; each call normally creates a fresh graph. |
+| `EffectNodes.input` | readonly AudioNode | Signal input. |
+| `EffectNodes.output` | readonly AudioNode | Signal output. |
+| `EffectNodes.params` | optional `Record<string, AudioParam>` | Only explicitly exposed live parameters. |
+| `EffectNodes.dispose()` | optional void method | Custom release of internal resources. Callers must also manage the edges they establish. |
+| `GainOptions`, `FilterOptions`, `DelayOptions`, `CompressorOptions` | types | Own every builder setting listed above; builders install no timer, events or transport state. |
+
+</details>
+
+<div class="component-section">
+
+**Composed by.** No element exposes an effect rack yet; the chain reaches
+elements through the player effect property and mixer member effect definitions used by
+[`<audio-player>`](/audio/element/play/audio-player/) and
+[`<audio-mixer>`](/audio/element/play/audio-mixer/).
+
+</div>
+
+## Related
+
+[AudioClipPlayer](/audio/headless/play/audio-clip-player/) · [AudioMixer](/audio/headless/play/audio-mixer/) · [Offline export](/audio/api/play/)

@@ -27,6 +27,10 @@ export type UiPresenterName =
   | 'analysis'
   | 'pitch'
   | 'harmony'
+  | 'level-analyzer'
+  | 'oscilloscope'
+  | 'spectrum-analyzer'
+  | 'transient-analyzer'
   | 'workbench';
 
 export interface UiPresenterClass {
@@ -111,7 +115,7 @@ export const UI_PRESENTER_CLASSES: readonly UiPresenterClass[] = [
   {
     slug: 'views-analysis',
     label: 'Views and analysis',
-    summary: 'Passive pitch and harmony readouts, analytical cards, timelines and reports.',
+    summary: 'Pitch and harmony readouts, analytical reports and interactive signal inspection tools.',
   },
   {
     slug: 'layout-feedback',
@@ -120,8 +124,114 @@ export const UI_PRESENTER_CLASSES: readonly UiPresenterClass[] = [
   },
 ] as const;
 
-/** The complete set of 21 public `@webmusic/ui` presenter subpaths on main. */
+/** Shared presenter catalog with the Score and Audio Element consumers in this checkout. */
 export const UI_PRESENTER_CATALOG: readonly UiPresenterEntry[] = [
+  {
+    presenter: 'level-analyzer',
+    classSlug: 'views-analysis',
+    label: 'Level analyzer',
+    summary: 'Live dBFS RMS and sample-peak history with hold, threshold, and freeze controls.',
+    api: `import {mountLevelAnalyzer} from '@webmusic/ui/level-analyzer';
+
+const handle = mountLevelAnalyzer(host, {
+  onThresholdChange: (dbfs) => setThreshold(dbfs),
+  onFreezeChange: (frozen) => setFrozen(frozen),
+  onResetHold: () => resetPeakHold(),
+});
+handle.update(state);`,
+    invocation: {name: 'mountLevelAnalyzer', arguments: 'host, actions'},
+    consumerTags: ['audio-level-analyzer'],
+    hint: 'Inspect the moving dBFS history, change the threshold, then freeze or reset peak hold. The demo signal is generated locally.',
+    state: [
+      {name: 'rmsDbfs', kind: 'number', required: true, initial: -24, min: -60, max: 0, step: 1, note: 'Base RMS of the generated demo signal; the live history adds a small movement around it.'},
+      {name: 'peakDbfs', kind: 'number', required: true, initial: -10, min: -60, max: 0, step: 1, note: 'Base sample peak in dBFS. Held peak and recent history derive from incoming samples.'},
+      {name: 'thresholdDbfs', kind: 'number', required: true, initial: -6, min: -60, max: 0, step: 1, note: 'Alert threshold for sample peaks; the presenter slider changes this same state.'},
+      {name: 'frozen', kind: 'boolean', required: true, initial: false, note: 'Stops accepting demo samples; the presenter Freeze button changes this same state.'},
+    ],
+  },
+  {
+    presenter: 'spectrum-analyzer',
+    classSlug: 'views-analysis',
+    label: 'Spectrum analyzer',
+    summary: 'Log-frequency spectrum with keyboard and pointer probing, freeze, and peak hold.',
+    api: `import {mountSpectrumAnalyzer} from '@webmusic/ui/spectrum-analyzer';
+
+const handle = mountSpectrumAnalyzer(host, {
+  snapshot: () => state,
+  setFrozen: (value) => setFrozen(value),
+  setPeakHold: (value) => setPeakHold(value),
+  probe: (hertz, db) => inspect(hertz, db),
+  subscribe: (notify) => store.subscribe(notify),
+});`,
+    consumerTags: ['audio-spectrum-analyzer'],
+    hint: 'Probe the plot with pointer or arrow keys, hold peaks, then freeze a frame. The moving harmonic spectrum is generated locally.',
+    state: [
+      {name: 'fundamentalHz', kind: 'number', required: true, initial: 440, min: 55, max: 2000, step: 1, note: 'Fundamental of the generated harmonic test signal; each frame contains real dB values per FFT bin.'},
+      {name: 'frozen', kind: 'boolean', required: true, initial: false, note: 'Keeps the latest frame; the presenter Freeze button changes this same state.'},
+      {name: 'peakHold', kind: 'boolean', required: true, initial: false, note: 'Overlays maxima until Reset peaks or source replacement.'},
+      {name: 'minFrequency', kind: 'number', required: true, initial: 20, min: 20, max: 5000, step: 1, note: 'Lower bound of the log-frequency inspector in hertz.'},
+      {name: 'maxFrequency', kind: 'number', required: true, initial: 20000, min: 200, max: 24000, step: 100, note: 'Upper bound of the inspector in hertz, clamped to Nyquist.'},
+    ],
+    options: [
+      {name: 'label', kind: 'text', fallback: 'Spectrum analyzer', placeholder: 'Bus spectrum', note: 'Accessible name of the presenter group.', inert: 'The name is exposed through aria-label, not a visible heading.'},
+      {name: 'stylesheet', kind: 'boolean', fallback: 'on', note: 'Install the exported presenter stylesheet into this host.'},
+      {name: 'onError', kind: 'enum', fallback: 'no handler', choices: [{value: 'report', label: 'report demo errors', literal: '(error) => report(error)'}], note: 'Receives snapshot, probe, sizing, or cleanup failures.', inert: 'The healthy generated signal does not manufacture an error.'},
+    ],
+  },
+  {
+    presenter: 'oscilloscope',
+    classSlug: 'views-analysis',
+    label: 'Oscilloscope',
+    summary: 'Trigger-aligned waveform window with timebase, freeze and time-amplitude probe controls.',
+    api: `import {mountOscilloscope} from '@webmusic/ui/oscilloscope';
+
+const handle = mountOscilloscope(host, {
+  snapshot: () => state,
+  setFrozen: (value) => setFrozen(value),
+  setTimebaseMs: (value) => setTimebase(value),
+  setTriggerLevel: (value) => setTriggerLevel(value),
+  setTriggerEdge: (value) => setTriggerEdge(value),
+  probe: (timeMs, amplitude) => inspect(timeMs, amplitude),
+  subscribe: (notify) => store.subscribe(notify),
+});`,
+    consumerTags: ['audio-oscilloscope'],
+    hint: 'Adjust the timebase or trigger, then probe and freeze the generated waveform. This demo does not read an audio device.',
+    state: [
+      {name: 'frequencyHz', kind: 'number', required: true, initial: 440, min: 60, max: 1800, step: 1, note: 'Frequency of the caller-generated test waveform, not an audio-device reading.'},
+      {name: 'amplitude', kind: 'number', required: true, initial: 0.75, min: 0, max: 1, step: 0.05, note: 'Linear amplitude of the generated samples; a threshold above it has no matching edge.'},
+      {name: 'timebaseMs', kind: 'number', required: true, initial: 10, min: 1, max: 85, step: 0.5, note: 'Requested visible window in milliseconds; the presenter Timebase control writes this state.'},
+      {name: 'triggerLevel', kind: 'number', required: true, initial: 0, min: -1, max: 1, step: 0.05, note: 'Linear-amplitude crossing level; the presenter Trigger control writes this state.'},
+      {name: 'triggerEdge', kind: 'enum', required: true, initial: 'rising', choices: [{value: 'rising', label: 'rising'}, {value: 'falling', label: 'falling'}, {value: 'off', label: 'off'}], note: 'Select the edge used to align the sampled window; Off runs freely.'},
+      {name: 'frozen', kind: 'boolean', required: true, initial: false, note: 'Hold the current sampled window; the presenter Freeze button writes this state.'},
+    ],
+    options: [
+      {name: 'label', kind: 'text', fallback: 'Oscilloscope', placeholder: 'Bus waveform', note: 'Accessible group name.', inert: 'This name changes the group aria-label, not its visible heading.'},
+      {name: 'stylesheet', kind: 'boolean', fallback: 'on', note: 'Install the presenter stylesheet for this mount.'},
+      {name: 'onError', kind: 'enum', fallback: 'no handler', choices: [{value: 'report', label: 'report demo errors', literal: '(error) => report(error)'}], note: 'Receives reported snapshot, command, drawing and cleanup failures.', inert: 'The healthy synthetic signal does not manufacture an error.'},
+    ],
+  },
+  {
+    presenter: 'transient-analyzer',
+    classSlug: 'views-analysis',
+    label: 'Transient analyzer',
+    summary: 'Recent attack-strength and hit history with sensitivity, freeze and clear actions.',
+    api: `import {mountTransientAnalyzer} from '@webmusic/ui/transient-analyzer';
+
+const handle = mountTransientAnalyzer(host, {
+  onSensitivityChange: (value) => setSensitivity(value),
+  onFreezeChange: (value) => setFrozen(value),
+  onClear: () => clearHistory(),
+});
+handle.update(state);`,
+    invocation: {name: 'mountTransientAnalyzer', arguments: 'host, actions'},
+    consumerTags: ['audio-transient-analyzer'],
+    hint: 'Watch generated attacks cross the threshold, change Sensitivity, then Freeze or Clear. This demo does not analyze a microphone.',
+    state: [
+      {name: 'attackStrength', kind: 'number', required: true, initial: 0.32, min: 0, max: 1, step: 0.01, note: 'Base strength of generated attack pulses; sensitivity decides which pulses count as hits.'},
+      {name: 'sensitivity', kind: 'number', required: true, initial: 0.55, min: 0, max: 1, step: 0.01, note: 'Higher sensitivity lowers the demo threshold; the presenter slider changes this same state.'},
+      {name: 'frozen', kind: 'boolean', required: true, initial: false, note: 'Hold the current synthetic history; the presenter Freeze button changes this same state.'},
+    ],
+  },
   {
     presenter: 'transport',
     classSlug: 'transport-time',
@@ -136,7 +246,7 @@ const handle = mountTransport(host, {
   seekFraction: (fraction) => seekTo(fraction),
   subscribe: (notify) => store.subscribe(notify),
 });`,
-    consumerTags: ['score-player'],
+    consumerTags: ['score-player', 'audio-player'],
     hint: 'Press Play, drag the seek control, then change State or Options; surface seek also supports the arrow keys.',
     state: [
       {
@@ -623,7 +733,7 @@ const handle = mountPlaylist(host, {
   select: (id) => player.select(id),
   subscribe: (notify) => store.subscribe(notify),
 });`,
-    consumerTags: [],
+    consumerTags: ['audio-playlist'],
     hint: 'Use Previous, Play and Next, drag Seek, or choose a row; then expose loading/error items or change Options.',
     state: [
       {
@@ -648,7 +758,7 @@ const handle = mountPlaylist(host, {
         kind: 'boolean',
         initial: false,
         fallback: 'off',
-        note: 'Disables the transport buttons and seek range.',
+        note: 'Disables transport buttons and seek, and blocks row selection.',
       },
       {
         name: 'items',
@@ -731,7 +841,7 @@ const handle = mountPlaylist(host, {
     api: `import {mountParameterRack} from '@webmusic/ui/parameter';
 
 const handle = mountParameterRack(host, binding, options);`,
-    consumerTags: ['synth-panel'],
+    consumerTags: ['score-synth-panel'],
     hint: 'Drag a knob vertically or focus it and use the range keys; State notifies the binding and Options remount the rack.',
     state: [
       {
@@ -823,7 +933,7 @@ const handle = mountMacro(host, binding, options);`,
       name: 'mountMacroRack',
       arguments: 'host, bindings',
     },
-    consumerTags: ['synth-panel'],
+    consumerTags: ['score-synth-panel'],
     hint: 'Drag either rack knob; State edits the first binding, while rack Options remount both real macro children.',
     state: [
       {name: 'label', kind: 'text', required: true, initial: 'MORPH', note: 'Labels the rotary control.'},
@@ -892,7 +1002,7 @@ const handle = mountSectionPanel(host, sections, options);`,
       name: 'mountSectionPanel',
       arguments: 'host, sections',
     },
-    consumerTags: ['synth-panel'],
+    consumerTags: ['score-synth-panel'],
     hint: 'Change Options to remount the same three presenter slots with accessibility and compatibility hooks applied.',
     options: [
       {
@@ -934,7 +1044,7 @@ const handle = mountSectionPanel(host, sections, options);`,
     api: `import {mountEnvelope} from '@webmusic/ui/envelope';
 
 const handle = mountEnvelope(host, binding, options);`,
-    consumerTags: ['synth-panel'],
+    consumerTags: ['score-synth-panel'],
     hint: 'Drag the three curve handles, use the hidden native ranges from the keyboard, or edit every State value below.',
     state: [
       {name: 'attack', kind: 'number', required: true, initial: 0.08, min: 0, step: 0.01, note: 'Attack duration in seconds, bounded visually by attackMax.'},
@@ -961,7 +1071,7 @@ const handle = mountEnvelope(host, binding, options);`,
     api: `import {mountLfo} from '@webmusic/ui/lfo';
 
 const handle = mountLfo(host, binding, options);`,
-    consumerTags: ['synth-panel'],
+    consumerTags: ['score-synth-panel'],
     hint: 'Run the phase clock, choose a waveform, drag Rate or Depth, then drive the same values from State below.',
     state: [
       {name: 'shape', kind: 'enum', required: true, initial: 'sine', choices: [{value: 'sine', label: 'sine'}, {value: 'triangle', label: 'triangle'}, {value: 'square', label: 'square'}, {value: 'saw', label: 'saw'}], note: 'Selects the waveform glyph and plotted curve.'},
@@ -990,7 +1100,7 @@ const handle = mountLfo(host, binding, options);`,
     api: `import {mountEq} from '@webmusic/ui/eq';
 
 const handle = mountEq(host, binding, options);`,
-    consumerTags: ['synth-panel'],
+    consumerTags: ['score-synth-panel'],
     hint: 'Drag a band point in two dimensions, then try every State and Option; hidden inputs mirror geometry but are not interactive.',
     state: [
       {name: 'bands', kind: 'enum', required: true, initial: 'three-band', choices: [{value: 'three-band', label: 'three bands'}, {value: 'single-band', label: 'one band'}, {value: 'empty', label: 'no bands'}], note: 'Selects the caller-owned EqBandState list.'},
@@ -1019,7 +1129,7 @@ const handle = mountMixer(host, {
   setMaster: (value) => mixer.setMaster(value),
   setChannel: (id, value) => mixer.setChannel(id, value),
 });`,
-    consumerTags: ['rack-control'],
+    consumerTags: ['score-rack-control', 'audio-mixer'],
     hint: 'Move a fader or press M / S; in this demo Play enables, Pause disables, and Stop clears the levels.',
     state: [
       {
@@ -1103,7 +1213,7 @@ const handle = mountMeter(host, {
   readLevel: () => meter.level,
   readSpectrum: (bars) => meter.spectrum(bars),
 });`,
-    consumerTags: [],
+    consumerTags: ['audio-meter', 'audio-view'],
     hint: 'Change the pulled level and peak values, switch mode, or turn animation off and use State changes to call redraw().',
     state: [
       {
@@ -1250,11 +1360,11 @@ const handle = mountRecorder(host, {
   toggleRecording: () => recorder.toggle(),
   subscribe: (notify) => store.subscribe(notify),
 });`,
-    consumerTags: ['score-recorder'],
+    consumerTags: ['score-recorder', 'audio-recorder'],
     hint: 'Press Record to run an asynchronous demo capture; choose exportFormats to add working download callbacks.',
     state: [
       {name: 'recording', kind: 'boolean', required: true, initial: false, note: 'Paints and labels the record toggle as Record or Stop.'},
-      {name: 'busy', kind: 'boolean', initial: false, fallback: 'off', note: 'Disables the record button and sets its aria-busy state.'},
+      {name: 'busy', kind: 'boolean', initial: false, fallback: 'off', note: 'Blocks recorder commands and sets root and record-button aria-busy state.'},
       {name: 'playing', kind: 'boolean', initial: false, fallback: 'off', note: 'Paints the playback toggle as Play or Stop.'},
       {name: 'level', kind: 'number', initial: 0.2, min: 0, max: 1, step: 0.01, fallback: 'meter hidden', note: 'Normalized input level; omission hides the visual meter.'},
       {name: 'recordedCount', kind: 'number', initial: 0, min: 0, step: 1, fallback: '0', note: 'Fallback count printed in the generated recording status.'},
@@ -1300,7 +1410,7 @@ const handle = mountNoteSurface(host, {
     setNote: (midi, on) => synth.setNote(midi, on),
   },
 });`,
-    consumerTags: ['note-input'],
+    consumerTags: ['score-note-input'],
     hint: 'Click or drag notes; focus the keyboard surface and use its printed keys, Z / X for octave, or Esc to release; chord buttons also hold with Space / Enter.',
     state: [
       {
@@ -1394,10 +1504,7 @@ mountCanvasStage(canvasHost, canvasBinding);
 mountSurfaceSlider(surface, sliderBinding);`,
       variant: 'stage-compound',
     },
-    consumerTags: [
-      'score-view',
-      'sheet-view',
-    ],
+    consumerTags: ['score-view', 'score-sheet-view', 'audio-view', 'audio-live-view'],
     hint: 'Drag the surface slider or use its Arrow, Home, and End keys; all three real stage mounts share the same caller-owned State.',
     state: [
       {
@@ -1593,7 +1700,7 @@ mountSurfaceSlider(surface, sliderBinding);`,
     api: `import {mountStatus} from '@webmusic/ui/status';
 
 const handle = mountStatus(host, binding, options);`,
-    consumerTags: ['score-view', 'sheet-view'],
+    consumerTags: ['score-view', 'score-sheet-view', 'audio-view', 'audio-live-view'],
     hint: 'Choose Ready, Loading, Empty, or Error, then edit the caller-owned message.',
     state: [
       {
@@ -1779,13 +1886,7 @@ const playhead = createAnalysisPlayhead(root);`,
       name: 'createAnalysisPlayhead',
       arguments: 'root',
     },
-    consumerTags: [
-      'key-analysis',
-      'chord-analysis',
-      'roman-analysis',
-      'voice-leading-analysis',
-      'live-chord-analysis',
-    ],
+    consumerTags: ['score-chord-analysis', 'score-live-chord-analysis'],
     hint: 'Watch the real playhead move across helper-rendered spans; Options remount its controller.',
     options: [
       {
@@ -1833,7 +1934,7 @@ const fretboard = mountFretboard(fretboardHost, fretboardBinding);`,
       name: 'mountKeyboard',
       arguments: 'host, keyboardBinding',
     },
-    consumerTags: ['pitch-view'],
+    consumerTags: ['score-pitch-view'],
     hint: 'The progression advances on its own; picking a chord takes it over, and Reset hands it back.',
     state: [
       {
@@ -2001,7 +2102,7 @@ const wheel = mountWheel(wheelHost, wheelBinding);`,
       name: 'mountFlowLane',
       arguments: 'host, laneBinding',
     },
-    consumerTags: ['key-analysis', 'chord-analysis', 'roman-analysis', 'voice-leading-analysis', 'live-chord-analysis'],
+    consumerTags: ['score-chord-analysis', 'score-live-chord-analysis'],
     hint: 'The progression runs itself past the now line. Drag or arrow-key the lane to scrub, click a band to jump to it, and pick an alternate reading to take the nameplate over.',
     state: [
       {
@@ -2172,7 +2273,7 @@ if (rail) mountKeyboard(rail, keyboardBinding);`,
       name: 'mountWorkbench',
       arguments: 'host, shellBinding',
     },
-    consumerTags: ['key-analysis', 'chord-analysis', 'roman-analysis', 'voice-leading-analysis', 'live-chord-analysis'],
+    consumerTags: ['score-chord-analysis', 'score-live-chord-analysis'],
     hint: 'Arrow-key the tabs and press Enter: an arrow moves focus and chooses nothing. Fold a dock away with its switch and the presenter inside it is unmounted, because a caller must not be able to mount into a box nobody can see. Park the shell and the frame loop stops with it.',
     state: [
       {

@@ -23,7 +23,7 @@ const themeSources = ['styles', 'internal/palette', 'internal/surface', 'interna
   .map((name) => `packages/ui/src/${name}.ts`);
 
 /** Public catalog records derive from the same reviewed catalogs as the site. */
-export function componentCatalog(pages, presenters, composition) {
+export function componentCatalog(pages, presenters, composition, extension) {
   const byRoute = new Map(pages.map((page) => [page.route, page]));
   const requirePage = (route) => {
     const page = byRoute.get(route);
@@ -54,11 +54,12 @@ export function componentCatalog(pages, presenters, composition) {
   for (const entry of presenters) {
     components.push(record(`ui/${entry.presenter}`, 'ui', requirePage(`/uikit/${entry.classSlug}/${entry.presenter}/`), [`packages/ui/src/${entry.presenter}.ts`], {description: entry.summary}));
   }
+  components.push(...(extension?.components(pages, record) ?? []));
   components.sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
   if (new Set(components.map(({id}) => id)).size !== components.length) throw new Error('Agent component catalog contains duplicate IDs.');
   return {
     schemaVersion: 1,
-    sourceScope: 'Selected owning implementation files at the verified release; imports and internal selectors are not public entry points.',
+    sourceScope: extension?.sourceScope ?? 'Selected owning implementation files at the verified release; imports and internal selectors are not public entry points.',
     license: {id: 'MIT', output: licenseOutput},
     stylesFormat: 'public-documentation',
     components,

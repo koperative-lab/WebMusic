@@ -1,0 +1,160 @@
+---
+title: 'LiveViewController and LiveScrollBuffer'
+description: 'Caller-paced analyser projection and fixed-capacity timestamped column storage, without a renderer or scheduler.'
+sidebar:
+  order: 4
+---
+
+`LiveViewController` turns a borrowed `AnalyserNode` into a scrolling
+projection: it samples frames, converts each to a column, and appends it to a
+`LiveScrollBuffer` whose capacity is sized from the expected window and sampling
+rate. It retains a fixed number of columns, not an exact time-pruned interval. The renderer
+draws whatever the ring holds.
+
+It **borrows** the analyser and never mutates or disconnects it — the same
+rule everywhere in this repository, because a tap usually has other readers.
+Sampling is caller-paced: the controller never schedules a frame, so each
+`capture(nowMs)` you make reads exactly one column. `clear()` drops the
+history; the buffer itself is yours to drop.
+
+## Import
+
+```ts
+import {createLiveViewController} from '@webmusic/audio/view/headless';
+
+const live = createLiveViewController({
+  analyser: player.analyser,
+  type: 'spectrogram',
+  windowSeconds: 8,
+});
+
+let frameId = 0;
+const frame = (now: number) => {
+  const buffer = live.capture(now);
+  if (buffer) console.log(buffer.length, buffer.latestSeconds);
+  frameId = requestAnimationFrame(frame);
+};
+frameId = requestAnimationFrame(frame);
+const dispose = () => {
+  cancelAnimationFrame(frameId); // application owns the rendering cadence
+  live.clear();                // release history/scratch, not the borrowed tap
+};
+```
+
+## Capacity is fixed on purpose
+
+`LiveScrollBuffer` derives its capacity once, from `windowSeconds ×
+columnsPerSecond`, and never grows. Irregular capture can make the actual time
+span differ from windowSeconds. The source comment says why better than a
+paraphrase would: a live view runs for as long as the page is open, so an
+unbounded history is a leak with a pretty name. When the ring is full the
+oldest column is overwritten.
+
+Each column carries **its own timestamp** rather than relying on its index,
+so a renderer draws correct spacing even when frames arrive irregularly —
+which they do, since sampling competes with everything else on the main
+thread.
+
+## Two frame shapes
+
+The analyser gives two different kinds of data, and the two column builders
+are how one buffer takes both:
+
+- `timeDomainColumn(frame)` reduces a time-domain window to a `[min, max]`
+  pair — two rows, a waveform band in normalized −1…1 units.
+- `frequencyColumn(frame, out)` writes a byte spectrum into an existing
+  `Float32Array` — N rows, a spectrogram slice. It takes the output array so
+  the hot path allocates nothing.
+
+`LiveViewController` uses two rows for the waveform pair and frequencyBinCount
+rows for a spectrum. LiveScrollBuffer itself accepts any positive row count.
+
+Time-domain frames have **no dB mapping** — that is a frequency-domain notion
+— so a renderer must not apply one uniformly across both projections.
+
+## Time, ownership and contract source
+
+Capture timestamps locate observations relative to the first capture; they are
+not an AudioContext or musical transport authority. The controller and buffer have
+no events or dispose methods. The application owns frame scheduling and must stop
+it before dropping the projection.
+
+The public barrel and `packages/audio/src/view/headless/live.ts` define the value, option, state and event
+contracts described below. The reference does not turn private implementation
+fields into public API.
+
+<details class="component-section">
+<summary>API</summary>
+
+**LiveViewController construction**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `new LiveViewController(options?)` | constructor | No graph or timer is created. |
+| `createLiveViewController(options?)` | factory | Returns the same controller type. |
+| `analyser` | option | Optional borrowed tap; no reconfiguration/disconnection. |
+| `type` | option | 'waveform' by default; LiveProjectionType also permits 'spectrogram'. |
+| `windowSeconds` | option | 5 by default, minimum 0.5 for controller history sizing. |
+| `columnsPerSecond` | option | 60 by default, minimum 1; sizes capacity without scheduling captures. |
+
+**Controller commands and state**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `capture(nowMs)` | LiveScrollBuffer or undefined | One sample at caller-supplied monotonic milliseconds; first capture sets local time zero. No analyser returns undefined. |
+| `setAnalyser(analyserOrUndefined)` | void | Changes borrowed source and clears history when changed. |
+| `setType(type)` | void | Changes projection and clears history when changed. |
+| `setWindowSeconds(seconds)` | void | Changes capacity policy and clears history when changed. |
+| `clear()` | void | Drops buffer/scratch/local origin; does not disconnect analyser. |
+| `analyser` | AnalyserNode or undefined | Borrowed source. |
+| `type` | LiveProjectionType | Current waveform or spectrogram mode. |
+| `windowSeconds` | number | Requested history window. |
+| `buffer` | LiveScrollBuffer or undefined | Created on capture; undefined before capture/after clear. |
+
+**LiveScrollBuffer construction**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `new LiveScrollBuffer(options)` | constructor | Allocates fixed storage once. |
+| `rows` | option | Required values per column; floored with minimum 1. |
+| `windowSeconds` | option | 5 by default; minimum 0.1 for the standalone buffer. |
+| `columnsPerSecond` | option | 60 by default; minimum 1. |
+| `capacity` | readonly number | max(2, ceil(windowSeconds × columnsPerSecond)); fixed after construction. |
+| `rows` | readonly number | Stored values per column. |
+| `windowSeconds` | readonly number | History sizing value. |
+| `length` | readonly number | Held columns, initially 0. |
+| `latestSeconds` | readonly number | Most recent column timestamp, initially 0. |
+
+**Buffer commands and reads**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `push(seconds, values)` | void | Copies up to rows values, pads missing values with zero, overwrites oldest at capacity. |
+| `forEach(visit)` | void | Visits oldest first. One scratch values array is reused across callbacks; copy it if retaining a column. The walk is not allocation-free. |
+| `at(index)` | LiveColumn or undefined | Age index 0 is oldest; returned values are copied. |
+| `clear()` | void | Resets count/cursor; allocated storage remains reusable. |
+
+**Pure helpers and types**
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `timeDomainColumn(frame)` | [min, max] | Byte time-domain samples mapped around 128 into normalized −1…1; empty input yields [0,0]. |
+| `frequencyColumn(frame, out)` | Float32Array | Writes byte spectrum normalized to 0–1 into caller output and returns it. |
+| `LiveColumn` | type | `{seconds, values}`; units of values depend on the projection. |
+| `LiveProjectionType` | type | waveform or spectrogram. |
+| `LiveScrollOptions` | type | rows, windowSeconds, columnsPerSecond. |
+| `LiveViewControllerOptions` | type | analyser, type, windowSeconds, columnsPerSecond. |
+
+</details>
+
+<div class="component-section">
+
+**Composed by.** [`<audio-live-view>`](/audio/element/view/audio-live-view/) —
+Audio / View, whose `type` picks between the two projections over one
+controller.
+
+</div>
+
+## Related
+
+[AudioTimeline](/audio/headless/view/audio-timeline/) · [Realtime analyzer](/audio/headless/analyze/realtime-analyzer/) · [Metering](/audio/headless/play/engines/)

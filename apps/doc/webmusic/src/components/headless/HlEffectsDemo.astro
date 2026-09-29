@@ -1,0 +1,102 @@
+---
+// Headless demo: an Effect chain inserted into AudioClipPlayer's post-processing
+// bus (source → gain → panner → [effect] → analyser → destination). The `effect`
+// is a CONSTRUCTOR-ONLY option, so switching presets rebuilds the player —
+// carrying over the play state — using the factories from @webmusic/audio/play/headless.
+import LiveDemoCanvas from '../LiveDemoCanvas.astro';
+
+const SRC = `${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`;
+---
+
+<div class="wui-panel wui-panel--flow not-content">
+  <div class="wui-panel__title">
+    <span>@webmusic/audio/play/headless</span>
+    <strong>Effect chain</strong>
+  </div>
+  <LiveDemoCanvas size="compact" label="Audio effect chain">
+    <div class="wui-row" data-hl-effects data-src={SRC}>
+      <button class="wui-btn" data-play type="button">▶ Play</button>
+      <div class="wui-field">
+        <label class="wui-label" for="hl-effects-select">Effect</label>
+        <select class="wui-select" data-variant="ghost" data-effect id="hl-effects-select">
+          <option value="dry">Dry</option>
+          <option value="lowpass">Lowpass</option>
+          <option value="delay">Delay</option>
+        </select>
+      </div>
+      <div class="wui-track"><div class="wui-track__fill" data-fill></div></div>
+      <span class="wui-readout" data-time>0.0s</span>
+    </div>
+  </LiveDemoCanvas>
+</div>
+
+<script>
+  import {mountDemos, type DemoScope} from '../demo-lifecycle';
+  import { loadClipFromUrl } from '@webmusic/audio/play';
+  import { AudioClipPlayer, chainEffects, delay, filter } from '@webmusic/audio/play/headless';
+  import type { Effect } from '@webmusic/audio/play/headless';
+  import type { AudioClip } from '@webmusic/audio';
+
+  const buildEffect = (kind: string): Effect | undefined => {
+    if (kind === 'lowpass') return filter({ type: 'lowpass', frequency: 800 });
+    if (kind === 'delay') return chainEffects(delay({ delaySeconds: 0.25, feedback: 0.35, wet: 0.4 }));
+    return undefined; // Dry
+  };
+
+  const setup = async (root: HTMLElement, scope: DemoScope) => {
+    const btn = root.querySelector<HTMLButtonElement>('[data-play]')!;
+    const select = root.querySelector<HTMLSelectElement>('[data-effect]')!;
+    const fill = root.querySelector<HTMLElement>('[data-fill]')!;
+    const time = root.querySelector<HTMLElement>('[data-time]')!;
+
+    const clip: AudioClip = await loadClipFromUrl(root.dataset.src!, {signal: scope.signal});
+    if (!scope.active) return;
+    let player: AudioClipPlayer;
+    scope.add(() => player?.dispose());
+    let playing = false;
+
+    // Build (or rebuild) the player with the chosen effect, restoring transport
+    // state. `effect` is a constructor option, so a swap means a fresh player.
+    const buildPlayer = (kind: string) => {
+      const effect = buildEffect(kind);
+      // Timer-based cursor (vs default rAF) so timeupdate keeps firing when the
+      // tab is backgrounded.
+      const next = new AudioClipPlayer(clip, { cursorIntervalMs: 100, effect });
+      next.on('timeupdate', ({ seconds, progress }) => {
+        fill.style.width = `${Math.min(100, progress * 100)}%`;
+        time.textContent = `${seconds.toFixed(1)}s`;
+      });
+      next.on('end', () => { playing = false; btn.textContent = '▶ Play'; });
+      return next;
+    };
+
+    player = buildPlayer(select.value);
+
+    let playGeneration = 0;
+    const startPlayer = () => {
+      const current = player;
+      const request = ++playGeneration;
+      scope.run(current.play(), () => {
+        if (current !== player || request !== playGeneration) return;
+        playing = false;
+        btn.textContent = '▶ Play';
+      });
+    };
+
+
+    scope.listen(btn, 'click', () => {
+      if (playing) { ++playGeneration; player.pause(); btn.textContent = '▶ Play'; }
+      else { startPlayer(); btn.textContent = '⏸ Pause'; }
+      playing = !playing;
+    });
+
+    scope.listen(select, 'change', () => {
+      const wasPlaying = playing;
+      player.dispose();
+      player = buildPlayer(select.value);
+      if (wasPlaying) { startPlayer(); }
+    });
+  };
+
+  mountDemos('[data-hl-effects]', setup);
+</script>

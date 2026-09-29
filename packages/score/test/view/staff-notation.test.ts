@@ -1,11 +1,10 @@
-import {readFileSync} from 'node:fs';
 import {describe, expect, it} from 'vitest';
 import {
   Duration, Note, NoteId, Part, PartId, Pitch, Rational, ScoreBuilder, VoiceId,
   type MeasureData, type NoteData,
 } from '../../src/core';
 import {inferStaffClefChanges, projectStaffNotation, spellStaffDuration} from '../../src/view/core/staff-notation';
-import {parseMusicXML} from '../../src/io';
+import {loadArabesqueMxlFixture} from '../arabesque-fixture';
 
 const q = (numerator: number, denominator = 1) => new Rational(numerator, denominator);
 function note(id: string, onset: Rational, patch: Partial<NoteData> = {}): Note {
@@ -170,9 +169,8 @@ describe('staff notation projection', () => {
     expect(projection.layers[0].notes[0]).toBe(score.parts[0].notes[0]);
   });
 
-  it('projects the demo score from source notation with both initial treble clefs and complete triplet groups', () => {
-    const xml = readFileSync(new URL('../../../../apps/doc/webmusic/public/xml/demo.xml', import.meta.url), 'utf8');
-    const score = parseMusicXML(xml);
+  it('projects Arabesque from source notation with both initial treble clefs and complete triplet groups', async () => {
+    const score = await loadArabesqueMxlFixture();
     const projection = projectStaffNotation(score);
     expect(projection.measures.map((measure) => measure.source)).toEqual(score.measures);
     expect(projection.layers.map((layer) => layer.measures[0].clef)).toEqual([{sign: 'G', line: 2}, {sign: 'G', line: 2}]);

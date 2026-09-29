@@ -91,7 +91,7 @@ ${componentSurfaceCss('minimap')}
   height: 100%;
   overflow: hidden;
   touch-action: none;
-  background: var(--wm-minimap-background, transparent);
+  background: var(--wm-minimap-background, var(--wm-surface, transparent));
   border: var(--wm-minimap-border, 0);
   border-radius: var(--wm-minimap-radius, var(--wm-control-radius, 0));
 }
@@ -101,8 +101,8 @@ ${componentSurfaceCss('minimap')}
   inset-block: 0;
   box-sizing: border-box;
   min-width: 1px;
-  border: 1px solid var(--wm-minimap-brush-border, var(--wm-selection, #4869d8));
-  background: var(--wm-minimap-brush, var(--wm-selection-fill, rgba(72,105,216,.18)));
+  border: 1px solid var(--wm-minimap-brush-border, var(--wm-selection, var(--wm-foreground, #111)));
+  background: var(--wm-minimap-brush, var(--wm-selection-fill, rgba(127,127,127,.18)));
   cursor: grab;
   touch-action: none;
 }

@@ -1,11 +1,17 @@
 // @vitest-environment jsdom
+import {readFileSync} from 'node:fs';
+import {dirname, resolve} from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {afterEach, describe, expect, it, vi} from 'vitest';
+import {loadScore} from '@webmusic/score/io';
 import {ScorePlayer} from '@webmusic/score/play/headless';
 import type {AnalysisFollower} from '@webmusic/score/analyze/headless';
 import type {PitchView, ScoreMapView} from '@webmusic/score/view/headless';
 import type {HeadlessDemoInstance} from '../src/lib/headless-playground-client';
 import {createPlaybackFollowerDemo} from '../src/components/headless/playback-followers-client';
 
+const file = resolve(dirname(fileURLToPath(import.meta.url)), '../public/midi/Arabesque No.1.mid');
+const source = (await loadScore(readFileSync(file), {format: 'midi'})).withMetadata({title: 'Arabesque No. 1'});
 const demos: HeadlessDemoInstance[] = [];
 afterEach(() => {
   for (const demo of demos.splice(0)) demo.dispose();
@@ -20,7 +26,7 @@ function setup(kind: 'analysis-follower' | 'score-map-view' | 'pitch-view', opti
     <output data-follow-owner></output><p data-follow-input></p><output data-follow-summary></output>
     <div data-follow-data></div><p data-follow-status></p>`;
   document.body.append(stage);
-  const demo = createPlaybackFollowerDemo(kind)(options, stage) as HeadlessDemoInstance;
+  const demo = createPlaybackFollowerDemo(kind, source)(options, stage) as HeadlessDemoInstance;
   demos.push(demo);
   return {demo, stage, invoke: (name: string, ...args: unknown[]) => demo.invoke!(name, args)};
 }
@@ -31,7 +37,7 @@ describe('real Analyze/View Headless demonstrations', () => {
   it('hydrates analysis from its real player, adapts score selection and reports read-only seek failure', async () => {
     const {demo, stage, invoke} = setup('analysis-follower');
     const follower = demo.object as unknown as AnalysisFollower;
-    expect(follower.state.score?.metadata.title).toBe('C major study');
+    expect(follower.state.score?.metadata.title).toBe('Arabesque No. 1');
     expect(follower.state.result?.chords.length).toBeGreaterThan(0);
     stage.querySelector<HTMLButtonElement>('[data-follow-owner-seek]')!.click();
     await flush();
@@ -108,11 +114,12 @@ describe('real Analyze/View Headless demonstrations', () => {
   it('navigates through actual map cells and preserves the focused cell while position changes', async () => {
     const {demo, stage} = setup('score-map-view', {score: 'sample', playback: 'none'});
     const map = demo.object as unknown as ScoreMapView;
-    const button = stage.querySelector<HTMLButtonElement>('[data-follow-quarter="4"]')!;
+    const button = stage.querySelectorAll<HTMLButtonElement>('[data-follow-quarter]')[4];
+    const quarter = Number(button.dataset.followQuarter);
     button.focus();
     button.click();
     await flush();
-    expect(map.state.quarters).toBe(4);
+    expect(map.state.quarters).toBeCloseTo(quarter);
     expect(document.activeElement).toBe(button);
     expect(button.getAttribute('aria-current')).toBe('true');
     expect(stage.querySelector('[data-follow-status]')?.textContent).toContain('committed');
@@ -120,9 +127,9 @@ describe('real Analyze/View Headless demonstrations', () => {
 
   it('ignores delayed command feedback from an old model after Reset recreates the stage', async () => {
     const {demo: old, stage} = setup('score-map-view', {score: 'sample', playback: 'none', seekNominal: 'deferred'});
-    stage.querySelector<HTMLButtonElement>('[data-follow-quarter="4"]')!.click();
+    stage.querySelectorAll<HTMLButtonElement>('[data-follow-quarter]')[4].click();
     old.dispose();
-    const next = createPlaybackFollowerDemo('score-map-view')({score: 'sample', playback: 'none'}, stage) as HeadlessDemoInstance;
+    const next = createPlaybackFollowerDemo('score-map-view', source)({score: 'sample', playback: 'none'}, stage) as HeadlessDemoInstance;
     demos.push(next);
     const before = stage.textContent;
     await flush();

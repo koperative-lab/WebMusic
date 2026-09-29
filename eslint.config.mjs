@@ -25,7 +25,7 @@ export default tseslint.config(
       globals: {...globals.browser, ...globals.node},
     },
   },
-  ...astro.configs.recommended,
+  ...astro.configs['flat/recommended'],
   ...tseslint.configs.recommended.map((config) => ({
     ...config,
     files: ['**/*.{ts,tsx}'],
@@ -48,6 +48,8 @@ export default tseslint.config(
     files: [
       'packages/score/src/react/**/*.{ts,tsx}',
       'packages/score/test/react/**/*.{ts,tsx}',
+      'packages/audio/src/react/**/*.{ts,tsx}',
+      'packages/audio/test/react/**/*.{ts,tsx}',
     ],
     plugins: {'react-hooks': reactHooks},
     rules: {

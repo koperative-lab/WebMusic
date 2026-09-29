@@ -854,8 +854,11 @@ describe('the docks and the status bar', () => {
     expect(full.element.querySelectorAll('[aria-live]')).toHaveLength(1);
     full.destroy();
 
-    const bare = shell({phase: 'empty', status: {message: 'nothing here'}}, {}, {chrome: 'bare'});
+    const bare = shell({phase: 'empty', status: {message: 'nothing here'}}, {}, {
+      chrome: 'bare', parts: {note: 'analysis-status'},
+    });
     const bareNote = bare.element.querySelector<HTMLElement>('.wui-workbench__note')!;
+    expect(bareNote.getAttribute('part')).toContain('analysis-status');
     expect(bareNote.getAttribute('role')).toBe('status');
     expect(bareNote.getAttribute('aria-live')).toBe('polite');
     expect(bare.element.querySelectorAll('[aria-live]')).toHaveLength(1);

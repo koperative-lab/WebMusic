@@ -1,0 +1,64 @@
+---
+import {DEFAULT_TR808_GRID_MAP} from '@webmusic/score/play/element';
+import ElementPlayground from './ElementPlayground.astro';
+
+const setup = `const input = document.querySelector('score-note-input');
+const recorder = document.querySelector('score-recorder');
+recorder.source = input; // capture events; keep any existing input monitoring
+// When removing this composition: recorder.source = undefined;`;
+---
+
+<ElementPlayground
+  tag="score-recorder"
+  target="[data-sr-recorder]"
+  markup="[data-sr-composition]"
+  class="sr-demo"
+  companions={[{tag: 'score-note-input', target: '[data-sr-input]'}]}
+>
+  <div class="sr-demo__composition" data-sr-composition data-pg-fragment>
+    <score-note-input
+      data-sr-input
+      layout="piano"
+      start="48"
+      end="71"
+      map={DEFAULT_TR808_GRID_MAP}
+    ></score-note-input>
+    <score-recorder data-sr-recorder bpm="120" quantize="0"></score-recorder>
+  </div>
+
+  <div class="wm-pg__code-extra" slot="setup">
+    <span class="wm-pg__code-label">JavaScript setup</span>
+    <pre class="wm-pg__markup" data-pg-copy-source>{setup}</pre>
+  </div>
+</ElementPlayground>
+
+<script>
+  import {
+    defineNoteInputElement,
+    defineScoreRecorderElement,
+    type NoteInputElement,
+    type ScoreRecorderElement,
+  } from '@webmusic/score/play/element';
+  import {mountDemos} from './demo-lifecycle';
+  import {monitorNoteInput} from './note-input-monitor';
+
+  defineNoteInputElement();
+  defineScoreRecorderElement();
+
+  mountDemos('[data-sr-composition]', (root, scope) => {
+    const input = root.querySelector<NoteInputElement>('[data-sr-input]')!;
+    const recorder = root.querySelector<ScoreRecorderElement>('[data-sr-recorder]')!;
+    recorder.source = input;
+    scope.add(() => { recorder.source = undefined; });
+    monitorNoteInput(input, scope);
+  });
+</script>
+
+<style>
+  .sr-demo :global(.sr-demo__composition) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.5rem;
+    min-width: 0;
+  }
+</style>

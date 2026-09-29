@@ -1,0 +1,58 @@
+---
+// CANONICAL headless-demo pattern. Each demo: the shared wui-panel card chrome
+// (title bar: package · class) + a body whose UI is wired client-side to a
+// HEADLESS class from @webmusic/audio/<pkg>/headless — no custom element involved.
+// Clips load from the bundled Arabesque No.1 WAV; the player owns + resumes its
+// AudioContext when play() is called inside the click handler.
+import LiveDemoCanvas from '../LiveDemoCanvas.astro';
+
+const SRC = `${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`;
+---
+
+<div class="wui-panel wui-panel--flow not-content">
+  <div class="wui-panel__title">
+    <span>@webmusic/audio/play/headless</span>
+    <strong>AudioClipPlayer</strong>
+  </div>
+  <LiveDemoCanvas size="compact" label="Audio clip player">
+    <div class="doc-transport" data-hl-clipplayer data-src={SRC}>
+      <button class="wui-btn" data-play type="button">▶ Play</button>
+      <div class="wui-track"><div class="wui-track__fill" data-fill></div></div>
+      <span class="doc-transport__time" data-time>0.0s</span>
+    </div>
+  </LiveDemoCanvas>
+</div>
+
+<script>
+  import {mountDemos, type DemoScope} from '../demo-lifecycle';
+  import { loadClipFromUrl } from '@webmusic/audio/play';
+  import { AudioClipPlayer } from '@webmusic/audio/play/headless';
+
+  const setup = async (root: HTMLElement, scope: DemoScope) => {
+    const btn = root.querySelector<HTMLButtonElement>('[data-play]')!;
+    const fill = root.querySelector<HTMLElement>('[data-fill]')!;
+    const time = root.querySelector<HTMLElement>('[data-time]')!;
+
+    const clip = await loadClipFromUrl(root.dataset.src!, {signal: scope.signal});
+    if (!scope.active) return;
+    // Timer-based cursor (vs the default rAF) so timeupdate keeps firing even
+    // when the tab is backgrounded.
+    const player = new AudioClipPlayer(clip, { cursorIntervalMs: 100 });
+    scope.add(() => player.dispose());
+    let playing = false;
+
+    player.on('timeupdate', ({ seconds, progress }) => {
+      fill.style.width = `${Math.min(100, progress * 100)}%`;
+      time.textContent = `${seconds.toFixed(1)}s`;
+    });
+    player.on('end', () => { playing = false; btn.textContent = '▶ Play'; });
+
+    scope.listen(btn, 'click', () => {
+      if (playing) { player.pause(); btn.textContent = '▶ Play'; }
+      else { scope.run(player.play(), () => { playing = false; btn.textContent = '▶ Play'; }); btn.textContent = '⏸ Pause'; }
+      playing = !playing;
+    });
+  };
+
+  mountDemos('[data-hl-clipplayer]', setup);
+</script>

@@ -158,6 +158,46 @@
         "default": "./dist/meter.cjs"
       }
     },
+    "./level-analyzer": {
+      "import": {
+        "types": "./dist/level-analyzer.d.ts",
+        "default": "./dist/level-analyzer.js"
+      },
+      "require": {
+        "types": "./dist/level-analyzer.d.cts",
+        "default": "./dist/level-analyzer.cjs"
+      }
+    },
+    "./spectrum-analyzer": {
+      "import": {
+        "types": "./dist/spectrum-analyzer.d.ts",
+        "default": "./dist/spectrum-analyzer.js"
+      },
+      "require": {
+        "types": "./dist/spectrum-analyzer.d.cts",
+        "default": "./dist/spectrum-analyzer.cjs"
+      }
+    },
+    "./oscilloscope": {
+      "import": {
+        "types": "./dist/oscilloscope.d.ts",
+        "default": "./dist/oscilloscope.js"
+      },
+      "require": {
+        "types": "./dist/oscilloscope.d.cts",
+        "default": "./dist/oscilloscope.cjs"
+      }
+    },
+    "./transient-analyzer": {
+      "import": {
+        "types": "./dist/transient-analyzer.d.ts",
+        "default": "./dist/transient-analyzer.js"
+      },
+      "require": {
+        "types": "./dist/transient-analyzer.d.cts",
+        "default": "./dist/transient-analyzer.cjs"
+      }
+    },
     "./mixer": {
       "import": {
         "types": "./dist/mixer.d.ts",
@@ -236,7 +276,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsup src/index.ts src/analysis.ts src/envelope.ts src/eq.ts src/harmony.ts src/lfo.ts src/macro.ts src/meter.ts src/minimap.ts src/mixer.ts src/note.ts src/panel.ts src/parameter.ts src/pitch.ts src/playlist.ts src/recorder.ts src/stage.ts src/status.ts src/timeline.ts src/track-list.ts src/transport.ts src/workbench.ts --tsconfig tsconfig.build.json --format esm,cjs --dts --sourcemap --clean && node ../../scripts/package-artifacts.mjs --write",
+    "build": "tsup src/index.ts src/analysis.ts src/envelope.ts src/eq.ts src/harmony.ts src/level-analyzer.ts src/lfo.ts src/macro.ts src/meter.ts src/minimap.ts src/mixer.ts src/note.ts src/oscilloscope.ts src/panel.ts src/parameter.ts src/pitch.ts src/playlist.ts src/recorder.ts src/spectrum-analyzer.ts src/stage.ts src/status.ts src/timeline.ts src/track-list.ts src/transient-analyzer.ts src/transport.ts src/workbench.ts --tsconfig tsconfig.build.json --format esm,cjs --dts --sourcemap --clean && node ../../scripts/package-artifacts.mjs --write",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "prepack": "node ../../scripts/package-artifacts.mjs"

@@ -14,7 +14,7 @@ for manual input and owns no audio resource or clock.
 
 It composes the counted-note behavior of
 [createActiveNoteTracker](/score/headless/view/pitch-view/#active-note-tracker) with
-source attachment and cleanup. [`<pitch-view>`](/score/element/view/pitch-view/)
+source attachment and cleanup. [`<score-pitch-view>`](/score/element/view/score-pitch-view/)
 uses this model behind its browser adapter and UIKit presenter.
 
 <PlaybackFollowersPlayground object="pitch-view" />
@@ -105,7 +105,7 @@ external manual-note input listeners when its view is released.
 
 `createActiveNoteTracker()` tracks which MIDI notes are held. That is all it
 does, and the narrowness is the point: it needs no `Score`, so a source that
-has no sequence to match against — a MIDI keyboard, `<note-input>`, a step
+has no sequence to match against — a MIDI keyboard, `<score-note-input>`, a step
 sequencer — can drive it exactly like a player can.
 
 For automatic playback attachment and reusable staff/fretboard projections, use
@@ -189,7 +189,7 @@ callback does not roll back the committed held-note counts.
 
 #### Tracker Related
 
-**Composed by.** [`<pitch-view>`](/score/element/view/pitch-view/) —
+**Composed by.** [`<score-pitch-view>`](/score/element/view/score-pitch-view/) —
 Score / View, which is why that element lights up from playback and from live
 MIDI input alike.
 

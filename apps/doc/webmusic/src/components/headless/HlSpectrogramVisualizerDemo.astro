@@ -1,0 +1,92 @@
+---
+// Browser-renderer demo: the shared .wui-panel card chrome plus a body wired
+// client-side without a custom element.
+// Here: compute an STFT spectrogram (@webmusic/audio/analyze) over the first few
+// seconds of the bundled clip, then paint it with renderSpectrogramVisualizer
+// (@webmusic/audio/view/render) into a .wui-surface.
+import LiveDemoCanvas from '../LiveDemoCanvas.astro';
+
+const SRC = `${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`;
+// Analyze only the leading slice — a full 320s STFT would be far too heavy.
+const ANALYZE_SECONDS = 5;
+---
+
+<div class="wui-panel wui-panel--flow not-content">
+  <div class="wui-panel__title">
+    <span>@webmusic/audio/view/render</span>
+    <strong>renderSpectrogramVisualizer</strong>
+  </div>
+  <LiveDemoCanvas size="tall" label="Spectrogram renderer">
+    <div class="wui-row" data-hl-spectrogram data-src={SRC} data-seconds={ANALYZE_SECONDS}>
+      <div class="wui-row">
+        <button class="wui-btn" data-variant="ghost" data-map="viridis" type="button">viridis</button>
+        <button class="wui-btn" data-variant="ghost" data-map="magma" type="button">magma</button>
+        <button class="wui-btn" data-variant="ghost" data-map="grayscale" type="button">grayscale</button>
+        <span class="wui-readout" data-readout>computing…</span>
+      </div>
+      <div class="wui-surface" data-surface></div>
+    </div>
+  </LiveDemoCanvas>
+</div>
+
+<script>
+  import {mountDemos, type DemoScope} from '../demo-lifecycle';
+  import { loadClipFromUrl } from '@webmusic/audio/play';
+  import { computeSpectrogram } from '@webmusic/audio/analyze';
+  import { renderSpectrogramVisualizer } from '@webmusic/audio/view/render';
+  import type { ColormapName, RenderedAudioVisualizer } from '@webmusic/audio/view';
+
+  const setup = async (root: HTMLElement, scope: DemoScope) => {
+
+    const surface = root.querySelector<HTMLElement>('[data-surface]')!;
+    const readout = root.querySelector<HTMLElement>('[data-readout]')!;
+    const buttons = Array.from(root.querySelectorAll<HTMLButtonElement>('[data-map]'));
+
+    const clip = await loadClipFromUrl(root.dataset.src!, {signal: scope.signal});
+    if (!scope.active) return;
+    const channel = clip.channelData(0);
+    if (!channel) {
+      readout.textContent = 'no channel data';
+      return;
+    }
+
+    // Slice the leading few seconds so the STFT stays responsive over the
+    // long (~320s) sample.
+    const seconds = Number(root.dataset.seconds) || 5;
+    const slice = channel.subarray(0, Math.min(channel.length, Math.floor(seconds * clip.sampleRate)));
+
+    const data = computeSpectrogram(slice, clip.sampleRate, { fftSize: 1024, hopSize: 256 });
+    const frames = data.binsPerFrame > 0 ? Math.floor(data.magnitudes.length / data.binsPerFrame) : 0;
+
+    let viz: RenderedAudioVisualizer | null = null;
+    scope.add(() => viz?.dispose());
+    const draw = (colorMap: ColormapName) => {
+      if (viz) viz.dispose();
+      viz = renderSpectrogramVisualizer(surface, data, {
+        colorMap,
+        height: 180,
+        pixelsPerSecond: 120,
+        maxFreq: 8000,
+      });
+    };
+
+    const select = (name: ColormapName) => {
+      buttons.forEach((b) => b.setAttribute('data-on', String(b.dataset.map === name)));
+      draw(name);
+    };
+
+    for (const b of buttons) {
+      scope.listen(b, 'click', () => select(b.dataset.map as ColormapName));
+    }
+
+    select('viridis');
+    readout.textContent = `${frames} frames · ${data.binsPerFrame} bins · first ${seconds}s`;
+  };
+
+  mountDemos('[data-hl-spectrogram]', setup);
+</script>
+
+<style>
+  /* `not-content` drops Starlight's sibling margin, so the card carries its own. */
+  .hl-demo { margin-block: 1rem 1.5rem; }
+</style>

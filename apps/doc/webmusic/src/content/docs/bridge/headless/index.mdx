@@ -1,0 +1,44 @@
+---
+title: 'Headless'
+description: 'The code-only objects @webmusic/bridge exports, and the rules every one of them follows.'
+sidebar:
+  label: 'Overview'
+  order: 0
+---
+
+`@webmusic/bridge` has no `/headless` subpath — everything is a root export.
+This section exists because its stateful object is documented under the
+**headless** contract rather than the API one: it is something you construct,
+drive and dispose, not a function you call.
+
+The object has no DOM or styles. A directly constructed sync calls each
+participant's optional dispose() method when released; it does not automatically
+borrow participants without cleanup. Factories own the players they create and
+close only contexts they create. A supplied context remains caller-owned.
+
+## Exports documented here
+
+| Export | Kind | Page |
+| --- | --- | --- |
+| `ScoreAudioSync` | class | [ScoreAudioSync](/bridge/headless/score-audio-sync/) |
+| `createSyncedPlayback` | factory | on the same page — a class and its factories share a page |
+| `createAudioMasteredPlayback` | factory | on the same page |
+| `clipAsMaster` · `scoreAsFollower` | protocol adapters | [ScoreAudioSync](/bridge/headless/score-audio-sync/) — state/axis and disposer forwarding |
+
+## Type ownership
+
+`ScoreAudioSyncOptions`, `CreateSyncedPlaybackOptions`,
+`CreateAudioMasteredPlaybackOptions`, `AudioMasterAdapterOptions`,
+`SyncScoreTransport`, `SyncClipTransport`, `SyncMasterTransport`,
+`SyncFollowerTransport`, `SyncTransportClockView`, `SyncLoopRegion` and
+`SyncTransportContract` are explained with
+[ScoreAudioSync](/bridge/headless/score-audio-sync/).
+
+The remaining root values, constants and their options belong to the
+[Bridge API](/bridge/api/): timeline conversions, renderScoreToClip and
+scoreFromTranscription. Those operations have explicit data, resource and fidelity
+contracts; "function" does not necessarily mean allocation-free or reversible.
+
+The source barrel is `bridges/score-audio/src/index.ts`. This manual map routes
+values and types to their explanation owner. It is not proof that an automated
+symbol-name check has validated every signature, default or lifecycle behavior.

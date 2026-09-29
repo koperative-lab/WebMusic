@@ -3,7 +3,7 @@ import {afterEach, describe, expect, it, vi} from 'vitest';
 import {Duration, Pitch, Rational, ScoreBuilder, VoiceId} from '../../src/core';
 import type {ScoreNoteSequence} from '../../src/view/core/types';
 import {ScoreViewElement} from '../../src/view/element/score-view';
-import {SheetViewElement} from '../../src/view/element/sheet-view';
+import {SheetViewElement} from '../../src/view/element/score-sheet-view';
 import {PianoRollCanvasVisualizer} from '../../src/view/render/renderers/piano-roll';
 
 customElements.define('styling-score-view', ScoreViewElement);

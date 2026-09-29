@@ -99,6 +99,12 @@ handle.update();  // re-read binding.snapshot() and repaint
 handle.destroy(); // remove this presenter's nodes, listeners and subscription
 ```
 
+This is the common binding shape. `level-analyzer` and `transient-analyzer`
+take action callbacks and `update(state)` because the caller already owns
+each sampled frame. `oscilloscope` uses snapshot, commands and optional
+subscriptions; the one-shot `analysis` helpers document their own smaller
+contract.
+
 ### The binding is a port, not a model
 
 ```ts
@@ -479,7 +485,7 @@ change the npm subpath or require a Score Element consumer.
 
 | Entry | Purpose |
 |---|---|
-| `@webmusic/ui` | complete stable surface (barrel over all 21 published subpaths) |
+| `@webmusic/ui` | complete stable surface (barrel over published subpaths) |
 | **Transport and navigation** | |
 | `@webmusic/ui/transport` | play/pause/seek presenter with named controls |
 | `@webmusic/ui/timeline` | domain-neutral ruler, regions, loop, selection, playhead |
@@ -502,6 +508,10 @@ change the npm subpath or require a Score Element consumer.
 | `@webmusic/ui/analysis` | analysis cards, timelines, summaries and playhead controller |
 | `@webmusic/ui/pitch` | keyboard, grand stave and fretboard read-outs coloured by caller-supplied tone roles |
 | `@webmusic/ui/harmony` | flow lane, nameplate, chip strip and wheel: read-outs for material that is still arriving |
+| `@webmusic/ui/level-analyzer` | sampled dBFS RMS and peak history with threshold, hold and freeze controls |
+| `@webmusic/ui/oscilloscope` | trigger-aligned time-domain window with timebase, freeze and probe controls |
+| `@webmusic/ui/spectrum-analyzer` | inspectable log-frequency spectrum with freeze and peak hold |
+| `@webmusic/ui/transient-analyzer` | caller-supplied attack-strength history with sensitivity, freeze and clear actions |
 | **Layout and feedback** | |
 | `@webmusic/ui/panel` | compound section/slot skeleton for composing specialized presenters |
 | `@webmusic/ui/stage` | generic surface, DPR/resize/rAF-owned canvas stage, status overlay and reusable surface-slider interaction |

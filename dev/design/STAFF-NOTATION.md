@@ -1,9 +1,10 @@
 # Scrolling staff notation
 
-Status: the scrolling backend and the supported timed-notation, expression
-and PDF-driven layout corrections passed the automated and Chrome checks
-recorded below. Broader engraving coverage and browser/accessibility acceptance
-remain open; this is not full MuseScore parity.
+Status: the written-Score/VexFlow scrolling backend and its supported timed
+notation, expression and PDF-driven layout corrections passed the automated and
+Chrome checks recorded below. Those checks retain their original branch baseline;
+current verification belongs in [STATUS](../STATUS.md). Broader engraving,
+browser and accessibility coverage remains open; this is not full MuseScore parity.
 
 Layer and public entry: Score View core projection and browser `/render`
 adapter, composed by `<score-view type="staff">`.
@@ -28,7 +29,7 @@ A developer supplies a Score or attaches a view to a player and obtains readable
 scrolling notation: written note values, beam groups, tuplets, rests, voices,
 timed clefs, supported expressions and measure boundaries. The existing `staff` type owns this result; no
 additional Element, renderer-selection option or embedded control is needed.
-`sheet-view` retains its separate optional OSMD page-engraving workflow.
+`score-sheet-view` retains its separate optional OSMD page-engraving workflow.
 
 The previous renderer reduced notation to pitch and quantized note lengths.
 It could not reconstruct the source's written eighth-note triplets or clefs
@@ -210,7 +211,7 @@ independent fixtures and tests its own implemented behavior.
 ## PDF comparison
 
 On 2026-09-11, all ten pages of the maintainer-supplied `demo.pdf` were inspected
-against the repository's [107-measure MusicXML demo](../../apps/doc/webmusic/public/xml/demo.xml)
+against the repository's [107-measure compressed MusicXML demo](../../apps/doc/webmusic/public/mxl/Arabesque%20No.1.mxl)
 and the model/import/render paths. The PDF was exported by MuseScore Studio
 4.7.4; the XML identifies MuseScore 3.5.2 and a 2020 encoding date. Its explicit
 page breaks at measures 21, 43, 69 and 91 differ from the PDF's reflow. This

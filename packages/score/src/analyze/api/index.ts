@@ -1,6 +1,6 @@
 // ============================================================================
 // @webmusic/score/analyze/api — the stateless API: one-shot score analysis (key,
-// chords, roman numerals, motifs, voice leading, summary). Pure functions in /
+// chords, roman numerals, intervals, rhythm, motifs, voice leading, summary). Pure functions in /
 // data out, no DOM and no long-lived resource ownership.
 //
 // The package's other layers build on this one:
@@ -12,6 +12,30 @@ export {identifyChord, identifyChordFromMidi, segmentChords} from '../core';
 export {detectKey} from '../core';
 export {distributions, type DistributionBin, type Distributions} from '../core';
 export {findMotifs, rhythmPatterns} from '../core';
+export {
+  findRhythmPatternOccurrences,
+  type RhythmPatternOccurrence,
+  type RhythmPatternOccurrenceGroup,
+  type RhythmPatternOccurrenceOptions,
+} from '../core';
+export {
+  analyzeIntervals,
+  type AnalyzedInterval,
+  type IntervalAnalysis,
+  type IntervalAnalysisOptions,
+  type IntervalEvidence,
+  type IntervalPitchMode,
+  type IntervalSelection,
+} from '../core';
+export {
+  inspectScoreRhythm,
+  type RhythmBeat,
+  type RhythmInspection,
+  type RhythmInspectionOptions,
+  type RhythmOnset,
+  type RhythmPerformedOnset,
+  type RhythmSubdivision,
+} from '../core';
 export {romanNumeralForChord, romanNumerals, type RomanNumeralOptions} from '../core';
 export {voiceLeading} from '../core';
 // Incremental re-analysis for live editing (`createAnalysisSession`) is a

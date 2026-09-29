@@ -202,6 +202,8 @@ export interface WorkbenchParts {
   tablist?: string;
   tab?: string;
   stage?: string;
+  /** Empty/error sentence beside the stage. */
+  note?: string;
   rail?: string;
   strip?: string;
   status?: string;
@@ -971,6 +973,7 @@ export function mountWorkbench(
 
   const note = document.createElement('p');
   note.className = 'wui-workbench__note';
+  setParts(note, 'note', options.parts?.note);
   note.hidden = true;
   dress(note, workbenchParts.note);
   main.append(stage, note);

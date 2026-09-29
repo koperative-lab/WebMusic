@@ -1,0 +1,65 @@
+{
+  "note": "Node24 source bundle CPU profile; two full fixture STFT calls. Self sample time includes profiler noise and is not a browser end-to-end measurement.",
+  "top": [
+    {
+      "selfMs": 664,
+      "function": "_realTransform4 webmusic-view-data-probe.bundle.mjs:257"
+    },
+    {
+      "selfMs": 525,
+      "function": "computeSpectrogram webmusic-view-data-probe.bundle.mjs:967"
+    },
+    {
+      "selfMs": 347,
+      "function": "forward webmusic-view-data-probe.bundle.mjs:915"
+    },
+    {
+      "selfMs": 101,
+      "function": "(anonymous) webmusic-view-data-probe.bundle.mjs:669"
+    },
+    {
+      "selfMs": 92,
+      "function": "parseWav webmusic-view-data-probe.bundle.mjs:407"
+    },
+    {
+      "selfMs": 65,
+      "function": "buildBaseLevel webmusic-view-data-probe.bundle.mjs:850"
+    },
+    {
+      "selfMs": 46,
+      "function": "(garbage collector) :0"
+    },
+    {
+      "selfMs": 30,
+      "function": "(program) :0"
+    },
+    {
+      "selfMs": 20,
+      "function": "(anonymous) webmusic-view-data-probe.bundle.mjs:719"
+    },
+    {
+      "selfMs": 18,
+      "function": "read :0"
+    },
+    {
+      "selfMs": 11,
+      "function": "(anonymous) webmusic-view-data-probe.mjs:8"
+    },
+    {
+      "selfMs": 10,
+      "function": "(idle) :0"
+    },
+    {
+      "selfMs": 8,
+      "function": "channelData webmusic-view-data-probe.bundle.mjs:712"
+    },
+    {
+      "selfMs": 5,
+      "function": "(anonymous) webmusic-view-data-probe.mjs:15"
+    },
+    {
+      "selfMs": 3,
+      "function": "compileForInternalLoader realm:383"
+    }
+  ]
+}

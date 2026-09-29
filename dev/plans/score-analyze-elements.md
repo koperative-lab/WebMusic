@@ -31,7 +31,8 @@ Later that day, [DEC-014](../DECISIONS.md#dec-014--five-task-specific-analyze-el
 further narrowed the Element collection to five performance/practice tasks,
 retiring diagnostic wrappers and generic aliases. The
 [Analyze inventory](../../apps/doc/webmusic/src/content/docs/score/element/index.mdx#analyze)
-owns that current inventory. The earlier delivery notes below remain historical evidence.
+owns the current inventory, later narrowed by DEC-043 to two chord surfaces.
+The earlier delivery notes below remain historical evidence.
 
 Original Section 7's statement that main is frozen at five elements per
 capability belongs to an earlier release snapshot. The current repository

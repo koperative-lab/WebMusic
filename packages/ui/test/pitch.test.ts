@@ -1289,7 +1289,8 @@ describe('properties carried across the merge', () => {
     // half key the boundary is 0% or 100% and half the key paints outside the
     // widget — which declares no `overflow`, so it really does spill. The
     // reserve is in `pianoKeyLayout` and not in this mount's padding, which is
-    // what carries it to `<keyboard-view>` and `<note-input>` as well.
+    // what carries it to `<score-pitch-view type="keyboard">` and
+    // `<score-note-input>` as well.
     for (const [low, high] of [
       [60, 82],
       [61, 84],

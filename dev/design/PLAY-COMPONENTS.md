@@ -2,7 +2,7 @@
 
 Status: implemented, including responsive presenter changes; browser and real-device acceptance pending.
 Layer and public entry: Score Play Headless, Elements and UI bindings.
-Related decision: DEC-016.
+Related decisions: DEC-016 and DEC-045.
 Source and public types: [Play source](../../packages/score/src/play/).
 Owning reference and demos: [Play Elements](../../apps/doc/webmusic/src/content/docs/score/element/index.mdx#play).
 
@@ -16,15 +16,15 @@ one player would duplicate those owners or make unrelated controls mandatory.
 | Element | User task | Composition and configuration |
 |---|---|---|
 | `score-player` | Start, pause and navigate existing music | One transport over a native Score, Rack or borrowed PlayerController |
-| `rack-control` | Mix voices already owned by one Rack | Master/member levels, mute and solo; no second transport |
-| `note-input` | Produce live pitch on/off gestures | `layout` selects `piano`, `grid` or `chords`; `keyboard` separately enables QWERTY input |
+| `score-rack-control` | Mix voices already owned by one Rack | Master/member levels, mute and solo; no second transport |
+| `score-note-input` | Produce live pitch on/off gestures | `layout` selects `piano`, `grid` or `chords`; `keyboard` separately enables QWERTY input |
 | `score-recorder` | Capture matched note gestures into a Score | Borrow an event source or accept imperative capture; built-in live monitoring and take audition |
-| `synth-panel` | Edit caller-supplied sound and DSP parameters | `sections` chooses the applicable editor sections |
-| `rack-part` | Declare a desk's score and sound in markup | Nonvisual data declaration; no player, input or presenter |
+| `score-synth-panel` | Edit caller-supplied sound and DSP parameters | `sections` chooses the applicable editor sections |
+| `score-rack-part` | Declare a desk's score and sound in markup | Nonvisual data declaration; no player, input or presenter |
 
-No new alias tags or a generic `type` spanning unrelated roles are introduced.
-The existing `simple-score-player` compatibility constructor/tag delegates to
-the canonical `score-player` implementation; both registration functions remain available.
+No alias tags or a generic `type` spanning unrelated roles are introduced.
+DEC-045 retires the former `simple-score-player` compatibility tag and keeps
+`score-player` as the canonical transport component.
 
 ## Composition
 
@@ -34,7 +34,7 @@ sound descriptors feed the Synth Panel model and audio graph. Musical algorithms
 remain outside presenter DOM. A component can be replaced by custom UI over the
 same Headless behavior.
 
-A player can wrap one mixing desk with `rack-part` declarations, or a sibling
+A player can wrap one mixing desk with `score-rack-part` declarations, or a sibling
 mixer can receive the same Rack by property. The player's precedence is borrowed
 controller, explicit Rack, composed Rack, explicit Score, then `src`. All built-in
 transport modes mount into an owned child host, preserving authored children.
@@ -163,5 +163,5 @@ actual command results. The frontend source audit records presenter and demo
 verification. STATUS owns remaining browser/device work.
 
 Element and Headless leaf pages document actual mode support and lifecycle.
-The catalog retains the same six tags; `rack-part` shares its desk's reference.
+The catalog retains six Play tags; `score-rack-part` shares its desk's reference.
 Generated inventories are refreshed through `docs:sync`.

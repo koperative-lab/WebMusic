@@ -1,4 +1,4 @@
-/* Canonical collapsible API and styling blocks shared by the public documentation.
+/* Canonical collapsible API and styling blocks shared by Score and Audio docs.
    These are documentation chrome, so they follow the theme-aware site tokens;
    `--wui-panel` intentionally stays light for live-demo canvases. */
 .sl-markdown-content details.component-section {

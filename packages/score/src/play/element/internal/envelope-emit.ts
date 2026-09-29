@@ -1,6 +1,6 @@
 // ============================================================================
 // The `webscore:envelope` announcement shared by the two elements that host an
-// ADSR editor — <envelope-control> and <synth-panel>'s envelope section.
+// ADSR editor — <envelope-control> and <score-synth-panel>'s envelope section.
 //
 // Both dispatch the event, then hand the same envelope to a caller-owned
 // `apply` that may be async. The subtle part is the rejection path: an apply

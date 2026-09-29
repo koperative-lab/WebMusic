@@ -1,0 +1,115 @@
+[
+  {
+    "filePath": "packages/score/src/io/formats/abc.ts",
+    "messages": [
+      {
+        "ruleId": "no-useless-assignment",
+        "severity": 2,
+        "message": "The value assigned to 'cursor' is not used in subsequent statements.",
+        "line": 561,
+        "column": 9,
+        "messageId": "unnecessaryAssignment",
+        "endLine": 561,
+        "endColumn": 15
+      }
+    ]
+  },
+  {
+    "filePath": "packages/score/src/io/formats/mxl.ts",
+    "messages": [
+      {
+        "ruleId": "no-useless-assignment",
+        "severity": 2,
+        "message": "The value assigned to 'container' is not used in subsequent statements.",
+        "line": 119,
+        "column": 3,
+        "messageId": "unnecessaryAssignment",
+        "endLine": 119,
+        "endColumn": 12
+      },
+      {
+        "ruleId": "no-useless-assignment",
+        "severity": 2,
+        "message": "The value assigned to 'containerFiles' is not used in subsequent statements.",
+        "line": 120,
+        "column": 3,
+        "messageId": "unnecessaryAssignment",
+        "endLine": 120,
+        "endColumn": 17
+      }
+    ]
+  },
+  {
+    "filePath": "packages/score/src/play/headless/rack.ts",
+    "messages": [
+      {
+        "ruleId": "no-useless-assignment",
+        "severity": 2,
+        "message": "The value assigned to 'committed' is not used in subsequent statements.",
+        "line": 619,
+        "column": 9,
+        "messageId": "unnecessaryAssignment",
+        "endLine": 619,
+        "endColumn": 18
+      }
+    ]
+  },
+  {
+    "filePath": "packages/score/src/view/render/osmd-staff.ts",
+    "messages": [
+      {
+        "ruleId": "preserve-caught-error",
+        "severity": 2,
+        "message": "There is no `cause` attached to the symptom error being thrown.",
+        "line": 488,
+        "column": 5,
+        "messageId": "missingCause",
+        "endLine": 491,
+        "endColumn": 7,
+        "suggestions": [
+          {
+            "messageId": "includeCause",
+            "fix": {
+              "range": [
+                17937,
+                17937
+              ],
+              "text": ", { cause: cause }"
+            },
+            "desc": "Include the original caught error as the `cause` of the symptom error."
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "filePath": "packages/ui/src/parameter.ts",
+    "messages": [
+      {
+        "ruleId": "no-useless-assignment",
+        "severity": 2,
+        "message": "The value assigned to 'disabled' is not used in subsequent statements.",
+        "line": 672,
+        "column": 9,
+        "messageId": "unnecessaryAssignment",
+        "endLine": 672,
+        "endColumn": 17
+      }
+    ]
+  },
+  {
+    "filePath": "packages/ui/src/workbench.ts",
+    "messages": [
+      {
+        "ruleId": "no-useless-assignment",
+        "severity": 2,
+        "message": "The value assigned to 'to' is not used in subsequent statements.",
+        "line": 1495,
+        "column": 9,
+        "messageId": "unnecessaryAssignment",
+        "endLine": 1495,
+        "endColumn": 11
+      }
+    ]
+  }
+]

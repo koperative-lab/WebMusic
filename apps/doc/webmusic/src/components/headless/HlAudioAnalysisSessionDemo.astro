@@ -1,0 +1,169 @@
+---
+// Headless demo: createAudioAnalysisSession (@webmusic/audio/analyze/headless).
+// Incremental clip analysis — NO playback. Load the bundled demo clip, run a
+// session over it (peaks + loudness + tempo + key + onsets), and render the
+// summary. A second button trims the clip to its first half and calls
+// session.update(...), which reuses unchanged ranges and re-renders the result.
+// Card chrome is the shared docs UI kit (apps/doc/shared/ui.css).
+import LiveDemoCanvas from '../LiveDemoCanvas.astro';
+
+const SRC = `${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`;
+---
+
+<div class="wui-panel wui-panel--flow not-content">
+  <div class="wui-panel__title">
+    <span>@webmusic/audio/analyze/headless</span>
+    <strong>createAudioAnalysisSession</strong>
+  </div>
+  <LiveDemoCanvas label="Audio analysis session">
+    <div class="hl-session" data-hl-analysissession data-src={SRC}>
+      <div class="wui-row">
+        <button class="wui-btn" data-analyze type="button" disabled>Analyze ▸</button>
+        <button class="wui-btn" data-variant="ghost" data-trim type="button" disabled>
+          Trim ½ &amp; update ▸
+        </button>
+        <span class="wui-readout" data-status>loading…</span>
+      </div>
+      <div class="wui-surface hl-session__out" data-out hidden>
+        <div class="wui-readout" data-row-clip></div>
+        <div class="wui-readout" data-row-loudness></div>
+        <div class="wui-readout" data-row-tempo></div>
+        <div class="wui-readout" data-row-key></div>
+        <div class="wui-readout" data-row-onsets></div>
+        <div class="wui-readout" data-row-peaks></div>
+      </div>
+    </div>
+  </LiveDemoCanvas>
+</div>
+
+<script>
+  import {mountDemos, type DemoScope} from '../demo-lifecycle';
+  import {loadClipFromUrl} from '@webmusic/audio/play';
+  import {createAudioAnalysisSession} from '@webmusic/audio/analyze/headless';
+  import type {AudioClip} from '@webmusic/audio';
+  import type {AudioAnalysisResult} from '@webmusic/audio/analyze';
+
+  const setup = async (root: HTMLElement, scope: DemoScope) => {
+
+    const analyzeBtn = root.querySelector<HTMLButtonElement>('[data-analyze]')!;
+    const trimBtn = root.querySelector<HTMLButtonElement>('[data-trim]')!;
+    const status = root.querySelector<HTMLElement>('[data-status]')!;
+    const out = root.querySelector<HTMLElement>('[data-out]')!;
+    const rowClip = root.querySelector<HTMLElement>('[data-row-clip]')!;
+    const rowLoud = root.querySelector<HTMLElement>('[data-row-loudness]')!;
+    const rowTempo = root.querySelector<HTMLElement>('[data-row-tempo]')!;
+    const rowKey = root.querySelector<HTMLElement>('[data-row-key]')!;
+    const rowOnsets = root.querySelector<HTMLElement>('[data-row-onsets]')!;
+    const rowPeaks = root.querySelector<HTMLElement>('[data-row-peaks]')!;
+
+    // Load the bundled sample as an immutable AudioClip (decoded samples).
+    const original = await loadClipFromUrl(root.dataset.src!, {signal: scope.signal});
+    if (!scope.active) return;
+
+    // Incremental session: peaks + loudness are always run; the rest are opt-in.
+    const session = createAudioAnalysisSession(original, {
+      tasks: ['peaks', 'loudness', 'tempo', 'key', 'onsets'],
+    });
+
+    const render = (clip: AudioClip, result: AudioAnalysisResult, label: string) => {
+      if (!scope.active) return;
+      const {peaks, loudness, tempo, key, onsets} = result;
+
+      rowClip.textContent =
+        `clip · ${clip.duration.toFixed(1)}s · ${clip.sampleRate} Hz · ` +
+        `${clip.numberOfChannels}ch (${label})`;
+
+      rowLoud.textContent =
+        `loudness · ${loudness.integratedLufs.toFixed(1)} LUFS · ` +
+        `peak ${loudness.truePeakDb.toFixed(1)} dBFS · rms ${loudness.rms.toFixed(3)}`;
+
+      rowTempo.textContent = tempo
+        ? `tempo · ${tempo.bpm.toFixed(1)} BPM · conf ${(tempo.confidence * 100).toFixed(0)}%`
+        : 'tempo · —';
+
+      rowKey.textContent = key
+        ? `key · ${key.tonic} ${key.mode} · conf ${(key.confidence * 100).toFixed(0)}%`
+        : 'key · —';
+
+      const onsetCount = onsets?.length ?? 0;
+      rowOnsets.textContent = onsets
+        ? `onsets · ${onsetCount} detected` +
+          (onsetCount ? ` · first ${onsets[0].toFixed(2)}s` : '')
+        : 'onsets · —';
+
+      rowPeaks.textContent =
+        `peaks · ${peaks.levels.length} levels · ` +
+        `base ${peaks.baseSamplesPerPeak} samples/peak`;
+
+      out.hidden = false;
+    };
+
+    const run = async (fn: () => Promise<void>, working: string) => {
+      analyzeBtn.disabled = true;
+      trimBtn.disabled = true;
+      status.textContent = working;
+      const t0 = performance.now();
+      try {
+        await fn();
+        if (!scope.active) return;
+        status.textContent = `done in ${Math.round(performance.now() - t0)}ms`;
+      } catch (e) {
+        if (!scope.active) return;
+        status.textContent = 'analysis failed';
+        console.error('[HlAudioAnalysisSessionDemo]', e);
+      } finally {
+        if (scope.active) {
+          analyzeBtn.disabled = false;
+          trimBtn.disabled = false;
+        }
+      }
+    };
+
+    let analyzed = false;
+
+    scope.listen(analyzeBtn, 'click', () =>
+      void run(async () => {
+        const result = await session.analyze();
+        render(session.clip, result, 'full');
+        analyzed = true;
+      }, 'analyzing…'),
+    );
+
+    scope.listen(trimBtn, 'click', () =>
+      void run(async () => {
+        // Ensure there's a cached baseline so update() can reuse unchanged ranges.
+        if (!analyzed) {
+          render(session.clip, await session.analyze(), 'full');
+          if (!scope.active) return;
+          analyzed = true;
+        }
+        // Zero-copy trim to the first half — slice() shares buffers via subarray,
+        // so update() diffs samples and recomputes only what the edit touched.
+        const trimmed = session.clip.slice(0, session.clip.duration / 2);
+        const result = await session.update(trimmed);
+        render(trimmed, result, 'trimmed ½');
+      }, 'updating…'),
+    );
+
+    status.textContent = 'ready';
+    analyzeBtn.disabled = false;
+    trimBtn.disabled = false;
+  };
+
+  mountDemos('[data-hl-analysissession]', setup);
+</script>
+
+<style>
+  /* This demo's body is a stretched column — controls on top, the result block
+     spanning the card below — rather than the kit's centred row. */
+  .hl-session { display: flex; flex-direction: column; align-items: stretch; gap: 0.7rem; }
+
+  /* The result block holds full sentences, not the single-line values a kit
+     readout assumes, so the lines wrap and space themselves. `.wui-surface`
+     declares `display`, and any author declaration outranks the UA's
+     `[hidden] { display: none }` — hence the explicit hidden state. */
+  .hl-session__out { padding: 0.5rem; }
+  .hl-session__out[hidden] { display: none; }
+  .hl-session__out > div { white-space: normal; }
+  .hl-session__out > div + div { margin-top: 0.3rem; }
+</style>

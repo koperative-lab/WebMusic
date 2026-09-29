@@ -216,6 +216,14 @@ describe('mountTimeline', () => {
     await Promise.resolve();
     await Promise.resolve();
     expect(onError).toHaveBeenCalledWith(error);
+
+    handle.seek.value = '3';
+    handle.seek.dispatchEvent(new Event('input', {bubbles: true}));
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+    expect(handle.seek.value).toBe('1');
   });
 });
 
@@ -360,7 +368,7 @@ it('keeps tiny ranged-region hit boxes proportional while retaining point-marker
   expect(next.style.left).toBe('0.1%');
   for (const region of [small, next]) {
     const style = getComputedStyle(region);
-    expect(style.minWidth).toBe('0px');
+    expect(Number.parseFloat(style.minWidth)).toBe(0);
     expect(style.padding).toBe('0px');
     expect(style.borderWidth).toBe('0px');
     expect(style.boxSizing).toBe('border-box');

@@ -28,7 +28,7 @@ function player(activeNotes: {midi: number}[] = []) {
   return {owner, snapshot};
 }
 function panel(selector = '#performance') {
-  const element = document.createElement('live-chord-analysis') as LiveChordAnalysisElement;
+  const element = document.createElement('score-live-chord-analysis') as LiveChordAnalysisElement;
   element.setAttribute('player', selector);
   document.body.append(element);
   return element;
@@ -115,5 +115,24 @@ describe('live chord input ownership', () => {
     document.body.append(element);
     await flush();
     expectWaiting(element);
+  });
+
+  it('cancels a pending name event on reset and publishes only the settled display', async () => {
+    const {owner} = player();
+    document.body.append(owner);
+    const element = panel();
+    element.stabilityMs = 30;
+    await flush();
+    const changes: Array<{chord: string; midis: number[]}> = [];
+    element.addEventListener('webscore:chordchange', (event) => changes.push((event as CustomEvent).detail));
+    sound(owner, [60, 64, 67]);
+    expect(element.chord).toBe('CM');
+    expect(changes).toHaveLength(0);
+    owner.dispatchEvent(new CustomEvent('webscore:stop'));
+    await new Promise((resolve) => setTimeout(resolve, 45));
+    expect(changes).toHaveLength(0);
+    sound(owner, [62, 66, 69]);
+    await new Promise((resolve) => setTimeout(resolve, 45));
+    expect(changes).toEqual([{chord: element.chord, midis: [62, 66, 69]}]);
   });
 });

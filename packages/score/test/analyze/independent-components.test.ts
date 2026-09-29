@@ -5,7 +5,7 @@ import {defineAllAnalysisElements, type ChordAnalysisElement} from '../../src/an
 
 defineAllAnalysisElements();
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
-const features = ['key', 'chord', 'roman', 'voice-leading', 'live-chord'];
+const features = ['chord', 'live-chord'];
 
 function music(): Score {
   const builder = new ScoreBuilder();
@@ -33,7 +33,7 @@ function player(score = music()) {
 }
 
 function mount(feature: string) {
-  const node = document.createElement(`${feature}-analysis`) as ChordAnalysisElement;
+  const node = document.createElement(`score-${feature}-analysis`) as ChordAnalysisElement;
   node.setAttribute('player', '#source');
   node.setAttribute('motion', 'stepped');
   document.body.append(node);
@@ -58,9 +58,9 @@ describe('independent analysis capabilities', () => {
     expect(node.querySelector('[part~="header"], [part~="dock"], [role="switch"], .wui-pitch-keyboard, .wui-pitch-staff, .wui-pitch-fretboard')).toBeNull();
   });
 
-  it.each(['chord', 'roman', 'voice-leading'])('%s borrows an already paused player and seeks at its rate', async (feature) => {
+  it('chord borrows an already paused player and seeks at its rate', async () => {
     const source = player();
-    const node = mount(feature);
+    const node = mount('chord');
     await flush();
     const slider = node.querySelector<HTMLElement>('[role="slider"]')!;
     expect(Number(slider.getAttribute('aria-valuenow'))).toBeCloseTo(1);
@@ -75,7 +75,7 @@ describe('independent analysis capabilities', () => {
   it('several companions share one score, survive owner replacement and release their subscriptions', async () => {
     const first = player();
     const chord = mount('chord');
-    const roman = mount('roman');
+    const sibling = mount('chord');
     await flush();
     first.remove();
     const second = player();
@@ -88,12 +88,12 @@ describe('independent analysis capabilities', () => {
     const before = chord.textContent;
     second.dispatchEvent(new CustomEvent('webscore:timeupdate', {detail: {nominalSeconds: 2, playing: false, rate: 2}}));
     expect(chord.textContent).toBe(before);
-    expect(Number(roman.querySelector('[role="slider"]')!.getAttribute('aria-valuenow'))).toBeCloseTo(2);
+    expect(Number(sibling.querySelector('[role="slider"]')!.getAttribute('aria-valuenow'))).toBeCloseTo(2);
   });
 
-  it('parks a score-backed key view and applies paused seeks without an animation frame', async () => {
+  it('parks a score-backed chord view and applies paused seeks without an animation frame', async () => {
     const source = player();
-    const node = document.createElement('key-analysis');
+    const node = document.createElement('score-chord-analysis');
     node.setAttribute('player', '#source');
     node.setAttribute('motion', 'continuous');
     document.body.append(node);

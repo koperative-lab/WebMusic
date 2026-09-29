@@ -10,8 +10,8 @@ import {Code} from 'astro:components';
 import QuickStartPlayerDemo from '../../components/QuickStartPlayerDemo.astro';
 import statusCode from '../../components/quick-start-player-client.ts?raw';
 
-Build a player for `demo.mxl`, a compressed MusicXML score. One player loads the
-file; a staff view follows its position and a three-octave piano keyboard
+Build a player for *Arabesque No. 1*, supplied as a compressed MusicXML score.
+One player loads the file; a staff view follows its position and a three-octave piano keyboard
 highlights sounding notes within its C3–C6 range. Playback uses the built-in
 oscillator, so no SoundFont is needed.
 
@@ -19,7 +19,7 @@ oscillator, so no SoundFont is needed.
 
 Press **Play** to enable sound. Try pausing and seeking with the player's slider:
 both views follow the same player. The keyboard is a visual readout; for playable
-keys, see [`<note-input>`](/score/element/play/note-input/).
+keys, see [`<score-note-input>`](/score/element/play/score-note-input/).
 
 ## Install the packages
 
@@ -36,19 +36,19 @@ TypeScript and an ES-module bundler such as Vite to resolve the package imports.
 
 ## Add the player and its views
 
-Download [demo.mxl](/mxl/demo.mxl) and save it as `public/demo.mxl` in your
+Download [Arabesque No. 1 (MXL)](/mxl/Arabesque%20No.1.mxl) and save it as `public/arabesque.mxl` in your
 application. The player reads compressed MusicXML directly; no manual extraction
 is needed. The example assumes that your application serves this file at
-`/demo.mxl`; set `src` to your file's public URL.
+`/arabesque.mxl`; set `src` to your file's public URL.
 
 Put this markup in `index.html`. The player owns the file load, musical state
 and sound; the two `player="#piece"` selectors attach views to that same instance.
 
 ```html
 <main id="music-demo">
-  <score-player id="piece" src="/demo.mxl" time-control="full"></score-player>
+  <score-player id="piece" src="/arabesque.mxl" time-control="full"></score-player>
   <score-view player="#piece" type="staff"></score-view>
-  <pitch-view player="#piece" type="keyboard" low="48" high="84" fit-to-width="true" white-key-height="128" black-key-height="80"></pitch-view>
+  <score-pitch-view player="#piece" type="keyboard" low="48" high="84" fit-to-width="true" white-key-height="128" black-key-height="80"></score-pitch-view>
 </main>
 <script type="module" src="/src/main.ts"></script>
 
@@ -81,7 +81,7 @@ definePitchViewElement();
 | `<score-player id="piece" src="…">` | Loads the MusicXML once and owns playback, sound and the current position. Its controls let you play, pause and seek. |
 | `time-control="full"` | Shows elapsed time and total duration beside the player controls. |
 | `<score-view player="#piece" type="staff">` | Borrows the loaded score and playback position to draw notation with a following playhead and active-note highlights. |
-| `<pitch-view player="#piece" type="keyboard">` | Borrows the same player's sounding notes and highlights their piano keys. |
+| `<score-pitch-view player="#piece" type="keyboard">` | Borrows the same player's sounding notes and highlights their piano keys. |
 | `low="48" high="84"` | Sets the keyboard's MIDI endpoints to C3 and C6: a three-octave span with both end keys included, for 37 keys. |
 | `white-key-height="128" black-key-height="80"` | Sets white keys to 128 px tall and black keys to 80 px tall. |
 | `fit-to-width="true"` | Fits all three octaves to the container width without horizontal scrolling; key heights stay unchanged. |
@@ -93,7 +93,7 @@ player. To use another piece, change the player's `src`; the views follow its
 replacement score and note state.
 
 The staff view provides lightweight notation. For detailed engraving, see
-[`<sheet-view>`](/score/element/view/sheet-view/).
+[`<score-sheet-view>`](/score/element/view/score-sheet-view/).
 
 <details>
 <summary>Add loading and error feedback</summary>
@@ -150,7 +150,35 @@ Use the [Score setup](/score/) for other formats, registration and integration o
 
 Full references: [Score player](/score/element/play/score-player/) ·
 [Score view](/score/element/view/score-view/) ·
-[Pitch view](/score/element/view/pitch-view/).
+[Pitch view](/score/element/view/score-pitch-view/).
 
 To build with a coding agent, see [Agent Toolkit](/agent-toolkit/) for reference
 selection, task prompts and project instructions.
+
+## Play recorded audio
+
+For recorded sound, install `@webmusic/audio` alongside Kernel and UI:
+
+```bash
+npm install @webmusic/audio @webmusic/kernel @webmusic/ui
+```
+
+Download the [Arabesque No. 1 WAV recording](/wav/Arabesque%20No.1.wav), save it as `public/arabesque.wav`,
+and add the player to your browser application:
+
+```html
+<script type="module">
+  import '@webmusic/audio/play/auto';
+</script>
+<audio-player src="/arabesque.wav" controls></audio-player>
+```
+
+Click **Play** to enable audio. This example uses built-in WAV decoding and
+needs no optional decoder. The player owns its file and playback resources;
+removing it releases them. Check its error state and the URL if loading fails.
+A Score player and an Audio player run independently. To coordinate them, use
+the [Bridge composition](/bridge/composition/).
+
+For custom controls and API + UI composition, see [Audio setup](/audio/),
+[Audio playback](/audio/#play), and the
+[Audio player reference](/audio/element/play/audio-player/).

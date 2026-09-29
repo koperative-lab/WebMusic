@@ -124,7 +124,8 @@ export interface TransportGroupOptions {
   leadInSeconds?: number;
   /** Re-join a follower when |follower − expected| exceeds this. Default 0.03 s. */
   driftToleranceSeconds?: number;
-  /** Drift check cadence. Default 250 ms. 0 disables the monitor. */
+  /** Drift check cadence. Default 250 ms. 0 disables follower drift checks;
+   * the playback watcher still detects natural master stops and loop ends. */
   driftCheckIntervalMs?: number;
   /** Loop region on the master axis; also settable live via {@link TransportGroup.setLoop}. */
   loop?: SyncLoopRegion | null;
@@ -204,6 +205,11 @@ const MAX_CONSECUTIVE_DRIFT_JOINS = 3;
  */
 const MIRROR_RATE_TOLERANCE = 0.02;
 
+/** Clockless adapters still need periodic sampling when follower drift is off.
+ * Use the normal default drift cadence to avoid treating brief position
+ * quantization gaps as natural stops. */
+const MASTER_RECONCILE_INTERVAL_MS = 250;
+
 interface FollowerRecord {
   transport: SyncFollowerTransport;
   offset: number;
@@ -240,11 +246,14 @@ export class TransportGroup {
   #ticker: TickSource | null = null;
   #tickOptions: TickSourceOptions;
   #ticksPerDriftCheck: number;
+  #ticksPerMasterReconcile: number;
   #tickCount = 0;
   #loop: SyncLoopRegion | null = null;
   #wrapping = false;
   #generation = 0;
   #revision = 0;
+  /** Last submitted command, excluding background reconciliation revisions. */
+  #lastCommandRevision = 0;
   readonly #pendingCommands = new Set<number>();
   readonly #observers = new Set<(event: TransportEvent) => void>();
   #lastSnapshot?: TransportSnapshot;
@@ -277,7 +286,8 @@ export class TransportGroup {
         `tick.intervalMs must be a positive safe integer no greater than ${MAX_TIMER_DELAY_MS}.`,
       );
     }
-    this.#ticksPerDriftCheck = Math.max(1, Math.round(this.#driftIntervalMs / (this.#tickOptions.intervalMs ?? 25)));
+    this.#ticksPerDriftCheck = Math.max(1, Math.round(this.#driftIntervalMs / tickInterval));
+    this.#ticksPerMasterReconcile = Math.max(1, Math.ceil(MASTER_RECONCILE_INTERVAL_MS / tickInterval));
     if (options.loop) {
       assertValidLoop(options.loop);
       this.#loop = {...options.loop};
@@ -344,6 +354,7 @@ export class TransportGroup {
       ? {...input, loop: input.loop ? Object.freeze({...input.loop}) : null}
       : {...input});
     const revision = ++this.#revision;
+    this.#lastCommandRevision = revision;
     this.#pendingCommands.add(revision);
     this.#publish({type: 'invalidate', revision, command, snapshot: this.snapshot});
     let operation: Promise<void> | void = undefined;
@@ -451,9 +462,9 @@ export class TransportGroup {
     this.#assertActive();
     if (loop) assertValidLoop(loop);
     this.#loop = loop ? {...loop} : null;
-    if (this.clock.paused) {
-      if (!this.#needsMonitor()) this.#stopDriftMonitor();
-    } else if (this.#needsMonitor()) {
+    // A master may have stopped outside the group just before this call;
+    // preserve the watcher until that stop is reconciled against our intent.
+    if (this.#intent === 'playing') {
       this.#startDriftMonitor();
     } else {
       this.#stopDriftMonitor();
@@ -586,6 +597,11 @@ export class TransportGroup {
           for (const record of [...this.#followers]) {
             if (!this.#isCurrent(generation)) break;
             if (!this.#followers.includes(record)) continue;
+            // The master may have stopped naturally while a longer follower
+            // is still sounding. Its seek could restart sound immediately;
+            // park it before positioning for the shared loop re-entry.
+            record.transport.pause();
+            if (!this.#isCurrent(generation) || !this.#followers.includes(record)) continue;
             record.transport.seek(this.#localPosition(record, settled));
           }
         } else {
@@ -650,7 +666,12 @@ export class TransportGroup {
 
   dispose(): void {
     if (this.#disposed) return;
-    this.#lastSnapshot = this.snapshot;
+    try {
+      this.#lastSnapshot = this.snapshot;
+    } catch {
+      // A failed clock read must not prevent releasing participants. Keep the
+      // last coherent snapshot, if any, for the final disposed notification.
+    }
     this.#disposed = true;
     ++this.#revision;
     ++this.#generation;
@@ -670,7 +691,9 @@ export class TransportGroup {
         errors.push(error);
       }
     }
-    this.#publish({type: 'snapshot', snapshot: this.snapshot});
+    let snapshot: TransportSnapshot | undefined;
+    try { snapshot = this.snapshot; } catch { /* No readable snapshot remains. */ }
+    if (snapshot) this.#publish({type: 'snapshot', snapshot});
     this.#observers.clear();
     if (errors.length > 0) throw errors[0];
   }
@@ -873,13 +896,23 @@ export class TransportGroup {
   /**
    * One watcher drives every concern off a kernel tick source (worker-backed
    * where the platform allows, so background-tab throttling does not starve
-   * it): master-stop reconciliation and the loop boundary every tick, drift
-   * every `driftCheckIntervalMs` worth of ticks.
+   * it): clocked master-stop reconciliation and the loop boundary every
+   * tick, drift every `driftCheckIntervalMs` worth of ticks. A clockless
+   * adapter is sampled at the default drift cadence when drift is disabled.
    */
   #onTick(): void {
     if (this.#disposed) return;
     const revision = this.#revision;
     try {
+      // A clockless master can stop without pausing its sampled mirror.
+      // With drift checks disabled, its lifecycle reconciliation still has
+      // to run so an ended master cannot leave followers playing alone.
+      if (this.#driftIntervalMs === 0 &&
+          this.#tickCount % this.#ticksPerMasterReconcile === 0 &&
+          this.#intent === 'playing' &&
+          !this.#wrapping && this.#pendingTransitions === 0) {
+        this.#master.reconcile?.(this.#now());
+      }
       this.#reconcileMasterStop();
       this.#checkLoop();
       this.#tickCount += 1;
@@ -933,15 +966,22 @@ export class TransportGroup {
    */
   #wrap(startSeconds: number): void {
     this.#wrapping = true;
+    const generation = this.#generation;
+    const wrapCommandRevision = this.#revision + 1;
+    const stillCurrent = () =>
+      this.#isCurrent(generation) && this.#lastCommandRevision === wrapCommandRevision;
     void this.seek(startSeconds)
       .then(() => {
-        if (!this.#disposed && this.#intent === 'playing' && this.clock.paused) {
+        if (stillCurrent() && this.#intent === 'playing' && this.clock.paused) {
           return this.play();
         }
       })
       .catch((error: unknown) => {
+        // An older wrap failure cannot pause a newer play or seek. Its
+        // dispatch already published the rejection to command observers.
+        if (!stillCurrent()) return;
         this.#reportOperationError('loop wrap', error);
-        if (!this.#disposed && this.#intent === 'playing') this.#settleMasterStopped();
+        if (stillCurrent() && this.#intent === 'playing') this.#settleMasterStopped();
       })
       .finally(() => {
         this.#wrapping = false;
@@ -949,10 +989,6 @@ export class TransportGroup {
   }
 
   #startDriftMonitor(): void {
-    if (!this.#needsMonitor()) {
-      this.#stopDriftMonitor();
-      return;
-    }
     this.#ticker ??= createTickSource(this.#tickOptions);
     this.#ticker.start(() => this.#onTick());
   }
@@ -962,16 +998,31 @@ export class TransportGroup {
     this.#tickCount = 0;
   }
 
-  #needsMonitor(): boolean {
-    return this.#loop !== null || this.#driftIntervalMs > 0;
-  }
-
   #isCurrent(generation: number): boolean {
     return !this.#disposed && generation === this.#generation;
   }
 
   #reportOperationError(operation: string, error: unknown): void {
-    this.#publish({type: 'operation-error', operation, error, snapshot: this.snapshot});
+    let snapshot: TransportSnapshot | undefined;
+    try {
+      snapshot = this.snapshot;
+    } catch {
+      // A failing clock read can be the error being reported. Keep the last
+      // known position/reference time and expose the current command state,
+      // rather than letting the error reporter throw from the same read.
+      if (this.#lastSnapshot) {
+        snapshot = Object.freeze({
+          ...this.#lastSnapshot,
+          revision: this.#revision,
+          paused: this.#intent !== 'playing',
+          holding: false,
+          pending: this.#pendingCommands.size > 0 || this.#pendingTransitions > 0,
+          disposed: this.#disposed,
+        });
+        this.#lastSnapshot = snapshot;
+      }
+    }
+    if (snapshot) this.#publish({type: 'operation-error', operation, error, snapshot});
     try {
       this.#onOperationError?.(operation, error);
     } catch {
@@ -1168,12 +1219,14 @@ export interface ClocklessMasterTransport {
  * Adapts a transport WITHOUT a readable clock into the required-clock
  * master role by dead-reckoning a mirror TransportClock across the command
  * surface, and reconciling the reckoning against the transport's actual
- * position on every drift check:
+ * position at drift checks or periodic lifecycle samples when follower drift
+ * checks are disabled:
  *
- * - two identical position samples while the mirror advanced past the
- *   tolerance mean the transport stopped on its own (ended, clamped at its
- *   duration, paused out of band) — the adapter pauses the mirror and
- *   reports 'stalled', which the group treats as a master stop;
+ * - after observed forward motion establishes the position's reported step,
+ *   a longer stationary interval can indicate that the transport stopped
+ *   on its own. The adapter then pauses the mirror and reports 'stalled'.
+ *   Without prior motion, repeated positions alone are inconclusive and
+ *   the adapter leaves the transport running;
  * - a moving transport that diverged from the extrapolation (refused or
  *   clamped rate, tempo automation) re-anchors the mirror so drift is
  *   measured against the transport, not the reckoning.
@@ -1186,7 +1239,13 @@ export class MirrorClockMaster implements SyncMasterTransport {
   readonly #mirror: TransportClock;
   readonly #now: () => number;
   #tolerance: number;
-  #lastSample: {position: number; mirrorPosition: number; time: number} | null = null;
+  /** Last sample for estimating the transport's slope. */
+  #lastSample: {position: number; time: number} | null = null;
+  /** Last position change, retained across identical quantized samples. */
+  #lastChange: {position: number; time: number} | null = null;
+  /** Largest observed positive step since the last command. */
+  #reportedStep = 0;
+  #positiveSteps = 0;
 
   constructor(inner: ClocklessMasterTransport, now: () => number, options: {reconcileToleranceSeconds?: number} = {}) {
     this.#inner = inner;
@@ -1206,19 +1265,19 @@ export class MirrorClockMaster implements SyncMasterTransport {
 
   async play(when?: number): Promise<void> {
     await this.#inner.play(when);
-    this.#lastSample = null;
+    this.#resetSamples();
     this.#mirror.start(this.#now(), this.#inner.position);
   }
 
   pause(): void {
     this.#inner.pause();
-    this.#lastSample = null;
+    this.#resetSamples();
     this.#mirror.pause(this.#now());
   }
 
   stop(): void {
     this.#inner.stop();
-    this.#lastSample = null;
+    this.#resetSamples();
     const now = this.#now();
     this.#mirror.pause(now);
     this.#mirror.seekTo(0, now);
@@ -1226,29 +1285,51 @@ export class MirrorClockMaster implements SyncMasterTransport {
 
   async seekPosition(position: number, when?: number): Promise<void> {
     await this.#inner.seekPosition(position, when);
-    this.#lastSample = null;
+    this.#resetSamples();
     this.#mirror.seekTo(this.#inner.position, this.#now());
   }
 
   setRate(rate: number): void {
     this.#inner.setRate?.(rate);
-    this.#lastSample = null;
+    this.#resetSamples();
     this.#mirror.setRate(rate, this.#now());
+  }
+
+  #resetSamples(): void {
+    this.#lastSample = null;
+    this.#lastChange = null;
+    this.#reportedStep = 0;
+    this.#positiveSteps = 0;
   }
 
   reconcile(now: number): 'ok' | 'stalled' {
     const actual = this.#inner.position;
-    if (!Number.isFinite(actual) || actual < 0) return 'ok';
+    if (!Number.isFinite(actual) || actual < 0) {
+      this.#resetSamples();
+      return 'ok';
+    }
     const mirrorPosition = this.#mirror.positionAt(now);
     const sample = this.#lastSample;
-    this.#lastSample = {position: actual, mirrorPosition, time: now};
+    this.#lastSample = {position: actual, time: now};
+    const changed = sample !== null && actual !== sample.position;
+    const previousChange = this.#lastChange;
+    if (sample === null || changed) {
+      if (changed && actual > sample.position) {
+        this.#reportedStep = Math.max(this.#reportedStep, actual - sample.position);
+        this.#positiveSteps += 1;
+      }
+      this.#lastChange = {position: actual, time: now};
+    }
+    // Position-only evidence cannot distinguish a stop from a quantized
+    // moving transport until it has reported at least one positive step.
+    // Allow that whole step plus tolerance before inferring a stall.
     if (
-      sample !== null &&
-      actual === sample.position &&
-      mirrorPosition - sample.mirrorPosition > this.#tolerance &&
+      !changed && sample !== null && previousChange !== null &&
+      this.#reportedStep > 0 &&
+      (now - previousChange.time) * this.#mirror.rate > this.#reportedStep + this.#tolerance &&
       !this.#mirror.paused
     ) {
-      this.#lastSample = null;
+      this.#resetSamples();
       this.#mirror.pause(now);
       return 'stalled';
     }
@@ -1258,16 +1339,20 @@ export class MirrorClockMaster implements SyncMasterTransport {
     // drifting away again before the next check, which is what turns a rate
     // mismatch into an endless correction loop. The next join then hands the
     // followers the rate the transport actually runs at.
-    if (sample !== null && !this.#mirror.paused) {
-      const elapsed = now - sample.time;
-      const advanced = actual - sample.position;
+    if (changed && previousChange !== null && !this.#mirror.paused) {
+      const elapsed = now - previousChange.time;
+      const advanced = actual - previousChange.position;
       if (elapsed > 0 && advanced > 0) {
         const measured = advanced / elapsed;
         const current = this.#mirror.rate;
         if (
           Number.isFinite(measured) &&
           measured > 0 &&
-          Math.abs(measured - current) > MIRROR_RATE_TOLERANCE * current
+          Math.abs(measured - current) > MIRROR_RATE_TOLERANCE * current &&
+          // The first boundary jump of a rounded position can look much
+          // faster than the true rate. Wait for another step in that case.
+          (measured < current || this.#positiveSteps >= 2 ||
+            advanced <= elapsed * current + this.#tolerance)
         ) {
           this.#mirror.setRate(measured, now);
         }

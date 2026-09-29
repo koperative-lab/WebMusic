@@ -1,0 +1,18 @@
+---
+// One layout for real Element siblings inside the shared live canvas.
+// Copy serializes the custom elements, leaving documentation layout out.
+---
+
+<div class="element-composition" data-demo-composition data-pg-fragment>
+  <slot />
+</div>
+
+<style>
+  .element-composition {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.5rem;
+    width: 100%;
+    min-width: 0;
+  }
+</style>
