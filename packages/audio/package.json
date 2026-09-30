@@ -1,6 +1,6 @@
 {
   "name": "@webmusic/audio",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Digital audio for the web: immutable clip model, mp3/wav/ogg/flac decoding via optional WASM peers, playback, MIR analysis, transcription, views, Web Components and React bindings.",
   "type": "module",
   "sideEffects": [
@@ -263,9 +263,10 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "node ../../scripts/clean-dist.mjs dist && tsup && node scripts/postbuild-worker-facade.mjs",
+    "build": "node ../../scripts/clean-dist.mjs dist && tsup && node scripts/postbuild-worker-facade.mjs && node ../../scripts/bundle-notices.mjs --package-dir . && node ../../scripts/package-artifacts.mjs --write",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepack": "node ../../scripts/package-artifacts.mjs"
   },
   "dependencies": {
     "fft.js": "^4.0.4",
@@ -280,8 +281,8 @@
     "@tensorflow/tfjs": ">=4",
     "@wasm-audio-decoders/flac": ">=0.2",
     "@wasm-audio-decoders/ogg-vorbis": ">=0.1",
-    "@webmusic/kernel": "^0.1.0",
-    "@webmusic/ui": "^0.1.0",
+    "@webmusic/kernel": "^0.2.0",
+    "@webmusic/ui": "^0.2.0",
     "aubiojs": ">=0.2",
     "essentia.js": ">=0.1",
     "mediabunny": ">=1",

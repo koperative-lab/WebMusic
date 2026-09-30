@@ -490,10 +490,10 @@ The design buys its properties with real costs. The honest list:
 
 | Package | What it is |
 |---|---|
-| [`@webmusic/kernel`](https://github.com/mrsteamedbun/WebMusic) | The zero-domain contracts every package shares. |
+| [`@webmusic/kernel`](https://github.com/koperative-lab/WebMusic) | The zero-domain contracts every package shares. |
 | `@webmusic/ui` | Optional domain-neutral presenters used by Audio Web Components and the meter renderer. |
-| [`@webmusic/score`](https://github.com/mrsteamedbun/WebMusic) | Symbolic music: MIDI / MusicXML / MXL / ABC scores. |
+| [`@webmusic/score`](https://github.com/koperative-lab/WebMusic) | Symbolic music: MIDI / MusicXML / MXL / ABC scores. |
 | `@webmusic/audio` | This package. |
-| [`@webmusic/bridge`](https://github.com/mrsteamedbun/WebMusic) | Score ↔ audio: synchronized playback, score→clip rendering, transcription assembly. |
+| [`@webmusic/bridge`](https://github.com/koperative-lab/WebMusic) | Score ↔ audio: synchronized playback, score→clip rendering, transcription assembly. |
 
 MIT.

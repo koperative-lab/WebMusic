@@ -29,7 +29,7 @@
     "typecheck:tests": "tsc -p tsconfig.test.json",
     "test": "npm run test --workspaces --if-present",
     "check:source": "npm run check:format && npm run check:lockfile && npm run check:dev-server && npm run lint && npm run check:architecture && npm run check:docs && npm run check:dev-docs && npm run check:site-notices && npm run build:packages && npm run check:doc-snippets && npm run typecheck && npm run typecheck:tests && npm test",
-    "check:packages": "node --test scripts/package-artifacts.test.mjs && node scripts/check-package-exports.mjs && node scripts/package-artifacts.mjs --all && node --test scripts/bundle-notices.test.mjs && node scripts/bundle-notices.mjs --check",
+    "check:packages": "node --test scripts/package-artifacts.test.mjs && node scripts/check-package-exports.mjs && node scripts/package-artifacts.mjs --all && node --test scripts/bundle-notices.test.mjs && node scripts/bundle-notices.mjs --check && node scripts/bundle-notices.mjs --package-dir packages/audio --check",
     "check:external-install": "node scripts/check-external-install.mjs",
     "check:release-manifests": "node --test scripts/release-version.test.mjs scripts/release-manifests.test.mjs && node scripts/release-manifests.mjs",
     "check": "npm run check:source && npm run check:licenses && npm run check:packages && npm run check:release-manifests",

@@ -6,6 +6,10 @@ a working demo, or a passing code-license check does not establish permission to
 redistribute the file. [DEV-05](../../../dev/STATUS.md) remains open: verify the
 creator, exact source, redistribution terms, and required notices for every
 unresolved asset before deploying the site or publishing a release containing it.
+The five npm tarballs do not include these site media files. CI continues to
+build the site for validation; deployment requires a manual dispatch on `main`
+with `deploy_pages` selected after this review is complete. This does not remove
+files already deployed by earlier workflow runs.
 
 | Public path | Evidence currently available | Redistribution status |
 | --- | --- | --- |
@@ -34,7 +38,7 @@ separate inventory and do not clear these standalone assets.
 
 ## Bundled code notices
 
-The Score browser bundle uses [bundle-notices.mjs](../../../scripts/bundle-notices.mjs)
+The Score and Audio browser bundles use [bundle-notices.mjs](../../../scripts/bundle-notices.mjs)
 to collect dependency notices from bundled source-map owners. Its output is
 embedded in the generated JavaScript and emitted as
 `dist/THIRD_PARTY_NOTICES.txt`.

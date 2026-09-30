@@ -1,0 +1,78 @@
+{
+  "baseline": "eaa88af43a40661b3a7ded6ae9853e1b000be9d1",
+  "kind": "local-candidate-pack-previews",
+  "node": "24.21.0",
+  "npm": "11.19.0",
+  "packages": [
+    {
+      "name": "@webmusic/kernel",
+      "version": "0.2.0",
+      "files": 114,
+      "size": 159379,
+      "integrity": "sha512-YUA1+2h3pRT+wl1stD7fuzfo09Fwo67M/lz6WEcaOs3pYOSTRUr8IVW3KFJaaQI08Dv4TYiXFX1PXtluok+Zcw==",
+      "buildReceipt": {
+        "schema": 1,
+        "name": "@webmusic/kernel",
+        "version": "0.2.0",
+        "source": "4b97ad9c9f851f547206db4fadede814da47c8904798781ab564680b50d85c54",
+        "outputs": "487eeb45c12c1fdc9d36c4d0a6a21c4e36d488d2f0952fd02acf88d5d3616101"
+      }
+    },
+    {
+      "name": "@webmusic/ui",
+      "version": "0.2.0",
+      "files": 236,
+      "size": 1669633,
+      "integrity": "sha512-r6Xbq2ZzinJvqzvMDWrPkiExiKeZFd1xD2PBWaX3nFvVlN0WKmoqAEwcKFf9AGA2d/kQ34PYoPUiHf6QzZUsLg==",
+      "buildReceipt": {
+        "schema": 1,
+        "name": "@webmusic/ui",
+        "version": "0.2.0",
+        "source": "4b97ad9c9f851f547206db4fadede814da47c8904798781ab564680b50d85c54",
+        "outputs": "af0d062ff5b37c4f13543151eb6f2681b11e8c5eae6cb29b5b305f1ee46b8cc7"
+      }
+    },
+    {
+      "name": "@webmusic/score",
+      "version": "0.2.0",
+      "files": 335,
+      "size": 2910243,
+      "integrity": "sha512-LpAJuDAme755HkIb9C4ArvoKJDBySWcOeYqYPDbWi3TxQYz9lJBeyGfrcIVmPE4OFugnSr3hrCezVhTXHRgUfA==",
+      "buildReceipt": {
+        "schema": 1,
+        "name": "@webmusic/score",
+        "version": "0.2.0",
+        "source": "4b97ad9c9f851f547206db4fadede814da47c8904798781ab564680b50d85c54",
+        "outputs": "4ad57e7a98e7ee8c4300420285c6ac04fd91287b45fd0929e8f8d849c522504c"
+      }
+    },
+    {
+      "name": "@webmusic/audio",
+      "version": "0.2.0",
+      "files": 273,
+      "size": 2536847,
+      "integrity": "sha512-ydpGFxUipTg2zvkFHVbSA+EosMJGKOJdLbEGcNZdOrNIaXC796dHHc+4KfFyvS/oM4MfuvrDWhkj6bu5ElP26w==",
+      "buildReceipt": {
+        "schema": 1,
+        "name": "@webmusic/audio",
+        "version": "0.2.0",
+        "source": "4b97ad9c9f851f547206db4fadede814da47c8904798781ab564680b50d85c54",
+        "outputs": "5ea84c04a9f487dea4f73512b864cb5443f2f3c2229656f96d016256cc696f64"
+      }
+    },
+    {
+      "name": "@webmusic/bridge",
+      "version": "0.2.0",
+      "files": 10,
+      "size": 66041,
+      "integrity": "sha512-1SwOvcNx1yX3/dMmZpiIxW3AijoZW24CNLBnkvUkmdOS3RTAy0Y0a+tq15MiI/F1AP1smSn/dtFOy2gRKGBKHw==",
+      "buildReceipt": {
+        "schema": 1,
+        "name": "@webmusic/bridge",
+        "version": "0.2.0",
+        "source": "4b97ad9c9f851f547206db4fadede814da47c8904798781ab564680b50d85c54",
+        "outputs": "4380f0a9116796a9da75169bd73914d4e54e943c134290934a704adb6d826bb0"
+      }
+    }
+  ]
+}

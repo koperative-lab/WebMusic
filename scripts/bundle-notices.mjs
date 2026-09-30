@@ -2,6 +2,7 @@
 import {readFile, readdir, stat, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
+import {parseArgs} from 'node:util';
 
 const repository = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const marker = 'WEBMUSIC BUNDLED LICENSES';
@@ -11,6 +12,11 @@ const reviewedSnapshots = {
     license: 'MIT',
     repository: 'git+https://github.com/nodable/val-parsers.git',
     file: 'scripts/licenses/nodable-entities-3.0.0-MIT.txt',
+  },
+  'fft.js@4.0.4': {
+    license: 'MIT',
+    repository: 'git+ssh://git@github.com/indutny/fft.js.git',
+    file: 'scripts/licenses/site/fft.js-4.0.4-MIT.txt',
   },
 };
 
@@ -129,9 +135,12 @@ export async function processBundleNotices({packageDirectory = path.join(reposit
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-  const args = process.argv.slice(2);
-  if (args.some((arg) => arg !== '--check')) throw new Error('Usage: node scripts/bundle-notices.mjs [--check]');
-  const check = args.includes('--check');
-  const result = await processBundleNotices({check});
+  const {values} = parseArgs({options: {
+    check: {type: 'boolean', default: false},
+    'package-dir': {type: 'string'},
+  }});
+  const check = values.check;
+  const packageDirectory = values['package-dir'] ? path.resolve(values['package-dir']) : undefined;
+  const result = await processBundleNotices({packageDirectory, check});
   console.log(`Bundled notices ${check ? 'verified' : 'written'}: ${result.packages} packages in ${result.bundles} bundles.`);
 }
