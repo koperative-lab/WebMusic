@@ -14,7 +14,7 @@ status or a second task list. The complete documentation routing map lives in
 ## Checkout and release boundary
 
 DEC-021 records the original three-package first release. DEC-046 accepts
-Kernel, UI Kit, Score, Audio and Bridge in the source tree planned for `main`.
+Kernel, UI Kit, Score, Audio and Bridge in the integrated `main` source tree.
 The Score and Agent Toolkit baseline incorporates the approved Recorder and
 Analyze demo composition (DEC-032/033), component framing (DEC-034), two-tool
 Analyze inventory (DEC-043), and domain-prefixed tags (DEC-045). Shared

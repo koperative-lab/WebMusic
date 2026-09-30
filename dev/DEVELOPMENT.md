@@ -165,8 +165,10 @@ pushes to all branches, on pull requests and on manual dispatch. It sets
 
 That workflow does not run the separate `audit:production` command or publish
 packages. It deploys the built Pages site only from the official repository's
-`main` on a push or manual dispatch, after quality and documentation jobs
-succeed. Its configuration is evidence of what is scheduled, not of the outcome
+`main` on a manual dispatch with `deploy_pages` selected, after quality and
+documentation jobs succeed. Pushes and pull requests receive validation without
+deployment. Review the public asset inventory before requesting deployment.
+Its configuration is evidence of what is scheduled, not of the outcome
 of a remote run. Archived release automation is documented separately in
 [RELEASING.md](release/RELEASING.md).
 

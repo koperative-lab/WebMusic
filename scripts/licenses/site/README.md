@@ -37,7 +37,7 @@ also have SHA-256 records. Missing or changed records fail generation.
 
 | Package | Source of the preserved text |
 | --- | --- |
-| `fft.js@4.0.4` | [Complete MIT text](fft.js-4.0.4-MIT.txt) copied verbatim from the installed README LICENSE section, retaining Fedor Indutny's 2017 copyright; the exact runtime artifact is fingerprinted. Used by Audio. |
+| `fft.js@4.0.4` | [Complete MIT text](fft.js-4.0.4-MIT.txt) copied verbatim from the installed README LICENSE section, retaining Fedor Indutny's 2017 copyright; the exact runtime artifact is fingerprinted. Shared by the site and Audio npm browser-bundle notice collectors. |
 | `@stitches/core@1.2.8` | [LICENSE.md at the v1.2.8 commit](https://github.com/stitchesjs/stitches/blob/c268db3938e2cf6bdbaa3d30f3ce7b67c0492a41/LICENSE.md), retaining the 2020 Modulz copyright. The npm archive omits this file. |
 | `static-browser-server@1.0.3` | Its installed manifest and [upstream repository](https://github.com/codesandbox/static-browser-server) designate Apache-2.0 but omit LICENSE. The [unmodified ASF text](https://www.apache.org/licenses/LICENSE-2.0.txt) is provided; no copyright holder or year is invented. The original package contains no NOTICE file. |
 | `intersection-observer@0.10.0` | Its source header supplies the 2016 Google copyright and links to the [W3C 2015 license](https://www.w3.org/copyright/software-license-2015/). The snapshot retains the header and full official notice, and identifies the site's bundling/minification step. |

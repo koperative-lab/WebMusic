@@ -5,6 +5,11 @@ on:
     branches: ['**']
   pull_request:
   workflow_dispatch:
+    inputs:
+      deploy_pages:
+        description: 'Deploy the website after public asset redistribution has been reviewed'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -60,7 +65,8 @@ jobs:
         if: >-
           github.repository == 'koperative-lab/WebMusic' &&
           github.ref == 'refs/heads/main' &&
-          (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+          github.event_name == 'workflow_dispatch' &&
+          inputs.deploy_pages
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: apps/doc/webmusic/dist
@@ -71,7 +77,8 @@ jobs:
     if: >-
       github.repository == 'koperative-lab/WebMusic' &&
       github.ref == 'refs/heads/main' &&
-      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+      github.event_name == 'workflow_dispatch' &&
+      inputs.deploy_pages
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

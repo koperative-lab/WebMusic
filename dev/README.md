@@ -9,8 +9,8 @@ Web Components, Headless objects, and API + UI composition. Accepted design
 describes the intended contracts; [STATUS.md](STATUS.md) describes this
 checkout's delivery and verification gaps. Sharing guidance between branches
 does not merge implementations or transfer old verification results. This
-checkout integrates Kernel, UI Kit, Score, Audio and Bridge for the planned
-`main` merge. The recorded first release remains a three-package npm release;
+checkout contains the Kernel, UI Kit, Score, Audio and Bridge integration in
+`main`. The recorded first release remains a three-package npm release;
 source integration does not publish updated packages or verify registry delivery.
 
 ## Directory map

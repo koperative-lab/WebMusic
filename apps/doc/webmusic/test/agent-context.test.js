@@ -182,7 +182,18 @@ describe('agent context release and output contracts', () => {
       expect(page).toContain('[Interactive example on the documentation page]');
       expect(page).not.toContain('<AudioAnalyzeFeaturePlayground');
     }
-    expect(pages.manifest.sourceSnapshot.packages).toEqual({'@webmusic/kernel': '0.1.0', '@webmusic/ui': '0.1.0', '@webmusic/score': '0.1.0', '@webmusic/audio': '0.1.0', '@webmusic/bridge': '0.1.0'});
+    const sourcePackages = {
+      '@webmusic/kernel': 'platform/kernel',
+      '@webmusic/ui': 'packages/ui',
+      '@webmusic/score': 'packages/score',
+      '@webmusic/audio': 'packages/audio',
+      '@webmusic/bridge': 'bridges/score-audio',
+    };
+    const sourceVersions = Object.fromEntries(await Promise.all(Object.entries(sourcePackages).map(async ([name, directory]) => {
+      const manifest = JSON.parse(await readFile(path.join(root, directory, 'package.json'), 'utf8'));
+      return [name, manifest.version];
+    })));
+    expect(pages.manifest.sourceSnapshot.packages).toEqual(sourceVersions);
     expect(pages.manifest.sourceSnapshot.adapter).toBe('audio-bridge');
     expect(pages.manifest.mode).toBeUndefined();
     expect(pages.manifest.release).toBeUndefined();
@@ -193,7 +204,7 @@ describe('agent context release and output contracts', () => {
     expect([...await declaredAgentContextPaths({root, extension: audioBridgeContext})].sort()).toEqual([...pages.files.keys()].map((name) => `/${name}`).sort());
   });
 
-  it('fingerprints unreleased source changes without accepting them as a release', async () => {
+  it('fingerprints unreleased source and version changes without accepting them as a release', async () => {
     const directory = await temp();
     const owners = ['platform/kernel', 'packages/ui', 'packages/score', 'packages/audio', 'bridges/score-audio'];
     for (const owner of owners) {
@@ -205,6 +216,10 @@ describe('agent context release and output contracts', () => {
     const after = await audioBridgeContext.inspectSources(directory);
     expect(after.sourceSnapshot.revision).not.toBe(before.sourceSnapshot.revision);
     expect(after.packages.map(({version}) => version)).toEqual(before.packages.map(({version}) => version));
+    await write(directory, 'packages/audio/package.json', json({name: 'packages/audio', version: '0.2.0'}));
+    const versioned = await audioBridgeContext.inspectSources(directory);
+    expect(versioned.sourceSnapshot.packages['packages/audio']).toBe('0.2.0');
+    expect(versioned.sourceSnapshot.revision).not.toBe(after.sourceSnapshot.revision);
     await expect(generateAgentContext({root: directory})).rejects.toThrow(/release mapping/);
   });
 

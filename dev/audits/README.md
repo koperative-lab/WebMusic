@@ -33,6 +33,7 @@ another checkout. [STATUS](../STATUS.md) owns current gaps;
 | 2026-09-26 | [Score Analyze frame and startup correction](2026-09-26/ANALYZE-FRAME-AND-DEV-STARTUP.md) | Follow-up correcting the earlier bare-surface acceptance and destructive repeated Astro startup. |
 | 2026-09-26 | [Score Analyze inspection redesign](2026-09-26/SCORE-ANALYZE-INSPECTION.md) | DEC-038 five-tool inventory, reusable interval/rhythm inspection, current-tree checks and bounded desktop/mobile browser evidence. |
 | 2026-09-28 | [Local CI lint and attribution repair](2026-09-28/CI-LINT-AND-ATTRIBUTION.md) | Seven Score/UI diagnostics and Koperative metadata repaired in the dev tree and a local main worktree; Node 24 gates and main's release-baseline boundary are recorded separately. |
+| 2026-09-29 | [Five-package 0.2.0 preparation](2026-09-29/RELEASE-0.2.0-PREPARATION.md) | Release metadata, Audio license notices, prepack guards, actual npm migration comparison and local release gates; publication and final registry verification remain manual. |
 
 For a new audit, record the commit or working-tree baseline, scope, environment,
 procedure, findings and actual command outcomes. Distinguish source inspection,

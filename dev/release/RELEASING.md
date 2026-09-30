@@ -76,8 +76,10 @@ and toolchain. A workflow definition is not a record of its latest result.
 No package publication or promotion job is wired into that workflow.
 `npm run pages:build` produces a configured documentation build; it does not
 deploy by itself. After successful quality and documentation jobs, the workflow
-deploys GitHub Pages only for a push or manual dispatch on the official
-repository's `main` branch. Other branches receive validation without deployment.
+deploys GitHub Pages only for a manual dispatch on the official repository's
+`main` branch with `deploy_pages` selected. Pushes and pull requests receive
+validation without deployment. Review the public asset inventory before selecting
+that option; npm publication does not require a website deployment.
 Registry/tag verification and manual release commands are in
 [PUBLISHING.md](PUBLISHING.md).
 
