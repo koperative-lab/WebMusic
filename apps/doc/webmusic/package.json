@@ -18,7 +18,7 @@
     "@webmusic/ui": "^0.2.0",
     "astro": "^7.3.3",
     "eslint-plugin-astro": "^3.2.1",
-    "fast-xml-parser": "^5.11.1",
+    "fast-xml-parser": "^5.11.2",
     "js-yaml": "^5.4.2",
     "jsdom": "^30.1.0",
     "opensheetmusicdisplay": "^2.1.3",
