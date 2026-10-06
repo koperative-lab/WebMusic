@@ -25,7 +25,7 @@
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "satteri": "^0.10.5",
-    "sharp": "^0.35.4",
+    "sharp": "^0.35.5",
     "spessasynth_lib": "^4.3.6",
     "tone": "^15.0.4",
     "typescript": "^5.9.3",
