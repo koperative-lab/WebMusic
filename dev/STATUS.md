@@ -204,6 +204,18 @@ Final local verification passed `VITEST_MAX_WORKERS=2 npm run check` (4,301
 workspace tests) and `npm run docs:build` (112 pages). This records local
 verification, not remote CI, publication or new browser/device acceptance.
 
+The first [dev CI run](https://github.com/koperative-lab/WebMusic/actions/runs/37707309933)
+passed the website build and both Node 22/24 full checks and external-install
+checks. Its dependency audit failed with four high and ten moderate findings
+in the unchanged baseline lockfile. The follow-up updates `devalue` to 5.9.4,
+`http-cache-semantics` to 4.3.0, `sharp` to 0.35.5 and `source-map-js` to 1.2.2
+within the existing manifest ranges, including Sharp's matching native packages.
+The corrected lockfile passes the high-severity audit gate; the remaining ten
+moderate findings belong to the PostCSS selector-parser chain tracked in DEP-02.
+After a fresh `npm ci`, the corrected tree again passed all 4,301 workspace
+tests in `npm run check`, the 112-page documentation build, external-install
+verification and `npm run audit:dependencies` at its configured high threshold.
+
 [The earlier inspection record](audits/2026-09-26/SCORE-ANALYZE-INSPECTION.md)
 describes DEC-038's former five-tool tree and does not verify the current tools.
 DEC-041's presentation boundary remains: candidates are available in `.analysis`
@@ -246,6 +258,7 @@ The current public surface is generated in [COMPONENTS](COMPONENTS.md); document
 
 | ID | Work and state | Acceptance | Owning reference |
 |---|---|---|---|
+| DEP-02 | The dev-consolidation dependency follow-up clears the four high findings with compatible lockfile updates. Ten moderate findings remain in the documentation site's PostCSS selector-parser 6.x chain | Adopt a supported parent dependency update and rerun full checks, site build, external-install and audit. The audit's suggested Starlight downgrade is not an accepted migration | [Closeout record](log/2026-10-07-score-analysis-dev-closeout.md), [Development](DEVELOPMENT.md) |
 | TIME-01 | Group command authority, revisioned observation and participant re-entry are implemented; same-instance clock injection remains open | Specify/verify engine consumption of one shared anchor if introducing injection; preserve the existing command outcome, cancellation and participant ownership guarantees | [Shared-clock design](../platform/shared-clock-injection.md), DEC-018 |
 | BIND-01 | Native Score data/state attachment is implemented; external controller/Rack and legacy event capabilities remain partial | Extend only explicitly supported source/part/activity capabilities; preserve readiness, source identity and borrowed lifetimes. Do not invent a single Score for a multi-source owner | [Player binding design](design/PLAYER-BINDING.md), DEC-011 and DEC-017 |
 | BIND-02 | Readout/log tags and scored-chord preview remain targets; retained PitchView supports player/source binding | Resolve the spec's open member/unit choices; implement the supported modes, part/note identity and bounded logs; align public entries, presenters, catalogs, references and accessible demos | Player binding design and component/page templates |

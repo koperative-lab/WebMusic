@@ -57,3 +57,42 @@ surfaces, score/live switching and normal/390px layouts. They remain evidence
 for those checks; this closeout does not add real MIDI hardware, screen-reader
 or acoustic timing acceptance. A local check is not remote CI or deployment
 evidence.
+
+## Remote CI and dependency follow-up
+
+Commit `92e841abc455b6c2c00067f85c3d2485fb72420b` was fast-forwarded and
+pushed to `dev`. The merged `score-analysis-basics` and `midi_vis_features`
+branches were deleted locally; neither had a remote branch. The original
+research branch, its local archive tag and both stashes remain. `main` stays
+at the baseline above.
+
+The [first CI run](https://github.com/koperative-lab/WebMusic/actions/runs/37707309933)
+passed `npm run check` and `check:external-install` on Node 22.22.3 and 24,
+and passed `pages:build`. Its final audit failed with four high and ten moderate
+findings. All package manifests and the lockfile were unchanged by the analysis
+commit; both baseline and reviewed lockfile had blob
+`bb2bb6efd879f64fcd89831fdbc7ba5b0178858a`.
+
+A separate compatible lockfile update resolves the high findings:
+
+| Dependency | Previous | Updated |
+|---|---|---|
+| `devalue` | 5.9.1 | 5.9.4 |
+| `http-cache-semantics` | 4.2.0 | 4.3.0 |
+| `sharp` | 0.35.4 | 0.35.5 |
+| `source-map-js` | 1.2.1 | 1.2.2 |
+
+Manifest ranges are unchanged. The remaining lockfile differences are Sharp's
+matching native packages and libvips 1.3.4, including npm's hoisting of those
+packages. Lockfile-only audit now reports zero high/critical findings and ten
+moderate findings in the PostCSS selector-parser chain. The latter remain
+DEP-02; no forced Starlight downgrade is applied. This is a high-severity gate
+pass, not a claim that the dependency tree has no advisory findings.
+
+After a fresh `npm ci`, the corrected tree passed
+`VITEST_MAX_WORKERS=2 npm run check` (4,301 workspace tests), `npm run docs:build`
+(112 pages), `npm run check:external-install` and `npm run audit:dependencies`.
+External-install verification imported 168 runtime entries, exercised Score
+model composition in ESM/CommonJS, and checked 88 ESM/browser and 84 CommonJS
+declarations without `skipLibCheck`. The final audit exits successfully at the
+repository's high threshold while retaining the ten moderate findings above.
