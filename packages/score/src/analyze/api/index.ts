@@ -9,6 +9,14 @@
 // ============================================================================
 
 export {identifyChord, identifyChordFromMidi, segmentChords} from '../core';
+export {
+  inspectChordPitches, inspectScoreChords,
+  type BasicChordQuality, type BasicChordCandidate, type ChordInspection,
+  type ScoreChordGrouping, type ScoreChordInspectionOptions, type ScoreChordSpan, type ScoreChordInspection,
+  inspectScale, type TheoryScale, type ScaleKind, type ScaleInspectionOptions,
+  type ScaleDegreePitch, type ScaleNoteInspection, type ScaleInspection,
+  type TheoryNoteEvidence,
+} from '../core';
 export {detectKey} from '../core';
 export {distributions, type DistributionBin, type Distributions} from '../core';
 export {findMotifs, rhythmPatterns} from '../core';

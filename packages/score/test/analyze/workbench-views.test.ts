@@ -3,7 +3,7 @@
 import {afterEach, describe, expect, it} from 'vitest';
 import {Duration, Pitch, Rational, ScoreBuilder, VoiceId, type Score} from '../../src/core';
 import {
-  ChordAnalysisElement, LiveChordAnalysisElement,
+  ChordAnalysisElement,
 } from '../../src/analyze/element/index';
 
 // ---------------------------------------------------------------------------
@@ -20,7 +20,7 @@ const define = (ctor: CustomElementConstructor): string => {
   return tag;
 };
 const CHORDS = define(ChordAnalysisElement);
-const LIVE_CHORD = define(LiveChordAnalysisElement);
+const LIVE_CHORD = define(ChordAnalysisElement);
 const FEATURE_TAGS: Record<string, string> = {
   chords: CHORDS, 'live-chord': LIVE_CHORD,
 };
@@ -80,6 +80,7 @@ interface MountOptions {
 
 async function mount(options: MountOptions = {}) {
   const element = document.createElement(options.tag ?? FEATURE_TAGS[options.feature ?? 'chords']) as ChordAnalysisElement;
+  if (options.tag === LIVE_CHORD || options.feature === 'live-chord') element.mode = 'live';
   for (const [name, value] of Object.entries(options.attrs ?? {})) element.setAttribute(name, value);
   if (options.player) {
     element.setAttribute('player', '#p');
@@ -166,7 +167,7 @@ describe('atomic Analyze displays', () => {
     expect(hero.root.querySelector('.wui-harmony-nameplate')?.getAttribute('data-emphasis')).toBe('hero');
     expect(hero.root.querySelector('.wui-harmony-flow')).toBeNull();
     for (const midi of [60, 64, 67]) player.emit('webscore:noteon', {midi});
-    expect(hero.text()).toContain('CM');
+    expect(hero.text()).toContain('C');
     for (const midi of [60, 64, 67]) player.emit('webscore:noteoff', {midi});
     expect(hero.element.chord).toBeUndefined();
   });
@@ -249,8 +250,8 @@ describe('focused Analyze displays — the shell survives what it is asked to do
 
     expect(host.seeks).toHaveLength(1);
     const detail = host.seeks[0].detail as {quarters: number; seconds: number};
-    expect(detail.quarters).toBeCloseTo(2, 6);
-    expect(detail.seconds).toBeCloseTo(1, 6);
+    expect(detail.quarters).toBeCloseTo(1, 6);
+    expect(detail.seconds).toBeCloseTo(0.5, 6);
     expect(calls).toHaveLength(1);
     expect(calls[0]).toBeCloseTo(detail.seconds / 2, 6);
   });
@@ -271,18 +272,18 @@ describe('focused Analyze displays — reduced motion changes the driver, not th
     const player = stubPlayer();
     const host = await mount({feature: 'chords', score: melodyScore(C_MAJOR), player, motion});
     const reel = host.root.querySelector<HTMLElement>('.wui-harmony-flow__reel')!;
-    const pinned = host.root.querySelector<HTMLElement>('.wui-harmony-flow__pinned-name')!;
+    const pinned = host.root.querySelector<HTMLElement>('.wui-harmony-flow__pinned')!;
     const transforms = new Set<string>();
-    const names = new Set<string>();
+    const readings = new Set<string>();
     for (const seconds of CURSORS) {
       player.emit('webscore:timeupdate', {seconds, nominalSeconds: seconds});
       transforms.add(reel.style.transform);
-      names.add(pinned.textContent ?? '');
+      readings.add(pinned.textContent ?? '');
     }
     const boxes = [...host.root.querySelectorAll<HTMLElement>('.wui-harmony-flow__band')].map(
       (band) => `${band.style.left}|${band.style.width}`,
     );
-    return {host, reel, transforms, names, boxes};
+    return {host, reel, transforms, readings, boxes};
   }
 
   it('keeps the conveyor moving with no frame loop at all', async () => {
@@ -291,9 +292,9 @@ describe('focused Analyze displays — reduced motion changes the driver, not th
       'stepped',
     );
     // The bug this pins: ONE transform for the whole piece, forever, and a
-    // pinned name that never leaves the first chord.
+    // pinned reading that never leaves the first note set.
     expect(stepped.transforms.size).toBeGreaterThan(1);
-    expect(stepped.names.size).toBeGreaterThan(1);
+    expect(stepped.readings.size).toBeGreaterThan(1);
     // Re-anchored on the BAND, not on the instant — which is the saving §2.5.3
     // promises: two cursors inside one chord write the reel once, not twice.
     expect(stepped.transforms.size).toBeLessThan(CURSORS.length);
@@ -341,11 +342,11 @@ describe('focused Analyze displays — score boundaries', () => {
     // thing a listener has heard.
     player.emit('webscore:timeupdate', {seconds: 1.75, nominalSeconds: 1.75});
     expect(active()).toHaveLength(1);
-    expect(active()[0]).toContain('CM');
+    expect(active()[0]).toContain('C');
 
     player.emit('webscore:timeupdate', {seconds: 2.0, nominalSeconds: 2.0});
     expect(active()).toHaveLength(1);
-    expect(active()[0]).toContain('FM');
+    expect(active()[0]).toContain('F');
   });
 
   it('parks at the double bar instead of counting bars nobody wrote', async () => {
@@ -368,15 +369,16 @@ describe('focused Analyze displays — score boundaries', () => {
 
 describe('focused Analyze displays — readings and controls', () => {
 
-  it('shows alternate readings below the primary symbol without a button', async () => {
+  it('limits live readings to complete triads and sevenths without candidate controls', async () => {
     const player = stubPlayer();
     const host = await mount({tag: LIVE_CHORD, player});
-    for (const midi of [60, 64, 67, 69]) player.emit('webscore:noteon', {midi}); // C6 / Am7
+    for (const midi of [60, 64, 67, 69]) player.emit('webscore:noteon', {midi}); // Complete Am7/C; added-sixth aliases are outside the basic inventory.
     const nameplate = host.root.querySelector<HTMLElement>('.wui-harmony-nameplate')!;
     const symbol = nameplate.querySelector<HTMLElement>('.wui-harmony-nameplate__symbol')!;
     const alternateList = nameplate.querySelector<HTMLElement>('.wui-harmony-nameplate__alternates')!;
     const alternates = [...alternateList.querySelectorAll<HTMLElement>('.wui-harmony-nameplate__alternate')];
-    expect(alternates.length).toBeGreaterThan(0);
+    expect(host.element.chord).toBe('Am7/C');
+    expect(alternates).toHaveLength(0);
     expect(alternates.every((item) => item.tagName === 'LI')).toBe(true);
     expect(alternateList.querySelector('button')).toBeNull();
     expect([...nameplate.children].indexOf(alternateList)).toBeGreaterThan(
@@ -458,7 +460,7 @@ describe('focused Analyze displays — every attribute reaches a surface', () =>
     const flatPlayer = stubPlayer();
     const flat = await mount({tag: LIVE_CHORD, player: flatPlayer, attrs: {spelling: 'flat'}});
     for (const midi of [61, 65, 68]) flatPlayer.emit('webscore:noteon', {midi});
-    expect(flat.element.chord).toBe('DbM');
+    expect(flat.element.chord).toBe('Db');
     expect(
       flat.root.querySelector('.wui-harmony-nameplate__voicing')?.textContent?.split(/\s+/).filter(Boolean),
     ).toEqual(['Db4', 'F4', 'Ab4']);
@@ -466,7 +468,7 @@ describe('focused Analyze displays — every attribute reaches a surface', () =>
     const sharpPlayer = stubPlayer();
     const sharp = await mount({tag: LIVE_CHORD, player: sharpPlayer, attrs: {spelling: 'sharp'}});
     for (const midi of [61, 65, 68]) sharpPlayer.emit('webscore:noteon', {midi});
-    expect(sharp.element.chord).toBe('C#M');
+    expect(sharp.element.chord).toBe('C#');
     expect(
       sharp.root.querySelector('.wui-harmony-nameplate__voicing')?.textContent?.split(/\s+/).filter(Boolean),
     ).toEqual(['C#4', 'E#4', 'G#4']);

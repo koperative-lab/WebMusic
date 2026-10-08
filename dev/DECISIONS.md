@@ -1599,6 +1599,178 @@ five-package manifests, public exports and Agent Toolkit source-snapshot
 claims. Verify CI and deployment on the exact target commit separately; none
 of these checks establishes npm publication or live device/audio behavior.
 
+## DEC-047 — Four elementary Score analysis tools with explicit musical context
+
+**Date / status:** 2026-10-03; accepted by the maintainer's request to develop
+basic music-theory analysis before resuming recurrence research. This supersedes
+DEC-043's two-tag inventory and DEC-042's fixed half-bar aggregate chord
+projection; the research branch and dated evidence remain untouched.
+
+**Problem:** separate score/live chord tags duplicate one musical task, while
+basic interval, scale-degree and metrical questions have no direct component.
+Recurrence lanes and inferred-key reports do not provide those elementary facts.
+
+**Decision:** register exactly four Score Analyze tags: `score-chord-analysis`,
+`score-interval-analysis`, `score-scale-analysis` and `score-rhythm-analysis`.
+Chord `mode="score"` is the default; `mode="live"` selects the held-note nameplate
+on that same tag. Remove the separate live-chord class/registration and redirect
+its documentation bookmark to the merged reference. Every score surface reuses
+API/Headless inspection and neutral UI presenters, can borrow one player's Score
+and timeline, and also accepts standalone explicit input.
+
+Chord score inspection uses simultaneous, spelled complete triads/sevenths,
+including bass and inversion. Key-relative degrees require an explicit major or
+minor reference and do not assert harmonic function. Interval inspection keeps
+spelling, diatonic size, quality, direction, semitones and source identities;
+ambiguous chord attacks do not invent a melodic line. Scale inspection requires
+a chosen tonic and one of major, natural minor, harmonic minor, ascending melodic
+minor or descending melodic minor; alterations are descriptive, not errors.
+Rhythm inspection uses simple/compound pulses and requires explicit grouping
+for irregular meters. Written durations and exact beat placement remain separate
+from performance judgments. Written/sounding pitch basis is explicit where
+applicable; no component estimates a key to fill missing context.
+
+**Alternatives considered:** restore recurrence research first; add an inferred
+key component; retain separate chord tags; or put every report in one component.
+These alternatives do not establish four independent elementary musical tasks
+with clear, reusable inputs.
+
+**Consequences:** migrate `score-live-chord-analysis` to
+`score-chord-analysis mode="live"`. Historical tags remain unregistered. The
+four tag-owned demos use the existing `public/mxl/Arabesque No.1.mxl` asset
+and pair one real player with one tool. They inspect the piece’s actual notes
+and preserve its written spelling; generated substitute scores are not used.
+Scale starts with an explicit E-major reference. Synthetic elementary examples
+belong in regression tests. Controls, Copy and Reset remain outside the
+component. API/Headless retain detailed data and specialist algorithms; the
+research branch is not merged as part of this work.
+
+**Owner:** [Score Analyze design](design/ANALYZE-COMPONENTS.md), owning
+[Element pages](../apps/doc/webmusic/src/content/docs/score/element/index.mdx#analyze)
+and [Analyze API](../apps/doc/webmusic/src/content/docs/score/api/analyze.mdx).
+
+**Verification implications:** assert the exact tag/export/catalog inventory;
+cover C–F♯ versus C–G♭, transposing parts, explicit-key chord inversions, all
+minor forms, tie continuations, simple/compound/additive meters, invalid context,
+source replacement, mode changes, cancellation and repeated cleanup. Verify
+public examples and responsive keyboard/pointer demos on the same tree. Unit
+and static checks do not establish audible timing or accessibility acceptance.
+
+## DEC-048 — Metrical chord collections and readable elementary inspection lanes
+
+**Date / status:** 2026-10-07; accepted after reviewing the four elementary
+Analyze tools against the existing Arabesque No. 1 demos. This supersedes
+DEC-047's simultaneous-only default for the chord Element and refines the lane
+presentation. DEC-047's four tasks, explicit context and strict chord dictionary
+remain in force; its dated record is retained above.
+
+**Problem:** exact simultaneous slices fragment arpeggiated material into
+unhelpful short sets. Dense lanes can leave the primary reading too small to
+read, repeat generic failure text, and reserve blank rows for overlapping notes
+far outside the visible passage. These presentations obscure valid evidence.
+
+**Decision:** score-mode `score-chord-analysis` defaults to `grouping="beat"`.
+Each actual metrical pulse collects all selected source notes that overlap its
+half-open span, retaining sustained and sequential notes and their identities.
+Simple 2/3/4 meters use one denominator unit per pulse; compound 6/9/12 meters
+use groups of three. Other numerators require explicit `beat-groups`, whose
+positive integer values must sum to each inspected numerator. Grouping is
+independent of the visible seconds window. `grouping="simultaneous"` retains
+exact note-boundary inspection. Live mode continues to inspect held MIDI notes.
+
+`inspectScoreChords()` keeps its simultaneous default and adds explicit
+`grouping: 'beat'` and `beatGroups`; `projectBasicInspection()` also keeps its
+simultaneous default and accepts `chordGrouping: 'beat'`. Chord results and spans
+identify their grouping. Only complete, correctly spelled triads and supported
+sevenths receive names. No passing tone is removed, missing tone inferred, key
+estimated or harmonic function asserted. The lowest collected source pitch
+determines the displayed bass/inversion; a grouped reading does not prove the
+passage's structural harmonic bass. Unmatched collections display their pitches.
+
+The musical rationale is bounded by the distinction between texture and
+analysis: arpeggios can express a chord, harmonic duration can vary, and
+non-chord-tone classification depends on surrounding motion. Beat grouping is
+an explicit collection method, not an automatic harmonic reduction. See the
+University of Puget Sound's *Music Theory for the 21st-Century Classroom*:
+[Arpeggiated Accompaniments §14.3.1](https://musictheory.pugetsound.edu/mt21c/ArpeggiatedAccompaniments.html),
+[Harmonic Rhythm §9.2](https://musictheory.pugetsound.edu/mt21c/HarmonicRhythm.html)
+and [Introduction to Non-Chord Tones §10.1](https://musictheory.pugetsound.edu/mt21c/NonChordTonesIntroduction.html).
+
+All four score lanes retain a prominent full current readout and quieter
+configuration context. Visible material determines occupied rows; offscreen
+overlap must not create blank space. Melodic interval pairs use an arrow and
+harmonic pairs use `+`. Rhythm uses compact duration/beat labels while preserving
+exact units and source notation in evidence. Semantic lists, keyboard commands,
+source identities and `.analysis` remain available. No additional report panel,
+player, clock or sibling musical view is created inside a tool.
+
+**Alternatives considered:** retain simultaneous slicing as the only component
+view; restore a fixed half-bar window; or infer an underlying harmony by removing
+non-chord tones. The first under-serves arpeggiated input, the second ignores
+metrical pulse, and the third requires analysis beyond the elementary contract.
+
+**Consequences:** expose grouping in the chord reference and external Parameters;
+Copy/Reset preserve it. Keep API/Headless defaults compatible. The chord Arabesque
+demo starts with a four-second viewport; the other three start with one second.
+Those are demo display settings, not musical grouping rules. Detailed inspection
+evidence remains available independently of presentation.
+
+**Owner:** [Score Analyze design](design/ANALYZE-COMPONENTS.md),
+[Analyze API](../apps/doc/webmusic/src/content/docs/score/api/analyze.mdx), the
+[four Element references](../apps/doc/webmusic/src/content/docs/score/element/index.mdx#analyze)
+and the [Harmony presenter reference](../apps/doc/webmusic/src/content/docs/uikit/views-analysis/harmony.mdx).
+
+**Verification implications:** preserve simultaneous-default regressions and
+test metrical collection of arpeggios, sustained overlaps, passing tones,
+compound/irregular meter, clipped selections, transposition and bass provenance.
+Verify readouts, harmonic separators, visible row compaction, narrow layouts,
+keyboard/pointer seeking and Copy/Reset on the real Arabesque demos. Tests and
+static checks do not replace browser, audible or accessibility evidence.
+
+**DEC-048 display refinement, 2026-10-07:** at the maintainer's request, chord
+labels no longer repeat the grouping caption. Named chords appear above their
+source note names with octaves; unmatched sets show only note names. Grouping
+remains explicit in configuration and inspection evidence. Chord timeline
+labels wrap with content-sized row height instead of ellipses, preserving their
+time coordinates. The chord demo now starts at one second, like the other three,
+to give its labels more room. This refines DEC-048's initial presentation, not
+its musical collection or matching rules.
+
+**DEC-048 note-row clarification, 2026-10-07:** unmatched pitches remain in
+the secondary note/voicing row, with the primary chord-name row empty. This
+applies to the current score readout, timeline and stable live nameplate,
+superseding DEC-042's unnamed-held-set promotion to the main readout. Empty
+name slots retain their row so notes align with those beneath named chords.
+
+**DEC-048 live display refinement, 2026-10-07:** the performance surface omits
+the MIDI-spelling caption and starts directly with the chord name. Its quieter
+note row follows the same hierarchy as score mode; unmatched notes remain below
+an empty chord row. Fixed reading rows and scrollable, unabridged long lines
+retain the live layout's stability. MIDI spelling limitations remain in the
+public reference rather than recurring above every reading.
+
+**DEC-048 structured readout refinement, 2026-10-07:** interval, scale and rhythm
+replace a changing secondary sentence with fixed fields under the primary
+reading. Their three equal-width slots are Notes/Motion/Semitones,
+Note/Reference/Relation and Bar/Beat/Duration (qn), respectively. Rhythm keeps
+the same slots for attacks, rests and tie continuations; unavailable values
+stay empty. Field labels, order and horizontal positions remain stable while
+values change. Gaps clear values but retain labels and reserved space. The
+chord symbol/note presentation is unchanged.
+
+UIKit adds domain-neutral `FlowReadoutField {id, label, value}` and
+`FlowReadout {primary?, secondary?, fields?}` for `FlowBand.readout` and
+`FlowLaneState.pinned`. Score uses the same structural field shape without a
+new named field export. Existing secondary text remains available for consumers
+that do not use the structured fields. The presenter derives stable slots from
+the full band collection and measures the maximum wrapped heading/field space
+on content or geometry changes. Its fixed three-column grid keeps playback to
+value updates without per-frame measurement or readout resizing. More generic
+UI fields continue in additional rows; these Score tools supply exactly three.
+Verify slot identity, long values, gaps, narrow widths and semantic field text;
+do not infer that fixed readout geometry fixes the separate scrolling lane's
+visible row count.
+
 ## Recording the next decision
 
 Add an identifier, date, status, problem, chosen contract, considered alternatives, consequences, owning document, and verification implications. A proposed choice does not change a public API. If a choice supersedes this register, retain its old identifier and point to the replacement; do not rewrite historical evidence as though the new choice always existed.

@@ -687,6 +687,36 @@ describe('harmony read-out regressions', () => {
 
 
 describe('mountNameplate responsive content', () => {
+  it.each([true, false])('reserves a separate caption row without shrinking the stable symbol row (stylesheet=%s)', (stylesheet) => {
+    let state: NameplateState = {primary: {symbol: 'C'}, caption: 'MIDI note spelling is inferred'};
+    const handle = mountNameplate(host(), {snapshot: () => state}, {stableLayout: true, stylesheet});
+    const plate = handle.element;
+    const live = handle.symbol.parentElement!;
+    const caption = plate.querySelector<HTMLElement>('.wui-harmony-nameplate__caption')!;
+    const assertSlots = (withCaption: boolean) => {
+      const styles = getComputedStyle(plate);
+      const rows = styles.gridTemplateRows.split(' ');
+      expect(rows).toEqual(withCaption ? ['1.25rem', '3.5rem', '1.25rem', '1.25rem'] : ['3.5rem', '1.25rem', '1.25rem']);
+      expect(styles.height).toBe(withCaption ? '128px' : '104px');
+      expect(live.style.gridRow).toBe(withCaption ? '2' : '1');
+      expect(rows[Number(live.style.gridRow) - 1]).toBe('3.5rem');
+      expect(caption.hidden).toBe(!withCaption);
+    };
+    assertSlots(true);
+    expect(getComputedStyle(caption).marginBottom).toBe('0px');
+    state = {caption: 'MIDI note spelling is inferred', emptyLabel: '—'};
+    handle.update();
+    assertSlots(true);
+    state = {primary: {symbol: 'C'}};
+    handle.update();
+    assertSlots(false);
+    state = {primary: {symbol: 'C'}, caption: 'MIDI note spelling is inferred'};
+    handle.update();
+    assertSlots(true);
+    expect(handle.symbol.parentElement).toBe(live);
+    handle.destroy();
+  });
+
   it.each([true, false])('holds a stable live reading through rest, notes and chord (stylesheet=%s)', (stylesheet) => {
     let state: NameplateState = {emptyLabel: '—'};
     const handle = mountNameplate(host(), {snapshot: () => state}, {stableLayout: true, stylesheet});
@@ -710,8 +740,20 @@ describe('mountNameplate responsive content', () => {
     state = {voicing: [{label: 'A4'}, {label: 'A5'}], emptyLabel: '—'};
     handle.update();
     expect(plate.dataset.reading).toBe('notes');
-    expect(handle.symbol.textContent).toBe('A4 · A5');
-    expect(voicing.textContent).toBe('');
+    expect(handle.symbol.textContent).toBe('');
+    expect(handle.symbol.hidden).toBe(true);
+    expect(voicing.textContent).toBe('A4  A5');
+    expect(voicing.style.visibility).toBe('visible');
+    expect(voicing.style.gridRow).toBe('2');
+    const noteStyle = getComputedStyle(voicing);
+    // jsdom retains nested custom-property reads rather than resolving RGB.
+    expect(noteStyle.color).toContain('--wm-harmony-muted');
+    expect(getComputedStyle(handle.symbol).color).not.toContain('--wm-harmony-muted');
+    expect(noteStyle.whiteSpace).toBe('nowrap');
+    expect(noteStyle.overflowX).toBe('auto');
+    expect(noteStyle.textOverflow).not.toBe('ellipsis');
+    expect(live?.style.gridRow).toBe('1');
+    expect(live?.querySelector('.wui-harmony-nameplate__full')?.textContent).toBe('A4 · A5');
     expect(empty.textContent).toBe('');
     expect(getComputedStyle(plate).height).toBe(height);
 
@@ -724,11 +766,19 @@ describe('mountNameplate responsive content', () => {
     handle.update();
     expect(plate.dataset.reading).toBe('chord');
     expect(handle.symbol.textContent).toBe('Am');
+    expect(handle.symbol.hidden).toBe(false);
     expect(handle.symbol.parentElement).toBe(live);
     expect(voicing.textContent).toBe('A4  C5  E5');
     expect(voicing.style.visibility).toBe('visible');
     expect(alternates.style.visibility).toBe('visible');
     expect(alternates.querySelector('button')).toBeNull();
+    expect(getComputedStyle(plate).height).toBe(height);
+
+    state = {voicing: ['B2', 'E3', 'F#4', 'G#4', 'B4'].map((label) => ({label})), emptyLabel: 'B2 E3 F#4 G#4 B4'};
+    handle.update();
+    expect(handle.symbol.textContent).toBe('');
+    expect(voicing.textContent).toBe('B2  E3  F#4  G#4  B4');
+    expect(voicing.style.gridRow).toBe('2');
     expect(getComputedStyle(plate).height).toBe(height);
 
     state = {emptyLabel: '—'};

@@ -1,11 +1,11 @@
 import {
   isPitchedNote,
-  Pitch,
+  type Pitch,
   type Note,
   type Part,
   type Score,
-  type Step,
 } from "../../core";
+import { inspectedPitch } from "./inspection-notes";
 
 export type IntervalPitchMode = "written" | "sounding";
 
@@ -33,6 +33,11 @@ export interface IntervalEvidence {
   readonly writtenPitch: string;
   /** Spelling used to calculate this interval. */
   readonly pitch: string;
+  /**
+   * This analysis needed a MIDI-derived spelling to apply transposition.
+   * Does not identify spelling inferred earlier by an importer.
+   */
+  readonly spellingInferred: boolean;
 }
 
 export interface AnalyzedInterval {
@@ -69,24 +74,6 @@ interface Candidate {
 
 const STEPS = "CDEFGAB";
 const NATURAL_SEMITONES = [0, 2, 4, 5, 7, 9, 11] as const;
-
-function spelling(pitch: Pitch, part: Part, mode: IntervalPitchMode): Pitch {
-  if (mode === "written" || !part.transpose) return pitch;
-  const { chromatic, diatonic, octaveChange = 0 } = part.transpose;
-  const targetMidi = pitch.midi + chromatic + 12 * octaveChange;
-  if (diatonic === undefined) return Pitch.fromMidi(targetMidi);
-
-  // A MusicXML diatonic hint preserves the intended letter through a
-  // transposition; MIDI-only conversion would turn, for example, Eb into D#.
-  const position =
-    pitch.octave * 7 + STEPS.indexOf(pitch.step) + diatonic + 7 * octaveChange;
-  const octave = Math.floor(position / 7);
-  const step = STEPS[((position % 7) + 7) % 7] as Step;
-  const alter = targetMidi - ((octave + 1) * 12 + Pitch.STEP_TO_SEMITONE[step]);
-  return Number.isSafeInteger(alter) && alter >= -2 && alter <= 2
-    ? new Pitch(step, alter as -2 | -1 | 0 | 1 | 2, octave)
-    : Pitch.fromMidi(targetMidi);
-}
 
 function intervalName(
   from: Pitch,
@@ -237,9 +224,11 @@ function validate(selection: IntervalSelection, mode: IntervalPitchMode): void {
 
 /**
  * Inspect selected score notes without changing score state. Consecutive
- * pitched onsets in one voice make melodic intervals; pairs sounding at once
+ * unambiguous pitched attacks in one voice make melodic intervals; pairs sounding at once
  * make harmonic intervals, including chord members in one voice. Explicit
- * rests and unpitched-only onsets interrupt melodic continuity.
+ * rests, unpitched-only onsets and ambiguous chord attacks interrupt melodic
+ * continuity. Select one note ID from each chord to inspect a particular
+ * melodic path. Tied continuations are sustained sound, not new attacks.
  * Harmonic output is pairwise: at most n(n-1)/2 records for n selected pitched
  * notes. Narrow a range or select notes/voices when inspecting dense scores.
  */
@@ -270,7 +259,7 @@ export function analyzeIntervals(
         continue;
       const onset = note.onsetQuarters.toFloat();
       const offset = note.offsetQuarters.toFloat();
-      const pitch = spelling(note.pitch, part, pitchMode);
+      const { pitch, inferred } = inspectedPitch(note.pitch, part, pitchMode);
       const candidate: Candidate = {
         note,
         part,
@@ -285,9 +274,11 @@ export function analyzeIntervals(
           offsetQuarters: offset,
           writtenPitch: note.pitch.toString(),
           pitch: pitch.toString(),
+          spellingInferred: inferred,
         },
       };
-      if (onset >= from && onset < to) melodic.set(note, candidate);
+      if (onset >= from && onset < to && note.tie !== "continue" && note.tie !== "stop")
+        melodic.set(note, candidate);
       if (onset < to && offset > from) harmonic.push(candidate);
     }
   }
@@ -309,16 +300,18 @@ export function analyzeIntervals(
       for (let index = 0; index < notes.length;) {
         const onset = notes[index]!.onsetQuarters;
         let hasPitched = false;
-        let current: Candidate | undefined;
+        const selected: Candidate[] = [];
         while (index < notes.length && notes[index]!.onsetQuarters.eq(onset)) {
           const note = notes[index++]!;
           if (isPitchedNote(note)) {
             hasPitched = true;
-            current ??= melodic.get(note);
+            const candidate = melodic.get(note);
+            if (candidate) selected.push(candidate);
           }
         }
-        if (!hasPitched) previous = undefined;
-        else if (current) {
+        if (!hasPitched || selected.length > 1) previous = undefined;
+        else if (selected.length === 1) {
+          const current = selected[0]!;
           if (previous) intervals.push(melodicInterval(previous, current));
           previous = current;
         }
@@ -338,12 +331,6 @@ export function analyzeIntervals(
       other.note.offsetQuarters.gt(candidate.note.onsetQuarters),
     );
     for (const other of active) {
-      if (
-        other.part.id === candidate.part.id &&
-        other.note.voice === candidate.note.voice &&
-        !other.note.onsetQuarters.eq(candidate.note.onsetQuarters)
-      )
-        continue;
       const interval = harmonicInterval(other, candidate, from, to);
       if (interval.endQuarters > interval.startQuarters)
         intervals.push(interval);

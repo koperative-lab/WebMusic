@@ -7,7 +7,16 @@ export interface RhythmInspectionOptions {
   endQuarters?: number;
   /** Restrict attacks to one part. The beat grid remains score-wide. */
   partId?: string;
-  /** Number of visible equal divisions per notated beat. Default 2. */
+  /** Denominator-note grid by default; meter groups use musical pulses. */
+  beatUnit?: 'denominator' | 'meter';
+  /**
+   * Explicit pulse lengths in denominator notes, in order. Requires meter mode
+   * and a sum equal to every inspected meter's numerator. For example, [2, 3]
+   * and [3, 2] are distinct 5/8 groupings. Other than simple 2/3/4 and compound
+   * 6/9/12 numerators, meter mode requires this choice instead of guessing.
+   */
+  beatGroups?: readonly number[];
+  /** Number of visible equal divisions per selected beat unit. Default 2. */
   subdivision?: 1 | 2 | 3 | 4;
 }
 
@@ -46,7 +55,7 @@ export interface RhythmOnset {
   noteIds: ReadonlyArray<string>;
   measure: number;
   beat: number;
-  /** Position within the denominator beat, from 0 inclusive to 1 exclusive. */
+  /** Position within the selected beat unit, from 0 inclusive to 1 exclusive. */
   subbeat: number;
   subbeatExact: string;
   offbeat: boolean;
@@ -63,6 +72,8 @@ export interface RhythmOnset {
 }
 
 export interface RhythmInspection {
+  /** Coordinate convention used by beats, onsets and subdivisions. */
+  beatUnit: 'denominator' | 'meter';
   /** Effective range, clamped to the score's duration. */
   range: Readonly<{startQuarters: number; endQuarters: number}>;
   beats: ReadonlyArray<RhythmBeat>;
@@ -120,9 +131,104 @@ function beatContext(score: Score, at: Rational): {meter: Readonly<TimeSignature
   return {meter: score.timeMap.timeSignatureAt(at), boundary};
 }
 
-function nextBeat(score: Score, at: Rational, meter: Readonly<TimeSignature>, boundary?: Rational): Rational {
-  const regular = at.add(new Rational(4, meter.denominator));
-  return boundary?.lt(regular) ? boundary : regular;
+interface BeatPosition {
+  meter: Readonly<TimeSignature>;
+  measure: number;
+  beat: number;
+  start: Rational;
+  length: Rational;
+  end: Rational;
+  subbeat: Rational;
+}
+
+function meterGroups(meter: Readonly<TimeSignature>, explicit?: readonly number[]): readonly number[] {
+  if (explicit) {
+    if (explicit.reduce((total, group) => total + group, 0) !== meter.numerator) {
+      throw new RangeError(`Rhythm beatGroups must sum to ${meter.numerator} for ${meter.numerator}/${meter.denominator}`);
+    }
+    return explicit;
+  }
+  if (meter.numerator === 2 || meter.numerator === 3 || meter.numerator === 4) {
+    return Array.from({length: meter.numerator}, () => 1);
+  }
+  if (meter.numerator === 6 || meter.numerator === 9 || meter.numerator === 12) {
+    return Array.from({length: meter.numerator / 3}, () => 3);
+  }
+  throw new RangeError(`Rhythm meter mode requires explicit beatGroups for ${meter.numerator}/${meter.denominator}`);
+}
+
+/**
+ * Derive the pulse containing an exact position from TimeMap's authored
+ * measure origin. Pickups truncate that pulse at their actual end; missing
+ * beats before a pickup are not inferred from its duration.
+ */
+function beatPosition(
+  score: Score,
+  at: Rational,
+  beatUnit: 'denominator' | 'meter',
+  beatGroups?: readonly number[],
+): BeatPosition {
+  const {meter, boundary} = beatContext(score, at);
+  const address = score.timeMap.quartersToMBS(at);
+  const denominatorLength = new Rational(4, meter.denominator);
+  let beat = address.beat;
+  let length = denominatorLength;
+  let start = at.sub(denominatorLength.mul(address.subbeat));
+  if (beatUnit === 'meter') {
+    const groups = meterGroups(meter, beatGroups);
+    const units = new Rational(address.beat - 1).add(address.subbeat);
+    // Authored irregular bars can exceed the nominal meter. Continue the
+    // declared group sequence while preserving the one authored bar origin.
+    const cycle = Math.floor(units.div(new Rational(meter.numerator)).toFloat());
+    let preceding = cycle * meter.numerator;
+    let group = 0;
+    while (group < groups.length - 1 && units.gte(new Rational(preceding + groups[group]!))) {
+      preceding += groups[group++]!;
+    }
+    beat = cycle * groups.length + group + 1;
+    length = denominatorLength.mul(new Rational(groups[group]!));
+    start = at.sub(denominatorLength.mul(units.sub(new Rational(preceding))));
+  }
+  const regularEnd = start.add(length);
+  const end = boundary?.lt(regularEnd) ? boundary : regularEnd;
+  return {meter, measure: address.measure, beat, start, length, end, subbeat: at.sub(start).div(length)};
+}
+
+function validateBeatOptions(beatUnit: 'denominator' | 'meter', beatGroups?: readonly number[]): void {
+  if (beatUnit !== 'denominator' && beatUnit !== 'meter') {
+    throw new RangeError('Rhythm inspection beatUnit must be denominator or meter');
+  }
+  if (beatGroups !== undefined) {
+    if (beatUnit !== 'meter') throw new RangeError('Rhythm beatGroups requires beatUnit meter');
+    if (!Array.isArray(beatGroups) || beatGroups.length === 0 ||
+        Array.from(beatGroups).some((group) => !Number.isSafeInteger(group) || group <= 0) ||
+        !Number.isSafeInteger(beatGroups.reduce((total, group) => total + group, 0))) {
+      throw new RangeError('Rhythm beatGroups must contain positive safe integers');
+    }
+  }
+}
+
+/**
+ * @internal Exact notated pulses intersecting a range, including the pulse
+ * containing its beginning. Structural ends retain pickups and meter changes;
+ * callers clip to their own range. Not part of the public analysis API.
+ */
+export function* rhythmBeatSpans(
+  score: Score,
+  start: Rational,
+  end: Rational,
+  beatUnit: 'denominator' | 'meter',
+  beatGroups?: readonly number[],
+): Generator<BeatPosition> {
+  validateBeatOptions(beatUnit, beatGroups);
+  if (!end.gt(start)) return;
+  let at = beatPosition(score, start, beatUnit, beatGroups).start;
+  while (at.lt(end)) {
+    const position = beatPosition(score, at, beatUnit, beatGroups);
+    if (!position.end.gt(at)) throw new RangeError('TimeMap beat grid did not advance');
+    yield position;
+    at = position.end;
+  }
 }
 
 function addBeatGrid(
@@ -130,42 +236,36 @@ function addBeatGrid(
   start: number,
   end: number,
   subdivision: 1 | 2 | 3 | 4,
+  beatUnit: 'denominator' | 'meter',
+  beatGroups?: readonly number[],
 ): {beats: RhythmBeat[]; subdivisions: RhythmSubdivision[]} {
   const beats: RhythmBeat[] = [];
   const subdivisions: RhythmSubdivision[] = [];
   if (end <= start) return {beats, subdivisions};
 
-  const startAddress = score.timeMap.quartersToMBS(Rational.from(start));
-  let at = score.timeMap.mbsToQuarters({
-    measure: startAddress.measure,
-    beat: startAddress.beat,
-    subbeat: Rational.ZERO,
-  });
-  while (at.toFloat() < end) {
-    const {meter, boundary} = beatContext(score, at);
-    const following = nextBeat(score, at, meter, boundary);
-    if (!following.gt(at)) throw new RangeError('TimeMap beat grid did not advance');
-    const address = score.timeMap.quartersToMBS(at);
+  const rangeStart = Rational.from(start);
+  const rangeEnd = Rational.from(end);
+  for (const position of rhythmBeatSpans(score, rangeStart, rangeEnd, beatUnit, beatGroups)) {
+    const at = position.start;
+    const following = position.end;
     const atQuarters = at.toFloat();
-    if (atQuarters >= start) {
+    if (at.gte(rangeStart)) {
       beats.push({
         atQuarters,
-        measure: address.measure,
-        beat: address.beat,
-        beatLengthQuarters: new Rational(4, meter.denominator).toFloat(),
-        meter,
-        metricAccent: address.beat === 1,
+        measure: position.measure,
+        beat: position.beat,
+        beatLengthQuarters: position.length.toFloat(),
+        meter: position.meter,
+        metricAccent: position.beat === 1,
       });
     }
     // A shortened measure or a meter event can truncate a beat. Its visible
     // divisions stop at that structural boundary; no invented subdivisions.
-    const beatLength = new Rational(4, meter.denominator);
     for (let index = 1; index < subdivision; index += 1) {
-      const division = at.add(beatLength.mul(new Rational(index, subdivision)));
-      if (division.gte(following) || division.toFloat() < start || division.toFloat() >= end) continue;
+      const division = at.add(position.length.mul(new Rational(index, subdivision)));
+      if (division.gte(following) || division.lt(rangeStart) || division.gte(rangeEnd)) continue;
       subdivisions.push({atQuarters: division.toFloat(), beatAtQuarters: atQuarters, index, of: subdivision});
     }
-    at = following;
   }
   return {beats, subdivisions};
 }
@@ -196,6 +296,9 @@ export function inspectScoreRhythm(score: Score, options: RhythmInspectionOption
   if (subdivision !== 1 && subdivision !== 2 && subdivision !== 3 && subdivision !== 4) {
     throw new RangeError('Rhythm inspection subdivision must be 1, 2, 3 or 4');
   }
+  const beatUnit = options.beatUnit ?? 'denominator';
+  const beatGroups = options.beatGroups;
+  validateBeatOptions(beatUnit, beatGroups);
   const start = Math.min(requestedStart, duration);
   const end = Math.min(requestedEnd, duration);
   const parts = options.partId === undefined
@@ -205,7 +308,7 @@ export function inspectScoreRhythm(score: Score, options: RhythmInspectionOption
     throw new RangeError(`Unknown rhythm inspection part: ${options.partId}`);
   }
 
-  const {beats, subdivisions} = addBeatGrid(score, start, end, subdivision);
+  const {beats, subdivisions} = addBeatGrid(score, start, end, subdivision, beatUnit, beatGroups);
   const grouped = new Map<string, RhythmOnset & {noteIds: string[]; performed: RhythmPerformedOnset[]}>();
   for (const part of parts) {
     for (const note of part.notes) {
@@ -215,21 +318,21 @@ export function inspectScoreRhythm(score: Score, options: RhythmInspectionOption
       const id = JSON.stringify([part.id, voiceId, note.onsetQuarters.toString()]);
       let onset = grouped.get(id);
       if (!onset) {
-        const address = score.timeMap.quartersToMBS(note.onsetQuarters);
-        const subbeat = address.subbeat;
+        const position = beatPosition(score, note.onsetQuarters, beatUnit, beatGroups);
+        const subbeat = position.subbeat;
         onset = {
           id,
           atQuarters: quarter,
           partId: String(part.id),
           voiceId,
           noteIds: [],
-          measure: address.measure,
-          beat: address.beat,
+          measure: position.measure,
+          beat: position.beat,
           subbeat: subbeat.toFloat(),
           subbeatExact: subbeat.toString(),
           offbeat: !subbeat.isZero(),
           subdivisionIndex: alignedDivision(subbeat, subdivision),
-          metricAccent: address.beat === 1 && subbeat.isZero(),
+          metricAccent: position.beat === 1 && subbeat.isZero(),
           authoredAccent: false,
           syncopationCue: false,
           nominalSeconds: score.timeMap.quartersToSeconds(note.onsetQuarters),
@@ -252,6 +355,7 @@ export function inspectScoreRhythm(score: Score, options: RhythmInspectionOption
   }
   const onsets = [...grouped.values()].sort((a, b) => a.atQuarters - b.atQuarters);
   return {
+    beatUnit,
     range: {startQuarters: start, endQuarters: end},
     beats,
     subdivisions,

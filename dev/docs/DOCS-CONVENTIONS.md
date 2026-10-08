@@ -309,15 +309,19 @@ what happens on failure.
 
 ### Demo assets
 
-Assets live in `apps/doc/webmusic/public/`. These are selection guidelines, not
-cross-browser support guarantees.
+All musical demos use the existing Arabesque No. 1 assets in
+`apps/doc/webmusic/public/`, as required by [AGENTS](../../AGENTS.md#demo-music-reuse-arabesque-no-1).
+Reuse the piece or a passage instead of generating substitute notes or media.
+Related demos and their copyable examples use the same source. Deterministic
+unit-test fixtures are separate from the demo repertoire. The format choices
+below are not cross-browser support guarantees.
 
 | Asset | Use | What the author checks |
 |---|---|---|
 | `wav/Arabesque No.1.wav` | Decoded-audio demos | WAV takes the pure-JS decoder path, avoiding optional codec dependencies. The full recording is about 37 MB; avoid redundant decode and full-clip analysis |
 | `mp3/Arabesque No.1.mp3` | Native decode or media streaming | A supplied context supporting the format can use `decodeAudioData`; an optional WASM decoder is needed when no usable native path exists. Check peer installation and docs stubs in configuration |
-| `midi/Arabesque No.1.mid` | Score playback and analysis | Dense input can be expensive for SVG rendering |
-| `mxl/Arabesque No.1.mxl` | Staff/sheet demos requiring notation semantics | MIDI does not preserve equivalent original layout, clef, and staff metadata; follow the renderer's actual input requirements |
+| `midi/Arabesque No.1.mid` | MIDI and Score playback workflows | Dense input can be expensive for SVG rendering; imported spelling and notation are inferred |
+| `mxl/Arabesque No.1.mxl` | Score theory analysis and staff/sheet demos | Preserve authored spelling, voices, rhythm, clefs and staff metadata; MIDI does not preserve equivalent notation semantics |
 | `soundfont/*.sf2` | Timbre demos | Large files; avoid redundant soundfont loads on one page |
 
 Native decoding, optional peers, and streaming are separate paths.

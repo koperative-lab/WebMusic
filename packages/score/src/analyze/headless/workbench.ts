@@ -193,6 +193,10 @@ export interface FlowBandView {
   track?: number;
   primary?: string;
   secondary?: string;
+  /** Expanded current reading; compact labels remain on the timeline bands. */
+  readout?: {primary?: string; secondary?: string;
+    /** Stable named slots; when present, replace the secondary line in the current readout. */
+    fields?: readonly {id: string; label: string; value: string}[]};
   trailing?: string;
   glyph?: string;
   /** A normalised contour inside the band. `y` of 1 draws at the top. */
@@ -251,7 +255,7 @@ export interface FlowLaneView {
   now: number;
   playing?: boolean;
   future?: boolean;
-  pinned?: {primary?: string; secondary?: string};
+  pinned?: FlowBandView['readout'];
   focusGroup?: string;
   emptyLabel?: string;
   disabled?: boolean;

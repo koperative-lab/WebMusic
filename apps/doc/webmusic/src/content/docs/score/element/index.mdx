@@ -14,7 +14,7 @@ listed in their sections below.
 | Capability | Elements |
 | --- | --- |
 | [Play](#play) | Playing a score: the transport, a rack mixer, note input, recording and synth control. |
-| [Analyze](#analyze) | Following a performance: chord progression and the current sounding chord. |
+| [Analyze](#analyze) | Elementary inspection: chord score/live modes, intervals, explicit scales and grouped rhythm. |
 | [View](#view) | Whole-score representations, held-pitch representations and optional sheet engraving. |
 
 ## Play
@@ -55,10 +55,12 @@ editing the score.
 
 | Purpose | Component | What it does |
 | --- | --- | --- |
-| Identify the current chord | [`<score-live-chord-analysis>`](/score/element/analyze/score-live-chord-analysis/) | Read the primary chord and optional alternate interpretations of sounding notes. |
-| Probe a harmonic passage | [`<score-chord-analysis>`](/score/element/analyze/score-chord-analysis/) | Select a chord segment to inspect pitch evidence and a key-relative degree. |
+| Inspect chord structure | [`<score-chord-analysis>`](/score/element/analyze/score-chord-analysis/) | Score or live mode: complete triads/sevenths, bass and inversion; degrees only with an explicit key. |
+| Compare two notes | [`<score-interval-analysis>`](/score/element/analyze/score-interval-analysis/) | Spelled melodic or harmonic intervals, direction, semitones and note provenance. |
+| Compare notes with a scale | [`<score-scale-analysis>`](/score/element/analyze/score-scale-analysis/) | Explicit tonic and major/minor form; degree and alteration without guessing a key. |
+| Locate an attack in meter | [`<score-rhythm-analysis>`](/score/element/analyze/score-rhythm-analysis/) | Duration, measure, grouped beat and subdivision in simple, compound or explicitly grouped meter. |
 
-Whole-score summaries, histograms and rhythmic-vocabulary reports use the [Headless report workflow](/score/api/analyze/#reports). [Motif search](/score/api/analyze/#find-motifs), [recurring rhythmic phrases](/score/api/analyze/#find-recurring-rhythmic-phrases), [key estimates](/score/api/analyze/#detect-key), [intervals](/score/api/analyze/#inspect-selected-intervals), [metrical placement](/score/api/analyze/#inspect-rhythmic-placement), [Roman numerals](/score/api/analyze/#roman-numerals) and [voice-leading checks](/score/api/analyze/#voice-leading) remain code-only building blocks for application-owned displays.
+Whole-score summaries, histograms and rhythmic-vocabulary reports use the [Headless report workflow](/score/api/analyze/#reports). [Motif search](/score/api/analyze/#find-motifs), [recurring rhythmic phrases](/score/api/analyze/#find-recurring-rhythmic-phrases), [key estimates](/score/api/analyze/#detect-key), specialist [Roman analysis](/score/api/analyze/#roman-numerals) and [voice-leading checks](/score/api/analyze/#voice-leading) remain code-only building blocks. These four elementary tools describe supplied evidence; they do not guess tonal function or grade musical correctness.
 
 ### Compose a performance
 
@@ -80,7 +82,7 @@ Whole-score summaries, histograms and rhythmic-vocabulary reports use the [Headl
 
 The player loads once. Score-based companions borrow its resolved data and position; pitch views borrow its held notes. Each is an ordinary sibling that can be placed, styled or omitted independently. Configuration belongs to each tag’s attributes and application-owned controls. Each tag-owned live demo pairs that Analyze component with one player; the example above shows an optional composition. No Analyze component mounts an internal keyboard, staff, fretboard, tab bar or settings dock.
 
-Score input precedence is explicit `.score`, then `src`, then the selected player’s resolved data. Score lanes also work with standalone input: they update local inspection and emit seek requests without creating playback resources. When bound, navigation goes to the existing player with explicit nominal/transport time conversion. Selecting analysis evidence is local to that tool. The current-chord nameplate reads sounding note activity and does not seek score time.
+Score input precedence is explicit `.score`, then `src`, then the selected player’s resolved data. Score lanes also work with standalone input: they update local inspection and emit seek requests without creating playback resources. When bound, navigation goes to the existing player with explicit nominal/transport time conversion. Selecting analysis evidence is local to that tool. The chord component in `mode="live"` reads sounding note activity and does not seek score time. Its default `mode="score"` shares the same data/selection contract as the other three score lanes.
 
 ### Shared player connection
 
@@ -106,9 +108,11 @@ subscriptions, discovery and owned analysis work, without stopping the player.
 
 | Element | Register |
 | --- | --- |
-| [`<score-live-chord-analysis>`](/score/element/analyze/score-live-chord-analysis/) | `defineLiveChordAnalysisElement(tag?)` |
 | [`<score-chord-analysis>`](/score/element/analyze/score-chord-analysis/) | `defineChordAnalysisElement(tag?)` |
-| — | `defineAllAnalysisElements()` registers both. |
+| [`<score-interval-analysis>`](/score/element/analyze/score-interval-analysis/) | `defineIntervalAnalysisElement(tag?)` |
+| [`<score-scale-analysis>`](/score/element/analyze/score-scale-analysis/) | `defineScaleAnalysisElement(tag?)` |
+| [`<score-rhythm-analysis>`](/score/element/analyze/score-rhythm-analysis/) | `defineRhythmAnalysisElement(tag?)` |
+| — | `defineAllAnalysisElements()` registers all four. |
 
 ## View
 

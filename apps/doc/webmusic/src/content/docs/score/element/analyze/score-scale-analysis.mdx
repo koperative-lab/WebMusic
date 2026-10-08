@@ -1,0 +1,113 @@
+---
+title: '<score-scale-analysis>'
+description: 'Compare spelled score notes with an explicitly chosen tonic and scale form.'
+sidebar:
+  order: 3
+---
+
+import AnalysisFeaturePlayground from '../../../../../components/elements/AnalysisFeaturePlayground.astro';
+
+Choose a tonic and a textbook scale, then inspect each note’s degree and alteration against that reference. This tool does not estimate a key. Altered degrees describe the supplied spelling and are not labeled musical errors.
+
+<AnalysisFeaturePlayground tag="score-scale-analysis" />
+
+## Import
+
+```html
+<script type="module">
+  import {defineScorePlayerElement} from '@webmusic/score/play/element';
+  import {defineScaleAnalysisElement} from '@webmusic/score/analyze/element';
+  defineScorePlayerElement();
+  defineScaleAnalysisElement();
+</script>
+
+<score-player id="piece" src="/mxl/Arabesque%20No.1.mxl"></score-player>
+<score-scale-analysis player="#piece" window="1" tonic="E" scale="major"></score-scale-analysis>
+```
+
+Registration is idempotent and SSR-safe. `defineAllAnalysisElements()` registers all four tools from the same entry; see the [family inventory](/score/element/#analyze). This demo contains one player and one inspection surface. Its one-second initial window keeps the dense opening notes readable; adjust `window` to inspect a longer passage. External Parameters configures them; Copy includes their actual markup and Reset restores attributes and the player connection. Optional sibling views belong in [an application composition](/score/element/#compose-a-performance).
+
+## Musical reading
+
+The tonic is required and explicitly spelled, such as C, F♯ or B♭. Without it the surface asks for a tonic rather than guessing from the score. Major, natural minor, harmonic minor, ascending melodic minor and descending melodic minor are separate reference forms. Melodic-minor direction is a chosen reference, not an inference from the melody's last motion. Ascending melodic minor raises degrees 6 and 7; descending melodic minor uses the natural-minor form.
+
+A note's letter establishes the degree and its accidental establishes alteration against the chosen scale spelling. In C major F♯ is ♯4 while G♭ is ♭5; enharmonic equality does not erase that distinction. In-scale membership requires exact reference spelling. `pitch-mode="sounding"` applies declared part transposition and retains written-pitch provenance; inferred transposition spelling is identified in the evidence. It does not change the Score.
+
+The demo loads the existing [Arabesque No. 1 MXL](/mxl/Arabesque%20No.1.mxl) and explicitly chooses E major as its starting reference, matching the source title and opening four-sharp signature. This choice remains fixed while inspecting the piece; it is not a detected key or a claim that every later passage belongs to E major. Clear the tonic to see the required-input state, or choose another tonic/scale form to compare the same actual notes against that reference.
+
+`spellingInferred` in underlying note evidence marks spelling inferred during analysis-time transposition only. It does not detect spelling chosen earlier by an importer; a false flag cannot establish authored spelling for a MIDI-origin Score.
+
+The current readout shows the degree above three fixed, equal-width fields: **Note**, **Reference** and **Relation**. The reference names the explicitly chosen tonic and scale form; relation describes membership or alteration. Field labels and positions stay fixed while playback updates their values, and long values wrap inside their own field. Space is reserved from all supplied readings when content or geometry changes; gaps clear the values while retaining labels and slots. Quieter context identifies the pitch basis. Lane rows still compact to the visible material without changing the reference or source evidence.
+
+## Binding and lifetime
+
+Explicit `.score` wins over `src`, then the selected player's resolved Score. Native bindings prefer the player's `.playback` [shared source](/score/api/#shared-playback-observation), including its initial readiness, data, position and note identities. Late, upgraded or replaced targets are rebound. Invalid or ambiguous selectors stay unbound. Targets without an available native source retain the compatibility snapshot/event path; they do not promise an initial snapshot.
+
+Failed explicit loading does not fall back to unrelated player data; empty input and errors are shown by the surface. Superseded loads cannot restore old input. An explicit Score different from the native player's Score suppresses mismatched activity and cannot seek that owner. Pointer selection and keyboard navigation use `seekNominal()` when available, otherwise convert nominal seconds by the current rate before `seek()`. Failed commands restore the previous local position unless newer state has arrived. Standalone navigation still emits a seek request.
+
+The component owns its URL request, analysis projection, target observer, subscriptions and presenters. Disconnect cancels/releases those resources. The player retains its lifetime, Score, sound and authoritative timeline. No Analyze component creates a player, synth, AudioContext or playback scheduler.
+
+<details class="component-section">
+<summary>API</summary>
+
+### Attributes
+
+| Attribute | Values / default | Behavior |
+| --- | --- | --- |
+| `src` | URL, absent | Explicit MIDI / MusicXML / MXL / ABC input; overrides borrowed player data. |
+| `format` | `midi` / `mxl` / `musicxml` / `abc`, inferred | Parser override for `src`; otherwise infer from extension or bytes. |
+| `player` | selector, absent | Borrow one target's available Score, position and note activity in the current Document or ShadowRoot. |
+| `density` | `comfortable` / `compact`, `comfortable` | Typography and spacing for this surface. |
+| `scheme` | `light` / `dark`, inherited | Pin the surface palette; removal follows the page. |
+| `motion` | `auto` / `continuous` / `stepped` / `none`, `auto` | Auto follows a `data-motion` ancestor and reduced-motion preference. |
+| `window` | `0.5`–`600` seconds or `auto`, `auto` | Visible duration, retained when resized; auto uses the opening two bars when available. |
+| `part` | exact part ID, absent | Inspect only that part; absent includes all parts. |
+| `voice` | exact voice ID, absent | Inspect only that voice in selected parts. |
+| `tonic` | spelled pitch class, required | Uppercase A–G plus optional one/two sharps or flats, without octave; Unicode accidentals are accepted. Missing input waits; malformed input shows an error. |
+| `scale` | `major` / `natural-minor` / `harmonic-minor` / `melodic-minor-ascending` / `melodic-minor-descending`, `major` | Explicit reference form; unknown forms show an error. |
+| `pitch-mode` | `written` / `sounding`, `written` | Written notation or declared part-transposed pitches. |
+
+Unknown presentation values fall back to their documented defaults. Invalid musical configuration is reported by the surface rather than converted into a clean result. This tag has no generic `type`, internal View controls or transport methods.
+
+### Properties and methods
+
+| Property | Type | Behavior |
+| --- | --- | --- |
+| `.score` | `Score \| undefined` | Explicit input; clearing resumes `src`, then borrowed player data. |
+| `.selection` | read-only `AnalysisSelection \| undefined` | Local selected band/passage: `id`, `startQuarters`, `endQuarters`. |
+| `.analysis` | read-only `AnalysisInspection \| undefined` | Selected `kind`, `selection`, `headline`, `detail`, `evidence` and `candidates`; full provenance remains available beyond the compact lane readout. |
+| `.density` | `comfortable \| compact` | Reflected density. |
+| `.scheme` | `light \| dark \| undefined` | Reflected palette; undefined removes the override. |
+| `.motion` | `auto \| continuous \| stepped \| none` | Reflected motion policy. |
+| `.window` | `number \| auto` | Reflected visible duration in seconds. |
+| `.tonic` | `string \| undefined` | Reflected explicit tonic; undefined removes it. |
+| `.scale` | `TheoryScale` | Reflected scale form. |
+| `.pitchMode` | `written \| sounding` | Reflected pitch basis. |
+
+`ScaleAnalysisElement`, `AnalysisSelection`, `AnalysisInspection`, `AnalysisSeekDetail` and `AnalysisSelectDetail` are exported from `@webmusic/score/analyze/element`.
+
+`selectRegion(startQuarters, endQuarters)` selects a finite increasing quarter-note passage without seeking. It clamps to the loaded Score, throws `RangeError` for invalid/wholly out-of-score bounds, and has no effect without a Score. `clearSelection()` returns to the first available band. Neither method edits notes or commands playback. `selectNotes(noteIds: readonly string[])` restricts the inspection to exact source note IDs without seeking; an empty array restores attribute filtering. Empty/non-string IDs throw `TypeError`. Selection retains the `part`/`voice` filters. Unknown IDs provide no matching evidence.
+
+### Events and accessibility
+
+All emitted events bubble and are composed.
+
+| Event | Detail | Trigger |
+| --- | --- | --- |
+| `webscore:seek` | `AnalysisSeekDetail`: `{quarters, seconds}` | Lane navigation; quarter notes and nominal score seconds. |
+| `webscore:analysisselect` | `AnalysisSelectDetail`: `{kind: 'scale', id, startQuarters, endQuarters}` | Band/region selection; local inspection state. |
+
+The score lane is a named slider tab stop. Arrow keys, Home/End and `[` / `]` navigate; pointer selection chooses a band and seeks. A semantic ordered list marks the current span with `aria-current`; detailed selection evidence has a nonvisual status. Passive playback does not repeatedly announce a local selection. Display configuration remains outside the component, and automatic motion respects reduced-motion preference.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+The component renders in light DOM with a full-width, shrinkable block host. Its one outer surface owns background, border, radius and equal padding; the inner lane/nameplate stays unframed. Set inherited `--wm-component-background`, `--wm-component-border` (a complete CSS border), `--wm-component-radius` and `--wm-component-padding`. More specific `--wm-workbench-surface-*` tokens override these. Defaults are the neutral player surface, a 1px border and `.6rem` padding.
+
+Shared palette tokens include `--wm-surface`, `--wm-foreground`, `--wm-accent` and `--wm-border` (a color). `--wm-harmony-flow-now` overrides the now-line color; `--wm-harmony-flow-tone` supplies a uniform band fill. Geometry uses `--wm-harmony-flow-height` and `--wm-harmony-lane-height`. These presentation settings do not change the musical time axis.
+
+Public light-DOM part tokens are `root`, `presentation`, `surface`, `content`, `index`, `lane`, `viewport` and `reel`. Target `[part~="surface"]`, not Shadow DOM `::part()` or private `.wui-*` classes. See [Harmony tokens](/uikit/views-analysis/harmony/) and [Workbench tokens](/uikit/layout-feedback/workbench/) for presenter overrides. No internal keyboard, staff, tabs or settings dock is mounted.
+
+</details>

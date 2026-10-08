@@ -6,7 +6,7 @@ description: Score analysis — stateless algorithms, code-only sessions and liv
 import ScoreReportPlayground from '../../../../components/headless/ScoreReportPlayground.astro';
 
 
-`@webmusic/score/analyze` is the **analysis** capability of the `@webmusic/score` package. It reads `Score` objects from `@webmusic/score` and returns plain data — a score summary, chord timelines, key detection, chord segmentation, intervals, meter-aligned rhythm inspection, roman numerals, motif search, rhythm patterns, and voice-leading checks. Its interactive Web Components compose those results around a player; the [Analyze overview](/score/element/#analyze) selects the component for each task.
+`@webmusic/score/analyze` is the **analysis** capability of the `@webmusic/score` package. It reads `Score` objects from `@webmusic/score` and returns plain data — a score summary, chord timelines, key detection, chord segmentation, elementary chord structure, spelled intervals, explicit scale degrees, meter-aligned rhythm inspection, Roman numerals, motif search, rhythm patterns and voice-leading checks. Its interactive Web Components compose those results around a player; the [Analyze overview](/score/element/#analyze) selects the component for each task.
 
 The capability root and `/headless` entry have no DOM dependency, so they run in Node, workers, browsers, tests, import pipelines, and batch jobs. It does not play audio, render notation, or own a framework — those live in [`@webmusic/score/play`](/score/api/play/), [`@webmusic/score/view`](/score/api/view/), and [`@webmusic/score/react`](/score/api/react/).
 
@@ -14,19 +14,19 @@ The capability root and `/headless` entry have no DOM dependency, so they run in
 
 `npm install @webmusic/score` — use an available published version or the local workspace; [Install](/score/#install) has the full setup.
 
-The root model and this capability ship in that one package. A Web Component that loads a file from `src` dynamically uses the sibling `@webmusic/score/io` capability. Chord naming is powered by the bundled `@tonaljs/chord-detect` and `@tonaljs/chord`.
+The root model and this capability ship in that one package. A Web Component that loads a file from `src` dynamically uses the sibling `@webmusic/score/io` capability. Legacy chord naming uses the bundled `@tonaljs/chord-detect` and `@tonaljs/chord`; the elementary inspection functions below use explicit spelled triad/seventh rules.
 
 The analysis capability separates stateless analysis, stateful resources and UI:
 
-The `@webmusic/score/analyze` root is the canonical stateless surface. `/headless` contains stateful code-only analysis components — the incremental session, live note-event trackers and Worker client — without UI, DOM access or styles. `/element` contains the styled Web Components. The elements reuse the public live trackers and keep score loading, DOM player binding, playhead state and rendering private. Each public entry tree-shakes independently; only `/worker` self-registers a runtime listener.
+The `@webmusic/score/analyze` root is the canonical stateless surface. `/headless` contains stateful code-only analysis components — the incremental session, live note-event trackers and Worker client — without UI, DOM access or styles. `/element` contains the styled Web Components. The elements reuse API/Headless inspection and keep score loading, DOM player binding, playhead state and rendering private. Each public entry tree-shakes independently; only `/worker` self-registers a runtime listener.
 
 ---
 
 ## Web Components
 
-Two inspection surfaces are exported by `@webmusic/score/analyze/element`: passage harmony and the current sounding chord. Each owning page under [Web Components › Analyze](/score/element/#analyze) explains its attributes, events, player binding and styling.
+Four elementary surfaces are exported by `@webmusic/score/analyze/element`: chord (score/live modes), interval, explicit scale and grouped rhythm. Each owning page under [Web Components › Analyze](/score/element/#analyze) explains its attributes, events, player binding and styling.
 
-Whole-score summaries, histograms and rhythmic-vocabulary reports use the [report workflow](/score/api/analyze/#reports). Tonal estimation, selected intervals, metrical placement, specialist Roman and voice-leading displays, pitch diagnostics and retained chord history can be composed from the code-only results below or the [live trackers and projections](/score/headless/analyze/live-trackers/#key-diagnostics). Motif and recurring-rhythm algorithms remain code-only building blocks for application-owned displays.
+Whole-score summaries, histograms and rhythmic-vocabulary reports use the [report workflow](/score/api/analyze/#reports). Tonal estimation, specialist Roman and voice-leading displays, pitch diagnostics and retained chord history can be composed from the code-only results below or the [live trackers and projections](/score/headless/analyze/live-trackers/#key-diagnostics). Motif and recurring-rhythm algorithms remain code-only building blocks for application-owned displays.
 
 The score algorithms below take a `Score` (from an importer, or built with `@webmusic/score`) and return plain data. The following examples assume a `score` that holds a I–IV–V–I progression in C major.
 
@@ -181,21 +181,32 @@ Output:
 
 ## Pitch basis and transposing instruments
 
-Score-based analysis currently reads stored `Note.pitch` values and does not
-automatically apply `Part.transpose`. This affects chord/key pitch evidence,
-pitch distributions and cross-part voice comparisons, including the incremental
-analysis session. A mixed score for concert-pitch and transposing instruments
-must not be interpreted as a reliable concert-pitch harmony analysis without
-first creating an explicit concert-pitch analysis input.
+The elementary `inspectScoreChords`, `analyzeIntervals` and `inspectScale`
+functions expose `pitchMode: 'written' | 'sounding'`. Written is the default.
+Sounding applies each part's declared transposition once while retaining
+original note IDs and written-pitch evidence; the Score itself is unchanged.
+The matching chord, interval and scale Elements expose `pitch-mode`.
 
-For example, piano C/E plus B♭ clarinet written A actually sounds C/E/G, but
-the current Score path analyzes C/E/A. `soundingPitch(note, part)` from the root
-API can convert individual pitches for an application-owned analysis copy;
-clear the copy's part transposition to avoid applying it again in playback.
-Keep the original notated Score for notation. There is no exported whole-Score
-normalizer or pitch-basis option yet. Direct `identifyChord(notes)` has no Part
-context; `identifyChordFromMidi` and live trackers analyze the actual MIDI values
-supplied by the caller.
+Legacy `detectKey`, `segmentChords`, pitch distributions and cross-part
+voice-leading comparisons still read stored `Note.pitch` values. The
+incremental analysis session and its worker/projection paths retain that
+written-pitch basis. Their results for mixed concert-pitch and transposing
+instruments must not be presented as concert-pitch harmony without an explicit
+normalized analysis input.
+
+For example, piano C/E plus B♭ clarinet written A sounds C/E/G. Elementary
+chord inspection with `pitchMode: 'sounding'` uses C/E/G; the legacy written
+path uses C/E/A. `soundingPitch(note, part)` from the root API can convert
+individual notes for an application-owned analysis copy where a legacy
+algorithm is required; clear that copy's part transposition to avoid applying
+it again in playback. Retain the original Score for notation. No exported
+whole-Score normalizer spans every legacy analysis path yet.
+
+`spellingInferred` marks spelling derived during analysis-time transposition
+when exact diatonic spelling is unavailable or unrepresentable. It does not
+identify choices made earlier by a MIDI importer. Direct `identifyChord(notes)`
+has no Part context; `identifyChordFromMidi` and live held-note inspection
+analyze the actual MIDI values supplied by the caller.
 
 ## Identify a supplied chord
 
@@ -213,13 +224,126 @@ root. The direct functions return only the preferred label; the Headless
 spelling projection also exposes alternatives and optional rootless readings.
 No staff or fretboard projection is computed to obtain a label.
 
+## Inspect elementary chord structure
+
+`inspectChordPitches(pitches, key?)` accepts spelled `Pitch` values and matches
+complete triads and supported seventh chords. `inspectScoreChords(score,
+options?)` applies the same rules to score notes. Its default
+`grouping: 'simultaneous'` inspects exact positive-duration spans between note
+boundaries; `grouping: 'beat'` explicitly collects notes by metrical pulse.
+Both preserve spelling and source-note evidence. The
+[`<score-chord-analysis>`](/score/element/analyze/score-chord-analysis/) Element
+selects beat grouping by default; older
+`identifyChord` and `segmentChords` retain their documented heuristic behavior.
+
+```ts
+import {Pitch} from '@webmusic/score';
+import {inspectChordPitches, inspectScoreChords} from '@webmusic/score/analyze';
+
+const firstInversion = inspectChordPitches(
+  ['E3', 'G3', 'C4'].map(Pitch.parse),
+  {tonic: 'C', mode: 'major'},
+);
+// primary.symbol: C/E; primary.inversion: 1; primary.roman: I6
+const spans = inspectScoreChords(score, {pitchMode: 'written'}).spans;
+const pulses = inspectScoreChords(score, {
+  grouping: 'beat', pitchMode: 'written',
+}).spans;
+```
+
+`ScoreChordGrouping` is `'simultaneous' | 'beat'`. A beat collection includes all
+selected source notes overlapping the pulse's half-open span, including notes
+sustained from before it and sequential notes within it. Pulses follow authored
+measure boundaries: numerators 2/3/4 use one denominator unit, and 6/9/12 use
+groups of three. Other numerators require `beatGroups`, a nonempty array of
+positive safe integers whose sum matches each inspected meter numerator, such
+as `[2, 3]` for 5/8. Incompatible groups throw `RangeError`; simultaneous grouping
+ignores retained `beatGroups`. A quarter-range selection clips the returned
+pulses; groups without pitched notes are omitted. Grouping is independent of a
+presenter's visible duration in seconds.
+
+`ChordInspection` contains distinct supplied `pitches`, `candidates`, optional
+`primary` and a `label` (pitch names for an unclassified set; empty for silence).
+Each candidate contains `symbol`, spelled `root` and `bass`, `quality`, `family`
+(`triad`/`seventh`), `inversion` (0–3), and optional `roman`. Doublings are allowed;
+omitted/rootless notes and enharmonic reinterpretations are not inferred. The
+first candidate is deterministic, not a confidence score. Supported qualities
+are major/minor/diminished/augmented triads and major, dominant, minor,
+half-diminished, diminished, minor-major and augmented-major sevenths.
+
+Beat collection does not remove passing tones or other pitches to force a chord
+match. The candidate's `bass` and `inversion` use the lowest collected source
+pitch; they do not establish a structural harmonic bass for the passage. A
+collection can include pitches that never sound simultaneously. This is a
+bounded inspection method: arpeggios can express chords, but harmonic duration
+can vary independently of the beat, and non-chord-tone classification depends
+on surrounding motion. See *Music Theory for the 21st-Century Classroom*:
+[Arpeggiated Accompaniments §14.3.1](https://musictheory.pugetsound.edu/mt21c/ArpeggiatedAccompaniments.html),
+[Harmonic Rhythm §9.2](https://musictheory.pugetsound.edu/mt21c/HarmonicRhythm.html)
+and [Introduction to Non-Chord Tones §10.1](https://musictheory.pugetsound.edu/mt21c/NonChordTonesIntroduction.html).
+
+An explicit major or minor `key` supplies scale-relative degree, quality and
+inversion figure; absent key means no Roman degree. Minor uses natural-minor
+reference spelling. A degree is not a harmonic-function, cadence or modulation
+verdict. Invalid tonic or mode throws. `ScoreChordInspectionOptions.pitchMode`
+is `written` by default or `sounding` to apply part transposition. `selection`
+optionally restricts source IDs, part/voice and half-open quarter range using
+`IntervalSelection`. `ScoreChordInspection` and every `ScoreChordSpan` identify
+their `grouping`. Spans retain `id`, quarter-note bounds and `TheoryNoteEvidence`
+with original onset/offset, note/part/voice IDs, written/analyzed pitch and
+`spellingInferred` when analysis-time transposition has to derive a new spelling
+from MIDI (missing diatonic information or an unrepresentable accidental).
+This flag describes only
+the current analysis transposition; it does not track spelling inferred earlier
+by a MIDI or other importer. A false flag therefore does not prove authored
+notation. No playback resources
+are allocated, and no input is changed.
+
+## Inspect an explicit scale
+
+`inspectScale(score, selection, options)` compares selected authored pitches
+against an explicit tonic and scale. The selection uses `IntervalSelection`
+(note IDs, part/voice, or a finite half-open quarter range). `options.tonic` is
+required; it is an uppercase pitch letter with optional single/double sharps
+or flats, no octave. Unicode accidentals are accepted. There is no key estimate.
+
+```ts
+import {inspectScale} from '@webmusic/score/analyze';
+
+const scale = inspectScale(score, {
+  fromQuarters: 0,
+  toQuarters: score.durationQuarters.toFloat(),
+}, {tonic: 'A', scale: 'harmonic-minor', pitchMode: 'written'});
+console.table(scale.notes.map(({pitch, label, inScale}) => ({pitch, label, inScale})));
+```
+
+`TheoryScale` (also exported as `ScaleKind`) is `major`, `natural-minor`,
+`harmonic-minor`, `melodic-minor-ascending` or `melodic-minor-descending`; default
+is major. Ascending melodic minor raises degrees 6 and 7; descending uses the
+natural-minor form. Direction selects a reference and is never guessed from
+melodic motion. `pitchMode` defaults to written; sounding applies declared
+part transposition while retaining written evidence.
+
+`ScaleInspection` returns normalized `tonic`, `scale`, `pitchMode`, seven spelled
+reference `pitches` (`{degree, pitch}`), and selected `notes`. Each
+`ScaleNoteInspection` extends `TheoryNoteEvidence` with `degree` (1–7), signed
+semitone `alteration`, a degree `label` such as `#4` or `b5`, and exact-spelling
+`inScale`. In C major, F♯ is #4 and G♭ is b5 even though they share a pitch
+class. An altered degree is not a musical error. Invalid tonic, scale,
+pitch mode or selection throws; no mutation, inferred context or resources
+are hidden in the result. The [Scale Element](/score/element/analyze/score-scale-analysis/)
+provides the same evidence as a player-connected surface.
+
 ## Inspect selected intervals
 
 `analyzeIntervals(score, selection, options?)` relates authored notes rather
 than guessing an interval from a whole-score pitch histogram. Select note IDs,
 a part/voice, a half-open quarter-note range, or a combination. Consecutive
-pitched onsets in one voice form melodic intervals; concurrently sounding
-pairs form vertical intervals. Explicit rests break melodic continuity.
+pitched attacks in one voice form melodic intervals; concurrently sounding
+pairs form harmonic intervals. Explicit rests and onsets containing more than
+one selected pitched attack break melodic continuity. Supply exact note IDs
+to disambiguate a chosen line through chords. Tie continuation/stop notes do
+not create new melodic attacks.
 
 ```ts
 import {analyzeIntervals} from '@webmusic/score/analyze';
@@ -241,7 +365,11 @@ The default `pitchMode: 'written'` uses stored notation. Set
 chromatic-only transpositions fall back to MIDI-derived spelling. Each result
 has a stable note-pair ID, kind, spelled label such as `3M`, direction, signed
 melodic or non-negative vertical semitones, quarter-note span, and two evidence
-records with note/part/voice IDs and written/analyzed pitches. A range must
+records with note/part/voice IDs, written/analyzed pitches and `spellingInferred`.
+A chromatic-only transposition that cannot preserve a diatonic spelling marks
+that flag; no-op/octave-only transformations retain spelling. The flag does not
+identify spelling inferred earlier by an importer, so false is not proof of
+authored spelling (including for MIDI-origin Scores). A range must
 include both finite, ordered bounds. Dense chords produce pairwise vertical
 results, so use a narrow selection when presenting them interactively. The
 function does not edit notes, create a player, or own resources.
@@ -403,7 +531,8 @@ not infer performed groove, accents or syncopation.
 score's meter-aware beat grid. `startQuarters` is inclusive and `endQuarters`
 exclusive; both default to the full score. `partId` limits the attacks but not
 the shared beat grid. `subdivision` chooses 1, 2, 3 or 4 equal divisions of a
-notated denominator beat, defaulting to 2.
+selected beat, defaulting to 2. `beatUnit` defaults to `denominator` for
+compatibility; choose `meter` for grouped musical pulses.
 
 ```ts
 import {inspectScoreRhythm} from '@webmusic/score/analyze';
@@ -425,10 +554,25 @@ The result separates `beats`, `subdivisions`, onset groups and a summary.
 Each onset retains part/voice/note IDs, exact subbeat, authored accent,
 nominal seconds and optional per-note performed timing/deviation. Its
 `syncopationCue` is deliberately narrow: an authored accent or marcato on an
-offbeat attack, not a complete syncopation or groove inference. A denominator
-beat in 6/8 is an eighth note; the function does not infer compound-meter
-accent groups. No notes are quantized or changed. Invalid ranges,
-subdivisions and unknown part IDs throw; the function owns no resources.
+offbeat attack, not a complete syncopation or groove inference. Tie
+continuations do not create new attacks. No notes are quantized or changed.
+Invalid ranges, subdivisions, grouping or unknown part IDs throw; the function
+owns no resources.
+
+With `beatUnit: 'denominator'`, a beat in 6/8 remains an eighth note. With
+`beatUnit: 'meter'`, numerators 2/3/4 use denominator-unit beats and 6/9/12 use
+groups of three (two dotted-quarter pulses in 6/8). Other numerators require
+`beatGroups`, such as `[2, 3]` for 5/8. Groups must be positive safe integers
+whose sum matches every effective inspected meter numerator, and are only
+valid with `beatUnit: 'meter'`. A single explicit grouping does not silently
+adapt to a different meter later in the Score.
+
+The result reports `beatUnit`; `beat` is 1-based within the selected pulse
+model. `beatLengthQuarters`, exact `subbeat`/`subbeatExact` and subdivisions
+refer to that pulse. Pickups align at their authored measure start and the
+last pulse is truncated at an authored boundary; missing leading beats are
+not inferred. The [Rhythm Element](/score/element/analyze/score-rhythm-analysis/)
+uses grouped `meter` semantics by default.
 
 ## Voice leading
 
@@ -702,7 +846,7 @@ Use the [Analyze API](/score/api/analyze/) for one-shot algorithms and [live Ana
 
 | API | Kind | Use it for |
 | --- | --- | --- |
-| `defineAllAnalysisElements()` | Web Components | Register the live Analyze family from `@webmusic/score/analyze/element`; individual classes and helpers are owned by the [Element references](/score/element/#analyze). |
+| `defineAllAnalysisElements()` | Web Components | Register the four elementary Analyze tools from `@webmusic/score/analyze/element`; individual classes and helpers are owned by the [Element references](/score/element/#analyze). |
 | `summarizeScore(score)` | Summary | Metadata, counts, duration, tempo, meter, key, and pitch range. |
 | `distributions(score)` | Statistics | Duration-weighted pitch classes, melodic interval counts and note-duration counts. |
 | `chordTimeline(score, opts?)` | Harmony analysis | Zero-config chord labels over fixed musical windows (quarters). |
@@ -712,6 +856,9 @@ Use the [Analyze API](/score/api/analyze/) for one-shot algorithms and [live Ana
 | `romanNumerals(score, key, opts?)`, `romanNumeralForChord(symbol, key)` | Harmony analysis | Convert chord segments or one symbol into coarse key-relative Roman labels. |
 | `findMotifs(score, opts?)` | Motif analysis | Find repeated interval/rhythm patterns in each part. |
 | `findRhythmPatternOccurrences(score, opts?)` | Rhythm analysis | Find exact voice-local onset-gap and duration recurrences with source identities and quarter-note spans. |
+| `inspectChordPitches(pitches, key?)` | Elementary chord inspection | Complete spelled triads/sevenths, bass, inversion and optional explicit-key degree. |
+| `inspectScoreChords(score, options?)` | Score chord inspection | Simultaneous spans by default, or explicit metrical pulse collections; source provenance and written/sounding pitch choice. |
+| `inspectScale(score, selection, options)` | Scale inspection | Explicit tonic and scale form, spelled degrees, alterations and exact membership. |
 | `analyzeIntervals(score, selection, options?)` | Interval inspection | Inspect spelled melodic and overlapping vertical note relationships with note provenance; supports written or transposed sounding pitch. |
 | `inspectScoreRhythm(score, options?)` | Rhythm inspection | Inspect meter-aligned beats, subdivisions, note onsets and explicit accent/offbeat cues in a quarter-note region. |
 | `rhythmPatterns(score, length?)` | Rhythm analysis | Count repeated duration patterns and their onset positions. |
@@ -736,6 +883,8 @@ Use the [Analyze API](/score/api/analyze/) for one-shot algorithms and [live Ana
 | `RhythmPatternOccurrenceOptions`, `RhythmPatternOccurrenceGroup`, `RhythmPatternOccurrence` | Type | Phrase length, repeat threshold and optional part filter; each group retains a signature and provenance-rich occurrences. |
 | `IntervalPitchMode`, `IntervalSelection`, `IntervalAnalysisOptions`, `IntervalEvidence`, `AnalyzedInterval`, `IntervalAnalysis` | Type | Written/sounding pitch choice, note selection and provenance-rich interval results. |
 | `RhythmInspectionOptions`, `RhythmBeat`, `RhythmSubdivision`, `RhythmPerformedOnset`, `RhythmOnset`, `RhythmInspection` | Type | Meter grid, subdivision, authored/performed onset evidence and rhythm-inspection result. |
+| `BasicChordQuality`, `BasicChordCandidate`, `ChordInspection`, `ScoreChordGrouping`, `ScoreChordInspectionOptions`, `ScoreChordSpan`, `ScoreChordInspection` | Type | Elementary chord qualities/candidates, grouping/options and source-rich spans. |
+| `TheoryScale`, `ScaleKind`, `ScaleInspectionOptions`, `ScaleDegreePitch`, `ScaleNoteInspection`, `ScaleInspection`, `TheoryNoteEvidence` | Type | Explicit scale form/reference, spelling, degree alterations and source-note provenance. |
 | `Key`, `KeyResult` | Type | A `{ tonic, mode }` target, and a key result with confidence and candidates. |
 | `ChordSegment` | Type | A chord window (in quarters) with pitch classes and chord label. |
 | `RNAResult` | Type | A roman-numeral entry (in quarters) with chord and roman labels. |
@@ -750,10 +899,68 @@ exports of the stateless capability root. They return data without mounting UI.
 
 The **projections** turn a result into the shapes a read-out draws: marks for a
 keyboard, columns for a stave, dots for a fretboard, bands for a scrolling lane,
-segments for a wheel. The two [live Analyze components](/score/element/#analyze)
+segments for a wheel. The four [elementary Analyze components](/score/element/#analyze)
 use only the projections needed by their musical surfaces. All projections
 remain available for application-owned markup; see
 [key diagnostics and history](/score/headless/analyze/live-trackers/#key-diagnostics).
+
+`projectBasicInspection(score, kind, options?)` builds the shared elementary
+lane and evidence. `BasicAnalysisKind` is `chord`, `interval`, `scale` or
+`rhythm`. `BasicInspectionOptions` includes `pitchMode`, `selection`
+(`IntervalSelection`), `intervalKind` (`melodic`/`harmonic`/`both`), explicit
+`key`, `tonic`, `scale`, `chordGrouping`, `beatGroups` and `subdivision`. Defaults
+are written pitch, simultaneous chord inspection, melodic intervals, major
+scale and two subdivisions. Pass `chordGrouping: 'beat'` to collect chord notes
+by metrical pulse; `beatGroups` then supplies explicit grouping for irregular
+meters. Rhythm also uses `beatGroups`; other inspections ignore it. Chord key
+remains absent; scale without tonic returns an explanatory `message` and no readings.
+Rhythm uses grouped meter semantics. The projection selects a full-score range
+when no explicit selection is supplied.
+
+`BasicInspectionProjection` contains a `FlowLaneView` in nominal seconds,
+`inspections` and optional `message`. Each `AnalysisInspection` contains `kind`,
+a quarter-note `AnalysisSelection`, `headline`, `detail`, source `evidence` and
+`AnalysisInspectionCandidate` values (`id`, `label`, optional `detail`, `selected`).
+The lane's bands provide compact `primary`/`secondary` labels and optional
+`readout` text for the full current reading. Interval readouts name the quality
+and number, harmonic pairs use `+`, and rhythm readouts preserve authored note
+values, dots and tuplets. Chord labels show the symbol above source pitch names
+with octaves. When no complete chord matches, `primary` is empty and pitch names
+remain in `secondary`, including in `readout`. Grouping and
+pitch-basis explanations remain in inspection details, not visual captions.
+Detailed source units remain in `inspections`.
+
+`FlowBandView.readout` is structurally
+`{primary?: string, secondary?: string, fields?: readonly {id: string, label: string, value: string}[]}`.
+The inline field shape does not add a separate named Score export. The existing
+`secondary` text remains available for compatibility; a structured presenter
+uses `fields` for distinct labeled values in its place. The three non-chord
+projections supply these fields in a fixed order:
+
+| Inspection | First field | Second field | Third field |
+|---|---|---|---|
+| Interval | Notes (`notes`) | Motion (`motion`) | Semitones (`semitones`) |
+| Scale | Note (`note`) | Reference (`reference`) | Relation (`relation`) |
+| Rhythm | Bar (`bar`) | Beat (`beat`) | Duration (qn) (`duration`) |
+
+Rhythm uses the same slots for attacks, rests and tie continuations, with an
+empty string for unavailable values; `qn` denotes quarter-note units.
+Bar and Beat describe the original written onset; a rest or tie continuation
+entering from before the selection retains its original Bar and full authored
+Duration but leaves Beat empty if the earlier meter cannot use this selection's
+`beatGroups`, while invalid grouping inside the selection still throws.
+The field data owns no geometry. UIKit keeps these three equal-width slots and reserves
+their maximum wrapped height from the supplied readings outside the playback
+frame; playback only changes values. Gaps preserve labels and clear values.
+The chord projection retains its existing symbol and note rows.
+
+Application-owned presenters choose track layout; the four Elements use the
+[visible-track layout](/uikit/views-analysis/harmony/) to hide rows
+whose material is outside the current viewport.
+The returned data owns no DOM or transport. Invalid musical options propagate
+the underlying inspection error; application UI chooses how to display it.
+The named projection and inspection types are exported from the same Headless entry. Element selection and
+seek events remain browser adapters, documented on the owning tag page.
 
 A projection is a pure data operation, not another live object. Keep one
 analysis result and recompute its relevant projection when that input or its

@@ -5,24 +5,9 @@ import {
   type SyncMasterTransport,
   type TransportCommand,
 } from "@webmusic/kernel/sync";
-import { createAudioClip } from "@webmusic/audio";
+import { loadClipFromUrl } from "@webmusic/audio/play";
 import { AudioClipPlayer } from "@webmusic/audio/play/headless";
 import type { DemoScope } from "../demo-lifecycle";
-
-/** A short decaying tone followed by silence; each clip's end is its native loop boundary. */
-function pulseClip(seconds: number, frequency: number, sampleRate: number) {
-  const samples = new Float32Array(Math.round(seconds * sampleRate));
-  const length = Math.round(0.12 * sampleRate);
-  for (let i = 0; i < length; i++) {
-    const time = i / sampleRate;
-    samples[i] =
-      0.18 *
-      Math.sin(2 * Math.PI * frequency * time) *
-      Math.min(1, time / 0.004) *
-      Math.exp(-45 * time);
-  }
-  return createAudioClip({ sampleRate, channelData: [samples] });
-}
 
 /** App-owned continuous master: only TransportGroup delegates mutations to it. */
 function continuousMaster(context: AudioContext): SyncMasterTransport {
@@ -91,6 +76,7 @@ export function mountIndependentLoops(
   let generation = 0;
   let frame = 0;
   let offGroup: (() => void) | undefined;
+  let sourceAbort: AbortController | undefined;
   const report = (error: unknown) => {
     if (scope.active)
       status.textContent =
@@ -103,6 +89,8 @@ export function mountIndependentLoops(
   };
   const dispose = () => {
     generation++;
+    sourceAbort?.abort();
+    sourceAbort = undefined;
     try {
       offGroup?.();
     } catch (error) {
@@ -149,14 +137,23 @@ export function mountIndependentLoops(
         if (!scope.active || expected !== generation) return;
         if (!group) {
           const sessionContext = context;
+          const abort = new AbortController();
+          sourceAbort = abort;
+          status.textContent = "Loading Arabesque No. 1 audio…";
+          const source = await loadClipFromUrl(
+            `${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`,
+            { signal: abort.signal },
+          );
+          if (!scope.active || expected !== generation) return;
+          sourceAbort = undefined;
           group = new TransportGroup(
             continuousMaster(sessionContext),
             () => sessionContext.currentTime,
             { onOperationError: (_operation, error) => report(error) },
           );
-          for (const [index, period] of periods.entries()) {
+          for (const period of periods) {
             const player = new AudioClipPlayer(
-              pulseClip(period, index ? 660 : 330, context.sampleRate),
+              source.slice(0, period),
               {
                 audioContext: context,
                 engine: "buffer",

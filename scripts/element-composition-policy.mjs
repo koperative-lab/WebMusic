@@ -19,7 +19,9 @@ export const elementCompositionPolicy = Object.freeze([
   entry('Score', 'Play', 'score-synth-panel', 'packages/score/src/play/element/score-synth-panel.ts', ['panel', 'parameter', 'macro', 'envelope', 'eq', 'lfo']),
 
   entry('Score', 'Analyze', 'score-chord-analysis', 'packages/score/src/analyze/element/score-chord-analysis.ts', ['analysis', 'harmony', 'workbench']),
-  entry('Score', 'Analyze', 'score-live-chord-analysis', 'packages/score/src/analyze/element/score-live-chord-analysis.ts', ['analysis', 'harmony', 'workbench']),
+  entry('Score', 'Analyze', 'score-interval-analysis', 'packages/score/src/analyze/element/score-interval-analysis.ts', ['analysis', 'harmony', 'workbench']),
+  entry('Score', 'Analyze', 'score-scale-analysis', 'packages/score/src/analyze/element/score-scale-analysis.ts', ['analysis', 'harmony', 'workbench']),
+  entry('Score', 'Analyze', 'score-rhythm-analysis', 'packages/score/src/analyze/element/score-rhythm-analysis.ts', ['analysis', 'harmony', 'workbench']),
 
   entry('Score', 'View', 'score-view', 'packages/score/src/view/element/score-view.ts', ['stage', 'timeline', 'status']),
   entry('Score', 'View', 'score-sheet-view', 'packages/score/src/view/element/score-sheet-view.ts', ['stage', 'status']),

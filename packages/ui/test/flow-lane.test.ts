@@ -7,7 +7,7 @@ import {
   readAnalysisIdleStyle,
   readAnalysisSpans,
 } from '../src/analysis';
-import {harmonyPresenterStyle, mountFlowLane, type FlowBand, type FlowLaneState} from '../src/harmony';
+import {harmonyPresenterStyle, mountFlowLane, type FlowBand, type FlowLaneState, type FlowReadout} from '../src/harmony';
 import {joinFrameLoop, type FrameClock, type FrameTick} from '../src/internal/frame';
 
 /**
@@ -261,12 +261,12 @@ describe('mountFlowLane geometry', () => {
     handle.destroy();
   });
 
-  it.each([true, false])('reserves a silent readout line through gaps (stylesheet=%s)', (stylesheet) => {
+  it.each([true, false])('reserves both readout line boxes through gaps (stylesheet=%s)', (stylesheet) => {
     let now = 0;
     const handle = lane({}, {
       snapshot: () => ({
         bands: [
-          {id: 'first', start: 0, end: 1, primary: 'M1'},
+          {id: 'first', start: 0, end: 1, primary: 'M1', secondary: 'First reading'},
           {id: 'repeat', start: 3, end: 4, primary: 'M1'},
         ],
         span: {start: 0, end: 4},
@@ -274,9 +274,26 @@ describe('mountFlowLane geometry', () => {
       }),
     }, {stylesheet, reservePinned: true, animate: false});
     const pinned = handle.element.querySelector<HTMLElement>('.wui-harmony-flow__pinned')!;
-    expect(pinned.textContent).toBe('M1');
+    const name = pinned.querySelector<HTMLElement>('.wui-harmony-flow__pinned-name')!;
+    const note = pinned.querySelector<HTMLElement>('.wui-harmony-flow__pinned-note')!;
+    // Distinct definite sizes make font-relative reservation observable in
+    // jsdom, whose computed style does not resolve our nested token calc().
+    pinned.style.fontSize = '10px';
+    name.style.fontSize = '24px';
+    note.style.fontSize = '12px';
+    const lineBoxes = () => [name, note].map((row) => {
+      const style = getComputedStyle(row);
+      // jsdom has no layout. Test the actual CSS line-box contract rather
+      // than comparing two zero getBoundingClientRect() heights.
+      expect(style.display).toBe('block');
+      expect(Number.parseFloat(style.minHeight)).toBeCloseTo(
+        Number.parseFloat(style.fontSize) * Number.parseFloat(style.lineHeight),
+      );
+      return row.style.minHeight;
+    });
+    expect(pinned.textContent).toBe('M1First reading');
     expect(pinned.hidden).toBe(false);
-    expect(pinned.style.minHeight).toBe('1.1em');
+    expect(lineBoxes()).toEqual(['1.15em', '1.35em']);
 
     now = 2;
     handle.update();
@@ -284,12 +301,29 @@ describe('mountFlowLane geometry', () => {
     expect(pinned.style.visibility).toBe('hidden');
     expect(pinned.hidden).toBe(false);
     expect(getComputedStyle(pinned).display).not.toBe('none');
-    expect(pinned.style.minHeight).toBe('1.1em');
+    expect(lineBoxes()).toEqual(['1.15em', '1.35em']);
 
     now = 3;
     handle.update();
     expect(pinned.textContent).toBe('M1');
     expect(pinned.style.visibility).toBe('');
+    expect(note.textContent).toBe('');
+    expect(lineBoxes()).toEqual(['1.15em', '1.35em']);
+    handle.destroy();
+  });
+
+  it.each([true, false])('does not reserve empty readout rows unless requested (stylesheet=%s)', (stylesheet) => {
+    let now = 0;
+    const handle = lane({}, {
+      snapshot: () => ({bands: [{id: 'first', start: 0, end: 1, primary: 'M1'}], now}),
+    }, {stylesheet, animate: false});
+    const pinned = handle.element.querySelector<HTMLElement>('.wui-harmony-flow__pinned')!;
+    expect(pinned.hidden).toBe(false);
+    expect([...pinned.children].every((row) => (row as HTMLElement).style.minHeight === '')).toBe(true);
+    now = 2;
+    handle.update();
+    expect(pinned.hidden).toBe(true);
+    expect(getComputedStyle(pinned).display).toBe('none');
     handle.destroy();
   });
 
@@ -1216,6 +1250,55 @@ describe('mountFlowLane regressions', () => {
 
 
 describe('mountFlowLane responsive layout', () => {
+  it.each([true, false])('thins measured ruler labels on resize/zoom, prioritizing majors without moving ticks (stylesheet=%s)', (stylesheet) => {
+    let resize = (): void => {};
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(callback: () => void) { resize = callback; }
+      observe(): void {}
+      disconnect(): void {}
+    });
+    const original = HTMLElement.prototype.getBoundingClientRect;
+    const labelMeasure = vi.fn(() => 40);
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this.classList.contains('wui-harmony-flow__tick-label')) {
+        return {x: 0, y: 0, left: 0, top: 0, right: 40, bottom: 12,
+          width: labelMeasure(), height: 12, toJSON: () => ({})};
+      }
+      return original.call(this);
+    });
+    const ruler = Array.from({length: 11}, (_, at) => ({at, label: `bar:${at}`, major: at % 4 === 0}));
+    const handle = lane({ruler}, {}, {visibleSpan: 10, animate: false, stylesheet});
+    let width = 100;
+    const widthRead = vi.fn(() => width);
+    Object.defineProperty(handle.viewport, 'clientWidth', {get: widthRead});
+    const visible = () => [...handle.element.querySelectorAll<HTMLElement>('.wui-harmony-flow__tick-label')]
+      .filter((node) => !node.hidden);
+    const ticks = () => [...handle.element.querySelectorAll<HTMLElement>('.wui-harmony-flow__tick')]
+      .map((node) => node.style.left);
+    const positions = ticks();
+    const originalBoxes = boxes(handle.element);
+    resize();
+    expect(widthRead).toHaveBeenCalled();
+    expect(labelMeasure).toHaveBeenCalled();
+    expect(visible().map((node) => node.textContent)).toEqual(['bar:0', 'bar:8']);
+    expect(ticks()).toEqual(positions);
+    expect(ticks()).toHaveLength(11);
+    expect(boxes(handle.element)).toEqual(originalBoxes);
+    const measured = labelMeasure.mock.calls.length;
+    handle.tick(); handle.tick(); handle.update();
+    expect(labelMeasure).toHaveBeenCalledTimes(measured);
+    width = 480;
+    resize();
+    expect(visible()).toHaveLength(11);
+    const lefts = visible().map((node) => Number.parseFloat(node.style.left) / 100 * 480);
+    lefts.slice(1).forEach((left, index) => expect(left - lefts[index]!).toBeGreaterThanOrEqual(48));
+    expect(ticks()).toEqual(positions);
+    handle.viewport.dispatchEvent(new WheelEvent('wheel', {deltaY: 300 * Math.log(2), ctrlKey: true}));
+    expect(visible().map((node) => node.textContent)).toEqual(['bar:0', 'bar:2', 'bar:4', 'bar:6', 'bar:8', 'bar:10']);
+    expect(ticks()).toEqual(positions);
+    handle.destroy();
+  });
+
   it.each([true, false])('keeps three rows separate without shrinking low-weight labels (stylesheet=%s)', (stylesheet) => {
     const handle = lane(
       {
@@ -1328,6 +1411,158 @@ describe('mountFlowLane responsive layout', () => {
 });
 
 
+describe('mountFlowLane wrapped labels', () => {
+  it.each([true, false])('keeps unmatched notes below an empty primary slot aligned with wrapped chord names (stylesheet=%s)', (stylesheet) => {
+    const original = HTMLElement.prototype.getBoundingClientRect;
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this.classList.contains('wui-harmony-flow__label') && this.parentElement?.dataset.labelMeasure === 'true') {
+        expect(this.style.minHeight).toBe('1.25em');
+        return {height: this.textContent ? 32 : 16} as DOMRect;
+      }
+      if (this.dataset.labelMeasure !== 'true') return original.call(this);
+      // The unmatched note list is taller, but its primary slot is empty.
+      const named = Boolean(this.querySelector('.wui-harmony-flow__label')!.textContent);
+      return {height: named ? 65 : 105} as DOMRect;
+    });
+    const handle = lane({bands: [
+      {id: 'named', start: 0, end: 0.4, primary: 'F#m7/C#', secondary: 'C#3 F#3 A3 E4'},
+      {id: 'notes', start: 0.4, end: 0.8, primary: '', secondary: 'B2 E3 F#4 G#4 B4'},
+    ]}, {}, {stylesheet, labelOverflow: 'wrap', visibleSpan: 4, animate: false});
+    const named = handle.band('named')!;
+    const unmatched = handle.band('notes')!;
+    const primary = unmatched.querySelector<HTMLElement>('.wui-harmony-flow__label')!;
+    const note = unmatched.querySelector<HTMLElement>('.wui-harmony-flow__note')!;
+    expect(primary.textContent).toBe('');
+    expect(primary.hidden).toBe(false);
+    expect(note.textContent).toBe('B2 E3 F#4 G#4 B4');
+    expect(primary.nextElementSibling).toBe(note);
+    expect(getComputedStyle(named).justifyContent).toBe('flex-start');
+    expect(getComputedStyle(unmatched).justifyContent).toBe('flex-start');
+    expect(getComputedStyle(primary).minHeight).toBe(getComputedStyle(named.querySelector('.wui-harmony-flow__label')!).minHeight);
+    expect(handle.element.style.getPropertyValue('--wui-harmony-flow-primary-height')).toBe('32px');
+    expect(handle.element.style.getPropertyValue('--wui-harmony-flow-row-height')).toContain('121px');
+    expect(handle.index.textContent).toContain('B2 E3 F#4 G#4 B4');
+    expect(handle.element.querySelector('[data-label-measure]')).toBeNull();
+    handle.destroy();
+  });
+
+  it.each([true, false])('fits narrow complete stacks without changing time boxes or frame cost (stylesheet=%s)', (stylesheet) => {
+    const measured = vi.fn();
+    const original = HTMLElement.prototype.getBoundingClientRect;
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this.dataset.labelMeasure !== 'true') return original.call(this);
+      measured(Number.parseFloat(this.style.width));
+      expect(this.parentElement?.getAttribute('aria-hidden')).toBe('true');
+      expect(this.style.contentVisibility).toBe('visible');
+      return {height: 173.25} as DOMRect;
+    });
+    let now = 0;
+    let primary = 'F#m7/C#';
+    const snapshot = (): FlowLaneState => ({
+      bands: [{id: 'one', start: 0, end: 0.4, track: 0, primary, secondary: 'C#3 F#3 A3 E4'},
+        {id: 'two', start: 4, end: 4.4, track: 2, primary, secondary: 'C#3 F#3 A3 E4'}],
+      tracks: [{id: 'first'}, {id: 'blank'}, {id: 'later'}], span: {start: 0, end: 8}, now,
+    });
+    const handle = lane({}, {snapshot, position: () => now},
+      {stylesheet, labelOverflow: 'wrap', trackLayout: 'visible', visibleSpan: 4, animate: false});
+    expect(measured).toHaveBeenCalledTimes(1); // identical text + width, even on another row
+    expect(measured).toHaveBeenCalledWith(30);
+    const band = handle.band('one')!;
+    const geometry = boxes(handle.element);
+    expect(band.style.width).toBe('5%');
+    expect(band.dataset.labelOverflow).toBe('wrap');
+    for (const selector of ['.wui-harmony-flow__label', '.wui-harmony-flow__note']) {
+      const text = band.querySelector<HTMLElement>(selector)!;
+      const style = getComputedStyle(text);
+      expect(style.whiteSpace).toBe('normal');
+      expect(style.overflowWrap).toBe('anywhere');
+      expect(style.textOverflow).toBe('clip');
+      expect(style.display).not.toBe('none');
+      expect(text.hidden).toBe(false);
+    }
+    expect(handle.element.style.getPropertyValue('--wui-harmony-flow-row-height')).toBe(
+      'max(var(--wui-harmony-lane-height, var(--wm-harmony-lane-height, 48px)), 174px)',
+    );
+    expect(handle.element.style.getPropertyValue('--wui-harmony-lane-height')).toBe('');
+    expect(handle.element.querySelector('[data-label-measure]')).toBeNull();
+    expect(handle.track('later')!.hidden).toBe(true);
+    for (let i = 0; i < 20; i++) { now += 0.01; handle.tick(); }
+    expect(measured).toHaveBeenCalledTimes(1);
+    handle.update();
+    expect(measured).toHaveBeenCalledTimes(2);
+    now = 4.1; handle.tick();
+    expect(handle.track('later')!.hidden).toBe(false);
+    expect(handle.track('later')!.style.top).toContain('* 0');
+    expect(boxes(handle.element)).toEqual(geometry);
+    primary = 'F# minor seventh / C#';
+    handle.update();
+    expect(measured).toHaveBeenCalledTimes(3);
+    expect(handle.index.textContent).toContain(primary);
+    handle.destroy();
+  });
+
+  it('remeasures measured width and inherited typography on resize and zoom, retaining the public minimum', () => {
+    let resize = () => {};
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(callback: () => void) { resize = callback; }
+      observe(): void {} disconnect(): void {}
+    });
+    const parent = host();
+    parent.style.setProperty('--wui-harmony-lane-height', '180px');
+    parent.style.setProperty('--wui-harmony-size-body', '24px');
+    const widths: number[] = [];
+    const original = HTMLElement.prototype.getBoundingClientRect;
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this.classList.contains('wui-harmony-flow__label') && this.parentElement?.dataset.labelMeasure === 'true') {
+        const width = Number.parseFloat(this.parentElement.style.width);
+        const fontScale = Number.parseFloat(parent.style.getPropertyValue('--wui-harmony-size-body')) / 24;
+        return {height: (width < 32 ? 190 : 80) * fontScale - 8} as DOMRect;
+      }
+      if (this.dataset.labelMeasure !== 'true') return original.call(this);
+      expect(parent.contains(this)).toBe(true);
+      expect(this.querySelector<HTMLElement>('.wui-harmony-flow__label')!.style.fontSize).toContain('--wui-harmony-size-body');
+      const width = Number.parseFloat(this.style.width);
+      widths.push(width);
+      // Deliberate measurement seam: jsdom does not lay text into line boxes.
+      const fontScale = Number.parseFloat(parent.style.getPropertyValue('--wui-harmony-size-body')) / 24;
+      return {height: (width < 32 ? 190 : 80) * fontScale} as DOMRect;
+    });
+    const handle = mountFlowLane(parent, {snapshot: () => ({
+      bands: [{id: 'small', start: 0, end: 0.5, primary: 'C#4 E4 G#4 B4'}], now: 0,
+    })}, {labelOverflow: 'wrap', visibleSpan: 4, fallbackWidth: 200, animate: false, stylesheet: false});
+    expect(widths).toEqual([25]);
+    expect(handle.element.style.getPropertyValue('--wui-harmony-flow-row-height')).toContain('190px');
+    const geometry = boxes(handle.element);
+    Object.defineProperty(handle.viewport, 'clientWidth', {value: 400});
+    resize();
+    expect(widths).toEqual([25, 50]);
+    expect(handle.element.style.getPropertyValue('--wui-harmony-flow-row-height')).toContain('80px');
+    expect(parent.style.getPropertyValue('--wui-harmony-lane-height')).toBe('180px');
+    expect(handle.track('0')!.style.height).toContain('--wui-harmony-flow-row-height');
+    parent.style.setProperty('--wui-harmony-size-body', '36px');
+    handle.update();
+    expect(widths).toEqual([25, 50, 50]);
+    expect(handle.element.style.getPropertyValue('--wui-harmony-flow-row-height')).toContain('120px');
+    handle.viewport.dispatchEvent(new WheelEvent('wheel', {deltaY: -300 * Math.log(2), ctrlKey: true}));
+    expect(widths).toEqual([25, 50, 50, 100]);
+    expect(boxes(handle.element)).toEqual(geometry);
+    handle.tick();
+    expect(widths).toHaveLength(4);
+    handle.destroy();
+  });
+
+  it('keeps truncation as the default and performs no label-stack measurement', () => {
+    const rect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect');
+    const handle = lane({bands: [{id: 'short', start: 0, end: 0.1, primary: 'Long label'}]}, {}, {animate: false});
+    const band = handle.band('short')!;
+    expect(band.dataset.labelOverflow).toBeUndefined();
+    expect(getComputedStyle(band.querySelector('.wui-harmony-flow__label')!).textOverflow).toBe('ellipsis');
+    expect(handle.element.style.getPropertyValue('--wui-harmony-flow-row-height')).toBe('');
+    expect(rect.mock.instances.some((node) => (node as HTMLElement).dataset.labelMeasure === 'true')).toBe(false);
+    handle.destroy();
+  });
+});
+
 describe('mountFlowLane contour labels', () => {
   it.each([true, false])('keeps a narrow band readable through its title and semantic index (stylesheet=%s)', (stylesheet) => {
     const handle = lane({
@@ -1350,7 +1585,8 @@ describe('mountFlowLane contour labels', () => {
     expect(harmonyPresenterStyle).toContain('container-type: inline-size');
     expect(harmonyPresenterStyle).toContain('container-name: wui-harmony-band');
     expect(harmonyPresenterStyle).toContain('@container wui-harmony-band (max-width: 31px)');
-    expect(harmonyPresenterStyle).toContain('.wui-harmony-flow__label, .wui-harmony-flow__note { display: none; }');
+    expect(harmonyPresenterStyle).toContain('.wui-harmony-flow__band:not([data-label-overflow="wrap"]) > .wui-harmony-flow__label');
+    expect(harmonyPresenterStyle).toContain('.wui-harmony-flow__band:not([data-label-overflow="wrap"]) > .wui-harmony-flow__note { display: none; }');
   });
 
   it.each([true, false])('reserves label space and keeps contour strokes independent of the axis scale (stylesheet=%s)', (stylesheet) => {
@@ -1392,6 +1628,326 @@ describe('mountFlowLane contour labels', () => {
     expect(band.style.getPropertyValue('--wui-harmony-flow-tone')).toBe('#236b44');
     expect(fill.style.background.startsWith('var(--wm-harmony-flow-tone,')).toBe(true);
     expect(handle.element.style.getPropertyValue('--wm-harmony-flow-tone')).toBe('#d03030');
+    handle.destroy();
+  });
+});
+
+describe('mountFlowLane fixed readout fields', () => {
+  it.each([true, false])('reserves all headings and fields, retains slots across bands and clears gap values (stylesheet=%s)', (stylesheet) => {
+    const reads = vi.fn();
+    const original = HTMLElement.prototype.getBoundingClientRect;
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const kind = this.dataset.readoutMeasure;
+      if (!kind) return original.call(this);
+      reads(kind, this.textContent);
+      expect(this.closest('[aria-hidden="true"]')).not.toBeNull();
+      return {height: kind === 'primary' ? (this.textContent!.length > 20 ? 56 : 28)
+        : kind === 'value' && this.textContent!.length > 18 ? 52 : 18} as DOMRect;
+    });
+    let now = 0;
+    const material: FlowBand[] = [
+      {id: 'short', start: 0, end: 1, primary: '3m', secondary: 'legacy · text', readout: {
+        primary: 'Minor third', fields: [
+          {id: 'notes', label: 'Notes', value: 'C4 → Eb4'},
+          {id: 'motion', label: 'Motion', value: 'Ascending'},
+          {id: 'semitones', label: 'Semitones', value: '3'},
+        ],
+      }},
+      {id: 'long', start: 2, end: 3, primary: '8th', secondary: 'other · legacy', readout: {
+        primary: 'Dotted eighth-note triplet', fields: [
+          {id: 'semitones', label: 'Semitones', value: '15'},
+          {id: 'notes', label: 'Notes', value: 'B#-1 → C##10'},
+          {id: 'motion', label: 'Motion', value: 'Descending across the interval'},
+        ],
+      }},
+    ];
+    const handle = lane({bands: material, span: {start: 0, end: 3}}, {position: () => now, seek: vi.fn()},
+      {stylesheet, reservePinned: true, animate: false});
+    const heading = handle.element.querySelector<HTMLElement>('.wui-harmony-flow__pinned-name')!;
+    const legacy = handle.element.querySelector<HTMLElement>('.wui-harmony-flow__pinned-note')!;
+    const fields = handle.element.querySelector<HTMLElement>('.wui-harmony-flow__pinned-fields')!;
+    const slots = [...fields.children];
+    const values = () => [...fields.querySelectorAll('.wui-harmony-flow__pinned-field-value')].map((node) => node.textContent);
+    expect(getComputedStyle(fields).gridTemplateColumns).toBe('repeat(3, minmax(0, 1fr))');
+    expect(slots.map((slot) => (slot as HTMLElement).dataset.readoutField)).toEqual(['notes', 'motion', 'semitones']);
+    expect(heading.textContent).toBe('Minor third');
+    expect(heading.style.minHeight).toBe('56px'); // future long heading already reserved
+    expect(fields.style.getPropertyValue('--wui-harmony-flow-field-value-height')).toBe('52px');
+    expect(values()).toEqual(['C4 → Eb4', 'Ascending', '3']);
+    expect(legacy.hidden).toBe(true);
+    expect(legacy.textContent).toBe('');
+    expect(handle.band('short')!.title).toBe('Minor third\nNotes: C4 → Eb4\nMotion: Ascending\nSemitones: 3');
+    expect(handle.index.textContent).not.toContain('legacy');
+    expect(handle.viewport.getAttribute('aria-valuetext')).toContain('Notes: C4 → Eb4');
+    expect(handle.element.querySelector('[data-readout-measure]')).toBeNull();
+    const measurements = reads.mock.calls.length;
+    const geometry = boxes(handle.element);
+    for (let i = 0; i < 10; i++) { now += 0.01; handle.tick(); }
+    now = 1.5; handle.tick();
+    expect(heading.textContent).toBe('');
+    expect(values()).toEqual(['', '', '']);
+    expect(fields.hidden).toBe(false);
+    expect(fields.textContent).toBe('NotesMotionSemitones');
+    expect(heading.parentElement!.style.visibility).not.toBe('hidden');
+    now = 2.2; handle.tick();
+    expect(heading.textContent).toBe('Dotted eighth-note triplet');
+    expect(values()).toEqual(['B#-1 → C##10', 'Descending across the interval', '15']);
+    expect([...fields.children]).toEqual(slots); // reordered data does not move keyed slots
+    expect(heading.style.minHeight).toBe('56px');
+    expect(boxes(handle.element)).toEqual(geometry);
+    expect(reads).toHaveBeenCalledTimes(measurements);
+    handle.destroy();
+  });
+
+  it.each([
+    {stylesheet: true, reservePinned: undefined},
+    {stylesheet: false, reservePinned: undefined},
+    {stylesheet: true, reservePinned: false},
+    {stylesheet: false, reservePinned: false},
+  ] as const)('collapses structured gaps unless reserved and retains explicit overrides (stylesheet=$stylesheet, reservePinned=$reservePinned)', ({stylesheet, reservePinned}) => {
+    let now = 0;
+    let pinned: FlowReadout | undefined;
+    const material: FlowBand[] = [
+      {id: 'first', start: 0, end: 1, readout: {primary: 'Major third', fields: [
+        {id: 'notes', label: 'Notes', value: 'C4 → E4'},
+        {id: 'motion', label: 'Motion', value: 'Ascending'},
+        {id: 'semitones', label: 'Semitones', value: '4'},
+      ]}},
+      {id: 'next', start: 2, end: 3, readout: {primary: 'Minor third', fields: [
+        {id: 'notes', label: 'Notes', value: 'E4 → G4'},
+        {id: 'motion', label: 'Motion', value: 'Ascending'},
+        {id: 'semitones', label: 'Semitones', value: '3'},
+      ]}},
+    ];
+    const handle = lane({}, {snapshot: () => ({bands: material, span: {start: 0, end: 3}, now: 0, pinned}),
+      position: () => now}, {stylesheet, animate: false, ...(reservePinned === undefined ? {} : {reservePinned})});
+    const readout = handle.element.querySelector<HTMLElement>('.wui-harmony-flow__pinned')!;
+    const fields = handle.element.querySelector<HTMLElement>('.wui-harmony-flow__pinned-fields')!;
+    const slots = [...fields.children];
+    const values = () => [...fields.querySelectorAll('.wui-harmony-flow__pinned-field-value')].map((node) => node.textContent);
+    expect(readout.hidden).toBe(false);
+    expect(values()).toEqual(['C4 → E4', 'Ascending', '4']);
+
+    now = 1.5; handle.tick();
+    expect(readout.hidden).toBe(true);
+    expect(getComputedStyle(readout).display).toBe('none');
+    expect(fields.hidden).toBe(true);
+
+    pinned = {primary: 'Selected pair', fields: [
+      {id: 'notes', label: 'Notes', value: 'F4 → A4'},
+      {id: 'motion', label: 'Motion', value: 'Ascending'},
+      {id: 'semitones', label: 'Semitones', value: '4'},
+    ]};
+    handle.update();
+    expect(readout.hidden).toBe(false);
+    expect(fields.hidden).toBe(false);
+    expect(values()).toEqual(['F4 → A4', 'Ascending', '4']);
+    expect([...fields.children]).toEqual(slots);
+
+    pinned = undefined; handle.update();
+    expect(readout.hidden).toBe(true);
+    expect(getComputedStyle(readout).display).toBe('none');
+    now = 2.5; handle.tick();
+    expect(readout.hidden).toBe(false);
+    expect(fields.hidden).toBe(false);
+    expect(values()).toEqual(['E4 → G4', 'Ascending', '3']);
+    expect([...fields.children]).toEqual(slots);
+    handle.destroy();
+  });
+
+  it('honors whole-array overrides and explicit empty fields while preserving legacy secondary behavior', () => {
+    let pinned: FlowReadout | undefined;
+    let material: FlowBand[] = [{id: 'band', start: 0, end: 2, primary: 'Interval', secondary: 'legacy · description',
+      readout: {fields: [{id: 'notes', label: 'Notes', value: 'C4 → E4'}]}}];
+    const handle = lane({}, {snapshot: () => ({bands: material, now: 0, pinned})}, {reservePinned: true, animate: false});
+    const fields = handle.element.querySelector<HTMLElement>('.wui-harmony-flow__pinned-fields')!;
+    const legacy = handle.element.querySelector<HTMLElement>('.wui-harmony-flow__pinned-note')!;
+    const heading = handle.element.querySelector<HTMLElement>('.wui-harmony-flow__pinned-name')!;
+    const slot = fields.firstElementChild;
+    pinned = {primary: 'Override', fields: [{id: 'notes', label: 'Input', value: 'F4 → A4'}]};
+    handle.update();
+    expect(fields.firstElementChild).toBe(slot);
+    expect(fields.textContent).toBe('InputF4 → A4');
+    expect(heading.textContent).toBe('Override');
+    pinned = {fields: [], secondary: 'must not leak'};
+    handle.update();
+    expect(fields.hidden).toBe(true);
+    expect(fields.childElementCount).toBe(0);
+    expect(legacy.hidden).toBe(true);
+    expect(legacy.textContent).toBe('');
+    pinned = undefined;
+    material = [{id: 'band', start: 0, end: 2, primary: 'Old reader', secondary: 'legacy · description'}];
+    handle.update();
+    expect(legacy.hidden).toBe(false);
+    expect(legacy.textContent).toBe('legacy · description');
+    expect(heading.style.minHeight).toBe('1.15em');
+    expect(handle.band('band')!.title).toBe('Old reader — legacy · description');
+    handle.destroy();
+  });
+
+  it('remeasures fixed columns on width, typography and zoom changes without replacing slots or measuring frames', () => {
+    let resize = () => {};
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(callback: () => void) { resize = callback; }
+      observe(): void {} disconnect(): void {}
+    });
+    let factor = 1;
+    const reads = vi.fn();
+    const original = HTMLElement.prototype.getBoundingClientRect;
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const kind = this.dataset.readoutMeasure;
+      if (!kind) return original.call(this);
+      const width = Number.parseFloat((this.closest('.wui-harmony-flow__pinned') as HTMLElement).style.width);
+      reads(kind, width);
+      // Measured line-box seam: jsdom itself cannot wrap text into geometry.
+      return {height: (width < 240 ? 64 : 24) * factor} as DOMRect;
+    });
+    const handle = lane({bands: [{id: 'degree', start: 0, end: 1, readout: {primary: 'Degree #6', fields: [
+      {id: 'note', label: 'Note', value: 'F##4'},
+      {id: 'reference', label: 'Reference', value: 'C# descending melodic minor'},
+      {id: 'relation', label: 'Relation', value: 'Altered degree'},
+    ]}}]}, {}, {reservePinned: true, animate: false});
+    const fields = handle.element.querySelector<HTMLElement>('.wui-harmony-flow__pinned-fields')!;
+    const pinned = fields.parentElement!;
+    const heading = pinned.querySelector<HTMLElement>('.wui-harmony-flow__pinned-name')!;
+    const slots = [...fields.children];
+    expect(heading.style.minHeight).toBe('24px');
+    let width = 180;
+    const widthRead = vi.fn(() => width);
+    Object.defineProperty(pinned, 'clientWidth', {get: widthRead});
+    resize();
+    expect(heading.style.minHeight).toBe('64px');
+    expect(fields.style.getPropertyValue('--wui-harmony-flow-field-value-height')).toBe('64px');
+    expect(getComputedStyle(fields).gridTemplateColumns).toBe('repeat(3, minmax(0, 1fr))');
+    factor = 1.5;
+    handle.element.style.setProperty('--wui-harmony-size-label', '1.5rem');
+    handle.update();
+    expect(heading.style.minHeight).toBe('96px');
+    width = 360; resize();
+    expect(heading.style.minHeight).toBe('36px');
+    expect([...fields.children]).toEqual(slots);
+    const beforeZoom = reads.mock.calls.length;
+    handle.viewport.dispatchEvent(new WheelEvent('wheel', {deltaY: -100, ctrlKey: true}));
+    expect(reads.mock.calls.length).toBeGreaterThan(beforeZoom);
+    const measurements = reads.mock.calls.length;
+    const widths = widthRead.mock.calls.length;
+    handle.tick(); handle.tick();
+    expect(reads).toHaveBeenCalledTimes(measurements);
+    expect(widthRead).toHaveBeenCalledTimes(widths);
+    expect(handle.element.querySelector('[data-readout-measure]')).toBeNull();
+    handle.destroy();
+    resize();
+    expect(reads).toHaveBeenCalledTimes(measurements);
+  });
+});
+
+// A sparse score can have many rows somewhere without needing empty rows here.
+describe('mountFlowLane expanded readings and visible rows', () => {
+  it.each([true, false])('separates compact labels from a clear pinned reading and honors state overrides (stylesheet=%s)', (stylesheet) => {
+    let pinned: FlowLaneState['pinned'] = undefined;
+    const handle = lane({}, {snapshot: () => ({
+      bands: [{id: 'interval', start: 0, end: 4, primary: '3m', secondary: 'C#4 → E4',
+        readout: {primary: 'Minor third', secondary: 'C#4 → E4 · ascending'}}],
+      now: 0, pinned,
+    }), seek: vi.fn()}, {stylesheet, animate: false});
+    const primary = handle.element.querySelector<HTMLElement>('.wui-harmony-flow__pinned-name')!;
+    const secondary = handle.element.querySelector<HTMLElement>('.wui-harmony-flow__pinned-note')!;
+    expect(primary.textContent).toBe('Minor third');
+    expect(secondary.textContent).toBe('C#4 → E4 · ascending');
+    expect(getComputedStyle(primary).fontWeight).toBe('700');
+    expect(getComputedStyle(secondary).fontWeight).toBe('400');
+    expect(handle.band('interval')?.querySelector('.wui-harmony-flow__label')?.textContent).toBe('3m');
+    expect(handle.index.textContent).toBe('Minor third — C#4 → E4 · ascending');
+    expect(handle.viewport.getAttribute('aria-valuetext')).toContain('Minor third');
+    pinned = {primary: 'Selected passage', secondary: ''}; handle.update();
+    expect(primary.textContent).toBe('Selected passage'); expect(secondary.textContent).toBe('');
+    handle.destroy();
+  });
+
+  it.each([true, false])('compacts sparse original tracks, decorations and keyboard neighbors without removing data (stylesheet=%s)', (stylesheet) => {
+    let now = 1;
+    const focusBand = vi.fn();
+    const seek = vi.fn();
+    const source: FlowBand[] = [
+      {id: 'near', start: 0, end: 3, track: 0, primary: 'Near'},
+      {id: 'far', start: 8, end: 9, track: 1, primary: 'Far'},
+      {id: 'low', start: 0, end: 3, track: 3, primary: 'Low'},
+    ];
+    const handle = lane({bands: source, tracks: [{id: 'top'}, {id: 'later'}, {id: 'empty'}, {id: 'lower'}],
+      flags: [{id: 'lower-flag', at: 1, track: 3}, {id: 'hidden-flag', at: 8, track: 1}],
+      brackets: [{id: 'pair', start: 0, end: 3, from: 0, to: 3}], now,
+    }, {position: () => now, seek, focusBand}, {trackLayout: 'visible', visibleSpan: 2, anchor: 0.5, stylesheet, animate: false});
+    const nodes = source.map((band) => handle.band(band.id));
+    const geometry = boxes(handle.element);
+    expect(handle.viewport.dataset.lanes).toBe('2');
+    expect(handle.track('later')!.hidden).toBe(true);
+    expect(handle.track('empty')!.hidden).toBe(true);
+    expect(handle.track('lower')!.style.top).toContain('* 1');
+    expect(handle.band('low')?.parentElement).toBe(handle.track('lower'));
+    expect(handle.element.querySelector<HTMLElement>('[data-flag="lower-flag"]')!.style.top).toBe(handle.track('lower')!.style.top);
+    expect(handle.element.querySelector<HTMLElement>('[data-flag="hidden-flag"]')!.hidden).toBe(true);
+    expect(handle.element.querySelector<HTMLElement>('[data-bracket="pair"]')!.style.height).toContain('* 1');
+    expect(handle.element.querySelector<HTMLElement>('.wui-harmony-flow__gutter')!.hidden).toBe(true);
+    handle.viewport.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowDown', bubbles: true}));
+    expect(focusBand).toHaveBeenLastCalledWith('low');
+    expect(handle.index.children).toHaveLength(3);
+    now = 8.5; handle.tick();
+    expect(handle.viewport.dataset.lanes).toBe('1');
+    expect(handle.track('later')!.hidden).toBe(false);
+    expect(handle.track('later')!.style.top).toContain('* 0');
+    expect(handle.track('lower')!.hidden).toBe(true);
+    expect(handle.element.querySelector<HTMLElement>('[data-flag="hidden-flag"]')!.style.top).toBe(handle.track('later')!.style.top);
+    expect(handle.element.querySelector<HTMLElement>('[data-bracket="pair"]')!.hidden).toBe(false);
+    expect(boxes(handle.element)).toEqual(geometry);
+    expect(source.map((band) => handle.band(band.id))).toEqual(nodes);
+    expect(handle.index.children).toHaveLength(3);
+    handle.viewport.dispatchEvent(new KeyboardEvent('keydown', {key: 'Home', bubbles: true}));
+    expect(seek).toHaveBeenLastCalledWith(0, 'commit');
+    expect(handle.viewport.dataset.lanes).toBe('2');
+    handle.destroy();
+  });
+
+  it('uses half-open viewport intersections, handles backward seeks and reserves a single empty row', () => {
+    let now = 1;
+    const handle = lane({bands: [
+      {id: 'old', start: 0, end: 1, track: 0}, {id: 'next', start: 2, end: 3, track: 2},
+    ], tracks: [{id: 'old'}, {id: 'unused'}, {id: 'next'}], now}, {position: () => now},
+    {trackLayout: 'visible', visibleSpan: 2, anchor: 0.5, animate: false});
+    // [0,2) only touches next at its right boundary.
+    expect(handle.track('next')!.hidden).toBe(true);
+    now = 1.001; handle.tick(); expect(handle.viewport.dataset.lanes).toBe('2');
+    // [1,3) no longer intersects old's [0,1).
+    now = 2; handle.tick(); expect(handle.track('old')!.hidden).toBe(true);
+    expect(handle.viewport.dataset.lanes).toBe('1');
+    now = 1; handle.tick(); expect(handle.track('next')!.hidden).toBe(true);
+    now = 5; handle.tick(); expect(handle.viewport.dataset.lanes).toBe('1');
+    expect(handle.viewport.style.height).toContain('* 1');
+    expect(handle.track('old')!.hidden).toBe(false);
+    expect(handle.index.children).toHaveLength(2);
+    handle.destroy();
+  });
+
+  it('reflows after zoom and measured resize without reading layout or rescanning bands on ordinary frames', () => {
+    let resize = () => {};
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(callback: () => void) { resize = callback; }
+      observe(): void {} disconnect(): void {}
+    });
+    let now = 1;
+    const readStart = vi.fn(() => 4);
+    const handle = lane({bands: [{id: 'held', start: 0, end: 3, track: 2},
+      {id: 'later', get start() { return readStart(); }, end: 5, track: 4}], now}, {position: () => now},
+    {trackLayout: 'visible', scale: 100, fallbackWidth: 200, anchor: 0.5, animate: false});
+    const readWidth = vi.fn(() => 800);
+    Object.defineProperty(handle.viewport, 'clientWidth', {get: readWidth});
+    const reads = readStart.mock.calls.length;
+    for (let i = 0; i < 10; i++) { now += 0.01; handle.tick(); }
+    expect(readStart).toHaveBeenCalledTimes(reads);
+    expect(readWidth).not.toHaveBeenCalled();
+    resize(); expect(handle.viewport.dataset.lanes).toBe('2');
+    handle.viewport.dispatchEvent(new WheelEvent('wheel', {deltaY: -300 * Math.log(4), ctrlKey: true}));
+    expect(handle.viewport.dataset.lanes).toBe('1');
+    expect(handle.band('later')!.parentElement!.hidden).toBe(true);
     handle.destroy();
   });
 });

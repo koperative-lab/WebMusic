@@ -72,6 +72,7 @@ export const audioBridgeContext = Object.freeze({
   rawInputs: [
     'apps/doc/webmusic/src/components/bridges/bridge-composition-client.ts',
     'apps/doc/webmusic/src/components/bridges/independent-loops-client.ts',
+    'apps/doc/webmusic/src/components/headless/arabesque-score.ts',
   ],
   htmlElements: ['kbd'],
   demoComponents: [

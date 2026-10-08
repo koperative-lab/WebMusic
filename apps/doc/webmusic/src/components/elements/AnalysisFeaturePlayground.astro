@@ -1,18 +1,20 @@
 ---
 import ElementPlayground from '../ElementPlayground.astro';
 import ElementComposition from '../ElementComposition.astro';
-interface Props { tag: 'score-chord-analysis' | 'score-live-chord-analysis'; }
+interface Props { tag: 'score-chord-analysis' | 'score-interval-analysis' | 'score-scale-analysis' | 'score-rhythm-analysis'; }
 const {tag} = Astro.props;
 const playerId = `pg-${tag}-player`;
-const SRC = `${import.meta.env.BASE_URL}midi/Arabesque%20No.1.mid`;
+const SRC = `${import.meta.env.BASE_URL}mxl/Arabesque%20No.1.mxl`;
 const companions = [{tag: 'score-player', target: 'score-player'}];
 ---
 
 <ElementPlayground tag={tag} markup="[data-demo-composition]" companions={companions}>
   <ElementComposition>
     <score-player id={playerId} src={SRC}></score-player>
-    {tag === 'score-chord-analysis' && <score-chord-analysis player={`#${playerId}`}></score-chord-analysis>}
-    {tag === 'score-live-chord-analysis' && <score-live-chord-analysis player={`#${playerId}`}></score-live-chord-analysis>}
+    {tag === 'score-chord-analysis' && <score-chord-analysis player={`#${playerId}`} window="1" grouping="beat"></score-chord-analysis>}
+    {tag === 'score-interval-analysis' && <score-interval-analysis player={`#${playerId}`} window="1"></score-interval-analysis>}
+    {tag === 'score-scale-analysis' && <score-scale-analysis player={`#${playerId}`} window="1" tonic="E" scale="major"></score-scale-analysis>}
+    {tag === 'score-rhythm-analysis' && <score-rhythm-analysis player={`#${playerId}`} window="1"></score-rhythm-analysis>}
   </ElementComposition>
 </ElementPlayground>
 

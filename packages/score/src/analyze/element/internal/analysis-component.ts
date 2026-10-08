@@ -1,17 +1,18 @@
-import {Rational, isPitchedNote, noteMidi, type Score, type ScorePlaybackSource} from '../../../core';
+import {Rational, Pitch, type Score, type ScorePlaybackSource} from '../../../core';
 import {
-  romanNumeralForChord,
   spellChord,
-  spellChordNotes,
+  inspectChordPitches,
+  type IntervalPitchMode,
+  type ScaleKind,
   type Key,
   type SpellingPreference,
 } from '../../core';
-import {createAnalysisSession, type AnalysisResult, type AnalysisSession} from '../../headless/session';
+import {projectBasicInspection, type BasicAnalysisKind, type BasicInspectionOptions, type BasicInspectionProjection,
+  type AnalysisSelection, type AnalysisInspection} from '../../headless/basic-inspection';
+export type {AnalysisSelection, AnalysisInspection, AnalysisInspectionCandidate} from '../../headless/basic-inspection';
 import {createTransportClock, rateFromDurations, type TransportClock} from '../../headless/transport-clock';
 import {
   formatMetricalPosition,
-  projectProgression,
-  projectNameplate,
   type FlowBandView,
   type FlowLaneView,
   type NameplateView,
@@ -20,7 +21,6 @@ import {
 import {
   bindAnalysisPlayer,
   createLiveChordTracker,
-  createLiveKeyTracker,
   createPlayheadHighlighter,
   createScoreSource,
   recipeFor,
@@ -31,7 +31,6 @@ import {
 } from './index';
 import {HTMLElementBase, upgradeProperties} from '../base';
 import {seekAnalysisPlayer, type AnalysisTimeUpdate} from './player-binding';
-import {projectChordCells} from './chord-cells';
 import {
   mountFlowLane,
   mountNameplate,
@@ -54,30 +53,8 @@ export interface AnalysisViewSeekDetail {
   seconds: number;
 }
 
-export interface AnalysisSelection {
-  readonly id: string;
-  readonly startQuarters: number;
-  readonly endQuarters: number;
-}
-
 export interface AnalysisViewSelectDetail extends AnalysisSelection {
-  readonly kind: 'chord';
-}
-
-export interface AnalysisInspectionCandidate {
-  readonly id: string;
-  readonly label: string;
-  readonly detail?: string;
-  readonly selected: boolean;
-}
-
-export interface AnalysisInspection {
-  readonly kind: AnalysisViewSelectDetail['kind'];
-  readonly selection: AnalysisSelection;
-  readonly headline: string;
-  readonly detail: string;
-  readonly evidence: readonly string[];
-  readonly candidates: readonly AnalysisInspectionCandidate[];
+  readonly kind: BasicAnalysisKind;
 }
 
 /**
@@ -168,7 +145,8 @@ interface Material {
   /** Identity as a number, so a repaint decision is a string compare. */
   revision: number;
   score?: Score;
-  result?: AnalysisResult;
+  result?: BasicInspectionProjection;
+  error?: string;
   lane: FlowLaneView;
   index: readonly IndexRow[];
 }
@@ -184,9 +162,6 @@ interface Tenant {
 }
 
 const EMPTY_LANE: FlowLaneView = {bands: [], now: 0};
-// Scores and analysis results are immutable: sibling components share one
-// default analysis snapshot without sharing their local interaction state.
-const ANALYSES = new WeakMap<Score, AnalysisResult>();
 
 /** Shared composition and lifecycle for independent analysis components. */
 export abstract class AnalysisComponentElement extends HTMLElementBase {
@@ -197,7 +172,7 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
   }
 
   #source = createScoreSource(this);
-  #session?: AnalysisSession;
+  #noteIds?: readonly string[];
   #highlight = createPlayheadHighlighter({scroll: false});
   #clock: TransportClock = createTransportClock();
 
@@ -257,8 +232,6 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
     },
   });
 
-  // Only the live nameplate uses this context to choose automatic spelling.
-  #liveKey = createLiveKeyTracker(() => undefined);
 
   connectedCallback(): void {
     upgradeProperties(this, [
@@ -268,7 +241,11 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
       'spelling',
       'motion',
       'window',
-      'analysisWindow',
+      'mode',
+      'grouping',
+      'pitchMode',
+      'tonic',
+      'scale',
       'key',
       'stabilityMs',
     ]);
@@ -283,6 +260,17 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
 
   attributeChangedCallback(name?: string): void {
     if (!this.isConnected) return;
+    if (name === 'mode') {
+      const value = this.getAttribute('mode');
+      if (value !== null && value !== 'score' && value !== 'live') this.#warn(`mode="${value}" must be score or live — using score.`);
+      this.#destroy();
+      this.#score = undefined;
+      this.#error = undefined;
+      this.#mount();
+      this.#bindPlayer();
+      void this.#refresh();
+      return;
+    }
     if (name === 'player') {
       this.#bindPlayer();
       if (!this.#source.score && !this.getAttribute('src')) void this.#refresh();
@@ -305,7 +293,7 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
       this.#cache = undefined;
       this.#inspectionCache = undefined;
       this.#apply();
-      if (name === 'spelling') this.#scheduleChordChange();
+      if (name === 'spelling' || name === 'key') this.#scheduleChordChange();
       return;
     }
     void this.#refresh();
@@ -319,6 +307,23 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
 
   get score(): Score | undefined {
     return this.#source.score;
+  }
+
+  /** Written notation or concert-pitch inspection; live MIDI already supplies sounding values. */
+  get pitchMode(): IntervalPitchMode {
+    return pick(this.getAttribute('pitch-mode'), ['written', 'sounding'] as const, 'written', 'pitch-mode', (message) => this.#warn(message)) ?? 'written';
+  }
+  set pitchMode(value: IntervalPitchMode) { this.setAttribute('pitch-mode', value); }
+
+  /** Restrict interval/scale inspection to source note IDs; an empty list restores the attribute filters. */
+  selectNotes(noteIds: readonly string[]): void {
+    if (this.analysisType !== 'intervals' && this.analysisType !== 'scale') throw new TypeError('selectNotes is supported by interval and scale inspection');
+    if (!Array.isArray(noteIds) || noteIds.some((id) => typeof id !== 'string' || !id)) throw new TypeError('noteIds must contain non-empty source note IDs');
+    this.#noteIds = noteIds.length ? [...new Set(noteIds)] : undefined;
+    this.#selection = undefined;
+    this.#cache = undefined;
+    this.#inspectionCache = undefined;
+    this.#apply();
   }
 
   /** The named chord, or `undefined` for silence or an unnamed note set. */
@@ -610,12 +615,11 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
     this.#evidenceStatus = undefined;
     this.#renderedInspection = undefined;
     // Release derived caches when the component disconnects.
-    this.#session = undefined;
     this.#model = undefined;
     this.#cache = undefined;
     this.#soundingCache = undefined;
     this.#selection = undefined;
-    this.#selectionScore = undefined;
+    // Retain the source identity so reconnecting after replacement clears stale note IDs.
     this.#inspectionCache = undefined;
   }
 
@@ -624,17 +628,18 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
     if (!this.#recipe().needsScore) {
       this.#source.cancel();
       this.#score = undefined;
-      this.#session = undefined;
       this.#error = undefined;
       this.#syncClock();
       if (this.#lastUpdate) this.#followTime(this.#lastUpdate);
       else this.#apply();
+      this.#scheduleChordChange();
       return;
     }
     const {score, stale, error} = await this.#source.load();
     if (stale || !this.isConnected) return;
     this.#score = score;
     if (this.#selectionScore !== score) {
+      if (this.#selectionScore) this.#noteIds = undefined;
       this.#selection = undefined;
       this.#selectionScore = score;
       this.#inspectionCache = undefined;
@@ -647,7 +652,6 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
       this.setAttribute('data-player-state', 'mismatched');
     }
     this.#error = error;
-    if (!score) this.#session = undefined;
     this.#syncClock();
     if (this.#lastUpdate) this.#followTime(this.#lastUpdate);
     else this.#apply();
@@ -708,13 +712,13 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
     const recipe = this.#recipe();
     this.#moving = this.#animating(this.#now());
     const score = recipe.needsScore ? this.#score : undefined;
-    const result = score && type === 'chords'
-      ? this.#analyze(score) : undefined;
-    const material = this.#material(recipe, result, score);
+    const material = this.#material(score);
+    const result = material.result;
     const lane = material.lane;
     this.#syncSelection(lane, score);
+    const selectedBand = lane.bands.find((band) => band.id === this.#selection?.id);
     const index = material.index;
-    const message = this.#error
+    const message = this.#error ?? material.error ?? result?.message
       ?? (recipe.needsScore && !score ? 'Waiting for a score — set player, src or .score.'
         : index.length === 0 ? recipe.emptyLabel : '');
     return {
@@ -723,40 +727,63 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
       lane: {
         ...lane,
         playing: this.#playing,
-        focusGroup: material.lane.bands.find((band) => band.id === this.#selection?.id)?.group ?? this.#selection?.id,
+        primaryTrack: selectedBand?.track ?? lane.primaryTrack,
+        focusGroup: selectedBand?.group ?? this.#selection?.id,
       },
-      sounding: type === 'live-chord' ? this.#sounding(this.#liveKey.result()) : undefined,
+      sounding: type === 'live-chord' ? this.#sounding(this.#chordKey().key) : undefined,
       index,
       laneKey: `${material.revision}|${this.#playing ? 1 : 0}|${this.#selection?.id ?? ''}`,
-      phase: this.#error ? 'error'
+      phase: this.#error || material.error ? 'error'
         : this.#moving ? 'playing'
         : recipe.slot.kind === 'flow' && index.length === 0 ? 'empty' : 'idle',
       message,
-      detail: score ? formatMetricalPosition(score, this.#quartersNow(score)) : '',
+      detail: score ? this.#formatPosition(score, this.#quartersNow(score)) : '',
       inspection: score && this.#selection ? this.#inspect(score, this.#selection, result) : undefined,
     };
   }
 
   /** Reuse immutable lane geometry and semantic rows between player snapshots. */
-  #material(
-    recipe: ViewRecipe,
-    result: AnalysisResult | undefined,
-    score: Score | undefined,
-  ): Material {
-    const cached = this.#cache;
-    if (cached && cached.score === score && cached.result === result) {
-      return cached;
+  #material(score: Score | undefined): Material {
+    if (this.#cache && this.#cache.score === score) return this.#cache;
+    let result: BasicInspectionProjection | undefined;
+    let error: string | undefined;
+    try {
+      const kind = this.#inspectionKind();
+      if (score && kind) result = projectBasicInspection(score, kind, this.#options());
+    } catch (cause) {
+      error = cause instanceof Error ? cause.message : String(cause);
     }
-    const lane = this.#laneFor(recipe, result, score);
-    const material: Material = {
-      revision: (this.#materials += 1),
-      score,
-      result,
-      lane,
-      index: this.#indexFor(lane, score),
-    };
+    const lane = result?.lane ?? {...EMPTY_LANE, disabled: true};
+    const material: Material = {revision: ++this.#materials, score, result, error,
+      lane, index: this.#indexFor(lane, score)};
     this.#cache = material;
     return material;
+  }
+
+  #options(): BasicInspectionOptions {
+    const pitchMode = this.getAttribute('pitch-mode');
+    if (pitchMode !== null && !['written', 'sounding'].includes(pitchMode.trim().toLowerCase())) {
+      throw new RangeError('pitch-mode must be written or sounding');
+    }
+    const kind = this.getAttribute('kind') ?? 'melodic';
+    if (!['melodic', 'harmonic', 'both'].includes(kind)) throw new RangeError('kind must be melodic, harmonic or both');
+    const groups = this.getAttribute('beat-groups');
+    const grouping = this.getAttribute('grouping') ?? 'beat';
+    if (this.analysisType === 'chords' && !['beat', 'simultaneous'].includes(grouping)) throw new RangeError('grouping must be beat or simultaneous');
+    const subdivision = Number(this.getAttribute('subdivision') ?? 2);
+    if (![1, 2, 3, 4].includes(subdivision)) throw new RangeError('subdivision must be 1, 2, 3 or 4');
+    return {
+      pitchMode: this.pitchMode,
+      key: this.#chordKey().key,
+      chordGrouping: grouping as 'beat' | 'simultaneous',
+      selection: {noteIds: this.#noteIds, partId: this.getAttribute('part') || undefined,
+        voiceId: this.getAttribute('voice') || undefined},
+      intervalKind: kind as 'melodic' | 'harmonic' | 'both',
+      tonic: this.getAttribute('tonic') || undefined,
+      scale: (this.getAttribute('scale') ?? 'major') as ScaleKind,
+      beatGroups: groups === null ? undefined : groups.split('+').map((value) => Number(value.trim())),
+      subdivision: subdivision as 1 | 2 | 3 | 4,
+    };
   }
 
   /** Name only the sounding set; pitch diagrams belong to sibling View elements. */
@@ -767,7 +794,14 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
     const cached = this.#soundingCache;
     if (cached?.signature === signature) return cached.projection;
     const spelling = spellChord(midis, {key, spelling: this.spelling});
-    const projection = {spelling, naming: projectNameplate(spelling)};
+    const chord = inspectChordPitches(spelling.pitches.map((pitch) => Pitch.parse(pitch.name)), key);
+    const naming: NameplateView = {
+      primary: chord.primary ? {symbol: chord.primary.symbol, full: `${chord.primary.quality} · bass ${chord.primary.bass} · inversion ${chord.primary.inversion}`} : undefined,
+      alternates: chord.candidates.slice(1).map((candidate) => ({symbol: candidate.symbol})),
+      voicing: spelling.pitches.map((pitch) => ({label: pitch.name})),
+      emptyLabel: '—',
+    };
+    const projection = {spelling, naming};
     this.#soundingCache = {signature, projection};
     return projection;
   }
@@ -845,38 +879,13 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
     return Math.min(Math.max(bars, MIN_WINDOW_SECONDS), MAX_WINDOW_SECONDS);
   }
 
-  #laneFor(
-    recipe: ViewRecipe,
-    result: AnalysisResult | undefined,
-    score: Score | undefined,
-  ): FlowLaneView {
-    const source = recipe.slot.source;
-    if (!score) return {...EMPTY_LANE, disabled: true};
-    if (source === 'progression') {
-      if (!result) return {...EMPTY_LANE, disabled: true};
-      // The projection pins the position under the name for a PARKED lane. It
-      // is dropped here rather than refreshed, because refreshing it means
-      // reconciling every band on the reel twenty times a second to move one
-      // text node — and the status strip already carries the live bar and beat,
-      // on the cursor's own rate and deliberately outside the live region. What
-      // stays pinned is the crossing band's own name, which is what the line is
-      // there to answer.
-      const lane = projectChordCells(score, projectProgression(result, score, 'chords', {roll: false}), {
-        spelling: this.spelling,
-        key: this.#chordKey(result).key,
-      });
-      return {...lane, bands: lane.bands.map((band) => ({...band, group: band.id})), pinned: undefined};
-    }
-    return EMPTY_LANE;
-  }
-
   #syncSelection(lane: FlowLaneView, score: Score | undefined): void {
     const type = this.analysisType;
     if (!score || type === 'live-chord') return;
     const selected = this.#selection;
     if (selected?.id.startsWith('region:')) return;
     const band = lane.bands.find((item) => item.id === selected?.id)
-      ?? lane.bands.find((item) => Boolean(item.primary));
+      ?? lane.bands.find((item) => Boolean(item.primary || item.secondary));
     if (!band) {
       this.#selection = undefined;
       return;
@@ -904,65 +913,33 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
     }
   }
 
-  #inspectionKind(): AnalysisViewSelectDetail['kind'] | undefined {
-    return this.analysisType === 'chords' ? 'chord' : undefined;
+  #inspectionKind(): BasicAnalysisKind | undefined {
+    return ({chords: 'chord', intervals: 'interval', scale: 'scale', rhythm: 'rhythm'} as const)[this.analysisType as 'chords' | 'intervals' | 'scale' | 'rhythm'];
   }
 
-  #inspect(score: Score, selection: AnalysisSelection, result: AnalysisResult | undefined): AnalysisInspection | undefined {
+  #inspect(score: Score, selection: AnalysisSelection, result: BasicInspectionProjection | undefined): AnalysisInspection | undefined {
     const kind = this.#inspectionKind();
-    if (!kind) return undefined;
-    const signature = `${kind}|${selection.id}|${selection.startQuarters}|${selection.endQuarters}|${this.spelling}|${this.getAttribute('key') ?? ''}`;
+    if (!kind || !result) return undefined;
+    const direct = result?.inspections.find((item) => item.selection.id === selection.id);
+    if (direct) return direct;
     const cached = this.#inspectionCache;
-    if (cached?.score === score && cached.selection === selection && cached.signature === signature) return cached.value;
-    const value = this.#chordInspection(score, selection, result);
-    this.#inspectionCache = {score, selection, signature, value};
+    if (cached?.score === score && cached.selection === selection) return cached.value;
+    const matches = result?.inspections.filter((item) => item.selection.startQuarters < selection.endQuarters && item.selection.endQuarters > selection.startQuarters) ?? [];
+    const value: AnalysisInspection = {
+      kind, selection, headline: `${matches.length} ${kind} readings`,
+      detail: `Selected passage; separate readings retain their notes and time spans. ${[...new Set(matches.map((item) => item.detail))].join(' · ')}`,
+      evidence: matches.flatMap((item) => [`${item.headline} · ${item.selection.startQuarters}–${item.selection.endQuarters} quarters`, ...item.evidence]),
+      candidates: [],
+    };
+    this.#inspectionCache = {score, selection, signature: '', value};
     return value;
   }
 
-  #chordInspection(score: Score, selection: AnalysisSelection, result: AnalysisResult | undefined): AnalysisInspection {
-    const cell = selection.id.startsWith('chord-cell-');
-    const at = (selection.startQuarters + selection.endQuarters) / 2;
-    const evidence = score.parts.flatMap((part) => part.notes
-      .filter((note) => isPitchedNote(note)
-        && (cell
-          ? note.onsetQuarters.toFloat() < selection.endQuarters
-            && note.offsetQuarters.toFloat() > selection.startQuarters
-          : note.onsetQuarters.toFloat() <= at && note.offsetQuarters.toFloat() > at))
-      .map((note) => ({note, partId: String(part.id)})));
-    const {key, explicit} = this.#chordKey(result);
-    const spelling = spellChordNotes(evidence.map((item) => item.note), {
-      key, spelling: this.spelling,
-    });
-    const symbol = spelling.primary?.symbol ?? spelling.label;
-    const degree = key && spelling.primary ? romanNumeralForChord(symbol, key) : undefined;
-    const context = key ? `Degree ${degree ?? 'unknown'} in ${key.tonic} ${key.mode}${explicit ? ' (chosen)' : ' (score-wide estimate)'}`
-      : 'No reliable key context';
-    const pitches = new Map(spelling.pitches.map((pitch) => [pitch.midi, pitch]));
-    return {
-      kind: 'chord', selection,
-      headline: symbol,
-      detail: cell
-        ? `Notes across ${formatMetricalPosition(score, selection.startQuarters)} to ${formatMetricalPosition(score, selection.endQuarters)} · ${context}`
-        : `Sampled at ${formatMetricalPosition(score, at)} within the selected region · ${context}`,
-      evidence: evidence.map(({note, partId}) => {
-        const spelled = pitches.get(noteMidi(note));
-        return `${spelled?.name ?? note.pitch?.toString() ?? 'pitch'} ${spelled?.degreeLabel ?? ''} · ${partId}/${String(note.voice)} · ${String(note.id)}`;
-      }),
-      candidates: spelling.namings.map((name) => ({
-        id: name.symbol, label: name.symbol, detail: name.kind,
-        selected: name.symbol === spelling.primary?.symbol,
-      })),
-    };
-  }
-
-  #chordKey(result: AnalysisResult | undefined): {key?: Key; explicit: boolean} {
-    const keyAttribute = this.getAttribute('key');
-    const explicitKey = parseKey(keyAttribute);
-    if (keyAttribute && !explicitKey) {
-      this.#warn(`key="${keyAttribute}" must name a tonic and major or minor mode — using the detected key.`);
-    }
-    const detected = result?.key.scores.length && result.key.confidence > 0 ? result.key : undefined;
-    return {key: explicitKey ?? detected, explicit: Boolean(explicitKey)};
+  #chordKey(): {key?: Key; explicit: boolean} {
+    const raw = this.getAttribute('key');
+    const key = parseKey(raw);
+    if (raw && !key) this.#warn(`key="${raw}" must name a tonic and major or minor mode — no key assumed.`);
+    return {key, explicit: Boolean(key)};
   }
 
   /** Semantic rows share the intervals drawn by the visible lane. */
@@ -970,22 +947,13 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
     if (!score) return [];
     const stamped = lane.primaryTrack;
     return lane.bands
-      .filter((band) => Boolean(band.primary))
+      .filter((band) => Boolean(band.primary || band.secondary))
       .map((band) => ({
         id: band.id,
-        text: rowText(band, score),
+        text: rowText(band, score, this.analysisType === 'rhythm'),
         span:
           stamped === undefined || (band.track ?? 0) === stamped ? stampOf(band) : undefined,
       }));
-  }
-
-  #analyze(score: Score): AnalysisResult {
-    const shared = ANALYSES.get(score);
-    if (shared) return shared;
-    if (!this.#session) this.#session = createAnalysisSession(score);
-    const result = this.#session.update(score);
-    ANALYSES.set(score, result);
-    return result;
   }
 
   // -------------------------------------------------------------------------
@@ -1012,7 +980,7 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
     const spec = (this.#model?.recipe ?? this.#recipe()).slot;
     const visibleSpan = spec.kind === 'flow' ? this.#laneSpan() : undefined;
     const held = this.#presenter;
-    if (held && held.visibleSpan === visibleSpan) return;
+    if (held && held.kind === spec.kind && held.visibleSpan === visibleSpan) return;
     const host = held?.host ?? this.ownerDocument.createElement('div');
     if (held) held.destroy();
     else {
@@ -1053,7 +1021,9 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
           clock: workbench.clock,
           // The playhead owns the semantic index instead; see the class note.
           spans: false,
-          reservePinned: this.analysisType === 'chords',
+          reservePinned: true,
+          trackLayout: 'visible',
+          labelOverflow: this.analysisType === 'chords' ? 'wrap' : 'truncate',
           // The caller owns seconds; UIKit owns responsive pixel geometry.
           visibleSpan: this.#laneSpan(),
           formatPosition: (position) => this.#describePosition(position),
@@ -1183,7 +1153,11 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
   #describePosition(position: number): string {
     const score = this.#model?.score;
     if (!score) return `${position.toFixed(2)} s`;
-    return formatMetricalPosition(score, score.timeMap.secondsToQuarters(Math.max(0, position)).toFloat());
+    return this.#formatPosition(score, score.timeMap.secondsToQuarters(Math.max(0, position)).toFloat());
+  }
+
+  #formatPosition(score: Score, quarters: number): string {
+    return this.analysisType === 'rhythm' ? quarterPosition(quarters) : formatMetricalPosition(score, quarters);
   }
 
   /** Announce the seek and drive the bound player, which does not listen. */
@@ -1250,7 +1224,8 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
     this.#player = undefined;
     this.#resetPlayerState();
     this.#unbind = bindAnalysisPlayer(this, {
-      score: () => this.#source.score ?? (this.getAttribute('src') ? this.#score : undefined),
+      score: () => this.analysisType === 'live-chord' ? undefined
+        : this.#source.score ?? (this.getAttribute('src') ? this.#score : undefined),
       targetChanged: (target) => {
         this.#revision += 1;
         this.#resetPlayerState();
@@ -1266,7 +1241,6 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
       },
       ...(this.analysisType === 'live-chord' ? {
         noteOn: (midi: number) => {
-          this.#liveKey.noteOn(midi);
           this.#liveChord.noteOn(midi);
         },
         noteOff: (midi: number) => this.#liveChord.noteOff(midi),
@@ -1282,7 +1256,6 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
         // wherever the last coast happened to reach.
         this.#clock.stop(this.#now(), this.#score?.durationSeconds);
         if (this.analysisType === 'live-chord') {
-          this.#liveKey.reset();
           this.#liveChord.reset();
         }
         this.#highlight.clear();
@@ -1319,12 +1292,9 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
     // Live analysis and playhead state are owned by the current player
     // subscription. A disconnect or selector replacement starts a fresh
     // ownership domain instead of mixing events from two players.
-    if (this.analysisType === 'live-chord') {
-      this.#clearChordChange();
-      this.#lastEmittedChord = undefined;
-      this.#liveKey.reset();
-      this.#liveChord.reset();
-    }
+    this.#clearChordChange();
+    this.#lastEmittedChord = undefined;
+    this.#liveChord.reset();
     this.#highlight.clear();
     this.#soundingMidis = [];
     this.#playing = false;
@@ -1369,17 +1339,22 @@ function stampOf(band: FlowBandView): {start: number; end: number} | undefined {
   return Number.isFinite(start) && Number.isFinite(end) ? {start, end} : undefined;
 }
 
-function rowText(band: FlowBandView, score: Score): string {
+function quarterPosition(quarters: number): string {
+  return `${Number(quarters.toFixed(3))} quarter-note units from start`;
+}
+
+function rowText(band: FlowBandView, score: Score, groupedRhythm = false): string {
   const stamp = stampOf(band);
   const parts = [
-    band.primary,
-    band.secondary,
-    stamp ? formatMetricalPosition(score, stamp.start) : undefined,
+    band.readout?.primary ?? band.primary,
+    ...(band.readout?.fields === undefined ? [band.readout?.secondary ?? band.secondary]
+      : band.readout.fields.map((field) => `${field.label}: ${field.value || '—'}`)),
+    stamp ? (groupedRhythm ? quarterPosition(stamp.start) : formatMetricalPosition(score, stamp.start)) : undefined,
   ].filter((part): part is string => Boolean(part));
   // De-duplicated, because a projection is free to have already put the
   // position in `secondary` and a row reading `bar 3 · bar 3` is a row nobody
   // wrote on purpose.
-  return [...new Set(parts)].join(' · ');
+  return [...new Set(parts)].join(band.readout?.fields === undefined ? ' · ' : ', ');
 }
 
 /** Stamp the semantic row on the same quarter-note interval as its band. */

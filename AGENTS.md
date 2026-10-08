@@ -21,8 +21,7 @@ The source tree contains Kernel, UI Kit, Score, Audio and Bridge. The earlier
 three-package `main` release remains a historical publication baseline; adding
 Audio and Bridge source does not publish new npm artifacts. Score and Agent
 Toolkit behavior retain their accepted contracts. The reviewed Score Recorder,
-Analyze demo and component-frame choices (DEC-032–034), two-tool Analyze
-inventory (DEC-043), and domain-prefixed Score tags (DEC-045) are part of this
+Analyze demo and component-frame choices (DEC-032–034), four elementary Analyze tools (DEC-047), and domain-prefixed Score tags (DEC-045) are part of this
 combined source tree. Keep Kernel and UI domain-neutral, with explicit contracts
 and tests for compatibility used by both domains.
 
@@ -30,6 +29,23 @@ Preserve unrelated uncommitted work and dated evidence when synchronizing
 branches. Read [STATUS](dev/STATUS.md), manifests and source for the checkout's
 delivery and verification; an older branch's passing checks do not establish
 current results. Generated inventories must describe the actual tracked tree.
+
+## Demo music: reuse Arabesque No. 1
+
+All musical demos must use the existing **Arabesque No. 1** assets in
+`apps/doc/webmusic/public/`. Inspect that directory before choosing an input:
+use MXL when authored pitch spelling, voices, rhythm or notation matters, MIDI
+for MIDI/playback workflows, and WAV or MP3 for audio workflows. Follow the
+[demo asset guidance](dev/docs/DOCS-CONVENTIONS.md#demo-assets) for format
+limitations, URL encoding and the site base path.
+
+Do not generate replacement note sequences, teaching pieces, synthetic demo
+Scores or new media files merely to populate a demo. Reuse the existing piece
+or a passage from it; keep the same source across related demos and their
+copyable examples. Choose another demo piece only when the user explicitly
+requests it. Small deterministic fixtures belong in automated tests, not in
+the user-facing demo repertoire. Live input/recording demos may accept user
+input; their bundled sample material must still use Arabesque No. 1.
 
 ## Start every task
 

@@ -5,7 +5,7 @@ import {defineAllAnalysisElements, type ChordAnalysisElement} from '../../src/an
 
 defineAllAnalysisElements();
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
-const features = ['chord', 'live-chord'];
+const features = ['chord', 'live-chord', 'interval', 'scale', 'rhythm'];
 
 function music(): Score {
   const builder = new ScoreBuilder();
@@ -33,7 +33,8 @@ function player(score = music()) {
 }
 
 function mount(feature: string) {
-  const node = document.createElement(`score-${feature}-analysis`) as ChordAnalysisElement;
+  const node = document.createElement(`score-${feature === 'live-chord' ? 'chord' : feature}-analysis`) as ChordAnalysisElement;
+  if (feature === 'live-chord') node.mode = 'live';
   node.setAttribute('player', '#source');
   node.setAttribute('motion', 'stepped');
   document.body.append(node);
@@ -110,7 +111,7 @@ describe('independent analysis capabilities', () => {
     const live = mount('live-chord');
     await flush();
     for (const midi of [60, 64, 67]) source.dispatchEvent(new CustomEvent('webscore:noteon', {detail: {midi}}));
-    expect(live.chord).toBe('CM');
+    expect(live.chord).toBe('C');
     expect(live.querySelector('[role="slider"]')).toBeNull();
     for (const midi of [60, 64, 67]) source.dispatchEvent(new CustomEvent('webscore:noteoff', {detail: {midi}}));
     expect(live.chord).toBeUndefined();

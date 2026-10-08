@@ -18,7 +18,8 @@ and Bridge work. Inspect local and remote Git refs separately when describing
 availability.
 
 Score follows main except for explicitly requested Analyze component-frame
-defaults (DEC-034), the two-chord-tool Analyze inventory (DEC-043), and
+defaults (DEC-034), the four elementary Analyze tools and their readable metrical
+inspection lanes (DEC-047–048), and
 domain-prefixed Web Component tags (DEC-045). Public
 references and parameter catalogs also retain the standalone Score Recorder
 page/demo (DEC-032) and Analyze demo layout alignment (DEC-033).
@@ -73,17 +74,143 @@ supersedes that pass's acceptance of bare Score surfaces: DEC-034 restores the
 shared component border and padding. Ordinary development starts now reuse the
 tracked server; replacement is explicit.
 
-DEC-043 parks the motif and rhythm-pattern Elements from DEC-040 on the local
-`codex/score-pattern-analysis-research` branch for later study. The current
-Score Analyze Elements are live chord and chord progression; recurrence
-algorithms and projections remain API/Headless capabilities. Selection stays
-local to a component and does not edit Score or create playback authority.
-The change is present in the integrated `main` baseline.
+DEC-043 parks the motif and rhythm-pattern Elements from DEC-040 for later
+study; the local `archive/score-pattern-analysis-research` tag and original
+research branch preserve that snapshot. Recurrence algorithms and projections
+remain API/Headless capabilities. DEC-047 now
+selects four elementary Score Analyze Elements: chord (score/live modes),
+interval, explicit scale and grouped rhythm. This supersedes DEC-043's two-tag
+inventory and DEC-042's dense, fixed half-bar chord aggregation. Score chord
+inspection follows DEC-048: the Element defaults to explicitly labelled
+metrical pitch collections, with exact simultaneous inspection still selectable.
+API and Headless defaults remain simultaneous; live mode reads held notes.
+Only complete spelled triads/sevenths receive names, and the lowest collected
+pitch does not assert a structural harmonic bass. The earlier inventory was part
+of the integrated `main` baseline; the reviewed `score-analysis-basics` work
+is consolidated on `dev` and has not been merged into `main`.
+
+Local verification on 2026-10-03 passed `npm run check`, including 4,246
+workspace tests, and `npm run docs:build` (112 pages). The existing
+development-server subprocess cleanup test
+required execution outside the sandbox; it passed without changing its
+assertions. Initial browser checks covered all four demos, score/live mode switching,
+player-driven live C-major readings, keyboard seeking, explicit scale-context
+errors and recovery, grouped-rhythm subdivision controls, Copy/Reset, and
+390px layout without page overflow. Ruler labels no longer overlap at narrow
+widths, and the live spelling caption leaves the chord symbol fully visible.
+Automated cases cover source replacement, borrowed lifetimes, independent
+companions and passage/note selection. Real MIDI devices, screen-reader use
+and audible non-unit-rate timing remain unverified.
+
+The demo-source follow-up replaces the temporary teaching score with the
+existing Arabesque No. 1 MXL across all four Analyze demos and their examples.
+Scale inspection explicitly starts with E major. AGENTS now requires existing
+Arabesque assets or passages for musical demos; synthetic boundary cases remain
+test fixtures. The initial C-major browser readings above describe the earlier
+fixture, not a claim about a passage in Arabesque.
+Follow-up browser checks verified all four MXL-backed Analyze surfaces,
+score/live mode switching, copied/reset source attributes and the explicit E
+major reference. The initial one-second demo windows keep written notes and
+complete chord labels readable. Bridge checks verified real MIDI excerpt replacement (16 to
+24 quarter-note beats), WAV-backed native loops, seek phases at master 4.25 s
+(0.25 s and 1.25 s) and disposal.
+UIKit's analysis, pitch, harmony and workbench demos now project the same MXL
+opening instead of canned progressions. Browser checks verified source-derived
+readings, relative passage selection and the Roots and basses view, without
+console errors. These presenter demos use a visual inspection clock, not audio
+playback. The editable API examples also load the existing MXL; their remote
+sandbox preview remains disabled by default and was not executed.
+
+Final follow-up verification passed `VITEST_MAX_WORKERS=2 npm run check`
+(4,252 workspace tests) and `npm run docs:build` (112 pages). An earlier
+unbounded run encountered module-import, worker-start and real-clock assertion
+timeouts under load; the two affected Score files passed all 23 tests in an
+isolated rerun, and the bounded full run passed without changing assertions or
+production behavior.
+
+The 2026-10-07 readability follow-up implements DEC-048's metrical chord
+collections and expanded current readings. Real Arabesque regression cases
+recognize the opening A/C# and G#m/B collections while retaining the fifth-bar
+A/C#/D# collection without a chord name. All four lanes compact offscreen-only
+rows, retain source evidence and prefer the selected overlapping row in the
+current readout. Reserved primary/secondary line boxes persist across gaps.
+`VITEST_MAX_WORKERS=2 npm run check` passed all 4,274 workspace tests, and
+`npm run docs:build` built 112 pages. Browser checks at 1280px and 390px verified
+all four readings without page overflow, score/simultaneous/live chord modes,
+player-driven live names, keyboard navigation, harmonic interval `+` separation,
+explicit scale-context removal/recovery, lower-row rest selection, rhythm
+subdivision, and copied/reset chord markup. The existing Arabesque source is
+unchanged. Browser console errors were absent; real MIDI hardware, screen-reader
+acceptance and acoustic timing remain outside this verification.
+
+The requested chord display refinement removes collection captions from visual
+labels: named chords show their source note names below, including octaves;
+unmatched sets leave the chord-name row empty and show their note names only in
+the secondary row, in both the current readout and timeline. The live nameplate
+keeps the same separation. Grouping evidence remains in `.analysis`.
+Chord bands opt into wrapped labels with measured row height, preserving their
+time coordinates. The initial chord demo window is now one second, matching
+the other three demos and giving full labels more room.
+Refinement verification passed `VITEST_MAX_WORKERS=2 npm run check` (4,278
+workspace tests) and `npm run docs:build` (112 pages). Browser checks confirmed
+named chords with notes below, note-only unmatched sets, and wrapped labels
+without ellipsis or vertical clipping at the normal viewport and 390px, including
+a denser four-second window. Dense narrow windows grow vertically to retain
+their text; the default one-second window stays compact. Reset restores that
+default, and browser error logs remained empty. The note-row clarification also
+preserves unnamed-set selection and semantic index entries, and aligns empty
+chord-name slots with neighbouring named chords.
+
+The subsequent note-row correction passed `VITEST_MAX_WORKERS=2 npm run check`
+(4,283 workspace tests) and `npm run docs:build` (112 pages). Browser verification
+at the normal viewport and 390px used the actual Arabesque set
+`B2 E3 F#4 G#4 B4`: the chord-name row remains empty while the complete note row
+aligns with the next `C#m/E` chord's notes. The temporary viewport override was
+reset and browser errors remained absent. Unit regressions also cover both
+score grouping modes, live unnamed/named transitions and reduced-motion updates.
+
+The live-display follow-up removes the MIDI-spelling caption from the component
+and uses muted note text beneath the prominent chord name; the spelling limits
+remain in the public reference. The reserved live rows and unabridged,
+horizontally scrollable long readings are unchanged. `VITEST_MAX_WORKERS=2 npm
+run check` passed all 4,283 workspace tests, and `npm run docs:build` built 112
+pages. Actual Arabesque playback confirmed named (`F#m7`), unnamed and silent
+states without the caption; their nameplate height remained 104px in the tested
+default theme. Playback was paused and the preview left in live mode.
+
+The interval, scale and rhythm readouts now use three fixed labeled fields
+instead of a concatenated visual subtitle. Interval shows Notes, Motion and
+Semitones; scale shows Note, Reference and Relation; rhythm shows Bar, Beat and
+Duration (qn). Equal-width columns reserve the maximum heading and field heights
+across supplied readings, so wrapped values and gaps retain their layout during
+playback. Rest and tie readings retain their original written onset; an
+out-of-range onset with incompatible beat grouping leaves Beat unavailable
+without changing the original Bar or Duration. Invalid in-range grouping still
+fails validation.
+`VITEST_MAX_WORKERS=2 npm run check` passed all 4,295 workspace tests, and
+`npm run docs:build` built 112 pages. Actual Arabesque playback and keyboard
+navigation verified all three surfaces at the normal viewport and 390px,
+including a wrapped melodic-minor reference, interval gaps, and rest/triplet
+selection. Field widths and their offsets within the readout remained fixed;
+browser error logs were empty. Playback was paused and the temporary viewport
+override reset. This does not extend device, screen-reader or acoustic acceptance.
+
+The [2026-10-07 dev consolidation review](log/2026-10-07-score-analysis-dev-closeout.md)
+found and corrected two additional boundary cases: structured readouts now
+collapse through gaps when `reservePinned` is omitted or false, and rhythm
+Headless note selection no longer inherits accent evidence from excluded notes.
+All six added regressions failed before their fixes and passed afterward.
+Final local verification passed `VITEST_MAX_WORKERS=2 npm run check` (4,301
+workspace tests) and `npm run docs:build` (112 pages). This records local
+verification, not remote CI, publication or new browser/device acceptance.
+
 [The earlier inspection record](audits/2026-09-26/SCORE-ANALYZE-INSPECTION.md)
-describes DEC-038's former five-tool tree and does not verify this inventory.
-DEC-041 still governs the retained chord readings: candidates remain in
-`.analysis` instead of Element buttons, and live alternate names are static
-text below the symbol. DEC-042's dense chord projection also remains.
+describes DEC-038's former five-tool tree and does not verify the current tools.
+DEC-041's presentation boundary remains: candidates are available in `.analysis`
+instead of Element buttons, and live alternate names are static text below the
+symbol. Selection stays local to each component and creates no playback
+authority. All four reuse the selected player's Score/time; missing musical
+context remains explicit instead of triggering a key or function guess.
 
 DEC-044 retires the three narrower Audio View Elements
 `audio-clip-thumbnail`, `audio-minimap` and `audio-region-list`. Audio View now
@@ -124,9 +251,9 @@ The current public surface is generated in [COMPONENTS](COMPONENTS.md); document
 | BIND-02 | Readout/log tags and scored-chord preview remain targets; retained PitchView supports player/source binding | Resolve the spec's open member/unit choices; implement the supported modes, part/note identity and bounded logs; align public entries, presenters, catalogs, references and accessible demos | Player binding design and component/page templates |
 | PLAY-01 | Algorithm/lifecycle and responsive UI source changes are implemented; earlier external-theme browser checks cover transparent surfaces, colors, radii, narrow/wide geometry and transport keyboard focus | Verify the merged Play demos' rendered state, keyboard and touch behavior at narrow/wide widths; measure device suspend/resume and MIDI separately | [Play design](design/PLAY-COMPONENTS.md), [implementation audit](audits/2026-09-09/SCORE-PLAY.md), [frontend source audit](audits/2026-09-09/SCORE-PLAY-FRONTEND.md), [styling review](audits/2026-09-10/SCORE-STYLING.md) |
 | VIEW-01 | Written-time projection and VexFlow replace the quantized staffrender path. Timed Part clefs/directions, source tuplet visibility, no-source clef inference and independent slur/tie geometry are implemented. The ten-page, 107-measure PDF review also led to full-Part slur pairing, articulation/barline/rest-position preservation and compact ink packing; final automated and Chrome results are recorded in the contract | Cross-staff/cross-measure beams, nested tuplets, complete grace/expression/font fidelity, per-articulation placement, credits/labels and page/editor layout remain bounded or unsupported. The cross-staff curve collision solver is bounded and does not establish complete engraving parity. Complete cross-browser/accessibility acceptance, including keyboard access; MIDI notation remains inferred. Do not claim full MuseScore parity | [Staff notation contract and acceptance](design/STAFF-NOTATION.md#acceptance), [PDF coverage](design/STAFF-NOTATION.md#pdf-comparison), [ScoreView notation limits](../apps/doc/webmusic/src/content/docs/score/element/view/score-view.mdx), DEC-024 |
-| CHORDIO-01 | DEC-043 selects two Score Analyze Elements and parks recurrence UI; the 2026-09-27 reduced-inventory checks are recorded for their earlier tree | Verify chord passage selection and seeking, multiple companions, source replacement, pointer/keyboard/screen-reader behavior, audible non-unit-rate navigation and real-device layout on the merged tree | [Analyze component design](design/ANALYZE-COMPONENTS.md), DEC-043 and owning Element/API pages |
+| CHORDIO-01 | DEC-047's four elementary tools, explicit chord modes, catalog and Arabesque No. 1 demos are implemented; full automated checks and desktop/390px browser checks passed on 2026-10-03. Recurrence UI remains parked | Complete real MIDI-device, screen-reader and audible non-unit-rate seeking acceptance; do not treat local browser checks as device or acoustic evidence | [Analyze component design](design/ANALYZE-COMPONENTS.md), DEC-047 and owning Element/API pages |
 | ANALYZE-01 | Deterministic regression cases cover key-profile rotations, triads and inference boundaries; empirical musical accuracy remains unmeasured | Evaluate an annotated real-music corpus with declared genres, ground truth, metrics and ambiguity policy before claiming accuracy percentages or calibrated confidence | [Score Headless review](audits/2026-09-10/SCORE-HEADLESS.md), [Analyze algorithm record](audits/2026-09-10/SCORE-HEADLESS-ANALYZE.md) |
-| ANALYZE-02 | Score-based analysis reads written Note pitches and ignores Part.transpose; mixed transposing-instrument harmony and cross-part voice results are not reliable concert-pitch analysis | Establish written/concert pitch-basis contracts and one normalization path across stateless algorithms, incremental caches, workers and projections. Preserve source IDs/notation, define spelling, avoid double transposition, and verify piano/B♭ clarinet chord and parallel-fifth fixtures | [API transposition finding](audits/2026-09-10/SCORE-API.md#open-transposing-instrument-contract), [public pitch basis](../apps/doc/webmusic/src/content/docs/score/api/analyze.mdx#pitch-basis-and-transposing-instruments) |
+| ANALYZE-02 | Elementary chord, interval and scale inspection now offer explicit written/sounding pitch basis, apply Part.transpose in sounding mode and retain notation/source evidence. Legacy key/chord segmentation, distributions, voice-leading, incremental sessions and their workers/projections still use stored written pitches | Extend the explicit pitch-basis contract and consistent normalization to those remaining legacy paths without changing the authored Score, double-transposing or overstating inference provenance; verify mixed piano/B♭ clarinet harmony and cross-part parallel-fifth fixtures | [API transposition finding](audits/2026-09-10/SCORE-API.md#open-transposing-instrument-contract), [public pitch basis](../apps/doc/webmusic/src/content/docs/score/api/analyze.mdx#pitch-basis-and-transposing-instruments) |
 | SCOREIO-01 | MIDI/MusicXML/ABC/MXL correctness repairs cover supported format subsets; full interchange and navigation fidelity remain limited | Define and test supported complex features before expansion: SMPTE timing, richer ABC syntax, cross-measure notation splitting and nested/alternative repeat routing. Preserve documented unsupported-input errors and lossy boundaries | [Score API review](audits/2026-09-10/SCORE-API.md), [IO detail](audits/2026-09-10/SCORE-API-IO.md), [repeat contracts](audits/2026-09-10/SCORE-API-MODEL.md) |
 | DEV-05 | The [public asset inventory](../apps/doc/webmusic/ASSETS.md) lists nine site files; eight binary resources still lack verified redistribution terms. They are excluded from npm tarballs. Pages deployment is now an explicit manual dispatch; existing deployed files are unchanged | Confirm exact sources, authors, licenses, required notices and hashes, or replace the files before selecting `deploy_pages` or distributing a release containing them | [Development](DEVELOPMENT.md), [Contributing](../CONTRIBUTING.md) |
 | TIME-02 | Native follower loops have explicit phase mapping; sample-accurate cross-domain group loop behavior still needs evidence and scheduler work | Verify next-pass scheduling before group boundaries and measure actual discontinuities; native loop metadata alone does not prove acoustic precision | Shared-clock design and Bridge |

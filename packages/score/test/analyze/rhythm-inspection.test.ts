@@ -152,4 +152,130 @@ describe('inspectScoreRhythm', () => {
     expect(() => inspectScoreRhythm(score, {subdivision: 5 as 4})).toThrow(RangeError);
     expect(() => inspectScoreRhythm(score, {partId: 'missing'})).toThrow(/Unknown/);
   });
+
+  it('uses two dotted-quarter pulses in 6/8 while keeping the denominator default', () => {
+    const builder = new ScoreBuilder();
+    const partId = PartId('p');
+    builder.addPart({id: partId, name: 'Part'});
+    builder.addMeasure({
+      id: MeasureId('compound'), number: 1, onsetQuarters: Rational.ZERO,
+      durationQuarters: new Rational(3), timeSignature: {numerator: 6, denominator: 8},
+    });
+    for (let index = 0; index < 6; index += 1) {
+      builder.addNote(partId, {
+        id: NoteId(`n${index}`), pitch: Pitch.parse('C4'), voice: VoiceId('v'),
+        onsetQuarters: new Rational(index, 2), duration: Duration.eighth(),
+      });
+    }
+    const score = builder.build();
+    const denominator = inspectScoreRhythm(score);
+    expect(denominator.beatUnit).toBe('denominator');
+    expect(denominator.beats.map(({atQuarters}) => atQuarters)).toEqual([0, 0.5, 1, 1.5, 2, 2.5]);
+    expect(denominator.onsets.every(({offbeat}) => !offbeat)).toBe(true);
+
+    const meter = inspectScoreRhythm(score, {beatUnit: 'meter', subdivision: 3});
+    expect(meter.beatUnit).toBe('meter');
+    expect(meter.beats.map(({atQuarters, beat, beatLengthQuarters}) => [atQuarters, beat, beatLengthQuarters]))
+      .toEqual([[0, 1, 1.5], [1.5, 2, 1.5]]);
+    expect(meter.subdivisions.map(({atQuarters}) => atQuarters)).toEqual([0.5, 1, 2, 2.5]);
+    expect(meter.onsets.map(({beat, subbeatExact, offbeat, subdivisionIndex}) =>
+      [beat, subbeatExact, offbeat, subdivisionIndex],
+    )).toEqual([
+      [1, '0', false, 0], [1, '1/3', true, 1], [1, '2/3', true, 2],
+      [2, '0', false, 0], [2, '1/3', true, 1], [2, '2/3', true, 2],
+    ]);
+    const slice = inspectScoreRhythm(score, {
+      beatUnit: 'meter', subdivision: 3, startQuarters: 0.5, endQuarters: 1.5,
+    });
+    expect(slice.beats).toEqual([]);
+    expect(slice.subdivisions.map(({atQuarters}) => atQuarters)).toEqual([0.5, 1]);
+    expect(slice.onsets.map(({subbeatExact}) => subbeatExact)).toEqual(['1/3', '2/3']);
+  });
+
+  it('requires explicit irregular-meter groups and distinguishes 2+3 from 3+2', () => {
+    const builder = new ScoreBuilder();
+    const partId = PartId('p');
+    builder.addPart({id: partId, name: 'Part'});
+    builder.addMeasure({
+      id: MeasureId('irregular'), number: 1, onsetQuarters: Rational.ZERO,
+      durationQuarters: new Rational(5, 2), timeSignature: {numerator: 5, denominator: 8},
+    });
+    builder.addNote(partId, {
+      id: NoteId('attack'), pitch: Pitch.parse('C4'), voice: VoiceId('v'),
+      onsetQuarters: Rational.ONE, duration: Duration.eighth(),
+    });
+    const score = builder.build();
+    expect(() => inspectScoreRhythm(score, {beatUnit: 'meter'})).toThrow(/explicit beatGroups.*5\/8/);
+    const shortLong = inspectScoreRhythm(score, {beatUnit: 'meter', beatGroups: [2, 3]});
+    const longShort = inspectScoreRhythm(score, {beatUnit: 'meter', beatGroups: [3, 2]});
+    expect(shortLong.beats.map(({atQuarters, beatLengthQuarters}) => [atQuarters, beatLengthQuarters]))
+      .toEqual([[0, 1], [1, 1.5]]);
+    expect(longShort.beats.map(({atQuarters, beatLengthQuarters}) => [atQuarters, beatLengthQuarters]))
+      .toEqual([[0, 1.5], [1.5, 1]]);
+    expect(shortLong.onsets[0]).toMatchObject({beat: 2, subbeatExact: '0', offbeat: false});
+    expect(longShort.onsets[0]).toMatchObject({beat: 1, subbeatExact: '2/3', offbeat: true});
+    for (const groups of [[], [2, 2], [0, 5], [-1, 6], [1.5, 3.5], [Infinity], [Number.MAX_SAFE_INTEGER, 1]]) {
+      expect(() => inspectScoreRhythm(score, {beatUnit: 'meter', beatGroups: groups})).toThrow(RangeError);
+    }
+    expect(() => inspectScoreRhythm(score, {beatGroups: [2, 3]})).toThrow(/requires beatUnit meter/);
+    expect(() => inspectScoreRhythm(score, {beatUnit: 'guess' as 'meter'})).toThrow(/beatUnit/);
+    const sparse = new Array<number>(2);
+    sparse[1] = 5;
+    expect(() => inspectScoreRhythm(score, {beatUnit: 'meter', beatGroups: sparse})).toThrow(/positive safe integers/);
+  });
+
+  it('truncates pickup pulses, changes pulse units at authored bars and excludes tied continuations', () => {
+    const builder = new ScoreBuilder();
+    const partId = PartId('p');
+    builder.addPart({id: partId, name: 'Part'});
+    builder.addMeasure({
+      id: MeasureId('pickup'), number: 0, onsetQuarters: Rational.ZERO,
+      durationQuarters: Rational.ONE, timeSignature: {numerator: 6, denominator: 8},
+    });
+    builder.addMeasure({
+      id: MeasureId('compound'), number: 1, onsetQuarters: Rational.ONE,
+      durationQuarters: new Rational(3), timeSignature: {numerator: 6, denominator: 8},
+    });
+    builder.addMeasure({
+      id: MeasureId('simple'), number: 2, onsetQuarters: new Rational(4),
+      durationQuarters: new Rational(3), timeSignature: {numerator: 3, denominator: 4},
+    });
+    for (const [index, tie] of (['start', 'continue', 'stop'] as const).entries()) {
+      builder.addNote(partId, {
+        id: NoteId(tie), pitch: Pitch.parse('C4'), voice: VoiceId('v'),
+        onsetQuarters: new Rational(index, 2), duration: Duration.eighth(), tie,
+      });
+    }
+    const result = inspectScoreRhythm(builder.build(), {beatUnit: 'meter', subdivision: 3});
+    expect(result.beats.map(({atQuarters, measure, beat}) => [atQuarters, measure, beat]))
+      .toEqual([[0, 0, 1], [1, 1, 1], [2.5, 1, 2], [4, 2, 1], [5, 2, 2], [6, 2, 3]]);
+    expect(result.subdivisions.filter(({beatAtQuarters}) => beatAtQuarters === 0).map(({atQuarters}) => atQuarters))
+      .toEqual([0.5]);
+    expect(result.onsets.map(({noteIds}) => noteIds)).toEqual([['start']]);
+  });
+
+  it('restarts grouped pulses at a meter-only partial bar boundary', () => {
+    const builder = new ScoreBuilder();
+    const partId = PartId('p');
+    builder.addPart({id: partId, name: 'Part'});
+    builder.addMeter({
+      atQuarters: Rational.ZERO, measureNumber: 1,
+      timeSignature: {numerator: 6, denominator: 8},
+    });
+    builder.addMeter({
+      atQuarters: new Rational(5, 2), measureNumber: 2,
+      timeSignature: {numerator: 3, denominator: 4},
+    });
+    builder.addNote(partId, {
+      id: NoteId('tail'), pitch: Pitch.parse('C4'), voice: VoiceId('v'),
+      onsetQuarters: new Rational(4), duration: Duration.quarter(),
+    });
+    const score = builder.build();
+    const result = inspectScoreRhythm(score, {beatUnit: 'meter', subdivision: 3});
+    expect(result.beats.map(({atQuarters, measure, beat}) => [atQuarters, measure, beat]))
+      .toEqual([[0, 1, 1], [1.5, 1, 2], [2.5, 2, 1], [3.5, 2, 2], [4.5, 2, 3]]);
+    expect(result.subdivisions.some(({atQuarters, beatAtQuarters}) => atQuarters === 2.5 && beatAtQuarters === 1.5))
+      .toBe(false);
+    expect(() => inspectScoreRhythm(score, {beatUnit: 'meter', beatGroups: [3, 3]})).toThrow(/sum to 3/);
+  });
 });

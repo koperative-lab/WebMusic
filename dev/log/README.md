@@ -13,6 +13,7 @@ than maintaining another member or component inventory.
 
 | Record | Purpose |
 |---|---|
+| [Score analysis review and dev consolidation — 2026-10-07](2026-10-07-score-analysis-dev-closeout.md) | Four basic Analyze tools, final UI/selection regression fixes, archived research and preserved stashes. |
 | [First-release branch split — 2026-09-10](2026-09-10-first-release-split.md) | Audio/Bridge preservation on dev, three-package main release scope, original work preservation and independent verification. |
 | [Audio visual alignment — 2026-09-25](2026-09-25-audio-visual-alignment.md) | Neutral Score/Audio defaults, inherited theme repair and rendered acceptance boundaries. |
 | [Dev guidance alignment and setup repair — 2026-09-25](2026-09-25-dev-guidance-alignment.md) | Alignment with the reviewed main design, restored-worktree boundaries, local startup repair and fresh verification. |

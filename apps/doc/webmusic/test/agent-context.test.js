@@ -232,6 +232,7 @@ describe('agent context release and output contracts', () => {
       'apps/doc/webmusic/src/components/quick-start-player-client.ts',
       'apps/doc/webmusic/src/components/bridges/bridge-composition-client.ts',
       'apps/doc/webmusic/src/components/bridges/independent-loops-client.ts',
+      'apps/doc/webmusic/src/components/headless/arabesque-score.ts',
       'apps/doc/webmusic/scripts/agent-context.mjs',
       'apps/doc/webmusic/scripts/agent-context-catalog.mjs',
       'apps/doc/webmusic/scripts/agent-context-release.mjs',

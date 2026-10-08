@@ -27,6 +27,17 @@ role `third`"*, and the axis is a number line whose unit the kit has never been 
 [pitch](/uikit/views-analysis/pitch/) when the answer is a set of sounding notes rather than a name,
 and [analysis](/uikit/views-analysis/analysis/) for the static cards and tables a playhead walks.
 
+The live demo derives its spans and pitch labels from the opening 16
+quarter-note units of the existing [Arabesque No. 1 MXL](/mxl/Arabesque%20No.1.mxl).
+Complete spelled triads/sevenths may receive chord names; other note sets keep
+their pitch names. Its second lane contains source pitches rather than inferred
+Roman functions. The matched focus highlights those complete chord readings,
+without a key estimate or confidence claim. Movement follows a visual
+inspection clock and produces no audio.
+
+The source loads before the presenters mount. Loading failures remain visible
+with a Retry action; removing a demo prevents a late result from mounting.
+
 <UiPresenterLiveDemo presenter="harmony" />
 
 ## Import
@@ -139,11 +150,11 @@ cannot: only the caller knows the map. Omit the stamping pair and it defaults to
 | `now` | `number` | — | The position. With `binding.position` it seeds only the first frame. |
 | `playing` | `boolean` | `false` | Published as `data-playing`. |
 | `future` | `boolean` | `true` | `false` draws the space right of the now line as an empty field. |
-| `pinned` | `{primary?, secondary?}` | the sounding band's own | Override the current readout above the plot. |
+| `pinned` | `FlowReadout` | the sounding band's own | Override the current readout above the plot. Each supplied member takes precedence over the band's `readout`; `fields` replaces the complete field array. |
 | `focusGroup` | `string` | — | Every band whose `group` matches lights with the sounding one. |
 | `disabled` / `emptyLabel` | | — | |
 
-`FlowBand` is `{id, start, end, stampStart?, stampEnd?, spans?, track?, primary?, secondary?,
+`FlowBand` is `{id, start, end, stampStart?, stampEnd?, spans?, track?, primary?, secondary?, readout?,
 trailing?, glyph?, points?, tone?, role?, severity?, weight?, group?, disabled?}`. `tone` is `0…11`
 and fills the block; `role` paints a stripe down the leading edge, so colour never carries a fact
 alone; `severity` paints a bead and never the whole block. `weight` controls the centred fill's share of the row height (`0.1…1`, default `1`); the band's text and hit area retain the full row height. `glyph` is a caller-owned path and
@@ -153,6 +164,40 @@ many. `spans` is judged on what SURVIVES, not on what was passed: the natural ca
 `spans: motif.occurrences.map(...)`, and a list that comes back empty — or whose every entry is
 still unplaced — falls back to the band's own `start`/`end` rather than un-stamping a band that has
 a perfectly good pair of numbers and dropping it out of the playhead's reach for good.
+
+`readout?: FlowReadout` supplies an expanded current reading while `primary` and
+`secondary` remain compact inside the band. These public types are exported from
+`@webmusic/ui/harmony`:
+
+| Type / member | Shape | Meaning |
+|---|---|---|
+| `FlowReadoutField` | `{id: string, label: string, value: string}` | A caller-owned labeled value; keep `id` stable for the same field. |
+| `FlowReadout.primary` | `string?` | Expanded heading; omission falls back to the band's compact primary, while `''` keeps it empty. |
+| `FlowReadout.secondary` | `string?` | Expanded secondary text for consumers without structured fields; omission falls back to the compact secondary. |
+| `FlowReadout.fields` | `readonly FlowReadoutField[]?` | Structured values that visually replace the secondary sentence. `[]` explicitly suppresses fields and the legacy secondary text. |
+
+`state.pinned` overrides primary and secondary independently. Its `fields`, when
+present, replaces the band's entire array and the collection's field schema;
+an absent value falls back to the current band's `readout.fields`. An explicit
+empty array does not fall back. Consumers that supply no structured fields
+retain the existing secondary-text behavior.
+
+Structured fields occupy a fixed three-column grid with equal column widths;
+additional fields continue in later rows. The collection's slot order follows
+the first occurrence of each field ID across all bands. Each ID retains its
+DOM slot as readings change, and text wraps inside its own slot. The presenter
+reserves the maximum wrapped space needed by all supplied primary headings,
+field labels and values on updates, resizes and zoom changes. Playback only
+updates values; it does not measure or resize this readout per frame. With
+`reservePinned`, a gap retains the field labels and reserved slot heights while
+clearing their values. Call `update()` after changing typography tokens so the
+reserved dimensions can be measured again.
+
+The expanded reading supplies the band title and semantic index. Structured
+fields are rendered there as `label: value` items rather than an unlabeled
+sentence. The pinned primary uses larger display type; secondary text and field
+values use regular-weight muted text. The visual readout remains `aria-hidden`
+because the semantic index provides its accessible text.
 
 | `FlowLaneBinding` | Description |
 |---|---|
@@ -168,7 +213,9 @@ a perfectly good pair of numbers and dropping it out of the playhead's reach for
 | `anchor` | `number` | `.33` | Where the now line is pinned, `0…1`. |
 | `scale` | `number` | `44` | Pixels per axis unit before zoom; used when `visibleSpan` is absent or invalid. |
 | `visibleSpan` | `number` | — | Axis units visible across the measured plot before zoom. A finite positive value takes precedence over `scale`; resizing keeps this window and the current position. |
-| `reservePinned` | `boolean` | `false` | Reserve one line above the plot when no band is sounding, so the readout can appear without shifting the lane. The empty slot has no visible text. |
+| `trackLayout` | `'fixed' \| 'visible'` | `'fixed'` | Fixed retains every row. Visible hides rows without a positive-duration band intersecting the current viewport and compacts the remaining rows in their original order, with one empty row retained through gaps. |
+| `labelOverflow` | `'truncate' \| 'wrap'` | `'truncate'` | Wrap keeps both band labels visible without ellipses and grows the row height to fit their complete text stack. The public lane-height token remains a minimum. |
+| `reservePinned` | `boolean` | `false` | Keep readout space through gaps. Structured fields retain their labels and measured slot heights with empty values. Without fields, reserve one primary and one secondary text row; longer wrapped legacy readings may still grow. |
 | `fallbackWidth` | `number` | `640` | What the lane assumes it is wide when nothing can measure it. |
 | `animate` | `boolean` | whether `position` exists | Run a frame loop. A `clock` forces it `false`. |
 | `clock` | `FrameClock` | — | Somebody else's clock. Given one, the mount opens no loop and becomes a passenger. |
@@ -187,12 +234,32 @@ excludes the label gutter. A resize preserves the chosen zoom and current positi
 scale for painting and pointer seeks. Without a usable measurement, `fallbackWidth` supplies the
 width. No layout measurements run in the frame callback.
 
-The current readout wraps above the clipped plot. The label gutter has its own column, and ruler
+The current readout sits above the clipped plot. Structured fields wrap within their reserved
+slots; legacy primary/secondary text retains its natural wrapping behavior. The label gutter has its own column, and ruler
 labels have their own line above the tracks. The viewport grows to fit all rows even when the flow
 height token is smaller; a third or fourth track is never clipped by the default two-row height.
-Labels inside short bands use ellipsis; below 32px of band width, the inner label and note are
-hidden instead of showing clipped fragments. The complete reading remains in the band title and
-semantic twin, while a track label stays in the separate gutter.
+With `trackLayout: 'visible'`, height instead follows the visible row count using the lane-height
+token. Band identities, coordinates, stamps and all semantic index entries are retained;
+`track(id)` continues to return the original row node even when hidden. Row flags and brackets
+follow the compacted positions, and up/down navigation skips hidden rows. Intersection uses
+half-open time ranges: merely touching a viewport edge does not make a row visible. Layout is
+reconsidered at viewport boundary crossings, seeks, zooms, resizes and data changes; ordinary
+frames use cached boundary ranks without measuring or rebuilding the material.
+By default, labels inside short bands use ellipsis; below 32px of band width, the inner label and
+note are hidden instead of showing clipped fragments. The complete reading remains in the band
+title and semantic twin, while a track label stays in the separate gutter.
+`labelOverflow: 'wrap'` disables that narrow-band hiding and wraps primary text above secondary
+text. A shared primary-row height keeps secondary labels aligned even when a band's primary
+label is empty or a neighbouring primary wraps. Invisible temporary copies measure the complete label stacks at their actual band widths;
+all rows use the largest required height, with the public lane-height token as a minimum.
+Measurements run on `update()`, resize and zoom, never on playback frames, and temporary nodes
+are removed immediately. Call `update()` after changing typography tokens. Identical text/width
+pairs share one measurement within each batch. Very narrow bands can create tall rows; zooming
+in or choosing a shorter visible span gives the text more horizontal room. Band times, widths,
+stamps, interaction coordinates and semantic entries remain unchanged.
+Ruler ticks remain at every supplied position. When labels would overlap at
+the current scale, only their text is thinned; zooming or resizing recalculates
+the visible labels without moving ticks or changing the time axis.
 Ticks, flags and brackets do not intercept a band click or drag. A contour occupies the remaining
 row height below its labels, and its stroke keeps the same pixel width when the time axis stretches
 or zooms.
@@ -215,10 +282,14 @@ again"* are told apart. The kit only ever compares it with `!==`.
 rate, the metre and on what the caller thinks *near* means, so it is a number the caller returns
 rather than one the kit infers from a lane it cannot see. `NameplateOptions` adds `popDuration`
 (default `180`, `0` in any reduced mode), `animate` and `clock` to the shared six.
-Set `stableLayout: true` for a live nameplate without `caption`, `next` or `history`:
-it reserves fixed symbol, voicing and alternate rows through note changes. When no
-primary reading exists, literal `voicing` labels occupy the main row; this is
-not a newly inferred chord. Long lines scroll horizontally instead of changing
+Set `stableLayout: true` for a live nameplate without `next` or `history`:
+it reserves fixed symbol, muted voicing and alternate rows through note changes. An optional
+`caption` adds a separate row above the full-height symbol row. Keep the caption
+present through silence and note changes when the whole surface must retain its height;
+adding or removing it switches between the four-row and three-row layouts. When no
+primary reading exists, literal `voicing` labels stay in the voicing row below
+the empty symbol row; they never become a primary name. With no voicing either,
+the symbol row may show `emptyLabel`. Long lines scroll horizontally instead of changing
 the surface height. The default is `false` and keeps the natural layout.
 
 **The chip strip**
@@ -331,7 +402,7 @@ include presenter-owned outputs; use the public `--wm-*` palette above for new t
 | Property | Default | Controls |
 |---|---|---|
 | `--wui-harmony-flow-height` | `96px` / `72px` | The viewport's preferred height, expanded when needed for the ruler and all tracks; the second value is `data-density="compact"`. |
-| `--wui-harmony-lane-height` | `48px` / `36px` | One row inside it. |
+| `--wui-harmony-lane-height` | `48px` / `36px` | One row inside it; a minimum when `labelOverflow: 'wrap'` grows rows to fit their labels. |
 | `--wui-harmony-flow-now` | the accent | The now line. |
 | `--wm-harmony-flow-tone` | per-band tone, or accent at 18% alpha | Public fill override for every band, ahead of the per-band internal value. |
 | `--wui-harmony-approach` | — | Published by the nameplate, `0…1`, for the ghost of `next`. |

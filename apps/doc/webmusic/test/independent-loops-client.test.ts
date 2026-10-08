@@ -3,7 +3,8 @@ import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {mountDemos} from '../src/components/demo-lifecycle';
 import {mountIndependentLoops} from '../src/components/bridges/independent-loops-client';
 
-const boundaries = vi.hoisted(() => ({players: vi.fn(), groups: vi.fn()}));
+const boundaries = vi.hoisted(() => ({players: vi.fn(), groups: vi.fn(), loadClip: vi.fn()}));
+vi.mock('@webmusic/audio/play', () => ({loadClipFromUrl: boundaries.loadClip}));
 vi.mock('@webmusic/audio/play/headless', () => ({AudioClipPlayer: class {
   constructor(...args: unknown[]) { return boundaries.players(...args); }
 }}));
@@ -32,6 +33,7 @@ function mount() {
 
 beforeEach(() => {
   boundaries.players.mockReset(); boundaries.groups.mockReset();
+  boundaries.loadClip.mockReset().mockResolvedValue({slice: (start: number, end: number) => ({start, end})});
   resume = vi.fn(async () => {}); close = vi.fn(async () => {});
   vi.stubGlobal('AudioContext', class {
     state = 'running'; currentTime = 0; sampleRate = 44100;
@@ -47,6 +49,21 @@ afterEach(async () => {
 });
 
 describe('independent loop composition lifecycle', () => {
+  it('aborts pending asset loading without installing followers after disposal', async () => {
+    const pending = deferred();
+    boundaries.loadClip.mockReturnValue(pending.promise);
+    const root = mount();
+    root.querySelector<HTMLButtonElement>('[data-start]')!.click(); await flush();
+    const [url, options] = boundaries.loadClip.mock.calls[0];
+    expect(url).toMatch(/wav\/Arabesque%20No\.1\.wav$/);
+    root.querySelector<HTMLButtonElement>('[data-dispose]')!.click();
+    expect(options.signal.aborted).toBe(true);
+    pending.resolve(); await flush();
+    expect(boundaries.players).not.toHaveBeenCalled();
+    expect(boundaries.groups).not.toHaveBeenCalled();
+    expect(close).toHaveBeenCalledOnce();
+  });
+
   it('releases an already registered follower and the context when the next follower fails', async () => {
     const first = {play: vi.fn(), pause: vi.fn(), stop: vi.fn(), seek: vi.fn(),
       setRate: vi.fn(), dispose: vi.fn(), seconds: 0, playing: false};

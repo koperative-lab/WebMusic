@@ -4,7 +4,9 @@ import {afterEach, describe, expect, it, vi} from 'vitest';
 import {Duration, Pitch, Rational, ScoreBuilder, VoiceId} from '../../src/core';
 import {
   ChordAnalysisElement,
-  LiveChordAnalysisElement,
+  IntervalAnalysisElement,
+  RhythmAnalysisElement,
+  ScaleAnalysisElement,
 } from '../../src/analyze/element';
 
 // Exercise the actual sibling presenter source without requiring a dist build
@@ -13,11 +15,16 @@ vi.mock('@webmusic/ui/harmony', () => import('../../../ui/src/harmony'));
 vi.mock('@webmusic/ui/workbench', () => import('../../../ui/src/workbench'));
 
 const cases = [
-  ['score-chord-analysis', ChordAnalysisElement, 'lane'],
-  ['score-live-chord-analysis', LiveChordAnalysisElement, 'nameplate'],
+  ['score-chord-analysis', ChordAnalysisElement, 'lane', 'score'],
+  ['score-chord-analysis', ChordAnalysisElement, 'nameplate', 'live'],
+  ['score-interval-analysis', IntervalAnalysisElement, 'lane', 'score'],
+  ['score-rhythm-analysis', RhythmAnalysisElement, 'lane', 'score'],
+  ['score-scale-analysis', ScaleAnalysisElement, 'lane', 'score'],
 ] as const;
 
-for (const [tag, constructor] of cases) customElements.define(tag, constructor);
+for (const [tag, constructor] of cases) {
+  if (!customElements.get(tag)) customElements.define(tag, constructor);
+}
 
 const score = (() => {
   const builder = new ScoreBuilder();
@@ -42,9 +49,10 @@ const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 afterEach(() => document.body.replaceChildren());
 
 describe('Analyze Element styling composition', () => {
-  for (const [tag, , contentPart] of cases) {
-    it(`${tag} exposes one outer surface and an unpainted musical child`, async () => {
+  for (const [tag, , contentPart, mode] of cases) {
+    it(`${tag} ${mode} exposes one outer surface and an unpainted musical child`, async () => {
       const host = document.createElement(tag) as ChordAnalysisElement;
+      host.setAttribute('mode', mode);
       if (contentPart === 'lane') host.score = score;
       document.body.append(host);
       await flush();
@@ -83,10 +91,11 @@ describe('Analyze Element styling composition', () => {
       }
     });
 
-    it(`${tag} preserves application styles and inherited token access after updates and remounts`, async () => {
+    it(`${tag} ${mode} preserves application styles and inherited token access after updates and remounts`, async () => {
       const parent = document.createElement('section');
       parent.style.cssText = '--wm-component-background:transparent;--wm-component-border:2px solid teal;--wm-control-radius:12px;--wm-foreground:navy;--wm-accent:purple;--wm-harmony-flow-tone:gold';
       const host = document.createElement(tag) as ChordAnalysisElement;
+      host.setAttribute('mode', mode);
       host.style.cssText = 'width:85%;color:maroon;--wm-harmony-foreground:teal';
       const originalStyle = host.style.cssText;
       parent.append(host);
@@ -120,8 +129,9 @@ describe('Analyze Element styling composition', () => {
       expect(presentation.style.getPropertyValue('color-scheme')).toBe('');
     });
 
-    it(`${tag} respects native hidden without replacing its surface`, async () => {
+    it(`${tag} ${mode} respects native hidden without replacing its surface`, async () => {
       const host = document.createElement(tag);
+      host.setAttribute('mode', mode);
       host.hidden = true;
       document.body.append(host);
       await flush();

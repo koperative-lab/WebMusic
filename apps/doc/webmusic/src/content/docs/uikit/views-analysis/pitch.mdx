@@ -25,6 +25,16 @@ pointer and keyboard input and emits notes. These three own no gestures. Use
 [analysis](/uikit/views-analysis/analysis/) for the span-carrying cards and timelines that a
 playhead walks.
 
+The live demo loads the existing [Arabesque No. 1 MXL](/mxl/Arabesque%20No.1.mxl)
+and inspects its opening 16 quarter-note units. The position control selects a
+relative point in that passage; it does not substitute a preset chord. Written
+pitches supply the marks, and the fretboard shows playable locations for those
+pitches rather than a recommended fingering or barre. Automatic movement is a
+visual inspection clock and produces no audio.
+
+The source loads before the presenters mount. Loading failures remain visible
+with a Retry action; removing a demo prevents a late result from mounting.
+
 <UiPresenterLiveDemo presenter="pitch" />
 
 ## Import

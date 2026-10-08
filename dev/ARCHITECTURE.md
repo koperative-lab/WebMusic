@@ -16,8 +16,8 @@ status or a second task list. The complete documentation routing map lives in
 DEC-021 records the original three-package first release. DEC-046 accepts
 Kernel, UI Kit, Score, Audio and Bridge in the integrated `main` source tree.
 The Score and Agent Toolkit baseline incorporates the approved Recorder and
-Analyze demo composition (DEC-032/033), component framing (DEC-034), two-tool
-Analyze inventory (DEC-043), and domain-prefixed tags (DEC-045). Shared
+Analyze demo composition (DEC-032/033), component framing (DEC-034), four elementary
+Analyze tools (DEC-047), and domain-prefixed tags (DEC-045). Shared
 Kernel/UI changes have explicit consumers and regression coverage.
 
 The five-package source tree and site routes describe implementation, not npm

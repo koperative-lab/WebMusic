@@ -1,0 +1,107 @@
+---
+title: '<score-rhythm-analysis>'
+description: 'Inspect score attacks against simple, compound or explicitly grouped meter.'
+sidebar:
+  order: 4
+---
+
+import AnalysisFeaturePlayground from '../../../../../components/elements/AnalysisFeaturePlayground.astro';
+
+Read a note attack’s measure, grouped beat and position within that beat. Written durations stay in quarter-note units. Compound meter uses musical pulses, so 6/8 has two dotted-quarter beats rather than six equal beats.
+
+<AnalysisFeaturePlayground tag="score-rhythm-analysis" />
+
+## Import
+
+```html
+<script type="module">
+  import {defineScorePlayerElement} from '@webmusic/score/play/element';
+  import {defineRhythmAnalysisElement} from '@webmusic/score/analyze/element';
+  defineScorePlayerElement();
+  defineRhythmAnalysisElement();
+</script>
+
+<score-player id="piece" src="/mxl/Arabesque%20No.1.mxl"></score-player>
+<score-rhythm-analysis player="#piece" window="1"></score-rhythm-analysis>
+```
+
+Registration is idempotent and SSR-safe. `defineAllAnalysisElements()` registers all four tools from the same entry; see the [family inventory](/score/element/#analyze). This demo contains one player and one inspection surface. Its one-second initial window keeps the dense opening notes readable; adjust `window` to inspect a longer passage. External Parameters configures them; Copy includes their actual markup and Reset restores attributes and the player connection. Optional sibling views belong in [an application composition](/score/element/#compose-a-performance).
+
+## Musical reading
+
+Meters with numerators 2, 3 or 4 use one denominator unit per beat. 6/8, 9/8 and 12/8 use groups of three denominator units. Other numerators require an explicit grouping: for a 5/8 score choose `beat-groups="2+3"` or `"3+2"`. No irregular grouping is guessed. The groups must be positive integers whose sum matches each inspected meter numerator; an incompatible setting displays an error.
+
+A quarter-note unit is a duration, independent of the time signature. The ruler displays measure and grouped beat; an onset within a beat adds its exact fractional subbeat. `subdivision` divides each grouped beat evenly. Rest and Tie continuation bands identify written silence and sustained notation separately from attacks. Tied continuations do not create new attacks; notes sustained across beats retain their duration. Evidence retains source dot and tuplet notation when available. Authored accent and beat placement remain separate facts. This display does not claim groove, expressive timing, syncopation or performance correctness.
+
+The demo uses the existing [Arabesque No. 1 MXL](/mxl/Arabesque%20No.1.mxl). Its written meter is 4/4, with a 2/4 measure at 94 before returning to 4/4 at 95. Leave `beat-groups` unset to follow those conventional meters, and inspect the actual written attacks, rests and ties. A single explicit grouping must match every inspected numerator; `2+3` describes a separate 5/8 input, not this piece. Pickups begin at their authored measure boundary; this tool does not infer absent beats before that boundary.
+
+The current readout names the written duration above three fixed, equal-width fields: **Bar**, **Beat** and **Duration (qn)**. `qn` means quarter-note units; Beat retains the grouped beat and any fractional subbeat. Attacks, rests and tie continuations use the same three slots, leaving an unavailable value empty. Bar and Beat refer to the original written onset; for a rest or tie continuation entering from before the selection, an earlier meter unsupported by the selection's `beat-groups` leaves Beat empty while preserving Bar and the full authored Duration, and invalid grouping within the selection still reports an error. Labels and positions stay fixed while playback updates values, with long values wrapping inside their own field. Space is reserved from all supplied readings when content or geometry changes; gaps retain the labels and slots with cleared values. Meter/subdivision context stays secondary. Exact durations, fractional positions and source dot/tuplet notation remain in `.analysis`; lane rows still compact to the visible material.
+
+## Binding and lifetime
+
+Explicit `.score` wins over `src`, then the selected player's resolved Score. Native bindings prefer the player's `.playback` [shared source](/score/api/#shared-playback-observation), including its initial readiness, data, position and note identities. Late, upgraded or replaced targets are rebound. Invalid or ambiguous selectors stay unbound. Targets without an available native source retain the compatibility snapshot/event path; they do not promise an initial snapshot.
+
+Failed explicit loading does not fall back to unrelated player data; empty input and errors are shown by the surface. Superseded loads cannot restore old input. An explicit Score different from the native player's Score suppresses mismatched activity and cannot seek that owner. Pointer selection and keyboard navigation use `seekNominal()` when available, otherwise convert nominal seconds by the current rate before `seek()`. Failed commands restore the previous local position unless newer state has arrived. Standalone navigation still emits a seek request.
+
+The component owns its URL request, analysis projection, target observer, subscriptions and presenters. Disconnect cancels/releases those resources. The player retains its lifetime, Score, sound and authoritative timeline. No Analyze component creates a player, synth, AudioContext or playback scheduler.
+
+<details class="component-section">
+<summary>API</summary>
+
+### Attributes
+
+| Attribute | Values / default | Behavior |
+| --- | --- | --- |
+| `src` | URL, absent | Explicit MIDI / MusicXML / MXL / ABC input; overrides borrowed player data. |
+| `format` | `midi` / `mxl` / `musicxml` / `abc`, inferred | Parser override for `src`; otherwise infer from extension or bytes. |
+| `player` | selector, absent | Borrow one target's available Score, position and note activity in the current Document or ShadowRoot. |
+| `density` | `comfortable` / `compact`, `comfortable` | Typography and spacing for this surface. |
+| `scheme` | `light` / `dark`, inherited | Pin the surface palette; removal follows the page. |
+| `motion` | `auto` / `continuous` / `stepped` / `none`, `auto` | Auto follows a `data-motion` ancestor and reduced-motion preference. |
+| `window` | `0.5`–`600` seconds or `auto`, `auto` | Visible duration, retained when resized; auto uses the opening two bars when available. |
+| `part` | exact part ID, absent | Limit authored attacks to that part. |
+| `beat-groups` | `2+3` form, absent | Denominator-unit groups; absent uses conventional simple/compound grouping and requires explicit input for irregular meters. Positive integer groups must sum to every inspected numerator. |
+| `subdivision` | `1` / `2` / `3` / `4`, `2` | Equal divisions of each grouped beat; invalid values show an error. |
+
+Unknown presentation values fall back to their documented defaults. Invalid musical configuration is reported by the surface rather than converted into a clean result. This tag has no generic `type`, internal View controls or transport methods.
+
+### Properties and methods
+
+| Property | Type | Behavior |
+| --- | --- | --- |
+| `.score` | `Score \| undefined` | Explicit input; clearing resumes `src`, then borrowed player data. |
+| `.selection` | read-only `AnalysisSelection \| undefined` | Local selected band/passage: `id`, `startQuarters`, `endQuarters`. |
+| `.analysis` | read-only `AnalysisInspection \| undefined` | Selected `kind`, `selection`, `headline`, `detail`, `evidence` and `candidates`; full provenance remains available beyond the compact lane readout. |
+| `.density` | `comfortable \| compact` | Reflected density. |
+| `.scheme` | `light \| dark \| undefined` | Reflected palette; undefined removes the override. |
+| `.motion` | `auto \| continuous \| stepped \| none` | Reflected motion policy. |
+| `.window` | `number \| auto` | Reflected visible duration in seconds. |
+
+
+`RhythmAnalysisElement`, `AnalysisSelection`, `AnalysisInspection`, `AnalysisSeekDetail` and `AnalysisSelectDetail` are exported from `@webmusic/score/analyze/element`.
+
+`selectRegion(startQuarters, endQuarters)` selects a finite increasing quarter-note passage without seeking. It clamps to the loaded Score, throws `RangeError` for invalid/wholly out-of-score bounds, and has no effect without a Score. `clearSelection()` returns to the first available band. Neither method edits notes or commands playback. The inherited `selectNotes()` method is unsupported on this tag and throws `TypeError`; rhythm selection uses a part or time region.
+
+### Events and accessibility
+
+All emitted events bubble and are composed.
+
+| Event | Detail | Trigger |
+| --- | --- | --- |
+| `webscore:seek` | `AnalysisSeekDetail`: `{quarters, seconds}` | Lane navigation; quarter notes and nominal score seconds. |
+| `webscore:analysisselect` | `AnalysisSelectDetail`: `{kind: 'rhythm', id, startQuarters, endQuarters}` | Band/region selection; local inspection state. |
+
+The score lane is a named slider tab stop. Its continuous position text uses quarter-note units from the start; grouped beat labels belong to the ruler and onset readings. Arrow keys, Home/End and `[` / `]` navigate; pointer selection chooses a band and seeks. A semantic ordered list marks the current span with `aria-current`; detailed selection evidence has a nonvisual status. Passive playback does not repeatedly announce a local selection. Display configuration remains outside the component, and automatic motion respects reduced-motion preference.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+The component renders in light DOM with a full-width, shrinkable block host. Its one outer surface owns background, border, radius and equal padding; the inner lane/nameplate stays unframed. Set inherited `--wm-component-background`, `--wm-component-border` (a complete CSS border), `--wm-component-radius` and `--wm-component-padding`. More specific `--wm-workbench-surface-*` tokens override these. Defaults are the neutral player surface, a 1px border and `.6rem` padding.
+
+Shared palette tokens include `--wm-surface`, `--wm-foreground`, `--wm-accent` and `--wm-border` (a color). `--wm-harmony-flow-now` overrides the now-line color; `--wm-harmony-flow-tone` supplies a uniform band fill. Geometry uses `--wm-harmony-flow-height` and `--wm-harmony-lane-height`. These presentation settings do not change the musical time axis.
+
+Public light-DOM part tokens are `root`, `presentation`, `surface`, `content`, `index`, `lane`, `viewport` and `reel`. Target `[part~="surface"]`, not Shadow DOM `::part()` or private `.wui-*` classes. See [Harmony tokens](/uikit/views-analysis/harmony/) and [Workbench tokens](/uikit/layout-feedback/workbench/) for presenter overrides. No internal keyboard, staff, tabs or settings dock is mounted.
+
+</details>

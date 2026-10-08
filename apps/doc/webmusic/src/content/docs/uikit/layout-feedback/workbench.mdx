@@ -38,6 +38,17 @@ replaced. Under a clock that rule gains a sharper meaning — an `update()` call
 unmount every child presenter sixty times a second — so the frame path and the snapshot path never
 meet: the clock only ever calls `tick()`.
 
+The live demo composes presenters around the opening 16 quarter-note units
+of the existing [Arabesque No. 1 MXL](/mxl/Arabesque%20No.1.mxl). Chord, root/bass
+and voicing views share the same source-derived evidence. The Roots and basses
+view retains the internal ID `key` for the control example but does not estimate
+a key or harmonic function. Dock pitch marks retain written spelling; fret
+positions, where shown, are playable alternatives rather than prescribed
+fingerings. The demo advances a visual inspection clock and does not play audio.
+
+The source loads before the presenters mount. Loading failures remain visible
+with a Retry action; removing a demo prevents a late result from mounting.
+
 <UiPresenterLiveDemo presenter="workbench" />
 
 ## Import

@@ -1,13 +1,13 @@
 ---
 title: '<score-chord-analysis>'
-description: 'A seekable chord lane with selected-passage analysis data.'
+description: 'Inspect metrical score pitch collections, simultaneous chords or held live notes.'
 sidebar:
   order: 1
 ---
 
 import AnalysisFeaturePlayground from '../../../../../components/elements/AnalysisFeaturePlayground.astro';
 
-The lane groups written notes into up to two beat-aligned cells per measure and names each cell's combined pitch material. The notes need not sound simultaneously: this is a readable harmonic summary of a passage, not a claim that every note in the cell forms one held chord. Select a cell to inspect its evidence and seek the connected player. `.analysis` provides its score-note evidence, candidate readings and key-relative degree for application-owned inspectors. Use a sibling [`<score-view type="piano-roll">`](/score/element/view/score-view/) for individual notes over time, or [`<score-live-chord-analysis>`](/score/element/analyze/score-live-chord-analysis/) for the chord currently sounding in playback.
+Inspect complete, spelled triads and seventh chords, including their bass and inversion. Score mode collects notes by metrical pulse by default, with exact simultaneous inspection available; live mode reads the selected player’s held MIDI notes. Choose the mode in external Parameters. Degree labels require an explicit key and never infer harmonic function.
 
 <AnalysisFeaturePlayground tag="score-chord-analysis" />
 
@@ -21,25 +21,37 @@ The lane groups written notes into up to two beat-aligned cells per measure and 
   defineChordAnalysisElement();
 </script>
 
-<score-player id="piece" src="/midi/Arabesque%20No.1.mid"></score-player>
-<score-chord-analysis player="#piece"></score-chord-analysis>
+<score-player id="piece" src="/mxl/Arabesque%20No.1.mxl"></score-player>
+<score-chord-analysis player="#piece" window="1"></score-chord-analysis>
 ```
 
-The live demo pairs this component with one `<score-player>`. Parameters configures those two elements; Copy includes their markup and Reset restores their original attributes and connection. For optional supporting views, see [Compose a performance](/score/element/#compose-a-performance). `defineChordAnalysisElement(tag?)` is idempotent and SSR-safe; `defineAllAnalysisElements()` registers the Analyze family from the same entry.
+Registration is idempotent and SSR-safe. `defineAllAnalysisElements()` registers all four tools from the same entry; see the [family inventory](/score/element/#analyze). This demo contains one player and one inspection surface. Its one-second initial window leaves room for complete chord and note labels; adjust `window` to change the visible passage without changing the musical grouping. External Parameters configures them; Copy includes their actual markup and Reset restores attributes and the player connection. Optional sibling views belong in [an application composition](/score/element/#compose-a-performance).
 
-## Behavior and lifetime
+## Musical reading
 
-The lane fits its containing block. Automatic `window` uses the duration of the opening two bars so the cell labels have room to breathe; an explicit window keeps its visible duration when the container is resized. UIKit recalculates the drawing and pointer coordinates. Track labels, the time ruler and the reserved current readout have separate layout space. There is no candidate control row above the lane or evidence prose beneath it.
+Score mode defaults to `grouping="beat"`: each half-open metrical pulse collects every source note overlapping it, including sequential notes and notes sustained from an earlier pulse. Simple 2/3/4 meters use one denominator unit per pulse; compound 6/9/12 meters use groups of three. Other numerators require `beat-groups`, such as `2+3` for 5/8. One explicit grouping must match every inspected meter numerator. `grouping="simultaneous"` instead reads exact positive-duration spans between note boundaries and ignores a retained `beat-groups` setting. The stateless API and Headless projection keep simultaneous inspection as their default.
 
-Clicking a cell selects it and seeks the bound player. Pointer drag, arrow keys, Home/End and `[` / `]` also navigate the lane; `selectRegion()` chooses a quarter-note passage for local inspection without seeking. For a selected cell, `.analysis.evidence` lists note IDs and part/voice identities that overlap that cell, and its headline uses the same combined pitch material as the lane. A custom `selectRegion()` still samples at its midpoint instead of merging all harmonies in an arbitrary range. `.analysis.candidates` retains possible readings for custom inspectors. The `.analysis` Roman degree uses the explicit `key` or a score-wide detected key; it is a coarse degree, not harmonic-function, modulation, inversion or cadence analysis. The underlying Analyze API retains its unsummarized chord segments. For specialist Roman and voice-leading results, use the [Analyze API](/score/api/analyze/).
+Complete triads and supported seventh chords are matched by spelling; doublings are allowed, but missing roots, omitted tones and enharmonic reinterpretations are not invented. Beat collections retain passing tones and all other overlapping pitches even when these prevent a match. Unmatched sets show their pitch names. The displayed bass/inversion uses the lowest collected source pitch; a beat collection does not establish the passage’s structural harmonic bass. A deterministic first candidate is a reading, not a probability. `key="C major"` or `key="A minor"` adds a scale-relative Roman degree, chord quality and inversion figure; it does not infer a key, modulation, cadence or harmonic function. Minor degrees use the explicit natural-minor reference.
 
-Chord naming and automatic key context use the Score's written pitches; this component does not apply part transposition to produce concert pitch. An inconclusive automatic key does not assign a Roman degree. Set `key` for an explicit local interpretation, or use [the interval API](/score/api/analyze/#inspect-selected-intervals) with `pitchMode: 'sounding'` when transposed pitch relationships are needed.
+Beat grouping can expose notes distributed across an arpeggio, but it is not an automatic harmonic reduction: actual harmonic duration may span several beats, and non-chord-tone interpretation requires more context. The [API method reference](/score/api/analyze/#inspect-elementary-chord-structure) explains the source evidence and musical limits.
 
-Navigation emits `webscore:seek` in nominal score seconds even when no player is attached. No player, synth or AudioContext is created by the component.
+Live mode updates its nameplate immediately from held notes. MIDI lacks authored spelling, so `spelling` and explicit key context choose display spellings; this inferred spelling cannot recover an original score's notation. Live MIDI pitches are already sounding values, so `pitch-mode` applies only to score inspection. Live mode ignores score/source input and has no score seek or history lane. Silence and unclassified sets leave `.chord` undefined. `webscore:chordchange` waits for a stable named chord; changing notes, reset or source replacement cancels pending notification. Switching modes changes this component's surface without changing the player's state.
 
-Explicit `.score` wins over `src`, then the selected player’s resolved data. Native bindings prefer the player’s `.playback` [shared source](/score/api/#shared-playback-observation), which supplies readiness, the current position and note identity. If an explicit Score differs from the native player's Score object, the component does not apply that player's activity to the local score or seek the mismatched owner. Targets without an available source retain the compatibility snapshot/event path. Late or replaced targets are rebound. Explicit input retains precedence on player source changes. Empty input and loading failure are shown on the surface. Stale URL loads cannot restore superseded data. Seek uses `seekNominal()` when available, otherwise converts nominal seconds by the current rate before `seek()`. Failed seeking restores the previous local position if no newer state has arrived.
+The live surface starts with the large chord name, followed by quieter source note names with octaves. It omits the spelling explanation from the performance display; that explanation remains here. An unmatched set keeps the chord row empty and its notes below. Silence shows `—`. Reserved chord, note and optional alternate-reading rows keep the layout steady as held notes change; long lines can scroll horizontally without ellipses. Alternate readings remain secondary text, controlled by `alternates` in Parameters.
 
-The selector must match exactly one target in the current Document or ShadowRoot. Invalid or ambiguous matches remain unbound. Native single-score player mode supplies complete initial data/state; Rack/controller modes do not promise that snapshot. Disconnect cancels owned work, releases subscriptions/observation and destroys presenters, while the borrowed player keeps its own lifetime.
+The demo loads the existing [Arabesque No. 1 score](/mxl/Arabesque%20No.1.mxl), shared by all four tools. Select a pulse to inspect its actual collected pitches and any complete chord reading, then compare `grouping="simultaneous"` to see exact overlapping sets. Leave `beat-groups` unset for the piece’s conventional meters; unmatched collections retain their pitch names. Switch to live mode to follow the same player’s held notes. Set an explicit key only when you want that reference for degree labels; the component does not infer it from the piece.
+
+`spellingInferred` in underlying note evidence marks spelling inferred during analysis-time transposition only. It does not detect spelling chosen earlier by an importer; a false flag cannot establish authored spelling for a MIDI-origin Score.
+
+Named chords appear above their source pitch names, including octaves. An unmatched collection leaves the chord-name row empty and keeps its pitch names in the quieter note row below, in both the current readout and timeline. Live mode uses the same separation. No placeholder chord or collection caption is shown. Grouping stays in external Parameters and `.analysis.detail`; it is not repeated in the visual readout. An explicit key adds its degree/reference only to a named chord's current reading. Timeline labels wrap and rows grow to fit their text instead of using ellipses; the full current reading also wraps above the timeline. Rows with offscreen-only material are hidden, with one empty row retained through gaps; this layout does not change the collected notes or their evidence.
+
+## Binding and lifetime
+
+Explicit `.score` wins over `src`, then the selected player's resolved Score. Native bindings prefer the player's `.playback` [shared source](/score/api/#shared-playback-observation), including its initial readiness, data, position and note identities. Late, upgraded or replaced targets are rebound. Invalid or ambiguous selectors stay unbound. Targets without an available native source retain the compatibility snapshot/event path; they do not promise an initial snapshot.
+
+Failed explicit loading does not fall back to unrelated player data; empty input and errors are shown by the surface. Superseded loads cannot restore old input. An explicit Score different from the native player's Score suppresses mismatched activity and cannot seek that owner. Pointer selection and keyboard navigation use `seekNominal()` when available, otherwise convert nominal seconds by the current rate before `seek()`. Failed commands restore the previous local position unless newer state has arrived. Standalone navigation still emits a seek request.
+
+The component owns its URL request, analysis projection, target observer, subscriptions and presenters. Disconnect cancels/releases those resources. The player retains its lifetime, Score, sound and authoritative timeline. No Analyze component creates a player, synth, AudioContext or playback scheduler.
 
 <details class="component-section">
 <summary>API</summary>
@@ -48,73 +60,68 @@ The selector must match exactly one target in the current Document or ShadowRoot
 
 | Attribute | Values / default | Behavior |
 | --- | --- | --- |
-| `src` | URL, absent | Explicit MIDI / MusicXML / MXL / ABC score; wins over player data. |
+| `src` | URL, absent | Explicit MIDI / MusicXML / MXL / ABC input; overrides borrowed player data. |
 | `format` | `midi` / `mxl` / `musicxml` / `abc`, inferred | Parser override for `src`; otherwise infer from extension or bytes. |
-| `player` | selector, absent | Exactly one source in the component’s Document or ShadowRoot; borrow available score, state and note events. |
-| `density` | `comfortable` / `compact`, `comfortable` | Type and spacing defaults for this surface. |
-| `scheme` | `light` / `dark`, inherited | Pin this surface’s palette; removing it follows the page. |
-| `motion` | `auto` / `continuous` / `stepped` / `none`, `auto` | Automatic reads a `data-motion` ancestor, then reduced-motion preference; explicit values override it. |
-| `window` | seconds `0.5`–`600` or `auto`, `auto` | Visible time scale; automatic uses the duration of the opening two bars when available, otherwise the presenter default. UIKit fits that duration to the measured lane width. |
-| `spelling` | `auto` / `sharp` / `flat`, `auto` | Names pitches and `.analysis` chord candidates; auto uses available key context. |
-| `key` | `C major` / `A minor` form, absent | Local key context for the selected chord's degree; absent or unparseable values use score analysis. Does not change the score or playback. |
+| `player` | selector, absent | Borrow one target's available Score, position and note activity in the current Document or ShadowRoot. |
+| `density` | `comfortable` / `compact`, `comfortable` | Typography and spacing for this surface. |
+| `scheme` | `light` / `dark`, inherited | Pin the surface palette; removal follows the page. |
+| `motion` | `auto` / `continuous` / `stepped` / `none`, `auto` | Auto follows a `data-motion` ancestor and reduced-motion preference. |
+| `window` | `0.5`–`600` seconds or `auto`, `auto` | Visible duration, retained when resized; auto uses the opening two bars when available. |
+| `mode` | `score` / `live`, `score` | Score chord lane or held-note nameplate; does not command playback. |
+| `grouping` | `beat` / `simultaneous`, `beat` | Collect overlapping source notes per metrical pulse, or inspect exact note-boundary spans; score mode only. |
+| `beat-groups` | positive integer groups joined by `+`, absent | Explicit pulse groups for beat inspection, such as `2+3` in 5/8; must sum to each inspected numerator. Ignored in simultaneous/live modes. |
+| `spelling` | `auto` / `sharp` / `flat`, `auto` | Live MIDI spelling preference; score inspection preserves authored spelling. |
+| `key` | spelled tonic plus `major` / `minor`, absent | Explicit key reference; absent or invalid values leave degrees unavailable. |
+| `pitch-mode` | `written` / `sounding`, `written` | Preserve written pitches or apply part transposition in score mode. |
+| `alternates` | `show` / `hide`, `show` | Show secondary noninteractive live chord interpretations. |
+| `stability-ms` | `0`–`1000` milliseconds, `80` | Stable-name delay for the live event, not the display; invalid values use 80. |
 
-Unknown display values fall back to the documented default. This fixed component has no `type`, `show`, `shell`, `range` or `tuning` control; configure sibling pitch views on their own tags.
+Unknown presentation values fall back to their documented defaults. Invalid musical configuration is reported by the surface rather than converted into a clean result. This tag has no generic `type`, internal View controls or transport methods.
 
-### Properties
+### Properties and methods
 
 | Property | Type | Behavior |
 | --- | --- | --- |
-| `.score` | `Score \| undefined` | Explicit score; clearing it resumes `src` or player-data fallback. |
-| `.selection` | read-only `AnalysisSelection \| undefined` | Selected band or local region with `id`, `startQuarters` and `endQuarters`. |
-| `.analysis` | read-only `AnalysisInspection \| undefined` | Headline, detail, evidence and candidate readings for the selection; detailed data is not shown in a visible panel. |
+| `.score` | `Score \| undefined` | Explicit input; clearing resumes `src`, then borrowed player data. |
+| `.selection` | read-only `AnalysisSelection \| undefined` | Local selected band/passage: `id`, `startQuarters`, `endQuarters`. |
+| `.analysis` | read-only `AnalysisInspection \| undefined` | Selected `kind`, `selection`, `headline`, `detail`, `evidence` and `candidates`; full provenance remains available beyond the compact lane readout. |
 | `.density` | `comfortable \| compact` | Reflected density. |
 | `.scheme` | `light \| dark \| undefined` | Reflected palette; undefined removes the override. |
 | `.motion` | `auto \| continuous \| stepped \| none` | Reflected motion policy. |
 | `.window` | `number \| auto` | Reflected visible duration in seconds. |
-| `.spelling` | `auto \| sharp \| flat` | Reflected pitch spelling. |
-| `.key` | `string \| undefined` | Reflected local key override; undefined removes it. |
+| `.mode` | `score \| live` | Reflected mode. |
+| `.grouping` | `beat \| simultaneous` | Reflected score grouping; defaults to beat. |
+| `.spelling` | `auto \| sharp \| flat` | Reflected MIDI spelling preference. |
+| `.key` | `string \| undefined` | Explicit key; undefined removes it. |
+| `.pitchMode` | `written \| sounding` | Reflected score pitch basis. |
+| `.chord` | read-only `string \| undefined` | Named live chord, absent for silence or an unclassified set. |
+| `.stabilityMs` | `number` | Reflected live notification delay. |
 
-`ChordAnalysisElement` is exported from `@webmusic/score/analyze/element`. `selectRegion(startQuarters, endQuarters)` selects a finite increasing quarter-note range, clamps it to the loaded score and throws `RangeError` for an invalid or wholly out-of-score range; without a score it has no effect. `clearSelection()` returns to the first available band. Neither method commands playback. There are no public playback methods.
+`ChordAnalysisElement`, `AnalysisSelection`, `AnalysisInspection`, `AnalysisSeekDetail` and `AnalysisSelectDetail` are exported from `@webmusic/score/analyze/element`.
 
-### Events
+`selectRegion(startQuarters, endQuarters)` selects a finite increasing quarter-note passage without seeking. It clamps to the loaded Score, throws `RangeError` for invalid/wholly out-of-score bounds, and has no effect without a Score. `clearSelection()` returns to the first available band. Neither method edits notes or commands playback. In live mode `.selection` and `.analysis` are undefined and region selection has no effect. `selectNotes()` is unsupported and throws `TypeError`. `src`, `.score`, `motion` and `window` remain available for returning to score mode.
 
-All emitted events bubble and are composed. `AnalysisSeekDetail` and `AnalysisSelectDetail` are exported from `@webmusic/score/analyze/element`.
+### Events and accessibility
+
+All emitted events bubble and are composed.
 
 | Event | Detail | Trigger |
 | --- | --- | --- |
-| `webscore:seek` | `AnalysisSeekDetail` (`{quarters, seconds}`) | Lane navigation; quarter notes and nominal score seconds. |
-| `webscore:analysisselect` | `AnalysisSelectDetail` (`{kind: 'chord', id, startQuarters, endQuarters}`) | Selecting a band or calling `selectRegion()`; local inspection state. |
+| `webscore:seek` | `AnalysisSeekDetail`: `{quarters, seconds}` | Lane navigation; quarter notes and nominal score seconds. |
+| `webscore:analysisselect` | `AnalysisSelectDetail`: `{kind: 'chord', id, startQuarters, endQuarters}` | Band/region selection; local inspection state. |
+| `webscore:chordchange` | `{chord, midis}` | A named live chord remains stable for the configured delay. |
 
-### Accessibility
-
-The lane is a named slider tab stop with keyboard navigation. A semantic ordered list accompanies the graphical data and marks the current score span with `aria-current`. Selected details are available through a nonvisual status; candidate readings are data for application-owned inspectors, not Element buttons. Automatic motion respects reduced-motion preference on moving surfaces; display controls remain outside the component.
+The score lane is a named slider tab stop. Arrow keys, Home/End and `[` / `]` navigate; pointer selection chooses a band and seeks. A semantic ordered list marks the current span with `aria-current`; detailed selection evidence has a nonvisual status. Passive playback does not repeatedly announce a local selection. The chord's live nameplate exposes text and has no navigation controls. Display configuration remains outside the component, and automatic motion respects reduced-motion preference.
 
 </details>
 
 <details class="component-section">
 <summary>Styling</summary>
 
-The component uses light DOM. Its block host fills the available width and can shrink in flex/grid layouts; application CSS can override its layout. Set public tokens on this host or any ancestor. The component does not install host-local theme defaults that mask inherited values.
+The component renders in light DOM with a full-width, shrinkable block host. Its one outer surface owns background, border, radius and equal padding; the inner lane/nameplate stays unframed. Set inherited `--wm-component-background`, `--wm-component-border` (a complete CSS border), `--wm-component-radius` and `--wm-component-padding`. More specific `--wm-workbench-surface-*` tokens override these. Defaults are the neutral player surface, a 1px border and `.6rem` padding.
 
-One outer surface owns background, border, padding and radius. The inner musical presenter stays unframed, so translucent backgrounds are painted once. Use `--wm-component-background`, `--wm-component-border` (a complete CSS border), `--wm-component-radius` and `--wm-component-padding`; the corresponding `--wm-workbench-surface-*` tokens provide a specific override. By default it has a neutral surface, a 1px border and `.6rem` padding on all sides, matching the player. Its light/dark colors follow the inherited scheme or the explicit `scheme` attribute. Set the component border and padding to `0` and its background to `transparent` for a frameless composition. `--wm-surface`, `--wm-foreground`, `--wm-accent`, `--wm-border` (a color) and `--wm-control-radius` supply shared palette and control defaults. Existing `--wm-analysis-*` and `--wm-harmony-*` palette overrides remain supported.
+Shared palette tokens include `--wm-surface`, `--wm-foreground`, `--wm-accent` and `--wm-border` (a color). `--wm-harmony-flow-now` overrides the now-line color; `--wm-harmony-flow-tone` supplies a uniform band fill. Geometry uses `--wm-harmony-flow-height` and `--wm-harmony-lane-height`. These presentation settings do not change the musical time axis.
 
-```css
-score-chord-analysis {
-  --wm-component-background: transparent;
-  --wm-component-border: 1px solid #94a3b8;
-  --wm-component-radius: .75rem;
-  --wm-foreground: #0f172a;
-  --wm-accent: #7c3aed;
-  --wm-harmony-flow-tone: rgb(124 58 237 / 18%);
-}
-```
-
-The now line follows `--wm-accent`, with `--wm-harmony-flow-now` as a specific override. Set `--wm-harmony-flow-tone` for one uniform band fill, or `--wm-progression-tone-0` through `--wm-progression-tone-11` for individual pitch-class colors.
-
-Stable part tokens are `root` on the direct child wrapper, `presentation`, `surface`, `content`, `index`, `lane`, `viewport` and `reel`. The former `inspection` and `candidates` parts were retired with their visible panels. Use selectors such as `score-chord-analysis [part~="surface"]` in application CSS. These are light-DOM hooks, not Shadow DOM `::part()` selectors; private `.wui-*` classes are not an API. The same hooks remain available after configuration changes and reconnects.
-
-Lane geometry uses `--wm-harmony-flow-height` and `--wm-harmony-lane-height`; changing colors does not change the time axis or pointer geometry.
-
-The [harmony presenter](/uikit/views-analysis/harmony/) and [workbench presenter](/uikit/layout-feedback/workbench/) own the complete token references. No header, tabs, dock controls or sibling pitch views are embedded in this component.
+Public light-DOM part tokens are `root`, `presentation`, `surface`, `content`, `index`, `lane`, `viewport` and `reel`; chord live mode uses `nameplate` and `symbol` in place of the lane. Target `[part~="surface"]`, not Shadow DOM `::part()` or private `.wui-*` classes. See [Harmony tokens](/uikit/views-analysis/harmony/) and [Workbench tokens](/uikit/layout-feedback/workbench/) for presenter overrides. No internal keyboard, staff, tabs or settings dock is mounted.
 
 </details>

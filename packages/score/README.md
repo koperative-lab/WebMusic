@@ -98,7 +98,7 @@ state.
 | `@webmusic/score/play/demos` | Demo elements and sample scores. |
 | `@webmusic/score/analyze` | Stateless analysis: key, chords, Roman numerals, motifs, voice leading. |
 | `@webmusic/score/analyze/headless` | Sessions, playback followers, live trackers, worker clients and presentation prediction; no DOM. |
-| `@webmusic/score/analyze/element` | Interactive current-chord and chord-progression analysis components. |
+| `@webmusic/score/analyze/element` | Four elementary tools: chord (score/live), interval, explicit scale and grouped rhythm. |
 | `@webmusic/score/analyze/worker-client` | Main-thread analysis Worker client (`createAnalysisWorker`). |
 | `@webmusic/score/analyze/worker-protocol` | Pure analysis wire types and constants. |
 | `@webmusic/score/analyze/worker` | Self-registering analysis Worker runtime. |
@@ -636,7 +636,7 @@ and terminated on `dispose()`. Structured remote failures reject with
 live at `@webmusic/score/analyze/worker-protocol`; the runtime at
 `@webmusic/score/analyze/worker`.
 
-Analysis Web Components expose two focused inspection tools:
+Analysis Web Components expose four elementary inspection tools:
 
 ```ts
 import {defineAllAnalysisElements} from '@webmusic/score/analyze/element';
@@ -657,7 +657,9 @@ attributes, and supporting keyboards, staffs or fretboards remain reusable View
 components. They borrow the player's existing data or held-note state and own no
 playback graph.
 
-The two tags cover current-chord interpretation and passage harmony. The
+The four tags inspect chord structure (score or live mode), spelled intervals,
+notes against an explicit tonic/scale, and written placement within grouped
+meter. They do not guess a key or judge harmonic function. The
 [Analyze overview](../../apps/doc/webmusic/src/content/docs/score/element/index.mdx#analyze)
 selects and documents them. Each live demo contains its player and the current
 tag, with external Parameters.

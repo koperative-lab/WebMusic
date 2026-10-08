@@ -1,3 +1,4 @@
+import {mountArabesqueMaterial, sourceSpanAt, type ArabesqueMaterial, type DemoChord as HarmonyDemoChord, type DemoSpan as HarmonyDemoBar} from './arabesque-material';
 import {mountAnalyzerToolsDemo} from './analyzer-tools';
 import {
   createAnalysisPlayhead,
@@ -23,11 +24,9 @@ import {
   type FlowLaneOptions,
   type FlowLaneState,
   type FrameTick,
-  type HarmonyVoice,
   type NameplateHandle,
   type NameplateOptions,
   type NameplateState,
-  type Severity,
   type WheelHandle,
   type WheelOptions,
   type WheelState,
@@ -36,7 +35,6 @@ import {
   mountFretboard,
   mountKeyboard,
   mountStaff,
-  type FretboardBarre,
   type FretboardHandle,
   type FretboardOptions,
   type FretboardState,
@@ -672,40 +670,23 @@ function analysisPlayheadOptions(
   return options;
 }
 
-function mountAnalysisDemo(host: HTMLElement): UiPresenterDemoHandle {
+function mountAnalysisDemo(host: HTMLElement, material: ArabesqueMaterial): UiPresenterDemoHandle {
   const root = createAnalysisRoot(host.ownerDocument);
   root.setAttribute('aria-label', 'Live harmonic analysis');
   host.append(root);
 
-  renderSummaryCard(
-    {
-      title: 'Harmonic motion',
-      subtitle: 'Live presenter output',
-      rows: [
-        {label: 'Key', value: 'C major'},
-        {label: 'Tempo', value: '112 BPM'},
-      ],
-    },
-    root,
-  );
-  renderHistogram(
-    [
-      {label: 'C', value: 12},
-      {label: 'G', value: 9},
-      {label: 'Am', value: 7},
-      {label: 'F', value: 10},
-    ],
-    root,
-  );
-  renderChordTimeline(
-    [
-      {chord: 'Cmaj7', startQuarters: 0, endQuarters: 1},
-      {chord: 'G7', startQuarters: 1, endQuarters: 2},
-      {chord: 'Am7', startQuarters: 2, endQuarters: 3},
-      {chord: 'Fmaj7', startQuarters: 3, endQuarters: 4},
-    ],
-    root,
-  );
+  renderSummaryCard({
+    title: 'Arabesque No. 1', subtitle: 'Original MusicXML opening · visual inspection',
+    rows: [{label: 'Excerpt', value: `${material.quarters} quarter-note beats`},
+      {label: 'Source', value: 'Written pitches; exact simultaneous spans'}],
+  }, root);
+  renderHistogram(material.chords.map((chord) => ({
+    label: chord.symbol,
+    value: material.spans.filter((span) => span.chord === chord).length,
+  })), root);
+  renderChordTimeline(material.spans.map((span) => ({
+    chord: span.chord.symbol, startQuarters: span.stampStart, endQuarters: span.stampEnd,
+  })), root);
 
   let optionValues: Record<string, unknown> = {scroll: false};
   let presenter: AnalysisPlayheadHandle | undefined;
@@ -720,7 +701,7 @@ function mountAnalysisDemo(host: HTMLElement): UiPresenterDemoHandle {
 
   const view = host.ownerDocument.defaultView;
   const timer = view?.setInterval(() => {
-    quarters = (quarters + 0.25) % 4;
+    quarters = (quarters + 0.25) % material.quarters;
     presenter?.update(quarters);
   }, 450);
 
@@ -750,123 +731,9 @@ function mountAnalysisDemo(host: HTMLElement): UiPresenterDemoHandle {
 }
 
 // ---------------------------------------------------------------------------
-// @webmusic/ui/pitch — three surfaces reading one progression that plays itself.
-//
-// Everything musical below is the DEMO's answer, not the kit's. The kit is
-// handed MIDI numbers, diatonic steps, string/fret pairs, role names and the
-// clef glyph strings; it is never told that this is a ii-V-I-vi in C, and it
-// could not work it out.
+// @webmusic/ui/pitch — original Arabesque pitches projected by the demo layer.
+// UI receives positions and labels; it performs no musical interpretation.
 // ---------------------------------------------------------------------------
-
-/** The four roles this progression uses. A subset of the kit's tone roles. */
-type PitchDemoRole = 'root' | 'third' | 'fifth' | 'seventh';
-
-interface PitchDemoTone {
-  midi: number;
-  /** The diatonic step, C4 = 28 — which follows the SPELLING, not the pitch. */
-  diatonic: number;
-  label: string;
-  role: PitchDemoRole;
-}
-
-/** One stopped position on a guitar in standard tuning. String 0 is the top. */
-interface PitchDemoStop {
-  string: number;
-  fret: number;
-  label: string;
-  role: PitchDemoRole;
-}
-
-interface PitchDemoChord {
-  name: string;
-  /** A close piano voicing: what the keyboard and the staff are given. */
-  tones: readonly PitchDemoTone[];
-  /** One hand position: what the fretboard is given. */
-  grip: readonly PitchDemoStop[];
-  barre: FretboardBarre;
-  muted: readonly number[];
-}
-
-const PITCH_DEMO_PROGRESSION: readonly PitchDemoChord[] = [
-  {
-    name: 'Dm7',
-    tones: [
-      {midi: 50, diatonic: 22, label: 'D3', role: 'root'},
-      {midi: 53, diatonic: 24, label: 'F3', role: 'third'},
-      {midi: 57, diatonic: 26, label: 'A3', role: 'fifth'},
-      {midi: 60, diatonic: 28, label: 'C4', role: 'seventh'},
-    ],
-    grip: [
-      {string: 0, fret: 5, label: 'A4', role: 'fifth'},
-      {string: 1, fret: 6, label: 'F4', role: 'third'},
-      {string: 2, fret: 5, label: 'C4', role: 'seventh'},
-      {string: 3, fret: 7, label: 'A3', role: 'fifth'},
-      {string: 4, fret: 5, label: 'D3', role: 'root'},
-    ],
-    barre: {fret: 5, fromString: 0, toString: 4},
-    muted: [5],
-  },
-  {
-    name: 'G7',
-    tones: [
-      {midi: 55, diatonic: 25, label: 'G3', role: 'root'},
-      {midi: 59, diatonic: 27, label: 'B3', role: 'third'},
-      {midi: 62, diatonic: 29, label: 'D4', role: 'fifth'},
-      {midi: 65, diatonic: 31, label: 'F4', role: 'seventh'},
-    ],
-    grip: [
-      {string: 0, fret: 3, label: 'G4', role: 'root'},
-      {string: 1, fret: 3, label: 'D4', role: 'fifth'},
-      {string: 2, fret: 4, label: 'B3', role: 'third'},
-      {string: 3, fret: 3, label: 'F3', role: 'seventh'},
-      {string: 4, fret: 5, label: 'D3', role: 'fifth'},
-      {string: 5, fret: 3, label: 'G2', role: 'root'},
-    ],
-    barre: {fret: 3, fromString: 0, toString: 5},
-    muted: [],
-  },
-  {
-    name: 'Cmaj7',
-    tones: [
-      {midi: 60, diatonic: 28, label: 'C4', role: 'root'},
-      {midi: 64, diatonic: 30, label: 'E4', role: 'third'},
-      {midi: 67, diatonic: 32, label: 'G4', role: 'fifth'},
-      {midi: 71, diatonic: 34, label: 'B4', role: 'seventh'},
-    ],
-    grip: [
-      {string: 0, fret: 8, label: 'C5', role: 'root'},
-      {string: 1, fret: 8, label: 'G4', role: 'fifth'},
-      {string: 2, fret: 9, label: 'E4', role: 'third'},
-      {string: 3, fret: 9, label: 'B3', role: 'seventh'},
-      {string: 4, fret: 10, label: 'G3', role: 'fifth'},
-      {string: 5, fret: 8, label: 'C3', role: 'root'},
-    ],
-    barre: {fret: 8, fromString: 0, toString: 5},
-    muted: [],
-  },
-  {
-    name: 'Am7',
-    tones: [
-      {midi: 57, diatonic: 26, label: 'A3', role: 'root'},
-      {midi: 60, diatonic: 28, label: 'C4', role: 'third'},
-      {midi: 64, diatonic: 30, label: 'E4', role: 'fifth'},
-      {midi: 67, diatonic: 32, label: 'G4', role: 'seventh'},
-    ],
-    grip: [
-      {string: 0, fret: 5, label: 'A4', role: 'root'},
-      {string: 1, fret: 5, label: 'E4', role: 'fifth'},
-      {string: 2, fret: 5, label: 'C4', role: 'third'},
-      {string: 3, fret: 5, label: 'G3', role: 'seventh'},
-      {string: 4, fret: 7, label: 'E3', role: 'fifth'},
-      {string: 5, fret: 5, label: 'A2', role: 'root'},
-    ],
-    barre: {fret: 5, fromString: 0, toString: 5},
-    muted: [],
-  },
-];
-
-/** The pitch classes of C major: in the key, drawn as a wash when not sounding. */
-const PITCH_DEMO_SCALE: readonly number[] = [0, 2, 4, 5, 7, 9, 11];
 
 /** Whether middle C is called C4 is a convention, so the caller supplies it. */
 const PITCH_DEMO_OCTAVES: ReadonlyMap<number, string> = new Map([
@@ -893,9 +760,7 @@ const PITCH_DEMO_INLAYS: readonly number[] = [3, 5, 7, 9, 12, 15, 17, 19, 21];
 
 /** How often the demo repaints, and how far its own clock moves each time. */
 const PITCH_TICK_MS = 200;
-const PITCH_BEAT_PER_TICK = 0.25;
-/** How long one chord is held, on the demo's own ruler. */
-const PITCH_CHORD_BEATS = 2;
+const PITCH_SECONDS_PER_TICK = PITCH_TICK_MS / 1000;
 
 interface PitchDemoState {
   labels: 'none' | 'marked' | 'white' | 'all';
@@ -985,7 +850,7 @@ function pitchSurfaceHost(document: Document, parent: HTMLElement): HTMLElement 
   return surface;
 }
 
-function mountPitchDemo(host: HTMLElement): UiPresenterDemoHandle {
+function mountPitchDemo(host: HTMLElement, material: ArabesqueMaterial): UiPresenterDemoHandle {
   const document = host.ownerDocument;
   const view = document.defaultView;
   const notifier = createNotifier();
@@ -1010,17 +875,22 @@ function mountPitchDemo(host: HTMLElement): UiPresenterDemoHandle {
   let timer: number | undefined;
   let destroyed = false;
 
-  const chord = (): PitchDemoChord => PITCH_DEMO_PROGRESSION[index];
+  const progression = material.spans;
+  const chord = (): HarmonyDemoChord => progression[index].chord;
+  const positions = ['opening', 'quarter', 'half', 'three-quarter'] as const;
+  let selectedPosition: typeof positions[number] = 'opening';
 
   const keyboardBinding = {
     snapshot: (): KeyboardState => ({
+      low: material.low,
+      high: material.high,
       marks: chord().tones.map((tone) => ({
         midi: tone.midi,
         label: tone.label,
         role: tone.role,
         since: chordSince,
       })),
-      ghostPitchClasses: PITCH_DEMO_SCALE,
+      ghostPitchClasses: material.pitchClasses,
       labels: state.labels,
       octaveLabels: PITCH_DEMO_OCTAVES,
       now,
@@ -1033,8 +903,8 @@ function mountPitchDemo(host: HTMLElement): UiPresenterDemoHandle {
   // than the line move across static material.
   const staffBinding = {
     snapshot: (): StaffState => ({
-      marks: PITCH_DEMO_PROGRESSION.flatMap((entry, column) =>
-        entry.tones.map((tone) => ({
+      marks: progression.flatMap((entry, column) =>
+        entry.chord.tones.map((tone) => ({
           midi: tone.midi,
           diatonic: tone.diatonic,
           label: tone.label,
@@ -1045,7 +915,7 @@ function mountPitchDemo(host: HTMLElement): UiPresenterDemoHandle {
       ),
       system: 'grand' as const,
       clefs: PITCH_DEMO_CLEFS,
-      columns: PITCH_DEMO_PROGRESSION.length,
+      columns: progression.length,
       activeColumn: index,
       follow: state.follow,
       emptyLabel: 'Nothing is sounding.',
@@ -1059,20 +929,15 @@ function mountPitchDemo(host: HTMLElement): UiPresenterDemoHandle {
       strings: PITCH_DEMO_STRINGS.length,
       firstFret: state.firstFret,
       fretCount: 5,
-      marks: chord().grip.map((stop) => ({
-        stringIndex: stop.string,
-        fret: stop.fret,
-        midi: (PITCH_DEMO_TUNING[stop.string] ?? 0) + stop.fret,
-        label: stop.label,
-        role: stop.role,
-        since: chordSince,
+      marks: chord().tones.flatMap((tone) => PITCH_DEMO_TUNING.flatMap((open, stringIndex) => {
+        const fret = tone.midi - open;
+        return fret >= 0 && fret <= 21 ? [{stringIndex, fret, midi: tone.midi,
+          label: tone.label, role: tone.role, since: chordSince}] : [];
       })),
-      muted: chord().muted,
       stringLabels: PITCH_DEMO_STRINGS,
       inlays: PITCH_DEMO_INLAYS,
       orientation: state.orientation,
-      barre: [chord().barre],
-      emptyLabel: 'No shape is sounding.',
+      emptyLabel: 'No source pitch is playable in this range.',
       now,
     }),
     subscribe: notifier.subscribe,
@@ -1093,11 +958,10 @@ function mountPitchDemo(host: HTMLElement): UiPresenterDemoHandle {
 
   const tick = (): void => {
     if (destroyed) return;
-    now = Math.round((now + PITCH_BEAT_PER_TICK) * 100) / 100;
-    if (now - chordSince >= PITCH_CHORD_BEATS) {
-      index = (index + 1) % PITCH_DEMO_PROGRESSION.length;
-      chordSince = now;
-    }
+    now = (now + PITCH_SECONDS_PER_TICK) % material.duration;
+    index = Math.max(0, sourceSpanAt(progression, now));
+    chordSince = progression[index].start;
+    selectedPosition = positions[Math.min(3, Math.floor(now / material.duration * 4))];
     notifier.notify();
   };
 
@@ -1117,14 +981,12 @@ function mountPitchDemo(host: HTMLElement): UiPresenterDemoHandle {
   return {
     setState(name, value) {
       if (destroyed) return;
-      if (name === 'chord') {
-        // Picking a chord takes the wheel; Reset hands it back to the clock.
+      if (name === 'position') {
         stopClock();
-        const picked = PITCH_DEMO_PROGRESSION.findIndex((entry) => entry.name === value);
-        if (picked >= 0) {
-          index = picked;
-          chordSince = now;
-        }
+        selectedPosition = positions.find((position) => position === value) ?? 'opening';
+        now = positions.indexOf(selectedPosition) * material.duration / 4;
+        index = Math.max(0, sourceSpanAt(progression, now));
+        chordSince = progression[index].start;
       } else if (name === 'labels') {
         state = {...state, labels: PITCH_LABEL_MODES.find((mode) => mode === value) ?? 'marked'};
       } else if (name === 'follow') {
@@ -1152,11 +1014,12 @@ function mountPitchDemo(host: HTMLElement): UiPresenterDemoHandle {
       index = 0;
       now = 0;
       chordSince = 0;
+      selectedPosition = 'opening';
       remount();
       startClock();
       notifier.notify();
     },
-    snapshot: () => ({chord: chord().name, ...state}),
+    snapshot: () => ({position: selectedPosition, ...state}),
     subscribe: notifier.subscribe,
     destroy() {
       if (destroyed) return;
@@ -1176,204 +1039,29 @@ function mountPitchDemo(host: HTMLElement): UiPresenterDemoHandle {
 }
 
 // ---------------------------------------------------------------------------
-// @webmusic/ui/harmony — one progression on a conveyor, read four ways at once.
-//
-// Everything musical below is the DEMO's answer. The kit is handed "from 24.0
-// to 26.0, stamped 48 to 52, tone slot 7, labelled 'G7'" and could not work out
-// that this is a ii-V-I in C, that its twelve wheel segments are a circle of
-// fifths, or that a chord has a root at all.
-//
-// The lane's axis is SECONDS and the stamp is QUARTERS on purpose. The two are
-// related by a tempo nobody here ever tells the kit, which is the entire reason
-// `stampStart` / `stampEnd` exist as a second pair of numbers: the conveyor is a
-// portrait of real time, so a ritardando has to be visibly wider, while a
-// playhead is fed the score's own metrical position.
+// @webmusic/ui/harmony — source spans on seconds and quarter-note axes.
+// Exact spelled matches are named; all other collections retain pitch names.
 // ---------------------------------------------------------------------------
 
-interface HarmonyDemoChord {
-  symbol: string;
-  /** The spoken form. Announced instead of the symbol, which is an abbreviation. */
-  full: string;
-  roman: string;
-  /** What the chord is doing in the key — the demo's word, never the kit's. */
-  harmonicFunction: string;
-  /** 0…11, the progression slot that colours the block. */
-  rootPitchClass: number;
-  /** Where the root sits on the demo's own circle of fifths. */
-  fifthsIndex: number;
-  confidence: number;
-  voicing: readonly HarmonyVoice[];
-  alternates: readonly {symbol: string; note: string}[];
-  /** Siblings that light together when the reader asks for a group. */
-  group?: string;
-  severity?: Severity;
-}
-
-const HARMONY_DEMO_CHORDS: readonly HarmonyDemoChord[] = [
-  {
-    symbol: 'Dm7',
-    full: 'D minor seventh',
-    roman: 'iim7',
-    harmonicFunction: 'predominant',
-    rootPitchClass: 2,
-    fifthsIndex: 2,
-    confidence: 0.74,
-    voicing: [
-      {label: 'D3', role: 'root'},
-      {label: 'F3', role: 'third'},
-      {label: 'A3', role: 'fifth'},
-      {label: 'C4', role: 'seventh'},
-    ],
-    alternates: [
-      {symbol: 'F6/D', note: 'inversion'},
-      {symbol: 'Dm9', note: 'with the ninth'},
-    ],
-  },
-  {
-    symbol: 'G7',
-    full: 'G dominant seventh',
-    roman: 'V7',
-    harmonicFunction: 'dominant',
-    rootPitchClass: 7,
-    fifthsIndex: 1,
-    confidence: 0.86,
-    voicing: [
-      {label: 'G3', role: 'root'},
-      {label: 'B3', role: 'third'},
-      {label: 'D4', role: 'fifth'},
-      {label: 'F4', role: 'seventh'},
-    ],
-    alternates: [
-      {symbol: 'Bdim', note: 'rootless'},
-      {symbol: 'G7sus4', note: 'suspended'},
-    ],
-  },
-  {
-    symbol: 'Cmaj7',
-    full: 'C major seventh',
-    roman: 'Imaj7',
-    harmonicFunction: 'tonic',
-    rootPitchClass: 0,
-    fifthsIndex: 0,
-    confidence: 0.93,
-    voicing: [
-      {label: 'C4', role: 'root'},
-      {label: 'E4', role: 'third'},
-      {label: 'G4', role: 'fifth'},
-      {label: 'B4', role: 'seventh'},
-    ],
-    alternates: [
-      {symbol: 'Em/C', note: 'rootless'},
-      {symbol: 'C6/9', note: 'a fuller reading'},
-    ],
-  },
-  {
-    symbol: 'Fmaj7',
-    full: 'F major seventh',
-    roman: 'IVmaj7',
-    harmonicFunction: 'subdominant',
-    rootPitchClass: 5,
-    fifthsIndex: 11,
-    confidence: 0.55,
-    voicing: [
-      {label: 'F3', role: 'root'},
-      {label: 'A3', role: 'third'},
-      {label: 'C4', role: 'fifth'},
-      {label: 'E4', role: 'seventh'},
-    ],
-    alternates: [
-      {symbol: 'Am/F', note: 'rootless'},
-      {symbol: 'Dm9/F', note: 'as a predominant'},
-    ],
-    group: 'subdominant',
-    // The one place this demo's own analysis is least sure, and it says so on
-    // two channels: a bead on the band, and a dimmer sector on the wheel.
-    severity: 'warning',
-  },
-];
-
-/** Three passes of a six-bar loop. Indices into the chord table above. */
-const HARMONY_DEMO_LOOP: readonly number[] = [0, 1, 2, 3, 1, 2];
-const HARMONY_DEMO_PASSES = 3;
-/** One bar, on each of the two rulers: two seconds of real time, four quarters. */
-const HARMONY_BAR_SECONDS = 2;
-const HARMONY_BAR_QUARTERS = 4;
-
-interface HarmonyDemoBar {
-  id: string;
-  chord: HarmonyDemoChord;
-  /** Seconds — the LANE axis. */
-  start: number;
-  end: number;
-  /** Quarters — the STAMPING axis, a different ruler on purpose. */
-  stampStart: number;
-  stampEnd: number;
-}
-
-const HARMONY_DEMO_BARS: readonly HarmonyDemoBar[] = Array.from(
-  {length: HARMONY_DEMO_LOOP.length * HARMONY_DEMO_PASSES},
-  (_unused, at): HarmonyDemoBar => ({
-    id: `bar-${at}`,
-    chord: HARMONY_DEMO_CHORDS[HARMONY_DEMO_LOOP[at % HARMONY_DEMO_LOOP.length]],
-    start: at * HARMONY_BAR_SECONDS,
-    end: (at + 1) * HARMONY_BAR_SECONDS,
-    stampStart: at * HARMONY_BAR_QUARTERS,
-    stampEnd: (at + 1) * HARMONY_BAR_QUARTERS,
-  }),
-);
-
-const HARMONY_DEMO_SPAN = HARMONY_DEMO_BARS.length * HARMONY_BAR_SECONDS;
-
-const HARMONY_DEMO_TRACKS = [
-  {id: 'chords', label: 'Chords'},
-  {id: 'numerals', label: 'Numerals', sublabel: 'in C'},
-] as const;
-
-/** A tick on every bar line, a label on every fourth. Seconds, like the axis. */
-const HARMONY_DEMO_RULER = Array.from(
-  {length: HARMONY_DEMO_BARS.length + 1},
-  (_unused, at) => ({
-    at: at * HARMONY_BAR_SECONDS,
-    label: at % 4 === 0 ? `${at * HARMONY_BAR_SECONDS}s` : '',
-    major: at % 4 === 0,
-  }),
-);
-
-/** One flag per pass, on no track: a fact about the moment, not about a row. */
-const HARMONY_DEMO_FLAGS = Array.from({length: HARMONY_DEMO_PASSES}, (_unused, pass) => ({
-  id: `top-${pass}`,
-  at: pass * HARMONY_DEMO_LOOP.length * HARMONY_BAR_SECONDS,
-  severity: 'info' as Severity,
-  label: 'top of the form',
-}));
-
-/** The ii-V of each pass, bracketed across every row the lane is showing. */
-const HARMONY_DEMO_BRACKETS = Array.from({length: HARMONY_DEMO_PASSES}, (_unused, pass) => {
-  const first = HARMONY_DEMO_BARS[pass * HARMONY_DEMO_LOOP.length];
-  const second = HARMONY_DEMO_BARS[pass * HARMONY_DEMO_LOOP.length + 1];
+function harmonyMaterial(material: ArabesqueMaterial) {
   return {
-    id: `ii-v-${pass}`,
-    start: first.start,
-    end: second.end,
-    from: 0,
-    to: 1,
-    severity: 'info' as Severity,
-    label: 'ii-V',
+    HARMONY_DEMO_BARS: material.spans,
+    HARMONY_DEMO_CHORDS: material.chords,
+    HARMONY_DEMO_SPAN: material.duration,
+    HARMONY_DEMO_TRACKS: [{id: 'chords', label: 'Chords / pitches'}, {id: 'pitches', label: 'Pitch names'}],
+    HARMONY_DEMO_RULER: Array.from({length: Math.ceil(material.duration) + 1}, (_, at) => ({at, label: `${at}s`, major: true})),
+    HARMONY_DEMO_FLAGS: [{id: 'source', at: 0, label: 'Arabesque No. 1 opening', severity: 'info' as const}],
+    HARMONY_DEMO_BRACKETS: [{id: 'excerpt', start: 0, end: material.duration, from: 0, to: 1, label: 'Original excerpt'}],
   };
-});
+}
 
 /**
- * The demo's circle of fifths, and the relative minor of each position. Both
- * are theory, so both are the caller's: the wheel is handed twelve labelled
+ * The demo's circle of fifths is a caller-supplied reference: the wheel receives twelve labelled
  * segments in the order it should draw them clockwise and nothing else.
  */
 const HARMONY_DEMO_FIFTHS: readonly string[] = [
   'C', 'G', 'D', 'A', 'E', 'B', 'F#', 'Db', 'Ab', 'Eb', 'Bb', 'F',
 ];
-const HARMONY_DEMO_RELATIVES: readonly string[] = [
-  'Am', 'Em', 'Bm', 'F#m', 'C#m', 'G#m', 'D#m', 'Bbm', 'Fm', 'Cm', 'Gm', 'Dm',
-];
-
 /** How often the demo re-reads its own data. The frame loop is the kit's. */
 const HARMONY_POLL_MS = 90;
 
@@ -1453,7 +1141,9 @@ function harmonyWheelOptions(
   return options;
 }
 
-function mountHarmonyDemo(host: HTMLElement): UiPresenterDemoHandle {
+function mountHarmonyDemo(host: HTMLElement, material: ArabesqueMaterial): UiPresenterDemoHandle {
+  const {HARMONY_DEMO_BARS, HARMONY_DEMO_CHORDS, HARMONY_DEMO_SPAN, HARMONY_DEMO_TRACKS,
+    HARMONY_DEMO_RULER, HARMONY_DEMO_FLAGS, HARMONY_DEMO_BRACKETS} = harmonyMaterial(material);
   const document = host.ownerDocument;
   const view = document.defaultView;
   const notifier = createNotifier();
@@ -1500,10 +1190,7 @@ function mountHarmonyDemo(host: HTMLElement): UiPresenterDemoHandle {
     return ((raw % HARMONY_DEMO_SPAN) + HARMONY_DEMO_SPAN) % HARMONY_DEMO_SPAN;
   };
   const barAt = (position: number): number =>
-    Math.min(
-      HARMONY_DEMO_BARS.length - 1,
-      Math.max(0, Math.floor(position / HARMONY_BAR_SECONDS)),
-    );
+    Math.max(0, sourceSpanAt(HARMONY_DEMO_BARS, Math.min(position, HARMONY_DEMO_SPAN - 1e-9)));
 
   const seekTo = (position: number, phase: 'drag' | 'commit'): void => {
     held = Math.max(0, Math.min(HARMONY_DEMO_SPAN, position));
@@ -1555,10 +1242,9 @@ function mountHarmonyDemo(host: HTMLElement): UiPresenterDemoHandle {
           stampEnd: entry.stampEnd,
           track: 0,
           primary: entry.chord.symbol,
-          secondary: entry.chord.harmonicFunction,
+          secondary: entry.chord.description,
           tone: entry.chord.rootPitchClass,
           ...(entry.chord.group ? {group: entry.chord.group} : {}),
-          ...(entry.chord.severity ? {severity: entry.chord.severity} : {}),
         });
         if (rows < 2) continue;
         bands.push({
@@ -1568,7 +1254,7 @@ function mountHarmonyDemo(host: HTMLElement): UiPresenterDemoHandle {
           stampStart: entry.stampStart,
           stampEnd: entry.stampEnd,
           track: 1,
-          primary: entry.chord.roman,
+          primary: entry.chord.pitchNames,
           // The other ruler, printed, so the two are visibly not the same number.
           secondary: `q${entry.stampStart}`,
           tone: entry.chord.rootPitchClass,
@@ -1606,11 +1292,10 @@ function mountHarmonyDemo(host: HTMLElement): UiPresenterDemoHandle {
         primary: readings[0],
         alternates: readings.slice(1),
         voicing: entry.chord.voicing,
-        caption: `bar ${bar + 1} of ${HARMONY_DEMO_BARS.length}`,
+        caption: `Arabesque No. 1 · span ${bar + 1} of ${HARMONY_DEMO_BARS.length}`,
         history: HARMONY_DEMO_BARS.slice(Math.max(0, bar - 3), bar + 1).map(
           (heard) => heard.chord.symbol,
         ),
-        confidence: entry.chord.confidence,
         emphasis: state.emphasis,
         next: {symbol: next.chord.symbol, key: next.id},
         emptyLabel: 'Nothing is sounding.',
@@ -1620,7 +1305,8 @@ function mountHarmonyDemo(host: HTMLElement): UiPresenterDemoHandle {
     // on the bar length, which the demo knows and the nameplate does not.
     approach: (tick: FrameTick): number => {
       const at = positionAt(tick.at);
-      return (at % HARMONY_BAR_SECONDS) / HARMONY_BAR_SECONDS;
+      const current = HARMONY_DEMO_BARS[barAt(at)];
+      return (at - current.start) / (current.end - current.start);
     },
     selectAlternate: (index: number): void => {
       const total = HARMONY_DEMO_BARS[bar].chord.alternates.length + 1;
@@ -1637,19 +1323,18 @@ function mountHarmonyDemo(host: HTMLElement): UiPresenterDemoHandle {
         const every = HARMONY_DEMO_BARS.filter((entry) => entry.chord === chord);
         const soFar = heard.filter((entry) => entry.chord === chord);
         return {
-          id: chord.symbol,
+          id: `${chord.symbol}:${chord.pitchNames}`,
           // Chips are stamped on the QUARTERS ruler, like the bands they count.
           start: every[0].stampStart,
           end: every[0].stampEnd,
           primary: chord.symbol,
-          roman: chord.roman,
+          roman: chord.pitchNames,
           spans: soFar.map((entry) => ({start: entry.stampStart, end: entry.stampEnd})),
           occurrences: soFar.map((entry) => entry.stampStart),
           meter: soFar.length / Math.max(1, heard.length),
           // The whole-piece answer, drawn as an outline the bar grows towards.
           meterGhost: every.length / HARMONY_DEMO_BARS.length,
           tone: chord.rootPitchClass,
-          ...(chord.severity ? {severity: chord.severity} : {}),
         };
       });
       return {
@@ -1681,27 +1366,19 @@ function mountHarmonyDemo(host: HTMLElement): UiPresenterDemoHandle {
           weight: share(at),
           active: at === entry.chord.fifthsIndex,
         })),
-        inner: HARMONY_DEMO_RELATIVES.map((label, at) => ({
-          id: label,
-          label,
-          weight: share(at) * 0.6,
-        })),
         centre: {
-          primary: 'C major',
-          secondary: `${Math.round(entry.chord.confidence * 100)}% sure`,
+          primary: 'Root / bass',
+          secondary: entry.chord.description,
         },
-        needle: {
+        ...(entry.chord.fifthsIndex < 0 ? {} : {needle: {
           at: entry.chord.fifthsIndex,
-          // An answer held at fifty-five per cent has to LOOK unsure: the wedge
-          // widens as the confidence falls, rather than pointing precisely at
-          // a guess.
-          spread: (1 - entry.chord.confidence) * 3,
-          label: `The harmony is sitting on ${HARMONY_DEMO_FIFTHS[entry.chord.fifthsIndex]}`,
-        },
-        trail: HARMONY_DEMO_BARS.slice(Math.max(0, bar - 3), bar).map((heard) => ({
+          spread: 0,
+          label: `Source root or bass ${HARMONY_DEMO_FIFTHS[entry.chord.fifthsIndex]}`,
+        }}),
+        trail: HARMONY_DEMO_BARS.slice(Math.max(0, bar - 3), bar).filter((heard) => heard.chord.fifthsIndex >= 0).map((heard) => ({
           at: heard.chord.fifthsIndex,
         })),
-        emptyLabel: 'No key estimate yet.',
+        emptyLabel: 'No source pitches.',
       };
     },
     subscribe: notifier.subscribe,
@@ -1781,7 +1458,7 @@ function mountHarmonyDemo(host: HTMLElement): UiPresenterDemoHandle {
       } else if (name === 'future') {
         state = {...state, future: value !== false};
       } else if (name === 'focus') {
-        state = {...state, focus: value === 'subdominant' ? 'subdominant' : 'none'};
+        state = {...state, focus: value === 'matched' ? 'matched' : 'none'};
       } else if (name === 'layout') {
         state = {...state, layout: HARMONY_LAYOUTS.find((mode) => mode === value) ?? 'flow'};
       } else if (name === 'emphasis') {
@@ -1841,31 +1518,6 @@ function mountHarmonyDemo(host: HTMLElement): UiPresenterDemoHandle {
 // a keyboard draws pitches; the words are the demo's, and so is every number.
 // ---------------------------------------------------------------------------
 
-interface WorkbenchDemoPitch {
-  midi: number;
-  /** C4 = 28 — a convention, and therefore the caller's to state. */
-  diatonic: number;
-}
-
-/**
- * Every note name the shared voicings use, on both ladders the pitch surfaces
- * read. Neither ladder is in the kit, because whether middle C is called C4 is
- * a convention rather than a fact.
- */
-const WORKBENCH_DEMO_PITCHES: Readonly<Record<string, WorkbenchDemoPitch>> = {
-  D3: {midi: 50, diatonic: 22},
-  F3: {midi: 53, diatonic: 24},
-  G3: {midi: 55, diatonic: 25},
-  A3: {midi: 57, diatonic: 26},
-  B3: {midi: 59, diatonic: 27},
-  C4: {midi: 60, diatonic: 28},
-  D4: {midi: 62, diatonic: 29},
-  E4: {midi: 64, diatonic: 30},
-  F4: {midi: 65, diatonic: 31},
-  G4: {midi: 67, diatonic: 32},
-  B4: {midi: 71, diatonic: 34},
-};
-
 /**
  * The three views, each declaring the docks it wants. A dock a view does not
  * name loses its whole section — head, switch and body — because a switch left
@@ -1875,19 +1527,19 @@ const WORKBENCH_DEMO_VIEWS: readonly WorkbenchView[] = [
   {
     id: 'chords',
     label: 'Chords',
-    description: 'The progression, as it goes past',
+    description: 'Arabesque No. 1 source spans',
     docks: ['keyboard', 'staff', 'chips'],
   },
   {
     id: 'key',
-    label: 'Key',
-    description: 'Where the harmony is sitting',
+    label: 'Roots and basses',
+    description: 'Exact chord roots or the source bass pitch',
     docks: ['chips'],
   },
   {
     id: 'voicing',
     label: 'Voicing',
-    description: 'What the hands are holding',
+    description: 'Original written pitches',
     docks: ['keyboard', 'chips'],
   },
 ];
@@ -1901,7 +1553,7 @@ const WORKBENCH_DEMO_DOCKS: readonly WorkbenchDock[] = [
 
 /** What the status bar says in each phase. The shell prints it and reads none of it. */
 const WORKBENCH_DEMO_SENTENCES: Readonly<Record<WorkbenchPhase, string>> = {
-  playing: 'Following the performance.',
+  playing: 'Inspecting Arabesque No. 1; no audio playback.',
   listening: 'Listening for the next chord.',
   idle: 'Parked. Nothing is being read.',
   empty: 'Nothing has been analysed yet.',
@@ -1932,25 +1584,8 @@ const WORKBENCH_INITIAL_STATE: WorkbenchDemoState = {
   keyboard: true,
 };
 
-/** Which bar of the shared progression a position lands in. */
-function workbenchBarAt(position: number): number {
-  return Math.min(
-    HARMONY_DEMO_BARS.length - 1,
-    Math.max(0, Math.floor(position / HARMONY_BAR_SECONDS)),
-  );
-}
-
-/** A chord's voicing on the two ladders the keyboard and the staff read. */
-function workbenchTones(
-  chord: HarmonyDemoChord,
-): readonly {midi: number; diatonic: number; label: string; role: HarmonyVoice['role']}[] {
-  return chord.voicing.flatMap((voice) => {
-    const label = voice.label;
-    const pitch = label === undefined ? undefined : WORKBENCH_DEMO_PITCHES[label];
-    if (label === undefined || pitch === undefined) return [];
-    return [{...pitch, label, role: voice.role}];
-  });
-}
+/** Preserve the exact original spelling and register in every readout. */
+const workbenchTones = (chord: HarmonyDemoChord) => chord.tones;
 
 function workbenchOptions(
   host: HTMLElement,
@@ -1967,7 +1602,9 @@ function workbenchOptions(
   return options;
 }
 
-function mountWorkbenchDemo(host: HTMLElement): UiPresenterDemoHandle {
+function mountWorkbenchDemo(host: HTMLElement, material: ArabesqueMaterial): UiPresenterDemoHandle {
+  const {HARMONY_DEMO_BARS, HARMONY_DEMO_CHORDS, HARMONY_DEMO_SPAN, HARMONY_DEMO_TRACKS,
+    HARMONY_DEMO_RULER, HARMONY_DEMO_FLAGS} = harmonyMaterial(material);
   const document = host.ownerDocument;
   const view = document.defaultView;
   const notifier = createNotifier();
@@ -2021,7 +1658,7 @@ function mountWorkbenchDemo(host: HTMLElement): UiPresenterDemoHandle {
     // not, which is what stops a backwards seek being tweened across material
     // nobody heard.
     epoch += 1;
-    bar = workbenchBarAt(held);
+    bar = Math.max(0, sourceSpanAt(HARMONY_DEMO_BARS, Math.min(held, HARMONY_DEMO_SPAN - 1e-9)));
     republish();
   };
 
@@ -2051,7 +1688,7 @@ function mountWorkbenchDemo(host: HTMLElement): UiPresenterDemoHandle {
           ...(blank
             ? {}
             : {
-                detail: `bar ${bar + 1} of ${HARMONY_DEMO_BARS.length}, ${soundingChord().symbol}`,
+                detail: `Arabesque No. 1 · span ${bar + 1} of ${HARMONY_DEMO_BARS.length}, ${soundingChord().symbol}`,
               }),
         },
       };
@@ -2088,9 +1725,8 @@ function mountWorkbenchDemo(host: HTMLElement): UiPresenterDemoHandle {
           stampEnd: entry.stampEnd,
           track: 0,
           primary: entry.chord.symbol,
-          secondary: entry.chord.harmonicFunction,
+          secondary: entry.chord.description,
           tone: entry.chord.rootPitchClass,
-          ...(entry.chord.severity ? {severity: entry.chord.severity} : {}),
         },
         {
           id: `${entry.id}-roman`,
@@ -2099,7 +1735,7 @@ function mountWorkbenchDemo(host: HTMLElement): UiPresenterDemoHandle {
           stampStart: entry.stampStart,
           stampEnd: entry.stampEnd,
           track: 1,
-          primary: entry.chord.roman,
+          primary: entry.chord.pitchNames,
           tone: entry.chord.rootPitchClass,
         },
       ]),
@@ -2135,13 +1771,13 @@ function mountWorkbenchDemo(host: HTMLElement): UiPresenterDemoHandle {
           weight: (weights.get(at) ?? 0) / most,
           active: at === chord.fifthsIndex,
         })),
-        centre: {primary: 'C major', secondary: `${Math.round(chord.confidence * 100)}% sure`},
-        needle: {
+        centre: {primary: 'Root / bass', secondary: chord.description},
+        ...(chord.fifthsIndex < 0 ? {} : {needle: {
           at: chord.fifthsIndex,
-          spread: (1 - chord.confidence) * 3,
-          label: `The harmony is sitting on ${HARMONY_DEMO_FIFTHS[chord.fifthsIndex]}`,
-        },
-        emptyLabel: 'No key estimate yet.',
+          spread: 0,
+          label: `Source root or bass ${HARMONY_DEMO_FIFTHS[chord.fifthsIndex]}`,
+        }}),
+        emptyLabel: 'No source pitches.',
       };
     },
     subscribe: notifier.subscribe,
@@ -2149,17 +1785,16 @@ function mountWorkbenchDemo(host: HTMLElement): UiPresenterDemoHandle {
 
   const keyboardBinding = {
     snapshot: (): KeyboardState => ({
-      // A rail is narrower than a page, so the demo asks for two octaves and a
-      // half rather than the default three: the range is a caller's answer.
-      low: 48,
-      high: 76,
+      // Cover the actual excerpt's register, including its bass notes.
+      low: material.low,
+      high: material.high,
       marks: workbenchTones(soundingChord()).map((tone) => ({
         midi: tone.midi,
         label: tone.label,
         role: tone.role,
         since: HARMONY_DEMO_BARS[bar].start,
       })),
-      ghostPitchClasses: PITCH_DEMO_SCALE,
+      ghostPitchClasses: material.pitchClasses,
       octaveLabels: PITCH_DEMO_OCTAVES,
       now: positionAt(clockNow()),
     }),
@@ -2197,17 +1832,16 @@ function mountWorkbenchDemo(host: HTMLElement): UiPresenterDemoHandle {
           const every = HARMONY_DEMO_BARS.filter((entry) => entry.chord === chord);
           const soFar = heard.filter((entry) => entry.chord === chord);
           return {
-            id: chord.symbol,
+            id: `${chord.symbol}:${chord.pitchNames}`,
             start: every[0].stampStart,
             end: every[0].stampEnd,
             primary: chord.symbol,
-            roman: chord.roman,
+            roman: chord.pitchNames,
             occurrences: soFar.map((entry) => entry.stampStart),
             meter: soFar.length / Math.max(1, heard.length),
             meterGhost: every.length / HARMONY_DEMO_BARS.length,
             tone: chord.rootPitchClass,
-            ...(chord.severity ? {severity: chord.severity} : {}),
-          };
+            };
         }),
         layout: 'flow' as const,
         emptyLabel: 'Nothing has been heard yet.',
@@ -2231,7 +1865,7 @@ function mountWorkbenchDemo(host: HTMLElement): UiPresenterDemoHandle {
     }
     return HARMONY_DEMO_BARS.map((entry) => ({
       id: entry.id,
-      text: `${entry.chord.symbol} (${entry.chord.roman})`,
+      text: `${entry.chord.symbol} (${entry.chord.pitchNames})`,
     }));
   };
 
@@ -2361,7 +1995,7 @@ function mountWorkbenchDemo(host: HTMLElement): UiPresenterDemoHandle {
    */
   const poll = (): void => {
     if (destroyed) return;
-    const landed = workbenchBarAt(positionAt(clockNow()));
+    const landed = Math.max(0, sourceSpanAt(HARMONY_DEMO_BARS, positionAt(clockNow())));
     if (landed === bar) return;
     bar = landed;
     republish();
@@ -2458,9 +2092,9 @@ export function mountViewsAnalysisDemo(
   if (presenter === 'stage') return mountStageDemo(host);
   if (presenter === 'status') return mountStatusDemo(host);
   if (presenter === 'track-list') return mountTrackListDemo(host);
-  if (presenter === 'analysis') return mountAnalysisDemo(host);
-  if (presenter === 'pitch') return mountPitchDemo(host);
-  if (presenter === 'harmony') return mountHarmonyDemo(host);
-  if (presenter === 'workbench') return mountWorkbenchDemo(host);
+  if (presenter === 'analysis') return mountArabesqueMaterial(host, mountAnalysisDemo);
+  if (presenter === 'pitch') return mountArabesqueMaterial(host, mountPitchDemo);
+  if (presenter === 'harmony') return mountArabesqueMaterial(host, mountHarmonyDemo);
+  if (presenter === 'workbench') return mountArabesqueMaterial(host, mountWorkbenchDemo);
   return undefined;
 }

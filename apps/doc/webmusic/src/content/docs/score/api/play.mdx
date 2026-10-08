@@ -6,23 +6,13 @@ description: Score playback — Web Components, push and pull engines, Sound tim
 import ApiSandbox from '../../../../components/ApiSandbox.astro';
 import ProgrammaticTransportDriverDemo from '../../../../components/programmatic/ProgrammaticTransportDriverDemo.astro';
 
-export const scorePlayerCode = `import { Duration, MeasureId, PartId, Pitch, Rational, ScoreBuilder, VoiceId } from '@webmusic/score';
+export const scorePlayerCode = `import { loadScoreFromUrl } from '@webmusic/score/io';
 import { ScorePlayer, Sound, Effect } from '@webmusic/score/play/headless';
 
-const b = new ScoreBuilder();
-const part = PartId('piano');
-const voice = VoiceId('v1');
-const ts = { numerator: 4, denominator: 4 };
-b.setMetadata({ title: 'Etude' })
-  .addTempo({ atQuarters: Rational.ZERO, bpm: 120 })
-  .addMeter({ atQuarters: Rational.ZERO, measureNumber: 1, timeSignature: ts });
-b.addPart({ id: part, name: 'Piano', staves: 1 });
-b.addMeasure({ id: MeasureId('m1'), number: 1, onsetQuarters: Rational.ZERO, durationQuarters: new Rational(4), timeSignature: ts });
-['C4', 'E4', 'G4', 'C5'].forEach((p, i) =>
-  b.addNote(part, { id: b.newNoteId(), pitch: Pitch.parse(p), onsetQuarters: new Rational(i), duration: Duration.quarter(), voice }));
+const score = await loadScoreFromUrl('/mxl/Arabesque%20No.1.mxl');
 
 // <player · score · sound · effect>
-const player = new ScorePlayer(b.build(), {
+const player = new ScorePlayer(score, {
   synth: Sound.oscillator({ type: 'triangle' }),
   effect: Effect.reverb({ wet: 0.25 }),
 });
@@ -39,24 +29,14 @@ play.onclick = async () => {
 };
 document.body.append(play);`;
 
-export const interactiveCode = `import { Duration, MeasureId, PartId, Pitch, Rational, ScoreBuilder, VoiceId } from '@webmusic/score';
+export const interactiveCode = `import { loadScoreFromUrl } from '@webmusic/score/io';
 import { InteractivePlayer, Sound, Effect } from '@webmusic/score/play/headless';
 
-const b = new ScoreBuilder();
-const part = PartId('lead');
-const voice = VoiceId('v1');
-const ts = { numerator: 4, denominator: 4 };
-b.setMetadata({ title: 'Tap' })
-  .addTempo({ atQuarters: Rational.ZERO, bpm: 100 })
-  .addMeter({ atQuarters: Rational.ZERO, measureNumber: 1, timeSignature: ts });
-b.addPart({ id: part, name: 'Lead', staves: 1 });
-b.addMeasure({ id: MeasureId('m1'), number: 1, onsetQuarters: Rational.ZERO, durationQuarters: new Rational(4), timeSignature: ts });
-['C4', 'E4', 'G4', 'C5'].forEach((p, i) =>
-  b.addNote(part, { id: b.newNoteId(), pitch: Pitch.parse(p), onsetQuarters: new Rational(i), duration: Duration.quarter(), voice }));
+const score = await loadScoreFromUrl('/mxl/Arabesque%20No.1.mxl');
 
 const player = new InteractivePlayer({ effect: Effect.reverb({ wet: 0.3 }) });
 player.addVoice('lead', Sound.oscillator({ type: 'triangle' }));
-player.addSource('lead', b.build());
+player.addSource('lead', score);
 player.on('beat', (e) => console.log('beat', e.beat + 1, 'of', e.total));
 
 // PULL: each tap fires one beat; the gap between taps sets the tempo.
@@ -176,65 +156,42 @@ const tap = Effect.analyser({ fftSize: 1024, onReady: (node) => (scope = node) }
 // new InteractivePlayer({ effect: room });
 console.log('effects ready', { room, tap });`;
 
-export const rackCode = `import { Duration, MeasureId, PartId, Pitch, Rational, ScoreBuilder, VoiceId } from '@webmusic/score';
+export const rackCode = `import { loadScoreFromUrl } from '@webmusic/score/io';
 import { Rack, Sound, Effect } from '@webmusic/score/play/headless';
 
-const make = (name, pitches) => {
-  const b = new ScoreBuilder();
-  const part = PartId(name);
-  const voice = VoiceId(name + '-v');
-  const ts = { numerator: 4, denominator: 4 };
-  b.setMetadata({ title: name })
-    .addTempo({ atQuarters: Rational.ZERO, bpm: 100 })
-    .addMeter({ atQuarters: Rational.ZERO, measureNumber: 1, timeSignature: ts });
-  b.addPart({ id: part, name, staves: 1 });
-  b.addMeasure({ id: MeasureId('m1'), number: 1, onsetQuarters: Rational.ZERO, durationQuarters: new Rational(4), timeSignature: ts });
-  pitches.forEach((p, i) =>
-    b.addNote(part, { id: b.newNoteId(), pitch: Pitch.parse(p), onsetQuarters: new Rational(i), duration: Duration.quarter(), voice }));
-  return b.build();
-};
+const score = await loadScoreFromUrl('/mxl/Arabesque%20No.1.mxl');
 
-// One instrument per player; group them in a Rack.
+// Two timbres share the same loaded piece, each with independent Rack gain/mute.
 const rack = new Rack({ effect: Effect.reverb({ wet: 0.25 }) });
-rack.add({ id: 'lead', score: make('lead', ['C5', 'E5', 'G5', 'C6']), sound: Sound.oscillator({ type: 'triangle' }) });
-rack.add({ id: 'bass', score: make('bass', ['C3', 'C3', 'G2', 'G2']), sound: Sound.oscillator({ type: 'sawtooth' }) });
+rack.add({ id: 'piano', score, sound: Sound.oscillator({ type: 'triangle' }) });
+rack.add({ id: 'layer', score, sound: Sound.oscillator({ type: 'sawtooth' }) });
 
 const play = document.createElement('button');
 play.textContent = 'Play ensemble';
 play.onclick = () => rack.play();
 const mute = document.createElement('button');
-mute.textContent = 'mute bass';
-mute.onclick = () => rack.mute('bass');
+mute.textContent = 'Mute layer';
+mute.onclick = () => rack.mute('layer');
 document.body.append(play, mute);`;
 
-export const renderCode = `import { Duration, MeasureId, PartId, Pitch, Rational, ScoreBuilder, VoiceId } from '@webmusic/score';
+export const renderCode = `import { loadScoreFromUrl } from '@webmusic/score/io';
 import { renderScoreToBuffer, bufferToWav } from '@webmusic/score/play';
 import { Sound, Effect } from '@webmusic/score/play/headless';
 
-const b = new ScoreBuilder();
-const part = PartId('piano');
-const voice = VoiceId('v1');
-const ts = { numerator: 4, denominator: 4 };
-b.setMetadata({ title: 'Render' })
-  .addTempo({ atQuarters: Rational.ZERO, bpm: 120 })
-  .addMeter({ atQuarters: Rational.ZERO, measureNumber: 1, timeSignature: ts });
-b.addPart({ id: part, name: 'Piano', staves: 1 });
-b.addMeasure({ id: MeasureId('m1'), number: 1, onsetQuarters: Rational.ZERO, durationQuarters: new Rational(4), timeSignature: ts });
-['C4', 'E4', 'G4', 'C5'].forEach((p, i) =>
-  b.addNote(part, { id: b.newNoteId(), pitch: Pitch.parse(p), onsetQuarters: new Rational(i), duration: Duration.quarter(), voice }));
+const score = await loadScoreFromUrl('https://koperative-lab.github.io/WebMusic/mxl/Arabesque%20No.1.mxl');
 
 // Render the same score · sound · effect stack offline, then download a WAV.
 const btn = document.createElement('button');
 btn.textContent = 'Render and download WAV';
 btn.onclick = async () => {
-  const buffer = await renderScoreToBuffer(b.build(), {
+  const buffer = await renderScoreToBuffer(score, {
     synth: Sound.oscillator({ type: 'triangle' }),
     effect: Effect.reverb({ wet: 0.3 }),
   });
   const url = URL.createObjectURL(bufferToWav(buffer));
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'score.wav';
+  a.download = 'arabesque-no-1.wav';
   a.click();
 };
 document.body.append(btn);`;
@@ -261,12 +218,12 @@ import { createScorePlayerFromUrl } from '@webmusic/score/play/headless';
 // Players take a Score, not a file. Parse once, reuse everywhere.
 // const a = await loadScore(bytes);                 // auto-detect midi/musicxml/mxl/abc
 // const b = await loadScore(xml, { format: 'musicxml' });
-// const c = await loadScoreFromUrl('/etude.mid');   // fetch + infer from extension
+const score = await loadScoreFromUrl('https://koperative-lab.github.io/WebMusic/mxl/Arabesque%20No.1.mxl'); // fetch + infer from extension
 // detectFormat(bytes); // 'midi' | 'mxl' | 'musicxml' | 'abc'
 
 // One-line sugar (parsers load lazily):
 // const player = await createScorePlayerFromUrl('song.mxl');
-console.log('loaders ready');`;
+console.log('loaded', score.notes.length, 'notes');`;
 
 `@webmusic/score/play` is the **playback** capability of the `@webmusic/score` package. It owns the playback engines, audio graph, interaction drivers and playback UI. MIDI, MusicXML, MXL and ABC import/export live exclusively in [`@webmusic/score/io`](/score/api/io/).
 
@@ -391,6 +348,11 @@ valid assignment for a cell winning. This mapping helper does not clamp MIDI
 range; callers choose and validate the playable range for their input surface.
 
 ## Export — render to audio (offline)
+
+The editable example loads the existing Arabesque No. 1 MXL and renders that
+piece. The remote editor uses the existing asset's absolute published URL,
+including the `/WebMusic/` base path, instead of the sandbox's origin. The editor
+preview is disabled by default.
 
 `renderScoreToBuffer` plays the same `score · sound · effect` stack through an `OfflineAudioContext` — deterministically and faster than real time — and hands back an `AudioBuffer`. `bufferToWav` (or `renderScoreToWav`) encodes it as a downloadable 16-bit PCM WAV. This closes the loop alongside the notation/MIDI serializers: load/build → play → **export audio**.
 

@@ -42,3 +42,12 @@ export {
 // element, and gets exactly what the element draws.
 export * from './workbench';
 export {projectRhythmPatternFlow} from './rhythm-pattern-flow';
+export {
+  projectBasicInspection,
+  type BasicAnalysisKind,
+  type BasicInspectionOptions,
+  type BasicInspectionProjection,
+  type AnalysisSelection,
+  type AnalysisInspection,
+  type AnalysisInspectionCandidate,
+} from './basic-inspection';

@@ -7,7 +7,7 @@ import {defineAllViewElements, type PitchViewElement} from '../../src/view/eleme
 defineAllAnalysisElements();
 defineAllViewElements();
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
-const panels = ['score-chord-analysis', 'score-live-chord-analysis'];
+const panels = ['score-chord-analysis', 'score-interval-analysis', 'score-scale-analysis', 'score-rhythm-analysis'];
 
 function source() {
   const builder = new ScoreBuilder();

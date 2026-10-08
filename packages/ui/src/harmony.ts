@@ -174,7 +174,8 @@ const MOTION_CHIP = 'var(--wui-harmony-motion-chip, 120ms)';
 const MOTION_TURN = 'var(--wui-harmony-motion-turn, 320ms)';
 
 const FLOW_HEIGHT = 'var(--wui-harmony-flow-height, var(--wm-harmony-flow-height, 96px))';
-const LANE_HEIGHT = 'var(--wui-harmony-lane-height, var(--wm-harmony-lane-height, 48px))';
+const MIN_LANE_HEIGHT = 'var(--wui-harmony-lane-height, var(--wm-harmony-lane-height, 48px))';
+const LANE_HEIGHT = `var(--wui-harmony-flow-row-height, ${MIN_LANE_HEIGHT})`;
 /** The ruler owns a line above the tracks; its labels never cover band labels. */
 const RULER_HEIGHT = `calc(${SIZE_MICRO} * 2)`;
 const NOW_LINE =
@@ -402,19 +403,58 @@ const flowParts = {
     position: 'relative',
     'min-width': '0',
     'margin-bottom': SPACE_2,
-    'font-family': FONT_DISPLAY,
-    'font-weight': '700',
-    'font-size': SIZE_TITLE,
-    'line-height': '1.1',
+    'font-family': FONT,
+    'font-weight': '400',
+    'font-size': SIZE_LABEL,
+    'line-height': '1.35',
     'white-space': 'normal',
     'overflow-wrap': 'anywhere',
     'pointer-events': 'none',
   },
+  pinnedName: {
+    display: 'block',
+    'font-family': FONT_DISPLAY,
+    'font-weight': '700',
+    'font-size': `calc(${SIZE_TITLE} * 1.35)`,
+    'line-height': '1.15',
+  },
   pinnedNote: {
     display: 'block',
     'font-family': FONT,
-    'font-size': SIZE_MICRO,
+    'font-size': SIZE_LABEL,
+    'font-weight': '400',
     color: INK_MUTED,
+  },
+  pinnedFields: {
+    display: 'grid',
+    'grid-template-columns': 'repeat(3, minmax(0, 1fr))',
+    gap: SPACE_2,
+    'margin-top': SPACE_1,
+    'min-width': '0',
+  },
+  pinnedField: {
+    display: 'grid',
+    'grid-template-rows': 'var(--wui-harmony-flow-field-label-height, 1.35em) var(--wui-harmony-flow-field-value-height, 1.35em)',
+    'min-width': '0',
+  },
+  pinnedFieldLabel: {
+    display: 'block',
+    'font-size': SIZE_MICRO,
+    'font-weight': '400',
+    'line-height': '1.35',
+    color: INK_MUTED,
+    'white-space': 'normal',
+    'overflow-wrap': 'anywhere',
+  },
+  pinnedFieldValue: {
+    display: 'block',
+    'font-size': SIZE_LABEL,
+    'font-weight': '400',
+    'font-variant-numeric': 'tabular-nums',
+    'line-height': '1.35',
+    color: INK,
+    'white-space': 'normal',
+    'overflow-wrap': 'anywhere',
   },
   // "There is no future here" — the empty field a live read-out shows to its
   // right, because pretending to know what has not been played is the one lie
@@ -469,6 +509,7 @@ const flowParts = {
     top: '0',
     'font-size': SIZE_MICRO,
     color: INK_MUTED,
+    'white-space': 'nowrap',
   },
   flag: {position: 'absolute', width: '2px', top: '0', bottom: '0'},
   bracket: {
@@ -489,6 +530,17 @@ const flowParts = {
     'list-style': 'none',
   },
 } satisfies Readonly<Record<string, Declarations>>;
+
+/** Opt-in text layout; the time-axis box remains the band's original box. */
+const flowWrapBand: Declarations = {'padding-block': SPACE_1, 'justify-content': 'flex-start'};
+const flowWrapLabel: Declarations = {
+  'white-space': 'normal', 'overflow-wrap': 'anywhere', overflow: 'visible',
+  'text-overflow': 'clip',
+};
+const flowWrapPrimary: Declarations = {
+  ...flowWrapLabel, 'line-height': '1.25',
+  'min-height': 'var(--wui-harmony-flow-primary-height, 1.25em)',
+};
 
 const nameplateParts = {
   root: {
@@ -590,6 +642,19 @@ const nameplateParts = {
     height: '6.5rem',
     overflow: 'hidden',
   },
+  stableCaptionRoot: {
+    'grid-template-rows': '1.25rem 3.5rem 1.25rem 1.25rem',
+    height: '8rem',
+  },
+  stableCaption: {
+    'grid-row': '1',
+    margin: '0',
+    'min-width': '0',
+    'line-height': '1.25rem',
+    'white-space': 'nowrap',
+    'overflow-x': 'auto',
+    'overflow-y': 'hidden',
+  },
   stableLive: {'min-width': '0', overflow: 'hidden'},
   stableSymbol: {
     display: 'flex',
@@ -602,9 +667,9 @@ const nameplateParts = {
     'overflow-x': 'auto',
     'overflow-y': 'hidden',
   },
-  stableNotes: {'font-size': `calc(${SIZE_DISPLAY} * .7)`},
   stableVoicing: {
     margin: '0',
+    color: INK_MUTED,
     'min-height': '0',
     'line-height': '1.25rem',
     'white-space': 'nowrap',
@@ -818,12 +883,20 @@ export const harmonyPresenterStyle = [
   harmonyRule('.wui-harmony-flow__note', flowParts.note),
   // A 21px occurrence cannot carry an honest `R2` label; its full reading
   // remains on the band title and in the semantic index beside the gutter.
-  '@container wui-harmony-band (max-width: 31px) { .wui-harmony-flow__label, .wui-harmony-flow__note { display: none; } }',
+  '@container wui-harmony-band (max-width: 31px) { .wui-harmony-flow__band:not([data-label-overflow="wrap"]) > .wui-harmony-flow__label, .wui-harmony-flow__band:not([data-label-overflow="wrap"]) > .wui-harmony-flow__note { display: none; } }',
+  harmonyRule('.wui-harmony-flow__band[data-label-overflow="wrap"]', flowWrapBand),
+  harmonyRule('.wui-harmony-flow__band[data-label-overflow="wrap"] > .wui-harmony-flow__label, .wui-harmony-flow__band[data-label-overflow="wrap"] > .wui-harmony-flow__note', flowWrapLabel),
+  harmonyRule('.wui-harmony-flow__band[data-label-overflow="wrap"] > .wui-harmony-flow__label', flowWrapPrimary),
   harmonyRule('.wui-harmony-flow__bead', flowParts.bead),
   harmonyRule('.wui-harmony-flow__glyph', flowParts.glyph),
   harmonyRule('.wui-harmony-flow__now', flowParts.now),
   harmonyRule('.wui-harmony-flow__pinned', flowParts.pinned),
+  harmonyRule('.wui-harmony-flow__pinned-name', flowParts.pinnedName),
   harmonyRule('.wui-harmony-flow__pinned-note', flowParts.pinnedNote),
+  harmonyRule('.wui-harmony-flow__pinned-fields', flowParts.pinnedFields),
+  harmonyRule('.wui-harmony-flow__pinned-field', flowParts.pinnedField),
+  harmonyRule('.wui-harmony-flow__pinned-field-label', flowParts.pinnedFieldLabel),
+  harmonyRule('.wui-harmony-flow__pinned-field-value', flowParts.pinnedFieldValue),
   harmonyRule('.wui-harmony-flow__future', flowParts.future),
   harmonyRule('.wui-harmony-flow__gutter', flowParts.gutter),
   harmonyRule('.wui-harmony-flow__gutter-row', flowParts.gutterRow),
@@ -888,9 +961,10 @@ export const harmonyPresenterStyle = [
   harmonyRule('.wui-harmony-nameplate__chip[data-current="true"]', harmonyParts.historyChipActive),
   harmonyRule('.wui-harmony-nameplate__empty', nameplateParts.empty),
   harmonyRule('.wui-harmony-nameplate[data-layout="stable"]', nameplateParts.stableRoot),
+  harmonyRule('.wui-harmony-nameplate[data-layout="stable"][data-caption="true"]', nameplateParts.stableCaptionRoot),
+  harmonyRule('.wui-harmony-nameplate[data-layout="stable"] .wui-harmony-nameplate__caption', nameplateParts.stableCaption),
   harmonyRule('.wui-harmony-nameplate[data-layout="stable"] .wui-harmony-nameplate__live', nameplateParts.stableLive),
   harmonyRule('.wui-harmony-nameplate[data-layout="stable"] .wui-harmony-nameplate__symbol', nameplateParts.stableSymbol),
-  harmonyRule('.wui-harmony-nameplate[data-layout="stable"][data-reading="notes"] .wui-harmony-nameplate__symbol', nameplateParts.stableNotes),
   harmonyRule('.wui-harmony-nameplate[data-layout="stable"] .wui-harmony-nameplate__voicing', nameplateParts.stableVoicing),
   harmonyRule('.wui-harmony-nameplate[data-layout="stable"] .wui-harmony-nameplate__alternates', nameplateParts.stableAlternates),
   harmonyRule('.wui-harmony-nameplate[data-layout="stable"] li.wui-harmony-nameplate__alternate', nameplateParts.stableAlternate),
@@ -1054,6 +1128,20 @@ function dressMotion(root: HTMLElement, stepped: boolean): void {
 // The flow lane.
 // ---------------------------------------------------------------------------
 
+/** One named slot in a fixed three-column readout. Empty values keep the slot. */
+export interface FlowReadoutField {
+  id: string;
+  label: string;
+  value: string;
+}
+
+export interface FlowReadout {
+  primary?: string;
+  secondary?: string;
+  /** Replaces secondary visually; [] explicitly suppresses it without fields. */
+  fields?: readonly FlowReadoutField[];
+}
+
 /** One item on the conveyor. Domain-neutral: two numbers, some text, three colours. */
 export interface FlowBand {
   id: string;
@@ -1080,6 +1168,8 @@ export interface FlowBand {
   /** The big word, pinned at the now line while this band is sounding. */
   primary?: string;
   secondary?: string;
+  /** Expanded reading at the now line; omitted fields fall back to the compact labels. */
+  readout?: FlowReadout;
   trailing?: string;
   /** A pure-geometry path, drawn inside the band's own box. The kit only frames it. */
   glyph?: string;
@@ -1150,7 +1240,7 @@ export interface FlowLaneState {
   /** `false` draws the space right of the now line as an empty field. */
   future?: boolean;
   /** Override the readout pinned at the now line. */
-  pinned?: {primary?: string; secondary?: string};
+  pinned?: FlowReadout;
   /** Every band in this group lights together. */
   focusGroup?: string;
   emptyLabel?: string;
@@ -1206,7 +1296,11 @@ export interface FlowLaneOptions {
    * use scale. Resize preserves the current position and zoom.
    */
   visibleSpan?: number;
-  /** Keep one line of readout space when the now line crosses an unlabeled gap. Defaults to false. */
+  /** Fixed rows by default; visible compacts rows intersecting the current viewport. */
+  trackLayout?: 'fixed' | 'visible';
+  /** Truncate by default; wrap grows row height to fit the complete label stack. */
+  labelOverflow?: 'truncate' | 'wrap';
+  /** Keep primary and secondary readout rows through unlabeled gaps. Defaults to false. */
   reservePinned?: boolean;
   /**
    * What the lane assumes it is wide when nothing can measure it — no
@@ -1271,6 +1365,15 @@ interface BandNode {
 
 const mountedFlowLanes = new WeakMap<HarmonyHost, FlowLaneHandle>();
 
+function flowBandReading(band: FlowBand): string {
+  const fields = band.readout?.fields;
+  const primary = band.readout?.primary ?? band.primary;
+  return fields === undefined
+    ? [primary, band.readout?.secondary ?? band.secondary, band.trailing].filter(Boolean).join(' — ')
+    : [primary, ...fields.map((field) => [field.label, field.value].filter(Boolean).join(': ')), band.trailing]
+      .filter(Boolean).join('\n');
+}
+
 /** Mount the conveyor: a fixed now line, and the material running under it. */
 export function mountFlowLane(
   host: HarmonyHost,
@@ -1294,6 +1397,7 @@ export function mountFlowLane(
   const keyboardStep = finitePositive(options.keyboardStep, 1);
   const keyboardPage = finitePositive(options.keyboardPage, 4);
   const stamping = options.spans !== false;
+  const wrapLabels = options.labelOverflow === 'wrap';
 
   const root = document.createElement('div');
   root.className = 'wui-harmony-flow';
@@ -1358,13 +1462,23 @@ export function mountFlowLane(
   pinned.className = 'wui-harmony-flow__pinned';
   pinned.setAttribute('aria-hidden', 'true');
   dress(pinned, flowParts.pinned);
-  if (options.reservePinned) pinned.style.minHeight = '1.1em';
   const pinnedName = document.createElement('span');
   pinnedName.className = 'wui-harmony-flow__pinned-name';
+  dress(pinnedName, flowParts.pinnedName);
   const pinnedNote = document.createElement('span');
   pinnedNote.className = 'wui-harmony-flow__pinned-note';
   dress(pinnedNote, flowParts.pinnedNote);
-  pinned.append(pinnedName, pinnedNote);
+  const pinnedFields = document.createElement('div');
+  pinnedFields.className = 'wui-harmony-flow__pinned-fields';
+  dress(pinnedFields, flowParts.pinnedFields);
+  setHidden(pinnedFields, true);
+  if (options.reservePinned) {
+    // Each row reserves its own line box: the larger primary font cannot be
+    // represented by a minimum height in the parent's smaller font units.
+    pinnedName.style.minHeight = `${flowParts.pinnedName['line-height']}em`;
+    pinnedNote.style.minHeight = `${flowParts.pinned['line-height']}em`;
+  }
+  pinned.append(pinnedName, pinnedNote, pinnedFields);
 
   const future = document.createElement('div');
   future.className = 'wui-harmony-flow__future';
@@ -1390,6 +1504,9 @@ export function mountFlowLane(
 
   const bands = new Map<string, BandNode>();
   const trackNodes = new Map<string, HTMLElement>();
+  const fieldNodes = new Map<string, {root: HTMLElement; label: HTMLElement; value: HTMLElement; defaultLabel: string}>();
+  let fieldOrder: string[] = [];
+  let structuredReadout = false;
   let axis: FlowAxis = flowAxis(undefined, []);
   let boundaries: number[] = [];
   let ordered: FlowBand[] = [];
@@ -1401,7 +1518,16 @@ export function mountFlowLane(
   let laneWidth = fallbackWidth;
   let laneSignature = '';
   let rulerSignature = '';
+  let visibleSignature = '';
+  let visibleRows: number[] = [];
+  let starts: number[] = [];
+  let ends: number[] = [];
+  let rowLabels: HTMLElement[] = [];
+  let rowFlags: {node: HTMLElement; track: number}[] = [];
+  let rowBrackets: {node: HTMLElement; from: number; to: number}[] = [];
   let currentId: string | undefined;
+  let lookupAt = Number.NaN;
+  let lookupBand: FlowBand | undefined;
   /**
    * The row the pinned readout, the aria text and the stepped re-anchor all
    * answer from: the LOWEST track number present, not whatever `state.bands`
@@ -1454,12 +1580,36 @@ export function mountFlowLane(
    * the readout: the lane still says what is sounding, on whichever row it is.
    */
   const bandAt = (at: number): FlowBand | undefined => {
+    if (options.trackLayout === 'visible' && !flowCrossed(boundaries, lookupAt, at)) return lookupBand;
     const held = currentId === undefined ? undefined : bands.get(currentId)?.band;
     if (held && trackOf(held) === primaryTrack && flowZone(at, held) === 'now') return held;
-    return (
+    lookupAt = at;
+    lookupBand = (
       ordered.find((band) => trackOf(band) === primaryTrack && flowZone(at, band) === 'now') ??
       ordered.find((band) => flowZone(at, band) === 'now')
     );
+    return lookupBand;
+  };
+
+  const paintReadout = (current: FlowBand | undefined): void => {
+    const fields = state.pinned?.fields ?? current?.readout?.fields;
+    const structured = fields !== undefined || (options.reservePinned === true && !current && structuredReadout);
+    const showFields = structured && fields?.length !== 0 && fieldOrder.length > 0;
+    setText(pinnedName, state.pinned?.primary ?? current?.readout?.primary ?? current?.primary ?? '');
+    setText(pinnedNote, structured ? ''
+      : state.pinned?.secondary ?? current?.readout?.secondary ?? current?.secondary ?? '');
+    setHidden(pinnedNote, structured);
+    setHidden(pinnedFields, !showFields);
+    const values = new Map(fields?.map((field) => [field.id, field]));
+    for (const id of fieldOrder) {
+      const node = fieldNodes.get(id)!;
+      const field = values.get(id);
+      setText(node.label, field?.label ?? node.defaultLabel);
+      setText(node.value, field?.value ?? '');
+    }
+    const emptyPinned = !pinnedName.textContent && !pinnedNote.textContent && !showFields;
+    if (options.reservePinned) setStyleValue(pinned, 'visibility', emptyPinned ? 'hidden' : undefined);
+    else setHidden(pinned, emptyPinned);
   };
 
   /**
@@ -1501,12 +1651,15 @@ export function mountFlowLane(
   const announce = (): void => {
     if (!binding.seek) return;
     const current = currentId === undefined ? undefined : bands.get(currentId)?.band;
+    const reading = current?.readout?.fields === undefined
+      ? current?.readout?.primary ?? current?.primary
+      : flowBandReading(current);
     setAttr(viewport, 'aria-valuenow', coordinate(position));
     setAttr(
       viewport,
       'aria-valuetext',
       options.formatPosition?.(position) ??
-        (current?.primary ? `${coordinate(position)} — ${current.primary}` : coordinate(position)),
+        (reading ? `${coordinate(position)} — ${reading}` : coordinate(position)),
     );
   };
 
@@ -1522,6 +1675,7 @@ export function mountFlowLane(
     // Reduced motion re-anchors on the BAND, not on the instant: the layout is
     // pixel-identical and only this number differs.
     const at = stepped ? (current ? current.start : position) : position;
+    layoutTracks(at);
     const shift = flowShift(at, axis, pxPerUnit(), anchor, laneWidth);
     const transform = `translate3d(${shift}px, 0, 0)`;
     if (reel.style.transform !== transform) reel.style.transform = transform;
@@ -1589,11 +1743,7 @@ export function mountFlowLane(
       );
     }
 
-    setText(pinnedName, state.pinned?.primary ?? current?.primary ?? '');
-    setText(pinnedNote, state.pinned?.secondary ?? current?.secondary ?? '');
-    const emptyPinned = !pinnedName.textContent && !pinnedNote.textContent;
-    if (options.reservePinned) setStyleValue(pinned, 'visibility', emptyPinned ? 'hidden' : undefined);
-    else setHidden(pinned, emptyPinned);
+    if (forced || changed || !Number.isFinite(previous)) paintReadout(current);
     setStyleValue(nowLine, 'width', current ? '2px' : '1px');
     if (forced || changed) announce();
     painted = position;
@@ -1641,6 +1791,7 @@ export function mountFlowLane(
   const buildBand = (): BandNode => {
     const node = document.createElement('div');
     node.className = 'wui-harmony-flow__band';
+    if (wrapLabels) node.dataset.labelOverflow = 'wrap';
     const fill = document.createElement('span');
     fill.className = 'wui-harmony-flow__fill';
     dress(fill, flowParts.fill);
@@ -1650,11 +1801,11 @@ export function mountFlowLane(
     dress(role, flowParts.role);
     const label = document.createElement('span');
     label.className = 'wui-harmony-flow__label';
-    dress(label, flowParts.label);
+    dress(label, flowParts.label, ...(wrapLabels ? [flowWrapPrimary] : []));
     const note = document.createElement('span');
     note.className = 'wui-harmony-flow__note';
     note.hidden = true;
-    dress(note, flowParts.note);
+    dress(note, flowParts.note, ...(wrapLabels ? [flowWrapLabel] : []));
     const bead = document.createElement('span');
     bead.className = 'wui-harmony-flow__bead';
     bead.hidden = true;
@@ -1680,11 +1831,75 @@ export function mountFlowLane(
     return Math.max(1, widest);
   };
 
+  /** Boundary ranks change only when the viewport gains or loses a band. */
+  const rank = (values: readonly number[], value: number, inclusive: boolean): number => {
+    let lo = 0;
+    let hi = values.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >>> 1;
+      if (values[mid]! < value || (inclusive && values[mid] === value)) lo = mid + 1;
+      else hi = mid;
+    }
+    return lo;
+  };
+
+  const displayRow = (row: number): number => options.trackLayout === 'visible'
+    ? visibleRows.indexOf(row) : row;
+
+  const layoutRowDecorations = (): void => {
+    for (const {node, track} of rowFlags) {
+      const row = displayRow(track);
+      setHidden(node, row < 0);
+      if (row >= 0) setStyleValue(node, 'top', `calc(${RULER_HEIGHT} + ${LANE_HEIGHT} * ${row})`);
+    }
+    for (const {node, from, to} of rowBrackets) {
+      const rows = options.trackLayout === 'visible'
+        ? visibleRows.filter((row) => row >= from && row <= to).map(displayRow)
+        : [from, to];
+      setHidden(node, rows.length === 0);
+      if (!rows.length) continue;
+      const first = rows[0]!;
+      const last = rows[rows.length - 1]!;
+      setStyleValue(node, 'top', `calc(${RULER_HEIGHT} + ${LANE_HEIGHT} * ${first} + ${LANE_HEIGHT} / 2)`);
+      setStyleValue(node, 'height', `calc(${LANE_HEIGHT} * ${last - first})`);
+    }
+  };
+
+  const layoutTracks = (at: number): void => {
+    if (options.trackLayout !== 'visible') return;
+    const extent = laneWidth / pxPerUnit();
+    const left = at - anchor * extent;
+    const right = at + (1 - anchor) * extent;
+    const signature = `${rank(starts, right, false)}:${rank(ends, left, true)}`;
+    if (signature === visibleSignature) return;
+    visibleSignature = signature;
+    const rows = [...new Set(ordered.filter((band) => band.end > band.start
+      && band.start < right && band.end > left).map(trackOf))].sort((a, b) => a - b);
+    // Preserve one empty row through a gap; no note or band is invented.
+    if (!rows.length) rows.push(0);
+    if (rows.length === visibleRows.length && rows.every((row, index) => row === visibleRows[index])) return;
+    visibleRows = rows;
+    for (let track = 0; track < lanes.children.length; track++) {
+      const node = lanes.children[track] as HTMLElement;
+      const row = displayRow(track);
+      setHidden(node, row < 0);
+      const label = rowLabels[track];
+      if (label) setHidden(label, row < 0);
+      if (row >= 0) setStyleValue(node, 'top', `calc(${RULER_HEIGHT} + ${LANE_HEIGHT} * ${row})`);
+    }
+    setHidden(gutter, !rows.some((row) => rowLabels[row]?.textContent));
+    setStyleValue(viewport, 'min-height', `calc(${RULER_HEIGHT} + ${LANE_HEIGHT} * ${rows.length})`);
+    setStyleValue(viewport, 'height', `calc(${RULER_HEIGHT} + ${LANE_HEIGHT} * ${rows.length})`);
+    setData(viewport, 'lanes', String(rows.length));
+    layoutRowDecorations();
+  };
+
   /** A band's whole box, from its own fields and the axis. Never from `now`. */
   const boxOf = (band: FlowBand): string => {
     const box = flowBox(band, axis);
     return harmonyInline(
       inline ? flowParts.band : {},
+      inline && wrapLabels ? flowWrapBand : {},
       {
         left: `${box.left}%`,
         width: `${box.width}%`,
@@ -1776,9 +1991,11 @@ export function mountFlowLane(
     setStyleValue(node.fill, 'bottom', 'auto');
     setStyleValue(node.fill, 'height', `${coordinate(weight * 100)}%`);
     setText(node.label, band.primary ?? '');
+    if (wrapLabels) setHidden(node.label, false);
     const note = [band.secondary, band.trailing].filter(Boolean).join(' · ');
     setText(node.note, note);
-    setAttr(node.root, 'title', [band.primary, note].filter(Boolean).join(' — ') || undefined);
+    const reading = flowBandReading(band);
+    setAttr(node.root, 'title', reading || undefined);
     setHidden(node.note, note === '');
     if (band.severity) {
       setStyleValue(node.bead, 'background', severityFill(band.severity));
@@ -1789,7 +2006,7 @@ export function mountFlowLane(
     paintGlyph(node, band);
     setText(
       node.entry,
-      [band.primary, band.secondary, band.trailing].filter(Boolean).join(' — ') || band.id,
+      reading || band.id,
     );
   };
 
@@ -1842,6 +2059,8 @@ export function mountFlowLane(
     const signature = JSON.stringify([count, state.tracks ?? []]);
     if (signature === laneSignature) return;
     laneSignature = signature;
+    visibleSignature = '';
+    visibleRows = [];
     trackNodes.clear();
     const rows: HTMLElement[] = [];
     const labels: HTMLElement[] = [];
@@ -1872,6 +2091,7 @@ export function mountFlowLane(
     }
     lanes.replaceChildren(...rows);
     gutter.replaceChildren(...labels);
+    rowLabels = labels;
     setHidden(gutter, !labels.some((label) => label.textContent));
     // CSS owns token lengths; no computed-style reads are needed to fit rows.
     viewport.style.minHeight = `calc(${RULER_HEIGHT} + ${LANE_HEIGHT} * ${count})`;
@@ -1884,10 +2104,14 @@ export function mountFlowLane(
       state.brackets ?? null,
       axis.start,
       axis.end,
+      pxPerUnit(),
     ]);
     if (signature === rulerSignature) return;
     rulerSignature = signature;
     const items: HTMLElement[] = [];
+    rowFlags = [];
+    rowBrackets = [];
+    const labels: {node: HTMLElement; left: number; major: boolean}[] = [];
     for (const entry of state.ruler ?? []) {
       if (!Number.isFinite(entry?.at)) continue;
       const at = ((entry.at - axis.start) / axis.span) * 100;
@@ -1909,6 +2133,7 @@ export function mountFlowLane(
         text.textContent = entry.label;
         dress(text, flowParts.tickLabel);
         items.push(text);
+        labels.push({node: text, left: (entry.at - axis.start) * pxPerUnit(), major: Boolean(entry.major)});
       }
     }
     for (const flag of state.flags ?? []) {
@@ -1932,6 +2157,7 @@ export function mountFlowLane(
         node.style.bottom = 'auto';
         node.style.height = LANE_HEIGHT;
         node.dataset.track = String(row);
+        rowFlags.push({node, track: row});
       }
       node.dataset.flag = flag.id;
       if (flag.label) node.title = flag.label;
@@ -1956,10 +2182,37 @@ export function mountFlowLane(
       node.style.height = `calc(${LANE_HEIGHT} * ${to - from})`;
       node.style.borderColor = severityFill(bracket.severity);
       node.dataset.bracket = bracket.id;
+      rowBrackets.push({node, from, to});
       if (bracket.label) node.title = bracket.label;
       items.push(node);
     }
     decorations.replaceChildren(...items);
+    layoutRowDecorations();
+    // Measure only while material/scale changes, never on the frame path.
+    // Reserve the caller's major labels first, then fill gaps with minor
+    // labels. Every tick remains at its original position even when its text
+    // cannot fit. A detached/hidden host uses a conservative text estimate.
+    const measured = labels.map((label) => ({...label,
+      width: finitePositive(label.node.getBoundingClientRect().width, Math.max(12, (label.node.textContent?.length ?? 0) * 9)),
+    })).sort((a, b) => Number(b.major) - Number(a.major) || a.left - b.left);
+    const occupied: {left: number; right: number}[] = [];
+    const gap = 8;
+    for (const label of measured) {
+      let low = 0;
+      let high = occupied.length;
+      while (low < high) {
+        const middle = (low + high) >>> 1;
+        if (occupied[middle]!.left < label.left) low = middle + 1;
+        else high = middle;
+      }
+      const previous = occupied[low - 1];
+      const next = occupied[low];
+      const right = label.left + label.width;
+      const fits = (!previous || previous.right + gap <= label.left)
+        && (!next || right + gap <= next.left);
+      setHidden(label.node, !fits);
+      if (fits) occupied.splice(low, 0, {left: label.left, right});
+    }
   };
 
   const measure = (): void => {
@@ -1972,6 +2225,187 @@ export function mountFlowLane(
     laneWidth = finitePositive(viewport.clientWidth || root.clientWidth, fallbackWidth);
   };
 
+  /** Keyed slots follow material order, never the current band's text widths. */
+  const reconcileReadoutFields = (): void => {
+    const override = state.pinned?.fields;
+    structuredReadout = override !== undefined || ordered.some((band) => band.readout?.fields !== undefined);
+    const schema = new Map<string, string>();
+    for (const fields of override === undefined ? ordered.map((band) => band.readout?.fields) : [override]) {
+      for (const field of fields ?? []) if (!schema.has(field.id)) schema.set(field.id, field.label);
+    }
+    fieldOrder = [...schema.keys()];
+    for (const [id, label] of schema) {
+      let node = fieldNodes.get(id);
+      if (!node) {
+        const slot = document.createElement('div');
+        slot.className = 'wui-harmony-flow__pinned-field';
+        slot.dataset.readoutField = id;
+        dress(slot, flowParts.pinnedField);
+        const name = document.createElement('span');
+        name.className = 'wui-harmony-flow__pinned-field-label';
+        dress(name, flowParts.pinnedFieldLabel);
+        const value = document.createElement('span');
+        value.className = 'wui-harmony-flow__pinned-field-value';
+        dress(value, flowParts.pinnedFieldValue);
+        slot.append(name, value);
+        node = {root: slot, label: name, value, defaultLabel: label};
+        fieldNodes.set(id, node);
+      }
+      node.defaultLabel = label;
+    }
+    for (const [id, node] of fieldNodes) if (!schema.has(id)) {
+      node.root.remove();
+      fieldNodes.delete(id);
+    }
+    const slots = fieldOrder.map((id) => fieldNodes.get(id)!.root);
+    if (slots.some((slot, index) => pinnedFields.children[index] !== slot)) pinnedFields.replaceChildren(...slots);
+  };
+
+  /** Reserve complete readout line boxes once per material/size change. */
+  const measureReadout = (): void => {
+    if (!structuredReadout) {
+      setStyleValue(pinnedName, 'min-height', options.reservePinned ? `${flowParts.pinnedName['line-height']}em` : undefined);
+      setStyleValue(pinnedFields, '--wui-harmony-flow-field-label-height', undefined);
+      setStyleValue(pinnedFields, '--wui-harmony-flow-field-value-height', undefined);
+      return;
+    }
+    const width = finitePositive(pinned.clientWidth || root.clientWidth, laneWidth);
+    const titles = new Set<string>(state.pinned?.primary === undefined
+      ? ordered.map((band) => band.readout?.primary ?? band.primary ?? '') : [state.pinned.primary]);
+    if (!titles.size) titles.add('');
+    const samples = new Map<string, FlowReadoutField>();
+    const sets = state.pinned?.fields === undefined
+      ? ordered.map((band) => band.readout?.fields) : [state.pinned.fields];
+    for (const fields of sets) for (const field of fields ?? []) {
+      samples.set(JSON.stringify([field.label, field.value]), field);
+    }
+    const holder = document.createElement('div');
+    holder.className = 'wui-harmony-flow__pinned';
+    holder.setAttribute('aria-hidden', 'true');
+    paint(holder, flowParts.pinned, {position: 'absolute', left: '0', top: '0', width: `${width}px`,
+      height: '0', overflow: 'hidden', visibility: 'hidden', margin: '0'});
+    const primaryProbes = [...titles].map((title) => {
+      const probe = document.createElement('span');
+      probe.className = 'wui-harmony-flow__pinned-name';
+      probe.dataset.readoutMeasure = 'primary';
+      probe.textContent = title;
+      paint(probe, flowParts.pinnedName, {'min-height': `${flowParts.pinnedName['line-height']}em`});
+      holder.append(probe);
+      return probe;
+    });
+    const grid = document.createElement('div');
+    grid.className = 'wui-harmony-flow__pinned-fields';
+    paint(grid, flowParts.pinnedFields);
+    const fieldProbes = [...samples.values()].map((field) => {
+      const slot = document.createElement('div');
+      slot.className = 'wui-harmony-flow__pinned-field';
+      paint(slot, flowParts.pinnedField, {'grid-template-rows': 'auto auto', 'align-self': 'start'});
+      const label = document.createElement('span');
+      label.className = 'wui-harmony-flow__pinned-field-label';
+      label.dataset.readoutMeasure = 'label';
+      label.textContent = field.label;
+      paint(label, flowParts.pinnedFieldLabel, {'min-height': '1.35em'});
+      const value = document.createElement('span');
+      value.className = 'wui-harmony-flow__pinned-field-value';
+      value.dataset.readoutMeasure = 'value';
+      value.textContent = field.value;
+      paint(value, flowParts.pinnedFieldValue, {'min-height': '1.35em'});
+      slot.append(label, value);
+      grid.append(slot);
+      return {label, value};
+    });
+    holder.append(grid);
+    root.append(holder);
+    try {
+      const fallback = (text: string, available: number, glyph: number, line: number) =>
+        Math.max(1, Math.ceil(text.length / Math.max(1, Math.floor(available / glyph)))) * line;
+      let primaryHeight = 0;
+      let labelHeight = 0;
+      let valueHeight = 0;
+      for (const probe of primaryProbes) primaryHeight = Math.max(primaryHeight,
+        finitePositive(probe.getBoundingClientRect().height, fallback(probe.textContent ?? '', width, 12, 26)));
+      const fieldWidth = Math.max(1, (width - 16) / 3);
+      for (const {label, value} of fieldProbes) {
+        labelHeight = Math.max(labelHeight, finitePositive(label.getBoundingClientRect().height,
+          fallback(label.textContent ?? '', fieldWidth, 8, 16)));
+        valueHeight = Math.max(valueHeight, finitePositive(value.getBoundingClientRect().height,
+          fallback(value.textContent ?? '', fieldWidth, 9, 18)));
+      }
+      setStyleValue(pinnedName, 'min-height', `${Math.ceil(primaryHeight)}px`);
+      setStyleValue(pinnedFields, '--wui-harmony-flow-field-label-height', `${Math.ceil(labelHeight)}px`);
+      setStyleValue(pinnedFields, '--wui-harmony-flow-field-value-height', `${Math.ceil(valueHeight)}px`);
+    } finally {
+      holder.remove();
+    }
+  };
+
+  /** Measure complete stacks in one batch, independent of offscreen culling. */
+  const measureWrappedLabels = (): void => {
+    if (!wrapLabels) return;
+    const width = axis.span * pxPerUnit();
+    const samples = new Map<string, {width: number; primary: string; secondary: string}>();
+    for (const band of ordered) {
+      const primary = band.primary ?? '';
+      const secondary = [band.secondary, band.trailing].filter(Boolean).join(' · ');
+      if (!primary && !secondary) continue;
+      const sample = {width: flowBox(band, axis).width * width / 100, primary, secondary};
+      samples.set(JSON.stringify(sample), sample);
+    }
+    const holder = document.createElement('div');
+    holder.setAttribute('aria-hidden', 'true');
+    paint(holder, {position: 'absolute', left: '0', top: '0', height: '0',
+      overflow: 'hidden', visibility: 'hidden', 'pointer-events': 'none'});
+    const probes = [...samples.values()].map((sample) => {
+      const probe = document.createElement('div');
+      probe.className = 'wui-harmony-flow__band';
+      probe.dataset.labelOverflow = 'wrap';
+      probe.dataset.labelMeasure = 'true';
+      paint(probe, flowParts.band, flowWrapBand, {width: `${sample.width}px`,
+        height: 'auto', 'content-visibility': 'visible', 'contain-intrinsic-size': 'none'});
+      for (const [text, className, declarations] of [
+        [sample.primary, 'wui-harmony-flow__label', flowParts.label],
+        [sample.secondary, 'wui-harmony-flow__note', flowParts.note],
+      ] as const) {
+        const primary = className === 'wui-harmony-flow__label';
+        if (!text && !primary) continue;
+        const label = document.createElement('span');
+        label.className = className;
+        label.textContent = text;
+        paint(label, declarations, primary ? flowWrapPrimary : flowWrapLabel,
+          // Measure natural primary height, not the previous batch's slot.
+          primary ? {'min-height': '1.25em'} : {});
+        probe.append(label);
+      }
+      holder.append(probe);
+      return {probe, sample};
+    });
+    root.append(holder);
+    try {
+      let primaryHeight = 0;
+      let remainderHeight = 0;
+      for (const {probe, sample} of probes) {
+        // Detached/hidden hosts have no line boxes. A conservative fallback
+        // is replaced by the actual measurement when ResizeObserver fires.
+        const columns = Math.max(1, Math.floor(Math.max(1, sample.width - 8) / 9));
+        const primaryFallback = Math.max(1, Math.ceil(sample.primary.length / columns)) * 18;
+        const fallback = 8 + primaryFallback
+          + (sample.secondary ? Math.ceil(sample.secondary.length / columns) * 16 : 0)
+          + (sample.secondary ? 1 : 0);
+        const label = probe.querySelector<HTMLElement>('.wui-harmony-flow__label')!;
+        const primary = finitePositive(label.getBoundingClientRect().height, primaryFallback);
+        primaryHeight = Math.max(primaryHeight, primary);
+        remainderHeight = Math.max(remainderHeight,
+          finitePositive(probe.getBoundingClientRect().height, fallback) - primary);
+      }
+      // One shared primary slot keeps secondary-only bands on the same note
+      // line as named neighbours, including a neighbour with a wrapped name.
+      setStyleValue(root, '--wui-harmony-flow-primary-height', `${Math.ceil(primaryHeight)}px`);
+      setStyleValue(root, '--wui-harmony-flow-row-height', `max(${MIN_LANE_HEIGHT}, ${Math.ceil(primaryHeight) + Math.ceil(remainderHeight)}px)`);
+    } finally {
+      holder.remove();
+    }
+  };
+
   const update = (): void => {
     if (destroyed) return;
     try {
@@ -1982,6 +2416,13 @@ export function mountFlowLane(
       );
       axis = flowAxis(state.span, ordered);
       boundaries = flowBoundaries(ordered);
+      lookupAt = Number.NaN;
+      if (options.trackLayout === 'visible') {
+        const occupied = ordered.filter((band) => band.end > band.start);
+        starts = occupied.map((band) => band.start).sort((a, b) => a - b);
+        ends = occupied.map((band) => band.end).sort((a, b) => a - b);
+        visibleSignature = '';
+      }
       primaryTrack = Number.isFinite(state.primaryTrack)
         ? Math.max(0, Math.round(state.primaryTrack as number))
         : ordered.length === 0
@@ -1989,6 +2430,10 @@ export function mountFlowLane(
           : Math.min(...ordered.map(trackOf));
       if (!resizeObserver) measure();
       rebuildLanes(laneCount());
+      reel.style.width = `${coordinate(axis.span * pxPerUnit())}px`;
+      measureWrappedLabels();
+      reconcileReadoutFields();
+      measureReadout();
       rebuildDecorations();
 
       const seen = new Set<string>();
@@ -2020,14 +2465,13 @@ export function mountFlowLane(
       if (structural || entries.length !== index.childElementCount)
         index.replaceChildren(...entries);
 
-      reel.style.width = `${coordinate(axis.span * pxPerUnit())}px`;
       const nowAt = `${coordinate(anchor * 100)}%`;
       if (nowLine.style.left !== nowAt) nowLine.style.left = nowAt;
       if (future.style.left !== nowAt) future.style.left = nowAt;
       setHidden(future, state.future !== false);
       setData(root, 'playing', state.playing ? 'true' : undefined);
       setData(root, 'disabled', state.disabled ? 'true' : undefined);
-      setData(viewport, 'lanes', String(laneCount()));
+      if (options.trackLayout !== 'visible') setData(viewport, 'lanes', String(laneCount()));
       // Only where the viewport is actually a slider. A range on a node with no
       // role is a promise to a reader that nothing keeps.
       if (binding.seek) {
@@ -2155,6 +2599,9 @@ export function mountFlowLane(
       zoom = next;
       event.preventDefault();
       reel.style.width = `${coordinate(axis.span * pxPerUnit())}px`;
+      measureWrappedLabels();
+      measureReadout();
+      rebuildDecorations();
       place(position, true);
       return;
     }
@@ -2183,7 +2630,11 @@ export function mountFlowLane(
       // The accessibility the shared axis gives away: "what numeral is under
       // this chord" is one key press, because the rows are one reel.
       const current = bandAt(position);
-      const row = Math.round(finite(current?.track, 0)) + (event.key === 'ArrowDown' ? 1 : -1);
+      const currentRow = Math.round(finite(current?.track, 0));
+      const direction = event.key === 'ArrowDown' ? 1 : -1;
+      const row = options.trackLayout === 'visible'
+        ? visibleRows[visibleRows.indexOf(currentRow) + direction]
+        : currentRow + direction;
       const neighbour = ordered
         .filter((band) => Math.round(finite(band.track, 0)) === row)
         .sort((a, b) => Math.abs(a.start - position) - Math.abs(b.start - position))[0];
@@ -2312,6 +2763,12 @@ export function mountFlowLane(
         if (destroyed) return;
         measure();
         reel.style.width = `${coordinate(axis.span * pxPerUnit())}px`;
+        measureWrappedLabels();
+        measureReadout();
+        // A font/height change or a hidden host becoming visible can change
+        // measured text widths even when the effective time scale is equal.
+        rulerSignature = '';
+        rebuildDecorations();
         place(position, true);
       });
       resizeObserver.observe(viewport);
@@ -2499,7 +2956,7 @@ export function mountNameplate(
   const caption = document.createElement('div');
   caption.className = 'wui-harmony-nameplate__caption';
   caption.hidden = true;
-  dress(caption, nameplateParts.caption);
+  dress(caption, nameplateParts.caption, options.stableLayout ? nameplateParts.stableCaption : {});
 
   // ONE live region, and the symbol lives inside it for its whole life. A
   // replaced node inside `aria-live` is a change the reader never hears, which
@@ -2634,14 +3091,15 @@ export function mountNameplate(
         .map((voice) => voice.label ?? voice.mark ?? (voice.role ? toneMark(voice.role) : ''))
         .filter(Boolean);
       const unnamedNotes = options.stableLayout && !primary ? voiceLabels.join(' · ') : '';
-      const displayedSymbol = primary?.symbol ?? (options.stableLayout ? unnamedNotes || state.emptyLabel || '' : '');
+      const displayedSymbol = primary?.symbol ?? (options.stableLayout && !voiceLabels.length ? state.emptyLabel || '' : '');
       const identity = primary ? (primary.key ?? primary.symbol) : undefined;
       setText(symbol, displayedSymbol);
       setHidden(symbol, displayedSymbol === '');
       if (options.stableLayout)
         setData(root, 'reading', primary ? 'chord' : unnamedNotes ? 'notes' : 'rest');
-      setText(full, primary?.full ?? '');
-      setHidden(full, !primary?.full);
+      const spoken = primary?.full ?? unnamedNotes;
+      setText(full, spoken);
+      setHidden(full, !spoken);
       // With a spoken form present the symbol is hidden from the reader, so the
       // pair is announced once rather than as an abbreviation and its expansion.
       setAttr(symbol, 'aria-hidden', primary?.full ? 'true' : undefined);
@@ -2652,6 +3110,20 @@ export function mountNameplate(
 
       setText(caption, state.caption ?? '');
       setHidden(caption, !state.caption);
+      if (options.stableLayout) {
+        const hasCaption = Boolean(state.caption);
+        setData(root, 'caption', hasCaption ? 'true' : undefined);
+        const rows = hasCaption ? nameplateParts.stableCaptionRoot : nameplateParts.stableRoot;
+        if (inline) {
+          setStyleValue(root, 'grid-template-rows', rows['grid-template-rows']);
+          setStyleValue(root, 'height', rows.height);
+        }
+        // Optional content must never auto-place the main symbol into a
+        // shorter metadata row. Its full-height slot follows the caption.
+        setStyleValue(live, 'grid-row', hasCaption ? '2' : '1');
+        setStyleValue(voicing, 'grid-row', hasCaption ? '3' : '2');
+        setStyleValue(alternates, 'grid-row', hasCaption ? '4' : '3');
+      }
       setText(next, state.next?.symbol ?? '');
       setHidden(next, !state.next);
       setData(root, 'emphasis', state.emphasis);
@@ -2664,7 +3136,7 @@ export function mountNameplate(
           symbol,
           'font-size',
           options.stableLayout
-            ? unnamedNotes ? nameplateParts.stableNotes['font-size'] : SIZE_DISPLAY
+            ? SIZE_DISPLAY
             : state.emphasis === 'hero' ? `calc(${SIZE_DISPLAY} * 1.35)` : undefined,
         );
       setData(
@@ -2673,10 +3145,10 @@ export function mountNameplate(
         Number.isFinite(state.confidence) ? String(clamp01(state.confidence)) : undefined,
       );
 
-      setText(voicing, options.stableLayout && !primary ? '' : voiceLabels.join('  '));
+      setText(voicing, voiceLabels.join('  '));
       setHidden(voicing, !options.stableLayout && voices.length === 0);
       if (options.stableLayout)
-        setStyleValue(voicing, 'visibility', primary && voiceLabels.length > 0 ? 'visible' : 'hidden');
+        setStyleValue(voicing, 'visibility', voiceLabels.length > 0 ? 'visible' : 'hidden');
 
       const readings = state.alternates ?? [];
       // `key` and `weight` belong in the signature even though neither is drawn.
