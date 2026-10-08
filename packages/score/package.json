@@ -279,7 +279,7 @@
   },
   "dependencies": {
     "@tonejs/midi": "^2.0.28",
-    "fast-xml-parser": "^5.11.1",
+    "fast-xml-parser": "^5.11.2",
     "fflate": "^0.8.2",
     "vexflow": "4.2.5"
   },
