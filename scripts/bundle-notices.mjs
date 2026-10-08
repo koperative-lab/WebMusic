@@ -13,6 +13,11 @@ const reviewedSnapshots = {
     repository: 'git+https://github.com/nodable/val-parsers.git',
     file: 'scripts/licenses/nodable-entities-3.0.0-MIT.txt',
   },
+  '@nodable/entities@3.1.0': {
+    license: 'MIT',
+    repository: 'git+https://github.com/nodable/val-parsers.git',
+    file: 'scripts/licenses/nodable-entities-3.1.0-MIT.txt',
+  },
   'fft.js@4.0.4': {
     license: 'MIT',
     repository: 'git+ssh://git@github.com/indutny/fft.js.git',

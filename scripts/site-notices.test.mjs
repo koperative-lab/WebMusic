@@ -40,6 +40,28 @@ async function compile(directory, source, collector, aliases = []) {
   return path.join(directory, 'dist');
 }
 
+for (const version of ['3.0.0', '3.1.0']) {
+  test(`@nodable/entities@${version} site snapshot requires its reviewed version, license and repository`, async (t) => {
+    const directory = await fixture(t);
+    await rm(path.join(directory, 'LICENSE'));
+    const manifest = {name: '@nodable/entities', version, license: 'MIT',
+      repository: {url: 'git+https://github.com/nodable/val-parsers.git'}};
+    const notice = await readSitePackageNotice({directory, manifest});
+    const snapshot = await readFile(new URL(`./licenses/nodable-entities-${version}-MIT.txt`, import.meta.url), 'utf8');
+    assert.equal(notice.key, `@nodable/entities@${version}`);
+    assert.equal(notice.license, 'MIT');
+    assert.ok(notice.text.includes(snapshot.trim()), 'include the complete reviewed license text');
+    for (const change of [
+      {version: '99.0.0'},
+      {license: 'BSD-3-Clause'},
+      {repository: {url: 'https://example.invalid/unreviewed'}},
+    ]) {
+      await assert.rejects(readSitePackageNotice({directory, manifest: {...manifest, ...change}}),
+        /license identifier and license text/);
+    }
+  });
+}
+
 test('actual Vite chunks include CSS ownership, exclude tree-shaken dependencies, and preserve maps', async (t) => {
   const directory = await fixture(t);
   for (const name of ['used', 'unused', 'styles', 'worker-only']) {
