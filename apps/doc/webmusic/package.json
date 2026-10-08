@@ -14,8 +14,8 @@
     "@astrojs/check": "^0.9.10",
     "@astrojs/starlight": "^0.42.5",
     "@codesandbox/sandpack-react": "^2.20.0",
-    "@webmusic/score": "^0.2.0",
-    "@webmusic/ui": "^0.2.0",
+    "@webmusic/score": "^0.2.1",
+    "@webmusic/ui": "^0.2.1",
     "astro": "^7.3.3",
     "eslint-plugin-astro": "^3.2.1",
     "fast-xml-parser": "^5.11.2",
@@ -30,8 +30,8 @@
     "tone": "^15.0.4",
     "typescript": "^5.9.3",
     "vitest": "^5.0.0",
-    "@webmusic/audio": "^0.2.0",
-    "@webmusic/bridge": "^0.2.0"
+    "@webmusic/audio": "^0.2.1",
+    "@webmusic/bridge": "^0.2.1"
   },
   "description": "Documentation site for WebMusic Score, Audio, Bridge, UI and Kernel"
 }

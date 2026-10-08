@@ -745,6 +745,8 @@ describe('mountNameplate responsive content', () => {
     expect(voicing.textContent).toBe('A4  A5');
     expect(voicing.style.visibility).toBe('visible');
     expect(voicing.style.gridRow).toBe('2');
+    // The live region already speaks these notes; the visible row is not read twice.
+    expect(voicing.getAttribute('aria-hidden')).toBe('true');
     const noteStyle = getComputedStyle(voicing);
     // jsdom retains nested custom-property reads rather than resolving RGB.
     expect(noteStyle.color).toContain('--wm-harmony-muted');
@@ -770,6 +772,7 @@ describe('mountNameplate responsive content', () => {
     expect(handle.symbol.parentElement).toBe(live);
     expect(voicing.textContent).toBe('A4  C5  E5');
     expect(voicing.style.visibility).toBe('visible');
+    expect(voicing.getAttribute('aria-hidden')).toBeNull();
     expect(alternates.style.visibility).toBe('visible');
     expect(alternates.querySelector('button')).toBeNull();
     expect(getComputedStyle(plate).height).toBe(height);

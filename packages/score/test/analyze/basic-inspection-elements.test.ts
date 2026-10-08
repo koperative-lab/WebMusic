@@ -153,5 +153,55 @@ describe('basic theory Elements', () => {
     expect(element.analysis?.evidence.join(' ')).toContain('1:1 + 2/3');
     element.setAttribute('beat-groups', '2+2');
     expect(element.analysis).toBeUndefined();
+    // Several lists cover several irregular numerators; the matching one applies to 5/8.
+    element.setAttribute('beat-groups', '2+2+3, 2+3');
+    expect(element.analysis?.kind).toBe('rhythm');
+    element.selectRegion(1, 1.5);
+    expect(element.analysis?.evidence.join(' ')).toContain('1:2');
+    element.setAttribute('beat-groups', '2+3 3+2');
+    expect(element.analysis).toBeUndefined();
+    expect(element.querySelector('.wui-workbench')?.getAttribute('data-phase')).toBe('error');
+    element.setAttribute('subdivision', 'x');
+    element.setAttribute('beat-groups', '2+3');
+    expect(element.analysis).toBeUndefined();
+    element.removeAttribute('subdivision');
+    expect(element.analysis?.kind).toBe('rhythm');
   });
+
+  it('ignores attributes a tool does not observe instead of entering an error state', async () => {
+    const chord = document.createElement('score-chord-analysis') as HTMLElement & {analysis?: {kind: string}};
+    chord.setAttribute('subdivision', 'x');
+    chord.setAttribute('kind', 'sideways');
+    (chord as HTMLElement & {score?: unknown}).score = fixture().score;
+    document.body.append(chord);
+    await flush();
+    expect(chord.analysis?.kind).toBe('chord');
+    expect(chord.querySelector('.wui-workbench')?.getAttribute('data-phase')).not.toBe('error');
+  });
+
+  it('ignores an unobserved pitch mode on the rhythm tool', async () => {
+    const element = document.createElement('score-rhythm-analysis') as RhythmAnalysisElement;
+    element.setAttribute('pitch-mode', 'concert');
+    element.score = fixture().score;
+    document.body.append(element);
+    await flush();
+    expect(element.analysis?.kind).toBe('rhythm');
+    expect(element.querySelector('.wui-workbench')?.getAttribute('data-phase')).not.toBe('error');
+    element.setAttribute('subdivision', '3');
+    expect(element.analysis?.kind).toBe('rhythm');
+  });
+
+  it.each([' 2 + 3 ', '2 + 3 2 + 2 + 3', '2 + 3, 2 + 2 + 3'])(
+    'preserves whitespace around + in beat-groups="%s"', async (groups) => {
+      const element = document.createElement('score-rhythm-analysis') as RhythmAnalysisElement;
+      element.setAttribute('beat-groups', groups);
+      element.score = fixture({numerator: 5, denominator: 8}).score;
+      document.body.append(element);
+      await flush();
+      expect(element.analysis?.kind).toBe('rhythm');
+      element.selectRegion(1, 1.5);
+      expect(element.analysis?.evidence.join(' ')).toContain('1:2');
+      expect(element.querySelector('.wui-workbench')?.getAttribute('data-phase')).not.toBe('error');
+    },
+  );
 });

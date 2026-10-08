@@ -4,10 +4,11 @@
 > through [PR #25](https://github.com/koperative-lab/WebMusic/pull/25).
 > Its [CI run](https://github.com/koperative-lab/WebMusic/actions/runs/36516020568)
 > passed Node 22/24 quality checks, the website build and Pages deployment.
-> This checkout prepares the shared `0.2.0` release; registry publication is
-> still a separate manual step. The verified first `0.1.0` npm release contained
-> Kernel, UI Kit and Score. [Release instructions](release/0.2.0.md) own the
-> version-specific migration and manual publishing steps.
+> This checkout prepares shared `0.2.1` metadata. Registry and remote-tag queries
+> on 2026-10-07 confirmed all five packages at `0.2.0`; `0.2.1` was unused.
+> Publication remains a separate manual step. The
+> [0.2.1 preparation notes](release/0.2.1.md) own this update's scope;
+> [Publishing](release/PUBLISHING.md) owns delivery and verification.
 > Product direction is accepted in [PRODUCT](PRODUCT.md) and [DECISIONS](DECISIONS.md).
 > Historical plans and audit snapshots retain their recorded baselines.
 
@@ -75,8 +76,8 @@ shared component border and padding. Ordinary development starts now reuse the
 tracked server; replacement is explicit.
 
 DEC-043 parks the motif and rhythm-pattern Elements from DEC-040 for later
-study; the local `archive/score-pattern-analysis-research` tag and original
-research branch preserve that snapshot. Recurrence algorithms and projections
+study; the local `archive/score-pattern-analysis-research` tag preserves that
+snapshot after deletion of the redundant branch. Recurrence algorithms and projections
 remain API/Headless capabilities. DEC-047 now
 selects four elementary Score Analyze Elements: chord (score/live modes),
 interval, explicit scale and grouped rhythm. This supersedes DEC-043's two-tag
@@ -216,6 +217,39 @@ After a fresh `npm ci`, the corrected tree again passed all 4,301 workspace
 tests in `npm run check`, the 112-page documentation build, external-install
 verification and `npm run audit:dependencies` at its configured high threshold.
 
+The moderate follow-up adds a root npm override so that
+`@expressive-code/core` resolves `postcss-nested` 7.0.2 instead of 6.2.0. That
+major only raised its selector parser to 7 and refined comment handling, so the
+nested `postcss-selector-parser` 6.1.4 disappears and the site's build-time CSS
+nesting uses the patched 7.1.6 already present for `eslint-plugin-astro`.
+Starlight 0.42.5 and Expressive Code 0.44.2 are unchanged; `npm audit` reports
+no findings at the moderate threshold. With the override, `VITEST_MAX_WORKERS=2
+npm run check` passed (4,307 workspace tests), `npm run docs:build` and
+`npm run pages:build` each built 112 pages with the site-notice check validating
+350 emitted files, `npm run check:external-install` passed, and both audit
+thresholds reported no vulnerabilities. A local `astro preview` of the rebuilt
+site rendered the Analyze API page's 27 code frames with the same computed
+frame styles, rule count and heights as the still-running development server,
+without console errors. The override is a bridge until Expressive Code requires
+the newer `postcss-nested` itself; see DEP-02.
+
+The [2026-10-07 review corrections](log/2026-10-07-score-analysis-review-corrections.md)
+implement DEC-049: wrapped chord bands narrower than 48px
+hide their label stack instead of wrapping single glyphs, `beat-groups` accepts
+one grouping per irregular numerator while conventional meters keep their
+pulses, chord selections keep exact authored ends, the live nameplate no longer
+exposes unnamed notes twice, Elements validate only observed attributes, and
+the independent-loops demo caches its decoded opening excerpt. The harmonic
+interval overlap introduced with DEC-047 is now a documented contract. The
+independent review reproduced the 30-second chord window (10px bands, 486px
+rows, a 580px component) on the local site before the correction; afterwards
+the same window hides every label stack and keeps the component at 142px,
+while the accepted four-second window is unchanged. After the corrections the
+static checks, package build, documentation checks, typechecks, lockfile,
+license, package and release-manifest checks and all workspace tests passed
+locally on the tree that includes the merged dependency integration. None of
+this is registry-publication, screen-reader or device evidence.
+
 [The earlier inspection record](audits/2026-09-26/SCORE-ANALYZE-INSPECTION.md)
 describes DEC-038's former five-tool tree and does not verify the current tools.
 DEC-041's presentation boundary remains: candidates are available in `.analysis`
@@ -258,13 +292,13 @@ The current public surface is generated in [COMPONENTS](COMPONENTS.md); document
 
 | ID | Work and state | Acceptance | Owning reference |
 |---|---|---|---|
-| DEP-02 | The reviewed dependency updates clear the high audit findings. Ten moderate reports remain in the documentation site's PostCSS selector-parser 6.x chain | Adopt a supported parent dependency update and rerun full checks, site build, external-install and audit. The audit's suggested Starlight downgrade is not an accepted migration | [Dependabot integration review](log/2026-10-07-dependabot-integration.md), [Development](DEVELOPMENT.md) |
+| DEP-02 | The reviewed dependency updates clear the high audit findings. The ten moderate reports in the documentation site's PostCSS selector-parser chain are cleared by a root npm override that resolves `postcss-nested` 7.0.2 under `@expressive-code/core`, so the nested selector parser deduplicates to the patched 7.1.6; the audit reports no findings at the moderate threshold | Remove the override once `@expressive-code/core` itself requires `postcss-nested` 7 or later, and rerun full checks, both site builds, external-install and audit after any Starlight or Expressive Code update. The audit's suggested Starlight downgrade is not an accepted migration | [Review corrections](log/2026-10-07-score-analysis-review-corrections.md), [Dependabot integration review](log/2026-10-07-dependabot-integration.md), [Development](DEVELOPMENT.md) |
 | TIME-01 | Group command authority, revisioned observation and participant re-entry are implemented; same-instance clock injection remains open | Specify/verify engine consumption of one shared anchor if introducing injection; preserve the existing command outcome, cancellation and participant ownership guarantees | [Shared-clock design](../platform/shared-clock-injection.md), DEC-018 |
 | BIND-01 | Native Score data/state attachment is implemented; external controller/Rack and legacy event capabilities remain partial | Extend only explicitly supported source/part/activity capabilities; preserve readiness, source identity and borrowed lifetimes. Do not invent a single Score for a multi-source owner | [Player binding design](design/PLAYER-BINDING.md), DEC-011 and DEC-017 |
 | BIND-02 | Readout/log tags and scored-chord preview remain targets; retained PitchView supports player/source binding | Resolve the spec's open member/unit choices; implement the supported modes, part/note identity and bounded logs; align public entries, presenters, catalogs, references and accessible demos | Player binding design and component/page templates |
 | PLAY-01 | Algorithm/lifecycle and responsive UI source changes are implemented; earlier external-theme browser checks cover transparent surfaces, colors, radii, narrow/wide geometry and transport keyboard focus | Verify the merged Play demos' rendered state, keyboard and touch behavior at narrow/wide widths; measure device suspend/resume and MIDI separately | [Play design](design/PLAY-COMPONENTS.md), [implementation audit](audits/2026-09-09/SCORE-PLAY.md), [frontend source audit](audits/2026-09-09/SCORE-PLAY-FRONTEND.md), [styling review](audits/2026-09-10/SCORE-STYLING.md) |
 | VIEW-01 | Written-time projection and VexFlow replace the quantized staffrender path. Timed Part clefs/directions, source tuplet visibility, no-source clef inference and independent slur/tie geometry are implemented. The ten-page, 107-measure PDF review also led to full-Part slur pairing, articulation/barline/rest-position preservation and compact ink packing; final automated and Chrome results are recorded in the contract | Cross-staff/cross-measure beams, nested tuplets, complete grace/expression/font fidelity, per-articulation placement, credits/labels and page/editor layout remain bounded or unsupported. The cross-staff curve collision solver is bounded and does not establish complete engraving parity. Complete cross-browser/accessibility acceptance, including keyboard access; MIDI notation remains inferred. Do not claim full MuseScore parity | [Staff notation contract and acceptance](design/STAFF-NOTATION.md#acceptance), [PDF coverage](design/STAFF-NOTATION.md#pdf-comparison), [ScoreView notation limits](../apps/doc/webmusic/src/content/docs/score/element/view/score-view.mdx), DEC-024 |
-| CHORDIO-01 | DEC-047's four elementary tools, explicit chord modes, catalog and Arabesque No. 1 demos are implemented; full automated checks and desktop/390px browser checks passed on 2026-10-03. Recurrence UI remains parked | Complete real MIDI-device, screen-reader and audible non-unit-rate seeking acceptance; do not treat local browser checks as device or acoustic evidence | [Analyze component design](design/ANALYZE-COMPONENTS.md), DEC-047 and owning Element/API pages |
+| CHORDIO-01 | DEC-047's four elementary tools, explicit chord modes, catalog and Arabesque No. 1 demos are implemented; full automated checks and desktop/390px browser checks passed on 2026-10-03. DEC-049's review corrections (wrap minimum width, per-numerator beat groups, exact selection ends, nameplate accessibility) are implemented and the long-window chord demo was verified locally. Recurrence UI remains parked | Complete real MIDI-device, screen-reader and audible non-unit-rate seeking acceptance; do not treat local browser checks as device or acoustic evidence | [Analyze component design](design/ANALYZE-COMPONENTS.md), DEC-047, DEC-049 and owning Element/API pages |
 | ANALYZE-01 | Deterministic regression cases cover key-profile rotations, triads and inference boundaries; empirical musical accuracy remains unmeasured | Evaluate an annotated real-music corpus with declared genres, ground truth, metrics and ambiguity policy before claiming accuracy percentages or calibrated confidence | [Score Headless review](audits/2026-09-10/SCORE-HEADLESS.md), [Analyze algorithm record](audits/2026-09-10/SCORE-HEADLESS-ANALYZE.md) |
 | ANALYZE-02 | Elementary chord, interval and scale inspection now offer explicit written/sounding pitch basis, apply Part.transpose in sounding mode and retain notation/source evidence. Legacy key/chord segmentation, distributions, voice-leading, incremental sessions and their workers/projections still use stored written pitches | Extend the explicit pitch-basis contract and consistent normalization to those remaining legacy paths without changing the authored Score, double-transposing or overstating inference provenance; verify mixed piano/B♭ clarinet harmony and cross-part parallel-fifth fixtures | [API transposition finding](audits/2026-09-10/SCORE-API.md#open-transposing-instrument-contract), [public pitch basis](../apps/doc/webmusic/src/content/docs/score/api/analyze.mdx#pitch-basis-and-transposing-instruments) |
 | SCOREIO-01 | MIDI/MusicXML/ABC/MXL correctness repairs cover supported format subsets; full interchange and navigation fidelity remain limited | Define and test supported complex features before expansion: SMPTE timing, richer ABC syntax, cross-measure notation splitting and nested/alternative repeat routing. Preserve documented unsupported-input errors and lossy boundaries | [Score API review](audits/2026-09-10/SCORE-API.md), [IO detail](audits/2026-09-10/SCORE-API-IO.md), [repeat contracts](audits/2026-09-10/SCORE-API-MODEL.md) |
@@ -277,7 +311,7 @@ The current public surface is generated in [COMPONENTS](COMPONENTS.md); document
 | DOC-05 | Element/Headless/API page-shape and demo layout enforcement is incomplete | Define accepted exceptions, enforce applicable order/count rules, and align page-specific demo placement without breaking working demos | [Site plan](docs/DOCS-SITE-PLAN.md) |
 | DOC-06 | The family start pages and the two form inventories are in place; `checkLinks` now rejects a repository link that only resolves through a redirect, but no check constrains the title or section shape of the two inventories, and the retired capability-Overview title rule was not replaced | Decide whether the inventories need a title/section-shape rule of their own, and whether the family element inventory's per-capability sections should be asserted the way its absence of demos already is | [Site plan](docs/DOCS-SITE-PLAN.md), [Conventions](docs/DOCS-CONVENTIONS.md), DEC-020 |
 | VERIFY-01 | Source/package checks and dated browser evidence cover their stated scenarios; broader cross-browser/audio/MIDI/microphone acceptance, background timing and accessibility remain separate | Record actual environment, procedure and results separately; use the release gates for package delivery and device tests for acoustic/interaction claims | [Kernel release review](audits/2026-09-11/KERNEL-RELEASE.md), [Development](DEVELOPMENT.md), [Publishing](release/PUBLISHING.md) |
-| RELEASE-01 | Shared `0.2.0` metadata, bundled notices and prepack guards are prepared; the local release gates passed and are recorded in the [preparation audit](audits/2026-09-29/RELEASE-0.2.0-PREPARATION.md). The first-release receipt remains unchanged and new publication is not yet verified | Review the exact release commit's CI, authenticate the publisher, publish manually in dependency order, verify registry installation, then tag the producing commit and record verified delivery | [0.2.0 preparation](release/0.2.0.md), [Publishing](release/PUBLISHING.md), [Releasing](release/RELEASING.md) |
+| RELEASE-01 | Shared `0.2.1` metadata, bundled notices and prepack guards are prepared with the review corrections. Registry queries confirmed all five packages at `0.2.0`; no `0.2.1` publication is claimed | Validate the exact prepared commit and its CI; when publication is requested, authenticate the publisher, publish in dependency order, verify registry installation, then tag the producing commit and record delivery | [0.2.1 preparation](release/0.2.1.md), [Publishing](release/PUBLISHING.md), [Releasing](release/RELEASING.md) |
 | APP-01 | Score/Audio playback reference and independent-loop examples are implemented; workstation/project scenarios remain product goals | Use the reference to validate new capabilities before expansion; application project/undo/storage and installation deployment remain application-owned concerns | [Reference composition](../apps/doc/webmusic/src/content/docs/bridge/composition.mdx), [Product](PRODUCT.md), DEC-019 |
 
 REPO-01 and DEV-06 are closed by the merged integration and successful remote CI

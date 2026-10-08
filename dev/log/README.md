@@ -13,6 +13,7 @@ than maintaining another member or component inventory.
 
 | Record | Purpose |
 |---|---|
+| [Score analysis review corrections — 2026-10-07](2026-10-07-score-analysis-review-corrections.md) | Review findings on the four Analyze tools: wrapped-label minimum width, per-numerator beat groups, interval overlap contract, exact selection ends, nameplate accessibility, the cached demo excerpt and the PostCSS override that clears the moderate audit findings. |
 | [Dependabot integration review — 2026-10-07](2026-10-07-dependabot-integration.md) | Five dependency updates, exact license snapshots, preserved security fixes and integration verification. |
 | [Score analysis review and dev consolidation — 2026-10-07](2026-10-07-score-analysis-dev-closeout.md) | Four basic Analyze tools, final UI/selection regression fixes, archived research and preserved stashes. |
 | [First-release branch split — 2026-09-10](2026-09-10-first-release-split.md) | Audio/Bridge preservation on dev, three-package main release scope, original work preservation and independent verification. |

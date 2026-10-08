@@ -9,6 +9,7 @@ import IndependentLoopsDemo from "../../../components/bridges/IndependentLoopsDe
 import compositionSource from "../../../components/bridges/bridge-composition-client.ts?raw";
 import arabesqueSource from "../../../components/headless/arabesque-score.ts?raw";
 import loopsSource from "../../../components/bridges/independent-loops-client.ts?raw";
+import arabesqueAudioSource from "../../../components/headless/arabesque-audio.ts?raw";
 
 A complete composition has one command authority and several borrowers. This
 example loads an opening excerpt from the public Arabesque No. 1 MIDI, renders a matching recording, and gives both to
@@ -132,7 +133,10 @@ participant's content while the master keeps advancing. The following separate
 session uses a continuous application-owned master and two native Audio buffer
 loops from the opening of the public Arabesque No. 1 WAV: one second and
 one-and-a-half seconds. Both derive timing from the same
-AudioContext; each has its own local phase.
+AudioContext; each has its own local phase. The `../headless/arabesque-audio`
+helper decodes the recording once and keeps only its opening excerpt, so a
+disposed session's next start reuses that excerpt instead of downloading and
+decoding the complete recording again.
 
 <IndependentLoopsDemo />
 
@@ -158,6 +162,11 @@ writable clock instance.
 <summary>Complete independent-loop implementation</summary>
 
 <Code code={loopsSource} lang="ts" />
+
+The shared excerpt helper caches one decoded opening per requested length and
+forgets a failed load so a later start can retry it.
+
+<Code code={arabesqueAudioSource} lang="ts" />
 
 </details>
 

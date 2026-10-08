@@ -760,20 +760,25 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
     return material;
   }
 
+  /**
+   * Only the attributes a tool observes are validated, so a stray `kind` on a
+   * rhythm tool or `subdivision` on a chord tool cannot put it into an error.
+   */
   #options(): BasicInspectionOptions {
-    const pitchMode = this.getAttribute('pitch-mode');
+    const type = this.analysisType;
+    const pitchMode = type === 'rhythm' ? null : this.getAttribute('pitch-mode');
     if (pitchMode !== null && !['written', 'sounding'].includes(pitchMode.trim().toLowerCase())) {
       throw new RangeError('pitch-mode must be written or sounding');
     }
-    const kind = this.getAttribute('kind') ?? 'melodic';
+    const kind = type === 'intervals' ? this.getAttribute('kind') ?? 'melodic' : 'melodic';
     if (!['melodic', 'harmonic', 'both'].includes(kind)) throw new RangeError('kind must be melodic, harmonic or both');
-    const groups = this.getAttribute('beat-groups');
-    const grouping = this.getAttribute('grouping') ?? 'beat';
-    if (this.analysisType === 'chords' && !['beat', 'simultaneous'].includes(grouping)) throw new RangeError('grouping must be beat or simultaneous');
-    const subdivision = Number(this.getAttribute('subdivision') ?? 2);
+    const grouping = type === 'chords' ? this.getAttribute('grouping') ?? 'beat' : 'simultaneous';
+    if (!['beat', 'simultaneous'].includes(grouping)) throw new RangeError('grouping must be beat or simultaneous');
+    const subdivision = type === 'rhythm' ? Number(this.getAttribute('subdivision') ?? 2) : 2;
     if (![1, 2, 3, 4].includes(subdivision)) throw new RangeError('subdivision must be 1, 2, 3 or 4');
+    const groups = type === 'chords' || type === 'rhythm' ? this.getAttribute('beat-groups') : null;
     return {
-      pitchMode: this.pitchMode,
+      pitchMode: type === 'rhythm' ? 'written' : this.pitchMode,
       key: this.#chordKey().key,
       chordGrouping: grouping as 'beat' | 'simultaneous',
       selection: {noteIds: this.#noteIds, partId: this.getAttribute('part') || undefined,
@@ -781,7 +786,7 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
       intervalKind: kind as 'melodic' | 'harmonic' | 'both',
       tonic: this.getAttribute('tonic') || undefined,
       scale: (this.getAttribute('scale') ?? 'major') as ScaleKind,
-      beatGroups: groups === null ? undefined : groups.split('+').map((value) => Number(value.trim())),
+      beatGroups: parseBeatGroups(groups),
       subdivision: subdivision as 1 | 2 | 3 | 4,
     };
   }
@@ -1366,6 +1371,18 @@ function stampRow(node: HTMLLIElement, row: IndexRow): void {
   }
   node.dataset.startQuarters = String(row.span.start);
   node.dataset.endQuarters = String(row.span.end);
+}
+
+/**
+ * `beat-groups="2+3"` is one list; `"2+3 2+2+3"` (space or comma separated)
+ * lists one grouping per irregular numerator. Values are validated by the
+ * inspection, which reports the actual failure through the surface.
+ */
+function parseBeatGroups(raw: string | null): BasicInspectionOptions['beatGroups'] {
+  if (raw === null) return undefined;
+  const lists = raw.trim().replace(/\s*\+\s*/g, '+').split(/[\s,;]+/).filter(Boolean)
+    .map((list) => list.split('+').map((value) => Number(value.trim())));
+  return lists.length === 0 ? undefined : lists;
 }
 
 function parseKey(raw: string | null): Key | undefined {

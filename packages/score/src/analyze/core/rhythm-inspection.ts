@@ -1,5 +1,16 @@
 import {Rational, type Note, type Score, type TimeSignature} from '../../core';
 
+/**
+ * Explicit pulse lengths in denominator notes, in order. One list describes
+ * the meter numerator equal to its sum; several lists describe several
+ * numerators, each with a distinct sum. For example, [2, 3] and [3, 2] are
+ * distinct 5/8 groupings, and [[2, 3], [2, 2, 3]] covers 5/8 and 7/8 in one
+ * Score. Simple 2/3/4 and compound 6/9/12 numerators keep their conventional
+ * pulses unless a list sums to them; any other numerator without a matching
+ * list throws instead of guessing.
+ */
+export type BeatGroups = readonly number[] | ReadonlyArray<readonly number[]>;
+
 export interface RhythmInspectionOptions {
   /** Inclusive beginning of the inspected range, in quarter notes. */
   startQuarters?: number;
@@ -9,13 +20,8 @@ export interface RhythmInspectionOptions {
   partId?: string;
   /** Denominator-note grid by default; meter groups use musical pulses. */
   beatUnit?: 'denominator' | 'meter';
-  /**
-   * Explicit pulse lengths in denominator notes, in order. Requires meter mode
-   * and a sum equal to every inspected meter's numerator. For example, [2, 3]
-   * and [3, 2] are distinct 5/8 groupings. Other than simple 2/3/4 and compound
-   * 6/9/12 numerators, meter mode requires this choice instead of guessing.
-   */
-  beatGroups?: readonly number[];
+  /** Explicit pulse groups for meter mode; see {@link BeatGroups}. */
+  beatGroups?: BeatGroups;
   /** Number of visible equal divisions per selected beat unit. Default 2. */
   subdivision?: 1 | 2 | 3 | 4;
 }
@@ -141,20 +147,43 @@ interface BeatPosition {
   subbeat: Rational;
 }
 
-function meterGroups(meter: Readonly<TimeSignature>, explicit?: readonly number[]): readonly number[] {
-  if (explicit) {
-    if (explicit.reduce((total, group) => total + group, 0) !== meter.numerator) {
-      throw new RangeError(`Rhythm beatGroups must sum to ${meter.numerator} for ${meter.numerator}/${meter.denominator}`);
+const sumOf = (groups: readonly number[]): number => groups.reduce((total, group) => total + group, 0);
+
+/**
+ * Validate explicit groups once and return one list per distinct numerator.
+ * A flat list is one grouping; an array of lists covers several numerators.
+ */
+function normalizeBeatGroups(groups: BeatGroups | undefined): ReadonlyArray<readonly number[]> | undefined {
+  if (groups === undefined) return undefined;
+  const invalid = new RangeError('Rhythm beatGroups must contain positive safe integers');
+  if (!Array.isArray(groups) || groups.length === 0) throw invalid;
+  const lists = (groups as readonly unknown[]).every((entry) => Array.isArray(entry))
+    ? (groups as ReadonlyArray<readonly number[]>)
+    : [groups as readonly number[]];
+  const sums = new Set<number>();
+  for (const list of lists) {
+    if (!Array.isArray(list) || list.length === 0
+        || Array.from(list).some((group) => !Number.isSafeInteger(group) || group <= 0)
+        || !Number.isSafeInteger(sumOf(list))) {
+      throw invalid;
     }
-    return explicit;
+    const sum = sumOf(list);
+    if (sums.has(sum)) throw new RangeError(`Rhythm beatGroups lists must describe distinct numerators; ${sum} appears twice`);
+    sums.add(sum);
   }
+  return lists;
+}
+
+function meterGroups(meter: Readonly<TimeSignature>, explicit?: ReadonlyArray<readonly number[]>): readonly number[] {
+  const matching = explicit?.find((list) => sumOf(list) === meter.numerator);
+  if (matching) return matching;
   if (meter.numerator === 2 || meter.numerator === 3 || meter.numerator === 4) {
     return Array.from({length: meter.numerator}, () => 1);
   }
   if (meter.numerator === 6 || meter.numerator === 9 || meter.numerator === 12) {
     return Array.from({length: meter.numerator / 3}, () => 3);
   }
-  throw new RangeError(`Rhythm meter mode requires explicit beatGroups for ${meter.numerator}/${meter.denominator}`);
+  throw new RangeError(`Meter ${meter.numerator}/${meter.denominator} requires explicit beatGroups summing to ${meter.numerator}`);
 }
 
 /**
@@ -166,7 +195,7 @@ function beatPosition(
   score: Score,
   at: Rational,
   beatUnit: 'denominator' | 'meter',
-  beatGroups?: readonly number[],
+  beatGroups?: ReadonlyArray<readonly number[]>,
 ): BeatPosition {
   const {meter, boundary} = beatContext(score, at);
   const address = score.timeMap.quartersToMBS(at);
@@ -194,18 +223,15 @@ function beatPosition(
   return {meter, measure: address.measure, beat, start, length, end, subbeat: at.sub(start).div(length)};
 }
 
-function validateBeatOptions(beatUnit: 'denominator' | 'meter', beatGroups?: readonly number[]): void {
+function validateBeatOptions(
+  beatUnit: 'denominator' | 'meter',
+  beatGroups?: BeatGroups,
+): ReadonlyArray<readonly number[]> | undefined {
   if (beatUnit !== 'denominator' && beatUnit !== 'meter') {
     throw new RangeError('Rhythm inspection beatUnit must be denominator or meter');
   }
-  if (beatGroups !== undefined) {
-    if (beatUnit !== 'meter') throw new RangeError('Rhythm beatGroups requires beatUnit meter');
-    if (!Array.isArray(beatGroups) || beatGroups.length === 0 ||
-        Array.from(beatGroups).some((group) => !Number.isSafeInteger(group) || group <= 0) ||
-        !Number.isSafeInteger(beatGroups.reduce((total, group) => total + group, 0))) {
-      throw new RangeError('Rhythm beatGroups must contain positive safe integers');
-    }
-  }
+  if (beatGroups !== undefined && beatUnit !== 'meter') throw new RangeError('Rhythm beatGroups requires beatUnit meter');
+  return normalizeBeatGroups(beatGroups);
 }
 
 /**
@@ -218,13 +244,13 @@ export function* rhythmBeatSpans(
   start: Rational,
   end: Rational,
   beatUnit: 'denominator' | 'meter',
-  beatGroups?: readonly number[],
+  beatGroups?: BeatGroups,
 ): Generator<BeatPosition> {
-  validateBeatOptions(beatUnit, beatGroups);
+  const lists = validateBeatOptions(beatUnit, beatGroups);
   if (!end.gt(start)) return;
-  let at = beatPosition(score, start, beatUnit, beatGroups).start;
+  let at = beatPosition(score, start, beatUnit, lists).start;
   while (at.lt(end)) {
-    const position = beatPosition(score, at, beatUnit, beatGroups);
+    const position = beatPosition(score, at, beatUnit, lists);
     if (!position.end.gt(at)) throw new RangeError('TimeMap beat grid did not advance');
     yield position;
     at = position.end;
@@ -237,7 +263,7 @@ function addBeatGrid(
   end: number,
   subdivision: 1 | 2 | 3 | 4,
   beatUnit: 'denominator' | 'meter',
-  beatGroups?: readonly number[],
+  beatGroups?: ReadonlyArray<readonly number[]>,
 ): {beats: RhythmBeat[]; subdivisions: RhythmSubdivision[]} {
   const beats: RhythmBeat[] = [];
   const subdivisions: RhythmSubdivision[] = [];
@@ -297,8 +323,7 @@ export function inspectScoreRhythm(score: Score, options: RhythmInspectionOption
     throw new RangeError('Rhythm inspection subdivision must be 1, 2, 3 or 4');
   }
   const beatUnit = options.beatUnit ?? 'denominator';
-  const beatGroups = options.beatGroups;
-  validateBeatOptions(beatUnit, beatGroups);
+  const beatGroups = validateBeatOptions(beatUnit, options.beatGroups);
   const start = Math.min(requestedStart, duration);
   const end = Math.min(requestedEnd, duration);
   const parts = options.partId === undefined

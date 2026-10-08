@@ -37,6 +37,7 @@ export {
 } from '../core';
 export {
   inspectScoreRhythm,
+  type BeatGroups,
   type RhythmBeat,
   type RhythmInspection,
   type RhythmInspectionOptions,

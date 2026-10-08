@@ -190,11 +190,11 @@ describe('basic inspection projections', () => {
     }
   });
 
-  it('keeps an out-of-range continuation onset without inventing its incompatible beat grouping', () => {
+  it('keeps an out-of-range continuation onset without inventing an unmatched irregular beat grouping', () => {
     const b = builder();
     b.addMeasure({id: b.newMeasureId(), number: 1, onsetQuarters: Rational.ZERO,
-      durationQuarters: new Rational(4), timeSignature: {numerator: 4, denominator: 4}});
-    b.addMeasure({id: b.newMeasureId(), number: 2, onsetQuarters: new Rational(4),
+      durationQuarters: new Rational(7, 2), timeSignature: {numerator: 7, denominator: 8}});
+    b.addMeasure({id: b.newMeasureId(), number: 2, onsetQuarters: new Rational(7, 2),
       durationQuarters: new Rational(5, 2), timeSignature: {numerator: 5, denominator: 8}});
     add(b, 'rest', 3, null, Duration.half());
     add(b, 'tie', 3, 'E4', Duration.half(), {tie: 'stop', voice: VoiceId('held')});
@@ -209,6 +209,12 @@ describe('basic inspection projections', () => {
         {id: 'beat', label: 'Beat', value: ''},
         {id: 'duration', label: 'Duration (qn)', value: '2'},
       ]);
+    }
+    // A grouping for the earlier 7/8 bar restores its exact beat without changing the selection.
+    const grouped = projectBasicInspection(score, 'rhythm', {beatGroups: [[2, 3], [2, 2, 3]],
+      selection: {fromQuarters: 4, toQuarters: 5}});
+    for (const band of grouped.lane.bands) {
+      expect(band.readout?.fields?.map((field) => field.value)).toEqual(['1', '3 + 2/3', '2']);
     }
     expect(() => projectBasicInspection(score, 'rhythm', {beatGroups: [2, 2],
       selection: {fromQuarters: 4, toQuarters: 5}})).toThrow(RangeError);

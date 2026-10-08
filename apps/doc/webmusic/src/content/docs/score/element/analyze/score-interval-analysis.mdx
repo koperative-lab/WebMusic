@@ -29,7 +29,7 @@ Registration is idempotent and SSR-safe. `defineAllAnalysisElements()` registers
 
 ## Musical reading
 
-Melodic inspection follows consecutive pitched attacks within each part/voice. Rests and ambiguous chord attacks interrupt that line; the component does not choose a voice-leading note from a chord. Select exact note IDs to resolve an intended pair. Tied continuations do not create new attacks. Harmonic inspection compares overlapping notes. Compound intervals retain their diatonic size.
+Melodic inspection follows consecutive pitched attacks within each part/voice. Rests and ambiguous chord attacks interrupt that line; the component does not choose a voice-leading note from a chord. Select exact note IDs to resolve an intended pair. Tied continuations do not create new attacks. Harmonic inspection compares overlapping notes, including a sustained note beneath a later attack in the same voice. Compound intervals retain their diatonic size.
 
 `pitch-mode="written"` uses notation as authored; `sounding` applies each part's declared chromatic and diatonic transposition once. Evidence retains source note, part and voice identities and the original written pitch. When chromatic-only transposition requires inferred spelling, that limitation is named in the evidence. MIDI imports carry inferred spelling, so interval quality is only as reliable as the input spelling. This tool describes intervals; it does not judge counterpoint or voice-leading rules.
 

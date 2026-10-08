@@ -1,6 +1,6 @@
 {
   "name": "@webmusic/audio",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Digital audio for the web: immutable clip model, mp3/wav/ogg/flac decoding via optional WASM peers, playback, MIR analysis, transcription, views, Web Components and React bindings.",
   "type": "module",
   "sideEffects": [
@@ -281,8 +281,8 @@
     "@tensorflow/tfjs": ">=4",
     "@wasm-audio-decoders/flac": ">=0.2",
     "@wasm-audio-decoders/ogg-vorbis": ">=0.1",
-    "@webmusic/kernel": "^0.2.0",
-    "@webmusic/ui": "^0.2.0",
+    "@webmusic/kernel": "^0.2.1",
+    "@webmusic/ui": "^0.2.1",
     "aubiojs": ">=0.2",
     "essentia.js": ">=0.1",
     "mediabunny": ">=1",

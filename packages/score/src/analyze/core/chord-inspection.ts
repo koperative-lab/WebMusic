@@ -2,7 +2,7 @@ import {Pitch, Rational, type Score} from '../../core';
 import type {IntervalPitchMode, IntervalSelection} from './interval';
 import {inspectionNotes, validatePitchMode, type InspectionNote, type TheoryNoteEvidence} from './inspection-notes';
 import {degreeAccidental, theoryPitchName, theoryScalePitches} from './scale-inspection';
-import {rhythmBeatSpans} from './rhythm-inspection';
+import {rhythmBeatSpans, type BeatGroups} from './rhythm-inspection';
 import type {Key} from './types';
 
 export type BasicChordQuality = 'major' | 'minor' | 'diminished' | 'augmented'
@@ -39,8 +39,8 @@ export interface ScoreChordInspectionOptions {
   readonly pitchMode?: IntervalPitchMode;
   /** Exact simultaneous spans by default; beat collects notes across each metrical pulse. */
   readonly grouping?: ScoreChordGrouping;
-  /** Pulse lengths in denominator notes; used only by beat grouping, with rhythm inspection's meter rules. */
-  readonly beatGroups?: readonly number[];
+  /** Explicit pulse groups per meter numerator; used only by beat grouping, with rhythm inspection's meter rules. */
+  readonly beatGroups?: BeatGroups;
   /** Optional explicit source subset; range clips spans to its half-open limits. */
   readonly selection?: IntervalSelection;
   /** Explicit major/natural-minor reference; absent means no Roman degree. */
@@ -160,10 +160,14 @@ export function inspectScoreChords(score: Score, options: ScoreChordInspectionOp
   const grouping = options.grouping ?? 'simultaneous';
   if (grouping !== 'simultaneous' && grouping !== 'beat') throw new RangeError('Chord grouping must be simultaneous or beat');
   const notes = inspectionNotes(score, pitchMode, options.selection);
-  const from = options.selection?.fromQuarters === undefined ? Rational.ZERO
-    : Rational.from(Math.max(0, options.selection.fromQuarters));
-  const to = options.selection?.toQuarters === undefined ? score.durationQuarters
-    : Rational.from(Math.min(score.durationQuarters.toFloat(), options.selection.toQuarters));
+  // A float range is only approximated when it falls strictly inside the
+  // Score: its exact ends, which a full-score selection names as floats,
+  // keep their authored Rational so a span ending on a triplet is not rounded.
+  const duration = score.durationQuarters;
+  const from = options.selection?.fromQuarters === undefined || options.selection.fromQuarters <= 0
+    ? Rational.ZERO : Rational.from(options.selection.fromQuarters);
+  const to = options.selection?.toQuarters === undefined || options.selection.toQuarters >= duration.toFloat()
+    ? duration : Rational.from(options.selection.toQuarters);
   if (grouping === 'beat') {
     const candidates = notes.filter((entry) => entry.note.offsetQuarters.gt(entry.note.onsetQuarters))
       .sort((a, b) => a.note.onsetQuarters.cmp(b.note.onsetQuarters));

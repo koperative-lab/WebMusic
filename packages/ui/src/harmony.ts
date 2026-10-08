@@ -541,6 +541,12 @@ const flowWrapPrimary: Declarations = {
   ...flowWrapLabel, 'line-height': '1.25',
   'min-height': 'var(--wui-harmony-flow-primary-height, 1.25em)',
 };
+/**
+ * A wrapped stack needs room for a few glyphs per line. Below this measured
+ * band width the stack is hidden, as a truncated label is below 32px: the band
+ * keeps its title and semantic entry and does not raise the shared row height.
+ */
+const WRAP_LABEL_MIN_WIDTH = 48;
 
 const nameplateParts = {
   root: {
@@ -1298,7 +1304,11 @@ export interface FlowLaneOptions {
   visibleSpan?: number;
   /** Fixed rows by default; visible compacts rows intersecting the current viewport. */
   trackLayout?: 'fixed' | 'visible';
-  /** Truncate by default; wrap grows row height to fit the complete label stack. */
+  /**
+   * Truncate by default; wrap grows row height to fit the complete label stack
+   * of every band at least 48px wide. A narrower band hides its stack and
+   * keeps its title and semantic entry, like a truncated label below 32px.
+   */
   labelOverflow?: 'truncate' | 'wrap';
   /** Keep primary and secondary readout rows through unlabeled gaps. Defaults to false. */
   reservePinned?: boolean;
@@ -2349,7 +2359,14 @@ export function mountFlowLane(
       const secondary = [band.secondary, band.trailing].filter(Boolean).join(' · ');
       if (!primary && !secondary) continue;
       const sample = {width: flowBox(band, axis).width * width / 100, primary, secondary};
+      // A band too narrow to show its stack must not make every row tall.
+      if (sample.width < WRAP_LABEL_MIN_WIDTH) continue;
       samples.set(JSON.stringify(sample), sample);
+    }
+    if (samples.size === 0) {
+      setStyleValue(root, '--wui-harmony-flow-primary-height', undefined);
+      setStyleValue(root, '--wui-harmony-flow-row-height', undefined);
+      return;
     }
     const holder = document.createElement('div');
     holder.setAttribute('aria-hidden', 'true');
@@ -2403,6 +2420,22 @@ export function mountFlowLane(
       setStyleValue(root, '--wui-harmony-flow-row-height', `max(${MIN_LANE_HEIGHT}, ${Math.ceil(primaryHeight) + Math.ceil(remainderHeight)}px)`);
     } finally {
       holder.remove();
+    }
+  };
+
+  /**
+   * Hide the stacks of bands narrower than the wrap minimum. Runs with every
+   * measurement and never per frame: a band's pixel width changes only with
+   * the material, the measured lane width or the zoom.
+   */
+  const fitWrappedLabels = (): void => {
+    if (!wrapLabels) return;
+    const width = axis.span * pxPerUnit();
+    for (const node of bands.values()) {
+      const narrow = flowBox(node.band, axis).width * width / 100 < WRAP_LABEL_MIN_WIDTH;
+      setData(node.root, 'label-fit', narrow ? 'hidden' : undefined);
+      setHidden(node.label, narrow);
+      setHidden(node.note, narrow || node.note.textContent === '');
     }
   };
 
@@ -2464,6 +2497,7 @@ export function mountFlowLane(
       }
       if (structural || entries.length !== index.childElementCount)
         index.replaceChildren(...entries);
+      fitWrappedLabels();
 
       const nowAt = `${coordinate(anchor * 100)}%`;
       if (nowLine.style.left !== nowAt) nowLine.style.left = nowAt;
@@ -2600,6 +2634,7 @@ export function mountFlowLane(
       event.preventDefault();
       reel.style.width = `${coordinate(axis.span * pxPerUnit())}px`;
       measureWrappedLabels();
+      fitWrappedLabels();
       measureReadout();
       rebuildDecorations();
       place(position, true);
@@ -2764,6 +2799,7 @@ export function mountFlowLane(
         measure();
         reel.style.width = `${coordinate(axis.span * pxPerUnit())}px`;
         measureWrappedLabels();
+        fitWrappedLabels();
         measureReadout();
         // A font/height change or a hidden host becoming visible can change
         // measured text widths even when the effective time scale is equal.
@@ -3147,6 +3183,9 @@ export function mountNameplate(
 
       setText(voicing, voiceLabels.join('  '));
       setHidden(voicing, !options.stableLayout && voices.length === 0);
+      // An unnamed set is already spoken by the live region's full text; the
+      // visible note row must not be read a second time.
+      setAttr(voicing, 'aria-hidden', unnamedNotes ? 'true' : undefined);
       if (options.stableLayout)
         setStyleValue(voicing, 'visibility', voiceLabels.length > 0 ? 'visible' : 'hidden');
 

@@ -1425,8 +1425,8 @@ describe('mountFlowLane wrapped labels', () => {
       return {height: named ? 65 : 105} as DOMRect;
     });
     const handle = lane({bands: [
-      {id: 'named', start: 0, end: 0.4, primary: 'F#m7/C#', secondary: 'C#3 F#3 A3 E4'},
-      {id: 'notes', start: 0.4, end: 0.8, primary: '', secondary: 'B2 E3 F#4 G#4 B4'},
+      {id: 'named', start: 0, end: 0.8, primary: 'F#m7/C#', secondary: 'C#3 F#3 A3 E4'},
+      {id: 'notes', start: 0.8, end: 1.6, primary: '', secondary: 'B2 E3 F#4 G#4 B4'},
     ]}, {}, {stylesheet, labelOverflow: 'wrap', visibleSpan: 4, animate: false});
     const named = handle.band('named')!;
     const unmatched = handle.band('notes')!;
@@ -1446,7 +1446,7 @@ describe('mountFlowLane wrapped labels', () => {
     handle.destroy();
   });
 
-  it.each([true, false])('fits narrow complete stacks without changing time boxes or frame cost (stylesheet=%s)', (stylesheet) => {
+  it.each([true, false])('fits complete stacks at the wrap minimum without changing time boxes or frame cost (stylesheet=%s)', (stylesheet) => {
     const measured = vi.fn();
     const original = HTMLElement.prototype.getBoundingClientRect;
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
@@ -1459,17 +1459,17 @@ describe('mountFlowLane wrapped labels', () => {
     let now = 0;
     let primary = 'F#m7/C#';
     const snapshot = (): FlowLaneState => ({
-      bands: [{id: 'one', start: 0, end: 0.4, track: 0, primary, secondary: 'C#3 F#3 A3 E4'},
-        {id: 'two', start: 4, end: 4.4, track: 2, primary, secondary: 'C#3 F#3 A3 E4'}],
+      bands: [{id: 'one', start: 0, end: 0.8, track: 0, primary, secondary: 'C#3 F#3 A3 E4'},
+        {id: 'two', start: 4, end: 4.8, track: 2, primary, secondary: 'C#3 F#3 A3 E4'}],
       tracks: [{id: 'first'}, {id: 'blank'}, {id: 'later'}], span: {start: 0, end: 8}, now,
     });
     const handle = lane({}, {snapshot, position: () => now},
       {stylesheet, labelOverflow: 'wrap', trackLayout: 'visible', visibleSpan: 4, animate: false});
     expect(measured).toHaveBeenCalledTimes(1); // identical text + width, even on another row
-    expect(measured).toHaveBeenCalledWith(30);
+    expect(measured).toHaveBeenCalledWith(60);
     const band = handle.band('one')!;
     const geometry = boxes(handle.element);
-    expect(band.style.width).toBe('5%');
+    expect(band.style.width).toBe('10%');
     expect(band.dataset.labelOverflow).toBe('wrap');
     for (const selector of ['.wui-harmony-flow__label', '.wui-harmony-flow__note']) {
       const text = band.querySelector<HTMLElement>(selector)!;
@@ -1530,24 +1530,69 @@ describe('mountFlowLane wrapped labels', () => {
     const handle = mountFlowLane(parent, {snapshot: () => ({
       bands: [{id: 'small', start: 0, end: 0.5, primary: 'C#4 E4 G#4 B4'}], now: 0,
     })}, {labelOverflow: 'wrap', visibleSpan: 4, fallbackWidth: 200, animate: false, stylesheet: false});
-    expect(widths).toEqual([25]);
-    expect(handle.element.style.getPropertyValue('--wui-harmony-flow-row-height')).toContain('190px');
+    // 25px is below the wrap minimum: nothing is measured and the row keeps the token minimum.
+    const label = handle.band('small')!.querySelector<HTMLElement>('.wui-harmony-flow__label')!;
+    expect(widths).toEqual([]);
+    expect(label.hidden).toBe(true);
+    expect(handle.element.style.getPropertyValue('--wui-harmony-flow-row-height')).toBe('');
     const geometry = boxes(handle.element);
     Object.defineProperty(handle.viewport, 'clientWidth', {value: 400});
     resize();
-    expect(widths).toEqual([25, 50]);
+    expect(widths).toEqual([50]);
+    expect(label.hidden).toBe(false);
     expect(handle.element.style.getPropertyValue('--wui-harmony-flow-row-height')).toContain('80px');
     expect(parent.style.getPropertyValue('--wui-harmony-lane-height')).toBe('180px');
     expect(handle.track('0')!.style.height).toContain('--wui-harmony-flow-row-height');
     parent.style.setProperty('--wui-harmony-size-body', '36px');
     handle.update();
-    expect(widths).toEqual([25, 50, 50]);
+    expect(widths).toEqual([50, 50]);
     expect(handle.element.style.getPropertyValue('--wui-harmony-flow-row-height')).toContain('120px');
     handle.viewport.dispatchEvent(new WheelEvent('wheel', {deltaY: -300 * Math.log(2), ctrlKey: true}));
-    expect(widths).toEqual([25, 50, 50, 100]);
+    expect(widths).toEqual([50, 50, 100]);
     expect(boxes(handle.element)).toEqual(geometry);
     handle.tick();
-    expect(widths).toHaveLength(4);
+    expect(widths).toHaveLength(3);
+    handle.destroy();
+  });
+
+  it.each([true, false])('hides wrapped stacks below 48px, keeps their reading elsewhere and restores them when zoomed (stylesheet=%s)', (stylesheet) => {
+    const measured: number[] = [];
+    const original = HTMLElement.prototype.getBoundingClientRect;
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this.classList.contains('wui-harmony-flow__label') && this.parentElement?.dataset.labelMeasure === 'true') {
+        return {height: 18} as DOMRect;
+      }
+      if (this.dataset.labelMeasure !== 'true') return original.call(this);
+      measured.push(Number.parseFloat(this.style.width));
+      return {height: 60} as DOMRect;
+    });
+    const handle = lane({bands: [
+      {id: 'wide', start: 0, end: 1, primary: 'A/C#', secondary: 'C#4 E4 A4'},
+      {id: 'narrow', start: 1, end: 1.4, primary: 'G#m/B', secondary: 'B3 D#4 G#4'},
+    ]}, {}, {stylesheet, labelOverflow: 'wrap', visibleSpan: 4, animate: false});
+    // 300px across 4 units: the wide band is 75px and the narrow one 30px.
+    expect(measured).toEqual([75]);
+    const wide = handle.band('wide')!;
+    const narrow = handle.band('narrow')!;
+    const narrowLabel = narrow.querySelector<HTMLElement>('.wui-harmony-flow__label')!;
+    const narrowNote = narrow.querySelector<HTMLElement>('.wui-harmony-flow__note')!;
+    expect(narrow.dataset.labelFit).toBe('hidden');
+    expect(narrowLabel.hidden).toBe(true);
+    expect(narrowNote.hidden).toBe(true);
+    expect(getComputedStyle(narrowLabel).display).toBe('none');
+    expect(narrow.title).toBe('G#m/B — B3 D#4 G#4');
+    expect(handle.index.textContent).toContain('G#m/B — B3 D#4 G#4');
+    expect(wide.dataset.labelFit).toBeUndefined();
+    expect(wide.querySelector<HTMLElement>('.wui-harmony-flow__label')!.hidden).toBe(false);
+    expect(handle.element.style.getPropertyValue('--wui-harmony-flow-row-height')).toContain('60px');
+    const geometry = boxes(handle.element);
+    handle.viewport.dispatchEvent(new WheelEvent('wheel', {deltaY: -300 * Math.log(2), ctrlKey: true}));
+    expect(measured).toEqual([75, 150, 60]);
+    expect(narrow.dataset.labelFit).toBeUndefined();
+    expect(narrowLabel.hidden).toBe(false);
+    expect(narrowNote.hidden).toBe(false);
+    expect(boxes(handle.element)).toEqual(geometry);
+    expect(handle.element.querySelector('[data-label-measure]')).toBeNull();
     handle.destroy();
   });
 

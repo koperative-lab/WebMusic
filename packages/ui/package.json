@@ -1,6 +1,6 @@
 {
   "name": "@webmusic/ui",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Accessible, domain-neutral presenters and visual primitives for WebMusic Headless Components and Web Components.",
   "type": "module",
   "sideEffects": false,

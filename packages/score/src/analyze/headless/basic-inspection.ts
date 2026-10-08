@@ -1,7 +1,7 @@
 import {Rational, type Note, type Score} from '../../core';
 import {
   analyzeIntervals, inspectScale, inspectScoreChords, inspectScoreRhythm,
-  type IntervalPitchMode, type IntervalSelection, type Key, type ScaleKind,
+  type BeatGroups, type IntervalPitchMode, type IntervalSelection, type Key, type ScaleKind,
 } from '../core';
 import type {FlowBandView, FlowLaneView, FlowTrackView} from './workbench';
 import {rhythmBeatSpans} from '../core/rhythm-inspection';
@@ -35,7 +35,8 @@ export interface BasicInspectionOptions {
   readonly chordGrouping?: 'simultaneous' | 'beat';
   readonly tonic?: string;
   readonly scale?: ScaleKind;
-  readonly beatGroups?: readonly number[];
+  /** Explicit pulse groups per meter numerator for beat-grouped chords and rhythm. */
+  readonly beatGroups?: BeatGroups;
   readonly subdivision?: 1 | 2 | 3 | 4;
 }
 export interface BasicInspectionProjection {

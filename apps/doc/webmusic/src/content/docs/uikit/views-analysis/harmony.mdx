@@ -214,7 +214,7 @@ because the semantic index provides its accessible text.
 | `scale` | `number` | `44` | Pixels per axis unit before zoom; used when `visibleSpan` is absent or invalid. |
 | `visibleSpan` | `number` | — | Axis units visible across the measured plot before zoom. A finite positive value takes precedence over `scale`; resizing keeps this window and the current position. |
 | `trackLayout` | `'fixed' \| 'visible'` | `'fixed'` | Fixed retains every row. Visible hides rows without a positive-duration band intersecting the current viewport and compacts the remaining rows in their original order, with one empty row retained through gaps. |
-| `labelOverflow` | `'truncate' \| 'wrap'` | `'truncate'` | Wrap keeps both band labels visible without ellipses and grows the row height to fit their complete text stack. The public lane-height token remains a minimum. |
+| `labelOverflow` | `'truncate' \| 'wrap'` | `'truncate'` | Wrap keeps both band labels visible without ellipses and grows the row height to fit their complete text stack for bands at least 48px wide. A narrower band hides its stack and keeps its title and semantic entry. The public lane-height token remains a minimum. |
 | `reservePinned` | `boolean` | `false` | Keep readout space through gaps. Structured fields retain their labels and measured slot heights with empty values. Without fields, reserve one primary and one secondary text row; longer wrapped legacy readings may still grow. |
 | `fallbackWidth` | `number` | `640` | What the lane assumes it is wide when nothing can measure it. |
 | `animate` | `boolean` | whether `position` exists | Run a frame loop. A `clock` forces it `false`. |
@@ -248,14 +248,15 @@ frames use cached boundary ranks without measuring or rebuilding the material.
 By default, labels inside short bands use ellipsis; below 32px of band width, the inner label and
 note are hidden instead of showing clipped fragments. The complete reading remains in the band
 title and semantic twin, while a track label stays in the separate gutter.
-`labelOverflow: 'wrap'` disables that narrow-band hiding and wraps primary text above secondary
-text. A shared primary-row height keeps secondary labels aligned even when a band's primary
+`labelOverflow: 'wrap'` wraps primary text above secondary text in bands at least 48px wide; a
+narrower band hides its stack, is marked `data-label-fit="hidden"`, and keeps its title and
+semantic entry. A shared primary-row height keeps secondary labels aligned even when a band's primary
 label is empty or a neighbouring primary wraps. Invisible temporary copies measure the complete label stacks at their actual band widths;
 all rows use the largest required height, with the public lane-height token as a minimum.
 Measurements run on `update()`, resize and zoom, never on playback frames, and temporary nodes
 are removed immediately. Call `update()` after changing typography tokens. Identical text/width
-pairs share one measurement within each batch. Very narrow bands can create tall rows; zooming
-in or choosing a shorter visible span gives the text more horizontal room. Band times, widths,
+pairs share one measurement within each batch. Hidden stacks do not contribute to the row
+height; zooming in or choosing a shorter visible span restores them. Band times, widths,
 stamps, interaction coordinates and semantic entries remain unchanged.
 Ruler ticks remain at every supplied position. When labels would overlap at
 the current scale, only their text is thinned; zooming or resizing recalculates

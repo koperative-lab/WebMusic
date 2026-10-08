@@ -1771,6 +1771,78 @@ Verify slot identity, long values, gaps, narrow widths and semantic field text;
 do not infer that fixed readout geometry fixes the separate scrolling lane's
 visible row count.
 
+## DEC-049 — Per-numerator beat groups, a wrapped-label minimum width and the interval overlap contract
+
+**Date / status:** 2026-10-07; accepted after the independent review of the
+`dev` consolidation (`92e841a` and `4471a22`). This supersedes DEC-048's rule
+that one `beat-groups` list must sum to every inspected numerator and refines
+DEC-048's wrapped chord labels. It records, rather than changes, the harmonic
+interval contract that DEC-047's implementation introduced.
+
+**Problem:** the chord Element's default beat grouping failed for any score
+with an irregular meter until `beat-groups` was set, and one list could never
+satisfy a score whose irregular numerators differ. Wrapped chord labels had no
+lower width bound: a 30-second `window` on the Arabesque demo produced 10px
+bands with one glyph per line and rows nearly 500px tall. `analyzeIntervals`
+began reporting same-voice overlaps with different onsets without a recorded
+decision. A full-range float selection rounded a triplet-ending last chord
+span, the stable live nameplate exposed an unnamed note set to screen readers
+twice, unobserved attributes could put a tool into an error state, and the
+independent-loops demo decoded the complete recording for every session.
+
+**Decision:**
+
+- `BeatGroups` is one list or an array of lists. Each list applies to the
+  meter numerator equal to its sum; lists with equal sums are rejected.
+  Numerators 2/3/4 and 6/9/12 keep their conventional pulses unless a list
+  sums to them; any other numerator without a matching list throws. The
+  `beat-groups` attribute accepts several groupings separated by spaces or
+  commas, for example `2+3 2+2+3` for 5/8 and 7/8. Chord and rhythm inspection
+  share the rule; API/Headless defaults are unchanged.
+- A wrapped band narrower than 48 measured pixels hides its label stack, is
+  marked `data-label-fit="hidden"`, keeps its title and semantic entry, and
+  does not raise the shared row height. Bands at or above 48px keep complete
+  stacks. The threshold is a presenter constant, not a public token, and the
+  fit is recomputed only with measurements: data changes, resize and zoom.
+- Harmonic intervals include a note sustained in one voice beneath a later
+  attack in that same voice; continuation and stop fragments remain excluded
+  as attacks. The 0.2.0 release excluded such same-voice pairs.
+- A chord selection whose float bounds reach the Score's start or end uses the
+  authored Rational ends; bounds strictly inside the Score remain decimal
+  approximations.
+- The stable nameplate marks its visible note row `aria-hidden` while the live
+  region speaks the same unnamed notes.
+- An Element validates only the attributes it observes.
+- The independent-loops demo decodes the Arabesque recording once per excerpt
+  length through a shared site helper and keeps only the opening excerpt; a
+  failed load is forgotten so the next start can retry.
+
+**Alternatives considered:** keep the strict single-list rule and improve only
+its error message; cap the wrapped row height while still wrapping single
+glyphs; revert the harmonic overlap change. The first leaves the default chord
+tool unusable on mixed meters, the second keeps unreadable labels, and the
+third removes tested, musically defensible evidence.
+
+**Consequences:** the chord and rhythm Element references, the Analyze API
+page, the Parameters catalog and the Harmony presenter reference describe the
+new rules. Single-list callers are unaffected unless they relied on a mismatch
+throwing for a conventional meter. Browser evidence for long chord windows is
+recorded in STATUS when the correction is verified on the site.
+
+**Owner:** [Score Analyze design](design/ANALYZE-COMPONENTS.md),
+[Analyze API](../apps/doc/webmusic/src/content/docs/score/api/analyze.mdx),
+the [chord](../apps/doc/webmusic/src/content/docs/score/element/analyze/score-chord-analysis.mdx)
+and [rhythm](../apps/doc/webmusic/src/content/docs/score/element/analyze/score-rhythm-analysis.mdx)
+Element references and the
+[Harmony presenter reference](../apps/doc/webmusic/src/content/docs/uikit/views-analysis/harmony.mdx).
+
+**Verification implications:** cover mixed 4/4, 5/8 and 7/8 scores with one
+and several lists, equal-sum rejection, a conventional meter replaced by a
+matching list, hidden and restored wrapped stacks across zoom and resize,
+exact triplet ends, nameplate `aria-hidden`, unobserved attributes, and the
+cached excerpt's disposal and retry paths. Unit checks do not establish the
+rendered result; verify the chord demo at long windows in a browser.
+
 ## Recording the next decision
 
 Add an identifier, date, status, problem, chosen contract, considered alternatives, consequences, owning document, and verification implications. A proposed choice does not change a public API. If a choice supersedes this register, retain its old identifier and point to the replacement; do not rewrite historical evidence as though the new choice always existed.

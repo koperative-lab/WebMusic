@@ -255,9 +255,13 @@ const pulses = inspectScoreChords(score, {
 selected source notes overlapping the pulse's half-open span, including notes
 sustained from before it and sequential notes within it. Pulses follow authored
 measure boundaries: numerators 2/3/4 use one denominator unit, and 6/9/12 use
-groups of three. Other numerators require `beatGroups`, a nonempty array of
-positive safe integers whose sum matches each inspected meter numerator, such
-as `[2, 3]` for 5/8. Incompatible groups throw `RangeError`; simultaneous grouping
+groups of three. Other numerators require `beatGroups` (`BeatGroups`): one list
+of positive safe integers applies to the meter numerator equal to its sum, such
+as `[2, 3]` for 5/8, and an array of lists covers several numerators in one
+Score, such as `[[2, 3], [2, 2, 3]]` for 5/8 and 7/8. A list summing to a
+conventional numerator replaces that meter's conventional pulses; a numerator
+without a matching list keeps its conventional pulses or, when it has none,
+throws `RangeError`. Lists with equal sums also throw. Simultaneous grouping
 ignores retained `beatGroups`. A quarter-range selection clips the returned
 pulses; groups without pitched notes are omitted. Grouping is independent of a
 presenter's visible duration in seconds.
@@ -340,10 +344,12 @@ provides the same evidence as a player-connected surface.
 than guessing an interval from a whole-score pitch histogram. Select note IDs,
 a part/voice, a half-open quarter-note range, or a combination. Consecutive
 pitched attacks in one voice form melodic intervals; concurrently sounding
-pairs form harmonic intervals. Explicit rests and onsets containing more than
+pairs form harmonic intervals, including a note sustained in one voice beneath
+a later attack in that same voice. Explicit rests and onsets containing more than
 one selected pitched attack break melodic continuity. Supply exact note IDs
 to disambiguate a chosen line through chords. Tie continuation/stop notes do
-not create new melodic attacks.
+not create new melodic attacks. The 0.2.0 release excluded same-voice pairs
+with different onsets from harmonic output; the current contract includes them.
 
 ```ts
 import {analyzeIntervals} from '@webmusic/score/analyze';
@@ -562,10 +568,12 @@ owns no resources.
 With `beatUnit: 'denominator'`, a beat in 6/8 remains an eighth note. With
 `beatUnit: 'meter'`, numerators 2/3/4 use denominator-unit beats and 6/9/12 use
 groups of three (two dotted-quarter pulses in 6/8). Other numerators require
-`beatGroups`, such as `[2, 3]` for 5/8. Groups must be positive safe integers
-whose sum matches every effective inspected meter numerator, and are only
-valid with `beatUnit: 'meter'`. A single explicit grouping does not silently
-adapt to a different meter later in the Score.
+`beatGroups`, such as `[2, 3]` for 5/8. Each list of positive safe integers
+applies to the meter numerator equal to its sum, and an array of lists such as
+`[[2, 3], [2, 2, 3]]` covers several numerators in one Score; `beatGroups` is
+only valid with `beatUnit: 'meter'`. A list never adapts to a different
+numerator: a meter without a matching list keeps its conventional pulses, and
+an irregular meter without one throws `RangeError`.
 
 The result reports `beatUnit`; `beat` is 1-based within the selected pulse
 model. `beatLengthQuarters`, exact `subbeat`/`subbeatExact` and subdivisions
@@ -912,7 +920,7 @@ lane and evidence. `BasicAnalysisKind` is `chord`, `interval`, `scale` or
 are written pitch, simultaneous chord inspection, melodic intervals, major
 scale and two subdivisions. Pass `chordGrouping: 'beat'` to collect chord notes
 by metrical pulse; `beatGroups` then supplies explicit grouping for irregular
-meters. Rhythm also uses `beatGroups`; other inspections ignore it. Chord key
+meters, one list per numerator. Rhythm also uses `beatGroups`; other inspections ignore it. Chord key
 remains absent; scale without tonic returns an explanatory `message` and no readings.
 Rhythm uses grouped meter semantics. The projection selects a full-score range
 when no explicit selection is supplied.
@@ -947,8 +955,8 @@ Rhythm uses the same slots for attacks, rests and tie continuations, with an
 empty string for unavailable values; `qn` denotes quarter-note units.
 Bar and Beat describe the original written onset; a rest or tie continuation
 entering from before the selection retains its original Bar and full authored
-Duration but leaves Beat empty if the earlier meter cannot use this selection's
-`beatGroups`, while invalid grouping inside the selection still throws.
+Duration but leaves Beat empty if the earlier meter is irregular and no supplied
+list sums to its numerator, while invalid grouping inside the selection still throws.
 The field data owns no geometry. UIKit keeps these three equal-width slots and reserves
 their maximum wrapped height from the supplied readings outside the playback
 frame; playback only changes values. Gaps preserve labels and clear values.

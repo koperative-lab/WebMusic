@@ -5,9 +5,9 @@ import {
   type SyncMasterTransport,
   type TransportCommand,
 } from "@webmusic/kernel/sync";
-import { loadClipFromUrl } from "@webmusic/audio/play";
 import { AudioClipPlayer } from "@webmusic/audio/play/headless";
 import type { DemoScope } from "../demo-lifecycle";
+import { loadArabesqueAudioExcerpt } from "../headless/arabesque-audio";
 
 /** App-owned continuous master: only TransportGroup delegates mutations to it. */
 function continuousMaster(context: AudioContext): SyncMasterTransport {
@@ -76,7 +76,6 @@ export function mountIndependentLoops(
   let generation = 0;
   let frame = 0;
   let offGroup: (() => void) | undefined;
-  let sourceAbort: AbortController | undefined;
   const report = (error: unknown) => {
     if (scope.active)
       status.textContent =
@@ -89,8 +88,6 @@ export function mountIndependentLoops(
   };
   const dispose = () => {
     generation++;
-    sourceAbort?.abort();
-    sourceAbort = undefined;
     try {
       offGroup?.();
     } catch (error) {
@@ -137,15 +134,11 @@ export function mountIndependentLoops(
         if (!scope.active || expected !== generation) return;
         if (!group) {
           const sessionContext = context;
-          const abort = new AbortController();
-          sourceAbort = abort;
-          status.textContent = "Loading Arabesque No. 1 audio…";
-          const source = await loadClipFromUrl(
-            `${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`,
-            { signal: abort.signal },
-          );
+          status.textContent = "Loading the Arabesque No. 1 opening…";
+          // The shared excerpt is decoded once; a disposed session simply
+          // ignores a load that settles afterwards, and the next one reuses it.
+          const source = await loadArabesqueAudioExcerpt(Math.max(...periods));
           if (!scope.active || expected !== generation) return;
-          sourceAbort = undefined;
           group = new TransportGroup(
             continuousMaster(sessionContext),
             () => sessionContext.currentTime,

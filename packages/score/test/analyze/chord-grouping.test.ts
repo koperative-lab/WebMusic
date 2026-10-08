@@ -163,6 +163,45 @@ describe('metrical chord collections', () => {
     expect(span?.notes[0]).toMatchObject({writtenPitch: 'Db4', pitch: 'Cb4', spellingInferred: false});
   });
 
+  it('applies each explicit grouping to the numerator it sums to and keeps conventional meters', () => {
+    const score = builder();
+    score.addMeasure({id: MeasureId('common'), number: 1, onsetQuarters: q(0), durationQuarters: q(4), timeSignature: {numerator: 4, denominator: 4}});
+    score.addMeasure({id: MeasureId('five'), number: 2, onsetQuarters: q(4), durationQuarters: q([5, 2]), timeSignature: {numerator: 5, denominator: 8}});
+    score.addMeasure({id: MeasureId('seven'), number: 3, onsetQuarters: q([13, 2]), durationQuarters: q([7, 2]), timeSignature: {numerator: 7, denominator: 8}});
+    add(score, 'c', 'C4', 0, 4);
+    add(score, 'd', 'D4', 4, [5, 2]);
+    add(score, 'e', 'E4', [13, 2], [7, 2]);
+    const source = score.build();
+    expect(() => inspectScoreChords(source, {grouping: 'beat'})).toThrow(/5\/8 requires explicit beatGroups summing to 5/);
+    expect(() => inspectScoreChords(source, {grouping: 'beat', beatGroups: [2, 3]})).toThrow(/7\/8 requires explicit beatGroups summing to 7/);
+    const spans = inspectScoreChords(source, {grouping: 'beat', beatGroups: [[2, 3], [2, 2, 3]]}).spans;
+    expect(spans.map((span) => [span.startQuarters, span.endQuarters])).toEqual([
+      [0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6.5], [6.5, 7.5], [7.5, 8.5], [8.5, 10],
+    ]);
+    expect(() => inspectScoreChords(source, {grouping: 'beat', beatGroups: [[2, 3], [3, 2]]})).toThrow(/distinct numerators/);
+    // A list summing to a conventional numerator replaces that meter's conventional pulses.
+    expect(inspectScoreChords(source, {grouping: 'beat', beatGroups: [[2, 2], [2, 3], [2, 2, 3]]}).spans.slice(0, 2)
+      .map((span) => [span.startQuarters, span.endQuarters])).toEqual([[0, 2], [2, 4]]);
+  });
+
+  it('keeps an exact authored end for a full-range float selection', () => {
+    const score = builder();
+    add(score, 'c', 'C4', 0, 1);
+    add(score, 'e', 'E4', 1, [1, 3]);
+    const source = score.build();
+    expect(source.durationQuarters.toString()).toBe('4/3');
+    for (const grouping of ['beat', 'simultaneous'] as const) {
+      const spans = inspectScoreChords(source, {grouping,
+        selection: {fromQuarters: 0, toQuarters: source.durationQuarters.toFloat()}}).spans;
+      const last = spans[spans.length - 1];
+      expect(last?.endQuarters).toBe(4 / 3);
+      expect(last?.id.endsWith('-4/3')).toBe(true);
+    }
+    // A range strictly inside the Score is still a decimal approximation.
+    const clipped = inspectScoreChords(source, {grouping: 'beat', selection: {fromQuarters: 0, toQuarters: 1.25}}).spans;
+    expect(clipped[clipped.length - 1]?.endQuarters).toBe(1.25);
+  });
+
   it('recognizes real Arabesque arpeggios without forcing its ambiguous fifth-measure beat', async () => {
     const score = await loadArabesqueMxlFixture();
     const options = {grouping: 'beat', selection: {fromQuarters: 0, toQuarters: 20}} as const;

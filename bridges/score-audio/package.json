@@ -1,6 +1,6 @@
 {
   "name": "@webmusic/bridge",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Bridge between the score and audio families of the WebMusic ecosystem: synchronized score+audio playback on one AudioContext clock, score-to-clip offline rendering, and TimeMap/BeatGrid conversions. The only package allowed to import both families.",
   "type": "module",
   "sideEffects": false,
@@ -63,8 +63,8 @@
     "typescript"
   ],
   "peerDependencies": {
-    "@webmusic/audio": "^0.2.0",
-    "@webmusic/kernel": "^0.2.0",
-    "@webmusic/score": "^0.2.0"
+    "@webmusic/audio": "^0.2.1",
+    "@webmusic/kernel": "^0.2.1",
+    "@webmusic/score": "^0.2.1"
   }
 }

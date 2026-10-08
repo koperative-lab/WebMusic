@@ -1,6 +1,6 @@
 {
   "name": "@webmusic/score",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Symbolic music for the web: immutable score model, MIDI/MusicXML/MXL/ABC I/O, playback, analysis, views, Web Components and React bindings.",
   "type": "module",
   "sideEffects": [
@@ -284,8 +284,8 @@
     "vexflow": "4.2.5"
   },
   "peerDependencies": {
-    "@webmusic/kernel": "^0.2.0",
-    "@webmusic/ui": "^0.2.0",
+    "@webmusic/kernel": "^0.2.1",
+    "@webmusic/ui": "^0.2.1",
     "opensheetmusicdisplay": ">=1.8.0",
     "react": ">=18",
     "spessasynth_lib": "^4.0.0",

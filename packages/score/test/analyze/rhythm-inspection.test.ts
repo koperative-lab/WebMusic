@@ -205,7 +205,7 @@ describe('inspectScoreRhythm', () => {
       onsetQuarters: Rational.ONE, duration: Duration.eighth(),
     });
     const score = builder.build();
-    expect(() => inspectScoreRhythm(score, {beatUnit: 'meter'})).toThrow(/explicit beatGroups.*5\/8/);
+    expect(() => inspectScoreRhythm(score, {beatUnit: 'meter'})).toThrow(/5\/8 requires explicit beatGroups summing to 5/);
     const shortLong = inspectScoreRhythm(score, {beatUnit: 'meter', beatGroups: [2, 3]});
     const longShort = inspectScoreRhythm(score, {beatUnit: 'meter', beatGroups: [3, 2]});
     expect(shortLong.beats.map(({atQuarters, beatLengthQuarters}) => [atQuarters, beatLengthQuarters]))
@@ -276,6 +276,11 @@ describe('inspectScoreRhythm', () => {
       .toEqual([[0, 1, 1], [1.5, 1, 2], [2.5, 2, 1], [3.5, 2, 2], [4.5, 2, 3]]);
     expect(result.subdivisions.some(({atQuarters, beatAtQuarters}) => atQuarters === 2.5 && beatAtQuarters === 1.5))
       .toBe(false);
-    expect(() => inspectScoreRhythm(score, {beatUnit: 'meter', beatGroups: [3, 3]})).toThrow(/sum to 3/);
+    // One list describes the numerator it sums to; the 3/4 bar keeps its conventional pulses.
+    expect(inspectScoreRhythm(score, {beatUnit: 'meter', beatGroups: [3, 3]}).beats).toEqual(result.beats);
+    expect(inspectScoreRhythm(score, {beatUnit: 'meter', beatGroups: [[3, 3], [1, 2]]}).beats
+      .map(({atQuarters, beat}) => [atQuarters, beat])).toEqual([[0, 1], [1.5, 2], [2.5, 1], [3.5, 2]]);
+    expect(() => inspectScoreRhythm(score, {beatUnit: 'meter', beatGroups: [[2, 1], [1, 2]]}))
+      .toThrow(/distinct numerators/);
   });
 });
