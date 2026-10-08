@@ -61,9 +61,10 @@ export async function readSitePackageNotice({directory, manifest}) {
       if (/^(?:licen[cs]e|copying)/i.test(name)) hasLicense = true;
     }
   }
-  if (!documents.length && manifest.name === '@nodable/entities' && manifest.version === '3.0.0'
+  if (!documents.length && manifest.name === '@nodable/entities'
+      && (manifest.version === '3.0.0' || manifest.version === '3.1.0')
       && manifest.license === 'MIT' && manifest.repository?.url === 'git+https://github.com/nodable/val-parsers.git') {
-    documents.push(`Reviewed upstream LICENSE\n${(await readFile(path.join(repository, 'scripts/licenses/nodable-entities-3.0.0-MIT.txt'), 'utf8')).trim()}`);
+    documents.push(`Reviewed upstream LICENSE\n${(await readFile(path.join(repository, `scripts/licenses/nodable-entities-${manifest.version}-MIT.txt`), 'utf8')).trim()}`);
     hasLicense = true;
   }
   if (!hasLicense) {

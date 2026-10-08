@@ -58,8 +58,9 @@ test('discovers bundled transitive licenses, preserves mappings and rejects stri
 for (const reviewed of [
   {name: 'fft.js', version: '4.0.4', license: 'MIT', repository: {url: 'git+ssh://git@github.com/indutny/fft.js.git'}},
   {name: '@nodable/entities', version: '3.0.0', license: 'MIT', repository: {url: 'git+https://github.com/nodable/val-parsers.git'}},
+  {name: '@nodable/entities', version: '3.1.0', license: 'MIT', repository: {url: 'git+https://github.com/nodable/val-parsers.git'}},
 ]) {
-  test(`${reviewed.name} snapshot requires its reviewed version, license and repository`, async (t) => {
+  test(`${reviewed.name}@${reviewed.version} snapshot requires its reviewed version, license and repository`, async (t) => {
     const {packageDirectory, dependency, javascript} = await bundleFixture(t, reviewed);
     await processBundleNotices({packageDirectory});
     const bundle = await readFile(javascript, 'utf8');
@@ -67,6 +68,10 @@ for (const reviewed of [
     assert.match(bundle, /LICENSE \(reviewed upstream snapshot\)/);
     assert.match(bundle, /Permission is hereby granted, free of charge/);
     assert.match(bundle, /THE SOFTWARE IS PROVIDED "AS IS"/);
+    if (reviewed.name === '@nodable/entities' && reviewed.version === '3.1.0') {
+      const snapshot = await readFile(new URL('./licenses/nodable-entities-3.1.0-MIT.txt', import.meta.url), 'utf8');
+      assert.ok(bundle.includes(snapshot.trim()), 'embed the complete reviewed 3.1.0 license text');
+    }
     await processBundleNotices({packageDirectory, check: true});
     for (const change of [
       {version: '99.0.0'},
