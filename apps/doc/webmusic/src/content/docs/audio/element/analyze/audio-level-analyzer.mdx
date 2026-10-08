@@ -31,7 +31,7 @@ current API establishes inter-sample true peak.
 ```
 
 The demo pairs one player with this tool. Start playback for live samples;
-the tool's Freeze, Reset hold and Peak threshold controls operate on its own
+the tool's Freeze, Reset and Peak threshold controls operate on its own
 display. Copy includes both elements, and Reset restores their demo settings.
 
 ## Signal and lifetime
@@ -44,13 +44,17 @@ or own the borrowed node. It samples about every 50 ms, so the RMS and peak
 describe sampled windows, not continuous loudness or inter-sample true peak.
 The crest value is sample peak minus RMS in dB.
 
-Freeze holds the current display while sampling continues. Reset hold starts
+Freeze holds the current display while sampling continues. Reset starts
 the held peak again from the current sample. A pause, seek, source change or
 missing live input clears stale samples; a frame stall marks the signal
 unavailable. The element stops its own polling and subscriptions on rebind or
 disconnect without stopping the player. `player` must resolve uniquely in
 the current Document or ShadowRoot; invalid or ambiguous selectors remain
 unbound, and later target changes are observed.
+
+RMS, Peak hold and Crest stay in fixed positions above the history. The
+monochrome surface omits a repeated title and routine Live, Paused or Frozen
+messages. Waiting, no-signal and unavailable feedback remains visible.
 
 <details class="component-section">
 <summary>API</summary>
@@ -70,6 +74,12 @@ unbound, and later target changes are observed.
 The threshold is visual feedback against the sampled peak; crossing it does
 not mute, compress or otherwise change the signal.
 
+**Accessibility.** Freeze retains its label and exposes `aria-pressed`; Reset
+has the accessible name "Reset hold". The horizontal UIKit threshold fader has
+a visible dBFS value and a labelled slider role with `-60..0` bounds. Arrow
+keys change it by 1 dB, and Home/End select the bounds. Numeric
+readings and diagnostic status remain available outside the history plot.
+
 </details>
 
 <details class="component-section">
@@ -79,7 +89,11 @@ The full-width host honors native `hidden`. Its outer surface uses
 `--wm-component-background`, `--wm-component-border`,
 `--wm-component-padding` and `--wm-component-radius`; the
 `--wm-audio-level-analyzer-surface-*` tokens override this tag. The
-[level presenter](/uikit/) exposes `--wm-level-analyzer-rms`,
+[level presenter](/uikit/views-analysis/level-analyzer/) exposes `--wm-level-analyzer-rms`,
 `--wm-level-analyzer-peak` and `--wm-level-analyzer-threshold` for its graph.
+The default colors are gray and black. `--wm-analysis-control-size` defaults to
+`1.5rem` for compact controls; `--wm-fader-*` styles the horizontal threshold
+fader. Public parts are `root surface`, `freeze`, `reset` and `threshold`; the
+slider also has `fader`, so use `[part~="threshold"]`.
 
 </details>

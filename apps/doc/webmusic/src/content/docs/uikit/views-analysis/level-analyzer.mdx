@@ -35,6 +35,12 @@ The application owns `host`, sampled `state`, the three command functions and th
 
 `rmsDbfs` and `peakDbfs` are already measured values. The presenter derives only the displayed crest difference (`peakDbfs - rmsDbfs`), plot geometry and threshold indication. The caller decides the sample window and history cadence, caps the `history` array, maintains `heldPeakDbfs`, and clears it after `onResetHold()`. A silence value may be `-Infinity`; it renders as an empty numeric readout. The demo generates a bounded 64-sample window to exercise the real presenter commands.
 
+RMS, Peak hold and Crest retain fixed positions above the history. There is no
+repeated visible title. Routine Live, Paused and Frozen messages are hidden;
+waiting, no-signal, unavailable and other caller-supplied diagnostic text remains
+in the status region. Freeze keeps its label and reports its state through
+`aria-pressed`; Reset clears the held peak.
+
 <details class="component-section">
 <summary>API</summary>
 
@@ -47,13 +53,13 @@ The application owns `host`, sampled `state`, the three command functions and th
 | `history` | `readonly LevelAnalyzerSample[]` | required | Recent samples, in time order. The most recent 64 are plotted; older values are ignored. |
 | `thresholdDbfs` | `number` | required | Alert and slider position. The plot visually spans `-60` to `0` dBFS. |
 | `frozen` | `boolean` | required | Freeze button's pressed state; the caller stops accepting new samples. |
-| `status` | `string` | required | Visible status beside the title. |
+| `status` | `string` | required | Diagnostic status text; routine Live, Paused and Frozen messages are hidden. |
 
 **Actions and handle**
 
 | Member | Kind | Default | Description |
 |---|---|---|---|
-| `onThresholdChange(value)` | `(number) => void` | required | Called as the native threshold range moves; the caller commits it and calls `update()`. |
+| `onThresholdChange(value)` | `(number) => void` | required | Called as the horizontal threshold fader moves; the caller commits it and calls `update()`. |
 | `onFreezeChange(frozen)` | `(boolean) => void` | required | Requests the opposite of the last state supplied to `update()`. |
 | `onResetHold()` | `() => void` | required | Requests a held-peak reset; the caller supplies the next state. |
 | `element` | `HTMLElement` | mounted root | The one presenter surface. |
@@ -62,7 +68,7 @@ The application owns `host`, sampled `state`, the three command functions and th
 
 There is no `Binding` object or mount-options bag for this presenter; actions are passed directly as the second argument. It owns no subscription. See the [shared presenter shape](/uikit/api/#the-shared-presenter-shape) for the general host and cleanup model.
 
-**Accessibility.** Numeric readings use a definition list. The history plot has a descriptive image label updated from the current sample; it does not replace the numeric readouts. Freeze is a native button with `aria-pressed`, Reset hold is a native button, and the threshold is a native range input with a visible dBFS value. The status text uses `role="status"`.
+**Accessibility.** Numeric readings use a definition list. The history plot has a descriptive image label updated from the current sample; it does not replace the numeric readouts. Freeze is a native button with `aria-pressed`; the Reset button has the accessible name "Reset hold". The rectangular horizontal UIKit fader is a labelled slider with `-60..0` dBFS bounds, a 1 dB keyboard step and a visible value. Its ARIA value uses dBFS, not a normalized percentage. Arrow keys adjust it by one step, and Home/End select the bounds. Diagnostic status text uses `role="status"`.
 
 </details>
 
@@ -77,11 +83,13 @@ The stylesheet is installed into the supplied host and removed by `destroy()`. T
 | `--wm-level-analyzer-foreground` | `--wm-foreground`, then dark ink | Text color. |
 | `--wm-level-analyzer-border` | `--wm-border`, then light gray | Surface border. |
 | `--wm-level-analyzer-padding` | `.85rem` | Surface inset. |
-| `--wm-level-analyzer-rms` | teal | Recent RMS columns. |
-| `--wm-level-analyzer-peak` | dark blue | Sample-peak ticks. |
-| `--wm-level-analyzer-threshold` | orange | Threshold line and slider accent. |
+| `--wm-level-analyzer-rms` | `#999` | Recent RMS columns. |
+| `--wm-level-analyzer-peak` | `#111` | Sample-peak ticks. |
+| `--wm-level-analyzer-threshold` | `#666` | Dashed threshold line. |
+| `--wm-analysis-control-size` | `1.5rem` | Compact button height and horizontal fader thickness. |
+| `--wm-fader-*` | shared fader defaults | Threshold track, fill, thumb and corners. |
 
-The canonical root is `.wui-level-analyzer`, with one `part="root surface"`. Internal classes follow `.wui-level-analyzer__*`; they are implementation selectors, not a class-extension API. Shared `--wm-border`, `--wm-muted`, `--wm-surface` and `--wm-accent` tokens provide fallback colors for the plot and controls.
+The default palette is achromatic. The canonical root is `.wui-level-analyzer`, with one `part="root surface"`; controls expose `freeze`, `reset` and `threshold`. The threshold slider retains the shared `fader` part alongside `threshold`; use token selectors such as `[part~="threshold"]`. Internal classes follow `.wui-level-analyzer__*`; they are implementation selectors, not a class-extension API. Shared `--wm-border`, `--wm-muted`, `--wm-surface` and `--wm-accent` tokens provide fallback colors for the plot and controls.
 
 </details>
 

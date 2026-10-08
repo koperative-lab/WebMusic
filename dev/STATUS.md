@@ -30,6 +30,17 @@ retain their domain capabilities, including Audio timeline and synchronized
 viewport bindings. Shared Kernel/UI differences are limited to required domain
 compatibility with explicit source, contract and regression ownership.
 
+DEC-050 makes the PitchView keyboard fit MIDI 48–71 without scrolling by
+default. Its explicit `scroll` setting takes precedence over retained legacy
+fitting configuration; fixed-width waterfall companions opt into scrolling.
+Verification on 2026-10-07 passed `VITEST_MAX_WORKERS=2 npm run check`
+(4,325 workspace tests) and `npm run docs:build` (112 pages). The Arabesque
+demo fit all 24 keys into 527px and 303px containers at 937px and 390px browser
+widths, without page overflow. Playback highlights, native keyboard panning
+when enabled, offset reset when disabled, type switching and Reset passed;
+the generated markup preserved explicit `scroll="false"`, and console errors
+were absent. Automated tests verify clipboard serialization and legacy fallback.
+
 The earlier extra Score controllers, parked Elements and unrelated public UI
 applications are removed from the current surface. UI documentation uses the
 six canonical groups; Audio additions live in their owning presenter references.
@@ -70,6 +81,14 @@ new surfaces.
 The five current Analyze demos passed desktop and 390px browser smoke checks;
 the bundled WAV drove meter, oscilloscope and transient live readings. Real
 device input, acoustic accuracy and screen-reader interaction remain unverified.
+The 2026-10-08 presentation follow-up gives all five Audio Analyze Elements
+achromatic defaults. Detailed tools retain fixed readout slots, compact square-corner
+controls and actionable diagnostics while hiding routine transport prose.
+Threshold, sensitivity, timebase and trigger reuse the UIKit horizontal fader
+with actual-unit keyboard and ARIA values. Arabesque No. 1 MP3 browser checks
+covered playback, pause, freeze, probe/control interaction and 390px layouts;
+meter level and spectrum modes were both exercised. These UI checks do not
+close the acoustic, device or screen-reader acceptance in AUDIO-ANALYZE-01.
 The [frame and startup correction](audits/2026-09-26/ANALYZE-FRAME-AND-DEV-STARTUP.md)
 supersedes that pass's acceptance of bare Score surfaces: DEC-034 restores the
 shared component border and padding. Ordinary development starts now reuse the

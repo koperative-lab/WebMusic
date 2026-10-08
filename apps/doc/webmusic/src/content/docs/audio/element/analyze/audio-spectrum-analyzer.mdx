@@ -56,6 +56,12 @@ unavailable. Disconnect stops only this element's polling and subscriptions,
 not the player or its graph. `player` must resolve uniquely in the current
 Document or ShadowRoot, including when a target appears later.
 
+The monochrome surface keeps Frequency and Level in fixed readout slots.
+Freeze and Peak hold use pressed states without changing their labels, and
+Reset peaks clears the held trace. Routine Live, Paused and Frozen messages
+are hidden; waiting and unavailable feedback remains visible. A dashed held
+trace distinguishes maxima without relying on color.
+
 <details class="component-section">
 <summary>API</summary>
 
@@ -76,6 +82,12 @@ Document or ShadowRoot, including when a target appears later.
 | `webaudio:spectrumprobe` | event | `{frequency, decibels?}` after a pointer or keyboard probe; bubbles and is composed. |
 | `webaudio:error` | event | `{error: Error}` for an input, frame or presenter failure; bubbles and is composed. |
 
+**Accessibility.** The frequency plot is a labelled slider with Hz bounds and
+a frequency/dB `aria-valuetext`. Arrow keys move by a semitone, Shift by an
+octave, and Home/End select the bounds. Freeze and Peak hold are native
+`aria-pressed` buttons. Fixed Frequency and Level outputs use `aria-live="off"`;
+waiting and unavailable feedback remains outside the plot.
+
 </details>
 
 <details class="component-section">
@@ -83,8 +95,12 @@ Document or ShadowRoot, including when a target appears later.
 
 The full-width host honors native `hidden`. Its outer surface uses the
 `--wm-component-*` tokens, with `--wm-audio-spectrum-analyzer-surface-*`
-overrides for this tag. The [spectrum presenter](/uikit/) exposes
+overrides for this tag. The [spectrum presenter](/uikit/views-analysis/spectrum-analyzer/) exposes
 `--wm-spectrum-height`, `--wm-spectrum-plot-background` and related
-`--wm-spectrum-*` colors for the plot and controls.
+`--wm-spectrum-*` colors for the plot and controls. Defaults are gray and black;
+the live trace uses foreground and the dashed held trace uses muted ink.
+`--wm-analysis-control-size` defaults to `1.5rem` for compact buttons. Public
+parts are `root surface`, `toolbar`, `freeze`, `peak-hold`, `reset-peaks`,
+`readout`, `plot` and `status`.
 
 </details>

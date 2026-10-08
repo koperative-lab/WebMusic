@@ -28,7 +28,7 @@ const FRETBOARD_GEOMETRY_ATTRIBUTES = ['fret-width', 'string-spacing', 'string-w
  */
 export class PitchViewElement extends HTMLElementBase {
   static get observedAttributes(): string[] {
-    return ['type', 'player', 'source', 'low', 'high', 'system', 'spelling', 'density', 'scheme', 'tuning', 'first-fret', 'frets', 'follow', 'fit-to-width', ...KEYBOARD_GEOMETRY_ATTRIBUTES, ...FRETBOARD_GEOMETRY_ATTRIBUTES];
+    return ['type', 'player', 'source', 'low', 'high', 'system', 'spelling', 'density', 'scheme', 'tuning', 'first-fret', 'frets', 'follow', 'scroll', 'fit-to-width', ...KEYBOARD_GEOMETRY_ATTRIBUTES, ...FRETBOARD_GEOMETRY_ATTRIBUTES];
   }
 
   #notes = createPitchView();
@@ -47,8 +47,8 @@ export class PitchViewElement extends HTMLElementBase {
   set type(type: PitchViewType) { this.setAttribute('type', type); }
 
   /** Requested keyboard endpoints. UIKit normalizes the supported MIDI range. */
-  get low(): number { return Math.round(numAttr(this, 'low', 36)); }
-  get high(): number { return Math.round(numAttr(this, 'high', 84)); }
+  get low(): number { return Math.round(numAttr(this, 'low', 48)); }
+  get high(): number { return Math.round(numAttr(this, 'high', 71)); }
   /** Requested exact geometry in CSS px; undefined uses the presenter's default. */
   get whiteKeyWidth(): number | undefined { return this.#pixels('white-key-width'); }
   get blackKeyWidth(): number | undefined { return this.#pixels('black-key-width'); }
@@ -59,8 +59,13 @@ export class PitchViewElement extends HTMLElementBase {
   get stringWidth(): number | undefined { return this.#pixels('string-width'); }
   /** Newly sounding notes reveal themselves unless a composed surface owns scrolling. */
   get follow(): 'active' | 'none' { return this.getAttribute('follow') === 'none' ? 'none' : 'active'; }
-  /** Fit every keyboard key to the host width, overriding fixed/minimum key widths. */
-  get fitToWidth(): boolean { return boolAttr(this, 'fit-to-width'); }
+  /** Allow keyboard scrolling. Explicit `scroll` wins over the legacy inverse `fit-to-width`; defaults to false. */
+  get scrollable(): boolean {
+    if (this.hasAttribute('scroll')) return boolAttr(this, 'scroll');
+    return this.hasAttribute('fit-to-width') ? !boolAttr(this, 'fit-to-width') : false;
+  }
+  /** Effective keyboard fitting, overriding fixed/minimum key widths whenever scrolling is disabled. */
+  get fitToWidth(): boolean { return !this.scrollable; }
 
   #pixels(name: string): number | undefined {
     const value = numAttr(this, name, Number.NaN);
@@ -120,7 +125,7 @@ export class PitchViewElement extends HTMLElementBase {
     if (!this.isConnected || !this.#hostStyle) return;
     if (name === 'player' || name === 'source') this.#bindPlayer();
     else if (name === 'type' || name === 'density' || name === 'scheme'
-      || (this.type === 'keyboard' && (name === 'follow' || name === 'fit-to-width' || KEYBOARD_GEOMETRY_ATTRIBUTES.includes(name as typeof KEYBOARD_GEOMETRY_ATTRIBUTES[number])))
+      || (this.type === 'keyboard' && (name === 'follow' || name === 'scroll' || name === 'fit-to-width' || KEYBOARD_GEOMETRY_ATTRIBUTES.includes(name as typeof KEYBOARD_GEOMETRY_ATTRIBUTES[number])))
       || (this.type === 'fretboard' && FRETBOARD_GEOMETRY_ATTRIBUTES.includes(name as typeof FRETBOARD_GEOMETRY_ATTRIBUTES[number]))) this.#render();
     else if (name === 'spelling'
       || (this.type === 'keyboard' && (name === 'low' || name === 'high'))

@@ -1843,6 +1843,48 @@ exact triplet ends, nameplate `aria-hidden`, unobserved attributes, and the
 cached excerpt's disposal and retry paths. Unit checks do not establish the
 rendered result; verify the chord demo at long windows in a browser.
 
+## DEC-050 — PitchView keyboard fits two octaves unless scrolling is enabled
+
+**Date / status:** 2026-10-07; accepted by the maintainer's request for an
+optional scroll mode and a responsive MIDI 48–71 keyboard.
+
+**Problem:** the keyboard defaulted to MIDI 36–84 with a minimum key width.
+Ordinary demo containers therefore showed only part of the range and could
+move when new notes arrived. Disabling `follow` alone still allowed manual
+overflow and did not fit the full range.
+
+**Decision:** keyboard mode defaults to `low="48"`, `high="71"` and disabled
+scrolling. The Element reuses UIKit's full-range `fitToWidth` option, so the
+board scales with its container, ignores fixed/minimum widths while fitted,
+and has no scrolling focus stop. `scroll="true"` restores minimum or explicitly
+configured widths; `follow` independently controls new-note following in that
+mode. Turning scrolling off resets the horizontal offset while retaining held
+notes and the borrowed player subscription. Staff, fretboard and Headless
+behavior, key heights and the neutral UIKit defaults are unchanged.
+
+An explicit `scroll` attribute is authoritative. Without it, an explicit
+`fit-to-width` retains its inverse compatibility meaning; without either
+attribute the keyboard fits. The read-only `.scrollable` and `.fitToWidth`
+getters report this effective choice. The inherited `HTMLElement.scroll()`
+method is not replaced. Parameters primarily expose `scroll`; the legacy
+fitting row appears only for existing explicit `fit-to-width` settings.
+
+**Alternatives considered:** change only the demo; disable only automatic
+following; hide overflow without fitting. These leave ordinary consumers
+unchanged or hide part of the requested keyboard range.
+
+**Consequences:** exact-width waterfall/keyboard compositions explicitly opt
+into scrolling to preserve pitch-column alignment. Out-of-range sounding notes
+remain available in `.active`; fitting does not infer or expand the range.
+
+**Owner:** [View families](design/VIEW-COMPONENTS.md) and the
+[PitchView reference](../apps/doc/webmusic/src/content/docs/score/element/view/score-pitch-view.mdx).
+
+**Verification implications:** test default endpoints, scroll and legacy
+precedence, preserved notes/subscriptions, cleanup, focus and offset resets,
+and exact waterfall alignment. Verify fitted and scrolling keyboards in wide
+and narrow containers, including Parameters, Copy and Reset, with Arabesque No. 1.
+
 ## Recording the next decision
 
 Add an identifier, date, status, problem, chosen contract, considered alternatives, consequences, owning document, and verification implications. A proposed choice does not change a public API. If a choice supersedes this register, retain its old identifier and point to the replacement; do not rewrite historical evidence as though the new choice always existed.

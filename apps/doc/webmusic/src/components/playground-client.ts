@@ -253,14 +253,22 @@ function wire(panel: HTMLElement): PlaygroundMount {
   };
 
   const refresh = (): void => {
+    for (const control of panel.querySelectorAll<HTMLSelectElement>('select[data-pg-kind="bool"][data-pg-inverse-fallback]')) {
+      const legacy = targetOf(control)?.getAttribute(control.dataset.pgInverseFallback!);
+      const enabled = legacy == null ? control.dataset.pgFallback === 'on' : FALSY.test(legacy.trim());
+      const option = [...control.options].find((entry) => entry.value === 'unset');
+      if (option) option.textContent = `default (${enabled ? 'on' : 'off'})`;
+    }
     for (const row of panel.querySelectorAll<HTMLElement>('[data-pg-when]')) {
       try {
         const condition = JSON.parse(row.dataset.pgWhen!) as {
-          attribute: string; values: string[]; fallback: string; options?: string[];
+          attribute: string; values: string[]; fallback: string; options?: string[]; presentAttribute?: string;
         };
-        const raw = targetOf(row)?.getAttribute(condition.attribute) ?? '';
+        const owner = targetOf(row);
+        const raw = owner?.getAttribute(condition.attribute) ?? '';
         const value = condition.options ? (condition.options.includes(raw) ? raw : condition.fallback) : raw || condition.fallback;
-        row.hidden = !condition.values.includes(value);
+        row.hidden = !condition.values.includes(value)
+          || (condition.presentAttribute !== undefined && !owner?.hasAttribute(condition.presentAttribute));
       } catch {
         row.hidden = true;
       }

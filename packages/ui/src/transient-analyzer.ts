@@ -1,5 +1,6 @@
 import {claimHost} from './internal/lifecycle';
 import {installStyle} from './internal/style';
+import {analysisControlStyle, createAnalysisFader, setAnalysisStatus} from './internal/analysis-controls';
 
 export interface TransientAnalyzerSample {
   strength: number;
@@ -33,42 +34,33 @@ const COLUMNS = 64;
 const mounted = new WeakMap<HTMLElement, TransientAnalyzerHandle>();
 
 const transientAnalyzerStyle = `
+${analysisControlStyle}
 .wui-transient-analyzer { box-sizing: border-box; display: grid; gap: .75rem; width: 100%; min-width: 0;
-  color: var(--wm-transient-analyzer-foreground, var(--wm-foreground, #262b2a));
+  color: var(--wm-transient-analyzer-foreground, var(--wm-foreground, #222));
   background: var(--wm-transient-analyzer-background, var(--wm-surface, #fff));
-  border: 1px solid var(--wm-transient-analyzer-border, var(--wm-border, #d5d9d7));
+  border: 1px solid var(--wm-transient-analyzer-border, var(--wm-border, #d8d8d8));
   padding: var(--wm-transient-analyzer-padding, .85rem); }
 .wui-transient-analyzer, .wui-transient-analyzer * { box-sizing: border-box; }
-.wui-transient-analyzer__head, .wui-transient-analyzer__controls { display: flex; align-items: center; flex-wrap: wrap; gap: .55rem 1rem; }
-.wui-transient-analyzer__head { justify-content: space-between; }
-.wui-transient-analyzer__title { font-size: .82rem; font-weight: 700; text-transform: uppercase; }
-.wui-transient-analyzer__status { font-size: .78rem; color: var(--wm-muted, #68716e); }
+.wui-transient-analyzer__controls { display: flex; align-items: center; flex-wrap: wrap; gap: .45rem .65rem; }
+.wui-transient-analyzer__status { font-size: .78rem; color: var(--wm-muted, var(--wm-foreground-muted, #777)); }
 .wui-transient-analyzer__values { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .6rem; margin: 0; }
 .wui-transient-analyzer__values > div { min-width: 0; }
-.wui-transient-analyzer__values dt { font-size: .72rem; color: var(--wm-muted, #68716e); }
+.wui-transient-analyzer__values dt { font-size: .72rem; color: var(--wm-muted, var(--wm-foreground-muted, #777)); }
 .wui-transient-analyzer__values dd { margin: .15rem 0 0; font: 600 1.25rem/1.15 ui-monospace, SFMono-Regular, Consolas, monospace;
   font-variant-numeric: tabular-nums; white-space: nowrap; }
 .wui-transient-analyzer__values small { font: 400 .68rem/1.2 system-ui, sans-serif; }
 .wui-transient-analyzer__plot { position: relative; height: 96px; display: flex; align-items: end; gap: 1px;
-  border: 1px solid var(--wm-border, #d5d9d7); background: var(--wm-surface-muted, #f6f8f7); overflow: hidden; }
+  border: 1px solid var(--wm-border, #d8d8d8); background: var(--wm-surface-muted, #f3f3f3); overflow: hidden; }
 .wui-transient-analyzer__column { position: relative; flex: 1 1 0; min-width: 0; height: 100%; }
 .wui-transient-analyzer__bar { position: absolute; bottom: 0; left: 0; right: 0;
-  background: var(--wm-transient-analyzer-strength, #2b7973); }
+  background: var(--wm-transient-analyzer-strength, #999); }
 .wui-transient-analyzer__column[data-hit='true'] .wui-transient-analyzer__bar {
-  background: var(--wm-transient-analyzer-hit, #cb6541); }
+  background: var(--wm-transient-analyzer-hit, #333); }
 .wui-transient-analyzer__threshold { position: absolute; left: 0; right: 0; border-top: 1px dashed
-  var(--wm-transient-analyzer-threshold, #31475d); pointer-events: none; }
+  var(--wm-transient-analyzer-threshold, #666); pointer-events: none; }
 .wui-transient-analyzer__scale { display: flex; justify-content: space-between; margin-top: -.5rem;
-  font: .68rem ui-monospace, SFMono-Regular, Consolas, monospace; color: var(--wm-muted, #68716e); }
-.wui-transient-analyzer__button { color: inherit; background: var(--wm-surface, #fff); border: 1px solid var(--wm-border, #bfc7c4);
-  border-radius: var(--wm-control-radius, 4px); padding: .3rem .65rem; font: inherit; cursor: pointer; min-height: 32px; }
-.wui-transient-analyzer__button[aria-pressed='true'] { background: var(--wm-accent, #247a70); color: #fff; }
-.wui-transient-analyzer__sensitivity { display: inline-flex; align-items: center; gap: .5rem; margin-left: auto; font-size: .78rem; }
-.wui-transient-analyzer__sensitivity input { width: min(150px, 30vw); accent-color: var(--wm-transient-analyzer-strength, #2b7973); }
-.wui-transient-analyzer__sensitivity output { min-width: 4ch; text-align: right; font-variant-numeric: tabular-nums; }
-@media (max-width: 400px) { .wui-transient-analyzer__values dd { font-size: 1rem; }
-  .wui-transient-analyzer__sensitivity { width: 100%; margin-left: 0; }
-  .wui-transient-analyzer__sensitivity input { flex: 1; width: auto; } }
+  font: .68rem ui-monospace, SFMono-Regular, Consolas, monospace; color: var(--wm-muted, var(--wm-foreground-muted, #777)); }
+@media (max-width: 400px) { .wui-transient-analyzer__values dd { font-size: 1rem; } }
 @media (forced-colors: active) { .wui-transient-analyzer__bar { background: Highlight; }
   .wui-transient-analyzer__threshold { border-color: CanvasText; } }
 `;
@@ -86,15 +78,10 @@ export function mountTransientAnalyzer(host: HTMLElement, actions: TransientAnal
   root.setAttribute('part', 'root surface');
   root.setAttribute('aria-label', 'Transient analyzer');
 
-  const head = document.createElement('header');
-  head.className = 'wui-transient-analyzer__head';
-  const title = document.createElement('strong');
-  title.className = 'wui-transient-analyzer__title';
-  title.textContent = 'Transient analyzer';
   const status = document.createElement('span');
   status.className = 'wui-transient-analyzer__status';
   status.setAttribute('role', 'status');
-  head.append(title, status);
+  status.hidden = true;
 
   const values = document.createElement('dl');
   values.className = 'wui-transient-analyzer__values';
@@ -145,42 +132,34 @@ export function mountTransientAnalyzer(host: HTMLElement, actions: TransientAnal
   controls.className = 'wui-transient-analyzer__controls';
   const freeze = document.createElement('button');
   freeze.type = 'button';
-  freeze.className = 'wui-transient-analyzer__button';
+  freeze.className = 'wui-transient-analyzer__button wui-analysis-button';
   freeze.setAttribute('part', 'freeze');
+  freeze.textContent = 'Freeze';
+  freeze.setAttribute('aria-pressed', 'false');
   const clear = document.createElement('button');
   clear.type = 'button';
-  clear.className = 'wui-transient-analyzer__button';
+  clear.className = 'wui-transient-analyzer__button wui-analysis-button';
   clear.setAttribute('part', 'clear');
   clear.textContent = 'Clear';
-  const sensitivity = document.createElement('label');
-  sensitivity.className = 'wui-transient-analyzer__sensitivity';
-  sensitivity.textContent = 'Sensitivity';
-  const sensitivityInput = document.createElement('input');
-  sensitivityInput.type = 'range';
-  sensitivityInput.min = '0';
-  sensitivityInput.max = '100';
-  sensitivityInput.step = '1';
-  sensitivityInput.setAttribute('part', 'sensitivity');
-  const sensitivityValue = document.createElement('output');
-  sensitivity.append(sensitivityInput, sensitivityValue);
-  controls.append(freeze, clear, sensitivity);
-  root.append(head, values, plot, scale, controls);
+  const sensitivity = createAnalysisFader(document, {
+    label: 'Sensitivity', part: 'sensitivity', min: 0, max: 100, step: 1, value: 55,
+    formatValue: (value) => `${Math.round(value)}%`, onInput: (value) => actions.onSensitivityChange(value / 100),
+  });
+  controls.append(freeze, clear, sensitivity.element);
+  root.append(values, plot, scale, controls, status);
 
   let destroyed = false;
   let frozen = false;
   const onFreeze = () => actions.onFreezeChange(!frozen);
   const onClear = () => actions.onClear();
-  const onSensitivity = () => actions.onSensitivityChange(Number(sensitivityInput.value) / 100);
   const handle: TransientAnalyzerHandle = {
     element: root,
     update(state) {
       if (destroyed) return;
       frozen = state.frozen;
-      if (status.textContent !== state.status) status.textContent = state.status;
-      freeze.textContent = frozen ? 'Unfreeze' : 'Freeze';
+      setAnalysisStatus(status, state.status);
       freeze.setAttribute('aria-pressed', String(frozen));
-      sensitivityInput.value = String(Math.round(state.sensitivity * 100));
-      sensitivityValue.textContent = percent(state.sensitivity);
+      sensitivity.paint(Math.round(state.sensitivity * 100));
       strength.firstChild!.textContent = state.sample ? percent(state.sample.strength) : '--';
       hits.firstChild!.textContent = String(state.hitCount);
       interval.firstChild!.textContent = state.lastIntervalMs === undefined ? '--' : String(Math.round(state.lastIntervalMs));
@@ -201,7 +180,7 @@ export function mountTransientAnalyzer(host: HTMLElement, actions: TransientAnal
       destroyed = true;
       freeze.removeEventListener('click', onFreeze);
       clear.removeEventListener('click', onClear);
-      sensitivityInput.removeEventListener('input', onSensitivity);
+      sensitivity.destroy();
       root.remove();
       style?.remove();
       ownership.release();
@@ -214,7 +193,6 @@ export function mountTransientAnalyzer(host: HTMLElement, actions: TransientAnal
     else host.append(root);
     freeze.addEventListener('click', onFreeze);
     clear.addEventListener('click', onClear);
-    sensitivityInput.addEventListener('input', onSensitivity);
   } else handle.destroy();
   return handle;
 }

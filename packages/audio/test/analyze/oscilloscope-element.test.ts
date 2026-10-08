@@ -113,7 +113,7 @@ describe('<audio-oscilloscope>', () => {
     expect(scope.trace?.triggered).toBe(false);
     scope.timebaseMs = 2;
     expect(scope.trace?.triggered).toBe(true);
-    expect(scope.textContent).toContain('Live, triggered');
+    expect(scope.querySelector<HTMLElement>('[part="status"]')?.hidden).toBe(true);
     const probes: Array<{timeMs: number; amplitude?: number}> = [];
     scope.addEventListener('webaudio:oscilloscopeprobe', (event) => probes.push((event as CustomEvent).detail));
     scope.querySelector<HTMLCanvasElement>('[part="plot"]')!
@@ -139,7 +139,7 @@ describe('<audio-oscilloscope>', () => {
     owner.dispatchEvent(new CustomEvent('webaudio:statechange', {detail: {playing: false}}));
     expect(realtime.runners[1]!.stop).toHaveBeenCalledOnce();
     expect(scope.trace).toBeUndefined();
-    expect(scope.textContent).toContain('Playback paused');
+    expect(scope.querySelector<HTMLElement>('[part="status"]')?.hidden).toBe(true);
     expect(tap.fftSize).toBe(8);
   });
 

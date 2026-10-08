@@ -103,6 +103,27 @@ transport ownership. Each visible Element owns one neutral outer component
 surface and public tokens/parts; application Parameters configure attributes
 outside the component. Inspection gestures remain inside the applicable tool.
 
+## Presentation and controls
+
+The five Elements use achromatic default palettes and compact component
+surfaces. Detailed tools keep their primary measurements or probe values in
+fixed positions, without a repeated visible title. Accessible group names
+remain. Freeze buttons keep a stable label and use their pressed state;
+Reset/Clear and peak-hold controls keep their distinct operations. Routine
+Live, Paused and Frozen prose is suppressed. Waiting, unavailable, no-signal
+and unmatched-trigger feedback remains visible when applicable, so an empty
+or failed source is not presented as valid measured silence.
+
+Threshold, sensitivity, timebase and trigger controls reuse UIKit's rectangular
+horizontal fader. The adapter supplies the control's real units, bounds and
+keyboard steps through slider ARIA, while the domain continues to own values
+and commands. `--wm-analysis-control-size` defaults to `1.5rem` for compact
+buttons/selects and fader thickness; public `--wm-fader-*` tokens remain the
+fader styling surface. Existing named control parts remain alongside the
+shared fader parts. The meter retains its Shadow DOM and legacy color aliases.
+No presentation change alters measurement algorithms or borrowed graph
+ownership.
+
 ## Offline timing and View composition
 
 Onset times and beat grids are useful code-only results, not separate

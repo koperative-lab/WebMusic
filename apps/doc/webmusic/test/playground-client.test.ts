@@ -309,7 +309,7 @@ describe('element playground client', () => {
 
 import {SCORE_PLAY_PARAMS} from '../src/lib/params/score-play';
 import {SCORE_VIEW_PARAMS} from '../src/lib/params/score-view';
-import {defaultChoices} from '../src/lib/default-label';
+import {defaultChoices, defaultOptionLabel} from '../src/lib/default-label';
 
 function fixture(tag = 'score-view') {
   document.body.replaceChildren();
@@ -340,7 +340,7 @@ function fixture(tag = 'score-view') {
       let control: HTMLInputElement | HTMLSelectElement;
       if (param.kind === 'enum' || param.kind === 'bool') {
         control = document.createElement('select');
-        for (const choice of defaultChoices(param.fallback, param.kind === 'bool' ? ['on', 'off'] : param.options ?? [], param.kind === 'bool' ? 'unset' : '')) {
+        for (const choice of defaultChoices(param.kind === 'bool' && param.inverseFallbackAttribute ? 'default' : param.fallback, param.kind === 'bool' ? ['on', 'off'] : param.options ?? [], param.kind === 'bool' ? 'unset' : '')) {
           const option = document.createElement('option');
           option.value = choice.value;
           option.textContent = choice.label;
@@ -348,7 +348,13 @@ function fixture(tag = 'score-view') {
         }
       } else control = document.createElement('input');
       control.dataset.pgAttr = param.name;
-      if (param.kind === 'bool') control.dataset.pgKind = 'bool';
+      if (param.kind === 'bool') {
+        control.dataset.pgKind = 'bool';
+        if (param.inverseFallbackAttribute) {
+          control.dataset.pgInverseFallback = param.inverseFallbackAttribute;
+          control.dataset.pgFallback = defaultOptionLabel(param.fallback);
+        }
+      }
       row.append(control);
       panel.append(row);
     }
@@ -432,24 +438,80 @@ describe('type-specific Element playground parameters', () => {
     vi.runOnlyPendingTimers();
   });
 
-  it('exposes keyboard fitting in Parameters and retains it across types and Copy/Reset', async () => {
+  it('offers scrolling for new keyboards and retains its value across types and Copy/Reset', async () => {
     vi.useFakeTimers();
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, 'clipboard', {configurable: true, value: {writeText}});
     const f = fixture('score-pitch-view'); mountPlaygrounds();
-    expect(f.row('fit-to-width').hidden).toBe(false);
-    f.change('fit-to-width', 'on');
-    expect(f.target.getAttribute('fit-to-width')).toBe('');
+    expect(f.row('scroll').hidden).toBe(false);
+    expect(f.row('fit-to-width').hidden).toBe(true);
+    expect(f.input('scroll').value).toBe('unset');
+    expect(f.input('scroll').querySelector('option[value="unset"]')!.textContent).toBe('default (off)');
+    f.change('scroll', 'on');
+    expect(f.target.getAttribute('scroll')).toBe('');
     f.copy.click(); await Promise.resolve();
-    expect(writeText).toHaveBeenCalledWith(expect.stringContaining('fit-to-width'));
-    f.change('type', 'fretboard'); expect(f.row('fit-to-width').hidden).toBe(true);
-    f.change('type', 'keyboard'); expect(f.row('fit-to-width').hidden).toBe(false);
-    expect(f.input('fit-to-width').value).toBe('on');
-    f.change('fit-to-width', 'unset'); expect(f.target.hasAttribute('fit-to-width')).toBe(false);
-    f.change('fit-to-width', 'on');
-    f.reset.click(); expect(f.target.hasAttribute('fit-to-width')).toBe(false);
-    expect(f.row('fit-to-width').hidden).toBe(false);
+    expect(writeText).toHaveBeenCalledWith(expect.stringMatching(/<score-pitch-view[^>]*\bscroll[\s=>]/));
+    for (const type of ['staff', 'fretboard']) {
+      f.change('type', type);
+      expect(f.row('scroll').hidden).toBe(true);
+      expect(f.target.getAttribute('scroll')).toBe('');
+    }
+    f.copy.click(); await Promise.resolve();
+    expect(writeText).toHaveBeenLastCalledWith(expect.stringMatching(/<score-pitch-view[^>]*\bscroll[\s=>]/));
+    f.change('type', 'keyboard'); expect(f.row('scroll').hidden).toBe(false);
+    expect(f.input('scroll').value).toBe('on');
+    f.change('scroll', 'off'); expect(f.target.getAttribute('scroll')).toBe('false');
+    f.reset.click(); expect(f.target.hasAttribute('scroll')).toBe(false);
+    expect(f.input('scroll').value).toBe('unset');
+    expect(f.row('scroll').hidden).toBe(false);
+    expect(f.row('fit-to-width').hidden).toBe(true);
     vi.runOnlyPendingTimers();
+  });
+
+  it('lets explicit scroll off override retained legacy fitting, and default resumes the legacy fallback', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {configurable: true, value: {writeText}});
+    const f = fixture('score-pitch-view');
+    f.target.setAttribute('fit-to-width', 'false'); mountPlaygrounds();
+    const fallbackLabel = () => f.input('scroll').querySelector('option[value="unset"]')!.textContent;
+    expect(f.row('fit-to-width').hidden).toBe(false);
+    expect(fallbackLabel()).toBe('default (on)');
+    f.change('scroll', 'off');
+    expect(f.target.getAttribute('scroll')).toBe('false');
+    expect(f.target.getAttribute('fit-to-width')).toBe('false');
+    f.copy.click(); await Promise.resolve();
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining('scroll="false"'));
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining('fit-to-width="false"'));
+    f.change('scroll', 'unset');
+    expect(f.target.hasAttribute('scroll')).toBe(false);
+    expect(fallbackLabel()).toBe('default (on)');
+    f.change('type', 'staff'); expect(f.row('fit-to-width').hidden).toBe(true);
+    f.change('type', 'keyboard'); expect(f.row('fit-to-width').hidden).toBe(false);
+    expect(f.input('fit-to-width').value).toBe('off');
+    f.change('fit-to-width', 'unset');
+    expect(f.target.hasAttribute('fit-to-width')).toBe(false);
+    expect(f.row('fit-to-width').hidden).toBe(true);
+    expect(fallbackLabel()).toBe('default (off)');
+    f.reset.click();
+    expect(f.target.getAttribute('fit-to-width')).toBe('false');
+    expect(f.row('fit-to-width').hidden).toBe(false);
+    expect(fallbackLabel()).toBe('default (on)');
+  });
+
+  it('refreshes legacy controls added by a composition and removes them again on Reset', async () => {
+    const f = fixture('score-pitch-view'); mountPlaygrounds();
+    expect(f.row('fit-to-width').hidden).toBe(true);
+    f.target.setAttribute('fit-to-width', ' OFF '); await Promise.resolve();
+    expect(f.row('fit-to-width').hidden).toBe(false);
+    expect(f.input('scroll').querySelector('option[value="unset"]')!.textContent).toBe('default (on)');
+    f.panel.dispatchEvent(new Event(PLAYGROUND_SYNC_EVENT));
+    expect(f.input('fit-to-width').value).toBe('off');
+    f.change('scroll', 'off');
+    f.reset.click();
+    expect(f.target.hasAttribute('scroll')).toBe(false);
+    expect(f.target.hasAttribute('fit-to-width')).toBe(false);
+    expect(f.row('fit-to-width').hidden).toBe(true);
+    expect(f.input('scroll').querySelector('option[value="unset"]')!.textContent).toBe('default (off)');
   });
 
   it('keeps annotation visibility shared across every score type and includes it in Copy/Reset', async () => {
@@ -473,7 +535,7 @@ describe('type-specific Element playground parameters', () => {
     expect(f.output.textContent).not.toContain('show-annotations');
   });
 
-  it('resolves conditional companion rows against their own scoped element', () => {
+  it('resolves conditional companion rows and legacy fallbacks against their own scoped element', async () => {
     const f = fixture('score-view');
     const companion = document.createElement('score-pitch-view'); companion.setAttribute('type', 'fretboard');
     f.composition.append(companion); f.addRows('score-pitch-view', 'score-pitch-view'); mountPlaygrounds();
@@ -483,6 +545,17 @@ describe('type-specific Element playground parameters', () => {
     f.change('type', 'map');
     expect(scopeRow('frets').hidden).toBe(false);
     expect(f.row('cells').hidden).toBe(false);
+    companion.setAttribute('fit-to-width', 'false');
+    await Promise.resolve();
+    expect(scopeRow('fit-to-width').hidden).toBe(true);
+    companion.setAttribute('type', 'keyboard');
+    await Promise.resolve();
+    expect(scopeRow('fit-to-width').hidden).toBe(false);
+    expect(scopeRow('scroll').querySelector('option[value="unset"]')!.textContent).toBe('default (on)');
+    companion.removeAttribute('fit-to-width');
+    await Promise.resolve();
+    expect(scopeRow('fit-to-width').hidden).toBe(true);
+    expect(scopeRow('scroll').querySelector('option[value="unset"]')!.textContent).toBe('default (off)');
   });
 });
 

@@ -145,8 +145,8 @@ Current sounding pitches as a keyboard, staff or fretboard, selected by type.
 
 - Behavior/data collaboration: ActiveNoteTracker + pitch projections + player binding.
 - Reviewed UI composition: `@webmusic/ui/pitch`.
-- Attribute controls: `type`, `player`, `source`, `low`, `high`, `system`, `spelling`, `density`, `scheme`, `tuning`, `first-fret`, `frets`, `follow`, `fit-to-width`, `white-key-width`, `black-key-width`, `white-key-height`, `black-key-height`, `fret-width`, `string-spacing`, `string-width`
-- Properties and methods: `active`, `type`, `low`, `high`, `system`, `spelling`, `density`, `scheme`, `tuning`, `firstFret`, `frets`, `whiteKeyWidth / blackKeyWidth / whiteKeyHeight / blackKeyHeight`, `fretWidth / stringSpacing / stringWidth`, `follow`, `fitToWidth`
+- Attribute controls: `type`, `player`, `source`, `low`, `high`, `system`, `spelling`, `density`, `scheme`, `tuning`, `first-fret`, `frets`, `follow`, `scroll`, `fit-to-width`, `white-key-width`, `black-key-width`, `white-key-height`, `black-key-height`, `fret-width`, `string-spacing`, `string-width`
+- Properties and methods: `active`, `type`, `low`, `high`, `system`, `spelling`, `density`, `scheme`, `tuning`, `firstFret`, `frets`, `whiteKeyWidth / blackKeyWidth / whiteKeyHeight / blackKeyHeight`, `fretWidth / stringSpacing / stringWidth`, `follow`, `scrollable`, `fitToWidth`
 - Events: None declared in this catalog.
 - [Owning workflow and contract](<../apps/doc/webmusic/src/content/docs/score/element/view/score-pitch-view.mdx>) · [Element source](<../packages/score/src/view/element/score-pitch-view.ts>) · [Parameter catalog](<../apps/doc/webmusic/src/lib/params/score-view.ts>)
 

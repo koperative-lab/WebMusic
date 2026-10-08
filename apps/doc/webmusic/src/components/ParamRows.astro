@@ -9,7 +9,7 @@
 // row drives the panel target, exactly as before.
 import { ELEMENT_PARAMS } from '../lib/params';
 import type { ParamSpec } from '../lib/params/types';
-import {defaultChoices} from '../lib/default-label';
+import {defaultChoices, defaultOptionLabel} from '../lib/default-label';
 
 interface Props {
   /** Catalog key — the custom element tag whose attributes to render. */
@@ -36,7 +36,7 @@ if (omit) params = params.filter((p) => !omit.includes(p.name));
 
 const choicesFor = (p: ParamSpec) =>
   defaultChoices(
-    p.fallback,
+    p.kind === 'bool' && p.inverseFallbackAttribute ? 'default' : p.fallback,
     p.kind === 'bool' ? ['on', 'off'] : (p.options ?? []),
     p.kind === 'bool' ? 'unset' : '',
   );
@@ -55,7 +55,9 @@ const reasonFor = (p: ParamSpec) => inert[p.name] ?? p.inert;
     </span>
 
     {p.kind === 'bool' ? (
-      <select class="wui-select" data-pg-attr={p.name} data-pg-kind="bool">
+      <select class="wui-select" data-pg-attr={p.name} data-pg-kind="bool"
+        data-pg-inverse-fallback={p.inverseFallbackAttribute}
+        data-pg-fallback={p.inverseFallbackAttribute ? defaultOptionLabel(p.fallback) : undefined}>
         {choicesFor(p).map((c) => (
           <option value={c.value} selected={c.selected}>{c.label}</option>
         ))}

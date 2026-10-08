@@ -43,6 +43,8 @@ export interface ParamSpec {
    * carry it.
    */
   readonly fallback?: string;
+  /** Boolean only: an existing legacy attribute supplies the inverse fallback. Keep explicit on/off choices. */
+  readonly inverseFallbackAttribute?: string;
   /** One line: what this attribute changes. */
   readonly note: string;
   /**
@@ -57,6 +59,8 @@ export interface ParamSpec {
     readonly values: readonly string[];
     /** Effective value when the controlling enum is absent or invalid. */
     readonly fallback: string;
+    /** Also require this attribute on the same target; retained legacy controls only. */
+    readonly presentAttribute?: string;
   };
 }
 

@@ -55,6 +55,11 @@ document hiding and graph loss also clear them. A stopped frame source reports
 unavailable and is retried. Disconnect stops only this tool's poller, observers
 and presenter, never the borrowed player or graph.
 
+The monochrome surface keeps Time and Amplitude in fixed readout slots and
+omits a repeated title. Routine Live, Paused and Frozen messages are hidden;
+waiting, unavailable, No signal and No matching edge feedback remains visible.
+Freeze keeps its label and uses its pressed state to indicate a held frame.
+
 <details class="component-section">
 <summary>API</summary>
 
@@ -81,9 +86,13 @@ trace is unavailable.
 **Accessibility.** The canvas is a focusable slider named "Inspect waveform
 time", with its selected time and amplitude in `aria-valuetext`. Arrow keys
 move the probe by one percent of the visible window, Shift+Arrow by ten
-percent, and Home/End select its ends. Native range controls set timebase and
-trigger level; the edge select and Freeze button remain keyboard-operable.
-The current probe and status are also text outside the canvas.
+percent, and Home/End select its ends. Timebase and trigger use rectangular
+horizontal UIKit faders with actual-unit slider ARIA and visible values.
+Arrow keys change timebase by `0.5` ms and trigger by `0.05`; Home/End select
+the bounds. Timebase remains bounded by the available
+samples, including windows shorter than 1 ms. The edge select and Freeze
+button remain keyboard-operable. Probe outputs use `aria-live="off"`;
+diagnostic status remains outside the canvas.
 
 </details>
 
@@ -97,7 +106,10 @@ The full-width host honors native `hidden` and uses the shared
 `--wm-oscilloscope-height`, foreground, muted, border, control-background and
 selection tokens. Its public parts are `root surface`, `header`, `readout`,
 `plot`, `controls`, `freeze`, `timebase`, `trigger-level`, `trigger-edge` and
-`status`. The canvas trace and axis colors are currently fixed drawing
-colors; changing CSS background tokens alone does not recolor those pixels.
+`status`. The timebase and trigger sliders also expose the shared `fader` part;
+use `[part~="timebase"]` or `[part~="trigger-level"]`.
+`--wm-analysis-control-size` defaults to `1.5rem`, and `--wm-fader-*` styles the
+horizontal controls. Canvas foreground and muted colors follow the presenter
+tokens; its transparent clear preserves the configured plot background.
 
 </details>

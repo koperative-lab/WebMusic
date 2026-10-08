@@ -1,5 +1,7 @@
 import {claimHost, createErrorSink} from './internal/lifecycle';
 import {installStyle} from './internal/style';
+import {analysisControlStyle, createAnalysisFader, setAnalysisStatus} from './internal/analysis-controls';
+import {canvasInk} from './internal/canvas-ink';
 
 export type OscilloscopeTriggerEdge = 'off' | 'rising' | 'falling';
 
@@ -48,32 +50,32 @@ type OscilloscopeHost = HTMLElement | ShadowRoot;
 const mounted = new WeakMap<OscilloscopeHost, OscilloscopeHandle>();
 
 export const oscilloscopeStyle = String.raw`
+${analysisControlStyle}
 .wui-oscilloscope, .wui-oscilloscope * { box-sizing: border-box; }
-.wui-oscilloscope { display: grid; gap: .55rem; width: 100%; min-width: 0;
-  color: var(--wm-oscilloscope-foreground, var(--wm-foreground, #263138));
+.wui-oscilloscope { display: grid; gap: .4rem; width: 100%; min-width: 0;
+  --wui-oscilloscope-fader-fill: var(--wm-fader-fill, var(--wm-accent, #999));
+  color: var(--wm-oscilloscope-foreground, var(--wm-foreground, #444));
   font: 400 .78rem/1.4 var(--wm-font-family, system-ui, sans-serif); }
-.wui-oscilloscope__head, .wui-oscilloscope__controls { display: flex; align-items: center; flex-wrap: wrap; gap: .45rem .8rem; min-width: 0; }
-.wui-oscilloscope__title { font-size: .8rem; font-weight: 700; text-transform: uppercase; }
-.wui-oscilloscope__readout { margin-inline-start: auto; color: var(--wm-oscilloscope-muted, #536167);
-  font: 600 .75rem/1.4 var(--wm-font-mono, ui-monospace, monospace); font-variant-numeric: tabular-nums; }
+.wui-oscilloscope__head { min-width: 0; }
+.wui-oscilloscope__controls { display: flex; align-items: center; flex-wrap: wrap; gap: .4rem .65rem; min-width: 0; }
+.wui-oscilloscope__readout { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem; margin: 0;
+  color: var(--wm-oscilloscope-muted, var(--wm-foreground-muted, #666)); font-variant-numeric: tabular-nums; }
+.wui-oscilloscope__readout > div { display: flex; gap: .4rem; align-items: baseline; min-width: 0; }
+.wui-oscilloscope__readout dt { font-size: .68rem; }
+.wui-oscilloscope__readout dd { margin: 0; min-width: 0; font: 400 .75rem/1.4 var(--wm-font-mono, ui-monospace, monospace); }
 .wui-oscilloscope__plot { display: block; width: 100%; height: var(--wm-oscilloscope-height, 11rem); min-height: 7rem;
-  border: 0; background: var(--wm-oscilloscope-plot-background, #17252a); cursor: crosshair; touch-action: none; }
+  border: 0; background: var(--wm-oscilloscope-plot-background, var(--wm-surface-muted, #f3f3f3)); cursor: crosshair; touch-action: none; }
 .wui-oscilloscope__control { display: inline-flex; align-items: center; gap: .35rem; min-width: 0; }
-.wui-oscilloscope__range { width: clamp(5rem, 16vw, 8rem); accent-color: var(--wm-oscilloscope-accent, #258a80); }
-.wui-oscilloscope__value { min-width: 4.5ch; text-align: right; font: 600 .74rem/1.4 var(--wm-font-mono, ui-monospace, monospace); }
-.wui-oscilloscope__select, .wui-oscilloscope__button { min-height: 2rem; color: inherit;
-  border: 1px solid var(--wm-oscilloscope-border, var(--wm-border, #a8b4b8)); border-radius: var(--wm-control-radius, 0);
-  background: var(--wm-oscilloscope-control-background, var(--wm-surface, #fff)); font: inherit; }
-.wui-oscilloscope__select { padding: .2rem .35rem; }
-.wui-oscilloscope__button { padding: .25rem .6rem; cursor: pointer; }
-.wui-oscilloscope__button[aria-pressed='true'] { background: var(--wm-oscilloscope-selected-background, #d9eeeb);
-  border-color: var(--wm-oscilloscope-selected-border, #258e83); }
-.wui-oscilloscope__button:disabled { opacity: .5; cursor: default; }
-.wui-oscilloscope__status { min-height: 1.1rem; color: var(--wm-oscilloscope-muted, #536167); }
-.wui-oscilloscope__plot:focus-visible, .wui-oscilloscope__select:focus-visible,
-.wui-oscilloscope__range:focus-visible, .wui-oscilloscope__button:focus-visible {
-  outline: 2px solid var(--wm-focus, Highlight); outline-offset: 2px; }
-@media (max-width: 440px) { .wui-oscilloscope__readout { margin-inline-start: 0; width: 100%; } }
+.wui-oscilloscope .wui-analysis-fader { --wm-fader-fill: var(--wm-oscilloscope-accent, var(--wui-oscilloscope-fader-fill)); }
+.wui-oscilloscope__select, .wui-oscilloscope__button {
+  border-color: var(--wm-oscilloscope-border, var(--wm-control-border, var(--wm-border, #d8d8d8)));
+  background: var(--wm-oscilloscope-control-background, var(--wm-surface, #fff)); }
+.wui-oscilloscope__button[aria-pressed='true'] { background: var(--wm-oscilloscope-selected-background, var(--wm-accent, #444));
+  border-color: var(--wm-oscilloscope-selected-border, var(--wm-control-border, var(--wm-border, #d8d8d8))); }
+.wui-oscilloscope__status { color: var(--wm-oscilloscope-muted, var(--wm-foreground-muted, #666)); }
+.wui-oscilloscope__plot:focus-visible {
+  outline: 2px solid var(--wm-focus, var(--wm-foreground, #444)); outline-offset: 2px; }
+@media (max-width: 440px) { .wui-oscilloscope__readout > div { flex-direction: column; gap: .1rem; } }
 @media (forced-colors: active) { .wui-oscilloscope__plot { border: 1px solid CanvasText; background: Canvas; }
   .wui-oscilloscope__button[aria-pressed='true'] { border-color: Highlight; } }
 `;
@@ -108,13 +110,24 @@ export function mountOscilloscope(
   const head = document.createElement('div');
   head.className = 'wui-oscilloscope__head';
   head.setAttribute('part', 'header');
-  const title = document.createElement('strong');
-  title.className = 'wui-oscilloscope__title';
-  title.textContent = 'Oscilloscope';
-  const readout = document.createElement('output');
+  const readout = document.createElement('dl');
   readout.className = 'wui-oscilloscope__readout';
   readout.setAttribute('part', 'readout');
-  head.append(title, readout);
+  function readoutField(label: string): HTMLOutputElement {
+    const field = document.createElement('div');
+    const term = document.createElement('dt');
+    term.textContent = label;
+    const detail = document.createElement('dd');
+    const value = document.createElement('output');
+    value.setAttribute('aria-live', 'off');
+    detail.append(value);
+    field.append(term, detail);
+    readout.append(field);
+    return value;
+  }
+  const timeValue = readoutField('Time');
+  const amplitudeValue = readoutField('Amplitude');
+  head.append(readout);
 
   const canvas = document.createElement('canvas');
   canvas.className = 'wui-oscilloscope__plot';
@@ -127,34 +140,32 @@ export function mountOscilloscope(
   controls.className = 'wui-oscilloscope__controls';
   controls.setAttribute('part', 'controls');
   const freeze = document.createElement('button');
-  freeze.className = 'wui-oscilloscope__button';
+  freeze.className = 'wui-oscilloscope__button wui-analysis-button';
   freeze.type = 'button';
   freeze.textContent = 'Freeze';
   freeze.setAttribute('part', 'freeze');
 
-  function rangeControl(label: string, part: string): {container: HTMLLabelElement; input: HTMLInputElement; value: HTMLOutputElement} {
-    const container = document.createElement('label');
-    container.className = 'wui-oscilloscope__control';
-    container.textContent = label;
-    const input = document.createElement('input');
-    input.className = 'wui-oscilloscope__range';
-    input.type = 'range';
-    input.setAttribute('part', part);
-    const value = document.createElement('output');
-    value.className = 'wui-oscilloscope__value';
-    container.append(input, value);
-    return {container, input, value};
-  }
-  const timebase = rangeControl('Timebase', 'timebase');
-  const trigger = rangeControl('Trigger', 'trigger-level');
-  trigger.input.min = '-1';
-  trigger.input.max = '1';
-  trigger.input.step = '0.05';
+  const timebase = createAnalysisFader(document, {
+    label: 'Timebase', part: 'timebase', min: 1, max: 100, step: .5, value: 10,
+    formatValue: (value) => `${value.toFixed(1)} ms`,
+    onInput: (value) => {
+      if (!isCurrent()) return;
+      try { binding.setTimebaseMs(value); update(); } catch (error) { report(error); }
+    }, onError: report,
+  });
+  const trigger = createAnalysisFader(document, {
+    label: 'Trigger', part: 'trigger-level', min: -1, max: 1, step: .05, value: 0,
+    formatValue: (value) => value.toFixed(2),
+    onInput: (value) => {
+      if (!isCurrent()) return;
+      try { binding.setTriggerLevel(value); update(); } catch (error) { report(error); }
+    }, onError: report,
+  });
   const edgeLabel = document.createElement('label');
   edgeLabel.className = 'wui-oscilloscope__control';
   edgeLabel.textContent = 'Edge';
   const edge = document.createElement('select');
-  edge.className = 'wui-oscilloscope__select';
+  edge.className = 'wui-oscilloscope__select wui-analysis-select';
   edge.setAttribute('part', 'trigger-edge');
   for (const [value, label] of [['rising', 'Rising'], ['falling', 'Falling'], ['off', 'Off']] as const) {
     const option = document.createElement('option');
@@ -163,7 +174,7 @@ export function mountOscilloscope(
     edge.append(option);
   }
   edgeLabel.append(edge);
-  controls.append(freeze, timebase.container, trigger.container, edgeLabel);
+  controls.append(freeze, timebase.element, trigger.element, edgeLabel);
   const status = document.createElement('div');
   status.className = 'wui-oscilloscope__status';
   status.setAttribute('part', 'status');
@@ -188,8 +199,9 @@ export function mountOscilloscope(
     if (canvas.height !== pixelHeight) canvas.height = pixelHeight;
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
     context.clearRect(0, 0, width, height);
-    context.fillStyle = '#17252a';
-    context.fillRect(0, 0, width, height);
+    // Leave the CSS background visible, including caller-provided plot colors.
+    const ink = canvasInk(root, '#444');
+    const muted = canvasInk(readout, '#666');
     const left = 38;
     const top = 12;
     const plotWidth = Math.max(1, width - left - 12);
@@ -197,15 +209,17 @@ export function mountOscilloscope(
     const xAt = (fraction: number) => left + fraction * plotWidth;
     const yAt = (amplitude: number) => top + (1 - clamp(amplitude, -1, 1)) * plotHeight / 2;
     context.lineWidth = 1;
-    context.strokeStyle = '#40565c';
-    context.fillStyle = '#bbcccb';
+    context.strokeStyle = muted;
+    context.fillStyle = muted;
     context.font = '10px ui-monospace, monospace';
     for (const amplitude of [1, .5, 0, -.5, -1]) {
       const y = yAt(amplitude);
       context.beginPath();
       context.moveTo(left, y + .5);
       context.lineTo(left + plotWidth, y + .5);
+      context.globalAlpha = .25;
       context.stroke();
+      context.globalAlpha = 1;
       if (amplitude === 1 || amplitude === 0 || amplitude === -1) {
         context.fillText(amplitude > 0 ? `+${amplitude}` : String(amplitude), 8, y + 3);
       }
@@ -215,12 +229,18 @@ export function mountOscilloscope(
       context.beginPath();
       context.moveTo(x + .5, top);
       context.lineTo(x + .5, top + plotHeight);
+      context.globalAlpha = .25;
       context.stroke();
-      if (division % 2 === 0) context.fillText(`${(windowMs * division / 4).toFixed(1)}`, x + 2, height - 7);
+      context.globalAlpha = 1;
+      if (division % 2 === 0) {
+        context.textAlign = division === 4 ? 'right' : 'left';
+        context.fillText(`${(windowMs * division / 4).toFixed(1)}`, x + (division === 4 ? -2 : 2), height - 7);
+        context.textAlign = 'left';
+      }
     }
     if (state.triggerEdge !== 'off') {
       const y = yAt(state.triggerLevel);
-      context.strokeStyle = '#edb45e';
+      context.strokeStyle = muted;
       context.setLineDash([4, 3]);
       context.beginPath();
       context.moveTo(left, y);
@@ -230,7 +250,7 @@ export function mountOscilloscope(
     }
     const samples = state.trace?.samples;
     if (samples && samples.length > 0) {
-      context.strokeStyle = '#63d9c2';
+      context.strokeStyle = ink;
       context.lineWidth = 1.5;
       context.beginPath();
       for (let index = 0; index < samples.length; index += 1) {
@@ -241,7 +261,7 @@ export function mountOscilloscope(
       }
       context.stroke();
     }
-    context.strokeStyle = '#f1f6ed';
+    context.strokeStyle = ink;
     context.setLineDash([3, 3]);
     context.beginPath();
     const cursorX = xAt(selectedTimeMs / Math.max(0.001, windowMs));
@@ -260,15 +280,9 @@ export function mountOscilloscope(
       const windowMs = state.trace?.timebaseMs ?? clamp(state.timebaseMs, Math.min(1, available), available);
       selectedTimeMs = clamp(selectedTimeMs, 0, windowMs);
       freeze.setAttribute('aria-pressed', String(state.frozen));
-      freeze.textContent = state.frozen ? 'Unfreeze' : 'Freeze';
       freeze.disabled = !state.frozen && !state.trace;
-      timebase.input.min = String(Math.min(1, available));
-      timebase.input.max = String(available);
-      timebase.input.step = '0.5';
-      timebase.input.value = String(windowMs);
-      timebase.value.textContent = `${windowMs.toFixed(1)} ms`;
-      trigger.input.value = String(state.triggerLevel);
-      trigger.value.textContent = state.triggerLevel.toFixed(2);
+      timebase.paint(windowMs, {min: Math.min(1, available), max: available});
+      trigger.paint(state.triggerLevel);
       edge.value = state.triggerEdge;
       canvas.setAttribute('aria-valuemin', '0');
       canvas.setAttribute('aria-valuemax', windowMs.toFixed(2));
@@ -276,10 +290,11 @@ export function mountOscilloscope(
       const amplitude = amplitudeAt(state.trace, selectedTimeMs);
       const valueText = `${selectedTimeMs.toFixed(2)} ms${amplitude === undefined ? '' : `, ${amplitude >= 0 ? '+' : ''}${amplitude.toFixed(2)} amplitude`}`;
       canvas.setAttribute('aria-valuetext', valueText);
-      readout.textContent = valueText;
-      status.textContent = state.status === 'live'
-        ? state.trace?.silent ? 'No signal' : state.triggerEdge === 'off' ? 'Live, free run' : state.trace?.triggered ? 'Live, triggered' : 'Live, no matching edge'
-        : ({waiting: 'Waiting for playback', paused: 'Playback paused', unavailable: 'Analyser unavailable', frozen: 'Waveform frozen'} as const)[state.status];
+      timeValue.textContent = `${selectedTimeMs.toFixed(2)} ms`;
+      amplitudeValue.textContent = amplitude === undefined ? '—' : `${amplitude >= 0 ? '+' : ''}${amplitude.toFixed(2)}`;
+      setAnalysisStatus(status, state.status === 'live'
+        ? state.trace?.silent ? 'No signal' : state.triggerEdge !== 'off' && !state.trace?.triggered ? 'No matching edge' : ''
+        : ({waiting: 'Waiting for playback', paused: '', unavailable: 'Analyser unavailable', frozen: ''} as const)[state.status]);
       root.dataset.state = state.status;
       draw(state, windowMs);
     } catch (error) { report(error); }
@@ -328,18 +343,10 @@ export function mountOscilloscope(
   const onFreeze = (): void => {
     try { binding.setFrozen(!binding.snapshot().frozen); update(); } catch (error) { report(error); }
   };
-  const onTimebase = (): void => {
-    try { binding.setTimebaseMs(Number(timebase.input.value)); update(); } catch (error) { report(error); }
-  };
-  const onTrigger = (): void => {
-    try { binding.setTriggerLevel(Number(trigger.input.value)); update(); } catch (error) { report(error); }
-  };
   const onEdge = (): void => {
     try { binding.setTriggerEdge(edge.value as OscilloscopeTriggerEdge); update(); } catch (error) { report(error); }
   };
   freeze.addEventListener('click', onFreeze);
-  timebase.input.addEventListener('input', onTimebase);
-  trigger.input.addEventListener('input', onTrigger);
   edge.addEventListener('change', onEdge);
   canvas.addEventListener('pointerdown', onPointer);
   canvas.addEventListener('pointermove', onPointer);
@@ -355,8 +362,8 @@ export function mountOscilloscope(
       try { unsubscribe?.(); } catch (error) { report(error); }
       observer?.disconnect();
       freeze.removeEventListener('click', onFreeze);
-      timebase.input.removeEventListener('input', onTimebase);
-      trigger.input.removeEventListener('input', onTrigger);
+      timebase.destroy();
+      trigger.destroy();
       edge.removeEventListener('change', onEdge);
       canvas.removeEventListener('pointerdown', onPointer);
       canvas.removeEventListener('pointermove', onPointer);

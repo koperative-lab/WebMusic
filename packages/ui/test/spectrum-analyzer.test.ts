@@ -46,6 +46,9 @@ describe('mountSpectrumAnalyzer', () => {
     expect(plot.getAttribute('role')).toBe('slider');
     expect(plot.getAttribute('aria-valuetext')).toContain('-36.0 dB');
     expect(host.querySelector('output')?.textContent).toContain('1.0 kHz');
+    expect([...host.querySelectorAll('[part="readout"] dt')].map((node) => node.textContent)).toEqual(['Frequency', 'Level']);
+    expect([...host.querySelectorAll('[part="readout"] output')].map((node) => node.textContent)).toEqual(['1.0 kHz', '-36.0 dB']);
+    expect(host.querySelector<HTMLElement>('[part="status"]')?.hidden).toBe(true);
     expect(context.stroke).toHaveBeenCalled();
 
     plot.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowRight', bubbles: true}));
@@ -90,10 +93,39 @@ describe('mountSpectrumAnalyzer', () => {
     current.frame = undefined;
     current.status = 'paused';
     handle.update();
-    expect(host.querySelector('[part="status"]')?.textContent).toBe('Playback paused');
+    expect(host.querySelector<HTMLElement>('[part="status"]')?.hidden).toBe(true);
+    expect(host.querySelectorAll('[part="readout"] output')[1]?.textContent).toBe('—');
     current.sourceRevision += 1;
     handle.update();
     expect(reset.disabled).toBe(true);
+    handle.destroy();
+  });
+
+  it('paints solid signal and dashed held peaks with neutral or caller-resolved ink', () => {
+    const painted: string[] = [];
+    const drawing = {...context, strokeStyle: '', stroke: vi.fn(), fillRect: vi.fn(), setLineDash: vi.fn()};
+    drawing.stroke.mockImplementation(() => { painted.push(drawing.strokeStyle); });
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(drawing as unknown as CanvasRenderingContext2D);
+    const host = document.createElement('div'); document.body.append(host);
+    const current = state(); current.peakHold = true;
+    const handle = mountSpectrumAnalyzer(host, {snapshot: () => current, setFrozen: vi.fn(), setPeakHold: vi.fn()});
+    expect(new Set(painted)).toEqual(new Set(['#444', '#666']));
+    expect(drawing.fillRect).not.toHaveBeenCalled();
+    expect(drawing.setLineDash).toHaveBeenCalledWith([4, 3]);
+    painted.length = 0;
+    handle.element.style.color = 'rgb(22, 44, 66)';
+    host.querySelector<HTMLElement>('[part="readout"]')!.style.color = 'rgb(77, 88, 99)';
+    handle.update();
+    expect(new Set(painted)).toEqual(new Set(['rgb(22, 44, 66)', 'rgb(77, 88, 99)']));
+    for (const status of ['live', 'paused', 'frozen'] as const) {
+      current.status = status; handle.update();
+      expect(host.querySelector<HTMLElement>('[part="status"]')?.hidden).toBe(true);
+    }
+    current.status = 'waiting'; handle.update();
+    expect(host.querySelector('[part="status"]')?.textContent).toBe('Waiting for playback');
+    current.status = 'unavailable'; handle.update();
+    expect(host.querySelector('[part="status"]')?.textContent).toBe('Analyser unavailable');
+    expect(host.querySelector<HTMLElement>('[part="status"]')?.hidden).toBe(false);
     handle.destroy();
   });
 

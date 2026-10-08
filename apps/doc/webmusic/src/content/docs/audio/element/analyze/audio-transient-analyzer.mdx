@@ -56,6 +56,11 @@ explicit analyser, graph loss, hiding the document or disconnect also releases
 old evidence and polling/subscriptions. A stalled source is reported and
 retried without disposing the borrowed graph.
 
+Strength, Hits and Last interval stay in fixed positions above the history.
+The default surface is monochrome, without a repeated title or routine Live,
+Paused and Frozen messages. Waiting, no-signal and unavailable feedback remains
+visible; Freeze reports its state through its pressed appearance.
+
 <details class="component-section">
 <summary>API</summary>
 
@@ -79,7 +84,10 @@ tool's polling cadence. The threshold is an internal visual/detection
 quantity, not a gain or playback control.
 
 **Accessibility.** Freeze and Clear are native buttons; Freeze exposes
-`aria-pressed`. Sensitivity is a labelled native range input. The plot has a
+`aria-pressed` and keeps the same label. Sensitivity is a rectangular horizontal
+UIKit fader with a labelled slider role, a visible percentage and `0..100%`
+ARIA bounds. Arrow keys change it by one percentage point, and Home/End
+select the bounds. The `sensitivity` property remains `0..1`. The plot has a
 text alternative reporting current strength, threshold and hit count; status
 and numeric readouts remain outside the visual bars.
 
@@ -96,6 +104,8 @@ The host's neutral outer surface honors shared `--wm-component-*` tokens and
 `--wm-transient-analyzer-strength`, `--wm-transient-analyzer-hit` and
 `--wm-transient-analyzer-threshold` tokens. Public parts are `root surface`,
 `plot`, `freeze`, `clear` and `sensitivity`; structural `wui-*` child classes
-are not additional styling contracts.
+are not additional styling contracts. The fader also exposes `fader`; use
+`[part~="sensitivity"]`. `--wm-analysis-control-size` defaults to `1.5rem` for
+compact controls, and `--wm-fader-*` styles the shared horizontal fader.
 
 </details>

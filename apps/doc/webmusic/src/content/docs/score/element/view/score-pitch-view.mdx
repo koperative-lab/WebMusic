@@ -35,22 +35,34 @@ The component has no `src`, `.score`, note command or transport command. Changin
 
 ## Keyboard
 
-`type="keyboard"` shows requested MIDI endpoints `low="36"` through `high="84"` by default. The getters report rounded requested endpoints; the presenter normalizes them to MIDI 0–127, orders reversed endpoints and limits the displayed span to 88 semitones. Notes outside the displayed range remain in `.active`. Released keys clear without a visual release trail.
+`type="keyboard"` shows requested MIDI endpoints `low="48"` through `high="71"`
+(C3–B4) by default and fits the entire range into its container without
+horizontal scrolling. The getters report rounded requested endpoints; the presenter normalizes them to MIDI 0–127, orders reversed endpoints and limits the displayed span to 88 semitones. Notes outside the displayed range remain in `.active`. Released keys clear without a visual release trail.
 
-Use `white-key-width` and `black-key-width` for exact pixel widths, and
-`white-key-height` and `black-key-height` for key lengths. Explicit width fixes
-the board's pitch scale; a narrower host scrolls instead of compressing keys.
-With neither width set, the keyboard keeps its responsive sizing. Black width
+Set `scroll="true"` to allow horizontal scrolling. In that mode, use
+`white-key-width` and `black-key-width` for exact pixel widths; a narrower host
+scrolls instead of compressing keys. With neither width set, the keyboard uses
+responsive sizing with a readable minimum key width. Black width
 defaults to `0.62 × white width`; setting black width alone derives white width
-by dividing by `0.62`. Black width and height cannot exceed white dimensions.
+by dividing by `0.62`. Use `white-key-height` and `black-key-height` for key
+lengths in either mode. Black width and height cannot exceed white dimensions.
 
-Set `fit-to-width="true"` to fit the entire normalized keyboard range into its
-container without horizontal scrolling. This overrides both explicit key widths
-and the CSS minimum key width while enabled, using the default `0.62` black/white
-width ratio. Key heights and held notes stay unchanged. Set it to `false` or
-remove it to restore the existing fixed widths or responsive minimum width.
+Set `scroll="false"` to fit the complete normalized range again. Fitting
+overrides explicit key widths and the CSS minimum key width, using the default
+`0.62` black/white width ratio. It retains the width attributes for the next
+scrolling configuration. Key heights and held notes stay unchanged.
 
-`follow="active"` reveals newly sounding pitches by default. Use `follow="none"`
+The legacy `fit-to-width` attribute is still accepted when `scroll` is absent:
+`true` fits the range, while `false` enables scrolling. Explicit `scroll` always
+takes precedence. Removing both attributes restores the default fit. The
+Parameters panel offers `scroll` for new configurations and shows the legacy
+control only when that attribute is already present. The scroll control's
+`default (on/off)` choice removes `scroll` and reports the current fallback;
+explicit `on` or `off` overrides any retained legacy value.
+
+`follow="active"` reveals newly sounding pitches when scrolling is enabled.
+The requested follow mode stays `active` by default, but fitting does not scroll.
+Use `follow="none"`
 when a shared application container should pan the keyboard together with a
 [`waterfall`](/score/element/view/score-view/#align-a-waterfall-and-keyboard).
 
@@ -76,7 +88,7 @@ scale. Omit these attributes to retain density-based, responsive defaults.
 | `type` | `keyboard` | All | `keyboard`, `staff` or `fretboard`; unknown values use keyboard. |
 | `player` | absent | All | Unique selector for a held-note/state source; takes precedence over `source`. |
 | `source` | absent | All | Legacy selector fallback when `player` is empty. |
-| `low` / `high` | `36` / `84` | Keyboard | Requested lowest/highest MIDI key, rounded. |
+| `low` / `high` | `48` / `71` | Keyboard | Requested lowest/highest MIDI key, rounded. |
 | `system` | `grand` | Staff | `grand`, `treble` or `bass`. |
 | `spelling` | `sharp` | All | `sharp` or `flat`; no key inference. |
 | `density` | `comfortable` | All | `comfortable` or `compact`. |
@@ -84,10 +96,11 @@ scale. Omit these attributes to retain density-based, responsive defaults.
 | `tuning` | `standard` | Fretboard | Standard guitar `[40,45,50,55,59,64]`, or 1–12 comma/space-separated MIDI pitches in visual string order; invalid values use standard. |
 | `first-fret` | `0` | Fretboard | First displayed fret, clamped to 0–24. |
 | `frets` | `12` | Fretboard | Visible fret count, clamped to 1–24. |
-| `follow` | `active` | Keyboard | `active` reveals newly active pitches; `none` leaves scrolling to the application/user. |
-| `fit-to-width` | `false` | Keyboard | Fit the complete normalized range to the container, overriding explicit widths and the CSS minimum width. Heights remain unchanged. |
-| `white-key-width` | responsive | Keyboard | Fixed natural-key width in px; ignored while `fit-to-width` is enabled. |
-| `black-key-width` | `0.62 × white width` | Keyboard | Fixed accidental-key width in px, capped at white width; alone derives white width as `value / 0.62`. Ignored while `fit-to-width` is enabled. |
+| `follow` | `active` | Keyboard | Reveal newly active pitches when scrolling is enabled; `none` leaves panning to the application/user. Fitting never scrolls. |
+| `scroll` | `false` | Keyboard | Allow horizontal scrolling and explicit key widths. False fits the complete normalized range. When present, takes precedence over `fit-to-width`. |
+| `fit-to-width` | effective `true` | Keyboard | Legacy inverse of scrolling, read only when `scroll` is absent. True fits the range; false enables scrolling. |
+| `white-key-width` | fit the range; responsive when scrolling | Keyboard | Fixed natural-key width in px when scrolling is enabled; ignored while fitting. |
+| `black-key-width` | `0.62 × white width` | Keyboard | Fixed accidental-key width in px, capped at white width; alone derives white width as `value / 0.62`. Ignored while fitting. |
 | `white-key-height` | theme height | Keyboard | Natural-key length in px. |
 | `black-key-height` | theme proportion | Keyboard | Accidental-key length in px, capped at white-key height. |
 | `fret-width` | responsive | Fretboard | Fixed distance between adjacent fret wires in px. |
@@ -101,10 +114,14 @@ The geometry getters `.whiteKeyWidth`, `.blackKeyWidth`, `.whiteKeyHeight`,
 positive finite pixel request or `undefined`. Missing, empty, nonnumeric,
 non-finite, zero and negative geometry attributes use default geometry;
 removing an override restores the responsive/theme default. `.follow` returns
-the resolved mode. `.fitToWidth` is a read-only boolean, `false` by default.
-An empty or `true` attribute enables fitting; `false`, `0`, `no` and `off`
-disable it, ignoring case and surrounding whitespace. Other present values
-enable it. These settings do not replace the held-note tracker or player.
+the requested mode. `.scrollable` is a read-only boolean describing effective
+keyboard scrolling, `false` by default. `.fitToWidth` is its inverse, `true` by
+default. Configure them with attributes; `.scroll()` remains the inherited
+HTMLElement method. For both `scroll` and legacy `fit-to-width`, an empty or
+`true` attribute enables that setting; `false`, `0`, `no` and `off` disable it,
+ignoring case and surrounding whitespace. Other present values enable it.
+These keyboard settings do not change staff/fretboard layout or replace the
+held-note tracker or player.
 
 `PitchViewElement`, `PitchViewType` and `definePitchViewElement(tag?)` are exported from `@webmusic/score/view/element`. Registration is idempotent and SSR-safe; `defineAllViewElements()` registers all View tags. There are no emitted events or public commands.
 
@@ -115,10 +132,12 @@ enable it. These settings do not replace the held-note tracker or player.
 <details class="component-section">
 <summary>Styling</summary>
 
-By default, the keyboard and fretboard preserve readable key and marker sizes and scroll locally when their
-full range does not fit. `fit-to-width="true"` lets the keyboard compress its keys to show its complete range.
-A keyboard reveals newly sounding pitches; repeated snapshots and note
-releases leave manual scrolling in place. Wider fretboards expand fret spacing without enlarging
+By default, the keyboard fits every key in its range without horizontal
+scrolling. `scroll="true"` preserves fixed or minimum key widths and allows
+local scrolling; in that mode, `follow="active"` reveals newly sounding pitches
+while repeated snapshots and note releases leave manual scrolling in place.
+The fretboard preserves readable marker sizes and scrolls locally when its
+range does not fit. Wider fretboards expand fret spacing without enlarging
 the dots. Staff lines fill the container while noteheads retain their staff-space size. An
 overflowing surface is one keyboard focus stop for native scrolling; the musical input is unchanged.
 

@@ -10,8 +10,8 @@ import UiPresenterLiveDemo from '../../../../components/UiPresenterLiveDemo.astr
 import UiPresenterRelated from '../../../../components/UiPresenterRelated.astro';
 
 `mountTransientAnalyzer()` presents the current attack strength, threshold,
-recent hit pattern and hit count. Its native Sensitivity, Freeze and Clear
-controls call into the application's actions. The caller owns signal sampling,
+recent hit pattern and hit count. Its Sensitivity fader and native Freeze and Clear
+buttons call into the application's actions. The caller owns signal sampling,
 the detection algorithm and the history; this presenter does not infer onsets,
 BPM or a beat grid. For a player-connected implementation, use
 [`<audio-transient-analyzer>`](/audio/element/analyze/audio-transient-analyzer/).
@@ -61,17 +61,21 @@ covers one mounted presenter per host and cleanup.
 
 `sample.strength`, `history[*].strength`, `sensitivity` and `threshold` are
 normalized `0..1` values supplied by the caller. The most recent 64 history
-samples occupy fixed display columns, with `hit` coloring accepted cues.
+samples occupy fixed display columns, with darker `hit` bars marking accepted cues by default.
 The presenter never calculates a threshold from sensitivity; the caller must
 keep those values consistent when Sensitivity changes. `lastIntervalMs`
 describes the gap between accepted cues when known, not a beat period.
 
 Replacing the underlying source requires the caller to discard stale
-observations before calling `update()`. `destroy()` releases native listeners,
+observations before calling `update()`. `destroy()` releases control listeners,
 nodes and the stylesheet; it neither disposes a detector nor stops a player.
-Unlike presenters with an `onError` option, this entry does not catch errors
-thrown by caller actions; the caller should handle failures in its own action
-callbacks.
+This entry has no `onError` option. Handle failures inside the caller's action
+callbacks so the application can report them consistently.
+
+Strength, Hits and Last interval retain fixed positions above the history.
+The surface omits a repeated title and hides routine Live, Paused and Frozen
+messages. Waiting, no-signal, unavailable and other diagnostic text remains
+visible. Freeze keeps its label and uses its pressed state to show the hold.
 
 <details class="component-section">
 <summary>API</summary>
@@ -82,18 +86,18 @@ callbacks.
 |---|---|---|---|
 | `sample` | `TransientAnalyzerSample?` | absent | Latest `{strength, hit}` observation. Without one, the Strength readout is empty. |
 | `history` | `readonly TransientAnalyzerSample[]` | required | Ordered observations; the newest 64 are drawn. Each sample has normalized `strength` and boolean `hit`. |
-| `sensitivity` | `number` | required | Caller-provided `0..1` value shown by the labelled native range control. |
+| `sensitivity` | `number` | required | Caller-provided `0..1` value shown as `0..100%` by the labelled horizontal fader. |
 | `threshold` | `number` | required | Caller-provided normalized threshold shown across the history plot. |
 | `frozen` | `boolean` | required | Freeze button state; the caller decides whether to keep supplying observations. |
 | `hitCount` | `number` | required | Number of accepted cues displayed since the caller's reset. |
 | `lastIntervalMs` | `number?` | absent | Most recent gap between accepted cues, in milliseconds. |
-| `status` | `string` | required | Text shown in the status region. |
+| `status` | `string` | required | Diagnostic text shown in the status region; routine Live, Paused and Frozen messages are hidden. |
 
 **Actions and handle**
 
 | Member | Kind | Default | Description |
 |---|---|---|---|
-| `onSensitivityChange(value)` | `(number) => void` | required | Called by the native range input with a `0..1` value. |
+| `onSensitivityChange(value)` | `(number) => void` | required | Called by the horizontal fader with a `0..1` value. |
 | `onFreezeChange(value)` | `(boolean) => void` | required | Called by the Freeze button with its next state. |
 | `onClear()` | `() => void` | required | Called by the Clear button; the caller resets its evidence. |
 | `element` | `HTMLElement` | mounted root | Named section with `part="root surface"`. |
@@ -104,8 +108,11 @@ There are no mount options, subscription, automatic sampling or presenter
 events. The actions do not themselves alter the audio graph.
 
 **Accessibility.** Freeze and Clear are native buttons; Freeze reports its
-state with `aria-pressed`. Sensitivity is a labelled range input with a
-numeric output. The plot has an `img` role and a text alternative for current
+state with `aria-pressed` and keeps the same label. Sensitivity is a rectangular
+horizontal UIKit fader with a numeric output and `role="slider"`. Its bounds
+and ARIA value use `0..100%`; Arrow keys move one percentage point, and
+Home/End select the bounds. Actions still receive `0..1`. The plot has an
+`img` role and a text alternative for current
 strength, threshold and hit count. Numeric readouts and a `status` role remain
 available without reading the plot's colors.
 
@@ -115,7 +122,8 @@ available without reading the plot's colors.
 <summary>Styling</summary>
 
 The root is `.wui-transient-analyzer`. Public parts are `root surface`,
-`plot`, `freeze`, `clear` and `sensitivity`; internal
+`plot`, `freeze`, `clear` and `sensitivity`. The sensitivity slider also exposes
+the shared `fader` part; use `[part~="sensitivity"]`. Internal
 `.wui-transient-analyzer__*` classes are structural. This presenter has no
 `classNames`, `parts` or `stylesheet` option: mounting installs its stylesheet
 and `destroy()` removes the style node it owns.
@@ -126,12 +134,14 @@ and `destroy()` removes the style node it owns.
 | `--wm-transient-analyzer-background` | `--wm-surface`, then white | Root background. |
 | `--wm-transient-analyzer-border` | `--wm-border`, then gray | Root border. |
 | `--wm-transient-analyzer-padding` | `.85rem` | Root inset. |
-| `--wm-transient-analyzer-strength` | teal | Strength bars and range accent. |
-| `--wm-transient-analyzer-hit` | orange | Accepted-hit bars. |
-| `--wm-transient-analyzer-threshold` | dark ink | Dashed threshold line. |
+| `--wm-transient-analyzer-strength` | `#999` | Strength bars. |
+| `--wm-transient-analyzer-hit` | `#333` | Accepted-hit bars. |
+| `--wm-transient-analyzer-threshold` | `#666` | Dashed threshold line. |
 | `--wm-muted`, `--wm-border`, `--wm-surface-muted`, `--wm-surface`, `--wm-accent`, `--wm-control-radius` | stylesheet fallbacks | Secondary text, plot/control surfaces, pressed button and corners. |
+| `--wm-analysis-control-size` | `1.5rem` | Compact button height and horizontal fader thickness. |
+| `--wm-fader-*` | shared fader defaults | Sensitivity track, fill, thumb and corners. |
 
-Bar height and threshold position come from the supplied state, not CSS
+The default palette is achromatic. Bar height and threshold position come from the supplied state, not CSS
 variables. Forced-colors mode uses system colors for bars and the threshold
 line.
 

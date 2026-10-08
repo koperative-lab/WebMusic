@@ -105,7 +105,7 @@ ${componentSurfaceCss('meter', {
   inset: 0 auto 0 0;
   width: 2px;
   transform: translateX(-100%);
-  background: var(--wui-meter-peak, var(--wameter-peak, var(--wm-meter-peak, var(--wm-danger, #e0445b))));
+  background: var(--wui-meter-peak, var(--wameter-peak, var(--wm-meter-peak, var(--wm-danger, #444))));
 }
 .wui-meter__spectrum {
   display: flex;

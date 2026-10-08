@@ -124,12 +124,15 @@ fallbacks. The neutral [meter presenter](/uikit/mixing-capture/meter/) uses
 public `--wm-meter-*` colors and dimensions. Legacy `--wameter-bg`,
 `--wameter-track`, `--wameter-fill`, `--wameter-peak` and `--wameter-height`
 aliases remain effective. Its root exposes `part="wrap"`; the presenter's
-other documented parts remain available inside the shadow root.
+other documented parts remain available inside the shadow root. Default fill
+and peak colors are achromatic. Explicit `--wm-meter-*` or legacy color values
+remain authoritative; the peak keeps its `--wm-danger` fallback before `#444`.
+The compact monitor adds no title, transport status row or interactive controls.
 
 ```css
 audio-meter {
-  --wm-meter-fill: #258a80;
-  --wm-meter-peak: #cb6541;
+  --wm-meter-fill: #999;
+  --wm-meter-peak: #444;
   --wm-meter-height: 3rem;
 }
 ```

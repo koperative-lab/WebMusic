@@ -36,6 +36,11 @@ The caller supplies `host`, `state`, a notification store and commands. The pres
 
 `frame.bins` contains dB values for the `fftSize / 2` frequency bins. The presenter's frequency mapping uses `sampleRate / fftSize` Hz per bin; `minDb` and `maxDb` set the vertical axis. A new `sourceRevision` clears held maxima, so a trace from an old deck does not contaminate the next one. The caller increments that revision when the observed source changes and avoids publishing stale frames after replacement. No `AudioContext`, analyser or transport is created here.
 
+Frequency and Level occupy fixed readout slots, with `—` for a missing value.
+Freeze, Peak hold and Reset peaks keep stable button labels. Routine live,
+paused and frozen messages are hidden; waiting and unavailable feedback remains
+visible without repeating the tool title.
+
 <details class="component-section">
 <summary>API</summary>
 
@@ -48,7 +53,7 @@ The caller supplies `host`, `state`, a notification store and commands. The pres
 | `frozen` | `boolean` | required | Freeze button state; the caller retains the selected frame. |
 | `peakHold` | `boolean` | required | Overlay maximum dB per bin while enabled. |
 | `minFrequency` / `maxFrequency` | `number` (Hz) | required | Visible log-frequency range, clamped to the frame's Nyquist frequency. |
-| `status` | `'waiting' \| 'live' \| 'paused' \| 'unavailable' \| 'frozen'` | required | Visible signal state. |
+| `status` | `'waiting' \| 'live' \| 'paused' \| 'unavailable' \| 'frozen'` | required | Signal state; waiting/unavailable remain visible, while routine live/paused/frozen text is hidden. |
 
 **Binding, options and handle**
 
@@ -69,7 +74,7 @@ The caller supplies `host`, `state`, a notification store and commands. The pres
 
 See the [shared presenter shape](/uikit/api/#the-shared-presenter-shape) for host ownership. The callback never receives decoded PCM or a player. Replacing or disposing a borrowed audio graph belongs to the caller.
 
-**Accessibility.** The plot is a focusable frequency slider with `aria-valuemin`, `aria-valuemax`, `aria-valuenow` in Hz and a frequency/dB `aria-valuetext`. Arrow keys move a semitone, Shift+Arrow moves an octave, and Home/End select the range limits. Pointer down or movement probes the plot. Freeze and Peak hold use native `aria-pressed` buttons; Reset peaks is a native button. The current probe and signal status remain readable outside the canvas.
+**Accessibility.** The plot is a focusable frequency slider with `aria-valuemin`, `aria-valuemax`, `aria-valuenow` in Hz and a frequency/dB `aria-valuetext`. Arrow keys move a semitone, Shift+Arrow moves an octave, and Home/End select the range limits. Pointer down or movement probes the plot. Freeze and Peak hold use native `aria-pressed` buttons; Reset peaks is a native button. The Frequency and Level readouts remain outside the canvas with `aria-live="off"`; their values do not trigger live announcements on every frame. Meaningful waiting/unavailable status remains visible.
 
 </details>
 
@@ -81,14 +86,16 @@ The root is `.wui-spectrum-analyzer`. Public parts are `root surface`, `toolbar`
 | Token | Fallback | Controls |
 |---|---|---|
 | `--wm-spectrum-foreground` | `--wm-foreground`, then dark ink | Root text. |
-| `--wm-spectrum-muted` | `--wm-foreground-muted`, then gray | Probe readout and status. |
+| `--wm-spectrum-muted` | `--wm-foreground-muted`, then `#666` | Secondary text, axes, grid and held trace. |
 | `--wm-spectrum-height` | `11rem` | Plot height, minimum `7rem`. |
-| `--wm-spectrum-plot-background` | dark ink | Canvas CSS background. |
+| `--wm-spectrum-plot-background` | `--wm-surface-muted`, then `#f3f3f3` | Canvas background. |
 | `--wm-spectrum-border` | `--wm-border`, then gray | Button borders. |
 | `--wm-spectrum-control-background` | `--wm-surface`, then white | Buttons. |
-| `--wm-spectrum-selected-background` / `--wm-spectrum-selected-border` | mint / teal | Pressed buttons. |
+| `--wm-spectrum-selected-background` / `--wm-spectrum-selected-border` | `--wm-accent` / `--wm-control-border`, then gray | Pressed buttons. |
+| `--wm-analysis-control-size` | `1.5rem` | Compact button height. |
+| `--wm-focus` | `--wm-foreground`, then `#444` | Focus outlines. |
 
-The canvas drawing currently uses fixed axis and trace colors; the tokens above style the surrounding DOM and canvas background, not those drawn pixels. Internal `.wui-spectrum-analyzer__*` classes are structural selectors. Focus uses the shared `--wm-focus` token.
+The default palette is achromatic. The canvas is cleared transparently so its background token remains effective. The live trace and probe use the resolved foreground; axes, grid and the dashed held trace use the resolved muted color. The dashed pattern keeps held maxima distinct without relying on color. Internal `.wui-spectrum-analyzer__*` classes are structural selectors. Focus uses the shared `--wm-focus` token.
 
 </details>
 

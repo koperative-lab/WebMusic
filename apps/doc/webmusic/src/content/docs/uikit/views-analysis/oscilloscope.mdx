@@ -59,6 +59,12 @@ governs host replacement and cleanup. New source identity and obsolete trace
 rejection belong to the caller; `destroy()` removes this presenter's observer,
 subscription, listeners, nodes and installed style, not the audio source.
 
+Time and Amplitude occupy fixed readout slots; missing measurements show `—`.
+The surface omits a repeated title. Routine live, paused and frozen messages
+are hidden, while waiting, unavailable, No signal and No matching edge feedback
+remains visible. Freeze keeps its label and reflects its state with
+`aria-pressed`.
+
 <details class="component-section">
 <summary>API</summary>
 
@@ -66,17 +72,17 @@ subscription, listeners, nodes and installed style, not the audio source.
 
 | Member | Kind | Default | Description |
 |---|---|---|---|
-| `trace` | `OscilloscopeTrace?` | absent | Current `{samples, timebaseMs, triggered}` window. With no trace, the plot has no waveform. |
+| `trace` | `OscilloscopeTrace?` | absent | Current `{samples, timebaseMs, triggered, silent}` window. With no trace, the plot has no waveform. |
 | `trace.samples` | `ArrayLike<number>` | required in trace | Linear amplitudes painted from left to right; the caller owns the data. |
 | `trace.timebaseMs` | `number` | required in trace | Elapsed milliseconds across the displayed sample window. |
-| `trace.triggered` | `boolean` | required in trace | Whether the caller found an eligible edge; controls the visible live-status wording. |
+| `trace.triggered` | `boolean` | required in trace | Whether the caller found an eligible edge; an unmatched active trigger reports No matching edge. |
 | `trace.silent` | `boolean` | required in trace | Whether the sampled window is silent; displays "No signal" rather than a matching-edge message. |
 | `availableTimeMs` | `number` | required | Maximum sampled window available for the timebase control; invalid or non-positive values fall back to `100`. |
 | `timebaseMs` | `number` | required | Requested visible milliseconds, clamped in the control to the available window. |
-| `triggerLevel` | `number` | required | Linear amplitude threshold shown by the trigger line and native range input (`-1..1`). |
+| `triggerLevel` | `number` | required | Linear amplitude threshold shown by the trigger line and horizontal fader (`-1..1`). |
 | `triggerEdge` | `'off' \| 'rising' \| 'falling'` | required | Selected native edge control. `off` is free-run display. |
 | `frozen` | `boolean` | required | Freeze button state; the caller decides whether to keep replacing `trace`. |
-| `status` | `'waiting' \| 'live' \| 'paused' \| 'unavailable' \| 'frozen'` | required | Visible status message. |
+| `status` | `'waiting' \| 'live' \| 'paused' \| 'unavailable' \| 'frozen'` | required | Signal state; waiting/unavailable remain visible, while routine live/paused/frozen text is hidden. |
 
 **Binding, options and handle**
 
@@ -84,8 +90,8 @@ subscription, listeners, nodes and installed style, not the audio source.
 |---|---|---|---|
 | `snapshot()` | `() => OscilloscopeState` | required | Reads the latest caller-owned trace and controls. |
 | `setFrozen(value)` | `(boolean) => void` | required | Called by the native Freeze button. |
-| `setTimebaseMs(value)` | `(number) => void` | required | Called by the timebase range control, in milliseconds. |
-| `setTriggerLevel(value)` | `(number) => void` | required | Called by the trigger range control, in linear sample amplitude. |
+| `setTimebaseMs(value)` | `(number) => void` | required | Called by the horizontal timebase fader, in milliseconds. |
+| `setTriggerLevel(value)` | `(number) => void` | required | Called by the horizontal trigger fader, in linear sample amplitude. |
 | `setTriggerEdge(value)` | `(OscilloscopeTriggerEdge) => void` | required | Called by the rising/falling/off select. |
 | `probe(timeMs, amplitude)` | `(number, number \| undefined) => void` | optional | Reports a changed probe position and nearest sample amplitude, if present. Time is relative to the displayed window. |
 | `subscribe(notify)` | `(callback) => () => void` | optional | Caller notifications for repaint; the handle also offers `update()`. |
@@ -94,7 +100,7 @@ subscription, listeners, nodes and installed style, not the audio source.
 | `stylesheet` | `boolean` | `true` | Install this presenter's stylesheet for this mount. |
 | `element` | `HTMLElement` | mounted root | Group root with `part="root surface"`. |
 | `selectedTimeMs` | `number` | `0` | Read-only current probe position from the displayed window's left edge. |
-| `update()` | `() => void` | - | Read `snapshot()` and redraw the display and native controls. |
+| `update()` | `() => void` | - | Read `snapshot()` and redraw the display and controls. |
 | `destroy()` | `() => void` | - | Release observer, subscription, controls, nodes and owned style. |
 
 **Accessibility.** The canvas is a focusable slider named "Inspect waveform
@@ -102,7 +108,11 @@ time", with the selected time and optional amplitude in `aria-valuetext` and
 a matching text readout outside the canvas. Pointer movement probes the
 window. Arrow keys move by one percent, Shift+Arrow by ten percent, and
 Home/End select the ends. Freeze is a native `aria-pressed` button; trigger
-and timebase use labelled native controls. The status is a live status region.
+and timebase use labelled rectangular horizontal UIKit faders. Their slider
+ARIA uses actual amplitudes and milliseconds. Trigger has a `0.05` keyboard
+step; timebase has a `0.5` ms step between `min(1, availableTimeMs)` and the
+available window. Home/End select the bounds. Readout
+outputs use `aria-live="off"`; diagnostic status is a live status region.
 
 </details>
 
@@ -119,18 +129,23 @@ does not remove caller-owned or previously installed CSS.
 | Token | Fallback | Controls |
 |---|---|---|
 | `--wm-oscilloscope-foreground` | `--wm-foreground`, then dark ink | Root text. |
-| `--wm-oscilloscope-muted` | gray | Readout and status text. |
+| `--wm-oscilloscope-muted` | `--wm-foreground-muted`, then `#666` | Secondary text, axes and grid. |
 | `--wm-oscilloscope-height` | `11rem` | Plot height, minimum `7rem`. |
-| `--wm-oscilloscope-plot-background` | dark ink | Canvas CSS background. |
-| `--wm-oscilloscope-accent` | teal | Range-input accent. |
+| `--wm-oscilloscope-plot-background` | `--wm-surface-muted`, then `#f3f3f3` | Canvas background. |
+| `--wm-oscilloscope-accent` | inherited `--wm-fader-fill`, then `--wm-accent`, then `#999` | Legacy fader-fill override; an explicit value takes precedence over the shared fill. |
 | `--wm-oscilloscope-border` | `--wm-border`, then gray | Native select and button borders. |
 | `--wm-oscilloscope-control-background` | `--wm-surface`, then white | Select and button backgrounds. |
-| `--wm-oscilloscope-selected-background`, `--wm-oscilloscope-selected-border` | pale mint / teal | Pressed Freeze button. |
-| `--wm-focus` | browser Highlight | Focus outlines. |
+| `--wm-oscilloscope-selected-background`, `--wm-oscilloscope-selected-border` | `--wm-accent` / `--wm-control-border`, then gray | Pressed Freeze button. |
+| `--wm-analysis-control-size` | `1.5rem` | Compact controls and horizontal fader thickness. |
+| `--wm-fader-*` | shared fader defaults | Fader track, fill, thumb and corners. |
+| `--wm-focus` | `--wm-foreground`, then `#444` | Focus outlines. |
 
-The canvas currently paints its trace, grid, trigger line and probe with fixed
-colors, so CSS tokens alone do not recolor those pixels. Its geometry follows
-the caller's trace and the rendered host width.
+The default palette is achromatic. The canvas is cleared transparently so its
+background token remains effective; trace and probe use the resolved foreground,
+and axes/grid use the resolved muted color. Its geometry follows the caller's
+trace and rendered host width. Timebase and trigger sliders retain the shared
+`fader` part alongside their named parts; use selectors such as
+`[part~="timebase"]`.
 
 </details>
 
