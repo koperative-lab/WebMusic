@@ -75,6 +75,12 @@ Disabling stylesheet installation does not disable state machines, bindings, key
 
 Score and Audio share the same neutral default palette, control geometry and component-surface tokens. A musical domain does not introduce its own brand skin. Color may encode musical data or semantic states such as recording and clipping, and explicit caller styling remains authoritative. Canonical demos show these defaults; a separately identified customization example may supply its own palette.
 
+Pending component feedback uses the shared UI status presenter: four grayscale square cells
+for active loading and a slower square-outline pulse while awaiting input. Keep explanatory
+text available to assistive technology without displaying source-binding instructions as
+placeholder copy. Respect reduced motion, reveal content when ready, and retain visible
+errors and meaningful empty results. The animation owns no playback clock (DEC-047).
+
 Usable defaults do not impose one brand. A workstation may need dense controls; an installation may need one visual surface mapped to sound. They reuse interaction and timing contracts while expressing different aesthetics.
 
 ## 8. Demos are inspectable working examples

@@ -47,7 +47,9 @@ The application owns `host`, sampled `state`, the three command functions and th
 | `history` | `readonly LevelAnalyzerSample[]` | required | Recent samples, in time order. The most recent 64 are plotted; older values are ignored. |
 | `thresholdDbfs` | `number` | required | Alert and slider position. The plot visually spans `-60` to `0` dBFS. |
 | `frozen` | `boolean` | required | Freeze button's pressed state; the caller stops accepting new samples. |
-| `status` | `string` | required | Visible status beside the title. |
+| `loading` | `boolean?` | `false` | Active pending source work; shows the four-cell animation and `aria-busy`, taking precedence over `waiting`. |
+| `waiting` | `boolean?` | `false` | Show the shared square waiting indicator instead of visible status prose; controls and retained readings remain available. |
+| `status` | `string` | required | Status beside the title; remains accessible when `waiting` or `loading` is true. |
 
 **Actions and handle**
 
@@ -68,6 +70,8 @@ There is no `Binding` object or mount-options bag for this presenter; actions ar
 
 <details class="component-section">
 <summary>Styling</summary>
+
+Loading and waiting feedback use the shared [Status animation and tokens](/uikit/layout-feedback/status/), including reduced-motion support.
 
 The stylesheet is installed into the supplied host and removed by `destroy()`. This presenter does not currently accept `stylesheet`, `classNames` or `parts` options.
 

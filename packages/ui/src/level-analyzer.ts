@@ -1,3 +1,4 @@
+import {mountStatus, statusStyle, type StatusState} from './status';
 import {installStyle} from './internal/style';
 import {claimHost} from './internal/lifecycle';
 
@@ -14,6 +15,10 @@ export interface LevelAnalyzerState {
   thresholdDbfs: number;
   frozen: boolean;
   status: string;
+  /** Waiting for a source or playback; replaces visible status prose with the shared indicator. */
+  waiting?: boolean;
+  /** Active source work; takes precedence over passive waiting. */
+  loading?: boolean;
 }
 
 export interface LevelAnalyzerActions {
@@ -33,7 +38,8 @@ const MAX_DB = 0;
 const COLUMNS = 64;
 const mounted = new WeakMap<HTMLElement, LevelAnalyzerHandle>();
 
-const levelAnalyzerStyle = `
+const levelAnalyzerStyle = `${statusStyle}
+
 .wui-level-analyzer { box-sizing: border-box; display: grid; gap: .75rem; width: 100%; min-width: 0;
   color: var(--wm-level-analyzer-foreground, var(--wm-foreground, #262b2a));
   background: var(--wm-level-analyzer-background, var(--wm-surface, #fff));
@@ -96,9 +102,16 @@ export function mountLevelAnalyzer(host: HTMLElement, actions: LevelAnalyzerActi
   const title = document.createElement('strong');
   title.className = 'wui-level-analyzer__title';
   title.textContent = 'Level analyzer';
-  const status = document.createElement('span');
+  const status = document.createElement('div');
   status.className = 'wui-level-analyzer__status';
-  status.setAttribute('role', 'status');
+  const statusMessage = document.createElement('span');
+  statusMessage.setAttribute('role', 'status');
+  const waitingHost = document.createElement('div');
+  let feedback: StatusState = {kind: 'ready'};
+  const waiting = mountStatus(waitingHost, {snapshot: () => feedback}, {
+    stylesheet: false, classNames: {root: 'wui-status--embedded'},
+  });
+  status.append(statusMessage, waitingHost);
   head.append(title, status);
 
   const values = document.createElement('dl');
@@ -184,7 +197,11 @@ export function mountLevelAnalyzer(host: HTMLElement, actions: LevelAnalyzerActi
     update(state) {
       if (destroyed) return;
       frozen = state.frozen;
-      status.textContent = state.status;
+      const pending = state.loading || state.waiting;
+      if (statusMessage.textContent !== (pending ? '' : state.status)) statusMessage.textContent = pending ? '' : state.status;
+      statusMessage.hidden = pending === true;
+      feedback = {kind: state.loading ? 'loading' : state.waiting ? 'waiting' : 'ready', message: pending ? state.status : ''};
+      waiting.update();
       freeze.setAttribute('aria-pressed', String(frozen));
       freeze.textContent = frozen ? 'Unfreeze' : 'Freeze';
       thresholdInput.value = String(state.thresholdDbfs);
@@ -212,6 +229,7 @@ export function mountLevelAnalyzer(host: HTMLElement, actions: LevelAnalyzerActi
       freeze.removeEventListener('click', onFreeze);
       reset.removeEventListener('click', onReset);
       thresholdInput.removeEventListener('input', onThreshold);
+      waiting.destroy();
       root.remove();
       style?.remove();
       ownership.release();

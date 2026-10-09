@@ -20,6 +20,12 @@ it. Release held notes before stopping to include them.
 
 <ScoreRecorderDemo />
 
+Starting take playback shows the shared four-square loading animation until the player
+finishes preparing. Cancellation, a new recording, failure, or disconnect clears that
+pending state. The recorder remains ready to capture local or supplied note events when
+idle; an empty take is not a missing source. Recording and completed-take feedback remain
+visible, and loading descriptions remain available to assistive technology.
+
 ## Import
 
 ```html

@@ -94,7 +94,7 @@ This drawing is **precomputed only**: `src`, `peaks-src` and a bound player supp
 <audio-view player="#p" type="meter" mode="level"></audio-view>
 ```
 
-With no analyser to read, the view says `No analyser to meter — bind a player with an analyser` rather than rendering nothing; binding a player that has one draws it immediately.
+With no analyser to read, the view shows the shared square waiting animation with an accessible source description; binding a player that has one draws it immediately.
 
 :::note
 There are two meter surfaces. The `meter` **type** above is a passive drawing
@@ -248,18 +248,27 @@ Legacy event-only targets keep their `webaudio:timeupdate` cadence. For example,
 the native player's default event interval is 50 ms, while its live getters let
 the view observe movement between those events.
 
-## Nothing to draw is still something to say
+## Loading and waiting feedback
 
-Each `type` mounts the shared `@webmusic/ui/status` presenter when its data is missing, rather than
-a zero-height unlabelled box or Element-private placeholder:
+Each `type` mounts the shared `@webmusic/ui/status` presenter when its data is missing.
+An active `src` or `peaks-src` request shows the loading animation. When using borrowed
+player data, source loading and failure follow the player's `.loading`, `.loadError` and
+`webaudio:loadstatechange` contract. Explicit view data keeps its independent presentation. Otherwise a quiet square
+waiting animation replaces visible placeholder prose; the following descriptions remain
+available to assistive technology:
 
-| `type` | Placeholder |
+| `type` | Accessible description |
 | --- | --- |
 | `waveform` | `No audio to draw — assign .clip or .peaks` |
 | `spectrogram` | `No spectrogram to draw — assign .spectrogram` |
 | `meter` | `No analyser to meter — bind a player with an analyser` |
 
-Nothing is disposed or latched there: assign the missing data and the view draws.
+A failed `src` or `peaks-src` request shows its error message when no drawable data
+is available, while still emitting `webaudio:error`. Retrying, removing that URL,
+or replacing that input with `.clip` / `.peaks` clears that input's failure. The
+two URL inputs keep separate loading and error state; a pending alternative source
+continues to show loading, and stale requests cannot overwrite newer feedback.
+Assign the missing data and the view draws.
 
 <details class="component-section">
 <summary>API</summary>
@@ -434,7 +443,7 @@ Changing a colour, size or zoom attribute rebuilds into the **same** stage surfa
 
 The spectrogram image is rasterized through a 256-entry colormap lookup table and lands in one `putImageData`, so the palette is resolved once per render rather than per pixel.
 
-The placeholder shown when there is no data is the kit's `role="status"` presenter. In this embedded state it is deliberately transparent and unframed because the surrounding stage owns the component surface; its text still follows `--wm-status-foreground` and `--wm-font-family`. A standalone status presenter keeps its own full surface.
+The placeholder shown when there is no data is the kit's `role="status"` presenter. In this embedded state it is deliberately transparent and unframed because the surrounding stage owns the component surface; its animation follows the shared [Status tokens](/uikit/layout-feedback/status/) and reduced-motion preference. A standalone status presenter keeps its own full surface.
 
 </details>
 

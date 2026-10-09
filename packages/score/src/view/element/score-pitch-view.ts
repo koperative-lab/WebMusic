@@ -1,3 +1,4 @@
+import {mountStatus, type StatusHandle, type StatusState} from '@webmusic/ui/status';
 import {
   mountKeyboard,
   mountStaff,
@@ -35,6 +36,8 @@ export class PitchViewElement extends HTMLElementBase {
   #handle?: KeyboardHandle | StaffHandle | FretboardHandle;
   #unbind?: () => void;
   #hostStyle?: HTMLStyleElement;
+  #status?: StatusHandle;
+  #statusState: StatusState = {kind: 'waiting', message: 'Waiting for a pitch source…'};
 
   /** Currently held MIDI notes, ascending, including notes outside the view. */
   get active(): number[] { return [...this.#notes.state.activeMidis]; }
@@ -98,6 +101,7 @@ export class PitchViewElement extends HTMLElementBase {
   connectedCallback(): void {
     upgradeProperty(this, 'type');
     this.#mountHostStyle();
+    this.#status = mountStatus(this, {snapshot: () => this.#statusState}, {parts: {root: 'pitch-status', indicator: 'pitch-status-indicator', message: 'pitch-status-message'}});
     this.#render();
     this.#bindPlayer();
   }
@@ -108,6 +112,8 @@ export class PitchViewElement extends HTMLElementBase {
     try { unbind?.(); } finally {
       try { this.#handle?.destroy(); } finally {
         this.#handle = undefined;
+        this.#status?.destroy();
+        this.#status = undefined;
         this.#notes.dispose();
         this.#notes = createPitchView();
         this.#hostStyle?.remove();
@@ -137,7 +143,8 @@ export class PitchViewElement extends HTMLElementBase {
     // Layout belongs to the host; the shared presenters own all visual styles.
     // No inline sizing or display means application CSS and [hidden] still win.
     style.textContent = `:where(${selector}) { box-sizing: border-box; inline-size: 100%; min-inline-size: 0; }
-:where(${selector}:not([hidden])) { display: block; }`;
+:where(${selector}:not([hidden])) { display: block; }
+:where(${selector}) > [hidden] { display: none !important; }`;
     this.append(style);
     this.#hostStyle = style;
   }
@@ -189,9 +196,15 @@ export class PitchViewElement extends HTMLElementBase {
         subscribe: (notify) => this.#notes.subscribe(notify),
       }, {...options, release: 0, fretWidth: this.fretWidth, stringSpacing: this.stringSpacing, stringWidth: this.stringWidth});
     }
+    this.#paintStatus();
     if (this.#handle && scrollLeft !== undefined) {
       this.#handle.element.scrollLeft = this.type === 'keyboard' && this.fitToWidth ? 0 : scrollLeft;
     }
+  }
+
+  #paintStatus(): void {
+    this.#status?.update();
+    if (this.#handle) this.#handle.element.hidden = this.#statusState.kind !== 'ready';
   }
 
   #bindPlayer(): void {
@@ -199,11 +212,27 @@ export class PitchViewElement extends HTMLElementBase {
     this.#unbind = undefined;
     const clear = (): void => { this.#notes.clear(); };
     try { unbind?.(); } finally { this.#notes.setPlayback(undefined); }
+    this.#statusState = {kind: 'waiting', message: 'Waiting for a pitch source…'};
+    this.#paintStatus();
     this.#unbind = bindViewPlayer(this, {
       reset: clear,
       end: clear,
-      targetChanged: () => { this.#notes.setPlayback(undefined); },
-      playbackSnapshot: (snapshot) => { this.#notes.updatePlayback(snapshot); },
+      targetChanged: (target) => {
+        this.#notes.setPlayback(undefined);
+        this.#statusState = target ? {kind: 'ready'} : {kind: 'waiting', message: 'Waiting for a pitch source…'};
+        this.#paintStatus();
+      },
+      playbackSnapshot: (snapshot) => {
+        this.#notes.updatePlayback(snapshot);
+        this.#statusState = snapshot.readiness === 'loading'
+          ? {kind: 'loading', message: 'Loading pitch source…'}
+          : snapshot.readiness === 'error'
+            ? {kind: 'error', message: snapshot.error instanceof Error ? snapshot.error.message : 'Unable to load pitch source.'}
+            : snapshot.readiness === 'empty' || snapshot.readiness === 'disposed'
+              ? {kind: 'waiting', message: 'Waiting for a pitch source…'}
+              : {kind: 'ready'};
+        this.#paintStatus();
+      },
       noteOn: ({midi}) => { this.#notes.noteOn(midi); },
       noteOff: ({midi}) => { this.#notes.noteOff(midi); },
     }, this.getAttribute('player') ? 'player' : 'source');

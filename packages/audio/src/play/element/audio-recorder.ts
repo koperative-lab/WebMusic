@@ -491,7 +491,10 @@ export class AudioRecorderElement extends WebMusicElement {
       // and takes captured since the element was upgraded.
       recordedCount: Math.floor(this.elapsedSeconds()),
       takeCount: this.takes,
-      status: this.statusText(),
+      status: this.connection.requested && !this.owner && idle && !this.lastTake
+        ? 'Waiting for the playback owner.' : this.statusText(),
+      ...((this.connection.requested && !this.owner && idle && !this.lastTake)
+        ? {statusKind: 'waiting' as const} : {}),
       canPlay: take !== undefined && idle && (!this.connection.requested || !!this.owner),
       canExport: take !== undefined && idle,
     };

@@ -76,6 +76,71 @@ afterEach(() => {
 });
 
 describe('SheetView presentation-only settings', () => {
+  it('shows waiting, then loading through source resolution and asynchronous engraving', async () => {
+    let finishSource!: (value: Score) => void;
+    let finishEngraving!: () => void;
+    source.load.mockImplementation(() => new Promise<Score>((resolve) => { finishSource = resolve; }));
+    const h = mount();
+    expect(h.element.querySelector('[data-kind="waiting"]')?.textContent).toBe('Waiting for a score');
+    h.load.mockImplementationOnce(() => new Promise<void>((resolve) => { finishEngraving = resolve; }));
+    h.element.setAttribute('src', 'score.mxl');
+    expect(h.element.querySelector('[data-kind="loading"]')?.getAttribute('aria-busy')).toBe('true');
+    await vi.waitFor(() => expect(finishSource).toBeDefined());
+    finishSource(score());
+    await vi.waitFor(() => expect(h.load).toHaveBeenCalledOnce());
+    expect(h.element.querySelector('[data-kind="loading"]')).not.toBeNull();
+    expect(h.element.querySelector<HTMLElement>('[part="surface"]')?.style.visibility).toBe('hidden');
+    finishEngraving();
+    await vi.waitFor(() => expect(h.render).toHaveBeenCalledOnce());
+    expect(h.element.querySelector('[role="status"]')).toBeNull();
+    expect(h.element.querySelector<HTMLElement>('[part="surface"]')?.style.visibility).toBe('');
+  });
+
+  it('reports source failures and replaces the error with waiting when the source is removed', async () => {
+    source.load.mockRejectedValue(new Error('Sheet source unavailable'));
+    const h = mount({src: 'broken.mxl'});
+    await vi.waitFor(() => expect(h.element.querySelector('[role="alert"]')?.textContent).toBe('Sheet source unavailable'));
+    h.element.removeAttribute('src');
+    expect(h.element.querySelector('[role="alert"]')).toBeNull();
+    expect(h.element.querySelector('[data-kind="waiting"]')).not.toBeNull();
+    expect(h.construct).not.toHaveBeenCalled();
+  });
+
+  it('keeps the newer engraving loading when a superseded renderer completes', async () => {
+    let finishFirst!: () => void;
+    let finishSecond!: () => void;
+    const h = mount();
+    h.load.mockImplementationOnce(() => new Promise<void>((resolve) => { finishFirst = resolve; }))
+      .mockImplementationOnce(() => new Promise<void>((resolve) => { finishSecond = resolve; }));
+    h.element.score = score();
+    await vi.waitFor(() => expect(h.load).toHaveBeenCalledOnce());
+    h.element.score = score();
+    await vi.waitFor(() => expect(h.load).toHaveBeenCalledTimes(2));
+    const status = h.element.querySelector('[data-kind="loading"]');
+    finishFirst();
+    await vi.waitFor(() => expect(h.instances[0]!.clear).toHaveBeenCalledOnce());
+    expect(h.element.querySelector('[data-kind="loading"]')).toBe(status);
+    expect(h.render).not.toHaveBeenCalled();
+    finishSecond();
+    await vi.waitFor(() => expect(h.render).toHaveBeenCalledOnce());
+    expect(h.element.querySelector('[role="status"]')).toBeNull();
+  });
+
+  it('ignores pending source completion after disconnect and releases the loading status', async () => {
+    let finish!: (value: Score) => void;
+    source.load.mockImplementation(() => new Promise<Score>((resolve) => { finish = resolve; }));
+    const h = mount({src: 'score.mxl'});
+    await vi.waitFor(() => expect(finish).toBeDefined());
+    const signal = source.load.mock.calls[0]![1].signal as AbortSignal;
+    h.element.remove();
+    expect(signal.aborted).toBe(true);
+    finish(score());
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(h.element.querySelector('[role="status"]')).toBeNull();
+    expect(h.construct).not.toHaveBeenCalled();
+  });
+
   it('withdraws queued scrolling immediately when following is disabled, preserving held notes', async () => {
     source.load.mockResolvedValue(score());
     const h = mount({src: 'score.mxl'});

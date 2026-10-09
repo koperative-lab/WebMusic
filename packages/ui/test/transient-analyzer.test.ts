@@ -10,6 +10,29 @@ const base: TransientAnalyzerState = {
 afterEach(() => document.body.replaceChildren());
 
 describe('mountTransientAnalyzer', () => {
+  it('uses the shared waiting indicator and restores visible operational status', () => {
+    const host = document.createElement('div');
+    const handle = mountTransientAnalyzer(host, {onSensitivityChange: vi.fn(), onFreezeChange: vi.fn(), onClear: vi.fn()});
+    const current = {...base, waiting: true};
+    handle.update(current);
+    const indicator = host.querySelector<HTMLElement>('.wui-status')!;
+    expect(indicator.dataset.kind).toBe('waiting');
+    expect(indicator.getAttribute('role')).toBe('status');
+    expect(indicator.textContent).toBe('Waiting for playback');
+    expect(indicator.querySelector('.wui-status__indicator')?.getAttribute('aria-hidden')).toBe('true');
+    const controls = [...host.querySelectorAll('button')];
+    handle.update({...current, loading: true, status: 'Loading audio'});
+    expect(indicator.dataset.kind).toBe('loading');
+    expect(indicator.getAttribute('aria-busy')).toBe('true');
+    handle.update({...current, waiting: false, status: 'Paused'});
+    expect(indicator.hidden).toBe(true);
+    expect(indicator.hasAttribute('aria-busy')).toBe(false);
+    expect(host.querySelector('.wui-transient-analyzer__status')?.textContent).toBe('Paused');
+    expect([...host.querySelectorAll('button')]).toEqual(controls);
+    handle.destroy();
+    expect(host.children).toHaveLength(0);
+  });
+
   it('shows live attack evidence and forwards its three inspection controls', () => {
     const host = document.createElement('div');
     document.body.append(host);

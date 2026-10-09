@@ -43,6 +43,8 @@ export interface RackPartDeclaration {
 export interface RackPartElementLike extends Element {
   /** The declaration, or undefined until this part has resolved a score. */
   rackPartDeclaration(): RackPartDeclaration | undefined;
+  /** Visual readiness is rendered by the owning desk, never the declaration. */
+  rackPartStatus?(): {kind: 'ready' | 'loading' | 'waiting' | 'error'; message?: string};
 }
 
 export function isRackPart(node: Element): node is RackPartElementLike {

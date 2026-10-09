@@ -163,7 +163,7 @@ describe('the workbench stylesheet', () => {
     // A guard on the guard: an empty harvest would make this vacuously green.
     expect(harvested.size).toBeGreaterThan(10);
     expect([...harvested].filter((name) => declared.has(name))).toEqual([]);
-    expect([...harvested].every((name) => name.startsWith('wui-workbench'))).toBe(true);
+    expect([...harvested].every((name) => name.startsWith('wui-workbench') || name === 'wui-status--embedded')).toBe(true);
   });
 
   it('measures its breakpoints on a box no spacing token can move', () => {
@@ -207,7 +207,7 @@ describe('the workbench stylesheet', () => {
     // The only media query in the sheet is the reduced-motion floor, which has
     // nothing to do with layout.
     const queries = [...workbenchStyle.matchAll(/@media \(([a-z-]+)/g)].map((match) => match[1]);
-    expect(queries).toEqual(['prefers-reduced-motion']);
+    expect([...new Set(queries)]).toEqual(['prefers-reduced-motion']);
     // And the collapse to one column is a rule keyed off what the shell says is
     // true, so no JavaScript ever writes a grid template.
     expect(workbenchStyle).toContain('.wui-workbench[data-rail="false"] .wui-workbench__frame');
@@ -627,6 +627,79 @@ describe('the tablist', () => {
 // ---------------------------------------------------------------------------
 
 describe('the docks and the status bar', () => {
+  it('animates pending states without rebuilding caller content or starting the frame clock', () => {
+    const frames = driver();
+    let state = base({phase: 'waiting', status: {message: 'Waiting for a source'}});
+    const container = host();
+    const handle = mountWorkbench(container, {snapshot: () => state, now: () => 0}, {chrome: 'bare'});
+    const child = document.createElement('button');
+    handle.stage.append(child);
+    const feedback = handle.element.querySelector<HTMLElement>('[part~="feedback"]')!;
+    const indicator = feedback.querySelector('[part~="indicator"]');
+    expect(feedback.dataset.kind).toBe('waiting');
+    expect(feedback.getAttribute('aria-live')).toBe('polite');
+    expect(handle.stage.hidden).toBe(true);
+    expect(getComputedStyle(feedback.parentElement!).display).toBe('flex');
+    expect(getComputedStyle(feedback.parentElement!).flexGrow).toBe('1');
+    expect(getComputedStyle(feedback).height).toBe('auto');
+    expect(getComputedStyle(feedback).alignItems).toBe('center');
+    expect(getComputedStyle(feedback).justifyContent).toBe('center');
+    expect(container.querySelectorAll('style')).toHaveLength(1);
+
+    state = base({phase: 'loading', status: {message: 'Loading data'}});
+    handle.update();
+    expect(feedback.dataset.kind).toBe('loading');
+    expect(feedback.getAttribute('aria-busy')).toBe('true');
+    expect(feedback.querySelector('[part~="indicator"]')).toBe(indicator);
+    expect(handle.stage.firstChild).toBe(child);
+    expect(frames.armed()).toBe(0);
+
+    state = base({phase: 'idle'});
+    handle.update();
+    expect(feedback.hidden).toBe(true);
+    expect(getComputedStyle(feedback.parentElement!).display).toBe('none');
+    expect(handle.stage.hidden).toBe(false);
+    expect(handle.stage.firstChild).toBe(child);
+    handle.destroy();
+    expect(container.childElementCount).toBe(0);
+  });
+
+  it('retains static pending feedback and hidden copy without installing a stylesheet', () => {
+    let state = base({phase: 'waiting', status: {message: 'Waiting for a source'}});
+    const container = host();
+    const handle = mountWorkbench(container, {snapshot: () => state}, {chrome: 'bare', stylesheet: false});
+    const feedback = handle.element.querySelector<HTMLElement>('[part~="feedback"]')!;
+    const indicator = feedback.querySelector<HTMLElement>('[part~="indicator"]')!;
+    const message = feedback.querySelector<HTMLElement>('[part~="message"]')!;
+
+    expect(container.querySelector('style')).toBeNull();
+    expect(getComputedStyle(feedback).display).toBe('flex');
+    expect(getComputedStyle(feedback).alignItems).toBe('center');
+    expect(getComputedStyle(feedback).justifyContent).toBe('center');
+    expect(getComputedStyle(feedback.parentElement!).flexGrow).toBe('1');
+    expect(getComputedStyle(indicator).borderStyle).toBe('solid');
+    expect(getComputedStyle(indicator).animation).toBe('none');
+    expect(getComputedStyle(message).position).toBe('absolute');
+    expect(getComputedStyle(message).clipPath).toBe('inset(50%)');
+    expect(message.textContent).toBe('Waiting for a source');
+    expect(message.hidden).toBe(false);
+
+    state = base({phase: 'loading', status: {message: 'Preparing data'}});
+    handle.update();
+    expect(indicator.style.background.match(/linear-gradient/g)).toHaveLength(4);
+    expect(indicator.style.background).toContain('40% 40%');
+    expect(feedback.getAttribute('aria-busy')).toBe('true');
+    expect(message.textContent).toBe('Preparing data');
+    expect(getComputedStyle(message).clipPath).toBe('inset(50%)');
+
+    state = base({phase: 'idle'});
+    handle.update();
+    expect(getComputedStyle(feedback).display).toBe('none');
+    expect(getComputedStyle(feedback.parentElement!).display).toBe('none');
+    expect(handle.stage.hidden).toBe(false);
+    expect(container.querySelector('style')).toBeNull();
+    handle.destroy();
+  });
   it('folds a dock with a switch, not with a button that looks like one', () => {
     let state = base();
     const toggleDock = vi.fn((id: string, next: boolean) => {

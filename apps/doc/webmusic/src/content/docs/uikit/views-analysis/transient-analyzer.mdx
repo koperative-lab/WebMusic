@@ -87,7 +87,9 @@ callbacks.
 | `frozen` | `boolean` | required | Freeze button state; the caller decides whether to keep supplying observations. |
 | `hitCount` | `number` | required | Number of accepted cues displayed since the caller's reset. |
 | `lastIntervalMs` | `number?` | absent | Most recent gap between accepted cues, in milliseconds. |
-| `status` | `string` | required | Text shown in the status region. |
+| `loading` | `boolean?` | `false` | Active pending source work; shows the four-cell animation and `aria-busy`, taking precedence over `waiting`. |
+| `waiting` | `boolean?` | `false` | Show the shared square waiting indicator instead of visible status prose; controls and retained readings remain available. |
+| `status` | `string` | required | Status-region text; remains accessible when `waiting` or `loading` is true. |
 
 **Actions and handle**
 
@@ -113,6 +115,8 @@ available without reading the plot's colors.
 
 <details class="component-section">
 <summary>Styling</summary>
+
+Loading and waiting feedback use the shared [Status animation and tokens](/uikit/layout-feedback/status/), including reduced-motion support.
 
 The root is `.wui-transient-analyzer`. Public parts are `root surface`,
 `plot`, `freeze`, `clear` and `sensitivity`; internal

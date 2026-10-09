@@ -76,7 +76,7 @@ subscription, listeners, nodes and installed style, not the audio source.
 | `triggerLevel` | `number` | required | Linear amplitude threshold shown by the trigger line and native range input (`-1..1`). |
 | `triggerEdge` | `'off' \| 'rising' \| 'falling'` | required | Selected native edge control. `off` is free-run display. |
 | `frozen` | `boolean` | required | Freeze button state; the caller decides whether to keep replacing `trace`. |
-| `status` | `'waiting' \| 'live' \| 'paused' \| 'unavailable' \| 'frozen'` | required | Visible status message. |
+| `status` | `'loading' \| 'waiting' \| 'live' \| 'paused' \| 'unavailable' \| 'frozen'` | required | Signal state. `loading` shows the busy four-cell animation; `waiting` shows the outlined square indicator with accessible status text; other states retain visible wording. |
 
 **Binding, options and handle**
 
@@ -108,6 +108,8 @@ and timebase use labelled native controls. The status is a live status region.
 
 <details class="component-section">
 <summary>Styling</summary>
+
+Loading and waiting feedback use the shared [Status animation and tokens](/uikit/layout-feedback/status/), including reduced-motion support. The exported stylesheet includes that feedback style.
 
 The public root class is `.wui-oscilloscope`. Public parts are `root surface`,
 `header`, `readout`, `plot`, `controls`, `freeze`, `timebase`,

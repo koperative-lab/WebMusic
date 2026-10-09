@@ -126,7 +126,7 @@ Mounting twice on one host replaces the first shell, and the replaced shell's sl
 | `title` / `subtitle` | `string` | — | The identity block, hidden when both are absent. |
 | `density` | `'comfortable' \| 'compact'` | `'comfortable'` | Sets the shell's density and inheritable tokens. Pitch tenants with their own token roots need an explicit `density` option and remount when that option changes. |
 | `scheme` | `'light' \| 'dark'` | inherit | Declared rather than sniffed: a shell in a dark card on a light page is a fact its host knows and it does not. |
-| `phase` | `WorkbenchPhase` | `'idle'` | `'idle' \| 'listening' \| 'playing' \| 'empty' \| 'error'`. Published as `data-phase`, **and it gates the clock**. |
+| `phase` | `WorkbenchPhase` | `'idle'` | `'idle' \| 'listening' \| 'playing' \| 'loading' \| 'waiting' \| 'empty' \| 'error'`. Published as `data-phase`, **and it gates the clock**. |
 | `status` | `{message?, detail?}` | — | `message` is a live region; `detail` is not. |
 
 `placement` is `'rail'` or `'strip'` — a position on the grid, not a kind of thing. `toggleable:
@@ -136,6 +136,17 @@ false` (or a binding with no `toggleDock`) removes the switch and leaves the sec
 frame loop. Everything else is a still shell that still answers the pointer and the keyboard —
 parked is not blank, and a workbench you can drag through is more alive than one spinning a loop over
 nothing. `empty` and `error` additionally print `status.message` over the stage.
+
+`loading` and `waiting` temporarily hide the stage without rebuilding its nodes and show the
+shared [status animation](/uikit/layout-feedback/status/): four square cells for loading, or a
+slow square-outline pulse while waiting. `status.message` remains screen-reader text in this
+feedback region, with no duplicate status-bar announcement. Loading sets `aria-busy`; waiting
+does not. These phases never start the frame clock. Motion preferences can make both static.
+The feedback exposes `feedback`, `feedback-indicator`, and `feedback-message` parts, and uses
+the status presenter's tokens. `workbenchStyle` includes the status stylesheet for callers
+that install styles themselves. Feedback fills the stage's available area and centers its
+indicator. With `stylesheet: false`, inline styles retain the same square shapes and visually
+hidden messages, using static indicators without injecting a stylesheet.
 
 | `WorkbenchBinding` | Description |
 |---|---|
@@ -155,7 +166,7 @@ nothing. `empty` and `error` additionally print `status.message` over the stage.
 | `classNames` / `parts` | | — | `{root?, header?, tablist?, tab?, stage?, rail?, strip?, status?, index?}`. `parts` additionally accepts `frame?` for the painted box and `note?` for its empty/error sentence. |
 | `onDockVisibility` | `(id, visible) => void` | — | A dock started or stopped answering — `dock(id)` flipping between a node and `undefined`, whatever the reason. Reports only a **change**, and never before `mountWorkbench` has returned. |
 | `onError` | `(error) => void` | — | A faulty snapshot, a throwing `now()` or `epoch()`, a dock dropped with a presenter still in it, and anything a slot's own draw callback throws. |
-| `stylesheet` | `boolean` | `true` | Install the exported sheet, or paint the identical declarations onto the nodes. |
+| `stylesheet` | `boolean` | `true` | Install the exported sheet, or paint geometry and state feedback inline. Loading and waiting indicators are static on the inline path. |
 
 **Handle**
 
@@ -196,7 +207,8 @@ whose only content is a caller's presenter may have nothing focusable in it at a
 switch is `role="switch"` with `aria-checked`, named by its dock label — and where the binding has
 no `toggleDock` to receive the answer it is hidden **and** disabled, because a switch a reader can
 reach, is told is on, and throws to no effect is worse than no switch. The status message is the
-shell's **one** live region; `detail` carries none, because a caller is expected to put a position
+shell's active live region outside pending phases; loading and waiting announce through the
+shared feedback instead. `detail` carries none, because a caller is expected to put a position
 there and a polite region changing at that rate would read the piece out loud for as long as it
 lasts.
 
@@ -210,7 +222,8 @@ background (including `transparent`), foreground, accent, outer border and corne
 Presenter-specific tokens below take precedence within their documented roles.
 
 The shell installs `workbenchStyle`, or paints the same declarations onto the nodes when
-`stylesheet: false`. Both paths are generated from one record. Every colour is a chain ending in a
+`stylesheet: false`. Shell geometry comes from one record; pending feedback uses static inline
+square shapes when stylesheet installation is disabled. Every colour is a chain ending in a
 literal, never a bare `var()`: a bare custom property is invalid at computed-value time on a host
 carrying no tokens, which paints a control invisible — the one failure a colour system may not have.
 
@@ -294,10 +307,9 @@ implementation/state values; prefer the public surface and palette tokens for ne
 | Status | `.wui-workbench__status`, `__dot`, `__message`, `__detail` | The dot's colour comes from the root's `data-phase`. |
 | Semantic twin | `.wui-workbench__index` | An `<ol>` outside the frame. Its children, and their `aria-current`, are the caller's. |
 
-The one animation in the shell is `wui-workbench-breathe`, a pulse on the dot while `phase` is
-`listening`. It is deliberate: listening is a state with no material to move, and a pulse is the only
-honest way to say *still waiting* without pretending to be a position. Every other transition here is
-a colour change measured in `--wui-harmony-motion-chip`.
+The shell uses `wui-workbench-breathe` on its dot while `phase` is `listening`, plus the shared
+status presenter's square loading and waiting animations. Other transitions are color changes
+measured in `--wui-harmony-motion-chip`.
 
 The `parts` option adds `part` tokens for a shadow-DOM host; `classNames` adds classes without
 replacing the structural ones. Neither is required.

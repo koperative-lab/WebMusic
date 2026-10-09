@@ -502,7 +502,7 @@ function mountStatusDemo(host: HTMLElement): UiPresenterDemoHandle {
         state = {
           ...state,
           kind:
-            value === 'loading' || value === 'empty' || value === 'error'
+            value === 'loading' || value === 'waiting' || value === 'empty' || value === 'error'
               ? value
               : 'ready',
         };
@@ -1904,6 +1904,8 @@ const WORKBENCH_DEMO_SENTENCES: Readonly<Record<WorkbenchPhase, string>> = {
   playing: 'Following the performance.',
   listening: 'Listening for the next chord.',
   idle: 'Parked. Nothing is being read.',
+  loading: 'Loading analysis…',
+  waiting: 'Waiting for a source…',
   empty: 'Nothing has been analysed yet.',
   error: 'The analysis stopped answering.',
 };
@@ -1912,6 +1914,8 @@ const WORKBENCH_PHASES: readonly WorkbenchPhase[] = [
   'idle',
   'listening',
   'playing',
+  'loading',
+  'waiting',
   'empty',
   'error',
 ];

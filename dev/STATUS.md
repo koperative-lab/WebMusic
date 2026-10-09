@@ -97,6 +97,11 @@ registrations and the deprecated `simple-score-player` alias; old documentation
 routes redirect to the renamed Element pages. DEC-046 accepts this source
 surface for the main integration.
 
+DEC-047 adds shared square loading and source-waiting feedback across the current
+Element inventory. The [component feedback review](audits/2026-10-08/COMPONENT-FEEDBACK.md)
+records per-tag state coverage and bounded visual evidence. Ready input and valid
+silence remain usable, and the nonvisual rack declaration reports through its desk.
+
 ## How to read status
 
 “Implemented” means a source path exists and its stated behavior was inspected. “Verified” names the checks or environment used. “Accepted target” states intended behavior that still requires design or implementation. An automated check is not proof of real audio, device, browser, remote publication, or complete API documentation.

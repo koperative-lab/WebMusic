@@ -35,6 +35,12 @@ This tag uses the selected player’s held notes and note/state events. When ava
 
 The selector must match exactly one target in the current Document or ShadowRoot. Invalid or ambiguous matches remain unbound. Native single-score player mode supplies complete initial data/state; Rack/controller modes do not promise that snapshot. Disconnect cancels owned work, releases subscriptions/observation and destroys presenters, while the borrowed player keeps its own lifetime.
 
+Before note input, and while stopped without held notes, the surface shows a quiet square
+waiting animation instead of placeholder copy. A native player's pending load uses the
+four-square loading animation. Note input reveals the existing nameplate immediately.
+Descriptions remain available to screen readers; reduced-motion and `motion="none"` or
+`motion="stepped"` retain a static indicator.
+
 <details class="component-section">
 <summary>API</summary>
 

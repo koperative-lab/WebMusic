@@ -46,6 +46,13 @@ output enters the first card, then each card below it. The editor assigns the re
 than creating a separate copy for every part. The generated JavaScript beneath the markup is part
 of the Copy result too.
 
+A desk without resolved members shows the shared outlined-square waiting animation.
+While a child `score-rack-part` loads its score, the desk shows the four-square loading
+animation; existing channel controls remain available. A failed child load displays its
+error, and replacement or cancellation cannot leave stale loading feedback. The declaration
+itself stays nonvisual. Both animations use the shared grayscale status tokens and stop
+for reduced motion, with descriptions retained for assistive technology.
+
 ## Import
 
 ```html

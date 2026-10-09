@@ -54,6 +54,20 @@ entry. Its `.player` property accepts the central `AudioPlayer`.
 [`AudioClipPlayer`](/audio/headless/play/audio-clip-player/) remains the low-level
 Headless engine for one clip.
 
+## Loading and waiting
+
+An empty player shows the shared square waiting indicator beside its disabled
+transport. URL fetches and `load(ArrayBuffer | Blob)` decoding show the loading
+animation, including replacement loads while the previous clip remains usable.
+The transport stays mounted throughout. Successful source selection hides the
+indicator; a failed load shows its error message and still emits `webaudio:error`.
+A new load or explicit source selection clears that failure. Superseded requests
+cannot overwrite the current feedback. `controls="false"` hides the complete
+transport, including feedback.
+
+Loading and waiting descriptions remain available to assistive technology, and
+both animations respect reduced-motion preferences.
+
 ## Re-skinning
 
 Every visual knob is a CSS custom property, so the whole transport re-skins from
@@ -115,6 +129,9 @@ await el.player?.play();                     // stable AudioPlayer facade
 | `webaudio:timeupdate` | event | `detail = { seconds, duration, progress }`, on the cursor cadence (~50 ms). |
 | `webaudio:sourcechange` | event | `AudioPlayerElementSourceDetail = { clip, revision }` after resolved data or player identity changes, including clearing. Revision increases per Element. Read `.clip` for initial attachment; this event does not require building the audio graph. |
 | `webaudio:playerchange` | event | `{player}` after central player identity changes; companions rebind to the new owner. |
+| `loading` | readonly property | `boolean`; true only during this Element's current URL fetch or buffer/blob decode. Defaults to `false`. |
+| `loadError` | readonly property | `Error \| undefined`; current source-load failure, cleared by a new load or explicit source selection. |
+| `webaudio:loadstatechange` | event | `{loading, error}` whenever source loading or its failure changes, including cancellation. Read `.loading` / `.loadError` to initialize a late follower. Does not describe normal pause or playback buffering. |
 | `webaudio:statechange` | event | `{playing}` from the selected backend. |
 | `webaudio:loaded` | event | `detail = { duration }` once the selected backend is prepared. Source replacement is a separate `webaudio:sourcechange` notification. |
 | `webaudio:end` | event | `detail` is the finished `AudioClip`, or undefined for a group with no single clip. |
@@ -161,6 +178,9 @@ layouts, and respects `hidden`. Set host width in your application for a narrowe
 control; spacing between components belongs to their composition. The default
 transport gap is `0.75rem`, matching Score; override `--wm-transport-gap` or the
 shared `--wm-control-gap` token to change it.
+
+Feedback uses the shared [Status tokens](/uikit/layout-feedback/status/) and exposes
+`status`, `status-message` and `status-indicator` parts.
 
 The default surface uses the same neutral UI tokens as Score. These optional legacy aliases
 demonstrate an explicit dark customization; they do not define the default palette.

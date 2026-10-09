@@ -5,6 +5,29 @@ import {mountLevelAnalyzer} from '../src/level-analyzer';
 afterEach(() => document.body.replaceChildren());
 
 describe('level analyzer presenter', () => {
+  it('uses the shared waiting indicator and restores visible operational status', () => {
+    const host = document.createElement('div');
+    const handle = mountLevelAnalyzer(host, {onThresholdChange: vi.fn(), onFreezeChange: vi.fn(), onResetHold: vi.fn()});
+    const current = {history: [], thresholdDbfs: -12, frozen: false, status: 'Waiting for playback', waiting: true};
+    handle.update(current);
+    const indicator = host.querySelector<HTMLElement>('.wui-status')!;
+    expect(indicator.dataset.kind).toBe('waiting');
+    expect(indicator.getAttribute('role')).toBe('status');
+    expect(indicator.textContent).toBe('Waiting for playback');
+    expect(indicator.querySelector('.wui-status__indicator')?.getAttribute('aria-hidden')).toBe('true');
+    const controls = [...host.querySelectorAll('button')];
+    handle.update({...current, loading: true, status: 'Loading audio'});
+    expect(indicator.dataset.kind).toBe('loading');
+    expect(indicator.getAttribute('aria-busy')).toBe('true');
+    handle.update({...current, waiting: false, status: 'Paused'});
+    expect(indicator.hidden).toBe(true);
+    expect(indicator.hasAttribute('aria-busy')).toBe(false);
+    expect(host.querySelector('.wui-level-analyzer__status')?.textContent).toBe('Paused');
+    expect([...host.querySelectorAll('button')]).toEqual(controls);
+    handle.destroy();
+    expect(host.children).toHaveLength(0);
+  });
+
   it('shows sampled dynamics and delegates threshold, freeze and hold commands', () => {
     const host = document.createElement('div');
     document.body.append(host);

@@ -1,3 +1,4 @@
+import {mountStatus, statusStyle, type StatusState} from './status';
 import {claimHost} from './internal/lifecycle';
 import {installStyle} from './internal/style';
 
@@ -15,6 +16,10 @@ export interface TransientAnalyzerState {
   hitCount: number;
   lastIntervalMs?: number;
   status: string;
+  /** Waiting for a source or playback; replaces visible status prose with the shared indicator. */
+  waiting?: boolean;
+  /** Active source work; takes precedence over passive waiting. */
+  loading?: boolean;
 }
 
 export interface TransientAnalyzerActions {
@@ -32,7 +37,8 @@ export interface TransientAnalyzerHandle {
 const COLUMNS = 64;
 const mounted = new WeakMap<HTMLElement, TransientAnalyzerHandle>();
 
-const transientAnalyzerStyle = `
+const transientAnalyzerStyle = `${statusStyle}
+
 .wui-transient-analyzer { box-sizing: border-box; display: grid; gap: .75rem; width: 100%; min-width: 0;
   color: var(--wm-transient-analyzer-foreground, var(--wm-foreground, #262b2a));
   background: var(--wm-transient-analyzer-background, var(--wm-surface, #fff));
@@ -91,9 +97,16 @@ export function mountTransientAnalyzer(host: HTMLElement, actions: TransientAnal
   const title = document.createElement('strong');
   title.className = 'wui-transient-analyzer__title';
   title.textContent = 'Transient analyzer';
-  const status = document.createElement('span');
+  const status = document.createElement('div');
   status.className = 'wui-transient-analyzer__status';
-  status.setAttribute('role', 'status');
+  const statusMessage = document.createElement('span');
+  statusMessage.setAttribute('role', 'status');
+  const waitingHost = document.createElement('div');
+  let feedback: StatusState = {kind: 'ready'};
+  const waiting = mountStatus(waitingHost, {snapshot: () => feedback}, {
+    stylesheet: false, classNames: {root: 'wui-status--embedded'},
+  });
+  status.append(statusMessage, waitingHost);
   head.append(title, status);
 
   const values = document.createElement('dl');
@@ -176,7 +189,11 @@ export function mountTransientAnalyzer(host: HTMLElement, actions: TransientAnal
     update(state) {
       if (destroyed) return;
       frozen = state.frozen;
-      if (status.textContent !== state.status) status.textContent = state.status;
+      const pending = state.loading || state.waiting;
+      if (statusMessage.textContent !== (pending ? '' : state.status)) statusMessage.textContent = pending ? '' : state.status;
+      statusMessage.hidden = pending === true;
+      feedback = {kind: state.loading ? 'loading' : state.waiting ? 'waiting' : 'ready', message: pending ? state.status : ''};
+      waiting.update();
       freeze.textContent = frozen ? 'Unfreeze' : 'Freeze';
       freeze.setAttribute('aria-pressed', String(frozen));
       sensitivityInput.value = String(Math.round(state.sensitivity * 100));
@@ -202,6 +219,7 @@ export function mountTransientAnalyzer(host: HTMLElement, actions: TransientAnal
       freeze.removeEventListener('click', onFreeze);
       clear.removeEventListener('click', onClear);
       sensitivityInput.removeEventListener('input', onSensitivity);
+      waiting.destroy();
       root.remove();
       style?.remove();
       ownership.release();

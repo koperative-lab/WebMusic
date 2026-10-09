@@ -41,6 +41,13 @@ When both `effects` and `eq` are active their audio is spliced into one serial c
 behind the shared `.input` / `.output`. The demo pairs a piano `<score-note-input>` with the panel
 and exposes each property group through external Parameters.
 
+Unconfigured sound and macro sections, and effects/EQ sections without their required
+graph configuration, show the shared outlined-square waiting animation. Assigning their
+properties replaces the indicator with the configured controls. Envelope and LFO editors
+remain immediately usable with their defaults; they do not wait for sound or a held note.
+Status descriptions remain available to assistive technology, and reduced motion uses a
+static square.
+
 ## Try every property
 
 The demo is a real `<score-note-input>` and `<score-synth-panel>` composition. Play the keyboard, then edit the
@@ -212,6 +219,8 @@ score-synth-panel {
   --synth-radius: 0;
 }
 ```
+
+Waiting sections expose `synth-status`, `synth-status-indicator` and `synth-status-message` parts and inherit the shared `--wm-status-*` tokens.
 
 The shared envelope and LFO sections expose the same stable parts as their standalone presenters.
 Envelope exposes `root`, `svg`, `grid`, `area`, `curve`, `handle`, `readout`, `inputs` and `input`;

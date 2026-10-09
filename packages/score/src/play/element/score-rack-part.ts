@@ -47,6 +47,7 @@ export class RackPartElement extends WebMusicElement {
   private voiced?: {name: string; synth: HeadlessSynth};
   private loadToken = 0;
   private loadController?: AbortController;
+  private loadFailure?: {error: unknown};
 
   protected override onMount(): void {
     // This tag is a declaration, not a visual control. Keep that contract in
@@ -86,6 +87,16 @@ export class RackPartElement extends WebMusicElement {
 
   get sound(): HeadlessSynth | undefined {
     return this.explicitSound;
+  }
+
+  /** Loading feedback belongs to the desk; this declaration remains nonvisual. */
+  rackPartStatus(): {kind: 'ready' | 'loading' | 'waiting' | 'error'; message?: string} {
+    if (this.loadFailure) {
+      const {error} = this.loadFailure;
+      return {kind: 'error', message: error instanceof Error ? error.message : 'Unable to load rack part.'};
+    }
+    if (this.loadController) return {kind: 'loading', message: 'Loading rack parts…'};
+    return {kind: this.resolved ? 'ready' : 'waiting', message: 'Waiting for rack part scores…'};
   }
 
   /**
@@ -138,6 +149,7 @@ export class RackPartElement extends WebMusicElement {
 
   private async resolve(): Promise<void> {
     this.cancelLoad();
+    this.loadFailure = undefined;
     const token = this.loadToken;
     if (this.explicitScore) {
       this.resolved = this.explicitScore;
@@ -153,6 +165,7 @@ export class RackPartElement extends WebMusicElement {
     if (!this.parentElement || !isRackDesk(this.parentElement)) return;
     const controller = new AbortController();
     this.loadController = controller;
+    this.announce();
     try {
       const {loadScoreFromUrl} = await import('../../io/load');
       if (controller.signal.aborted) return;
@@ -160,12 +173,15 @@ export class RackPartElement extends WebMusicElement {
       const score = await loadScoreFromUrl(src, {...(format ? {format} : {}), signal: controller.signal});
       if (token !== this.loadToken || !this.isConnected) return;
       this.resolved = score;
-      this.announce();
     } catch (error) {
       if (token !== this.loadToken || controller.signal.aborted) return;
+      this.loadFailure = {error};
       this.reportError(error);
     } finally {
-      if (this.loadController === controller) this.loadController = undefined;
+      if (this.loadController === controller) {
+        this.loadController = undefined;
+        this.announce();
+      }
     }
   }
 

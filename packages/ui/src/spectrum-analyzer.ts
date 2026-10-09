@@ -1,3 +1,4 @@
+import {mountStatus, statusStyle, type StatusState} from './status';
 import {claimHost, createErrorSink} from './internal/lifecycle';
 import {installStyle} from './internal/style';
 
@@ -18,7 +19,7 @@ export interface SpectrumAnalyzerState {
   peakHold: boolean;
   minFrequency: number;
   maxFrequency: number;
-  status: 'waiting' | 'live' | 'paused' | 'unavailable' | 'frozen';
+  status: 'loading' | 'waiting' | 'live' | 'paused' | 'unavailable' | 'frozen';
 }
 
 export interface SpectrumAnalyzerBinding {
@@ -47,7 +48,7 @@ export interface SpectrumAnalyzerHandle {
 type SpectrumHost = HTMLElement | ShadowRoot;
 const mounted = new WeakMap<SpectrumHost, SpectrumAnalyzerHandle>();
 
-export const spectrumAnalyzerStyle = String.raw`
+export const spectrumAnalyzerStyle = String.raw`${statusStyle}
 .wui-spectrum-analyzer, .wui-spectrum-analyzer * { box-sizing: border-box; }
 .wui-spectrum-analyzer {
   display: grid;
@@ -181,6 +182,14 @@ export function mountSpectrumAnalyzer(
   const status = document.createElement('div');
   status.className = 'wui-spectrum-analyzer__status';
   status.setAttribute('part', 'status');
+  const statusMessage = document.createElement('span');
+  statusMessage.setAttribute('role', 'status');
+  const waitingHost = document.createElement('div');
+  let feedback: StatusState = {kind: 'ready'};
+  const waiting = mountStatus(waitingHost, {snapshot: () => feedback}, {
+    stylesheet: false, classNames: {root: 'wui-status--embedded'},
+  });
+  status.append(statusMessage, waitingHost);
   root.append(toolbar, canvas, status);
 
   let destroyed = false;
@@ -326,13 +335,18 @@ export function mountSpectrumAnalyzer(
       const valueText = `${frequencyLabel(selectedFrequency)}${db === undefined ? '' : `, ${db.toFixed(1)} dB`}`;
       canvas.setAttribute('aria-valuetext', valueText);
       readout.textContent = valueText;
-      status.textContent = ({
-        waiting: 'Waiting for playback',
+      const statusText = ({
+        loading: 'Loading audio', waiting: 'Waiting for playback',
         live: 'Live spectrum',
         paused: 'Playback paused',
         unavailable: 'Analyser unavailable',
         frozen: 'Spectrum frozen',
       } as const)[state.status];
+      const isWaiting = state.status === 'waiting' || state.status === 'loading';
+      statusMessage.textContent = isWaiting ? '' : statusText;
+      statusMessage.hidden = isWaiting;
+      feedback = {kind: state.status === 'loading' ? 'loading' : isWaiting ? 'waiting' : 'ready', message: isWaiting ? statusText : ''};
+      waiting.update();
       root.dataset.state = state.status;
       draw(state, min, max);
     } catch (error) {
@@ -412,6 +426,7 @@ export function mountSpectrumAnalyzer(
       canvas.removeEventListener('pointermove', onPointer);
       canvas.removeEventListener('keydown', onKey);
       claim.release();
+      waiting.destroy();
       root.remove();
       style?.remove();
     },

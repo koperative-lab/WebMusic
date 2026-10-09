@@ -430,3 +430,38 @@ describe('<audio-meter> borrowed player binding', () => {
   });
 
 });
+
+describe('<audio-meter> passive source feedback', () => {
+  it('follows owner loading, failure, ready silence and removal without borrowing ownership', async () => {
+    stubFrames();
+    const owner = Object.assign(document.createElement('div'), {
+      loading: false, loadError: undefined as Error | undefined,
+      analyser: undefined as AnalyserNode | undefined,
+    });
+    owner.id = 'meter-status-owner';
+    document.body.append(owner);
+    const element = document.createElement('test-audio-meter') as AudioMeterElement;
+    element.setAttribute('player', '#meter-status-owner');
+    document.body.append(element);
+    const feedback = () => element.shadowRoot!.querySelector<HTMLElement>('.wui-status')!;
+    expect(feedback().dataset.kind).toBe('waiting');
+    owner.loading = true;
+    owner.dispatchEvent(new CustomEvent('webaudio:loadstatechange'));
+    expect(feedback().dataset.kind).toBe('loading');
+    owner.loading = false;
+    owner.loadError = new Error('Decode failed');
+    owner.dispatchEvent(new CustomEvent('webaudio:loadstatechange'));
+    expect(feedback().getAttribute('role')).toBe('alert');
+    expect(feedback().textContent).toBe('Decode failed');
+    const fixture = ownedContext();
+    owner.loadError = undefined;
+    owner.analyser = fixture.context.createAnalyser();
+    owner.dispatchEvent(new CustomEvent('webaudio:sourcechange'));
+    expect(feedback().hidden).toBe(true);
+    expect(element.shadowRoot!.querySelector('[role="meter"]')?.getAttribute('aria-valuenow')).toBe('0');
+    owner.remove();
+    await Promise.resolve();
+    expect(feedback().dataset.kind).toBe('waiting');
+    expect(fixture.analysers[0]!.disconnect).not.toHaveBeenCalled();
+  });
+});

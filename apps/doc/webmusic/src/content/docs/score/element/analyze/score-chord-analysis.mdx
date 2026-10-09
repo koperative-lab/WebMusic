@@ -85,6 +85,10 @@ All emitted events bubble and are composed. `AnalysisSeekDetail` and `AnalysisSe
 | `webscore:seek` | `AnalysisSeekDetail` (`{quarters, seconds}`) | Lane navigation; quarter notes and nominal score seconds. |
 | `webscore:analysisselect` | `AnalysisSelectDetail` (`{kind: 'chord', id, startQuarters, endQuarters}`) | Selecting a band or calling `selectRegion()`; local inspection state. |
 
+Pending URL loads or a native player's loading state show the shared four-square loading
+animation. Missing input shows the slower square waiting animation. Their descriptions remain
+available to screen readers; load failures and empty analysis results retain visible text.
+
 ### Accessibility
 
 The lane is a named slider tab stop with keyboard navigation. A semantic ordered list accompanies the graphical data and marks the current score span with `aria-current`. Selected details are available through a nonvisual status; candidate readings are data for application-owned inspectors, not Element buttons. Automatic motion respects reduced-motion preference on moving surfaces; display controls remain outside the component.

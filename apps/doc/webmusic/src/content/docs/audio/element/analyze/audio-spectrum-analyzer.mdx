@@ -56,6 +56,16 @@ unavailable. Disconnect stops only this element's polling and subscriptions,
 not the player or its graph. `player` must resolve uniquely in the current
 Document or ShadowRoot, including when a target appears later.
 
+While waiting for a source or playback, the status area shows the shared square waiting
+animation and keeps its message accessible to assistive technology. Paused, frozen and
+unavailable states retain visible wording; controls and retained readings stay available.
+The animation respects reduced-motion preferences.
+
+When following an `audio-player`, pending fetch/decode uses the shared loading animation,
+load failures remain visible, and a missing source uses the waiting animation. Normal
+pause, silence and frozen readings retain their ordinary status. An explicit `.analyser`
+takes precedence over the player's loading and failure state.
+
 <details class="component-section">
 <summary>API</summary>
 

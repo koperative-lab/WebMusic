@@ -6,12 +6,14 @@ import {
   type ScorePlayerElement,
 } from '../../src/play/element/score-player';
 import {defineAllAnalysisElements, type ChordAnalysisElement} from '../../src/analyze/element';
+import {defineScoreViewElement} from '../../src/view/element/score-view';
 
 const io = vi.hoisted(() => ({load: vi.fn()}));
 vi.mock('../../src/io/load', () => ({loadScoreFromUrl: io.load}));
 
 defineScorePlayerElement();
 defineAllAnalysisElements();
+defineScoreViewElement();
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 function music(): Score {
@@ -115,7 +117,10 @@ describe('native single-score player with independent Analyze components', () =>
     expect(source.resolvedScore).toBeUndefined();
     await flush();
     for (const companion of [chord, sibling]) {
-      expect(companion.textContent).toContain('Waiting for a score');
+      const feedback = companion.querySelector('[part~="feedback"]');
+      expect(feedback?.getAttribute('data-kind')).toBe('loading');
+      expect(feedback?.getAttribute('aria-busy')).toBe('true');
+      expect(feedback?.textContent).toContain('Loading score');
       expect(companion.querySelector('[role="slider"]')?.getAttribute('aria-disabled')).toBe('true');
     }
     expect(position(chord)).toBe(0);
@@ -128,4 +133,24 @@ describe('native single-score player with independent Analyze components', () =>
     expect(sibling.querySelector('[role="slider"]')).not.toBeNull();
     expect(io.load).toHaveBeenCalledTimes(2);
   });
+});
+
+
+it('Score View follows native source loading and error even before a score exists', async () => {
+  let reject!: (error: Error) => void;
+  io.load.mockImplementationOnce(() => new Promise<Score>((_resolve, fail) => { reject = fail; }));
+  const source = await nativePlayer();
+  const view = document.createElement('score-view');
+  view.setAttribute('type', 'map');
+  view.setAttribute('player', '#source');
+  document.body.append(view);
+  await flush();
+  expect(view.querySelector('[data-kind="loading"]')?.getAttribute('aria-busy')).toBe('true');
+  reject(new Error('Unavailable score file'));
+  await flush();
+  expect(view.querySelector('[data-kind="error"]')?.textContent).toContain('Unavailable score file');
+  source.removeAttribute('src');
+  await flush();
+  expect(view.querySelector('[data-kind="waiting"]')).not.toBeNull();
+  expect(view.querySelector('[aria-busy="true"]')).toBeNull();
 });

@@ -1,3 +1,4 @@
+import {mountStatus, statusStyle, type StatusState} from './status';
 import {claimHost} from './internal/lifecycle';
 import {createFader, faderStyle} from './fader';
 import {installStyle} from './internal/style';
@@ -17,6 +18,8 @@ export interface MixerChannel {
 export interface MixerState {
   master: number;
   channels: readonly MixerChannel[];
+  /** Optional owner/source readiness, without replacing usable channel strips. */
+  status?: StatusState;
   disabled?: boolean;
 }
 
@@ -49,6 +52,7 @@ export interface MixerClassNames {
   play?: string;
   pause?: string;
   stop?: string;
+  status?: string;
 }
 
 export type MixerParts = MixerClassNames;
@@ -81,7 +85,7 @@ type MixerAction = "play" | "pause" | "stop";
 
 const mounted = new WeakMap<MixerHost, MixerHandle>();
 
-export const mixerStyle = faderStyle + `
+export const mixerStyle = statusStyle + faderStyle + `
 :where(.wui-mixer) {
 ${componentSurfaceCss('mixer', {
   padding: 'var(--wm-mixer-padding, .6rem)',
@@ -91,6 +95,8 @@ ${componentSurfaceCss('mixer', {
 })}
 inline-size:100%; min-inline-size:0; max-inline-size:100%; color:var(--wui-mixer-text,var(--wm-mixer-text,var(--wm-foreground,#444))); font:.8rem/1.35 var(--wm-font-family,var(--wm-font,system-ui,sans-serif)); }
 :where(.wui-mixer__board,.wui-mixer__channels) { display:flex; gap:.75rem; align-items:flex-start; min-inline-size:0; }
+.wui-mixer__status .wui-status { min-height:3rem; height:auto; }
+.wui-mixer__status[hidden], .wui-mixer__board[hidden], .wui-mixer__transport[hidden] { display:none; }
 :where(.wui-mixer__transport) { display:flex; flex-wrap:wrap; gap:.35rem; margin-bottom:.65rem; }
 /* Leave room inside the scroller for the shared fader's focus outline. */
 :where(.wui-mixer__channels) { box-sizing:border-box; overflow-x:auto; flex:1 1 auto; padding:.3rem .3rem .5rem; }
@@ -297,6 +303,16 @@ export function mountMixer(
   board.append(...(masterStrip ? [masterStrip.element] : []), channelsBox);
   root.replaceChildren(...(transport.childNodes.length ? [transport, board] : [board]));
 
+  const statusHost = document.createElement('div');
+  statusHost.className = 'wui-mixer__status';
+  addClassNames(statusHost, options.classNames?.status);
+  setParts(statusHost, ['status'], options.parts?.status);
+  root.append(statusHost);
+  let statusState: StatusState = {kind: 'ready'};
+  const status = mountStatus(statusHost, {snapshot: () => statusState}, {
+    stylesheet: false, classNames: {root: 'wui-status--embedded'},
+  });
+
   const strips = new Map<string, Strip>();
   const releaseStrips = (): void => {
     for (const strip of strips.values()) strip.destroy();
@@ -308,6 +324,13 @@ export function mountMixer(
     if (destroyed) return;
     try {
       const state = binding.snapshot();
+      statusState = state.status ?? {kind: 'ready'};
+      status.update();
+      statusHost.hidden = statusState.kind === 'ready';
+      const unavailable = statusState.kind !== 'ready' && state.channels.length === 0;
+      board.hidden = unavailable;
+      transport.hidden = unavailable;
+      root.setAttribute('aria-busy', String(statusState.kind === 'loading'));
       const disabled = state.disabled === true;
       channelsBox.tabIndex = state.channels.length ? 0 : -1;
       for (const button of actionButtons) button.disabled = disabled;
@@ -357,6 +380,7 @@ export function mountMixer(
       destroyed = true;
       unsubscribe?.();
       releaseStrips();
+      status.destroy();
       claim.release();
       root.remove();
       style?.remove();

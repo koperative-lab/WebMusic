@@ -363,6 +363,9 @@ export class AudioPlaylistElement extends WebMusicElement {
       playing: queue?.playing ?? false,
       disabled: this.connection.requested && !this.owner,
       progress: queue?.progress ?? 0,
+      status: this.connection.requested && !this.owner
+        ? {kind: 'waiting' as const, message: 'Waiting for the playback owner.'}
+        : {kind: items.length ? 'ready' as const : 'waiting' as const, message: 'Waiting for playlist entries.'},
       items,
     };
   }

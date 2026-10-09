@@ -201,6 +201,8 @@ native note/state/navigation events are non-composed.
 
 **Subclassing.** `ScorePlayerElement` is exported from `/element` without registering a tag, and exposes protected seams for the two things a custom player usually needs to change: which UI is mounted (`mountScore()`, `mountRack()`, `mountController()`, and `replaceHandle()` to swap one safely) and where the music comes from (`resolveScore()`, `buildSynth()`). `render()` and `teardown()` bracket the whole lifecycle if you need to wrap it.
 
+Pending score loading displays the shared square loading animation; no source displays the quieter square waiting animation. Both retain screen-reader status text and respect reduced-motion preferences. Source and mount failures show a visible error message while retaining lifecycle error reporting. A successful mount replaces the status with transport controls; source replacement and disconnect release the previous status without removing authored child elements or disposing borrowed playback resources.
+
 For direct `mountPresetPlayer(score, host, options)` integration, the optional
 `PresetPlayerOptions.onSeek` callback reports native seek-bar navigation. The
 Element forwards it as `webscore:seek` so live evidence starts a new
@@ -227,6 +229,9 @@ UIKit owns the wrapping layout and inline control geometry. The facade also
 mounts UIKit's shared `transportStateStyle` for keyboard focus and disabled
 feedback, including volume faders and knobs. That style node survives chrome
 changes and is removed with the mounted transport.
+
+[Status](/uikit/layout-feedback/status/) owns loading, waiting and source-error
+appearance through the shared status tokens and public parts.
 
 Set `--wm-component-background: transparent`, `--wm-component-border: none`
 and `--wm-component-radius: 12px` to style the outer surface. Use

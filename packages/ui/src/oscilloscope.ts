@@ -1,3 +1,4 @@
+import {mountStatus, statusStyle, type StatusState} from './status';
 import {claimHost, createErrorSink} from './internal/lifecycle';
 import {installStyle} from './internal/style';
 
@@ -18,7 +19,7 @@ export interface OscilloscopeState {
   triggerLevel: number;
   triggerEdge: OscilloscopeTriggerEdge;
   frozen: boolean;
-  status: 'waiting' | 'live' | 'paused' | 'unavailable' | 'frozen';
+  status: 'loading' | 'waiting' | 'live' | 'paused' | 'unavailable' | 'frozen';
 }
 
 export interface OscilloscopeBinding {
@@ -47,7 +48,7 @@ export interface OscilloscopeHandle {
 type OscilloscopeHost = HTMLElement | ShadowRoot;
 const mounted = new WeakMap<OscilloscopeHost, OscilloscopeHandle>();
 
-export const oscilloscopeStyle = String.raw`
+export const oscilloscopeStyle = String.raw`${statusStyle}
 .wui-oscilloscope, .wui-oscilloscope * { box-sizing: border-box; }
 .wui-oscilloscope { display: grid; gap: .55rem; width: 100%; min-width: 0;
   color: var(--wm-oscilloscope-foreground, var(--wm-foreground, #263138));
@@ -167,7 +168,14 @@ export function mountOscilloscope(
   const status = document.createElement('div');
   status.className = 'wui-oscilloscope__status';
   status.setAttribute('part', 'status');
-  status.setAttribute('role', 'status');
+  const statusMessage = document.createElement('span');
+  statusMessage.setAttribute('role', 'status');
+  const waitingHost = document.createElement('div');
+  let feedback: StatusState = {kind: 'ready'};
+  const waiting = mountStatus(waitingHost, {snapshot: () => feedback}, {
+    stylesheet: false, classNames: {root: 'wui-status--embedded'},
+  });
+  status.append(statusMessage, waitingHost);
   root.append(head, canvas, controls, status);
 
   let destroyed = false;
@@ -277,9 +285,14 @@ export function mountOscilloscope(
       const valueText = `${selectedTimeMs.toFixed(2)} ms${amplitude === undefined ? '' : `, ${amplitude >= 0 ? '+' : ''}${amplitude.toFixed(2)} amplitude`}`;
       canvas.setAttribute('aria-valuetext', valueText);
       readout.textContent = valueText;
-      status.textContent = state.status === 'live'
+      const statusText = state.status === 'live'
         ? state.trace?.silent ? 'No signal' : state.triggerEdge === 'off' ? 'Live, free run' : state.trace?.triggered ? 'Live, triggered' : 'Live, no matching edge'
-        : ({waiting: 'Waiting for playback', paused: 'Playback paused', unavailable: 'Analyser unavailable', frozen: 'Waveform frozen'} as const)[state.status];
+        : ({loading: 'Loading audio', waiting: 'Waiting for playback', paused: 'Playback paused', unavailable: 'Analyser unavailable', frozen: 'Waveform frozen'} as const)[state.status];
+      const isWaiting = state.status === 'waiting' || state.status === 'loading';
+      statusMessage.textContent = isWaiting ? '' : statusText;
+      statusMessage.hidden = isWaiting;
+      feedback = {kind: state.status === 'loading' ? 'loading' : isWaiting ? 'waiting' : 'ready', message: isWaiting ? statusText : ''};
+      waiting.update();
       root.dataset.state = state.status;
       draw(state, windowMs);
     } catch (error) { report(error); }
@@ -362,6 +375,7 @@ export function mountOscilloscope(
       canvas.removeEventListener('pointermove', onPointer);
       canvas.removeEventListener('keydown', onKey);
       claim.release();
+      waiting.destroy();
       root.remove();
       style?.remove();
     },
