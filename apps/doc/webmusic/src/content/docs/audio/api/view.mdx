@@ -168,6 +168,47 @@ meter.dispose();                 // stops the paint loop and removes the DOM
 
 The meter uses the shared UI palette and transparent inner background. `<audio-view type="meter">` keeps those defaults and supplies a semantic red peak tick; explicit `color`, `peakColor` and `backgroundColor` options customize the drawing. The analyser is **borrowed** — `dispose()` tears down the presenter and its own controller, and never disconnects a node it did not create.
 
+## Paint meter displays
+
+The seven `<audio-meter>` displays are also available as code: a DOM-free
+[`AudioMeterDisplay`](/audio/headless/view/audio-meter/) reduces analyser
+windows into a typed snapshot, and `paintAudioMeterDisplay` draws that
+snapshot into any caller-owned 2D context with a resolved palette. Use
+`createAudioMeterPainter()` for a frame loop: it keeps the spectrogram's
+offscreen image and the spectrum's projection scratch between frames, and
+nothing audio-related.
+
+```ts
+import {createAudioMeterController, createAudioMeterDisplay} from '@webmusic/audio/view/headless';
+import {createAudioMeterPainter, defaultAudioMeterPalette} from '@webmusic/audio/view/render';
+
+const controller = createAudioMeterController({analyser});
+const display = createAudioMeterDisplay({type: 'spectrogram', scale: 'mel', windowSeconds: 6});
+const painter = createAudioMeterPainter();
+const palette = defaultAudioMeterPalette('color');
+const context = canvas.getContext('2d')!;
+
+function frame(time: number): void {
+  const snapshot = display.capture(controller, time);
+  painter.paint({context, width: canvas.width, height: canvas.height}, snapshot, palette);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+```
+
+`AudioMeterPalette` carries RGB triples and a font family rather than CSS
+tokens, because a canvas cannot read `var()`: `defaultAudioMeterPalette(theme)`
+returns the neutral light defaults, and `parseCssColor` converts a computed
+colour so an application can resolve its own tokens the way the Element does.
+`meterRampColor(palette, t)` and `meterHueColor(palette, position)` expose the
+two encodings, intensity and frequency position, for overlays drawn in the same
+theme. The individual painters (`paintVuMeter`, `paintLoudnessMeter`,
+`paintWaveformHistory`, `paintOscilloscopeTrace`, `paintSpectrumFrame`,
+`paintSpectrogramHistory`, `paintStereometer`) accept the matching snapshot
+type; `VU_SCALE_MARKS` lists the dial marks in VU. Every painter clears nothing
+and assumes the frame's surface was cleared by its owner, exactly as
+`paintLiveProjection` does.
+
 ## Bind a player to a visualizer
 
 `bindPlayerToWaveform` wires a structural player to any `RenderedAudioVisualizer`.
@@ -367,6 +408,7 @@ values of [`/view/headless`](/audio/headless/#view).
 | `AudioTimelineOptions`, `AudioTimelineSnapshot`, `AudioTimelineHit`, `AudioTimelineGeometryUpdate`, `AudioTimelineSubscriber` | Types | Headless timeline contracts. |
 | `WaveformViewModelOptions`, `WaveformColumn`, `WaveformChannelPeak`, `SpectrogramViewModelOptions`, `SpectrogramFrameView` | Types | Headless waveform and spectrogram model contracts. |
 | `LevelMeterFrame`, `LevelMeterOptions`, `SpectrumBarsOptions` | Types | Metering data and options. |
+| `AudioMeterDisplayType`, `AudioMeterFrequencyScale`, `AudioMeterLoudnessMode`, `AudioMeterTrigger`, `AudioMeterDisplayOptions`, `AudioMeterDisplaySnapshot` | Types | Meter display selection, options and the typed snapshot union. |
 | `AudioTimelineBinding`, `BindAudioTimelineOptions`, `PlayheadTarget` | Types | Headless timeline binding contracts. |
 
 ### `@webmusic/audio/view/render`
@@ -375,6 +417,9 @@ values of [`/view/headless`](/audio/headless/#view).
 | --- | --- | --- |
 | `renderWaveformVisualizer`, `renderSpectrogramVisualizer`, `renderLoudnessMeter` | Renderers | Retained Canvas waveform, spectrogram and live meter surfaces. |
 | `paintWaveformOverview`, `paintLiveProjection` | Paint adapters | Draw into caller-owned frames without creating DOM. |
+| `createAudioMeterPainter`, `paintAudioMeterDisplay`, `paintVuMeter`, `paintLoudnessMeter`, `paintWaveformHistory`, `paintOscilloscopeTrace`, `paintSpectrumFrame`, `paintSpectrogramHistory`, `paintStereometer` | Meter painters | Draw a meter display snapshot into a caller-owned frame; the factory retains only drawing scratch. |
+| `defaultAudioMeterPalette`, `meterRampColor`, `meterHueColor`, `parseCssColor`, `VU_SCALE_MARKS` | Palette helpers | Neutral palette defaults, the two theme encodings, computed-colour parsing and the VU dial marks. |
+| `AudioMeterPainter`, `AudioMeterPalette`, `AudioMeterTheme` | Types | Meter painter and palette contracts. |
 | `bindPlayerToWaveform`, `bindAudioTimelineViewport` | Bindings | Follow player position or a timeline viewport; release their subscriptions on teardown. |
 | `mountAudioTimeline`, `createAudioTimelinePresenterBinding` | UI adapters | Mount or bind a UI Kit audio timeline presenter. |
 | `audioTimelineTicks`, `formatAudioTimelinePosition` | Helpers | Timeline tick placement and position labels. |

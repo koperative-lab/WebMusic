@@ -32,7 +32,7 @@ export const elementCompositionPolicy = Object.freeze([
   entry('Audio', 'Play', 'audio-mixer', 'packages/audio/src/play/element/audio-mixer.ts', ['mixer']),
   entry('Audio', 'Play', 'audio-recorder', 'packages/audio/src/play/element/audio-recorder.ts', ['recorder']),
   entry('Audio', 'Analyze', 'audio-level-analyzer', 'packages/audio/src/analyze/element/audio-level-analyzer.ts', ['level-analyzer']),
-  entry('Audio', 'Analyze', 'audio-meter', 'packages/audio/src/analyze/element/audio-meter.ts', ['meter']),
+  entry('Audio', 'Analyze', 'audio-meter', 'packages/audio/src/analyze/element/audio-meter.ts', ['stage']),
   entry('Audio', 'Analyze', 'audio-oscilloscope', 'packages/audio/src/analyze/element/audio-oscilloscope.ts', ['oscilloscope']),
   entry('Audio', 'Analyze', 'audio-spectrum-analyzer', 'packages/audio/src/analyze/element/audio-spectrum-analyzer.ts', ['spectrum-analyzer']),
   entry('Audio', 'Analyze', 'audio-transient-analyzer', 'packages/audio/src/analyze/element/audio-transient-analyzer.ts', ['transient-analyzer']),

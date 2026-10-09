@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import {afterEach, beforeAll, describe, expect, it, vi} from 'vitest';
+import {afterEach, beforeAll, beforeEach, describe, expect, it, vi} from 'vitest';
 import {
   AudioMeterElement,
   defineAudioMeterElement,
@@ -29,6 +29,28 @@ beforeAll(() => {
   }
 });
 
+/** A recording 2D context, so the stage's synchronous first paint can run under jsdom. */
+function fakeContext(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
+  const state: Record<string, unknown> = {canvas};
+  return new Proxy(state, {
+    get(target, key) {
+      if (key === 'then') return undefined;
+      if (key in target) return target[key as string];
+      return () => undefined;
+    },
+    set(target, key, value) {
+      target[key as string] = value;
+      return true;
+    },
+  }) as unknown as CanvasRenderingContext2D;
+}
+
+beforeEach(() => {
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(function (this: HTMLCanvasElement) {
+    return fakeContext(this);
+  } as never);
+});
+
 afterEach(() => {
   document.body.replaceChildren();
   vi.unstubAllGlobals();
@@ -39,91 +61,137 @@ function node() {
   return {connect: vi.fn(), disconnect: vi.fn()};
 }
 
-function ownedContext() {
+type FakeAnalyser = ReturnType<typeof node> & {
+  fftSize: number;
+  smoothingTimeConstant: number;
+  frequencyBinCount: number;
+  minDecibels: number;
+  maxDecibels: number;
+  context: unknown;
+  getByteTimeDomainData: ReturnType<typeof vi.fn>;
+  getByteFrequencyData: ReturnType<typeof vi.fn>;
+  getFloatTimeDomainData: ReturnType<typeof vi.fn>;
+  getFloatFrequencyData: ReturnType<typeof vi.fn>;
+};
+
+/** A context that can build the owned tap and the stereo branch. */
+function ownedContext(sample = 0) {
   const gains: ReturnType<typeof node>[] = [];
-  const analysers: Array<ReturnType<typeof node> & {
-    fftSize: number;
-    smoothingTimeConstant: number;
-    frequencyBinCount: number;
-    getByteTimeDomainData: ReturnType<typeof vi.fn>;
-    getByteFrequencyData: ReturnType<typeof vi.fn>;
-  }> = [];
+  const splitters: ReturnType<typeof node>[] = [];
+  const analysers: FakeAnalyser[] = [];
   const context = {
+    sampleRate: 48_000,
     createGain: vi.fn(() => {
       const gain = node();
       gains.push(gain);
       return gain;
     }),
+    createChannelSplitter: vi.fn(() => {
+      const splitter = node();
+      splitters.push(splitter);
+      return splitter;
+    }),
     createAnalyser: vi.fn(() => {
-      const analyser = {
+      const analyser: FakeAnalyser = {
         ...node(),
         fftSize: 4,
         smoothingTimeConstant: 0,
         frequencyBinCount: 8,
+        minDecibels: -100,
+        maxDecibels: -30,
+        context,
         getByteTimeDomainData: vi.fn((buffer: Uint8Array) => buffer.fill(128)),
         getByteFrequencyData: vi.fn((buffer: Uint8Array) => buffer.fill(128)),
+        getFloatTimeDomainData: vi.fn((buffer: Float32Array) => buffer.fill(sample)),
+        getFloatFrequencyData: vi.fn((buffer: Float32Array) => buffer.fill(-60)),
       };
       analysers.push(analyser);
       return analyser;
     }),
-  } as unknown as BaseAudioContext;
-  return {context, gains, analysers};
+  };
+  return {context: context as unknown as BaseAudioContext, gains, splitters, analysers};
 }
 
-describe('<audio-meter> shared UI composition', () => {
-  it('keeps its graph while mode and bars remount only the presenter', () => {
-    vi.stubGlobal('requestAnimationFrame', vi.fn(() => 3));
-    vi.stubGlobal('cancelAnimationFrame', vi.fn());
-    const fixture = ownedContext();
-    const element = document.createElement('test-audio-meter') as AudioMeterElement;
-    element.context = fixture.context;
-    const firstInput = element.input;
-    document.body.append(element);
-
-    expect(element.shadowRoot?.querySelector('.wrap')).not.toBeNull();
-    expect(element.shadowRoot?.querySelector('.track')).not.toBeNull();
-    expect(element.shadowRoot?.querySelector('.wrap')?.getAttribute('part')).toContain('wrap');
-    expect(fixture.context.createAnalyser).toHaveBeenCalledOnce();
-
-    element.setAttribute('mode', 'spectrum');
-    element.setAttribute('bars', '7');
-
-    expect(element.input).toBe(firstInput);
-    expect(fixture.context.createAnalyser).toHaveBeenCalledOnce();
-    expect(element.shadowRoot?.querySelectorAll('.fbar')).toHaveLength(7);
-
-    element.remove();
-    expect(fixture.gains.every((gain) => gain.disconnect.mock.calls.length === 1)).toBe(true);
-    document.body.append(element);
-    expect(element.input).not.toBe(firstInput);
-    expect(fixture.context.createAnalyser).toHaveBeenCalledTimes(2);
-  });
-
-  it('never disconnects a borrowed analyser', () => {
-    vi.stubGlobal('requestAnimationFrame', vi.fn(() => 5));
-    vi.stubGlobal('cancelAnimationFrame', vi.fn());
-    const external = {
-      ...node(),
-      fftSize: 4,
-      frequencyBinCount: 8,
-      getByteTimeDomainData: vi.fn((buffer: Uint8Array) => buffer.fill(128)),
-      getByteFrequencyData: vi.fn((buffer: Uint8Array) => buffer.fill(0)),
-    } as unknown as AnalyserNode;
-    const element = document.createElement('test-audio-meter') as AudioMeterElement;
-    element.analyser = external;
-    document.body.append(element);
-    element.remove();
-
-    expect(external.disconnect).not.toHaveBeenCalled();
-    expect(element.analyser).toBe(external);
-  });
-});
+function externalAnalyser(): FakeAnalyser {
+  const fixture = ownedContext(0.25);
+  const analyser = fixture.context.createAnalyser() as unknown as FakeAnalyser;
+  fixture.analysers.length = 0;
+  return analyser;
+}
 
 /** Keep the presenter's paint loop from running across a test. */
 function stubFrames(): void {
   vi.stubGlobal('requestAnimationFrame', vi.fn(() => 3));
   vi.stubGlobal('cancelAnimationFrame', vi.fn());
 }
+
+describe('<audio-meter> shared UI composition', () => {
+  it('keeps its graph while type, theme and bars change only the display', () => {
+    stubFrames();
+    const fixture = ownedContext();
+    const element = document.createElement('test-audio-meter') as AudioMeterElement;
+    element.context = fixture.context;
+    const firstInput = element.input;
+    document.body.append(element);
+
+    const stage = element.shadowRoot?.querySelector('.wrap');
+    expect(stage).not.toBeNull();
+    expect(stage?.getAttribute('part')).toContain('wrap');
+    expect(stage?.getAttribute('role')).toBe('img');
+    expect(element.shadowRoot?.querySelector('canvas')).not.toBeNull();
+    expect(element.shadowRoot?.querySelector('.frame')?.getAttribute('part')).toBe('frame');
+    expect(fixture.context.createAnalyser).toHaveBeenCalledOnce();
+    expect(element.type).toBe('vu');
+    expect(element.snapshot?.type).toBe('vu');
+
+    element.setAttribute('type', 'spectrum');
+    element.setAttribute('bars', '7');
+    element.setAttribute('theme', 'color');
+
+    expect(element.input).toBe(firstInput);
+    expect(fixture.context.createAnalyser).toHaveBeenCalledOnce();
+    expect(element.shadowRoot?.querySelector('.wrap')).toBe(stage);
+    expect(element.type).toBe('spectrum');
+    expect(element.theme).toBe('color');
+    expect(element.snapshot?.type).toBe('spectrum');
+    expect(element.snapshot?.type === 'spectrum' && element.snapshot.bars).toBe(7);
+
+    element.remove();
+    expect(fixture.gains.every((gain) => gain.disconnect.mock.calls.length === 1)).toBe(true);
+    expect(element.snapshot).toBeUndefined();
+    document.body.append(element);
+    expect(element.input).not.toBe(firstInput);
+    expect(fixture.context.createAnalyser).toHaveBeenCalledTimes(2);
+    expect(element.shadowRoot?.querySelectorAll('.frame')).toHaveLength(1);
+    expect(element.shadowRoot?.querySelectorAll('.wrap')).toHaveLength(1);
+  });
+
+  it('never disconnects a borrowed analyser', () => {
+    stubFrames();
+    const external = externalAnalyser();
+    const element = document.createElement('test-audio-meter') as AudioMeterElement;
+    element.analyser = external as unknown as AnalyserNode;
+    document.body.append(element);
+    element.remove();
+
+    expect(external.disconnect).not.toHaveBeenCalled();
+    expect(element.analyser).toBe(external);
+  });
+
+  it('shows an empty status without a source and clears it once one arrives', () => {
+    stubFrames();
+    const element = document.createElement('test-audio-meter') as AudioMeterElement;
+    document.body.append(element);
+    const status = element.shadowRoot?.querySelector<HTMLElement>('.wui-stage__status');
+    expect(status?.hidden).toBe(false);
+    expect(status?.textContent).toContain('No audio source');
+    expect(element.snapshot).toBeUndefined();
+
+    element.context = ownedContext().context;
+    expect(element.shadowRoot?.querySelector<HTMLElement>('.wui-stage__status')?.hidden).toBe(true);
+    expect(element.snapshot?.type).toBe('vu');
+  });
+});
 
 describe('<audio-meter> legacy CSS variable bridge', () => {
   const mappings = [
@@ -135,8 +203,8 @@ describe('<audio-meter> legacy CSS variable bridge', () => {
   ] as const;
 
   /**
-   * The presenter's own stylesheet also mentions `--wameter-*` — it reads those
-   * names directly; the element only supplies the canonical outer surface.
+   * The element's own style node carries the outer surface, the frame height
+   * and the token probe the painters read; it never redeclares a public token.
    */
   function bridges(element: AudioMeterElement): HTMLStyleElement[] {
     return [...(element.shadowRoot?.querySelectorAll('style') ?? [])].filter((style) =>
@@ -144,37 +212,133 @@ describe('<audio-meter> legacy CSS variable bridge', () => {
     );
   }
 
-  it('delegates legacy and semantic values to UIKit without shadowing caller tokens', () => {
+  it('reads legacy and semantic values without shadowing caller tokens', () => {
     stubFrames();
     const element = document.createElement('test-audio-meter') as AudioMeterElement;
     element.context = ownedContext().context;
     document.body.append(element);
 
     const bridge = bridges(element)[0]?.textContent ?? '';
-    const css = [...(element.shadowRoot?.querySelectorAll('style') ?? [])]
-      .map((style) => style.textContent ?? '').join('');
     for (const [token, legacy] of mappings) {
-      expect(css).toContain(`var(${legacy},`);
-      expect(css).toContain(`var(${token},`);
+      expect(bridge).toContain(`var(${legacy},`);
+      expect(bridge).toContain(`var(${token},`);
       expect(bridge).not.toContain(`${token}:`);
     }
+    expect(bridge).toContain('var(--wameter-track, var(--wm-meter-track,');
+    expect(element.shadowRoot?.querySelector('.palette')).not.toBeNull();
   });
 
-  it('keeps exactly one bridge node, last, across presenter remounts', () => {
+  it('keeps exactly one bridge node and one frame across display and source changes', () => {
     stubFrames();
     const element = document.createElement('test-audio-meter') as AudioMeterElement;
     element.context = ownedContext().context;
     document.body.append(element);
     const first = bridges(element)[0];
+    const frame = element.shadowRoot?.querySelector('.frame');
 
-    element.setAttribute('mode', 'spectrum');
-    element.setAttribute('bars', '9');
-    element.setAttribute('mode', 'level');
+    element.setAttribute('type', 'spectrogram');
+    element.setAttribute('type', 'stereometer');
+    element.context = ownedContext().context;
+    element.setAttribute('type', 'vu');
 
     expect(bridges(element)).toEqual([first]);
-    // The presenter appends its own style + root on every mount, so the bridge
-    // is only reliably in effect while it stays behind them.
-    expect(element.shadowRoot?.lastElementChild).toBe(first);
+    expect(element.shadowRoot?.querySelector('.frame')).toBe(frame);
+    expect(element.shadowRoot?.querySelectorAll('.wui-stage')).toHaveLength(1);
+    expect(element.shadowRoot?.querySelectorAll('.palette')).toHaveLength(1);
+  });
+
+  it('sizes the frame adaptively per type and preset until a height token takes over', () => {
+    stubFrames();
+    const element = document.createElement('test-audio-meter') as AudioMeterElement;
+    element.context = ownedContext().context;
+    document.body.append(element);
+    const frame = element.shadowRoot!.querySelector<HTMLElement>('.frame')!;
+    expect(frame.style.getPropertyValue('--wui-meter-aspect')).toBe('2.6');
+    expect(frame.style.getPropertyValue('--wui-meter-max-height')).toBe('var(--wm-surface-md, 144px)');
+    expect(frame.style.getPropertyValue('--wui-meter-height')).toBe('');
+    element.setAttribute('type', 'stereometer');
+    expect(frame.style.getPropertyValue('--wui-meter-aspect')).toBe('1.6');
+    const bridge = bridges(element)[0]?.textContent ?? '';
+    expect(bridge).toContain('aspect-ratio:var(--wui-meter-aspect,3)');
+    expect(bridge).toContain('height:var(--wm-audio-meter-height,var(--wm-meter-height,var(--wameter-height,var(--wui-meter-height,auto))))');
+    expect(bridge).toContain('max-height:var(--wm-audio-meter-height,var(--wm-meter-height,var(--wameter-height,var(--wui-meter-max-height,none))))');
+    expect(bridge).toContain('min-height:var(--wm-audio-meter-min-height,var(--wm-meter-min-height,3rem))');
+  });
+});
+
+describe('<audio-meter> sizing', () => {
+  it('maps size presets onto the surface tiers and reflects the property', () => {
+    stubFrames();
+    const element = document.createElement('test-audio-meter') as AudioMeterElement;
+    element.setAttribute('size', 'sm');
+    element.context = ownedContext().context;
+    document.body.append(element);
+    const frame = element.shadowRoot!.querySelector<HTMLElement>('.frame')!;
+    expect(element.size).toBe('sm');
+    expect(frame.style.getPropertyValue('--wui-meter-max-height')).toBe('var(--wm-surface-sm, 72px)');
+    element.size = 'lg';
+    expect(element.getAttribute('size')).toBe('lg');
+    expect(frame.style.getPropertyValue('--wui-meter-max-height')).toBe('var(--wm-surface-lg, 216px)');
+    element.setAttribute('size', 'huge');
+    expect(element.size).toBe('md');
+    expect(frame.style.getPropertyValue('--wui-meter-max-height')).toBe('var(--wm-surface-md, 144px)');
+  });
+
+  it('fixes the height from the attribute, in pixels for a bare number, and restores the preset when cleared', () => {
+    stubFrames();
+    const element = document.createElement('test-audio-meter') as AudioMeterElement;
+    element.setAttribute('size', 'lg');
+    element.context = ownedContext().context;
+    document.body.append(element);
+    const frame = element.shadowRoot!.querySelector<HTMLElement>('.frame')!;
+    element.setAttribute('height', '12rem');
+    expect(element.height).toBe('12rem');
+    expect(frame.style.getPropertyValue('--wui-meter-height')).toBe('12rem');
+    expect(frame.style.getPropertyValue('--wui-meter-max-height')).toBe('12rem');
+    element.height = 96;
+    expect(element.getAttribute('height')).toBe('96');
+    expect(frame.style.getPropertyValue('--wui-meter-height')).toBe('96px');
+    expect(frame.style.getPropertyValue('--wui-meter-max-height')).toBe('96px');
+    element.height = undefined;
+    expect(element.hasAttribute('height')).toBe(false);
+    expect(frame.style.getPropertyValue('--wui-meter-height')).toBe('');
+    expect(frame.style.getPropertyValue('--wui-meter-max-height')).toBe('var(--wm-surface-lg, 216px)');
+  });
+
+  it('writes an explicit width onto the host and removes only what it wrote', () => {
+    stubFrames();
+    const element = document.createElement('test-audio-meter') as AudioMeterElement;
+    element.style.setProperty('width', '50%');
+    element.context = ownedContext().context;
+    document.body.append(element);
+    expect(element.style.getPropertyValue('width')).toBe('50%');
+    element.setAttribute('width', '320');
+    expect(element.width).toBe('320px');
+    expect(element.style.getPropertyValue('width')).toBe('320px');
+    element.width = '20rem';
+    expect(element.style.getPropertyValue('width')).toBe('20rem');
+    element.removeAttribute('width');
+    expect(element.width).toBeUndefined();
+    expect(element.style.getPropertyValue('width')).toBe('');
+    const fluid = document.createElement('test-audio-meter') as AudioMeterElement;
+    fluid.style.setProperty('width', '40%');
+    document.body.append(fluid);
+    expect(fluid.style.getPropertyValue('width')).toBe('40%');
+  });
+
+  it('keeps the graph and stage while the box changes', () => {
+    stubFrames();
+    const fixture = ownedContext();
+    const element = document.createElement('test-audio-meter') as AudioMeterElement;
+    element.context = fixture.context;
+    document.body.append(element);
+    const stage = element.shadowRoot?.querySelector('.wrap');
+    element.setAttribute('size', 'sm');
+    element.setAttribute('height', '5rem');
+    element.setAttribute('width', '240');
+    expect(element.shadowRoot?.querySelector('.wrap')).toBe(stage);
+    expect(fixture.context.createAnalyser).toHaveBeenCalledOnce();
+    expect(fixture.gains.every((gain) => gain.disconnect.mock.calls.length === 0)).toBe(true);
   });
 });
 
@@ -196,7 +360,7 @@ describe('<audio-meter> live attributes', () => {
     expect(fixture.context.createAnalyser).toHaveBeenCalledOnce();
   });
 
-  it('restores the default name in place when the author name is cleared', () => {
+  it('restores the type default name in place when the author name is cleared', () => {
     stubFrames();
     const element = document.createElement('test-audio-meter') as AudioMeterElement;
     element.setAttribute('aria-label', 'Bus A');
@@ -208,7 +372,12 @@ describe('<audio-meter> live attributes', () => {
 
     const renamed = element.shadowRoot?.querySelector('.wrap');
     expect(renamed).toBe(presenter);
-    expect(renamed?.getAttribute('aria-label')).toBe('Audio level');
+    expect(renamed?.getAttribute('aria-label')).toBe('VU meter');
+    element.setAttribute('type', 'spectrogram');
+    expect(renamed?.getAttribute('aria-label')).toBe('Spectrogram');
+    element.setAttribute('aria-label', 'Bus C');
+    element.setAttribute('type', 'waveform');
+    expect(renamed?.getAttribute('aria-label')).toBe('Bus C');
   });
 
   it('passes the tuning attributes to the controller and omits absent ones', () => {
@@ -267,6 +436,165 @@ describe('<audio-meter> live attributes', () => {
   });
 });
 
+describe('<audio-meter> display types', () => {
+  it('maps a legacy mode onto a type until type is set, and reflects type and theme properties', () => {
+    stubFrames();
+    const element = document.createElement('test-audio-meter') as AudioMeterElement;
+    element.setAttribute('mode', 'spectrum');
+    element.context = ownedContext().context;
+    document.body.append(element);
+    expect(element.type).toBe('spectrum');
+    expect(element.snapshot?.type).toBe('spectrum');
+    element.setAttribute('mode', 'level');
+    expect(element.type).toBe('vu');
+    element.type = 'waveform';
+    expect(element.getAttribute('type')).toBe('waveform');
+    expect(element.type).toBe('waveform');
+    element.setAttribute('type', 'bogus');
+    expect(element.type).toBe('vu');
+    expect(element.theme).toBe('mono');
+    element.theme = 'color';
+    expect(element.getAttribute('theme')).toBe('color');
+  });
+
+  it('reads display attributes into the reduction without touching the graph', () => {
+    stubFrames();
+    const fixture = ownedContext(0.5);
+    const element = document.createElement('test-audio-meter') as AudioMeterElement;
+    element.setAttribute('type', 'oscilloscope');
+    element.setAttribute('timebase-ms', '0.05');
+    element.setAttribute('trigger', 'off');
+    element.setAttribute('fft-size', '64');
+    element.context = fixture.context;
+    document.body.append(element);
+    const input = element.input;
+    const scope = element.snapshot;
+    expect(scope?.type).toBe('oscilloscope');
+    if (scope?.type !== 'oscilloscope') return;
+    // 0.05 ms is raised to the 0.1 ms floor: 4.8 samples at 48 kHz, rounded, plus one.
+    expect(scope.samples).toHaveLength(6);
+    expect(scope.triggered).toBe(false);
+
+    element.setAttribute('type', 'loudness');
+    element.setAttribute('loudness-mode', 'rms-fast');
+    const loud = element.snapshot;
+    expect(loud?.type).toBe('loudness');
+    if (loud?.type !== 'loudness') return;
+    expect(loud.unit).toBe('dB');
+    expect(loud.mode).toBe('rms-fast');
+    expect(loud.value).toBeCloseTo(20 * Math.log10(0.5), 3);
+
+    element.setAttribute('type', 'vu');
+    element.setAttribute('reference-dbfs', '-12');
+    const vu = element.snapshot;
+    if (vu?.type !== 'vu') return;
+    expect(vu.referenceDbfs).toBe(-12);
+    // The loudness type attached and released its channel analysers; the owned
+    // tap itself was never rebuilt.
+    expect(element.input).toBe(input);
+    expect(fixture.analysers[0]!.fftSize).toBe(64);
+    expect(fixture.gains[0]!.disconnect).not.toHaveBeenCalled();
+    expect(fixture.gains[1]!.disconnect).not.toHaveBeenCalled();
+  });
+
+  it('attaches the owned stereo branch only for stereometer and loudness and releases it on type change and removal', () => {
+    stubFrames();
+    const fixture = ownedContext(0.25);
+    const element = document.createElement('test-audio-meter') as AudioMeterElement;
+    element.context = fixture.context;
+    document.body.append(element);
+    expect(fixture.context.createChannelSplitter).not.toHaveBeenCalled();
+
+    element.setAttribute('type', 'stereometer');
+    expect(fixture.context.createChannelSplitter).toHaveBeenCalledOnce();
+    expect(fixture.analysers).toHaveLength(3);
+    const [tap, left, right] = fixture.analysers;
+    const fanOut = fixture.gains[2]!;
+    expect(tap!.connect).toHaveBeenCalledWith(fanOut);
+    expect(fixture.splitters[0]!.connect).toHaveBeenCalledWith(left, 0);
+    expect(fixture.splitters[0]!.connect).toHaveBeenCalledWith(right, 1);
+    const snapshot = element.snapshot;
+    expect(snapshot?.type).toBe('stereometer');
+    if (snapshot?.type !== 'stereometer') return;
+    expect(snapshot.stereo).toBe(true);
+    expect(left!.getFloatTimeDomainData).toHaveBeenCalled();
+
+    element.setAttribute('type', 'loudness');
+    expect(fixture.context.createChannelSplitter).toHaveBeenCalledOnce();
+    expect(element.snapshot?.type === 'loudness' && element.snapshot.stereo).toBe(true);
+
+    element.setAttribute('type', 'vu');
+    expect(tap!.disconnect).toHaveBeenCalledTimes(1);
+    expect(tap!.disconnect).toHaveBeenCalledWith(fanOut);
+    expect(fanOut.disconnect).toHaveBeenCalledOnce();
+    expect(left!.disconnect).toHaveBeenCalledOnce();
+    expect(right!.disconnect).toHaveBeenCalledOnce();
+
+    element.setAttribute('type', 'stereometer');
+    expect(fixture.context.createChannelSplitter).toHaveBeenCalledTimes(2);
+    element.remove();
+    // The branch is released before the owned tap is disposed: one selective
+    // disconnect for the branch edge, then the tap's own full disconnect.
+    expect(tap!.disconnect).toHaveBeenCalledTimes(3);
+    expect(tap!.disconnect.mock.calls[1]).toEqual([fixture.gains[3]]);
+    expect(tap!.disconnect.mock.calls[2]).toEqual([]);
+  });
+
+  it('fans a borrowed analyser out for the stereometer and removes only that edge on cleanup', () => {
+    stubFrames();
+    const external = externalAnalyser();
+    const element = document.createElement('test-audio-meter') as AudioMeterElement;
+    element.setAttribute('type', 'stereometer');
+    element.analyser = external as unknown as AnalyserNode;
+    document.body.append(element);
+    expect(external.connect).toHaveBeenCalledOnce();
+    const fanOut = external.connect.mock.calls[0]![0];
+    expect(element.snapshot?.type === 'stereometer' && element.snapshot.stereo).toBe(true);
+
+    element.remove();
+    expect(external.disconnect).toHaveBeenCalledOnce();
+    expect(external.disconnect).toHaveBeenCalledWith(fanOut);
+    document.body.append(element);
+    expect(external.connect).toHaveBeenCalledTimes(2);
+    element.analyser = undefined;
+    expect(external.disconnect).toHaveBeenCalledTimes(2);
+    expect(external.disconnect.mock.calls.every((call) => call.length === 1)).toBe(true);
+  });
+
+  it('reports a failed stereo branch as an error while keeping the display live', () => {
+    stubFrames();
+    const fixture = ownedContext(0.25);
+    vi.mocked(fixture.context.createChannelSplitter).mockImplementation(() => {
+      throw new Error('splitter unavailable');
+    });
+    const element = document.createElement('test-audio-meter') as AudioMeterElement;
+    const errors = vi.fn();
+    element.addEventListener('webaudio:error', errors);
+    element.context = fixture.context;
+    document.body.append(element);
+    element.setAttribute('type', 'stereometer');
+    expect(errors).toHaveBeenCalledOnce();
+    const snapshot = element.snapshot;
+    expect(snapshot?.type).toBe('stereometer');
+    if (snapshot?.type !== 'stereometer') return;
+    expect(snapshot.stereo).toBe(false);
+    expect(Array.from(snapshot.right)).toEqual(Array.from(snapshot.left));
+  });
+
+  it('paints with a palette resolved from its tokens and falls back to neutral defaults', () => {
+    stubFrames();
+    const fixture = ownedContext(0.25);
+    const element = document.createElement('test-audio-meter') as AudioMeterElement;
+    element.context = fixture.context;
+    document.body.append(element);
+    const probe = element.shadowRoot?.querySelector<HTMLElement>('.palette');
+    expect(probe).not.toBeNull();
+    expect(() => element.setAttribute('theme', 'color')).not.toThrow();
+    expect(() => element.setAttribute('theme', 'mono')).not.toThrow();
+    expect(element.snapshot?.type).toBe('vu');
+  });
+});
+
 describe('<audio-meter> failed changes preserve the current route', () => {
   it('reports invalid tuning while preserving ports, presenter and previous settings', () => {
     stubFrames();
@@ -304,9 +632,9 @@ describe('<audio-meter> failed changes preserve the current route', () => {
 describe('<audio-meter> borrowed player binding', () => {
   function playerFixture() {
     const listeners = new Map<string, Set<() => void>>();
-    const analyser = ownedContext().context.createAnalyser();
+    const analyser = externalAnalyser();
     const player = {
-      analyser: analyser as AnalyserNode | undefined,
+      analyser: analyser as unknown as AnalyserNode | undefined,
       on(event: 'sourcechange' | 'load', listener: () => void) {
         const set = listeners.get(event) ?? new Set<() => void>();
         set.add(listener); listeners.set(event, set);
@@ -327,7 +655,7 @@ describe('<audio-meter> borrowed player binding', () => {
     expect(element.analyser).toBe(first.analyser);
     expect(element.input).toBeUndefined();
     const next = playerFixture().analyser;
-    first.player.analyser = next; first.emit('sourcechange');
+    first.player.analyser = next as unknown as AnalyserNode; first.emit('sourcechange');
     expect(element.analyser).toBe(next);
     expect(first.analyser.disconnect).not.toHaveBeenCalled();
     first.player.analyser = undefined; first.emit('sourcechange');
@@ -379,7 +707,7 @@ describe('<audio-meter> borrowed player binding', () => {
     target.id = 'meter-owner'; document.body.append(target);
     const element = document.createElement('test-audio-meter') as AudioMeterElement;
     const direct = playerFixture().analyser;
-    element.setAttribute('player', '#meter-owner'); element.analyser = direct;
+    element.setAttribute('player', '#meter-owner'); element.analyser = direct as unknown as AnalyserNode;
     document.body.append(element);
     expect(element.analyser).toBe(direct);
     element.analyser = undefined;
@@ -403,7 +731,7 @@ describe('<audio-meter> borrowed player binding', () => {
     const element = document.createElement('test-audio-meter') as AudioMeterElement;
     const release = vi.fn();
     const first = {
-      analyser: playerFixture().analyser,
+      analyser: playerFixture().analyser as unknown as AnalyserNode,
       on: vi.fn(() => {element.player = second.player; return release;}),
     };
     element.player = first; document.body.append(element);
@@ -421,7 +749,7 @@ describe('<audio-meter> borrowed player binding', () => {
     const releases = [vi.fn(() => {throw new Error('release failed');}), vi.fn()];
     const element = document.createElement('test-audio-meter') as AudioMeterElement;
     let index = 0;
-    element.player = {analyser: playerFixture().analyser, on: () => releases[index++]!};
+    element.player = {analyser: playerFixture().analyser as unknown as AnalyserNode, on: () => releases[index++]!};
     const errors = vi.fn(); element.addEventListener('webaudio:error', errors);
     document.body.append(element); element.remove();
     expect(releases[0]).toHaveBeenCalledOnce();
@@ -429,4 +757,23 @@ describe('<audio-meter> borrowed player binding', () => {
     expect(errors).toHaveBeenCalledOnce();
   });
 
+  it('keeps the stereo branch following a replaced player analyser', () => {
+    stubFrames();
+    const first = playerFixture();
+    const element = document.createElement('test-audio-meter') as AudioMeterElement;
+    element.setAttribute('type', 'stereometer');
+    element.player = first.player;
+    document.body.append(element);
+    expect(first.analyser.connect).toHaveBeenCalledOnce();
+    const replacement = playerFixture().analyser;
+    first.player.analyser = replacement as unknown as AnalyserNode;
+    first.emit('sourcechange');
+    expect(first.analyser.disconnect).toHaveBeenCalledOnce();
+    expect(first.analyser.disconnect.mock.calls[0]).toHaveLength(1);
+    expect(replacement.connect).toHaveBeenCalledOnce();
+    expect(element.snapshot?.type === 'stereometer' && element.snapshot.stereo).toBe(true);
+    element.remove();
+    expect(replacement.disconnect).toHaveBeenCalledOnce();
+    expect(replacement.disconnect.mock.calls[0]).toHaveLength(1);
+  });
 });

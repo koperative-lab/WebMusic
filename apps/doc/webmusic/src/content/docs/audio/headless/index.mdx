@@ -138,6 +138,9 @@ subscriptions and returns unsubscribe(). None draws or creates a playback clock.
 | Export | Kind | Page |
 | --- | --- | --- |
 | `AudioMeterController` · `createAudioMeterController` · `calculateLevelMeter` · `calculateSpectrumBars` | controller · factory · helpers | [Metering](/audio/headless/view/audio-meter/) |
+| `AudioMeterDisplay` · `createAudioMeterDisplay` · `AUDIO_METER_DISPLAY_TYPES` · `LoudnessEstimator` | display reduction · factory · constant · estimator | [Metering](/audio/headless/view/audio-meter/) |
+| `windowLevel` · `alignTrigger` · `stereoCorrelation` · `vuFromRms` · `vuDeflection` · `decibelsFromLinear` · `kWeightingRatio` | time-domain helpers | [Metering](/audio/headless/view/audio-meter/) |
+| `frequencyAt` · `fractionOf` · `projectSpectrum` · `peakFrequency` · `spectralCentroid` · `describeFrequency` | frequency-axis helpers | [Metering](/audio/headless/view/audio-meter/) |
 | `AudioTimeline` · `createAudioTimeline` | class · factory | [AudioTimeline](/audio/headless/view/audio-timeline/) |
 | `bindPlayerToAudioTimeline` | binding | [AudioTimeline](/audio/headless/view/audio-timeline/) |
 | `WaveformViewModel` · `createWaveformViewModel` · `fitWaveformColumns` | class · factory · helper | [View models](/audio/headless/view/view-models/) |
@@ -150,7 +153,8 @@ subscriptions and returns unsubscribe(). None draws or creates a playback clock.
 
 | Exported types | Explanation owner |
 | --- | --- |
-| `AudioMeterControllerOptions`, `AudioMeterConfiguration`, `AudioMeterLevelFrame`, `LevelMeterFrame`, `LevelMeterOptions`, `SpectrumBarsOptions` | [Metering](/audio/headless/view/audio-meter/) |
+| `AudioMeterControllerOptions`, `AudioMeterConfiguration`, `AudioMeterLevelFrame`, `AudioMeterStereoFrame`, `AudioMeterFrequencyInfo`, `LevelMeterFrame`, `LevelMeterOptions`, `SpectrumBarsOptions` | [Metering](/audio/headless/view/audio-meter/) |
+| `AudioMeterDisplayOptions`, `AudioMeterDisplaySource`, `AudioMeterDisplaySnapshot`, `AudioMeterDisplayType`, `AudioMeterFrequencyScale`, `AudioMeterLoudnessMode`, `AudioMeterTrigger`, `AudioMeterVuSnapshot`, `AudioMeterLoudnessSnapshot`, `AudioMeterWaveformSnapshot`, `AudioMeterOscilloscopeSnapshot`, `AudioMeterSpectrumSnapshot`, `AudioMeterSpectrumPeak`, `AudioMeterSpectrogramSnapshot`, `AudioMeterStereometerSnapshot` | [Metering](/audio/headless/view/audio-meter/) |
 | `AudioTimelineOptions`, `AudioTimelineSnapshot`, `AudioTimelineHit`, `AudioTimelineGeometryUpdate`, `AudioTimelineSubscriber`, `AudioTimelineBinding`, `BindAudioTimelineOptions`, `PlayheadTarget` | [AudioTimeline](/audio/headless/view/audio-timeline/) |
 | `WaveformViewModelOptions`, `WaveformColumn`, `WaveformChannelPeak`, `SpectrogramViewModelOptions`, `SpectrogramFrameView` | [View models](/audio/headless/view/view-models/) |
 | `LiveColumn`, `LiveProjectionType`, `LiveScrollOptions`, `LiveViewControllerOptions` | [Live projection](/audio/headless/view/live-projection/) |

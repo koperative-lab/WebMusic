@@ -50,7 +50,7 @@ task and place the surface beside the player:
 | Element | Live task |
 | --- | --- |
 | [`<audio-level-analyzer>`](/audio/element/analyze/audio-level-analyzer/) | Inspect sampled RMS, sample peak, crest and a peak threshold; freeze or reset the hold. |
-| [`<audio-meter>`](/audio/element/analyze/audio-meter/) | Monitor normalized level or FFT bars at a glance beside playback. |
+| [`<audio-meter>`](/audio/element/analyze/audio-meter/) | Monitor playback at a glance as a VU dial, loudness bars, waveform, oscilloscope, spectrum, spectrogram or stereometer, in page greys or colour. |
 | [`<audio-oscilloscope>`](/audio/element/analyze/audio-oscilloscope/) | Inspect a sampled waveform with trigger edge, level, timebase, freeze and a time probe. |
 | [`<audio-spectrum-analyzer>`](/audio/element/analyze/audio-spectrum-analyzer/) | Probe a live log-frequency FFT; freeze the frame or hold peaks. |
 | [`<audio-transient-analyzer>`](/audio/element/analyze/audio-transient-analyzer/) | Inspect approximate live attack strength and adjust detection sensitivity. |
@@ -61,7 +61,8 @@ samples, but an `AudioContext` and signal graph must already exist. They do
 not seek the player. The sampled level is not integrated LUFS or true peak;
 FFT bins are not calibrated acoustic SPL. A streaming transient cue is not a
 beat-grid or sample-accurate onset result. The compact meter may also build a
-transparent tap in a caller-supplied context; see its resource contract.
+transparent tap in a caller-supplied context, and attaches an owned stereo
+branch for its stereometer and loudness displays; see its resource contract.
 
 Whole-clip key, tempo, loudness and onset estimates, beat grids, clip summaries,
 chroma, distributions and offline pitch tracks are data workflows under the
@@ -95,7 +96,7 @@ registration helpers allow a smaller selected surface.
 | Element | Register | Surface |
 | --- | --- | --- |
 | `<audio-level-analyzer>` | `defineAudioLevelAnalyzerElement(tag?)` | Sampled dynamics inspector. |
-| `<audio-meter>` | `defineAudioMeterElement(tag?)` | Compact normalized level or spectrum monitor. |
+| `<audio-meter>` | `defineAudioMeterElement(tag?)` | Compact type-selected live monitor. |
 | `<audio-oscilloscope>` | `defineAudioOscilloscopeElement(tag?)` | Triggered time-domain inspection. |
 | `<audio-spectrum-analyzer>` | `defineAudioSpectrumAnalyzerElement(tag?)` | Probeable live spectrum. |
 | `<audio-transient-analyzer>` | `defineAudioTransientAnalyzerElement(tag?)` | Approximate streaming attack inspection. |

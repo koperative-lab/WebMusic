@@ -222,12 +222,12 @@ Inspect sampled RMS, sample peak, crest and a peak threshold from a live audio g
 
 #### `<audio-meter>`
 
-Monitor normalized RMS level or FFT bars from a player, borrowed analyser or transparent audio tap.
+Monitor a live signal as a VU dial, loudness bars, waveform, oscilloscope, spectrum, spectrogram or stereometer from a player, borrowed analyser or transparent audio tap.
 
-- Behavior/data collaboration: AudioMeterController + owned/borrowed analyser.
-- Reviewed UI composition: `@webmusic/ui/meter`.
-- Attribute controls: `player`, `mode`, `bars`, `aria-label`, `fft-size`, `smoothing-time-constant`, `level-scale`, `peak-decay`
-- Properties and methods: `player`, `context`, `analyser`, `input / output`
+- Behavior/data collaboration: AudioMeterController + AudioMeterDisplay over an owned/borrowed analyser.
+- Reviewed UI composition: `@webmusic/ui/stage`.
+- Attribute controls: `player`, `type`, `theme`, `size`, `width`, `height`, `mode`, `bars`, `aria-label`, `scale`, `window-seconds`, `timebase-ms`, `trigger`, `loudness-mode`, `reference-dbfs`, `fft-size`, `smoothing-time-constant`, `level-scale`, `peak-decay`
+- Properties and methods: `player`, `context`, `analyser`, `input / output`, `type / theme`, `snapshot`
 - Events: `webaudio:error`
 - [Owning workflow and contract](<../apps/doc/webmusic/src/content/docs/audio/element/analyze/audio-meter.mdx>) · [Element source](<../packages/audio/src/analyze/element/audio-meter.ts>) · [Parameter catalog](<../apps/doc/webmusic/src/lib/params/audio-analyze.ts>)
 
@@ -333,7 +333,7 @@ These are the currently documented ownership pages, not a proof that every expor
 | [AudioRecorder](<../apps/doc/webmusic/src/content/docs/audio/headless/play/audio-recorder.mdx>) | Microphone capture into an AudioClip, with a live level, a device selection and hard retention caps. | [Barrel and contracts](<../packages/audio/src/play/headless/index.ts>) |
 | [Effect](<../apps/doc/webmusic/src/content/docs/audio/headless/play/effects.mdx>) | The effect builders and the two graph helpers: describe a chain as data, then let a player or the exporter wire it. | [Barrel and contracts](<../packages/audio/src/play/headless/index.ts>) |
 | [BufferEngine and MediaEngine](<../apps/doc/webmusic/src/content/docs/audio/headless/play/engines.mdx>) | Buffer and host-adapted media engines for low-level audio transport. | [Barrel and contracts](<../packages/audio/src/play/headless/index.ts>) |
-| [AudioMeterController](<../apps/doc/webmusic/src/content/docs/audio/headless/view/audio-meter.mdx>) | Read live level and spectrum frames from a borrowed analyser or an owned transparent tap. | [Barrel and contracts](<../packages/audio/src/view/headless/index.ts>) |
+| [AudioMeterController](<../apps/doc/webmusic/src/content/docs/audio/headless/view/audio-meter.mdx>) | Read live level, spectrum, float window and stereo frames from a borrowed analyser or an owned transparent tap, and reduce them into the seven meter displays. | [Barrel and contracts](<../packages/audio/src/view/headless/index.ts>) |
 | [AudioTimeline](<../apps/doc/webmusic/src/content/docs/audio/headless/view/audio-timeline.mdx>) | Zoom, offset, playhead and hit testing for an audio view — the geometry every waveform and spectrogram surface shares, with nothing drawn. | [Barrel and contracts](<../packages/audio/src/view/headless/index.ts>) |
 | [LiveViewController and LiveScrollBuffer](<../apps/doc/webmusic/src/content/docs/audio/headless/view/live-projection.mdx>) | Caller-paced analyser projection and fixed-capacity timestamped column storage, without a renderer or scheduler. | [Barrel and contracts](<../packages/audio/src/view/headless/index.ts>) |
 | [computeClipPeaks and peaksDuration](<../apps/doc/webmusic/src/content/docs/audio/headless/view/peaks.mdx>) | computeClipPeaks and peaksDuration: the compact min/max pyramid a waveform reads instead of the samples. | [Barrel and contracts](<../packages/audio/src/view/headless/index.ts>) |

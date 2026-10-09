@@ -8,7 +8,12 @@
 //
 // The tap and the byte-domain arithmetic are the kernel's shared analyser
 // meter. View owns Audio's PCM-sample level helper, the published frame
-// shapes, and the bar aggregation re-exported under Audio's option names.
+// shapes, the bar aggregation re-exported under Audio's option names, the
+// float-precision window reads the display types need, and the optional
+// stereo side-branch (`analyser -> fan-out -> splitter -> two analysers`)
+// that a stereometer or channel-summed loudness reading requires. That branch
+// only ever ADDS an output edge to the analyser it reads from; it never
+// disconnects a borrowed node's existing connections.
 // ============================================================================
 
 import {AnalyserMeter, aggregateSpectrumBars} from '@webmusic/kernel/meter';
@@ -53,6 +58,20 @@ export type AudioMeterConfiguration = Omit<AudioMeterControllerOptions, 'context
 export interface AudioMeterLevelFrame extends LevelMeterFrame {
   /** Scaled, clamped RMS value intended for a visual meter. */
   level: number;
+}
+
+/** One left/right pair of float time-domain windows from the stereo branch. */
+export interface AudioMeterStereoFrame {
+  left: Float32Array;
+  right: Float32Array;
+}
+
+/** Analyser frequency-grid facts a display needs to label its axis. */
+export interface AudioMeterFrequencyInfo {
+  sampleRate: number;
+  frequencyBinCount: number;
+  minDecibels: number;
+  maxDecibels: number;
 }
 
 /**
@@ -101,6 +120,18 @@ export function calculateSpectrumBars(
  */
 export class AudioMeterController {
   readonly #meter: AnalyserMeter;
+  #timeDomain?: Float32Array<ArrayBuffer>;
+  #frequency?: Float32Array;
+  #frequencyBytes?: Uint8Array<ArrayBuffer>;
+  #frequencyDecibels?: Float32Array<ArrayBuffer>;
+  #stereo?: {
+    fanOut: GainNode;
+    splitter: ChannelSplitterNode;
+    left: AnalyserNode;
+    right: AnalyserNode;
+    leftFrame: Float32Array<ArrayBuffer>;
+    rightFrame: Float32Array<ArrayBuffer>;
+  };
 
   constructor(options: AudioMeterControllerOptions = {}) {
     if (options.context && options.analyser) {
@@ -138,6 +169,30 @@ export class AudioMeterController {
     return this.#meter.ownsGraph;
   }
 
+  /** Sample rate of the active analyser's context, or `undefined` without one. */
+  get sampleRate(): number | undefined {
+    const rate = this.#meter.analyser?.context?.sampleRate;
+    return typeof rate === 'number' && Number.isFinite(rate) && rate > 0 ? rate : undefined;
+  }
+
+  /** Axis facts of the active analyser, or `undefined` without one. */
+  get frequencyInfo(): AudioMeterFrequencyInfo | undefined {
+    const analyser = this.#meter.analyser;
+    const sampleRate = this.sampleRate;
+    if (!analyser || sampleRate === undefined) return undefined;
+    return {
+      sampleRate,
+      frequencyBinCount: Math.max(1, analyser.frequencyBinCount),
+      minDecibels: finiteOr(analyser.minDecibels, -100),
+      maxDecibels: finiteOr(analyser.maxDecibels, -30),
+    };
+  }
+
+  /** Whether the stereo side-branch is attached and readable. */
+  get stereo(): boolean {
+    return this.#stereo !== undefined;
+  }
+
   /**
    * Update tuning in place. Omitted fields retain their values. Invalid owned
    * analyser settings leave the graph and previous tuning intact; fftSize and
@@ -145,6 +200,15 @@ export class AudioMeterController {
    */
   configure(options: AudioMeterConfiguration = {}): void {
     this.#meter.configure(options);
+    const stereo = this.#stereo;
+    const analyser = this.#meter.analyser;
+    if (stereo && analyser) {
+      // Keep both channel windows the length of the summed window so a
+      // left/right pair describes the same slice of time.
+      for (const node of [stereo.left, stereo.right]) {
+        if (node.fftSize !== analyser.fftSize) node.fftSize = analyser.fftSize;
+      }
+    }
   }
 
   /** Read one time-domain frame and calculate its current level. */
@@ -159,6 +223,142 @@ export class AudioMeterController {
   }
 
   /**
+   * Read the current float time-domain window (fftSize samples, -1..1). The
+   * returned array is a scratch buffer reused by the next read; copy it to
+   * retain it.
+   */
+  readTimeDomain(): Float32Array {
+    const analyser = this.#assertAnalyser();
+    const length = Math.max(1, analyser.fftSize);
+    if (!this.#timeDomain || this.#timeDomain.length !== length) {
+      this.#timeDomain = new Float32Array(new ArrayBuffer(length * 4));
+    }
+    analyser.getFloatTimeDomainData(this.#timeDomain);
+    return this.#timeDomain;
+  }
+
+  /**
+   * Read the current frequency frame normalized to 0..1 per bin, using the
+   * analyser's own `minDecibels..maxDecibels` window exactly as its byte data
+   * does. Scratch buffer; copy to retain.
+   */
+  readFrequency(): Float32Array {
+    const analyser = this.#assertAnalyser();
+    const bins = Math.max(1, analyser.frequencyBinCount);
+    if (!this.#frequencyBytes || this.#frequencyBytes.length !== bins) {
+      this.#frequencyBytes = new Uint8Array(new ArrayBuffer(bins));
+    }
+    if (!this.#frequency || this.#frequency.length !== bins) this.#frequency = new Float32Array(bins);
+    analyser.getByteFrequencyData(this.#frequencyBytes);
+    for (let index = 0; index < bins; index += 1) this.#frequency[index] = this.#frequencyBytes[index]! / 255;
+    return this.#frequency;
+  }
+
+  /** Read the current frequency frame in decibels per bin. Scratch buffer; copy to retain. */
+  readFrequencyDecibels(): Float32Array {
+    const analyser = this.#assertAnalyser();
+    const bins = Math.max(1, analyser.frequencyBinCount);
+    if (!this.#frequencyDecibels || this.#frequencyDecibels.length !== bins) {
+      this.#frequencyDecibels = new Float32Array(new ArrayBuffer(bins * 4));
+    }
+    analyser.getFloatFrequencyData(this.#frequencyDecibels);
+    return this.#frequencyDecibels;
+  }
+
+  /**
+   * Attach the stereo side-branch so {@link readStereo} can return separate
+   * left/right windows. The branch is owned here even when the analyser is
+   * borrowed: it adds one output edge (`analyser -> fan-out`) and is removed
+   * with `analyser.disconnect(fanOut)`, which leaves every other connection
+   * of a borrowed node untouched. A mono input is up-mixed to both channels
+   * by the fan-out's speaker interpretation, so a mono source reads as a
+   * centered signal rather than a hard-left one. Idempotent; returns whether
+   * the branch exists afterwards.
+   */
+  attachStereo(): boolean {
+    if (this.#stereo) return true;
+    const analyser = this.#meter.analyser;
+    const context = analyser?.context;
+    if (!analyser || !context) return false;
+    let fanOut: GainNode | undefined;
+    let splitter: ChannelSplitterNode | undefined;
+    let left: AnalyserNode | undefined;
+    let right: AnalyserNode | undefined;
+    try {
+      fanOut = context.createGain();
+      fanOut.channelCount = 2;
+      fanOut.channelCountMode = 'explicit';
+      fanOut.channelInterpretation = 'speakers';
+      splitter = context.createChannelSplitter(2);
+      left = context.createAnalyser();
+      right = context.createAnalyser();
+      for (const node of [left, right]) {
+        node.fftSize = analyser.fftSize;
+        node.smoothingTimeConstant = 0;
+      }
+      analyser.connect(fanOut);
+      fanOut.connect(splitter);
+      splitter.connect(left, 0);
+      splitter.connect(right, 1);
+    } catch (error) {
+      try { if (fanOut) analyser.disconnect(fanOut); } catch { /* preserve the construction failure */ }
+      for (const node of [fanOut, splitter, left, right]) {
+        try { node?.disconnect(); } catch { /* preserve the construction failure */ }
+      }
+      throw error;
+    }
+    const length = Math.max(1, analyser.fftSize);
+    this.#stereo = {
+      fanOut, splitter, left, right,
+      leftFrame: new Float32Array(new ArrayBuffer(length * 4)),
+      rightFrame: new Float32Array(new ArrayBuffer(length * 4)),
+    };
+    return true;
+  }
+
+  /** Remove the stereo side-branch. The read analyser keeps every other connection. */
+  releaseStereo(): void {
+    const stereo = this.#stereo;
+    if (!stereo) return;
+    this.#stereo = undefined;
+    let firstError: unknown;
+    let failed = false;
+    try {
+      this.#meter.analyser?.disconnect(stereo.fanOut);
+    } catch {
+      // The edge is already gone (the caller detached its node first). The
+      // branch is released either way; only failures on owned nodes surface.
+    }
+    for (const node of [stereo.fanOut, stereo.splitter, stereo.left, stereo.right]) {
+      try {
+        node.disconnect();
+      } catch (error) {
+        if (!failed) firstError = error;
+        failed = true;
+      }
+    }
+    if (failed) throw firstError;
+  }
+
+  /**
+   * Read left and right float windows from the stereo branch, or `undefined`
+   * when it is not attached. Scratch buffers; copy to retain.
+   */
+  readStereo(): AudioMeterStereoFrame | undefined {
+    const stereo = this.#stereo;
+    if (!stereo) return undefined;
+    this.#assertAnalyser();
+    const length = Math.max(1, stereo.left.fftSize);
+    if (stereo.leftFrame.length !== length) {
+      stereo.leftFrame = new Float32Array(new ArrayBuffer(length * 4));
+      stereo.rightFrame = new Float32Array(new ArrayBuffer(length * 4));
+    }
+    stereo.left.getFloatTimeDomainData(stereo.leftFrame);
+    stereo.right.getFloatTimeDomainData(stereo.rightFrame);
+    return {left: stereo.leftFrame, right: stereo.rightFrame};
+  }
+
+  /**
    * Release an owned graph. Borrowed analysers are never disconnected.
    *
    * Every owned node is attempted even when an earlier disconnect throws; the
@@ -166,7 +366,31 @@ export class AudioMeterController {
    * state. Repeated calls are safe.
    */
   dispose(): void {
-    this.#meter.dispose();
+    let firstError: unknown;
+    let failed = false;
+    try {
+      this.releaseStereo();
+    } catch (error) {
+      firstError = error;
+      failed = true;
+    }
+    this.#timeDomain = undefined;
+    this.#frequency = undefined;
+    this.#frequencyBytes = undefined;
+    this.#frequencyDecibels = undefined;
+    try {
+      this.#meter.dispose();
+    } catch (error) {
+      if (!failed) firstError = error;
+      failed = true;
+    }
+    if (failed) throw firstError;
+  }
+
+  #assertAnalyser(): AnalyserNode {
+    const analyser = this.#meter.analyser;
+    if (!analyser) throw new Error('AudioMeterController has no analyser');
+    return analyser;
   }
 }
 
@@ -179,4 +403,8 @@ export function createAudioMeterController(
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
+}
+
+function finiteOr(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }

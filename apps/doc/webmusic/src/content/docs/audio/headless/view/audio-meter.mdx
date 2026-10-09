@@ -1,24 +1,33 @@
 ---
 title: AudioMeterController
-description: 'Read live level and spectrum frames from a borrowed analyser or an owned transparent tap.'
+description: 'Read live level, spectrum, float window and stereo frames from a borrowed analyser or an owned transparent tap, and reduce them into the seven meter displays.'
 sidebar:
   order: 6
 ---
 
 `AudioMeterController` remains in the **View Headless** entry: it provides
 measurements for a caller-owned presentation loop and owns no playback state,
-transport or timer. The standalone [`<audio-meter>`](/audio/element/analyze/audio-meter/)
-is now cataloged as a compact live Analyze tool and reuses this controller;
-the original View entry remains available for code-only consumers.
+transport or timer. `AudioMeterDisplay` sits beside it and reduces the
+controller's windows into one typed snapshot per frame for the seven displays
+of [`<audio-meter>`](/audio/element/analyze/audio-meter/): VU, loudness,
+waveform, oscilloscope, spectrum, spectrogram and stereometer. Neither draws;
+the [View render entry](/audio/api/view/#paint-meter-displays) paints a
+snapshot. The Element is cataloged as a compact live Analyze tool and composes
+exactly these two objects; the original View entry remains available for
+code-only consumers.
 
 ## Import
 
 ```ts
-import {createAudioMeterController} from '@webmusic/audio/view/headless';
+import {createAudioMeterController, createAudioMeterDisplay} from '@webmusic/audio/view/headless';
 
 const meter = createAudioMeterController({analyser});
 const level = meter.readLevel();
 const spectrum = meter.readSpectrum(28);
+
+const display = createAudioMeterDisplay({type: 'vu', referenceDbfs: -18});
+const snapshot = display.capture(meter, performance.now()); // {type: 'vu', vu, deflection, ...}
+
 meter.dispose(); // the borrowed analyser stays connected
 ```
 
@@ -29,26 +38,38 @@ meter.dispose(); // the borrowed analyser stays connected
 | Member | Contract |
 | --- | --- |
 | `context?: BaseAudioContext` | Creates an owned input → analyser → output tap. Mutually exclusive with `analyser`. |
-| `analyser?: AnalyserNode` | Borrows a node without configuring or disconnecting it. Omit both source options for a zero-valued meter. |
+| `analyser?: AnalyserNode` | Borrows a node without configuring it. Omit both source options for a zero-valued meter. |
 | `fftSize?: number` | Owned FFT size; power of two 32–32768, default 1024. |
 | `smoothingTimeConstant?: number` | Owned FFT smoothing, 0–1; default 0.8. |
 | `levelScale?: number` | Nonnegative display gain; default 1.8. |
 | `peakDecay?: number` | Nonnegative scaled-RMS peak-hold decrement per read; default 0.012. |
 | `analyser`, `input`, `output` | Read-only active analyser and owned splice ports. Borrowed mode has no input/output ports. |
 | `ownsGraph` | Whether this controller owns a transparent tap. |
+| `sampleRate`, `frequencyInfo` | Read-only sample rate of the active analyser's context, and `{sampleRate, frequencyBinCount, minDecibels, maxDecibels}`; both `undefined` without an analyser. |
+| `stereo` | Whether the stereo branch is attached. |
 
-`AudioMeterControllerOptions`, `AudioMeterConfiguration` and
-`AudioMeterLevelFrame` are exported from the same entry. Configuration excludes
-source options: replacement means constructing a new controller.
+`AudioMeterControllerOptions`, `AudioMeterConfiguration`,
+`AudioMeterLevelFrame`, `AudioMeterStereoFrame` and `AudioMeterFrequencyInfo`
+are exported from the same entry. Configuration excludes source options:
+replacement means constructing a new controller.
 
 ### Commands and returned frames
 
 | Method | Result |
 | --- | --- |
-| `configure(options)` | Changes tuning in place. Omitted values persist; invalid settings leave previous tuning and graph intact. Borrowed nodes retain their own FFT/smoothing configuration. |
+| `configure(options)` | Changes tuning in place. Omitted values persist; invalid settings leave previous tuning and graph intact. Borrowed nodes retain their own FFT/smoothing configuration. An attached stereo branch follows the summed window length. |
 | `readLevel()` | Returns `{rms, peak, peakHold, level}`. `level` is clamped scaled RMS; the live held marker retains scaled RMS with the per-read decrement. |
 | `readSpectrum(bars = 28)` | Returns normalized FFT bars as a `Float32Array`. |
-| `dispose()` | Releases every owned node, even if one disconnect fails, then rethrows the first error. Repeated disposal is safe. |
+| `readTimeDomain()` | Returns the current float time-domain window (`fftSize` samples, -1..1). |
+| `readFrequency()` | Returns the current frequency frame normalized to 0..1 per bin, in the analyser's own `minDecibels..maxDecibels` window. |
+| `readFrequencyDecibels()` | Returns the current frequency frame in decibels per bin. |
+| `attachStereo()` | Attaches the stereo branch: the analyser fans out through a two-channel gain into a `ChannelSplitterNode` and two owned analysers. Adds exactly one output edge to the read analyser, including a borrowed one; a mono input is up-mixed to both channels. Idempotent; returns whether a branch exists, `false` without an analyser; throws after rolling back a partially built branch. |
+| `releaseStereo()` | Removes that one edge with `disconnect(branch)` and disconnects the owned nodes. An already detached analyser is tolerated; failures on owned nodes are rethrown after every node was attempted. |
+| `readStereo()` | Returns `{left, right}` float windows from the branch, or `undefined` when none is attached. |
+| `dispose()` | Releases the stereo branch and every owned node, even if one disconnect fails, then rethrows the first error. Repeated disposal is safe. |
+
+The three window reads and `readStereo()` return scratch buffers that the next
+call of the same method overwrites; copy a frame to retain it.
 
 The pure helpers `calculateLevelMeter(samples, {previousPeak?, peakDecay?})` and
 `calculateSpectrumBars(spectrum, {bars?, normalizeBytes?})` share this entry.
@@ -59,24 +80,85 @@ RMS hold. Spectrum byte normalization defaults to true. Types
 `LevelMeterFrame`, `LevelMeterOptions` and `SpectrumBarsOptions` describe these
 pure calls.
 
+### AudioMeterDisplay
+
+`createAudioMeterDisplay(options?)` builds the reduction behind one display.
+`capture(source, nowMs)` reads the source once and returns an
+`AudioMeterDisplaySnapshot` discriminated by `type`; the typed arrays inside
+stay valid until the next capture. `source` is any `AudioMeterDisplaySource`:
+`frequencyInfo`, `readTimeDomain()`, `readFrequency()`,
+`readFrequencyDecibels()` and `readStereo()`, which `AudioMeterController`
+satisfies. `configure(options)` changes options in place; a new `type`,
+`scale`, `windowSeconds` or `spectrogramRows` clears accumulated state, other
+fields do not. `clear()` drops history, holds, ballistics and smoothing, for
+example on source replacement. `wantsStereo` reports whether the current type
+reads the stereo branch (`stereometer` and `loudness`); `history` exposes the
+current `LiveScrollBuffer` for the two scrolling types.
+
+| Option | Default | Used by |
+| --- | --- | --- |
+| `type` | `vu` | Selects the reduction; `AUDIO_METER_DISPLAY_TYPES` lists the seven. |
+| `scale` | `log` | `spectrum`, `spectrogram`: `log`, `mel` or `linear` axis from 20 Hz to the lower of 20 kHz and Nyquist. |
+| `windowSeconds`, `columnsPerSecond` | `4`, `60` | `waveform`, `spectrogram`: history length (minimum 0.5 s) and the capture rate that sizes the ring. |
+| `timebaseMs`, `trigger` | `20`, `rising` | `oscilloscope`: visible span, capped by the window; alignment to the latest rising zero crossing or `off`. |
+| `loudnessMode` | `momentary` | `loudness`: `momentary` (K-weighted 400 ms, LUFS), `short-term` (K-weighted 3 s, LUFS), `rms-fast` (300 ms, dBFS) or `rms-slow` (1 s, dBFS). |
+| `referenceDbfs` | `-18` | `vu`: sine level in dBFS peak that reads 0 VU. |
+| `bars` | `0` | `spectrum`: `0` for the continuous curve, otherwise at least 4. |
+| `gain` | `1.8` | `waveform`, `stereometer`: visual gain of the columns and points. |
+| `peakDecay` | `0.012` | `vu`, `loudness`: per-capture decrement of the held markers in normalized scale units. |
+| `spectrogramRows` | `96` | `spectrogram`: projected rows per column. |
+
+| Snapshot | Fields beyond `type`, `time` and `silent` |
+| --- | --- |
+| `AudioMeterVuSnapshot` | `vu` (first-order 300 ms ballistic on window RMS, `-Infinity` for silence), `deflection` and `hold` (0 at rest, 1 at +3 VU), `referenceDbfs`, `peakDbfs`, `peakLit` (-6 dBFS, 250 ms hold), `clipLit` (full scale, 1 s hold). |
+| `AudioMeterLoudnessSnapshot` | `mode`, `value` (LUFS or dBFS by `unit`), `peakDbfs`, `peakHoldDbfs`, `stereo` (whether channels were summed separately). |
+| `AudioMeterWaveformSnapshot` | `history` with rows `[min, max, hue]`, `hue` the log-axis position of the window's spectral centroid; `gain` for painting. |
+| `AudioMeterOscilloscopeSnapshot` | `samples` (a view into the window), `timebaseMs`, `triggered`. |
+| `AudioMeterSpectrumSnapshot` | `bins` (0..1), `sampleRate`, `minDecibels`, `maxDecibels`, `scale`, `minHz`, `maxHz`, `bars`, `peak` as `AudioMeterSpectrumPeak` (`hz`, `value`, `decibels`, `note`, `cents`) or `undefined`. |
+| `AudioMeterSpectrogramSnapshot` | `history` of projected rows, `scale`, `minHz`, `maxHz`. |
+| `AudioMeterStereometerSnapshot` | `left`, `right` (equal for a mono-only source), `stereo`, `correlation` (250 ms smoothed, 0 for silence), `gain`, `hue`. |
+
+The loudness reduction applies BS.1770 K-weighting as a power ratio of each
+window's own decibel spectrum (`kWeightingRatio`) and averages the windows
+inside the selected span (`LoudnessEstimator`), summing left and right from
+the stereo branch or doubling the mono window when none is attached. It is a
+meter-grade estimate from windows polled on animation frames, not a gapless,
+gated or certified EBU R128 measurement.
+
+### Helpers
+
+The reduction's arithmetic is exported for custom displays: `windowLevel`
+(mean square and absolute peak), `alignTrigger` (latest rising zero crossing
+that fits a window), `stereoCorrelation` (Pearson correlation, 0 for silence),
+`vuFromRms` and `vuDeflection` (VU calibration and the amplitude-linear dial
+law), `decibelsFromLinear`, `kWeightingRatio`, `frequencyAt` and `fractionOf`
+(axis mapping on the three scales), `projectSpectrum` (bins onto axis cells,
+maximum for wide cells and interpolation for narrow ones), `peakFrequency`
+(loudest bin refined by parabolic interpolation), `spectralCentroid` and
+`describeFrequency` (nearest equal-tempered note and cents).
+
 ### Lifecycle and measurement limits
 
 The controller emits no events and schedules no frames. A caller chooses the
 read cadence and rebuilds on source replacement; several monitors may borrow the
 same analyser. A context is borrowed even when its tap nodes are owned: disposal
-never closes it. The values are normalized display readings, not dBFS, LUFS or
-true-peak measurements. Peak decay depends on reads, not elapsed time.
+never closes it. The stereo branch is the one change the controller makes to
+a borrowed analyser, and it is confined to one added output edge. The values
+are normalized or meter-grade display readings, not calibrated dBFS, LUFS or
+true-peak measurements. Holds decay per read or capture, not by elapsed time.
 
 ### Migration
 
-Import the controller and pure helpers from `@webmusic/audio/view/headless`.
-Their former `play/headless` exports have been removed so Play does not depend on
-View. The Element's Analyze catalog placement does not move these Headless exports
-or rename the tag; `view/element` and `view/auto` retain compatibility registration.
+Import the controller, the display and the pure helpers from
+`@webmusic/audio/view/headless`. Their former `play/headless` exports have been
+removed so Play does not depend on View. The Element's Analyze catalog
+placement does not move these Headless exports or rename the tag; `view/element`
+and `view/auto` retain compatibility registration.
 
 ## Related
 
 - [Audio Meter Element](/audio/element/analyze/audio-meter/)
+- [Meter display painters](/audio/api/view/#paint-meter-displays)
 - [Audio Player](/audio/headless/play/audio-player/)
 - [View API](/audio/api/view/)
 - [Headless inventory](/audio/headless/)
