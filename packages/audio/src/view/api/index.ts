@@ -79,6 +79,14 @@ export type {
   SpectrumBarsOptions,
 } from '../headless/meter';
 export type {
+  AudioMeterDisplayType,
+  AudioMeterFrequencyScale,
+  AudioMeterLoudnessMode,
+  AudioMeterTrigger,
+  AudioMeterDisplayOptions,
+  AudioMeterDisplaySnapshot,
+} from '../headless/meter-display';
+export type {
   AudioTimelineBinding,
   BindAudioTimelineOptions,
   PlayheadTarget,

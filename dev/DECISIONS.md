@@ -1885,6 +1885,85 @@ precedence, preserved notes/subscriptions, cleanup, focus and offset resets,
 and exact waterfall alignment. Verify fitted and scrolling keyboards in wide
 and narrow containers, including Parameters, Copy and Reset, with Arabesque No. 1.
 
+## DEC-051 — One type-selected live meter with mono and colour themes
+
+**Date / status:** 2026-10-08; accepted by the maintainer's request to give
+`audio-meter` the seven MiniMeters-style displays. This supersedes DEC-037's
+description of the meter as a two-mode normalized RMS/FFT-bar monitor; the
+five-tag Analyze inventory, the API/Headless ownership of static reports and
+the player-borrowing rule remain in force. Browser and device acceptance
+remain in STATUS.
+
+**Problem:** the compact monitor offered one level bar and one bank of bars
+through the neutral meter presenter, while a music workstation expects the
+familiar at-a-glance instruments: VU, loudness, waveform, oscilloscope,
+spectrum, spectrogram and stereometer. Adding seven tags would multiply the
+same binding, tap and lifecycle code; the inspection tools already own
+gestures, so the meter needs displays, not interaction.
+
+**Decision:** `audio-meter` keeps one tag and selects its drawing with
+`type`: `vu` (default), `loudness`, `waveform`, `oscilloscope`, `spectrum`,
+`spectrogram` and `stereometer`. `theme` selects `mono` (default), which
+encodes sound only as a ramp between the page's surface and ink tokens, or
+`color`, which adds hue for frequency position and a perceptual colormap for
+intensity. Every display is a square-cornered canvas with square cells, dots
+and lamps. The reductions (VU ballistics, K-weighted windows, histories,
+trigger alignment, correlation) live in a DOM-free `AudioMeterDisplay` in
+View Headless; the painters live in View render; the Element composes them
+with the UI kit's canvas stage and resolves its colours from public tokens
+through computed style. The retired two-mode DOM presenter is replaced: `mode`
+remains a compatibility alias (`spectrum` maps to the spectrum, anything else
+to the VU dial) that applies only while `type` is absent, `bars` now defaults
+to a continuous spectrum curve, and the presenter's inner `track`, `fill`,
+`peak`, `spectrum` and `bar` parts are retired while `part="wrap"`, the outer
+surface tokens and the legacy `--wameter-*` aliases remain effective.
+
+The box adapts: width fills the container; without an explicit height each
+type keeps its aspect ratio until the `size` preset's cap, which maps `sm`,
+`md` (default) and `lg` onto the UI kit's `--wm-surface-sm/md/lg` tiers so
+the meter follows the same scale as the kit's other drawing surfaces. `width`
+and `height` attributes, or the existing height tokens, fix a custom box.
+
+The stereometer and loudness displays need separate channels, which an
+`AnalyserNode` does not provide. The controller may attach an owned stereo
+branch (`analyser -> two-channel fan-out -> ChannelSplitterNode -> two
+analysers`) to the analyser it reads, including a borrowed one. This is the
+single permitted change to a borrowed node: one added output edge, removed
+with a selective `disconnect(branch)`, never a disconnect of the owner's
+connections or a retune. A mono input is up-mixed to both channels.
+
+**Alternatives considered:** seven new Analyze tags; keeping the DOM
+presenter beside the canvas types; reading stereo from the player's internal
+graph; or shipping colour-only displays. Separate tags duplicate the binding
+and tap contracts; two presenters make one tag two designs; the player's
+graph is private; and a colour-only meter has no page-neutral default.
+
+**Consequences:** the K-weighting biquads move to the Audio core so the
+offline loudness analysis and the live meter share one derivation. Readings
+are meter-grade: windows polled on animation frames overlap or skip, the
+loudness bar is a windowed K-weighted estimate rather than a gapless, gated or
+certified EBU R128 measurement, peaks are sample peaks, spectrum magnitudes
+remain the analyser's own decibel window, and the trigger is not
+sample-accurate. The Element declares the `stage` presenter instead of
+`meter`; `audio-view type="meter"` still composes the neutral meter presenter.
+Documentation demos keep one player and one meter with external Parameters
+for type, theme and the display attributes.
+
+**Owner:** [Audio Analyze design](design/AUDIO-ANALYZE-COMPONENTS.md),
+[Audio View design](design/AUDIO-VIEW-COMPONENTS.md), the
+[meter reference](../apps/doc/webmusic/src/content/docs/audio/element/analyze/audio-meter.mdx)
+and the [metering Headless page](../apps/doc/webmusic/src/content/docs/audio/headless/view/audio-meter.mdx).
+
+**Verification implications:** assert the seven types and two themes, the
+legacy `mode` mapping, type changes that keep the graph and stage, the stereo
+branch attached only for the two displays and removed with a selective
+disconnect on type change, source replacement and removal, the owned-tap and
+borrowed-analyser cleanup, palette resolution fallbacks, every painter in both
+themes, the VU calibration, K-weighting coefficients and window estimates,
+trigger alignment, correlation and spectrum projection; verify the demo's
+type/theme controls, Copy/Reset and narrow layouts in a browser. Static tests
+do not establish calibrated loudness, true peak or acoustic accuracy.
+
 ## Recording the next decision
 
 Add an identifier, date, status, problem, chosen contract, considered alternatives, consequences, owning document, and verification implications. A proposed choice does not change a public API. If a choice supersedes this register, retain its old identifier and point to the replacement; do not rewrite historical evidence as though the new choice always existed.

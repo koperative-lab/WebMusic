@@ -91,8 +91,8 @@ in, data out, no DOM, no engine state.
 | `@webmusic/audio/play/worker-protocol` | The decode-worker wire types, engine-free. |
 | `@webmusic/audio/play/worker` | The self-registering decode Worker runtime. |
 | `@webmusic/audio/view` | Layout and view models for waveform / spectrogram views. |
-| `@webmusic/audio/view/headless` | Stateful code-only views, `AudioMeterController` and PCM metering helpers. |
-| `@webmusic/audio/view/render` | Imperative browser visualizers. |
+| `@webmusic/audio/view/headless` | Stateful code-only views, `AudioMeterController`, the `AudioMeterDisplay` reductions behind the seven meter displays and PCM metering helpers. |
+| `@webmusic/audio/view/render` | Imperative browser visualizers and the meter display painters. |
 | `@webmusic/audio/view/element` | `<audio-view>` and `<audio-live-view>`; retains a legacy `<audio-meter>` import/registration alias. |
 | `@webmusic/audio/analyze` | One-shot MIR analysis: key, tempo, pitch, loudness, onsets, spectrogram, summaries. |
 | `@webmusic/audio/analyze/headless` | Stateful analysis sessions and live trackers. |
@@ -392,9 +392,9 @@ The Element class is the browser composition root. It translates attributes,
 properties and events, decides resource ownership, and supplies the small
 structural binding the presenter needs — and that mapping stays *in the
 class*, not in a separate adapter layer. `<audio-meter>` is the reference
-shape: `createMeterController`, `createMeterBinding`, `mountMeterUI` and
-`onMeterError` are `protected`, so an application can subclass, override one
-hook and register its own tag. Analyze is its canonical Element entry; the
+shape: `createMeterController`, `createMeterDisplay`, `createMeterPainter`,
+`mountMeterUI`, `paintMeterFrame` and `onMeterError` are `protected`, so an
+application can subclass, override one hook and register its own tag. Analyze is its canonical Element entry; the
 former View import remains a compatibility alias for the same implementation.
 
 This is why there are three independent consumer paths rather than one blessed

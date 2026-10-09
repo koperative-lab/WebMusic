@@ -1,8 +1,10 @@
 # Audio Analyze live tools
 
-Status: accepted dev contract under DEC-037; implementation and browser/audio
-acceptance belong to [STATUS](../STATUS.md). DEC-037 supersedes DEC-036's Audio
-Element inventory without changing its static API/Headless ownership rule.
+Status: accepted dev contract under DEC-037 and DEC-051; implementation and
+browser/audio acceptance belong to [STATUS](../STATUS.md). DEC-037 supersedes
+DEC-036's Audio Element inventory without changing its static API/Headless
+ownership rule; DEC-051 replaces the meter's two-mode presenter with seven
+type-selected displays and two themes.
 Source and public entries: [Audio Analyze](../../packages/audio/src/analyze/),
 [Element inventory](../../apps/doc/webmusic/src/content/docs/audio/element/index.mdx#analyze),
 [API](../../apps/doc/webmusic/src/content/docs/audio/api/analyze.mdx) and
@@ -19,7 +21,7 @@ One fixed tag names one musical task.
 
 | Element | One surface | User operation |
 |---|---|---|
-| `audio-meter` | Compact normalized RMS or FFT-bar monitor | Choose level or spectrum mode and tune display scale/hold from the host; monitor current activity at a glance |
+| `audio-meter` | Compact type-selected monitor: VU dial, loudness bars, waveform, oscilloscope, spectrum, spectrogram or stereometer | Choose the display type, a mono or colour theme and per-display tuning from the host; monitor current activity at a glance |
 | `audio-level-analyzer` | Recent level history and peak/threshold readout | Inspect sampled RMS, sample peak and crest, set a peak threshold, freeze and clear peak hold |
 | `audio-spectrum-analyzer` | Live frequency-spectrum inspection | Inspect log-spaced FFT frequency evidence, freeze it and compare peak hold |
 | `audio-oscilloscope` | Trigger-aligned time-domain window | Adjust trigger and timebase, freeze a frame and probe time/amplitude |
@@ -27,13 +29,14 @@ One fixed tag names one musical task.
 
 The View family's `audio-live-view` and `audio-view type="meter"` remain signal
 projections. The independent `audio-meter` tag is now an Analyze monitor; it
-does not replace the more detailed level analyzer. Meter fill and FFT bars are
-normalized display values, while the level analyzer reports sampled dBFS
-dynamics, history and a threshold. `audio-view type="spectrogram"` projects a
-time-frequency data set; a live spectrum analyzer inspects *now* across
-frequency. The oscilloscope inspects a short waveform window rather than
-becoming another scrolling View, and the transient tool provides live onset
-cues rather than an offline beat grid.
+does not replace the more detailed inspection tools. Its displays are
+at-a-glance readings without gestures: the level analyzer reports sampled
+dBFS dynamics, history and a threshold; the spectrum analyzer probes
+frequencies and holds peaks; the oscilloscope offers trigger, timebase and a
+time probe. `audio-view type="spectrogram"` projects a time-frequency data
+set; the meter's spectrogram and waveform types scroll the live signal, and
+the spectrum analyzer inspects *now* across frequency. The transient tool
+provides live onset cues rather than an offline beat grid.
 
 The former offline `audio-analysis`, result card, clip summary, histogram and
 generic timeline tags were retired by DEC-035. DEC-036 additionally retired the
@@ -58,11 +61,18 @@ creates its own player or clock, or closes or disconnects a borrowed graph.
 Missing graph, denied/unavailable input and silence must remain distinguishable
 from a valid measured zero.
 
-The meter retains its existing controller and presenter behavior: its level
-fill and held marker are scaled normalized readings, and spectrum mode is a
-compact bar display. Its peak-hold decay is per read, not elapsed-time decay.
-It is not a LUFS meter, a true-peak meter, or a substitute for the level or
-spectrum inspection tools. `audio-meter` is canonically registered/exported
+The meter retains its existing controller and adds a DOM-free display
+reduction (`AudioMeterDisplay`) and canvas painters: `type` selects a VU dial
+with 300 ms ballistics and PK/CL lamps, windowed loudness bars, a scrolling
+waveform, a trigger-aligned oscilloscope, a projected spectrum with a named
+peak, a scrolling spectrogram or a goniometer with a correlation bar; `theme`
+selects the page-grey ramp or colour encoding; `size` presets cap an
+adaptive, aspect-kept height at the kit's surface tiers, and `width`/`height`
+fix a custom box. Holds decay per frame, not by elapsed time. Readings are meter-grade: windows are polled on animation
+frames, loudness is a windowed K-weighted estimate rather than gated EBU R128
+programme loudness, peaks are sample peaks, and the trigger is not
+sample-accurate. It is not a substitute for the level, spectrum or
+oscilloscope inspection tools. `audio-meter` is canonically registered/exported
 from Analyze; the former View Element import and auto-registration remain a
 compatibility alias for the same tag and implementation, not a second meter.
 The Analyze Element facade may reach the existing View meter implementation
@@ -96,8 +106,11 @@ onset timing; those remain API/Headless tasks over decoded audio.
 
 Every tool owns its sampler or analyzer, short-lived UI state, subscriptions
 and presenter. It releases those on rebind/disconnect and invalidates callbacks
-from older sources. The meter alone may own its documented transparent tap;
-all borrowed graph resources remain caller-owned. A frozen display never
+from older sources. The meter alone may own its documented transparent tap and,
+for its stereometer and loudness displays, a stereo branch fanned out from the
+analyser it reads: one added output edge, removed selectively, never a change
+to the owner's connections or tuning. All other borrowed graph resources
+remain caller-owned. A frozen display never
 becomes a second signal authority; the current player retains data, sound and
 transport ownership. Each visible Element owns one neutral outer component
 surface and public tokens/parts; application Parameters configure attributes
@@ -141,7 +154,8 @@ Assert exactly the five Analyze tool registrations and the absence of tuner and
 other retired Audio Analyze tags in canonical exports, policy, catalogs and
 navigation. Test the meter's legacy View import/auto-registration as one
 idempotent compatibility path, not a second tag. Cover one-player binding,
-explicit-analyser precedence, meter tap ownership, late/replaced sources,
+explicit-analyser precedence, meter tap and stereo-branch ownership, the seven
+display types in both themes and the legacy mode alias, late/replaced sources,
 pause/seek/end, graph loss, frozen/held-state reset, threshold, spectrum probe,
 oscilloscope trigger/timebase/probe, transient sensitivity/refractory interval,
 silence, callback cancellation and repeated cleanup. Each tag demo pairs one

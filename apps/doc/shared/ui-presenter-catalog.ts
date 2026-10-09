@@ -1213,7 +1213,7 @@ const handle = mountMeter(host, {
   readLevel: () => meter.level,
   readSpectrum: (bars) => meter.spectrum(bars),
 });`,
-    consumerTags: ['audio-meter', 'audio-view'],
+    consumerTags: ['audio-view'],
     hint: 'Change the pulled level and peak values, switch mode, or turn animation off and use State changes to call redraw().',
     state: [
       {
@@ -1504,7 +1504,7 @@ mountCanvasStage(canvasHost, canvasBinding);
 mountSurfaceSlider(surface, sliderBinding);`,
       variant: 'stage-compound',
     },
-    consumerTags: ['score-view', 'score-sheet-view', 'audio-view', 'audio-live-view'],
+    consumerTags: ['score-view', 'score-sheet-view', 'audio-view', 'audio-live-view', 'audio-meter'],
     hint: 'Drag the surface slider or use its Arrow, Home, and End keys; all three real stage mounts share the same caller-owned State.',
     state: [
       {

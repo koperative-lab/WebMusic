@@ -1,6 +1,6 @@
 ---
 title: '<audio-meter>'
-description: 'Monitor normalized RMS level or FFT bars from a player, borrowed analyser or transparent audio tap.'
+description: 'Monitor a live signal as a VU dial, loudness bars, waveform, oscilloscope, spectrum, spectrogram or stereometer from a player, borrowed analyser or transparent audio tap.'
 sidebar:
   order: 1
 ---
@@ -8,13 +8,19 @@ sidebar:
 import AudioAnalyzeFeaturePlayground from '../../../../../components/elements/AudioAnalyzeFeaturePlayground.astro';
 
 `<audio-meter>` is the compact, always-visible Analyze monitor for a live
-signal. Use it to watch normalized level or spectrum activity at a glance
-beside an [`<audio-player>`](/audio/element/play/audio-player/). For sampled
-dBFS history, a peak threshold and freeze, choose
+signal. One tag draws one of seven displays, chosen with `type`, beside an
+[`<audio-player>`](/audio/element/play/audio-player/): a needle VU dial,
+loudness bars, a scrolling waveform, a triggered oscilloscope, a spectrum, a
+scrolling spectrogram or a stereometer. Every display is a square-cornered
+canvas drawn in the page's own greys; `theme="color"` adds hue for frequency
+and a colormap for intensity. For sampled dBFS history, a peak threshold and
+freeze, choose
 [`<audio-level-analyzer>`](/audio/element/analyze/audio-level-analyzer/);
 for frequency probing, choose
-[`<audio-spectrum-analyzer>`](/audio/element/analyze/audio-spectrum-analyzer/).
-The meter is not a LUFS or inter-sample true-peak measurement.
+[`<audio-spectrum-analyzer>`](/audio/element/analyze/audio-spectrum-analyzer/);
+for a triggered window with a time probe, choose
+[`<audio-oscilloscope>`](/audio/element/analyze/audio-oscilloscope/). The
+meter has no inspection gestures and makes no certified measurement claim.
 
 <AudioAnalyzeFeaturePlayground tag="audio-meter" />
 
@@ -29,14 +35,72 @@ The meter is not a LUFS or inter-sample true-peak measurement.
 </script>
 
 <audio-player id="session" src="/mp3/Arabesque%20No.1.mp3" controls></audio-player>
-<audio-meter player="#session"></audio-meter>
+<audio-meter player="#session" type="spectrogram" theme="color"></audio-meter>
 ```
 
-The demo pairs one real player with this meter. Its Parameters switch level and
-spectrum display modes and tune the monitor. Copy includes both Elements;
+The demo pairs one real player with this meter. Its Parameters switch the
+display type and theme and tune each display. Copy includes both Elements;
 Reset restores the demo settings. `@webmusic/audio/analyze/auto` also registers
 the tag. Existing `view/element` and `view/auto` imports remain compatibility
 paths to the same implementation and must not register a second meter.
+
+## Display types
+
+| `type` | Draws | Reads |
+| --- | --- | --- |
+| `vu` (default) | Needle dial from -20 to +3 VU with a held maximum tick and square PK/CL lamps | RMS of each window through a first-order 300 ms ballistic; a sine at `reference-dbfs` (peak) reads 0 VU |
+| `loudness` | Sample-peak bar with a held tick beside a windowed loudness bar on a 0 to -50 scale, with a numeric readout | `loudness-mode`: K-weighted 400 ms (momentary) or 3 s (short-term) windows in LUFS, or plain 300 ms / 1 s RMS windows in dBFS |
+| `waveform` | Scrolling min/max history, newest at the right, scaled by `level-scale` | One column per frame over `window-seconds` |
+| `oscilloscope` | One trace across the stage with a centre line and quarter divisions | `timebase-ms` of the latest window, aligned by `trigger` to the latest rising zero crossing |
+| `spectrum` | Filled curve with the loudest peak named in Hz, dB and nearest note, or `bars` bars | The analyser's current normalized FFT frame on the `scale` axis from 20 Hz to the lower of 20 kHz and Nyquist |
+| `spectrogram` | Scrolling history, newest column at the right, low frequencies at the bottom | 96 projected rows per frame on the `scale` axis over `window-seconds` |
+| `stereometer` | Goniometer point cloud in a diamond frame with a signed correlation bar | Left and right windows from the stereo branch, scaled by `level-scale`; a mono source draws the vertical axis |
+
+Changing `type`, `theme`, `size`, `width`, `height` or any display attribute
+keeps the audio graph and the stage; only the box, the reduction and the
+paint change. A type change, a changed
+axis or history length, and a replaced source clear accumulated history, holds
+and ballistics.
+
+## Sizing
+
+The meter fills its container's width. Without an explicit height, each
+display keeps a type-specific aspect ratio (4:1 for the waveform and
+oscilloscope, about 2.6:1 for the dial, spectrum and spectrogram, 2.2:1 for
+the loudness bars and 1.6:1 for the stereometer) until it reaches the cap of
+its `size` preset, so a narrow column gets a shorter meter and a wide one
+stops growing at the preset. The presets are the UI kit's surface tiers:
+`sm` caps at `--wm-surface-sm` (72px), `md` (default) at `--wm-surface-md`
+(144px) and `lg` at `--wm-surface-lg` (216px); retheming a tier re-sizes
+every meter that uses it. A `min-height` of 3rem keeps the narrowest column
+readable. Labels scale with the frame height within a legible band.
+
+For a custom box, set `width` and `height` as CSS lengths (a bare number is
+pixels): `height` fixes the frame and ignores the preset, `width` fixes the
+host instead of filling the container. The equivalent tokens are
+`--wm-meter-height` (or `--wm-audio-meter-height`), which also wins over the
+preset, and `--wm-meter-min-height`; the host accepts ordinary page CSS for
+its width. The canvas re-renders on every box change.
+
+```html
+<audio-meter player="#session" type="vu" size="sm"></audio-meter>
+<audio-meter player="#session" type="stereometer" size="lg"></audio-meter>
+<audio-meter player="#session" type="spectrogram" width="480" height="12rem"></audio-meter>
+```
+
+## Themes and tokens
+
+`theme="mono"` (default) paints with the resolved page tokens: data in the ink
+colour, intensity as a ramp from the surface colour to the ink, scale lines in
+the track colour and labels in the muted colour. It therefore follows a light
+or dark page palette without a second skin. `theme="color"` keeps the same
+geometry and adds hue for frequency position (red low, violet high) on the
+waveform, spectrum, bars and stereometer points, the magma colormap for
+spectrogram intensity, a heat ramp on the loudness bar, the peak colour for
+the VU over-zero zone, clip lamp and anti-phase correlation, and the warning
+colour for the peak lamp. Styling below lists the tokens each colour comes
+from; they are re-read about twice a second, so a page theme change takes
+effect without reloading.
 
 ## Signal and ownership
 
@@ -44,8 +108,9 @@ The `player` selector must match one element in the meter's Document or
 ShadowRoot. The meter borrows the player's current analyser, follows late
 upgrade and source replacement, and never owns its transport. `.player` can
 instead borrow a nonvisual player directly and takes precedence over the
-selector. A missing or ambiguous selector leaves the meter empty; invalid
-selector syntax emits `webaudio:error`.
+selector. A missing or ambiguous selector leaves the meter empty with a
+visible "No audio source" status; invalid selector syntax emits
+`webaudio:error`.
 
 For another live graph, assign `.analyser` to borrow an `AnalyserNode`, or
 assign `.context` to create an owned transparent input -> analyser -> output
@@ -53,8 +118,8 @@ tap. The caller supplies that context and connects the tap into its graph;
 the meter does not create an `AudioContext`. Direct `.analyser` or `.context`
 input takes precedence over player binding until cleared. Assigning a
 nonempty `.player` clears direct input. Disconnect or rebind releases the
-presenter, subscriptions and only owned tap nodes; it never closes or
-disconnects the borrowed player, analyser or context.
+presenter, subscriptions and only owned nodes; it never closes or disconnects
+the borrowed player, analyser or context.
 
 ```ts
 // For a caller-owned graph that should pass through the meter:
@@ -72,13 +137,35 @@ sourceNode.connect(input);
 output.connect(context.destination);
 ```
 
-The level fill is scaled RMS. Its held marker retains scaled RMS with an
-absolute decrement **per read**, not elapsed-time decay or instantaneous
-sample-peak hold. Spectrum bars aggregate the borrowed analyser's current FFT
-bins. The displayed values are normalized, not dBFS, LUFS or calibrated SPL.
-The presenter's frame loop reads while connected; changing a source builds a
-replacement before releasing the prior tap, and failed replacement preserves
-the working route.
+### Stereo branch
+
+An `AnalyserNode` analyses a mono down-mix, so the `stereometer` and
+`loudness` types attach a stereo branch while selected: the analyser being
+read fans out through a two-channel gain into a `ChannelSplitterNode` and two
+owned analysers, one per channel. This adds exactly one output edge to that
+analyser, including a borrowed one; it never changes or removes the
+connections the owner made. Selecting another type, replacing the source or
+disconnecting removes that edge with `disconnect(branch)` and releases the
+owned nodes. A mono input is up-mixed to both channels, so a mono source
+reads as a centred signal. When the branch cannot be built, the meter
+reports `webaudio:error` and the display falls back to the mono window, with
+`snapshot.stereo` false.
+
+## Measurement limits
+
+Every reading is reduced from analyser windows polled on animation frames, so
+windows overlap or skip with frame cadence. The VU reading follows a
+first-order ballistic on window RMS rather than a rectified-average movement.
+The loudness bar applies BS.1770 K-weighting as a power ratio of each
+window's own spectrum and averages the windows inside the selected span: a
+meter-grade momentary or short-term estimate, not a gapless, gated or
+certified EBU R128 measurement, and not integrated programme loudness. The
+peak bar and the PK/CL lamps use sample peaks, not inter-sample true peak;
+PK lights at -6 dBFS and CL at full scale. Spectrum magnitudes are the
+analyser's own `minDecibels..maxDecibels` window, not calibrated SPL, and the
+named peak is the loudest bin refined by parabolic interpolation. The
+oscilloscope trigger aligns within the available window and cannot promise a
+sample-accurate edge.
 
 <details class="component-section">
 <summary>API</summary>
@@ -86,54 +173,84 @@ the working route.
 | Member | Kind | Behavior |
 | --- | --- | --- |
 | `player` | attribute | Unique selector for one player Element in the current root; default absent. Late insertion, upgrade, replacement and removal are observed. |
-| `mode` | attribute | `level` (default) or `spectrum`; other values use level. Changing it remounts the presenter, not the audio graph. |
-| `bars` | attribute | Spectrum bar count, minimum `4`, default `28`; changing it remounts the presenter. |
-| `aria-label` | attribute | Accessible meter name; updates without remounting the presenter. |
-| `fft-size` | attribute | Owned tap analyser FFT size, power of two from `32` to `32768`; default `1024`. Does not retune a borrowed analyser. |
+| `type` | attribute | `vu` (default), `loudness`, `waveform`, `oscilloscope`, `spectrum`, `spectrogram` or `stereometer`; other values use `vu`. Changes the reduction and paint, not the graph or stage. |
+| `theme` | attribute | `mono` (default) or `color`. Re-resolves the palette on change. |
+| `size` | attribute | `sm`, `md` (default) or `lg`: caps the adaptive height at the matching `--wm-surface-*` tier (72, 144 or 216px); other values read as `md`. Ignored while `height` or a height token is set. |
+| `width` | attribute | Explicit host width as a CSS length; a bare number is pixels. Absent: fills the container. |
+| `height` | attribute | Explicit frame height as a CSS length; a bare number is pixels. Absent: the width-derived height up to the preset cap. |
+| `mode` | attribute | Legacy selector read only while `type` is absent: `spectrum` selects the spectrum, anything else the VU dial. |
+| `bars` | attribute | Spectrum bar count, `0` (default) for the continuous curve, otherwise at least `4`. |
+| `aria-label` | attribute | Accessible surface name; default is the type name, such as `VU meter`. Updates without remounting. |
+| `scale` | attribute | `log` (default), `mel` or `linear` frequency axis for `spectrum` and `spectrogram`; changing it clears spectrogram history. |
+| `window-seconds` | attribute | History of `waveform` and `spectrogram` in seconds; default `4`, minimum `0.5`; changing it clears the strip. |
+| `timebase-ms` | attribute | Visible `oscilloscope` span; default `20`, minimum `0.1`, capped by the analyser window. |
+| `trigger` | attribute | `rising` (default) aligns the oscilloscope to the latest rising zero crossing within the window; `off` shows the latest window. |
+| `loudness-mode` | attribute | `momentary` (default, K-weighted 400 ms, LUFS), `short-term` (K-weighted 3 s, LUFS), `rms-fast` (300 ms, dBFS) or `rms-slow` (1 s, dBFS). |
+| `reference-dbfs` | attribute | Sine level in dBFS peak that reads 0 VU; default `-18`. |
+| `fft-size` | attribute | Owned tap analyser FFT size, power of two from `32` to `32768`; default `1024`. Does not retune a borrowed analyser. The stereo branch follows the summed window length. |
 | `smoothing-time-constant` | attribute | Owned tap analyser smoothing in `0..1`; default `0.8`. Does not retune a borrowed analyser. |
-| `level-scale` | attribute | Non-negative multiplier for displayed RMS/peak; default `1.8`. |
-| `peak-decay` | attribute | Non-negative absolute decrement of the held scaled-RMS marker per read; default `0.012`. |
+| `level-scale` | attribute | Non-negative display gain for `readLevel()` on the underlying controller, the waveform columns and the stereometer points; default `1.8`. The oscilloscope stays 1:1. |
+| `peak-decay` | attribute | Non-negative per-frame decrement of the VU hold tick and the loudness peak hold, in normalized scale units; default `0.012`. |
 | `.player` | property | Borrow an `AudioMeterPlayer`; takes precedence over selector binding. Clearing it returns to the selector. |
-| `.analyser` | property | Borrow an existing `AnalyserNode` without connecting or disconnecting it; the getter exposes the current analyser, if any. |
+| `.analyser` | property | Borrow an existing `AnalyserNode`; the getter exposes the current analyser, if any. The meter adds at most one output edge to it for the stereo branch and removes only that edge. |
 | `.context` | property | Caller-supplied `BaseAudioContext` used to build an owned transparent tap. |
 | `.input`, `.output` | read-only properties | Stable tap splice points when using `.context`; absent for a borrowed analyser. |
-| `webaudio:error` | event | The thrown error value is passed directly as `detail` for tuning, read or cleanup failures; bubbles and is composed. |
+| `.type`, `.theme`, `.size` | properties | Reflect the `type`, `theme` and `size` attributes. |
+| `.width`, `.height` | properties | Reflect the `width` and `height` attributes as CSS lengths; assigning `undefined` removes the attribute. |
+| `.snapshot` | read-only property | The latest painted reduction, an `AudioMeterDisplaySnapshot` discriminated by `type`; `undefined` without a source. Its typed arrays are valid until the next frame. |
+| `webaudio:error` | event | The thrown error value is passed directly as `detail` for tuning, read, stereo-branch or cleanup failures; bubbles and is composed. |
 
 Removing a tuning attribute restores its default. Invalid live tuning reports
 an error and keeps the previous working graph and settings. The controller's
 input/output ports remain stable during valid tuning changes. Subclasses may
-override the protected `createMeterController`, `createMeterBinding`,
-`mountMeterUI` and `onMeterError` hooks; they do not change the tag's resource
-ownership by default.
+override the protected `createMeterController`, `createMeterDisplay`,
+`createMeterPainter`, `mountMeterUI`, `paintMeterFrame` and `onMeterError`
+hooks; they do not change the tag's resource ownership by default. The
+reduction and painters are also available without the Element from
+[`AudioMeterController`](/audio/headless/view/audio-meter/) and the
+[View render entry](/audio/api/view/#paint-meter-displays).
 
-The presenter's level and spectrum surfaces use an accessible name supplied by
-`aria-label`. This meter has no built-in
-transport or parameter gestures. The surrounding application controls its
-mode and tuning attributes; its readout itself does not seek or alter audio.
+**Accessibility.** The stage root has `role="img"` and the accessible name
+above; the canvas itself is `aria-hidden`. Without a source the stage shows a
+live status message instead of an empty surface. The meter is read-only and
+has no keyboard interaction; the surrounding application controls its
+attributes, and its readout never seeks or alters audio.
 
 </details>
 
 <details class="component-section">
 <summary>Styling</summary>
 
-The host has an open shadow root. Its outer surface uses
+The host has an open shadow root with one framed surface, exposed as
+`part="frame"`, around the UI kit's canvas stage, exposed as `part="root wrap"`
+with its `part="canvas surface"` and `part="status"` nodes. The frame uses
 `--wm-audio-meter-surface-background`, `--wm-audio-meter-surface-border`,
 `--wm-audio-meter-surface-padding` and `--wm-audio-meter-surface-radius`, then
 the corresponding `--wm-meter-surface-*` and shared `--wm-component-*`
-fallbacks. The neutral [meter presenter](/uikit/mixing-capture/meter/) uses
-public `--wm-meter-*` colors and dimensions. Legacy `--wameter-bg`,
-`--wameter-track`, `--wameter-fill`, `--wameter-peak` and `--wameter-height`
-aliases remain effective. Its root exposes `part="wrap"`; the presenter's
-other documented parts remain available inside the shadow root. Default fill
-and peak colors are achromatic. Explicit `--wm-meter-*` or legacy color values
-remain authoritative; the peak keeps its `--wm-danger` fallback before `#444`.
-The compact monitor adds no title, transport status row or interactive controls.
+fallbacks. Its height is `--wm-audio-meter-height`, then `--wm-meter-height`,
+then the legacy `--wameter-height`, then the `height` attribute, then the
+adaptive width-derived height capped by the `size` preset's `--wm-surface-sm`,
+`--wm-surface-md` or `--wm-surface-lg` tier; `--wm-meter-min-height`
+(default 3rem) bounds it from below. See [Sizing](#sizing).
+
+The painters read their colours from tokens through computed style, so a
+token works wherever it is set, including `light-dark()` values:
+
+| Painted role | Tokens, first match wins | Default |
+| --- | --- | --- |
+| Surface, low end of the intensity ramp | the frame background above, then `--wm-meter-background`, `--wameter-bg`, `--wm-surface` | `#fff`; a transparent surface uses white or near-black, whichever contrasts with the ink |
+| Ink, high end of the ramp | `--wameter-fill`, `--wm-meter-fill`, `--wm-accent`, `--wm-foreground` | `#111` |
+| Scale lines, frames, off lamps | `--wameter-track`, `--wm-meter-track`, `--wm-surface-muted` | `#e4e4e4` |
+| Labels and readouts | `--wm-meter-muted`, `--wm-foreground-muted` | `#777` |
+| Over-zero zone, clip lamp, anti-phase bar (`color`) | `--wameter-peak`, `--wm-meter-peak`, `--wm-danger` | `#e0445b` |
+| Peak lamp (`color`) | `--wm-meter-warning`, `--wm-warning` | `#dea028` |
+| Label font | `--wm-font-mono` | `ui-monospace, monospace` |
 
 ```css
 audio-meter {
-  --wm-meter-fill: #999;
-  --wm-meter-peak: #444;
-  --wm-meter-height: 3rem;
+  --wm-meter-fill: #258a80;
+  --wm-meter-peak: #cb6541;
+  --wm-meter-height: 10rem; /* fixed; or leave it adaptive and set size="lg" */
 }
 ```
 
