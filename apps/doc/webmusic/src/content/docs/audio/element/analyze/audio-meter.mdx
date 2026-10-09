@@ -108,9 +108,11 @@ The `player` selector must match one element in the meter's Document or
 ShadowRoot. The meter borrows the player's current analyser, follows late
 upgrade and source replacement, and never owns its transport. `.player` can
 instead borrow a nonvisual player directly and takes precedence over the
-selector. A missing or ambiguous selector leaves the meter empty with a
-visible "No audio source" status; invalid selector syntax emits
-`webaudio:error`.
+selector. A missing or ambiguous selector shows the shared outlined-square waiting animation; invalid
+selector syntax emits `webaudio:error`. Loading on a linked `audio-player` shows the
+shared four-square indicator and player load failures remain visible. A connected
+silent analyser is ready and continues its normal display. Descriptions remain
+available to screen readers, and both animations honor reduced-motion preferences.
 
 For another live graph, assign `.analyser` to borrow an `AnalyserNode`, or
 assign `.context` to create an owned transparent input -> analyser -> output
@@ -199,6 +201,11 @@ sample-accurate edge.
 | `.width`, `.height` | properties | Reflect the `width` and `height` attributes as CSS lengths; assigning `undefined` removes the attribute. |
 | `.snapshot` | read-only property | The latest painted reduction, an `AudioMeterDisplaySnapshot` discriminated by `type`; `undefined` without a source. Its typed arrays are valid until the next frame. |
 | `webaudio:error` | event | The thrown error value is passed directly as `detail` for tuning, read, stereo-branch or cleanup failures; bubbles and is composed. |
+
+`AudioMeterPlayer` exposes an optional `analyser`, optional `loading` and `loadError`
+readiness, and optional `on('sourcechange' | 'load', listener)` subscriptions.
+Element selector bindings also observe `webaudio:loadstatechange`. Readiness never
+creates a graph or requests playback.
 
 Removing a tuning attribute restores its default. Invalid live tuning reports
 an error and keeps the previous working graph and settings. The controller's

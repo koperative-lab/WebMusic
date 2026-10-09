@@ -225,10 +225,10 @@ export class RackControlElement extends WebMusicElement {
         if (declaration) declarations.push({part, declaration});
       } catch (error) { this.reportError(error); }
     }
-    if (declarations.length === 0 && this.declared.size === 0) return;
+    if (declarations.length === 0 && this.declared.size === 0) { this.notifyMembers?.(); return; }
 
     const rack = this.ensureRack();
-    if (!rack) return;
+    if (!rack) { this.notifyMembers?.(); return; }
 
     // A part that no longer resolves a declaration (or left the desk) no
     // longer owns a member. Remove these first so their ids are available to
@@ -296,6 +296,7 @@ export class RackControlElement extends WebMusicElement {
         this.declared.set(part, declaration);
       } catch (error) { this.reportError(error); }
     }
+    this.notifyMembers?.();
   }
 
   /**
@@ -330,7 +331,12 @@ export class RackControlElement extends WebMusicElement {
       snapshot: () => {
         const rack = this.rack;
         const members = this.inWrittenOrder(rack?.list() ?? []);
+        const partStates = Array.from(this.children).filter(isRackPart).map((part) => part.rackPartStatus?.());
+        const status = partStates.find((state) => state?.kind === 'error')
+          ?? partStates.find((state) => state?.kind === 'loading')
+          ?? (members.length === 0 ? {kind: 'waiting' as const, message: 'Waiting for rack parts…'} : undefined);
         return {
+          status,
           master: rack?.masterVolume ?? 1,
           channels: members.map((member) => ({
             id: member.id,

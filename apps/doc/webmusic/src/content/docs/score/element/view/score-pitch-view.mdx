@@ -11,6 +11,13 @@ import PitchViewPlayground from '../../../../../components/elements/PitchViewPla
 
 <PitchViewPlayground />
 
+Without a resolved `player` or `source`, the view shows the shared outlined-square waiting
+animation. A native source that is loading shows the four-square loading animation;
+source errors remain visible. A ready source with no held notes keeps its normal pitch
+surface and meaningful empty reading. These states borrow the existing source subscription
+and never create another player or clock. Descriptions remain available to assistive
+technology; reduced-motion preferences stop the animation.
+
 ## Import
 
 ```html
@@ -141,6 +148,8 @@ range does not fit. Wider fretboards expand fret spacing without enlarging
 the dots. Staff lines fill the container while noteheads retain their staff-space size. An
 overflowing surface is one keyboard focus stop for native scrolling; the musical input is unchanged.
 
+
+The passive status exposes `pitch-status`, `pitch-status-indicator` and `pitch-status-message` parts and the shared `--wm-status-*` tokens.
 
 The light-DOM component uses the public [pitch presenter tokens](/uikit/views-analysis/pitch/). Its rendered nodes expose `root` plus `board` for keyboard, or `root` plus `svg` for staff/fretboard. The presenter owns resizing and note graphics; the application owns host layout and spacing. There is no internal settings bar or additional sibling view. Motion follows the surrounding `data-motion` setting and reduced-motion preference.
 

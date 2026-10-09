@@ -38,6 +38,7 @@ import {
 import {applyAudioPresenterSurface, prepareAudioViewHost} from './internal/surface';
 import {mountCanvasStage, type CanvasStageHandle} from '@webmusic/ui/stage';
 import type {StatusState} from '@webmusic/ui/status';
+import {observeElementTarget} from '@webmusic/kernel/element';
 
 /** Which drawing the live columns get. */
 export type LiveViewType = LiveProjectionType;
@@ -46,6 +47,8 @@ const TYPES: ReadonlySet<string> = new Set(['waveform', 'spectrogram'] satisfies
 
 /** Anything that can hand over a live analyser. */
 interface AnalyserSource extends Element {
+  loading?: boolean;
+  loadError?: Error;
   analyser?: AnalyserNode;
   inputAnalyser?: AnalyserNode;
   recorder?: {inputAnalyser?: AnalyserNode};
@@ -74,6 +77,11 @@ export class AudioLiveViewElement extends HTMLElementBase {
   private boundAnalyser?: AnalyserNode;
   private readonly controller: LiveViewController = createLiveViewController();
   private presenter?: CanvasStageHandle;
+  private sourceTarget?: AnalyserSource;
+  private sourceLoading = false;
+  private sourceError?: Error;
+  private stopSourceObservation?: () => void;
+  private detachSource?: () => void;
 
   connectedCallback(): void {
     upgradeProperties(this, ['analyser', 'source']);
@@ -84,6 +92,12 @@ export class AudioLiveViewElement extends HTMLElementBase {
   }
 
   disconnectedCallback(): void {
+    this.stopSourceObservation?.();
+    this.stopSourceObservation = undefined;
+    this.detachSource?.();
+    this.detachSource = undefined;
+    this.sourceTarget = undefined;
+    this.boundAnalyser = undefined;
     this.presenter?.destroy();
     this.presenter = undefined;
     this.controller.clear();
@@ -125,8 +139,7 @@ export class AudioLiveViewElement extends HTMLElementBase {
   /** Borrow an analyser directly (overrides `source`). Never disposed here. */
   set analyser(analyser: AnalyserNode | undefined) {
     this.explicitAnalyser = analyser;
-    this.controller.setAnalyser(this.analyser);
-    this.presenter?.update();
+    this.refreshSource();
   }
 
   get analyser(): AnalyserNode | undefined {
@@ -141,19 +154,47 @@ export class AudioLiveViewElement extends HTMLElementBase {
   // --- wiring ---
 
   private resolveSource(): void {
-    this.boundAnalyser = undefined;
+    this.stopSourceObservation?.();
+    this.stopSourceObservation = undefined;
+    this.detachSource?.();
+    this.detachSource = undefined;
+    this.sourceTarget = undefined;
+    this.sourceError = undefined;
     const selector = this.getAttribute('source');
-    if (selector) {
-      const target = (this.getRootNode() as ParentNode).querySelector(selector) as AnalyserSource | null;
+    if (!selector) { this.refreshSource(); return; }
+    this.stopSourceObservation = observeElementTarget(this, selector, (element, state) => {
+      this.detachSource?.();
+      this.detachSource = undefined;
+      this.sourceTarget = element as AnalyserSource | undefined;
+      this.sourceError = state === 'invalid' ? new Error('Invalid source selector')
+        : state === 'ambiguous' ? new Error('Source selector matches multiple elements') : undefined;
+      const target = this.sourceTarget;
       if (target) {
-        // Several shapes in this family expose a tap: the meter and player publish
-        // `.analyser`, the recorder publishes `.inputAnalyser` (and `.recorder`
-        // for the element wrapper). Try each rather than demanding one spelling.
-        this.boundAnalyser =
-          target.analyser ??
-          target.inputAnalyser ??
-          target.recorder?.inputAnalyser ??
-          target.player?.analyser;
+        const refresh = (event: Event) => { if (event.target === target) this.refreshSource(); };
+        const events = ['webaudio:loadstatechange', 'webaudio:sourcechange', 'webaudio:playerchange',
+          'webaudio:loaded', 'webaudio:statechange', 'webaudio:recordingstart', 'webaudio:recorded'];
+        for (const name of events) target.addEventListener(name, refresh);
+        this.detachSource = () => { for (const name of events) target.removeEventListener(name, refresh); };
+      }
+      this.refreshSource();
+    });
+  }
+
+  private refreshSource(): void {
+    this.boundAnalyser = undefined;
+    this.sourceLoading = false;
+    const target = this.sourceTarget;
+    if (target && !this.explicitAnalyser) {
+      try {
+        this.sourceLoading = target.loading === true;
+        this.sourceError = target.loadError;
+        if (!this.sourceLoading && !this.sourceError) {
+          this.boundAnalyser = target.analyser ?? target.inputAnalyser ??
+            target.recorder?.inputAnalyser ?? target.player?.analyser;
+        }
+      } catch (error) {
+        this.sourceError = error instanceof Error ? error : new Error(String(error));
+        this.dispatchError(this.sourceError);
       }
     }
     this.controller.setAnalyser(this.analyser);
@@ -198,12 +239,14 @@ export class AudioLiveViewElement extends HTMLElementBase {
   }
 
   private status(): StatusState {
+    if (!this.explicitAnalyser && this.sourceLoading) return {kind: 'loading', message: 'Loading audio source'};
+    if (!this.explicitAnalyser && this.sourceError) return {kind: 'error', message: this.sourceError.message};
     if (!this.analyser) {
-      return {kind: 'empty', message: 'No live source — set source or .analyser'};
+      return {kind: 'waiting', message: 'Waiting for a live audio source'};
     }
     return this.controller.buffer?.length
       ? {kind: 'ready'}
-      : {kind: 'loading', message: 'Waiting for signal…'};
+      : {kind: 'waiting', message: 'Waiting for a live audio frame'};
   }
 
   private dispatchError(error: unknown): void {

@@ -1,3 +1,4 @@
+import type {StatusKind} from '@webmusic/ui/status';
 import {
   mountMixer,
   type MixerBinding,
@@ -71,6 +72,7 @@ function reportOption(host: HTMLElement, value: unknown): ((error: unknown) => v
 }
 
 const MIXER_CHANNELS: Readonly<Record<string, readonly MixerChannel[]>> = {
+  empty: [],
   studio: [
     {id: 'piano', label: 'Piano', value: 0.74, muted: false, solo: false},
     {id: 'bass', label: 'Bass', value: 0.62, muted: false, solo: false},
@@ -101,6 +103,7 @@ function mixerOptions(
   if (values.classNames === 'demo') {
     options.classNames = {
       root: 'demo-mixer',
+      status: 'demo-status',
       transport: 'demo-transport',
       board: 'demo-board',
       channels: 'demo-channels',
@@ -121,6 +124,7 @@ function mixerOptions(
   if (values.parts === 'demo') {
     options.parts = {
       root: 'demo-root',
+      status: 'demo-status',
       transport: 'demo-transport',
       board: 'demo-board',
       channels: 'demo-channels',
@@ -144,7 +148,7 @@ function mixerOptions(
 
 function mountMixerDemo(host: HTMLElement): UiPresenterDemoHandle {
   const notifier = createNotifier();
-  const initialControlState = {master: 0.82, channels: 'studio', disabled: false};
+  const initialControlState = {master: 0.82, channels: 'studio', disabled: false, status: 'ready'};
   let controlState: Record<string, unknown> = {...initialControlState};
   let state: MixerState = {
     master: initialControlState.master,
@@ -231,6 +235,10 @@ function mountMixerDemo(host: HTMLElement): UiPresenterDemoHandle {
         const preset = typeof value === 'string' ? value : 'studio';
         controlState.channels = preset;
         state = {...state, channels: mixerChannels(preset)};
+      } else if (name === 'status') {
+        const kind = value === 'loading' || value === 'waiting' || value === 'error' ? value : 'ready';
+        controlState.status = kind;
+        state = {...state, status: {kind, ...(kind === 'error' ? {message: 'Demo mixer unavailable.'} : {})}};
       } else if (name === 'disabled') {
         controlState.disabled = value;
         const next = {...state};
@@ -288,6 +296,7 @@ function meterOptions(
   if (values.classNames === 'demo') {
     options.classNames = {
       root: 'demo-meter',
+      status: 'demo-status',
       track: 'demo-track',
       fill: 'demo-fill',
       peak: 'demo-peak',
@@ -298,6 +307,7 @@ function meterOptions(
   if (values.parts === 'demo') {
     options.parts = {
       root: 'demo-root',
+      status: 'demo-status',
       track: 'demo-track',
       fill: 'demo-fill',
       peak: 'demo-peak',
@@ -316,9 +326,11 @@ function mountMeterDemo(host: HTMLElement): UiPresenterDemoHandle {
   let optionValues: Record<string, unknown> = {};
   let presenter: MeterHandle | undefined;
   let phase = 0;
+  let status: StatusKind = 'ready';
   let destroyed = false;
 
   const binding: MeterBinding = {
+    readStatus: () => ({kind: status, ...(status === 'error' ? {message: 'Demo meter unavailable.'} : {})}),
     readLevel() {
       phase += 0.025;
       const movement = Math.sin(phase) * 0.055;
@@ -347,7 +359,14 @@ function mountMeterDemo(host: HTMLElement): UiPresenterDemoHandle {
 
   return {
     setState(name, value) {
-      if (destroyed || !['level', 'peak', 'peakHold'].includes(name)) return;
+      if (destroyed) return;
+      if (name === 'status') {
+        status = value === 'loading' || value === 'waiting' || value === 'error' ? value : 'ready';
+        presenter?.redraw();
+        notifier.notify();
+        return;
+      }
+      if (!['level', 'peak', 'peakHold'].includes(name)) return;
       const next = {...state};
       if (name === 'level') next.level = clamp(value);
       else if (name === 'peak') {
@@ -371,11 +390,12 @@ function mountMeterDemo(host: HTMLElement): UiPresenterDemoHandle {
       state = {...initialState};
       optionValues = {};
       phase = 0;
+      status = 'ready';
       delete host.dataset.presenterDemoError;
       remount();
       notifier.notify();
     },
-    snapshot: () => ({...state}),
+    snapshot: () => ({...state, status}),
     subscribe: notifier.subscribe,
     destroy() {
       if (destroyed) return;
@@ -425,6 +445,7 @@ function mountRecorderDemo(host: HTMLElement): UiPresenterDemoHandle {
   let captureTimer: number | undefined;
   let tick = 0;
   let destroyed = false;
+  let operationRevision = 0;
 
   const publish = (): void => notifier.notify();
   const stopCaptureTimer = (): void => {
@@ -458,11 +479,13 @@ function mountRecorderDemo(host: HTMLElement): UiPresenterDemoHandle {
   const binding: RecorderBinding = {
     snapshot: () => state,
     async toggleRecording() {
+      const revision = ++operationRevision;
+      delete state.statusKind;
       state = {...state, busy: true, status: state.recording ? 'Finalizing take…' : 'Starting recorder…'};
       syncCaptureTimer();
       publish();
       await settle();
-      if (destroyed) return;
+      if (destroyed || revision !== operationRevision) return;
       if (state.recording) {
         const takeCount = (state.takeCount ?? 0) + 1;
         state = {
@@ -491,11 +514,13 @@ function mountRecorderDemo(host: HTMLElement): UiPresenterDemoHandle {
       publish();
     },
     async togglePlayback() {
+      const revision = ++operationRevision;
+      delete state.statusKind;
       state = {...state, busy: true, status: 'Preparing take…'};
       syncCaptureTimer();
       publish();
       await settle();
-      if (destroyed) return;
+      if (destroyed || revision !== operationRevision) return;
       const playing = !state.playing;
       state = {
         ...state,
@@ -509,11 +534,13 @@ function mountRecorderDemo(host: HTMLElement): UiPresenterDemoHandle {
       publish();
     },
     async export(format) {
+      const revision = ++operationRevision;
+      delete state.statusKind;
       state = {...state, busy: true, status: `Preparing ${format.toUpperCase()}…`};
       syncCaptureTimer();
       publish();
       await settle();
-      if (destroyed) return;
+      if (destroyed || revision !== operationRevision) return;
       state = {
         ...state,
         busy: false,
@@ -556,6 +583,9 @@ function mountRecorderDemo(host: HTMLElement): UiPresenterDemoHandle {
           delete next.canPlay;
           delete next.canExport;
         }
+      } else if (name === 'statusKind') {
+        if (value === 'loading' || value === 'waiting' || value === 'error') next.statusKind = value;
+        else delete next.statusKind;
       } else if (name === 'status') {
         if (value === undefined) delete next.status;
         else next.status = String(value);
@@ -572,6 +602,7 @@ function mountRecorderDemo(host: HTMLElement): UiPresenterDemoHandle {
     },
     reset() {
       if (destroyed) return;
+      operationRevision += 1;
       stopCaptureTimer();
       tick = 0;
       state = {...INITIAL_RECORDER_STATE};

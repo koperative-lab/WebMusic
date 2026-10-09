@@ -275,7 +275,7 @@ different identity from native playback suppresses incompatible highlighting and
 map navigation; use the same Score instance to share data intentionally. A custom
 target replacing its `.playback` property dispatches `webmusic:sourcechange`.
 
-Missing source data displays a waiting status. The three note views show an empty status for a score without notes, and load or drawing failures show an accessible error message. Replacing the source or drawing options retries the applicable work. Disconnect also releases the waterfall resize observer.
+Missing source data displays a quiet square waiting animation. Loading a URL or borrowing a native player whose source is loading displays the shared square loading animation, including while a replacement source is pending. Native source failures remain visible; independent explicit view data takes precedence. Both retain a screen-reader status message and respect reduced-motion preferences. The three note views show an empty status for a score without notes, and load or drawing failures show an accessible error message. Replacing the source or drawing options retries the applicable work. Disconnect also releases the waterfall resize observer.
 
 <details class="component-section">
 <summary>API</summary>
@@ -341,7 +341,7 @@ The component fits its containing block. Size the host with `width` / `height` o
 
 Idle notes inherit `--wm-foreground` through `--wm-score-view-note`, with neutral `#333` / `#ddd` defaults for light / dark schemes. Active notes use `--wm-score-view-active-note`, then the shared `--wm-accent`, then the existing red default `rgb(240, 84, 119)`. Explicit `note-color` / `active-note-color` attributes or `.options.noteRGB` / `.options.activeNoteRGB` override those defaults; `.options.noteColor` / `.options.activeNoteColor` accept full CSS colors, including variables. The [imperative renderers](/score/api/view/) retain their separate neutral RGB defaults.
 
-Map uses [timeline](/uikit/transport-time/timeline/) tokens such as `--wm-timeline-lane-height`, `--wm-timeline-background`, `--wm-accent` and `--wm-playhead`. [Status](/uikit/layout-feedback/status/) owns the waiting, empty and error appearance. A separately composed PitchView uses its own [pitch tokens](/score/element/view/score-pitch-view/).
+Map uses [timeline](/uikit/transport-time/timeline/) tokens such as `--wm-timeline-lane-height`, `--wm-timeline-background`, `--wm-accent` and `--wm-playhead`. [Status](/uikit/layout-feedback/status/) owns the loading, waiting, empty and error appearance. A separately composed PitchView uses its own [pitch tokens](/score/element/view/score-pitch-view/).
 
 The stage/timeline frame accepts `--wm-component-background`, `--wm-component-border` (a complete border shorthand) and `--wm-component-radius`; the presenter's `--wm-stage-surface-*` or `--wm-timeline-surface-*` tokens take precedence. Set `--wm-surface: transparent` as well when clearing nested drawing surfaces. Staff, piano-roll and thumbnail SVGs have transparent drawing backgrounds.
 

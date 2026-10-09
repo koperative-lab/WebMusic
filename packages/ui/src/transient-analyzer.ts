@@ -1,3 +1,4 @@
+import {mountStatus, statusStyle, type StatusState} from './status';
 import {claimHost} from './internal/lifecycle';
 import {installStyle} from './internal/style';
 import {analysisControlStyle, createAnalysisFader, setAnalysisStatus} from './internal/analysis-controls';
@@ -16,6 +17,10 @@ export interface TransientAnalyzerState {
   hitCount: number;
   lastIntervalMs?: number;
   status: string;
+  /** Waiting for a source or playback; replaces visible status prose with the shared indicator. */
+  waiting?: boolean;
+  /** Active source work; takes precedence over passive waiting. */
+  loading?: boolean;
 }
 
 export interface TransientAnalyzerActions {
@@ -33,7 +38,7 @@ export interface TransientAnalyzerHandle {
 const COLUMNS = 64;
 const mounted = new WeakMap<HTMLElement, TransientAnalyzerHandle>();
 
-const transientAnalyzerStyle = `
+const transientAnalyzerStyle = `${statusStyle}
 ${analysisControlStyle}
 .wui-transient-analyzer { box-sizing: border-box; display: grid; gap: .75rem; width: 100%; min-width: 0;
   color: var(--wm-transient-analyzer-foreground, var(--wm-foreground, #222));
@@ -78,10 +83,18 @@ export function mountTransientAnalyzer(host: HTMLElement, actions: TransientAnal
   root.setAttribute('part', 'root surface');
   root.setAttribute('aria-label', 'Transient analyzer');
 
-  const status = document.createElement('span');
+  const status = document.createElement('div');
   status.className = 'wui-transient-analyzer__status';
-  status.setAttribute('role', 'status');
   status.hidden = true;
+  const statusMessage = document.createElement('span');
+  statusMessage.setAttribute('role', 'status');
+  statusMessage.hidden = true;
+  const waitingHost = document.createElement('div');
+  let feedback: StatusState = {kind: 'ready'};
+  const waiting = mountStatus(waitingHost, {snapshot: () => feedback}, {
+    stylesheet: false, classNames: {root: 'wui-status--embedded'},
+  });
+  status.append(statusMessage, waitingHost);
 
   const values = document.createElement('dl');
   values.className = 'wui-transient-analyzer__values';
@@ -157,7 +170,11 @@ export function mountTransientAnalyzer(host: HTMLElement, actions: TransientAnal
     update(state) {
       if (destroyed) return;
       frozen = state.frozen;
-      setAnalysisStatus(status, state.status);
+      const pending = state.loading || state.waiting;
+      setAnalysisStatus(statusMessage, pending ? '' : state.status);
+      feedback = {kind: state.loading ? 'loading' : state.waiting ? 'waiting' : 'ready', message: pending ? state.status : ''};
+      waiting.update();
+      status.hidden = !pending && statusMessage.hidden;
       freeze.setAttribute('aria-pressed', String(frozen));
       sensitivity.paint(Math.round(state.sensitivity * 100));
       strength.firstChild!.textContent = state.sample ? percent(state.sample.strength) : '--';
@@ -181,6 +198,7 @@ export function mountTransientAnalyzer(host: HTMLElement, actions: TransientAnal
       freeze.removeEventListener('click', onFreeze);
       clear.removeEventListener('click', onClear);
       sensitivity.destroy();
+      waiting.destroy();
       root.remove();
       style?.remove();
       ownership.release();

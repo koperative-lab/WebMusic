@@ -37,7 +37,8 @@ animation frame, calls `redraw()`, and schedules the next frame until destroyed.
 `readLevel()`; spectrum mode calls `readSpectrum(barCount)` and reads one array-like value per
 created bar. Binding values are clamped to `0…1`, and missing spectrum entries become `0`.
 
-With `animate: false`, mount performs one synchronous redraw. Call `handle.redraw()` whenever new
+Mount resolves optional readiness immediately without sampling. Animated meters first sample
+on the first animation frame; `animate: false` instead performs one synchronous redraw. Call `handle.redraw()` whenever new
 data is available. Mode and bar count determine the DOM at mount time and require a remount to
 change; only the accessible label has an in-place `updateLabel()` method. The rest of the host and
 lifecycle behavior follows the
@@ -61,8 +62,10 @@ lifecycle behavior follows the
 
 | Member | Kind | Description |
 |---|---|---|
-| `readLevel()` | `() => MeterLevelState` | Required pull port read on every level-mode redraw. Throws are sent to `onError` and leave the last successful paint in place. |
+| `readLevel()` | `() => MeterLevelState` | Required pull port read on every level-mode redraw. Throws are sent to `onError` and show visible error feedback until a successful redraw. |
 | `readSpectrum(bars)` | `(number) => ArrayLike<number>` | Required pull port read on every spectrum redraw. Receives the normalized mount-time bar count. The largest painted bar drives the accessible value. |
+
+| `readStatus?()` | `() => StatusState` | Optional readiness from [Status](/uikit/layout-feedback/status/). Defaults to ready. Nonready states show feedback without sampling; a valid silent source remains a zero-valued meter. |
 
 **Options**
 
@@ -76,8 +79,8 @@ lifecycle behavior follows the
 | `color` | `string` | — | Writes inline `--wui-meter-fill`, ahead of stylesheet tokens. |
 | `peakColor` | `string` | — | Writes inline `--wui-meter-peak`. It has no visible effect in spectrum mode. |
 | `backgroundColor` | `string` | — | Writes inline `--wui-meter-background`. |
-| `classNames` | `MeterClassNames` | `{}` | Adds compatibility classes for `root`, `track`, `fill`, `peak`, `spectrum`, and `bar`. |
-| `parts` | `MeterParts` | `{}` | Adds part tokens for the same six node kinds. |
+| `classNames` | `MeterClassNames` | `{}` | Adds compatibility classes for `root`, `track`, `fill`, `peak`, `spectrum`, `bar`, and `status`. |
+| `parts` | `MeterParts` | `{}` | Adds part tokens for the same node kinds. |
 | `onError` | `(error: unknown) => void` | — | Receives binding-read and cleanup errors. |
 | `stylesheet` | `boolean` | `true` | Installs the presenter's stylesheet unless explicitly `false`, for a light-DOM host that cannot inject CSS into its page. |
 
@@ -90,7 +93,10 @@ lifecycle behavior follows the
 | `updateLabel(label?)` | `(string?) => void` | Updates `aria-label` in place; `undefined` restores the mode-specific default. |
 | `destroy()` | `() => void` | Idempotently cancels the outstanding frame and removes the root and installed style node. Cleanup errors are reported after all cleanup is attempted. |
 
-**Accessibility.** The root has `role="meter"`, the configured or mode-default name,
+**Accessibility.** Missing-source waiting and active loading use the shared square animations
+with visually hidden live descriptions and reduced-motion support. During nonready states,
+the root is a named group without stale meter values; failures remain visible.
+The ready root has `role="meter"`, the configured or mode-default name,
 `aria-valuemin="0"`, and `aria-valuemax="100"`. Each redraw sets integer `aria-valuenow`; level
 mode exposes `<n>% level` and spectrum mode exposes `<n>% spectrum peak` through
 `aria-valuetext`. The meter is read-only and has no keyboard interaction. In forced-colors mode,
@@ -142,6 +148,7 @@ your own CSS from the host.
 | Peak marker | `.wui-meter__peak` | Level mode | `peak` |
 | Spectrum bank | `.wui-meter__spectrum` | Spectrum mode | `spectrum` |
 | Spectrum bar | `.wui-meter__bar` | Once per bar in spectrum mode | `bar` |
+| Passive feedback host | `.wui-meter__status` | Visible while nonready | `status` |
 
 **Parts**
 
@@ -155,6 +162,7 @@ your own CSS from the host.
 | Peak marker | `peak` | Level mode | `peak` |
 | Spectrum bank | `spectrum` | Spectrum mode | `spectrum` |
 | Spectrum bar | `bar` | Once per bar in spectrum mode | `bar` |
+| Passive feedback host | `status` | Visible while nonready | `status` |
 
 </details>
 

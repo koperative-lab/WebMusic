@@ -178,13 +178,13 @@ describe('<audio-meter> shared UI composition', () => {
     expect(element.analyser).toBe(external);
   });
 
-  it('shows an empty status without a source and clears it once one arrives', () => {
+  it('shows waiting feedback without a source and clears it once one arrives', () => {
     stubFrames();
     const element = document.createElement('test-audio-meter') as AudioMeterElement;
     document.body.append(element);
     const status = element.shadowRoot?.querySelector<HTMLElement>('.wui-stage__status');
     expect(status?.hidden).toBe(false);
-    expect(status?.textContent).toContain('No audio source');
+    expect(status?.querySelector<HTMLElement>('.wui-status')?.dataset.kind).toBe('waiting');
     expect(element.snapshot).toBeUndefined();
 
     element.context = ownedContext().context;
@@ -775,5 +775,87 @@ describe('<audio-meter> borrowed player binding', () => {
     element.remove();
     expect(replacement.disconnect).toHaveBeenCalledOnce();
     expect(replacement.disconnect.mock.calls[0]).toHaveLength(1);
+  });
+});
+
+describe('<audio-meter> passive source feedback', () => {
+  it.each(['vu', 'loudness', 'waveform', 'oscilloscope', 'spectrum', 'spectrogram', 'stereometer'] as const)(
+    'keeps %s following owner loading, failure, ready silence and removal without borrowing ownership', async (type) => {
+      stubFrames();
+      const owner = Object.assign(document.createElement('div'), {
+        loading: false, loadError: undefined as Error | undefined,
+        analyser: undefined as AnalyserNode | undefined,
+      });
+      owner.id = 'meter-status-owner';
+      document.body.append(owner);
+      const element = document.createElement('test-audio-meter') as AudioMeterElement;
+      element.type = type;
+      element.setAttribute('player', '#meter-status-owner');
+      document.body.append(element);
+      const feedback = () => element.shadowRoot!.querySelector<HTMLElement>('.wui-status')!;
+      expect(feedback().dataset.kind).toBe('waiting');
+      owner.loading = true;
+      owner.dispatchEvent(new CustomEvent('webaudio:loadstatechange'));
+      expect(feedback().dataset.kind).toBe('loading');
+      owner.loading = false;
+      owner.loadError = new Error('Decode failed');
+      owner.dispatchEvent(new CustomEvent('webaudio:loadstatechange'));
+      expect(feedback().getAttribute('role')).toBe('alert');
+      expect(feedback().textContent).toBe('Decode failed');
+      const fixture = ownedContext();
+      owner.loadError = undefined;
+      owner.analyser = fixture.context.createAnalyser();
+      fixture.analysers[0]!.getByteFrequencyData.mockImplementation((buffer: Uint8Array) => buffer.fill(0));
+      fixture.analysers[0]!.getFloatFrequencyData.mockImplementation((buffer: Float32Array) => buffer.fill(-Infinity));
+      owner.dispatchEvent(new CustomEvent('webaudio:sourcechange'));
+      expect(feedback().hidden).toBe(true);
+      expect(element.snapshot?.type).toBe(type);
+      expect(element.snapshot?.silent).toBe(true);
+      const stage = element.shadowRoot!.querySelector('.wrap');
+      const analyser = element.analyser;
+      // Native player load state can change while the analyser identity stays
+      // the same. Redraw the existing stage without recreating the audio graph.
+      owner.loading = true;
+      owner.dispatchEvent(new CustomEvent('webaudio:loadstatechange'));
+      expect(feedback().dataset.kind).toBe('loading');
+      expect(element.shadowRoot!.querySelector('.wrap')).toBe(stage);
+      expect(element.analyser).toBe(analyser);
+      owner.loading = false;
+      owner.dispatchEvent(new CustomEvent('webaudio:loadstatechange'));
+      expect(feedback().hidden).toBe(true);
+      expect(element.shadowRoot!.querySelector('.wrap')).toBe(stage);
+      owner.remove();
+      await Promise.resolve();
+      expect(feedback().dataset.kind).toBe('waiting');
+      // Stereo displays remove their own fan-out edge; no borrowed analyser
+      // ever receives an unqualified disconnect that would cut the owner route.
+      expect(fixture.analysers[0]!.disconnect.mock.calls.every((call) => call.length === 1)).toBe(true);
+    },
+  );
+
+  it.each(['context', 'analyser'] as const)('keeps explicit %s ahead of native owner loading and errors', (source) => {
+    stubFrames();
+    const owner = Object.assign(document.createElement('div'), {
+      loading: true, loadError: new Error('Owner unavailable'),
+    });
+    owner.id = 'meter-status-owner';
+    document.body.append(owner);
+    const element = document.createElement('test-audio-meter') as AudioMeterElement;
+    element.setAttribute('player', '#meter-status-owner');
+    const fixture = ownedContext();
+    if (source === 'context') element.context = fixture.context;
+    else element.analyser = fixture.context.createAnalyser();
+    document.body.append(element);
+    const feedback = () => element.shadowRoot!.querySelector<HTMLElement>('.wui-status')!;
+    expect(feedback().hidden).toBe(true);
+    owner.dispatchEvent(new CustomEvent('webaudio:loadstatechange'));
+    expect(feedback().hidden).toBe(true);
+    if (source === 'context') element.context = undefined;
+    else element.analyser = undefined;
+    expect(feedback().dataset.kind).toBe('loading');
+    owner.loading = false;
+    owner.dispatchEvent(new CustomEvent('webaudio:loadstatechange'));
+    expect(feedback().getAttribute('role')).toBe('alert');
+    expect(feedback().textContent).toBe('Owner unavailable');
   });
 });

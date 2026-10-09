@@ -31,6 +31,30 @@ afterEach(() => {
 });
 
 describe('mountSpectrumAnalyzer', () => {
+  it('uses shared waiting feedback without replacing plot controls or hiding unavailable status', () => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(context as unknown as CanvasRenderingContext2D);
+    const host = document.createElement('div');
+    const current = state();
+    current.status = 'waiting';
+    const handle = mountSpectrumAnalyzer(host, {snapshot: () => current, setFrozen: vi.fn(), setPeakHold: vi.fn()});
+    const indicator = host.querySelector<HTMLElement>('.wui-status')!;
+    expect(indicator.dataset.kind).toBe('waiting');
+    expect(indicator.textContent).toBe('Waiting for playback');
+    const plot = host.querySelector('[part="plot"]');
+    current.status = 'loading';
+    handle.update();
+    expect(indicator.dataset.kind).toBe('loading');
+    expect(indicator.getAttribute('aria-busy')).toBe('true');
+    current.status = 'unavailable';
+    handle.update();
+    expect(indicator.hidden).toBe(true);
+    expect(indicator.hasAttribute('aria-busy')).toBe(false);
+    expect(host.querySelector('[part="status"]')?.textContent).toBe('Analyser unavailable');
+    expect(host.querySelector('[part="plot"]')).toBe(plot);
+    handle.destroy();
+    expect(host.children).toHaveLength(0);
+  });
+
   it('shows an accessible log-frequency probe with analyser-bin dB, and pointer/keyboard inspection', () => {
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(context as unknown as CanvasRenderingContext2D);
     const host = document.createElement('div');

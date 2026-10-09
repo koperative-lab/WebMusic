@@ -75,7 +75,7 @@ import {
   type StageHandle,
   type SurfaceSliderHandle,
 } from '@webmusic/ui/stage';
-import {mountStatus, type StatusHandle} from '@webmusic/ui/status';
+import {mountStatus, type StatusHandle, type StatusState} from '@webmusic/ui/status';
 
 /** The union of option bags `<audio-view>` accepts across its three types. */
 export type AudioViewOptions = WaveformRenderOptions & SpectrogramRenderOptions & MeterRenderOptions;
@@ -272,9 +272,10 @@ export class AudioViewElement extends WebMusicElement {
   private derivedPeaks?: AudioPeaks;
   private sourceToken = 0;
   private sourceAbort?: AbortController;
+  private sourceError?: Error;
   private peaksToken = 0;
   private peaksAbort?: AbortController;
-  private pendingLoads = 0;
+  private peaksError?: Error;
   private assignedRole?: string;
   private assignedAriaLabel?: string;
   private stage?: StageHandle;
@@ -366,8 +367,16 @@ export class AudioViewElement extends WebMusicElement {
   }
 
   set peaks(peaks: AudioPeaks | undefined) {
+    if (peaks && peaks === this.explicitPeaks) return;
+    if (peaks) {
+      this.cancelPeaksLoad();
+      this.sourcePeaks = undefined;
+    }
     this.explicitPeaks = peaks;
-    if (this.isConnected) this.refresh();
+    if (this.isConnected) {
+      if (!peaks && this.hasAttribute('peaks-src')) void this.loadPeaksSource();
+      else this.refresh();
+    }
   }
   get peaks(): AudioPeaks | undefined {
     return this.explicitPeaks ?? this.sourcePeaks;
@@ -782,6 +791,11 @@ export class AudioViewElement extends WebMusicElement {
     host.style.width = '100%';
     this.host = host;
 
+    const owner = this.boundPlayer as {loading?: boolean; loadError?: Error} | undefined;
+    if (!this.explicitClip && !this.sourceClip && !this.explicitPeaks && !this.sourcePeaks &&
+        !this.explicitSpectrogram && !this.explicitFrequencyData && (owner?.loading || owner?.loadError)) {
+      return this.renderEmpty(host);
+    }
     const options = this.renderOptions();
     this.renderedClip = this.resolveClip();
     this.renderedDuration = this.resolveDuration();
@@ -828,7 +842,14 @@ export class AudioViewElement extends WebMusicElement {
   private renderEmpty(host: HTMLElement): void {
     this.status = mountStatus(
       host,
-      {snapshot: () => ({kind: 'empty', message: EMPTY_STATE_MESSAGES[this.type]})},
+      {snapshot: (): StatusState => {
+        if (this.sourceAbort || this.peaksAbort) return {kind: 'loading', message: 'Loading audio visualization'};
+        const owner = this.boundPlayer as {loading?: boolean; loadError?: Error} | undefined;
+        if (owner?.loading) return {kind: 'loading', message: 'Loading audio source'};
+        const error = this.peaksError ?? this.sourceError ?? owner?.loadError;
+        return error ? {kind: 'error', message: error.message}
+          : {kind: 'waiting', message: EMPTY_STATE_MESSAGES[this.type]};
+      }},
       {classNames: {root: 'wui-status--embedded'}},
     );
     this.configureAccessibility();
@@ -933,9 +954,15 @@ export class AudioViewElement extends WebMusicElement {
           this.surfaceSlider?.update();
         }
       };
+      const onLoadStateChange = (): void => {
+        if (this.isConnected && !this.explicitClip && !this.sourceClip && !this.explicitPeaks &&
+            !this.sourcePeaks && !this.explicitSpectrogram && !this.explicitFrequencyData) this.refresh();
+      };
+      target.addEventListener('webaudio:loadstatechange', onLoadStateChange);
       target.addEventListener('webaudio:loaded', onLoaded);
       target.addEventListener('webaudio:sourcechange', onSourceChange);
       this.playerUnbind = () => {
+        target.removeEventListener('webaudio:loadstatechange', onLoadStateChange);
         target.removeEventListener('webaudio:loaded', onLoaded);
         target.removeEventListener('webaudio:sourcechange', onSourceChange);
       };
@@ -1412,27 +1439,31 @@ export class AudioViewElement extends WebMusicElement {
 
   // ---- Sources ----
 
-  /** aria-busy is shared by both loaders, so it is counted, not toggled. */
+  /** Only current loaders own busy state; superseded requests may settle later. */
   private beginLoad(): void {
-    this.pendingLoads++;
     this.setAttribute('aria-busy', 'true');
+    if (this.isConnected) this.refresh();
   }
 
   private endLoad(): void {
-    this.pendingLoads = Math.max(0, this.pendingLoads - 1);
-    if (this.pendingLoads === 0) this.removeAttribute('aria-busy');
+    if (!this.sourceAbort && !this.peaksAbort) this.removeAttribute('aria-busy');
+    this.status?.update();
   }
 
   private cancelClipLoad(): void {
     this.sourceToken++;
     this.sourceAbort?.abort();
     this.sourceAbort = undefined;
+    this.sourceError = undefined;
+    this.endLoad();
   }
 
   private cancelPeaksLoad(): void {
     this.peaksToken++;
     this.peaksAbort?.abort();
     this.peaksAbort = undefined;
+    this.peaksError = undefined;
+    this.endLoad();
   }
 
   private async loadSource(): Promise<void> {
@@ -1465,7 +1496,8 @@ export class AudioViewElement extends WebMusicElement {
       this.refresh();
     } catch (cause) {
       if (token !== this.sourceToken || !this.isConnected) return;
-      this.onViewError(cause);
+      this.sourceError = cause instanceof Error ? cause : new Error(String(cause));
+      this.onViewError(this.sourceError);
     } finally {
       if (token === this.sourceToken) this.sourceAbort = undefined;
       this.endLoad();
@@ -1501,7 +1533,8 @@ export class AudioViewElement extends WebMusicElement {
       this.refresh();
     } catch (cause) {
       if (token !== this.peaksToken || !this.isConnected) return;
-      this.onViewError(cause);
+      this.peaksError = cause instanceof Error ? cause : new Error(String(cause));
+      this.onViewError(this.peaksError);
     } finally {
       if (token === this.peaksToken) this.peaksAbort = undefined;
       this.endLoad();

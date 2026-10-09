@@ -38,8 +38,8 @@ The caller supplies `host`, `state`, a notification store and commands. The pres
 
 Frequency and Level occupy fixed readout slots, with `—` for a missing value.
 Freeze, Peak hold and Reset peaks keep stable button labels. Routine live,
-paused and frozen messages are hidden; waiting and unavailable feedback remains
-visible without repeating the tool title.
+paused and frozen messages are hidden. Loading and waiting use square indicators
+with accessible descriptions; unavailable feedback retains visible text.
 
 <details class="component-section">
 <summary>API</summary>
@@ -53,7 +53,7 @@ visible without repeating the tool title.
 | `frozen` | `boolean` | required | Freeze button state; the caller retains the selected frame. |
 | `peakHold` | `boolean` | required | Overlay maximum dB per bin while enabled. |
 | `minFrequency` / `maxFrequency` | `number` (Hz) | required | Visible log-frequency range, clamped to the frame's Nyquist frequency. |
-| `status` | `'waiting' \| 'live' \| 'paused' \| 'unavailable' \| 'frozen'` | required | Signal state; waiting/unavailable remain visible, while routine live/paused/frozen text is hidden. |
+| `status` | `'loading' \| 'waiting' \| 'live' \| 'paused' \| 'unavailable' \| 'frozen'` | required | Signal state. `loading` shows the busy four-cell animation; `waiting` shows the outlined square indicator with accessible status text; unavailable diagnostics remain visible, while routine live/paused/frozen text is hidden. |
 
 **Binding, options and handle**
 
@@ -74,12 +74,14 @@ visible without repeating the tool title.
 
 See the [shared presenter shape](/uikit/api/#the-shared-presenter-shape) for host ownership. The callback never receives decoded PCM or a player. Replacing or disposing a borrowed audio graph belongs to the caller.
 
-**Accessibility.** The plot is a focusable frequency slider with `aria-valuemin`, `aria-valuemax`, `aria-valuenow` in Hz and a frequency/dB `aria-valuetext`. Arrow keys move a semitone, Shift+Arrow moves an octave, and Home/End select the range limits. Pointer down or movement probes the plot. Freeze and Peak hold use native `aria-pressed` buttons; Reset peaks is a native button. The Frequency and Level readouts remain outside the canvas with `aria-live="off"`; their values do not trigger live announcements on every frame. Meaningful waiting/unavailable status remains visible.
+**Accessibility.** The plot is a focusable frequency slider with `aria-valuemin`, `aria-valuemax`, `aria-valuenow` in Hz and a frequency/dB `aria-valuetext`. Arrow keys move a semitone, Shift+Arrow moves an octave, and Home/End select the range limits. Pointer down or movement probes the plot. Freeze and Peak hold use native `aria-pressed` buttons; Reset peaks is a native button. The Frequency and Level readouts remain outside the canvas with `aria-live="off"`; their values do not trigger live announcements on every frame. Loading/waiting descriptions remain accessible; unavailable diagnostics remain visible.
 
 </details>
 
 <details class="component-section">
 <summary>Styling</summary>
+
+Loading and waiting feedback use the shared [Status animation and tokens](/uikit/layout-feedback/status/), including reduced-motion support. The exported stylesheet includes that feedback style.
 
 The root is `.wui-spectrum-analyzer`. Public parts are `root surface`, `toolbar`, `freeze`, `peak-hold`, `reset-peaks`, `readout`, `plot` and `status`. There is no `classNames` or `parts` option. `stylesheet:false` skips installing this mount's stylesheet; it does not erase caller CSS.
 

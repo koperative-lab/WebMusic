@@ -52,6 +52,7 @@ import {parseLoopAttr} from '../core/format';
 import {browserMediaAdapterFactory} from './internal/browser-media-adapter';
 import {getAudioContextConstructor} from '@webmusic/kernel/audio-context';
 import type {TransportClockReader} from '@webmusic/kernel/transport';
+import {mountStatus, type StatusHandle, type StatusState} from '@webmusic/ui/status';
 import {
   mountTransport,
   type TransportBinding,
@@ -122,6 +123,11 @@ export class AudioPlayerElement extends WebMusicElement {
   private sourceCommit?: {clip: AudioClip | undefined};
 
   private transportHandle?: TransportHandle;
+  private statusHandle?: StatusHandle;
+  private statusHost?: HTMLElement;
+  private _loadError?: Error;
+  private announcedLoading = false;
+  private announcedLoadError?: Error;
   private compatibilityStyle?: HTMLStyleElement;
   private readonly uiSubscribers = new Set<() => void>();
 
@@ -315,6 +321,8 @@ export class AudioPlayerElement extends WebMusicElement {
     } catch (err) {
       if (token !== this.loadToken) return;
       this.loadController = null;
+      this._loadError = err instanceof Error ? err : new Error(String(err));
+      this.updateLoadFeedback();
       this.onPlayerError(err);
     }
   }
@@ -336,6 +344,12 @@ export class AudioPlayerElement extends WebMusicElement {
   get scratching(): boolean {
     return this._player?.scratching ?? false;
   }
+
+  /** True while this Element is fetching or decoding its current source. */
+  get loading(): boolean { return this.loadController !== null; }
+
+  /** Current source-load failure, cleared by a new load or explicit source assignment. */
+  get loadError(): Error | undefined { return this._loadError; }
 
   get playing(): boolean {
     return this._player?.playing ?? false;
@@ -407,6 +421,10 @@ export class AudioPlayerElement extends WebMusicElement {
     this.cancelLoad();
     this.cancelScheduledRender();
     this.releasePlayer();
+    this.statusHandle?.destroy();
+    this.statusHandle = undefined;
+    this.statusHost?.remove();
+    this.statusHost = undefined;
     this.transportHandle?.destroy();
     this.transportHandle = undefined;
     this.closeOwnedContext();
@@ -441,6 +459,8 @@ export class AudioPlayerElement extends WebMusicElement {
     } catch (err) {
       if (token !== this.loadToken) return; // a stale failure is not ours to report
       this.loadController = null;
+      this._loadError = err instanceof Error ? err : new Error(String(err));
+      this.updateLoadFeedback();
       this.onPlayerError(err);
     }
   }
@@ -449,13 +469,18 @@ export class AudioPlayerElement extends WebMusicElement {
     this.loadController?.abort();
     const controller = new AbortController();
     this.loadController = controller;
-    return {token: ++this.loadToken, controller};
+    this._loadError = undefined;
+    const token = ++this.loadToken;
+    this.updateLoadFeedback();
+    return {token, controller};
   }
 
   private cancelLoad(): void {
     this.loadToken++;
     this.loadController?.abort();
     this.loadController = null;
+    this._loadError = undefined;
+    this.updateLoadFeedback();
   }
 
   private clearLoadedClip(): void {
@@ -770,14 +795,49 @@ export class AudioPlayerElement extends WebMusicElement {
   private render(): void {
     if (!this.root) return;
     if (!this.root.ownerDocument) return;
+    this.statusHandle?.destroy();
+    this.statusHost?.remove();
     this.transportHandle?.destroy();
     this.transportHandle = this.mountTransportUI(this.root);
+    this.statusHost = this.root.ownerDocument.createElement('div');
+    this.statusHost.className = 'audio-player-status-host';
+    this.transportHandle.element.append(this.statusHost);
+    this.statusHandle = mountStatus(this.statusHost, {snapshot: () => this.loadFeedback()}, {
+      classNames: {root: 'wui-status--embedded'},
+      parts: {root: 'status', message: 'status-message', indicator: 'status-indicator'},
+      onError: (error) => this.onPlayerError(error),
+    });
+    this.updateLoadFeedback();
     this.appendCompatibilityStyle();
     this.applyControls();
   }
 
   private paint(): void {
     this.transportHandle?.update();
+    this.updateLoadFeedback();
+  }
+
+  private loadFeedback(): StatusState {
+    if (this.loadController) return {kind: 'loading', message: 'Loading audio'};
+    if (this._loadError) return {kind: 'error', message: this._loadError.message};
+    return this.clip || this._player?.transport
+      ? {kind: 'ready'}
+      : {kind: 'waiting', message: 'Waiting for an audio source'};
+  }
+
+  private updateLoadFeedback(): void {
+    const loading = this.loading;
+    const error = this.loadError;
+    if (loading !== this.announcedLoading || error !== this.announcedLoadError) {
+      this.announcedLoading = loading;
+      this.announcedLoadError = error;
+      this.dispatch('loadstatechange', {loading, error});
+    }
+    if (!this.statusHost) return;
+    const state = this.loadFeedback();
+    this.statusHost.hidden = state.kind === 'ready';
+    this.statusHost.dataset.kind = state.kind;
+    this.statusHandle?.update();
   }
 
   /**
@@ -848,7 +908,9 @@ export class AudioPlayerElement extends WebMusicElement {
         '--cp-button-color:var(--wap-fg,var(--wm-transport-button-foreground,var(--wm-accent-foreground,#fff)));' +
         '--cp-fill:var(--wap-accent,var(--wm-transport-fill,var(--wm-accent,#999)));' +
         '--cp-track:var(--wap-track,var(--wm-transport-track,var(--wm-surface-muted,#f3f3f3)))}' +
-        ':host([data-controls="hidden"]) .wui-transport{display:none}';
+        ':host([data-controls="hidden"]) .wui-transport{display:none}' +
+        '.audio-player-status-host{flex:0 0 auto;inline-size:var(--wm-status-indicator-size,1.25rem);min-inline-size:0;max-inline-size:100%}' +
+        '.audio-player-status-host[data-kind="error"]{flex-basis:100%;inline-size:auto}';
     }
     this.root.append(this.compatibilityStyle);
   }

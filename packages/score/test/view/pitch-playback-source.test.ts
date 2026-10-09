@@ -77,6 +77,28 @@ describe('pitch-view shared native follower', () => {
     expect(owner.playback.seekNominal).not.toHaveBeenCalled();
   });
 
+  it('uses waiting and loading only while the borrowed source is unavailable, preserving ready silence', async () => {
+    const view = mount('staff');
+    const status = () => view.querySelector<HTMLElement>('[part~="pitch-status"]')!;
+    expect(status().dataset.kind).toBe('waiting');
+    const owner = player(snapshot({readiness: 'loading'}));
+    await flush();
+    expect(status().dataset.kind).toBe('loading');
+    expect(status().getAttribute('aria-busy')).toBe('true');
+    owner.emit(snapshot({revision: 1, readiness: 'ready', activeNotes: []}));
+    expect(status().hidden).toBe(true);
+    expect(view.querySelector<HTMLElement>('[role="img"]')!.hidden).toBe(false);
+    expect(view.textContent).toContain('No sounding notes');
+    owner.emit(snapshot({revision: 2, readiness: 'error', error: new Error('Source failed')}));
+    expect(status().dataset.kind).toBe('error');
+    expect(status().textContent).toContain('Source failed');
+    owner.element.remove();
+    await flush();
+    expect(status().dataset.kind).toBe('waiting');
+    view.remove();
+    expect(view.querySelector('[part~="pitch-status"]')).toBeNull();
+  });
+
   it.each(['keyboard', 'staff', 'fretboard'] as const)('%s reuses occurrence-aware snapshots and clears reused IDs at stop', (type) => {
     const owner = player(snapshot({activeNotes: [note('left'), note('right')]}));
     const view = mount(type);

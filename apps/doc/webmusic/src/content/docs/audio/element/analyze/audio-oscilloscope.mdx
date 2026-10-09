@@ -57,8 +57,14 @@ and presenter, never the borrowed player or graph.
 
 The monochrome surface keeps Time and Amplitude in fixed readout slots and
 omits a repeated title. Routine Live, Paused and Frozen messages are hidden;
-waiting, unavailable, No signal and No matching edge feedback remains visible.
+unavailable, No signal and No matching edge feedback remains visible.
 Freeze keeps its label and uses its pressed state to indicate a held frame.
+
+While waiting for a source or playback, the shared outlined-square animation keeps
+its description accessible to assistive technology. Pending fetch/decode on a linked
+`audio-player` shows the four-square loading animation; load failures remain visible.
+Controls and retained readings stay available, and both animations respect reduced
+motion. An explicit `.analyser` takes precedence over the player's readiness state.
 
 <details class="component-section">
 <summary>API</summary>

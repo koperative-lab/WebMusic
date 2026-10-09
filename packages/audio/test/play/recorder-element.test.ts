@@ -422,3 +422,27 @@ describe('recorder companion binding', () => {
     element.remove(); owner.dispose();
   });
 });
+
+describe('<audio-recorder> passive source feedback', () => {
+  it('animates pending microphone startup and retains independent capture with a missing owner', async () => {
+    let grant!: (stream: MediaStream) => void;
+    getUserMedia.mockImplementationOnce(() => new Promise((resolve) => { grant = resolve; }));
+    const element = mount({player: '#missing-recorder-owner'});
+    const feedback = () => element.shadowRoot!.querySelector<HTMLElement>('.wui-status')!;
+    const record = element.shadowRoot!.querySelector<HTMLButtonElement>('[part="record"]')!;
+    expect(feedback().dataset.kind).toBe('waiting');
+    expect(record.disabled).toBe(false);
+    const pending = element.start();
+    expect(feedback().dataset.kind).toBe('loading');
+    expect(record.disabled).toBe(true);
+    grant({getTracks: () => [{stop: vi.fn()}]} as unknown as MediaStream);
+    await pending;
+    expect(element.recording).toBe(true);
+    expect(feedback().hidden).toBe(true);
+    expect(record.disabled).toBe(false);
+    feed(64);
+    await element.stop();
+    expect(feedback().hidden).toBe(true);
+    expect(element.shadowRoot!.querySelector('[part="status"]')?.textContent).toContain('take 1');
+  });
+});

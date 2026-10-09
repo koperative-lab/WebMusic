@@ -1964,6 +1964,43 @@ trigger alignment, correlation and spectrum projection; verify the demo's
 type/theme controls, Copy/Reset and narrow layouts in a browser. Static tests
 do not establish calibrated loudness, true peak or acoustic accuracy.
 
+## DEC-052 — Loading and source waiting use shared square animations
+
+**Date / status:** 2026-10-08; accepted at the maintainer's request.
+
+**Problem:** source placeholders such as “No live source” and “Waiting for a score”
+interrupt the otherwise minimal component presentation, and some asynchronous views
+remain blank until their source or renderer finishes loading.
+
+**Decision:** UI Status owns two neutral, square animations: sequential four-cell loading
+for pending work, and a slower outlined-square pulse for source/input waiting. Score
+and Audio Play, View and Analyze compose these states without another player or clock.
+Status adds `waiting`; Workbench adds `loading` and `waiting` phases. Keep descriptions
+in a polite live region, mark only loading busy, and retain visible error and meaningful
+empty-result text. Reduced-motion and stepped/no-motion surfaces use static indicators.
+
+**Alternatives considered:** independent per-component animations or treating every empty
+surface as loading. Both would obscure the distinction between pending work and missing input.
+
+**Consequences:** animations use existing foreground/surface tokens, sharp square geometry
+and CSS only. Pending feedback preserves mounted content and state, and stops being visible
+when data arrives. Existing `empty`, `error` and `ready` meanings remain intact.
+Queue rows, mixer desks, recorder operations, synth configuration sections and pitch
+followers use the same presenter. A valid silent or paused source is not pending work;
+an immediately usable note input has no artificial loading phase. The nonvisual rack-part
+declaration reports readiness to its visible desk. Native Audio Player exposes current
+`loading` and `loadError` plus `webaudio:loadstatechange` so companions can share its
+readiness without initiating another load.
+
+**Owner:** [Design principles](DESIGN-PRINCIPLES.md),
+[Status presenter](../apps/doc/webmusic/src/content/docs/uikit/layout-feedback/status.mdx),
+[Workbench](../apps/doc/webmusic/src/content/docs/uikit/layout-feedback/workbench.mdx),
+and the affected Element references.
+
+**Verification implications:** loading/waiting/ready/error transitions, source replacement,
+cancellation, teardown, unchanged-update stability, light/dark themes, narrow layouts and
+reduced motion. Browser and screen-reader acceptance remain distinct from DOM regressions.
+
 ## Recording the next decision
 
 Add an identifier, date, status, problem, chosen contract, considered alternatives, consequences, owning document, and verification implications. A proposed choice does not change a public API. If a choice supersedes this register, retain its old identifier and point to the replacement; do not rewrite historical evidence as though the new choice always existed.

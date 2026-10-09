@@ -98,6 +98,11 @@ The score lane is a named slider tab stop. Its continuous position text uses qua
 <details class="component-section">
 <summary>Styling</summary>
 
+Pending URL loads or a native player's loading state show the shared four-square
+animation. Missing input shows the outlined-square waiting animation. Descriptions
+remain accessible to screen readers; load failures and meaningful empty results
+retain visible text. Both indicators respect reduced-motion preferences.
+
 The component renders in light DOM with a full-width, shrinkable block host. Its one outer surface owns background, border, radius and equal padding; the inner lane/nameplate stays unframed. Set inherited `--wm-component-background`, `--wm-component-border` (a complete CSS border), `--wm-component-radius` and `--wm-component-padding`. More specific `--wm-workbench-surface-*` tokens override these. Defaults are the neutral player surface, a 1px border and `.6rem` padding.
 
 Shared palette tokens include `--wm-surface`, `--wm-foreground`, `--wm-accent` and `--wm-border` (a color). `--wm-harmony-flow-now` overrides the now-line color; `--wm-harmony-flow-tone` supplies a uniform band fill. Geometry uses `--wm-harmony-flow-height` and `--wm-harmony-lane-height`. These presentation settings do not change the musical time axis.

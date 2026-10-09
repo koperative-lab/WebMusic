@@ -111,6 +111,10 @@ All emitted events bubble and are composed.
 | `webscore:analysisselect` | `AnalysisSelectDetail`: `{kind: 'chord', id, startQuarters, endQuarters}` | Band/region selection; local inspection state. |
 | `webscore:chordchange` | `{chord, midis}` | A named live chord remains stable for the configured delay. |
 
+Pending URL loads or a native player's loading state show the shared four-square loading
+animation. Missing input shows the slower square waiting animation. Their descriptions remain
+available to screen readers; load failures and empty analysis results retain visible text.
+
 The score lane is a named slider tab stop. Arrow keys, Home/End and `[` / `]` navigate; pointer selection chooses a band and seeks. A semantic ordered list marks the current span with `aria-current`; detailed selection evidence has a nonvisual status. Passive playback does not repeatedly announce a local selection. The chord's live nameplate exposes text and has no navigation controls. Display configuration remains outside the component, and automatic motion respects reduced-motion preference.
 
 </details>

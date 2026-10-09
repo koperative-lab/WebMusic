@@ -1,3 +1,4 @@
+import {mountStatus, statusStyle, type StatusState} from './status';
 import {claimHost, createErrorSink} from './internal/lifecycle';
 import {installStyle} from './internal/style';
 import {analysisControlStyle, createAnalysisFader, setAnalysisStatus} from './internal/analysis-controls';
@@ -20,7 +21,7 @@ export interface OscilloscopeState {
   triggerLevel: number;
   triggerEdge: OscilloscopeTriggerEdge;
   frozen: boolean;
-  status: 'waiting' | 'live' | 'paused' | 'unavailable' | 'frozen';
+  status: 'loading' | 'waiting' | 'live' | 'paused' | 'unavailable' | 'frozen';
 }
 
 export interface OscilloscopeBinding {
@@ -49,7 +50,7 @@ export interface OscilloscopeHandle {
 type OscilloscopeHost = HTMLElement | ShadowRoot;
 const mounted = new WeakMap<OscilloscopeHost, OscilloscopeHandle>();
 
-export const oscilloscopeStyle = String.raw`
+export const oscilloscopeStyle = String.raw`${statusStyle}
 ${analysisControlStyle}
 .wui-oscilloscope, .wui-oscilloscope * { box-sizing: border-box; }
 .wui-oscilloscope { display: grid; gap: .4rem; width: 100%; min-width: 0;
@@ -178,7 +179,14 @@ export function mountOscilloscope(
   const status = document.createElement('div');
   status.className = 'wui-oscilloscope__status';
   status.setAttribute('part', 'status');
-  status.setAttribute('role', 'status');
+  const statusMessage = document.createElement('span');
+  statusMessage.setAttribute('role', 'status');
+  const waitingHost = document.createElement('div');
+  let feedback: StatusState = {kind: 'ready'};
+  const waiting = mountStatus(waitingHost, {snapshot: () => feedback}, {
+    stylesheet: false, classNames: {root: 'wui-status--embedded'},
+  });
+  status.append(statusMessage, waitingHost);
   root.append(head, canvas, controls, status);
 
   let destroyed = false;
@@ -292,9 +300,14 @@ export function mountOscilloscope(
       canvas.setAttribute('aria-valuetext', valueText);
       timeValue.textContent = `${selectedTimeMs.toFixed(2)} ms`;
       amplitudeValue.textContent = amplitude === undefined ? '—' : `${amplitude >= 0 ? '+' : ''}${amplitude.toFixed(2)}`;
-      setAnalysisStatus(status, state.status === 'live'
+      const statusText = state.status === 'live'
         ? state.trace?.silent ? 'No signal' : state.triggerEdge !== 'off' && !state.trace?.triggered ? 'No matching edge' : ''
-        : ({waiting: 'Waiting for playback', paused: '', unavailable: 'Analyser unavailable', frozen: ''} as const)[state.status]);
+        : ({loading: 'Loading audio', waiting: 'Waiting for playback', paused: '', unavailable: 'Analyser unavailable', frozen: ''} as const)[state.status];
+      const pending = state.status === 'waiting' || state.status === 'loading';
+      setAnalysisStatus(statusMessage, pending ? '' : statusText);
+      feedback = {kind: state.status === 'loading' ? 'loading' : pending ? 'waiting' : 'ready', message: pending ? statusText : ''};
+      waiting.update();
+      status.hidden = !pending && statusMessage.hidden;
       root.dataset.state = state.status;
       draw(state, windowMs);
     } catch (error) { report(error); }
@@ -369,6 +382,7 @@ export function mountOscilloscope(
       canvas.removeEventListener('pointermove', onPointer);
       canvas.removeEventListener('keydown', onKey);
       claim.release();
+      waiting.destroy();
       root.remove();
       style?.remove();
     },

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import {afterEach, describe, expect, it} from 'vitest';
+import {afterEach, describe, expect, it, vi} from 'vitest';
 import {Duration, Pitch, Rational, ScoreBuilder, VoiceId, type Score} from '../../src/core';
 import {
   ChordAnalysisElement,
@@ -368,6 +368,26 @@ describe('focused Analyze displays — score boundaries', () => {
 });
 
 describe('focused Analyze displays — readings and controls', () => {
+  it('replaces source waiting with musical content when data or notes arrive', async () => {
+    const chords = await mount({feature: 'chords'});
+    const waiting = chords.root.querySelector<HTMLElement>('[part~="feedback"]')!;
+    expect(waiting.dataset.kind).toBe('waiting');
+    expect(waiting.getAttribute('aria-busy')).toBeNull();
+    chords.element.score = melodyScore(C_MAJOR);
+    await flush();
+    expect(waiting.hidden).toBe(true);
+    expect(chords.root.querySelector<HTMLElement>('[part~="content"]')?.hidden).toBe(false);
+
+    const player = stubPlayer();
+    const live = await mount({tag: LIVE_CHORD, player});
+    const liveWaiting = live.root.querySelector<HTMLElement>('[part~="feedback"]')!;
+    expect(liveWaiting.dataset.kind).toBe('waiting');
+    for (const midi of [60, 64, 67]) player.emit('webscore:noteon', {midi});
+    expect(liveWaiting.hidden).toBe(true);
+    expect(live.root.querySelector('.wui-harmony-nameplate__symbol')?.textContent).toContain('C');
+    player.emit('webscore:end');
+    expect(liveWaiting.dataset.kind).toBe('waiting');
+  });
 
   it('limits live readings to complete triads and sevenths without candidate controls', async () => {
     const player = stubPlayer();
@@ -391,36 +411,30 @@ describe('focused Analyze displays — readings and controls', () => {
 
 
   it('does not reload the score when presentation attributes change', async () => {
-    // One `AbortController` per attempted `src` load — the source builds one
-    // only on that path, so counting them counts loads.
-    let loads = 0;
-    const Original = globalThis.AbortController;
-    globalThis.AbortController = class extends Original {
-      constructor() {
-        super();
-        loads += 1;
-      }
-    } as typeof AbortController;
+    const io = await import('../../src/io/load');
+    const load = vi.spyOn(io, 'loadScoreFromUrl').mockImplementation(() => new Promise<Score>(() => {}));
     try {
       const element = document.createElement(CHORDS) as ChordAnalysisElement;
       element.setAttribute('src', 'song.mid');
       document.body.append(element);
-      await flush();
-      expect(loads).toBe(1);
+      await vi.waitFor(() => expect(load).toHaveBeenCalledTimes(1));
+      expect(element.querySelector('[part~="feedback"]')?.getAttribute('data-kind')).toBe('loading');
 
       for (const [name, value] of Object.entries({window: '4', density: 'compact', scheme: 'dark', motion: 'stepped'})) {
         element.setAttribute(name, value);
         await flush();
       }
       // Presentation changes preserve the loaded source and its pending request.
-      expect(loads).toBe(1);
+      expect(load).toHaveBeenCalledTimes(1);
+      expect(element.querySelector('[part~="feedback"]')?.getAttribute('data-kind')).toBe('loading');
 
       element.setAttribute('window', '4');
       await flush();
-      expect(loads).toBe(1);
+      expect(load).toHaveBeenCalledTimes(1);
       element.remove();
+      expect(load.mock.calls[0]?.[1]?.signal?.aborted).toBe(true);
     } finally {
-      globalThis.AbortController = Original;
+      load.mockRestore();
     }
   });
 });

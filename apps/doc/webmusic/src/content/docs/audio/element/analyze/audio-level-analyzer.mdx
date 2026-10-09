@@ -54,7 +54,13 @@ unbound, and later target changes are observed.
 
 RMS, Peak hold and Crest stay in fixed positions above the history. The
 monochrome surface omits a repeated title and routine Live, Paused or Frozen
-messages. Waiting, no-signal and unavailable feedback remains visible.
+messages. No-signal and unavailable feedback remains visible.
+
+While waiting for a source or playback, the shared outlined-square animation keeps
+its description accessible to assistive technology. Pending fetch/decode on a linked
+`audio-player` shows the four-square loading animation; load failures remain visible.
+Controls and retained readings stay available, and both animations respect reduced
+motion. An explicit `.analyser` takes precedence over the player's readiness state.
 
 <details class="component-section">
 <summary>API</summary>

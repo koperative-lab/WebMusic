@@ -61,8 +61,8 @@ subscription, listeners, nodes and installed style, not the audio source.
 
 Time and Amplitude occupy fixed readout slots; missing measurements show `—`.
 The surface omits a repeated title. Routine live, paused and frozen messages
-are hidden, while waiting, unavailable, No signal and No matching edge feedback
-remains visible. Freeze keeps its label and reflects its state with
+are hidden, while unavailable, No signal and No matching edge feedback remains
+visible. Loading and waiting use square indicators with accessible descriptions. Freeze keeps its label and reflects its state with
 `aria-pressed`.
 
 <details class="component-section">
@@ -82,7 +82,7 @@ remains visible. Freeze keeps its label and reflects its state with
 | `triggerLevel` | `number` | required | Linear amplitude threshold shown by the trigger line and horizontal fader (`-1..1`). |
 | `triggerEdge` | `'off' \| 'rising' \| 'falling'` | required | Selected native edge control. `off` is free-run display. |
 | `frozen` | `boolean` | required | Freeze button state; the caller decides whether to keep replacing `trace`. |
-| `status` | `'waiting' \| 'live' \| 'paused' \| 'unavailable' \| 'frozen'` | required | Signal state; waiting/unavailable remain visible, while routine live/paused/frozen text is hidden. |
+| `status` | `'loading' \| 'waiting' \| 'live' \| 'paused' \| 'unavailable' \| 'frozen'` | required | Signal state. `loading` shows the busy four-cell animation; `waiting` shows the outlined square indicator with accessible status text; unavailable diagnostics remain visible, while routine live/paused/frozen text is hidden. |
 
 **Binding, options and handle**
 
@@ -118,6 +118,8 @@ outputs use `aria-live="off"`; diagnostic status is a live status region.
 
 <details class="component-section">
 <summary>Styling</summary>
+
+Loading and waiting feedback use the shared [Status animation and tokens](/uikit/layout-feedback/status/), including reduced-motion support. The exported stylesheet includes that feedback style.
 
 The public root class is `.wui-oscilloscope`. Public parts are `root surface`,
 `header`, `readout`, `plot`, `controls`, `freeze`, `timebase`,

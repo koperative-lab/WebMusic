@@ -58,8 +58,14 @@ retried without disposing the borrowed graph.
 
 Strength, Hits and Last interval stay in fixed positions above the history.
 The default surface is monochrome, without a repeated title or routine Live,
-Paused and Frozen messages. Waiting, no-signal and unavailable feedback remains
+Paused and Frozen messages. No-signal and unavailable feedback remains
 visible; Freeze reports its state through its pressed appearance.
+
+While waiting for a source or playback, the shared outlined-square animation keeps
+its description accessible to assistive technology. Pending fetch/decode on a linked
+`audio-player` shows the four-square loading animation; load failures remain visible.
+Controls and retained readings stay available, and both animations respect reduced
+motion. An explicit `.analyser` takes precedence over the player's readiness state.
 
 <details class="component-section">
 <summary>API</summary>

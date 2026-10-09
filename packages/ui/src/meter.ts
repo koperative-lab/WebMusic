@@ -1,3 +1,4 @@
+import {mountStatus, statusStyle, type StatusState} from './status';
 import {claimHost} from './internal/lifecycle';
 import {installStyle} from './internal/style';
 import {addClassNames, clamp01, finite, setParts} from './internal/dom';
@@ -21,6 +22,8 @@ export interface MeterLevelState {
 export interface MeterBinding {
   readLevel(): MeterLevelState;
   readSpectrum(bars: number): ArrayLike<number>;
+  /** Omit for an always-ready meter, including a valid silent source. */
+  readStatus?(): StatusState;
 }
 
 export interface MeterClassNames {
@@ -30,6 +33,7 @@ export interface MeterClassNames {
   peak?: string;
   spectrum?: string;
   bar?: string;
+  status?: string;
 }
 
 export interface MeterParts {
@@ -39,6 +43,7 @@ export interface MeterParts {
   peak?: string;
   spectrum?: string;
   bar?: string;
+  status?: string;
 }
 
 export interface MeterOptions {
@@ -71,7 +76,7 @@ type MeterHost = HTMLElement | ShadowRoot;
 const mountedMeters = new WeakMap<MeterHost, MeterHandle>();
 
 /** Semantic tokens first; legacy `--wameter-*` aliases remain supported. */
-export const meterStyle = `
+export const meterStyle = statusStyle + `
 .wui-meter {
 ${componentSurfaceCss('meter', {
   padding: 'var(--wm-meter-padding, .6rem)',
@@ -85,6 +90,8 @@ ${componentSurfaceCss('meter', {
   overflow: hidden;
   color: var(--wui-meter-fill, var(--wameter-fill, var(--wm-meter-fill, var(--wm-accent, #999))));
 }
+.wui-meter__status { height:100%; }
+.wui-meter__status[hidden], .wui-meter__track[hidden], .wui-meter__spectrum[hidden] { display:none; }
 .wui-meter, .wui-meter * { box-sizing: border-box; }
 .wui-meter__track {
   position: relative;
@@ -200,6 +207,34 @@ export function mountMeter(
   }
 
 
+  const visualization = root.firstElementChild as HTMLElement;
+  const statusHost = document.createElement('div');
+  statusHost.className = 'wui-meter__status';
+  addClassNames(statusHost, options.classNames?.status);
+  setParts(statusHost, 'status', options.parts?.status);
+  root.append(statusHost);
+  let statusState: StatusState = {kind: 'ready'};
+  const status = mountStatus(statusHost, {snapshot: () => statusState}, {
+    stylesheet: false, classNames: {root: 'wui-status--embedded'},
+  });
+  const paintStatus = (): boolean => {
+    status.update();
+    const ready = statusState.kind === 'ready';
+    statusHost.hidden = ready;
+    visualization.hidden = !ready;
+    root.setAttribute('role', ready ? 'meter' : 'group');
+    root.setAttribute('aria-busy', String(statusState.kind === 'loading'));
+    if (ready) {
+      root.setAttribute('aria-valuemin', '0');
+      root.setAttribute('aria-valuemax', '100');
+    } else {
+      for (const name of ['aria-valuemin', 'aria-valuemax', 'aria-valuenow', 'aria-valuetext']) {
+        root.removeAttribute(name);
+      }
+    }
+    return ready;
+  };
+
   let destroyed = false;
   let rafId: number | null = null;
   const reportError = (error: unknown): void => options.onError?.(error);
@@ -209,9 +244,21 @@ export function mountMeter(
     root.setAttribute('aria-label', label ?? defaultLabel);
   };
 
+  const readStatus = (): boolean => {
+    statusState = binding.readStatus?.() ?? {kind: 'ready'};
+    return paintStatus();
+  };
+
+  const reportReadFailure = (error: unknown): void => {
+    statusState = {kind: 'error', message: error instanceof Error ? error.message : String(error)};
+    paintStatus();
+    reportError(error);
+  };
+
   const redraw = (): void => {
     if (destroyed) return;
     try {
+      if (!readStatus()) return;
       if (mode === 'spectrum') {
         const values = binding.readSpectrum(barCount);
         let maximum = 0;
@@ -234,7 +281,7 @@ export function mountMeter(
         root.setAttribute('aria-valuetext', `${percentage}% level`);
       }
     } catch (error) {
-      reportError(error);
+      reportReadFailure(error);
     }
   };
 
@@ -252,9 +299,6 @@ export function mountMeter(
     if (destroyed) return;
     rafId = requestFrame?.(tick) ?? null;
   };
-  if (options.animate === false) redraw();
-  else if (requestFrame) rafId = requestFrame(tick);
-
   const handle: MeterHandle = {
     element: root,
     redraw,
@@ -271,6 +315,7 @@ export function mountMeter(
         }
       }
       rafId = null;
+      status.destroy();
       try {
         root.remove();
       } catch (error) {
@@ -295,5 +340,13 @@ export function mountMeter(
   if (!claim.isCurrent()) return handle;
 
   host.append(...(style ? [style] : []), root);
+  if (!claim.isCurrent()) return handle;
+  if (options.animate === false) redraw();
+  else {
+    // Publish readiness immediately without advancing the meter's per-read
+    // peak decay before the first animation frame or explicit redraw.
+    try { readStatus(); } catch (error) { reportReadFailure(error); }
+    if (claim.isCurrent() && requestFrame) rafId = requestFrame(tick);
+  }
   return handle;
 }

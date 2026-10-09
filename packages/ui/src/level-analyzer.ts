@@ -1,3 +1,4 @@
+import {mountStatus, statusStyle, type StatusState} from './status';
 import {installStyle} from './internal/style';
 import {claimHost} from './internal/lifecycle';
 import {analysisControlStyle, createAnalysisFader, setAnalysisStatus} from './internal/analysis-controls';
@@ -15,6 +16,10 @@ export interface LevelAnalyzerState {
   thresholdDbfs: number;
   frozen: boolean;
   status: string;
+  /** Waiting for a source or playback; replaces visible status prose with the shared indicator. */
+  waiting?: boolean;
+  /** Active source work; takes precedence over passive waiting. */
+  loading?: boolean;
 }
 
 export interface LevelAnalyzerActions {
@@ -34,7 +39,7 @@ const MAX_DB = 0;
 const COLUMNS = 64;
 const mounted = new WeakMap<HTMLElement, LevelAnalyzerHandle>();
 
-const levelAnalyzerStyle = `
+const levelAnalyzerStyle = `${statusStyle}
 ${analysisControlStyle}
 .wui-level-analyzer { box-sizing: border-box; display: grid; gap: .75rem; width: 100%; min-width: 0;
   color: var(--wm-level-analyzer-foreground, var(--wm-foreground, #222));
@@ -83,10 +88,18 @@ export function mountLevelAnalyzer(host: HTMLElement, actions: LevelAnalyzerActi
   root.setAttribute('part', 'root surface');
   root.setAttribute('aria-label', 'Level analyzer');
 
-  const status = document.createElement('span');
+  const status = document.createElement('div');
   status.className = 'wui-level-analyzer__status';
-  status.setAttribute('role', 'status');
   status.hidden = true;
+  const statusMessage = document.createElement('span');
+  statusMessage.setAttribute('role', 'status');
+  statusMessage.hidden = true;
+  const waitingHost = document.createElement('div');
+  let feedback: StatusState = {kind: 'ready'};
+  const waiting = mountStatus(waitingHost, {snapshot: () => feedback}, {
+    stylesheet: false, classNames: {root: 'wui-status--embedded'},
+  });
+  status.append(statusMessage, waitingHost);
 
   const values = document.createElement('dl');
   values.className = 'wui-level-analyzer__values';
@@ -165,7 +178,11 @@ export function mountLevelAnalyzer(host: HTMLElement, actions: LevelAnalyzerActi
     update(state) {
       if (destroyed) return;
       frozen = state.frozen;
-      setAnalysisStatus(status, state.status);
+      const pending = state.loading || state.waiting;
+      setAnalysisStatus(statusMessage, pending ? '' : state.status);
+      feedback = {kind: state.loading ? 'loading' : state.waiting ? 'waiting' : 'ready', message: pending ? state.status : ''};
+      waiting.update();
+      status.hidden = !pending && statusMessage.hidden;
       freeze.setAttribute('aria-pressed', String(frozen));
       threshold.paint(state.thresholdDbfs);
       line.style.bottom = `${heightFor(state.thresholdDbfs)}%`;
@@ -191,6 +208,7 @@ export function mountLevelAnalyzer(host: HTMLElement, actions: LevelAnalyzerActi
       freeze.removeEventListener('click', onFreeze);
       reset.removeEventListener('click', onReset);
       threshold.destroy();
+      waiting.destroy();
       root.remove();
       style?.remove();
       ownership.release();

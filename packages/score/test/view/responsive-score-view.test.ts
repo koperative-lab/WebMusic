@@ -303,6 +303,7 @@ describe('score-view presentation states', () => {
     document.body.append(view);
     await flush();
     expect(view.querySelector('[role="status"]')?.textContent).toBe('Waiting for a score');
+    expect(view.querySelector('[data-kind="waiting"]')).not.toBeNull();
     view.score = music([]);
     await flush();
     expect(view.querySelector('[role="status"]')?.textContent).toBe('No notes to display');
@@ -320,5 +321,35 @@ describe('score-view presentation states', () => {
     expect(view.querySelector('[role="alert"], [role="status"]')).toBeNull();
     expect(view.querySelector('[data-index="0"]')).not.toBeNull();
     expect(report).toHaveBeenCalled();
+  });
+
+  it('keeps the loading animation through mode changes and ignores a superseded source', async () => {
+    let finishFirst!: (value: ReturnType<typeof music>) => void;
+    let finishSecond!: (value: ReturnType<typeof music>) => void;
+    failures.load.mockImplementationOnce(() => new Promise((resolve) => { finishFirst = resolve; }))
+      .mockImplementationOnce(() => new Promise((resolve) => { finishSecond = resolve; }));
+    const view = document.createElement('responsive-score-view') as ScoreViewElement;
+    view.setAttribute('src', 'first.mid');
+    document.body.append(view);
+    expect(view.querySelector('[data-kind="loading"]')?.getAttribute('aria-busy')).toBe('true');
+    await vi.waitFor(() => expect(finishFirst).toBeDefined());
+    view.type = 'waterfall';
+    expect(view.querySelector('[data-kind="loading"]')).not.toBeNull();
+    view.setAttribute('src', 'second.mid');
+    await vi.waitFor(() => expect(finishSecond).toBeDefined());
+    finishFirst(music(['G5']));
+    await flush();
+    expect(view.querySelector('[data-kind="loading"]')).not.toBeNull();
+    expect(view.querySelector('[data-index]')).toBeNull();
+    finishSecond(music());
+    await flush();
+    expect(view.querySelector('[role="status"]')).toBeNull();
+    expect(view.querySelectorAll('.waterfall-notes [data-index]')).toHaveLength(3);
+
+    view.removeAttribute('src');
+    await flush();
+    expect(view.querySelector('[data-kind="waiting"]')).not.toBeNull();
+    view.remove();
+    expect(view.querySelector('[role="status"]')).toBeNull();
   });
 });

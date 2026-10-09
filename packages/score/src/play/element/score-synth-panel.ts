@@ -33,6 +33,7 @@
 // SynthPanelAudioGraph, and all interactive DOM comes from @webmusic/ui.
 // ============================================================================
 
+import {mountStatus, type StatusHandle} from "@webmusic/ui/status";
 import type { Effect } from "../headless/effects";
 import {
   mountEnvelope,
@@ -241,6 +242,7 @@ export class SynthPanelElement extends WebMusicElement {
 
   private root?: ShadowRoot;
   private panelHandle?: SectionPanelHandle;
+  private sectionStatuses: StatusHandle[] = [];
   private ctx?: AudioContext;
 
   // sound section
@@ -738,6 +740,7 @@ export class SynthPanelElement extends WebMusicElement {
   // --- sound section ---
 
   private wireSound(host: HTMLElement): void {
+    if (!this.soundParams.length) { this.waitForSection(host, 'Waiting for sound parameters…'); return; }
     this.soundHandle = mountParameterRack(host, {
         snapshot: () => ({parameters: this.soundParams.map((param,index)=>({id:String(index),label:param.name,value:this.soundValues.get(index)??param.value,min:param.options?.length?0:param.min,max:param.options?.length?(param.options.length-1):param.max,step:param.options?.length?1:param.step,unit:param.unit,options:param.options,group:param.group}))}),
         setValue: (id, value) => {
@@ -773,6 +776,7 @@ export class SynthPanelElement extends WebMusicElement {
   // --- effects section ---
 
   private wireEffects(host: HTMLElement): void {
+    if (!this.ctx || !this.effectList.length) { this.waitForSection(host, 'Waiting for an effects graph…'); return; }
     this.effectHandle = mountParameterRack(host, {
         snapshot: () => ({parameters: this.audio.effectNodes.flatMap((node,index)=>Object.entries(node.params??{}).map(([name,param])=>{const [min,max,step]=PARAM_RANGE[name]??[0,1,.01];return{id:`${index}:${name}`,label:name,value:this.effectValues[index]?.[name]??param.value,min,max,step,unit:PARAM_UNIT[name],group:this.effectList[index]?.label??`fx ${index+1}`}}))}),
         setValue: (id,value) => {const [rawIndex,name]=id.split(':');const index=Number(rawIndex);(this.effectValues[index]??={})[name]=value;const target=this.audio.effectNodes[index]?.params?.[name];if(target)target.value=value},
@@ -871,7 +875,7 @@ export class SynthPanelElement extends WebMusicElement {
 
   private wireEq(host: HTMLElement): void {
     const controller = this.audio.equalizer;
-    if (!controller) return;
+    if (!controller) { this.waitForSection(host, 'Waiting for an equalizer graph…'); return; }
     const generation = ++this.eqMountGeneration;
     let next: EqHandle;
     try {
@@ -904,7 +908,7 @@ export class SynthPanelElement extends WebMusicElement {
   }
 
   protected mountSynthEqUI(host: HTMLElement, binding: EqBinding): EqHandle {
-    return mountEq(host, binding, {
+    const handle = mountEq(host, binding, {
       classNames: {
         root: "graph eq",
         grid: "grid",
@@ -916,9 +920,21 @@ export class SynthPanelElement extends WebMusicElement {
         readout: "read",
         empty: "needs-ctx",
       },
-      emptyLabel: "Assign an AudioContext to .context",
       onError: (error) => this.reportLfoError(error),
     });
+    const empty = handle.emptyElement();
+    empty.replaceChildren();
+    empty.removeAttribute('role');
+    empty.removeAttribute('aria-live');
+    const status = mountStatus(empty, {
+      snapshot: () => ({kind: binding.snapshot().ready ? 'ready' : 'waiting', message: 'Waiting for an equalizer graph…'}),
+      subscribe: binding.subscribe ? (notify) => binding.subscribe!(notify) : undefined,
+    }, {classNames: {root: 'wui-status--embedded'}, onError: (error) => this.reportLfoError(error)});
+    return {
+      ...handle,
+      update: () => { handle.update(); status.update(); },
+      destroy: () => { try { status.destroy(); } finally { handle.destroy(); } },
+    };
   }
 
   private replaceEqHandle(
@@ -1135,6 +1151,7 @@ export class SynthPanelElement extends WebMusicElement {
   // --- macros section ---
 
   private wireMacros(host: HTMLElement): void {
+    if (!this.macroList.length) { this.waitForSection(host, 'Waiting for macro controls…'); return; }
     this.macroHandle = mountMacroRack(
       host,
       this.macroList.map((macro, index) => ({
@@ -1180,7 +1197,15 @@ export class SynthPanelElement extends WebMusicElement {
     }
   }
 
+  private waitForSection(host: HTMLElement, message: string): void {
+    this.sectionStatuses.push(mountStatus(host, {snapshot: () => ({kind: 'waiting', message})}, {
+      parts: {root: 'synth-status', indicator: 'synth-status-indicator', message: 'synth-status-message'},
+      onError: (error) => this.reportLfoError(error),
+    }));
+  }
+
   private destroySharedHandles(): void {
+    for (const status of this.sectionStatuses.splice(0)) status.destroy();
     this.soundHandle?.destroy(); this.soundHandle = undefined;
     this.effectHandle?.destroy(); this.effectHandle = undefined;
     this.macroHandle?.destroy(); this.macroHandle = undefined;

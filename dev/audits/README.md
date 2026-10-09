@@ -8,6 +8,7 @@ another checkout. [STATUS](../STATUS.md) owns current gaps;
 
 | Date | Records | Evidence and reading boundary |
 |---|---|---|
+| 2026-10-08 | [Component loading and waiting feedback](2026-10-08/COMPONENT-FEEDBACK.md) | Per-tag state coverage, shared square animations, source/DOM checks and bounded browser evidence; device and assistive-technology acceptance remain separate. |
 | 2026-09-05 | [Project audit](2026-09-05/README.md), [repairs](2026-09-05/FIXES.md), [code alignment](2026-09-05/CODE-ALIGNMENT.md) | Read the original findings with the later repair records. Raw reproductions and logs remain in [evidence](2026-09-05/evidence/) and [repair evidence](2026-09-05/repair-evidence/); the [portable evidence manifest](2026-09-05/evidence/portable-evidence.json) locates retained log copies. |
 | 2026-09-05 | [Development documentation review](2026-09-05/DEV-DOCS-REVIEW.md), [documentation reorganization](2026-09-05/DOCUMENTATION-REORGANIZATION.md) | Ownership, source alignment, checker coverage and the limits of the recorded documentation pass. |
 | 2026-09-06 | [Documentation synchronization](2026-09-06/DOCUMENTATION-SYNC.md) | Branch-specific documentation checks; shared guidance did not merge runtime implementations. |

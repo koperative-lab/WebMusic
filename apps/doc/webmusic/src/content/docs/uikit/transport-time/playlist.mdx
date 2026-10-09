@@ -75,11 +75,15 @@ state to change.
 | `progress` | `number` | Current-entry position. Finite values clamp to `0…1`; non-finite values paint as `0`. |
 | `disabled?` | `boolean` | Strict `true` disables transport controls and blocks every command, including row selection; the root exposes `aria-disabled`. |
 | `items` | `readonly PlaylistItem[]` | Ordered entries. Absence at runtime is treated as an empty list. |
+| `status?` | `StatusState` | Optional owner readiness from [Status](/uikit/layout-feedback/status/). Defaults to waiting for an empty list and ready otherwise; loading/waiting use accessible square animations. Existing entries remain available. |
 
 `PlaylistItem` contains required `id` and `label`, optional preformatted `duration`, optional
 `active`, and optional `status: 'loading' | 'error'`. Strict `active: true` sets
-`aria-current`; status adds a styling data attribute. The presenter does not synthesize status
-text or mutate the item objects.
+`aria-current`; status adds a styling data attribute. Loading replaces the duration with the
+shared four-square indicator and a visually hidden description; failure shows `Unable to load`.
+The row and keyboard focus remain stable across those transitions. The presenter never mutates
+the item objects. Only loading the active entry marks the entire playlist busy; background
+prefetch remains local to its row.
 
 **Binding**
 
@@ -125,9 +129,10 @@ text or mutate the item objects.
 toggle name follows `playing`. Seek is a native range labelled `Seek`, and all four transport
 controls reflect `disabled` through the native attribute. The ordered list receives `label` as
 its accessible name. Each row is a focusable `role="button"` with click, Enter, and Space
-activation plus `aria-current` for the active item. Root `disabled` blocks row selection as well as transport commands. Loading/error remain
-visual data states, so the binding owns status messaging and per-item selection policy. Caller nodes outside the presenter root are never
-rewritten.
+activation plus `aria-current` for the active item. Root `disabled` blocks row selection as
+well as transport commands. Loading descriptions are visually hidden live feedback; failures
+remain visible. Empty waiting queues hide the unused transport and list. The binding retains
+per-item selection policy, and caller nodes outside the presenter root are never rewritten.
 
 </details>
 
@@ -170,8 +175,7 @@ values and then literals.
 
 **Classes**
 
-`classNames` adds compatibility classes alongside the canonical classes for its six public node
-roles. Labels and durations expose canonical classes but have no `classNames` key.
+`classNames` adds compatibility classes alongside the canonical classes for these public nodes.
 
 | Node | Canonical class | `classNames` key |
 |---|---|---|
@@ -184,6 +188,12 @@ roles. Labels and durations expose canonical classes but have no `classNames` ke
 | Entry number | `.wui-playlist__number` | `number` |
 | Entry label | `.wui-playlist__label` | `label` |
 | Entry duration | `.wui-playlist__duration` | `duration` |
+| Whole-list feedback | `.wui-playlist__status` | `status` |
+| Per-entry feedback | `.wui-playlist__item-status` | `itemStatus` |
+
+The `status` class/part hook reaches whole-list feedback; `itemStatus` adds classes or parts
+to each `item-status` host. Shared [Status tokens](/uikit/layout-feedback/status/) and
+reduced-motion behavior apply to both.
 
 **Parts**
 
@@ -203,6 +213,8 @@ carries its action modifier.
 | Entry number | `number` | `number` |
 | Entry label | `label` | `label` |
 | Entry duration | `duration` | `duration` |
+| Whole-list feedback | `status` | `status` |
+| Per-entry feedback | `item-status` | `itemStatus` |
 
 With `stylesheet: false`, the presenter installs no style node; the caller must style these
 classes and parts itself.

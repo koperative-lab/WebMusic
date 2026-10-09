@@ -57,9 +57,11 @@ The `CanvasStage` requests an initial draw and, when `requestAnimationFrame` is 
 one column per frame while connected. It cancels its animation and resize observer on disconnect;
 hosts without RAF get the initial draw but no Element-owned timer fallback.
 
-With nothing to show, the shared status overlay says `No live source — set source or .analyser`
-until an analyser resolves, then `Waiting for signal…` until the first column arrives. Status text
-is accessible DOM rather than pixels painted into the canvas.
+The shared status overlay shows a quiet square waiting animation until an analyser and its
+first column arrive. A bound source exposing `.loading` shows the loading animation only
+while that source is fetching or decoding. Source-load failures remain visible. The source and signal messages remain
+available to assistive technology without visible placeholder prose. Both animations honor
+reduced-motion preferences and use the shared [Status tokens](/uikit/layout-feedback/status/).
 
 </details>
 
@@ -82,6 +84,12 @@ function draw(frame) {
   paintLiveProjection(frame, live.buffer, live.type, {waveColor: '#4a9eff'});
 }
 ```
+
+The `source` selector must match one element in the current Document or ShadowRoot.
+Late insertion, replacement and source readiness events refresh the borrowed analyser.
+Invalid or ambiguous selectors show an error. Disconnect releases discovery and event
+subscriptions without stopping the source. An explicit `.analyser` takes precedence over
+bound-source feedback.
 
 Changing analyser, type or window clears incompatible scratch/history state. The controller never
 schedules, mutates or disconnects the borrowed node. It is DOM-free and the painter accepts a

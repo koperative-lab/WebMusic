@@ -48,6 +48,8 @@ import {WebMusicElement, cssSizeAttr, numAttr, upgradeProperties} from './intern
 /** Borrowed nonvisual player capability; monitoring never owns its transport. */
 export interface AudioMeterPlayer {
   readonly analyser?: AnalyserNode;
+  readonly loading?: boolean;
+  readonly loadError?: unknown;
   on?(event: 'sourcechange' | 'load', listener: () => void): () => void;
 }
 
@@ -63,6 +65,8 @@ export interface AudioMeterSurfaceHandle {
 
 type PlayerElement = Element & {
   readonly analyser?: AnalyserNode;
+  readonly loading?: boolean;
+  readonly loadError?: unknown;
   readonly player?: AudioMeterPlayer;
 };
 
@@ -489,8 +493,15 @@ export class AudioMeterElement extends WebMusicElement {
   }
 
   private meterStatus(): StatusState {
-    if (!this.meter?.analyser) return {kind: 'empty', message: 'No audio source'};
-    return {kind: 'ready'};
+    if (this.contextRef || this.analyserRef) return {kind: 'ready'};
+    const source = this.explicitPlayer ?? this.boundTarget;
+    if (source?.loading) return {kind: 'loading', message: 'Loading audio source.'};
+    if (source?.loadError) {
+      return {kind: 'error', message: source.loadError instanceof Error ? source.loadError.message : String(source.loadError)};
+    }
+    return this.meter?.analyser
+      ? {kind: 'ready'}
+      : {kind: 'waiting', message: 'Waiting for an audio source.'};
   }
 
   private applyDisplayOptions(): void {
@@ -571,7 +582,7 @@ export class AudioMeterElement extends WebMusicElement {
       if (revision === this.bindingRevision) this.refreshPlayerAnalyser();
     };
     if (target) {
-      for (const name of ['webaudio:sourcechange', 'webaudio:loaded', 'webaudio:playerchange']) {
+      for (const name of ['webaudio:sourcechange', 'webaudio:loaded', 'webaudio:playerchange', 'webaudio:loadstatechange']) {
         target.addEventListener(name, refresh);
         this.playerUnbind.push(() => target.removeEventListener(name, refresh));
       }
@@ -604,7 +615,10 @@ export class AudioMeterElement extends WebMusicElement {
       const analyser = player?.analyser;
       if (revision !== this.bindingRevision || !this.isConnected) return;
       this.boundPlayer = player;
-      if (analyser === this.playerAnalyser && this.meter?.analyser === analyser) return;
+      if (analyser === this.playerAnalyser && this.meter?.analyser === analyser) {
+        this.presenter?.redraw();
+        return;
+      }
       const previous = this.playerAnalyser;
       this.playerAnalyser = analyser;
       try { this.rebuild(); }

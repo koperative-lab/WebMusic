@@ -16,6 +16,11 @@ Each member retains its own clock; linking does not create a new shared clock.
 Assign `.members` to let the component own the backend, or `.mixer` to borrow an
 existing backend. A borrowed mixer is never disposed by the Element.
 
+Without mixer members or a requested playback owner, the desk shows the shared
+outlined-square waiting animation with a screen-reader description. Usable channel
+strips remain visible while an owner is missing. Member assignment is synchronous;
+loading clips before assignment remains the caller's responsibility.
+
 <AudioMixerDemo />
 
 ## Import

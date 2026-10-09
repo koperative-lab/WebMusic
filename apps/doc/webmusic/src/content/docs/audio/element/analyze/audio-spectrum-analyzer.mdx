@@ -59,8 +59,14 @@ Document or ShadowRoot, including when a target appears later.
 The monochrome surface keeps Frequency and Level in fixed readout slots.
 Freeze and Peak hold use pressed states without changing their labels, and
 Reset peaks clears the held trace. Routine Live, Paused and Frozen messages
-are hidden; waiting and unavailable feedback remains visible. A dashed held
+are hidden; unavailable feedback remains visible. A dashed held
 trace distinguishes maxima without relying on color.
+
+While waiting for a source or playback, the shared outlined-square animation keeps
+its description accessible to assistive technology. Pending fetch/decode on a linked
+`audio-player` shows the four-square loading animation; load failures remain visible.
+Controls and retained readings stay available, and both animations respect reduced
+motion. An explicit `.analyser` takes precedence over the player's readiness state.
 
 <details class="component-section">
 <summary>API</summary>

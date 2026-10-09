@@ -430,6 +430,9 @@ export class AudioMixerElement extends WebMusicElement {
     return {
       master: state?.masterVolume ?? this.initialMasterVolume,
       disabled: !mixer || (this.connection.requested && !this.owner),
+      status: !mixer || (this.connection.requested && !this.owner) || !state?.members.length
+        ? {kind: 'waiting', message: 'Waiting for mixer sources.'}
+        : {kind: 'ready'},
       channels: (state?.members ?? []).map((member) => ({
         id: member.id,
         label: member.id,

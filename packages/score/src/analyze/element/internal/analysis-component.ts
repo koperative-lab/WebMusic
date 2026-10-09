@@ -191,6 +191,7 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
   #soundingCache?: {signature: string; projection: Pick<SoundingProjection, 'spelling' | 'naming'>};
   #score?: Score;
   #error?: string;
+  #loading = false;
   #unbind?: () => void;
   #player?: Element;
   /** `window`, resolved once per (spec, score) — `auto` allocates Rationals. */
@@ -599,6 +600,7 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
 
   #destroy(): void {
     this.#revision += 1;
+    this.#loading = false;
     this.#source.cancel();
     this.#unbind?.();
     this.#unbind = undefined;
@@ -625,6 +627,7 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
 
   async #refresh(): Promise<void> {
     this.#revision += 1;
+    this.#loading = false;
     if (!this.#recipe().needsScore) {
       this.#source.cancel();
       this.#score = undefined;
@@ -635,8 +638,12 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
       this.#scheduleChordChange();
       return;
     }
+    this.#loading = !this.#source.score && Boolean(this.getAttribute('src'));
+    this.#error = undefined;
+    this.#apply();
     const {score, stale, error} = await this.#source.load();
     if (stale || !this.isConnected) return;
+    this.#loading = false;
     this.#score = score;
     if (this.#selectionScore !== score) {
       if (this.#selectionScore) this.#noteIds = undefined;
@@ -718,9 +725,18 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
     this.#syncSelection(lane, score);
     const selectedBand = lane.bands.find((band) => band.id === this.#selection?.id);
     const index = material.index;
-    const message = this.#error ?? material.error ?? result?.message
-      ?? (recipe.needsScore && !score ? 'Waiting for a score — set player, src or .score.'
-        : index.length === 0 ? recipe.emptyLabel : '');
+    const native = !recipe.needsScore || (!this.#source.score && !this.getAttribute('src'))
+      ? (this.#player as (Element & {playback?: ScorePlaybackSource}) | undefined)?.playback?.snapshot()
+      : undefined;
+    const loading = this.#loading || native?.readiness === 'loading';
+    const waiting = recipe.needsScore ? !score : !this.#playing && this.#soundingMidis.length === 0;
+    const error = this.#error ?? (native?.readiness === 'error'
+      ? native.error instanceof Error ? native.error.message : 'Could not load playback source.' : undefined)
+      ?? (loading ? undefined : material.error);
+    const message = error
+      ?? (loading ? 'Loading score…'
+        : result?.message ?? (recipe.needsScore && !score ? 'Waiting for a score — set player, src or .score.'
+          : index.length === 0 ? recipe.emptyLabel : ''));
     return {
       recipe,
       score,
@@ -733,7 +749,9 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
       sounding: type === 'live-chord' ? this.#sounding(this.#chordKey().key) : undefined,
       index,
       laneKey: `${material.revision}|${this.#playing ? 1 : 0}|${this.#selection?.id ?? ''}`,
-      phase: this.#error || material.error ? 'error'
+      phase: error ? 'error'
+        : loading ? 'loading'
+        : waiting ? 'waiting'
         : this.#moving ? 'playing'
         : recipe.slot.kind === 'flow' && index.length === 0 ? 'empty' : 'idle',
       message,
@@ -1240,6 +1258,7 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
       dataChanged: () => {
         if (!this.#source.score && !this.getAttribute('src')) void this.#refresh();
       },
+      snapshot: () => this.#apply(),
       reset: () => {
         this.#resetPlayerState();
         this.#apply();

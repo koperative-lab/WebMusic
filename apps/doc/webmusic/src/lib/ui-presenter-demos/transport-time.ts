@@ -574,6 +574,7 @@ const PLAYLIST_ITEMS = [
 ] as const;
 
 function playlistItems(mode: string, activeId = 'prelude'): PlaylistState['items'] {
+  if (mode === 'empty') return [];
   const source = mode === 'single' ? PLAYLIST_ITEMS.slice(0, 1) : PLAYLIST_ITEMS;
   return source.map((item, index) => ({
     ...item,
@@ -595,6 +596,8 @@ function playlistOptions(
   if (values.classNames === 'demo') {
     options.classNames = {
       root: 'demo-playlist',
+      status: 'demo-status',
+      itemStatus: 'demo-item-status',
       bar: 'demo-bar',
       button: 'demo-button',
       seek: 'demo-seek',
@@ -605,6 +608,8 @@ function playlistOptions(
   if (values.parts === 'demo') {
     options.parts = {
       root: 'demo-root',
+      status: 'demo-status',
+      itemStatus: 'demo-item-status',
       bar: 'demo-bar',
       button: 'demo-button',
       seek: 'demo-seek',
@@ -699,7 +704,10 @@ function mountPlaylistDemo(host: HTMLElement): UiPresenterDemoHandle {
       if (destroyed) return;
       if (name === 'playing') state = {...state, playing: value === true};
       else if (name === 'progress') state = {...state, progress: clamp(Number(value) || 0, 0, 1)};
-      else if (name === 'disabled') {
+      else if (name === 'status') {
+        const kind = value === 'loading' || value === 'waiting' || value === 'error' ? value : 'ready';
+        state = {...state, status: {kind, ...(kind === 'error' ? {message: 'Demo playlist unavailable.'} : {})}};
+      } else if (name === 'disabled') {
         const next = {...state};
         if (value === undefined) delete next.disabled;
         else next.disabled = value === true;
@@ -730,7 +738,7 @@ function mountPlaylistDemo(host: HTMLElement): UiPresenterDemoHandle {
       remount();
       notifier.notify();
     },
-    snapshot: () => ({...state, items: itemMode}),
+    snapshot: () => ({...state, items: itemMode, status: state.status?.kind ?? 'ready'}),
     subscribe: notifier.subscribe,
     destroy() {
       if (destroyed) return;

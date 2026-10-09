@@ -74,8 +74,8 @@ callbacks so the application can report them consistently.
 
 Strength, Hits and Last interval retain fixed positions above the history.
 The surface omits a repeated title and hides routine Live, Paused and Frozen
-messages. Waiting, no-signal, unavailable and other diagnostic text remains
-visible. Freeze keeps its label and uses its pressed state to show the hold.
+messages. No-signal, unavailable and other diagnostics remain visible.
+Loading and waiting use square indicators with accessible descriptions. Freeze keeps its label and uses its pressed state to show the hold.
 
 <details class="component-section">
 <summary>API</summary>
@@ -91,7 +91,9 @@ visible. Freeze keeps its label and uses its pressed state to show the hold.
 | `frozen` | `boolean` | required | Freeze button state; the caller decides whether to keep supplying observations. |
 | `hitCount` | `number` | required | Number of accepted cues displayed since the caller's reset. |
 | `lastIntervalMs` | `number?` | absent | Most recent gap between accepted cues, in milliseconds. |
-| `status` | `string` | required | Diagnostic text shown in the status region; routine Live, Paused and Frozen messages are hidden. |
+| `loading` | `boolean?` | `false` | Active pending source work; shows the four-cell animation and `aria-busy`, taking precedence over `waiting`. |
+| `waiting` | `boolean?` | `false` | Show the shared square waiting indicator instead of visible status prose; controls and retained readings remain available. |
+| `status` | `string` | required | Diagnostic text; accessible during loading/waiting, visible for meaningful diagnostics, and hidden for routine Live, Paused and Frozen states. |
 
 **Actions and handle**
 
@@ -120,6 +122,8 @@ available without reading the plot's colors.
 
 <details class="component-section">
 <summary>Styling</summary>
+
+Loading and waiting feedback use the shared [Status animation and tokens](/uikit/layout-feedback/status/), including reduced-motion support.
 
 The root is `.wui-transient-analyzer`. Public parts are `root surface`,
 `plot`, `freeze`, `clear` and `sensitivity`. The sensitivity slider also exposes

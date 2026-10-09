@@ -54,6 +54,8 @@ The demo contains one player and one sheet view, configured by external Paramete
 
 No events. Swapping the score mid-render supersedes the older engraving instead of letting it paint over the newer one.
 
+Without a source, the element shows the shared square waiting animation. Source loading and asynchronous engraving show the square loading animation until the complete page is ready; both keep screen-reader status text and respect reduced-motion preferences. Source and engraving failures remain visible error messages. Replacing the source clears the previous presentation, and disconnect cancels pending work and releases the status and drawing.
+
 For the same renderer without a custom element, call `renderOSMDStaffVisualizer(score, container, options)` from [`@webmusic/score/view/render`](/score/api/view/) — the element is that call plus attribute plumbing.
 
 </details>
@@ -63,7 +65,7 @@ For the same renderer without a custom element, call `renderOSMDStaffVisualizer(
 
 The host fills its container and accepts application CSS or explicit `width` / `height` attributes. Removing a size attribute clears only the size set by the element; application inline styles and `hidden` remain usable.
 
-The engraving keeps a minimum layout width of `32rem` so narrow containers scroll horizontally instead of squeezing notes together. Override `--wm-sheet-min-width` when the score or application needs a different readable width. This changes the inner drawing, while the host continues to fit its container. The component composes [UIKit stage](/uikit/layout-feedback/stage/) for this scrolling surface and [status](/uikit/layout-feedback/status/) for engraving errors.
+The engraving keeps a minimum layout width of `32rem` so narrow containers scroll horizontally instead of squeezing notes together. Override `--wm-sheet-min-width` when the score or application needs a different readable width. This changes the inner drawing, while the host continues to fit its container. The component composes [UIKit stage](/uikit/layout-feedback/stage/) for this scrolling surface and [status](/uikit/layout-feedback/status/) for loading, waiting and errors.
 
 The default remains black ink on white paper. Paper follows `--wm-sheet-background`, then `--wm-surface`, then white; ink follows `--wm-sheet-foreground`, then `--wm-foreground`, then black. Set the paper or shared surface to `transparent` and choose an ink color suitable for the application background. The actual SVG noteheads, stems, staff lines and labels consume the ink token. OSMD's drawing background stays transparent underneath the stage.
 
