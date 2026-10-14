@@ -312,7 +312,7 @@
     "@testing-library/dom": "^10.4.2",
     "@testing-library/react": "^16.3.3",
     "@tonaljs/abc-notation": "^4.9.1",
-    "@tonaljs/chord": "^6.1.2",
+    "@tonaljs/chord": "^6.2.0",
     "@tonaljs/chord-detect": "^4.9.1",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
