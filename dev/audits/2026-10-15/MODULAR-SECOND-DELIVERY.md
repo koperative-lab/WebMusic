@@ -1,5 +1,10 @@
 # Modular second delivery: sound and modulation
 
+> Recovery notice (2026-10-17): The generated evidence marked unavailable below
+> was not recovered. The results in this report describe the historical run,
+> not current verification. Original artifact paths are retained as text.
+> See the [recovery record](../2026-10-17/MODULAR-RECOVERY-AND-RELEASE-FIXES.md).
+
 This record covers steps 9–10 (MOD-09/10, MC-16/17) in the local
 `modular-redesign` working tree based on `ef8664d`. It extends the uncommitted
 [first delivery](MODULAR-FIRST-DELIVERY.md); that earlier record retains its
@@ -44,7 +49,7 @@ Callback-only legacy targets retain their declared capabilities.
 
 ## Verification
 
-[`npm run check`](second-evidence/full-check.json) passed as one complete command
+`npm run check` (unavailable: `second-evidence/full-check.json`) passed as one complete command
 (exit 0). It includes formatting, lint, architecture and documentation policies,
 all five package builds, 254 compiled documentation examples, source/test type
 checks, licenses, package verification and release manifests. The workspace
@@ -59,7 +64,7 @@ suites passed 358 files and 4,414 tests:
 | Bridge | 7 | 182 |
 | Documentation | 28 | 231 |
 
-[`npm run docs:build`](second-evidence/docs-build.json) also passed as one
+`npm run docs:build` (unavailable: `second-evidence/docs-build.json`) also passed as one
 complete command (exit 0), including the five-package rebuild, 113 generated
 pages, 111 public search/Markdown references and the site license verification
 (74 records, 353 files). The retained
@@ -68,25 +73,25 @@ fixtures and public-entry resolution.
 
 The final rebuild changed generated Score chunk names and declaration ordering.
 All four native/browser suites were rerun against that final output and passed.
-The [entry verification](second-evidence/fingerprint-verification.json) matches
+The entry verification (unavailable: `second-evidence/fingerprint-verification.json`) matches
 all 11 recorded public entries; the
-[site verification](second-evidence/public-build-verification.json) matches
+site verification (unavailable: `second-evidence/public-build-verification.json`) matches
 the tested public page and all 134 client JavaScript assets. The
-[rebuild comparison](second-evidence/rebuild-comparison.json) preserves the
+rebuild comparison (unavailable: `second-evidence/rebuild-comparison.json`) preserves the
 earlier mismatch and rerun history. Final status/evidence edits were followed
 by documentation inventory, public documentation, formatting and diff checks.
 
 ### Native signal evidence
 
-[The offline suite](second-evidence/offline-audio.json) passed 28 scenarios at
+The offline suite (unavailable: `second-evidence/offline-audio.json`) passed 28 scenarios at
 48 kHz: 667,680 compared frames in
 28 windows, maximum absolute sample error `6.853789091109536e-6` against the
 unchanged `3e-5` tolerance. Independent formulas/reference graphs cover ADSR,
 interrupted and reordered envelope gates, oscillator and sampler voices,
 same-pitch release, CV/base accounting, current/future polyphony, native LFO,
 macros, automation and the explicit unsupported-rate case.
-The [numeric summary](second-evidence/offline-summary.json) and
-[public-entry fingerprints](second-evidence/build-fingerprints.json) accompany
+The numeric summary (unavailable: `second-evidence/offline-summary.json`) and
+public-entry fingerprints (unavailable: `second-evidence/build-fingerprints.json`) accompany
 the retained fixture and executable runner.
 
 The follower's first implementation exposed native low-frequency DC drift in
@@ -97,18 +102,18 @@ caught zero-decay envelope and positive-minimum AudioParam edge cases.
 
 ### Browser evidence
 
-[The actual generated guide](second-evidence/public-demo.json) passed with
+The actual generated guide (unavailable: `second-evidence/public-demo.json`) passed with
 Chromium's normal autoplay policy.
 The first trusted Run click starts the context; keyboard notes produce measured
 audio and settle to silence after release. Both panels share macro state,
 automation cancel holds its modeled base, hidden panels leave the LFO running,
 there is one transport, and the 320px layout has no horizontal page overflow.
 Page errors and module errors are empty after the target-readiness repair.
-An [independent panel pass](second-evidence/panel-public-demo.json) also checked
+An independent panel pass (unavailable: `second-evidence/panel-public-demo.json`) also checked
 all four ADSR controls, shared sustain `0.35`, LFO Amount `300 Hz`, the macro's
 `3150 Hz` cutoff base and `3000–3300 Hz` predicted range, followed by automation
 hold and actual panel removal. The desktop and narrow screenshots were inspected.
-The [raw browser fixture](second-evidence/browser.json) separately verifies that
+The raw browser fixture (unavailable: `second-evidence/browser.json`) separately verifies that
 releasing one of two same-pitch input occurrences leaves the other audible,
 and that releasing both settles to silence.
 
@@ -124,7 +129,7 @@ MDX, an imported raw helper and runtime source between generations; an unchanged
 importer also rejects a subsequently symlinked helper. Test timeouts and
 assertions were not weakened. Earlier failures and the CPU profile are retained
 beside the final evidence.
-The [complete documentation suite](second-evidence/docs-tests.json) subsequently
+The complete documentation suite (unavailable: `second-evidence/docs-tests.json`) subsequently
 passed all 28 files and 231 tests in 23.23 seconds.
 
 The complete Score suite also exposed an existing Analyze test's asynchronous

@@ -17,8 +17,8 @@ already own. The mixer **owns what it created and borrows what you passed**:
 
 Use `.transport` with the central [AudioPlayer](/audio/headless/play/audio-player/):
 `player.setTransport(mixer.transport)`. The adapter exposes group commands,
-seconds/duration/playing and subscriptions without claiming a single clip or
-aggregate analyser. The facade borrows it; the caller still disposes the mixer.
+seconds/duration/playing, subscriptions, and the prepared master analyser.
+It has no single clip. The facade borrows it; the caller still disposes the mixer.
 
 ## Import
 

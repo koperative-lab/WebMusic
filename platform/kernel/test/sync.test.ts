@@ -1139,6 +1139,46 @@ describe('TransportGroup observer and reconciliation lifetime', () => {
     group.dispose();
   });
 
+  it('discards a stale reconciliation verdict after its callback submits a newer seek', async () => {
+    const world = makeWorld();
+    let replacement: ReturnType<TransportGroup['dispatch']> | undefined;
+    const master = {...world.master, reconcile: () => {
+      replacement = group.dispatch({type: 'seek', position: 0.2});
+      return 'stalled' as const;
+    }};
+    const group = new TransportGroup(master, world.now, {driftCheckIntervalMs: 0});
+    group.addFollower(world.follower);
+    try {
+      await group.dispatch({type: 'play'});
+      world.advance(2);
+      expect(group.checkDrift()).toBe(0);
+      expect(await replacement).toMatchObject({status: 'committed', snapshot: {paused: false, position: 0.2}});
+      expect(world.follower.running).toBe(true);
+      expect(world.masterCalls).not.toContain('pause');
+    } finally { group.dispose(); }
+  });
+
+  it('does not measure retired transports after disposal inside reconciliation', async () => {
+    const world = makeWorld();
+    let retired = false;
+    const master = {...world.master, get clock() {
+      if (retired) throw new Error('retired clock was read');
+      return world.masterClock;
+    }, reconcile: () => {
+      group.dispose();
+      retired = true;
+      return 'stalled' as const;
+    }};
+    const group = new TransportGroup(master, world.now, {driftCheckIntervalMs: 0});
+    group.addFollower(world.follower);
+    try {
+      await group.dispatch({type: 'play'});
+      world.advance(2);
+      expect(() => group.checkDrift()).not.toThrow();
+      expect(group.snapshot.disposed).toBe(true);
+    } finally { group.dispose(); }
+  });
+
   it('makes a failed background drift correction observable and revises its state', async () => {
     const world = makeWorld();
     const group = makeGroup(world);

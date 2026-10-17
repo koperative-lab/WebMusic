@@ -1,0 +1,13 @@
+{
+  "command": [
+    "npm",
+    "run",
+    "check"
+  ],
+  "cwd": "/tmp/webmusic-final-node24-20261017",
+  "startedAt": "2026-10-17T20:00:46.477520+00:00",
+  "finishedAt": "2026-10-17T20:06:51.456297+00:00",
+  "elapsedSeconds": 364.979,
+  "exitCode": 0,
+  "log": "/workspace/artifacts/recovery-2026-10-17/node24-gate/npm-check.log"
+}

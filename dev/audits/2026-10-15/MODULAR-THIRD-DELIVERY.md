@@ -1,5 +1,10 @@
 # Modular third delivery: precision and project editing
 
+> Recovery notice (2026-10-17): The generated evidence marked unavailable below
+> was not recovered. The results in this report describe the historical run,
+> not current verification. Original artifact paths are retained as text.
+> See the [recovery record](../2026-10-17/MODULAR-RECOVERY-AND-RELEASE-FIXES.md).
+
 This record covers steps 11–12 (MOD-11/12, MC-18/19) in the local
 `modular-redesign` working tree based on `ef8664d`. It extends the uncommitted
 [first](MODULAR-FIRST-DELIVERY.md) and [second](MODULAR-SECOND-DELIVERY.md)
@@ -51,7 +56,7 @@ presenter contract without domain imports.
 
 ## Verification
 
-[`npm run check`](third-evidence/full-check.json) passed as one complete command
+`npm run check` (unavailable: `third-evidence/full-check.json`) passed as one complete command
 (exit 0). It includes formatting, lint, architecture and documentation policies,
 all five package builds, 256 compiled documentation examples, source/test type
 checks, licenses, package verification and release manifests. The workspace
@@ -66,17 +71,17 @@ suites passed 367 files and 4,548 tests:
 | Bridge | 8 | 192 |
 | Documentation | 28 | 238 |
 
-[`npm run docs:build`](third-evidence/docs-build.json) also passed as one complete
+`npm run docs:build` (unavailable: `third-evidence/docs-build.json`) also passed as one complete
 command (exit 0), including the five-package rebuild, 114 generated pages, 112
 public search/Markdown references and site license verification (74 records,
-356 files). The [check log](third-evidence/full-check-output.txt),
-[site build log](third-evidence/docs-build-output.txt) and
+356 files). The check log (unavailable: `third-evidence/full-check-output.txt`),
+site build log (unavailable: `third-evidence/docs-build-output.txt`) and
 [reproducible fixtures](third-evidence/README.md) are retained. Acceptance was
 rebundled after the final site build so measurements use the final package output.
 
 ### Native signal evidence
 
-[The final native suite](third-evidence/timing-results.json) passed all 11 cases
+The final native suite (unavailable: `third-evidence/timing-results.json`) passed all 11 cases
 at 48 kHz with no browser errors. Five mixed Score/Audio cases cover native loops,
 future seek/pause, rate changes during a sounding note and wider loops with a
 shorter clip and negative offset. Their 263,747 compared frames have maximum
@@ -92,9 +97,9 @@ have maximum errors `1.0108947745557373e-7` and `9.655952453169192e-7`, respecti
 against the unchanged `3e-5` tolerance. Ports remain stable and outgoing effect
 handles retire at their audio deadline.
 
-The [run receipt](third-evidence/timing-run-receipt.json),
-[build metadata](third-evidence/timing-build.json) and
-[fingerprint verification](third-evidence/timing-fingerprint-verification.json)
+The run receipt (unavailable: `third-evidence/timing-run-receipt.json`),
+build metadata (unavailable: `third-evidence/timing-build.json`) and
+fingerprint verification (unavailable: `third-evidence/timing-fingerprint-verification.json`)
 match all six public entries and the final fixture bundle. No repository source
 imports were bundled. Native acceptance exposed a decimal loop-boundary rounding
 failure; the corrected segment calculation derives boundaries from the shared
@@ -102,28 +107,28 @@ anchor and integer iteration, with its original failure retained separately.
 
 ### Browser evidence
 
-[The structural editor fixture](third-evidence/modular-third-editor-results.json)
+The structural editor fixture (unavailable: `third-evidence/modular-third-editor-results.json`)
 passed keyboard audio/CV wiring, collision-safe parameter ports, signed layout,
 stable module identity during movement, JSON round-trip, missing-plugin recovery
 and editor unmount without disposing the native oscillator. It uses public built
-Kernel/UI entries and retains [desktop](third-evidence/modular-third-editor-desktop.png)
-and [narrow](third-evidence/modular-third-editor-narrow.png) screenshots.
+Kernel/UI entries and retains desktop (unavailable: `third-evidence/modular-third-editor-desktop.png`)
+and narrow (unavailable: `third-evidence/modular-third-editor-narrow.png`) screenshots.
 
-[The actual public guide and UI Kit reference](third-evidence/modular-third-project-docs-results.json)
+The actual public guide and UI Kit reference (unavailable: `third-evidence/modular-third-project-docs-results.json`)
 passed user-gesture activation, play/pause, rename and keyboard layout edits,
 browser save/load, JSON download/import, CV connection/disconnection, missing-plugin
 recovery and invalid-schema import without damage to the active graph. Loading
 and recovery remain paused. The guide and reference both fit a 320px page; the
 guide's 832px module canvas scrolls within its 239px viewport. No browser errors
 occurred. Retained screenshots show the
-[desktop project](third-evidence/modular-third-project-docs-desktop.png),
-[narrow project](third-evidence/modular-third-project-docs-narrow.png) and
-[narrow UI reference](third-evidence/modular-third-editor-uikit-narrow.png).
+desktop project (unavailable: `third-evidence/modular-third-project-docs-desktop.png`),
+narrow project (unavailable: `third-evidence/modular-third-project-docs-narrow.png`) and
+narrow UI reference (unavailable: `third-evidence/modular-third-editor-uikit-narrow.png`).
 Only fixed documentation chrome was hidden during screenshot capture; interaction
 and geometry assertions used the unchanged page. The invalid-import message is
 intentionally visible in the project screenshots.
 
-[Final output verification](third-evidence/final-output-verification.json) matches
+Final output verification (unavailable: `third-evidence/final-output-verification.json`) matches
 all eight recorded public entries, both fixture bundles and 43 loaded guide
 JavaScript assets, and records both tested public page fingerprints. Final
 status/evidence edits are followed by documentation synchronization, inventory,

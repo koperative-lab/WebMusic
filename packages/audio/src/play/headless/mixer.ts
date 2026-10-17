@@ -17,8 +17,8 @@ import {AudioPlayer, type AudioPlayerTransport} from './audio-player';
 
 /**
  * Scheduling headroom before the stems join, in seconds. Schedulable
- * AudioClipPlayer members receive one future AudioContext time target. Actual
- * alignment depends on each player and backend.
+ * AudioClipPlayer and AudioPlayer members receive one future AudioContext time
+ * target. Actual alignment depends on each player and backend.
  */
 const MIXER_START_LEAD_SECONDS = 0.06;
 
@@ -304,8 +304,10 @@ export class AudioMixer {
       }
       const routable = player as PlayerLike & {readonly outputPort?: AudioOutputPort; peekOutputPort?(): AudioOutputPort | undefined};
       const port = routable.peekOutputPort ? routable.peekOutputPort() : routable.outputPort;
+      // A lazy source still claims membership now; readiness must not let it
+      // hide a direct channel with the same ID from its ordinary remove owner.
+      if (!previous && this.channels.has(init.id)) throw new Error(`Audio channel already exists: ${init.id}`);
       if (port) {
-        if (!previous && this.channels.has(init.id)) throw new Error(`Audio channel already exists: ${init.id}`);
         channel = this.prepareChannel(init.id, port, member);
         member.audio = channel.lease;
       }
@@ -596,7 +598,7 @@ export class AudioMixer {
           // A member removed or replaced while warming no longer belongs to
           // this start. Recheck per member because play may call host listeners.
           if (!this.isCurrent(generation) || this.members.get(m.id) !== m) return;
-          await (m.player instanceof AudioClipPlayer ? m.player.play(when) : m.player.play());
+          await (m.player instanceof AudioClipPlayer || m.player instanceof AudioPlayer ? m.player.play(when) : m.player.play());
           // Structural players can finish an async start after pause/stop.
           if (!this.isCurrent(generation) && this.members.get(m.id) === m) {
             if (this.intent === 'paused') m.player.pause();

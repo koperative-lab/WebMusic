@@ -724,7 +724,11 @@ export class TransportGroup {
     if (this.#pendingTransitions > 0) return 0;
     const now = this.#now();
     if (this.#master.reconcile) {
+      const revision = this.#revision;
       const verdict = this.#master.reconcile(now);
+      // Reconciliation can synchronously submit a newer command or dispose
+      // the group. Neither its verdict nor its old drift sample owns that state.
+      if (this.#disposed || revision !== this.#revision) return 0;
       if (verdict === 'stalled' && this.#intent === 'playing') {
         this.#handleMasterStopped();
         return 0;
@@ -930,6 +934,7 @@ export class TransportGroup {
           this.#intent === 'playing' &&
           !this.#wrapping && this.#pendingTransitions === 0) {
         this.#master.reconcile?.(this.#now());
+        if (this.#disposed || revision !== this.#revision) return;
       }
       this.#reconcileMasterStop();
       this.#checkLoop();

@@ -1,5 +1,10 @@
 # Modular composition: first delivery
 
+> Recovery notice (2026-10-17): The generated evidence marked unavailable below
+> was not recovered. The results in this report describe the historical run,
+> not current verification. Original artifact paths are retained as text.
+> See the [recovery record](../2026-10-17/MODULAR-RECOVERY-AND-RELEASE-FIXES.md).
+
 Baseline: the uncommitted `modular-redesign` working tree based on `ef8664d`.
 Environment: Linux cloud workspace, Node 24.19.0, npm 11.9.0 and Chromium
 151.0.7922.173. Node 22.23.3/npm 10.9.9 was also used during diagnosis. This record describes local source and built-package acceptance;
@@ -29,7 +34,7 @@ Source-local, channel and master inserts remain distinct processing stages.
 
 ## Verification
 
-[`npm run check`](evidence/full-check.json) passed as one complete command on Node 24.19.0 (exit 0),
+`npm run check` (unavailable: `evidence/full-check.json`) passed as one complete command on Node 24.19.0 (exit 0),
 including source policy, formatting, lint, architecture, documentation, all five
 package builds, 252 compiled documentation examples, type checks, licenses,
 package verification and release manifests. The workspace suites passed 352
@@ -44,7 +49,7 @@ files and 4,345 tests:
 | Bridge | 7 | 182 |
 | Documentation | 28 | 231 |
 
-[`npm run docs:build`](evidence/docs-build.json) also passed as one complete
+`npm run docs:build` (unavailable: `evidence/docs-build.json`) also passed as one complete
 command (exit 0), including the five-package rebuild, 113 generated pages,
 111 public search/Markdown references and the site license verification.
 The built-page acceptance below includes the Audio upgrade repair and was
@@ -59,7 +64,7 @@ the subject of the test.
 
 The existing full-score Quick Start test initially exceeded its 20-second budget
 on both supported Node versions during the complete suite.
-[CPU sampling](evidence/quick-start-cpu.txt) located repeated jsdom Document named
+CPU sampling (unavailable: `evidence/quick-start-cpu.txt`) located repeated jsdom Document named
 property scans as the dominant cost within one VexFlow staff render. Staff now
 captures the standard SVG node factory once per owned drawing context. This
 retains real SVG nodes and their namespace, independent view lifetimes and the
@@ -69,7 +74,7 @@ covers sibling views, seek, disposal and unchanged shared context factories.
 
 ### Native browser
 
-[Browser observations](evidence/browser.json) use a bundle resolved from public
+Browser observations (unavailable: `evidence/browser.json`) use a bundle resolved from public
 built entries, without source aliases. Both Score and Audio fixtures passed:
 
 - The empty root has two real participants and one visible transport.
@@ -94,7 +99,7 @@ without narrowing legal parameter values or inventing modulation readback.
 
 ### Built documentation pages
 
-[Public-page observations](evidence/public-demo.json) use the generated site and
+Public-page observations (unavailable: `evidence/public-demo.json`) use the generated site and
 its real MIDI, WAV and MusicXML assets in Chromium. The mixed composition has
 three channels, a source-free root and two master inserts. Both attached room
 panels update to `0.25`; there is one visible transport, a committed seek to
@@ -112,14 +117,14 @@ The original mixed declaration passed after the repair.
 
 The real Quick Start page also passed: 1,615 notes, 37 keyboard keys, 6,189 SVG
 paths, a view borrowing the player's Score and a committed nominal seek to `2.4`
-seconds. The [desktop](evidence/public-demo-desktop.png),
-[narrow composition](evidence/public-demo-narrow.png) and
-[staff](evidence/quick-start.png) screenshots were inspected and retained.
+seconds. The desktop (unavailable: `evidence/public-demo-desktop.png`),
+narrow composition (unavailable: `evidence/public-demo-narrow.png`) and
+staff (unavailable: `evidence/quick-start.png`) screenshots were inspected and retained.
 
 ### Native offline audio
 
-[Offline results](evidence/offline-audio.json) and
-[built-entry fingerprints](evidence/build-fingerprints.json) record 12 native
+Offline results (unavailable: `evidence/offline-audio.json`) and
+built-entry fingerprints (unavailable: `evidence/build-fingerprints.json`) record 12 native
 OfflineAudioContext scenarios. The recorded public-entry fingerprints also
 match the final package build. All passed with no browser errors: 24 steady-state
 windows, 46,080 samples, maximum absolute error `6.25e-8`, tolerance `2e-6`.

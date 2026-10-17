@@ -16,12 +16,18 @@
 // ============================================================================
 
 import {configureAnalysisWorkerScriptUrl} from '../api/worker-client';
-import {defineAllAudioElements} from './index';
+import {AudioMeterElement as LocalAudioMeterElement, defineAllAudioElements} from './index';
 
 // The side effect: register all elements as soon as this module is evaluated.
 const currentScript = typeof document !== 'undefined' ? (document.currentScript as HTMLScriptElement | null) : null;
 configureAnalysisWorkerScriptUrl(currentScript?.src);
 defineAllAudioElements();
+
+// The View bundle may already own this shared tag. Its registered constructor
+// is also the imperative constructor exposed by the Analyze global.
+export const AudioMeterElement: typeof LocalAudioMeterElement =
+  (typeof customElements !== 'undefined' && customElements.get('audio-meter') as typeof LocalAudioMeterElement | undefined) || LocalAudioMeterElement;
+export type AudioMeterElement = LocalAudioMeterElement;
 
 // Re-export the named API too, so the same module can also be used imperatively.
 export * from './index';

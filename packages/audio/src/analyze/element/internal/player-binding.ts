@@ -46,13 +46,19 @@ export function bindAnalysisPlayer(
   host: Element,
   onUpdate: (kind: AnalysisPlayerUpdate, snapshot: AnalysisPlayerSnapshot) => void,
   assigned?: ModuleHandle | null,
+  isCurrent: () => boolean = () => true,
 ): () => void {
   if (assigned !== undefined || host.hasAttribute('input') || (!host.hasAttribute('player') && isModularComposition(host))) {
     return bindModuleAudioInput(host, assigned, ({analyser, error}) => {
       const target = analyser ? {analyser, playing: true} as AnalysisPlayerTarget : undefined;
       onUpdate('target', {target, seconds: 0, duration: 0, playing: !!analyser, state: analyser ? 'ready' : 'unbound'});
-      if (error) host.dispatchEvent(new CustomEvent('webaudio:error', {detail: error, bubbles: true, composed: true}));
-    });
+      if (error !== undefined && isCurrent()) {
+        host.dispatchEvent(new CustomEvent('webaudio:error', {
+          detail: {error: error instanceof Error ? error : new Error(String(error))},
+          bubbles: true, composed: true,
+        }));
+      }
+    }, isCurrent);
   }
   const selector = host.getAttribute('player');
   if (!selector) {
@@ -69,7 +75,7 @@ export function bindAnalysisPlayer(
     detach = undefined;
     const ownGeneration = ++generation;
     const target = element as AnalysisPlayerTarget | undefined;
-    const current = () => !disposed && generation === ownGeneration && host.getAttribute('player') === selector;
+    const current = () => !disposed && isCurrent() && generation === ownGeneration && host.getAttribute('player') === selector;
     host.setAttribute('data-player-state', state);
     onUpdate('target', snapshot(target, state));
     if (!target || !current()) return;

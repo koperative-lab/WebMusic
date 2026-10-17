@@ -264,6 +264,45 @@ describe('AudioMixer lazy admission ownership', () => {
 });
 
 describe('AudioMixer modular channel membership', () => {
+  it.each([false, true])('rejects an occupied direct channel for a prepared=%s facade and removes its route completely', async (prepared) => {
+    const {context, mixer, port} = fixture();
+    const direct = port();
+    const admission = mixer.admitAudio('voice', direct.output);
+    const player = new AudioPlayer(clip(), {audioContext: context.audio});
+    cleanups.push(() => player.dispose());
+    if (prepared) await player.preload();
+    expect(() => mixer.add({id: 'voice', player})).toThrow('Audio channel already exists: voice');
+    expect(mixer.ids()).toEqual(['voice']);
+    expect(admission.active).toBe(true);
+    expect(amplitude(direct.node, context.destination)).toBe(1);
+    mixer.remove('voice');
+    expect(mixer.ids()).toEqual([]);
+    expect(admission.active).toBe(false);
+    expect(amplitude(direct.node, context.destination)).toBe(0);
+    expect(direct.output.disposed).toBe(false);
+    await player.play();
+    expect(player.playing).toBe(true);
+  });
+
+  it.each([false, true])('retains legitimate member replacement by a prepared=%s facade', async (prepared) => {
+    const {context, mixer} = fixture();
+    const previous = new AudioClipPlayer(clip(), {audioContext: context.audio});
+    const replacement = new AudioPlayer(clip(), {audioContext: context.audio});
+    cleanups.push(() => previous.dispose(), () => replacement.dispose());
+    await previous.preload();
+    mixer.add({id: 'voice', player: previous});
+    if (prepared) await replacement.preload();
+    expect(() => mixer.add({id: 'voice', player: replacement})).not.toThrow();
+    await mixer.play();
+    expect(mixer.ids()).toEqual(['voice']);
+    expect(previous.peekOutputPort()?.defaultDestination).toBeUndefined();
+    expect(replacement.playing).toBe(true);
+    mixer.remove('voice');
+    expect(mixer.ids()).toEqual([]);
+    expect(replacement.peekOutputPort()?.defaultDestination).toBeUndefined();
+    expect(replacement.peekOutputPort()?.disposed).toBe(false);
+  });
+
   it.each([
     ['add', 'admit'], ['admit', 'add'], ['add', 'add'],
   ] as const)('preserves %s → %s readiness ownership and fully removes the winner', async (outer, nested) => {

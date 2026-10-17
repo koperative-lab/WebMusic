@@ -15,10 +15,16 @@
 // and import the individual `define*` functions from `@webmusic/audio/view/element`.
 // ============================================================================
 
-import {defineAllAudioElements} from './index';
+import {AudioMeterElement as LocalAudioMeterElement, defineAllAudioElements} from './index';
 
 // The side effect: register all elements as soon as this module is evaluated.
 defineAllAudioElements();
+
+// View and Analyze can be loaded as separate classic bundles in either order.
+// Publish the constructor that owns the registered tag in this document.
+export const AudioMeterElement: typeof LocalAudioMeterElement =
+  (typeof customElements !== 'undefined' && customElements.get('audio-meter') as typeof LocalAudioMeterElement | undefined) || LocalAudioMeterElement;
+export type AudioMeterElement = LocalAudioMeterElement;
 
 // Re-export the named API too, so the same module can also be used imperatively
 // (e.g. `import { defineAudioViewElement } from '@webmusic/audio/view/auto'`).

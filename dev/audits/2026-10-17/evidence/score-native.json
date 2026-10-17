@@ -1,0 +1,882 @@
+{
+  "generatedAt": "2026-10-17T20:05:17.401Z",
+  "consumerDir": "/tmp/webmusic-external-0btO9u/consumer",
+  "node": "v22.22.3",
+  "browser": "151.0.7922.173",
+  "passed": true,
+  "results": [
+    {
+      "kind": "template",
+      "passed": true,
+      "lazyGainAllocations": 0,
+      "parameterIds": [
+        "attackSeconds",
+        "decaySeconds",
+        "sustainLevel",
+        "releaseSeconds"
+      ],
+      "editedDecay": 0.3,
+      "sourcesBeforeRate": 1,
+      "sourcesAfterRate": 1,
+      "originalStarts": [
+        0.22266666666666665
+      ],
+      "originalStops": [
+        2.3026666666666666,
+        1.3366666666666667
+      ]
+    },
+    {
+      "kind": "explicit",
+      "passed": true,
+      "lazyGainAllocations": 0,
+      "parameterIds": [
+        "busGain",
+        "attackSeconds",
+        "decaySeconds",
+        "sustainLevel",
+        "releaseSeconds"
+      ],
+      "editedDecay": 0.3,
+      "sourcesBeforeRate": 1,
+      "sourcesAfterRate": 1,
+      "originalStarts": [
+        0.14266666666666666
+      ],
+      "originalStops": [
+        2.2226666666666666,
+        1.2673333333333334
+      ]
+    }
+  ],
+  "pageErrors": [],
+  "packages": [
+    {
+      "name": "@webmusic/score",
+      "version": "0.3.0",
+      "manifest": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/score/package.json",
+      "manifestSha256": "4b0067b644468c5281e4b0de62a355d0c8ab50f37df22b129a281b7b2cf0aedb"
+    },
+    {
+      "name": "@webmusic/kernel",
+      "version": "0.3.0",
+      "manifest": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/package.json",
+      "manifestSha256": "3dd3595a8068331e9ccc82da7257467620cb4d8be4914a81df51366e47a6e3dc"
+    },
+    {
+      "name": "@webmusic/ui",
+      "version": "0.3.0",
+      "manifest": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/package.json",
+      "manifestSha256": "1ff7ef3007f63bd7f269926a0107572693b96ccb7ca0b26fa812fd81405f8567"
+    }
+  ],
+  "sourceInputs": [],
+  "disallowedInputs": [],
+  "changedInputs": [],
+  "bundleChanged": false,
+  "publicInputs": [
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/chunk-GO4N5T27.js",
+      "sha256": "1580d8995daccb7ccad828ea2150a1301171a1ca3f9bed4d8aa4cb4450fd414c"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/chunk-PXG64RU4.js",
+      "sha256": "66c870d036873e0ed8003aac457a90bfe7f64e359b811e89c60e1a3d365bddb8"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/events.js",
+      "sha256": "5e65922406f8a4b06fe9306a461b7de31733c69edb81b60fdd1380a11f74fc22"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/score/dist/chunk-AVDZAIZG.js",
+      "sha256": "6d543849eee775653e42fc171595e859ca376b7bcf74dd4693e11d6d977f8ffe"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/score/dist/chunk-PXG64RU4.js",
+      "sha256": "66c870d036873e0ed8003aac457a90bfe7f64e359b811e89c60e1a3d365bddb8"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/score/dist/index.js",
+      "sha256": "25d074976b86248d9959ee1d21f0bb0110208617f5286c4125ca1e430faa08bb"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/chunk-HY2YIL75.js",
+      "sha256": "82d8632fc2f91c98549074a6d97ebf643b2b855a50cbef65d8c63bd671e76459"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/audio-context.js",
+      "sha256": "7ee09324dcb9e9e82a2f551deab026ef2743bd14be1531b3cc86aca565632906"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/chunk-53YD73OY.js",
+      "sha256": "dec2f76a44627947448c9f257fb5c9758325acb85d3449b335954c49f78c1cbe"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/chunk-FJLY3RWZ.js",
+      "sha256": "bf3c4d15d3f23d9862dd35e73586dc7368f22df34260a95162063380342c23fe"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/chunk-KXBBVTMJ.js",
+      "sha256": "bdec97bb125bcabac118bdbd88f402e70926910a55dbcc94e6465a5dd7fbae43"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/chunk-NDJF6SGC.js",
+      "sha256": "81159d547a1e3eed955e0a5f0345ce42044506875e4108db03e608cdb9e68287"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/chunk-FYNV7XAU.js",
+      "sha256": "65943ae831d24984148741845c7e1a8866a0ed8779fdefde4b1c39535fd2f179"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/chunk-ANFTSKZF.js",
+      "sha256": "a6dba481dba743420ad364fe52e82e8e70bd1be2878f0cd42665609b8a8f422b"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/module.js",
+      "sha256": "93a390004884e3eee40c8253ac59d1f435021ecaa82b1a7528db3c2f63f21a9e"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/score/dist/chunk-F2ATX36I.js",
+      "sha256": "9e2c095b37f5f681f76ae10187e042c523834106f712ee1a8ebebf3e63178a09"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/chunk-7SWS2OJZ.js",
+      "sha256": "57b4670bebfd7f5f11d7b8411035cb405030ca5632285167db89d6ef311c2a98"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/effect.js",
+      "sha256": "cd58d5594b4f20b3f07ae827a157a53c75bd30c453fa40e9c470b8280e020bfa"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/tick.js",
+      "sha256": "a1e86138e96d640bebe1549861291d8317d45077aa189d1cb3523ce4f6fadf53"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/transport.js",
+      "sha256": "02110ac4dc4cd36fa5f7189229f09f75f731fc0064b7902d44d7baa8239b778a"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/score/dist/chunk-UFBZP2HJ.js",
+      "sha256": "19204f0e7d9efb8676e0295370a73099d9bcc2f334eb0c19fd6e195d3968c39b"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/score/dist/chunk-FECUEA2O.js",
+      "sha256": "596c0149ebf1f5b15881f93ae0f475551eaaa7be5548463add43bc4a8c9a99a2"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/score/dist/chunk-U2EA76DX.js",
+      "sha256": "eea77397b9c489f3d2e92b234f6e6494a94d7b21f8f38d608538ee6d5adf9418"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/score/dist/chunk-45SBOCXT.js",
+      "sha256": "e5c9f450a79d4a760bbe24a10c615c0373e7d286148dc46592326001df1ba0c7"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/score/dist/io/load.js",
+      "sha256": "33465302a6ceddcf5c25238bfacb7b81696833272d70ad9e84cda07ad5ebe143"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/score/dist/chunk-ENEDJ5IB.js",
+      "sha256": "f8430962ecf30349c2c79d4e95cee9ebaa07fbe54282f708b517b8151d961943"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/score/dist/sfz-YA4576OK.js",
+      "sha256": "80ac417d9faa584665586a792c78adae463f2f6d20e68b339ab507c704b61178"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/score/dist/chunk-7QO6GKM7.js",
+      "sha256": "5d5c1b07b6cb448e44ff2dd073b3d6b5b20be7bd4d94574f518979da378ad8c6"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/chunk-OPBHDUZK.js",
+      "sha256": "d59052cb8452f398aef9a9d132c066ed05b702e5ab2596001c6e45d6f3b97ce4"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/meter.js",
+      "sha256": "509912c229ccb872a7d896ced2e2d0a8ae4190dd7e037821517941d4c866448d"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/score/dist/chunk-SAAMKFOB.js",
+      "sha256": "a3461136729cf872d39734613fd0ccb6cb98d3027e8972ff86703df59781e126"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/score/dist/chunk-Y6ZAMOMH.js",
+      "sha256": "af869bb39d06bd54cca753fb78c3c1b8bf58e1d50e9dde1a4c937f54fe0c043a"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/score/dist/play/headless/index.js",
+      "sha256": "97bcd9c7e90abf4b6ba656410f92393cc0263442111985e780d1df6c30f9f837"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/score/dist/chunk-PLP6RPHN.js",
+      "sha256": "377522ac8c62b28cdafb22783493ade05303fd4c551688ca1b66bd9caa9c457e"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/chunk-ULMZWKU2.js",
+      "sha256": "abeab6713dbc83c069c4b166c2bfd6ec6168603b49796c495707a1080f7afcfd"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/elements.js",
+      "sha256": "8669470edc4fb840ca9755212e5662b87a7ed9ff5ce717da03308e695f642b33"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/chunk-VK2B4GNR.js",
+      "sha256": "94d460c0d18b351514225c3be82af4cce5f28e97ada021194ed8c8c6b5f5b9b6"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/chunk-Y5E22HCY.js",
+      "sha256": "8bf97875895045d9d1947452cd5c7cfa1643c4de929c2a6aa5f512ae654f30fc"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/chunk-AMXI3O2Z.js",
+      "sha256": "64da6ad50669b5480bbcccdf29fce69d66ad22cf8212be27ffd191bd730a77f6"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/chunk-3BUTD4K4.js",
+      "sha256": "961e36825dda355eccfb4ff2f202fa6a1c0bd095045f40abb6795f2708708525"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/recorder.js",
+      "sha256": "5030e943a26d88cd48616f5ed19d4a9b709bd3876674f8dcdae6bf15a46af43a"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/chunk-UGMSLVHP.js",
+      "sha256": "58f21c24dbb738dff8e3336548d95945e631e1160bfd7d8f55926eae771115c3"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/chunk-L3DGZ5I4.js",
+      "sha256": "54464f48fa312387444b0cb54d891cbc49853204bb143d1bc8475471518ddbce"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/chunk-BH5SWUF5.js",
+      "sha256": "1ac7ca5523d7c63c86d19028ddb92b13b56331921f802b05e02def1165870d48"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/note.js",
+      "sha256": "15599989fa8babcf63064be2cb4a06aaa38669f53b9c1e28b7fde6f4b4cccc2a"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/chunk-3AVHAV4B.js",
+      "sha256": "4d1b5ae7c02b710e4849ef6f1ba18bda09966c103fde12d60cc12c75b6182f44"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/chunk-FIHUNDEW.js",
+      "sha256": "23bdd08a7a2ce91d14e73d49f917813348c8e9033d90171bb0da65ee0207cadb"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/chunk-QS3WNR7L.js",
+      "sha256": "f3ddfac2b887ed5a371cd14c1e6b91e2d6f69560cc29204f7d88a9b73800e3bf"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/envelope.js",
+      "sha256": "6920ea2e98b521ec8d3df636f6f58ffc6b05881bb9f1bae3691d70e5a4fe8c50"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/chunk-OPHGBACB.js",
+      "sha256": "01fde7ebc96b83a85b2a1b48d17cf5f2aeb50e133809e9762264b1242a2bd0c0"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/eq.js",
+      "sha256": "677ff2da2276e623d903efd887c51c0579e218cb4cec2043ae3ee8a46043c42a"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/chunk-3QIGZHJC.js",
+      "sha256": "a48ac22ea5fc8315708d0302c699023b9b433ade3c9f983044f8e8277796c61f"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/lfo.js",
+      "sha256": "76e702fb44927d4d168257b1379666f906eb1a5dc1319ebe9903d12bb14f1a28"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/chunk-IQOKO2HF.js",
+      "sha256": "b06447aef337222c9e16f44f6b751fca32487b4fd3f508cf8b05e73cd02cd997"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/parameter.js",
+      "sha256": "b8deeb12f565a13d28fb3c711f50114dd225e0cd5119f438ae9c665e0f995baf"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/chunk-H3HBSU5F.js",
+      "sha256": "65af886b1784b71c171f95ce41767ffebd4ef5c8486e2baba4615b2d23d88001"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/macro.js",
+      "sha256": "6eeefdc66f00a59cf5d73875bd3471dfa16b565cc13e9dadda1687cfa76047bc"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/chunk-ATD3GKXC.js",
+      "sha256": "2b82c4de853d806e7c303bbe5b3ce1c6a6b0516b2b7a3bfb88e1a84333ca1dab"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/panel.js",
+      "sha256": "56f3a42a13e556c0ea24317d6c560c841d81a1a048eb00dfedd99fb176ea22f3"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/chunk-KD4R6U7B.js",
+      "sha256": "2af6cfda84e5b3b1acc716c059f569d3c64a1c10b89c3ba8fb62c42d976f3c98"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/chunk-5ILU5AJR.js",
+      "sha256": "4402d4a79d27c20a00c60e605595a31540a45411e21742476936154cad041a81"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/chunk-OAOA5VZU.js",
+      "sha256": "550d06401338ee10285d6e4949b08a8aaa4d5923a80e81849fddcc320df8557a"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/chunk-XLY7XCAZ.js",
+      "sha256": "f68ede17932d2e14858e8f97eb84fdc6d78f130f93463ed38539a050e83ed364"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/transport.js",
+      "sha256": "aad0f2eb34137b751b7771fd84152e4e297bb80e9cbd6ebf00e9688566198385"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/session.js",
+      "sha256": "154a19306c2a4a749ac9eeb84b8fa9b3ae1c66c15c36028a7dab826e00d626cd"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/chunk-NOSAIZNZ.js",
+      "sha256": "758718c2fdf3e148cc41c2edf22a38106d2adc2046d8499d2be17ae669f5b29b"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/mixer.js",
+      "sha256": "1e23b92731184e46f7c3533642ae809687c2175bb426856c6ed365f30a7e8deb"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/score/dist/chunk-2RINFIPL.js",
+      "sha256": "0d4daf4b171d8cc30afdb3454a834861dd52fe3246fc40eb1a7fcae54dea29ff"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/score/dist/chunk-ABNYNENQ.js",
+      "sha256": "c58fdbda9d3df5c1ca14b3df8d0db82c22cecc0f33508dca8378ea31cd4f4b78"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/score/dist/chunk-6ITEWPCU.js",
+      "sha256": "8ab2258697e66726adbd74f60ac9b260490975441499b1062740c1c874a06637"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/score/dist/chunk-NSL2O7MY.js",
+      "sha256": "ae30f02694f499ed40a8760dfbad608b857dcbd09f4f49936e0e4244fb1fe5c6"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/score/dist/play/element/index.js",
+      "sha256": "32873c1150429d980b735b1746352c7c3cf5d7f1d2b36b5da643c50602f62bee"
+    }
+  ],
+  "inputHashes": [
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/chunk-GO4N5T27.js",
+      "sha256": "1580d8995daccb7ccad828ea2150a1301171a1ca3f9bed4d8aa4cb4450fd414c"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/chunk-PXG64RU4.js",
+      "sha256": "66c870d036873e0ed8003aac457a90bfe7f64e359b811e89c60e1a3d365bddb8"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/events.js",
+      "sha256": "5e65922406f8a4b06fe9306a461b7de31733c69edb81b60fdd1380a11f74fc22"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/score/dist/chunk-AVDZAIZG.js",
+      "sha256": "6d543849eee775653e42fc171595e859ca376b7bcf74dd4693e11d6d977f8ffe"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/score/dist/chunk-PXG64RU4.js",
+      "sha256": "66c870d036873e0ed8003aac457a90bfe7f64e359b811e89c60e1a3d365bddb8"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/score/dist/index.js",
+      "sha256": "25d074976b86248d9959ee1d21f0bb0110208617f5286c4125ca1e430faa08bb"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/chunk-HY2YIL75.js",
+      "sha256": "82d8632fc2f91c98549074a6d97ebf643b2b855a50cbef65d8c63bd671e76459"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/audio-context.js",
+      "sha256": "7ee09324dcb9e9e82a2f551deab026ef2743bd14be1531b3cc86aca565632906"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/chunk-53YD73OY.js",
+      "sha256": "dec2f76a44627947448c9f257fb5c9758325acb85d3449b335954c49f78c1cbe"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/chunk-FJLY3RWZ.js",
+      "sha256": "bf3c4d15d3f23d9862dd35e73586dc7368f22df34260a95162063380342c23fe"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/chunk-KXBBVTMJ.js",
+      "sha256": "bdec97bb125bcabac118bdbd88f402e70926910a55dbcc94e6465a5dd7fbae43"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/chunk-NDJF6SGC.js",
+      "sha256": "81159d547a1e3eed955e0a5f0345ce42044506875e4108db03e608cdb9e68287"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/chunk-FYNV7XAU.js",
+      "sha256": "65943ae831d24984148741845c7e1a8866a0ed8779fdefde4b1c39535fd2f179"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/chunk-ANFTSKZF.js",
+      "sha256": "a6dba481dba743420ad364fe52e82e8e70bd1be2878f0cd42665609b8a8f422b"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/module.js",
+      "sha256": "93a390004884e3eee40c8253ac59d1f435021ecaa82b1a7528db3c2f63f21a9e"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/score/dist/chunk-F2ATX36I.js",
+      "sha256": "9e2c095b37f5f681f76ae10187e042c523834106f712ee1a8ebebf3e63178a09"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/chunk-7SWS2OJZ.js",
+      "sha256": "57b4670bebfd7f5f11d7b8411035cb405030ca5632285167db89d6ef311c2a98"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/effect.js",
+      "sha256": "cd58d5594b4f20b3f07ae827a157a53c75bd30c453fa40e9c470b8280e020bfa"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/tick.js",
+      "sha256": "a1e86138e96d640bebe1549861291d8317d45077aa189d1cb3523ce4f6fadf53"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/transport.js",
+      "sha256": "02110ac4dc4cd36fa5f7189229f09f75f731fc0064b7902d44d7baa8239b778a"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/fast-xml-parser/src/util.js",
+      "sha256": "870ccd88a5d51e35ef8cbc59e7f2a35d31defc87aded9c06023ae57838851901"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/fast-xml-parser/src/validator.js",
+      "sha256": "e818788b069429443a97756a4c458999d6751461c4ef41c7bfe1cc58bd70dde4"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@nodable/entities/src/entities.js",
+      "sha256": "96ec5d127a4e8cd77bdc678422f0d57c8ff9e37bcec999983da71a7b72ce9a0e"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@nodable/entities/src/EntityDecoder.js",
+      "sha256": "a56cf2bf8174e0adf94970d70e003afcfc3923a53d0cf973f92d374cfe684544"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@nodable/entities/src/all-entities.js",
+      "sha256": "2f1340ab32dce314f41638b7ee6d0368b974e3302983154b815a6d49a6dfb63b"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@nodable/entities/src/entityTries.js",
+      "sha256": "fa2838d141fba0e8ee5bd2197956c3f6b1d23668be2c8841a585614ea7051f99"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@nodable/entities/src/EntityEncoder.js",
+      "sha256": "812a2077e073564d6470b8fda8ac0d20ecaaf75ddb1594d55d28acc2da8a1a71"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@nodable/entities/src/index.js",
+      "sha256": "79a65ddeda08664d00b7b82f5a903ea437de1dff54a02ed469e9cb1067cb568b"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/fast-xml-parser/src/xmlparser/OptionsBuilder.js",
+      "sha256": "4f177e43f1ac36dc25b2b6a44970c97918091416bd15722b65ac938256bda687"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/fast-xml-parser/src/xmlparser/xmlNode.js",
+      "sha256": "758d7a8b80ea22d19872b5219c874b4039ea2725e7af5ef0afe2a3e295b779e7"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/xml-naming/src/index.js",
+      "sha256": "1a5d9fd32360e2cec4adbee9e56221fb26def66bb9d122e0b5745cebc963d92e"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/fast-xml-parser/src/xmlparser/DocTypeReader.js",
+      "sha256": "e693e1e1b6b972aa641bd2d3f7e18b653088a1f4af2c89d05b6f1f9897f4d7b8"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/anynum/digitTable.js",
+      "sha256": "c649d39c53ebe6817c71407de8105b6d8cbc2326867f90d59f49ab02d9271b44"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/anynum/anynum.js",
+      "sha256": "f8c6a9b031489dfc1573e7a669e4860223ddeedc0007db5dbf5878a14249776d"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/strnum/strnum.js",
+      "sha256": "629ac48bfc12de3bc04b36320e532423212804e04a5b7aa475e76d71de089db3"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/fast-xml-parser/src/ignoreAttributes.js",
+      "sha256": "40bdf3ab37f544b9f8ea7e474114f489a77ed3247e0be597b9e83e01688e8c80"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/path-expression-matcher/src/Expression.js",
+      "sha256": "c24531320e7f2a69708fa8127b660bfb0efaa3a26636e6f56209f8cf4e984b9a"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/path-expression-matcher/src/ExpressionSet.js",
+      "sha256": "a6250aa83ce7f238614fb7421f31e541c63c415a295e3764687693464918f3c4"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/path-expression-matcher/src/Matcher.js",
+      "sha256": "d3b6ddfa1e9a07d6db63939e55106f4df3e8f2e48119c81e372f60f157914d66"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/path-expression-matcher/src/index.js",
+      "sha256": "ebbf22c6979f6b2b05c580922e7dd197f4f4a246d504d4c0cc8e64778f12d4ed"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/is-unsafe/src/contexts/html.js",
+      "sha256": "5f378567e5be461b0850876c91b8f1c8ffdc8d29201d87edd7aa666eecabb9f3"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/is-unsafe/src/contexts/xml.js",
+      "sha256": "2ae9cb95ada7140a80c1ad378f2c4c5f7360bc3f3f6480a96247712df8d8ab16"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/is-unsafe/src/contexts/svg.js",
+      "sha256": "eb9e106e81226ab9547882079e7fd6a9d885d2c71ba78784f7edaa7db61bb941"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/is-unsafe/src/contexts/sql.js",
+      "sha256": "4de8a60302e6ab22ef5607ee88ab6dd6559221fb8620780fb874a1dcf3000d06"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/is-unsafe/src/contexts/shell.js",
+      "sha256": "c26834ef2c968e8a4223a89b2d0e5653952bbf6f3eed95e5ba45465e1870eb65"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/is-unsafe/src/contexts/redos.js",
+      "sha256": "59ceb09d3fd2402e81ed7e5992245f2b398c7ceeb80141138f4eab5da0244586"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/is-unsafe/src/contexts/nosql.js",
+      "sha256": "e20a132033f105a29db1cfdb3d85bbadbb7206b9a7e3336bcb030a63d66b4ab2"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/is-unsafe/src/contexts/log.js",
+      "sha256": "fe1678ab1c98db7387bea6892ec10a90a06a8e2ed01efb1ee577c3d155e4a395"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/is-unsafe/src/contexts/sql-strict.js",
+      "sha256": "16d6522ee4ecf4a91c4d29357ebc874844c266f2ae89ef2a92ec2d391f3762e9"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/is-unsafe/src/index.js",
+      "sha256": "24f5eb575e633b68771328cc12fa6fde751ecc5f2700a6f52ea325938dc94342"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/fast-xml-parser/src/xmlparser/OrderedObjParser.js",
+      "sha256": "d1d5d64ecfb3df9b07ba3bd5ee020d166eaecbf569ebce67be692aa5892a21b5"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/fast-xml-parser/src/xmlparser/node2json.js",
+      "sha256": "cce0e8a8876bd1d3305a666e70cd556fd1ae57560fbca9f4ff0577d91178a0b1"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/fast-xml-parser/src/xmlparser/XMLParser.js",
+      "sha256": "e3280436ad479a240fa6b9034327efe12c97eb9dbd5d541800ebd74a6420c023"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/fast-xml-builder/src/util.js",
+      "sha256": "f585f26c6fa18af890c32d00fbb00fbfd05b9c7217419b6fe8675bdcee264140"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/fast-xml-builder/src/orderedJs2Xml.js",
+      "sha256": "4d5b4d0e3a8b3bfa4535e85a2182446f05f32e179dffba00e07422da84cbdb69"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/fast-xml-builder/src/ignoreAttributes.js",
+      "sha256": "40bdf3ab37f544b9f8ea7e474114f489a77ed3247e0be597b9e83e01688e8c80"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/fast-xml-builder/src/fxb.js",
+      "sha256": "44d54aa1500d8b179b56c47003530ade9220c0daec31caeeeb1a59760eca6d88"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/fast-xml-parser/src/xmlbuilder/json2xml.js",
+      "sha256": "bcc5325758b3b940384c7bf2a7132874421989c2561a59dc49c4ef0b88c352dc"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/fast-xml-parser/src/fxp.js",
+      "sha256": "587bee5d27b6dbc99d24f472ea93028659610c3496be7d667e72483483c3f3ba"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/score/dist/chunk-UFBZP2HJ.js",
+      "sha256": "19204f0e7d9efb8676e0295370a73099d9bcc2f334eb0c19fd6e195d3968c39b"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/score/dist/chunk-FECUEA2O.js",
+      "sha256": "596c0149ebf1f5b15881f93ae0f475551eaaa7be5548463add43bc4a8c9a99a2"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/midi-file/lib/midi-parser.js",
+      "sha256": "2dcbf8aa98cda9b822a241d7e9aed7251ac19afa96568a200ae1f93d8ae1511f"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/midi-file/lib/midi-writer.js",
+      "sha256": "9d10a69ec6ff6cbd8a3db3a5bfdb7249e4beb4a620a36a5c79be334bcb0c0e02"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/midi-file/index.js",
+      "sha256": "00b8308e930d47fa475f4bf867d8b97466e4f1fa045590034620887c966a17fa"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@tonejs/midi/dist/BinarySearch.js",
+      "sha256": "ecd55fa1310a0542e617b19d90094e7b6d5ea04efbfb9819e0c1d08903d4a698"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@tonejs/midi/dist/Header.js",
+      "sha256": "0de762f0eb266a877212df60e3242954cc3ffd9f50169e7b053803c198e98593"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@tonejs/midi/dist/ControlChange.js",
+      "sha256": "8f0b63aa5c5a036b4fe7ff4c068d9ef4b91f7a5f4f81f752fd5359768ce49fad"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@tonejs/midi/dist/ControlChanges.js",
+      "sha256": "234cf554c1cca32c917b2eaac91912d5c377eb75b1bd037b439aa68b628af3a3"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@tonejs/midi/dist/PitchBend.js",
+      "sha256": "7bf15ef32db068725f8834b919c1e5073011056262dac36628b557d7f2c6ba1f"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@tonejs/midi/dist/InstrumentMaps.js",
+      "sha256": "36431ffba629374120af21fa203296dec4947e09f620b0e2e8e33884a71e4ed7"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@tonejs/midi/dist/Instrument.js",
+      "sha256": "3c4f89ae31f01887cf307c5d05c2c9145aefc065e5c70bada80a14c00a5691e1"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@tonejs/midi/dist/Note.js",
+      "sha256": "ef15390204a0cd3ea689936d02821bf5fb25a239b443a580450ccc0d744f633a"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@tonejs/midi/dist/Track.js",
+      "sha256": "2b8de5250cb3e7900c161ea8c4fd190dcae846177ed9fb86effcce078b4c1580"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/array-flatten/dist/index.js",
+      "sha256": "c0ecfb5710941b56937bd4e43ddc94c4ae4b00b316c66e5e497a55e12d5c312b"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@tonejs/midi/dist/Encode.js",
+      "sha256": "5f18a12dd34092278b6886e0a66e515c0223922c7778d3348a7d85c049738607"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@tonejs/midi/dist/Midi.js",
+      "sha256": "d9dbb99865da025fcb0858a1de99c7f608a35e9d24ff81f9099f5bffdc9fe3c2"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/fflate/esm/browser.js",
+      "sha256": "b7ca4450b19559a1d50eb381adcee94b82449674be4cd17789d9beba7e6122a1"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/score/dist/chunk-U2EA76DX.js",
+      "sha256": "eea77397b9c489f3d2e92b234f6e6494a94d7b21f8f38d608538ee6d5adf9418"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/score/dist/chunk-45SBOCXT.js",
+      "sha256": "e5c9f450a79d4a760bbe24a10c615c0373e7d286148dc46592326001df1ba0c7"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/score/dist/io/load.js",
+      "sha256": "33465302a6ceddcf5c25238bfacb7b81696833272d70ad9e84cda07ad5ebe143"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/score/dist/chunk-ENEDJ5IB.js",
+      "sha256": "f8430962ecf30349c2c79d4e95cee9ebaa07fbe54282f708b517b8151d961943"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/score/dist/sfz-YA4576OK.js",
+      "sha256": "80ac417d9faa584665586a792c78adae463f2f6d20e68b339ab507c704b61178"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/score/dist/chunk-7QO6GKM7.js",
+      "sha256": "5d5c1b07b6cb448e44ff2dd073b3d6b5b20be7bd4d94574f518979da378ad8c6"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/chunk-OPBHDUZK.js",
+      "sha256": "d59052cb8452f398aef9a9d132c066ed05b702e5ab2596001c6e45d6f3b97ce4"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/meter.js",
+      "sha256": "509912c229ccb872a7d896ced2e2d0a8ae4190dd7e037821517941d4c866448d"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/score/dist/chunk-SAAMKFOB.js",
+      "sha256": "a3461136729cf872d39734613fd0ccb6cb98d3027e8972ff86703df59781e126"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/score/dist/chunk-Y6ZAMOMH.js",
+      "sha256": "af869bb39d06bd54cca753fb78c3c1b8bf58e1d50e9dde1a4c937f54fe0c043a"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/score/dist/play/headless/index.js",
+      "sha256": "97bcd9c7e90abf4b6ba656410f92393cc0263442111985e780d1df6c30f9f837"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/score/dist/chunk-PLP6RPHN.js",
+      "sha256": "377522ac8c62b28cdafb22783493ade05303fd4c551688ca1b66bd9caa9c457e"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/chunk-ULMZWKU2.js",
+      "sha256": "abeab6713dbc83c069c4b166c2bfd6ec6168603b49796c495707a1080f7afcfd"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/elements.js",
+      "sha256": "8669470edc4fb840ca9755212e5662b87a7ed9ff5ce717da03308e695f642b33"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/chunk-VK2B4GNR.js",
+      "sha256": "94d460c0d18b351514225c3be82af4cce5f28e97ada021194ed8c8c6b5f5b9b6"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/chunk-Y5E22HCY.js",
+      "sha256": "8bf97875895045d9d1947452cd5c7cfa1643c4de929c2a6aa5f512ae654f30fc"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/chunk-AMXI3O2Z.js",
+      "sha256": "64da6ad50669b5480bbcccdf29fce69d66ad22cf8212be27ffd191bd730a77f6"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/chunk-3BUTD4K4.js",
+      "sha256": "961e36825dda355eccfb4ff2f202fa6a1c0bd095045f40abb6795f2708708525"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/recorder.js",
+      "sha256": "5030e943a26d88cd48616f5ed19d4a9b709bd3876674f8dcdae6bf15a46af43a"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/chunk-UGMSLVHP.js",
+      "sha256": "58f21c24dbb738dff8e3336548d95945e631e1160bfd7d8f55926eae771115c3"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/chunk-L3DGZ5I4.js",
+      "sha256": "54464f48fa312387444b0cb54d891cbc49853204bb143d1bc8475471518ddbce"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/chunk-BH5SWUF5.js",
+      "sha256": "1ac7ca5523d7c63c86d19028ddb92b13b56331921f802b05e02def1165870d48"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/note.js",
+      "sha256": "15599989fa8babcf63064be2cb4a06aaa38669f53b9c1e28b7fde6f4b4cccc2a"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/chunk-3AVHAV4B.js",
+      "sha256": "4d1b5ae7c02b710e4849ef6f1ba18bda09966c103fde12d60cc12c75b6182f44"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/chunk-FIHUNDEW.js",
+      "sha256": "23bdd08a7a2ce91d14e73d49f917813348c8e9033d90171bb0da65ee0207cadb"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/chunk-QS3WNR7L.js",
+      "sha256": "f3ddfac2b887ed5a371cd14c1e6b91e2d6f69560cc29204f7d88a9b73800e3bf"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/envelope.js",
+      "sha256": "6920ea2e98b521ec8d3df636f6f58ffc6b05881bb9f1bae3691d70e5a4fe8c50"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/chunk-OPHGBACB.js",
+      "sha256": "01fde7ebc96b83a85b2a1b48d17cf5f2aeb50e133809e9762264b1242a2bd0c0"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/eq.js",
+      "sha256": "677ff2da2276e623d903efd887c51c0579e218cb4cec2043ae3ee8a46043c42a"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/chunk-3QIGZHJC.js",
+      "sha256": "a48ac22ea5fc8315708d0302c699023b9b433ade3c9f983044f8e8277796c61f"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/lfo.js",
+      "sha256": "76e702fb44927d4d168257b1379666f906eb1a5dc1319ebe9903d12bb14f1a28"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/chunk-IQOKO2HF.js",
+      "sha256": "b06447aef337222c9e16f44f6b751fca32487b4fd3f508cf8b05e73cd02cd997"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/parameter.js",
+      "sha256": "b8deeb12f565a13d28fb3c711f50114dd225e0cd5119f438ae9c665e0f995baf"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/chunk-H3HBSU5F.js",
+      "sha256": "65af886b1784b71c171f95ce41767ffebd4ef5c8486e2baba4615b2d23d88001"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/macro.js",
+      "sha256": "6eeefdc66f00a59cf5d73875bd3471dfa16b565cc13e9dadda1687cfa76047bc"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/chunk-ATD3GKXC.js",
+      "sha256": "2b82c4de853d806e7c303bbe5b3ce1c6a6b0516b2b7a3bfb88e1a84333ca1dab"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/panel.js",
+      "sha256": "56f3a42a13e556c0ea24317d6c560c841d81a1a048eb00dfedd99fb176ea22f3"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/chunk-KD4R6U7B.js",
+      "sha256": "2af6cfda84e5b3b1acc716c059f569d3c64a1c10b89c3ba8fb62c42d976f3c98"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/chunk-5ILU5AJR.js",
+      "sha256": "4402d4a79d27c20a00c60e605595a31540a45411e21742476936154cad041a81"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/chunk-OAOA5VZU.js",
+      "sha256": "550d06401338ee10285d6e4949b08a8aaa4d5923a80e81849fddcc320df8557a"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/chunk-XLY7XCAZ.js",
+      "sha256": "f68ede17932d2e14858e8f97eb84fdc6d78f130f93463ed38539a050e83ed364"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/transport.js",
+      "sha256": "aad0f2eb34137b751b7771fd84152e4e297bb80e9cbd6ebf00e9688566198385"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/session.js",
+      "sha256": "154a19306c2a4a749ac9eeb84b8fa9b3ae1c66c15c36028a7dab826e00d626cd"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/chunk-NOSAIZNZ.js",
+      "sha256": "758718c2fdf3e148cc41c2edf22a38106d2adc2046d8499d2be17ae669f5b29b"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/ui/dist/mixer.js",
+      "sha256": "1e23b92731184e46f7c3533642ae809687c2175bb426856c6ed365f30a7e8deb"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/score/dist/chunk-2RINFIPL.js",
+      "sha256": "0d4daf4b171d8cc30afdb3454a834861dd52fe3246fc40eb1a7fcae54dea29ff"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/score/dist/chunk-ABNYNENQ.js",
+      "sha256": "c58fdbda9d3df5c1ca14b3df8d0db82c22cecc0f33508dca8378ea31cd4f4b78"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/score/dist/chunk-6ITEWPCU.js",
+      "sha256": "8ab2258697e66726adbd74f60ac9b260490975441499b1062740c1c874a06637"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/score/dist/chunk-NSL2O7MY.js",
+      "sha256": "ae30f02694f499ed40a8760dfbad608b857dcbd09f4f49936e0e4244fb1fe5c6"
+    },
+    {
+      "file": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/score/dist/play/element/index.js",
+      "sha256": "32873c1150429d980b735b1746352c7c3cf5d7f1d2b36b5da643c50602f62bee"
+    },
+    {
+      "file": "/workspace/artifacts/recovery-2026-10-17/fix-score-native-entry.ts",
+      "sha256": "5edd1ebf34743b11014ca10b511edb3f3849a45fdaa4057d26a44145667f3c2b"
+    }
+  ],
+  "bundleSha256": "bc98aea6ceeaad9ba59e2b6aff4a6822168c2b27f666b4a61321e27fc2d26886"
+}

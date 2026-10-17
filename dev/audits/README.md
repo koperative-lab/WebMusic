@@ -8,6 +8,7 @@ another checkout. [STATUS](../STATUS.md) owns current gaps;
 
 | Date | Records | Evidence and reading boundary |
 |---|---|---|
+| 2026-10-17 | [Modular recovery and release fixes](2026-10-17/MODULAR-RECOVERY-AND-RELEASE-FIXES.md) | Source recovered from exact task-history edits and saved as a Git checkpoint; fresh RC-01–08 repair validation is recorded separately from unavailable historical screenshots and logs. |
 | 2026-10-16 | [Modular release candidate review](2026-10-16/MODULAR-RELEASE-CANDIDATE-REVIEW.md), [evidence reproduction](2026-10-16/release-candidate-review-evidence/README.md) | Read-only follow-up finds eight additional lifecycle, timing, adapter and public-contract defects; fresh Node 22, native/browser and package-consumer evidence is distinguished from prior gates and unpublished release steps. |
 | 2026-10-16 | [Modular release hardening](2026-10-16/MODULAR-RELEASE-HARDENING.md), [evidence reproduction](2026-10-16/release-hardening-evidence/README.md) | Two further reentrant lifecycle repairs, a scoped development dependency fix, and original public media with independent provenance and format checks; integrated verification is recorded in the report. |
 | 2026-10-16 | [Modular release follow-up repairs](2026-10-16/MODULAR-RELEASE-FOLLOWUP-FIXES.md), [evidence reproduction](2026-10-16/release-followup-evidence/README.md) | Twelve further automation, envelope, readiness, packaging and editor findings; current verification and release boundaries are recorded separately from previous passes. |

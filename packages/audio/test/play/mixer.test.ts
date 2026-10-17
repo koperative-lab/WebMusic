@@ -2,6 +2,7 @@ import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {createAudioClip} from '../../src/core';
 import {AudioMixer, createAudioMixer} from '../../src/play/headless/mixer';
 import {AudioClipPlayer, type PlayerLike} from '../../src/play/headless/player';
+import {AudioPlayer} from '../../src/play/headless/audio-player';
 
 // ---------------------------------------------------------------------------
 // A fake PlayerLike that records transport calls and the most recent volume.
@@ -338,6 +339,39 @@ function driftingContext() {
 }
 
 describe('AudioMixer stem alignment', () => {
+  it('aligns a built-in facade with a clip player on play and seek', async () => {
+    const {ctx, starts} = driftingContext();
+    const clip = createAudioClip({sampleRate: 1_000, channelData: [new Float32Array(4_000)]});
+    const facade = new AudioPlayer(clip, {audioContext: ctx});
+    const player = new AudioClipPlayer(clip, {audioContext: ctx});
+    const mixer = new AudioMixer({audioContext: ctx});
+    mixer.add({id: 'facade', player: facade}).add({id: 'clip', player});
+    try {
+      await mixer.play();
+      expect(starts).toHaveLength(2);
+      expect(new Set(starts).size).toBe(1);
+      starts.length = 0;
+      mixer.seek(1);
+      await vi.waitFor(() => expect(starts).toHaveLength(2));
+      expect(new Set(starts).size).toBe(1);
+    } finally {
+      mixer.dispose();
+      facade.dispose();
+      player.dispose();
+    }
+  });
+
+  it('keeps unscheduled structural player dispatch argument-free', async () => {
+    const {ctx} = driftingContext();
+    const player = {...fakePlayer(), play: vi.fn()};
+    const mixer = new AudioMixer({audioContext: ctx});
+    mixer.add({id: 'custom', player});
+    try {
+      await mixer.play();
+      expect(player.play).toHaveBeenCalledExactlyOnceWith();
+    } finally { mixer.dispose(); }
+  });
+
   it('starts every member on one shared audio-clock instant', async () => {
     const {ctx, starts} = driftingContext();
     const mixer = new AudioMixer({audioContext: ctx});

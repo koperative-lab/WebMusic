@@ -1,0 +1,17 @@
+{
+  "command": [
+    "python",
+    "/workspace/.webmusic-setup/reap.py",
+    "node",
+    "scripts/check-external-install.mjs",
+    "--keep"
+  ],
+  "cwd": "/workspace/WebMusic",
+  "startedAt": "2026-10-17T20:03:50.613173+00:00",
+  "node": "v22.22.3",
+  "npm": "10.9.8",
+  "inputFiles": 1448,
+  "exitCode": 0,
+  "durationSeconds": 55.765,
+  "completedAt": "2026-10-17T20:04:46.378669+00:00"
+}

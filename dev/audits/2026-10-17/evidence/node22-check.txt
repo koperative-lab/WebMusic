@@ -1,0 +1,2426 @@
+
+> check
+> npm run check:source && npm run check:licenses && npm run check:packages && npm run check:release-manifests
+
+
+> check:source
+> npm run check:format && npm run check:lockfile && npm run check:dev-server && npm run lint && npm run check:architecture && npm run check:docs && npm run check:dev-docs && npm run check:site-notices && npm run build:packages && npm run check:demo-assets && npm run check:doc-snippets && npm run typecheck && npm run typecheck:tests && npm test
+
+
+> check:format
+> node scripts/check-format.mjs
+
+Format check passed.
+
+> check:lockfile
+> node scripts/check-lockfile.mjs
+
+Lockfile check passed: every declared optional dependency is present across 901 locked packages.
+
+> check:dev-server
+> node --test scripts/docs-dev.test.mjs
+
+TAP version 13
+# Subtest: repeat dev reuses a running server before a package build or takeover
+ok 1 - repeat dev reuses a running server before a package build or takeover
+  ---
+  duration_ms: 1.344185
+  type: 'test'
+  ...
+# Subtest: first root start builds before launch and preserves Astro flags and foreground default
+ok 2 - first root start builds before launch and preserves Astro flags and foreground default
+  ---
+  duration_ms: 1.203658
+  type: 'test'
+  ...
+# Subtest: explicit restart stops before rebuilding; docs restart skips build
+ok 3 - explicit restart stops before rebuilding; docs restart skips build
+  ---
+  duration_ms: 0.268296
+  type: 'test'
+  ...
+# Subtest: status, logs and stop never trigger package builds
+ok 4 - status, logs and stop never trigger package builds
+  ---
+  duration_ms: 0.246314
+  type: 'test'
+  ...
+# Subtest: build and child failures are preserved, including termination code 143
+ok 5 - build and child failures are preserved, including termination code 143
+  ---
+  duration_ms: 27.068386
+  type: 'test'
+  ...
+# Subtest: unsafe bypass flags are rejected before stopping or building
+ok 6 - unsafe bypass flags are rejected before stopping or building
+  ---
+  duration_ms: 0.483704
+  type: 'test'
+  ...
+# Subtest: concurrent starts build and start only once; second caller observes ready server
+ok 7 - concurrent starts build and start only once; second caller observes ready server
+  ---
+  duration_ms: 51.672607
+  type: 'test'
+  ...
+# Subtest: racing stale-owner recovery does not remove a newly acquired lock
+ok 8 - racing stale-owner recovery does not remove a newly acquired lock
+  ---
+  duration_ms: 105.632277
+  type: 'test'
+  ...
+# Subtest: a failing action releases the startup lock for the next attempt
+ok 9 - a failing action releases the startup lock for the next attempt
+  ---
+  duration_ms: 5.737854
+  type: 'test'
+  ...
+# Subtest: foreground readiness releases startup coordination while the child remains running
+ok 10 - foreground readiness releases startup coordination while the child remains running
+  ---
+  duration_ms: 58.16872
+  type: 'test'
+  ...
+# Subtest: interrupting a build stops its process tree before another start
+ok 11 - interrupting a build stops its process tree before another start
+  ---
+  duration_ms: 306.230702
+  type: 'test'
+  ...
+# Subtest: all npm entry points route through the same startup coordinator without predev stop
+ok 12 - all npm entry points route through the same startup coordinator without predev stop
+  ---
+  duration_ms: 1.734441
+  type: 'test'
+  ...
+1..12
+# tests 12
+# suites 0
+# pass 12
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 641.792386
+
+> lint
+> eslint .
+
+
+> check:architecture
+> node --test scripts/release-surface.test.mjs && node scripts/check-architecture.mjs
+
+TAP version 13
+# Subtest: first-release consumers accept Score, Kernel and standalone UI presenter imports
+ok 1 - first-release consumers accept Score, Kernel and standalone UI presenter imports
+  ---
+  duration_ms: 0.841182
+  type: 'test'
+  ...
+# Subtest: deferred packages cannot return through a root or subpath import
+ok 2 - deferred packages cannot return through a root or subpath import
+  ---
+  duration_ms: 0.206395
+  type: 'test'
+  ...
+# Subtest: third-party packages and platform APIs are outside the workspace boundary
+ok 3 - third-party packages and platform APIs are outside the workspace boundary
+  ---
+  duration_ms: 0.23038
+  type: 'test'
+  ...
+# Subtest: deferred dependencies fail even when only optional or used by docs development
+ok 4 - deferred dependencies fail even when only optional or used by docs development
+  ---
+  duration_ms: 1.226682
+  type: 'test'
+  ...
+# Subtest: Score consumers retain required Kernel and optional UI without a deferred package
+ok 5 - Score consumers retain required Kernel and optional UI without a deferred package
+  ---
+  duration_ms: 0.772581
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 74.216405
+Architecture check passed for 5 packages and 441 source modules.
+
+> check:docs
+> node --test scripts/headless-docs-policy.test.mjs && node --experimental-strip-types --no-warnings scripts/check-docs.mjs
+
+TAP version 13
+# Subtest: accepts direct/manual and recursive catalog frames without requiring a catalog
+ok 1 - accepts direct/manual and recursive catalog frames without requiring a catalog
+  ---
+  duration_ms: 4.214213
+  type: 'test'
+  ...
+# Subtest: fenced or commented example demos cannot replace or multiply the rendered main demo
+ok 2 - fenced or commented example demos cannot replace or multiply the rendered main demo
+  ---
+  duration_ms: 1.084912
+  type: 'test'
+  ...
+# Subtest: requires ordered Import, API details and Related; a loose API summary is insufficient
+ok 3 - requires ordered Import, API details and Related; a loose API summary is insufficient
+  ---
+  duration_ms: 0.502533
+  type: 'test'
+  ...
+# Subtest: validates dense orders independently in each capability and rejects Overview leaves
+ok 4 - validates dense orders independently in each capability and rejects Overview leaves
+  ---
+  duration_ms: 1.235475
+  type: 'test'
+  ...
+# Subtest: an unused frame import, missing import or import cycle cannot satisfy frame reachability
+ok 5 - an unused frame import, missing import or import cycle cannot satisfy frame reachability
+  ---
+  duration_ms: 0.549071
+  type: 'test'
+  ...
+# Subtest: rejects separate frame State/Events panels but allows musical state text and reference examples
+ok 6 - rejects separate frame State/Events panels but allows musical state text and reference examples
+  ---
+  duration_ms: 0.387442
+  type: 'test'
+  ...
+# Subtest: the frame retains one canvas, Parameters disclosure, Copy and Reset control
+ok 7 - the frame retains one canvas, Parameters disclosure, Copy and Reset control
+  ---
+  duration_ms: 0.479808
+  type: 'test'
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 76.255536
+check-docs: clean — 73 live-demo pages · 87 instances, 112 pages · 24 elements · 112 routes
+
+> check:dev-docs
+> node --experimental-strip-types --no-warnings scripts/docs-catalog.mjs --check
+
+Development documentation check passed: 272 documents; generated inventories, local file links and dev/.agent reading routes are consistent.
+
+> check:site-notices
+> node --test scripts/site-notices.test.mjs
+
+TAP version 13
+# Subtest: @nodable/entities@3.0.0 site snapshot requires its reviewed version, license and repository
+ok 1 - @nodable/entities@3.0.0 site snapshot requires its reviewed version, license and repository
+  ---
+  duration_ms: 8.934014
+  type: 'test'
+  ...
+# Subtest: @nodable/entities@3.1.0 site snapshot requires its reviewed version, license and repository
+ok 2 - @nodable/entities@3.1.0 site snapshot requires its reviewed version, license and repository
+  ---
+  duration_ms: 4.397103
+  type: 'test'
+  ...
+# Subtest: actual Vite chunks include CSS ownership, exclude tree-shaken dependencies, and preserve maps
+ok 3 - actual Vite chunks include CSS ownership, exclude tree-shaken dependencies, and preserve maps
+  ---
+  duration_ms: 99.676625
+  type: 'test'
+  ...
+# Subtest: real React, Sandpack, Bravura, OSMD and SpessaSynth ship complete site notices
+ok 4 - real React, Sandpack, Bravura, OSMD and SpessaSynth ship complete site notices
+  ---
+  duration_ms: 977.60554
+  type: 'test'
+  ...
+# Subtest: new prebundled dependency versions and modified reviewed fonts require a new review
+ok 5 - new prebundled dependency versions and modified reviewed fonts require a new review
+  ---
+  duration_ms: 3.489934
+  type: 'test'
+  ...
+# Subtest: actual Nodebox bundles and unreviewed license identifiers fail the site policy
+ok 6 - actual Nodebox bundles and unreviewed license identifiers fail the site policy
+  ---
+  duration_ms: 21.887519
+  type: 'test'
+  ...
+# Subtest: Astro builds capture client code and prerender CSS without shipping server dependency notices
+ok 7 - Astro builds capture client code and prerender CSS without shipping server dependency notices
+  ---
+  duration_ms: 1386.968958
+  type: 'test'
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2713.723506
+
+> build:packages
+> npm run build -w @webmusic/kernel && npm run build -w @webmusic/ui && npm run build -w @webmusic/score && npm run build -w @webmusic/audio && npm run build -w @webmusic/bridge && node scripts/package-artifacts.mjs --all --write
+
+
+> @webmusic/kernel@0.3.0 build
+> tsup src/index.ts src/events.ts src/elements.ts src/worker.ts src/audio-context.ts src/player.ts src/effect.ts src/module.ts src/meter.ts src/transport.ts src/tick.ts src/sync.ts src/session.ts --tsconfig tsconfig.build.json --format esm,cjs --splitting --dts --sourcemap --clean && node ../../scripts/package-artifacts.mjs --write
+
+CLI Building entry: src/audio-context.ts, src/effect.ts, src/elements.ts, src/events.ts, src/index.ts, src/meter.ts, src/module.ts, src/player.ts, src/session.ts, src/sync.ts, src/tick.ts, src/transport.ts, src/worker.ts
+CLI Using tsconfig: tsconfig.build.json
+CLI tsup v8.5.1
+CLI Target: es2020
+CLI Cleaning output folder
+ESM Build start
+CJS Build start
+DTS Build start
+CJS dist/session.cjs            530.00 B
+CJS dist/sync.cjs               392.00 B
+CJS dist/transport.cjs          264.00 B
+CJS dist/worker.cjs             346.00 B
+CJS dist/tick.cjs               332.00 B
+CJS dist/audio-context.cjs      367.00 B
+CJS dist/effect.cjs             479.00 B
+CJS dist/events.cjs             257.00 B
+CJS dist/elements.cjs           1.36 KB
+CJS dist/chunk-C3YWUZW3.cjs     1.75 KB
+CJS dist/index.cjs              5.07 KB
+CJS dist/chunk-MG5MSD7J.cjs     22.02 KB
+CJS dist/chunk-UMTPJ76S.cjs     3.52 KB
+CJS dist/chunk-YWCR3ENJ.cjs     26.66 KB
+CJS dist/meter.cjs              404.00 B
+CJS dist/chunk-WOPW6WLR.cjs     12.44 KB
+CJS dist/module.cjs             1.83 KB
+CJS dist/chunk-NSHR7KNN.cjs     52.56 KB
+CJS dist/chunk-BEOKPASG.cjs     114.93 KB
+CJS dist/chunk-SM5YPDDI.cjs     8.29 KB
+CJS dist/chunk-ATYJAEQI.cjs     67.76 KB
+CJS dist/chunk-52NV4WPM.cjs     26.05 KB
+CJS dist/chunk-3INDOVUC.cjs     4.23 KB
+CJS dist/player.cjs             551.00 B
+CJS dist/chunk-ZMU72HJS.cjs     867.00 B
+CJS dist/chunk-VY6WWZSW.cjs     749.00 B
+CJS dist/chunk-7ZTZZ5PN.cjs     1.26 KB
+CJS dist/session.cjs.map        295.00 B
+CJS dist/transport.cjs.map      227.00 B
+CJS dist/worker.cjs.map         231.00 B
+CJS dist/audio-context.cjs.map  245.00 B
+CJS dist/events.cjs.map         221.00 B
+CJS dist/sync.cjs.map           253.00 B
+CJS dist/tick.cjs.map           227.00 B
+CJS dist/effect.cjs.map         267.00 B
+CJS dist/elements.cjs.map       396.00 B
+CJS dist/index.cjs.map          1.04 KB
+CJS dist/chunk-C3YWUZW3.cjs.map 7.70 KB
+CJS dist/chunk-MG5MSD7J.cjs.map 44.37 KB
+CJS dist/chunk-UMTPJ76S.cjs.map 7.37 KB
+CJS dist/chunk-WOPW6WLR.cjs.map 21.92 KB
+CJS dist/module.cjs.map         515.00 B
+CJS dist/meter.cjs.map          239.00 B
+CJS dist/chunk-NSHR7KNN.cjs.map 106.08 KB
+CJS dist/chunk-BEOKPASG.cjs.map 119.87 KB
+CJS dist/chunk-SM5YPDDI.cjs.map 13.88 KB
+CJS dist/chunk-ATYJAEQI.cjs.map 108.87 KB
+CJS dist/chunk-3INDOVUC.cjs.map 10.63 KB
+CJS dist/player.cjs.map         261.00 B
+CJS dist/chunk-52NV4WPM.cjs.map 56.79 KB
+CJS dist/chunk-ZMU72HJS.cjs.map 4.19 KB
+CJS dist/chunk-YWCR3ENJ.cjs.map 39.70 KB
+CJS dist/chunk-VY6WWZSW.cjs.map 2.04 KB
+CJS dist/chunk-7ZTZZ5PN.cjs.map 1.47 KB
+CJS ⚡️ Build success in 330ms
+ESM dist/sync.js               249.00 B
+ESM dist/tick.js               195.00 B
+ESM dist/transport.js          152.00 B
+ESM dist/session.js            356.00 B
+ESM dist/audio-context.js      230.00 B
+ESM dist/worker.js             209.00 B
+ESM dist/effect.js             311.00 B
+ESM dist/index.js              3.19 KB
+ESM dist/elements.js           857.00 B
+ESM dist/chunk-ILKEVUJ3.js     1.62 KB
+ESM dist/chunk-GO4N5T27.js     2.81 KB
+ESM dist/chunk-7SWS2OJZ.js     23.85 KB
+ESM dist/meter.js              242.00 B
+ESM dist/chunk-ULMZWKU2.js     17.46 KB
+ESM dist/chunk-OPBHDUZK.js     9.46 KB
+ESM dist/events.js             145.00 B
+ESM dist/chunk-FYNV7XAU.js     44.54 KB
+ESM dist/chunk-ANFTSKZF.js     94.97 KB
+ESM dist/chunk-HY2YIL75.js     493.00 B
+ESM dist/chunk-53YD73OY.js     6.53 KB
+ESM dist/chunk-FJLY3RWZ.js     3.28 KB
+ESM dist/chunk-KXBBVTMJ.js     51.61 KB
+ESM dist/player.js             339.00 B
+ESM dist/chunk-NDJF6SGC.js     23.82 KB
+ESM dist/chunk-N6KU2HYA.js     660.00 B
+ESM dist/chunk-PXG64RU4.js     1.08 KB
+ESM dist/module.js             1.17 KB
+ESM dist/sync.js.map           71.00 B
+ESM dist/tick.js.map           71.00 B
+ESM dist/transport.js.map      71.00 B
+ESM dist/session.js.map        71.00 B
+ESM dist/audio-context.js.map  71.00 B
+ESM dist/effect.js.map         71.00 B
+ESM dist/index.js.map          71.00 B
+ESM dist/elements.js.map       71.00 B
+ESM dist/chunk-ILKEVUJ3.js.map 6.77 KB
+ESM dist/worker.js.map         71.00 B
+ESM dist/chunk-GO4N5T27.js.map 6.14 KB
+ESM dist/chunk-7SWS2OJZ.js.map 49.05 KB
+ESM dist/meter.js.map          71.00 B
+ESM dist/chunk-OPBHDUZK.js.map 16.61 KB
+ESM dist/chunk-ULMZWKU2.js.map 34.75 KB
+ESM dist/events.js.map         71.00 B
+ESM dist/chunk-FYNV7XAU.js.map 79.96 KB
+ESM dist/chunk-HY2YIL75.js.map 1.72 KB
+ESM dist/chunk-53YD73OY.js.map 11.41 KB
+ESM dist/chunk-FJLY3RWZ.js.map 8.96 KB
+ESM dist/chunk-ANFTSKZF.js.map 155.76 KB
+ESM dist/chunk-KXBBVTMJ.js.map 81.14 KB
+ESM dist/player.js.map         71.00 B
+ESM dist/chunk-PXG64RU4.js.map 71.00 B
+ESM dist/chunk-NDJF6SGC.js.map 44.91 KB
+ESM dist/chunk-N6KU2HYA.js.map 3.85 KB
+ESM dist/module.js.map         71.00 B
+ESM ⚡️ Build success in 331ms
+DTS ⚡️ Build success in 2889ms
+DTS dist/index.d.ts                  4.20 KB
+DTS dist/audio-context.d.ts          621.00 B
+DTS dist/events.d.ts                 1.89 KB
+DTS dist/meter.d.ts                  4.07 KB
+DTS dist/player.d.ts                 2.18 KB
+DTS dist/sync.d.ts                   14.21 KB
+DTS dist/tick.d.ts                   1.97 KB
+DTS dist/transport.d.ts              5.50 KB
+DTS dist/worker.d.ts                 2.06 KB
+DTS dist/elements.d.ts               5.74 KB
+DTS dist/session.d.ts                9.84 KB
+DTS dist/effect.d.ts                 2.44 KB
+DTS dist/module.d.ts                 16.76 KB
+DTS dist/effect-chain-Cu03O5Y0.d.ts  3.51 KB
+DTS dist/parameter-DwQzFmBR.d.ts     7.17 KB
+DTS dist/context-3qIpgOc8.d.ts       4.92 KB
+DTS dist/index.d.cts                 4.22 KB
+DTS dist/audio-context.d.cts         621.00 B
+DTS dist/events.d.cts                1.89 KB
+DTS dist/meter.d.cts                 4.07 KB
+DTS dist/player.d.cts                2.18 KB
+DTS dist/sync.d.cts                  14.21 KB
+DTS dist/tick.d.cts                  1.97 KB
+DTS dist/transport.d.cts             5.50 KB
+DTS dist/worker.d.cts                2.06 KB
+DTS dist/elements.d.cts              5.75 KB
+DTS dist/session.d.cts               9.85 KB
+DTS dist/effect.d.cts                2.45 KB
+DTS dist/module.d.cts                16.77 KB
+DTS dist/effect-chain-Do75T7uK.d.cts 3.51 KB
+DTS dist/parameter-DwQzFmBR.d.cts    7.17 KB
+DTS dist/context-DZwwsmPF.d.cts      4.92 KB
+Package artifact receipts written for 1 package(s).
+
+> @webmusic/ui@0.3.0 build
+> tsup src/index.ts src/analysis.ts src/envelope.ts src/eq.ts src/harmony.ts src/level-analyzer.ts src/lfo.ts src/macro.ts src/meter.ts src/minimap.ts src/mixer.ts src/note.ts src/oscilloscope.ts src/panel.ts src/parameter.ts src/patch-editor.ts src/pitch.ts src/playlist.ts src/recorder.ts src/spectrum-analyzer.ts src/stage.ts src/status.ts src/timeline.ts src/track-list.ts src/transient-analyzer.ts src/transport.ts src/workbench.ts --tsconfig tsconfig.build.json --format esm,cjs --splitting --dts --sourcemap --clean && node ../../scripts/package-artifacts.mjs --write
+
+CLI Building entry: src/analysis.ts, src/envelope.ts, src/eq.ts, src/harmony.ts, src/index.ts, src/level-analyzer.ts, src/lfo.ts, src/macro.ts, src/meter.ts, src/minimap.ts, src/mixer.ts, src/note.ts, src/oscilloscope.ts, src/panel.ts, src/parameter.ts, src/patch-editor.ts, src/pitch.ts, src/playlist.ts, src/recorder.ts, src/spectrum-analyzer.ts, src/stage.ts, src/status.ts, src/timeline.ts, src/track-list.ts, src/transient-analyzer.ts, src/transport.ts, src/workbench.ts
+CLI Using tsconfig: tsconfig.build.json
+CLI tsup v8.5.1
+CLI Target: es2020
+CLI Cleaning output folder
+ESM Build start
+CJS Build start
+DTS Build start
+ESM dist/transient-analyzer.js     207.00 B
+ESM dist/workbench.js              368.00 B
+ESM dist/pitch.js                  502.00 B
+ESM dist/recorder.js               243.00 B
+ESM dist/spectrum-analyzer.js      254.00 B
+ESM dist/stage.js                  372.00 B
+ESM dist/playlist.js               243.00 B
+ESM dist/status.js                 263.00 B
+ESM dist/timeline.js               303.00 B
+ESM dist/track-list.js             279.00 B
+ESM dist/minimap.js                268.00 B
+ESM dist/meter.js                  258.00 B
+ESM dist/note.js                   405.00 B
+ESM dist/oscilloscope.js           233.00 B
+ESM dist/panel.js                  286.00 B
+ESM dist/parameter.js              294.00 B
+ESM dist/analysis.js               965.00 B
+ESM dist/patch-editor.js           289.00 B
+ESM dist/envelope.js               333.00 B
+ESM dist/eq.js                     303.00 B
+ESM dist/harmony.js                478.00 B
+ESM dist/chunk-P4WBBSZ3.js         9.59 KB
+ESM dist/index.js                  4.38 KB
+ESM dist/mixer.js                  378.00 B
+ESM dist/chunk-XLY7XCAZ.js         27.40 KB
+ESM dist/chunk-Q72DW26N.js         36.30 KB
+ESM dist/chunk-TWFLVRUL.js         67.06 KB
+ESM dist/chunk-3BUTD4K4.js         15.60 KB
+ESM dist/chunk-MXOIG4PI.js         16.47 KB
+ESM dist/chunk-OAVC6DPA.js         14.96 KB
+ESM dist/chunk-XO262WDJ.js         21.05 KB
+ESM dist/chunk-BJMZW3B2.js         7.19 KB
+ESM dist/chunk-6A4TGBDZ.js         9.63 KB
+ESM dist/chunk-RVJCS4DQ.js         12.10 KB
+ESM dist/chunk-OAOA5VZU.js         4.17 KB
+ESM dist/chunk-NOSAIZNZ.js         11.83 KB
+ESM dist/chunk-5ILU5AJR.js         22.48 KB
+ESM dist/chunk-KD4R6U7B.js         3.83 KB
+ESM dist/chunk-L3DGZ5I4.js         27.36 KB
+ESM dist/chunk-BH5SWUF5.js         6.50 KB
+ESM dist/chunk-TGGSVMKB.js         20.14 KB
+ESM dist/chunk-OPHGBACB.js         17.40 KB
+ESM dist/chunk-QS3WNR7L.js         16.49 KB
+ESM dist/chunk-3AVHAV4B.js         1.69 KB
+ESM dist/chunk-E6CR4TZ6.js         89.76 KB
+ESM dist/chunk-C46KBNAI.js         2.67 KB
+ESM dist/level-analyzer.js         195.00 B
+ESM dist/chunk-VIUAGA76.js         20.24 KB
+ESM dist/chunk-UKWGP2I6.js         9.93 KB
+ESM dist/lfo.js                    278.00 B
+ESM dist/chunk-3QIGZHJC.js         21.32 KB
+ESM dist/macro.js                  360.00 B
+ESM dist/chunk-VK2B4GNR.js         677.00 B
+ESM dist/chunk-H3HBSU5F.js         7.01 KB
+ESM dist/chunk-IQOKO2HF.js         22.32 KB
+ESM dist/chunk-FIHUNDEW.js         1.21 KB
+ESM dist/chunk-Y5E22HCY.js         1.60 KB
+ESM dist/chunk-AMXI3O2Z.js         509.00 B
+ESM dist/chunk-UGMSLVHP.js         1.56 KB
+ESM dist/transport.js              610.00 B
+ESM dist/chunk-G2LGPXQ4.js         34.36 KB
+ESM dist/chunk-PHVZYYUW.js         15.53 KB
+ESM dist/chunk-ATD3GKXC.js         3.50 KB
+ESM dist/transient-analyzer.js.map 71.00 B
+ESM dist/workbench.js.map          71.00 B
+ESM dist/pitch.js.map              71.00 B
+ESM dist/recorder.js.map           71.00 B
+ESM dist/stage.js.map              71.00 B
+ESM dist/status.js.map             71.00 B
+ESM dist/timeline.js.map           71.00 B
+ESM dist/playlist.js.map           71.00 B
+ESM dist/track-list.js.map         71.00 B
+ESM dist/minimap.js.map            71.00 B
+ESM dist/meter.js.map              71.00 B
+ESM dist/oscilloscope.js.map       71.00 B
+ESM dist/note.js.map               71.00 B
+ESM dist/panel.js.map              71.00 B
+ESM dist/parameter.js.map          71.00 B
+ESM dist/analysis.js.map           71.00 B
+ESM dist/patch-editor.js.map       71.00 B
+ESM dist/envelope.js.map           71.00 B
+ESM dist/eq.js.map                 71.00 B
+ESM dist/harmony.js.map            71.00 B
+ESM dist/index.js.map              71.00 B
+ESM dist/chunk-P4WBBSZ3.js.map     14.46 KB
+ESM dist/mixer.js.map              71.00 B
+ESM dist/chunk-XLY7XCAZ.js.map     60.10 KB
+ESM dist/chunk-Q72DW26N.js.map     86.29 KB
+ESM dist/spectrum-analyzer.js.map  71.00 B
+ESM dist/chunk-3BUTD4K4.js.map     29.86 KB
+ESM dist/chunk-TWFLVRUL.js.map     151.93 KB
+ESM dist/chunk-MXOIG4PI.js.map     32.85 KB
+ESM dist/chunk-OAVC6DPA.js.map     26.65 KB
+ESM dist/chunk-BJMZW3B2.js.map     13.53 KB
+ESM dist/chunk-6A4TGBDZ.js.map     22.50 KB
+ESM dist/chunk-RVJCS4DQ.js.map     22.67 KB
+ESM dist/chunk-OAOA5VZU.js.map     10.45 KB
+ESM dist/chunk-NOSAIZNZ.js.map     22.46 KB
+ESM dist/chunk-5ILU5AJR.js.map     47.03 KB
+ESM dist/chunk-KD4R6U7B.js.map     7.28 KB
+ESM dist/chunk-L3DGZ5I4.js.map     50.71 KB
+ESM dist/chunk-BH5SWUF5.js.map     25.20 KB
+ESM dist/chunk-TGGSVMKB.js.map     42.32 KB
+ESM dist/chunk-OPHGBACB.js.map     31.91 KB
+ESM dist/chunk-QS3WNR7L.js.map     31.27 KB
+ESM dist/chunk-3AVHAV4B.js.map     4.06 KB
+ESM dist/chunk-C46KBNAI.js.map     12.82 KB
+ESM dist/level-analyzer.js.map     71.00 B
+ESM dist/chunk-E6CR4TZ6.js.map     214.02 KB
+ESM dist/lfo.js.map                71.00 B
+ESM dist/chunk-UKWGP2I6.js.map     15.06 KB
+ESM dist/chunk-3QIGZHJC.js.map     40.21 KB
+ESM dist/macro.js.map              71.00 B
+ESM dist/chunk-VK2B4GNR.js.map     3.19 KB
+ESM dist/chunk-IQOKO2HF.js.map     41.56 KB
+ESM dist/chunk-FIHUNDEW.js.map     5.36 KB
+ESM dist/chunk-Y5E22HCY.js.map     3.90 KB
+ESM dist/chunk-AMXI3O2Z.js.map     2.58 KB
+ESM dist/chunk-UGMSLVHP.js.map     7.11 KB
+ESM dist/transport.js.map          71.00 B
+ESM dist/chunk-VIUAGA76.js.map     43.33 KB
+ESM dist/chunk-H3HBSU5F.js.map     13.43 KB
+ESM dist/chunk-XO262WDJ.js.map     37.55 KB
+ESM dist/chunk-PHVZYYUW.js.map     26.44 KB
+ESM dist/chunk-G2LGPXQ4.js.map     61.63 KB
+ESM dist/chunk-ATD3GKXC.js.map     7.65 KB
+ESM ⚡️ Build success in 510ms
+CJS dist/transient-analyzer.cjs     322.00 B
+CJS dist/workbench.cjs              523.00 B
+CJS dist/pitch.cjs                  774.00 B
+CJS dist/transport.cjs              935.00 B
+CJS dist/playlist.cjs               386.00 B
+CJS dist/recorder.cjs               386.00 B
+CJS dist/spectrum-analyzer.cjs      394.00 B
+CJS dist/stage.cjs                  571.00 B
+CJS dist/status.cjs                 409.00 B
+CJS dist/track-list.cjs             425.00 B
+CJS dist/meter.cjs                  404.00 B
+CJS dist/timeline.cjs               452.00 B
+CJS dist/minimap.cjs                414.00 B
+CJS dist/mixer.cjs                  536.00 B
+CJS dist/note.cjs                   646.00 B
+CJS dist/oscilloscope.cjs           373.00 B
+CJS dist/panel.cjs                  432.00 B
+CJS dist/parameter.cjs              440.00 B
+CJS dist/patch-editor.cjs           435.00 B
+CJS dist/analysis.cjs               1.45 KB
+CJS dist/envelope.cjs               485.00 B
+CJS dist/eq.cjs                     455.00 B
+CJS dist/harmony.cjs                708.00 B
+CJS dist/index.cjs                  7.08 KB
+CJS dist/chunk-B3O5IRP4.cjs         10.37 KB
+CJS dist/chunk-YGYD3EJA.cjs         32.85 KB
+CJS dist/chunk-HRHWHSUD.cjs         42.97 KB
+CJS dist/chunk-4PRMBTJ5.cjs         77.20 KB
+CJS dist/chunk-4ET5GOBM.cjs         20.23 KB
+CJS dist/chunk-26WAI5VL.cjs         19.27 KB
+CJS dist/chunk-23QPDPAP.cjs         16.32 KB
+CJS dist/chunk-IXVWPSTE.cjs         25.92 KB
+CJS dist/chunk-57AQI2HC.cjs         9.66 KB
+CJS dist/chunk-EF7PVZSG.cjs         12.59 KB
+CJS dist/chunk-L2UQRJVP.cjs         14.58 KB
+CJS dist/chunk-EK7525VA.cjs         16.25 KB
+CJS dist/chunk-IMI3VZYJ.cjs         5.79 KB
+CJS dist/chunk-5CYFMQNH.cjs         26.29 KB
+CJS dist/chunk-5P7BLABN.cjs         5.22 KB
+CJS dist/chunk-FYQKKP2D.cjs         8.15 KB
+CJS dist/chunk-U7IQ7EFO.cjs         31.93 KB
+CJS dist/chunk-TFOJRJLX.cjs         17.24 KB
+CJS dist/chunk-KWW7C2AB.cjs         5.30 KB
+CJS dist/chunk-6XLRMOYF.cjs         38.61 KB
+CJS dist/chunk-LXK4WFF7.cjs         24.72 KB
+CJS dist/chunk-K4PMXN7A.cjs         4.13 KB
+CJS dist/chunk-GR7UZ7LW.cjs         21.11 KB
+CJS dist/chunk-P4UWXKVF.cjs         104.78 KB
+CJS dist/level-analyzer.cjs         310.00 B
+CJS dist/lfo.cjs                    427.00 B
+CJS dist/chunk-ATYE6GHU.cjs         10.91 KB
+CJS dist/chunk-5PU5A4XJ.cjs         838.00 B
+CJS dist/chunk-EKY2DNGL.cjs         26.64 KB
+CJS dist/macro.cjs                  559.00 B
+CJS dist/chunk-YFOFA4YG.cjs         8.91 KB
+CJS dist/chunk-2INOBN3O.cjs         2.25 KB
+CJS dist/chunk-HH5KGXZB.cjs         27.23 KB
+CJS dist/chunk-JH25ND5K.cjs         2.03 KB
+CJS dist/chunk-CZR7TZRG.cjs         610.00 B
+CJS dist/chunk-3GX6EL5S.cjs         2.61 KB
+CJS dist/chunk-34L5LB3H.cjs         2.52 KB
+CJS dist/chunk-DKJMJVUK.cjs         21.83 KB
+CJS dist/chunk-DZ5YQLFZ.cjs         22.69 KB
+CJS dist/transient-analyzer.cjs.map 250.00 B
+CJS dist/workbench.cjs.map          307.00 B
+CJS dist/pitch.cjs.map              344.00 B
+CJS dist/transport.cjs.map          385.00 B
+CJS dist/playlist.cjs.map           253.00 B
+CJS dist/recorder.cjs.map           253.00 B
+CJS dist/spectrum-analyzer.cjs.map  258.00 B
+CJS dist/stage.cjs.map              293.00 B
+CJS dist/status.cjs.map             262.00 B
+CJS dist/track-list.cjs.map         270.00 B
+CJS dist/meter.cjs.map              260.00 B
+CJS dist/timeline.cjs.map           279.00 B
+CJS dist/minimap.cjs.map            264.00 B
+CJS dist/note.cjs.map               306.00 B
+CJS dist/oscilloscope.cjs.map       248.00 B
+CJS dist/panel.cjs.map              260.00 B
+CJS dist/parameter.cjs.map          268.00 B
+CJS dist/patch-editor.cjs.map       274.00 B
+CJS dist/analysis.cjs.map           417.00 B
+CJS dist/envelope.cjs.map           292.00 B
+CJS dist/eq.cjs.map                 280.00 B
+CJS dist/harmony.cjs.map            333.00 B
+CJS dist/index.cjs.map              1.59 KB
+CJS dist/mixer.cjs.map              312.00 B
+CJS dist/chunk-B3O5IRP4.cjs.map     12.51 KB
+CJS dist/chunk-YGYD3EJA.cjs.map     53.18 KB
+CJS dist/chunk-HRHWHSUD.cjs.map     75.37 KB
+CJS dist/chunk-4PRMBTJ5.cjs.map     126.85 KB
+CJS dist/chunk-4ET5GOBM.cjs.map     30.68 KB
+CJS dist/chunk-26WAI5VL.cjs.map     30.23 KB
+CJS dist/chunk-23QPDPAP.cjs.map     21.44 KB
+CJS dist/chunk-IXVWPSTE.cjs.map     34.16 KB
+CJS dist/chunk-57AQI2HC.cjs.map     11.97 KB
+CJS dist/chunk-L2UQRJVP.cjs.map     22.89 KB
+CJS dist/chunk-EF7PVZSG.cjs.map     27.40 KB
+CJS dist/chunk-EK7525VA.cjs.map     20.14 KB
+CJS dist/chunk-IMI3VZYJ.cjs.map     9.81 KB
+CJS dist/chunk-5CYFMQNH.cjs.map     58.90 KB
+CJS dist/chunk-5P7BLABN.cjs.map     9.03 KB
+CJS dist/chunk-FYQKKP2D.cjs.map     28.92 KB
+CJS dist/chunk-U7IQ7EFO.cjs.map     43.04 KB
+CJS dist/chunk-TFOJRJLX.cjs.map     26.63 KB
+CJS dist/chunk-KWW7C2AB.cjs.map     7.59 KB
+CJS dist/chunk-6XLRMOYF.cjs.map     49.09 KB
+CJS dist/chunk-LXK4WFF7.cjs.map     35.30 KB
+CJS dist/chunk-K4PMXN7A.cjs.map     14.61 KB
+CJS dist/chunk-P4UWXKVF.cjs.map     184.95 KB
+CJS dist/level-analyzer.cjs.map     242.00 B
+CJS dist/chunk-GR7UZ7LW.cjs.map     41.76 KB
+CJS dist/chunk-5PU5A4XJ.cjs.map     3.58 KB
+CJS dist/lfo.cjs.map                269.00 B
+CJS dist/chunk-ATYE6GHU.cjs.map     13.27 KB
+CJS dist/macro.cjs.map              293.00 B
+CJS dist/chunk-EKY2DNGL.cjs.map     35.26 KB
+CJS dist/chunk-YFOFA4YG.cjs.map     11.97 KB
+CJS dist/chunk-2INOBN3O.cjs.map     6.14 KB
+CJS dist/chunk-HH5KGXZB.cjs.map     36.20 KB
+CJS dist/chunk-JH25ND5K.cjs.map     4.67 KB
+CJS dist/chunk-CZR7TZRG.cjs.map     2.98 KB
+CJS dist/chunk-3GX6EL5S.cjs.map     7.59 KB
+CJS dist/chunk-34L5LB3H.cjs.map     5.12 KB
+CJS dist/chunk-DZ5YQLFZ.cjs.map     27.41 KB
+CJS dist/chunk-DKJMJVUK.cjs.map     27.62 KB
+CJS ⚡️ Build success in 523ms
+DTS ⚡️ Build success in 3982ms
+DTS dist/index.d.ts                    7.08 KB
+DTS dist/analysis.d.ts                 9.08 KB
+DTS dist/envelope.d.ts                 1.79 KB
+DTS dist/eq.d.ts                       2.00 KB
+DTS dist/harmony.d.ts                  17.85 KB
+DTS dist/level-analyzer.d.ts           965.00 B
+DTS dist/lfo.d.ts                      2.92 KB
+DTS dist/macro.d.ts                    1.76 KB
+DTS dist/meter.d.ts                    1.79 KB
+DTS dist/minimap.d.ts                  1.73 KB
+DTS dist/mixer.d.ts                    2.07 KB
+DTS dist/note.d.ts                     4.20 KB
+DTS dist/oscilloscope.d.ts             1.66 KB
+DTS dist/panel.d.ts                    1.72 KB
+DTS dist/parameter.d.ts                3.51 KB
+DTS dist/patch-editor.d.ts             3.83 KB
+DTS dist/pitch.d.ts                    15.54 KB
+DTS dist/playlist.d.ts                 3.77 KB
+DTS dist/recorder.d.ts                 2.16 KB
+DTS dist/spectrum-analyzer.d.ts        1.69 KB
+DTS dist/stage.d.ts                    7.47 KB
+DTS dist/status.d.ts                   1.21 KB
+DTS dist/timeline.d.ts                 3.13 KB
+DTS dist/track-list.d.ts               3.79 KB
+DTS dist/transient-analyzer.d.ts       983.00 B
+DTS dist/workbench.d.ts                8.62 KB
+DTS dist/transport.d.ts                12.64 KB
+DTS dist/harmony-style-CMWPwKcO.d.ts   1.68 KB
+DTS dist/pitch-geometry-DKkCiPQz.d.ts  5.57 KB
+DTS dist/frame-DzPHJlgc.d.ts           4.86 KB
+DTS dist/index.d.cts                   7.11 KB
+DTS dist/analysis.d.cts                9.08 KB
+DTS dist/envelope.d.cts                1.79 KB
+DTS dist/eq.d.cts                      2.00 KB
+DTS dist/harmony.d.cts                 17.85 KB
+DTS dist/level-analyzer.d.cts          965.00 B
+DTS dist/lfo.d.cts                     2.92 KB
+DTS dist/macro.d.cts                   1.76 KB
+DTS dist/meter.d.cts                   1.79 KB
+DTS dist/minimap.d.cts                 1.74 KB
+DTS dist/mixer.d.cts                   2.07 KB
+DTS dist/note.d.cts                    4.21 KB
+DTS dist/oscilloscope.d.cts            1.66 KB
+DTS dist/panel.d.cts                   1.72 KB
+DTS dist/parameter.d.cts               3.51 KB
+DTS dist/patch-editor.d.cts            3.83 KB
+DTS dist/pitch.d.cts                   15.54 KB
+DTS dist/playlist.d.cts                3.77 KB
+DTS dist/recorder.d.cts                2.16 KB
+DTS dist/spectrum-analyzer.d.cts       1.69 KB
+DTS dist/stage.d.cts                   7.47 KB
+DTS dist/status.d.cts                  1.21 KB
+DTS dist/timeline.d.cts                3.13 KB
+DTS dist/track-list.d.cts              3.79 KB
+DTS dist/transient-analyzer.d.cts      983.00 B
+DTS dist/workbench.d.cts               8.62 KB
+DTS dist/transport.d.cts               12.64 KB
+DTS dist/harmony-style-CMWPwKcO.d.cts  1.68 KB
+DTS dist/pitch-geometry-DKkCiPQz.d.cts 5.57 KB
+DTS dist/frame-DzPHJlgc.d.cts          4.86 KB
+Package artifact receipts written for 1 package(s).
+
+> @webmusic/score@0.3.0 build
+> node ../../scripts/clean-dist.mjs dist && tsup && node scripts/postbuild-worker-facade.mjs && node scripts/check-cjs-worker-client.mjs && node ../../scripts/bundle-notices.mjs && node ../../scripts/package-artifacts.mjs --write
+
+CLI Building entry: {"global":"src/play/element/global.ts"}
+CLI Using tsconfig: tsconfig.build.json
+CLI Building entry: {"play/auto":"src/play/element/auto.ts"}
+CLI Using tsconfig: ../../scripts/tsconfig.browser-iife.json
+CLI tsup v8.5.1
+CLI Using tsup config: /workspace/WebMusic/packages/score/tsup.config.mjs
+CLI tsup v8.5.1
+CLI Using tsup config: /workspace/WebMusic/packages/score/tsup.config.mjs
+CLI Building entry: src/index.ts, src/analyze/index.ts, src/analyze/worker-client.ts, src/analyze/worker-protocol.ts, src/analyze/worker-url.ts, src/analyze/worker.ts, src/io/index.ts, src/io/load.ts, src/io/worker-client.ts, src/io/worker-protocol.ts, src/io/worker.ts, src/play/drivers.ts, src/play/index.ts, src/react/index.tsx, src/view/index.ts, src/analyze/element/index.ts, src/analyze/headless/index.ts, src/io/formats/index.ts, src/play/demos/index.ts, src/play/element/auto.ts, src/play/element/global.ts, src/play/element/index.ts, src/play/headless/index.ts, src/view/element/index.ts, src/view/headless/index.ts, src/view/render/index.ts
+CLI Using tsconfig: tsconfig.build.json
+CLI tsup v8.5.1
+CLI Using tsup config: /workspace/WebMusic/packages/score/tsup.config.mjs
+CLI Building entry: src/index.ts, src/analyze/index.ts, src/analyze/worker-client.ts, src/analyze/worker-protocol.ts, src/analyze/worker-url.ts, src/analyze/worker.ts, src/io/index.ts, src/io/load.ts, src/io/worker-client.ts, src/io/worker-protocol.ts, src/io/worker.ts, src/play/drivers.ts, src/play/index.ts, src/react/index.tsx, src/view/index.ts, src/analyze/element/index.ts, src/analyze/headless/index.ts, src/io/formats/index.ts, src/play/demos/index.ts, src/play/element/auto.ts, src/play/element/global.ts, src/play/element/index.ts, src/play/headless/index.ts, src/view/element/index.ts, src/view/headless/index.ts, src/view/render/index.ts
+CLI Using tsconfig: tsconfig.build.json
+CLI tsup v8.5.1
+CLI Using tsup config: /workspace/WebMusic/packages/score/tsup.config.mjs
+CLI Target: es2020
+IIFE Build start
+CLI Target: es2020
+ESM Build start
+CLI Target: es2020
+CJS Build start
+DTS Build start
+DTS Build start
+DTS Build start
+IIFE dist/play/auto.global.js     668.03 KB
+IIFE dist/play/auto.global.js.map 2.72 MB
+IIFE ⚡️ Build success in 755ms
+ESM dist/play/demos/index.js            10.02 KB
+ESM dist/play/element/auto.js           2.17 KB
+ESM dist/play/headless/index.js         2.97 KB
+ESM dist/io/worker-client.js            12.75 KB
+ESM dist/react/index.js                 23.66 KB
+ESM dist/view/index.js                  759.00 B
+ESM dist/analyze/index.js               21.55 KB
+ESM dist/serializer-SJMRGYY5.js         198.00 B
+ESM dist/sfz-YA4576OK.js                267.00 B
+ESM dist/play/element/global.js         34.00 B
+ESM dist/play/element/index.js          2.13 KB
+ESM dist/chunk-ABNYNENQ.js              17.54 KB
+ESM dist/chunk-6SHXFBSO.js              19.54 KB
+ESM dist/io/worker-protocol.js          439.00 B
+ESM dist/io/worker.js                   1.51 KB
+ESM dist/chunk-WJAKIJKV.js              4.16 KB
+ESM dist/play/drivers.js                3.75 KB
+ESM dist/chunk-2RINFIPL.js              163.71 KB
+ESM dist/play/index.js                  1.40 KB
+ESM dist/chunk-6ITEWPCU.js              463.00 B
+ESM dist/chunk-ENEDJ5IB.js              5.07 KB
+ESM dist/chunk-QPMGHKQZ.js              42.00 B
+ESM dist/chunk-PLP6RPHN.js              5.59 KB
+ESM dist/chunk-XBBFKSWV.js              10.11 KB
+ESM dist/chunk-Y6ZAMOMH.js              4.24 KB
+ESM dist/chunk-SAAMKFOB.js              50.70 KB
+ESM dist/chunk-JNTWPSJE.js              8.61 KB
+ESM dist/chunk-F2ATX36I.js              36.81 KB
+ESM dist/chunk-GNKXFWW2.js              5.13 KB
+ESM dist/chunk-7OVFETD7.js              158.15 KB
+ESM dist/chunk-7QO6GKM7.js              261.34 KB
+ESM dist/chunk-ZJYTMMXB.js              7.88 KB
+ESM dist/analyze/worker-client.js       581.00 B
+ESM dist/index.js                       2.28 KB
+ESM dist/chunk-RC3IQAAP.js              55.79 KB
+ESM dist/chunk-TZUA3ULS.js              42.00 B
+ESM dist/analyze/worker-url.js          179.00 B
+ESM dist/analyze/worker.js              4.60 KB
+ESM dist/chunk-HKSNPU73.js              17.54 KB
+ESM dist/analyze/worker-protocol.js     318.00 B
+ESM dist/chunk-TZADZADN.js              383.00 B
+ESM dist/chunk-J2YLVCWN.js              60.98 KB
+ESM dist/io/index.js                    2.14 KB
+ESM dist/chunk-BBLMZHIK.js              11.82 KB
+ESM dist/chunk-M2RHFW35.js              1.08 KB
+ESM dist/io/load.js                     895.00 B
+ESM dist/chunk-NSL2O7MY.js              42.00 B
+ESM dist/chunk-45SBOCXT.js              12.98 KB
+ESM dist/chunk-U2EA76DX.js              76.00 KB
+ESM dist/chunk-6AKTIGL4.js              3.78 KB
+ESM dist/chunk-UFBZP2HJ.js              21.42 KB
+ESM dist/chunk-FECUEA2O.js              7.60 KB
+ESM dist/chunk-AVDZAIZG.js              123.98 KB
+ESM dist/chunk-PXG64RU4.js              1.08 KB
+ESM dist/view/headless/index.js         396.00 B
+ESM dist/io/formats/index.js            1.57 KB
+ESM dist/analyze/headless/index.js      1.60 KB
+ESM dist/view/render/index.js           624.00 B
+ESM dist/view/element/index.js          55.40 KB
+ESM dist/analyze/element/index.js       70.75 KB
+ESM dist/play/demos/index.js.map        21.99 KB
+ESM dist/play/element/auto.js.map       1.70 KB
+ESM dist/play/headless/index.js.map     71.00 B
+ESM dist/io/worker-client.js.map        28.10 KB
+ESM dist/react/index.js.map             51.91 KB
+ESM dist/view/index.js.map              71.00 B
+ESM dist/analyze/index.js.map           48.34 KB
+ESM dist/serializer-SJMRGYY5.js.map     71.00 B
+ESM dist/sfz-YA4576OK.js.map            71.00 B
+ESM dist/play/element/global.js.map     71.00 B
+ESM dist/play/element/index.js.map      71.00 B
+ESM dist/chunk-ABNYNENQ.js.map          37.46 KB
+ESM dist/chunk-6SHXFBSO.js.map          41.07 KB
+ESM dist/io/worker-protocol.js.map      71.00 B
+ESM dist/io/worker.js.map               2.99 KB
+ESM dist/chunk-WJAKIJKV.js.map          10.78 KB
+ESM dist/play/drivers.js.map            8.34 KB
+ESM dist/chunk-6ITEWPCU.js.map          1.13 KB
+ESM dist/play/index.js.map              71.00 B
+ESM dist/chunk-ENEDJ5IB.js.map          10.85 KB
+ESM dist/chunk-QPMGHKQZ.js.map          71.00 B
+ESM dist/chunk-PLP6RPHN.js.map          13.07 KB
+ESM dist/chunk-2RINFIPL.js.map          314.40 KB
+ESM dist/chunk-XBBFKSWV.js.map          21.13 KB
+ESM dist/chunk-Y6ZAMOMH.js.map          10.38 KB
+ESM dist/chunk-JNTWPSJE.js.map          17.53 KB
+ESM dist/chunk-SAAMKFOB.js.map          111.57 KB
+ESM dist/chunk-F2ATX36I.js.map          76.53 KB
+ESM dist/chunk-GNKXFWW2.js.map          11.95 KB
+ESM dist/chunk-7OVFETD7.js.map          330.18 KB
+ESM dist/analyze/worker-client.js.map   71.00 B
+ESM dist/chunk-ZJYTMMXB.js.map          22.19 KB
+ESM dist/index.js.map                   71.00 B
+ESM dist/chunk-RC3IQAAP.js.map          199.72 KB
+ESM dist/analyze/worker-url.js.map      71.00 B
+ESM dist/analyze/worker.js.map          9.29 KB
+ESM dist/chunk-TZUA3ULS.js.map          71.00 B
+ESM dist/analyze/worker-protocol.js.map 71.00 B
+ESM dist/chunk-HKSNPU73.js.map          29.31 KB
+ESM dist/chunk-TZADZADN.js.map          1.65 KB
+ESM dist/io/index.js.map                71.00 B
+ESM dist/chunk-BBLMZHIK.js.map          27.17 KB
+ESM dist/chunk-M2RHFW35.js.map          4.10 KB
+ESM dist/io/load.js.map                 71.00 B
+ESM dist/chunk-J2YLVCWN.js.map          194.70 KB
+ESM dist/chunk-45SBOCXT.js.map          28.32 KB
+ESM dist/chunk-6AKTIGL4.js.map          8.10 KB
+ESM dist/chunk-U2EA76DX.js.map          152.35 KB
+ESM dist/chunk-FECUEA2O.js.map          22.30 KB
+ESM dist/chunk-NSL2O7MY.js.map          71.00 B
+ESM dist/chunk-UFBZP2HJ.js.map          42.90 KB
+ESM dist/chunk-PXG64RU4.js.map          71.00 B
+ESM dist/chunk-AVDZAIZG.js.map          286.71 KB
+ESM dist/chunk-7QO6GKM7.js.map          525.37 KB
+ESM dist/io/formats/index.js.map        71.00 B
+ESM dist/view/headless/index.js.map     71.00 B
+ESM dist/analyze/headless/index.js.map  71.00 B
+ESM dist/view/render/index.js.map       71.00 B
+ESM dist/view/element/index.js.map      107.91 KB
+ESM dist/analyze/element/index.js.map   117.89 KB
+ESM ⚡️ Build success in 2213ms
+CJS dist/view/render/index.cjs           920.00 B
+CJS dist/view/headless/index.cjs         592.00 B
+CJS dist/serializer-3YAKQIB3.cjs         313.00 B
+CJS dist/sfz-OMQ7NGYG.cjs                454.00 B
+CJS dist/io/formats/index.cjs            2.39 KB
+CJS dist/play/demos/index.cjs            12.43 KB
+CJS dist/analyze/headless/index.cjs      2.39 KB
+CJS dist/play/element/auto.cjs           3.38 KB
+CJS dist/play/element/global.cjs         48.00 B
+CJS dist/play/element/index.cjs          3.31 KB
+CJS dist/chunk-SZBAFOX2.cjs              20.87 KB
+CJS dist/play/headless/index.cjs         4.90 KB
+CJS dist/chunk-UYJ2W4SC.cjs              189.92 KB
+CJS dist/chunk-3AP7QU22.cjs              21.60 KB
+CJS dist/view/element/index.cjs          68.93 KB
+CJS dist/io/worker-client.cjs            14.10 KB
+CJS dist/io/worker-protocol.cjs          616.00 B
+CJS dist/io/worker.cjs                   2.23 KB
+CJS dist/chunk-7J55YFR4.cjs              4.89 KB
+CJS dist/play/drivers.cjs                4.58 KB
+CJS dist/play/index.cjs                  2.28 KB
+CJS dist/chunk-PGQQML47.cjs              5.50 KB
+CJS dist/chunk-XUCS2OM5.cjs              546.00 B
+CJS dist/chunk-4LMR7NOH.cjs              7.13 KB
+CJS dist/chunk-A3W4NUQ4.cjs              56.00 B
+CJS dist/react/index.cjs                 27.73 KB
+CJS dist/chunk-HAJFPHGW.cjs              11.63 KB
+CJS dist/chunk-Q475HXKQ.cjs              55.17 KB
+CJS dist/chunk-XJRVQHZJ.cjs              173.28 KB
+CJS dist/chunk-6E6T75VX.cjs              5.70 KB
+CJS dist/chunk-N7C3FN7Q.cjs              40.84 KB
+CJS dist/view/index.cjs                  1.16 KB
+CJS dist/chunk-JKLMPUH2.cjs              283.92 KB
+CJS dist/chunk-BZE5KQTP.cjs              10.12 KB
+CJS dist/chunk-PKTJJQWI.cjs              5.42 KB
+CJS dist/chunk-IGHIMG5J.cjs              8.64 KB
+CJS dist/chunk-LH4J4V6S.cjs              59.67 KB
+CJS dist/index.cjs                       4.00 KB
+CJS dist/analyze/index.cjs               24.21 KB
+CJS dist/chunk-BPDCCWTO.cjs              5.28 KB
+CJS dist/analyze/worker-client.cjs       806.00 B
+CJS dist/chunk-MARE6ZNX.cjs              56.00 B
+CJS dist/chunk-2F2JCAVH.cjs              22.40 KB
+CJS dist/analyze/worker-protocol.cjs     480.00 B
+CJS dist/analyze/worker-url.cjs          291.00 B
+CJS dist/chunk-ZOQGZGOS.cjs              447.00 B
+CJS dist/analyze/worker.cjs              5.77 KB
+CJS dist/chunk-SKBPLVFN.cjs              13.44 KB
+CJS dist/analyze/element/index.cjs       91.80 KB
+CJS dist/chunk-BSSSJBKH.cjs              1.26 KB
+CJS dist/io/index.cjs                    3.27 KB
+CJS dist/io/load.cjs                     1.31 KB
+CJS dist/chunk-Z56M2FDQ.cjs              56.00 B
+CJS dist/chunk-3RM2ZWM2.cjs              15.12 KB
+CJS dist/chunk-QEP5ALPF.cjs              82.09 KB
+CJS dist/chunk-MWGFFESZ.cjs              23.01 KB
+CJS dist/chunk-FQNVPGD4.cjs              7.78 KB
+CJS dist/chunk-4K4QVAO5.cjs              131.21 KB
+CJS dist/chunk-7ZTZZ5PN.cjs              1.26 KB
+CJS dist/chunk-RXDL5MTF.cjs              64.89 KB
+CJS dist/serializer-3YAKQIB3.cjs.map     258.00 B
+CJS dist/view/headless/index.cjs.map     314.00 B
+CJS dist/view/render/index.cjs.map       351.00 B
+CJS dist/sfz-OMQ7NGYG.cjs.map            261.00 B
+CJS dist/io/formats/index.cjs.map        577.00 B
+CJS dist/play/demos/index.cjs.map        27.48 KB
+CJS dist/play/element/auto.cjs.map       2.39 KB
+CJS dist/analyze/headless/index.cjs.map  629.00 B
+CJS dist/play/element/global.cjs.map     193.00 B
+CJS dist/chunk-SZBAFOX2.cjs.map          33.68 KB
+CJS dist/play/element/index.cjs.map      794.00 B
+CJS dist/play/headless/index.cjs.map     1.00 KB
+CJS dist/chunk-UYJ2W4SC.cjs.map          270.16 KB
+CJS dist/chunk-3AP7QU22.cjs.map          46.34 KB
+CJS dist/io/worker-client.cjs.map        26.24 KB
+CJS dist/io/worker-protocol.cjs.map      328.00 B
+CJS dist/io/worker.cjs.map               3.79 KB
+CJS dist/chunk-7J55YFR4.cjs.map          12.59 KB
+CJS dist/play/index.cjs.map              598.00 B
+CJS dist/play/drivers.cjs.map            10.65 KB
+CJS dist/view/element/index.cjs.map      95.15 KB
+CJS dist/chunk-PGQQML47.cjs.map          13.72 KB
+CJS dist/chunk-4LMR7NOH.cjs.map          14.82 KB
+CJS dist/chunk-XUCS2OM5.cjs.map          1.53 KB
+CJS dist/chunk-A3W4NUQ4.cjs.map          183.00 B
+CJS dist/chunk-HAJFPHGW.cjs.map          17.67 KB
+CJS dist/react/index.cjs.map             46.83 KB
+CJS dist/chunk-Q475HXKQ.cjs.map          136.59 KB
+CJS dist/chunk-6E6T75VX.cjs.map          13.04 KB
+CJS dist/chunk-N7C3FN7Q.cjs.map          62.31 KB
+CJS dist/view/index.cjs.map              387.00 B
+CJS dist/chunk-XJRVQHZJ.cjs.map          265.84 KB
+CJS dist/chunk-BZE5KQTP.cjs.map          19.56 KB
+CJS dist/chunk-PKTJJQWI.cjs.map          12.60 KB
+CJS dist/chunk-IGHIMG5J.cjs.map          26.47 KB
+CJS dist/chunk-JKLMPUH2.cjs.map          433.42 KB
+CJS dist/chunk-LH4J4V6S.cjs.map          199.34 KB
+CJS dist/index.cjs.map                   878.00 B
+CJS dist/analyze/index.cjs.map           39.77 KB
+CJS dist/chunk-BPDCCWTO.cjs.map          7.39 KB
+CJS dist/analyze/worker-client.cjs.map   375.00 B
+CJS dist/chunk-MARE6ZNX.cjs.map          183.00 B
+CJS dist/chunk-2F2JCAVH.cjs.map          29.11 KB
+CJS dist/analyze/worker-protocol.cjs.map 273.00 B
+CJS dist/chunk-ZOQGZGOS.cjs.map          1.91 KB
+CJS dist/analyze/worker-url.cjs.map      243.00 B
+CJS dist/analyze/worker.cjs.map          9.36 KB
+CJS dist/chunk-BSSSJBKH.cjs.map          4.66 KB
+CJS dist/chunk-SKBPLVFN.cjs.map          31.95 KB
+CJS dist/analyze/element/index.cjs.map   102.96 KB
+CJS dist/chunk-Z56M2FDQ.cjs.map          183.00 B
+CJS dist/io/load.cjs.map                 404.00 B
+CJS dist/io/index.cjs.map                699.00 B
+CJS dist/chunk-3RM2ZWM2.cjs.map          28.92 KB
+CJS dist/chunk-QEP5ALPF.cjs.map          125.67 KB
+CJS dist/chunk-MWGFFESZ.cjs.map          46.29 KB
+CJS dist/chunk-FQNVPGD4.cjs.map          23.46 KB
+CJS dist/chunk-7ZTZZ5PN.cjs.map          1.47 KB
+CJS dist/chunk-4K4QVAO5.cjs.map          232.35 KB
+CJS dist/chunk-RXDL5MTF.cjs.map          176.84 KB
+CJS ⚡️ Build success in 3007ms
+DTS ⚡️ Build success in 6443ms
+DTS dist/play/element/global.d.ts 262.00 B
+Export "Part" of module "src/core/model/Part.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/analyze/headless/worker.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/io/worker-client.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/io/worker-protocol.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/view/render/osmd-staff.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Note" of module "src/core/model/Note.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/view/core/types.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/analyze/core/rhythm-pattern-occurrences.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/analyze/headless/session.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/io/load.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/view/headless/score-map.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/view/core/map.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/view/headless/score-view.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/play/demos/samples.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/view/core/layout.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/view/core/note-sequence.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/play/core/record.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/play/headless/interactive-player.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/play/headless/rack/contracts.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/react/analysis.tsx" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/react/context.tsx" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/react/presets.tsx" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/view/element/score-view.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/view/element/score-sheet-view.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/analyze/element/internal/analysis-component.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/play/headless/recorder.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/play/headless/controller.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Note" of module "src/core/model/Note.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/play/headless/controller.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Note" of module "src/core/model/Note.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/play/headless/audio-contracts.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/play/headless/audio-contracts.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/play/headless/score-player.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/io/diagnostics.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/io/formats/musicxml/parser.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/io/formats/mxl.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/io/formats/midi.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/io/formats/abc.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/analyze/headless/report.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/analyze/headless/follower.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/analyze/headless/workbench.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/analyze/headless/rhythm-pattern-flow.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/view/render/renderers/factory.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/view/render/thumbnail.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/view/render/score-visualizer.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Note" of module "src/core/model/Note.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/analyze/core/chords.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/analyze/core/chords.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/analyze/core/distributions.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/analyze/core/interval.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/analyze/core/key.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/analyze/core/motif.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/analyze/core/roman.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/analyze/core/rhythm-inspection.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Note" of module "src/core/model/Note.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/analyze/core/summary.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/analyze/core/summary.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/analyze/core/voice-leading.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Note" of module "src/core/model/Note.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/play/headless/soundfont-synth.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/play/headless/tone-player.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Note" of module "src/core/model/Note.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/play/headless/tone-player.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/play/headless/score-module.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/analyze/headless/worker-client.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/analyze/headless/worker-protocol.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/io/formats/musicxml/serializer.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/play/element/score-recorder.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Note" of module "src/core/model/Note.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/play/element/internal/preset-player.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/play/element/internal/preset-player.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/play/element/score-player.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/play/element/score-rack-part.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/play/headless/loop-player.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/play/headless/ab-player.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/play/headless/render.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+DTS ⚡️ Build success in 46351ms
+DTS dist/io/index.d.cts                1.42 KB
+DTS dist/io/worker.d.cts               13.00 B
+DTS dist/analyze/worker-url.d.cts      343.00 B
+DTS dist/analyze/worker.d.cts          1.39 KB
+DTS dist/io/worker-client.d.cts        2.64 KB
+DTS dist/io/worker-protocol.d.cts      3.47 KB
+DTS dist/play/drivers.d.cts            1.88 KB
+DTS dist/io/load.d.cts                 5.10 KB
+DTS dist/view/headless/index.d.cts     3.41 KB
+DTS dist/play/demos/index.d.cts        3.75 KB
+DTS dist/view/index.d.cts              2.81 KB
+DTS dist/react/index.d.cts             8.17 KB
+DTS dist/view/element/index.d.cts      11.87 KB
+DTS dist/analyze/element/index.d.cts   4.75 KB
+DTS dist/analyze/headless/index.d.cts  23.76 KB
+DTS dist/view/render/index.d.cts       4.14 KB
+DTS dist/analyze/index.d.cts           12.67 KB
+DTS dist/index.d.cts                   13.24 KB
+DTS dist/play/headless/index.d.cts     43.67 KB
+DTS dist/analyze/worker-client.d.cts   4.15 KB
+DTS dist/analyze/worker-protocol.d.cts 2.80 KB
+DTS dist/io/formats/index.d.cts        1.24 KB
+DTS dist/play/element/index.d.cts      44.70 KB
+DTS dist/play/element/auto.d.cts       2.28 KB
+DTS dist/play/index.d.cts              1.80 KB
+DTS dist/rack-DVwYWCt5.d.cts           3.75 KB
+DTS dist/compat-CxbVD-Y1.d.cts         3.91 KB
+DTS dist/pitch-readout-CVBpaKuG.d.cts  1.49 KB
+DTS dist/osmd-staff-CdOzzByU.d.cts     2.83 KB
+DTS dist/playback-Bsm_GWSc.d.cts       2.40 KB
+DTS dist/types-D4LrND9O.d.cts          6.43 KB
+DTS dist/chord-spelling-B5-bzbbr.d.cts 6.76 KB
+DTS dist/live-trackers-D2cbJyG8.d.cts  2.92 KB
+DTS dist/session-D7AUNSO2.d.cts        6.68 KB
+DTS dist/pitch-view-Bsh2chvc.d.cts     3.64 KB
+DTS dist/score-view-DVZ2u1sY.d.cts     2.85 KB
+DTS dist/contracts-CsVmeQlL.d.cts      9.89 KB
+DTS dist/controller-qTG7rQOR.d.cts     14.54 KB
+DTS dist/score-player-CxWU4Oes.d.cts   24.00 KB
+DTS dist/abc-BPPmEk0L.d.cts            9.85 KB
+DTS dist/Score-d-88_BDC.d.cts          42.60 KB
+DTS dist/index-407rHJd3.d.cts          8.02 KB
+Export "Part" of module "src/core/model/Part.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/analyze/headless/worker.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/io/worker-client.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/io/worker-protocol.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/view/render/osmd-staff.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Note" of module "src/core/model/Note.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/view/core/types.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/analyze/core/rhythm-pattern-occurrences.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/analyze/headless/session.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/io/load.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/view/headless/score-map.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/view/core/map.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/view/headless/score-view.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/play/demos/samples.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/view/core/layout.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/view/core/note-sequence.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/play/core/record.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/play/headless/interactive-player.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/play/headless/rack/contracts.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/react/analysis.tsx" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/react/context.tsx" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/react/presets.tsx" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/view/element/score-view.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/view/element/score-sheet-view.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/analyze/element/internal/analysis-component.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/play/headless/recorder.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/play/headless/controller.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Note" of module "src/core/model/Note.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/play/headless/controller.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Note" of module "src/core/model/Note.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/play/headless/audio-contracts.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/play/headless/audio-contracts.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/play/headless/score-player.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/io/diagnostics.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/io/formats/musicxml/parser.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/io/formats/mxl.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/io/formats/midi.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/io/formats/abc.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/analyze/headless/report.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/analyze/headless/follower.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/analyze/headless/workbench.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/analyze/headless/rhythm-pattern-flow.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/view/render/renderers/factory.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/view/render/thumbnail.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/view/render/score-visualizer.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Note" of module "src/core/model/Note.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/analyze/core/chords.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/analyze/core/chords.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/analyze/core/distributions.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/analyze/core/interval.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/analyze/core/key.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/analyze/core/motif.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/analyze/core/roman.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/analyze/core/rhythm-inspection.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Note" of module "src/core/model/Note.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/analyze/core/summary.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/analyze/core/summary.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/analyze/core/voice-leading.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Note" of module "src/core/model/Note.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/play/headless/soundfont-synth.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/play/headless/tone-player.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Note" of module "src/core/model/Note.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/play/headless/tone-player.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/play/headless/score-module.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/analyze/headless/worker-client.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/analyze/headless/worker-protocol.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/io/formats/musicxml/serializer.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/play/element/score-recorder.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Note" of module "src/core/model/Note.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/play/element/internal/preset-player.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/play/element/internal/preset-player.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/play/element/score-player.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/play/element/score-rack-part.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/play/headless/loop-player.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/play/headless/ab-player.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+Export "Score" of module "src/core/model/Score.ts" was reexported through module "src/core/index.ts" while both modules are dependencies of each other and will end up in different chunks by current Rollup settings. This scenario is not well supported at the moment as it will produce a circular dependency between chunks and will likely lead to broken execution order.
+Either change the import in "src/play/headless/render.ts" to point directly to the exporting module or reconfigure "output.manualChunks" to ensure these modules end up in the same chunk.
+DTS ⚡️ Build success in 47626ms
+DTS dist/io/index.d.ts                1.41 KB
+DTS dist/io/worker.d.ts               13.00 B
+DTS dist/analyze/worker-url.d.ts      343.00 B
+DTS dist/analyze/worker.d.ts          1.39 KB
+DTS dist/io/worker-client.d.ts        2.64 KB
+DTS dist/io/worker-protocol.d.ts      3.47 KB
+DTS dist/play/drivers.d.ts            1.88 KB
+DTS dist/io/load.d.ts                 5.10 KB
+DTS dist/view/headless/index.d.ts     3.40 KB
+DTS dist/play/demos/index.d.ts        3.74 KB
+DTS dist/view/index.d.ts              2.80 KB
+DTS dist/react/index.d.ts             8.16 KB
+DTS dist/view/element/index.d.ts      11.87 KB
+DTS dist/analyze/element/index.d.ts   4.75 KB
+DTS dist/analyze/headless/index.d.ts  23.75 KB
+DTS dist/view/render/index.d.ts       4.13 KB
+DTS dist/analyze/index.d.ts           12.67 KB
+DTS dist/index.d.ts                   13.23 KB
+DTS dist/play/headless/index.d.ts     43.66 KB
+DTS dist/analyze/worker-client.d.ts   4.15 KB
+DTS dist/analyze/worker-protocol.d.ts 2.79 KB
+DTS dist/io/formats/index.d.ts        1.24 KB
+DTS dist/play/element/index.d.ts      44.69 KB
+DTS dist/play/element/auto.d.ts       2.27 KB
+DTS dist/play/index.d.ts              1.79 KB
+DTS dist/rack-DvxrPnCY.d.ts           3.75 KB
+DTS dist/compat-CbmJ4WuO.d.ts         3.91 KB
+DTS dist/pitch-readout-9ATAnTbk.d.ts  1.49 KB
+DTS dist/osmd-staff-B-Vo7_lj.d.ts     2.83 KB
+DTS dist/playback-CQsb9OvU.d.ts       2.40 KB
+DTS dist/types-C9akjUSr.d.ts          6.43 KB
+DTS dist/chord-spelling-B5-bzbbr.d.ts 6.76 KB
+DTS dist/live-trackers-BdgJDEXk.d.ts  2.92 KB
+DTS dist/session-BPfphyb1.d.ts        6.68 KB
+DTS dist/pitch-view-BJhUF4gd.d.ts     3.64 KB
+DTS dist/score-view-DYf92ZpY.d.ts     2.85 KB
+DTS dist/contracts-_hwJpzfe.d.ts      9.89 KB
+DTS dist/controller-CkN_bPmJ.d.ts     14.54 KB
+DTS dist/score-player-mOTLgcFo.d.ts   24.00 KB
+DTS dist/abc-B_D5qa1a.d.ts            9.85 KB
+DTS dist/Score-d-88_BDC.d.ts          42.60 KB
+DTS dist/index-D6tE2Vax.d.ts          8.02 KB
+Worker URL layout verified for 2 spawn sites.
+CommonJS worker-client fallback verified for 2 clients.
+Bundled notices written: 26 packages in 7 bundles.
+Package artifact receipts written for 1 package(s).
+
+> @webmusic/audio@0.3.0 build
+> node ../../scripts/clean-dist.mjs dist && tsup && node scripts/postbuild-worker-facade.mjs && node ../../scripts/bundle-notices.mjs --package-dir . && node ../../scripts/package-artifacts.mjs --write
+
+CLI Building entry: {"view/auto":"src/view/element/auto.ts"}
+CLI Using tsconfig: ../../scripts/tsconfig.browser-iife.json
+CLI Building entry: {"play/auto":"src/play/element/auto.ts"}
+CLI Using tsconfig: ../../scripts/tsconfig.browser-iife.json
+CLI Building entry: {"analyze/auto":"src/analyze/element/auto.ts"}
+CLI Using tsconfig: ../../scripts/tsconfig.browser-iife.json
+CLI tsup v8.5.1
+CLI Using tsup config: /workspace/WebMusic/packages/audio/tsup.config.mjs
+CLI tsup v8.5.1
+CLI Using tsup config: /workspace/WebMusic/packages/audio/tsup.config.mjs
+CLI tsup v8.5.1
+CLI Using tsup config: /workspace/WebMusic/packages/audio/tsup.config.mjs
+CLI Building entry: src/index.ts, src/analyze/index.ts, src/analyze/transcribe.ts, src/analyze/worker-client.ts, src/analyze/worker-protocol.ts, src/analyze/worker.ts, src/play/index.ts, src/play/worker-client.ts, src/play/worker-protocol.ts, src/play/worker.ts, src/react/index.tsx, src/view/index.ts, src/analyze/element/auto.ts, src/analyze/element/global.ts, src/analyze/element/index.ts, src/analyze/headless/index.ts, src/play/element/auto.ts, src/play/element/global.ts, src/play/element/index.ts, src/play/headless/index.ts, src/view/element/auto.ts, src/view/element/global.ts, src/view/element/index.ts, src/view/headless/index.ts, src/view/render/index.ts
+CLI Using tsconfig: tsconfig.build.json
+CLI tsup v8.5.1
+CLI Using tsup config: /workspace/WebMusic/packages/audio/tsup.config.mjs
+CLI Building entry: src/index.ts, src/analyze/index.ts, src/analyze/transcribe.ts, src/analyze/worker-client.ts, src/analyze/worker-protocol.ts, src/analyze/worker.ts, src/play/index.ts, src/play/worker-client.ts, src/play/worker-protocol.ts, src/play/worker.ts, src/react/index.tsx, src/view/index.ts, src/analyze/element/auto.ts, src/analyze/element/global.ts, src/analyze/element/index.ts, src/analyze/headless/index.ts, src/play/element/auto.ts, src/play/element/global.ts, src/play/element/index.ts, src/play/headless/index.ts, src/view/element/auto.ts, src/view/element/global.ts, src/view/element/index.ts, src/view/headless/index.ts, src/view/render/index.ts
+CLI Using tsconfig: tsconfig.build.json
+CLI tsup v8.5.1
+CLI Using tsup config: /workspace/WebMusic/packages/audio/tsup.config.mjs
+CLI Target: es2020
+IIFE Build start
+CLI Target: es2020
+IIFE Build start
+CLI Target: es2020
+IIFE Build start
+CLI Target: es2020
+ESM Build start
+CLI Target: es2020
+CJS Build start
+IIFE dist/view/auto.global.js     122.72 KB
+IIFE dist/view/auto.global.js.map 576.93 KB
+IIFE ⚡️ Build success in 361ms
+IIFE dist/analyze/auto.global.js     101.20 KB
+IIFE dist/analyze/auto.global.js.map 393.01 KB
+IIFE ⚡️ Build success in 379ms
+IIFE dist/play/auto.global.js     275.58 KB
+IIFE dist/play/auto.global.js.map 1.07 MB
+IIFE ⚡️ Build success in 438ms
+DTS Build start
+DTS Build start
+ESM dist/play/element/auto.js           1.20 KB
+ESM dist/view/render/index.js           960.00 B
+ESM dist/play/headless/index.js         892.00 B
+ESM dist/view/element/auto.js           946.00 B
+ESM dist/view/headless/index.js         3.65 KB
+ESM dist/react/index.js                 10.10 KB
+ESM dist/analyze/element/auto.js        1.40 KB
+ESM dist/analyze/headless/index.js      430.00 B
+ESM dist/api-XL4HU2EC.js                1.20 KB
+ESM dist/play/element/global.js         34.00 B
+ESM dist/play/element/index.js          958.00 B
+ESM dist/view/element/global.js         34.00 B
+ESM dist/view/element/index.js          748.00 B
+ESM dist/chunk-IUXNQAI4.js              96.24 KB
+ESM dist/chunk-GY3W72BP.js              50.33 KB
+ESM dist/chunk-BXBCCY7N.js              8.29 KB
+ESM dist/play/worker-protocol.js        328.00 B
+ESM dist/play/worker.js                 471.00 B
+ESM dist/chunk-L3ONXW6I.js              13.80 KB
+ESM dist/chunk-6BIHSA2X.js              42.00 B
+ESM dist/chunk-UOTWF4UI.js              137.96 KB
+ESM dist/chunk-QKSJ5N7B.js              48.33 KB
+ESM dist/chunk-H2LWRH5Y.js              5.16 KB
+ESM dist/chunk-4RROY5LC.js              10.70 KB
+ESM dist/chunk-MR6KFZX2.js              1.69 KB
+ESM dist/chunk-V3NFK6OT.js              2.56 KB
+ESM dist/analyze/element/global.js      34.00 B
+ESM dist/analyze/element/index.js       914.00 B
+ESM dist/chunk-DK6KZYR3.js              75.00 KB
+ESM dist/chunk-2JTCGXVU.js              17.50 KB
+ESM dist/chunk-CXWE3ZD6.js              3.73 KB
+ESM dist/chunk-KI7X52HI.js              42.00 B
+ESM dist/chunk-S255HA4H.js              5.13 KB
+ESM dist/index.js                       862.00 B
+ESM dist/analyze/worker-client.js       439.00 B
+ESM dist/analyze/index.js               1.09 KB
+ESM dist/chunk-4GHPIVDM.js              10.55 KB
+ESM dist/analyze/worker-protocol.js     496.00 B
+ESM dist/analyze/worker.js              807.00 B
+ESM dist/chunk-ATXQSQ6S.js              10.44 KB
+ESM dist/chunk-H5L3HPFC.js              6.49 KB
+ESM dist/chunk-HYGCGFUM.js              27.18 KB
+ESM dist/play/index.js                  1.21 KB
+ESM dist/chunk-YOSZR7ST.js              42.00 B
+ESM dist/view/index.js                  698.00 B
+ESM dist/chunk-FNCOYTF5.js              5.99 KB
+ESM dist/chunk-DJOPQWDZ.js              1.14 KB
+ESM dist/play/worker-client.js          433.00 B
+ESM dist/chunk-X25RZDAJ.js              7.15 KB
+ESM dist/chunk-UZHEVG6G.js              14.38 KB
+ESM dist/chunk-VI2UXTK3.js              28.74 KB
+ESM dist/chunk-PXG64RU4.js              1.08 KB
+ESM dist/chunk-ETZNJNTF.js              8.69 KB
+ESM dist/core-SN757ABS.js               870.00 B
+ESM dist/analyze/transcribe.js          5.05 KB
+ESM dist/chunk-VAZ5ZSUV.js              627.00 B
+ESM dist/view/render/index.js.map       71.00 B
+ESM dist/play/headless/index.js.map     71.00 B
+ESM dist/view/element/auto.js.map       1.88 KB
+ESM dist/view/headless/index.js.map     4.82 KB
+ESM dist/react/index.js.map             20.71 KB
+ESM dist/analyze/element/auto.js.map    2.15 KB
+ESM dist/analyze/headless/index.js.map  71.00 B
+ESM dist/play/element/auto.js.map       1.67 KB
+ESM dist/api-XL4HU2EC.js.map            71.00 B
+ESM dist/play/element/global.js.map     71.00 B
+ESM dist/play/element/index.js.map      71.00 B
+ESM dist/view/element/index.js.map      71.00 B
+ESM dist/view/element/global.js.map     71.00 B
+ESM dist/chunk-GY3W72BP.js.map          98.42 KB
+ESM dist/chunk-BXBCCY7N.js.map          13.47 KB
+ESM dist/play/worker-protocol.js.map    71.00 B
+ESM dist/chunk-IUXNQAI4.js.map          184.98 KB
+ESM dist/play/worker.js.map             1.50 KB
+ESM dist/chunk-6BIHSA2X.js.map          71.00 B
+ESM dist/chunk-L3ONXW6I.js.map          29.86 KB
+ESM dist/chunk-QKSJ5N7B.js.map          105.52 KB
+ESM dist/chunk-H2LWRH5Y.js.map          9.97 KB
+ESM dist/chunk-4RROY5LC.js.map          17.38 KB
+ESM dist/chunk-UOTWF4UI.js.map          280.17 KB
+ESM dist/chunk-MR6KFZX2.js.map          5.70 KB
+ESM dist/analyze/element/global.js.map  71.00 B
+ESM dist/chunk-V3NFK6OT.js.map          7.58 KB
+ESM dist/analyze/element/index.js.map   71.00 B
+ESM dist/chunk-2JTCGXVU.js.map          33.00 KB
+ESM dist/chunk-DK6KZYR3.js.map          98.00 KB
+ESM dist/chunk-CXWE3ZD6.js.map          8.80 KB
+ESM dist/chunk-KI7X52HI.js.map          71.00 B
+ESM dist/index.js.map                   71.00 B
+ESM dist/analyze/worker-client.js.map   71.00 B
+ESM dist/analyze/index.js.map           71.00 B
+ESM dist/analyze/worker-protocol.js.map 71.00 B
+ESM dist/chunk-4GHPIVDM.js.map          20.66 KB
+ESM dist/analyze/worker.js.map          1.93 KB
+ESM dist/chunk-S255HA4H.js.map          13.59 KB
+ESM dist/chunk-ATXQSQ6S.js.map          21.54 KB
+ESM dist/chunk-H5L3HPFC.js.map          15.97 KB
+ESM dist/play/index.js.map              71.00 B
+ESM dist/chunk-HYGCGFUM.js.map          70.42 KB
+ESM dist/chunk-YOSZR7ST.js.map          71.00 B
+ESM dist/chunk-DJOPQWDZ.js.map          3.09 KB
+ESM dist/view/index.js.map              71.00 B
+ESM dist/play/worker-client.js.map      71.00 B
+ESM dist/chunk-X25RZDAJ.js.map          17.98 KB
+ESM dist/chunk-VI2UXTK3.js.map          63.72 KB
+ESM dist/chunk-UZHEVG6G.js.map          36.35 KB
+ESM dist/chunk-PXG64RU4.js.map          71.00 B
+ESM dist/chunk-ETZNJNTF.js.map          15.97 KB
+ESM dist/chunk-FNCOYTF5.js.map          15.80 KB
+ESM dist/core-SN757ABS.js.map           71.00 B
+ESM dist/chunk-VAZ5ZSUV.js.map          2.28 KB
+ESM dist/analyze/transcribe.js.map      12.94 KB
+ESM ⚡️ Build success in 1167ms
+CJS dist/view/render/index.cjs           1.33 KB
+CJS dist/core-Q5ZAFWZP.cjs               1.50 KB
+CJS dist/api-QRQZBR3Q.cjs                1.91 KB
+CJS dist/play/element/auto.cjs           2.23 KB
+CJS dist/play/element/global.cjs         48.00 B
+CJS dist/play/element/index.cjs          1.37 KB
+CJS dist/chunk-6BPRAMTH.cjs              114.16 KB
+CJS dist/play/headless/index.cjs         1.45 KB
+CJS dist/view/element/auto.cjs           1.23 KB
+CJS dist/view/element/global.cjs         48.00 B
+CJS dist/view/element/index.cjs          1.03 KB
+CJS dist/chunk-3FBVDTJS.cjs              60.42 KB
+CJS dist/chunk-I3OZO2WX.cjs              11.42 KB
+CJS dist/play/worker-protocol.cjs        515.00 B
+CJS dist/play/worker.cjs                 537.00 B
+CJS dist/react/index.cjs                 12.00 KB
+CJS dist/chunk-COHABPMP.cjs              15.54 KB
+CJS dist/chunk-7XQB3MGO.cjs              56.00 B
+CJS dist/view/headless/index.cjs         5.05 KB
+CJS dist/chunk-WBKR32CG.cjs              155.24 KB
+CJS dist/chunk-M2WBTJOD.cjs              52.84 KB
+CJS dist/chunk-BP6KQTHG.cjs              6.61 KB
+CJS dist/chunk-P3CE2VTZ.cjs              13.71 KB
+CJS dist/view/index.cjs                  1.12 KB
+CJS dist/chunk-OYRU7WX5.cjs              1.82 KB
+CJS dist/chunk-LIEOYKTW.cjs              2.84 KB
+CJS dist/analyze/element/auto.cjs        2.36 KB
+CJS dist/analyze/element/global.cjs      48.00 B
+CJS dist/analyze/element/index.cjs       1.27 KB
+CJS dist/chunk-BWW73RXY.cjs              102.47 KB
+CJS dist/chunk-TNLAM6SE.cjs              21.04 KB
+CJS dist/chunk-EPMQPG34.cjs              4.34 KB
+CJS dist/analyze/headless/index.cjs      621.00 B
+CJS dist/chunk-BKKOZXCH.cjs              56.00 B
+CJS dist/chunk-BCCOQEMO.cjs              5.80 KB
+CJS dist/index.cjs                       1.49 KB
+CJS dist/analyze/index.cjs               1.73 KB
+CJS dist/chunk-ULRYKYJJ.cjs              747.00 B
+CJS dist/analyze/transcribe.cjs          7.44 KB
+CJS dist/analyze/worker-client.cjs       635.00 B
+CJS dist/chunk-JE7ZQPVO.cjs              13.96 KB
+CJS dist/analyze/worker-protocol.cjs     714.00 B
+CJS dist/analyze/worker.cjs              883.00 B
+CJS dist/chunk-A3XYARM3.cjs              12.82 KB
+CJS dist/chunk-EQKYNVGP.cjs              8.04 KB
+CJS dist/chunk-L727TIDN.cjs              30.66 KB
+CJS dist/play/index.cjs                  1.91 KB
+CJS dist/chunk-K5BTDPF6.cjs              56.00 B
+CJS dist/chunk-LATQKM2B.cjs              7.35 KB
+CJS dist/chunk-UARXXPMD.cjs              1.85 KB
+CJS dist/play/worker-client.cjs          629.00 B
+CJS dist/chunk-RCCYVQIP.cjs              8.80 KB
+CJS dist/chunk-2KKNZNSA.cjs              10.35 KB
+CJS dist/chunk-WVLPRVQP.cjs              16.43 KB
+CJS dist/chunk-YUPBRFJ4.cjs              30.43 KB
+CJS dist/chunk-7ZTZZ5PN.cjs              1.26 KB
+CJS dist/view/render/index.cjs.map       438.00 B
+CJS dist/core-Q5ZAFWZP.cjs.map           454.00 B
+CJS dist/play/element/global.cjs.map     193.00 B
+CJS dist/api-QRQZBR3Q.cjs.map            540.00 B
+CJS dist/play/element/auto.cjs.map       2.11 KB
+CJS dist/play/element/index.cjs.map      447.00 B
+CJS dist/play/headless/index.cjs.map     483.00 B
+CJS dist/view/element/auto.cjs.map       2.26 KB
+CJS dist/view/element/index.cjs.map      412.00 B
+CJS dist/chunk-6BPRAMTH.cjs.map          165.59 KB
+CJS dist/play/worker-protocol.cjs.map    277.00 B
+CJS dist/play/worker.cjs.map             1.78 KB
+CJS dist/view/element/global.cjs.map     193.00 B
+CJS dist/chunk-I3OZO2WX.cjs.map          18.73 KB
+CJS dist/view/headless/index.cjs.map     6.74 KB
+CJS dist/react/index.cjs.map             26.10 KB
+CJS dist/chunk-7XQB3MGO.cjs.map          183.00 B
+CJS dist/chunk-M2WBTJOD.cjs.map          93.27 KB
+CJS dist/chunk-BP6KQTHG.cjs.map          12.85 KB
+CJS dist/chunk-P3CE2VTZ.cjs.map          23.25 KB
+CJS dist/chunk-WBKR32CG.cjs.map          282.47 KB
+CJS dist/chunk-OYRU7WX5.cjs.map          7.07 KB
+CJS dist/view/index.cjs.map              384.00 B
+CJS dist/chunk-LIEOYKTW.cjs.map          8.95 KB
+CJS dist/analyze/element/global.cjs.map  199.00 B
+CJS dist/chunk-COHABPMP.cjs.map          29.17 KB
+CJS dist/analyze/element/auto.cjs.map    2.62 KB
+CJS dist/analyze/element/index.cjs.map   394.00 B
+CJS dist/chunk-BWW73RXY.cjs.map          142.11 KB
+CJS dist/chunk-EPMQPG34.cjs.map          10.34 KB
+CJS dist/chunk-TNLAM6SE.cjs.map          41.47 KB
+CJS dist/chunk-BKKOZXCH.cjs.map          183.00 B
+CJS dist/analyze/headless/index.cjs.map  328.00 B
+CJS dist/chunk-BCCOQEMO.cjs.map          16.53 KB
+CJS dist/index.cjs.map                   438.00 B
+CJS dist/analyze/index.cjs.map           491.00 B
+CJS dist/analyze/transcribe.cjs.map      12.11 KB
+CJS dist/chunk-ULRYKYJJ.cjs.map          2.70 KB
+CJS dist/analyze/worker-client.cjs.map   318.00 B
+CJS dist/chunk-JE7ZQPVO.cjs.map          20.10 KB
+CJS dist/analyze/worker-protocol.cjs.map 319.00 B
+CJS dist/analyze/worker.cjs.map          2.31 KB
+CJS dist/chunk-A3XYARM3.cjs.map          27.45 KB
+CJS dist/chunk-EQKYNVGP.cjs.map          19.13 KB
+CJS dist/play/index.cjs.map              536.00 B
+CJS dist/chunk-L727TIDN.cjs.map          68.40 KB
+CJS dist/chunk-K5BTDPF6.cjs.map          183.00 B
+CJS dist/chunk-LATQKM2B.cjs.map          18.81 KB
+CJS dist/play/worker-client.cjs.map      312.00 B
+CJS dist/chunk-UARXXPMD.cjs.map          3.25 KB
+CJS dist/chunk-RCCYVQIP.cjs.map          18.01 KB
+CJS dist/chunk-2KKNZNSA.cjs.map          16.38 KB
+CJS dist/chunk-WVLPRVQP.cjs.map          31.74 KB
+CJS dist/chunk-YUPBRFJ4.cjs.map          51.48 KB
+CJS dist/chunk-7ZTZZ5PN.cjs.map          1.47 KB
+CJS dist/chunk-3FBVDTJS.cjs.map          84.27 KB
+CJS ⚡️ Build success in 1767ms
+DTS ⚡️ Build success in 24698ms
+DTS dist/analyze/worker.d.ts           13.00 B
+DTS dist/analyze/element/auto.d.ts     1010.00 B
+DTS dist/analyze/element/global.d.ts   1.78 KB
+DTS dist/analyze/headless/index.d.ts   1.45 KB
+DTS dist/analyze/transcribe.d.ts       2.16 KB
+DTS dist/play/element/global.d.ts      869.00 B
+DTS dist/play/headless/index.d.ts      2.06 KB
+DTS dist/react/index.d.ts              2.61 KB
+DTS dist/view/element/auto.d.ts        944.00 B
+DTS dist/view/element/global.d.ts      1.34 KB
+DTS dist/view/headless/index.d.ts      2.03 KB
+DTS dist/view/index.d.ts               4.59 KB
+DTS dist/play/index.d.ts               5.67 KB
+DTS dist/view/element/index.d.ts       14.78 KB
+DTS dist/analyze/index.d.ts            5.33 KB
+DTS dist/index.d.ts                    2.36 KB
+DTS dist/analyze/element/index.d.ts    6.22 KB
+DTS dist/view/render/index.d.ts        7.51 KB
+DTS dist/analyze/worker-client.d.ts    2.58 KB
+DTS dist/analyze/worker-protocol.d.ts  4.11 KB
+DTS dist/play/worker-protocol.d.ts     2.33 KB
+DTS dist/play/worker.d.ts              13.00 B
+DTS dist/play/element/index.d.ts       1.18 KB
+DTS dist/play/element/auto.d.ts        1.18 KB
+DTS dist/play/worker-client.d.ts       515.00 B
+DTS dist/realtime-BOkz8bQQ.d.ts        2.57 KB
+DTS dist/ClipEditSession-CtLg_d6P.d.ts 1.96 KB
+DTS dist/playlist-BvTv1_Ed.d.ts        7.09 KB
+DTS dist/effects-DASRC4EJ.d.ts         1.39 KB
+DTS dist/session-Bw-pZjbm.d.ts         1.30 KB
+DTS dist/audio-meter-FLUajkyM.d.ts     4.15 KB
+DTS dist/AudioClip-0X12s878.d.ts       3.61 KB
+DTS dist/audio-CcloXvn_.d.ts           898.00 B
+DTS dist/meter-CODaAU40.d.ts           4.10 KB
+DTS dist/live-7XuzV3D-.d.ts            3.59 KB
+DTS dist/BeatGrid-C6sSvQYv.d.ts        1.51 KB
+DTS dist/colormaps-X1oaqeT9.d.ts       983.00 B
+DTS dist/timeline-DLpIKUCQ.d.ts        2.43 KB
+DTS dist/types-lKfcazQ9.d.ts           12.75 KB
+DTS dist/AudioPeaks-CVK6MkF8.d.ts      2.19 KB
+DTS dist/Region-DCS7zfNM.d.ts          1.51 KB
+DTS dist/export-CfVTcr7e.d.ts          2.42 KB
+DTS dist/recorder-Dx9YqtSu.d.ts        14.16 KB
+DTS dist/player-4CLu0zgv.d.ts          18.12 KB
+DTS dist/binding-CAwUDvME.d.ts         3.19 KB
+DTS dist/analyze-clip-jlEFHEkf.d.ts    9.08 KB
+DTS dist/auto-c3SFgpzX.d.ts            29.39 KB
+DTS dist/worker-client-DqVfy32k.d.ts   4.00 KB
+DTS ⚡️ Build success in 26308ms
+DTS dist/analyze/worker.d.cts           13.00 B
+DTS dist/analyze/element/auto.d.cts     1014.00 B
+DTS dist/analyze/element/global.d.cts   1.78 KB
+DTS dist/analyze/headless/index.d.cts   1.45 KB
+DTS dist/analyze/transcribe.d.cts       2.16 KB
+DTS dist/play/element/global.d.cts      878.00 B
+DTS dist/play/headless/index.d.cts      2.07 KB
+DTS dist/react/index.d.cts              2.62 KB
+DTS dist/view/element/auto.d.cts        956.00 B
+DTS dist/view/element/global.d.cts      1.35 KB
+DTS dist/view/headless/index.d.cts      2.04 KB
+DTS dist/view/index.d.cts               4.60 KB
+DTS dist/play/index.d.cts               5.68 KB
+DTS dist/view/element/index.d.cts       14.79 KB
+DTS dist/analyze/index.d.cts            5.34 KB
+DTS dist/index.d.cts                    2.37 KB
+DTS dist/analyze/element/index.d.cts    6.22 KB
+DTS dist/view/render/index.d.cts        7.52 KB
+DTS dist/analyze/worker-client.d.cts    2.59 KB
+DTS dist/analyze/worker-protocol.d.cts  4.12 KB
+DTS dist/play/worker-protocol.d.cts     2.33 KB
+DTS dist/play/worker.d.cts              13.00 B
+DTS dist/play/element/index.d.cts       1.19 KB
+DTS dist/play/element/auto.d.cts        1.19 KB
+DTS dist/play/worker-client.d.cts       521.00 B
+DTS dist/realtime-BOkz8bQQ.d.cts        2.57 KB
+DTS dist/ClipEditSession-Biskwd0c.d.cts 1.96 KB
+DTS dist/playlist-BRQtr9S3.d.cts        7.09 KB
+DTS dist/effects-DASRC4EJ.d.cts         1.39 KB
+DTS dist/session-uc6DM4kc.d.cts         1.30 KB
+DTS dist/audio-meter-eWTYP2m3.d.cts     4.16 KB
+DTS dist/AudioClip-CEjOTTru.d.cts       3.61 KB
+DTS dist/audio-CcloXvn_.d.cts           898.00 B
+DTS dist/meter-CODaAU40.d.cts           4.10 KB
+DTS dist/live-7XuzV3D-.d.cts            3.59 KB
+DTS dist/BeatGrid-C6sSvQYv.d.cts        1.51 KB
+DTS dist/colormaps-X1oaqeT9.d.cts       983.00 B
+DTS dist/timeline-BvATXGA5.d.cts        2.43 KB
+DTS dist/types-DDlEMBsV.d.cts           12.76 KB
+DTS dist/AudioPeaks-CVK6MkF8.d.cts      2.19 KB
+DTS dist/Region-DCS7zfNM.d.cts          1.51 KB
+DTS dist/export-BIiqchW3.d.cts          2.42 KB
+DTS dist/recorder-CsEUq4PG.d.cts        14.17 KB
+DTS dist/player-BphdalLn.d.cts          18.12 KB
+DTS dist/binding-4eITyVOf.d.cts         3.19 KB
+DTS dist/analyze-clip-B3VlC7N9.d.cts    9.08 KB
+DTS dist/auto-TgYB67Zt.d.cts            29.40 KB
+DTS dist/worker-client-CEZVjWye.d.cts   4.00 KB
+Worker facades generated for 2 spawn sites.
+Bundled notices written: 4 packages in 3 bundles.
+Package artifact receipts written for 1 package(s).
+
+> @webmusic/bridge@0.3.0 build
+> tsup src/index.ts --tsconfig tsconfig.build.json --format esm,cjs --dts --sourcemap --clean && node ../../scripts/package-artifacts.mjs --write
+
+CLI Building entry: src/index.ts
+CLI Using tsconfig: tsconfig.build.json
+CLI tsup v8.5.1
+CLI Target: es2020
+CLI Cleaning output folder
+ESM Build start
+CJS Build start
+ESM dist/index.js     41.69 KB
+ESM dist/index.js.map 90.24 KB
+ESM ⚡️ Build success in 93ms
+CJS dist/index.cjs     43.89 KB
+CJS dist/index.cjs.map 91.29 KB
+CJS ⚡️ Build success in 94ms
+DTS Build start
+DTS ⚡️ Build success in 2421ms
+DTS dist/index.d.ts  19.34 KB
+DTS dist/index.d.cts 19.34 KB
+Package artifact receipts written for 1 package(s).
+Package artifact receipts written for 5 package(s).
+
+> check:demo-assets
+> node --test scripts/demo-assets.test.mjs && node scripts/demo-assets.mjs --check
+
+TAP version 13
+# Subtest: the checked-in public tree is exactly the reproducible original asset inventory
+ok 1 - the checked-in public tree is exactly the reproducible original asset inventory
+  ---
+  duration_ms: 172.786394
+  type: 'test'
+  ...
+# Subtest: standalone MXL, MIDI, WAV, MP3 and icon retain the complete project license
+ok 2 - standalone MXL, MIDI, WAV, MP3 and icon retain the complete project license
+  ---
+  duration_ms: 103.129544
+  type: 'test'
+  ...
+# Subtest: MIDI exposes two independent musical parts with exactly the MXL notes and timing
+ok 3 - MIDI exposes two independent musical parts with exactly the MXL notes and timing
+  ---
+  duration_ms: 172.257673
+  type: 'test'
+  ...
+# Subtest: PCM is bounded, non-silent stereo with exact score duration and aligned triplet attacks
+ok 4 - PCM is bounded, non-silent stereo with exact score duration and aligned triplet attacks
+  ---
+  duration_ms: 198.41293
+  type: 'test'
+  ...
+# Subtest: checks reject unreviewed public files and symbolic links
+ok 5 - checks reject unreviewed public files and symbolic links
+  ---
+  duration_ms: 468.06698
+  type: 'test'
+  ...
+# Subtest: checks reject changed generated media, changed MP3 bytes and stale distributed manifests
+ok 6 - checks reject changed generated media, changed MP3 bytes and stale distributed manifests
+  ---
+  duration_ms: 607.862561
+  type: 'test'
+  ...
+# Subtest: checks reject changed trusted artwork and missing project licensing
+ok 7 - checks reject changed trusted artwork and missing project licensing
+  ---
+  duration_ms: 239.071635
+  type: 'test'
+  ...
+# Subtest: changing both inventory hashes cannot approve an arbitrary replacement MP3
+ok 8 - changing both inventory hashes cannot approve an arbitrary replacement MP3
+  ---
+  duration_ms: 352.613089
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2516.911172
+Demo assets verified: 4 generated files, 6 provenance records, 7 public files.
+
+> check:doc-snippets
+> node --test scripts/check-doc-snippets.test.mjs && node scripts/check-doc-snippets.mjs
+
+TAP version 13
+# Subtest: selects supported fence languages and retains independent source locations
+ok 1 - selects supported fence languages and retains independent source locations
+  ---
+  duration_ms: 15.868195
+  type: 'test'
+  ...
+# Subtest: uses syntax to distinguish real imports, side effects, re-exports and type references from prose
+ok 2 - uses syntax to distinguish real imports, side effects, re-exports and type references from prose
+  ---
+  duration_ms: 2.897949
+  type: 'test'
+  ...
+# Subtest: respects fence delimiter kind and length without extracting nested examples twice
+ok 3 - respects fence delimiter kind and length without extracting nested examples twice
+  ---
+  duration_ms: 1.603909
+  type: 'test'
+  ...
+# Subtest: extracts executable inline HTML scripts once, excluding remote and data scripts
+ok 4 - extracts executable inline HTML scripts once, excluding remote and data scripts
+  ---
+  duration_ms: 0.982331
+  type: 'test'
+  ...
+# Subtest: rejects type-check suppressions without mistaking quoted examples for directives
+ok 5 - rejects type-check suppressions without mistaking quoted examples for directives
+  ---
+  duration_ms: 4.771857
+  type: 'test'
+  ...
+# Subtest: decodes MDX literal strings without executing code or re-scanning their contents
+ok 6 - decodes MDX literal strings without executing code or re-scanning their contents
+  ---
+  duration_ms: 3.803457
+  type: 'test'
+  ...
+# Subtest: compiles each carrier against declarations and preserves body, type and import failures
+ok 7 - compiles each carrier against declarations and preserves body, type and import failures
+  ---
+  duration_ms: 967.593
+  type: 'test'
+  ...
+# Subtest: reports compiler-level diagnostics and removes temporary files after errors
+ok 8 - reports compiler-level diagnostics and removes temporary files after errors
+  ---
+  duration_ms: 1.767981
+  type: 'test'
+  ...
+# Subtest: overlapping checks own distinct caches and leave each other’s files intact
+ok 9 - overlapping checks own distinct caches and leave each other’s files intact
+  ---
+  duration_ms: 1.400358
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1639.055303
+Doc snippet check passed: 256 examples (fences, inline scripts, and literal MDX code exports) compile against built declarations.
+
+> typecheck
+> npm run typecheck --workspaces --if-present
+
+
+> @webmusic/kernel@0.3.0 typecheck
+> tsc --noEmit
+
+
+> @webmusic/ui@0.3.0 typecheck
+> tsc --noEmit
+
+
+> @webmusic/score@0.3.0 typecheck
+> tsc --noEmit
+
+
+> @webmusic/audio@0.3.0 typecheck
+> tsc --noEmit
+
+
+> @webmusic/bridge@0.3.0 typecheck
+> tsc --noEmit
+
+
+> typecheck
+> astro check
+
+20:02:37 [content] Syncing content
+20:02:38 [content] Synced content
+20:02:38 [types] Generated 1.64s
+20:02:38 [check] Getting diagnostics for Astro files in /workspace/WebMusic/apps/doc/webmusic...
+src/starlight/search-client.ts:154:36 - warning ts(6385): 'keyCode' is deprecated.
+
+154     if (event.isComposing || event.keyCode === 229) return;
+                                       ~~~~~~~
+src/starlight/search-client.ts:143:36 - warning ts(6385): 'keyCode' is deprecated.
+
+143     if (event.isComposing || event.keyCode === 229) return;
+                                       ~~~~~~~
+src/starlight/search-client.ts:138:36 - warning ts(6385): 'keyCode' is deprecated.
+
+138     if (event.isComposing || event.keyCode === 229) return;
+                                       ~~~~~~~
+
+Result (168 files):
+- 0 errors
+- 0 warnings
+- 3 hints
+
+
+> typecheck:tests
+> tsc -p tsconfig.test.json
+
+
+> test
+> npm run test --workspaces --if-present
+
+
+> @webmusic/kernel@0.3.0 test
+> vitest run
+
+
+ RUN  v5.0.2 /workspace/WebMusic/platform/kernel
+
+
+ Test Files  25 passed (25)
+      Tests  445 passed (445)
+   Start at  20:03:07
+   Duration  3.72s (environment 42%, transform 31%, tests 17%, import 8%, worker 1%)
+
+  Transform  transforming modules took 2.16s · 31% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+
+
+> @webmusic/ui@0.3.0 test
+> vitest run
+
+
+ RUN  v5.0.2 /workspace/WebMusic/packages/ui
+
+
+ Test Files  37 passed (37)
+      Tests  697 passed (697)
+   Start at  20:03:11
+   Duration  17.14s (environment 66%, tests 24%, transform 7%, import 3%)
+
+    Isolate  37 workers spawned · ~950ms startup each (spawn + environment, per file)
+             at least ~10.77s faster with isolate: false — reuses workers across files instead of one per file
+
+
+> @webmusic/score@0.3.0 test
+> vitest run
+
+
+ RUN  v5.0.2 /workspace/WebMusic/packages/score
+
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+
+ Test Files  197 passed (197)
+      Tests  2240 passed (2240)
+   Start at  20:03:29
+   Duration  91.44s (environment 41%, tests 35%, import 15%, transform 8%, worker 1%)
+
+    Isolate  197 workers spawned · ~718ms startup each (spawn + environment, per file)
+             at least ~46.41s faster with isolate: false — reuses workers across files instead of one per file
+
+
+> @webmusic/audio@0.3.0 test
+> vitest run
+
+
+ RUN  v5.0.2 /workspace/WebMusic/packages/audio
+
+
+ Test Files  77 passed (77)
+      Tests  1013 passed (1013)
+   Start at  20:05:01
+   Duration  34.16s (environment 52%, tests 27%, transform 12%, import 8%, worker 1%)
+
+    Isolate  77 workers spawned · ~797ms startup each (spawn + environment, per file)
+             at least ~19.65s faster with isolate: false — reuses workers across files instead of one per file
+
+
+> @webmusic/bridge@0.3.0 test
+> vitest run
+
+
+ RUN  v5.0.2 /workspace/WebMusic/bridges/score-audio
+
+
+ Test Files  8 passed (8)
+      Tests  192 passed (192)
+   Start at  20:05:36
+   Duration  4.23s (transform 67%, import 20%, tests 13%, worker 1%)
+
+  Transform  transforming modules took 6.33s · 67% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+
+
+> test
+> vitest run
+
+
+ RUN  v5.0.2 /workspace/WebMusic/apps/doc/webmusic
+
+
+ Test Files  29 passed (29)
+      Tests  246 passed (246)
+   Start at  20:05:41
+   Duration  32.81s (tests 42%, environment 34%, transform 12%, import 11%)
+
+    Isolate  29 workers spawned · ~1.24s startup each (spawn + environment, per file)
+             at least ~10.75s faster with isolate: false — reuses workers across files instead of one per file
+
+
+> check:licenses
+> node scripts/license-gate.mjs
+
+License gate passed: no copyleft package in hard dependencies; all restricted peers are optional.
+
+> check:packages
+> node --test scripts/package-artifacts.test.mjs && node scripts/check-package-exports.mjs && node scripts/package-artifacts.mjs --all && node --test scripts/bundle-notices.test.mjs && node scripts/bundle-notices.mjs --check && node scripts/bundle-notices.mjs --package-dir packages/audio --check
+
+TAP version 13
+# Subtest: packing rejects missing, stale, or altered build output
+ok 1 - packing rejects missing, stale, or altered build output
+  ---
+  duration_ms: 9.274577
+  type: 'test'
+  ...
+# Subtest: source receipts include shared source, lockfile, and browser build mappings
+ok 2 - source receipts include shared source, lockfile, and browser build mappings
+  ---
+  duration_ms: 35.59639
+  type: 'test'
+  ...
+# Subtest: packing rejects added, edited, or removed tsup configurations at every repository ancestor
+    # Subtest: tsup.config.ts
+    ok 1 - tsup.config.ts
+      ---
+      duration_ms: 20.065784
+      type: 'test'
+      ...
+    # Subtest: tsup.config.cts
+    ok 2 - tsup.config.cts
+      ---
+      duration_ms: 9.190242
+      type: 'test'
+      ...
+    # Subtest: tsup.config.mts
+    ok 3 - tsup.config.mts
+      ---
+      duration_ms: 9.213957
+      type: 'test'
+      ...
+    # Subtest: tsup.config.js
+    ok 4 - tsup.config.js
+      ---
+      duration_ms: 8.119892
+      type: 'test'
+      ...
+    # Subtest: tsup.config.cjs
+    ok 5 - tsup.config.cjs
+      ---
+      duration_ms: 7.538182
+      type: 'test'
+      ...
+    # Subtest: tsup.config.mjs
+    ok 6 - tsup.config.mjs
+      ---
+      duration_ms: 8.000255
+      type: 'test'
+      ...
+    # Subtest: tsup.config.json
+    ok 7 - tsup.config.json
+      ---
+      duration_ms: 12.821646
+      type: 'test'
+      ...
+    # Subtest: packages/tsup.config.ts
+    ok 8 - packages/tsup.config.ts
+      ---
+      duration_ms: 8.147412
+      type: 'test'
+      ...
+    # Subtest: packages/tsup.config.cts
+    ok 9 - packages/tsup.config.cts
+      ---
+      duration_ms: 10.422211
+      type: 'test'
+      ...
+    # Subtest: packages/tsup.config.mts
+    ok 10 - packages/tsup.config.mts
+      ---
+      duration_ms: 7.519766
+      type: 'test'
+      ...
+    # Subtest: packages/tsup.config.js
+    ok 11 - packages/tsup.config.js
+      ---
+      duration_ms: 7.142078
+      type: 'test'
+      ...
+    # Subtest: packages/tsup.config.cjs
+    ok 12 - packages/tsup.config.cjs
+      ---
+      duration_ms: 7.74635
+      type: 'test'
+      ...
+    # Subtest: packages/tsup.config.mjs
+    ok 13 - packages/tsup.config.mjs
+      ---
+      duration_ms: 11.490199
+      type: 'test'
+      ...
+    # Subtest: packages/tsup.config.json
+    ok 14 - packages/tsup.config.json
+      ---
+      duration_ms: 8.289281
+      type: 'test'
+      ...
+    # Subtest: packages/ui/tsup.config.ts
+    ok 15 - packages/ui/tsup.config.ts
+      ---
+      duration_ms: 8.656715
+      type: 'test'
+      ...
+    # Subtest: packages/ui/tsup.config.cts
+    ok 16 - packages/ui/tsup.config.cts
+      ---
+      duration_ms: 9.01933
+      type: 'test'
+      ...
+    # Subtest: packages/ui/tsup.config.mts
+    ok 17 - packages/ui/tsup.config.mts
+      ---
+      duration_ms: 24.09226
+      type: 'test'
+      ...
+    # Subtest: packages/ui/tsup.config.js
+    ok 18 - packages/ui/tsup.config.js
+      ---
+      duration_ms: 13.260493
+      type: 'test'
+      ...
+    # Subtest: packages/ui/tsup.config.cjs
+    ok 19 - packages/ui/tsup.config.cjs
+      ---
+      duration_ms: 8.110138
+      type: 'test'
+      ...
+    # Subtest: packages/ui/tsup.config.mjs
+    ok 20 - packages/ui/tsup.config.mjs
+      ---
+      duration_ms: 11.54454
+      type: 'test'
+      ...
+    # Subtest: packages/ui/tsup.config.json
+    ok 21 - packages/ui/tsup.config.json
+      ---
+      duration_ms: 10.333821
+      type: 'test'
+      ...
+    # Subtest: platform/tsup.config.ts
+    ok 22 - platform/tsup.config.ts
+      ---
+      duration_ms: 6.747736
+      type: 'test'
+      ...
+    # Subtest: platform/tsup.config.cts
+    ok 23 - platform/tsup.config.cts
+      ---
+      duration_ms: 5.679067
+      type: 'test'
+      ...
+    # Subtest: platform/tsup.config.mts
+    ok 24 - platform/tsup.config.mts
+      ---
+      duration_ms: 13.228886
+      type: 'test'
+      ...
+    # Subtest: platform/tsup.config.js
+    ok 25 - platform/tsup.config.js
+      ---
+      duration_ms: 30.288542
+      type: 'test'
+      ...
+    # Subtest: platform/tsup.config.cjs
+    ok 26 - platform/tsup.config.cjs
+      ---
+      duration_ms: 6.835445
+      type: 'test'
+      ...
+    # Subtest: platform/tsup.config.mjs
+    ok 27 - platform/tsup.config.mjs
+      ---
+      duration_ms: 8.841507
+      type: 'test'
+      ...
+    # Subtest: platform/tsup.config.json
+    ok 28 - platform/tsup.config.json
+      ---
+      duration_ms: 7.461589
+      type: 'test'
+      ...
+    1..28
+ok 3 - packing rejects added, edited, or removed tsup configurations at every repository ancestor
+  ---
+  duration_ms: 304.826137
+  type: 'test'
+  ...
+# Subtest: ancestor package.json tsup configuration and TypeScript mappings invalidate receipts
+ok 4 - ancestor package.json tsup configuration and TypeScript mappings invalidate receipts
+  ---
+  duration_ms: 29.656328
+  type: 'test'
+  ...
+# Subtest: ambient tsup configuration outside the repository is rejected unless shadowed
+ok 5 - ambient tsup configuration outside the repository is rejected unless shadowed
+  ---
+  duration_ms: 7.813559
+  type: 'test'
+  ...
+# Subtest: build configuration cannot depend on a symbolic link
+ok 6 - build configuration cannot depend on a symbolic link
+  ---
+  duration_ms: 1.376773
+  type: 'test'
+  ...
+# Subtest: prepack rejects the actual tsup output change caused by packages/ui/tsup.config.js
+ok 7 - prepack rejects the actual tsup output change caused by packages/ui/tsup.config.js
+  ---
+  duration_ms: 1208.702502
+  type: 'test'
+  ...
+# Subtest: prepack rejects the actual tsup output change caused by tsup.config.mjs
+ok 8 - prepack rejects the actual tsup output change caused by tsup.config.mjs
+  ---
+  duration_ms: 1057.470493
+  type: 'test'
+  ...
+1..8
+# tests 36
+# suites 0
+# pass 36
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2863.484665
+Package export check passed for 96 public entries.
+Package artifact check passed for 5 package(s).
+TAP version 13
+# Subtest: discovers bundled transitive licenses, preserves mappings and rejects stripped notices
+ok 1 - discovers bundled transitive licenses, preserves mappings and rejects stripped notices
+  ---
+  duration_ms: 64.480707
+  type: 'test'
+  ...
+# Subtest: fft.js@4.0.4 snapshot requires its reviewed version, license and repository
+ok 2 - fft.js@4.0.4 snapshot requires its reviewed version, license and repository
+  ---
+  duration_ms: 31.761737
+  type: 'test'
+  ...
+# Subtest: @nodable/entities@3.0.0 snapshot requires its reviewed version, license and repository
+ok 3 - @nodable/entities@3.0.0 snapshot requires its reviewed version, license and repository
+  ---
+  duration_ms: 20.248314
+  type: 'test'
+  ...
+# Subtest: @nodable/entities@3.1.0 snapshot requires its reviewed version, license and repository
+ok 4 - @nodable/entities@3.1.0 snapshot requires its reviewed version, license and repository
+  ---
+  duration_ms: 8.302141
+  type: 'test'
+  ...
+# Subtest: CLI selects a package relative to the working directory and checks its notices
+ok 5 - CLI selects a package relative to the working directory and checks its notices
+  ---
+  duration_ms: 314.424334
+  type: 'test'
+  ...
+1..5
+# tests 5
+# suites 0
+# pass 5
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 545.735107
+Bundled notices verified: 26 packages in 7 bundles.
+Bundled notices verified: 4 packages in 3 bundles.
+
+> check:release-manifests
+> node --test scripts/release-version.test.mjs scripts/release-manifests.test.mjs && node scripts/release-manifests.mjs
+
+TAP version 13
+# Subtest: explicit origin verification accepts GitHub HTTPS and both SSH URL forms
+ok 1 - explicit origin verification accepts GitHub HTTPS and both SSH URL forms
+  ---
+  duration_ms: 351.298936
+  type: 'test'
+  ...
+# Subtest: forks pass ordinary local checks but fail explicit publication-origin verification
+ok 2 - forks pass ordinary local checks but fail explicit publication-origin verification
+  ---
+  duration_ms: 181.816383
+  type: 'test'
+  ...
+# Subtest: explicit verification rejects missing Git metadata, missing origin and unsupported origins
+ok 3 - explicit verification rejects missing Git metadata, missing origin and unsupported origins
+  ---
+  duration_ms: 377.262161
+  type: 'test'
+  ...
+# Subtest: fork CI passes default checks while explicit CI verification enforces repository identity
+ok 4 - fork CI passes default checks while explicit CI verification enforces repository identity
+  ---
+  duration_ms: 194.844233
+  type: 'test'
+  ...
+# Subtest: explicit CI verification rejects missing or malformed GITHUB_REPOSITORY
+ok 5 - explicit CI verification rejects missing or malformed GITHUB_REPOSITORY
+  ---
+  duration_ms: 885.392071
+  type: 'test'
+  ...
+# Subtest: origin and CI verification can be combined without bypassing either check
+ok 6 - origin and CI verification can be combined without bypassing either check
+  ---
+  duration_ms: 214.671571
+  type: 'test'
+  ...
+# Subtest: ordinary local checks still reject inconsistent package repository URLs
+ok 7 - ordinary local checks still reject inconsistent package repository URLs
+  ---
+  duration_ms: 68.969693
+  type: 'test'
+  ...
+# Subtest: accepts the first release and stable major/minor/patch versions
+ok 8 - accepts the first release and stable major/minor/patch versions
+  ---
+  duration_ms: 1.113414
+  type: 'test'
+  ...
+# Subtest: rejects versions npm cannot publish and non-stable release lanes
+ok 9 - rejects versions npm cannot publish and non-stable release lanes
+  ---
+  duration_ms: 0.231121
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2419.182078
+Release manifests are consistent at 0.3.0.

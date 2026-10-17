@@ -1,0 +1,53 @@
+{
+  "browser": "151.0.7922.173",
+  "errors": [],
+  "bundleSha256": "94d4e3048b6e8bc5d8c93eb48d769a39ac4e882946577b96b7e54921afb1d702",
+  "sampleRate": 48000,
+  "cases": [
+    {
+      "name": "factory-disposal",
+      "rejected": true,
+      "published": false,
+      "released": 1,
+      "peak": 0
+    },
+    {
+      "name": "mixed-play",
+      "frames": [
+        2880,
+        2880
+      ],
+      "starts": [
+        0.06,
+        0.06
+      ]
+    },
+    {
+      "name": "mixed-seek",
+      "frames": [
+        2880,
+        2880
+      ],
+      "starts": [
+        0.06,
+        0.06,
+        0.06,
+        0.06
+      ]
+    },
+    {
+      "name": "lazy-collision",
+      "rejected": true,
+      "ids": [],
+      "active": false,
+      "peak": 0
+    },
+    {
+      "name": "prepared-collision",
+      "rejected": true,
+      "ids": [],
+      "active": false,
+      "peak": 0
+    }
+  ]
+}

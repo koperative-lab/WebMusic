@@ -1,0 +1,62 @@
+{
+  "boundary": "Final independent tarball consumer; natural public export resolution; every bundled dependency realpath is inside consumer/node_modules; zero src inputs.",
+  "generatedAt": "2026-10-17T20:05:08.765Z",
+  "consumer": "/tmp/webmusic-external-0btO9u/consumer",
+  "runDirectory": "/workspace/artifacts/recovery-2026-10-17/fix-audio-native-packed/runs/2026-10-17T20-05-08.604Z",
+  "entryPath": "/workspace/artifacts/recovery-2026-10-17/fix-audio-native-packed/entry.ts",
+  "entrySha256": "d95261164b850d37a29cf2bf880be0c07167975f233b0edbbed88d9e705030c6",
+  "runnerSha256": "c8a7c24e907d601c4de1b20ed94e29a7520c72a834d3e3fc2a845df7c23bd7dd",
+  "publicImports": [
+    "@webmusic/audio",
+    "@webmusic/audio/play/headless",
+    "@webmusic/kernel/module"
+  ],
+  "lockSha256": "c08991c1bbc5c9d0dd0d3a08236a516c0e068d8ed6de1fdf497b0b5995e1a16b",
+  "packages": {
+    "@webmusic/audio": {
+      "version": "0.3.0",
+      "manifestPath": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/audio/package.json",
+      "manifestSha256": "26efba21a1e584f041187d2ce9860c8940b69be57b105d235806c9c844b71c26",
+      "tarball": "/tmp/webmusic-external-0btO9u/tarballs/webmusic-audio-0.3.0.tgz",
+      "tarballSha256": "67a6c13647a511fa810f88521c3be0bf1e488b5b9add451eba49b4ce307e7a2d",
+      "integrity": "sha512-AfyNi9eBeGzBEgxd9XyMuWD31Ymg5sx4RZW0eeKSnlqKR0Ozuax3UnAOf+mU3wYfwCxLYt9QfE9an6LaywPKhw=="
+    },
+    "@webmusic/kernel": {
+      "version": "0.3.0",
+      "manifestPath": "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/package.json",
+      "manifestSha256": "3dd3595a8068331e9ccc82da7257467620cb4d8be4914a81df51366e47a6e3dc",
+      "tarball": "/tmp/webmusic-external-0btO9u/tarballs/webmusic-kernel-0.3.0.tgz",
+      "tarballSha256": "3c4ed4784e2ffb2a3f7e117b0718f959d66ecd12d3fd332784792c7b04c415b8",
+      "integrity": "sha512-vWu18qcWAnFofgma33buujK/Tjb3M+Sv9PG053GyTDID1euYYz7yF+TBCGx3Pa5rxr9PAtz19Y3unltLJfWsMQ=="
+    }
+  },
+  "productInputCount": 24,
+  "sourceInputCount": 0,
+  "inputs": {
+    "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/chunk-GO4N5T27.js": "1580d8995daccb7ccad828ea2150a1301171a1ca3f9bed4d8aa4cb4450fd414c",
+    "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/chunk-PXG64RU4.js": "66c870d036873e0ed8003aac457a90bfe7f64e359b811e89c60e1a3d365bddb8",
+    "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/events.js": "5e65922406f8a4b06fe9306a461b7de31733c69edb81b60fdd1380a11f74fc22",
+    "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/audio/dist/chunk-VI2UXTK3.js": "ac23f96e083f9b8c0fb5bb8c97fd94726529572f767adbfa81828b54587e89ad",
+    "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/audio/dist/chunk-PXG64RU4.js": "66c870d036873e0ed8003aac457a90bfe7f64e359b811e89c60e1a3d365bddb8",
+    "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/audio/dist/index.js": "3d5d20e119eca61e675a09719bcf42e6c63309ba5d3618791dfef05bec15177b",
+    "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/audio/dist/chunk-6BIHSA2X.js": "43de97e8d7c9074ed870037fe6c5aa7d86dd5f2c7eb2104b324f38640d4a24cc",
+    "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/chunk-53YD73OY.js": "dec2f76a44627947448c9f257fb5c9758325acb85d3449b335954c49f78c1cbe",
+    "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/transport.js": "02110ac4dc4cd36fa5f7189229f09f75f731fc0064b7902d44d7baa8239b778a",
+    "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/chunk-FJLY3RWZ.js": "bf3c4d15d3f23d9862dd35e73586dc7368f22df34260a95162063380342c23fe",
+    "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/chunk-KXBBVTMJ.js": "bdec97bb125bcabac118bdbd88f402e70926910a55dbcc94e6465a5dd7fbae43",
+    "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/chunk-NDJF6SGC.js": "81159d547a1e3eed955e0a5f0345ce42044506875e4108db03e608cdb9e68287",
+    "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/chunk-FYNV7XAU.js": "65943ae831d24984148741845c7e1a8866a0ed8779fdefde4b1c39535fd2f179",
+    "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/chunk-HY2YIL75.js": "82d8632fc2f91c98549074a6d97ebf643b2b855a50cbef65d8c63bd671e76459",
+    "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/chunk-ANFTSKZF.js": "a6dba481dba743420ad364fe52e82e8e70bd1be2878f0cd42665609b8a8f422b",
+    "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/module.js": "93a390004884e3eee40c8253ac59d1f435021ecaa82b1a7528db3c2f63f21a9e",
+    "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/tick.js": "a1e86138e96d640bebe1549861291d8317d45077aa189d1cb3523ce4f6fadf53",
+    "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/chunk-7SWS2OJZ.js": "57b4670bebfd7f5f11d7b8411035cb405030ca5632285167db89d6ef311c2a98",
+    "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/effect.js": "cd58d5594b4f20b3f07ae827a157a53c75bd30c453fa40e9c470b8280e020bfa",
+    "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/kernel/dist/audio-context.js": "7ee09324dcb9e9e82a2f551deab026ef2743bd14be1531b3cc86aca565632906",
+    "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/audio/dist/chunk-UOTWF4UI.js": "3b770d2426333444dab934a71f11a519e559b67b8cb5a8307b031fbac2859d8c",
+    "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/audio/dist/chunk-DJOPQWDZ.js": "d59719baf5e3073fadc74568334be765b53ce941ad5e7e41408778a312860320",
+    "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/audio/dist/chunk-UZHEVG6G.js": "b04038d9a37e5a09c112efb95db9f2952db7e3598ef397e682daa1d6d7fc4303",
+    "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/audio/dist/play/headless/index.js": "0652856afa16a79ac4afb04cfe04b1aa7aa884160637aab1d337fde20e7f12f3"
+  },
+  "bundleSha256": "94d4e3048b6e8bc5d8c93eb48d769a39ac4e882946577b96b7e54921afb1d702"
+}

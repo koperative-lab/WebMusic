@@ -1,0 +1,19 @@
+{
+  "command": [
+    "python",
+    "/workspace/.webmusic-setup/reap.py",
+    "npm",
+    "run",
+    "build",
+    "-w",
+    "webmusic-doc"
+  ],
+  "cwd": "/workspace/WebMusic",
+  "startedAt": "2026-10-17T20:04:10.927129+00:00",
+  "node": "v22.22.3",
+  "npm": "10.9.8",
+  "inputFiles": 1448,
+  "exitCode": 0,
+  "durationSeconds": 64.185,
+  "completedAt": "2026-10-17T20:05:15.112223+00:00"
+}

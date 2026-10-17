@@ -1,0 +1,1383 @@
+
+> build
+> astro build
+
+20:05:43 [content] Syncing content
+20:05:43 [content] Astro config changed
+20:05:43 [content] Clearing content store
+20:05:44 [content] Synced content
+20:05:44 [types] Generated 2.82s
+20:05:44 [build] output: "static"
+20:05:44 [build] mode: "static"
+20:05:44 [build] directory: /workspace/WebMusic/apps/doc/webmusic/dist/
+20:05:44 [build] Collecting build info...
+20:05:44 [build] ✓ Completed in 3.17s.
+20:05:44 [build] Building static entrypoints...
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/index.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/index.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/audio/element/analyze/audio-transient-analyzer.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/audio/element/analyze/audio-transient-analyzer.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/audio/element/analyze/audio-oscilloscope.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/audio/element/analyze/audio-oscilloscope.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/score/api/play.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/score/api/play.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/audio/element/play/audio-mixer.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/audio/element/play/audio-mixer.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/kernel/api.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/kernel/api.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/audio/element/analyze/audio-level-analyzer.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/audio/element/analyze/audio-level-analyzer.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/audio/api/view.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/audio/api/view.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/score/api/index.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/score/api/index.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/audio/element/analyze/audio-spectrum-analyzer.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/audio/element/analyze/audio-spectrum-analyzer.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/uikit/views-analysis/transient-analyzer.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/uikit/views-analysis/transient-analyzer.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/audio/api/index.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/audio/api/index.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/audio/element/play/audio-effect.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/audio/element/play/audio-effect.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/score/api/io.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/score/api/io.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/score/api/react.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/score/api/react.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/score/element/play/score-effect.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/score/element/play/score-effect.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/quick-start.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/quick-start.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/audio/headless/analyze/audio-analysis-session.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/audio/headless/analyze/audio-analysis-session.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/score/api/analyze.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/score/api/analyze.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/agent-toolkit/llms-txt.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/agent-toolkit/llms-txt.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/audio/headless/play/audio-playlist.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/audio/headless/play/audio-playlist.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/audio/headless/analyze/realtime-analyzer.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/audio/headless/analyze/realtime-analyzer.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/score/element/play/score-recorder.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/score/element/play/score-recorder.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/audio/element/analyze/audio-meter.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/audio/element/analyze/audio-meter.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/score/element/play/score-note-input.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/score/element/play/score-note-input.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/audio/api/analyze.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/audio/api/analyze.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/score/element/play/score-player.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/score/element/play/score-player.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/agent-toolkit/agents-md.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/agent-toolkit/agents-md.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/score/element/play/score-synth-panel.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/score/element/play/score-synth-panel.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/agent-toolkit/skills.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/agent-toolkit/skills.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/score/element/view/score-pitch-view.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/score/element/view/score-pitch-view.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/audio/api/react.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/audio/api/react.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/audio/headless/play/audio-clip-player.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/audio/headless/play/audio-clip-player.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/audio/element/play/audio-recorder.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/audio/element/play/audio-recorder.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/audio/headless/index.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/audio/headless/index.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/agent-toolkit/index.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/agent-toolkit/index.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/audio/element/view/audio-live-view.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/audio/element/view/audio-live-view.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/score/headless/analyze/analysis-follower.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/score/headless/analyze/analysis-follower.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/score/element/analyze/score-chord-analysis.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/score/element/analyze/score-chord-analysis.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/score/element/index.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/score/element/index.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/score/element/play/score-rack-control.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/score/element/play/score-rack-control.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/score/headless/index.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/score/headless/index.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/kernel/index.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/kernel/index.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/score/api/view.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/score/api/view.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/score/element/view/score-sheet-view.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/score/element/view/score-sheet-view.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/audio/headless/play/audio-player.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/audio/headless/play/audio-player.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/audio/element/play/audio-player.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/audio/element/play/audio-player.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/audio/headless/play/audio-recorder.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/audio/headless/play/audio-recorder.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/audio/element/index.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/audio/element/index.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/score/headless/play/metronome.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/score/headless/play/metronome.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/score/headless/analyze/analysis-session.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/score/headless/analyze/analysis-session.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/score/element/view/score-view.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/score/element/view/score-view.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/uikit/index.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/uikit/index.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/score/headless/analyze/live-trackers.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/score/headless/analyze/live-trackers.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/audio/headless/view/audio-meter.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/audio/headless/view/audio-meter.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/bridge/api.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/bridge/api.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/score/headless/play/ab-player.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/score/headless/play/ab-player.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/audio/element/view/audio-view.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/audio/element/view/audio-view.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/uikit/transport-time/transport.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/uikit/transport-time/transport.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/audio/api/play.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/audio/api/play.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/uikit/mixing-capture/meter.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/uikit/mixing-capture/meter.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/score/element/analyze/score-live-chord-analysis.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/score/element/analyze/score-live-chord-analysis.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/audio/headless/play/audio-mixer.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/audio/headless/play/audio-mixer.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/audio/element/play/audio-playlist.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/audio/element/play/audio-playlist.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/uikit/mixing-capture/recorder.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/uikit/mixing-capture/recorder.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/score/headless/play/rack.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/score/headless/play/rack.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/audio/headless/view/peaks.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/audio/headless/view/peaks.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/uikit/transport-time/track-list.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/uikit/transport-time/track-list.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/uikit/parameters-gestures/lfo.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/uikit/parameters-gestures/lfo.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/uikit/parameters-gestures/envelope.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/uikit/parameters-gestures/envelope.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/uikit/layout-feedback/stage.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/uikit/layout-feedback/stage.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/score/headless/view/score-map-view.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/score/headless/view/score-map-view.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/bridge/composition.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/bridge/composition.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/score/headless/play/score-player.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/score/headless/play/score-player.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/uikit/views-analysis/oscilloscope.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/uikit/views-analysis/oscilloscope.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/uikit/transport-time/playlist.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/uikit/transport-time/playlist.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/score/headless/play/sound.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/score/headless/play/sound.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/uikit/views-analysis/harmony.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/uikit/views-analysis/harmony.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/audio/index.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/audio/index.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/uikit/views-analysis/analysis.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/uikit/views-analysis/analysis.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/uikit/views-analysis/spectrum-analyzer.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/uikit/views-analysis/spectrum-analyzer.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/uikit/notes/note.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/uikit/notes/note.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/audio/headless/view/audio-timeline.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/audio/headless/view/audio-timeline.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/audio/headless/view/view-models.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/audio/headless/view/view-models.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/score/headless/view/pitch-view.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/score/headless/view/pitch-view.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/uikit/views-analysis/pitch.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/uikit/views-analysis/pitch.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/audio/headless/play/effects.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/audio/headless/play/effects.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/uikit/mixing-capture/mixer.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/uikit/mixing-capture/mixer.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/score/headless/play/effect.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/score/headless/play/effect.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/bridge/headless/score-audio-sync.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/bridge/headless/score-audio-sync.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/uikit/parameters-gestures/patch-editor.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/uikit/parameters-gestures/patch-editor.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/audio/headless/play/engines.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/audio/headless/play/engines.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/score/headless/play/interactive-player.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/score/headless/play/interactive-player.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/score/headless/view/score-view.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/score/headless/view/score-view.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/uikit/layout-feedback/workbench.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/uikit/layout-feedback/workbench.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/uikit/layout-feedback/status.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/uikit/layout-feedback/status.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/uikit/layout-feedback/panel.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/uikit/layout-feedback/panel.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/bridge/headless/index.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/bridge/headless/index.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/uikit/transport-time/timeline.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/uikit/transport-time/timeline.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/uikit/transport-time/minimap.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/uikit/transport-time/minimap.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/uikit/parameters-gestures/parameter.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/uikit/parameters-gestures/parameter.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/bridge/index.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/bridge/index.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/bridge/modular-composition.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/bridge/modular-composition.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/score/index.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/score/index.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/uikit/parameters-gestures/macro.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/uikit/parameters-gestures/macro.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/uikit/api.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/uikit/api.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/uikit/parameters-gestures/eq.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/uikit/parameters-gestures/eq.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/audio/headless/view/live-projection.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/audio/headless/view/live-projection.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/score/headless/play/player-controller.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/score/headless/play/player-controller.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/score/headless/play/loop-player.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/score/headless/play/loop-player.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/uikit/views-analysis/level-analyzer.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/uikit/views-analysis/level-analyzer.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use astro:head-inject" in "src/content/docs/uikit/catalog.mdx?astroPropagatedAssets" may not be preserved when bundling.
+   ╭─[ src/content/docs/uikit/catalog.mdx?astroPropagatedAssets:2:6 ]
+   │
+ 2 │               "use astro:head-inject";
+   │               ────────────┬───────────
+   │                           ╰───────────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:55 [vite] ✓ built in 11.20s
+20:05:58 [WARN] [vite] [plugin builtin:vite-reporter]
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+20:05:58 [WARN] [vite] [MODULE_LEVEL_DIRECTIVE] The semantics of the module level directive "use client" in "../../../node_modules/@codesandbox/sandpack-react/dist/index.mjs" may not be preserved when bundling.
+   ╭─[ ../../../node_modules/@codesandbox/sandpack-react/dist/index.mjs:1:1 ]
+   │
+ 1 │ "use client";
+   │ ──────┬──────
+   │       ╰──────── module level directive may not be preserved
+   │
+   │ Help: For more information, see https://rolldown.rs/in-depth/directives#other-directives
+───╯
+
+20:05:58 [vite] ✓ built in 2.72s
+20:05:58 [build] Rearranging server assets...
+
+ generating static routes
+20:05:58 [WARN] [content] The collection "i18n" does not exist or is empty. Please check your content config file for errors.
+20:05:58   ├─ /404.html20:05:58 [WARN] [content] Entry docs → 404 was not found.
+ (+70ms)
+20:05:58   ├─ /audio/api/core/index.html (+7ms)
+20:05:58   ├─ /audio/element/analyze/audio-analysis/index.html (+1ms)
+20:05:58   ├─ /audio/element/analyze/audio-analysis-timeline/index.html (+5ms)
+20:05:58   ├─ /audio/element/analyze/audio-analysis-view/index.html (+1ms)
+20:05:58   ├─ /audio/element/analyze/audio-beat-analysis/index.html (+1ms)
+20:05:58   ├─ /audio/element/analyze/audio-clip-summary/index.html (+1ms)
+20:05:58   ├─ /audio/element/analyze/audio-histogram/index.html (+1ms)
+20:05:58   ├─ /audio/element/analyze/audio-onset-analysis/index.html (+2ms)
+20:05:58   ├─ /audio/element/analyze/audio-pitch-analysis/index.html (+1ms)
+20:05:58   ├─ /audio/element/analyze/audio-tuner/index.html (+1ms)
+20:05:58   ├─ /audio/element/analyze/index.html (+1ms)
+20:05:58   ├─ /audio/element/play/index.html (+1ms)
+20:05:58   ├─ /audio/element/view/audio-clip-thumbnail/index.html (+1ms)
+20:05:58   ├─ /audio/element/view/audio-meter/index.html (+1ms)
+20:05:58   ├─ /audio/element/view/audio-minimap/index.html (+1ms)
+20:05:58   ├─ /audio/element/view/audio-region-list/index.html (+1ms)
+20:05:58   ├─ /audio/element/view/meter/index.html (+1ms)
+20:05:58   ├─ /audio/element/view/spectrogram/index.html (+1ms)
+20:05:58   ├─ /audio/element/view/waveform/index.html (+1ms)
+20:05:58   ├─ /audio/element/view/index.html (+1ms)
+20:05:58   ├─ /audio/getting-started/index.html (+1ms)
+20:05:58   ├─ /audio/headless/analyze/index.html (+1ms)
+20:05:58   ├─ /audio/headless/play/index.html (+1ms)
+20:05:58   ├─ /audio/headless/view/index.html (+1ms)
+20:05:58   ├─ /audio/headless-component/analyze/index.html (+5ms)
+20:05:58   ├─ /audio/headless-component/play/index.html (+1ms)
+20:05:58   ├─ /audio/headless-component/view/index.html (+2ms)
+20:05:58   ├─ /audio/integration/react/index.html (+1ms)
+20:05:58   ├─ /audio/web-component/analyze/index.html (+17ms)
+20:05:58   ├─ /audio/web-component/play/index.html (+1ms)
+20:05:58   ├─ /audio/web-component/view/index.html (+1ms)
+20:05:58   ├─ /introduction/index.html (+72ms)
+20:05:59   ├─ /score/api/core/index.html (+2ms)
+20:05:59   ├─ /score/bridges/score-audio/index.html (+1ms)
+20:05:59   ├─ /score/element/analyze/analysis-histogram/index.html (+24ms)
+20:05:59   ├─ /score/element/analyze/analysis-timeline/index.html (+1ms)
+20:05:59   ├─ /score/element/analyze/analysis-view/index.html (+1ms)
+20:05:59   ├─ /score/element/analyze/chord-analysis/index.html (+1ms)
+20:05:59   ├─ /score/element/analyze/chord-history/index.html (+1ms)
+20:05:59   ├─ /score/element/analyze/interval-analysis/index.html (+1ms)
+20:05:59   ├─ /score/element/analyze/key-analysis/index.html (+4ms)
+20:05:59   ├─ /score/element/analyze/key-candidates/index.html (+1ms)
+20:05:59   ├─ /score/element/analyze/key-wheel/index.html (+8ms)
+20:05:59   ├─ /score/element/analyze/live-chord-analysis/index.html (+1ms)
+20:05:59   ├─ /score/element/analyze/motif-analysis/index.html (+1ms)
+20:05:59   ├─ /score/element/analyze/pitch-evidence/index.html (+1ms)
+20:05:59   ├─ /score/element/analyze/rhythm-analysis/index.html (+1ms)
+20:05:59   ├─ /score/element/analyze/rhythm-pattern-analysis/index.html (+1ms)
+20:05:59   ├─ /score/element/analyze/rhythm-patterns/index.html (+1ms)
+20:05:59   ├─ /score/element/analyze/roman-analysis/index.html (+1ms)
+20:05:59   ├─ /score/element/analyze/score-analysis/index.html (+8ms)
+20:05:59   ├─ /score/element/analyze/voice-leading-analysis/index.html (+1ms)
+20:05:59   ├─ /score/element/analyze/index.html (+1ms)
+20:05:59   ├─ /score/element/play/note-input/index.html (+1ms)
+20:05:59   ├─ /score/element/play/rack-control/index.html (+3ms)
+20:05:59   ├─ /score/element/play/simple-score-player/index.html (+1ms)
+20:05:59   ├─ /score/element/play/synth-panel/index.html (+1ms)
+20:05:59   ├─ /score/element/play/index.html (+0ms)
+20:05:59   ├─ /score/element/view/fretboard-view/index.html (+3ms)
+20:05:59   ├─ /score/element/view/keyboard-view/index.html (+1ms)
+20:05:59   ├─ /score/element/view/piano-roll/index.html (+1ms)
+20:05:59   ├─ /score/element/view/pitch-view/index.html (+0ms)
+20:05:59   ├─ /score/element/view/score-map/index.html (+1ms)
+20:05:59   ├─ /score/element/view/score-thumbnail/index.html (+5ms)
+20:05:59   ├─ /score/element/view/sheet-view/index.html (+1ms)
+20:05:59   ├─ /score/element/view/staff/index.html (+1ms)
+20:05:59   ├─ /score/element/view/staff-view/index.html (+1ms)
+20:05:59   ├─ /score/element/view/waterfall/index.html (+1ms)
+20:05:59   ├─ /score/element/view/index.html (+0ms)
+20:05:59   ├─ /score/getting-started/index.html (+2ms)
+20:05:59   ├─ /score/headless/analyze/analysis-worker/index.html (+1ms)
+20:05:59   ├─ /score/headless/analyze/score-report/index.html (+1ms)
+20:05:59   ├─ /score/headless/analyze/transport-clock/index.html (+6ms)
+20:05:59   ├─ /score/headless/analyze/index.html (+1ms)
+20:05:59   ├─ /score/headless/play/playercontroller--an-event-wrapper/index.html (+1ms)
+20:05:59   ├─ /score/headless/play/scoreplayer--the-push-engine/index.html (+1ms)
+20:05:59   ├─ /score/headless/play/sound--timbres/index.html (+1ms)
+20:05:59   ├─ /score/headless/play/synth-backends/index.html (+0ms)
+20:05:59   ├─ /score/headless/play/tone-player/index.html (+2ms)
+20:05:59   ├─ /score/headless/play/transport-drivers/index.html (+2ms)
+20:05:59   ├─ /score/headless/play/web-midi/index.html (+8ms)
+20:05:59   ├─ /score/headless/play/index.html (+1ms)
+20:05:59   ├─ /score/headless/view/active-note-tracker/index.html (+1ms)
+20:05:59   ├─ /score/headless/view/createscoreview/index.html (+21ms)
+20:05:59   ├─ /score/headless/view/index.html (+1ms)
+20:05:59   ├─ /score/headless-component/analyze/index.html (+1ms)
+20:05:59   ├─ /score/headless-component/play/index.html (+1ms)
+20:05:59   ├─ /score/headless-component/view/index.html (+0ms)
+20:05:59   ├─ /score/integration/react/index.html (+1ms)
+20:05:59   ├─ /score/programmatic/analyze/index.html (+1ms)
+20:05:59   ├─ /score/programmatic/play/index.html (+7ms)
+20:05:59   ├─ /score/programmatic/view/index.html (+1ms)
+20:05:59   ├─ /score/ui-kit/index.html (+2ms)
+20:05:59   ├─ /score/web-component/analyze/index.html (+3ms)
+20:05:59   ├─ /score/web-component/play/index.html (+7ms)
+20:05:59   ├─ /score/web-component/view/index.html (+1ms)
+20:05:59   ├─ /ui/presenters/index.html (+1ms)
+20:05:59   ├─ /ui/index.html (+1ms)
+20:05:59   ├─ /uikit/parameters-gestures/panel/index.html (+10ms)
+20:05:59   ├─ /uikit/views-analysis/stage/index.html (+1ms)
+20:05:59   ├─ /uikit/views-analysis/status/index.html (+1ms)
+20:05:59   ├─ /uikit/views-analysis/track-list/index.html (+1ms)
+20:05:59   ├─ /uikit/views-analysis/workbench/index.html (+1ms)
+20:05:59   ├─ /agent-toolkit/index.html (+29ms)
+20:05:59   ├─ /agent-toolkit/agents-md/index.html (+34ms)
+20:05:59   ├─ /agent-toolkit/llms-txt/index.html (+34ms)
+20:05:59   ├─ /agent-toolkit/skills/index.html (+33ms)
+20:05:59   ├─ /audio/index.html (+42ms)
+20:05:59   ├─ /audio/api/index.html (+19ms)
+20:05:59   ├─ /audio/api/analyze/index.html (+24ms)
+20:05:59   ├─ /audio/api/play/index.html (+16ms)
+20:05:59   ├─ /audio/api/react/index.html (+8ms)
+20:05:59   ├─ /audio/api/view/index.html (+28ms)
+20:05:59   ├─ /audio/element/index.html (+21ms)
+20:05:59   ├─ /audio/element/analyze/audio-level-analyzer/index.html (+18ms)
+20:05:59   ├─ /audio/element/analyze/audio-meter/index.html (+10ms)
+20:05:59   ├─ /audio/element/analyze/audio-oscilloscope/index.html (+10ms)
+20:05:59   ├─ /audio/element/analyze/audio-spectrum-analyzer/index.html (+30ms)
+20:05:59   ├─ /audio/element/analyze/audio-transient-analyzer/index.html (+11ms)
+20:05:59   ├─ /audio/element/play/audio-effect/index.html (+35ms)
+20:05:59   ├─ /audio/element/play/audio-mixer/index.html (+15ms)
+20:05:59   ├─ /audio/element/play/audio-player/index.html (+12ms)
+20:05:59   ├─ /audio/element/play/audio-playlist/index.html (+38ms)
+20:05:59   ├─ /audio/element/play/audio-recorder/index.html (+13ms)
+20:05:59   ├─ /audio/element/view/audio-live-view/index.html (+9ms)
+20:05:59   ├─ /audio/element/view/audio-view/index.html (+39ms)
+20:05:59   ├─ /audio/headless/index.html (+35ms)
+20:05:59   ├─ /audio/headless/analyze/audio-analysis-session/index.html (+8ms)
+20:05:59   ├─ /audio/headless/analyze/realtime-analyzer/index.html (+12ms)
+20:05:59   ├─ /audio/headless/play/audio-clip-player/index.html (+12ms)
+20:05:59   ├─ /audio/headless/play/audio-mixer/index.html (+15ms)
+20:05:59   ├─ /audio/headless/play/audio-player/index.html (+46ms)
+20:05:59   ├─ /audio/headless/play/audio-playlist/index.html (+16ms)
+20:05:59   ├─ /audio/headless/play/audio-recorder/index.html (+12ms)
+20:05:59   ├─ /audio/headless/play/effects/index.html (+18ms)
+20:05:59   ├─ /audio/headless/play/engines/index.html (+16ms)
+20:05:59   ├─ /audio/headless/view/audio-meter/index.html (+14ms)
+20:05:59   ├─ /audio/headless/view/audio-timeline/index.html (+30ms)
+20:05:59   ├─ /audio/headless/view/live-projection/index.html (+31ms)
+20:05:59   ├─ /audio/headless/view/peaks/index.html (+15ms)
+20:06:00   ├─ /audio/headless/view/view-models/index.html (+21ms)
+20:06:00   ├─ /bridge/index.html (+39ms)
+20:06:00   ├─ /bridge/api/index.html (+15ms)
+20:06:00   ├─ /bridge/composition/index.html (+1.21s)
+20:06:01   ├─ /bridge/headless/index.html (+10ms)
+20:06:01   ├─ /bridge/headless/score-audio-sync/index.html (+20ms)
+20:06:01   ├─ /bridge/modular-composition/index.html (+40ms)
+20:06:01   ├─ /index.html (+11ms)
+20:06:01   ├─ /kernel/index.html (+6ms)
+20:06:01   ├─ /kernel/api/index.html (+9ms)
+20:06:01   ├─ /quick-start/index.html (+67ms)
+20:06:01   ├─ /score/index.html (+10ms)
+20:06:01   ├─ /score/api/index.html (+28ms)
+20:06:01   ├─ /score/api/analyze/index.html (+23ms)
+20:06:01   ├─ /score/api/io/index.html (+52ms)
+20:06:01   ├─ /score/api/play/index.html (+18ms)
+20:06:01   ├─ /score/api/react/index.html (+78ms)
+20:06:01   ├─ /score/api/view/index.html (+32ms)
+20:06:01   ├─ /score/element/index.html (+8ms)
+20:06:01   ├─ /score/element/analyze/score-chord-analysis/index.html (+67ms)
+20:06:01   ├─ /score/element/analyze/score-live-chord-analysis/index.html (+19ms)
+20:06:01   ├─ /score/element/play/score-effect/index.html (+8ms)
+20:06:01   ├─ /score/element/play/score-note-input/index.html (+55ms)
+20:06:01   ├─ /score/element/play/score-player/index.html (+13ms)
+20:06:01   ├─ /score/element/play/score-rack-control/index.html (+14ms)
+20:06:01   ├─ /score/element/play/score-recorder/index.html (+20ms)
+20:06:01   ├─ /score/element/play/score-synth-panel/index.html (+21ms)
+20:06:01   ├─ /score/element/view/score-pitch-view/index.html (+36ms)
+20:06:01   ├─ /score/element/view/score-sheet-view/index.html (+30ms)
+20:06:01   ├─ /score/element/view/score-view/index.html (+16ms)
+20:06:02   ├─ /score/headless/index.html (+20ms)
+20:06:02   ├─ /score/headless/analyze/analysis-follower/index.html (+40ms)
+20:06:02   ├─ /score/headless/analyze/analysis-session/index.html (+15ms)
+20:06:02   ├─ /score/headless/analyze/live-trackers/index.html (+14ms)
+20:06:02   ├─ /score/headless/play/ab-player/index.html (+30ms)
+20:06:02   ├─ /score/headless/play/effect/index.html (+40ms)
+20:06:02   ├─ /score/headless/play/interactive-player/index.html (+10ms)
+20:06:02   ├─ /score/headless/play/loop-player/index.html (+18ms)
+20:06:02   ├─ /score/headless/play/metronome/index.html (+8ms)
+20:06:02   ├─ /score/headless/play/player-controller/index.html (+10ms)
+20:06:02   ├─ /score/headless/play/rack/index.html (+16ms)
+20:06:02   ├─ /score/headless/play/score-player/index.html (+53ms)
+20:06:02   ├─ /score/headless/play/sound/index.html (+17ms)
+20:06:02   ├─ /score/headless/view/pitch-view/index.html (+15ms)
+20:06:02   ├─ /score/headless/view/score-map-view/index.html (+13ms)
+20:06:02   ├─ /score/headless/view/score-view/index.html (+32ms)
+20:06:02   ├─ /uikit/index.html (+10ms)
+20:06:02   ├─ /uikit/api/index.html (+23ms)
+20:06:02   ├─ /uikit/catalog/index.html (+23ms)
+20:06:02   ├─ /uikit/layout-feedback/panel/index.html (+45ms)
+20:06:02   ├─ /uikit/layout-feedback/stage/index.html (+14ms)
+20:06:02   ├─ /uikit/layout-feedback/status/index.html (+17ms)
+20:06:02   ├─ /uikit/layout-feedback/workbench/index.html (+16ms)
+20:06:02   ├─ /uikit/mixing-capture/meter/index.html (+53ms)
+20:06:02   ├─ /uikit/mixing-capture/mixer/index.html (+16ms)
+20:06:02   ├─ /uikit/mixing-capture/recorder/index.html (+21ms)
+20:06:02   ├─ /uikit/notes/note/index.html (+17ms)
+20:06:02   ├─ /uikit/parameters-gestures/envelope/index.html (+15ms)
+20:06:02   ├─ /uikit/parameters-gestures/eq/index.html (+34ms)
+20:06:02   ├─ /uikit/parameters-gestures/lfo/index.html (+23ms)
+20:06:02   ├─ /uikit/parameters-gestures/macro/index.html (+20ms)
+20:06:02   ├─ /uikit/parameters-gestures/parameter/index.html (+10ms)
+20:06:02   ├─ /uikit/parameters-gestures/patch-editor/index.html (+10ms)
+20:06:02   ├─ /uikit/transport-time/minimap/index.html (+37ms)
+20:06:02   ├─ /uikit/transport-time/playlist/index.html (+26ms)
+20:06:02   ├─ /uikit/transport-time/timeline/index.html (+18ms)
+20:06:02   ├─ /uikit/transport-time/track-list/index.html (+66ms)
+20:06:02   ├─ /uikit/transport-time/transport/index.html (+35ms)
+20:06:02   ├─ /uikit/views-analysis/analysis/index.html (+8ms)
+20:06:02   ├─ /uikit/views-analysis/harmony/index.html (+12ms)
+20:06:02   ├─ /uikit/views-analysis/level-analyzer/index.html (+30ms)
+20:06:02   ├─ /uikit/views-analysis/oscilloscope/index.html (+15ms)
+20:06:02   ├─ /uikit/views-analysis/pitch/index.html (+23ms)
+20:06:03   ├─ /uikit/views-analysis/spectrum-analyzer/index.html (+24ms)
+20:06:03   ├─ /uikit/views-analysis/transient-analyzer/index.html (+11ms)
+20:06:03 ✓ Completed in 4.44s.
+
+20:06:03 [build] ✓ Completed in 18.61s.
+20:06:03 [@astrojs/sitemap] `sitemap-index.xml` created at `dist`
+20:06:06 [build] Waiting for integration "webmusic-local-search", hook "astro:build:done"...
+20:06:24 [webmusic-local-search] Local search indexed 112 public documentation pages.
+20:06:26 [webmusic-agent-context] Agent context verified 112 public Markdown references, four llms files and the Skill catalog.
+20:06:27 [webmusic-site-notices] Site licenses verified: 74 records, 356 files.
+20:06:27 [build] 114 page(s) built in 46.67s
+20:06:27 [build] Complete!

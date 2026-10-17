@@ -99,6 +99,7 @@ export class AudioOscilloscopeElement extends WebMusicElement {
   #stalled = false;
   #stallReported = false;
   #unbind?: () => void;
+  #bindingRevision = 0;
   #revision = 0;
   #lastTime?: {seconds: number; at: number};
   #raw?: Float32Array;
@@ -223,8 +224,12 @@ export class AudioOscilloscopeElement extends WebMusicElement {
   }
 
   #bind(): void {
-    this.#unbind?.();
+    const revision = ++this.#bindingRevision;
+    const current = () => this.isConnected && this.#bindingRevision === revision;
+    const previous = this.#unbind;
     this.#unbind = undefined;
+    previous?.();
+    if (!current()) return;
     this.#player = undefined;
     this.#playerState = 'unbound';
     this.#playing = false;
@@ -232,7 +237,12 @@ export class AudioOscilloscopeElement extends WebMusicElement {
     this.#stalled = false;
     this.#stallReported = false;
     this.#resetForTransportChange();
-    this.#unbind = bindAnalysisPlayer(this, (kind, reading) => this.#onPlayer(kind, reading), this.#explicitAnalyser ? null : this.#inputModule);
+    if (!current()) return;
+    const unbind = bindAnalysisPlayer(this, (kind, reading) => {
+      if (current()) this.#onPlayer(kind, reading);
+    }, this.#explicitAnalyser ? null : this.#inputModule, current);
+    if (current()) this.#unbind = unbind;
+    else unbind();
   }
 
   #onPlayer(kind: AnalysisPlayerUpdate, reading: AnalysisPlayerSnapshot): void {
@@ -380,14 +390,18 @@ export class AudioOscilloscopeElement extends WebMusicElement {
   }
 
   #teardown(): void {
-    this.#unbind?.();
+    const revision = ++this.#bindingRevision;
+    const unbind = this.#unbind;
     this.#unbind = undefined;
     this.#stop();
+    const presenter = this.#presenter;
+    this.#presenter = undefined;
+    presenter?.destroy();
+    unbind?.();
+    if (this.#bindingRevision !== revision) return;
     this.#player = undefined;
     this.#lastTime = undefined;
     this.#clear('waiting');
-    this.#presenter?.destroy();
-    this.#presenter = undefined;
   }
 
   #report(error: unknown): void {

@@ -43,6 +43,7 @@ export class AudioTransientAnalyzerElement extends WebMusicElement {
   #analyser?: AnalyserNode;
   #runner?: RealtimeAnalyzer;
   #unbind?: () => void;
+  #bindingRevision = 0;
   #stallTimer?: ReturnType<typeof setTimeout>;
   #revision = 0;
   #stalled = false;
@@ -131,8 +132,12 @@ export class AudioTransientAnalyzerElement extends WebMusicElement {
   }
 
   #bind(): void {
-    this.#unbind?.();
+    const revision = ++this.#bindingRevision;
+    const current = () => this.isConnected && this.#bindingRevision === revision;
+    const previous = this.#unbind;
     this.#unbind = undefined;
+    previous?.();
+    if (!current()) return;
     this.#player = undefined;
     this.#playerState = 'unbound';
     this.#playing = false;
@@ -140,7 +145,12 @@ export class AudioTransientAnalyzerElement extends WebMusicElement {
     this.#reportedStall = false;
     this.#readFailed = false;
     this.#reconcile(true);
-    this.#unbind = bindAnalysisPlayer(this, (kind, reading) => this.#onPlayer(kind, reading), this.#explicitAnalyser ? null : this.#inputModule);
+    if (!current()) return;
+    const unbind = bindAnalysisPlayer(this, (kind, reading) => {
+      if (current()) this.#onPlayer(kind, reading);
+    }, this.#explicitAnalyser ? null : this.#inputModule, current);
+    if (current()) this.#unbind = unbind;
+    else unbind();
   }
 
   #onPlayer(kind: AnalysisPlayerUpdate, reading: AnalysisPlayerSnapshot): void {
@@ -341,12 +351,16 @@ export class AudioTransientAnalyzerElement extends WebMusicElement {
   }
 
   #teardown(): void {
-    this.#unbind?.();
+    const revision = ++this.#bindingRevision;
+    const unbind = this.#unbind;
     this.#unbind = undefined;
     this.#stop();
-    this.#resetReadings();
-    this.#handle?.destroy();
+    const handle = this.#handle;
     this.#handle = undefined;
+    handle?.destroy();
+    unbind?.();
+    if (this.#bindingRevision !== revision) return;
+    this.#resetReadings();
     this.#player = undefined;
     this.#lastTime = undefined;
   }

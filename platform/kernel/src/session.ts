@@ -491,11 +491,16 @@ export class SessionTransport {
           : options.ended?.() === true));
     if (!complete) return 'ok';
     this.#ended = true;
+    const epoch = this.#scheduling.epoch + 1;
     this.#scheduling.invalidate();
+    // Cancellation observers may replace this completion with a command or
+    // dispose the Session. Only its own invalidation can still commit an end.
+    if (this.#disposed || this.#scheduling.epoch !== epoch) return 'ok';
     this.#clock.pause(time);
     if (duration !== null && position > duration) this.#clock.seekTo(duration, time);
     this.#scheduling.anchor();
-    return 'stalled';
+    // Terminal-anchor observers have the same right to restart or reposition.
+    return !this.#disposed && this.#scheduling.epoch === epoch ? 'stalled' : 'ok';
   }
 
   #extend(snapshot: TransportSnapshot): SessionTransportSnapshot {

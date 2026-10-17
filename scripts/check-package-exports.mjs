@@ -144,6 +144,7 @@ await rm(npmCache, {recursive: true, force: true});
 await checkKernelReexports();
 await checkCommonJsWorkerFallbacks();
 await checkAnalysisWorkerEntryPurity();
+await checkCombinedAudioGlobals();
 checkPublicDeclarations();
 
 if (errors.length > 0) {
@@ -371,6 +372,45 @@ async function checkBrowserIife({name, subpath, sourcePath, declarationPath}) {
     }
   } catch (error) {
     errors.push(`${name} ${subpath}: browser IIFE contract check failed (${message(error)}).`);
+  }
+}
+
+async function checkCombinedAudioGlobals() {
+  const directory = path.join(packagesRoot, 'audio');
+  const manifest = JSON.parse(await readFile(path.join(directory, 'package.json'), 'utf8'));
+  for (const order of [['view'], ['analyze'], ['view', 'analyze'], ['analyze', 'view']]) {
+    const defined = new Map();
+    const sandbox = {
+      HTMLElement: class {
+        constructor() {
+          if (![...defined.values()].includes(new.target)) throw new Error('Unregistered custom element constructor');
+        }
+      },
+      customElements: {
+        get: tag => defined.get(tag),
+        define: (tag, constructor) => {
+          if (defined.has(tag) || [...defined.values()].includes(constructor)) throw new Error('Duplicate custom element registration');
+          defined.set(tag, constructor);
+        },
+      },
+    };
+    try {
+      for (const capability of order) {
+        const entry = manifest.exports[`./${capability}/global`].default;
+        const sourcePath = path.join(directory, entry);
+        runInNewContext(await readFile(sourcePath, 'utf8'), sandbox, {filename: sourcePath});
+      }
+      const registered = defined.get('audio-meter');
+      for (const capability of order) {
+        const globalName = expectedBrowserGlobals['@webmusic/audio'][`./${capability}/global`].globalName;
+        const exported = sandbox[globalName].AudioMeterElement;
+        if (exported !== registered || !(new exported() instanceof registered)) {
+          throw new Error(`${globalName}.AudioMeterElement does not expose the registered constructor`);
+        }
+      }
+    } catch (error) {
+      errors.push(`@webmusic/audio globals (${order.join(' then ')}): ${message(error)}.`);
+    }
   }
 }
 

@@ -12,6 +12,7 @@ export function bindModuleAudioInput(
   host: Element,
   assigned: ModuleHandle | null | undefined,
   update: (input: ModuleAudioInput) => void,
+  isCurrent: () => boolean = () => true,
 ): () => void {
   let active = true;
   let generation = 0;
@@ -23,60 +24,88 @@ export function bindModuleAudioInput(
   let stopDiscovery: (() => void) | undefined;
   let preparing = false;
   let initialized = false;
+  const current = (revision: number) => active && isCurrent() && generation === revision;
   const clearTap = () => {
     const previousTap = tap;
     const previousAnalyser = analyser;
     tap = undefined; analyser = undefined; port = undefined;
     try { previousTap?.release(); } finally { previousAnalyser?.disconnect(); }
   };
+  const dispose = () => {
+    if (!active) return;
+    active = false; generation++;
+    const discovery = stopDiscovery;
+    const subscription = unsubscribe;
+    stopDiscovery = undefined; unsubscribe = undefined; target = undefined;
+    try { discovery?.(); }
+    finally { try { subscription?.(); } finally { clearTap(); } }
+  };
   const refresh = () => {
     const module = target;
-    if (!active || !module || preparing) return;
+    if (!active || !isCurrent() || !module || preparing) return;
     const revision = generation;
     preparing = true;
+    let candidate: AnalyserNode | undefined;
+    let lease: ConnectionLease | undefined;
     try {
-      if (!active || generation !== revision) return;
       const next = module.getPort?.(host.getAttribute('port') ?? 'output');
-      if (!next || next.disposed) { clearTap(); update({module}); return; }
+      if (!current(revision)) return;
+      if (!next || next.disposed) {
+        clearTap();
+        if (current(revision)) update({module});
+        return;
+      }
       if (next === port) return;
-      const candidate = next.context.createAnalyser();
-      let lease: ConnectionLease;
-      try { lease = next.tap(candidate); }
-      catch (error) { candidate.disconnect(); throw error; }
+      candidate = next.context.createAnalyser();
+      if (!current(revision)) return;
+      lease = next.tap(candidate);
+      if (!current(revision)) return;
       clearTap();
+      if (!current(revision)) return;
       analyser = candidate; tap = lease; port = next;
+      candidate = undefined; lease = undefined;
       update({module, analyser});
     } catch (error) {
-      if (!active || generation !== revision) return;
+      if (!current(revision)) return;
       clearTap();
-      update({module, error});
+      if (current(revision)) update({module, error});
     } finally {
+      try { lease?.release(); } finally { candidate?.disconnect(); }
       if (generation === revision) preparing = false;
+      if (!isCurrent()) dispose();
     }
   };
   const attach = (module: ModuleHandle | undefined) => {
-    if (!active) return;
-    if (initialized && target === module) { if (module && !preparing) void refresh(); return; }
+    if (!active || !isCurrent()) return;
+    if (initialized && target === module) { if (module && !preparing) refresh(); return; }
     initialized = true;
-    generation++;
+    const revision = ++generation;
     preparing = false;
-    unsubscribe?.(); unsubscribe = undefined;
-    clearTap();
+    const previous = unsubscribe;
+    unsubscribe = undefined;
     target = module;
+    try { clearTap(); } finally { previous?.(); }
+    if (!current(revision)) return;
     update({module});
-    if (!active || target !== module || !module) return;
-    unsubscribe = module.subscribe?.(() => { void refresh(); });
-    void refresh();
+    if (!current(revision) || !module) return;
+    const subscription = module.subscribe?.(() => { refresh(); });
+    if (!current(revision)) { subscription?.(); return; }
+    unsubscribe = subscription;
+    refresh();
   };
-  if (assigned !== undefined) attach(assigned ?? undefined);
-  else if (host.hasAttribute('input')) {
-    const selector = host.getAttribute('input') ?? '';
-    stopDiscovery = observeModuleTarget(host, selector, attach);
-  } else stopDiscovery = observeModuleContext(host, (context) => attach(context?.target));
-  return () => {
-    if (!active) return;
-    active = false; generation++;
-    stopDiscovery?.(); unsubscribe?.(); clearTap();
-    target = undefined;
-  };
+  try {
+    if (assigned !== undefined) attach(assigned ?? undefined);
+    else {
+      const discovery = host.hasAttribute('input')
+        ? observeModuleTarget(host, host.getAttribute('input') ?? '', attach)
+        : observeModuleContext(host, (context) => attach(context?.target));
+      if (active && isCurrent()) stopDiscovery = discovery;
+      else discovery();
+    }
+    if (!isCurrent()) dispose();
+  } catch (error) {
+    dispose();
+    throw error;
+  }
+  return dispose;
 }

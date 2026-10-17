@@ -273,6 +273,61 @@ describe('source-free SessionTransport', () => {
     w.session.dispose();
   });
 
+  it.each((['check', 'tick'] as const).flatMap(driver =>
+    (['invalidate', 'anchor'] as const).flatMap(phase =>
+      (['stop', 'seek', 'play', 'dispose'] as const).map(command => ({driver, phase, command})))))(
+    'preserves a newer $command from the natural-completion $phase callback during $driver', async ({driver, phase, command}) => {
+      let time = 0;
+      const session = new SessionTransport(() => time, {range: {startSeconds: 0, endSeconds: 1},
+        leadInSeconds: 0, driftCheckIntervalMs: 0, tick: {createWorker: () => null}});
+      let armed = false;
+      let replaced = false;
+      let replacement: ReturnType<SessionTransport['play']> | undefined;
+      let immediatePosition: number | undefined;
+      const anchors: number[] = [];
+      const commands: string[] = [];
+      session.subscribe(event => { if (armed && event.type === 'invalidate') commands.push(event.command.type); });
+      session.scheduling.subscribe(event => {
+        if (armed && event.type === 'anchor') anchors.push(event.snapshot.originPosition);
+        if (!armed || replaced || event.type !== phase) return;
+        replaced = true;
+        if (command === 'dispose') session.dispose();
+        else replacement = command === 'seek' ? session.seek(0.2) : session[command]();
+        void replacement?.catch(() => {});
+        immediatePosition = session.position;
+      });
+      try {
+        await session.play();
+        time = 1.25;
+        armed = true;
+        if (driver === 'check') expect(() => session.checkDrift()).not.toThrow();
+        else await vi.advanceTimersByTimeAsync(25);
+        expect(replaced).toBe(true);
+        if (command === 'dispose') {
+          expect(session.position).toBe(immediatePosition);
+          expect(session.snapshot.disposed).toBe(true);
+          expect(session.scheduling.snapshot.phase).toBe('disposed');
+          expect(commands).toEqual([]);
+        } else {
+          const commit = await replacement;
+          expect(commit?.status).toBe('committed');
+          expect(commands).toEqual([command]);
+          const position = command === 'seek' ? 0.2 : 0;
+          const paused = command === 'stop' || command === 'seek' && phase === 'anchor';
+          expect(session.snapshot).toMatchObject({position, paused, ended: false});
+          expect(commit?.snapshot).toMatchObject({position, paused});
+          expect(anchors.at(-1)).toBe(position);
+          if (phase === 'invalidate') expect(anchors).not.toContain(1);
+          time += 0.1;
+          await vi.advanceTimersByTimeAsync(25);
+          expect(session.position).toBeCloseTo(position + (paused ? 0 : 0.1));
+          expect(session.snapshot.paused).toBe(paused);
+        }
+      } finally { session.dispose(); }
+      expect(vi.getTimerCount()).toBe(0);
+    },
+  );
+
   it('failed preparation rejects the command without starting any engine', async () => {
     const w = world();
     const leaf = w.leaf();

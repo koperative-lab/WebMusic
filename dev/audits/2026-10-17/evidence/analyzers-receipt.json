@@ -1,0 +1,82 @@
+{
+  "consumer": "/tmp/webmusic-external-0btO9u/consumer",
+  "exitCode": 0,
+  "passed": true,
+  "cases": 52,
+  "browser": "151.0.7922.173",
+  "node": "v24.19.0",
+  "pageErrors": [],
+  "sourceInputCount": 0,
+  "bundleInputCount": 35,
+  "installedPackageCount": 5,
+  "installedDistFileCount": 1121,
+  "installedDistSha256": "ea959e58ab4ff9a3a6e1be35f1a593a2cb1e07f07cd9ee514f905d3790f25086",
+  "distUnchanged": true,
+  "packages": [
+    {
+      "name": "@webmusic/audio",
+      "version": "0.3.0",
+      "manifestSha256": "26efba21a1e584f041187d2ce9860c8940b69be57b105d235806c9c844b71c26",
+      "distFileCount": 330,
+      "distSha256": "2528b47b5b216d73c2b638504cf3342c98c5809ca53aa50c524d27de599f0513"
+    },
+    {
+      "name": "@webmusic/bridge",
+      "version": "0.3.0",
+      "manifestSha256": "808abc3a510496fa54a3c9556cc52b535b65f6feef7850f3066bb223f37246c3",
+      "distFileCount": 7,
+      "distSha256": "fca9061ebf92952027dcb79d5c756aecb84fbd6f53f6552f51fa2701126d422a"
+    },
+    {
+      "name": "@webmusic/kernel",
+      "version": "0.3.0",
+      "manifestSha256": "3dd3595a8068331e9ccc82da7257467620cb4d8be4914a81df51366e47a6e3dc",
+      "distFileCount": 141,
+      "distSha256": "5b5387eeb866a28ca426def2ef08565dcfe919fbde0e0a02b399688e620ccf0f"
+    },
+    {
+      "name": "@webmusic/score",
+      "version": "0.3.0",
+      "manifestSha256": "4b0067b644468c5281e4b0de62a355d0c8ab50f37df22b129a281b7b2cf0aedb",
+      "distFileCount": 330,
+      "distSha256": "60c330c8e7a7c49917f7d05b85c01f34c182076405628e4adc0c9e862560b1af"
+    },
+    {
+      "name": "@webmusic/ui",
+      "version": "0.3.0",
+      "manifestSha256": "1ff7ef3007f63bd7f269926a0107572693b96ccb7ca0b26fa812fd81405f8567",
+      "distFileCount": 313,
+      "distSha256": "74ab146753aae9028ddd0699f5b4aeb2612a1063b9c7f7d52bfe9b0e86a52aa5"
+    }
+  ],
+  "files": [
+    {
+      "path": "/workspace/artifacts/recovery-2026-10-17/integration-analyzers-native/native-entry.ts",
+      "sha256": "74711e82770492e109282356564cb887c790167e5dbfaccada5c5dbba34898be"
+    },
+    {
+      "path": "/workspace/artifacts/recovery-2026-10-17/integration-analyzers-native/native-run.cjs",
+      "sha256": "9a19a268ad95a2914e6e27ebe21f12663c41323be67a3764ba4b9257a0c183f4"
+    },
+    {
+      "path": "/workspace/artifacts/recovery-2026-10-17/integration-analyzers-native/run.log",
+      "sha256": "013f49911918babda087d6de6fab00945e941dbf24cb1cf0e84a3108c0e3c595"
+    },
+    {
+      "path": "/workspace/artifacts/recovery-2026-10-17/integration-analyzers-native/results/installed-dist-hashes.json",
+      "sha256": "73b45ba4f5c9f23807349ccc0dc1eec453749ed8c6d872e69e52054b2886a604"
+    },
+    {
+      "path": "/workspace/artifacts/recovery-2026-10-17/integration-analyzers-native/results/native-build.json",
+      "sha256": "c90fd29378d012daf1da9b22cb05d8ad74237e034a419d9f58a0a9c39441a480"
+    },
+    {
+      "path": "/workspace/artifacts/recovery-2026-10-17/integration-analyzers-native/results/native-results.json",
+      "sha256": "d76c7b9c1939d097e3217c62f40beb16eace7953472550dd094e82098864f860"
+    },
+    {
+      "path": "/workspace/artifacts/recovery-2026-10-17/integration-analyzers-native/results/native-bundle.js",
+      "sha256": "2e133874329680eb877105902775d231226fd079df0c96b2e144835ef3b1368b"
+    }
+  ]
+}

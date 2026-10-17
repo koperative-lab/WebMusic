@@ -1,5 +1,10 @@
 # Modular redesign review fixes
 
+> Recovery notice (2026-10-17): The generated evidence marked unavailable below
+> was not recovered. The results in this report describe the historical run,
+> not current verification. Original artifact paths are retained as text.
+> See the [recovery record](../2026-10-17/MODULAR-RECOVERY-AND-RELEASE-FIXES.md).
+
 This follow-up repairs the 20 independently reproduced findings from the
 2026-10-16 review of the `modular-redesign` working tree based on `ef8664d`.
 It preserves the dated [third-delivery record](../2026-10-15/MODULAR-THIRD-DELIVERY.md)
@@ -50,7 +55,7 @@ native state before rendering; nodes, routes, schedules and output samples are
 native. The separate per-voice ADSR matrix remains 504/504. An exact-source browser
 probe passes 19 focus cases, including outside/shadow focus and consecutive seeks.
 
-The complete [`npm run check`](fix-evidence/full-check.json) passed as one
+The complete `npm run check` (unavailable: `fix-evidence/full-check.json`) passed as one
 command (exit 0), including source/test typechecks, five package builds, compiled
 documentation snippets, licenses, exports and release manifests. Its workspace
 suites passed **370 files / 4,620 tests**, adding 72 regressions to the previous
@@ -58,22 +63,22 @@ baseline: Kernel 380, UI 681, Score 2,211, Audio 912, Bridge 192, documentation 
 Raw output and isolated native/browser probes are retained in
 [the evidence directory](fix-evidence/README.md).
 
-The subsequent [`npm run docs:build`](fix-evidence/docs-build.json) passed
+The subsequent `npm run docs:build` (unavailable: `fix-evidence/docs-build.json`) passed
 (exit 0), generating 114 pages. Against those final package outputs, all
-[11 native scheduling/effect cases](fix-evidence/final-native-results.json)
+11 native scheduling/effect cases (unavailable: `fix-evidence/final-native-results.json`)
 passed with no browser errors. A separate
-[interrupted-fade render](fix-evidence/public-effect-results.json) imported the
+interrupted-fade render (unavailable: `fix-evidence/public-effect-results.json`) imported the
 rebuilt public effect entry and measured peak `1.0000004768371582` and maximum
 unity error `9.5367431640625e-7`, below the `2e-6` tolerance.
 
-The [built public-page checks](fix-evidence/final-project-docs-results.json)
+The built public-page checks (unavailable: `fix-evidence/final-project-docs-results.json`)
 passed playback/pause, keyboard editing, save/restore/import/export, missing-plugin
 recovery, invalid-import preservation and 320 px layout with no browser errors.
-The [consecutive-seek check](fix-evidence/public-demo-keyboard-results.json)
+The consecutive-seek check (unavailable: `fix-evidence/public-demo-keyboard-results.json`)
 retained focus for both key presses, advanced from `0.05` to `0.10` seconds and
 then reached the natural `4.00 s` end. Final SHA-256 verification matched all
 15 implementation sources, six public entries, the native fixture bundle and
-43 served client assets; see [verification](fix-evidence/final-verification.json).
+43 served client assets; see verification (unavailable: `fix-evidence/final-verification.json`).
 
 ## Boundaries
 

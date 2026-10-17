@@ -1,0 +1,35 @@
+{
+  "normalization": "ANSI color/control sequences removed; line endings normalized and trailing whitespace removed. Original logs retained in portable verification archive.",
+  "files": [
+    {
+      "file": "docs-pages-build.txt",
+      "rawSha256": "5121f88446c2f70f022e06798f66eadf047187d3d08cdd5d51171a75e83f699b",
+      "displaySha256": "89c6a50d52722c9b3949be46073d22120d67fb925611f63af04e5e98ed80c5fb"
+    },
+    {
+      "file": "docs-pages-notices.txt",
+      "rawSha256": "79ab526daca8c090b6def0d2fa446e0634ed405f9b60cfe7a7b2a2ef0fbc40f3",
+      "displaySha256": "79ab526daca8c090b6def0d2fa446e0634ed405f9b60cfe7a7b2a2ef0fbc40f3"
+    },
+    {
+      "file": "docs-pages-prefix.txt",
+      "rawSha256": "e24eb9c5643adda9bf8780854fe05ad8d607950b47f63cabcf84ccb1a87a87e7",
+      "displaySha256": "e24eb9c5643adda9bf8780854fe05ad8d607950b47f63cabcf84ccb1a87a87e7"
+    },
+    {
+      "file": "external-install.txt",
+      "rawSha256": "0095d52f295f3ea48dba0b884fc492706842007022261798fd7e52ec7b7d83b9",
+      "displaySha256": "0095d52f295f3ea48dba0b884fc492706842007022261798fd7e52ec7b7d83b9"
+    },
+    {
+      "file": "node22-check.txt",
+      "rawSha256": "9a6b104246a763af8f34d92471cdcfabcc572a13f16eadb85d313c669bb7d0b7",
+      "displaySha256": "d4c1fce6df15e4a2e137d0a4c18629ee0d7ef16a4ccb3edfd09a1af18dcfac48"
+    },
+    {
+      "file": "node24-check.txt",
+      "rawSha256": "fe60e36f399cd3efedafc2b2586d71f9222e5c5c6a033df8eb0a27192eb80d43",
+      "displaySha256": "e3e78126bf55fa1731a2b6d6045f38e95ee1adad919b6546cd204f617726e808"
+    }
+  ]
+}

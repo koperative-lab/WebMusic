@@ -109,6 +109,7 @@ export class AudioClipPlayer {
   private analyserNode: AnalyserNode | null = null;
   private inserts?: InsertChain;
   private port?: AudioOutputPort;
+  private preparingGraph = false;
 
   private volume: number;
   private pan: number;
@@ -382,7 +383,6 @@ export class AudioClipPlayer {
    */
   async preload(): Promise<void> {
     if (this.disposed) return;
-    this.ensureContext();
     this.ensureGraph();
     // Await only a genuinely asynchronous warm-up. Both built-in engines
     // prepare synchronously, and an unconditional `await` would add a
@@ -734,7 +734,11 @@ export class AudioClipPlayer {
   private ensureGraph(): void {
     if (this.disposed) throw new Error('AudioClipPlayer has been disposed');
     if (this.engine) return;
-    const context = this.ensureContext();
+    if (this.preparingGraph) throw new Error('AudioClipPlayer graph preparation cannot re-enter');
+    this.preparingGraph = true;
+    const assertCurrent = () => {
+      if (this.disposed) throw new Error('AudioClipPlayer has been disposed');
+    };
 
     let gain: GainNode | null = null;
     let panner: StereoPannerNode | null = null;
@@ -743,6 +747,8 @@ export class AudioClipPlayer {
     let inserts: InsertChain | undefined;
     let port: AudioOutputPort | undefined;
     try {
+      const context = this.ensureContext();
+      assertCurrent();
       gain = context.createGain();
       gain.gain.value = this.volume;
       panner = context.createStereoPanner();
@@ -771,6 +777,9 @@ export class AudioClipPlayer {
       gain.connect(panner);
       inserts = new InsertChain(context);
       inserts.setCompatibility(this.options.effect);
+      // The public factory may dispose this owner. Keep its candidate isolated
+      // until ownership is checked, then let the failure path release it once.
+      assertCurrent();
       panner.connect(inserts.input);
       inserts.output.connect(analyser);
       port = new AudioOutputPort(analyser, {defaultDestination: this.options.destination ?? context.destination});
@@ -788,6 +797,7 @@ export class AudioClipPlayer {
         this.emitter.emitSafely('error', error instanceof Error ? error : new Error(String(error)), () => {});
       });
 
+      assertCurrent();
       this.engine = engine;
       this.gainNode = gain;
       this.pannerNode = panner;
@@ -813,6 +823,8 @@ export class AudioClipPlayer {
       disconnectNode(panner);
       disconnectNode(analyser);
       throw error;
+    } finally {
+      this.preparingGraph = false;
     }
 
     if (!this.loadEmitted) {

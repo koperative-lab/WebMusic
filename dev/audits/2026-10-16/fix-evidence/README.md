@@ -1,38 +1,43 @@
 # Modular repair evidence
 
+> Recovery notice (2026-10-17): The generated evidence marked unavailable below
+> was not recovered. The results in this report describe the historical run,
+> not current verification. Original artifact paths are retained as text.
+> See the [recovery record](../../2026-10-17/MODULAR-RECOVERY-AND-RELEASE-FIXES.md).
+
 These files retain the 2026-10-16 cloud run for the accompanying
 [repair record](../MODULAR-REVIEW-FIXES.md). Absolute paths in raw logs, receipts
 and probe snapshots identify the machine that executed them; they are historical
 evidence, not repository configuration. Product regressions live in the owning
 workspace tests linked from the record.
 
-- [Complete check receipt](full-check.json) and [output](full-check.txt): one
+- Complete check receipt (unavailable: `full-check.json`) and output (unavailable: `full-check.txt`): one
   successful `npm run check`, 370 workspace test files / 4,620 tests, with all
   five package builds and the repository source/package/release gates.
-- [Native mixer samples](audio-native.json): stereo 48 kHz native graph gain and
+- Native mixer samples (unavailable: `audio-native.json`): stereo 48 kHz native graph gain and
   mute recovery. Preparation temporarily shadows only the offline context state;
   native rendering follows after removing that shadow.
-- [Interrupted effect fade](effect-interrupted.json): constant unity input stays
+- Interrupted effect fade (unavailable: `effect-interrupted.json`): constant unity input stays
   within `2e-6` of unity over the rendered buffer after repeated replacement.
-- [Global control envelope](sound-control-envelope-probe.json) and
-  [per-voice matrix](sound-envelope-probe.json): zero-stage boundary checks and
+- Global control envelope (unavailable: `sound-control-envelope-probe.json`) and
+  per-voice matrix (unavailable: `sound-envelope-probe.json`): zero-stage boundary checks and
   the independent 504-case amplitude envelope matrix.
-- [Browser focus checks](editor-focus-browser.json): 19 assertions against
+- Browser focus checks (unavailable: `editor-focus-browser.json`): 19 assertions against
   isolated current-source editor/demo bundles. The result names input hashes;
   the demo's dependency outputs were from the pre-integration build.
-- [Documentation build receipt](docs-build.json) and [output](docs-build.txt):
+- Documentation build receipt (unavailable: `docs-build.json`) and output (unavailable: `docs-build.txt`):
   successful build of 114 pages, including fresh package outputs.
-- [Final native acceptance](final-native-results.json): all 11 timing/effect
+- Final native acceptance (unavailable: `final-native-results.json`): all 11 timing/effect
   cases passed against the rebuilt public entries recorded in
-  [build metadata](final-native-build.json), with no browser errors.
-- [Final public effect render](public-effect-results.json): the interrupted-fade
+  build metadata (unavailable: `final-native-build.json`), with no browser errors.
+- Final public effect render (unavailable: `public-effect-results.json`): the interrupted-fade
   regression also passes using the rebuilt public entry; maximum unity error
   is `9.5367431640625e-7` against a `2e-6` tolerance.
-- [Final public-page acceptance](final-project-docs-results.json): playback,
+- Final public-page acceptance (unavailable: `final-project-docs-results.json`): playback,
   keyboard editing, project persistence/recovery and narrow layout passed with
-  no browser errors. [Consecutive keyboard seeks](public-demo-keyboard-results.json)
+  no browser errors. Consecutive keyboard seeks (unavailable: `public-demo-keyboard-results.json`)
   retain focus and playback reaches its natural end.
-- [Final hash verification](final-verification.json): the 15 recorded source
+- Final hash verification (unavailable: `final-verification.json`): the 15 recorded source
   fingerprints, six public entries, native bundle and 43 served client assets
   still match the validated files.
 

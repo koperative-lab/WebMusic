@@ -65,6 +65,81 @@ afterEach(() => {
 });
 
 describe('AudioClipPlayer terminal disposal', () => {
+  it.each([false, true])('abandons a graph disposed by its effect factory, even if cleanup throws=%s', async (cleanupThrows) => {
+    const {context} = fakeContext();
+    const clip = createAudioClip({sampleRate: 8_000, channelData: [new Float32Array(8)]});
+    const released = vi.fn(() => { if (cleanupThrows) throw new Error('effect cleanup failed'); });
+    const effectNode = context.createGain();
+    const player = new AudioClipPlayer(clip, {audioContext: context, effect: {
+      createAudioNodes: () => {
+        player.dispose();
+        return {input: effectNode, output: effectNode, dispose: released};
+      },
+    }});
+    const loaded = vi.fn();
+    player.on('load', loaded);
+
+    await expect(player.preload()).rejects.toThrow(/disposed/);
+    expect(player.peekOutputPort()).toBeUndefined();
+    expect(loaded).not.toHaveBeenCalled();
+    expect(released).toHaveBeenCalledOnce();
+    expect(vi.mocked(context.createAnalyser).mock.results[0]!.value.connect).not.toHaveBeenCalled();
+    expect(vi.mocked(context.createStereoPanner).mock.results[0]!.value.disconnect).toHaveBeenCalled();
+    expect(context.close).not.toHaveBeenCalled();
+    player.dispose();
+    expect(released).toHaveBeenCalledOnce();
+  });
+
+  it('rejects recursive graph acquisition without creating a second effect or output', async () => {
+    const {context} = fakeContext();
+    const clip = createAudioClip({sampleRate: 8_000, channelData: [new Float32Array(8)]});
+    const released = vi.fn();
+    let attempted = false;
+    let recursiveError: unknown;
+    const factory = vi.fn(() => {
+      if (!attempted) {
+        attempted = true;
+        try { void player.outputPort; } catch (error) { recursiveError = error; }
+      }
+      const node = context.createGain();
+      return {input: node, output: node, dispose: released};
+    });
+    const player = new AudioClipPlayer(clip, {audioContext: context, effect: {createAudioNodes: factory}});
+    try {
+      await player.preload();
+      expect(recursiveError).toBeInstanceOf(Error);
+      expect((recursiveError as Error).message).toMatch(/cannot re-enter/);
+      expect(factory).toHaveBeenCalledOnce();
+      expect(player.outputPort).toBe(player.peekOutputPort());
+      expect(released).not.toHaveBeenCalled();
+    } finally { player.dispose(); }
+    player.dispose();
+    expect(released).toHaveBeenCalledOnce();
+  });
+
+  it('can retry graph preparation after a failed effect factory', async () => {
+    const {context} = fakeContext();
+    const clip = createAudioClip({sampleRate: 8_000, channelData: [new Float32Array(8)]});
+    const failure = new Error('effect unavailable');
+    const released = vi.fn();
+    let attempts = 0;
+    const player = new AudioClipPlayer(clip, {audioContext: context, effect: {
+      createAudioNodes: () => {
+        if (++attempts === 1) throw failure;
+        const node = context.createGain();
+        return {input: node, output: node, dispose: released};
+      },
+    }});
+    try {
+      await expect(player.preload()).rejects.toBe(failure);
+      expect(player.peekOutputPort()).toBeUndefined();
+      await player.preload();
+      expect(player.peekOutputPort()?.disposed).toBe(false);
+      expect(attempts).toBe(2);
+    } finally { player.dispose(); }
+    expect(released).toHaveBeenCalledOnce();
+  });
+
   it('does not start after stop invalidates a pending context resume', async () => {
     const {context, resume, counts} = fakeContext('suspended');
     const clip = createAudioClip({

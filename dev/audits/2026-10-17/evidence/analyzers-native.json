@@ -1,0 +1,1321 @@
+{
+  "consumer": "/tmp/webmusic-external-0btO9u/consumer",
+  "browser": "151.0.7922.173",
+  "node": "v24.19.0",
+  "expectedCases": 52,
+  "cases": [
+    {
+      "tag": "audio-level-analyzer",
+      "scenario": "normal-remove",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 0,
+        "releases": [],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": []
+    },
+    {
+      "tag": "audio-level-analyzer",
+      "scenario": "error-remove",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 0,
+        "releases": [],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 0,
+        "releases": [],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": [
+        {
+          "message": "Module output is unavailable",
+          "isError": true,
+          "bubbles": true,
+          "composed": true
+        }
+      ]
+    },
+    {
+      "tag": "audio-level-analyzer",
+      "scenario": "error-retain",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 0,
+        "releases": [],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 0,
+        "releases": [],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": [
+        {
+          "message": "Module output is unavailable",
+          "isError": true,
+          "bubbles": true,
+          "composed": true
+        },
+        {
+          "message": "Module output is unavailable",
+          "isError": true,
+          "bubbles": true,
+          "composed": true
+        }
+      ]
+    },
+    {
+      "tag": "audio-level-analyzer",
+      "scenario": "subscribe-remove",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 0,
+        "releases": [],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": []
+    },
+    {
+      "tag": "audio-level-analyzer",
+      "scenario": "subscribe-rebind",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": []
+    },
+    {
+      "tag": "audio-level-analyzer",
+      "scenario": "getPort-remove",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 0,
+        "releases": [],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 0,
+        "releases": [],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": []
+    },
+    {
+      "tag": "audio-level-analyzer",
+      "scenario": "getPort-rebind",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 0,
+        "releases": [],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": []
+    },
+    {
+      "tag": "audio-level-analyzer",
+      "scenario": "createAnalyser-remove",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 0,
+        "releases": [],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": []
+    },
+    {
+      "tag": "audio-level-analyzer",
+      "scenario": "createAnalyser-rebind",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": []
+    },
+    {
+      "tag": "audio-level-analyzer",
+      "scenario": "connect-remove",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 0,
+        "releases": [],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": []
+    },
+    {
+      "tag": "audio-level-analyzer",
+      "scenario": "connect-rebind",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": []
+    },
+    {
+      "tag": "audio-level-analyzer",
+      "scenario": "selector-rebind",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": []
+    },
+    {
+      "tag": "audio-oscilloscope",
+      "scenario": "normal-remove",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 0,
+        "releases": [],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": []
+    },
+    {
+      "tag": "audio-oscilloscope",
+      "scenario": "error-remove",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 0,
+        "releases": [],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 0,
+        "releases": [],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": [
+        {
+          "message": "Module output is unavailable",
+          "isError": true,
+          "bubbles": true,
+          "composed": true
+        }
+      ]
+    },
+    {
+      "tag": "audio-oscilloscope",
+      "scenario": "error-retain",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 0,
+        "releases": [],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 0,
+        "releases": [],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": [
+        {
+          "message": "Module output is unavailable",
+          "isError": true,
+          "bubbles": true,
+          "composed": true
+        },
+        {
+          "message": "Module output is unavailable",
+          "isError": true,
+          "bubbles": true,
+          "composed": true
+        }
+      ]
+    },
+    {
+      "tag": "audio-oscilloscope",
+      "scenario": "subscribe-remove",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 0,
+        "releases": [],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": []
+    },
+    {
+      "tag": "audio-oscilloscope",
+      "scenario": "subscribe-rebind",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": []
+    },
+    {
+      "tag": "audio-oscilloscope",
+      "scenario": "getPort-remove",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 0,
+        "releases": [],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 0,
+        "releases": [],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": []
+    },
+    {
+      "tag": "audio-oscilloscope",
+      "scenario": "getPort-rebind",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 0,
+        "releases": [],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": []
+    },
+    {
+      "tag": "audio-oscilloscope",
+      "scenario": "createAnalyser-remove",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 0,
+        "releases": [],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": []
+    },
+    {
+      "tag": "audio-oscilloscope",
+      "scenario": "createAnalyser-rebind",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": []
+    },
+    {
+      "tag": "audio-oscilloscope",
+      "scenario": "connect-remove",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 0,
+        "releases": [],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": []
+    },
+    {
+      "tag": "audio-oscilloscope",
+      "scenario": "connect-rebind",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": []
+    },
+    {
+      "tag": "audio-oscilloscope",
+      "scenario": "selector-rebind",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": []
+    },
+    {
+      "tag": "audio-spectrum-analyzer",
+      "scenario": "normal-remove",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 0,
+        "releases": [],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": []
+    },
+    {
+      "tag": "audio-spectrum-analyzer",
+      "scenario": "error-remove",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 0,
+        "releases": [],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 0,
+        "releases": [],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": [
+        {
+          "message": "Module output is unavailable",
+          "isError": true,
+          "bubbles": true,
+          "composed": true
+        }
+      ]
+    },
+    {
+      "tag": "audio-spectrum-analyzer",
+      "scenario": "error-retain",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 0,
+        "releases": [],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 0,
+        "releases": [],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": [
+        {
+          "message": "Module output is unavailable",
+          "isError": true,
+          "bubbles": true,
+          "composed": true
+        },
+        {
+          "message": "Module output is unavailable",
+          "isError": true,
+          "bubbles": true,
+          "composed": true
+        }
+      ]
+    },
+    {
+      "tag": "audio-spectrum-analyzer",
+      "scenario": "subscribe-remove",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 0,
+        "releases": [],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": []
+    },
+    {
+      "tag": "audio-spectrum-analyzer",
+      "scenario": "subscribe-rebind",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": []
+    },
+    {
+      "tag": "audio-spectrum-analyzer",
+      "scenario": "getPort-remove",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 0,
+        "releases": [],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 0,
+        "releases": [],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": []
+    },
+    {
+      "tag": "audio-spectrum-analyzer",
+      "scenario": "getPort-rebind",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 0,
+        "releases": [],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": []
+    },
+    {
+      "tag": "audio-spectrum-analyzer",
+      "scenario": "createAnalyser-remove",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 0,
+        "releases": [],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": []
+    },
+    {
+      "tag": "audio-spectrum-analyzer",
+      "scenario": "createAnalyser-rebind",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": []
+    },
+    {
+      "tag": "audio-spectrum-analyzer",
+      "scenario": "connect-remove",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 0,
+        "releases": [],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": []
+    },
+    {
+      "tag": "audio-spectrum-analyzer",
+      "scenario": "connect-rebind",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": []
+    },
+    {
+      "tag": "audio-spectrum-analyzer",
+      "scenario": "selector-rebind",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": []
+    },
+    {
+      "tag": "audio-transient-analyzer",
+      "scenario": "normal-remove",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 0,
+        "releases": [],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": []
+    },
+    {
+      "tag": "audio-transient-analyzer",
+      "scenario": "error-remove",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 0,
+        "releases": [],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 0,
+        "releases": [],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": [
+        {
+          "message": "Module output is unavailable",
+          "isError": true,
+          "bubbles": true,
+          "composed": true
+        }
+      ]
+    },
+    {
+      "tag": "audio-transient-analyzer",
+      "scenario": "error-retain",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 0,
+        "releases": [],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 0,
+        "releases": [],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": [
+        {
+          "message": "Module output is unavailable",
+          "isError": true,
+          "bubbles": true,
+          "composed": true
+        },
+        {
+          "message": "Module output is unavailable",
+          "isError": true,
+          "bubbles": true,
+          "composed": true
+        }
+      ]
+    },
+    {
+      "tag": "audio-transient-analyzer",
+      "scenario": "subscribe-remove",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 0,
+        "releases": [],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": []
+    },
+    {
+      "tag": "audio-transient-analyzer",
+      "scenario": "subscribe-rebind",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": []
+    },
+    {
+      "tag": "audio-transient-analyzer",
+      "scenario": "getPort-remove",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 0,
+        "releases": [],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 0,
+        "releases": [],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": []
+    },
+    {
+      "tag": "audio-transient-analyzer",
+      "scenario": "getPort-rebind",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 0,
+        "releases": [],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": []
+    },
+    {
+      "tag": "audio-transient-analyzer",
+      "scenario": "createAnalyser-remove",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 0,
+        "releases": [],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": []
+    },
+    {
+      "tag": "audio-transient-analyzer",
+      "scenario": "createAnalyser-rebind",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": []
+    },
+    {
+      "tag": "audio-transient-analyzer",
+      "scenario": "connect-remove",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 0,
+        "releases": [],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": []
+    },
+    {
+      "tag": "audio-transient-analyzer",
+      "scenario": "connect-rebind",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": []
+    },
+    {
+      "tag": "audio-transient-analyzer",
+      "scenario": "selector-rebind",
+      "passed": true,
+      "first": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "second": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 1,
+        "releases": [
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": []
+    },
+    {
+      "tag": "audio-level-analyzer",
+      "scenario": "unsubscribe-reconnect",
+      "passed": true,
+      "state": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 2,
+        "releases": [
+          1,
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": []
+    },
+    {
+      "tag": "audio-oscilloscope",
+      "scenario": "unsubscribe-reconnect",
+      "passed": true,
+      "state": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 2,
+        "releases": [
+          1,
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": []
+    },
+    {
+      "tag": "audio-spectrum-analyzer",
+      "scenario": "unsubscribe-reconnect",
+      "passed": true,
+      "state": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 2,
+        "releases": [
+          1,
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": []
+    },
+    {
+      "tag": "audio-transient-analyzer",
+      "scenario": "unsubscribe-reconnect",
+      "passed": true,
+      "state": {
+        "edges": 0,
+        "subscriptions": 0,
+        "analysers": 2,
+        "releases": [
+          1,
+          1
+        ],
+        "borrowedDisposed": 0,
+        "portDisposed": false
+      },
+      "errors": []
+    }
+  ],
+  "pageErrors": [],
+  "sourceInputCount": 0,
+  "installedDistSha256": "ea959e58ab4ff9a3a6e1be35f1a593a2cb1e07f07cd9ee514f905d3790f25086",
+  "distUnchanged": true,
+  "passed": true
+}

@@ -1,0 +1,135 @@
+{
+  "completedAt": "2026-10-17T20:05:40.528Z",
+  "consumer": "/tmp/webmusic-external-0btO9u/consumer",
+  "browser": "151.0.7922.173",
+  "inputs": {
+    "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/audio/dist/view/auto.global.js": "315eb10bab93fd8162b2924c0501d2817bc0a08ec9beabbdc9e469d8934f0fbd",
+    "/tmp/webmusic-external-0btO9u/consumer/node_modules/@webmusic/audio/dist/analyze/auto.global.js": "58d3a1a62ef0c48457e4eba684d42c8f065473837b5ff601a8fb6185f73bcf26"
+  },
+  "sourceInputCount": 0,
+  "installedBytesUnchanged": true,
+  "scenarios": 6,
+  "passed": true,
+  "results": [
+    {
+      "order": [
+        "view"
+      ],
+      "cases": [
+        {
+          "capability": "view",
+          "identity": true,
+          "instance": true,
+          "constructible": true
+        }
+      ],
+      "errors": [],
+      "passed": true
+    },
+    {
+      "order": [
+        "analyze"
+      ],
+      "cases": [
+        {
+          "capability": "analyze",
+          "identity": true,
+          "instance": true,
+          "constructible": true
+        }
+      ],
+      "errors": [],
+      "passed": true
+    },
+    {
+      "order": [
+        "view",
+        "analyze"
+      ],
+      "cases": [
+        {
+          "capability": "view",
+          "identity": true,
+          "instance": true,
+          "constructible": true
+        },
+        {
+          "capability": "analyze",
+          "identity": true,
+          "instance": true,
+          "constructible": true
+        }
+      ],
+      "errors": [],
+      "passed": true
+    },
+    {
+      "order": [
+        "analyze",
+        "view"
+      ],
+      "cases": [
+        {
+          "capability": "analyze",
+          "identity": true,
+          "instance": true,
+          "constructible": true
+        },
+        {
+          "capability": "view",
+          "identity": true,
+          "instance": true,
+          "constructible": true
+        }
+      ],
+      "errors": [],
+      "passed": true
+    },
+    {
+      "order": [
+        "view",
+        "analyze",
+        "view"
+      ],
+      "cases": [
+        {
+          "capability": "view",
+          "identity": true,
+          "instance": true,
+          "constructible": true
+        },
+        {
+          "capability": "analyze",
+          "identity": true,
+          "instance": true,
+          "constructible": true
+        }
+      ],
+      "errors": [],
+      "passed": true
+    },
+    {
+      "order": [
+        "analyze",
+        "view",
+        "analyze"
+      ],
+      "cases": [
+        {
+          "capability": "analyze",
+          "identity": true,
+          "instance": true,
+          "constructible": true
+        },
+        {
+          "capability": "view",
+          "identity": true,
+          "instance": true,
+          "constructible": true
+        }
+      ],
+      "errors": [],
+      "passed": true
+    }
+  ]
+}

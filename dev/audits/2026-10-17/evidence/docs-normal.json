@@ -1,0 +1,799 @@
+{
+  "startedAt": "2026-10-17T20:09:42.092Z",
+  "variant": "normal",
+  "directory": "/workspace/artifacts/recovery-2026-10-17/docs-final/normal-dist",
+  "prefix": "/",
+  "browser": "151.0.7922.173",
+  "node": "v22.22.3",
+  "cases": [
+    {
+      "name": "home",
+      "route": "/",
+      "pageErrors": [],
+      "consoleErrors": [],
+      "failedRequests": [],
+      "badResponses": [],
+      "resources": [
+        "/",
+        "/_astro/MobileTableOfContents.astro_astro_type_script_index_0_lang.C3fM4Kra.js",
+        "/_astro/Search.astro_astro_type_script_index_0_lang.CLcOQW1E.js",
+        "/_astro/TableOfContents.astro_astro_type_script_index_0_lang.BpJaGz7G.js",
+        "/_astro/middleware.FS3xCRhp.css",
+        "/_astro/page.Dwipeu-R.js",
+        "/_astro/print.ehPL0gv-.css",
+        "/_astro/starlight-toc.D4UDIxQL.js",
+        "/favicon.svg"
+      ],
+      "heading": "Introduction",
+      "componentErrors": [],
+      "recoveredAborts": [],
+      "passed": true,
+      "screenshot": "home.png"
+    },
+    {
+      "name": "score-player",
+      "route": "/score/element/play/score-player/",
+      "pageErrors": [],
+      "consoleErrors": [],
+      "failedRequests": [],
+      "badResponses": [],
+      "resources": [
+        "/_astro/ElementPlayground.astro_astro_type_script_index_0_lang.Cpk1uQDT.js",
+        "/_astro/Matcher.Cbcnvvn4.js",
+        "/_astro/MobileTableOfContents.astro_astro_type_script_index_0_lang.C3fM4Kra.js",
+        "/_astro/ScorePlayerPlayground.astro_astro_type_script_index_0_lang.BiKJ3MPI.js",
+        "/_astro/Search.astro_astro_type_script_index_0_lang.CLcOQW1E.js",
+        "/_astro/TableOfContents.astro_astro_type_script_index_0_lang.BpJaGz7G.js",
+        "/_astro/chunk-2RINFIPL.B2ENRYTK.js",
+        "/_astro/chunk-3BUTD4K4.DVQ9FnEz.js",
+        "/_astro/chunk-45SBOCXT.DJjmrNoO.js",
+        "/_astro/chunk-5ILU5AJR.BXjB_2Rb.js",
+        "/_astro/chunk-7QO6GKM7.DP4Dois9.js",
+        "/_astro/chunk-7SWS2OJZ.DulewF39.js",
+        "/_astro/chunk-AMXI3O2Z.CD1dUPP6.js",
+        "/_astro/chunk-ATD3GKXC.BOk2t7W1.js",
+        "/_astro/chunk-AVDZAIZG.D1nItIvW.js",
+        "/_astro/chunk-BH5SWUF5.C3LLkgfR.js",
+        "/_astro/chunk-PXG64RU4.CISNSyvS.js",
+        "/_astro/chunk-U2EA76DX.Df2O8ZW0.js",
+        "/_astro/chunk-UFBZP2HJ.aZF_OJS6.js",
+        "/_astro/chunk-UGMSLVHP.DT2t_thQ.js",
+        "/_astro/chunk-ULMZWKU2.3eYpF9e7.js",
+        "/_astro/chunk-XLY7XCAZ.BFnM19mz.js",
+        "/_astro/ec.0vx5m.js",
+        "/_astro/ec.w36nc.css",
+        "/_astro/effect-chain-editor-client.Cd9R7IFo.js",
+        "/_astro/load.Cw3MhhAH.js",
+        "/_astro/middleware.FS3xCRhp.css",
+        "/_astro/page.Dwipeu-R.js",
+        "/_astro/playground-client.C79gcqcF.js",
+        "/_astro/preload-helper.B3nfOi5I.js",
+        "/_astro/print.ehPL0gv-.css",
+        "/_astro/rolldown-runtime.B0Z9INg1.js",
+        "/_astro/starlight-toc.D4UDIxQL.js",
+        "/favicon.svg",
+        "/midi/webmusic-study-no-1.mid",
+        "/score/element/play/score-player/"
+      ],
+      "heading": "<score-player>",
+      "playback": {
+        "duration": 32,
+        "position": 0,
+        "src": "/midi/webmusic-study-no-1.mid",
+        "moving": 0.2525170068027211,
+        "paused": 0.2815419501133787,
+        "after": 0.2815419501133787
+      },
+      "componentErrors": [],
+      "recoveredAborts": [],
+      "passed": true,
+      "screenshot": "score-player.png"
+    },
+    {
+      "name": "audio-player",
+      "route": "/audio/element/play/audio-player/",
+      "pageErrors": [],
+      "consoleErrors": [],
+      "failedRequests": [],
+      "badResponses": [],
+      "resources": [
+        "/_astro/AudioCustomStyleDemo.astro_astro_type_script_index_0_lang.Dr1LhtmK.js",
+        "/_astro/AudioPlayerDemo.astro_astro_type_script_index_0_lang.Dr1LhtmK.js",
+        "/_astro/ElementPlayground.astro_astro_type_script_index_0_lang.Cpk1uQDT.js",
+        "/_astro/MobileTableOfContents.astro_astro_type_script_index_0_lang.C3fM4Kra.js",
+        "/_astro/Search.astro_astro_type_script_index_0_lang.CLcOQW1E.js",
+        "/_astro/TableOfContents.astro_astro_type_script_index_0_lang.BpJaGz7G.js",
+        "/_astro/chunk-3BUTD4K4.DVQ9FnEz.js",
+        "/_astro/chunk-5ILU5AJR.BXjB_2Rb.js",
+        "/_astro/chunk-7SWS2OJZ.DulewF39.js",
+        "/_astro/chunk-AMXI3O2Z.CD1dUPP6.js",
+        "/_astro/chunk-FNCOYTF5.BuSJ6wpn.js",
+        "/_astro/chunk-IUXNQAI4.D0YUUXYg.js",
+        "/_astro/chunk-MXOIG4PI.Bbfdwpor.js",
+        "/_astro/chunk-PXG64RU4.CISNSyvS.js",
+        "/_astro/chunk-UGMSLVHP.DT2t_thQ.js",
+        "/_astro/chunk-ULMZWKU2.3eYpF9e7.js",
+        "/_astro/chunk-UOTWF4UI.BXvKWcX5.js",
+        "/_astro/chunk-UZHEVG6G.Ghc8_fsl.js",
+        "/_astro/chunk-VI2UXTK3.DqiFY7Wx.js",
+        "/_astro/chunk-XLY7XCAZ.BFnM19mz.js",
+        "/_astro/ec.0vx5m.js",
+        "/_astro/ec.w36nc.css",
+        "/_astro/middleware.FS3xCRhp.css",
+        "/_astro/page.Dwipeu-R.js",
+        "/_astro/playground-client.C79gcqcF.js",
+        "/_astro/preload-helper.B3nfOi5I.js",
+        "/_astro/print.ehPL0gv-.css",
+        "/_astro/starlight-toc.D4UDIxQL.js",
+        "/audio/element/play/audio-player/",
+        "/favicon.svg",
+        "/mp3/webmusic-study-no-1.mp3"
+      ],
+      "heading": "<audio-player>",
+      "playback": {
+        "duration": 32,
+        "position": 0,
+        "src": "/mp3/webmusic-study-no-1.mp3",
+        "moving": 0.2583219954648526,
+        "paused": 0.29895691609977326,
+        "after": 0.29895691609977326
+      },
+      "componentErrors": [],
+      "recoveredAborts": [],
+      "passed": true,
+      "screenshot": "audio-player.png"
+    },
+    {
+      "name": "bridge",
+      "route": "/bridge/composition/",
+      "pageErrors": [],
+      "consoleErrors": [],
+      "failedRequests": [],
+      "badResponses": [],
+      "resources": [
+        "/_astro/IndependentLoopsDemo.astro_astro_type_script_index_0_lang.JYO2PFWi.js",
+        "/_astro/MobileTableOfContents.astro_astro_type_script_index_0_lang.C3fM4Kra.js",
+        "/_astro/ScoreAudioSyncDemo.astro_astro_type_script_index_0_lang.BXP86uN6.js",
+        "/_astro/Search.astro_astro_type_script_index_0_lang.CLcOQW1E.js",
+        "/_astro/TableOfContents.astro_astro_type_script_index_0_lang.BpJaGz7G.js",
+        "/_astro/chunk-5ILU5AJR.BXjB_2Rb.js",
+        "/_astro/chunk-7OVFETD7.OzW2Obgi.js",
+        "/_astro/chunk-7QO6GKM7.DP4Dois9.js",
+        "/_astro/chunk-7SWS2OJZ.DulewF39.js",
+        "/_astro/chunk-AMXI3O2Z.CD1dUPP6.js",
+        "/_astro/chunk-AVDZAIZG.D1nItIvW.js",
+        "/_astro/chunk-BBLMZHIK.DKDjss8J.js",
+        "/_astro/chunk-BH5SWUF5.C3LLkgfR.js",
+        "/_astro/chunk-BJMZW3B2.LjlyDcbA.js",
+        "/_astro/chunk-C46KBNAI.Qi7gNXOJ.js",
+        "/_astro/chunk-CXWE3ZD6.CuMulInw.js",
+        "/_astro/chunk-HYGCGFUM.CaTRz7N_.js",
+        "/_astro/chunk-JNTWPSJE.BX9Cz2ZN.js",
+        "/_astro/chunk-PXG64RU4.CHb4-EOA.js",
+        "/_astro/chunk-PXG64RU4.CISNSyvS.js",
+        "/_astro/chunk-Q72DW26N.f3LtbJiI.js",
+        "/_astro/chunk-QKSJ5N7B.CpqRSbeI.js",
+        "/_astro/chunk-RC3IQAAP.1I9WrLm_.js",
+        "/_astro/chunk-TGGSVMKB.BcAchhu5.js",
+        "/_astro/chunk-TWFLVRUL.3d-7tbre.js",
+        "/_astro/chunk-UGMSLVHP.DT2t_thQ.js",
+        "/_astro/chunk-ULMZWKU2.3eYpF9e7.js",
+        "/_astro/chunk-UOTWF4UI.BXvKWcX5.js",
+        "/_astro/chunk-VI2UXTK3.DqiFY7Wx.js",
+        "/_astro/chunk-VIUAGA76.DeUJRKsF.js",
+        "/_astro/chunk-XLY7XCAZ.BFnM19mz.js",
+        "/_astro/chunk-ZJYTMMXB.lNKHYRU2.js",
+        "/_astro/demo-lifecycle.B7KvdfCs.js",
+        "/_astro/dist.CnkR2h5w.js",
+        "/_astro/ec.0vx5m.js",
+        "/_astro/ec.w36nc.css",
+        "/_astro/element.-Fw8Cn72.js",
+        "/_astro/element.B1CSaAsL.js",
+        "/_astro/middleware.FS3xCRhp.css",
+        "/_astro/page.Dwipeu-R.js",
+        "/_astro/pitchy.CMko2vHO.js",
+        "/_astro/preload-helper.B3nfOi5I.js",
+        "/_astro/print.ehPL0gv-.css",
+        "/_astro/rolldown-runtime.B0Z9INg1.js",
+        "/_astro/starlight-toc.D4UDIxQL.js",
+        "/bridge/composition/",
+        "/favicon.svg"
+      ],
+      "heading": "Playback composition",
+      "componentErrors": [],
+      "recoveredAborts": [],
+      "passed": true,
+      "screenshot": "bridge.png"
+    },
+    {
+      "name": "modular",
+      "route": "/bridge/modular-composition/",
+      "pageErrors": [],
+      "consoleErrors": [],
+      "failedRequests": [
+        {
+          "url": "http://127.0.0.1:44343/wav/webmusic-study-no-1.wav",
+          "error": "net::ERR_ABORTED"
+        }
+      ],
+      "badResponses": [],
+      "resources": [
+        "/_astro/Matcher.Cbcnvvn4.js",
+        "/_astro/MobileTableOfContents.astro_astro_type_script_index_0_lang.C3fM4Kra.js",
+        "/_astro/ModularCompositionDemo.astro_astro_type_script_index_0_lang.BITbAoS9.js",
+        "/_astro/ModularModulationDemo.astro_astro_type_script_index_0_lang.yo1EmKlV.js",
+        "/_astro/ModularProjectDemo.astro_astro_type_script_index_0_lang.B3Flix77.js",
+        "/_astro/Search.astro_astro_type_script_index_0_lang.CLcOQW1E.js",
+        "/_astro/TableOfContents.astro_astro_type_script_index_0_lang.BpJaGz7G.js",
+        "/_astro/chunk-2RINFIPL.B2ENRYTK.js",
+        "/_astro/chunk-3BUTD4K4.DVQ9FnEz.js",
+        "/_astro/chunk-45SBOCXT.DJjmrNoO.js",
+        "/_astro/chunk-5ILU5AJR.BXjB_2Rb.js",
+        "/_astro/chunk-7QO6GKM7.DP4Dois9.js",
+        "/_astro/chunk-7SWS2OJZ.DulewF39.js",
+        "/_astro/chunk-ABNYNENQ.srusl9xZ.js",
+        "/_astro/chunk-AMXI3O2Z.CD1dUPP6.js",
+        "/_astro/chunk-ATD3GKXC.BOk2t7W1.js",
+        "/_astro/chunk-AVDZAIZG.D1nItIvW.js",
+        "/_astro/chunk-BH5SWUF5.C3LLkgfR.js",
+        "/_astro/chunk-BJMZW3B2.LjlyDcbA.js",
+        "/_astro/chunk-CXWE3ZD6.CuMulInw.js",
+        "/_astro/chunk-DK6KZYR3.loglmHgZ.js",
+        "/_astro/chunk-FNCOYTF5.BuSJ6wpn.js",
+        "/_astro/chunk-G2LGPXQ4.5FIvedA3.js",
+        "/_astro/chunk-IUXNQAI4.D0YUUXYg.js",
+        "/_astro/chunk-MXOIG4PI.Bbfdwpor.js",
+        "/_astro/chunk-P4WBBSZ3.D6Ox2G2-.js",
+        "/_astro/chunk-PXG64RU4.CISNSyvS.js",
+        "/_astro/chunk-U2EA76DX.Df2O8ZW0.js",
+        "/_astro/chunk-UFBZP2HJ.aZF_OJS6.js",
+        "/_astro/chunk-UGMSLVHP.DT2t_thQ.js",
+        "/_astro/chunk-ULMZWKU2.3eYpF9e7.js",
+        "/_astro/chunk-UOTWF4UI.BXvKWcX5.js",
+        "/_astro/chunk-UZHEVG6G.Ghc8_fsl.js",
+        "/_astro/chunk-VI2UXTK3.DqiFY7Wx.js",
+        "/_astro/chunk-XLY7XCAZ.BFnM19mz.js",
+        "/_astro/demo-lifecycle.B7KvdfCs.js",
+        "/_astro/dist.CnkR2h5w.js",
+        "/_astro/ec.0vx5m.js",
+        "/_astro/ec.w36nc.css",
+        "/_astro/load.Cw3MhhAH.js",
+        "/_astro/middleware.FS3xCRhp.css",
+        "/_astro/page.Dwipeu-R.js",
+        "/_astro/preload-helper.B3nfOi5I.js",
+        "/_astro/print.ehPL0gv-.css",
+        "/_astro/rolldown-runtime.B0Z9INg1.js",
+        "/_astro/starlight-toc.D4UDIxQL.js",
+        "/bridge/modular-composition/",
+        "/favicon.svg",
+        "/midi/webmusic-study-no-1.mid",
+        "/wav/webmusic-study-no-1.wav"
+      ],
+      "heading": "Modular composition",
+      "composition": {
+        "playback": {
+          "duration": 32,
+          "position": 0,
+          "src": null,
+          "moving": 0.31151927437641724,
+          "paused": 0.3521541950113378,
+          "after": 0.3521541950113378
+        },
+        "session": {
+          "revision": 3,
+          "referenceTime": 0.8417233560090703,
+          "position": 0.3521541950113378,
+          "rate": 1,
+          "paused": true,
+          "holding": false,
+          "loop": null,
+          "pending": false,
+          "disposed": false,
+          "axis": "session-seconds",
+          "durationSeconds": 32,
+          "schedulingEpoch": 3,
+          "schedulingMode": "shared-anchor",
+          "participantCount": 3,
+          "pendingSourceCount": 0,
+          "membershipRevision": 11,
+          "ended": false,
+          "range": null
+        },
+        "audioClip": {
+          "source": "http://127.0.0.1:44343/wav/webmusic-study-no-1.wav",
+          "hasSamples": true,
+          "sampleRate": 44100,
+          "frames": 1411200,
+          "channels": 2,
+          "duration": 32,
+          "firstSecondPeak": 0.37261962890625,
+          "position": 0.3521541950113378
+        },
+        "effect": {
+          "first": "0.25",
+          "mirror": "0.25"
+        },
+        "screenshot": "composition.png"
+      },
+      "modulation": {
+        "playback": {
+          "duration": 2.4,
+          "position": 0,
+          "src": null,
+          "moving": 0.25056689342403626,
+          "paused": 0.2824943310657596,
+          "after": 0.2824943310657596
+        },
+        "envelope": {
+          "Attack (next notes)": "0.12",
+          "Decay (next notes)": "0.4",
+          "Sustain (next notes)": "0.6",
+          "Release (next notes)": "0.5"
+        },
+        "noteEvents": [
+          {
+            "type": "webscore:noteon",
+            "id": "note-input-1-1",
+            "midi": 48,
+            "velocity": 100,
+            "routed": true
+          },
+          {
+            "type": "webscore:noteoff",
+            "id": "note-input-1-1",
+            "midi": 48,
+            "velocity": 100,
+            "routed": true
+          }
+        ],
+        "lfo": "Cutoff base: 1200 Hz · modulation range: 1000–1400 Hz · effective audio-rate value: unavailable",
+        "macro": {
+          "value": "0.65",
+          "cutoff": "2810"
+        },
+        "automation": {
+          "held": "1335",
+          "heldAfter": "1335"
+        },
+        "screenshot": "modulation.png"
+      },
+      "project": {
+        "playing": "Playing · 2 sources on one Session · filter 990 Hz · vibrato follows Session position",
+        "keyboardSeek": {
+          "first": "0.05",
+          "second": "0.1"
+        },
+        "restored": {
+          "name": "Recovered melody",
+          "macro": "0.7",
+          "clock": "Paused · 2 sources on one Session · filter 730 Hz · vibrato follows Session position"
+        },
+        "exported": {
+          "sha256": "0edb38433a2e6a094f632b3bfda4f12903bcc3698337a3b737c42588bee545eb",
+          "moduleCount": 5,
+          "connectionCount": 1
+        },
+        "missing": "The filter plugin is unavailable. Its module, connection and automation records remain in the project. Make the module available to recover it.",
+        "recovered": "The filter and its saved connection are restored. Playback remains paused until Play.",
+        "invalidImport": "Unsupported module project schema/version.",
+        "screenshot": "project.png",
+        "narrow": {
+          "viewport": 320,
+          "document": 320
+        },
+        "narrowScreenshot": "project-narrow.png"
+      },
+      "componentErrors": [],
+      "recoveredAborts": [
+        {
+          "url": "http://127.0.0.1:44343/wav/webmusic-study-no-1.wav",
+          "error": "net::ERR_ABORTED"
+        }
+      ],
+      "passed": true,
+      "screenshot": "modular.png"
+    }
+  ],
+  "finishedAt": "2026-10-17T20:09:52.294Z",
+  "inputs": {
+    "harness": "baacb4ff6c75aab077dce8422fabc6ebf5d7c25f1012c23e67a1928d724f68c0",
+    "server": "c6dc4e956f03a9b31a70c140ed655942236d251e2758920ab09094a383307d71",
+    "resources": [
+      {
+        "path": "index.html",
+        "bytes": 60675,
+        "sha256": "1ff5ee4eec51c9accda1b5476148930466a7f5d672b60f14ba38997fb25cb393"
+      },
+      {
+        "path": "_astro/MobileTableOfContents.astro_astro_type_script_index_0_lang.C3fM4Kra.js",
+        "bytes": 690,
+        "sha256": "08fdcfbb2e9afba70106dd0061e48701d0bd6e7f962969baa00b4ca4aa6cacfb"
+      },
+      {
+        "path": "_astro/Search.astro_astro_type_script_index_0_lang.CLcOQW1E.js",
+        "bytes": 4763,
+        "sha256": "544c8b4a938b365cb94f53e6b8e5fd31bdc05c5790a124fabe1099032c2692b9"
+      },
+      {
+        "path": "_astro/TableOfContents.astro_astro_type_script_index_0_lang.BpJaGz7G.js",
+        "bytes": 104,
+        "sha256": "b4cddda2a4116a0e2c2e35ab981f20e8652f45f0e83948dd6b93cb87bbf6f74a"
+      },
+      {
+        "path": "_astro/middleware.FS3xCRhp.css",
+        "bytes": 86531,
+        "sha256": "ee020e0c035d8c8e6cb70c92604340d9f18481d62905706a181ad520a1d32426"
+      },
+      {
+        "path": "_astro/page.Dwipeu-R.js",
+        "bytes": 2554,
+        "sha256": "20c3c39331727149e8cb2ee57af369d86c4c352b0b6c45277148f3a3b1ca3566"
+      },
+      {
+        "path": "_astro/print.ehPL0gv-.css",
+        "bytes": 3385,
+        "sha256": "cf0ce24db3a4af2f2c9eb24f31e76815ae10cd288596af70851a22d5688a177c"
+      },
+      {
+        "path": "_astro/starlight-toc.D4UDIxQL.js",
+        "bytes": 2010,
+        "sha256": "87fc9b639532d7eedd28797b5af3b8aeac4a7e3892bf61dea6682b62438db099"
+      },
+      {
+        "path": "favicon.svg",
+        "bytes": 1343,
+        "sha256": "3d81ddf500aae3a6f7638d7ee65ad36dc81155336970fd57e8ed407138cc68d0"
+      },
+      {
+        "path": "_astro/ElementPlayground.astro_astro_type_script_index_0_lang.Cpk1uQDT.js",
+        "bytes": 124,
+        "sha256": "5b249c6328d79cab0a6893b21effbb511b5a7d8a1b83c1ed834d8e64b193f193"
+      },
+      {
+        "path": "_astro/Matcher.Cbcnvvn4.js",
+        "bytes": 7948,
+        "sha256": "a5bacf0a2446e14530b864ce6ebbaadccb2d733af1de5f1a319377b682a910c9"
+      },
+      {
+        "path": "_astro/ScorePlayerPlayground.astro_astro_type_script_index_0_lang.BiKJ3MPI.js",
+        "bytes": 181,
+        "sha256": "be1d933502fb3704681e77a4961a0f0c20c67c8e94879c02be13dc482360e62d"
+      },
+      {
+        "path": "_astro/chunk-2RINFIPL.B2ENRYTK.js",
+        "bytes": 95750,
+        "sha256": "ff74d8cbc63b20993f0cff814608fd848ea0dd233bb8c54de32b278dd2a31d30"
+      },
+      {
+        "path": "_astro/chunk-3BUTD4K4.DVQ9FnEz.js",
+        "bytes": 16416,
+        "sha256": "87adc9f1c717f6d6bbdc1a0c9f82d9de0b7054ad2572b7cdde5a59f491831e85"
+      },
+      {
+        "path": "_astro/chunk-45SBOCXT.DJjmrNoO.js",
+        "bytes": 6291,
+        "sha256": "707f5f58e74201fbf7de8ed41331db0ee9cdd0b671b4c319694a50929bef36ed"
+      },
+      {
+        "path": "_astro/chunk-5ILU5AJR.BXjB_2Rb.js",
+        "bytes": 13143,
+        "sha256": "c545cb88285f93e4451e81c435a598a356690b2e8dfed6a34dbe5a1c7dfe2bd4"
+      },
+      {
+        "path": "_astro/chunk-7QO6GKM7.DP4Dois9.js",
+        "bytes": 158311,
+        "sha256": "19449daea8984f263c8f07aceddb790c9881a891dbc8c318aa98ef3fc1fbd357"
+      },
+      {
+        "path": "_astro/chunk-7SWS2OJZ.DulewF39.js",
+        "bytes": 112393,
+        "sha256": "0ddefce2e8bbb8bf3a4bbfe148af07e5a9fb5600f51fbd6f7f8e6f4090f06ec1"
+      },
+      {
+        "path": "_astro/chunk-AMXI3O2Z.CD1dUPP6.js",
+        "bytes": 298,
+        "sha256": "128937864ca0426ba239aa28ccad483032b267fe956ad0376b9b1db681fedd6f"
+      },
+      {
+        "path": "_astro/chunk-ATD3GKXC.BOk2t7W1.js",
+        "bytes": 68812,
+        "sha256": "3f8ec012bcc3cbde83ba280cf8b2ad56c12f291ee87735aa8d80e379a77f6bce"
+      },
+      {
+        "path": "_astro/chunk-AVDZAIZG.D1nItIvW.js",
+        "bytes": 52463,
+        "sha256": "52bb659cdff608961bb6d8191abf41346930c049e4c5e2ce45afbd26fd23057c"
+      },
+      {
+        "path": "_astro/chunk-BH5SWUF5.C3LLkgfR.js",
+        "bytes": 2879,
+        "sha256": "dbfb0cb9092cd4a628413a02f42171145404e574247f4555f2e518a09e657ed7"
+      },
+      {
+        "path": "_astro/chunk-PXG64RU4.CISNSyvS.js",
+        "bytes": 533,
+        "sha256": "c1bcbad8d36b2ad2477dc38aa4e0f7c1ad3232342fff837d90f75d502d6615b5"
+      },
+      {
+        "path": "_astro/chunk-U2EA76DX.Df2O8ZW0.js",
+        "bytes": 128712,
+        "sha256": "4a142406c25cf923c1659439657a49cad957b37de50a7e5df52daa1106fba484"
+      },
+      {
+        "path": "_astro/chunk-UFBZP2HJ.aZF_OJS6.js",
+        "bytes": 24474,
+        "sha256": "021b08f35b99c00713f20df036bcd8e39c38560c74aed6ef7fe645f9c013e700"
+      },
+      {
+        "path": "_astro/chunk-UGMSLVHP.DT2t_thQ.js",
+        "bytes": 2267,
+        "sha256": "f1d89b3548b5aecb3fbe7d6370827272ea6fc1997a8e7f88feb9658d431497a7"
+      },
+      {
+        "path": "_astro/chunk-ULMZWKU2.3eYpF9e7.js",
+        "bytes": 7175,
+        "sha256": "7d0f0c62ab6c8c21aa4e98f5245e976fc0a29cac3abd4770a6114202d7babab1"
+      },
+      {
+        "path": "_astro/chunk-XLY7XCAZ.BFnM19mz.js",
+        "bytes": 18503,
+        "sha256": "c11b11456c8b13bd438438d86a6336f32bbfae1c9fe63a5a196942f7d39e20d6"
+      },
+      {
+        "path": "_astro/ec.0vx5m.js",
+        "bytes": 2591,
+        "sha256": "d7e7d8a717223e616dcdf1cd92e242ef42798575316daba8a8d58852bd522752"
+      },
+      {
+        "path": "_astro/ec.w36nc.css",
+        "bytes": 18360,
+        "sha256": "419744471ff4c87d228bca56c776d523a165c670111feba2abb815de8a11ffaa"
+      },
+      {
+        "path": "_astro/effect-chain-editor-client.Cd9R7IFo.js",
+        "bytes": 14610,
+        "sha256": "16c00ba0755fe79fb3ebe23a66723c57358d6f9f0a875cbddd6c74838b728f47"
+      },
+      {
+        "path": "_astro/load.Cw3MhhAH.js",
+        "bytes": 568,
+        "sha256": "54ac1cb6b17819219159a765e9279473f8039ea698ad0e9277774342ce234ed5"
+      },
+      {
+        "path": "_astro/playground-client.C79gcqcF.js",
+        "bytes": 5660,
+        "sha256": "869a956213c35f9122aaa9d92ced032d07b79f601cc1d3b1814224acd6436964"
+      },
+      {
+        "path": "_astro/preload-helper.B3nfOi5I.js",
+        "bytes": 1432,
+        "sha256": "b63bc5b4db9feb6988fc2914da101e21b57c98a7b0b4e1ee149fc2b6f17a419c"
+      },
+      {
+        "path": "_astro/rolldown-runtime.B0Z9INg1.js",
+        "bytes": 969,
+        "sha256": "56214e9206ccab61a358cebdc35efb9a3d1ca67356fa4c4b19c68606a4972a1a"
+      },
+      {
+        "path": "midi/webmusic-study-no-1.mid",
+        "bytes": 5766,
+        "sha256": "0af97f5390cb6a18e28aacb0889d4c08deeb22ed7fe8ac3ddf7692a13ccc562d"
+      },
+      {
+        "path": "score/element/play/score-player/index.html",
+        "bytes": 140514,
+        "sha256": "41cd17d17784d39d8cf8171561bc8c774bcb3dfd11a5f6bf5a5e78b3c62bad48"
+      },
+      {
+        "path": "_astro/AudioCustomStyleDemo.astro_astro_type_script_index_0_lang.Dr1LhtmK.js",
+        "bytes": 121,
+        "sha256": "821cbc489a7089ecfd1649495180ba6f555ea933a980cc3fd1c0178be00aafeb"
+      },
+      {
+        "path": "_astro/AudioPlayerDemo.astro_astro_type_script_index_0_lang.Dr1LhtmK.js",
+        "bytes": 121,
+        "sha256": "821cbc489a7089ecfd1649495180ba6f555ea933a980cc3fd1c0178be00aafeb"
+      },
+      {
+        "path": "_astro/chunk-FNCOYTF5.BuSJ6wpn.js",
+        "bytes": 4120,
+        "sha256": "0d9a888d88a93c731926f5fd185abd9cbe50a4db4fea74de6ef6923a17e5541e"
+      },
+      {
+        "path": "_astro/chunk-IUXNQAI4.D0YUUXYg.js",
+        "bytes": 55870,
+        "sha256": "81aac03dcec3a55146acc4e24a9a9855981c601ef2d20200cc79f94478b6f259"
+      },
+      {
+        "path": "_astro/chunk-MXOIG4PI.Bbfdwpor.js",
+        "bytes": 10755,
+        "sha256": "9bbccbfe6b8fa5177b571c0f450e47b932cba0bcfa84a75942bf2d280814f33c"
+      },
+      {
+        "path": "_astro/chunk-UOTWF4UI.BXvKWcX5.js",
+        "bytes": 75335,
+        "sha256": "d66bc675c7c83cadc04b48b74657fd2a751310c2d67c9099e449b3be159dea8e"
+      },
+      {
+        "path": "_astro/chunk-UZHEVG6G.Ghc8_fsl.js",
+        "bytes": 12522,
+        "sha256": "f666136ae3e9a10e25e6110e55bf1c37f4ac361a4e2823177a8fb1dd6f96c457"
+      },
+      {
+        "path": "_astro/chunk-VI2UXTK3.DqiFY7Wx.js",
+        "bytes": 14887,
+        "sha256": "6c69340fdcf546558e5a63c6fdede70d92bdb02df5aa650394bde0d78730802e"
+      },
+      {
+        "path": "audio/element/play/audio-player/index.html",
+        "bytes": 110105,
+        "sha256": "ca090cf0ac987599d83fa80c8a52143d82fcf3da8fe4d4be2ef7a41855eb3626"
+      },
+      {
+        "path": "mp3/webmusic-study-no-1.mp3",
+        "bytes": 514021,
+        "sha256": "2a8d6eb85eefec8d385edf365004c45b7a6800c693e16f9209d1dea194658196"
+      },
+      {
+        "path": "_astro/IndependentLoopsDemo.astro_astro_type_script_index_0_lang.JYO2PFWi.js",
+        "bytes": 3144,
+        "sha256": "9c0e52a9c8349b0a4d44c3cbe513389498aaf95a8225c6046df8a0176b40b3bf"
+      },
+      {
+        "path": "_astro/ScoreAudioSyncDemo.astro_astro_type_script_index_0_lang.BXP86uN6.js",
+        "bytes": 5977,
+        "sha256": "5e512e4ab766cffd235f370cceed2f55fbd14747614bcf73af636488d3f02ced"
+      },
+      {
+        "path": "_astro/chunk-7OVFETD7.OzW2Obgi.js",
+        "bytes": 645480,
+        "sha256": "693fe950e8c60dbaee2f016db616a38b689dd031299185a10992f4f467776d33"
+      },
+      {
+        "path": "_astro/chunk-BBLMZHIK.DKDjss8J.js",
+        "bytes": 39682,
+        "sha256": "8e97cc2f1c253b51c4e3abf1d07de1b0dadb3a88776b557aa43b604264188b1b"
+      },
+      {
+        "path": "_astro/chunk-BJMZW3B2.LjlyDcbA.js",
+        "bytes": 4512,
+        "sha256": "7aab2facdd6f20664ce65a24159ccdcde67ee1e9bcd4058ff6be8d3eea85fa2d"
+      },
+      {
+        "path": "_astro/chunk-C46KBNAI.Qi7gNXOJ.js",
+        "bytes": 1318,
+        "sha256": "c9cdc07974b8a36ba02f3a2f0e485700d58091f1c1c022c084117e743398f985"
+      },
+      {
+        "path": "_astro/chunk-CXWE3ZD6.CuMulInw.js",
+        "bytes": 5106,
+        "sha256": "fbc18d2d68a55fae32dcbd95c3aaf49cc2efd684c7142e0f9bf103e0203d372a"
+      },
+      {
+        "path": "_astro/chunk-HYGCGFUM.CaTRz7N_.js",
+        "bytes": 41599,
+        "sha256": "b1db646f53dcb7d2b9cfa42067d48e0796950c424c454e01d8e059847db8e67a"
+      },
+      {
+        "path": "_astro/chunk-JNTWPSJE.BX9Cz2ZN.js",
+        "bytes": 14239,
+        "sha256": "c0f4428a306f8dcd75b388fa5a75b5b721fdb4731fb9e3aef2644d97039e38d6"
+      },
+      {
+        "path": "_astro/chunk-PXG64RU4.CHb4-EOA.js",
+        "bytes": 533,
+        "sha256": "c1bcbad8d36b2ad2477dc38aa4e0f7c1ad3232342fff837d90f75d502d6615b5"
+      },
+      {
+        "path": "_astro/chunk-Q72DW26N.f3LtbJiI.js",
+        "bytes": 64042,
+        "sha256": "191e0b2b7cc940705c0ff923f62d3b6838a4e6f10782bfe360f290efe5dcaa96"
+      },
+      {
+        "path": "_astro/chunk-QKSJ5N7B.CpqRSbeI.js",
+        "bytes": 25764,
+        "sha256": "3e1438c82f9651ceba826ea0c90001dbc57201034da2610c542fd663b688de00"
+      },
+      {
+        "path": "_astro/chunk-RC3IQAAP.1I9WrLm_.js",
+        "bytes": 9108,
+        "sha256": "7ea1c7df9c186ab7a1cb6463d04e07e9669acea7b1e5c0ec48767edca6052807"
+      },
+      {
+        "path": "_astro/chunk-TGGSVMKB.BcAchhu5.js",
+        "bytes": 5712,
+        "sha256": "1f485b4da2cadedea662e873ba8432d20cb867aa0684d9beafd3876d52be8433"
+      },
+      {
+        "path": "_astro/chunk-TWFLVRUL.3d-7tbre.js",
+        "bytes": 44753,
+        "sha256": "7e4d7a3edea1ef573e446734b9d39584f04a92f3b113e2a2660a397c576c9a5e"
+      },
+      {
+        "path": "_astro/chunk-VIUAGA76.DeUJRKsF.js",
+        "bytes": 12601,
+        "sha256": "3efb4afd24669f010ab46f2ae2260c0f7a692775e7d2998b8f9b2247095be527"
+      },
+      {
+        "path": "_astro/chunk-ZJYTMMXB.lNKHYRU2.js",
+        "bytes": 3534,
+        "sha256": "3906d70e663eda9cd3d12688494f16fe542d625eb32aa8ade93e363c23369d68"
+      },
+      {
+        "path": "_astro/demo-lifecycle.B7KvdfCs.js",
+        "bytes": 1742,
+        "sha256": "6f21900b930a2bcec2adb2ae805a892d33050169d24c90840d5a595439a40f22"
+      },
+      {
+        "path": "_astro/dist.CnkR2h5w.js",
+        "bytes": 15782,
+        "sha256": "7ab0cd238d949e1ff3d39687c2979960f744f189d7c5258261b3e63ef4afa5c2"
+      },
+      {
+        "path": "_astro/element.-Fw8Cn72.js",
+        "bytes": 31083,
+        "sha256": "58b7feb168357f09a01512aa0fd18f3b386270dcc4f5b59e502899f59af7a561"
+      },
+      {
+        "path": "_astro/element.B1CSaAsL.js",
+        "bytes": 30530,
+        "sha256": "d39b9ff96cc56d2964a13a5e0408a25e9a44a608b3005b650d9ea90b0c361cf5"
+      },
+      {
+        "path": "_astro/pitchy.CMko2vHO.js",
+        "bytes": 8129,
+        "sha256": "663bb348e99cb0e9124a113f32084b4972964f644c9678dd5cf744c3fd0a7973"
+      },
+      {
+        "path": "bridge/composition/index.html",
+        "bytes": 225455,
+        "sha256": "22f5771733d2792bfea47875bdf1b414b8301fde5d08d6de62da9a056eba71cc"
+      },
+      {
+        "path": "_astro/ModularCompositionDemo.astro_astro_type_script_index_0_lang.BITbAoS9.js",
+        "bytes": 591,
+        "sha256": "877d8cdc06e02e77be95ce27417c518b0a7f95da02c82c8168c5555a6fd3f421"
+      },
+      {
+        "path": "_astro/ModularModulationDemo.astro_astro_type_script_index_0_lang.yo1EmKlV.js",
+        "bytes": 3663,
+        "sha256": "116bade72d4390a95d54af007e23de75f5c9b3926f5976d82a59be0da155b68f"
+      },
+      {
+        "path": "_astro/ModularProjectDemo.astro_astro_type_script_index_0_lang.B3Flix77.js",
+        "bytes": 9090,
+        "sha256": "d41283120b717cedab59178b43cfcf1d54baf1f2b1663ac94591a1711c138419"
+      },
+      {
+        "path": "_astro/chunk-ABNYNENQ.srusl9xZ.js",
+        "bytes": 10312,
+        "sha256": "ddf0bde493e6b4563227b915bd75365c558a5759c522a089217948db4b7bf867"
+      },
+      {
+        "path": "_astro/chunk-DK6KZYR3.loglmHgZ.js",
+        "bytes": 43795,
+        "sha256": "b0b7ec734b8fc526bafaab18570ae1c279d520cc38755202550a9d5a997918c3"
+      },
+      {
+        "path": "_astro/chunk-G2LGPXQ4.5FIvedA3.js",
+        "bytes": 20366,
+        "sha256": "e7168d4e8d9ababf9893a97245f827d22e173f93733b2090323704ae08191c8c"
+      },
+      {
+        "path": "_astro/chunk-P4WBBSZ3.D6Ox2G2-.js",
+        "bytes": 32683,
+        "sha256": "c20b74ce1fa160ef9ae8f597f6c099b9456dd3d08a60cb0360c08af68cc050c7"
+      },
+      {
+        "path": "bridge/modular-composition/index.html",
+        "bytes": 131294,
+        "sha256": "eee9f56946bd6f4faa0a694239826b1cecb17e7de540371566908cf5ab419c3a"
+      },
+      {
+        "path": "wav/webmusic-study-no-1.wav",
+        "bytes": 5646034,
+        "sha256": "445b82324fd49ce39d0a0e4a5304c1d4467d753f97587f8f3bdc22204fd7210f"
+      }
+    ]
+  }
+}

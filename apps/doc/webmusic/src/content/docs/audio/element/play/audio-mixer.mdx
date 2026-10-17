@@ -91,8 +91,8 @@ The linked player calls `play()` / `pause()` / `stop()`; the master and per-stri
 A linked desk omits its transport bar. Removing it releases only its own backend
 connection; it never disposes the central player. Without a connection, the mixer
 shows its own transport. The latest explicit player source selection wins.
-A mix has no single clip or aggregate analyser: clip views/meter need a specific
-member or an explicitly routed signal.
+A mix has no single clip, so clip views need a specific member. Its master
+analyser and `input="#desk" port="master"` routing monitor the mixed output.
 
 </details>
 

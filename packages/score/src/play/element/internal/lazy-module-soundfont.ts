@@ -40,8 +40,12 @@ export function createModuleSoundfont(context: ModuleContext, template: string):
   };
 
   return {
+    get params() { return backend?.params; },
     // This helper always uses SoundfontSynth's default oscillator fallback;
-    // both implementations support exact future-voice cancellation.
+    // both implementations support exact duration, retiming and cancellation.
+    // Capability reads must preserve lazy preparation, including panel discovery.
+    get supportsScheduledDuration() { return !disposed && (backend?.supportsScheduledDuration ?? true); },
+    get supportsScheduledRetiming() { return !disposed && (backend?.supportsScheduledRetiming ?? true); },
     get supportsScheduledCancellation() { return !disposed && (backend?.supportsScheduledCancellation ?? true); },
     connect(destination) {
       if (route || connecting) throw new Error('Module soundfont already has an active route.');
