@@ -1,14 +1,14 @@
 ---
 import LiveDemoCanvas from './LiveDemoCanvas.astro';
-const source = `${import.meta.env.BASE_URL}mxl/Arabesque%20No.1.mxl`;
+const source = `${import.meta.env.BASE_URL}mxl/webmusic-study-no-1.mxl`;
 ---
 
 <section class="quick-start-demo not-content" data-quick-start-player data-source={source}>
-  <LiveDemoCanvas label="Arabesque No. 1 score player">
+  <LiveDemoCanvas label="WebMusic Study No. 1 score player">
     <div class="quick-start-demo__layout">
-      <score-player id="quick-start-player" time-control="full" aria-label="Arabesque No. 1 score player"></score-player>
+      <score-player id="quick-start-player" time-control="full" aria-label="WebMusic Study No. 1 score player"></score-player>
       <p class="doc-status" data-quick-start-status role="status">Loading score…</p>
-      <score-view player="#quick-start-player" type="staff" aria-label="Arabesque No. 1 notation"></score-view>
+      <score-view player="#quick-start-player" type="staff" aria-label="WebMusic Study No. 1 notation"></score-view>
       <score-pitch-view player="#quick-start-player" type="keyboard" low="48" high="84" fit-to-width="true" white-key-height="128" black-key-height="80" aria-label="Currently sounding piano keys, C3 to C6"></score-pitch-view>
     </div>
     <noscript>Enable JavaScript to load and play this example.</noscript>

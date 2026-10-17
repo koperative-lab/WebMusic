@@ -16,6 +16,8 @@
 // `@webmusic/score/play/auto` entry just calls it for you.
 // ============================================================================
 
+export type {ParameterMacroTarget, ParameterMacroConfig, ParameterMacroState} from '../headless/param-controls';
+
 export {
   ScoreRecorderElement,
   defineScoreRecorderElement,
@@ -95,6 +97,7 @@ export {
   defineRackPartElement,
   type RackPartErrorDetail,
 } from "./score-rack-part";
+export {ScoreEffectElement, defineScoreEffectElement} from './score-effect';
 
 // Note input — `<score-note-input layout="…">` covers every discrete-note layout.
 
@@ -123,6 +126,7 @@ import {
 } from "./score-player";
 import { defineRackControlElement } from "./score-rack-control";
 import { defineRackPartElement } from "./score-rack-part";
+import {defineScoreEffectElement} from './score-effect';
 
 /**
  * Register every `@webmusic/score/play` custom element at its default tag — the
@@ -137,4 +141,5 @@ export function defineAllElements(): void {
   defineScorePlayerElement();
   defineRackControlElement();
   defineRackPartElement();
+  defineScoreEffectElement();
 }

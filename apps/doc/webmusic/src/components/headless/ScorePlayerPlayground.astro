@@ -26,14 +26,14 @@ import HeadlessPlayground from '../HeadlessPlayground.astro';
 
 <script>
   import {ScorePlayer, Sound} from '@webmusic/score/play/headless';
-  import {arabesqueExcerpt, arabesqueUrl, loadArabesqueScore} from './arabesque-score';
+  import {studyExcerpt, studyUrl, loadStudyScore} from './study-score';
   import type {
     HeadlessDemoFactory,
     HeadlessDemoInstance,
   } from '../../lib/headless-playground-client';
 
   const factory: HeadlessDemoFactory = async (options, stage): Promise<HeadlessDemoInstance> => {
-    const score = arabesqueExcerpt(await loadArabesqueScore());
+    const score = studyExcerpt(await loadStudyScore());
     // The synth is created per player and handed over, so each re-create
     // tears its own graph down rather than sharing one across generations.
     const synth = Sound.oscillator();
@@ -98,7 +98,7 @@ import HeadlessPlayground from '../HeadlessPlayground.astro';
       construction: `import {loadScoreFromUrl} from '@webmusic/score/io';
 import {ScorePlayer, Sound} from '@webmusic/score/play/headless';
 
-const score = await loadScoreFromUrl('${arabesqueUrl()}');
+const score = await loadScoreFromUrl('${studyUrl()}');
 const synth = Sound.oscillator();
 const player = new ScorePlayer(score, ${JSON.stringify({...options, synthOwnership}, null, 2).replace('{', '{\n  synth,')});
 // In a play gesture: await player.play();

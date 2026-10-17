@@ -40,7 +40,8 @@ const dispose = () => mixer.dispose();
 `solo(id)` mutes every other member, so an A/B comparison needs no second
 object. `solo(null)` clears the solo selection. Clearing the solo restores each
 member's own mute state. Removing the selected solo member also clears solo and
-recomputes the remaining gains.
+recomputes the remaining gains, including when a modular child's admission lease
+is released. A newly admitted channel follows the existing solo before connecting.
 
 ## One authoritative mix state
 
@@ -52,10 +53,16 @@ presenter's view after membership or mix changes; call `snapshot()` inside the
 listener to read the latest state, including after a reentrant command. Removing
 the subscription releases only that observer.
 
-`effectiveVolume` is the requested linear multiplier sent to a member's optional
-`setVolume`; it is not a measurement of device output. A structural player
-without `setVolume` cannot apply this mix. Commands directly on a borrowed player
-also bypass the mixer's requested state; use mixer commands for shared controls.
+`effectiveVolume` is the mixer's requested channel × master multiplier, not a
+measurement of device output. Players exposing a controlled audio output retain
+their own source volume, even before lazy preparation; channel/master gains apply
+the mix once. Direct source-volume commands remain independent of these faders.
+A structural transport without an audio output receives the combined multiplier
+through its optional `setVolume`; without that method it cannot apply the mix.
+An `AudioPlayer` borrowing a mixer, queue or external transport uses that
+backend's gain fallback. This does not overwrite the facade's stored source
+volume for a later clip. Switching between a clip output and a borrowed backend
+releases the obsolete channel and reapplies the current member mix.
 
 ## Errors from two levels
 
@@ -85,6 +92,28 @@ The public barrel and `packages/audio/src/play/headless/mixer.ts` define the val
 contracts described below. The reference does not turn private implementation
 fields into public API.
 
+## Module admissions and master inserts
+
+`channelInserts(id)` exposes the admitted channel's `InsertChain` after its
+fader and before the master bus. Source inserts remain source-owned; master
+inserts process the sum. The desk owns each channel chain and disposes it when
+that channel detaches. An unknown or unprepared channel returns undefined.
+
+`admitAudio(id, port)` accepts a same-context `AudioOutputPort` and returns a
+routing `ConnectionLease`. Admission adds channel/master signal flow; it does
+not create another transport participant or dispose the borrowed source.
+Admission rejects an occupied ID, including one claimed by a readiness observer
+during preparation. The rejected candidate releases its own route and leaves
+the committed channel available for removal through its ordinary owner.
+The same ownership check applies to `add()` and lazy channel preparation: if a
+callback replaces the channel while a candidate is preparing, the older
+candidate rejects and cleans up only its own resources.
+`outputPort`, `analyser`, master `insertChain` and `.module` expose the prepared
+bus. `setEffect(recipe)` updates the master compatibility slot while preserving
+explicit insert declarations. Master effects process the summed signal once.
+See [the mixed module example](/bridge/modular-composition/).
+
+
 <details class="component-section">
 <summary>API</summary>
 
@@ -100,7 +129,7 @@ fields into public API.
 | Member | Kind | Default | Description |
 | --- | --- | --- | --- |
 | `audioContext` | option | lazy creation | Borrowed when supplied; used by players constructed from clips. |
-| `masterVolume` | option | `1` | Applied with each member gain through its optional setVolume. |
+| `masterVolume` | option | `1` | Multiplies channel gains through the master bus. A structural transport without a controlled audio output receives the combined gain through its optional `setVolume`. |
 | `destination` | option | context destination | Destination for players created by the mixer. |
 | `mediaAdapterFactory` | option | none | Host streaming adapter for created players. |
 

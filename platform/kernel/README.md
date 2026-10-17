@@ -28,7 +28,7 @@ npm install @webmusic/kernel
 ```
 
 Node.js 22 or later is supported. Import a subpath for the capability you need;
-the root re-exports all ten modules. CommonJS uses the same paths with `require()`.
+the root re-exports the public modules. CommonJS uses the same paths with `require()`.
 Importing the package creates no context, worker, timer or custom-element
 registration. Browser operations still require their corresponding Web APIs.
 
@@ -60,42 +60,72 @@ The ledger records the extraction boundary, including the role-contract basis fo
 `kernel/sync`. Decision reasons belong in [DECISIONS.md](../../dev/DECISIONS.md).
 
 The counterpart rule matters as much: **policy that legitimately differs
-between the families stays with the families.** The kernel carries the
-`AudioContext` constructor lookup but not ownership, liveness validation or
-close-on-dispose; the `Effect` shape but not chain/insert helpers, whose
-dispose and rollback semantics differ by design; the `WorkerLike` surface and
-request correlation but not protocol versioning, cancellation or restart
-policy. Pulling those in would not remove duplication — it would force one
-family's semantics onto the other.
+between the families stays with the families.** The `/audio-context` constructor
+helper does not decide ownership or resume playback. The modular audio environment
+adds an explicit create/borrow lifetime, while callers choose which policy to
+use. InsertChain supplies a common modular effect lifecycle; domain adapters
+retain legacy effect behavior and DSP catalogs. WorkerLike and request correlation
+still leave protocol versioning, cancellation and restart policy to callers.
+Common mechanisms do not make distinct domain policies interchangeable.
 
 ## Module map
 
 | Entry | Contract |
 |---|---|
 | `@webmusic/kernel/events` | Hardened typed `EventEmitter` |
-| `@webmusic/kernel/element` | `WebMusicElement` connected-lifetime cleanup plus SSR-safe attribute and registration helpers |
+| `@webmusic/kernel/element` | `WebMusicElement` connected-lifetime cleanup, SSR-safe helpers and scoped modular context/target discovery |
 | `@webmusic/kernel/worker` | `WorkerLike`, `RequestTracker` correlation plumbing, `dedicatedWorkerScope()` |
 | `@webmusic/kernel/audio-context` | SSR-safe AudioContext construction |
 | `@webmusic/kernel/player` | `PlayerLike` playback control contract, capability tiers + guards |
-| `@webmusic/kernel/effect` | `Effect`/`EffectNodes` over `BaseAudioContext` |
+| `@webmusic/kernel/effect` | `Effect`/`EffectNodes`, stable modular InsertChain and effect instances |
+| `@webmusic/kernel/module` | Module handles, context/environment, route/CV leases, parameters and versioned project/runtime/editor contracts |
 | `@webmusic/kernel/meter` | `AnalyserMeter` tap, RMS/peak with peak hold, `aggregateSpectrumBars` |
 | `@webmusic/kernel/transport` | `TransportClock` affine anchor math + `TimelineMapping` |
 | `@webmusic/kernel/tick` | Throttling-resistant tick delivery for lookahead schedulers |
 | `@webmusic/kernel/sync` | `TransportGroup` master/follower choreography + `MirrorClockMaster` |
+| `@webmusic/kernel/session` | Source-free SessionTransport, shared scheduling bindings, relative automation and phase |
 
-Internally the kernel is almost entirely flat: every module is a leaf except
-`sync`, which composes `transport` and `tick`.
+Pure time math remains in `/transport`, wakeups in `/tick`, and existing
+master/follower coordination in `/sync`. The modular entries add composition
+around those foundations: `/module` defines runtime capabilities and managed
+resources, `/effect` manages effect instances, `/session` coordinates playback,
+and `/element` adds browser discovery. Consumers may implement the structural
+contracts without adopting an Element or a shared domain base class.
 
-```text
-transport ──┐
-            ├──→ sync          events   element   worker
-tick ───────┘                  audio-context   player   effect   meter
-```
+## Modular composition
 
-That shape is intentional. A module that imports a sibling has taken a
-position on how the sibling is used; nine independent leaves let a consumer
-adopt the parts it needs — and let a third party implement the contracts
-without inheriting the machinery.
+ModuleHandle is a borrowed structural view of an existing module. ModuleRegistry
+indexes handles by stable ID and returns precise registration leases; releasing
+a registration or disposing the registry does not dispose the registered player.
+ModuleContext explicitly lends audio, routing, registry, target and optional
+Session capabilities. Its browser discovery adapter does not prepare a graph,
+resume audio or transfer close/dispose permission.
+
+ModuleAudioEnvironment lazily creates an audio context only when prepared, or
+borrows one supplied by the caller. It closes only an owned real-time context.
+AudioOutputPort manages a default main route, one replacement claimant and
+separate send/tap branches. Leases release only managed edges; observing a signal
+does not replace its main route. Context identity and output admission remain
+necessary when attaching an already running player.
+
+ParamHandle owns a numeric base value, descriptor, revisioned snapshots and
+synchronous updates. ParamSurface exposes a named collection of those handles.
+Effective audio readback and audio-rate modulation are separate capabilities;
+the numeric value alone does not establish either. UI consumes structural
+projections of the handles and retains no Kernel dependency.
+
+InsertChain keeps stable same-context boundary ports while effect slots change.
+A recipe can create several independent instances; panels editing one sound
+must borrow the same instance and parameter handles. Compatibility adapters
+retain the original `.effect` stage. A Session provider is not an audio master:
+shared processing requires an explicit Rack/bus, and a source-free Session
+does not fabricate an aggregate audio output.
+
+The [modular composition contract](../../dev/design/MODULAR-COMPOSITION.md)
+defines the ownership, routing and migration invariants. Concrete public
+signatures belong in the [Kernel API reference](../../apps/doc/webmusic/src/content/docs/kernel/api.mdx);
+[STATUS](../../dev/STATUS.md) distinguishes delivered integration from the
+remaining sound, modulation and precision work.
 
 ## Design principles
 
@@ -217,9 +247,13 @@ provides no anchor-change notification. Exact mapping reads do not confer audio
 scheduling precision on a backend, timer or UI callback.
 
 The accepted architecture is one timeline authority per session, with independent
-sessions. Today's `TransportGroup` supplies a master-based authority while each
-engine retains its private clock. Same-instance injection and invalidation of
-already committed audio are not implemented by this reader.
+sessions. TransportGroup supplies a master-based authority; modular
+SessionTransport provides a source-free conductor and a separate
+`SessionSchedulingBinding` with authority identity, epoch, invalidation and
+future loop segments. Native domain schedulers borrow this mapped anchor;
+independent engines and legacy groups retain their own clocks. The pure reader
+alone does not provide that scheduling protocol. See
+[the shared-clock design](../shared-clock-injection.md).
 
 ### TimelineMapping — the musical-axis seam
 
@@ -378,9 +412,10 @@ Recorded so the boundaries are visible rather than discovered:
   Reverse playback is not represented by a negative rate. Pause holds position;
   applications can implement scrubbing through explicit seeks.
 - **No mutable-clock injection.** `TransportClock` remains pure time math with
-  no event surface. `TransportGroup` now publishes command invalidation and
-  settlement, but each engine still owns its clock; direct mutations outside
-  the group are not automatically versioned. See
+  no event surface. Native modular schedulers borrow `SessionSchedulingBinding`
+  with explicit invalidation and anchors; they never receive write authority.
+  Legacy groups publish their command outcomes while independent engines retain
+  private clocks. Direct local commands must not compete with an attached Session. See
   [`platform/shared-clock-injection.md`](../shared-clock-injection.md).
 - **No nonlinear mapped alignment.** `TimelineMapping` is published and both
   families ship adapters. The group consumes constant offset/scale and optional

@@ -354,14 +354,17 @@ describe('<audio-meter> borrowed player binding', () => {
     expect(second.listeners.get('load')?.size).toBe(1);
   });
 
-  it('follows a late selector target, source replacement and target removal', async () => {
+  it.each(['legacy', 'modules'])('follows a late selector target, source replacement and target removal in %s composition', async (composition) => {
     stubFrames();
+    const host = document.createElement('section');
+    host.setAttribute('composition', composition);
+    document.body.append(host);
     const element = document.createElement('test-audio-meter') as AudioMeterElement;
-    element.setAttribute('player', '#meter-owner'); document.body.append(element);
+    element.setAttribute('player', '#meter-owner'); host.append(element);
     expect(element.analyser).toBeUndefined();
     const fixture = playerFixture();
     const target = Object.assign(document.createElement('div'), {player: fixture.player});
-    target.id = 'meter-owner'; document.body.append(target);
+    target.id = 'meter-owner'; host.append(target);
     await Promise.resolve();
     expect(element.analyser).toBe(fixture.analyser);
     const next = playerFixture(); target.player = next.player;
@@ -370,6 +373,61 @@ describe('<audio-meter> borrowed player binding', () => {
     target.remove(); await Promise.resolve();
     expect(element.analyser).toBeUndefined();
     expect(next.analyser.disconnect).not.toHaveBeenCalled();
+  });
+
+  it.each(['legacy', 'modules'])('rebinds a replaced selector target and releases it on removal in %s composition', async (composition) => {
+    stubFrames();
+    const host = document.createElement('section');
+    host.setAttribute('composition', composition);
+    const first = playerFixture();
+    const target = Object.assign(document.createElement('div'), {player: first.player});
+    target.id = 'meter-owner';
+    const element = document.createElement('test-audio-meter') as AudioMeterElement;
+    element.setAttribute('player', '#meter-owner');
+    host.append(target, element); document.body.append(host);
+    expect(element.analyser).toBe(first.analyser);
+
+    const next = playerFixture();
+    const replacement = Object.assign(document.createElement('div'), {player: next.player});
+    replacement.id = target.id;
+    target.replaceWith(replacement);
+    await Promise.resolve();
+    expect(element.analyser).toBe(next.analyser);
+    expect(element.player).toBe(next.player);
+    target.dispatchEvent(new Event('webaudio:sourcechange'));
+    expect(element.analyser).toBe(next.analyser);
+
+    replacement.remove();
+    await Promise.resolve();
+    expect(element.analyser).toBeUndefined();
+    expect(element.player).toBeUndefined();
+    expect(first.analyser.disconnect).not.toHaveBeenCalled();
+    expect(next.analyser.disconnect).not.toHaveBeenCalled();
+  });
+
+  it.each(['object', 'selector'])('keeps explicit module %s input ahead of player selector discovery', async (binding) => {
+    stubFrames();
+    const host = document.createElement('section');
+    host.setAttribute('composition', 'modules');
+    const element = document.createElement('test-audio-meter') as AudioMeterElement;
+    element.setAttribute('player', '#meter-owner');
+    if (binding === 'object') element.inputModule = null;
+    else element.setAttribute('input', '#missing-module');
+    host.append(element); document.body.append(host);
+
+    const fixture = playerFixture();
+    const target = Object.assign(document.createElement('div'), {player: fixture.player});
+    target.id = 'meter-owner'; host.append(target);
+    await Promise.resolve();
+    expect(element.analyser).toBeUndefined();
+
+    if (binding === 'object') element.inputModule = undefined;
+    else element.removeAttribute('input');
+    expect(element.analyser).toBe(fixture.analyser);
+    target.remove();
+    await Promise.resolve();
+    expect(element.analyser).toBeUndefined();
+    expect(fixture.analyser.disconnect).not.toHaveBeenCalled();
   });
 
   it('keeps explicit input ahead of selector binding until the input is cleared', () => {

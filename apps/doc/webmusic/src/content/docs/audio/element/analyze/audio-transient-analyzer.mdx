@@ -28,7 +28,7 @@ tool does not estimate BPM or align a beat grid.
   defineAudioTransientAnalyzerElement();
 </script>
 
-<audio-player id="session" src="/mp3/Arabesque%20No.1.mp3" controls></audio-player>
+<audio-player id="session" src="/mp3/webmusic-study-no-1.mp3" controls></audio-player>
 <audio-transient-analyzer player="#session" sensitivity="0.55" min-interval-ms="160"></audio-transient-analyzer>
 ```
 
@@ -55,6 +55,20 @@ player, pause, seek and source change invalidate old readings. Replacing an
 explicit analyser, graph loss, hiding the document or disconnect also releases
 old evidence and polling/subscriptions. A stalled source is reported and
 retried without disposing the borrowed graph.
+
+## Tap a module output
+
+`input="#desk" port="master"` selects a module's prepared output. The default
+port is `main`; rack/mixer buses also expose `master`. `.inputModule` accepts a
+`ModuleHandle` before the selector; null explicitly unbinds and undefined restores
+selector discovery. This can observe a neutral Score output as well as Audio.
+
+The tool adds a side tap, preserving the audible route. It does not call the
+module's `prepare()` or request a second context merely to display a pending
+surface. Missing explicit targets/ports remain pending without ancestor fallback.
+Removing the analyzer releases only its tap and UI resources. Existing explicit
+`.analyser` and legacy `player` modes retain their documented ownership.
+
 
 <details class="component-section">
 <summary>API</summary>

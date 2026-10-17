@@ -1,0 +1,74 @@
+---
+import LiveDemoCanvas from './LiveDemoCanvas.astro';
+---
+
+<section class="not-content project-demo" data-project-demo>
+  <LiveDemoCanvas label="A shared Session and a recoverable modular project">
+    <div class="project-demo__intro">
+      <div>
+        <h3>A small studio you can save</h3>
+        <p>A generated melody and an audio pulse share one timeline. Edit their connections, save the project, and bring it back.</p>
+      </div>
+      <button type="button" class="wui-btn" data-project-initialize>Open demo project</button>
+    </div>
+    <fieldset class="project-demo__transport" data-project-controls disabled>
+      <legend>Session</legend>
+      <div class="project-demo__row">
+        <button type="button" class="wui-btn" data-project-play>Play</button>
+        <button type="button" class="wui-btn" data-project-pause>Pause</button>
+        <button type="button" class="wui-btn" data-project-stop>Stop</button>
+        <label>Speed <select data-project-rate><option value="0.75">0.75×</option><option value="1" selected>1×</option><option value="1.25">1.25×</option></select></label>
+        <label><input type="checkbox" data-project-loop checked /> Loop 0–4 s</label>
+      </div>
+      <label class="project-demo__seek">Position <input type="range" min="0" max="4" step="0.05" value="0" data-project-seek /><output data-project-position>0.00 s</output></label>
+      <label class="project-demo__seek">Mix level <input type="range" min="0" max="1" step="0.01" value="0.5" data-project-macro /><output data-project-macro-value>50%</output></label>
+      <p class="project-demo__readout" data-project-clock>Paused at the beginning.</p>
+    </fieldset>
+    <div data-project-editor></div>
+    <fieldset class="project-demo__storage" data-project-controls disabled>
+      <legend>Project</legend>
+      <label class="project-demo__name">Melody name <input type="text" value="Score melody" maxlength="80" data-project-name /></label>
+      <div class="project-demo__row">
+        <button type="button" class="wui-btn" data-project-save>Save in this browser</button>
+        <button type="button" class="wui-btn" data-project-load>Load saved project</button>
+        <button type="button" class="wui-btn" data-project-export>Export JSON</button>
+        <label class="project-demo__file">Import JSON <input type="file" accept="application/json,.json" data-project-import /></label>
+      </div>
+      <div class="project-demo__row">
+        <button type="button" class="wui-btn" data-project-missing>Try a missing module</button>
+        <button type="button" class="wui-btn" data-project-recover disabled>Make module available</button>
+        <button type="button" class="wui-btn" data-project-reset>Reset demo</button>
+      </div>
+    </fieldset>
+  </LiveDemoCanvas>
+  <p role="status" data-project-feedback>Open the project to prepare audio. Playback starts only when you press Play. Saved files refer to the generated assets supplied by this demo.</p>
+</section>
+
+<script>
+  import './modular-project-demo-client';
+</script>
+
+<style>
+  .project-demo { min-width: 0; --wm-patch-editor-height: 32rem; }
+  .project-demo [data-project-initialize][hidden] { display: none; }
+  .project-demo__intro { display: flex; align-items: start; gap: 1rem; flex-wrap: wrap; }
+  .project-demo__intro > div { flex: 1 1 18rem; }
+  .project-demo__intro h3 { margin: 0 0 .4rem; font-size: 1rem; }
+  .project-demo__intro p { margin: 0; font-size: .88rem; line-height: 1.5; }
+  .project-demo fieldset { min-width: 0; margin: 1rem 0; padding: .75rem; border: 1px solid var(--wm-border, #d8d8d8); }
+  .project-demo legend { padding-inline: .3rem; font-size: .85rem; }
+  .project-demo__row { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; }
+  .project-demo__row + .project-demo__row { margin-top: .75rem; }
+  .project-demo label { font-size: .85rem; }
+  .project-demo__seek { display: flex; align-items: center; gap: .6rem; margin-top: .9rem; }
+  .project-demo__seek input { min-width: 0; flex: 1; }
+  .project-demo__seek output { min-width: 3.7rem; font-variant-numeric: tabular-nums; }
+  .project-demo__file { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; max-width: 100%; }
+  .project-demo__file input { max-width: 100%; min-width: 0; font: inherit; }
+  .project-demo__name { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-bottom: .75rem; }
+  .project-demo__name input { min-width: 0; max-width: 100%; font: inherit; }
+  .project-demo__readout { margin: .7rem 0 0; font: .78rem/1.5 var(--wui-font-mono); overflow-wrap: anywhere; }
+  .project-demo [data-project-editor] { min-width: 0; }
+  .project-demo button:focus-visible, .project-demo input:focus-visible, .project-demo select:focus-visible { outline: 2px solid var(--wm-focus, currentColor); outline-offset: 3px; }
+  @media (max-width: 480px) { .project-demo__intro > button { width: 100%; } .project-demo fieldset { padding: .6rem; } }
+</style>

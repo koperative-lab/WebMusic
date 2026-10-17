@@ -22,11 +22,11 @@ import WaterfallKeyboardDemo from '../../../../../components/WaterfallKeyboardDe
   defineScoreViewElement();
 </script>
 
-<score-player id="piece" src="/mxl/Arabesque%20No.1.mxl"></score-player>
+<score-player id="piece" src="/mxl/webmusic-study-no-1.mxl"></score-player>
 <score-view player="#piece" type="staff"></score-view>
 ```
 
-The demo starts in staff mode with `public/mxl/Arabesque No.1.mxl`, a notation source for Debussy's *Arabesque No. 1* with one piano part and two staves. The player loads the MXL once and the view borrows the parsed score.
+The demo starts in staff mode with `public/mxl/webmusic-study-no-1.mxl`, the original *WebMusic Study No. 1* notation source with one piano part and two staves. The player loads the MXL once and the view borrows the parsed score.
 
 The demo contains one player and one score view. Expand the player’s Parameters group to configure playback. Copy includes both tags; Reset restores their initial attributes. The thumbnail type can borrow the player’s loaded score while remaining a static preview.
 
@@ -163,7 +163,7 @@ When an application also needs a keyboard, compose a separate
 
 #### Align a waterfall and keyboard
 
-This demo uses the opening passage of Arabesque No. 1 and one player.
+This demo uses the opening passage of WebMusic Study No. 1 and one player.
 Both views use MIDI 48–83 (C3–B5), 32px natural columns and 20px accidental
 columns. The 21 natural notes make a 672px track. Change **Pitch width**
 to resize both views together, **Note length** to change only the waterfall's
@@ -183,7 +183,7 @@ Use the same structure with a score file in your application:
   definePitchViewElement();
 </script>
 
-<score-player id="falling-piece" src="/midi/Arabesque%20No.1.mid"></score-player>
+<score-player id="falling-piece" src="/midi/webmusic-study-no-1.mid"></score-player>
 <div class="shared-pan">
   <div class="pitch-track">
     <score-view type="waterfall" player="#falling-piece"
@@ -256,7 +256,7 @@ but time changes do not redraw the thumbnail.
 
 ```html
 <a href="/songs/1">
-  <score-view type="thumbnail" src="/midi/Arabesque%20No.1.mid" width="180" height="48"></score-view>
+  <score-view type="thumbnail" src="/midi/webmusic-study-no-1.mid" width="180" height="48"></score-view>
 </a>
 ```
 

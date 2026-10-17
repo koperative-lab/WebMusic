@@ -392,6 +392,7 @@ export default defineConfig({
           items: [
             { label: 'Overview', link: '/bridge/' },
             { label: 'Playback composition', link: '/bridge/composition/' },
+            { label: 'Modular composition', link: '/bridge/modular-composition/' },
             {
               label: 'Headless',
               items: [{autogenerate: {directory: 'bridge/headless'}}],

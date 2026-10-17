@@ -6,20 +6,20 @@ import {afterEach, beforeAll, describe, expect, it, vi} from 'vitest';
 import type {Score} from '@webmusic/score';
 import {loadScore} from '@webmusic/score/io';
 import type {DemoScope} from '../src/components/demo-lifecycle';
-import {loadArabesqueScore} from '../src/components/headless/arabesque-score';
+import {loadStudyScore} from '../src/components/headless/study-score';
 import {mountWaterfallKeyboardDemo} from '../src/components/waterfall-keyboard-client';
 
-vi.mock('../src/components/headless/arabesque-score', async (importOriginal) => ({
-  ...await importOriginal<typeof import('../src/components/headless/arabesque-score')>(),
-  loadArabesqueScore: vi.fn(),
+vi.mock('../src/components/headless/study-score', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../src/components/headless/study-score')>(),
+  loadStudyScore: vi.fn(),
 }));
 
 const cleanups: Array<() => void | Promise<void>> = [];
 
 beforeAll(async () => {
-  const path = resolve(dirname(fileURLToPath(import.meta.url)), '../public/midi/Arabesque No.1.mid');
+  const path = resolve(dirname(fileURLToPath(import.meta.url)), '../public/midi/webmusic-study-no-1.mid');
   const score = await loadScore(readFileSync(path), {format: 'midi'});
-  vi.mocked(loadArabesqueScore).mockResolvedValue(score);
+  vi.mocked(loadStudyScore).mockResolvedValue(score);
 });
 
 afterEach(() => {
@@ -69,7 +69,7 @@ function mount() {
 }
 
 describe('aligned waterfall and keyboard demo', () => {
-  it('uses an Arabesque excerpt while changing one shared pitch scale', async () => {
+  it('uses a WebMusic Study excerpt while changing one shared pitch scale', async () => {
     const f = mount();
     await vi.waitFor(() => expect(f.player.score).toBeDefined());
     const score = f.player.score!;

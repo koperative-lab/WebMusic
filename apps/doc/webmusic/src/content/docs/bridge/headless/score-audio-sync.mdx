@@ -167,6 +167,11 @@ writable-clock injection is not implemented. Independent sessions may use separa
 uses fixed offsets and tick-detected loop boundaries; model conversions have their
 separate information limits on the [Bridge API page](/bridge/api/).
 
+For source-free composition with native shared-anchor participants, use
+[`SessionTransport`](/kernel/api/#session--webmusickernelsession) and the
+[modular project example](/bridge/modular-composition/#save-and-edit-a-project).
+That scheduling contract is separate from this legacy master/follower wrapper.
+
 The public barrel and `bridges/score-audio/src/sync.ts, audio-master.ts and platform/kernel/src/sync.ts` define the value, option, state and event
 contracts described below. The reference does not turn private implementation
 fields into public API.

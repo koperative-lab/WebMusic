@@ -99,7 +99,7 @@ describe('SSR safety', () => {
     expect(() => mod.defineAllElements()).not.toThrow();
   });
 
-  it('registers only the six prefixed Play tags, once each', async () => {
+  it('registers only the seven prefixed Play tags, once each', async () => {
     const mod = await import('../../src/play/element/index');
     const target = globalThis as Record<string, unknown>;
     const previous = target.customElements;
@@ -117,6 +117,7 @@ describe('SSR safety', () => {
       mod.defineAllElements();
 
       expect([...registry.keys()].sort()).toEqual([
+        'score-effect',
         'score-note-input',
         'score-player',
         'score-rack-control',
@@ -130,7 +131,8 @@ describe('SSR safety', () => {
       expect(registry.get('score-note-input')).toBe(mod.NoteInputElement);
       expect(registry.get('score-recorder')).toBe(mod.ScoreRecorderElement);
       expect(registry.get('score-synth-panel')).toBe(mod.SynthPanelElement);
-      expect(define).toHaveBeenCalledTimes(6);
+      expect(registry.get('score-effect')).toBe(mod.ScoreEffectElement);
+      expect(define).toHaveBeenCalledTimes(7);
       expect(mod).not.toHaveProperty('SimpleScorePlayerElement');
       expect(mod).not.toHaveProperty('defineSimpleScorePlayerElement');
     } finally {

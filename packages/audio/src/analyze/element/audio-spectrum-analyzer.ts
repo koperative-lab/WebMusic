@@ -1,3 +1,4 @@
+import type {ModuleHandle} from '@webmusic/kernel/module';
 import {
   mountSpectrumAnalyzer,
   type SpectrumAnalyzerFrame,
@@ -22,7 +23,14 @@ export interface AudioSpectrumProbeDetail {
 /** Live, inspectable FFT spectrum from a borrowed audio graph. */
 export class AudioSpectrumAnalyzerElement extends WebMusicElement {
   static get observedAttributes(): string[] {
-    return ['player', 'frozen', 'peak-hold', 'min-frequency', 'max-frequency', 'aria-label'];
+    return ['player', 'input', 'port', 'frozen', 'peak-hold', 'min-frequency', 'max-frequency', 'aria-label'];
+  }
+
+  #inputModule?: ModuleHandle | null;
+  get inputModule(): ModuleHandle | null | undefined { return this.#inputModule; }
+  set inputModule(value: ModuleHandle | null | undefined) {
+    this.#inputModule = value;
+    if (this.isConnected) this.#bind();
   }
 
   #explicitAnalyser?: AnalyserNode;
@@ -61,13 +69,13 @@ export class AudioSpectrumAnalyzerElement extends WebMusicElement {
     };
     this.ownerDocument.addEventListener('visibilitychange', onVisibility);
     this.own(() => this.ownerDocument.removeEventListener('visibilitychange', onVisibility));
-    upgradeProperties(this, ['analyser', 'frozen', 'peakHold']);
+    upgradeProperties(this, ['inputModule', 'analyser', 'frozen', 'peakHold']);
     this.#bind();
   }
 
   attributeChangedCallback(name?: string, previous?: string | null, next?: string | null): void {
     if (!this.isConnected || previous === next) return;
-    if (name === 'player') this.#bind();
+    if (name === 'player' || name === 'input' || name === 'port') this.#bind();
     else if (name === 'frozen') {
       if (this.frozen) {
         this.#stop();
@@ -88,7 +96,7 @@ export class AudioSpectrumAnalyzerElement extends WebMusicElement {
     this.#sourceRevision += 1;
     this.#stalled = false;
     this.#stallReported = false;
-    if (this.isConnected) this.#resetForTransportChange();
+    if (this.isConnected) this.#bind();
   }
   get analyser(): AnalyserNode | undefined { return this.#explicitAnalyser ?? this.#analyser; }
 
@@ -163,7 +171,7 @@ export class AudioSpectrumAnalyzerElement extends WebMusicElement {
     this.#stalled = false;
     this.#stallReported = false;
     this.#resetForTransportChange();
-    this.#unbind = bindAnalysisPlayer(this, (kind, reading) => this.#onPlayer(kind, reading));
+    this.#unbind = bindAnalysisPlayer(this, (kind, reading) => this.#onPlayer(kind, reading), this.#explicitAnalyser ? null : this.#inputModule);
   }
 
   #onPlayer(kind: AnalysisPlayerUpdate, reading: AnalysisPlayerSnapshot): void {

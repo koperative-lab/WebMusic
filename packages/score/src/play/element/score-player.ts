@@ -24,6 +24,15 @@ import type {Rack} from '../headless/rack';
 import type {Effect} from '../headless/effects';
 import {boolAttr, numAttr, WebMusicElement, upgradeProperties} from './internal/base';
 import {RACK_DESK_TAG, RACK_SHARE_EVENT} from './internal/rack-part';
+import {isModularComposition, observeModuleContext, provideModuleContext, notifyModuleContext, notifyModuleChange} from '@webmusic/kernel/element';
+import {ModuleAudioEnvironment, ModuleContext, type ModuleHandle} from '@webmusic/kernel/module';
+import {SessionTransport} from '@webmusic/kernel/session';
+import {ScorePlayerModule} from '../headless/score-module';
+import {mountModuleTransport, setModuleTransportVisibility} from './internal/module-transport';
+import {createModuleSoundfont} from './internal/lazy-module-soundfont';
+import {sameModuleScope} from './internal/module-scope';
+
+let nextElementModuleId = 0;
 
 /**
  * Detail payload for the DOM events a `<score-player>` dispatches. View
@@ -116,6 +125,9 @@ export class ScorePlayerElement extends WebMusicElement {
       'loop',
       'time-control',
       'volume-control',
+      'composition',
+      'session',
+      'controls',
     ];
   }
 
@@ -158,6 +170,32 @@ export class ScorePlayerElement extends WebMusicElement {
   private playbackReadiness: ScorePlaybackReadiness = 'empty';
   private sourceRevision = 0;
   private playbackError?: unknown;
+  private modular = false;
+  private readonly moduleId = `score-player-module-${++nextElementModuleId}`;
+  private moduleContext?: ModuleContext;
+  private moduleUpstream?: ModuleContext;
+  private moduleSource?: ScorePlayerModule;
+  private moduleAudio?: ModuleAudioEnvironment;
+  private ownedSession?: SessionTransport;
+  private moduleUnsubscribe?: () => void;
+  private moduleSessionUnsubscribe?: () => void;
+  private modulePendingSource?: ReturnType<SessionTransport['holdPendingSource']>;
+  private readonly moduleListeners = new Set<() => void>();
+  private readonly moduleFacade: ModuleHandle = (() => {
+    const source = () => this.moduleSource;
+    return {
+    id: this.moduleId,
+    get params() { return source()?.params; },
+    get inserts() { return source()?.inserts; },
+    get capabilities() { return source()?.capabilities; },
+    getPort: (name) => this.moduleSource?.getPort(name),
+    prepare: () => this.moduleSource?.prepare(),
+    subscribe: (listener) => {
+      this.moduleListeners.add(listener);
+      return () => this.moduleListeners.delete(listener);
+    },
+    };
+  })();
   private unbindPlayback?: () => void;
   private readonly playbackPublisher = new PlaybackPublisher(() => {
     const native = this.handle?.player?.playback?.snapshot();
@@ -175,6 +213,7 @@ export class ScorePlayerElement extends WebMusicElement {
       error: this.playbackError,
     };
   }, (seconds) => {
+    if (this.modular) return this.seekNominal(seconds);
     const source = this.handle?.player?.playback;
     if (!source?.seekNominal) return Promise.reject(new Error('Native score playback is unavailable.'));
     return source.seekNominal(seconds);
@@ -185,7 +224,24 @@ export class ScorePlayerElement extends WebMusicElement {
     return this.playbackPublisher;
   }
 
+  get module(): ModuleHandle | undefined {
+    return this.modular && this.moduleContext ? this.moduleFacade : undefined;
+  }
+
+  /** Borrow the current command authority without preparing audio. */
+  get sessionTransport(): SessionTransport | undefined {
+    return this.moduleContext?.session;
+  }
+
+  override disconnectedCallback(): void {
+    if (!this.modular) { super.disconnectedCallback(); return; }
+    // A synchronous layout move keeps the engine and Session registration.
+    queueMicrotask(() => { if (!this.isConnected) super.disconnectedCallback(); });
+  }
+
   protected override onMount(): void {
+    this.modular = isModularComposition(this);
+    if (this.modular) { this.mountModularComposition(); return; }
     // Register lifetime teardown before property upgrades or mounts: an
     // inherited setter/hook may fail, but a partial player/load must not leak.
     this.own(() => this.teardown());
@@ -224,6 +280,15 @@ export class ScorePlayerElement extends WebMusicElement {
 
   attributeChangedCallback(name?: string): void {
     if (!this.isConnected) return;
+    if (name === 'composition' || (name === 'session' && this.modular)) {
+      super.disconnectedCallback();
+      super.connectedCallback();
+      return;
+    }
+    if (name === 'controls' && this.modular) {
+      if (this.handle) setModuleTransportVisibility(this.handle.element, this.moduleControlsVisible);
+      return;
+    }
     // The live knobs apply in place. Re-rendering for them would tear the
     // player down and restart the piece just to change a volume.
     if (name === 'rate' || name === 'volume' || name === 'pan' || name === 'loop') {
@@ -323,8 +388,8 @@ export class ScorePlayerElement extends WebMusicElement {
 
   /** Assign a post-processing effect chain. */
   set effect(effect: Effect | undefined) {
+    (this.moduleSource?.player ?? this.handle?.player)?.setEffect(effect);
     this.explicitEffect = effect;
-    if (this.isConnected) this.requestRender();
   }
 
   get effect(): Effect | undefined {
@@ -333,8 +398,7 @@ export class ScorePlayerElement extends WebMusicElement {
 
   /** Share an existing AudioContext (e.g. so the player and an analyser agree on one). */
   set audioContext(context: AudioContext | undefined) {
-    this.explicitContext = context;
-    if (this.isConnected) this.requestRender();
+    this.setAudioConfiguration(context, this.explicitDestination);
   }
 
   get audioContext(): AudioContext | undefined {
@@ -343,12 +407,45 @@ export class ScorePlayerElement extends WebMusicElement {
 
   /** Route the player's output into this node (e.g. an analyser or effect input). */
   set destination(node: AudioNode | undefined) {
-    this.explicitDestination = node;
-    if (this.isConnected) this.requestRender();
+    this.setAudioConfiguration(this.explicitContext, node);
   }
 
   get destination(): AudioNode | undefined {
     return this.explicitDestination;
+  }
+
+  private setAudioConfiguration(context: AudioContext | undefined, destination: AudioNode | undefined): void {
+    const modular = this.modular || isModularComposition(this);
+    const selected = context ?? destination?.context;
+    if (modular) {
+      if (context && destination && destination.context !== context) throw new Error('Destination must use the same AudioContext.');
+      if (selected?.state === 'closed') throw new Error('Module audio context is closed.');
+      const borrowed = !this.moduleAudio ? this.moduleContext?.audio.peek() : undefined;
+      if (selected && borrowed && selected !== borrowed) throw new Error('A module must use its provider AudioContext.');
+    }
+    const previous = this.explicitContext ?? this.explicitDestination?.context;
+    const routeChanged = destination !== this.explicitDestination;
+    this.explicitContext = context;
+    this.explicitDestination = destination;
+    if (!this.isConnected) return;
+    if (this.modular && this.moduleAudio && this.moduleContext) {
+      if (selected !== this.moduleAudio.peek() && (selected || previous)) {
+        // A new reference clock requires a fresh, paused Session and scope.
+        // Validation above happens before releasing the working owner.
+        this.bindModularContext(undefined, 'missing');
+        return;
+      }
+      if (routeChanged) {
+        // A new resolver identity revokes descendant default routes as well.
+        this.moduleContext = new ModuleContext({
+          id: `${this.moduleId}:context`, audio: this.moduleAudio,
+          registry: this.moduleContext.registry, session: this.moduleContext.session,
+          destination: () => this.explicitDestination, target: this.moduleFacade,
+        });
+        notifyModuleContext(this);
+      }
+    }
+    this.requestRender();
   }
 
   /** Playback rate (1 = normal). Applies live. */
@@ -357,6 +454,7 @@ export class ScorePlayerElement extends WebMusicElement {
     this.setRateValue(rate, true);
   }
   get rate(): number {
+    if (this.modular) return this.moduleContext?.session?.snapshot.rate ?? this.rateValue;
     return this.externalController?.rate ?? this.handle?.player?.rate ?? this.rateValue;
   }
 
@@ -425,12 +523,12 @@ export class ScorePlayerElement extends WebMusicElement {
 
   private setVolumeValue(volume: number): void {
     this.volumeValue = Math.max(0, volume);
-    this.handle?.player?.setVolume(this.volumeValue);
+    (this.moduleSource?.player ?? this.handle?.player)?.setVolume(this.volumeValue);
   }
 
   private setPanValue(pan: number): void {
     this.panValue = Math.max(-1, Math.min(1, pan));
-    this.handle?.player?.setPan(this.panValue);
+    (this.moduleSource?.player ?? this.handle?.player)?.setPan(this.panValue);
   }
 
   private setLoopValue(on: boolean): void {
@@ -439,6 +537,10 @@ export class ScorePlayerElement extends WebMusicElement {
   }
 
   private applyRate(explicit: boolean): void {
+    if (this.modular && this.moduleContext?.session) {
+      if (explicit || this.ownedSession) void this.moduleContext.session.setRate(this.rateValue).catch((error) => this.reportPlaybackError(error));
+      return;
+    }
     // A borrowed controller owns its transport; only an explicit `.rate` set
     // reaches it (render() never re-pushes stored state onto it).
     if (this.externalController) {
@@ -450,6 +552,18 @@ export class ScorePlayerElement extends WebMusicElement {
   }
 
   private applyLoop(): void {
+    if (this.modular) {
+      if (!this.isConnected) return;
+      const session = this.moduleContext?.session;
+      if (!session || (!this.ownedSession && !this.pinnedLoop)) return;
+      const duration = session.snapshot.durationSeconds;
+      const loop = this.loopOn && duration !== null && Number.isFinite(duration) && duration > 0
+        ? {startSeconds: 0, endSeconds: duration} : null;
+      const current = session.snapshot.loop;
+      if (current?.startSeconds === loop?.startSeconds && current?.endSeconds === loop?.endSeconds) return;
+      void session.setLoop(loop).catch((error) => this.reportPlaybackError(error));
+      return;
+    }
     const player = this.handle?.player;
     if (!player) return;
     if (this.loopOn) player.setLoop(0, player.durationSeconds);
@@ -457,6 +571,7 @@ export class ScorePlayerElement extends WebMusicElement {
   }
 
   play(): Promise<void> {
+    if (this.modular) return this.moduleContext?.session?.play().then(() => undefined) ?? Promise.resolve();
     // A borrowed controller reports play() failures via its own 'error'
     // channel, so this resolves like any controller-initiated play.
     if (this.externalController) {
@@ -467,6 +582,7 @@ export class ScorePlayerElement extends WebMusicElement {
   }
 
   pause(): void {
+    if (this.modular) { void this.moduleContext?.session?.pause().catch((error) => this.reportPlaybackError(error)); return; }
     if (this.externalController) {
       this.externalController.pause();
       return;
@@ -477,6 +593,7 @@ export class ScorePlayerElement extends WebMusicElement {
 
   /** Stop and rewind to the start. */
   stop(): void {
+    if (this.modular) { void this.moduleContext?.session?.stop().catch((error) => this.reportPlaybackError(error)); return; }
     if (this.externalController) {
       this.externalController.stop();
       return;
@@ -489,6 +606,7 @@ export class ScorePlayerElement extends WebMusicElement {
 
   /** Jump to a position in seconds (clamped to `[0, duration]`). */
   seek(seconds: number): void {
+    if (this.modular) { void this.moduleContext?.session?.seek(seconds).catch((error) => this.reportPlaybackError(error, 'seek')); return; }
     if (this.externalController) {
       this.externalController.seek(seconds);
       return;
@@ -507,6 +625,10 @@ export class ScorePlayerElement extends WebMusicElement {
 
   /** Seek in nominal score seconds; delegates to the existing transport. */
   seekNominal(seconds: number): Promise<void> {
+    if (this.modular) {
+      if (!this.moduleSource) return Promise.reject(new Error('This aggregate Session has no nominal score axis.'));
+      return this.moduleContext?.session?.seek(seconds).then(() => undefined) ?? Promise.resolve();
+    }
     if (this.externalController) {
       this.externalController.seek(seconds / this.externalController.rate);
       return Promise.resolve();
@@ -525,6 +647,7 @@ export class ScorePlayerElement extends WebMusicElement {
 
   /** Jump to a fraction of the piece (`0` = start, `1` = end). */
   seekFraction(fraction: number): void {
+    if (this.modular) { this.seek(Math.max(0, Math.min(1, fraction)) * this.duration); return; }
     if (this.externalController) {
       this.externalController.seekFraction(fraction);
       return;
@@ -581,7 +704,8 @@ export class ScorePlayerElement extends WebMusicElement {
   private rollbackFailedRender(error: unknown): void {
     const failures: unknown[] = [error];
     try {
-      this.teardown();
+      this.teardown(this.modular && !!this.modulePendingSource);
+      if (this.modular) this.releaseModuleSource();
     } catch (cleanupError) {
       failures.push(cleanupError);
     }
@@ -607,6 +731,7 @@ export class ScorePlayerElement extends WebMusicElement {
 
   /** Reconcile both additions and removals against the currently attached desk. */
   private adoptComposedRack(): boolean {
+    if (this.modular) return false;
     const desk = this.querySelector(RACK_DESK_TAG);
     const rack = (desk as {rack?: Rack} | null)?.rack;
     if (rack === this.composedRack) return false;
@@ -632,6 +757,7 @@ export class ScorePlayerElement extends WebMusicElement {
   }
 
   protected async render(): Promise<void> {
+    if (this.modular) { await this.renderModular(); return; }
     // A caller can remove the desk and assign a score before the observer's
     // microtask. Never mount the removed desk's now-disposed Rack in that gap.
     this.adoptComposedRack();
@@ -829,11 +955,15 @@ export class ScorePlayerElement extends WebMusicElement {
     if (!source) this.playbackPublisher.notify();
   }
 
-  private cancelLoad(): void {
+  private cancelLoad(preservePendingSource = false): void {
     this.loadToken += 1;
     const controller = this.loadController;
     this.loadController = undefined;
     controller?.abort();
+    if (!preservePendingSource) {
+      this.modulePendingSource?.release();
+      this.modulePendingSource = undefined;
+    }
   }
 
   /**
@@ -937,9 +1067,9 @@ export class ScorePlayerElement extends WebMusicElement {
   }
 
   /** Release one connected lifetime. Borrowed score/rack/audio objects survive. */
-  protected teardown(): void {
+  protected teardown(preservePendingSource = false): void {
     this.renderRequest += 1;
-    this.cancelLoad();
+    this.cancelLoad(preservePendingSource);
     this.composedRack = undefined;
     this.unbindPlayback?.();
     this.unbindPlayback = undefined;
@@ -963,7 +1093,161 @@ export class ScorePlayerElement extends WebMusicElement {
     }
     if (cleanupError !== undefined) throw cleanupError;
   }
+
+  private mountModularComposition(): void {
+    this.own(() => this.releaseModularComposition());
+    this.own(() => this.teardown());
+    this.own(() => { this.rackHost?.remove(); this.rackHost = undefined; });
+    upgradeProperties(this, ['score', 'sound', 'effect', 'audioContext', 'destination', 'rate', 'volume', 'pan', 'loop']);
+    this.syncKnobAttributes();
+    this.own(provideModuleContext(this, () => this.moduleContext));
+    this.own(observeModuleContext(this, (upstream, state) => {
+      if (sameModuleScope(upstream, this.moduleUpstream)) { this.moduleUpstream = upstream; return; }
+      if (!upstream && state === 'missing' && this.moduleAudio && this.moduleContext) return;
+      this.bindModularContext(upstream, state);
+    }));
+  }
+
+  private bindModularContext(upstream: ModuleContext | undefined, state: 'ready' | 'pending' | 'missing'): void {
+    this.releaseModularComposition();
+    if (state === 'pending') {
+      notifyModuleContext(this);
+      this.publishModuleChange();
+      return;
+    }
+    this.moduleUpstream = upstream;
+    if (!upstream) {
+      this.moduleAudio = new ModuleAudioEnvironment({context: this.explicitContext ?? this.explicitDestination?.context});
+      upstream = new ModuleContext({id: `${this.moduleId}:root`, audio: this.moduleAudio,
+        destination: () => this.explicitDestination});
+    }
+    let session = upstream.session;
+    if (!session || this.getAttribute('session') === 'local') {
+      const audio = upstream.audio;
+      this.ownedSession = new SessionTransport(() => audio.peek()?.currentTime ?? 0, {
+        onOperationError: (_operation, error) => this.reportPlaybackError(error),
+      });
+      session = this.ownedSession;
+    }
+    this.moduleContext = upstream.derive({id: `${this.moduleId}:context`, session, target: this.moduleFacade});
+    this.moduleSessionUnsubscribe = session.subscribe((event) => {
+      if (event.type === 'snapshot' || event.type === 'participants' || event.type === 'source-error') this.applyLoop();
+    });
+    if (this.ownedSession) this.applyRate(false);
+    notifyModuleContext(this);
+    this.requestRender();
+  }
+
+  private async renderModular(): Promise<void> {
+    const context = this.moduleContext;
+    if (!context?.session) return;
+    this.cancelLoad();
+    const token = this.loadToken;
+    this.replaceHandle(undefined);
+    this.releaseModuleSource();
+    this.playbackReadiness = 'loading';
+    this.playbackPublisher.notify();
+    const controller = new AbortController();
+    this.loadController = controller;
+    const pending = !this.explicitScore && this.getAttribute('src') ? context.session.holdPendingSource() : undefined;
+    this.modulePendingSource = pending;
+    let score: Score | undefined;
+    try { score = await this.resolveScore(controller.signal); }
+    catch (error) { pending?.reject(error); throw error; }
+    finally { if (this.loadController === controller) this.loadController = undefined; }
+    if (token !== this.loadToken || !this.isConnected || context !== this.moduleContext) return;
+    try {
+      if (!score && pending) throw new Error('The declared score source did not produce a score.');
+      if (score) {
+      const template = this.getAttribute('sound-font');
+      const soundfont = !this.explicitSound && template?.includes('{midi}') ? createModuleSoundfont(context, template) : undefined;
+      const source = new ScorePlayerModule(score, {
+        id: this.moduleId, context, synth: this.explicitSound ?? soundfont, synthOwnership: soundfont ? 'owned' : 'borrowed', effect: this.explicitEffect,
+        audioContext: this.explicitContext, destination: this.explicitDestination,
+        onError: (error) => this.reportPlaybackError(error),
+      });
+      this.moduleSource = source;
+      source.player.setVolume(this.volumeValue);
+      source.player.setPan(this.panValue);
+      const current = () => token === this.loadToken && this.moduleSource === source && this.isConnected;
+      const subscriptions = [
+        source.subscribe(() => this.publishModuleChange()),
+        source.player.on('noteOn', (note) => { if (current()) this.emitNote('webscore:noteon', note, score!); }),
+        source.player.on('noteOff', (note) => { if (current()) this.emitNote('webscore:noteoff', note, score!); }),
+        source.player.on('timeupdate', (update) => {
+          if (!current()) return;
+          this.dispatchEvent(new CustomEvent('webscore:timeupdate', {bubbles: true, detail: {
+            ...update, seconds: update.nominalSeconds, rate: source.player.rate, playing: source.player.isPlaying(),
+          }}));
+        }),
+        source.player.on('end', () => {
+          if (!current()) return;
+          this.dispatchEvent(new CustomEvent('webscore:end', {bubbles: true}));
+          this.emitState();
+        }),
+      ];
+      this.moduleUnsubscribe = () => { for (const unsubscribe of subscriptions) unsubscribe(); };
+      }
+      pending?.resolve();
+      if (this.modulePendingSource === pending) this.modulePendingSource = undefined;
+    } catch (error) {
+      pending?.reject(error);
+      throw error;
+    }
+    const handle = mountModuleTransport(this.ensureTransportHost(), context.session, this.moduleSource, {
+      visible: this.moduleControlsVisible,
+      time: this.timeControl, volume: this.volumeControl, onError: (error) => this.reportPlaybackError(error),
+      getVolume: () => this.volumeValue, onVolumeChange: (value) => this.setVolumeValue(value),
+    });
+    if (!this.commitHandle(handle, token)) return;
+    this.setResolvedScore(score);
+    this.publishMountedPlayback();
+    this.applyLoop();
+    this.publishModuleChange();
+  }
+
+  private get moduleControlsVisible(): boolean {
+    return this.getAttribute('controls') === 'show' || (!!this.ownedSession && this.getAttribute('controls') !== 'hide');
+  }
+
+  private publishModuleChange(): void {
+    for (const listener of [...this.moduleListeners]) {
+      try { listener(); } catch (error) { this.reportPlaybackError(error); }
+    }
+    notifyModuleChange(this);
+  }
+
+  private releaseModuleSource(): void {
+    this.moduleUnsubscribe?.();
+    this.moduleUnsubscribe = undefined;
+    const source = this.moduleSource;
+    this.moduleSource = undefined;
+    source?.dispose();
+    this.publishModuleChange();
+  }
+
+  private releaseModularComposition(): void {
+    this.renderRequest += 1;
+    this.moduleSessionUnsubscribe?.();
+    this.moduleSessionUnsubscribe = undefined;
+    this.cancelLoad();
+    const session = this.ownedSession;
+    const audio = this.moduleAudio;
+    this.ownedSession = undefined;
+    this.moduleAudio = undefined;
+    this.moduleContext = undefined;
+    this.moduleUpstream = undefined;
+    const clean = (callback: () => void) => { try { callback(); } catch (error) { this.reportPlaybackError(error); } };
+    clean(() => this.replaceHandle(undefined));
+    this.playbackReadiness = this.isConnected ? 'unavailable' : 'disposed';
+    this.playbackError = undefined;
+    this.playbackPublisher.notify();
+    clean(() => this.releaseModuleSource());
+    clean(() => session?.dispose());
+    clean(() => audio?.dispose());
+  }
 }
+
 
 /** Register `<score-player>` without creating a global side effect on import. */
 export function defineScorePlayerElement(tag = 'score-player'): void {

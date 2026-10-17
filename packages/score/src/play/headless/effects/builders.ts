@@ -185,6 +185,9 @@ export function buildEffectChain(context: BaseAudioContext, effects: readonly Ef
   return {
     input: nodes[0].input,
     output: nodes[nodes.length - 1].output,
+    params: Object.fromEntries(nodes.flatMap((node, index) =>
+      Object.entries(node.params ?? {}).map(([id, parameter]) => [`${index}.${id}`, parameter]),
+    )),
     dispose: () => {
       if (disposed) return;
       disposed = true;

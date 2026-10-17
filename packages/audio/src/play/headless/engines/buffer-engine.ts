@@ -9,6 +9,29 @@
 
 import type {AudioClip} from '../../../core';
 import {TransportClock, type TransportClockReader} from '@webmusic/kernel/transport';
+import {createConnectionLease, type ConnectionLease} from '@webmusic/kernel/module';
+import type {SessionSchedulingBinding} from '@webmusic/kernel/session';
+import {createTickSource, type TickSource} from '@webmusic/kernel/tick';
+
+export type PlaybackSchedulingMode = 'independent' | 'session-native' | 'session-lookahead' | 'approximate-media';
+
+/** Declared engine guarantees, independent of UI or device output latency. */
+export interface PlaybackTimingCapabilities {
+  readonly engine: 'buffer' | 'media' | 'external';
+  readonly sharedSessionClock: boolean;
+  readonly futureStart: boolean;
+  readonly nativeLoop: boolean;
+}
+
+export const BUFFER_TIMING_CAPABILITIES: PlaybackTimingCapabilities = Object.freeze({
+  engine: 'buffer', sharedSessionClock: true, futureStart: true, nativeLoop: true,
+});
+export const MEDIA_TIMING_CAPABILITIES: PlaybackTimingCapabilities = Object.freeze({
+  engine: 'media', sharedSessionClock: false, futureStart: false, nativeLoop: false,
+});
+export const EXTERNAL_TIMING_CAPABILITIES: PlaybackTimingCapabilities = Object.freeze({
+  engine: 'external', sharedSessionClock: false, futureStart: false, nativeLoop: false,
+});
 
 /** The minimal contract both engines satisfy, so the player can switch freely. */
 export interface PlaybackEngine {
@@ -39,6 +62,7 @@ export interface PlaybackEngine {
   setLoop(loop: boolean | {start: number; end: number}): void;
   /** Called when natural end-of-stream is reached. */
   onEnded(cb: () => void): void;
+  onError?(cb: (error: unknown) => void): void;
   /**
    * Materialize whatever the first `play()` would otherwise build — the
    * decoded AudioBuffer, the media element — without starting sound. Optional
@@ -53,6 +77,8 @@ export interface PlaybackEngine {
    * a sample-accurate clock (the media engine) omit it.
    */
   readonly clock?: TransportClockReader;
+  attachScheduling?(binding: SessionSchedulingBinding): ConnectionLease;
+  readonly schedulingMode?: PlaybackSchedulingMode;
 }
 
 export interface BufferEngineOptions {
@@ -79,7 +105,19 @@ export class BufferEngine implements PlaybackEngine {
   // re-enter the loop window.
   private readonly transport = new TransportClock(() => this.context.currentTime);
   private endedCb: (() => void) | null = null;
+  private errorCb?: (error: unknown) => void;
   private disposed = false;
+  private scheduling?: {binding: SessionSchedulingBinding; lease: ConnectionLease; unsubscribe?: () => void};
+  private schedulingRevision = 0;
+  private segmentTicker?: TickSource;
+  private segmented = false;
+  private readonly segmentSources = new Set<AudioBufferSourceNode>();
+  private readonly scheduledPasses = new Map<number, number>();
+
+  readonly timingCapabilities = BUFFER_TIMING_CAPABILITIES;
+  get schedulingMode(): PlaybackSchedulingMode {
+    return this.scheduling ? this.segmented ? 'session-lookahead' : 'session-native' : 'independent';
+  }
 
   constructor(context: BaseAudioContext, clip: AudioClip, options: BufferEngineOptions = {}) {
     this.context = context;
@@ -103,7 +141,7 @@ export class BufferEngine implements PlaybackEngine {
    * the loop span).
    */
   get clock(): TransportClockReader {
-    return this.transport;
+    return this.scheduling?.binding.clock ?? this.transport;
   }
 
   get duration(): number {
@@ -111,10 +149,12 @@ export class BufferEngine implements PlaybackEngine {
   }
 
   get playing(): boolean {
+    if (this.scheduling) return (this.source !== null || this.segmented) && !this.scheduling.binding.snapshot.paused;
     return !this.transport.paused;
   }
 
   get currentTime(): number {
+    if (this.scheduling) return this.clampToDuration(this.scheduling.binding.positionAt(this.context.currentTime));
     const pos = this.transport.paused
       ? this.transport.position
       : this.wrapIntoLoop(this.transport.position);
@@ -122,6 +162,7 @@ export class BufferEngine implements PlaybackEngine {
   }
 
   async play(offsetSeconds?: number, when?: number): Promise<void> {
+    this.assertLocalAuthority();
     // Early-return BEFORE resolving the offset: a `play(offset)` while already
     // playing is a no-op (mutating the anchor without restarting the source
     // would silently desync position from audio).
@@ -142,6 +183,7 @@ export class BufferEngine implements PlaybackEngine {
    */
 
   pause(): void {
+    this.assertLocalAuthority();
     if (this.disposed || this.transport.paused) return;
     // Capture the wrapped, clamped position FIRST; `transport.pause` folds the
     // unwrapped one, and `seekTo` then normalizes per the loop invariant.
@@ -153,6 +195,7 @@ export class BufferEngine implements PlaybackEngine {
   }
 
   stop(): void {
+    this.assertLocalAuthority();
     if (this.disposed) return;
     this.teardownSource();
     const now = this.context.currentTime;
@@ -161,6 +204,7 @@ export class BufferEngine implements PlaybackEngine {
   }
 
   seek(seconds: number): void {
+    this.assertLocalAuthority();
     if (this.disposed) return;
     const target = this.clampToDuration(this.wrapIntoLoop(seconds));
     if (!Number.isFinite(target)) throw new RangeError('Seek position must be finite.');
@@ -181,6 +225,7 @@ export class BufferEngine implements PlaybackEngine {
   }
 
   setRate(rate: number): void {
+    this.assertLocalAuthority();
     if (this.disposed) return;
     const clamped = Math.max(0.25, Math.min(4, rate));
     // The clock re-anchors so the position stays continuous — and during an
@@ -191,6 +236,7 @@ export class BufferEngine implements PlaybackEngine {
   }
 
   setLoop(loop: boolean | {start: number; end: number}): void {
+    this.assertLocalAuthority();
     if (this.disposed) return;
     const normalized = normalizeLoopOption(loop, this.duration);
     // A live loop change is a transition point, so it owes the same position
@@ -213,6 +259,7 @@ export class BufferEngine implements PlaybackEngine {
   onEnded(cb: () => void): void {
     if (!this.disposed) this.endedCb = cb;
   }
+  onError(cb: (error: unknown) => void): void { if (!this.disposed) this.errorCb = cb; }
 
   /**
    * Decode the clip into its AudioBuffer now. Without this the whole-buffer
@@ -224,13 +271,62 @@ export class BufferEngine implements PlaybackEngine {
     if (!this.disposed) this.ensureBuffer();
   }
 
+  /** Borrow one Session anchor; only its epochs can arm or replace this source. */
+  attachScheduling(binding: SessionSchedulingBinding): ConnectionLease {
+    if (this.disposed) throw new Error('BufferEngine has been disposed.');
+    if (this.scheduling?.lease.active) throw new Error('BufferEngine already borrows a Session scheduling binding.');
+    this.pause();
+    const attachment: {binding: SessionSchedulingBinding; lease: ConnectionLease; unsubscribe?: () => void} = {
+      binding,
+      lease: createConnectionLease(() => {
+        if (this.scheduling !== attachment) return;
+        let position = this.transport.position;
+        let rate = this.transport.rate;
+        let failure: unknown;
+        try { position = this.currentTime; rate = binding.clock.rate; } catch (error) { failure = error; }
+        this.scheduling = undefined;
+        ++this.schedulingRevision;
+        try { attachment.unsubscribe?.(); } catch (error) { failure ??= error; }
+        try { this.teardownSource(); } catch (error) { failure ??= error; }
+        this.transport.pause(this.context.currentTime);
+        this.transport.seekTo(position, this.context.currentTime);
+        this.transport.setRate(rate, this.context.currentTime);
+        if (failure !== undefined) throw failure;
+      }),
+    };
+    this.scheduling = attachment;
+    try {
+      const unsubscribe = binding.subscribe(event => {
+        if (this.scheduling !== attachment || !attachment.lease.active) return;
+        ++this.schedulingRevision;
+        this.teardownSource();
+        if (event.type === 'dispose' || event.snapshot.phase === 'disposed') {
+          attachment.lease.release();
+          return;
+        }
+        if (event.type === 'anchor' && event.snapshot.phase === 'ready' && !event.snapshot.paused) {
+          this.startSessionSource(binding);
+        }
+      });
+      if (attachment.lease.active) attachment.unsubscribe = unsubscribe;
+      else unsubscribe();
+    } catch (error) {
+      attachment.lease.release();
+      throw error;
+    }
+    return attachment.lease;
+  }
+
   dispose(): void {
     if (this.disposed) return;
+    let failure: unknown;
+    try { this.scheduling?.lease.release(); } catch (error) { failure = error; }
     // Keep the same normalized stopped position as pause before making the
     // engine terminal; future public calls cannot rebuild its resources.
     this.pause();
     this.disposed = true;
     this.endedCb = null;
+    this.errorCb = undefined;
     // Designed change: freeze the clock so a disposed engine's position stops
     // advancing (previously `playing` stayed stale-true after dispose).
     this.transport.pause(this.context.currentTime);
@@ -240,9 +336,138 @@ export class BufferEngine implements PlaybackEngine {
       /* already disconnected */
     }
     this.buffer = null;
+    if (failure !== undefined) throw failure;
   }
 
   // --- internals ---
+
+  private assertLocalAuthority(): void {
+    if (this.scheduling?.lease.active) throw new Error('The Session owns this transport; send commands to the Session.');
+  }
+
+  private startSessionSource(binding: SessionSchedulingBinding): void {
+    const revision = this.schedulingRevision;
+    const epoch = binding.epoch;
+    this.ensureBuffer();
+    const snapshot = binding.snapshot;
+    const now = this.context.currentTime;
+    const at = snapshot.holding ? Math.max(now, snapshot.originTime) : now;
+    const position = binding.positionAt(at);
+    const loop = snapshot.loop;
+    if (position < 0 || loop && (loop.startSeconds < 0 || loop.endSeconds > this.duration)) {
+      this.segmented = true;
+      try {
+        this.scheduleSegments(binding, epoch, revision);
+        if (this.scheduling?.binding !== binding || revision !== this.schedulingRevision) return;
+        this.segmentTicker = createTickSource({intervalMs: 25});
+        this.segmentTicker.start(() => {
+          try { this.scheduleSegments(binding, epoch, revision); } catch (error) {
+            this.teardownSource();
+            this.errorCb?.(error);
+          }
+        });
+      } catch (error) {
+        this.teardownSource();
+        throw error;
+      }
+      return;
+    }
+    const offset = this.clampToDuration(position);
+    const source = this.context.createBufferSource();
+    try {
+      source.buffer = this.buffer;
+      source.playbackRate.value = snapshot.rate;
+      if (snapshot.loop) {
+        const {startSeconds: start, endSeconds: end} = snapshot.loop;
+        source.loop = true;
+        source.loopStart = start;
+        source.loopEnd = end;
+      } else source.loop = false;
+      source.connect(this.output);
+      source.onended = () => {
+        if (this.source !== source || this.scheduling?.binding !== binding || binding.epoch !== epoch || source.loop) return;
+        this.source = null;
+        source.onended = null;
+        source.disconnect();
+        this.endedCb?.();
+      };
+      if (this.disposed || this.scheduling?.binding !== binding || revision !== this.schedulingRevision || epoch !== binding.epoch || snapshot.phase !== 'ready') {
+        source.onended = null;
+        source.disconnect();
+        return;
+      }
+      source.start(at, offset);
+      if (this.disposed || this.scheduling?.binding !== binding || revision !== this.schedulingRevision || epoch !== binding.epoch) {
+        source.onended = null;
+        source.stop();
+        source.disconnect();
+        return;
+      }
+      this.source = source;
+    } catch (error) {
+      source.onended = null;
+      try { source.stop(); } catch { /* Candidate may not have started. */ }
+      try { source.disconnect(); } catch { /* Preserve preparation failure. */ }
+      throw error;
+    }
+  }
+
+  /** One bounded source per pass; the rest of a wider Session loop is silence. */
+  private scheduleSegments(binding: SessionSchedulingBinding, epoch: number, revision: number): void {
+    if (this.disposed || this.scheduling?.binding !== binding || binding.epoch !== epoch || revision !== this.schedulingRevision || binding.snapshot.phase !== 'ready') return;
+    const now = this.context.currentTime;
+    const from = binding.snapshot.holding ? Math.max(now, binding.snapshot.originTime) : now;
+    for (const [iteration, until] of this.scheduledPasses) if (until <= now) this.scheduledPasses.delete(iteration);
+    for (const segment of binding.segments(from, from + 0.2)) {
+      if (this.scheduledPasses.has(segment.iteration)) continue;
+      const loop = binding.snapshot.loop;
+      const endPosition = loop?.endSeconds ?? this.duration;
+      const until = loop ? segment.referenceStart + (endPosition - segment.positionStart) / segment.rate : Infinity;
+      this.scheduledPasses.set(segment.iteration, until);
+      const offset = Math.max(0, segment.positionStart);
+      const playableEnd = Math.min(this.duration, endPosition);
+      if (offset >= playableEnd) continue;
+      const start = segment.referenceStart + Math.max(0, -segment.positionStart) / segment.rate;
+      const source = this.context.createBufferSource();
+      try {
+        source.buffer = this.buffer;
+        source.loop = false;
+        source.playbackRate.value = segment.rate;
+        source.connect(this.output);
+        source.onended = () => {
+          if (!this.segmentSources.delete(source)) return;
+          source.onended = null;
+          source.disconnect();
+          if (!binding.snapshot.loop && this.scheduling?.binding === binding && epoch === binding.epoch) {
+            this.segmented = false;
+            this.segmentTicker?.dispose();
+            this.segmentTicker = undefined;
+            this.endedCb?.();
+          }
+        };
+        if (this.disposed || this.scheduling?.binding !== binding || binding.epoch !== epoch || revision !== this.schedulingRevision) {
+          source.onended = null;
+          source.disconnect();
+          return;
+        }
+        this.segmentSources.add(source);
+        source.start(start, offset, playableEnd - offset);
+        if (this.disposed || this.scheduling?.binding !== binding || binding.epoch !== epoch || revision !== this.schedulingRevision) {
+          this.segmentSources.delete(source);
+          source.onended = null;
+          source.stop();
+          source.disconnect();
+          return;
+        }
+      } catch (error) {
+        this.segmentSources.delete(source);
+        source.onended = null;
+        try { source.stop(); } catch { /* Candidate may not have started. */ }
+        try { source.disconnect(); } catch { /* Preserve scheduling failure. */ }
+        throw error;
+      }
+    }
+  }
 
   private ensureBuffer(): void {
     if (!this.buffer) this.buffer = this.clip.toAudioBuffer(this.context);
@@ -298,6 +523,16 @@ export class BufferEngine implements PlaybackEngine {
   }
 
   private teardownSource(): void {
+    this.segmentTicker?.dispose();
+    this.segmentTicker = undefined;
+    this.segmented = false;
+    this.scheduledPasses.clear();
+    for (const source of this.segmentSources) {
+      source.onended = null;
+      try { source.stop(); } catch { /* May already have ended. */ }
+      try { source.disconnect(); } catch { /* Release remaining sources. */ }
+    }
+    this.segmentSources.clear();
     if (!this.source) return;
     const s = this.source;
     this.source = null;

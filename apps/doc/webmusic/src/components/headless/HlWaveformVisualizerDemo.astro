@@ -1,12 +1,12 @@
 ---
 // Browser-renderer demo: the shared .wui-panel card chrome plus a body wired
 // client-side without a custom element.
-// Here: load the bundled Arabesque No.1 WAV, compute a peaks pyramid with
+// Here: load the bundled WebMusic Study No. 1 WAV, compute a peaks pyramid with
 // computePeaks (@webmusic/audio/analyze), then render a static waveform into a
 // .wui-surface div via renderWaveformVisualizer (@webmusic/audio/view/render).
 import LiveDemoCanvas from '../LiveDemoCanvas.astro';
 
-const SRC = `${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`;
+const SRC = `${import.meta.env.BASE_URL}wav/webmusic-study-no-1.wav`;
 ---
 
 <div class="wui-panel wui-panel--flow not-content">

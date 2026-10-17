@@ -338,6 +338,7 @@ export function mountPresetPlayer(
   playerUnsubscribes.push(
     player.on('operationError', ({error}) => {
       if (destroyed) return;
+      if (startingErrors?.has(error)) return;
       startingErrors?.add(error);
       notifyPlayError('PresetPlayer', options.onError, error);
     }),

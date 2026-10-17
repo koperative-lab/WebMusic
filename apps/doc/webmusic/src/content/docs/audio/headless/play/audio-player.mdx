@@ -13,7 +13,7 @@ second transport clock. Use [`AudioClipPlayer`](/audio/headless/play/audio-clip-
 when an immutable single-clip engine is all the application needs.
 
 The demo constructs one nonvisual player and controls it with plain inputs. Load
-the Arabesque No.1 WAV, switch between a clip and a two-pass queue, or clear and reselect the
+the WebMusic Study No. 1 WAV, switch between a clip and a two-pass queue, or clear and reselect the
 source. Its readouts follow the object's events; the demo owns decoding and queue
 cleanup, while the facade owns its context and clip engine.
 
@@ -26,7 +26,7 @@ import {AudioPlayer, AudioPlaylist, AudioMixer} from '@webmusic/audio/play/headl
 import {loadClipFromUrl} from '@webmusic/audio/play';
 
 const player = new AudioPlayer();
-const clip = await loadClipFromUrl('/wav/Arabesque%20No.1.wav', {context: player.audioContext});
+const clip = await loadClipFromUrl('/wav/webmusic-study-no-1.wav', {context: player.audioContext});
 player.setClip(clip);
 await player.play();
 player.pause();
@@ -65,6 +65,49 @@ active entry and exposes that clip. A mix uses its group axis and has no single
 clip or aggregate analyser. Unsupported analyser/clock/scratch capabilities are absent; unsupported live control setters throw rather than silently succeeding.
 Sharing this facade does not complete shared-clock injection across mix members.
 
+## Shared Session scheduling
+
+An owned buffer clip can borrow a Session scheduling binding through
+`attachScheduling(binding)`. Register `preload` as participant preparation and
+`activateScheduling` as activation: preparation never resumes audio, and activation
+completes before the shared future origin is chosen. While attached, route all
+transport changes to the Session. Direct clip transport commands throw and scratch
+input is unavailable; local gain, pan and effects remain editable.
+
+`timingCapabilities` is a resource-free declaration of the selected backend.
+`schedulingMode` reports native continuous buffer looping, bounded lookahead with
+silence outside a clip, or approximate media coordination. See the
+[clip scheduling guarantees and limits](/audio/headless/play/audio-clip-player/#shared-session-scheduling)
+for offsets, rates, suspension, effect tails and scheduling horizons. A borrowed
+backend must explicitly provide scheduling support; an ordinary playlist or mixer
+does not acquire these guarantees just by being attached to the facade.
+
+Replacing an owned clip releases its scheduling lease and cancels its sources
+without pausing or changing the borrowed Session. The stable facade output remains
+available. The host must register the replacement clip to resume coordinated
+playback; `<audio-player>` manages that registration for modular composition.
+When the facade attaches a scheduling-capable borrowed backend, it owns only that
+attachment lease. Replacing or disposing the facade releases the lease without
+disposing the borrowed backend. A backend already attached independently retains
+its caller-owned attachment when the facade detaches it.
+
+## Realized effects and module output
+
+`setEffect(recipe)` updates the legacy compatibility slot of the prepared
+`insertChain`; explicit insert slots remain in place. `outputPort` exposes the
+prepared stable output for leased replacement, sends and taps. These are lazy
+resources: observing module capabilities does not prepare a graph.
+
+The `AudioPlayer` facade exposes `.module` for capability discovery. Its
+`insertChain` is available for its owned clip engine; a source-free or borrowed
+backend does not invent a chain. Explicit preparation and ownership follow the
+selected backend. Use [Kernel routing leases](/kernel/api/#module--webmusickernelmodule)
+when admitting an output to a mixer or adding a side tap.
+Readiness observers may start playback. Preparation retains that same engine,
+so subsequent stop/dispose commands release its sources and timers. A source
+replacement or disposal during readiness cancels the superseded preparation.
+
+
 <details class="component-section">
 <summary>API</summary>
 
@@ -85,12 +128,17 @@ Sharing this facade does not complete shared-clock injection across mix members.
 | `pause()` / `stop()` | Delegate to the current backend. Pause retains position; stop resets according to that backend. |
 | `seek(seconds)` / `seekFraction(fraction)` / `scrub(deltaSeconds)` | Delegate seeks on the selected content axis. Fraction clamps to 0–1; scrub is a relative seek, not scratch audio. |
 | `preload()` | Prepare the selected backend without starting sound, when supported. |
+| `activateScheduling()` | Promise; resume the owned clip context or delegate the borrowed backend's explicit activation capability. Does not start a private clock. Unsupported backends throw. |
+| `attachScheduling(binding)` | Return a ConnectionLease for shared Session scheduling. Delegate to the owned clip or an explicitly supporting borrowed backend; unsupported backends throw. |
 | `setVolume(value)` / `setRate(value)` / `setPan(value)` | Set clip controls; rate clamps to 0.25–4, pan to −1–1, volume is nonnegative. Nonfinite input throws. A selected borrowed backend must expose the requested setter or the command throws without committing a new retained setting. |
 | `setLoop(loop)` / `setPreservesPitch(value)` | Clip configuration. Queue loop belongs to the queue's list policy; do not infer group loop/pan/pitch support. |
 | `beginScratch()` / `scratching` | Borrow the selected backend's optional scratch session. See [scratch sessions](/audio/headless/play/audio-clip-player/#scratch-sessions). |
 | `seconds` / `currentTime` / `duration` / `progress` | Live position, duration and fraction; zero for empty input. |
 | `playing` | Selected backend's playback state. |
-| `volume` / `rate` / `pan` | Facade's retained clip settings; a backend can expose narrower control support. |
+| `volume` / `rate` / `pan` | Facade clip settings; `rate` reads the effective mapped Session rate for an attached owned clip. A backend can expose narrower control support. |
+| `timingCapabilities` | PlaybackTimingCapabilities declaration without preparing audio; an undeclared external backend reports no shared-clock, future-start or native-loop guarantees. |
+| `schedulingMode` | PlaybackSchedulingMode for the selected backend; see the clip scheduling reference. |
+| `followsSession` | Whether the selected owned clip or explicitly declaring borrowed backend currently follows a Session scheduling binding. |
 | `audioContext` | Lazily creates or returns the borrowed AudioContext for shared decoding/owned playback. Throws after disposal. A borrowed group may own a different context; sharing must be configured explicitly. |
 | `clock` | Selected engine's optional read-only transport clock; the facade owns no clock. |
 | `analyser` | Stable owned clip-output analyser or a borrowed backend's optional analyser. Empty input does not create a graph. |
@@ -114,6 +162,10 @@ application lifetime. Cleanup must not reclaim a source selected by a callback.
 Optional clip/currentClip, analyser, clock, configuration, preload/scratch and
 subscribe/onEnd/onError ports expose backend capabilities without DOM. An
 `AudioPlaylist` implements this contract; use `AudioMixer.transport` for a mix.
+An external backend may also declare `timingCapabilities`, `schedulingMode` and `followsSession`,
+and implement `activateScheduling(): Promise<void>` and
+`attachScheduling(binding): ConnectionLease`; these methods carry the same
+ownership and timing contract as the owned buffer clip.
 
 </details>
 

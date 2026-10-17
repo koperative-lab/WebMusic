@@ -1,6 +1,6 @@
 import type {ScorePlayerElement} from '@webmusic/score/play/element';
 import type {DemoScope} from './demo-lifecycle';
-import {arabesqueExcerpt, loadArabesqueScore} from './headless/arabesque-score';
+import {studyExcerpt, loadStudyScore} from './headless/study-score';
 import {mountQuickStartStatus} from './quick-start-player-client';
 
 /** Both independent views use one pitch scale and one borrowed player. */
@@ -35,7 +35,7 @@ export function mountWaterfallKeyboardDemo(root: HTMLElement, scope: DemoScope):
   updateHeight();
   scope.add(() => { player.score = undefined; });
   scope.add(mountQuickStartStatus(player, status));
-  scope.run(loadArabesqueScore().then((score) => {
-    if (scope.active) player.score = arabesqueExcerpt(score, 16);
-  }), () => { status.textContent = 'Could not load the Arabesque score.'; });
+  scope.run(loadStudyScore().then((score) => {
+    if (scope.active) player.score = studyExcerpt(score, 16);
+  }), () => { status.textContent = 'Could not load the WebMusic Study score.'; });
 }

@@ -6,8 +6,12 @@ import {
   RACK_PART_EVENT,
   isRackDesk,
   type RackPartDeclaration,
+  type ModuleRackPartHost,
 } from './internal/rack-part';
 import {WebMusicElement, upgradeProperties} from './internal/base';
+import {isModularComposition, observeModuleContext, requestModuleContext} from '@webmusic/kernel/element';
+import type {ModuleHandle} from '@webmusic/kernel/module';
+import type {SessionTransport} from '@webmusic/kernel/session';
 
 export interface RackPartErrorDetail {
   operation: 'rack-part';
@@ -47,14 +51,52 @@ export class RackPartElement extends WebMusicElement {
   private voiced?: {name: string; synth: HeadlessSynth};
   private loadToken = 0;
   private loadController?: AbortController;
+  private pendingSource?: ReturnType<SessionTransport['holdPendingSource']>;
+  private pendingSession?: SessionTransport;
+  private sourceLoadFailed = false;
+  private sourceLoadError?: unknown;
+  private modular = false;
+  private modularDesk?: Element;
+
+  override disconnectedCallback(): void {
+    if (!this.modular) { super.disconnectedCallback(); return; }
+    queueMicrotask(() => { if (!this.isConnected) super.disconnectedCallback(); });
+  }
+
+  /** Borrow the desk-owned runtime without creating another source or route. */
+  get module(): ModuleHandle | undefined {
+    const desk = this.parentElement as Partial<ModuleRackPartHost> | null;
+    return desk?.rackPartModule?.(this);
+  }
 
   protected override onMount(): void {
+    this.modular = isModularComposition(this);
+    this.modularDesk = this.parentElement ?? undefined;
     // This tag is a declaration, not a visual control. Keep that contract in
     // the component itself so a page never needs a docs-only `display:none`.
     (this as unknown as HTMLElement).style?.setProperty('display', 'none');
     upgradeProperties(this, ['score', 'sound']);
     this.own(() => this.cancelLoad());
-    void this.resolve();
+    if (this.modular) {
+      let firstReady = true;
+      this.own(observeModuleContext(this, (context, state) => {
+        this.reservePendingSource(context?.session);
+        if (state !== 'ready') return;
+        if (this.modularDesk !== this.parentElement) {
+          const previous = this.modularDesk;
+          this.modularDesk = this.parentElement ?? undefined;
+          // Retire the previous owned declaration before a running new desk
+          // can prepare the same borrowed Sound backend.
+          previous?.dispatchEvent(new CustomEvent(RACK_PART_EVENT));
+        }
+        const needsResolution = firstReady || (!this.resolved && !this.loadController);
+        firstReady = false;
+        if (needsResolution && !this.sourceLoadFailed) {
+          void this.resolve();
+        }
+        else this.announce();
+      }));
+    } else void this.resolve();
   }
 
   attributeChangedCallback(name?: string): void {
@@ -153,6 +195,7 @@ export class RackPartElement extends WebMusicElement {
     if (!this.parentElement || !isRackDesk(this.parentElement)) return;
     const controller = new AbortController();
     this.loadController = controller;
+    this.reservePendingSource(isModularComposition(this) ? requestModuleContext(this)?.session : undefined);
     try {
       const {loadScoreFromUrl} = await import('../../io/load');
       if (controller.signal.aborted) return;
@@ -161,8 +204,16 @@ export class RackPartElement extends WebMusicElement {
       if (token !== this.loadToken || !this.isConnected) return;
       this.resolved = score;
       this.announce();
+      if (token !== this.loadToken || !this.isConnected) return;
+      if (this.pendingSource && !this.module) throw new Error('The Rack did not accept the loaded score declaration.');
+      this.pendingSource?.resolve();
+      this.pendingSource = undefined;
+      this.pendingSession = undefined;
     } catch (error) {
       if (token !== this.loadToken || controller.signal.aborted) return;
+      this.sourceLoadFailed = true;
+      this.sourceLoadError = error;
+      this.pendingSource?.reject(error);
       this.reportError(error);
     } finally {
       if (this.loadController === controller) this.loadController = undefined;
@@ -174,6 +225,24 @@ export class RackPartElement extends WebMusicElement {
     const controller = this.loadController;
     this.loadController = undefined;
     controller?.abort();
+    this.pendingSource?.release();
+    this.pendingSource = undefined;
+    this.pendingSession = undefined;
+    this.sourceLoadFailed = false;
+    this.sourceLoadError = undefined;
+  }
+
+  /** A fetch can survive a layout move, but its readiness belongs to the current Session. */
+  private reservePendingSource(session: SessionTransport | undefined): void {
+    if (session === this.pendingSession && this.pendingSource?.active) return;
+    this.pendingSource?.release();
+    this.pendingSource = undefined;
+    this.pendingSession = undefined;
+    if (!session || (!this.loadController && !this.sourceLoadFailed)) return;
+    const pending = session.holdPendingSource();
+    this.pendingSession = session;
+    this.pendingSource = pending;
+    if (this.sourceLoadFailed) pending.reject(this.sourceLoadError);
   }
 
   /** Nudge the desk to pull again. It reconciles; this only says "now". */

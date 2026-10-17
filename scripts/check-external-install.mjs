@@ -13,6 +13,7 @@
 //
 //   - imports every public entry as ESM and requires every dual entry as CJS;
 //   - composes Score's IO results with the root model API in both formats;
+//   - checks UI root/subpath identity and Audio loader assets in Bridge projects;
 //   - checks every ESM/CommonJS declaration under `node16` and `nodenext`,
 //     plus ESM under `bundler`, without skipping dependency declarations.
 //
@@ -124,16 +125,19 @@ try {
       "    if (entry.kind === 'esm') {",
       '      const namespace = await import(entry.spec);',
       "      if (typeof namespace !== 'object') throw new Error('namespace is not an object');",
-      "      if (entry.spec.startsWith('@webmusic/kernel/')) {",
-      "        const root = await import('@webmusic/kernel');",
+      // UI's root must reuse each presenter's host registry and generated-ID
+      // counter. Source lifecycle tests cover replacement through that shared
+      // mount; this check prevents packaging from creating independent copies.
+      "      if (entry.spec.startsWith('@webmusic/kernel/') || entry.spec.startsWith('@webmusic/ui/')) {",
+      "        const root = await import(entry.spec.split('/').slice(0, 2).join('/'));",
       '        for (const [name, value] of Object.entries(namespace)) {',
       '          if (root[name] !== value) throw new Error(`root re-export ${name} has a different identity`);',
       '        }',
       '      }',
       '    } else {',
       '      const namespace = require_(entry.spec);',
-      "      if (entry.spec.startsWith('@webmusic/kernel/')) {",
-      "        const root = require_('@webmusic/kernel');",
+      "      if (entry.spec.startsWith('@webmusic/kernel/') || entry.spec.startsWith('@webmusic/ui/')) {",
+      "        const root = require_(entry.spec.split('/').slice(0, 2).join('/'));",
       '        for (const [name, value] of Object.entries(namespace)) {',
       '          if (root[name] !== value) throw new Error(`root re-export ${name} has a different identity`);',
       '        }',
@@ -157,14 +161,17 @@ try {
     fail(`entries failed to import:\n${error.stdout ?? ''}${error.stderr ?? ''}`);
   }
 
-  writeFileSync(
-    path.join(consumer, 'score-composition.mjs'),
-    readFileSync(path.join(root, 'scripts', 'external-score-composition.mjs'), 'utf8'),
-  );
-  try {
-    process.stdout.write(run('node', ['score-composition.mjs'], consumer));
-  } catch (error) {
-    fail(`Score entries do not compose:\n${error.stdout ?? ''}${error.stderr ?? ''}`);
+  for (const domain of ['score', 'audio']) {
+    const filename = `${domain}-composition.mjs`;
+    writeFileSync(
+      path.join(consumer, filename),
+      readFileSync(path.join(root, 'scripts', `external-${filename}`), 'utf8'),
+    );
+    try {
+      process.stdout.write(run('node', [filename], consumer));
+    } catch (error) {
+      fail(`${domain} entries do not compose:\n${error.stdout ?? ''}${error.stderr ?? ''}`);
+    }
   }
 
   const esm = entries.filter((entry) => entry.kind === 'esm');
@@ -244,7 +251,7 @@ try {
   }
 
   console.log(
-    `\nExternal install check passed: ${entries.length} runtime entries imported, Score model composition passed in both formats, ` +
+    `\nExternal install check passed: ${entries.length} runtime entries imported, UI root/subpath identity and Score/Audio composition passed in both formats, ` +
       `${esm.length + browserDeclarations.length} ESM/browser and ${cjs.length} CommonJS declarations checked without skipLibCheck.`,
   );
 } catch (error) {

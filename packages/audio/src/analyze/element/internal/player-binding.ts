@@ -1,5 +1,8 @@
 import {observeElementTarget, type ElementTargetState} from '@webmusic/kernel/element';
 import type {AudioClip} from '../../../core';
+import type {ModuleHandle} from '@webmusic/kernel/module';
+import {isModularComposition} from '@webmusic/kernel/element';
+import {bindModuleAudioInput} from '../../../play/element/internal/module-input';
 
 export interface AnalysisPlayerTarget extends Element {
   readonly clip?: AudioClip;
@@ -42,7 +45,15 @@ function snapshot(target: AnalysisPlayerTarget | undefined, state: AnalysisPlaye
 export function bindAnalysisPlayer(
   host: Element,
   onUpdate: (kind: AnalysisPlayerUpdate, snapshot: AnalysisPlayerSnapshot) => void,
+  assigned?: ModuleHandle | null,
 ): () => void {
+  if (assigned !== undefined || host.hasAttribute('input') || (!host.hasAttribute('player') && isModularComposition(host))) {
+    return bindModuleAudioInput(host, assigned, ({analyser, error}) => {
+      const target = analyser ? {analyser, playing: true} as AnalysisPlayerTarget : undefined;
+      onUpdate('target', {target, seconds: 0, duration: 0, playing: !!analyser, state: analyser ? 'ready' : 'unbound'});
+      if (error) host.dispatchEvent(new CustomEvent('webaudio:error', {detail: error, bubbles: true, composed: true}));
+    });
+  }
   const selector = host.getAttribute('player');
   if (!selector) {
     onUpdate('target', snapshot(undefined, 'unbound'));

@@ -1,4 +1,6 @@
 import type {Rack} from '../../headless/rack';
+import {isModularComposition} from '@webmusic/kernel/element';
+import type {ModuleHandle} from '@webmusic/kernel/module';
 
 /**
  * How a mixing desk tells the player wrapping it which rack to drive.
@@ -51,5 +53,11 @@ export function isRackPart(node: Element): node is RackPartElementLike {
 
 /** Whether this node is the desk a part belongs to. */
 export function isRackDesk(node: Element): boolean {
-  return node.tagName.toLowerCase() === RACK_DESK_TAG;
+  return node.tagName.toLowerCase() === RACK_DESK_TAG ||
+    (isModularComposition(node) && typeof (node as Partial<ModuleRackPartHost>).rackPartModule === 'function');
+}
+
+/** Public structural capability used by custom-tag modular desks and parts. */
+export interface ModuleRackPartHost extends Element {
+  rackPartModule(part: RackPartElementLike): ModuleHandle | undefined;
 }

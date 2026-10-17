@@ -35,7 +35,7 @@ const fromUrl = await loadClipFromUrl('/track.flac', { context: ctx });
 // Stream instead of fetching or decoding up front: the clip holds only sourceUrl. A
 // headless player also needs a host-provided mediaAdapterFactory (see below);
 // <audio-player> supplies the browser adapter automatically.
-const streamed = await loadClipFromUrl('/mp3/Arabesque%20No.1.mp3', { streaming: true });
+const streamed = await loadClipFromUrl('/mp3/webmusic-study-no-1.mp3', { streaming: true });
 
 detectAudioFormat(bytes);              // 'wav' | 'mp3' | 'flac' | 'ogg' | 'opus' | 'aac' | 'm4a' | 'webm' | 'aiff' | undefined
 formatFromExtension('/song.opus');     // 'opus'
@@ -217,3 +217,17 @@ client and protocol also have dedicated subpaths in the
 
 The playlist's runtime values and types, the meter controller, both engines,
 and effect builders are documented under [Headless Play](/audio/headless/#play).
+
+
+## Module composition
+
+The opt-in [module composition](/bridge/modular-composition/) keeps transport,
+audio routing, realized effect slots, parameter controls and analysis taps as
+separate borrowed relationships. Kernel owns neutral
+[ModuleContext and SessionTransport](/kernel/api/#module--webmusickernelmodule).
+
+The [player](/audio/headless/play/audio-player/#realized-effects-and-module-output)
+and [mixer](/audio/headless/play/audio-mixer/#module-admissions-and-master-inserts)
+expose prepared module/output/insert capabilities. `AudioEffectElement` and
+`defineAudioEffectElement` belong to the Element entry and declare
+[one realized insert](/audio/element/play/audio-effect/).

@@ -10,10 +10,14 @@ import {Code} from 'astro:components';
 import QuickStartPlayerDemo from '../../components/QuickStartPlayerDemo.astro';
 import statusCode from '../../components/quick-start-player-client.ts?raw';
 
-Build a player for *Arabesque No. 1*, supplied as a compressed MusicXML score.
+Build a player for *WebMusic Study No. 1*, supplied as an original compressed MusicXML score.
 One player loads the file; a staff view follows its position and a three-octave piano keyboard
 highlights sounding notes within its C3–C6 range. Playback uses the built-in
 oscillator, so no SoundFont is needed.
+
+The study is by WebMusic Contributors and is supplied under the
+[MIT license](/licenses/DEMO_ASSETS_MIT.txt), included in each media file.
+The [asset inventory](/licenses/DEMO_ASSETS.json) records the generating source and hashes.
 
 <QuickStartPlayerDemo />
 
@@ -36,17 +40,17 @@ TypeScript and an ES-module bundler such as Vite to resolve the package imports.
 
 ## Add the player and its views
 
-Download [Arabesque No. 1 (MXL)](/mxl/Arabesque%20No.1.mxl) and save it as `public/arabesque.mxl` in your
+Download [WebMusic Study No. 1 (MXL)](/mxl/webmusic-study-no-1.mxl) and save it as `public/webmusic-study-no-1.mxl` in your
 application. The player reads compressed MusicXML directly; no manual extraction
 is needed. The example assumes that your application serves this file at
-`/arabesque.mxl`; set `src` to your file's public URL.
+`/webmusic-study-no-1.mxl`; set `src` to your file's public URL.
 
 Put this markup in `index.html`. The player owns the file load, musical state
 and sound; the two `player="#piece"` selectors attach views to that same instance.
 
 ```html
 <main id="music-demo">
-  <score-player id="piece" src="/arabesque.mxl" time-control="full"></score-player>
+  <score-player id="piece" src="/webmusic-study-no-1.mxl" time-control="full"></score-player>
   <score-view player="#piece" type="staff"></score-view>
   <score-pitch-view player="#piece" type="keyboard" low="48" high="84" fit-to-width="true" white-key-height="128" black-key-height="80"></score-pitch-view>
 </main>
@@ -163,14 +167,14 @@ For recorded sound, install `@webmusic/audio` alongside Kernel and UI:
 npm install @webmusic/audio @webmusic/kernel @webmusic/ui
 ```
 
-Download the [Arabesque No. 1 WAV recording](/wav/Arabesque%20No.1.wav), save it as `public/arabesque.wav`,
+Download the [WebMusic Study No. 1 synthesized WAV](/wav/webmusic-study-no-1.wav), save it as `public/webmusic-study-no-1.wav`,
 and add the player to your browser application:
 
 ```html
 <script type="module">
   import '@webmusic/audio/play/auto';
 </script>
-<audio-player src="/arabesque.wav" controls></audio-player>
+<audio-player src="/webmusic-study-no-1.wav" controls></audio-player>
 ```
 
 Click **Play** to enable audio. This example uses built-in WAV decoding and

@@ -38,6 +38,51 @@ function transport() {
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.useRealTimers(); });
 
 describe('AudioPlayer stable source ownership', () => {
+  it('changes source-local effects without replacing playback, and retains inserts when the clip changes', async () => {
+    const ctx = context();
+    const firstDispose = vi.fn();
+    const secondDispose = vi.fn();
+    const first = {createAudioNodes: vi.fn(() => ({input: ctx.createGain(), output: ctx.createGain(), dispose: firstDispose}))};
+    const second = {createAudioNodes: vi.fn(() => ({input: ctx.createGain(), output: ctx.createGain(), dispose: secondDispose}))};
+    const player = new AudioPlayer(clip(), {audioContext: ctx, effect: first});
+    await player.play();
+    player.seek(0.5);
+    const clock = player.clock;
+    const output = player.analyser;
+    const chain = player.insertChain!;
+    const starts = vi.mocked(ctx.createBufferSource).mock.results.length;
+    player.setEffect(second);
+    expect(player.playing).toBe(true);
+    expect(player.seconds).toBe(0.5);
+    expect(player.clock).toBe(clock);
+    expect(player.analyser).toBe(output);
+    expect(player.insertChain).toBe(chain);
+    expect(vi.mocked(ctx.createBufferSource).mock.results).toHaveLength(starts);
+    expect(firstDispose).toHaveBeenCalledOnce();
+    expect(second.createAudioNodes).toHaveBeenCalledOnce();
+    player.setClip(clip(3));
+    await player.play();
+    expect(player.insertChain).toBe(chain);
+    expect(second.createAudioNodes).toHaveBeenCalledOnce();
+    player.dispose();
+    expect(secondDispose).toHaveBeenCalledOnce();
+  });
+
+  it('keeps a working effect and playing source when a replacement recipe fails', async () => {
+    const ctx = context();
+    const released = vi.fn();
+    const effect = {createAudioNodes: () => ({input: ctx.createGain(), output: ctx.createGain(), dispose: released})};
+    const player = new AudioPlayer(clip(), {audioContext: ctx, effect});
+    await player.play();
+    const chain = player.insertChain!;
+    const instance = chain.instances[0];
+    expect(() => player.setEffect({createAudioNodes() { throw new Error('invalid effect'); }})).toThrow('invalid effect');
+    expect(player.playing).toBe(true);
+    expect(player.insertChain!.instances[0]).toBe(instance);
+    expect(released).not.toHaveBeenCalled();
+    player.dispose();
+  });
+
   it('keeps an empty owner free of audio resources and publishes sources before playback', () => {
     const ctx = context();
     const player = new AudioPlayer(undefined, {audioContext: ctx});
@@ -105,6 +150,94 @@ describe('AudioPlayer stable source ownership', () => {
     expect(player.clip).toBe(second);
     expect(times).toEqual([3]);
     player.dispose();
+  });
+});
+
+describe('AudioPlayer lazy preparation reentry', () => {
+  it.each(['stop', 'dispose'] as const)('retains and releases playback started by an output observer through %s', async (command) => {
+    vi.useFakeTimers();
+    const ctx = context();
+    const player = new AudioPlayer(clip(), {audioContext: ctx, loop: true});
+    let start: Promise<void> | undefined;
+    const unsubscribe = player.module.subscribe!(() => {
+      if (player.module.getPort!('output') && !start) start = player.play();
+    });
+    try {
+      await player.preload();
+      await start;
+      expect(player.playing).toBe(true);
+      const sources = vi.mocked(ctx.createBufferSource).mock.results.map(result => result.value);
+      expect(sources).toHaveLength(1);
+      player[command]();
+      expect(sources[0].stop).toHaveBeenCalledOnce();
+      expect(player.playing).toBe(false);
+      expect(vi.getTimerCount()).toBe(0);
+      player.dispose();
+      expect(sources[0].stop).toHaveBeenCalledOnce();
+    } finally { unsubscribe(); player.dispose(); }
+  });
+
+  it.each(['clip', 'transport', 'clear', 'dispose'] as const)('cancels stale preparation after an output observer requests %s', async (replacement) => {
+    const ctx = context();
+    const player = new AudioPlayer(clip(), {audioContext: ctx});
+    const next = clip(3);
+    const borrowed = transport().source;
+    let handled = false;
+    const unsubscribe = player.module.subscribe!(() => {
+      if (handled || !player.module.getPort!('output')) return;
+      handled = true;
+      if (replacement === 'clip') player.setClip(next);
+      else if (replacement === 'transport') player.setTransport(borrowed);
+      else if (replacement === 'clear') player.setClip(undefined);
+      else player.dispose();
+    });
+    try {
+      await expect(player.preload()).resolves.toBeUndefined();
+      expect(handled).toBe(true);
+      expect(ctx.createBuffer).not.toHaveBeenCalled();
+      expect(player.clock).toBeUndefined();
+      if (replacement === 'clip') {
+        expect(player.clip).toBe(next);
+        await player.preload();
+        expect(player.duration).toBe(3);
+        expect(ctx.createBuffer).toHaveBeenCalledOnce();
+      } else if (replacement === 'transport') expect(player.transport).toBe(borrowed);
+      else expect(player.clip).toBeUndefined();
+    } finally { unsubscribe(); player.dispose(); }
+  });
+
+  it('releases an uncommitted output exactly once when its effect factory disposes the owner', async () => {
+    const ctx = context();
+    const releaseEffect = vi.fn();
+    const player = new AudioPlayer(clip(), {audioContext: ctx, effect: {
+      createAudioNodes: () => {
+        const effect = ctx.createGain();
+        player.dispose();
+        return {input: effect, output: effect, dispose: releaseEffect};
+      },
+    }});
+    await expect(player.preload()).resolves.toBeUndefined();
+    expect(releaseEffect).toHaveBeenCalledOnce();
+    expect(ctx.createBuffer).not.toHaveBeenCalled();
+    expect(player.analyser).toBeUndefined();
+    player.dispose();
+    expect(releaseEffect).toHaveBeenCalledOnce();
+  });
+
+  it('rejects recursive output acquisition without replacing the outer candidate', async () => {
+    const ctx = context();
+    const released = vi.fn();
+    const create = vi.fn(() => {
+      expect(() => player.outputPort).toThrow('AudioPlayer output preparation cannot re-enter');
+      const effect = ctx.createGain();
+      return {input: effect, output: effect, dispose: released};
+    });
+    const player = new AudioPlayer(clip(), {audioContext: ctx, effect: {createAudioNodes: create}});
+    await player.preload();
+    expect(create).toHaveBeenCalledOnce();
+    expect(player.outputPort?.disposed).toBe(false);
+    player.dispose();
+    expect(released).toHaveBeenCalledOnce();
   });
 });
 

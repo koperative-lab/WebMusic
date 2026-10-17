@@ -1,6 +1,6 @@
 ---
 title: '@webmusic/bridge'
-description: 'Every root export of the bridge: timeline conversion, offline score rendering, the role adapters, transcription assembly, and the sync object documented under Headless.'
+description: 'Bridge exports for timeline conversion, offline rendering, transport adapters, transcription assembly and modular project factories.'
 sidebar:
   label: '@webmusic/bridge'
   order: 2
@@ -8,8 +8,8 @@ sidebar:
 
 `@webmusic/bridge` is a **single-entry package**: the root is the whole API.
 It is the only package allowed to import both families, and both are peer
-dependencies alongside `@webmusic/kernel` — the bridge borrows the score and
-audio instances your application already has.
+dependencies alongside `@webmusic/kernel`. Bridge can coordinate supplied
+players or construct explicitly owned instances through its factories.
 
 It does not decode audio, parse notation, or draw anything. Those live in
 [`@webmusic/audio`](/audio/api/) and [`@webmusic/score`](/score/api/); what is
@@ -168,6 +168,40 @@ and clamped to 1–127. Invalid options, accepted-note values, unsafe timing
 arithmetic, or resource-limit violations throw `RangeError`. Assembly owns
 no context, subscription, or running clock and has no disposal step.
 
+## Project module factories
+
+`createWebMusicProjectPlugins(): readonly ProjectPluginFactory[]` returns trusted
+factory definitions for [Kernel projects](/kernel/api/#versioned-projects).
+Register them in `ProjectPluginRegistry` explicitly. Calling this function
+creates no graph, loads no asset and registers nothing globally. Each factory
+creates a fresh instance owned by `ModuleProjectRuntime`; all use the project's
+borrowed audio environment and staged output destination.
+
+Every built-in factory uses exact plugin version **`1.0.0`**. This is the
+project-plugin schema version, separate from the package release version.
+
+| Plugin ID | Configuration and assets | Ports / parameters |
+| --- | --- | --- |
+| `webmusic.score-player` | Asset role `source` must resolve to a Score. `waveform` defaults `sine`; accepts sine/square/triangle/sawtooth. `offsetSeconds` defaults 0 and `positionScale` 1. Owns an oscillator Sound and one ScorePlayerModule. | Audio `output`; oscillator/shared ADSR parameters, including gain, detune, cutoff, resonance and busGain. |
+| `webmusic.audio-player` | Asset role `source` must resolve to an AudioClip. `offsetSeconds` defaults 0 and `positionScale` 1. Owns one AudioClipPlayer. | Audio `output`; synchronous `volume` (0…1) and `pan` (−1…1). Native automation uses an audio bus/effect parameter. |
+| `webmusic.score-rack` | `masterVolume` defaults 1. Optional `channels` maps stable child module IDs to `{volume?, muted?, solo?}`; channel volume is 0…1. Settings apply after child admission and live states are exported while unresolved records are retained. | Audio `input` and `output`; a child context owned by this module admits outputs as real Rack channels. |
+| `webmusic.audio-bus` | `gain` defaults 1. A child context owned by this module routes its normal outputs into this bus. | Audio `input`, `output`; native gain parameter. |
+| `webmusic.effect` | Required `type`: gain, filter, delay, compressor or reverb. `options` defaults `{}` and uses the effect's named numeric options. Filter options additionally accept a Biquad `type` (default lowpass). | Audio `input`, `output`; the realized effect's shared parameters. |
+| `webmusic.lfo` | Session-relative `frequency` defaults 1 cycle/Session-second, `phase` 0 cycles, `waveform` sine and `loop` repeat (or once). | Control `output`; shared frequency/phase handles. Paused Session produces zero; phase reconstructs from Session position. |
+
+Gain options are `gain`; filter options are `frequency`, `Q`, `gain`, `type`;
+delay options are `delaySeconds`, `feedback`, `wet`, `dry`; compressor options
+are `threshold`, `knee`, `ratio`, `attack`, `release`; reverb options are
+`seconds`, `decay`, `wet`, `dry`. Units and backend ranges follow
+[Score Effect](/score/headless/play/effect/). Runtime module `params` restore
+onto realized handles after construction, independently of recipe defaults.
+
+The application supplies `resolveAsset(reference, signal)`. Bridge checks the
+resolved domain object; it does not fetch URLs, decode arbitrary files, persist
+sample data or install missing code. A saved plugin reference without a matching
+registry entry remains unresolved until an explicit registration and retry.
+See [the complete project example](/bridge/modular-composition/#save-and-edit-a-project).
+
 ## API Reference
 
 Every export of the root, exactly once.
@@ -183,6 +217,7 @@ Every export of the root, exactly once.
 | `timeMapFromBeatGrid` | function | Carry a detected beat grid into a score `TimeMap`. |
 | `renderScoreToClip` | function | Render a score offline into an `AudioClip`. |
 | `scoreFromTranscription` | function | Assemble transcribed note events into a `Score`. |
+| `createWebMusicProjectPlugins` | factory | Exact-version Score, Audio, Rack, bus, effect and Session-LFO factories for Kernel project restore. |
 | `DEFAULT_MAX_MAPPED_BEATS` | constant | The beat ceiling `beatGridFromTimeMap` will not exceed. |
 | `DEFAULT_MAX_TRANSCRIPTION_MEASURES` | constant | Measure ceiling for one assembly. |
 | `DEFAULT_MAX_TRANSCRIPTION_NOTES` | constant | Note ceiling for one assembly. |

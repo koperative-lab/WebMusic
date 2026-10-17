@@ -1,0 +1,61 @@
+---
+import LiveDemoCanvas from './LiveDemoCanvas.astro';
+
+const midi = `${import.meta.env.BASE_URL}midi/webmusic-study-no-1.mid`;
+const wav = `${import.meta.env.BASE_URL}wav/webmusic-study-no-1.wav`;
+---
+
+<section class="not-content modular-demo" data-modular-demo>
+  <LiveDemoCanvas label="One Session, one mixed output">
+    <score-player composition="modules" controls="show" time-control="full" data-modular-session>
+      <score-rack-control id="modular-desk" master mute solo>
+        <score-player id="modular-score" src={midi} volume="0.3"></score-player>
+        <audio-player id="modular-audio" src={wav} volume="0.3"></audio-player>
+        <score-rack-part id="modular-pad" src={midi} sound="triangle"></score-rack-part>
+        <score-effect id="modular-room" type="reverb" wet="0.15" dry="1"></score-effect>
+        <audio-effect id="modular-filter" type="filter" frequency="6000" q="0.7"></audio-effect>
+      </score-rack-control>
+    </score-player>
+    <div class="modular-demo__panels">
+      <div><h3>Room parameters</h3><score-synth-panel target="#modular-room" sections="effects"></score-synth-panel></div>
+      <div><h3>The same room parameters</h3><score-synth-panel target="#modular-room" sections="effects"></score-synth-panel></div>
+    </div>
+    <audio-spectrum-analyzer input="#modular-desk" port="master" aria-label="Mixed output spectrum"></audio-spectrum-analyzer>
+  </LiveDemoCanvas>
+  <p data-modular-feedback role="status">Play prepares the source leaves, declared rack part and shared inserts. The two room panels then edit the same effect instance.</p>
+</section>
+
+<script>
+  import {defineAllElements, type ScorePlayerElement} from '@webmusic/score/play/element';
+  import {defineAllAudioElements} from '@webmusic/audio/play/element';
+  import {defineAudioSpectrumAnalyzerElement} from '@webmusic/audio/analyze/element';
+  import {mountDemos} from './demo-lifecycle';
+
+  defineAllElements();
+  defineAllAudioElements();
+  defineAudioSpectrumAnalyzerElement();
+
+  mountDemos('[data-modular-demo]', (root, scope) => {
+    const feedback = root.querySelector<HTMLElement>('[data-modular-feedback]');
+    const showError = (event: Event) => {
+      const detail: unknown = (event as CustomEvent).detail;
+      const error = detail && typeof detail === 'object' && 'error' in detail ? detail.error : detail;
+      if (feedback) feedback.textContent = error instanceof Error ? error.message : String(error);
+    };
+    scope.listen(root, 'webscore:error', showError);
+    scope.listen(root, 'webaudio:error', showError);
+    scope.add(() => {
+      const player = root.querySelector<ScorePlayerElement>('score-player');
+      // Page hide may retain connected DOM; stop the shared Session explicitly.
+      player?.stop();
+    });
+  });
+</script>
+
+<style>
+  .modular-demo score-player,
+  .modular-demo score-rack-control { display: block; }
+  .modular-demo__panels { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-block: 1rem; }
+  .modular-demo__panels h3 { margin: 0 0 .5rem; font-size: .9rem; }
+  @media (max-width: 640px) { .modular-demo__panels { grid-template-columns: 1fr; } }
+</style>

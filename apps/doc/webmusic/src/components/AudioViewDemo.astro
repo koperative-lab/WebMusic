@@ -54,7 +54,7 @@ const INERT: Record<string, string> = {
     const view = root.querySelector<AudioViewElement>('audio-view')!;
     const player = root.querySelector<AudioPlayerElement>('audio-player')!;
     const status = root.querySelector<HTMLElement>('[data-view-status]')!;
-    const fixture = acquireAudioViewFixture(`${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`);
+    const fixture = acquireAudioViewFixture(`${import.meta.env.BASE_URL}wav/webmusic-study-no-1.wav`);
     scope.add(() => fixture.release());
     scope.add(() => { player.stop(); player.clip = undefined; view.peaks = undefined; view.spectrogram = undefined; });
     let generation = 0;

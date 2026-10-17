@@ -112,6 +112,33 @@ describe("mountParameterRack", () => {
     expect(inputs[0]?.getAttribute("aria-valuetext")).toBe("1.5 ×");
   });
 
+  it("shows declared modulation range without replacing base value or claiming measured output", () => {
+    const host = document.createElement("div");
+    const binding = new FakeParameters();
+    binding.state = {parameters: [{
+      id: "cutoff", label: "Cutoff", value: 400, min: 20, max: 2000, unit: "Hz",
+      modulationRange: {min: 200, max: 600},
+    }]};
+    const handle = mountParameterRack(host, binding);
+    const input = handle.inputElement("cutoff")!;
+    const range = host.querySelector('[part="modulation"]')!;
+    expect(input.value).toBe("400");
+    expect(input.getAttribute("aria-valuetext")).toBe("400 Hz");
+    expect(input.getAttribute("aria-description")).toBe("Modulation range 200 Hz to 600 Hz; effective value is not measured.");
+    expect(range.getAttribute("d")).toContain(" A 19 19 ");
+    const path = range.getAttribute("d");
+    binding.state.parameters[0].modulationRange = {min: 50, max: 1000};
+    binding.emit();
+    expect(handle.inputElement("cutoff")).toBe(input);
+    expect(range.getAttribute("d")).not.toBe(path);
+    expect(binding.values).toEqual([]);
+    binding.state.parameters[0].modulationRange = undefined;
+    binding.emit();
+    expect(range.getAttribute("d")).toBe("");
+    expect(input.hasAttribute("aria-description")).toBe(false);
+    handle.destroy();
+  });
+
   it("exposes item, input and empty nodes through stable accessors", () => {
     const host = document.createElement("div");
     const binding = new FakeParameters();

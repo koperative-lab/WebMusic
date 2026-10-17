@@ -211,7 +211,7 @@ after the cursor emit, after each note commit and before arming the
 boundary timer, and a commit that lands on a frozen clock retires its record
 instead of throwing out of the tick callback.
 
-### 5.4 One session authority; separate clocks today
+### 5.4 One Session authority and borrowed scheduling anchors
 
 Score's scheduler clock is on the **nominal score-seconds** axis. `TimeMap` maps
 rational quarter positions to nominal seconds; playback rate maps those onto
@@ -222,17 +222,19 @@ alignment when the rate changes.
 
 The accepted architecture gives each music session one authority for transport
 commands and position. Multiple sessions may remain independent, including when
-they borrow one AudioContext. Current Bridge groups select a master reader and
-coordinate followers, but Score's scheduler and Audio's buffer engine still create
-private TransportClock instances. Clockless masters can use a mirror adapter.
-This is shared clock math and coordinated session authority, not completed
-same-instance injection.
+they borrow one AudioContext. Legacy Bridge groups select a master reader and
+coordinate followers. Standalone engines retain private clocks; modular native
+participants instead borrow a mapped `SessionSchedulingBinding` after preparation.
+It supplies authority identity, invalidation epoch, coherent anchors and future
+loop segments, without giving a participant the writable Session clock.
 
 [platform/shared-clock-injection.md](../../platform/shared-clock-injection.md)
-defines the missing writer/invalidation/rescheduling protocol. Injecting one object
-without retracting notes already scheduled against the old anchor would be unsafe.
-Group loops currently detect boundaries on ticks; they do not promise sample-accurate
-wrap. The source contracts and tests establish the implemented boundary.
+defines the implemented writer/invalidation/rescheduling protocol and its limits.
+Score retracts obsolete occurrences before consuming replacement anchors. Native
+lookahead schedules across loop segments; callback backends retain their timing
+capabilities, and long scheduling stalls can underrun. Legacy group loops still
+detect boundaries on ticks. Device latency and effect tails remain explicit
+backend concerns rather than consequences of a shared clock read.
 
 ### 5.5 Sound backends
 

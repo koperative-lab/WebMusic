@@ -11,6 +11,16 @@
 // ---- Score Player (THE playback engine: scheduling + transport surface) ----
 export type {PlaybackListenerError, PlaybackOperationError} from './playback-events';
 
+export {SCORE_NOTE_INPUT, NoteInputController, type NoteInputControllerOptions} from './note-input';
+export type {NoteInputOccurrence, NoteInputTarget} from '../core/note-input-model';
+
+export {
+  ParamLfoController, getParamLfoController,
+  ParameterMacroController, getParameterMacroController,
+  type ParamLfoConfig, type ParamLfoState,
+  type ParameterMacroTarget, type ParameterMacroConfig, type ParameterMacroState,
+} from './param-controls';
+
 export {
   ScorePlayer,
   createScorePlayer,
@@ -61,6 +71,7 @@ export {
   OscillatorSynth,
   SoundfontSynth,
   type HeadlessSynth,
+  type ScoreSchedulingCapabilities,
   type PreloadableHeadlessSynth,
   type SynthBackend,
   type SynthOwnership,
@@ -226,6 +237,10 @@ export {LoopPlayer, createLoopPlayer, type LoopPlayerOptions} from './loop-playe
 
 // ---- A/B player (live switching between named arrangements) ----
 export {AbPlayer, createAbPlayer, type AbPlayerOptions} from './ab-player';
+
+// ---- Modular composition over the same native engines and audio buses ----
+export {ScorePlayerModule, type ScorePlayerModuleOptions} from './score-module';
+export {ScoreRackModule, type ScoreRackModuleChannel} from './score-rack-module';
 
 // ---- Offline code-only rendering / encoding actions -----------------------
 export {

@@ -86,7 +86,7 @@ helps select commands; it does not define another execution chain.
 | `npm run build` | Build publishable packages in dependency order and record source/output receipts. |
 | `npm run build -w @webmusic/audio` | Build one package; choose the workspace affected by the change. |
 | `npm run check` | Complete local source, license, built-export and release-manifest gate. |
-| `npm run check:source` | Format, lockfile, dev-server startup tests, lint, architecture, docs, dev-docs, site notices, package builds, doc snippets, source/test typechecks and workspace tests. |
+| `npm run check:source` | Format, lockfile, dev-server startup tests, lint, architecture, docs, dev-docs, site notices, package builds, demo assets, doc snippets, source/test typechecks and workspace tests. |
 | `npm run check:format` | Check supported text files for LF, final newline, trailing whitespace and JSON validity. Includes tracked and non-ignored untracked files via `git ls-files -co --exclude-standard`; deleted files are skipped. |
 | `npm run check:lockfile` | Verify that declared optional dependencies have lockfile records, including other platforms' native packages. |
 | `npm run lint` | Run repository ESLint. |
@@ -100,6 +100,7 @@ helps select commands; it does not define another execution chain.
 | `npm test` | Run workspace test scripts, including kernel and documentation tests. |
 | `npm run check:licenses` | Check the dependency license/optional-peer policy. |
 | `npm run check:site-notices` | Test the main site notice collector; the site build separately verifies the actual bundled module inventory. |
+| `npm run check:demo-assets` | After package builds, test and verify the original public media, exact inventory, embedded licenses and independent hash pins. Included in source checks and both site build commands. No FFmpeg or network is required for verification. |
 | `npm run check:packages` | Validate built exports, source/output receipts and bundled third-party notices using the main checks, extended to this checkout's five packages. |
 | `npm run check:release-manifests` | Validate the shared version, cross-package ranges and publication metadata. |
 | `npm run dev` | Reuse the running site, or build packages and start it. |
@@ -108,7 +109,7 @@ helps select commands; it does not define another execution chain.
 | `npm run check:dev-server` | Test startup reuse, explicit restart, build failure, and concurrent starts. |
 | `npm run docs:dev -- status` | Inspect the documentation server without restarting it or rebuilding packages. |
 | `npm run docs:dev -- stop` | Stop this checkout's documentation server without rebuilding packages. |
-| `npm run docs:build` | Build packages and the documentation site. |
+| `npm run docs:build` | Build packages, verify demo assets and build the documentation site. |
 | `npm run pages:build` | Build the docs with the configured GitHub Pages site/base and validate the prefixed output; this command does not deploy it. |
 | `npm run audit:production` | Run the production dependency audit manually; it is outside `npm run check`. |
 | `npm run audit:dependencies` | Audit all dependencies, including development tools; CI runs this outside `npm run check`. |
@@ -213,7 +214,9 @@ of a remote run. Archived release automation is documented separately in
 - **Workspace install passes but consumer install fails:** use
   `npm run check:external-install -- --keep` to retain its temporary consumer
   for inspection. It installs all package tarballs together, avoiding local
-  directory links that can conceal export-map faults.
+  directory links that can conceal export-map faults. Runtime checks include
+  Kernel/UI entry identity and Audio loader-to-Bridge project composition in
+  both ESM and CommonJS, in addition to imports and strict declarations.
 
 Architecture decisions are broader than one policy file. Coordinate the
 accepted design, applicable policy tables, manifests, build configuration,

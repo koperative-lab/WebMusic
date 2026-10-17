@@ -42,7 +42,7 @@ import LiveDemoCanvas from './LiveDemoCanvas.astro';
 
   defineAudioViewElement();
   mountDemos('[data-wave-examples]', (root, scope) => {
-    const fixture = acquireAudioViewFixture(`${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`);
+    const fixture = acquireAudioViewFixture(`${import.meta.env.BASE_URL}wav/webmusic-study-no-1.wav`);
     const views = [...root.querySelectorAll<AudioViewElement>('audio-view')];
     const status = root.querySelector<HTMLElement>('[data-wave-status]')!;
     scope.add(() => fixture.release());

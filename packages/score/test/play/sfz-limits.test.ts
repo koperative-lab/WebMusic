@@ -24,6 +24,7 @@ function playableContext() {
     value: 1,
     setValueAtTime: vi.fn(),
     exponentialRampToValueAtTime: vi.fn(),
+    linearRampToValueAtTime: vi.fn(),
     cancelScheduledValues: vi.fn(),
   });
   const sources: Array<{stop: ReturnType<typeof vi.fn>}> = [];

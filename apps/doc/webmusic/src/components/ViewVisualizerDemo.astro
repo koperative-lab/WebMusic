@@ -22,9 +22,9 @@ const { demo = 'piano-roll' } = Astro.props;
 
 <script>
   import { renderPianoRollVisualizer, renderStaffVisualizer, renderWaterfallVisualizer } from '@webmusic/score/view/render';
-  import { arabesqueExcerpt, loadArabesqueScore } from './headless/arabesque-score';
+  import { studyExcerpt, loadStudyScore } from './headless/study-score';
 
-  const demoScore = loadArabesqueScore('mxl').then((score) => arabesqueExcerpt(score, 16));
+  const demoScore = loadStudyScore('mxl').then((score) => studyExcerpt(score, 16));
 
   const renderDemo = async (root: HTMLElement) => {
     if (root.dataset.initialized) return;
@@ -36,7 +36,7 @@ const { demo = 'piano-roll' } = Astro.props;
     try {
       score = await demoScore;
     } catch {
-      surface.textContent = 'Could not load the Arabesque score.';
+      surface.textContent = 'Could not load the WebMusic Study score.';
       return;
     }
     if (!root.isConnected) return;

@@ -37,12 +37,12 @@ The code-only APIs below let you maintain view state or build your own renderer;
 
 ## Prepare a score
 
-Score layout APIs work from a `Score`; current-pitch projections below instead accept MIDI values. The live view demos use an opening excerpt of the same Arabesque No. 1 MXL file used by the Score view elements.
+Score layout APIs work from a `Score`; current-pitch projections below instead accept MIDI values. The live view demos use an opening excerpt of the same WebMusic Study No. 1 MXL file used by the Score view elements.
 
 ```ts
 import {loadScoreFromUrl} from '@webmusic/score/io';
 
-const score = await loadScoreFromUrl('/mxl/Arabesque%20No.1.mxl');
+const score = await loadScoreFromUrl('/mxl/webmusic-study-no-1.mxl');
 ```
 
 ## Create a code-only score view

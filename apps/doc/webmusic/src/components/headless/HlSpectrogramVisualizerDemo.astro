@@ -6,8 +6,8 @@
 // (@webmusic/audio/view/render) into a .wui-surface.
 import LiveDemoCanvas from '../LiveDemoCanvas.astro';
 
-const SRC = `${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`;
-// Analyze only the leading slice — a full 320s STFT would be far too heavy.
+const SRC = `${import.meta.env.BASE_URL}wav/webmusic-study-no-1.wav`;
+// Analyze the leading five seconds to keep the interactive demo responsive.
 const ANALYZE_SECONDS = 5;
 ---
 
@@ -50,8 +50,7 @@ const ANALYZE_SECONDS = 5;
       return;
     }
 
-    // Slice the leading few seconds so the STFT stays responsive over the
-    // long (~320s) sample.
+    // Bound the leading slice by the actual clip length.
     const seconds = Number(root.dataset.seconds) || 5;
     const slice = channel.subarray(0, Math.min(channel.length, Math.floor(seconds * clip.sampleRate)));
 

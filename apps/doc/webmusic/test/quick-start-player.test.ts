@@ -3,6 +3,8 @@ import {readFileSync} from 'node:fs';
 import {dirname, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
+import {parseMusicXML, serializeMXL} from '@webmusic/score/io';
+import {largeScoreStudyXml} from '../../../../packages/score/test/notation-study-fixture';
 import {defineScorePlayerElement, type ScorePlayerElement} from '@webmusic/score/play/element';
 import {definePitchViewElement, defineScoreViewElement, type ScoreViewElement} from '@webmusic/score/view/element';
 import {mountQuickStartStatus} from '../src/components/quick-start-player-client';
@@ -11,7 +13,7 @@ defineScorePlayerElement();
 defineScoreViewElement();
 definePitchViewElement();
 
-const fixture = new Uint8Array(readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../public/mxl/Arabesque No.1.mxl')));
+const fixture = new Uint8Array(readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../public/mxl/webmusic-study-no-1.mxl')));
 const cleanups: Array<() => void> = [];
 
 function mount() {
@@ -48,11 +50,14 @@ afterEach(() => {
 });
 
 describe('Quick Start with native public elements', () => {
-  it('shows a failed file load and recovers when its source is replaced', async () => {
+  it.each([
+    {name: 'the bundled original study', bytes: fixture, minimumNotes: 300, minimumSeconds: 30},
+    {name: 'an original large score study', bytes: serializeMXL(parseMusicXML(largeScoreStudyXml())), minimumNotes: 1000, minimumSeconds: 100},
+  ])('shows a failed file load and recovers with $name', async ({bytes, minimumNotes, minimumSeconds}) => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     const fetch = vi.fn()
       .mockResolvedValueOnce(new Response('Missing', {status: 404, statusText: 'Not Found'}))
-      .mockResolvedValueOnce(new Response(fixture));
+      .mockResolvedValueOnce(new Response(new Uint8Array(bytes).buffer));
     vi.stubGlobal('fetch', fetch);
     const {player, status} = mount();
     player.setAttribute('src', '/missing.musicxml');
@@ -61,13 +66,13 @@ describe('Quick Start with native public elements', () => {
     await vi.waitFor(() => expect(status.textContent).toContain('404 Not Found'));
     expect(status.hidden).toBe(false);
 
-    player.setAttribute('src', '/arabesque.mxl');
+    player.setAttribute('src', '/webmusic-study-no-1.mxl');
     await vi.waitFor(() => expect(player.playback.snapshot().readiness).toBe('ready'));
     expect(status.hidden).toBe(true);
     expect(status.textContent).toBe('');
     const score = player.playback.snapshot().score!;
-    expect([...score.allNotes()].length).toBeGreaterThan(1000);
-    expect(score.durationSeconds).toBeGreaterThan(100);
+    expect([...score.allNotes()].length).toBeGreaterThan(minimumNotes);
+    expect(score.durationSeconds).toBeGreaterThan(minimumSeconds);
     const view = document.querySelector<ScoreViewElement>('score-view')!;
     await vi.waitFor(() => expect(view.score).toBe(score));
     await vi.waitFor(() => expect(view.querySelector('svg')).not.toBeNull());
@@ -84,7 +89,7 @@ describe('Quick Start with native public elements', () => {
   it('keeps playback errors visible across position updates and detaches cleanly', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(fixture)));
     const {player, status, detach} = mount();
-    player.setAttribute('src', '/arabesque.mxl');
+    player.setAttribute('src', '/webmusic-study-no-1.mxl');
     await vi.waitFor(() => expect(player.playback.snapshot().readiness).toBe('ready'));
     player.dispatchEvent(new CustomEvent('webscore:error', {detail: {error: new Error('Audio unavailable')}}));
     await player.seekNominal(2.4);

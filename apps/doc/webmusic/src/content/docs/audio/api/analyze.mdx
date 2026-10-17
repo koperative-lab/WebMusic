@@ -51,7 +51,7 @@ Every analyzer takes decoded samples and returns plain data. The single-channel 
 ```ts
 import {loadClipFromUrl} from '@webmusic/audio/play';
 
-const clip = await loadClipFromUrl('/wav/Arabesque%20No.1.wav');
+const clip = await loadClipFromUrl('/wav/webmusic-study-no-1.wav');
 const channels = clip.channels()!;        // Float32Array[] — null for a streaming-only clip
 const mono = clip.channelData(0)!;        // Float32Array of the first channel
 ```

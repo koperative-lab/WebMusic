@@ -106,6 +106,32 @@ transport.destroy();
 rack.dispose();
 ```
 
+## Source-free module bus
+
+`channelInserts(id)` exposes the admitted channel's `InsertChain` after its
+fader and before the master bus. Source inserts remain source-owned; master
+inserts process the sum. The desk owns each channel chain and disposes it when
+that channel detaches. An unknown or unprepared channel returns undefined.
+
+`ScoreRackModule(upstreamContext, {id?, effect?, onError?})` is the opt-in bus
+adapter; the existing `Rack` API below keeps its Score-member and transport-axis
+contracts. The module exposes a derived `.context` for children, `.inserts`,
+`getPort('master' | 'main' | 'output')`, explicit `prepare()`, `subscribe` and
+`dispose()`. It passes through the upstream Session and never registers its
+members a second time.
+
+`admit(module, port)` borrows a same-context Score or Audio output and returns a
+routing `ConnectionLease`. `list()` reports channels; `setVolume(id, value)`,
+`mute(id, flag)`, `solo(id, flag)` and `setMasterVolume(value)` control channel/
+master gains. `setEffect(recipe)` changes only the master compatibility slot.
+Disposal releases the bus and admissions, never borrowed engines. A nested bus
+is one upstream channel. See [modular composition](/bridge/modular-composition/).
+Admission rejects an ID claimed during readiness callbacks and retires only the
+uncommitted candidate. Initial preparation also rejects an upstream admission
+revoked before commit. A child bus that was already prepared retains its own
+lifetime when its parent later releases the borrowed admission.
+
+
 <details class="component-section">
 <summary>API</summary>
 

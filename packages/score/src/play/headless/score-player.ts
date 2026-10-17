@@ -5,6 +5,9 @@
 // ============================================================================
 
 import type {TransportClockReader} from '@webmusic/kernel/transport';
+import {InsertChain} from '@webmusic/kernel/effect';
+import {AudioOutputPort, type ConnectionLease} from '@webmusic/kernel/module';
+import type {SessionSchedulingBinding} from '@webmusic/kernel/session';
 import {
   EventEmitter,
   expandRepeats,
@@ -17,7 +20,7 @@ import {
 // Type-only import keeps file parsers out of the engine's static dependency
 // graph; URL loading remains lazy.
 import type {ScoreFormat as ImportedScoreFormat} from '../../io/load';
-import {insertEffect, resolveEffect} from './effects';
+import {resolveEffect, type Effect} from './effects';
 import {emitPlaybackEvent, emitPlaybackOperationError} from './playback-events';
 import type {
   HeadlessSynth,
@@ -30,6 +33,8 @@ import {locateSecondsCompat, resolveAudioGraphContext} from './audio-utils';
 import {OscillatorSynth} from './oscillator-synth';
 import {ScorePlayerScheduler} from './score-player-scheduler';
 import {PlaybackPublisher} from './playback-source';
+import {LiveNotes} from './internal/live-notes';
+import type {NoteInputOccurrence} from '../core/note-input-model';
 
 export function createScorePlayer(score: Score, options: ScorePlayerOptions = {}): ScorePlayer {
   return new ScorePlayer(score, options);
@@ -100,11 +105,16 @@ export class ScorePlayer {
   private synthRouteCleanup?: () => void;
   private preloadPromise?: Promise<void>;
   private effectDispose?: () => void;
+  private insertChain?: InsertChain;
+  private effectValue?: Effect;
+  private audioPort?: AudioOutputPort;
+  private outputMuted = false;
   private disposed = false;
   private graphBuildSerial = 0;
   private activeGraphBuild?: number;
   private playbackState: ScorePlaybackState = 'stopped';
   private readonly activeNotes = new Map<number, ScorePlaybackNote>();
+  private readonly liveNotes = new LiveNotes(() => this.ensureAudio());
   private readonly playbackPublisher = new PlaybackPublisher(
     () => {
       const nominalSeconds = this.scheduler.nominalSeconds;
@@ -139,7 +149,8 @@ export class ScorePlayer {
 
   constructor(score: Score, options: ScorePlayerOptions = {}) {
     this.score = options.expandRepeats ? expandRepeats(score) : score;
-    this.options = options;
+    this.options = {...options};
+    this.effectValue = resolveEffect(options.effect, options.reverb);
     this.scheduler = new ScorePlayerScheduler(
       this.score,
       {
@@ -151,6 +162,8 @@ export class ScorePlayer {
         getContext: () => this._context,
         getSynth: () => this.synth,
         onCursor: ({nominalSeconds, seconds: transportSeconds, duration: transportDurationSeconds, progress}) => {
+          if (this.scheduler.isPlaying) this.playbackState = 'playing';
+          else if (this.playbackState === 'playing') this.playbackState = 'paused';
           const revision = this.scheduler.revision;
           this.playbackPublisher.notify();
           if (revision !== this.scheduler.revision) return;
@@ -200,9 +213,81 @@ export class ScorePlayer {
     if (options.tempo) this.scheduler.setTempo(options.tempo);
   }
 
+  /** Borrow one read-only Session anchor. Preload before attaching; release detaches only this player. */
+  attachScheduling(binding: SessionSchedulingBinding): ConnectionLease {
+    if (this.disposed) throw new Error('ScorePlayer has been disposed.');
+    const lease = this.scheduler.attachScheduling(binding);
+    if (!this.scheduler.isPlaying && this.playbackState !== 'ended') this.playbackState = 'paused';
+    this.playbackPublisher.notify();
+    return lease;
+  }
+
+  get followsSession(): boolean { return this.scheduler.followsSession; }
+
+  /** Honest native/callback precision; public note events remain callback observations. */
+  get schedulingCapabilities() { return this.scheduler.schedulingCapabilities; }
+
   /** Lazily created Web Audio context. */
   get context(): AudioContext {
     return this.ensureAudio().context;
+  }
+
+  /** Observe the prepared environment without allocating or resuming audio. */
+  get preparedContext(): AudioContext | undefined {
+    return this._context;
+  }
+
+  /** Actual backend parameters; absent when the synth has no such capability. */
+  get params() { return this.synth?.params ?? this.options.synth?.params; }
+
+  /** Start one held live occurrence without moving or starting the score transport. */
+  noteOnOccurrence(note: NoteInputOccurrence): void { this.liveNotes.noteOn(note); }
+
+  /** Release only this live occurrence; another input's same-pitch note is independent. */
+  noteOffOccurrence(id: string): void { this.liveNotes.noteOff(id); }
+
+  /** Live local inserts, available after explicit preparation or playback. */
+  get inserts(): InsertChain | undefined {
+    return this.insertChain;
+  }
+
+  /** Stable controlled output; observation never prepares the audio graph. */
+  get audioOutput(): AudioOutputPort | undefined {
+    return this.audioPort;
+  }
+
+  /** Inject a borrowed environment before preparation, without creating audio. */
+  configureAudio(context: AudioContext, destination?: AudioNode): void {
+    if (this.disposed) throw new Error('ScorePlayer has been disposed.');
+    if (this.activeGraphBuild !== undefined) throw new Error('Audio configuration cannot change during graph construction.');
+    if (destination && destination.context !== context) throw new Error('Destination must use the same AudioContext.');
+    if (this._context && this._context !== context) throw new Error('A prepared player cannot migrate between AudioContexts.');
+    if (this.options.audioContext && this.options.audioContext !== context) throw new Error('The player already declares another AudioContext.');
+    this.options.audioContext = context;
+    if (destination) this.setDestination(destination);
+  }
+
+  /** Switch one default output path; null leaves the prepared player unrouted. */
+  setDestination(destination: AudioNode | null): void {
+    if (this.disposed) throw new Error('ScorePlayer has been disposed.');
+    if (this.activeGraphBuild !== undefined) throw new Error('Routing cannot change during graph construction.');
+    if (this._context && destination && destination.context !== this._context) throw new Error('Destination must use the same AudioContext.');
+    if (this.audioPort) this.audioPort.setDefault(destination ?? undefined);
+    this.outputMuted = destination === null;
+    this.options.destination = destination ?? undefined;
+  }
+
+  get effect(): Effect | undefined {
+    return this.effectValue;
+  }
+
+  /** Replace only the post-pan compatibility slot; retain playback and ports. */
+  setEffect(effect: Effect | undefined): void {
+    if (this.disposed) throw new Error('ScorePlayer has been disposed.');
+    if (this.activeGraphBuild !== undefined) throw new Error('Effects cannot change during audio graph construction.');
+    if (effect === this.effectValue) return;
+    this.insertChain?.setCompatibility(effect);
+    this.effectValue = effect;
   }
 
   /** Master output volume (linear 0..1+). Applies live. */
@@ -395,6 +480,7 @@ export class ScorePlayer {
     if (this.disposed) return;
     this.disposed = true;
     this.playbackState = 'stopped';
+    this.tryCleanup('live note input', () => this.liveNotes.dispose());
     this.scheduler.dispose();
     this.activeNotes.clear();
     this.playbackPublisher.notify();
@@ -410,6 +496,8 @@ export class ScorePlayer {
     // a voice into this player afterward.
     this.synthRouteCleanup = undefined;
     this.effectDispose = undefined;
+    this.insertChain = undefined;
+    this.audioPort = undefined;
     this.ownsContext = false;
     this._context = undefined;
     this.output = undefined;
@@ -470,6 +558,8 @@ export class ScorePlayer {
     let synth: HeadlessSynth | undefined;
     let synthRouteCleanup: (() => void) | undefined;
     let effectDispose: (() => void) | undefined;
+    let inserts: InsertChain | undefined;
+    let port: AudioOutputPort | undefined;
     try {
       const resolved = resolveAudioGraphContext(
         this.options.audioContext,
@@ -487,8 +577,21 @@ export class ScorePlayer {
       panner.pan.value = this.panValue;
       output.connect(panner);
       this.assertGraphBuildCurrent(build);
-      const effect = resolveEffect(this.options.effect, this.options.reverb);
-      effectDispose = insertEffect(context, panner, destination, effect).dispose;
+      inserts = new InsertChain(context, {
+        onCleanupError: (error) => this.reportOperationError('effect cleanup', error),
+      });
+      inserts.setCompatibility(this.effectValue);
+      const preparedInserts = inserts;
+      const preparedPanner = panner;
+      effectDispose = () => {
+        let failure: unknown;
+        try { preparedPanner.disconnect(preparedInserts.input); } catch (error) { failure = error; }
+        try { port?.dispose(); } catch (error) { failure ??= error; }
+        try { preparedInserts.dispose(); } catch (error) { failure ??= error; }
+        if (failure !== undefined) throw failure;
+      };
+      panner.connect(inserts.input);
+      port = new AudioOutputPort(inserts.output, {defaultDestination: this.outputMuted ? undefined : destination});
       this.assertGraphBuildCurrent(build);
       synth = suppliedSynth ?? new OscillatorSynth(context);
       const route = synth.connect?.(output);
@@ -504,6 +607,8 @@ export class ScorePlayer {
       this.synthOwnership = synthOwnership;
       this.synthRouteCleanup = synthRouteCleanup;
       this.effectDispose = effectDispose;
+      this.insertChain = inserts;
+      this.audioPort = port;
       this._context = context;
       this.output = output;
       this.panner = panner;
@@ -522,6 +627,7 @@ export class ScorePlayer {
         }
       }
       if (effectDispose) this.tryCleanup('failed effect.dispose', effectDispose);
+      else if (inserts) this.tryCleanup('failed inserts.dispose', () => inserts!.dispose());
       if (panner) this.tryCleanup('failed panner.disconnect', () => panner!.disconnect());
       if (output) this.tryCleanup('failed output.disconnect', () => output!.disconnect());
       if (ownsContext && context) this.closeContext(context, 'failed context.close');

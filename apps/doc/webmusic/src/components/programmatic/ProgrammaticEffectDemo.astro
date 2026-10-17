@@ -17,10 +17,10 @@ import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
 <script>
   import {mountProgrammaticDemo, programmaticCode} from './programmatic-demo-lifecycle';
   import { Effect, ScorePlayer, Sound } from '@webmusic/score/play/headless';
-  import {arabesqueExcerpt, loadArabesqueScore} from '../headless/arabesque-score';
+  import {studyExcerpt, loadStudyScore} from '../headless/study-score';
 
   mountProgrammaticDemo('[data-programmatic-effect]', async (root, scope) => {
-    const score = arabesqueExcerpt(await loadArabesqueScore());
+    const score = studyExcerpt(await loadStudyScore());
     if (!scope.active) return;
     const btn = root.querySelector('[data-play]') as HTMLButtonElement;
     const select = root.querySelector('[data-effect]') as HTMLSelectElement;

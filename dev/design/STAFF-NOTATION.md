@@ -211,11 +211,17 @@ independent fixtures and tests its own implemented behavior.
 ## PDF comparison
 
 On 2026-09-11, all ten pages of the maintainer-supplied `demo.pdf` were inspected
-against the repository's [107-measure compressed MusicXML demo](../../apps/doc/webmusic/public/mxl/Arabesque%20No.1.mxl)
+against the then-bundled 107-measure Arabesque compressed MusicXML demo
 and the model/import/render paths. The PDF was exported by MuseScore Studio
 4.7.4; the XML identifies MuseScore 3.5.2 and a 2020 encoding date. Its explicit
 page breaks at measures 21, 43, 69 and 91 differ from the PDF's reflow. This
 comparison verifies which notation is present, not pixel or page-layout parity.
+
+That resource was removed on 2026-10-16 because redistribution rights for its
+exact bytes were unverified. The comparison below remains historical evidence.
+Current regression coverage uses the independently authored
+[notation study fixture](../../packages/score/test/notation-study-fixture.ts);
+the public demo uses the original [WebMusic study](../../apps/doc/webmusic/ASSETS.md).
 
 | Present in the PDF | Source and implementation finding | Acceptance boundary |
 |---|---|---|

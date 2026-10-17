@@ -12,6 +12,7 @@ export type UiPresenterName =
   | 'minimap'
   | 'playlist'
   | 'parameter'
+  | 'patch-editor'
   | 'macro'
   | 'panel'
   | 'envelope'
@@ -126,6 +127,21 @@ export const UI_PRESENTER_CLASSES: readonly UiPresenterClass[] = [
 
 /** Shared presenter catalog with the Score and Audio Element consumers in this checkout. */
 export const UI_PRESENTER_CATALOG: readonly UiPresenterEntry[] = [
+  {
+    presenter: 'patch-editor',
+    classSlug: 'parameters-gestures',
+    label: 'Patch editor',
+    summary: 'Accessible module ports, connection commands and layout over caller-owned graph state.',
+    api: `import {mountPatchEditor} from '@webmusic/ui/patch-editor';
+
+const handle = mountPatchEditor(host, binding);`,
+    consumerTags: [],
+    hint: 'Choose an output and an input, then connect them. The connection list also supports disconnecting; focus a module heading and use arrow keys to move it.',
+    options: [
+      {name: 'label', kind: 'text', fallback: 'Patch editor', placeholder: 'Session connections', note: 'Accessible name of the editor group.', inert: 'The name is exposed through aria-label.'},
+      {name: 'stylesheet', kind: 'boolean', fallback: 'on', note: 'Install the exported presenter stylesheet into this host.'},
+    ],
+  },
   {
     presenter: 'level-analyzer',
     classSlug: 'views-analysis',

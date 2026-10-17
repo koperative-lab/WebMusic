@@ -1,0 +1,172 @@
+---
+title: '@webmusic/ui/patch-editor'
+description: 'Edit module connections and layout through an accessible structural presenter while the application owns the graph.'
+sidebar:
+  label: 'patch-editor'
+  order: 6
+---
+
+import UiPresenterLiveDemo from '../../../../components/UiPresenterLiveDemo.astro';
+import UiPresenterRelated from '../../../../components/UiPresenterRelated.astro';
+
+`mountPatchEditor()` displays named modules, input/output ports, wires and a
+connection list. The same connect and disconnect commands work through the
+port buttons or a native select form. It borrows a structural binding; the
+application validates routes and owns audio, project storage and undo history.
+
+<UiPresenterLiveDemo presenter="patch-editor" />
+
+## Import
+
+```ts
+import {mountPatchEditor, type PatchEditorBinding} from '@webmusic/ui/patch-editor';
+
+const binding: PatchEditorBinding = {
+  snapshot: () => graph.snapshot(),
+  connect: (request) => graph.connect(request),
+  disconnect: (id) => graph.disconnect(id),
+  moveModule: (id, position) => graph.moveModule(id, position),
+  subscribe: (notify) => graph.subscribe(notify),
+};
+const handle = mountPatchEditor(host, binding, {label: 'Session connections'});
+// At teardown, remove this view. The graph keeps its application owner.
+handle.destroy();
+```
+
+Here `graph` is the application's structural adapter. For a working adapter over
+real Score and Audio modules, see [the project example](/bridge/modular-composition/#save-and-edit-a-project).
+
+## Interaction and ownership
+
+Choose an output then a compatible input, or choose **Source output**,
+**Destination input** and **Connection mode**, then press **Connect**. Audio
+outputs offer replace, send and tap unless their descriptor narrows the list;
+other signals default to connect. The presenter filters inputs by signal kind,
+but graph/context compatibility, cycles and ownership remain binding decisions.
+An empty `modes` list offers no connection commands for that output.
+
+Controls remain disabled until a command's returned promise settles;
+notifications and settlement re-read authoritative state. Failure keeps the
+previous state and selection, announces the error and invokes
+`onError`. Stable module, port and connection IDs preserve nodes and focus across
+ordinary updates; changing a label or moving a card does not redefine a route.
+Unresolved modules and routes retain their names and diagnostics.
+
+A command can commit even if the following snapshot read fails. In that case
+the presenter ends its busy state using the last valid view and reports both
+the command outcome and the refresh error through its status and `onError`.
+It does not claim that the displayed routes or positions are current. A later
+notification or explicit `handle.update()` retries the snapshot; the binding
+retains the already committed graph change.
+If an error callback starts a new command, the older command cannot clear the
+new selection or overwrite its busy state, status or focus. Original command
+errors still reach `onError`.
+
+Focus a module heading and use arrow keys to move it by 16 pixels, or Shift with
+an arrow for 64 pixels. Dragging the heading uses the same `moveModule` command.
+Without that optional command, the layout is read-only. Escape clears the port
+selection. The canvas scrolls inside its own labeled region on narrow screens;
+the connection list and native controls remain outside it.
+
+<details class="component-section">
+<summary>API</summary>
+
+`mountPatchEditor(host, binding, options?)` accepts an `HTMLElement` or open
+`ShadowRoot` and returns `PatchEditorHandle`. Importing the entry needs no DOM.
+
+**State and records**
+
+| Member | Kind | Contract |
+| --- | --- | --- |
+| `PatchEditorState.modules` | `readonly PatchEditorModule[]` | Ordered module records with unique stable IDs. |
+| `connections` | `readonly PatchEditorConnection[]` | Explicit/default/unresolved routes to display. |
+| `disabled?` | `boolean` | Disable connection and movement commands. |
+| `PatchEditorModule.id`, `label`, `ports` | `string`, `string`, `readonly PatchEditorPort[]` | Identity, human-readable name and declared ports. |
+| `position?` | `{x: number; y: number}` | Canvas coordinates in pixels; omitted positions use the presenter's grid. |
+| `status?`, `diagnostic?` | `'ready' \| 'unresolved'`, `string` | Missing modules remain visible with an explanation. |
+| `PatchEditorPort.id`, `label?` | `string`, `string` | Stable port ID and optional readable name. |
+| `direction`, `kind` | `'input' \| 'output'`, `string` | Direction and exact signal-kind compatibility. |
+| `modes?` | `readonly PatchEditorMode[]` | Offered output commands; default audio list is `replace`, `send`, `tap`, otherwise `connect`. |
+| `PatchEditorEndpoint` | `{moduleId: string; port: string}` | Stable routing identity, independent of labels/layout. |
+| `PatchEditorConnection.id`, `from`, `to` | `string`, endpoints | Connection identity and endpoints. |
+| `mode?` | `PatchEditorMode \| 'default'` | Display and route semantics. Default routes are always read-only. |
+| `status?`, `diagnostic?` | `'connected' \| 'unresolved' \| 'error'`, `string` | Route state and visible explanation. |
+| `editable?` | `boolean` | Defaults true for explicit routes; false suppresses disconnect. |
+
+`PatchEditorMode` is `'connect' | 'replace' | 'send' | 'tap'`.
+`PatchEditorPosition` is `{x: number; y: number}`. The presenter creates no
+implicit route merely because it displays two compatible ports.
+
+**Binding**
+
+| Member | Contract |
+| --- | --- |
+| `snapshot(): PatchEditorState` | Read current caller-owned state on mount, notification, update and command settlement. |
+| `connect(request: PatchEditorConnectRequest)` | Required command with `from`, `to`, `mode`; returns void or `Promise<void>`. |
+| `disconnect(id: string)` | Required command for a stable connection ID; returns void or `Promise<void>`. |
+| `moveModule?(id, position)` | Optional presentation-only command; must preserve routing and identity. |
+| `subscribe?(notify)` | Optional subscription; return its unsubscribe function. |
+
+**Options**
+
+| Member | Default | Contract |
+| --- | --- | --- |
+| `label` | `'Patch editor'` | Accessible name of the editor root. |
+| `classNames` | `{}` | `PatchEditorClassNames` adds classes to documented node kinds. |
+| `parts` | `{}` | `PatchEditorParts` adds tokens beside canonical parts. |
+| `stylesheet` | `true` | Install `patchEditorStyle`; false leaves styling to the host. |
+| `onError` | — | Receives handled snapshot, command and cleanup errors. Subscription acquisition failure cleans up the failed mount and throws. |
+
+**Handle**
+
+| Member | Contract |
+| --- | --- |
+| `element` | Presenter-owned root. |
+| `controls.source`, `destination`, `mode` | Native select elements. |
+| `controls.connect`, `cancel` | Connect and clear-selection buttons. |
+| `controls.viewport`, `status` | Scrollable canvas region and live status element. |
+| `moduleElement(id)` | Current card or undefined. |
+| `portElement(endpoint)` | Current native port button or undefined. |
+| `connectionElement(id)` | Current connection row or undefined. |
+| `update()` | Re-read the binding and repaint. |
+| `destroy()` | Idempotently remove owned DOM, listeners, observers and subscription; retain the graph. |
+
+**Accessibility.** Port buttons name their module, direction, signal and port.
+The form provides a keyboard equivalent for wiring; connection rows provide
+named disconnect actions. The module header is a native button for layout
+commands. SVG wires are decorative. Status is a polite, atomic live region;
+errors also remain visible in text. Re-mounting this presenter on the same host
+destroys its previous handle.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+`patchEditorStyle` uses the shared [surface, palette and focus tokens](/uikit/#theme-with-css-custom-properties).
+Install it yourself or supply equivalent CSS when passing `stylesheet: false`.
+Card coordinates are independent of the scrollable viewport's width; changing
+the viewport size does not mutate saved layout.
+
+| Token | Fallback | Role |
+| --- | --- | --- |
+| `--wm-patch-editor-height` | `25rem` | Canvas viewport height. |
+| `--wm-patch-editor-foreground` | `--wm-foreground`, `#222` | Main text. |
+| `--wm-patch-editor-canvas` | `--wm-surface-subtle`, `#f6f6f6` | Canvas background. |
+| `--wm-patch-editor-wire` | `--wm-accent`, `#555` | Explicit connection wires. |
+| `--wm-patch-editor-selected` | `--wm-accent`, `#486ce6` | Selected port. |
+| `--wm-patch-editor-module-background` | `--wm-surface`, `#fff` | Module card background. |
+| `--wm-patch-editor-module-radius` | `--wm-control-radius`, `0` | Module corners. |
+| `--wm-danger` | `#b42318` | Diagnostics and unresolved/error wires. |
+
+`classNames` and `parts` share keys `root`, `instructions`, `form`, `viewport`,
+`canvas`, `module`, `moduleHeader`, `port`, `wire`, `connections`, `connection`,
+`diagnostic` and `status`. Canonical part names use kebab-case (`module-header`);
+canonical classes use the `.wui-patch-editor__` prefix, with the additional
+`.wui-patch-editor` root class. Prefer handle methods and these hooks to private
+descendant selectors. Default-route wires are dashed; unresolved/error routes
+also retain textual diagnostics and do not depend on color alone.
+
+</details>
+
+<UiPresenterRelated presenter="patch-editor" />

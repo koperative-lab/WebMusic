@@ -22,6 +22,9 @@ import {
   type AudioMeterControllerOptions,
 } from '../headless/meter';
 import {WebMusicElement, numAttr, upgradeProperties} from './internal/base';
+import {isModularComposition} from '@webmusic/kernel/element';
+import type {ModuleHandle} from '@webmusic/kernel/module';
+import {bindModuleAudioInput} from '../../play/element/internal/module-input';
 
 /** Borrowed nonvisual player capability; monitoring never owns its transport. */
 export interface AudioMeterPlayer {
@@ -44,7 +47,7 @@ const TUNING_ATTRIBUTES: readonly string[] = [
 
 export class AudioMeterElement extends WebMusicElement {
   static get observedAttributes(): string[] {
-    return ['player', 'mode', 'bars', 'aria-label', ...TUNING_ATTRIBUTES];
+    return ['player', 'input', 'port', 'mode', 'bars', 'aria-label', ...TUNING_ATTRIBUTES];
   }
 
   protected root?: ShadowRoot;
@@ -62,11 +65,17 @@ export class AudioMeterElement extends WebMusicElement {
   private presenter?: MeterHandle;
   /** Created once and re-appended; a per-mount node would accumulate. */
   private compatibilityStyle?: HTMLStyleElement;
+  private assignedModule?: ModuleHandle | null;
+  get inputModule(): ModuleHandle | null | undefined { return this.assignedModule; }
+  set inputModule(value: ModuleHandle | null | undefined) {
+    this.assignedModule = value;
+    if (this.isConnected) this.bindPlayer();
+  }
 
   protected override onMount(): void {
     // Register rollback before lazy-property setters can rebuild resources.
     this.own(() => this.teardown());
-    upgradeProperties(this, ['context', 'analyser', 'player']);
+    upgradeProperties(this, ['context', 'analyser', 'player', 'inputModule']);
     if (!this.root) this.root = this.attachShadow({mode: 'open'});
     if (!this.meter) this.meter = this.buildController();
     this.mountCurrentUI();
@@ -76,7 +85,7 @@ export class AudioMeterElement extends WebMusicElement {
 
   attributeChangedCallback(name?: string): void {
     if (!this.isConnected) return;
-    if (name === 'player') {
+    if (name === 'player' || name === 'input' || name === 'port') {
       this.bindPlayer();
       return;
     }
@@ -308,9 +317,25 @@ export class AudioMeterElement extends WebMusicElement {
     }
   }
 
+  private usesModuleInput(): boolean {
+    return !this.explicitPlayer && (
+      this.assignedModule !== undefined || this.hasAttribute('input') ||
+      (!this.hasAttribute('player') && isModularComposition(this))
+    );
+  }
+
   private bindPlayer(): void {
     const revision = this.unbindPlayer();
     if (revision !== this.bindingRevision || !this.isConnected || this.contextRef || this.analyserRef) return;
+    if (this.usesModuleInput()) {
+      this.playerUnbind.push(bindModuleAudioInput(this, this.assignedModule, ({analyser, error}) => {
+        if (revision !== this.bindingRevision || !this.isConnected) return;
+        this.playerAnalyser = analyser;
+        try { this.rebuild(); } catch (failure) { this.onMeterError(failure); }
+        if (error) this.onMeterError(error);
+      }));
+      return;
+    }
     const target = this.explicitPlayer ? undefined : this.resolvePlayerTarget();
     if (revision !== this.bindingRevision) return;
     this.boundTarget = target;
@@ -382,7 +407,7 @@ export class AudioMeterElement extends WebMusicElement {
   private observePlayerTarget(): void {
     if (typeof MutationObserver === 'undefined') return;
     this.sourceObserver = new MutationObserver(() => {
-      if (this.explicitPlayer || this.contextRef || this.analyserRef) return;
+      if (this.explicitPlayer || this.contextRef || this.analyserRef || this.usesModuleInput()) return;
       if (this.resolvePlayerTarget() !== this.boundTarget) this.bindPlayer();
     });
     this.sourceObserver.observe(this.getRootNode(), {

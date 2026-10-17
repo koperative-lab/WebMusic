@@ -1,3 +1,6 @@
+import type {ParamSurface} from '@webmusic/kernel/module';
+import {createEnvelopeParameters, readEnvelopeParameters} from '../internal/envelope-parameters';
+import {VoiceEnvelope} from '../internal/voice-envelope';
 import type {HeadlessSynth} from '../audio-contracts';
 import {midiToFrequency} from '../audio-utils';
 import type {FmOptions, NoiseOptions, WavetableOptions} from './contracts';
@@ -6,147 +9,82 @@ interface ExactSynthesisVoice {
   midi: number;
   sources: AudioScheduledSourceNode[];
   envelope: GainNode;
+  contour: VoiceEnvelope;
   startTime: number;
-  logicalEndTime: number;
-  level: number;
-  attackSeconds: number;
-  releaseSeconds: number;
 }
 
-/** Exact per-attack ownership shared by the built-in synthesis backends. */
+/** Exact per-attack ownership, retaining release tails until all sources end. */
 class ExactSynthesisVoices {
   private readonly byId = new Map<number, ExactSynthesisVoice>();
-  private readonly byMidi = new Map<number, Set<number>>();
+  private readonly sources = new Set<ExactSynthesisVoice>();
   private nextId = 1;
-
   constructor(private readonly context: AudioContext) {}
 
   register(voice: ExactSynthesisVoice): number {
     const id = this.nextId++;
     this.byId.set(id, voice);
-    const ids = this.byMidi.get(voice.midi) ?? new Set<number>();
-    ids.add(id);
-    this.byMidi.set(voice.midi, ids);
+    this.sources.add(voice);
     let remaining = voice.sources.length;
-    for (const source of voice.sources) {
-      source.onended = () => {
-        remaining -= 1;
-        if (remaining === 0) this.forget(id, voice);
-      };
-    }
+    for (const source of voice.sources) source.onended = () => {
+      if (--remaining !== 0) return;
+      this.byId.delete(id);
+      this.sources.delete(voice);
+      for (const owned of voice.sources) owned.disconnect();
+      voice.envelope.disconnect();
+    };
     return id;
   }
 
   releaseMidi(midi: number, time: number): void {
-    this.releaseIds([...(this.byMidi.get(midi) ?? [])], time);
-  }
-
-  releaseById(handle: unknown, time: number): void {
-    const id = typeof handle === 'number' ? handle : undefined;
-    const voice = id == null ? undefined : this.byId.get(id);
-    if (id == null || !voice) return;
-    this.forget(id, voice);
-    this.releaseVoice(voice, time);
-  }
-
-  retime(handle: unknown, logicalEndTime: number): void {
-    const voice = typeof handle === 'number' ? this.byId.get(handle) : undefined;
-    if (!voice) return;
-    voice.logicalEndTime = logicalEndTime;
-    const now = this.context.currentTime;
-    const param = voice.envelope.gain;
-    try {
-      if (now <= voice.startTime) {
-        param.cancelScheduledValues(now);
-        param.setValueAtTime(0.0001, voice.startTime);
-        param.exponentialRampToValueAtTime(
-          voice.level,
-          voice.startTime + voice.attackSeconds,
-        );
-      } else if (typeof param.cancelAndHoldAtTime === 'function') {
-        param.cancelAndHoldAtTime(now);
-      } else {
-        param.cancelScheduledValues(now);
-        param.setValueAtTime(Math.max(param.value, 0.0001), now);
-      }
-      if (logicalEndTime <= now) {
-        param.exponentialRampToValueAtTime(0.0001, now + voice.releaseSeconds);
-      } else {
-        param.setTargetAtTime(
-          0.0001,
-          logicalEndTime,
-          Math.max(0.0001, voice.releaseSeconds / 3),
-        );
-      }
-    } catch {
-      // The hard source stop below remains the authoritative safety bound.
-    }
-    for (const source of voice.sources) {
-      try {
-        source.stop(Math.max(now, logicalEndTime) + voice.releaseSeconds);
-      } catch {
-        // An already-ended voice is already safe.
-      }
-    }
-  }
-
-  releaseAll(time = this.context.currentTime): void {
-    this.releaseIds([...this.byId.keys()], time);
-  }
-
-  private releaseIds(ids: readonly number[], time: number): void {
     let firstError: unknown;
-    for (const id of ids) {
-      try {
-        this.releaseById(id, time);
-      } catch (error) {
-        firstError ??= error;
-      }
+    for (const [id, voice] of [...this.byId]) {
+      if (voice.midi !== midi) continue;
+      try { this.releaseById(id, time); } catch (error) { firstError ??= error; }
     }
     if (firstError !== undefined) throw firstError;
   }
 
-  private forget(id: number, voice: ExactSynthesisVoice): void {
-    if (!this.byId.delete(id)) return;
-    const ids = this.byMidi.get(voice.midi);
-    ids?.delete(id);
-    if (ids?.size === 0) this.byMidi.delete(voice.midi);
+  releaseById(handle: unknown, time: number): void {
+    const voice = typeof handle === 'number' ? this.byId.get(handle) : undefined;
+    if (!voice) return;
+    this.byId.delete(handle as number);
+    const cancel = time <= voice.startTime;
+    try { this.releaseVoice(voice, time, cancel); } finally {
+      if (cancel) {
+        this.sources.delete(voice);
+        for (const source of voice.sources) source.disconnect();
+        voice.envelope.disconnect();
+      }
+    }
   }
 
-  private releaseVoice(voice: ExactSynthesisVoice, time: number): void {
-    const param = voice.envelope.gain;
-    if (time <= voice.startTime) {
-      try {
-        param.cancelScheduledValues(time);
-        param.setValueAtTime(0, time);
-      } finally {
-        for (const source of voice.sources) {
-          try {
-            source.stop(time);
-          } catch {
-            // An ended source is already silent.
-          }
-        }
-      }
-      return;
+  retime(handle: unknown, end: number): void {
+    const voice = typeof handle === 'number' ? this.byId.get(handle) : undefined;
+    if (!voice) return;
+    const stop = voice.contour.retime(end, this.context.currentTime);
+    if (stop !== undefined) for (const source of voice.sources) {
+      try { source.stop(stop); } catch { /* Already ended. */ }
     }
+  }
+
+  releaseAll(time = this.context.currentTime): void {
+    let firstError: unknown;
+    for (const voice of this.sources) {
+      try { this.releaseVoice(voice, time, true); } catch (error) { firstError ??= error; }
+    }
+    this.byId.clear();
+    this.sources.clear();
+    if (firstError !== undefined) throw firstError;
+  }
+
+  private releaseVoice(voice: ExactSynthesisVoice, time: number, cancel: boolean): void {
+    let stop = cancel ? time : time + voice.contour.settings.releaseSeconds;
     try {
-      if (typeof param.cancelAndHoldAtTime === 'function') {
-        param.cancelAndHoldAtTime(time);
-      } else {
-        param.cancelScheduledValues(time);
-        param.setValueAtTime(Math.max(param.value, 0.0001), time);
-      }
-      param.exponentialRampToValueAtTime(0.0001, time + voice.releaseSeconds);
+      if (cancel) voice.contour.cancel(time);
+      else stop = voice.contour.release(time);
     } finally {
       for (const source of voice.sources) {
-        try {
-          // A later stop() replaces the original hard end, while an earlier
-          // one reliably shortens pause/seek/stop and live note-off.
-          source.stop(time + voice.releaseSeconds);
-        } catch {
-          // An ended source is already silent.
-        }
+        try { source.stop(stop); } catch { /* Already ended. */ }
       }
     }
   }
@@ -155,14 +93,22 @@ class ExactSynthesisVoices {
 /** Two-operator FM: a modulator oscillator drives the carrier frequency. */
 export class FmBackend implements HeadlessSynth {
   readonly supportsScheduledCancellation = true;
+  readonly supportsScheduledDuration = true;
+  readonly supportsScheduledRetiming = true;
+  readonly supportsNoteOccurrences = true;
   private readonly output: GainNode;
   private readonly voices: ExactSynthesisVoices;
   private readonly options: Required<Pick<
     FmOptions,
-    'ratio' | 'index' | 'carrierType' | 'modulatorType' | 'attackSeconds' | 'releaseSeconds'
+    'ratio' | 'index' | 'carrierType' | 'modulatorType'
   >>;
 
-  constructor(private readonly context: AudioContext, options: FmOptions = {}) {
+  readonly params: ParamSurface;
+  private readonly ownsParams: boolean;
+
+  constructor(private readonly context: AudioContext, options: FmOptions = {}, sharedParams?: ParamSurface) {
+    this.params = sharedParams ?? createEnvelopeParameters(options, 0.005, 0.12);
+    this.ownsParams = !sharedParams;
     this.output = context.createGain();
     this.voices = new ExactSynthesisVoices(context);
     this.options = {
@@ -170,8 +116,6 @@ export class FmBackend implements HeadlessSynth {
       index: options.index ?? 200,
       carrierType: options.carrierType ?? 'sine',
       modulatorType: options.modulatorType ?? 'sine',
-      attackSeconds: options.attackSeconds ?? 0.005,
-      releaseSeconds: options.releaseSeconds ?? 0.12,
     };
   }
 
@@ -202,31 +146,22 @@ export class FmBackend implements HeadlessSynth {
     modulation.gain.value = this.options.index;
     modulator.connect(modulation).connect(carrier.frequency);
 
+    const settings = readEnvelopeParameters(this.params);
     const envelope = this.context.createGain();
-    const level = Math.max(0.0001, (velocity / 127) * 0.9);
-    envelope.gain.setValueAtTime(0.0001, time);
-    envelope.gain.exponentialRampToValueAtTime(level, time + this.options.attackSeconds);
-    envelope.gain.setTargetAtTime(
-      0.0001,
-      time + durationSeconds,
-      this.options.releaseSeconds / 3,
-    );
+    const level = Math.max(0, (velocity / 127) * 0.9);
+    const contour = new VoiceEnvelope(envelope.gain, time, level, settings, durationSeconds);
     carrier.connect(envelope).connect(this.output);
 
-    const stopAt = time + durationSeconds + this.options.releaseSeconds;
+    const stopAt = time + durationSeconds + settings.releaseSeconds;
     carrier.start(time);
     modulator.start(time);
-    carrier.stop(stopAt);
-    modulator.stop(stopAt);
+    if (Number.isFinite(stopAt)) { carrier.stop(stopAt); modulator.stop(stopAt); }
     return this.voices.register({
       midi,
       sources: [carrier, modulator],
       envelope,
       startTime: time,
-      logicalEndTime: time + durationSeconds,
-      level,
-      attackSeconds: this.options.attackSeconds,
-      releaseSeconds: this.options.releaseSeconds,
+      contour,
     });
   }
 
@@ -247,27 +182,32 @@ export class FmBackend implements HeadlessSynth {
   }
 
   dispose(): void {
-    disposeSynthesisBackend(this.voices, () => this.disconnect());
+    try { disposeSynthesisBackend(this.voices, () => this.disconnect()); } finally {
+      if (this.ownsParams) for (const handle of this.params) handle.dispose();
+    }
   }
 }
 
 /** Wavetable oscillator backed by a PeriodicWave. */
 export class WavetableBackend implements HeadlessSynth {
   readonly supportsScheduledCancellation = true;
+  readonly supportsScheduledDuration = true;
+  readonly supportsScheduledRetiming = true;
+  readonly supportsNoteOccurrences = true;
   private readonly output: GainNode;
   private readonly voices: ExactSynthesisVoices;
   private readonly wave: PeriodicWave;
-  private readonly attackSeconds: number;
-  private readonly releaseSeconds: number;
+  readonly params: ParamSurface;
+  private readonly ownsParams: boolean;
 
-  constructor(private readonly context: AudioContext, options: WavetableOptions = {}) {
+  constructor(private readonly context: AudioContext, options: WavetableOptions = {}, sharedParams?: ParamSurface) {
     this.output = context.createGain();
     this.voices = new ExactSynthesisVoices(context);
     const real = Float32Array.from(options.real ?? [0, 1, 0.5, 0.25, 0.12]);
     const imag = Float32Array.from(options.imag ?? new Array(real.length).fill(0));
     this.wave = context.createPeriodicWave(real, imag);
-    this.attackSeconds = options.attackSeconds ?? 0.008;
-    this.releaseSeconds = options.releaseSeconds ?? 0.1;
+    this.params = sharedParams ?? createEnvelopeParameters(options, 0.008, 0.1);
+    this.ownsParams = !sharedParams;
   }
 
   connect(destination: AudioNode): () => void {
@@ -289,23 +229,19 @@ export class WavetableBackend implements HeadlessSynth {
     const oscillator = this.context.createOscillator();
     oscillator.setPeriodicWave(this.wave);
     oscillator.frequency.value = midiToFrequency(midi);
+    const settings = readEnvelopeParameters(this.params);
     const envelope = this.context.createGain();
-    const level = Math.max(0.0001, (velocity / 127) * 0.22);
-    envelope.gain.setValueAtTime(0.0001, time);
-    envelope.gain.exponentialRampToValueAtTime(level, time + this.attackSeconds);
-    envelope.gain.setTargetAtTime(0.0001, time + durationSeconds, this.releaseSeconds / 3);
+    const level = Math.max(0, (velocity / 127) * 0.22);
+    const contour = new VoiceEnvelope(envelope.gain, time, level, settings, durationSeconds);
     oscillator.connect(envelope).connect(this.output);
     oscillator.start(time);
-    oscillator.stop(time + durationSeconds + this.releaseSeconds);
+    if (Number.isFinite(durationSeconds)) oscillator.stop(time + durationSeconds + settings.releaseSeconds);
     return this.voices.register({
       midi,
       sources: [oscillator],
       envelope,
       startTime: time,
-      logicalEndTime: time + durationSeconds,
-      level,
-      attackSeconds: this.attackSeconds,
-      releaseSeconds: this.releaseSeconds,
+      contour,
     });
   }
 
@@ -326,28 +262,33 @@ export class WavetableBackend implements HeadlessSynth {
   }
 
   dispose(): void {
-    disposeSynthesisBackend(this.voices, () => this.disconnect());
+    try { disposeSynthesisBackend(this.voices, () => this.disconnect()); } finally {
+      if (this.ownsParams) for (const handle of this.params) handle.dispose();
+    }
   }
 }
 
 /** Filtered white noise for percussion, wind and effects. */
 export class NoiseBackend implements HeadlessSynth {
   readonly supportsScheduledCancellation = true;
+  readonly supportsScheduledDuration = true;
+  readonly supportsScheduledRetiming = true;
+  readonly supportsNoteOccurrences = true;
   private readonly output: GainNode;
   private readonly voices: ExactSynthesisVoices;
   private readonly buffer: AudioBuffer;
   private readonly pitched: boolean;
   private readonly q: number;
-  private readonly attackSeconds: number;
-  private readonly releaseSeconds: number;
+  readonly params: ParamSurface;
+  private readonly ownsParams: boolean;
 
-  constructor(private readonly context: AudioContext, options: NoiseOptions = {}) {
+  constructor(private readonly context: AudioContext, options: NoiseOptions = {}, sharedParams?: ParamSurface) {
     this.output = context.createGain();
     this.voices = new ExactSynthesisVoices(context);
     this.pitched = options.pitched ?? true;
     this.q = options.Q ?? 8;
-    this.attackSeconds = options.attackSeconds ?? 0.001;
-    this.releaseSeconds = options.releaseSeconds ?? 0.12;
+    this.params = sharedParams ?? createEnvelopeParameters(options, 0.001, 0.12);
+    this.ownsParams = !sharedParams;
     const frames = Math.max(1, Math.floor(context.sampleRate));
     this.buffer = context.createBuffer(1, frames, context.sampleRate);
     const data = this.buffer.getChannelData(0);
@@ -375,12 +316,10 @@ export class NoiseBackend implements HeadlessSynth {
     const source = this.context.createBufferSource();
     source.buffer = this.buffer;
     source.loop = true;
+    const settings = readEnvelopeParameters(this.params);
     const envelope = this.context.createGain();
-    const level = Math.max(0.0001, (velocity / 127) * 0.5);
-    envelope.gain.setValueAtTime(0.0001, time);
-    envelope.gain.exponentialRampToValueAtTime(level, time + this.attackSeconds);
-    envelope.gain.setTargetAtTime(0.0001, time + durationSeconds, this.releaseSeconds / 3);
-
+    const level = Math.max(0, (velocity / 127) * 0.5);
+    const contour = new VoiceEnvelope(envelope.gain, time, level, settings, durationSeconds);
     let tail: AudioNode = source;
     if (this.pitched) {
       const band = this.context.createBiquadFilter();
@@ -392,16 +331,13 @@ export class NoiseBackend implements HeadlessSynth {
     }
     tail.connect(envelope).connect(this.output);
     source.start(time);
-    source.stop(time + durationSeconds + this.releaseSeconds);
+    if (Number.isFinite(durationSeconds)) source.stop(time + durationSeconds + settings.releaseSeconds);
     return this.voices.register({
       midi,
       sources: [source],
       envelope,
       startTime: time,
-      logicalEndTime: time + durationSeconds,
-      level,
-      attackSeconds: this.attackSeconds,
-      releaseSeconds: this.releaseSeconds,
+      contour,
     });
   }
 
@@ -422,7 +358,9 @@ export class NoiseBackend implements HeadlessSynth {
   }
 
   dispose(): void {
-    disposeSynthesisBackend(this.voices, () => this.disconnect());
+    try { disposeSynthesisBackend(this.voices, () => this.disconnect()); } finally {
+      if (this.ownsParams) for (const handle of this.params) handle.dispose();
+    }
   }
 }
 

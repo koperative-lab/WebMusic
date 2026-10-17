@@ -10,17 +10,27 @@
 // ============================================================================
 
 import {EventEmitter, type AudioClip, type Region} from '../../core';
-import {insertEffect, type Effect} from '../core/effect';
-import {BufferEngine, normalizeLoopOption, type PlaybackEngine} from './engines/buffer-engine';
+import type {Effect} from '../core/effect';
+import {InsertChain} from '@webmusic/kernel/effect';
+import {
+  BufferEngine, normalizeLoopOption, BUFFER_TIMING_CAPABILITIES, MEDIA_TIMING_CAPABILITIES,
+  type PlaybackEngine, type PlaybackTimingCapabilities, type PlaybackSchedulingMode,
+} from './engines/buffer-engine';
 import {MediaEngine, type MediaPlaybackAdapterFactory} from './engines/media-engine';
 import {ScratchEngine} from './engines/scratch-engine';
 import {createWebAudioContext} from '@webmusic/kernel/audio-context';
 import type {TransportClockReader} from '@webmusic/kernel/transport';
+import {AudioOutputPort, createConnectionLease, type ConnectionLease, type ModuleContext} from '@webmusic/kernel/module';
+import type {SessionSchedulingBinding} from '@webmusic/kernel/session';
+
+export type {PlaybackTimingCapabilities, PlaybackSchedulingMode} from './engines/buffer-engine';
 
 export type PlayerEngineKind = 'auto' | 'buffer' | 'media';
 
 export interface AudioClipPlayerOptions {
   audioContext?: AudioContext;
+  /** Borrow a lazy audio environment; discovery itself allocates no graph. */
+  moduleContext?: ModuleContext;
   destination?: AudioNode;
   effect?: Effect;
   /** auto: decoded & ≤10min → buffer, else media. */
@@ -97,7 +107,8 @@ export class AudioClipPlayer {
   private gainNode: GainNode | null = null;
   private pannerNode: StereoPannerNode | null = null;
   private analyserNode: AnalyserNode | null = null;
-  private effectDispose: (() => void) | null = null;
+  private inserts?: InsertChain;
+  private port?: AudioOutputPort;
 
   private volume: number;
   private pan: number;
@@ -110,6 +121,8 @@ export class AudioClipPlayer {
   private readonly activeRegions = new Set<string>();
   private lastBeatIndex = -1;
   private disposed = false;
+  private schedulingLease?: ConnectionLease;
+  private schedulingBinding?: SessionSchedulingBinding;
   /** Invalidates work that resumes after an asynchronous playback boundary. */
   private lifecycleGeneration = 0;
   /** Invalidates an observation batch when a listener issues a newer command. */
@@ -121,7 +134,7 @@ export class AudioClipPlayer {
 
   constructor(clip: AudioClip, options: AudioClipPlayerOptions = {}) {
     this.clip = clip;
-    this.options = options;
+    this.options = {...options};
     this.volume = options.volume ?? 1;
     this.pan = options.pan ?? 0;
     this.rate = options.rate ?? 1;
@@ -131,12 +144,33 @@ export class AudioClipPlayer {
 
   // --- transport ---
 
+  /** Replace only the compatibility insert without replacing the engine or its clock. */
+  setEffect(effect: Effect | undefined): void {
+    if (this.disposed) return;
+    this.inserts?.setCompatibility(effect);
+    this.options.effect = effect;
+  }
+
+  /** Prepare the stable post-fader insert boundary for explicit Headless composition. */
+  get insertChain(): InsertChain {
+    this.ensureGraph();
+    return this.inserts!;
+  }
+
+  /** Explicitly prepare the controlled main output. Takeover never duplicates speaker routing. */
+  get outputPort(): AudioOutputPort {
+    this.ensureGraph();
+    return this.port!;
+  }
+  peekOutputPort(): AudioOutputPort | undefined { return this.port; }
+
   /**
    * Start playback. `when` is an absolute `AudioContext.currentTime` at which
    * sound should begin (sample-accurate on the buffer engine; the media
    * engine starts as soon as it can). Omitted or already past starts now.
    */
   play(when?: number): Promise<void> {
+    this.assertLocalAuthority();
     this.cancelScratch();
     return this.startPlayback(when);
   }
@@ -183,6 +217,7 @@ export class AudioClipPlayer {
 
   pause(): void {
     if (this.disposed) return;
+    this.assertLocalAuthority();
     this.cancelScratch();
     this.lifecycleGeneration++;
     this.observationRevision++;
@@ -195,6 +230,7 @@ export class AudioClipPlayer {
 
   stop(): void {
     if (this.disposed) return;
+    this.assertLocalAuthority();
     this.cancelScratch();
     this.lifecycleGeneration++;
     this.observationRevision++;
@@ -210,6 +246,7 @@ export class AudioClipPlayer {
 
   seek(seconds: number): void {
     if (this.disposed) return;
+    this.assertLocalAuthority();
     this.cancelScratch();
     const revision = ++this.observationRevision;
     this.ensureGraph();
@@ -232,7 +269,7 @@ export class AudioClipPlayer {
    * External play/pause/stop/seek and disposal invalidate the returned owner.
    */
   beginScratch(): AudioScratchSession | undefined {
-    if (this.disposed || !this.clip.hasSamples || this.clip.duration <= 0) return undefined;
+    if (this.disposed || this.schedulingLease?.active || !this.clip.hasSamples || this.clip.duration <= 0) return undefined;
     const wasPlaying = this.scratch?.wasPlaying ?? this.playing;
     this.cancelScratch();
     const generation = ++this.lifecycleGeneration;
@@ -287,6 +324,7 @@ export class AudioClipPlayer {
 
   setRate(rate: number): void {
     if (this.disposed) return;
+    this.assertLocalAuthority();
     this.observationRevision++;
     this.rate = Math.max(0.25, Math.min(4, rate));
     this.engine?.setRate(this.rate);
@@ -312,6 +350,7 @@ export class AudioClipPlayer {
    */
   setLoop(loop: boolean | {start: number; end: number}): void {
     if (this.disposed) return;
+    this.assertLocalAuthority();
     // Record it for an engine that does not exist yet: the graph is built on
     // first play and reads the stored value at construction.
     const normalized = normalizeLoopOption(loop);
@@ -353,6 +392,74 @@ export class AudioClipPlayer {
     if (warming) await warming;
   }
 
+  /** Native buffer timing is explicit; media transport remains approximate. */
+  get timingCapabilities(): PlaybackTimingCapabilities {
+    return this.chooseEngineKind() === 'buffer' ? BUFFER_TIMING_CAPABILITIES : MEDIA_TIMING_CAPABILITIES;
+  }
+
+  get followsSession(): boolean { return this.schedulingLease?.active ?? false; }
+  get playbackRate(): number { return this.followsSession ? this.schedulingBinding!.clock.rate : this.rate; }
+  get schedulingMode(): PlaybackSchedulingMode {
+    return this.engine?.schedulingMode ?? (this.chooseEngineKind() === 'media' ? 'approximate-media' : 'independent');
+  }
+
+  /** Resume only during Session activation, before its authoritative origin is chosen. */
+  async activateScheduling(): Promise<void> {
+    if (this.disposed) throw new Error('AudioClipPlayer has been disposed');
+    const context = this.ensureContext();
+    if (context.state === 'closed') throw new Error('AudioContext is closed');
+    if (context.state === 'suspended') await context.resume();
+    if (this.disposed) throw new Error('AudioClipPlayer activation was cancelled');
+  }
+
+  /** Borrow a prepared Session scheduling view without obtaining write authority. */
+  attachScheduling(binding: SessionSchedulingBinding): ConnectionLease {
+    if (this.followsSession) throw new Error('AudioClipPlayer already follows a Session.');
+    if (!this.timingCapabilities.sharedSessionClock) throw new Error('The media engine does not support shared Session scheduling; use approximate transport coordination.');
+    this.cancelScratch();
+    this.ensureGraph();
+    const engineLease = this.engine!.attachScheduling!(binding);
+    let unsubscribe: (() => void) | undefined;
+    const lease = createConnectionLease(() => {
+      let failure: unknown;
+      if (this.schedulingLease === lease) {
+        // The detached buffer engine retains the mapped rate. Keep readback
+        // and later scratch restoration on that same accepted local rate.
+        try { this.rate = binding.clock.rate; } catch (error) { failure = error; }
+        this.schedulingLease = undefined;
+        this.schedulingBinding = undefined;
+        this.lifecycleGeneration++;
+        this.observationRevision++;
+        this.stopCursor();
+      }
+      try { unsubscribe?.(); } catch (error) { failure ??= error; }
+      try { engineLease.release(); } catch (error) { failure ??= error; }
+      if (failure !== undefined) throw failure;
+    });
+    this.schedulingLease = lease;
+    this.schedulingBinding = binding;
+    try {
+      const stop = binding.subscribe(event => {
+        if (!lease.active || this.disposed) return;
+        if (event.type === 'dispose') { lease.release(); return; }
+        ++this.observationRevision;
+        if (event.type === 'anchor' && !event.snapshot.paused && event.snapshot.phase === 'ready') this.startCursor();
+        else this.stopCursor();
+        this.emitTimeupdate();
+      });
+      if (lease.active) unsubscribe = stop;
+      else stop();
+    } catch (error) {
+      lease.release();
+      throw error;
+    }
+    return lease;
+  }
+
+  private assertLocalAuthority(): void {
+    if (this.followsSession) throw new Error('The Session owns this transport; send commands to the Session.');
+  }
+
   dispose(): void {
     if (!this.disposed) {
       this.disposed = true;
@@ -363,14 +470,17 @@ export class AudioClipPlayer {
     // against resurrection, and idempotent cleanup makes the terminal state
     // robust even if a custom engine/effect completes unusually late.
     let firstError: unknown;
+    try { this.schedulingLease?.release(); } catch (error) { firstError = error; }
     this.cancelScratch();
     this.stopCursor();
     try {
-      this.effectDispose?.();
+      this.inserts?.dispose();
     } catch (error) {
-      firstError = error;
+      firstError ??= error;
     }
-    this.effectDispose = null;
+    this.inserts = undefined;
+    try { this.port?.dispose(); } catch (error) { firstError ??= error; }
+    this.port = undefined;
     try {
       this.engine?.dispose();
     } catch (error) {
@@ -385,7 +495,7 @@ export class AudioClipPlayer {
     this.analyserNode = null;
     this.emitter.removeAllListeners();
     // Close a context only if we created it.
-    if (this.context && !this.options.audioContext) {
+    if (this.context && !this.options.audioContext && !this.options.moduleContext) {
       try {
         void this.context.close().catch(() => {});
       } catch (error) {
@@ -603,6 +713,10 @@ export class AudioClipPlayer {
       this.context = this.options.audioContext;
       return this.context;
     }
+    if (this.options.moduleContext) {
+      this.context = this.options.moduleContext.audio.prepare() as AudioContext;
+      return this.context;
+    }
     this.context = createWebAudioContext('AudioContext is not available in this environment');
     return this.context;
   }
@@ -626,7 +740,8 @@ export class AudioClipPlayer {
     let panner: StereoPannerNode | null = null;
     let analyser: AnalyserNode | null = null;
     let engine: PlaybackEngine | null = null;
-    let effectDispose: (() => void) | null = null;
+    let inserts: InsertChain | undefined;
+    let port: AudioOutputPort | undefined;
     try {
       gain = context.createGain();
       gain.gain.value = this.volume;
@@ -654,9 +769,11 @@ export class AudioClipPlayer {
       // source(engine.output) → gain → panner → [effect] → analyser → destination
       engine.output.connect(gain);
       gain.connect(panner);
-      const inserted = insertEffect(context, panner, analyser, this.options.effect);
-      effectDispose = inserted.dispose ?? null;
-      analyser.connect(this.options.destination ?? context.destination);
+      inserts = new InsertChain(context);
+      inserts.setCompatibility(this.options.effect);
+      panner.connect(inserts.input);
+      inserts.output.connect(analyser);
+      port = new AudioOutputPort(analyser, {defaultDestination: this.options.destination ?? context.destination});
 
       const installedEngine = engine;
       engine.onEnded(() => {
@@ -666,21 +783,27 @@ export class AudioClipPlayer {
         this.stopCursor();
         this.emitter.emit('end', this.clip);
       });
+      engine.onError?.(error => {
+        if (this.disposed || this.engine !== installedEngine) return;
+        this.emitter.emitSafely('error', error instanceof Error ? error : new Error(String(error)), () => {});
+      });
 
       this.engine = engine;
       this.gainNode = gain;
       this.pannerNode = panner;
       this.analyserNode = analyser;
-      this.effectDispose = effectDispose;
+      this.inserts = inserts;
+      this.port = port;
     } catch (error) {
       // Preserve the graph-construction failure while releasing every
       // candidate resource. A disposer may itself fail; it must not prevent
       // the other graph nodes from being disconnected.
       try {
-        effectDispose?.();
+        inserts?.dispose();
       } catch {
         /* continue releasing the candidate graph */
       }
+      try { port?.dispose(); } catch { /* release the candidate route */ }
       try {
         engine?.dispose();
       } catch {

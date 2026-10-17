@@ -5,7 +5,7 @@ const code = "import {createAnalysisSession} from '@webmusic/score/analyze/headl
 ---
 
 <HeadlessDemoFrame entry="@webmusic/score/analyze/headless" name="createAnalysisSession" code={code}
-  hint="Compare two Arabesque excerpts or edit one note to inspect incremental analysis. Chord-window changes create a new session."
+  hint="Compare two WebMusic Study excerpts or edit one note to inspect incremental analysis. Chord-window changes create a new session."
   rootAttrs={{'data-analysis-session-demo': ''}}>
   <section class="wm-hl-music" aria-label="Score analysis">
     <p class="wm-hl-music__summary" data-session-summary></p>
@@ -15,7 +15,7 @@ const code = "import {createAnalysisSession} from '@webmusic/score/analyze/headl
   </section>
   <div slot="parameters" class="wm-pg__grid">
     <label class="wm-pg__param"><span class="wm-pg__name">score</span>
-      <select class="wui-select" data-session-score aria-label="Score"><option value="opening">Arabesque · opening</option><option value="extended">Arabesque · extended</option></select>
+      <select class="wui-select" data-session-score aria-label="Score"><option value="opening">WebMusic Study · opening</option><option value="extended">WebMusic Study · extended</option></select>
       <span class="wm-pg__note">Replace the immutable score through session.update(score).</span>
     </label>
     <label class="wm-pg__param"><span class="wm-pg__name">first note</span>
@@ -32,9 +32,9 @@ const code = "import {createAnalysisSession} from '@webmusic/score/analyze/headl
 <script>
   import {mountDemos} from '../demo-lifecycle';
   import {mountAnalysisSessionDemo} from './analysis-view-playgrounds-client';
-  import {loadArabesqueScore} from './arabesque-score';
+  import {loadStudyScore} from './study-score';
   mountDemos('[data-analysis-session-demo]', async (root, scope) => {
-    const source = await loadArabesqueScore();
+    const source = await loadStudyScore();
     if (scope.active) mountAnalysisSessionDemo(root, scope, source);
   });
 </script>

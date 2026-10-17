@@ -40,6 +40,7 @@ import type {
   UiPresenterDemoHandle,
   UiPresenterDemoMountResult,
 } from './types';
+import {mountPatchEditorDemo} from './patch-editor';
 
 interface DemoNotifier {
   notify(): void;
@@ -866,6 +867,8 @@ export function mountParametersGesturesDemo(
   host: HTMLElement,
 ): UiPresenterDemoMountResult {
   switch (presenter) {
+    case 'patch-editor':
+      return mountPatchEditorDemo(host);
     case 'parameter':
       return mountParameterDemo(host);
     case 'macro':

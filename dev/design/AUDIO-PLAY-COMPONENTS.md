@@ -8,6 +8,12 @@ Source: [Audio Play](../../packages/audio/src/play/).
 Public owners: [Play Elements](../../apps/doc/webmusic/src/content/docs/audio/element/index.mdx#play)
 and [Headless inventory](../../apps/doc/webmusic/src/content/docs/audio/headless/index.mdx).
 
+DEC-047 adds opt-in [modular composition](MODULAR-COMPOSITION.md). Its
+source-free aggregate role uses Headless SessionTransport; the mixer has real
+channel/master buses and independent inserts. The existing single-backend
+facade, borrowed queue/mix and no-additional-clock contracts below remain the
+legacy baseline outside `composition="modules"`. STATUS records verification.
+
 ## User tasks and composition
 
 | Component | Task and owner | Composition boundary |

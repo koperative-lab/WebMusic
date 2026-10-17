@@ -1,3 +1,6 @@
+import type {ParamSurface} from '@webmusic/kernel/module';
+import {createEnvelopeParameters, readEnvelopeParameters} from './internal/envelope-parameters';
+import {VoiceEnvelope} from './internal/voice-envelope';
 import {noteMidi, type Note} from '../../core';
 import type {HeadlessSynth, SoundfontSynthOptions} from './audio-contracts';
 import {OscillatorSynth} from './oscillator-synth';
@@ -13,6 +16,7 @@ interface ActiveSample {
   source: AudioBufferSourceNode;
   gain: GainNode;
   startTime: number;
+  envelope: VoiceEnvelope;
 }
 
 interface SampleVoiceHandle {
@@ -45,6 +49,9 @@ export function createSoundfontSynth(
 
 /** Exact-MIDI sample map with an oscillator fallback for missing notes. */
 export class SoundfontSynth implements HeadlessSynth {
+  get supportsNoteOccurrences(): boolean {
+    return (this.fallback.supportsNoteOccurrences === true || this.fallback.supportsScheduledCancellation === true) && typeof this.fallback.noteOffById === 'function';
+  }
   private readonly output: GainNode;
   private readonly buffers = new Map<number, AudioBuffer>();
   private readonly active = new Map<number, Set<ActiveSample>>();
@@ -54,8 +61,8 @@ export class SoundfontSynth implements HeadlessSynth {
   private nextId = 1;
   private readonly fallback: HeadlessSynth;
   private readonly gain: number;
-  private readonly attackSeconds: number;
-  private readonly releaseSeconds: number;
+  readonly params: ParamSurface;
+  private readonly ownsParams: boolean;
   private readonly loadControllers = new Set<AbortController>();
   private readonly pendingLoads = new Map<number, Promise<void>>();
   private readonly loadLimits: SoundfontLoadLimits;
@@ -64,14 +71,14 @@ export class SoundfontSynth implements HeadlessSynth {
   private loadGeneration = 0;
   private disposed = false;
 
-  constructor(private readonly context: AudioContext, private readonly options: SoundfontSynthOptions = {}) {
+  constructor(private readonly context: AudioContext, private readonly options: SoundfontSynthOptions = {}, sharedParams?: ParamSurface) {
     this.loadLimits = resolveSoundfontLoadLimits(options);
     this.output = context.createGain();
-    this.fallback = options.fallback ?? new OscillatorSynth(context);
+    this.fallback = options.fallback ?? new OscillatorSynth(context, {attackSeconds: options.attackSeconds ?? 0.004, decaySeconds: options.decaySeconds, sustainLevel: options.sustainLevel, releaseSeconds: options.releaseSeconds ?? 0.08});
     this.fallback.connect?.(this.output);
     this.gain = options.gain ?? 1;
-    this.attackSeconds = options.attackSeconds ?? 0.004;
-    this.releaseSeconds = options.releaseSeconds ?? 0.08;
+    this.params = sharedParams ?? createEnvelopeParameters(options, 0.004, 0.08);
+    this.ownsParams = !sharedParams;
   }
 
   /**
@@ -79,6 +86,12 @@ export class SoundfontSynth implements HeadlessSynth {
    * the fallback, so advertise clock lookahead only when that fallback can
    * retract its own future voices as well.
    */
+  get supportsScheduledDuration(): boolean { return this.fallback.supportsScheduledDuration === true; }
+
+  get supportsScheduledRetiming(): boolean {
+    return this.fallback.supportsScheduledRetiming === true && typeof this.fallback.retimeScheduledNote === 'function';
+  }
+
   get supportsScheduledCancellation(): boolean {
     return this.fallback.supportsScheduledCancellation === true &&
       typeof this.fallback.cancelScheduledNote === 'function' &&
@@ -120,17 +133,22 @@ export class SoundfontSynth implements HeadlessSynth {
   noteOn(midi: number, velocity: number, time: number, durationSeconds: number): unknown {
     if (this.disposed) throw new Error('SoundfontSynth has been disposed.');
     const buffer = this.buffers.get(midi);
-    if (!buffer) return this.fallback.noteOn(midi, velocity, time, durationSeconds);
+    if (!buffer) {
+      if (!this.options.fallback && this.fallback instanceof OscillatorSynth) {
+        const settings = readEnvelopeParameters(this.params);
+        for (const key of ['attackSeconds', 'decaySeconds', 'sustainLevel', 'releaseSeconds'] as const) this.fallback.setParam(key, settings[key]);
+      }
+      return this.fallback.noteOn(midi, velocity, time, durationSeconds);
+    }
 
+    const settings = readEnvelopeParameters(this.params);
     const source = this.context.createBufferSource();
     const gain = this.context.createGain();
-    const voice = {source, gain, startTime: time};
+    const voice = {source, gain, startTime: time, envelope: new VoiceEnvelope(gain.gain, time, Math.max(0, Math.min(1, velocity / 127)) * this.gain, settings, durationSeconds)};
     source.buffer = buffer;
-    gain.gain.setValueAtTime(0.0001, time);
-    gain.gain.exponentialRampToValueAtTime(Math.max(0.01, (velocity / 127) * this.gain), time + this.attackSeconds);
     source.connect(gain).connect(this.output);
     source.start(time);
-    source.stop(time + durationSeconds + this.releaseSeconds);
+    if (Number.isFinite(durationSeconds)) source.stop(time + durationSeconds + settings.releaseSeconds);
 
     let voices = this.active.get(midi);
     if (!voices) {
@@ -151,21 +169,24 @@ export class SoundfontSynth implements HeadlessSynth {
       this.sources.delete(voice);
       if (voices?.size === 0) this.active.delete(midi);
       this.byId.delete(handle);
+      source.disconnect();
+      gain.disconnect();
     };
     return handle;
   }
 
   noteOff(midi: number, time: number): void {
+    let firstError: unknown;
     const voices = this.active.get(midi);
-    if (voices) {
-      for (const voice of voices) this.releaseVoice(voice, time);
-      voices.clear();
-      this.active.delete(midi);
-      for (const [id, record] of this.byId) if (record.midi === midi) this.byId.delete(id);
+    this.active.delete(midi);
+    for (const [id, record] of this.byId) if (record.midi === midi) this.byId.delete(id);
+    for (const voice of voices ?? []) {
+      try { this.releaseVoice(voice, time); } catch (error) { firstError ??= error; }
     }
-    // A fallback voice may predate a sample that finished loading for the same
-    // pitch, so generic pitch release must quiet both possible stores.
-    this.fallback.noteOff?.(midi, time);
+    voices?.clear();
+    // A fallback occurrence can predate a loaded sample of this same pitch.
+    try { this.fallback.noteOff?.(midi, time); } catch (error) { firstError ??= error; }
+    if (firstError !== undefined) throw firstError;
   }
 
   noteOffById(handle: unknown, time: number): void {
@@ -202,7 +223,8 @@ export class SoundfontSynth implements HeadlessSynth {
       // As with OscillatorNode, a later stop() call replaces the previous
       // request, while the existing note-off timer still creates the release
       // envelope at the logical endpoint.
-      record.voice.source.stop(time + this.releaseSeconds);
+      const stop = record.voice.envelope.retime(time, this.context.currentTime);
+      if (stop !== undefined) record.voice.source.stop(stop);
     } catch {
       // An ended sample cannot be retimed and is already silent.
     }
@@ -217,24 +239,14 @@ export class SoundfontSynth implements HeadlessSynth {
   }
 
   private fadeOut(voice: ActiveSample, time: number): void {
-    voice.gain.gain.cancelScheduledValues(time);
-    voice.gain.gain.setValueAtTime(Math.max(voice.gain.gain.value, 0.0001), time);
-    const stopTime = time + this.releaseSeconds;
-    voice.gain.gain.exponentialRampToValueAtTime(0.0001, stopTime);
-    try {
-      voice.source.stop(stopTime);
-    } catch {
-      // The source has already ended.
+    try { voice.envelope.release(time); } finally {
+      try { voice.source.stop(time + voice.envelope.settings.releaseSeconds); } catch { /* Already ended. */ }
     }
   }
 
   private hardStopVoice(voice: ActiveSample, time: number): void {
-    voice.gain.gain.cancelScheduledValues(time);
-    voice.gain.gain.setValueAtTime(0, time);
-    try {
-      voice.source.stop(time);
-    } catch {
-      // The source has already ended.
+    try { voice.envelope.cancel(time); } finally {
+      try { voice.source.stop(time); } catch { /* Already ended. */ }
     }
   }
 
@@ -242,19 +254,21 @@ export class SoundfontSynth implements HeadlessSynth {
     if (this.disposed) return;
     this.disposed = true;
     this.invalidateLoads();
+    if (this.ownsParams) for (const handle of this.params) handle.dispose();
     const now = Number.isFinite(this.context.currentTime) ? this.context.currentTime : 0;
-    for (const voice of this.sources) this.hardStopVoice(voice, now);
+    let firstError: unknown;
+    for (const voice of this.sources) {
+      try { this.hardStopVoice(voice, now); } catch (error) { firstError ??= error; }
+    }
     this.active.clear();
     this.sources.clear();
     this.byId.clear();
     this.buffers.clear();
     this.totalSourceBytes = 0;
     this.totalDecodedBytes = 0;
-    try {
-      this.fallback.dispose?.();
-    } finally {
-      this.disconnect();
-    }
+    try { this.fallback.dispose?.(); } catch (error) { firstError ??= error; }
+    try { this.disconnect(); } catch (error) { firstError ??= error; }
+    if (firstError !== undefined) throw firstError;
   }
 
   private configuredMidis(): number[] {

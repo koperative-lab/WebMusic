@@ -17,8 +17,8 @@ packages; Bridge supplies the integration between them.
 
 The factories provide one AudioContext reference to both players and use the
 buffer engine. The group coordinates scheduled starts, seek, rate and drift using
-the master's readable clock. Players still own separate TransportClock instances;
-the same-instance session-clock injection protocol is not yet implemented.
+the master's readable clock. These legacy pair factories retain separate engine
+clocks; modular project factories use the read-only shared Session protocol below.
 Independent sessions can have separate groups, even when they share a context.
 
 A common scheduled origin allows audio-clock alignment when backends support
@@ -54,6 +54,24 @@ identity through the API.
 For repeated notation, call `expandRepeats(score)` first, then render and pair
 that expanded Score instance. `scoreOptions.expandRepeats` would expand only
 the player timeline, so the factories reject it for Bridge-rendered clips.
+
+## Modular projects
+
+`createWebMusicProjectPlugins()` returns exact-version trusted factories for
+Score players, Audio players, Rack, bus, effects and Session-relative LFO modules.
+Register them in Kernel's `ProjectPluginRegistry` and supply an application asset
+resolver to `ModuleProjectRuntime`. The runtime owns a staged graph and Session,
+borrows the audio environment, preserves missing-plugin specifications and
+restores paused by default. File storage, asset retrieval and undo remain with
+the application.
+
+Native participants consume mapped read-only Session anchors with invalidation
+epochs and future loop segments. Backend lookahead, media fallback, effect tails
+and device latency retain explicit limits. The
+[public factory reference](../../apps/doc/webmusic/src/content/docs/bridge/api.mdx)
+owns exact IDs, configuration and ports; the
+[runnable guide](../../apps/doc/webmusic/src/content/docs/bridge/modular-composition.mdx)
+shows save/load, missing-plugin recovery and keyboard-accessible patch editing.
 
 ## Conversion
 

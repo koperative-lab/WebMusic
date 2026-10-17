@@ -54,7 +54,7 @@ a synthetic fallback grid, which should not be presented as detected beats.
   import {AudioViewElement, defineAudioViewElement} from '@webmusic/audio/view/element';
 
   defineAudioViewElement();
-  const clip = await loadClipFromUrl('/wav/Arabesque%20No.1.wav');
+  const clip = await loadClipFromUrl('/wav/webmusic-study-no-1.wav');
   const {tempo} = await createAudioAnalysisSession(clip, {tasks: ['tempo']}).analyze();
   const view = document.querySelector('#beat-view');
   if (!(view instanceof AudioViewElement)) throw new Error('Beat view is unavailable');

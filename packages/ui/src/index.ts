@@ -15,6 +15,7 @@ export * from "./note";
 export * from "./oscilloscope";
 export * from "./panel";
 export * from "./parameter";
+export * from "./patch-editor";
 export * from "./pitch";
 export * from "./playlist";
 export * from "./spectrum-analyzer";

@@ -1,6 +1,6 @@
 {
   "name": "@webmusic/kernel",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Domain-neutral WebMusic contracts and utilities for events, elements, workers, metering and synchronized playback.",
   "type": "module",
   "sideEffects": false,
@@ -78,6 +78,16 @@
         "default": "./dist/effect.cjs"
       }
     },
+    "./module": {
+      "import": {
+        "types": "./dist/module.d.ts",
+        "default": "./dist/module.js"
+      },
+      "require": {
+        "types": "./dist/module.d.cts",
+        "default": "./dist/module.cjs"
+      }
+    },
     "./meter": {
       "import": {
         "types": "./dist/meter.d.ts",
@@ -118,10 +128,20 @@
         "default": "./dist/sync.cjs"
       }
     },
+    "./session": {
+      "import": {
+        "types": "./dist/session.d.ts",
+        "default": "./dist/session.js"
+      },
+      "require": {
+        "types": "./dist/session.d.cts",
+        "default": "./dist/session.cjs"
+      }
+    },
     "./package.json": "./package.json"
   },
   "scripts": {
-    "build": "tsup src/index.ts src/events.ts src/elements.ts src/worker.ts src/audio-context.ts src/player.ts src/effect.ts src/meter.ts src/transport.ts src/tick.ts src/sync.ts --tsconfig tsconfig.build.json --format esm,cjs --splitting --dts --sourcemap --clean && node ../../scripts/package-artifacts.mjs --write",
+    "build": "tsup src/index.ts src/events.ts src/elements.ts src/worker.ts src/audio-context.ts src/player.ts src/effect.ts src/module.ts src/meter.ts src/transport.ts src/tick.ts src/sync.ts src/session.ts --tsconfig tsconfig.build.json --format esm,cjs --splitting --dts --sourcemap --clean && node ../../scripts/package-artifacts.mjs --write",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "prepack": "node ../../scripts/package-artifacts.mjs"

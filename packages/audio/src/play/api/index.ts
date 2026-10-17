@@ -45,6 +45,8 @@ export type {
   AudioClipPlayerEvents,
   PlayerTimeUpdate,
   PlayerEngineKind,
+  PlaybackTimingCapabilities,
+  PlaybackSchedulingMode,
   PlayerLike,
 } from '../headless/player';
 export type {

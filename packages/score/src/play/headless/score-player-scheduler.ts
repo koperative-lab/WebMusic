@@ -1,3 +1,6 @@
+import {createConnectionLease, type ConnectionLease} from '@webmusic/kernel/module';
+import type {SessionSchedulingBinding} from '@webmusic/kernel/session';
+import {SessionScoreScheduler, scoreSchedulingCapabilities} from './internal/session-score-scheduler';
 import {createTickSource, type TickSource} from '@webmusic/kernel/tick';
 import {TransportClock, type TransportClockReader} from '@webmusic/kernel/transport';
 import {type Note, type Score} from '../../core';
@@ -102,6 +105,8 @@ export class ScorePlayerScheduler {
    * `state.originPosition` is the nominal resume position.
    */
   private readonly transport = new TransportClock();
+  private sessionScheduler?: SessionScoreScheduler;
+  private sessionLease?: ConnectionLease;
   private playing = false;
   private nextIndex = 0;
   /** Steady scheduling cadence; survives background-tab timer throttling. */
@@ -142,6 +147,39 @@ export class ScorePlayerScheduler {
     this.timeline = new ScoreTimeline(score);
   }
 
+  /** Borrow a Session scheduling authority after preload; its lease never owns the context. */
+  attachScheduling(binding: SessionSchedulingBinding): ConnectionLease {
+    if (this.sessionScheduler) throw new Error('ScorePlayer already has a Session scheduling authority.');
+    if (!this.host.getContext() || !this.host.getSynth()) throw new Error('Preload ScorePlayer before attaching Session scheduling.');
+    this.pause();
+    if (this.sessionScheduler || !this.host.getContext() || !this.host.getSynth()) throw new Error('Session scheduling attachment was superseded.');
+    const scheduler = new SessionScoreScheduler(binding, this.timeline, this.host, this.options, () => { ++this.transportRevision; });
+    this.sessionScheduler = scheduler;
+    const lease = createConnectionLease(() => {
+      if (this.sessionScheduler !== scheduler) return;
+      const position = scheduler.position;
+      scheduler.dispose();
+      const now = this.host.getContext()?.currentTime ?? 0;
+      this.transport.pause(now);
+      this.transport.setRate(binding.clock.rate, now);
+      this.transport.seekTo(position, now);
+      this.sessionScheduler = undefined;
+      this.sessionLease = undefined;
+      this.emitCursor();
+    });
+    this.sessionLease = lease;
+    try { scheduler.connect(); } catch (error) { lease.release(); throw error; }
+    return lease;
+  }
+
+  get followsSession(): boolean { return this.sessionScheduler !== undefined; }
+
+  get schedulingCapabilities() { return scoreSchedulingCapabilities(this.host.getSynth()); }
+
+  private assertOwnTransport(): void {
+    if (this.sessionScheduler) throw new Error('ScorePlayer transport is owned by its Session; send commands to SessionTransport.');
+  }
+
   /** Build and cache the immutable score snapshot before the first play. */
   prepare(): readonly Note[] {
     return this.timeline.preloadNotes;
@@ -161,6 +199,7 @@ export class ScorePlayerScheduler {
    * first pending start, including its `when`.
    */
   play(when?: number): Promise<void> {
+    if (this.sessionScheduler) return Promise.reject(new Error('ScorePlayer transport is owned by its Session; send commands to SessionTransport.'));
     if (this.playing) return Promise.resolve();
     if (this.startPromise) return this.startPromise;
 
@@ -180,6 +219,7 @@ export class ScorePlayerScheduler {
   }
 
   pause(): void {
+    this.assertOwnTransport();
     this.cancelPendingStart();
     if (!this.playing) return;
     // Capture the position before pausing the clock: with no live context the
@@ -197,6 +237,7 @@ export class ScorePlayerScheduler {
   }
 
   stop(): void {
+    this.assertOwnTransport();
     this.cancelPendingStart();
     this.stopTicking();
     this.playing = false;
@@ -221,6 +262,7 @@ export class ScorePlayerScheduler {
    * starts playback — and an expired `when` resumes immediately.
    */
   seek(seconds: number, when?: number, rejectRestartFailure = false): Promise<void> {
+    if (this.sessionScheduler) return Promise.reject(new Error('ScorePlayer transport is owned by its Session; send commands to SessionTransport.'));
     const wasPlaying = this.playing;
     const generation = this.startGeneration + 1;
     this.pause();
@@ -258,16 +300,18 @@ export class ScorePlayerScheduler {
   }
 
   setTempo(bpm: number): void {
+    this.assertOwnTransport();
     const baseTempo = this.score.timeMap.tempi[0]?.bpm ?? 120;
     this.applyTempoScale(bpm / baseTempo);
   }
 
   setRate(rate: number): void {
+    this.assertOwnTransport();
     this.applyTempoScale(rate > 0 ? rate : 1);
   }
 
   get rate(): number {
-    return this.transport.rate;
+    return this.sessionScheduler?.binding.clock.rate ?? this.transport.rate;
   }
 
   /**
@@ -276,7 +320,7 @@ export class ScorePlayerScheduler {
    * Consumers can anchor against it but never re-anchor it.
    */
   get clock(): TransportClockReader {
-    return this.transport;
+    return this.sessionScheduler?.binding.clock ?? this.transport;
   }
 
   get seconds(): number {
@@ -288,7 +332,7 @@ export class ScorePlayerScheduler {
   }
 
   get duration(): number {
-    return this.timeline.duration / this.transport.rate;
+    return this.timeline.duration / this.rate;
   }
 
   get progress(): number {
@@ -297,7 +341,7 @@ export class ScorePlayerScheduler {
   }
 
   get isPlaying(): boolean {
-    return this.playing;
+    return this.sessionScheduler?.running ?? this.playing;
   }
 
   /**
@@ -306,6 +350,7 @@ export class ScorePlayerScheduler {
    * stored, so a playback-rate change preserves the musical loop region.
    */
   setLoop(startSeconds: number, endSeconds: number): void {
+    this.assertOwnTransport();
     const duration = this.duration;
     const rawStart = Math.min(startSeconds, endSeconds);
     const rawEnd = Math.max(startSeconds, endSeconds);
@@ -322,6 +367,7 @@ export class ScorePlayerScheduler {
   }
 
   clearLoop(): void {
+    this.assertOwnTransport();
     const changed = this.loopStartNominal != null || this.loopEndNominal != null;
     this.loopStartNominal = undefined;
     this.loopEndNominal = undefined;
@@ -332,6 +378,7 @@ export class ScorePlayerScheduler {
   }
 
   dispose(): void {
+    this.sessionLease?.release();
     this.cancelPendingStart();
     this.stopTicking();
     this.playing = false;
@@ -927,11 +974,12 @@ export class ScorePlayerScheduler {
 
   /** Current rate-scaled transport position, in real seconds. */
   private currentSeconds(): number {
-    return this.nominalNow() / this.transport.rate;
+    return this.nominalNow() / this.rate;
   }
 
   /** Current nominal score position, clamped to the timeline duration. */
   private nominalNow(): number {
+    if (this.sessionScheduler) return this.sessionScheduler.position;
     const context = this.host.getContext();
     const nominal = this.playing && context
       ? this.transport.positionAt(context.currentTime)

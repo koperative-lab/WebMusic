@@ -1,3 +1,4 @@
+import type {ModuleHandle} from '@webmusic/kernel/module';
 import {
   mountTransientAnalyzer,
   type TransientAnalyzerHandle,
@@ -26,7 +27,14 @@ function thresholdFor(sensitivity: number): number {
 
 /** Streaming attack inspector over a borrowed audio graph. */
 export class AudioTransientAnalyzerElement extends WebMusicElement {
-  static get observedAttributes(): string[] { return ['player', 'sensitivity', 'min-interval-ms']; }
+  static get observedAttributes(): string[] { return ['player', 'input', 'port', 'sensitivity', 'min-interval-ms']; }
+
+  #inputModule?: ModuleHandle | null;
+  get inputModule(): ModuleHandle | null | undefined { return this.#inputModule; }
+  set inputModule(value: ModuleHandle | null | undefined) {
+    this.#inputModule = value;
+    if (this.isConnected) this.#bind();
+  }
 
   #explicitAnalyser?: AnalyserNode;
   #player?: AnalysisPlayerTarget;
@@ -66,7 +74,7 @@ export class AudioTransientAnalyzerElement extends WebMusicElement {
     };
     this.ownerDocument.addEventListener('visibilitychange', onVisibility);
     this.own(() => this.ownerDocument.removeEventListener('visibilitychange', onVisibility));
-    upgradeProperties(this, ['analyser']);
+    upgradeProperties(this, ['inputModule', 'analyser']);
     this.#handle = mountTransientAnalyzer(this, {
       onSensitivityChange: (value) => { this.sensitivity = value; },
       onFreezeChange: (value) => this.#setFrozen(value),
@@ -79,7 +87,7 @@ export class AudioTransientAnalyzerElement extends WebMusicElement {
 
   attributeChangedCallback(name?: string, previous?: string | null, next?: string | null): void {
     if (!this.isConnected || previous === next) return;
-    if (name === 'player') this.#bind();
+    if (name === 'player' || name === 'input' || name === 'port') this.#bind();
     else this.#render();
   }
 
@@ -89,7 +97,7 @@ export class AudioTransientAnalyzerElement extends WebMusicElement {
     this.#explicitAnalyser = value;
     this.#reportedStall = false;
     this.#readFailed = false;
-    if (this.isConnected) this.#reconcile(true);
+    if (this.isConnected) this.#bind();
   }
   get analyser(): AnalyserNode | undefined { return this.#explicitAnalyser; }
   get sample(): Readonly<TransientAnalyzerSample> | undefined { return this.#sample; }
@@ -132,7 +140,7 @@ export class AudioTransientAnalyzerElement extends WebMusicElement {
     this.#reportedStall = false;
     this.#readFailed = false;
     this.#reconcile(true);
-    this.#unbind = bindAnalysisPlayer(this, (kind, reading) => this.#onPlayer(kind, reading));
+    this.#unbind = bindAnalysisPlayer(this, (kind, reading) => this.#onPlayer(kind, reading), this.#explicitAnalyser ? null : this.#inputModule);
   }
 
   #onPlayer(kind: AnalysisPlayerUpdate, reading: AnalysisPlayerSnapshot): void {

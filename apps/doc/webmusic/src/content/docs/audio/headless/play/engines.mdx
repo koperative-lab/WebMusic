@@ -26,6 +26,16 @@ A seek during pre-roll replaces the pending source at the original absolute
 start time. Once sound has begun, seeking replaces it immediately. A failed
 replacement leaves the engine paused at the requested position.
 
+`attachScheduling(binding)` switches BufferEngine to the Session's mapped
+read-only clock and returns a release lease. Direct transport setters then throw;
+seek, rate, loop, pause and resume belong to the Session. A fitting loop uses a
+continuous native source; a loop extending outside the clip or a negative mapped
+position uses bounded sources with scheduled silence. See the
+[timing tiers and lookahead limits](/audio/headless/play/audio-clip-player/#shared-session-scheduling).
+Releasing the lease stops this engine's sources and leaves its local clock paused
+without changing the borrowed Session. Preparation and context activation remain
+the host's responsibility; the engine does not resume a context itself.
+
 The cost is memory: the whole clip is resident. `play(offset)` positions a
 **start** and folds an offset past the loop end back into the window — before
 that fold, a native `start` would run to the buffer's end and never re-enter
@@ -110,9 +120,13 @@ fields into public API.
 | `setRate(rate)` | void | Change playback multiplier; implementations clamp normal finite rates to 0.25–4. |
 | `setLoop(loop)` | void | Change full/range looping live; invalid range edits throw before replacing the accepted range. |
 | `onEnded(callback)` | void | Register the natural-end callback; this is not an EventEmitter subscription API. |
+| `onError(callback)` | optional void method | BufferEngine reports asynchronous lookahead scheduling failure here after cancelling its sources. Synchronous attachment failures throw. |
 | `prepare()` | void or `Promise<void>` | Optional in PlaybackEngine, implemented by both engines; creates needed resources without playing. |
 | `dispose()` | void | Terminal and idempotent; releases owned source/adapter/output and loop work without closing the borrowed context. |
 | `clock` | optional TransportClockReader | BufferEngine provides it; MediaEngine omits it. |
+| `attachScheduling(binding)` | optional ConnectionLease method | BufferEngine borrows one Session scheduling binding; MediaEngine omits it. The caller owns the release lease. |
+| `schedulingMode` | optional PlaybackSchedulingMode | BufferEngine reports independent, Session native or Session lookahead mode. |
+| `BufferEngine.timingCapabilities` | PlaybackTimingCapabilities | Buffer backend declares sharedSessionClock, futureStart and nativeLoop support; playable bounds determine whether a particular loop uses native or lookahead scheduling. |
 | `MediaEngine.setPreservesPitch(flag)` | void | Changes the streaming adapter; not a BufferEngine method. |
 
 **MediaPlaybackAdapter and factory**

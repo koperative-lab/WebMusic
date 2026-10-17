@@ -30,6 +30,19 @@ existing backend. A borrowed mixer is never disposed by the Element.
 <audio-mixer player="#session"></audio-mixer>
 ```
 
+## Module bus composition
+
+`composition="modules"`, or inheritance from a module provider, makes this desk
+an explicit audio bus. `.module` exposes its mixer capability, `master` output
+and insert chain. Child outputs are admitted through routing leases and their
+existing Session passes through unchanged: mixer admission is not transport
+registration. Effects declared directly under this desk own master insert slots.
+
+Use `input="#desk" port="master"` on an Audio analyzer to tap the mixed output.
+Reading `.module` does not prepare an AudioContext. Legacy player/mixer linking
+remains a separate supported mode. See [modular composition](/bridge/modular-composition/).
+
+
 <details class="component-section">
 <summary>API</summary>
 
@@ -39,7 +52,7 @@ import { loadClipFromUrl } from '@webmusic/audio/play';
 import { createAudioMixer } from '@webmusic/audio/play/headless';
 import type { AudioMixerElement } from '@webmusic/audio/play/element';
 
-const clip = await loadClipFromUrl('/wav/Arabesque%20No.1.wav');
+const clip = await loadClipFromUrl('/wav/webmusic-study-no-1.wav');
 
 // Drive a shared mixer (never disposed by the element):
 const mixer = createAudioMixer();

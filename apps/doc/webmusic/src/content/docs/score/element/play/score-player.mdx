@@ -24,7 +24,7 @@ that already own an engine can use [the borrowed controller mode](#four-ways-to-
 
 Use **Effects** in the demo's Parameters panel to add reverb, a three-band equalizer, filters, delay, chorus, compression, or distortion. Effects run from top to bottom; each card can be expanded, reordered, or removed. The equalizer is compiled to three peaking filters, so the demo uses the same public `Effect` recipes as application code rather than a docs-only audio path.
 
-An effect is an object graph, not an HTML attribute. The editor therefore assigns the real `.effect` property and adds a **JavaScript setup** block beside the live markup. **Copy** includes both blocks. Committing an effect edit stops and rebuilds the player's audio graph, so playback returns to the start; **Reset** clears the chain back to dry output.
+An effect is an object graph, not an HTML attribute. The editor therefore assigns the real `.effect` property and adds a **JavaScript setup** block beside the live markup. **Copy** includes both blocks. Committing an effect edit updates the realized compatibility insert; explicit declaration slots remain in place. **Reset** clears this editor's legacy chain back to dry output.
 
 That property belongs to the element's single-score mode. When `.rack` is the
 active source (including a nested `<score-rack-control>` composition), the Rack owns
@@ -51,7 +51,7 @@ if (player) player.effect = Effect.chain(
   defineScorePlayerElement();
 </script>
 
-<score-player src="/midi/Arabesque%20No.1.mid"></score-player>
+<score-player src="/midi/webmusic-study-no-1.mid"></score-player>
 ```
 
 That is the whole setup. To see what any attribute does to a live element, use the control strip on the demo above — it writes to the real tag and shows you the resulting markup.
@@ -126,6 +126,40 @@ Native and Rack `play()` await preparation and startup. Borrowed controller
 mode delegates its command and resolves immediately; the controller's error
 channel is forwarded as `webscore:error`.
 
+## Opt-in module composition
+
+Set `composition="modules"` before connection to give this player explicit
+module scope. A source-free outer player owns `SessionTransport`; a leaf with a
+source registers its actual engine once. Nested leaves borrow the nearest
+Session, including through layout wrappers and mixer scopes. `session="local"`
+creates an independent boundary. Legacy standalone behavior remains available
+when module composition is not selected.
+
+`controls="auto"` hides the transport of an inherited leaf, `show` displays a
+second control view of the same authority, and `hide` suppresses local chrome.
+These controls do not register another participant. `.sessionTransport` exposes
+the borrowed/owned authority and `.module` exposes the local capability handle;
+a source-free root has no fabricated audio output.
+
+Module-mode play/pause/stop/seek/rate commands delegate to the Session. Seek is
+on **Session seconds**; a module leaf adapter maps its own stable seconds axis.
+Unknown/live duration remains explicit on the Session snapshot instead of being
+reported as a known finite clip. Discovery does not prepare audio. See
+[modular composition](/bridge/modular-composition/) for a running mixed example.
+
+An owning root's whole-session `loop` follows the finite aggregate duration,
+including sources that finish loading later and subsequent membership changes.
+When a provider becomes pending, the leaf withdraws its old source and controls;
+it cannot keep commanding the former Session through stale chrome.
+
+Changing an owning root's AudioContext creates a new paused Session and updates
+descendant scopes. Same-context destination changes update its route scope.
+Closed contexts, context/destination mismatches and conflicts with a prepared
+borrowed provider reject before replacing the current configuration. If a
+destination belongs to the previous context, clear it before assigning a new
+context. Borrowed contexts and destination nodes remain caller-owned.
+
+
 <details class="component-section">
 <summary>API</summary>
 
@@ -141,10 +175,11 @@ The source attributes are read only while a source is being resolved; assigning 
 | `.score` | property | — | A parsed `Score`. Overrides `src`. |
 | `.playback` | read-only property | stable source | Resolved data and revisioned snapshots/subscriptions; optional `seekNominal` uses nominal seconds. See [shared source](/score/api/#shared-playback-observation). |
 | `.resolvedScore` | read-only property | `undefined` | Current mounted `Score`, including one loaded from `src`; undefined during source replacement and in Rack/controller modes. `.score` still returns only explicit assignment. |
+| `.sessionTransport` | read-only property | `undefined` | Current borrowed/owned modular Session; undefined outside module mode, while its provider is pending, or after teardown. |
 | `.rack` | property | — | A borrowed [`Rack`](/score/headless/play/rack/) whose members share these transport commands. Overrides the nested desk, `.score` and `src`. |
 | `.controller` | property | — | A borrowed [`PlayerController`](/score/headless/play/player-controller/). Overrides every other source; see [Four ways to drive it](#four-ways-to-drive-it). |
 | `.sound` | property | — | A `Sound` / `HeadlessSynth` timbre. Overrides `sound-font`. |
-| `.effect` | property | — | An `Effect` or `Effect.chain(...)` on the owned single-score output. Assigning it rebuilds that graph and resets playback; in `.rack` / `.controller` mode, set the owning Rack or controller instead. |
+| `.effect` | property | — | An `Effect` or `Effect.chain(...)` on the owned single-score output. Assigning it replaces the compatibility insert; in `.rack` / `.controller` mode, set the owning Rack or controller instead. |
 | `.audioContext` | property | one created on demand | Share an existing `AudioContext` — with an analyser, or with another player. |
 | `.destination` | property | `context.destination` | Route output into this node instead. Its `.context` also serves as the SoundFont context. |
 
@@ -179,9 +214,9 @@ settings on mount and accepts explicit `.rate` writes.
 Dragging either volume control updates `.volume` without pinning it, because the reader moving a control is not the same as your code assigning the property.
 
 ```html
-<score-player src="/midi/Arabesque%20No.1.mid" volume="0.5" rate="0.8" pan="-1" loop></score-player>
-<score-player src="/midi/Arabesque%20No.1.mid" time-control="full" volume-control="fader"></score-player>
-<score-player src="/midi/Arabesque%20No.1.mid" time-control="simple" volume-control="knob"></score-player>
+<score-player src="/midi/webmusic-study-no-1.mid" volume="0.5" rate="0.8" pan="-1" loop></score-player>
+<score-player src="/midi/webmusic-study-no-1.mid" time-control="full" volume-control="fader"></score-player>
+<score-player src="/midi/webmusic-study-no-1.mid" time-control="simple" volume-control="knob"></score-player>
 ```
 
 **Events** — bubbling `CustomEvent`s; `webscore:error` is composed, while the

@@ -1,13 +1,15 @@
 ---
 title: 'ScorePlayer'
-description: 'The push engine: hand it a Score and a timbre and it schedules and plays the whole piece on its own clock.'
+description: 'Play a Score with an autonomous clock or a borrowed Session scheduling anchor, with explicit backend timing capabilities.'
 sidebar:
   order: 1
 ---
 
 import ScorePlayerPlayground from '../../../../../components/headless/ScorePlayerPlayground.astro';
 
-`ScorePlayer` owns an autonomous clock: hand it a `Score` and a timbre and it schedules + plays the whole piece, emitting `cursor` / `end` events. This is the engine behind the `<score-player>` element.
+`ScorePlayer` schedules a Score through a timbre and emits `cursor` / `end`
+events. Standalone playback owns its clock; a module can instead borrow the
+Session's scheduling anchor. This is the engine behind `<score-player>`.
 
 For a one-call code action, `await playScore(score, options)` creates, starts
 and returns that same controllable player; `playScoreFromUrl()` also performs
@@ -84,6 +86,90 @@ Custom synths opt into audio-clock lookahead through
 backends receive notes just in time. The full backend contract is on
 [Synth backends](/score/headless/play/sound/#synth-backends).
 
+### Shared Session scheduling
+
+After `preload()`, `attachScheduling(binding)` borrows a
+[`SessionSchedulingBinding`](/kernel/api/#shared-scheduling-binding) and returns
+a `ConnectionLease`. `followsSession` reports whether it is attached. Direct
+play/pause/stop/seek/rate/tempo/loop commands reject while bound; submit those
+commands to the Session. Gain, pan, effects and live note input retain their local
+roles. Releasing the lease cancels only this player's work, without changing the
+Session or closing its context.
+
+`schedulingCapabilities: ScoreSchedulingCapabilities` makes backend differences
+explicit: `attacks` and `releases` are `audio-clock` or `callback`, `loopBoundary`
+is `lookahead` or `callback`, `cancellation` is `occurrence` or `pitch`, and
+`crossingNotes` is `clip-and-retrigger`. Future native attacks require scheduled
+cancellation with occurrence handles; native releases additionally require
+scheduled duration. Public note/cursor events remain callback observations.
+
+Lookahead consumes mapped future loop segments and cancels obsolete epochs.
+Note gates crossing a loop end are clipped, and the incoming pass retriggers its
+intersecting notes; tied notes are already merged by the timeline. Native backend
+ADSR can continue its release tail beyond a gate. Rate changes preserve and retime
+active voices only when the backend explicitly supports both scheduled duration
+and scheduled retiming; other backends cancel/retrigger at the new anchor. A timer
+stall beyond lookahead can miss deadlines, and this contract does not measure
+output-device latency or guarantee acoustic alignment.
+
+## Module adapter
+
+`ScorePlayerModule` wraps one real `ScorePlayer` in a `ModuleContext`. Construct
+it with `(score, {context, id?, player?, offsetSeconds?, positionScale?, ...playerOptions})`; an explicit player
+is borrowed, otherwise the module owns the engine it creates. Its local axis is
+nominal Score seconds. The context's Session registers that engine identity once,
+prepares it before attaching the shared scheduling binding, and activates audio
+only for explicit playback. Offset defaults 0 and positive position scale 1.
+
+| Member | Contract |
+| --- | --- |
+| `player` | Actual Score engine; module adapters command it directly, avoiding Element delegation recursion. |
+| `params` | Borrow the engine's available instrument `ParamSurface`; the same handles are exposed by `ScorePlayer.params`. |
+| `capabilities.get(SCORE_NOTE_INPUT)` | Borrow the module's live-note target. Preparation resumes audio for an actual input gesture, without starting the score or Session transport. |
+| `prepare()` | Explicitly prepare the shared audio environment/engine and admit its output once. |
+| `inserts` | Prepared live `InsertChain`, otherwise undefined. |
+| `getPort('main')` / `getPort('output')` | Prepared `AudioOutputPort`, otherwise undefined. |
+| `subscribe(listener)` | Observe capability readiness/replacement; discovery itself allocates nothing. |
+| `dispose()` | Release registration, participant and route; dispose only an engine the module created. |
+
+The native `ScorePlayer` additionally exposes `preparedContext`, `inserts`,
+`audioOutput`, its `effect` recipe and `setEffect(effect)`. `configureAudio(context)`
+configures its shared environment before preparation; `setDestination(null)`
+removes the default audible route. A legacy effect is the chain's compatibility
+slot, preserving separately declared inserts. Read
+[the shared contracts](/kernel/api/#module--webmusickernelmodule) before taking
+ownership of routing or parameter resources.
+
+## Live note occurrences
+
+`noteOnOccurrence({id, midi, velocity})` and `noteOffOccurrence(id)` play a held
+live voice through the same instrument and output as the score. Prepare the
+player first. The occurrence id identifies one gate, so two equal pitches can
+release independently. These commands do not move the score cursor or start its
+transport. Exact release is a required instrument capability; unsupported
+backends reject instead of falling back to a pitch-wide release.
+
+`NoteInputController` provides the same source-owned state for a custom keyboard
+or sensor. Its `NoteInputTarget` exposes `prepare(): Promise<void>`,
+`noteOn(occurrence)` and `noteOff(id)`. A controller borrows that target; it owns
+only the ids it presses. `NoteInputOccurrence` contains `id`, `midi` and
+`velocity`. Module bindings use the exported `SCORE_NOTE_INPUT` capability key.
+
+| Member | Contract |
+| --- | --- |
+| `new NoteInputController({target?, onError?})` | Construct without audio or transport startup. `NoteInputControllerOptions.onError` receives preparation/dispatch/cleanup failures. |
+| `press(midi, velocity = 100)` | Returns a fresh `NoteInputOccurrence`; preparation and dispatch belong to this occurrence. |
+| `release(id)` / `releaseAll()` | Release one or all occurrences owned by this controller. Pending preparation cannot attack after release. |
+| `setTarget(target)` | Borrow a `NoteInputTarget`, or `undefined` to unbind; releases the previous target's owned occurrences. |
+| `activeOccurrenceCount` / `connected` | Number of owned held occurrences and whether a target is assigned. |
+| `dispose()` | Release owned occurrences and detach from the borrowed target. |
+
+The [note-input Element](/score/element/play/score-note-input/) resolves this
+capability through context or an explicit module target. Unmounting one input
+releases only that input's notes; disposing the owning player releases all its
+remaining live voices.
+
+
 <details class="component-section">
 <summary>API</summary>
 
@@ -109,6 +195,7 @@ backends receive notes just in time. The full backend contract is on
 | Member | Return | Contract |
 | --- | --- | --- |
 | `preload()` | `Promise<void>` | Builds the timeline/graph and awaits sample readiness for sounding pitches, including part transposition; use `play()` to start and resume audio. |
+| `attachScheduling(binding)` | `ConnectionLease` | Borrow a prepared Session anchor; release removes only this scheduling attachment. |
 | `play(when?)` | `Promise<void>` | Prepares audio and starts or arms playback at absolute AudioContext seconds. |
 | `pause()` · `stop()` | `void` | Pause preserves the point; stop resets to the beginning. |
 | `seek(seconds, when?)` · `seekFraction(fraction, when?)` · `seekNominal(seconds, when?)` | `Promise<void>` | Seek in transport seconds, fraction, or nominal score seconds. While playing, optional `when` schedules the restart; paused seeks ignore it. |
@@ -116,6 +203,8 @@ backends receive notes just in time. The full backend contract is on
 | `setTempo(bpm)` · `setRate(rate)` | `void` | Change playback speed; retain the nominal musical point. |
 | `setVolume(value)` · `setPan(value)` | `void` | Master linear gain (minimum zero) and stereo pan (clamped to −1…1). |
 | `setLoop(startSeconds, endSeconds)` · `clearLoop()` | `void` | Set an ordered, clamped region in current transport seconds, or remove it; an empty region clears the loop. |
+| `noteOnOccurrence({id, midi, velocity})` | `void` | Start an independently releasable held live voice on the prepared instrument. |
+| `noteOffOccurrence(id)` | `void` | Release only that live occurrence, leaving matching pitches from other sources intact. |
 
 **State**
 
@@ -124,6 +213,7 @@ backends receive notes just in time. The full backend contract is on
 | `playback` | Borrowed `ScorePlaybackSource`: resolved score, coherent snapshot/subscription and optional nominal seek; see [shared contract](/score/api/#shared-playback-observation). Reading it does not create an audio graph. |
 | `context` | Lazily realised `AudioContext`. |
 | `clock` | Read-only transport clock; nominal score-second position against AudioContext time. |
+| `followsSession` · `schedulingCapabilities` | Shared-anchor attachment state and explicit backend precision/cancellation capabilities. |
 | `currentTime` | Musical `TimePosition`. |
 | `seconds` · `nominalSeconds` | Current transport seconds and nominal score seconds respectively. |
 | `durationSeconds` · `duration` | Rate-scaled transport duration, in seconds. |

@@ -10,20 +10,20 @@ import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
 >
   <div class="wui-row"><button class="wui-btn" data-play type="button">▶ Play</button><span class="wui-readout wui-readout--wide" data-readout>—</span></div>
   <div slot="parameters" class="wm-pg__grid">
-    <div class="wm-pg__param"><span class="wm-pg__name">select</span><div class="wui-seg" data-takes><button class="wui-btn" data-variant="ghost" data-select="A" type="button" aria-pressed="true">A · MIDI</button><button class="wui-btn" data-variant="ghost" data-select="B" type="button" aria-pressed="false">B · MXL</button></div><span class="wm-pg__note">Compare two imports of Arabesque No. 1 through ab.select(id).</span></div>
+    <div class="wm-pg__param"><span class="wm-pg__name">select</span><div class="wui-seg" data-takes><button class="wui-btn" data-variant="ghost" data-select="A" type="button" aria-pressed="true">A · MIDI</button><button class="wui-btn" data-variant="ghost" data-select="B" type="button" aria-pressed="false">B · MXL</button></div><span class="wm-pg__note">Compare two imports of WebMusic Study No. 1 through ab.select(id).</span></div>
   </div>
 </HeadlessDemoFrame>
 
 <script>
   import {mountProgrammaticDemo, programmaticCode} from './programmatic-demo-lifecycle';
   import { AbPlayer, Sound } from '@webmusic/score/play/headless';
-  import {arabesqueExcerpt, loadArabesqueScore} from '../headless/arabesque-score';
+  import {studyExcerpt, loadStudyScore} from '../headless/study-score';
 
   mountProgrammaticDemo('[data-programmatic-abplayer]', async (root, scope) => {
-    const [midi, mxl] = await Promise.all([loadArabesqueScore('midi'), loadArabesqueScore('mxl')]);
+    const [midi, mxl] = await Promise.all([loadStudyScore('midi'), loadStudyScore('mxl')]);
     if (!scope.active) return;
-    const midiTake = arabesqueExcerpt(midi);
-    const mxlTake = arabesqueExcerpt(mxl);
+    const midiTake = studyExcerpt(midi);
+    const mxlTake = studyExcerpt(mxl);
     const playBtn = root.querySelector('[data-play]') as HTMLButtonElement;
     const selectBtns = Array.from(
       root.querySelectorAll('[data-select]'),

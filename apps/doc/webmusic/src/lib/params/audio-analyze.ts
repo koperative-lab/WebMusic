@@ -18,6 +18,8 @@ export const AUDIO_ANALYZE_PARAMS: ElementParamCatalog = {
     entry: ENTRY,
     params: [
       {name: 'player', kind: 'text', placeholder: '#session', fallback: 'use .analyser or .context', note: 'Borrow the central player output analyser; late insertion and source replacement are observed.'},
+      {name: 'input', kind: 'text', placeholder: '#desk', fallback: 'legacy player binding', note: 'Select one module output without preparing or rerouting its audible graph; a missing explicit input remains pending.'},
+      {name: 'port', kind: 'text', placeholder: 'master', fallback: 'main', note: 'Named audio output to tap on the selected module, such as main or master.'},
       {name: 'mode', kind: 'enum', options: ['level', 'spectrum'], fallback: 'level', note: 'Choose normalized level or FFT bars; changing modes remounts the presenter.'},
       {name: 'bars', kind: 'number', min: 4, step: 1, fallback: '28', note: 'Spectrum bar count, minimum 4; remounts the presenter.'},
       {name: 'aria-label', kind: 'text', placeholder: 'Output level', fallback: 'Audio level, or Spectrum', note: 'Accessible monitor name.'},
@@ -27,6 +29,7 @@ export const AUDIO_ANALYZE_PARAMS: ElementParamCatalog = {
       {name: 'peak-decay', kind: 'number', min: 0, step: 0.002, fallback: '0.012', note: 'Absolute per-read decrement of the held scaled-RMS marker.'},
     ],
     properties: [
+      {name: 'inputModule', note: 'Borrow a ModuleHandle object before the input selector; null explicitly unbinds. Its existing port is tapped without changing routing.'},
       {name: 'player', note: 'Borrow an AudioMeterPlayer object instead of a selector.'},
       {name: 'context', note: 'Build an owned transparent input-analyser-output tap in a caller-supplied BaseAudioContext.'},
       {name: 'analyser', note: 'Borrow an existing AnalyserNode; it is never disconnected by the meter.'},
@@ -39,10 +42,13 @@ export const AUDIO_ANALYZE_PARAMS: ElementParamCatalog = {
     entry: ENTRY,
     params: [
       PLAYER,
+      {name: 'input', kind: 'text', placeholder: '#desk', fallback: 'legacy player binding', note: 'Select one module output without preparing or rerouting its audible graph; a missing explicit input remains pending.'},
+      {name: 'port', kind: 'text', placeholder: 'master', fallback: 'main', note: 'Named audio output to tap on the selected module, such as main or master.'},
       {name: 'threshold-dbfs', kind: 'number', min: -60, max: 0, step: 1, fallback: '-12',
         note: 'Sample-peak comparison threshold; the control and threshold line update together.'},
     ],
     properties: [
+      {name: 'inputModule', note: 'Borrow a ModuleHandle object before the input selector; null explicitly unbinds. Its existing port is tapped without changing routing.'},
       {name: 'analyser', note: 'Optional caller-owned AnalyserNode; takes precedence over player.'},
       {name: 'thresholdDbfs', note: 'Reflected threshold, clamped to -60 through 0 dBFS.'},
       {name: 'sample', note: 'Read-only latest sampled {rmsDbfs, peakDbfs}; undefined before a frame.'},
@@ -59,6 +65,8 @@ export const AUDIO_ANALYZE_PARAMS: ElementParamCatalog = {
     entry: ENTRY,
     params: [
       PLAYER,
+      {name: 'input', kind: 'text', placeholder: '#desk', fallback: 'legacy player binding', note: 'Select one module output without preparing or rerouting its audible graph; a missing explicit input remains pending.'},
+      {name: 'port', kind: 'text', placeholder: 'master', fallback: 'main', note: 'Named audio output to tap on the selected module, such as main or master.'},
       {name: 'frozen', kind: 'bool', fallback: 'false', note: 'Hold the currently drawn FFT frame for inspection.'},
       {name: 'peak-hold', kind: 'bool', fallback: 'false', note: 'Overlay the highest observed bin levels until Reset peaks.'},
       {name: 'min-frequency', kind: 'number', min: 1, max: 20000, step: 1, fallback: '20', note: 'Lower frequency of the logarithmic display.'},
@@ -66,6 +74,7 @@ export const AUDIO_ANALYZE_PARAMS: ElementParamCatalog = {
       {name: 'aria-label', kind: 'text', fallback: 'Spectrum analyzer', note: 'Accessible name of the inspection surface.'},
     ],
     properties: [
+      {name: 'inputModule', note: 'Borrow a ModuleHandle object before the input selector; null explicitly unbinds. Its existing port is tapped without changing routing.'},
       {name: 'analyser', note: 'Optional caller-owned AnalyserNode; borrowed FFT settings are not changed.'},
       {name: 'frozen / peakHold', note: 'Reflected display modes.'},
       {name: 'minFrequency / maxFrequency', note: 'Reflected display frequency bounds in Hz.'},
@@ -83,6 +92,8 @@ export const AUDIO_ANALYZE_PARAMS: ElementParamCatalog = {
     entry: ENTRY,
     params: [
       PLAYER,
+      {name: 'input', kind: 'text', placeholder: '#desk', fallback: 'legacy player binding', note: 'Select one module output without preparing or rerouting its audible graph; a missing explicit input remains pending.'},
+      {name: 'port', kind: 'text', placeholder: 'master', fallback: 'main', note: 'Named audio output to tap on the selected module, such as main or master.'},
       {name: 'frozen', kind: 'bool', fallback: 'false', note: 'Hold the current sampled window and stop polling.'},
       {name: 'timebase-ms', kind: 'number', min: 0.1, max: 100, step: 0.1, fallback: '10', note: 'Requested visible milliseconds, bounded by the borrowed analyser window.'},
       {name: 'trigger-level', kind: 'number', min: -1, max: 1, step: 0.05, fallback: '0', note: 'Linear sample-amplitude threshold for edge alignment.'},
@@ -90,6 +101,7 @@ export const AUDIO_ANALYZE_PARAMS: ElementParamCatalog = {
       {name: 'aria-label', kind: 'text', fallback: 'Oscilloscope', note: 'Accessible inspection surface name.'},
     ],
     properties: [
+      {name: 'inputModule', note: 'Borrow a ModuleHandle object before the input selector; null explicitly unbinds. Its existing port is tapped without changing routing.'},
       {name: 'analyser', note: 'Optional caller-owned AnalyserNode; takes precedence over player.'},
       {name: 'frozen / timebaseMs / triggerLevel / triggerEdge', note: 'Reflected inspection controls.'},
       {name: 'trace', note: 'Read-only copied waveform window and trigger state, or undefined before sampling.'},
@@ -105,10 +117,13 @@ export const AUDIO_ANALYZE_PARAMS: ElementParamCatalog = {
     entry: ENTRY,
     params: [
       PLAYER,
+      {name: 'input', kind: 'text', placeholder: '#desk', fallback: 'legacy player binding', note: 'Select one module output without preparing or rerouting its audible graph; a missing explicit input remains pending.'},
+      {name: 'port', kind: 'text', placeholder: 'master', fallback: 'main', note: 'Named audio output to tap on the selected module, such as main or master.'},
       {name: 'sensitivity', kind: 'number', min: 0, max: 1, step: 0.05, fallback: '0.55', note: 'Higher sensitivity lowers the attack threshold; the tool control updates this attribute.'},
       {name: 'min-interval-ms', kind: 'number', min: 50, max: 1000, step: 10, fallback: '160', note: 'Minimum spacing between emitted live attack cues in milliseconds.'},
     ],
     properties: [
+      {name: 'inputModule', note: 'Borrow a ModuleHandle object before the input selector; null explicitly unbinds. Its existing port is tapped without changing routing.'},
       {name: 'analyser', note: 'Optional caller-owned AnalyserNode; takes precedence over player.'},
       {name: 'sensitivity / minIntervalMs', note: 'Reflected detection controls.'},
       {name: 'sample', note: 'Latest normalized {strength, hit} cue observation, if available.'},

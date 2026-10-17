@@ -17,6 +17,9 @@ These jobs need both domains:
   reference, one group command authority and drift correction —
   `ScoreAudioSync` and its two factories. Each engine still owns its transport
   clock.
+- **Restore a mixed modular project**, with trusted Score, Audio, Rack, effect
+  and Session-LFO factories — `createWebMusicProjectPlugins`. Kernel owns the
+  shared scheduling/project protocol; your application supplies assets and storage.
 - **Turn a score into audio**, offline — `renderScoreToClip`.
 - **Convert between the two notions of time** — a Score `TimeMap` and an
   Audio `BeatGrid`, in either direction.
@@ -33,9 +36,10 @@ These jobs need both domains:
 @webmusic/audio ─┘
 ```
 
-Both families are **peer dependencies**, along with `@webmusic/kernel`: the
-bridge borrows the score and audio instances your application already has
-rather than bundling its own. It publishes last, after both families.
+Both families are **peer dependencies**, along with `@webmusic/kernel`.
+The application selects compatible package instances. Runtime factories declare
+which players they create and own; supplied resources retain their documented
+borrowed lifetime. Bridge publishes after both families.
 
 ## The smallest example
 
@@ -57,6 +61,7 @@ pages below.
 |                                                        |                                                                                                              |
 | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
 | [Playback composition](/bridge/composition/)           | A runnable score/audio session, borrowed views, source replacement and independent native loops.             |
+| [Modular composition and projects](/bridge/modular-composition/) | Shared Session scheduling, nested buses, parameters, recoverable project files and accessible patch editing. |
 | [`ScoreAudioSync`](/bridge/headless/score-audio-sync/) | The stateful sync object: construction, commands, state, the error channel, and what it owns versus borrows. |
 | [`@webmusic/bridge`](/bridge/api/)                     | The entry reference — every root export, including the stateless conversion and rendering functions.         |
 

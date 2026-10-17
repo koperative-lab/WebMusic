@@ -30,7 +30,7 @@ import LiveDemoCanvas from './LiveDemoCanvas.astro';
   defineAudioViewElement();
 
   (async () => {
-    const clip = await loadClipFromUrl(`${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`);
+    const clip = await loadClipFromUrl(`${import.meta.env.BASE_URL}wav/webmusic-study-no-1.wav`);
     const player = document.getElementById('wa-wb-player') as AudioPlayerElement | null;
     const view = document.getElementById('wa-wb-view') as AudioViewElement | null;
     if (player) player.clip = clip;                    // play the decoded clip

@@ -1,6 +1,6 @@
 ---
 title: '@webmusic/kernel'
-description: The ten kernel entries — events, element, worker, audio-context, player, effect, meter, transport, tick and sync — and the contracts each one carries.
+description: Kernel entries for lifecycle, module capabilities, routing, parameters, effects and Session coordination.
 ---
 
 Every entry is import-safe in Node, workers, and SSR. The root entry
@@ -19,6 +19,8 @@ take exactly what they use.
 | [`/transport`](#transport--webmusickerneltransport) | `TransportClock` affine anchor math + `TimelineMapping` |
 | [`/tick`](#tick--webmusickerneltick) | Throttling-resistant tick delivery for lookahead schedulers |
 | [`/sync`](#sync--webmusickernelsync) | Transport grouping, timeline mapping and drift coordination |
+| [`/module`](#module--webmusickernelmodule) | Module contexts, audio/control routing, parameter handles and versioned projects |
+| [`/session`](#session--webmusickernelsession) | Source-free Session conductor, shared scheduling anchors and participant leases |
 
 ## events — @webmusic/kernel/events
 
@@ -138,6 +140,567 @@ real-time control) and a `dispose`. An optional `label` lets UIs caption
 controls. Both families' effect chains and the score synth panel speak this
 contract.
 
+`InsertChain` realizes ordered recipes over one context. Its stable `input` and
+`output` ports bracket the chain; `slots`, `instances` and `revision` describe
+the committed graph. Failed candidates preserve the previous working graph.
+
+| API | Contract |
+| --- | --- |
+| `new InsertChain(context, options?)` | Creates owned gain endpoints; options include `id` and `onCleanupError`. |
+| `replace(slots)` | Replace the explicit ordered `InsertSlot` list. Duplicate ids reject. |
+| `setSlot(slot)` / `removeSlot(id)` | Append/update one slot without reordering other declarations; remove only that slot. |
+| `setCompatibility(effect)` | Manage the reserved `COMPATIBILITY_EFFECT_SLOT` (`$compat`) before explicit slots. |
+| `subscribe(listener)` | Observe graph changes; read the initial getters explicitly. |
+| `dispose()` | Disconnect managed edges and release owned instances/endpoints; borrowed instances remain borrowed. |
+
+An `InsertSlot` contains `id`, `recipe`, optional `ownership` (`owned` by default)
+and `parameterDescriptors`. Each `EffectInstance` has its own `id`, `slotId`,
+recipe, nodes, ownership and shared `params: ParamSurface`. Parameter descriptors
+name units, ranges and defaults; they do not turn `AudioParam.value` into a
+measurement of total modulated output. Legacy `.effect` writes affect only the
+compatibility slot and preserve explicit declarations.
+
+### Explicit effect transitions
+
+`TransitionInsertChain` is an opt-in wrapper for whole effect generations with
+stable external input/output nodes. Ordinary `InsertChain` retains its reuse and
+immediate retirement behavior; component `.effect` setters do not automatically
+acquire a crossfade or tail policy.
+
+| Member | Contract |
+| --- | --- |
+| `new TransitionInsertChain(context, options?)` | Borrow context; own boundary nodes and an initial empty chain. `TransitionInsertChainOptions` includes `id`, `onCleanupError`, `maxRetiring` (8, positive integer) and optional Kernel tick options. |
+| `input`, `output`, `context`, `id` | Stable same-context boundaries and identity. |
+| `current` | Borrow the active generation's `InsertChain` and its handles. |
+| `retiring` | Frozen `RetiringInsertChain[]` records with `chain` and absolute audio-clock `retireAt`. |
+| `revision`, `disposed` | Committed generation revision and terminal disposal state. |
+| `replace(slots, options?)` | Build a fresh owned generation before modifying the current one. `InsertTransitionOptions` accepts finite nonnegative `fadeSeconds` (0.02) and `tailSeconds` (0). |
+| `collect()` | Release generations whose audio-clock retirement time has passed; useful after offline rendering. |
+| `dispose()` | Cancel cleanup scheduling and release every owned generation; retain context and borrowed outer graph. |
+
+With no tail, replacement linearly crossfades old/new outputs over `fadeSeconds`.
+If another replacement interrupts that fade, all still-fading no-tail generations
+hand off their current combined mix over the new fade; their retirement deadlines
+move to its end. An immediate replacement cuts those unfinished contributions.
+Previously draining tails retain their own ramps and retirement deadlines.
+With a positive tail, the outgoing input fades to zero while its output is
+retained through the fade, then that output fades to silence over `tailSeconds`.
+The new output fades in over the same initial fade. Tail mixing can temporarily
+sum old and new energy; it is not normalization or latency compensation. Audio
+ramps reach silence at the scheduled bound even if the cleanup tick is late.
+Context suspension does not consume the tail budget.
+
+Every replacement has fresh effect, parameter, CV and automation identities,
+even when a recipe or slot ID is reused. Bind new views/mappings to the new
+`current`; old handles remain alive only until their generation retires. Direct
+edits to `current` use ordinary InsertChain semantics. Borrowed slots and aliases
+of a live generation's circuit are rejected. Failed candidate construction
+preserves the working generation; reaching `maxRetiring` rejects an additional
+timed replacement until old generations can retire. The wrapper does not promise
+hardware-atomic, perceptually click-free or device-latency-corrected switching.
+
+## module — @webmusic/kernel/module
+
+This entry exposes explicit nonvisual relationships. DOM lookup lives in
+`@webmusic/kernel/element`; discovering a capability never prepares audio.
+
+| Export | Public surface and lifetime |
+| --- | --- |
+| `createCapabilityKey<T>(name)` | Create a typed identity token; equal diagnostic names do not alias. |
+| `ModuleCapabilities` | Immutable `with(key, value)` directory with `get`/`has`; values are borrowed. |
+| `ModuleHandle`, `createModuleHandle()` | Borrow `id`, optional `params`, `inserts`, capabilities, named `getPort`, explicit `prepare` and `subscribe`; no disposal authority. |
+| `ModuleRegistry` | `register(module)` returns a `ConnectionLease`; `get(id)`, `snapshot()`, `revision` and `subscribe` describe one scope. Duplicate ids reject. `dispose()` unregisters without disposing modules. |
+| `ModuleAudioEnvironment` | Optional borrowed `context` or lazy `create` factory. `peek()` observes; `prepare()` explicitly allocates; `dispose()` closes only an owned context. |
+| `ModuleContext` | Explicit `id`, audio environment, registry, optional Session, destination callback, admission, target and capabilities. `derive(options)` defines inheritance without DOM search. |
+| `createConnectionLease(cleanup)` | Revocable, idempotent relationship with `active` and `release()`. Endpoints stay borrowed. |
+| `AudioOutputPort` | Stable named output with one default route, at most one replacement claimant and independent taps/sends. |
+| `ParamHandle` | Numeric base-value authority with native CV bindings, scheduled automation and subscriptions. |
+| `ParamSurface` | Read-only iterable collection of handles with `get(id)`; it does not own the handles. |
+| `ParamAudioBus` | One same-context full-value control bus shared by current and future AudioParam targets. |
+| `ControlLFO` · `ControlEnvelope` · `EnvelopeFollower` | Native audio-rate control generators; each borrows its context and owns its nodes. |
+| `ParamMacro` | Normalized multi-parameter base-value controller with explicit native-unit mapping ranges. |
+| `ModuleProject`, `parseModuleProject()`, `serializeModuleProject()` | Versioned JSON project, strict validation and serialization. |
+| `ProjectPluginRegistry` | Exact plugin ID/version lookup with revocable factory registrations. |
+| `ModuleProjectRuntime` | Own staged/active project graphs while borrowing an audio environment. |
+
+`ModuleContext` construction does not allocate nodes. `derive()` shares its audio
+environment and inherits unspecified relationships; explicit null clears Session,
+admission or target where allowed. A child registry is a separate explicit scope.
+
+### Output routing
+
+`new AudioOutputPort(node, {id?, defaultDestination?, onCleanupError?})` exposes
+`node`, `context`, `id`, `kind: 'audio'`, `direction: 'output'`, `disposed`,
+`defaultDestination` and `replaced`. `setDefault(destination)` configures its normal
+path. `replace(destination)` claims that path with a lease; releasing the claim
+restores the current default. `send(destination)` and `tap(destination)` add
+independent leased branches without replacing the audible route. Identical managed
+edges share reference counts. Cross-context edges, self-connections and cycles
+among managed edges reject. `dispose()` releases managed routes without disposing
+the source node or foreign graph.
+
+### Shared parameters
+
+`ParamDescriptor` names `id`, optional label, unit, finite legal range, default
+value, optional `displayRange`, step/scale and the supported update
+contract. `displayRange: {min, max}` is a finite, ordered subset of the legal range
+for a control's initial viewport; it never restricts `setBaseValue` writes.
+`step` is also a UI suggestion and does not quantize writes. `ParamHandle`
+options supply an initial `baseValue` and synchronous `apply(value)` backend.
+Out-of-range/nonfinite values and asynchronous backend writes reject. A failed
+write leaves the snapshot unchanged. `updateTiming` is `synchronous` or
+`scheduled`; `modulation` is `none`, `audio-rate` or `control-rate`. An omitted
+modulation capability does not support native CV. Unsupported scheduling or
+rate combinations reject rather than silently using a callback loop.
+
+`snapshot` reports base value, revision, `baseRevision`, disposal, optional scheduled `automation`
+and predicted `modulationRange`. While automation runs, the base is evaluated
+from the scheduled model at the current context time. The predicted range adds
+the declared mapping excursions; it is not a measured signal or a clamp.
+`effectiveReadback.status` remains `unavailable`: `AudioParam.value` does not
+include connected control input. Subscriptions announce configuration changes,
+not every audio sample or every point of a ramp. A view can poll the snapshot
+at its own display rate without driving the audio graph.
+
+`baseRevision` advances only when `setBaseValue` commits (including a manual
+automation cancellation that holds the current base). CV connection/depth
+changes and scheduled-trajectory notifications do not advance it. Consumers
+can distinguish a base override from a modulation graph update even while paused.
+
+Read `snapshot` before subscribing: parameter and chain subscriptions report
+subsequent changes rather than manufacturing an initial event. Multiple views
+share handles; disposing a view must not dispose borrowed handles.
+
+| `ParamHandle` member | Contract |
+| --- | --- |
+| `new ParamHandle(descriptor, {baseValue?, apply?})` | Validate finite legal/default/initial values; initial base defaults to `descriptor.defaultValue`. The optional `apply` must be synchronous. |
+| `descriptor` / `snapshot` | Immutable metadata and current authoritative state. |
+| `setBaseValue(value)` | Validate the legal range, apply the base, cancel pending base automation and notify. Mapping inputs remain independent. |
+| `audio(context)` | Prepare and return one `ParamAudioBus`. Another context rejects until `releaseAudio` releases the current one. |
+| `bindAudioParam(context, param, {lazy?})` | Borrow an AudioParam and return a precise `ConnectionLease`. With `lazy: true`, keep an ordinary intrinsic base until the first native bus is needed. |
+| `connectModulation(signal, {depth, polarity?})` | Return an additive `ParamMapping`. Depth uses the parameter's native unit; polarity defaults to `bipolar`. |
+| `scheduleAutomation(context, events, referenceTime?)` | Replace the future base trajectory with `ParamAutomationEvent[]` on absolute context seconds. Optional planning reference defaults to call-entry context time. Requires scheduled/native capability. |
+| `cancelAutomation()` | Cancel pending trajectory and hold its modeled current base. |
+| `releaseAudio(context)` | Release this context's bus and voice bindings, retaining reusable metadata/base state. A different context is ignored. |
+| `subscribe(listener)` | Observe later configuration changes; returns an unsubscribe callback. |
+| `dispose()` | Release owned audio resources and subscriptions. Borrowed views must not call it. |
+
+`ParamSurface(handles)` rejects duplicate parameter ids. Its frozen `handles`,
+`get(id)` and iterable view borrow the handles and introduce no DSP or disposal
+authority. `ParamDescriptor`, `ParamSnapshot` and `ParamHandleOptions` describe
+the metadata/state/construction above.
+
+### Native control signals and automation
+
+A `ControlSignal` declares `output: AudioNode`, `rate: 'a-rate' | 'k-rate'` and
+a finite, nonempty `range`. A mapping normalizes that range to bipolar −1…1 or
+unipolar 0…1, multiplies by native-unit depth and adds to the base. Negative
+depth reverses polarity. Audio contexts must match; an a-rate target rejects a
+k-rate source. There is no implicit conversion between Hz, cents, dB and gain.
+
+Each `ParamAudioBus` places its base on one ConstantSourceNode and zeros its
+borrowed targets' intrinsic values. Attaching another voice connects that same
+full-value bus, so the base is counted once for both current and future voices.
+Voice velocity and per-note envelopes remain separate instrument gain stages.
+Bindings are reference-counted per AudioParam; releasing the final lease removes
+only this bus's edge and leaves the target at the modeled current base.
+
+| Public surface | Contract |
+| --- | --- |
+| `new ParamAudioBus(context, baseValue, rate, changed?)` | Low-level native bus; ordinary consumers obtain it through `ParamHandle.audio`. |
+| `context` / `rate` / `active` | Borrowed context, declared processing rate and current lifetime. |
+| `automation` / `mappings` / `estimatedRange` | Readonly configuration and predicted additive bounds, never sampled effective output. |
+| `baseValueAt(time)` | Evaluate the scheduled base model at absolute context seconds. |
+| `bind(param)` | Return a lease for one native target; require compatible processing rate and context. |
+| `connect(signal, options)` | Return a `ParamMapping` with `active`, `depth`, `polarity`, `setDepth(depth)` and `release()`. |
+| `setBaseValue(value)` / `schedule(events, referenceTime?)` | Set a base or replace its future trajectory. Optional planning reference defaults to call-entry context time. Use the handle when legal-range validation is required. |
+| `dispose()` | Release mappings, bindings and owned source; never close the borrowed context. |
+
+`ParamAutomationEvent` has `type: 'set' | 'linear' | 'exponential'`, `value` in
+native units and `time` in absolute context seconds. Events must use finite
+values and nondecreasing times at or after the planning reference. Capture
+`referenceTime` before planning; it must be finite, nonnegative and no later
+than the current audio time. Both validation layers share that reference.
+If time advances during planning or allocation, elapsed set/ramp events are
+evaluated at submission and remaining endpoints retain their authored times.
+An empty schedule holds the modeled current base. Exponential ramps require
+positive endpoints. Validation happens before the current trajectory is replaced.
+Clock crossings during native submission receive bounded reconciliation using
+the original trajectory. A prolonged scheduler stall can still underrun; this
+does not imply atomic submission across an indefinitely blocked main thread.
+This API does not bind automation to Session seek, loop, tempo or persistence.
+
+```ts
+import {ControlLFO, ParamHandle} from '@webmusic/kernel/module';
+
+const cutoff = new ParamHandle({id: 'cutoff', unit: 'Hz',
+  range: {min: 20, max: 20000}, defaultValue: 1200,
+  updateTiming: 'scheduled', modulation: 'audio-rate'});
+const voice = cutoff.bindAudioParam(context, filter.frequency);
+const lfo = new ControlLFO(context, {frequency: 2, waveform: 'sine'});
+const mapping = cutoff.connectModulation(lfo.signal, {depth: 400});
+const now = context.currentTime;
+cutoff.scheduleAutomation(context, [
+  {type: 'set', value: 1200, time: now},
+  {type: 'linear', value: 3000, time: now + 2},
+], now);
+
+// The graph owner releases relationships before their endpoints.
+const dispose = () => {
+  mapping.release();
+  lfo.dispose();
+  voice.release();
+  cutoff.dispose();
+};
+```
+
+### Control generators
+
+All generators borrow a `BaseAudioContext`, expose a `signal` and own their
+native nodes. Importing their classes allocates nothing; construction explicitly
+creates DSP. Their lifetime belongs to the graph owner, not a display panel.
+
+| Export / member | Contract |
+| --- | --- |
+| `new ControlLFO(context, options?)` | Starts a native oscillator. `ControlLFOOptions.frequency` defaults to `1` Hz, finite from zero to Nyquist; `waveform` defaults to `sine` and accepts `sine`, `triangle`, `square` or `sawtooth`. |
+| `ControlLFO.signal` / `frequency` | Bipolar a-rate output and its shared frequency `ParamHandle`. |
+| `ControlLFO.waveform` / `setWaveform(value)` | Read/change oscillator waveform. No transport phase/seek contract is implied. |
+| `new ControlEnvelope(context, options?)` | Global a-rate ADSR generator with `ControlEnvelopeOptions.attack: 0.01`, `decay: 0.1`, `sustain: 0.7`, `release: 0.2`. Times are nonnegative seconds; sustain is 0…1. |
+| `ControlEnvelope.context` / `signal` | Borrowed context and unipolar 0…1 control output. |
+| `ControlEnvelope.trigger(time?, velocity?)` | Retrigger from its modeled current level; time defaults to current context seconds, velocity to `1` in 0…1. |
+| `ControlEnvelope.release(time?)` | Release from its modeled level at the current/future absolute context time. |
+| `new EnvelopeFollower(context, options?)` | Audio-rate absolute-value envelope follower with native one-pole IIR smoothing and unity DC gain. `EnvelopeFollowerOptions.smoothingHz` defaults to `20`, positive and below Nyquist. |
+| `EnvelopeFollower.input` / `signal` | Audio input and smoothed unipolar 0…1 control output. Input magnitude beyond the waveshaper range clips; this is not a calibrated level meter. |
+| `dispose()` | Each generator idempotently releases its own nodes. Release outgoing mappings first; it never closes the context or disposes a target. |
+
+Future envelope edits preserve the incoming curve before their timestamp,
+including the peak immediately before a zero-duration decay and silence before
+a zero-duration attack. Release starts from the level after any instantaneous
+transition at that timestamp; it does not replace the preceding ramp endpoint.
+Each command captures the current context time once, so a default-time command
+remains valid when the native clock advances. Completed model history is pruned
+to the last required anchor while future events remain available for retriggers.
+
+### Macros
+
+`new ParamMacro(targets, {value?})` borrows an iterable of `ParamMacroTarget`
+objects: `{target: ParamHandle, min, max}`. Native-unit endpoints must fit that
+handle's legal range; reversed endpoints are allowed. Repeating a target rejects.
+The initial normalized value defaults to `0` and does not write the targets.
+
+| Member | Contract |
+| --- | --- |
+| `targets` / `value` | Frozen mapping list and current normalized macro position. |
+| `setValue(value)` | Require finite 0…1 and write each target's base to `min + value * (max - min)`. These writes replace pending target automation. |
+| `subscribe(listener)` | Observe subsequent committed positions; read `value` for initial state. |
+| `dispose()` | Remove macro observers; keep all borrowed targets alive. |
+
+A failed multi-target write attempts to restore preceding successful writes;
+custom backend rollback can itself fail. The individual handle snapshots remain
+authoritative, and no atomic audio-graph transaction is claimed. Editing a target
+directly does not reverse-map an arbitrary parameter combination into a macro
+position. [The modular sound example](/bridge/modular-composition/#sound-and-modulation)
+uses the same handles from panels, LFO and macro controls.
+
+### Versioned projects
+
+`parseModuleProject(input: unknown)` accepts plain data or JSON text and returns a
+validated, copied, frozen `ModuleProject`. `serializeModuleProject(input, space?)`
+validates before producing JSON text and rejects encoded output beyond the
+parser's text limit, including expansion from escapes or indentation. It never
+returns an over-limit file as a successful serialization. The schema is `webmusic.module-project`,
+version `1`; unsupported fields/versions, nonfinite numbers, accessors, cycles,
+duplicate IDs and invalid references reject. Contexts require exactly one root
+and no parent cycles. Managed audio routes reject cycles and multiple replacement
+claims on one output. Bounded input limits include 10,000 array items, depth 32,
+50,000 visited values and 2 MiB text/string accounting; large sample payloads
+belong in assets.
+
+| `ModuleProject` field | Contract |
+| --- | --- |
+| `schema`, `version`, `id` | Schema tag, numeric version and stable project identity. |
+| `contexts` | `ProjectContextRecord[]`: `id`, optional `parentId` and `ownerModuleId`. An owner belongs to the direct parent scope and supplies its child's routing context. |
+| `modules` | `ProjectModuleRecord[]`: `id`, `plugin: {id, version}`, `contextId`, optional `label`, JSON `config`, optional `assets` role-to-ID map and numeric `params` base values. |
+| `assets` | `ProjectAssetReference[]`: `id`, `uri`, optional `mediaType` and `integrity`. Kernel never fetches the URI or verifies its contents. |
+| `connections` | `ProjectConnectionRecord[]`: `id`, `kind`, `from`, `to`, optional audio `mode` (`replace`, `send`, `tap`; default replace). Endpoints are `{moduleId, port}`. |
+| `modulations` | `ProjectModulationRecord[]`: `id`, control `source`, `target: {moduleId, param}`, native-unit `depth`, optional bipolar/unipolar `polarity`. |
+| `macros` | `ProjectMacroRecord[]`: `id`, optional `label`, normalized `value`, targets `{moduleId, param, min, max}`. |
+| `automation` | `ProjectAutomationRecord[]`: `id`, parameter `target`, points `{type, value, timeSeconds}`, optional `loop: 'repeat' \| 'once'`, `enabled` and `initialValue`. Time uses Session seconds; enabled defaults true. The initial value preserves the base before the first point. |
+| `session` | `ProjectSessionState`: nonnegative **unwrapped** `positionSeconds`, positive `rate`, optional finite `loop` or null. Export preserves elapsed loop iterations for once-policy automation/LFO phase; the runtime Session snapshot's display position is loop-folded. Playback is paused on ordinary restore. |
+| `layout` | `ProjectLayout`: `modules` of `{moduleId, x, y, collapsed?}`. Layout never defines signal routing. |
+
+The parser supplies empty omitted collections, empty module `config`, empty
+layout and Session defaults (position zero, rate one). Contexts/modules still
+must satisfy references and root topology. `ProjectJson`/`ProjectJsonObject`
+describe configuration values; they cannot contain AudioNodes, DOM, functions,
+live voices or application undo history.
+
+`new ProjectPluginRegistry()` exposes `get(id, version)` and
+`register(factory): ConnectionLease`. Registration borrows a
+`ProjectPluginFactory` and rejects duplicate exact ID/version pairs. It runs no
+factory and loads no code. Releasing registration removes lookup availability;
+it does not dispose instances already created. Versions are exact strings,
+without semver negotiation or automatic migrations.
+
+Each factory supplies `id`, `version` and `create(request)`. A
+`ProjectFactoryRequest` includes its `record`, borrowed `context`, cancellation
+`signal`, `asset(role)` reference lookup and async `resolveAsset(role)` delegated
+to the application. Return a fresh exclusively owned `ProjectModuleInstance`
+with a borrowed-view `module` handle and required `dispose()`. Optional members
+are `ports`, `getInput(port)`, `getControl(port)`, `childContext(context)` and
+`exportConfig()`. Child scopes preserve their ID, registry, audio environment
+and Session. Factories route through their context destination/admission and
+must not publish sound externally while being staged.
+
+### Project runtime
+
+`new ModuleProjectRuntime(options)` requires borrowed `audio` and `plugins`.
+Optional `destination()` chooses its output node, `resolveAsset(asset, signal)`
+supplies assets, `connect(request)` adapts explicitly supported domain signals,
+and `onCleanupError(error)` reports retirement failures. A connector returns an
+owned `ConnectionLease` or undefined for an unresolved route. The runtime
+creates no UI, storage service, network fetch or device permission request.
+
+| Member | Contract |
+| --- | --- |
+| `restore(input, {signal?, play?}?)` | Validate, build and prepare a muted candidate, then commit it. Returns `ProjectRestoreResult` with `status: 'committed' \| 'cancelled'` and snapshot. Failures reject and preserve the active graph. `play` defaults false. |
+| `cancelRestore()` | Cancel the pending candidate; leave the active graph intact. Late created instances are retired. |
+| `retryMissing(options?)` | Restore the current export against the registry again. This creates a replacement graph and defaults to paused; it is not an in-place plugin hot swap. |
+| `exportProject()` | Capture live parameter bases, supported configuration, macro positions and Session position/rate/loop while retaining unresolved records. |
+| `snapshot()` | `ProjectRuntimeSnapshot`: optional current `project`, `revision`, `restoring`, `disposed`, module records with `ready`/`unresolved` status and ports, plus unresolved diagnostics. |
+| `subscribe(listener)` | Immediate snapshot and subsequent configuration/restore notifications; returns unsubscribe. Not a playhead or audio-rate ticker. |
+| `context`, `session`, `resources` | Borrow the active context/Session; undefined before commit or after disposal. Resources also expose `module(id)`. A restore replaces these identities. |
+| `getModule(id)`, `getMacro(id)` | Borrow current handles/controllers; undefined when absent or unresolved. Macro commands may edit the owned macro, but callers must not dispose it. |
+| `connect(record)` | Add one explicit route without recreating players; return the settled snapshot. Validate document and actual backend constraints before committing. |
+| `disconnect(id)` | Release one explicit route and remove its record/diagnostic. A released replacement restores only its current valid default. |
+| `connectModulation(record)` / `disconnectModulation(id)` | Add/remove one native parameter mapping without recreating modules; return the resulting snapshot. |
+| `updateLayout(layout)` | Replace presentation coordinates without recreating modules, routes or Session. |
+| `updatePresentation({modules?, layout?})` | Update module labels/order and optional layout. A supplied module list must retain every stable ID. |
+| `dispose()` | Cancel pending work and release owned graphs, Sessions, mappings and leases; never close the borrowed audio environment. |
+
+Live connection edits hold their edit guard during plugin topology and export
+callbacks. Reentrant graph edits reject. A failed candidate snapshot preserves
+the previous route and document; successful edits return and publish the
+prevalidated commit snapshot. If connector retirement subsequently changes a
+parameter base or module configuration, a separate revision reports that change.
+A failure exporting that later notification is reported through the observer
+error path; it does not turn the committed route edit into a failed command.
+Notifications already represented by the prepared snapshot remain coalesced.
+
+Manual parameter or macro writes override an attached Session automation track.
+Export retains its authored points with `enabled: false`, so loading does not
+silently reactivate the overridden track. Its original pre-first-point baseline
+is stored as `initialValue`, separately from the parameter's current base.
+Subscriptions report this ownership change as well as the base edit; the latest
+notification can be saved and restored without re-enabling the overridden track.
+
+Missing exact plugins, missing supported endpoints or an unavailable domain
+connector are retained as unresolved records with `ProjectDiagnostic`
+`{kind, id, reason}`. A factory, asset or backend construction failure rejects
+the candidate instead. Retrying after registering a factory can resolve the
+retained document. An unresolved audio replacement holds a silent replacement
+lease, preserving the declaration without leaking through a normal speaker
+route; removing that declaration restores the current valid default. Unknown
+ports are not guessed from labels or layout.
+
+Each candidate owns a new Session and an output gate. The previous graph remains
+active until commit; superseded work cannot replace a newer graph. Retirement
+can cut old effects' tails. This is a logical replacement, with no automatic
+crossfade, output-latency compensation or hardware-atomic claim. App-owned asset
+resolution must honor cancellation and decide integrity/version policy. See
+[Bridge's standard factories](/bridge/api/#project-module-factories) and
+[the runnable project](/bridge/modular-composition/#save-and-edit-a-project).
+
+### Project editor binding
+
+`createProjectEditorBinding(runtime, {modulationDepth?}?)` borrows a runtime and
+returns `ProjectEditorBinding`: `snapshot()`, async `connect(request)`,
+`disconnect(id)`, `moveModule(id, {x, y})` and `subscribe(notify)`. It imports no UI
+code and is structurally compatible with
+[`mountPatchEditor()`](/uikit/parameters-gestures/patch-editor/).
+
+The projection supplies `ProjectEditorState` modules/ports/connections/disabled
+state, adds control inputs for modulatable parameters, includes persisted CV
+mappings, and infers incident ports of unresolved modules. Runtime module snapshots
+expose `defaultOwnerModuleId?`, the effective audio owner established by context
+destination/admission changes and inherited through organizational scopes.
+Default audio routes are visible and read-only when that owner is available with
+exactly one declared audio input; the input may have any ID. The projection omits
+external destinations and owners with zero or multiple audio inputs, whose exact
+destination port cannot be determined. A connection request delegates to the
+runtime's validated route or modulation command; new CV mappings use
+`modulationDepth` in the destination's native unit (default 1, finite). Layout
+commands preserve stable module identity. Generated editor connection/parameter
+port IDs are adapter identities; callers pass returned IDs back rather than
+constructing them from labels. Presentation subscriptions never own the graph.
+
+## session — @webmusic/kernel/session
+
+`SessionTransport` owns a source-free conductor and delegates command sequencing
+to `TransportGroup`. It creates no fake clip, score, audio output or AudioContext.
+The injected `now` must use the same reference clock as every participant.
+
+```ts
+import {ModuleAudioEnvironment, ModuleContext} from '@webmusic/kernel/module';
+import {SessionTransport} from '@webmusic/kernel/session';
+
+const audio = new ModuleAudioEnvironment();
+const session = new SessionTransport(() => audio.peek()?.currentTime ?? 0);
+const context = new ModuleContext({id: 'session', audio, session});
+// Domain module adapters receive context and register their real engines.
+// A user action calls session.play(); preparation precedes the start anchor.
+// At teardown, release domain modules first, then:
+session.dispose();
+context.registry.dispose();
+audio.dispose();
+```
+
+| API | Contract |
+| --- | --- |
+| `new SessionTransport(now, options?)` | TransportGroup scheduling options plus optional finite `range: {startSeconds, endSeconds}`. |
+| `register(follower, metadata)` | Borrow one `SyncFollowerTransport`; returns a unique `SessionParticipantLease`. |
+| `holdPendingSource()` | Reserve asynchronous data readiness without inventing an engine or incrementing participant count. |
+| `preload()` | Explicitly prepare current participants; registration in a paused Session does not allocate resources. |
+| `dispatch(command)` | Await committed/superseded `TransportCommit`; failures reject through the existing authority. |
+| `play`, `pause`, `stop`, `seek`, `setRate`, `setLoop` | Promise-returning command conveniences; seek uses Session seconds. |
+| `clock`, `position`, `snapshot`, `participantCount` | Read-only observation; `snapshot` is a getter, not a method. |
+| `scheduling` | Borrowed `SessionSchedulingBinding` on `session-seconds`; schedulers consume anchors without acquiring write authority. |
+| `subscribe(listener)` | Immediate snapshot followed by group, membership, participant-error and source-error events. |
+| `checkDrift()` | Explicit group drift/reconciliation check, usually handled by the existing watcher. |
+| `dispose()` | Cancel memberships and the conductor; never dispose borrowed engines. |
+
+Metadata requires `axis` and `durationSeconds` (number, null, or a callback).
+`identity` names the actual engine so different adapters cannot register it twice.
+Finite `offsetSeconds` and `positionScale > 0` mean
+`localSeconds = offsetSeconds + sessionSeconds * positionScale`; the same scale
+applies to playback rate. A negative offset requires `attachScheduling`; legacy
+followers require a nonnegative offset. Optional `prepare` runs before scheduling;
+`activate` explicitly resumes reference-clock resources for playback, separately
+from resource-only preload. `ended`
+reports actual completion, and `endPolicy: 'position'` explicitly opts into a
+finite mapped-endpoint policy. Optional `attachScheduling(binding)` returns a
+`ConnectionLease` after preparation; this participant consumes the mapped shared
+anchor instead of becoming an additional legacy group follower. A local `loop`
+describes an already native-looping legacy participant; it does not configure the
+engine's loop.
+
+The snapshot adds `axis: 'session-seconds'`, `durationSeconds`, `participantCount`,
+`pendingSourceCount`, `membershipRevision`, `ended`, `range`, `schedulingEpoch`
+and `schedulingMode` to `TransportSnapshot`. `schedulingMode` is `shared-anchor`
+when every member supplies scheduling attachment (including an empty Session),
+`legacy` when none do, and `mixed` otherwise. Unknown duration
+is null and live/unbounded duration is Infinity. Default completion requires all
+finite members to report ended; a paused member is not inferred to be finished.
+An explicit range or Session loop overrides the default end policy.
+
+Before starting an asynchronous source load, take a `SessionPendingSourceLease`
+with `holdPendingSource()`. Register the actual loaded participant before calling
+its `resolve()`. While any reservation exists, `durationSeconds` is null and
+natural completion is suppressed; `play()`/`preload()` wait for readiness. A
+reservation never increases `participantCount`. `reject(error)` reports
+`source-error` and rejects waiting/future starts, preserving the failed reservation
+until retry, replacement or cancellation explicitly calls `release()`. Release
+unblocks a cancelled wait and makes late completion harmless. Session disposal
+releases outstanding reservations. The lease exposes `token`, `active` and `ready`.
+
+A lease exposes `token`, `active`, `ready`, `settled`, `cancellationError` and
+`release()`. `ready` waits for first explicit preparation/attachment or release;
+preparation, activation and scheduling-attachment failures reject it.
+do not await it before the action that starts preparation. `release()` unregisters
+and cancels only its member. In-flight work retains engine identity until
+`settled`; cancellation failure blocks reuse and can be retried with `release()`.
+Old lease releases cannot cancel a newer owner.
+
+### Shared scheduling binding
+
+`SessionSchedulingBinding` is immutable and borrowed. Only Session commands
+change its anchor. Every member's binding shares `authority` identity while
+naming its own local `axis` and affine mapping. The clock is continuous through
+loops; read `positionAt()` for folded position or `segments()` for future passes.
+
+| Member | Contract |
+| --- | --- |
+| `authority`, `axis`, `epoch` | Stable authority identity, explicit position unit and current invalidation generation. |
+| `clock` | Read-only `TransportClockReader` on the mapped, unwrapped local axis. |
+| `snapshot` | `SessionSchedulingSnapshot`: `epoch`, `phase`, `referenceTime`, `originTime`, `originPosition`, `rate`, `paused`, `holding`, `loop`. |
+| `positionAt(referenceTime)` | Loop-folded local position at an absolute reference instant. |
+| `segments(fromReferenceTime, toReferenceTime)` | Ordered `SessionScheduleSegment[]`, split at future loop boundaries. Empty while invalidated, paused or before a held start. |
+| `subscribe(listener)` | Synchronous initial anchor/invalidation followed by `SessionSchedulingEvent` (`invalidate`, `anchor`, `dispose`); returns unsubscribe. Callbacks must complete synchronously. |
+
+Events also include optional `cause`, the triggering transport command type.
+Snapshot `phase` is `invalidated`, `ready` or `disposed`. Invalidation advances
+the epoch before old work is retracted; an anchor publishes its replacement.
+Superseded queued commands cannot publish a ready anchor in the latest epoch.
+Terminal disposal still reaches every registered listener if an earlier listener
+issues another Session command; only nonterminal stale events are suppressed.
+Each segment contains `epoch`, `iteration`, `referenceStart`, `referenceEnd`,
+`positionStart`, `positionEnd` and `rate`. Iteration zero includes the intro and
+first pass. Time windows require finite ordered bounds and are limited to 10,000
+segments per call; request smaller windows for short loops.
+
+Native schedulers can schedule the next pass before the boundary without waiting
+for a display tick. Native Audio buffer looping and lookahead Score scheduling
+retain their own capabilities and cancellation limits. Media/external followers
+remain explicitly approximate; a mixed Session does not upgrade them. No shared
+writable engine clock or output-device latency guarantee is implied. See
+[the runnable project](/bridge/modular-composition/#save-and-edit-a-project).
+
+### Session automation and phase
+
+`attachSessionAutomation(binding, context, parameter, points, options?)` owns one
+Session-relative base trajectory and returns a `SessionAutomationLease` with
+`active`, `error`, `initialValue` and `release()`. The target, binding and context
+remain borrowed. Targets require native scheduled capability; a second active
+track on the same handle rejects. `SessionAutomationPoint` is
+`{type: 'set' | 'linear' | 'exponential', value, timeSeconds}` in the binding's
+named seconds axis. Points require ordered nonnegative times and legal target
+values; exponential segments need positive endpoints.
+
+`SessionAutomationOptions` extends `SessionModulationOptions` with optional
+`initialValue`, the baseline at position zero before the first point. It defaults
+to the parameter base at attachment and is retained by the lease for export.
+Optional `onRelease` observes the terminal ownership change once, synchronously
+after cleanup. Callback errors are contained; the callback does not retain or
+reactivate the released lease.
+Common options are `loop: 'repeat' | 'once'` (default repeat),
+`lookaheadSeconds` (default 0.25 reference seconds, finite and in `(0, 60]`),
+optional Kernel tick options and `onError`.
+
+Repeat follows loop-folded position; once follows the continuous unwrapped
+axis and holds its final point. Pause holds the trajectory at the current
+position; paused seek/stop reconstruct its base at the new position. Resume and
+rate changes re-arm native automation against the new anchor. An explicit manual
+pause, stop or seek issued by an observer during initial attachment invalidates
+that attachment's pending ticker start; scheduling resumes only for the current
+ready, playing anchor. An explicit manual
+base or macro write releases the track, preventing the next tick from silently
+overwriting the user's edit. This includes a write made by a parameter observer
+during scheduling or pause. Releasing the lease cancels future automation and
+holds its modeled current base. Async scheduler failures populate `error`,
+release the track and call `onError`.
+
+`new SessionLFO(context, binding, options?)` produces a native `ControlSignal`
+with a-rate output and range −1…1. `SessionLFOOptions` adds `frequency` (default 1,
+0.001…1000 cycles per binding-axis second), `phase` (default 0, 0…1 cycles) and
+`waveform` (sine default, square, triangle or sawtooth). It also accepts the
+common loop/lookahead/tick/error options above.
+
+| Member | Contract |
+| --- | --- |
+| `signal` | Borrowable native control output; map its excursion with `ParamHandle.connectModulation`. |
+| `frequency`, `phase` | Owned synchronous `ParamHandle`s; editing either re-arms phase from the shared anchor. |
+| `waveform`, `setWaveform(value)` | Current waveform and explicit replacement. |
+| `error` | Last asynchronous scheduling failure, if any. |
+| `dispose()` | Cancel native waveform segments, dispose handles/ticker and detach; retain borrowed context/binding. |
+
+Phase is `position × frequency + phase`, modulo one. Repeat uses wrapped
+position; once uses unwrapped position. Session rate scales cycles per audio
+second. Pause outputs zero; resume/seek reconstructs phase, including after
+restore. This is a sampled periodic waveform scheduled through native buffer
+sources with lookahead, not a callback-driven parameter write. Scheduling stalls
+longer than the prepared horizon can underrun. For independent audio-clock
+modulation use [`ControlLFO`](#control-generators) instead.
+
 ## meter — @webmusic/kernel/meter
 
 `AnalyserMeter` owns the transparent `input → analyser → output` tap both
@@ -214,6 +777,13 @@ the structural ports it accepts, so anything exposing that surface can join —
 which is how the [bridge](/bridge/) synchronizes a Score player against an
 Audio clip without either package importing the other. Commands are
 serialized, so a late async settlement cannot reorder state.
+
+A continuous shared-anchor master receives an optional `isCurrent()` callback
+as the third argument of `seekPosition(position, when?, isCurrent?)` and the
+second argument of `loopChanged(loop, isCurrent?)`. Apply queued state changes
+in order, but publish native scheduling work only while that callback returns
+true: a newer command may already own the invalidation epoch. Other masters
+can continue implementing the shorter signatures.
 
 ### Session commands and observation
 

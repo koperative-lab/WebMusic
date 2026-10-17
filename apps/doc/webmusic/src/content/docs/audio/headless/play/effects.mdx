@@ -68,6 +68,23 @@ The public barrel and `packages/audio/src/play/headless/effects.ts, play/core/ef
 contracts described below. The reference does not turn private implementation
 fields into public API.
 
+## Realized insert instances
+
+Built-in recipes expose optional `parameterDescriptors` for their realized
+parameters: units, defaults, steps and recommended `displayRange` values.
+Kernel intersects display suggestions with the actual backend limits; legal
+parameter ranges remain separate. Composite recipes namespace parameters by
+slot index. Custom recipes without metadata retain native parameter descriptors.
+
+`Effect` remains a recipe. A module's `InsertChain` realizes it as an
+`EffectInstance` with stable slot identity, owned/borrowed nodes and a shared
+`ParamSurface`. Attached panels borrow those handles instead of calling the
+recipe again. Numeric base-value edits update the existing instance; replacing
+a recipe builds a candidate chain and preserves the working chain on failure.
+The legacy effect occupies the reserved compatibility slot before explicit
+inserts. See [Kernel effect ownership](/kernel/api/#effect--webmusickerneleffect).
+
+
 <details class="component-section">
 <summary>API</summary>
 

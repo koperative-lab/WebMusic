@@ -1,218 +1,147 @@
-# Shared session clock: injection and scheduling boundaries
+# Shared Session clock and scheduling boundaries
 
-**Accepted direction: one music session has one authoritative timeline, shared by
-Score and Audio; multiple sessions may remain independent.** This note defines
-the gap between current coordination and a same-instance clock contract. It is
-not documentation for an already callable injection API. The
-[platform ledger](README.md) records shared ownership; the
-[Score architecture](../packages/score/ARCHITECTURE.md) and the unit definitions
-below explain the timing boundaries. Decisions and reasons belong in
-[DECISIONS.md](../dev/DECISIONS.md), implementation and acceptance status in
-[STATUS.md](../dev/STATUS.md), and cross-package units in
-[ARCHITECTURE.md](../dev/ARCHITECTURE.md).
+**One music Session has one authoritative timeline.** Score and Audio schedulers
+borrow its reference-time anchor; independent Sessions may share an audio context
+without sharing transport authority. [DEC-048](../dev/DECISIONS.md#dec-048--session-scheduling-is-a-borrowed-anchor-projects-store-declarative-identity)
+records the accepted protocol. [STATUS](../dev/STATUS.md) owns current verification;
+the [Kernel API](../apps/doc/webmusic/src/content/docs/kernel/api.mdx) owns exact
+public members.
 
-## Current implementation
+## Layers and ownership
 
-| Concern | Implemented | Does not imply |
+| Layer | Responsibility | Boundary |
 |---|---|---|
-| Shared time math | Kernel `TransportClock`: explicit reference time, affine position, pause and future origin. | All players use the same object. |
-| Readable authority | `TransportClockReader`, exposed by an owner to followers, groups and views. | Write authorization or anchor-invalidation notification. |
-| Coordination | Kernel `TransportGroup` selects one structural master and coordinates N followers; Bridge adapts both Score and Audio master pairings. | A shared writable clock instance or sample-accurate loop boundaries. |
-| Command observation | Group `dispatch`, `snapshot` and `subscribe` expose revisioned invalidation and command outcomes. | Shared writable clock injection, acoustic success or sample-accurate loop boundaries. |
-| Reference time | Kernel coordination accepts an injected reference-time reader. | A common `AudioContext` automatically means a common work position, or timestamps from separate contexts are interchangeable. |
-| Live transports | Score and Audio engines own private clocks; clockless masters can use a Kernel mirror. | One shared clock object or automatic cross-engine invalidation. |
+| `TransportClock` | Pure affine reference-time/position math, pause and future origin. | It has no listeners and cannot retract submitted sound. |
+| `TransportClockReader` | Read-only clock view. | A reader alone carries no invalidation protocol. |
+| `TransportGroup` | Structural master/follower command sequencing and approximate reconciliation. | Existing callers retain their coordination contract. |
+| `SessionTransport` | Source-free Session-seconds writer, preparation and participant lifetime. | A Session owns no source or borrowed player/context. |
+| `SessionSchedulingBinding` | Authority identity, epoch, mapped anchor, invalidation and loop segments. | Borrowed schedulers cannot mutate its origin or dispose the authority. |
+| Domain scheduler | Schedule and cancel its own notes/sources against an anchor. | Capabilities remain backend-specific. |
 
-Current source entry points:
-[transport.ts](kernel/src/transport.ts), [sync.ts](kernel/src/sync.ts),
-[score-player-scheduler.ts](../packages/score/src/play/headless/score-player-scheduler.ts),
-[buffer-engine.ts](../packages/audio/src/play/headless/engines/buffer-engine.ts),
-and [Bridge sync.ts](../bridges/score-audio/src/sync.ts).
+Source entry points are [session.ts](kernel/src/session.ts),
+[session-scheduling.ts](kernel/src/session-scheduling.ts),
+[Score scheduler](../packages/score/src/play/headless/score-player-scheduler.ts)
+and [Audio buffer engine](../packages/audio/src/play/headless/engines/buffer-engine.ts).
+Bridge owns domain-aware assembly; neutral shared time stays in Kernel.
 
-Same-instance injection would let both engines consume one session anchor instead
-of private anchors requiring coordination. Current construction and scheduling
-assume private ownership; replacing an object reference alone is insufficient.
+## Reference time and position axes
 
-## Reference time, session axis and domain mapping
+`AudioContext.currentTime` is reference time; Session position locates the work.
+Pause, seek and rate change their relationship. Context suspension freezes audio
+time, so wall-clock timers and UI animation cannot establish that sound played.
+Participants must use the same reference-time source as their authority.
 
-`AudioContext.currentTime` is audio reference time; transport position locates the
-work. Pause and seek change the relationship. Context suspension stops reference
-time itself, so JS timeouts, UI animation or elapsed wall time cannot stand in for
-played time.
+Session positions use **Session seconds**. Score positions use **nominal Score
+seconds** at the default tempo scale; Audio positions use **clip seconds**.
+Registration names the local axis and maps it explicitly:
 
-Score clock positions are **nominal score seconds** at the default tempo scale.
-Audio buffer clock positions are **unwrapped clip seconds**. Score quarters,
-tempo and meter pass through `TimeMap`; Audio beat indices pass through `BeatGrid`;
-sample indices also need a sample rate. These are not interchangeable bare numbers.
+```text
+localSeconds = offsetSeconds + sessionSeconds × positionScale
+localRate = sessionRate × positionScale
+```
 
-The Kernel command protocol uses the selected master's stable content axis, with an
-explicit reference time, origin and rate. Score-mastered groups use nominal score
-seconds; Audio-mastered groups use clip seconds. New position/seek commands never
-reinterpret that axis as duration divided by playback rate.
+Scale must be finite and positive. Shared scheduling permits a finite negative
+offset, allowing an intro before a local source begins. Legacy followers retain
+their nonnegative-offset restriction. Domain scheduling clips silent/out-of-range
+local positions according to its own source contract.
 
-A follower can map this axis affinely: `local = offset + position * positionScale`,
-with the same scale applied to its playback rate. The default scale is one.
-Arbitrary nonlinear rubato alignment remains a separate mapping contract;
-publishing `TimelineMapping` does not make it an input accepted by the group.
+Score quarters require `TimeMap`; Audio beats require `BeatGrid`; sample indices
+require a sample rate. An affine mapping does not infer beat alignment between
+performances or implement nonlinear rubato warping. Existing Bridge master/follower
+factories retain their declared Score-master or Audio-master axes.
 
-Session isolation does not require allocating a new hardware context per session.
-Independent sessions may borrow one context, but must not accidentally share a
-writable transport. Session identity, resource owner and command authority must
-remain explicit.
+## One writer, explicit invalidation
 
-## Command authority and observation
+Callers send play, pause, stop, seek, rate and loop commands to the Session.
+`dispatch()` retains committed/superseded outcomes and failures. Participant
+commands must not compete with the authority while attached. A scheduling
+attachment lends a mapped read-only binding after preparation and returns a lease
+that releases only that participant's scheduling relationship.
 
-The existing `TransportGroup` is the session command authority; Bridge
-`ScoreAudioSync` delegates to it. Callers use
-`dispatch(command)` when they need a
-settled result, and `subscribe()` for an initial snapshot and subsequent command
-observations. A command result distinguishes committed work from work superseded
-by a newer command or disposal. Failures use the documented rejection/error
-channel. The [public Kernel reference](../apps/doc/webmusic/src/content/docs/kernel/api.mdx)
-owns exact current event payloads; the [Bridge reference](../apps/doc/webmusic/src/content/docs/bridge/api.mdx)
-documents its forwarding contract.
+The binding's authority identity is stable. Its epoch changes when old work
+becomes invalid, independently of UI/registry revisions. Notifications are
+synchronous and ordered:
 
-Invalidation is emitted before participant mutation. Existing participant commands
-perform their own cancellation and re-arming; a successful command describes the
-supported transport outcome rather than proving sound reached an output device.
-Consumers use the committed snapshot, and distinguish pending feedback from the
-owner's resulting position. Autonomous scheduling and native-device limitations
-remain governed by the participant contract.
+1. **Invalidate:** retract future voices, sources and automation derived from the
+   previous anchor. Scope cancellation to owned occurrences and scheduled work.
+2. **Anchor:** publish the new origin time/position, rate, paused/holding state and
+   loop. The scheduler reads that coherent snapshot and arms replacement work.
+3. **Dispose:** cancel owned work and detach observers. Borrowed engines and audio
+   environments retain their original resource owners.
 
-These additions keep one authority around the existing engines. They do not
-replace their private clock instances, or make a pure clock reader capable of
-cancelling sound. Direct commands to a participant bypass group arbitration and
-must not compete with the group while it owns the coordinated session.
+Scheduling callbacks must complete synchronously. Async preparation finishes
+before attachment/start; late work checks its generation before publishing.
+Removing a member unregisters it before cancellation, and pending work retains
+its engine identity until its lease settles. No older cleanup may pause a newer
+owner of the same engine.
 
-## Injection also requires invalidation
+A `TransportClock` object shared without this protocol would allow one engine's
+seek to invalidate another engine's already submitted `source.start()` or note
+onsets silently. The binding supplies one scheduling authority without handing
+every engine the writable clock.
 
-`TransportClock` has no listener, epoch or version; it is pure time math. The
-Score engine commits sound ahead of its onset; the Audio buffer engine does the
-same:
+## Continuous time and loops
 
-- Score submits absolute `audioStart` values inside its lookahead to backends
-  supporting scheduled cancellation, retaining a record per voice occurrence.
-- The Audio buffer engine creates a buffer source and calls
-  `source.start(when, offset)`.
+The binding's `clock` remains unwrapped. `positionAt(referenceTime)` folds into
+the current loop; `segments(from, to)` divides a future reference-time interval
+into local content intervals with explicit epoch and loop iteration. A future
+start holds position until its origin time, and segments omit that pre-roll.
+Native consumers can prepare the next pass before the current pass ends.
 
-Moving the anchor can invalidate future notes, source origins or releases computed
-under the old anchor. The current Score engine mutates its own clock and retracts or
-reschedules its own sound; the group coordinates participant commands. If two
-engines directly share a writable object, A's seek/rate/pause can invalidate B's
-commitments without notifying B. A more accurate clock read cannot retract work
-already submitted to the audio system.
+Score lookahead uses those intervals to identify each note occurrence/pass and
+submit absolute audio times. Audio buffers can use native source looping where
+the mapped loop fits the clip, and segmented scheduling for other supported
+windows. Invalidating an anchor stops obsolete scheduled sources/voices before
+re-entry. Backend release behavior and retained effects remain separate from
+this time mapping.
 
-Same-instance injection therefore requires **one writer, invalidation delivery and
-rescheduling in each engine**. The concrete combination of reader, epoch and
-callback remains to be designed and verified. The accepted single-authority
-session direction is no longer an undecided alternative.
+Legacy `TransportGroup` looping still uses watcher reconciliation. A mixed
+Session keeps its continuous native anchor while legacy participants reconcile
+approximately. Native timing is not inferred from matching display positions.
+The default watcher cadence and lead-in are configuration values, not a bound on
+browser stalls or preparation time. A lookahead scheduler can still underrun if
+its execution is suspended beyond the prepared horizon.
 
-## Required protocol properties
+## Automation, modulation, latency and tails
 
-These are design and acceptance requirements, not methods already provided by
-`TransportClock`.
+Session-bound parameter automation uses Session seconds and an explicit repeat
+or once loop policy. A seek rebuilds the trajectory at its new position; pause
+holds its modeled base. Absolute audio-clock automation remains available for
+work that intentionally continues independently of transport. Neither form
+measures effective audio-rate values from `AudioParam.value`.
 
-1. **One command authority.** A session owner handles play/pause/seek/rate/loop;
-   participants and views submit commands or read time. Score or Audio can be
-   master, but a session cannot have competing writers without arbitration.
-2. **Identifiable commits.** Each anchor change has a generation/epoch or
-   equivalent protocol, with its reference time and new mapping. Stale asynchronous
-   work cannot overwrite newer state.
-3. **Invalidate committed work.** Score cancels future voices and retimes releases;
-   Audio cancels/replaces sources. Distinguish sounding and future work to avoid
-   duplicate attacks or cancelling the wrong overlapping occurrence of a pitch.
-4. **Order preparation and re-entry.** Resume, sample preload, external callbacks,
-   disposal and interruption preserve the final user intent. A shared object does
-   not replace command FIFO, generations or resource cleanup.
-5. **Explicit lifetime.** Injected session clocks/contexts remain caller-owned
-   unless an API explicitly transfers ownership. Detaching a follower cannot
-   destroy its session. Closing a session cancels participant work and
-   subscriptions without affecting another session.
-6. **Visible capability differences.** Backends without future scheduling or
-   cancellation, media elements and external clocks need explicit degraded
-   contracts; coordination cannot confer buffer-engine timing precision on them.
+Session-bound cyclic modulation derives phase from the same anchor. Free-running
+native modulation retains its independent audio-clock lifetime. The selected
+policy must be part of a saved module's configuration, rather than inferred
+from whether a panel happens to be visible.
 
-A conductor/group wrapper around the pure clock can carry these responsibilities;
-changing the clock itself is another implementation option whose effect on purity,
-tests and public types must be assessed. Record the selected design and reasons in
-[DECISIONS.md](../dev/DECISIONS.md), rather than inventing incompatible session classes
-inside each domain.
+Shared reference time aligns submitted work; it does not compensate arbitrary
+plugin delay, external MIDI hardware or output-device latency. Media elements do
+not gain future-start or cancellable sample-accurate scheduling through an
+adapter. Consumers inspect declared timing capabilities and scheduling mode.
 
-## The two loop problems
+Pause/seek cancels source work, while retained delay/reverb graphs can continue
+their tails. Disposal or project replacement may cut those tails. Graph edits
+commit and retire at the logical level; Web Audio connection changes are not a
+hardware transaction, automatic crossfade or guaranteed click-free switch.
+Applications requiring tail drain or latency compensation need explicit backend
+support rather than a scheduling claim.
 
-Kernel `TransportGroup` currently detects a loop boundary on a watcher tick,
-then schedules a shared re-entry through seek. A common origin can align
-schedulable participants;
-it cannot make an already passed boundary wrap on time. The default watcher
-cadence is approximately 25 ms and lead-in 60 ms. These are nominal settings,
-not an 85 ms worst-case bound under browser throttling, suspension or preparation.
+## Acceptance and evidence
 
-Sample-accurate wrap requires committing the next pass before the boundary and
-defining both sides of its mapping:
+Verify real ScorePlayer and AudioClipPlayer integration in addition to pure time
+math: non-unit rate and positive/negative offset, suspension/resume, preparation
+crossing a proposed origin, repeated commands and observer re-entry, disposal
+during async work, independent Sessions and commitments on both sides of loops.
+Check epoch-specific cancellation before scheduling a replacement.
 
-- Score lookahead across a boundary needs the next pass's own reference basis,
-  with ties, crossing releases, seek/rate cancellation and re-entry accounted for.
-- The Audio buffer engine uses native source looping inside the audio
-  system, while its clock stays unwrapped and `currentTime` applies loop-window
-  modulo. Reading
-  the unwrapped clock as a wrapped session position introduces whole-loop errors.
-- `TransportGroup` now accepts `FollowerOptions.loop` metadata for participants
-  already configured to loop natively. The group maps its continuous master axis
-  through `offsetSeconds` and positive `positionScale`, then folds at the local
-  loop end. Join/seek targets use that phase; drift normalizes unwrapped or wrapped
-  native clocks and compares circular phase error in master units. Each follower
-  may have a different period. This does not configure native looping, schedule
-  the group boundary in advance, or implement nonlinear warping.
+Automation and phase tests must distinguish pause/seek/loop behavior from their
+free-running alternatives. Rendered sample positions or submitted absolute audio
+times establish different evidence from UI notifications. Device/audible
+measurement remains necessary for acoustic latency and hardware claims.
 
-Both `createSyncedPlayback` and `createAudioMasteredPlayback` reject defined
-`clipOptions.loop` and `clipOptions.rate` before acquiring resources. Use the
-group's `setLoop()` and `setRate()` controls. This validation does not establish
-a shared injected clock or sample-accurate cross-domain loops; see the
-[Bridge usage boundary](../bridges/README.md).
-
-## Implementation impact and acceptance evidence
-
-| Owner | Responsibility to verify |
-|---|---|
-| Kernel | Session write protocol, read-only access, invalidation and isolation, retaining domain neutrality. |
-| Score | No unauthorized anchor mutation after injection; retract/retime future voices; context freeze must not publish an onset merely because wall time advanced. |
-| Audio | Source replacement consistent with the reference origin; explicit unwrapped/looped positions; stop/dispose cancels pending sources. |
-| Bridge | Domain axes and offset/mapping, both master directions, compatibility with clockless adapters; reuse generic coordination. |
-| UI / Element | Bind the chosen session's reads and commands; unmount must not reset borrowed playback rate or destroy the session. |
-
-Acceptance needs real ScorePlayer and AudioClipPlayer integration as well as
-isolated clock tests: non-1× rates, offsets in both start/seek directions, context
-suspend/resume, preload crossing a proposed origin, repeated commands and callback
-re-entry, asynchronous settlement during disposal, independent sessions, and
-commitments on both sides of a loop. Audio precision needs submitted absolute times
-and rendered/audible evidence; UI callback timing is not a substitute.
-
-A shared anchor may reduce mirror and drift correction needs. It does not
-automatically remove backend delay, external-clock error, preparation headroom or
-concurrent cancellation. Deleting drift monitoring or lead-in negotiation is not
-an unverified benefit to promise in advance.
-
-## Observing reconciliation and independent native loops
-
-The implemented authority publishes an initial coherent snapshot, command
-invalidation and commit/error events. Background follower joins and drift
-corrections also increment revision and emit `reconcile` invalidation/settlement;
-`operation-error` exposes their failures alongside the existing callback. A master
-stopping naturally without an active group loop is reconciled through the same
-observed pause path; an active group loop wraps and restarts instead. Revision
-identifies the latest group authority; it does not count arbitrary mutations made
-directly on a participant. Display animation reads the current snapshot/clock;
-subscribers are not a musical ticker.
-
-Independent native loops preserve one continuous session coordinate while mapping
-each follower to its own phase. Native-loop metadata is copied on registration;
-its bounds must match the actual participant configuration. A non-unit local
-scale requires rate control and applies to both future seek positions and rate.
-The Bridge factory contract rejects clip-local loop overrides;
-applications requiring separate periods use explicit Kernel follower adapters.
-The current reference owner is [Kernel API](../apps/doc/webmusic/src/content/docs/kernel/api.mdx).
-
-Fake-clock regression evidence covers non-unit-rate stable seeks, awaited startup
-and pause reconciliation, stale-command/observer re-entry, failures, natural stops,
-watcher group loops and differing native-loop periods. It does not establish audio
-output precision, background browser/device behavior, nonlinear time stretching,
-or same-instance engine clock injection.
+Project restore builds a fresh owned Session and graph from serializable state;
+it does not restore active voices or transfer a live writable clock. Default
+restore remains paused. See [the modular contract](../dev/design/MODULAR-COMPOSITION.md)
+for graph ownership and [the runnable guide](../apps/doc/webmusic/src/content/docs/bridge/modular-composition.mdx)
+for application-owned storage and editing.

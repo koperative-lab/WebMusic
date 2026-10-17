@@ -4,7 +4,7 @@ import ElementComposition from '../ElementComposition.astro';
 interface Props { tag: 'score-chord-analysis' | 'score-live-chord-analysis'; }
 const {tag} = Astro.props;
 const playerId = `pg-${tag}-player`;
-const SRC = `${import.meta.env.BASE_URL}midi/Arabesque%20No.1.mid`;
+const SRC = `${import.meta.env.BASE_URL}midi/webmusic-study-no-1.mid`;
 const companions = [{tag: 'score-player', target: 'score-player'}];
 ---
 

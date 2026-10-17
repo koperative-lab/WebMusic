@@ -174,15 +174,19 @@ Implemented shared contracts are `TransportClock`, its read-only reader,
 authority, and coordinates starts, rates, seeks and drift. Both Score-mastered
 and Audio-mastered pairings exist.
 
-**Players currently retain separate `TransportClock` instances.** The
-[Score scheduler](../packages/score/src/play/headless/score-player-scheduler.ts) and
-[Audio buffer engine](../packages/audio/src/play/headless/engines/buffer-engine.ts)
-each construct one. A reader provides neither shared write ownership nor
-invalidation notification or same-instance injection. These implemented contracts
-support the accepted direction; they do not mean the complete shared-session-clock
-design has shipped. Injection and rescheduling requirements are specified in
-[platform/shared-clock-injection.md](../platform/shared-clock-injection.md), with
-delivery status in [STATUS.md](STATUS.md).
+Native modular participants borrow `SessionSchedulingBinding` from one
+`SessionTransport` authority. The
+[Score scheduler](../packages/score/src/play/headless/internal/session-score-scheduler.ts)
+and [Audio buffer engine](../packages/audio/src/play/headless/engines/buffer-engine.ts)
+consume mapped, read-only anchors and future loop segments; synchronous epoch
+invalidation retracts their owned scheduled work. Session-relative automation
+and LFO phase use that same coordinate. Standalone players retain their private
+clocks, while legacy Bridge/TransportGroup and media transports retain their
+declared coordination limits. Shared scheduling does not eliminate lookahead
+starvation or compensate device/plugin latency. The detailed consumption,
+cancellation and fallback contracts live in
+[platform/shared-clock-injection.md](../platform/shared-clock-injection.md);
+[STATUS.md](STATUS.md) links current delivery evidence.
 
 A running `TransportClock` uses:
 
@@ -291,12 +295,33 @@ Timeline uses a domain-neutral numeric axis whose binding supplies the meaning.
 The presenter inventory belongs in [COMPONENTS.md](COMPONENTS.md) and the
 [UI README](../packages/ui/README.md).
 
+### Modular composition
+
+[DEC-047](DECISIONS.md#dec-047--modular-composition-separates-resources-routing-and-session-authority)
+defines opt-in `composition="modules"`. Kernel `/module`, `/session` and
+`/effect` supply the shared runtime; `/element` supplies scoped browser discovery.
+[Modular composition](design/MODULAR-COMPOSITION.md) owns the context, typed-port,
+route-lease, effect/parameter and Session invariants. DOM layout, resource
+ownership, audio routing and Session membership remain separate relationships.
+The outer player can provide Session authority while a Rack owns the audio
+master; nested players can own their sources while borrowing that Session.
+
+Neutral audio/control ports may interoperate without either domain importing
+the other. Bridge still owns domain-aware time/data adaptation, and UI still
+consumes structural bindings without Kernel imports. Headless owns graphs and
+commands; Elements add scoped discovery and presentation. Sharing a context or
+controlling a group does not imply shared-clock injection. Existing public
+behavior remains governed by the Play owners outside opt-in composition.
+[STATUS](STATUS.md) owns delivery and verification; full ADSR, modulation,
+persistence and precision remain later stages.
+
 ## Public entries and build contracts
 
 Each package exports `.` and `/package.json`. Score/Audio capability roots are
-APIs; `/element` is the only element spelling. `/elements`, `/api` and `/session`
-are not public aliases. Kernel exports `/events`, `/element`, `/worker`,
-`/audio-context`, `/player`, `/effect`, `/meter`, `/transport`, `/tick` and `/sync`.
+APIs; `/element` is the only element spelling. `/elements` and `/api` are not
+public aliases. Kernel exports `/events`, `/element`, `/worker`,
+`/audio-context`, `/player`, `/effect`, `/module`, `/session`, `/meter`,
+`/transport`, `/tick` and `/sync`. Domain packages have no `/session` alias.
 Bridge currently exports its capabilities from its package root. Exact entry sets
 are reconciled between manifests and `expectedPublicEntries`.
 

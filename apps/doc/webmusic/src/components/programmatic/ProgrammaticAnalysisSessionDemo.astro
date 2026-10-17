@@ -25,12 +25,12 @@ import LiveDemoCanvas from '../LiveDemoCanvas.astro';
 <script>
   import {mountDemos} from '../demo-lifecycle';
   import { createAnalysisSession } from '@webmusic/score/analyze/headless';
-  import {arabesqueExcerpt, loadArabesqueScore} from '../headless/arabesque-score';
+  import {studyExcerpt, loadStudyScore} from '../headless/study-score';
 
   mountDemos('[data-programmatic-analysissession]', async (root, scope) => {
-    const source = await loadArabesqueScore();
+    const source = await loadStudyScore();
     if (!scope.active) return;
-    const passages = [arabesqueExcerpt(source, 16), arabesqueExcerpt(source, 24)] as const;
+    const passages = [studyExcerpt(source, 16), studyExcerpt(source, 24)] as const;
     const btn = root.querySelector('[data-mutate]') as HTMLButtonElement;
     const keyEl = root.querySelector('[data-key]') as HTMLElement;
     const chordsEl = root.querySelector('[data-chords]') as HTMLElement;

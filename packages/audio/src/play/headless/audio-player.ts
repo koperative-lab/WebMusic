@@ -1,6 +1,11 @@
 import {EventEmitter, type AudioClip, type Region} from '../../core';
 import {createWebAudioContext} from '@webmusic/kernel/audio-context';
+import {InsertChain, type Effect} from '@webmusic/kernel/effect';
+import {AudioOutputPort, createConnectionLease, type ModuleHandle} from '@webmusic/kernel/module';
 import type {TransportClockReader} from '@webmusic/kernel/transport';
+import type {SessionSchedulingBinding} from '@webmusic/kernel/session';
+import type {ConnectionLease} from '@webmusic/kernel/module';
+import {EXTERNAL_TIMING_CAPABILITIES, BUFFER_TIMING_CAPABILITIES, MEDIA_TIMING_CAPABILITIES, type PlaybackTimingCapabilities, type PlaybackSchedulingMode} from './engines/buffer-engine';
 import {AudioClipPlayer, type AudioClipPlayerOptions, type AudioScratchSession, type PlayerTimeUpdate} from './player';
 import {normalizeLoopOption} from './engines/buffer-engine';
 
@@ -13,6 +18,11 @@ export interface AudioPlayerTransport {
   readonly currentClip?: AudioClip;
   readonly analyser?: AnalyserNode;
   readonly clock?: TransportClockReader;
+  readonly timingCapabilities?: PlaybackTimingCapabilities;
+  readonly schedulingMode?: PlaybackSchedulingMode;
+  readonly followsSession?: boolean;
+  attachScheduling?(binding: SessionSchedulingBinding): ConnectionLease;
+  activateScheduling?(): Promise<void>;
   play(when?: number): void | Promise<void>;
   pause(): void;
   stop(): void;
@@ -49,6 +59,8 @@ export interface AudioPlayerEvents {
   error: Error;
 }
 
+let audioPlayerModuleSequence = 0;
+
 /**
  * Stable playback owner for a selected clip or a borrowed playlist/mixer.
  * Clip replacement stops the old owned engine and starts the new source at zero.
@@ -61,8 +73,15 @@ export class AudioPlayer {
   private selectedClip?: AudioClip;
   private engine?: AudioClipPlayer;
   private borrowed?: AudioPlayerTransport;
+  private scheduling?: ConnectionLease;
   private context?: AudioContext;
   private output?: AnalyserNode;
+  private inserts?: InsertChain;
+  private port?: AudioOutputPort;
+  private preparingOutput = false;
+  private readonly moduleListeners = new Set<() => void>();
+  /** Stable nonvisual identity. Capability reads never prepare audio. */
+  readonly module: ModuleHandle;
   private releases: Array<() => void> = [];
   private observer: ReturnType<typeof setInterval> | undefined;
   private generation = 0;
@@ -91,6 +110,18 @@ export class AudioPlayer {
     this.storedRate = options.rate ?? 1;
     this.storedLoop = normalizeLoopOption(options.loop ?? false);
     this.storedPreservesPitch = options.preservesPitch ?? false;
+    const readInserts = () => this.inserts;
+    this.module = {
+      id: `audio-player-${++audioPlayerModuleSequence}`,
+      get inserts() { return readInserts(); },
+      getPort: (name) => !this.borrowed && this.selectedClip && (name === 'output' || name === 'main') ? this.port : undefined,
+      prepare: () => this.preload(),
+      subscribe: (listener) => {
+        this.moduleListeners.add(listener);
+        const off = this.on('sourcechange', listener);
+        return () => { this.moduleListeners.delete(listener); off(); };
+      },
+    };
   }
 
   get clip(): AudioClip | undefined { return this.borrowed ? this.borrowed.clip ?? this.borrowed.currentClip : this.selectedClip; }
@@ -105,12 +136,78 @@ export class AudioPlayer {
   /** Lazily create or borrow the context shared by decoding and owned playback. */
   get audioContext(): AudioContext {
     if (this.disposed) throw new Error('AudioPlayer has been disposed');
-    this.context ??= this.options.audioContext ?? createWebAudioContext('AudioContext is not available in this environment');
+    this.context ??= this.options.audioContext ?? (this.options.moduleContext?.audio.prepare() as AudioContext | undefined) ?? createWebAudioContext('AudioContext is not available in this environment');
     return this.context;
+  }
+  peekAudioContext(): AudioContext | undefined {
+    return this.context ?? this.options.audioContext ?? this.options.moduleContext?.audio.peek() as AudioContext | undefined;
   }
   get volume(): number { return this.storedVolume; }
   get pan(): number { return this.storedPan; }
-  get rate(): number { return this.storedRate; }
+  get rate(): number { return this.engine?.playbackRate ?? this.storedRate; }
+  get timingCapabilities(): PlaybackTimingCapabilities {
+    if (this.borrowed) return this.borrowed.timingCapabilities ?? EXTERNAL_TIMING_CAPABILITIES;
+    if (this.engine) return this.engine.timingCapabilities;
+    if (!this.selectedClip) return EXTERNAL_TIMING_CAPABILITIES;
+    const kind = this.options.engine ?? 'auto';
+    return kind === 'media' || kind === 'auto' && this.selectedClip.sourceUrl && (!this.selectedClip.hasSamples || this.selectedClip.duration > 600)
+      ? MEDIA_TIMING_CAPABILITIES : BUFFER_TIMING_CAPABILITIES;
+  }
+  get followsSession(): boolean { return this.scheduling?.active || this.borrowed?.followsSession || this.engine?.followsSession || false; }
+  get schedulingMode(): PlaybackSchedulingMode {
+    return this.borrowed?.schedulingMode ?? this.engine?.schedulingMode ?? (this.timingCapabilities.engine === 'media' ? 'approximate-media' : 'independent');
+  }
+
+  async activateScheduling(): Promise<void> {
+    if (this.disposed) throw new Error('AudioPlayer has been disposed');
+    const generation = this.generation;
+    const target = this.borrowed ?? this.ensureEngine();
+    if (!target?.activateScheduling) throw new Error('The selected transport cannot activate shared Session scheduling.');
+    await target.activateScheduling();
+    if (this.disposed || generation !== this.generation) throw new Error('AudioPlayer activation was cancelled');
+  }
+
+  attachScheduling(binding: SessionSchedulingBinding): ConnectionLease {
+    if (this.disposed) throw new Error('AudioPlayer has been disposed');
+    if (this.scheduling?.active) throw new Error('AudioPlayer already follows a Session.');
+    const generation = this.generation;
+    const target = this.borrowed ?? this.ensureEngine();
+    if (!target?.attachScheduling) throw new Error('The selected transport does not support shared Session scheduling.');
+    const attachment = target.attachScheduling(binding);
+    if (this.disposed || generation !== this.generation) {
+      attachment.release();
+      throw new Error('AudioPlayer scheduling attachment was cancelled');
+    }
+    const cleanup = createConnectionLease(() => {
+      if (this.scheduling === lease) this.scheduling = undefined;
+      attachment.release();
+    });
+    const lease: ConnectionLease = Object.freeze({
+      get active() { return cleanup.active && attachment.active; },
+      release: () => cleanup.release(),
+    });
+    this.scheduling = lease;
+    return lease;
+  }
+  /** Source-local post-fader processing. A borrowed group retains its own effects. */
+  setEffect(effect: Effect | undefined): void {
+    if (this.disposed) return;
+    if (this.borrowed) throw new Error('Configure effects on the borrowed transport or its master bus');
+    this.inserts?.setCompatibility(effect);
+    this.options.effect = effect;
+  }
+  get insertChain(): InsertChain | undefined {
+    if (this.disposed || this.borrowed || !this.selectedClip) return undefined;
+    this.ensureOutput();
+    return this.inserts;
+  }
+  /** Explicit preparation of a source output; aggregate transports have no synthetic port. */
+  get outputPort(): AudioOutputPort | undefined {
+    if (this.disposed || this.borrowed || !this.selectedClip) return undefined;
+    this.ensureOutput();
+    return this.port;
+  }
+  peekOutputPort(): AudioOutputPort | undefined { return this.borrowed || !this.selectedClip ? undefined : this.port; }
   /** Stable owned output tap; a borrowed group exposes only its own supported tap. */
   get analyser(): AnalyserNode | undefined {
     if (this.disposed) return undefined;
@@ -122,7 +219,7 @@ export class AudioPlayer {
   setClip(clip: AudioClip | undefined): void {
     if (this.disposed || (!this.borrowed && clip === this.selectedClip)) return;
     const revision = ++this.generation;
-    if (clip) (this.borrowed ?? this.engine)?.pause();
+    if (clip && !this.followsSession) (this.borrowed ?? this.engine)?.pause();
     if (this.disposed || revision !== this.generation) return;
     this.releaseSource();
     if (this.disposed || revision !== this.generation) return;
@@ -137,7 +234,7 @@ export class AudioPlayer {
       throw new TypeError('AudioPlayer cannot borrow another AudioPlayer; connect the playlist or mixer transport directly');
     }
     const revision = ++this.generation;
-    if (transport) (this.borrowed ?? this.engine)?.pause();
+    if (transport && !this.followsSession) (this.borrowed ?? this.engine)?.pause();
     if (this.disposed || revision !== this.generation) return;
     this.releaseSource();
     if (this.disposed || revision !== this.generation) return;
@@ -268,11 +365,14 @@ export class AudioPlayer {
     this.generation++;
     let failure: unknown;
     try { this.releaseSource(); } catch (error) { failure = error; }
-    try { this.output?.disconnect(); } catch (error) { failure ??= error; }
+    try { this.inserts?.dispose(); } catch (error) { failure ??= error; }
+    this.inserts = undefined;
+    try { this.port?.dispose(); } catch (error) { failure ??= error; }
+    this.port = undefined;
     this.output = undefined;
     const context = this.context;
     this.context = undefined;
-    if (context && !this.options.audioContext) {
+    if (context && !this.options.audioContext && !this.options.moduleContext) {
       try { void context.close().catch(() => {}); } catch (error) { failure ??= error; }
     }
     this.selectedClip = undefined;
@@ -288,30 +388,65 @@ export class AudioPlayer {
     this.emitter.emitSafely('statechange', {playing: false}, observerFailed);
     this.emitter.emitSafely('timeupdate', {seconds: 0, duration: 0, progress: 0}, observerFailed);
     this.emitter.removeAllListeners();
+    this.moduleListeners.clear();
     if (failure !== undefined) throw failure;
   }
 
-  private ensureOutput(): AnalyserNode {
+  private ensureOutput(): AnalyserNode | undefined {
     if (this.output) return this.output;
-    const context = this.audioContext;
-    const output = context.createAnalyser();
+    if (this.preparingOutput) throw new Error('AudioPlayer output preparation cannot re-enter');
+    this.preparingOutput = true;
+    const generation = this.generation;
+    const current = () => !this.disposed && generation === this.generation && !this.borrowed && !!this.selectedClip;
+    let output: AnalyserNode | undefined;
+    let inserts: InsertChain | undefined;
+    let port: AudioOutputPort | undefined;
+    let committed = false;
     try {
+      const context = this.audioContext;
+      output = context.createAnalyser();
       output.fftSize = 2048;
       output.smoothingTimeConstant = 0.8;
-      output.connect(this.options.destination ?? context.destination);
-    } catch (error) {
-      try { output.disconnect(); } catch { /* release the candidate output */ }
-      throw error;
+      inserts = new InsertChain(context);
+      inserts.setCompatibility(this.options.effect);
+      if (!current()) return undefined;
+      inserts.output.connect(output);
+      port = new AudioOutputPort(output, {defaultDestination: this.options.moduleContext ? undefined : this.options.destination ?? context.destination});
+      if (!current()) return undefined;
+      this.output = output;
+      this.inserts = inserts;
+      this.port = port;
+      committed = true;
+    } finally {
+      this.preparingOutput = false;
+      if (!committed) {
+        try { port?.dispose(); } catch { /* release all candidate resources */ }
+        try { inserts?.dispose(); } catch { /* release all candidate resources */ }
+        try { output?.disconnect(); } catch { /* release the candidate output */ }
+      }
     }
-    this.output = output;
-    return output;
+    for (const listener of [...this.moduleListeners]) {
+      if (!current()) break;
+      if (!this.moduleListeners.has(listener)) continue;
+      try { listener(); } catch (error) {
+        this.emitter.emitSafely('error', error instanceof Error ? error : new Error(String(error)), () => {});
+      }
+    }
+    return current() ? output : undefined;
   }
 
   private ensureEngine(): AudioClipPlayer | undefined {
     if (this.engine || !this.selectedClip || this.disposed || this.borrowed) return this.engine;
-    const destination = this.ensureOutput();
+    const generation = this.generation;
+    this.ensureOutput();
+    // Readiness observers can replace/dispose the source or prepare its engine
+    // themselves. Keep that newer ownership instead of installing over it.
+    if (this.disposed || generation !== this.generation || this.borrowed || !this.selectedClip) return undefined;
+    if (this.engine) return this.engine;
+    const destination = this.inserts!.input;
     const engine = new AudioClipPlayer(this.selectedClip, {
       ...this.options,
+      effect: undefined,
       audioContext: this.context,
       destination,
       volume: this.storedVolume,
@@ -338,6 +473,8 @@ export class AudioPlayer {
     this.stopObserver();
     const releases = this.releases;
     const engine = this.engine;
+    const scheduling = this.scheduling;
+    this.scheduling = undefined;
     this.releases = [];
     this.engine = undefined;
     this.borrowed = undefined;
@@ -345,6 +482,7 @@ export class AudioPlayer {
     for (const release of releases) {
       try { release(); } catch (error) { failure ??= error; }
     }
+    try { scheduling?.release(); } catch (error) { failure ??= error; }
     try { engine?.dispose(); } catch (error) { failure ??= error; }
     if (failure !== undefined) throw failure;
   }

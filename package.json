@@ -28,18 +28,19 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "typecheck:tests": "tsc -p tsconfig.test.json",
     "test": "npm run test --workspaces --if-present",
-    "check:source": "npm run check:format && npm run check:lockfile && npm run check:dev-server && npm run lint && npm run check:architecture && npm run check:docs && npm run check:dev-docs && npm run check:site-notices && npm run build:packages && npm run check:doc-snippets && npm run typecheck && npm run typecheck:tests && npm test",
+    "check:source": "npm run check:format && npm run check:lockfile && npm run check:dev-server && npm run lint && npm run check:architecture && npm run check:docs && npm run check:dev-docs && npm run check:site-notices && npm run build:packages && npm run check:demo-assets && npm run check:doc-snippets && npm run typecheck && npm run typecheck:tests && npm test",
     "check:packages": "node --test scripts/package-artifacts.test.mjs && node scripts/check-package-exports.mjs && node scripts/package-artifacts.mjs --all && node --test scripts/bundle-notices.test.mjs && node scripts/bundle-notices.mjs --check && node scripts/bundle-notices.mjs --package-dir packages/audio --check",
     "check:external-install": "node scripts/check-external-install.mjs",
     "check:release-manifests": "node --test scripts/release-version.test.mjs scripts/release-manifests.test.mjs && node scripts/release-manifests.mjs",
     "check": "npm run check:source && npm run check:licenses && npm run check:packages && npm run check:release-manifests",
     "release:prepare": "node scripts/release-manifests.mjs --write",
     "docs:dev": "npm run dev -w webmusic-doc --",
-    "docs:build": "npm run build:packages && npm run build -w webmusic-doc",
-    "pages:build": "npm run build:packages && DOCS_SITE=https://koperative-lab.github.io DOCS_BASE=/WebMusic/ npm run build -w webmusic-doc && node scripts/prefix-docs-base.mjs apps/doc/webmusic/dist /WebMusic && node scripts/site-notices.mjs --check",
+    "docs:build": "npm run build:packages && npm run check:demo-assets && npm run build -w webmusic-doc",
+    "pages:build": "npm run build:packages && npm run check:demo-assets && DOCS_SITE=https://koperative-lab.github.io DOCS_BASE=/WebMusic/ npm run build -w webmusic-doc && node scripts/prefix-docs-base.mjs apps/doc/webmusic/dist /WebMusic && node scripts/site-notices.mjs --check",
     "check:site-notices": "node --test scripts/site-notices.test.mjs",
     "dev:restart": "node scripts/docs-dev.mjs --build restart",
-    "check:dev-server": "node --test scripts/docs-dev.test.mjs"
+    "check:dev-server": "node --test scripts/docs-dev.test.mjs",
+    "check:demo-assets": "node --test scripts/demo-assets.test.mjs && node scripts/demo-assets.mjs --check"
   },
   "engines": {
     "node": "^22.22.3 || ^24.16.0 || >=26.3.0"
@@ -57,6 +58,9 @@
   "overrides": {
     "tsup": {
       "esbuild": "^0.28.2"
+    },
+    "@expressive-code/core": {
+      "postcss-nested": "7.0.2"
     }
   }
 }

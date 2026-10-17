@@ -82,6 +82,8 @@ is on [`@webmusic/score/play`](/score/api/play/).
 | `MidiPlayerController` | `PlayerController` alias | [PlayerController](/score/headless/play/player-controller/) — [MIDI binding distinction](/score/headless/play/interactive-player/#web-midi-input) |
 | `TempoController` · `appendTap` · `tapBpm` · `TAP_WINDOW` · `TAP_RESET_GAP` | class · tap helpers | [Metronome](/score/headless/play/metronome/) |
 | `LfoController` · `createLfoController` · `lfoWave` · `LFO_SHAPES` | class · factory · helpers | [Synth backends](/score/headless/play/sound/#synth-backends) |
+| `NoteInputController` · `SCORE_NOTE_INPUT` | class · capability key | [Live note occurrences](/score/headless/play/score-player/#live-note-occurrences); `NoteInputTarget` and `NoteInputOccurrence` define the borrowed target and paired gate. |
+| `ParamLfoController` · `getParamLfoController` · `ParameterMacroController` · `getParameterMacroController` | classes · shared-controller accessors | [Shared parameter controllers](/score/headless/play/sound/#shared-parameter-controllers); configuration/state types and ownership live with that reference. |
 | `EqController` · `createEqController` | class · factory | [Effect](/score/headless/play/effect/) |
 | `eqFrequencyToX` · `eqXToFrequency` · `eqGainToY` · `eqYToGain` | curve maths | [Effect](/score/headless/play/effect/) |
 | `DEFAULT_EQ_BANDS` · `EQ_MIN_FREQUENCY` · `EQ_MAX_FREQUENCY` · `EQ_MAX_GAIN` · `EQ_RESPONSE_SAMPLES` | constants | [Effect](/score/headless/play/effect/) |
@@ -102,7 +104,7 @@ is on [`@webmusic/score/play`](/score/api/play/).
 | `bindMidiInput` | driver | [Web MIDI](/score/headless/play/interactive-player/#web-midi-input) |
 
 Option, event, state and structural interface types belong with their object
-or helper. Examples include `ScorePlayerOptions`, `PlayerTimeUpdate`,
+or helper. Examples include `ScorePlayerOptions`, `ScoreSchedulingCapabilities`, `PlayerTimeUpdate`,
 `RenderOptions`, `InteractivePlayerEvents`, `HeadlessSynth`,
 `TonePlayerOptions` and `TonePlayerEvents`. Use the linked references for
 their fields and ownership rules; a value-name coverage check is not a type
@@ -189,3 +191,5 @@ to the pitch-view page.
 caller-owned element, so by rule they are `/render` adapters, and they are
 documented on [`@webmusic/score/view`](/score/api/view/) with the rest of the
 code-facing surface.
+
+`ScorePlayerModule` is documented with [ScorePlayer](/score/headless/play/score-player/#module-adapter); `ScoreRackModule` with [Rack](/score/headless/play/rack/#source-free-module-bus). Both use explicit module contexts and Session ownership.

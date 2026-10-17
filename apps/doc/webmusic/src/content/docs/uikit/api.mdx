@@ -1,6 +1,6 @@
 ---
 title: '@webmusic/ui'
-description: 'The @webmusic/ui root: the twenty-five published presenter entries, their shared contracts and deliberate differences, and the release boundary.'
+description: 'The @webmusic/ui root: presenter entries, their shared contracts and deliberate differences, and the release boundary.'
 sidebar:
   label: '@webmusic/ui'
   order: 6
@@ -33,7 +33,7 @@ headless-only install does not pull it in.
 
 ## Package subpaths
 
-The root re-exports all twenty-five; import a subpath to keep the rest out of
+The root re-exports every entry below; import a subpath to keep the rest out of
 your bundle.
 
 | Entry | Class | What it presents |
@@ -52,6 +52,7 @@ your bundle.
 | [`@webmusic/ui/oscilloscope`](/uikit/views-analysis/oscilloscope/) | Views and analysis | Trigger-aligned time-domain waveform with timebase, freeze and probe controls. |
 | [`@webmusic/ui/panel`](/uikit/layout-feedback/panel/) | Layout and feedback | Semantic section panel that owns section and presenter-slot hosts. |
 | [`@webmusic/ui/parameter`](/uikit/parameters-gestures/parameter/) | Parameters and modulation | `mountParameterRack()`, its structural binding and side-effect-free style text. |
+| [`@webmusic/ui/patch-editor`](/uikit/parameters-gestures/patch-editor/) | Parameters and modulation | Module ports, connections and keyboard-accessible graph editing over caller-owned state. |
 | [`@webmusic/ui/pitch`](/uikit/views-analysis/pitch/) | Views and analysis | Keyboard, grand stave and fretboard read-outs coloured by the role each pitch is given. |
 | [`@webmusic/ui/playlist`](/uikit/transport-time/playlist/) | Transport and navigation | Transport-and-track-list presenter over a structural playlist binding. |
 | [`@webmusic/ui/recorder`](/uikit/mixing-capture/recorder/) | Mixing and capture | Record/playback/export presenter over a structural recorder binding. |
@@ -64,7 +65,7 @@ your bundle.
 | [`@webmusic/ui/transport`](/uikit/transport-time/transport/) | Transport and navigation | Structural transport binding plus `mountTransport()` and its named `controls`. |
 | [`@webmusic/ui/workbench`](/uikit/layout-feedback/workbench/) | Layout and feedback | The shell an analysis view sits in: tabs, a stage, docks, a status bar, one clock. |
 
-`@webmusic/ui` (the root) is the stable aggregate of the twenty-five. Presenter
+`@webmusic/ui` (the root) is the stable aggregate of these entries. Presenter
 styles are exported by their owning entries; there is no separate stylesheet subpath.
 
 ## The shared presenter shape
@@ -123,8 +124,9 @@ Each owning page describes its complete state, cleanup and styling contract.
 ## Release boundary
 
 Import presenters through the explicit subpaths above or the root barrel.
-The first-release UI package includes all entries listed here, including those
-without a current Score Element consumer. Audio and Bridge packages continue on
-`dev`; UI bindings remain independent of either domain package. Package entries
-and their supported features are defined by their references, not by a historical
-component count or the number of current Element consumers.
+This reference describes the current source package, including entries without
+a Score Element consumer. UI bindings remain independent of Score, Audio and
+Bridge. The modular `patch-editor` entry is new in the prepared `0.3.0` version;
+it is absent from the published `0.2.0` package. Use matching built packages
+until that version is published. Each entry's owning reference defines its
+supported features and lifecycle.

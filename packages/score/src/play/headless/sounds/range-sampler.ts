@@ -1,3 +1,6 @@
+import type {ParamSurface} from '@webmusic/kernel/module';
+import {createEnvelopeParameters, readEnvelopeParameters} from '../internal/envelope-parameters';
+import {VoiceEnvelope} from '../internal/voice-envelope';
 import type {HeadlessSynth} from '../audio-contracts';
 import type {SampleZone, SfzOptions} from './contracts';
 import {
@@ -16,6 +19,7 @@ interface ActiveRangeSample {
   source: AudioBufferSourceNode;
   gain: GainNode;
   startTime: number;
+  envelope: VoiceEnvelope;
 }
 
 interface SfzLoadLimits {
@@ -39,7 +43,10 @@ export const DEFAULT_SFZ_LOAD_LIMITS: Readonly<SfzLoadLimits> = Object.freeze({
 
 /** Key/velocity-ranged, pitch-shifting sampler used by `Sound.sfz()`. */
 export class RangeSampler implements HeadlessSynth {
+  readonly supportsNoteOccurrences = true;
   readonly supportsScheduledCancellation = true;
+  readonly supportsScheduledDuration = true;
+  readonly supportsScheduledRetiming = true;
   private readonly output: GainNode;
   private zones: LoadedZone[] = [];
   private readonly active = new Map<number, Set<ActiveRangeSample>>();
@@ -48,18 +55,18 @@ export class RangeSampler implements HeadlessSynth {
   private readonly byId = new Map<number, {midi: number; voice: ActiveRangeSample}>();
   private nextId = 1;
   private readonly roundRobin = new Map<string, number>();
-  private readonly attackSeconds: number;
-  private readonly releaseSeconds: number;
+  readonly params: ParamSurface;
+  private readonly ownsParams: boolean;
   private readonly loadLimits: SfzLoadLimits;
   private readonly loadControllers = new Set<AbortController>();
   private loadGeneration = 0;
   private disposed = false;
 
-  constructor(private readonly context: AudioContext, options: SfzOptions = {}) {
+  constructor(private readonly context: AudioContext, options: SfzOptions = {}, sharedParams?: ParamSurface) {
     this.loadLimits = resolveSfzLoadLimits(options);
     this.output = context.createGain();
-    this.attackSeconds = options.attackSeconds ?? 0.004;
-    this.releaseSeconds = options.releaseSeconds ?? 0.12;
+    this.params = sharedParams ?? createEnvelopeParameters(options, 0.004, 0.12);
+    this.ownsParams = !sharedParams;
   }
 
   connect(destination: AudioNode): () => void {
@@ -190,27 +197,24 @@ export class RangeSampler implements HeadlessSynth {
     const zone = chooseZone(this.zones, midi, velocity, this.roundRobin);
     if (!zone) return;
 
+    const settings = readEnvelopeParameters(this.params);
     const source = this.context.createBufferSource();
     const gain = this.context.createGain();
     source.buffer = zone.buffer;
     source.playbackRate.value = playbackRateFor(zone.rootKey, midi, zone.tuneCents ?? 0);
 
     const level = (velocity / 127) * dbToLinear(zone.volume ?? 0);
-    gain.gain.setValueAtTime(0.0001, time);
-    gain.gain.exponentialRampToValueAtTime(
-      Math.max(0.0001, level),
-      time + this.attackSeconds,
-    );
+    const envelope = new VoiceEnvelope(gain.gain, time, Math.max(0, level), settings, durationSeconds);
     source.connect(gain).connect(this.output);
     source.start(time);
-    source.stop(time + durationSeconds + this.releaseSeconds);
+    if (Number.isFinite(durationSeconds)) source.stop(time + durationSeconds + settings.releaseSeconds);
 
     let voices = this.active.get(midi);
     if (!voices) {
       voices = new Set();
       this.active.set(midi, voices);
     }
-    const voice = {source, gain, startTime: time};
+    const voice = {source, gain, startTime: time, envelope};
     voices.add(voice);
     this.sources.add(voice);
     const id = this.nextId++;
@@ -220,17 +224,22 @@ export class RangeSampler implements HeadlessSynth {
       this.sources.delete(voice);
       if (voices?.size === 0) this.active.delete(midi);
       this.byId.delete(id);
+      source.disconnect();
+      gain.disconnect();
     };
     return id;
   }
 
   noteOff(midi: number, time: number): void {
+    let firstError: unknown;
     const voices = this.active.get(midi);
-    if (!voices) return;
-    for (const voice of voices) this.releaseVoice(voice, time);
-    voices.clear();
     this.active.delete(midi);
     for (const [id, record] of this.byId) if (record.midi === midi) this.byId.delete(id);
+    for (const voice of voices ?? []) {
+      try { this.releaseVoice(voice, time); } catch (error) { firstError ??= error; }
+    }
+    voices?.clear();
+    if (firstError !== undefined) throw firstError;
   }
 
   noteOffById(handle: unknown, time: number): void {
@@ -245,7 +254,8 @@ export class RangeSampler implements HeadlessSynth {
     const record = typeof handle === 'number' ? this.byId.get(handle) : undefined;
     if (!record) return;
     try {
-      record.voice.source.stop(time + this.releaseSeconds);
+      const stop = record.voice.envelope.retime(time, this.context.currentTime);
+      if (stop !== undefined) record.voice.source.stop(stop);
     } catch {
       // The source has already ended.
     }
@@ -255,14 +265,19 @@ export class RangeSampler implements HeadlessSynth {
     if (this.disposed) return;
     this.disposed = true;
     this.invalidateLoads();
+    if (this.ownsParams) for (const handle of this.params) handle.dispose();
     const now = Number.isFinite(this.context.currentTime) ? this.context.currentTime : 0;
-    for (const voice of this.sources) this.hardStopVoice(voice, now);
+    let firstError: unknown;
+    for (const voice of this.sources) {
+      try { this.hardStopVoice(voice, now); } catch (error) { firstError ??= error; }
+    }
     this.active.clear();
     this.sources.clear();
     this.byId.clear();
     this.zones = [];
     this.roundRobin.clear();
-    this.disconnect();
+    try { this.disconnect(); } catch (error) { firstError ??= error; }
+    if (firstError !== undefined) throw firstError;
   }
 
   private releaseById(handle: unknown, time: number): void {
@@ -280,24 +295,14 @@ export class RangeSampler implements HeadlessSynth {
       this.hardStopVoice(voice, time);
       return;
     }
-    voice.gain.gain.cancelScheduledValues(time);
-    voice.gain.gain.setValueAtTime(Math.max(voice.gain.gain.value, 0.0001), time);
-    const stopTime = time + this.releaseSeconds;
-    voice.gain.gain.exponentialRampToValueAtTime(0.0001, stopTime);
-    try {
-      voice.source.stop(stopTime);
-    } catch {
-      // The source has already ended.
+    try { voice.envelope.release(time); } finally {
+      try { voice.source.stop(time + voice.envelope.settings.releaseSeconds); } catch { /* Already ended. */ }
     }
   }
 
   private hardStopVoice(voice: ActiveRangeSample, time: number): void {
-    voice.gain.gain.cancelScheduledValues(time);
-    voice.gain.gain.setValueAtTime(0, time);
-    try {
-      voice.source.stop(time);
-    } catch {
-      // The source has already ended.
+    try { voice.envelope.cancel(time); } finally {
+      try { voice.source.stop(time); } catch { /* Already ended. */ }
     }
   }
 

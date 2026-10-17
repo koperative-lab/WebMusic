@@ -8,6 +8,8 @@ function installElementSurface<T extends object>(element: T) {
   const target = element as unknown as Record<string, unknown>;
   target.isConnected = false;
   target.getAttribute = () => null;
+  target.hasAttribute = () => false;
+  target.getRootNode = () => ({});
   target.attachShadow = () => ({
     innerHTML: '',
     querySelector: () => null,

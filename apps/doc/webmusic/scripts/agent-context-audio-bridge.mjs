@@ -49,7 +49,13 @@ async function inspectSources(root) {
     const manifest = JSON.parse(await read(`${directory}/package.json`));
     const contract = Object.fromEntries(Object.keys(manifest).filter((key) => key !== 'devDependencies').sort().map((key) => [key, manifest[key]]));
     const sources = [];
-    for (const filename of await walk(`${directory}/src`)) sources.push([filename, digest(await read(`${directory}/src/${filename}`))]);
+    const filenames = await walk(`${directory}/src`);
+    // Each request fingerprints fresh checked bytes. Bounded concurrent reads
+    // avoid a filesystem round trip per source while retaining sorted output.
+    for (let index = 0; index < filenames.length; index += 16) {
+      sources.push(...await Promise.all(filenames.slice(index, index + 16).map(async (filename) =>
+        [filename, digest(await read(`${directory}/src/${filename}`))])));
+    }
     packages.push({directory, name: manifest.name, version: manifest.version, manifestSha256: digest(json(contract)), sourceSha256: digest(json(sources))});
   }
   return {packages, sourceSnapshot: {

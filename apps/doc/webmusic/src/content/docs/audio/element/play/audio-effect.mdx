@@ -1,0 +1,91 @@
+---
+title: '<audio-effect>'
+description: A nonvisual declaration of one realized insert effect in a module chain.
+sidebar:
+  order: 5
+---
+
+import ModularCompositionDemo from '../../../../../components/ModularCompositionDemo.astro';
+
+`<audio-effect>` declares one insert in the selected module's chain. The declaration
+renders nothing; use an attached panel to edit its realized parameters. The
+shared example below includes both Score and Audio declarations on one bus.
+
+<ModularCompositionDemo />
+
+## Import
+
+```html
+<script type="module">
+  import {defineAudioEffectElement} from '@webmusic/audio/play/element';
+  defineAudioEffectElement();
+</script>
+
+<audio-effect id="filter" target="#desk" type="filter" frequency="1200"></audio-effect>
+<score-synth-panel target="#filter" sections="effects"></score-synth-panel>
+```
+
+Register the target owner and Score panel through their owning entries as in
+[the runnable composition](/bridge/modular-composition/). The target must expose
+an `InsertChain`; an explicit missing target stays pending. Without `target`,
+the nearest module context supplies the owner: a player owns its local insert,
+a rack/mixer supplies its master insert. Ordinary HTML `slot` has no routing
+semantics here.
+
+<details class="component-section">
+<summary>API</summary>
+
+### Declaration and target
+
+| Member | Contract |
+| --- | --- |
+| `type` | Recipe kind, default `gain`; unknown kinds report an error. |
+| `target` | Unique module selector in the current root; discovery follows replacement without preparing audio. |
+| `.moduleTarget` | `ModuleHandle`, `null`, or `undefined`. Object wins; null unbinds; undefined resumes selector/context lookup. |
+| `.effect` | Custom domain `Effect` recipe; overrides the built-in type and numeric attributes. Assign undefined to restore declaration recipes. |
+| `.slotId` | Stable declaration identity. Changing the DOM id does not transfer the realized insert. |
+| `.module` | Read-only borrowed module of the exact realized `EffectInstance`, including its `ParamSurface`; absent until the owner is prepared. |
+
+### Type parameters
+
+Numeric attributes require finite values and apply only to the selected recipe.
+Changing a recipe attribute replaces that slot transactionally. Editing its live
+`ParamHandle` changes the existing instance in place.
+
+| Type | Attributes | Meaning/defaults |
+| --- | --- | --- |
+| `gain` | `gain` | Linear gain, default 1. |
+| `filter` | `filter-type`, `frequency`, `q`, `gain` | Defaults: lowpass, 1000 Hz, Q 1, 0 dB. |
+| `delay` | `time`, `feedback`, `wet`, `dry` | Defaults: 0.25 s, 0.3, 0.3, 1. |
+| `compressor` | `threshold`, `knee`, `ratio`, `attack`, `release` | Defaults: -24 dB, 30 dB, 12, 0.003 s, 0.25 s. |
+
+### Events and ownership
+
+Failures use `webaudio:error`; invalid candidates retain the previous working
+chain. The chain owns realized effect instances and their nodes. The declaration
+owns its slot membership, and a panel owns only UI/subscriptions. Multiple panels
+can therefore edit the same instance without constructing another effect.
+
+Declarations append in initial attachment order. A synchronous same-scope DOM
+layout move retains the slot and instance; an actual removal drops this slot at
+the next microtask. Replacing a source or owner releases obsolete connections.
+Neither discovery nor an attribute change forces audio preparation.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+This declaration has no visible surface and uses `display: none`. Style the
+player, desk and attached panel independently; their visibility does not define
+effect lifetime.
+
+</details>
+
+## Related
+
+- [Audio recipe defaults](/audio/headless/play/effects/)
+
+- [Modular composition](/bridge/modular-composition/)
+- [Attached parameter panel](/score/element/play/score-synth-panel/)
+- [InsertChain and ownership](/kernel/api/#effect--webmusickerneleffect)

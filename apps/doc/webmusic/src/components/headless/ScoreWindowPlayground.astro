@@ -28,9 +28,9 @@ const code = "import {createScoreView} from '@webmusic/score/view/headless';\nco
 <script>
   import {mountDemos} from '../demo-lifecycle';
   import {mountScoreWindowDemo} from './analysis-view-playgrounds-client';
-  import {loadArabesqueScore} from './arabesque-score';
+  import {loadStudyScore} from './study-score';
   mountDemos('[data-score-window-demo]', async (root, scope) => {
-    const source = await loadArabesqueScore();
+    const source = await loadStudyScore();
     if (scope.active) mountScoreWindowDemo(root, scope, source);
   });
 </script>

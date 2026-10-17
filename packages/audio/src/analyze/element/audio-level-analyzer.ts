@@ -1,3 +1,4 @@
+import type {ModuleHandle} from '@webmusic/kernel/module';
 import {mountLevelAnalyzer, type LevelAnalyzerHandle, type LevelAnalyzerSample} from '@webmusic/ui/level-analyzer';
 import {createRealtimeAnalyzer, type RealtimeAnalyzer, type RealtimeFrame} from '../headless/realtime';
 import {WebMusicElement, defineOnce, upgradeProperties} from './internal/base';
@@ -21,7 +22,14 @@ function toDbfs(linear: number): number {
 
 /** Sampled dynamics inspector over a borrowed audio graph. */
 export class AudioLevelAnalyzerElement extends WebMusicElement {
-  static get observedAttributes(): string[] { return ['player', 'threshold-dbfs']; }
+  static get observedAttributes(): string[] { return ['player', 'input', 'port', 'threshold-dbfs']; }
+
+  #inputModule?: ModuleHandle | null;
+  get inputModule(): ModuleHandle | null | undefined { return this.#inputModule; }
+  set inputModule(value: ModuleHandle | null | undefined) {
+    this.#inputModule = value;
+    if (this.isConnected) this.#bind();
+  }
 
   #explicitAnalyser?: AnalyserNode;
   #player?: AnalysisPlayerTarget;
@@ -61,7 +69,7 @@ export class AudioLevelAnalyzerElement extends WebMusicElement {
     };
     this.ownerDocument.addEventListener('visibilitychange', onVisibility);
     this.own(() => this.ownerDocument.removeEventListener('visibilitychange', onVisibility));
-    upgradeProperties(this, ['analyser']);
+    upgradeProperties(this, ['inputModule', 'analyser']);
     this.#handle = mountLevelAnalyzer(this, {
       onThresholdChange: (value) => { this.thresholdDbfs = value; },
       onFreezeChange: (frozen) => { this.#frozen = frozen; this.#render(); },
@@ -74,7 +82,7 @@ export class AudioLevelAnalyzerElement extends WebMusicElement {
 
   attributeChangedCallback(name?: string, previous?: string | null, next?: string | null): void {
     if (!this.isConnected || previous === next) return;
-    if (name === 'player') this.#bind();
+    if (name === 'player' || name === 'input' || name === 'port') this.#bind();
     else this.#render();
   }
 
@@ -84,7 +92,7 @@ export class AudioLevelAnalyzerElement extends WebMusicElement {
     this.#explicitAnalyser = value;
     this.#reportedStall = false;
     this.#readFailed = false;
-    if (this.isConnected) this.#reconcile(true);
+    if (this.isConnected) this.#bind();
   }
 
   get analyser(): AnalyserNode | undefined { return this.#explicitAnalyser; }
@@ -113,7 +121,7 @@ export class AudioLevelAnalyzerElement extends WebMusicElement {
     this.#readFailed = false;
     this.#lastTime = undefined;
     this.#reconcile(true);
-    this.#unbind = bindAnalysisPlayer(this, (kind, reading) => this.#onPlayer(kind, reading));
+    this.#unbind = bindAnalysisPlayer(this, (kind, reading) => this.#onPlayer(kind, reading), this.#explicitAnalyser ? null : this.#inputModule);
   }
 
   #onPlayer(kind: AnalysisPlayerUpdate, reading: AnalysisPlayerSnapshot): void {

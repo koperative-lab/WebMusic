@@ -31,5 +31,6 @@ export {
   type ScoreFromTranscriptionOptions,
 } from './transcription';
 export type {SyncTransportContract} from './transport-contracts';
+export {createWebMusicProjectPlugins} from './project';
 
 export type {TransportCommand, TransportCommit, TransportEvent, TransportSnapshot} from '@webmusic/kernel/sync';

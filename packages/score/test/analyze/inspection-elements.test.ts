@@ -5,6 +5,7 @@ import {Duration, Pitch, Rational, ScoreBuilder, VoiceId, type Score} from '../.
 import {loadScore} from '../../src/io';
 import {ChordAnalysisElement} from '../../src/analyze/element/score-chord-analysis';
 import {projectChordCells} from '../../src/analyze/element/internal/chord-cells';
+import {loadNotationStudyFixture} from '../notation-study-fixture';
 
 vi.mock('@webmusic/ui/harmony', () => import('../../../ui/src/harmony'));
 vi.mock('@webmusic/ui/workbench', () => import('../../../ui/src/workbench'));
@@ -12,8 +13,8 @@ vi.mock('@webmusic/ui/workbench', () => import('../../../ui/src/workbench'));
 let serial = 0;
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
-function arabesqueBytes(format: 'midi' | 'mxl'): Uint8Array {
-  const asset = `apps/doc/webmusic/public/${format === 'midi' ? 'midi/Arabesque No.1.mid' : 'mxl/Arabesque No.1.mxl'}`;
+function studyBytes(format: 'midi' | 'mxl'): Uint8Array {
+  const asset = `apps/doc/webmusic/public/${format === 'midi' ? 'midi/webmusic-study-no-1.mid' : 'mxl/webmusic-study-no-1.mxl'}`;
   return readFileSync(existsSync(asset) ? asset : `../../${asset}`);
 }
 
@@ -89,8 +90,8 @@ describe('score inspection Elements', () => {
     expect(element.score).toBeDefined();
   });
 
-  it('keeps dense Arabesque harmony readable and cell inspection aligned with the lane', async () => {
-    const music = await loadScore(arabesqueBytes('mxl'), {format: 'mxl'});
+  it('keeps the study harmony readable and cell inspection aligned with the lane', async () => {
+    const music = await loadScore(studyBytes('mxl'), {format: 'mxl'});
     const element = await mount(ChordAnalysisElement, music);
     const bands = [...element.querySelectorAll<HTMLElement>('.wui-harmony-flow__band')];
     expect(bands).toHaveLength(music.measures.length * 2);
@@ -106,14 +107,25 @@ describe('score inspection Elements', () => {
   });
 
   it('uses the MIDI demo meter grid when the imported score has no measure objects', async () => {
-    const music = await loadScore(arabesqueBytes('midi'), {format: 'midi'});
+    const music = await loadScore(studyBytes('midi'), {format: 'midi'});
     expect(music.measures).toHaveLength(0);
     const lane = projectChordCells(music, {bands: [], now: 0}, {spelling: 'auto'});
-    expect(lane.bands.length).toBeGreaterThan(200);
-    expect(lane.bands.length).toBeLessThan(220);
+    expect(lane.bands).toHaveLength(32);
     expect(lane.bands[0]).toMatchObject({stampStart: 0, stampEnd: 2});
     expect(lane.bands[1]).toMatchObject({stampStart: 2, stampEnd: 4});
     expect(lane.bands[lane.bands.length - 1]?.stampEnd).toBeCloseTo(music.durationQuarters.toFloat());
+  });
+
+  it('keeps a long dense notation study readable without one cell per note', async () => {
+    const music = loadNotationStudyFixture(108);
+    const element = await mount(ChordAnalysisElement, music);
+    const bands = [...element.querySelectorAll<HTMLElement>('.wui-harmony-flow__band')];
+    expect([...music.allNotes()]).toHaveLength(108 * 24);
+    expect(bands).toHaveLength(216);
+    expect(element.analysis?.evidence.length).toBeGreaterThan(3);
+    bands[215]!.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+    expect(element.selection).toMatchObject({startQuarters: 430, endQuarters: 432});
+    expect(element.analysis?.headline).toBe(bands[215]?.querySelector('.wui-harmony-flow__label')?.textContent);
   });
 
   it('splits odd and changed meters at beat boundaries and keeps tiny scores to one cell', () => {

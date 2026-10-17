@@ -111,12 +111,15 @@ export function synthPanelSetupCode(values: DemoValues): string {
     'defineSynthPanelElement();',
     '',
     "const input = document.querySelector('score-note-input');",
+    "input.routing = 'manual';",
     "const panel = document.querySelector('score-synth-panel');",
     'const context = new AudioContext();',
     'const synth = new OscillatorSynth(context, {',
     `  type: ${quoted(values.voice.wave)},`,
     `  gain: ${numberText(values.voice.level)},`,
     `  attackSeconds: ${numberText(values.envelope.attack)},`,
+    `  decaySeconds: ${numberText(values.envelope.decay)},`,
+    `  sustainLevel: ${numberText(values.envelope.sustain)},`,
     `  releaseSeconds: ${numberText(values.envelope.release)},`,
     `  detune: ${numberText(values.voice.tune)},`,
     `  cutoff: ${numberText(values.voice.cutoff)},`,
@@ -133,9 +136,11 @@ export function synthPanelSetupCode(values: DemoValues): string {
     '];',
     `panel.envelope = {attack: ${numberText(values.envelope.attack)}, decay: ${numberText(values.envelope.decay)}, sustain: ${numberText(values.envelope.sustain)}, release: ${numberText(values.envelope.release)}};`,
     `panel.ranges = {attackMax: ${numberText(values.ranges.attackMax)}, decayMax: ${numberText(values.ranges.decayMax)}, releaseMax: ${numberText(values.ranges.releaseMax)}};`,
-    'panel.apply = ({attack, release}) => {',
+    'panel.apply = ({attack, decay, sustain, release}) => {',
     "  synth.setParam('attackSeconds', attack);",
-    "  synth.setParam('releaseSeconds', Math.max(0.02, release));",
+    "  synth.setParam('decaySeconds', decay);",
+    "  synth.setParam('sustainLevel', sustain);",
+    "  synth.setParam('releaseSeconds', release);",
     '};',
     'panel.bands = [',
     `  {frequency: ${numberText(low?.frequency ?? 120)}, gain: ${numberText(low?.gain ?? 0)}, q: ${numberText(low?.q ?? 0.8)}},`,
@@ -249,6 +254,8 @@ function mountSynthPanelPlayground(editor: HTMLElement, scope: DemoScope): void 
         type: 'triangle',
         gain: 0.18,
         attackSeconds: 0.05,
+        decaySeconds: 0.2,
+        sustainLevel: 0.6,
         releaseSeconds: 0.4,
         detune: 0,
         cutoff: 8000,
@@ -344,7 +351,9 @@ function mountSynthPanelPlayground(editor: HTMLElement, scope: DemoScope): void 
     panel.ranges = {...current.ranges};
     panel.envelope = {...current.envelope};
     setSynth('attackSeconds', current.envelope.attack);
-    setSynth('releaseSeconds', Math.max(0.02, current.envelope.release));
+    setSynth('decaySeconds', current.envelope.decay);
+    setSynth('sustainLevel', current.envelope.sustain);
+    setSynth('releaseSeconds', current.envelope.release);
   };
 
   const applyBands = (current: DemoValues): void => {
@@ -430,9 +439,12 @@ function mountSynthPanelPlayground(editor: HTMLElement, scope: DemoScope): void 
 
   panel.apply = (envelope) => {
     setSynth('attackSeconds', envelope.attack);
-    setSynth('releaseSeconds', Math.max(0.02, envelope.release));
+    setSynth('decaySeconds', envelope.decay);
+    setSynth('sustainLevel', envelope.sustain);
+    setSynth('releaseSeconds', envelope.release);
   };
 
+  input.setAttribute('routing', 'manual');
   input.onNote = (midi, velocity, on) => {
     if (!scope.active || !synth || !context) return;
     if (!on) {

@@ -9,6 +9,7 @@ choices; [STATUS](../STATUS.md) distinguishes delivery from target design.
 |---|---|
 | [COMPONENT-DESIGN.md](COMPONENT-DESIGN.md) | Design questions, a copyable contract template and acceptance scenarios for any component |
 | [PLAYER-BINDING.md](PLAYER-BINDING.md) | Borrowing Play data, state and time, including ownership, standalone use and open binding choices |
+| [MODULAR-COMPOSITION.md](MODULAR-COMPOSITION.md) | Accepted modular redesign: capability contexts, typed ports, route ownership, shared effects/parameters and Session composition; runtime implementation pending |
 | [ANALYZE-COMPONENTS.md](ANALYZE-COMPONENTS.md) | Score's live analysis roles, sibling composition and Headless report boundary |
 | [VIEW-COMPONENTS.md](VIEW-COMPONENTS.md) | Score's type-selected representations and separate engraving/view responsibilities |
 | [STAFF-NOTATION.md](STAFF-NOTATION.md) | Written-time staff projection, beam grouping, glyph rendering and the boundary with page engraving |

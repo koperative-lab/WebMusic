@@ -27,13 +27,29 @@ const demoComponents = new Set([
   'AnalysisFeaturePlayground', 'AudioAnalyzeFeaturePlayground', 'NoteInputDemo', 'ScoreRecorderDemo', 'SheetViewPlayground', 'RackControlDemo',
   'SynthPanelDemo', 'LiveTrackersPlayground', 'AnalysisSessionPlayground',
   'PitchViewPlayground', 'ReactPresetShowcase', 'ScoreViewDemo', 'WaterfallKeyboardDemo',
-  'UiPresenterLiveDemo', 'ScoreReportPlayground', 'ProgrammaticTransportDriverDemo',
+  'UiPresenterLiveDemo', 'ScoreReportPlayground', 'ProgrammaticTransportDriverDemo', 'ModularCompositionDemo', 'ModularModulationDemo', 'ModularProjectDemo',
 ]);
 const htmlElements = new Set(['details', 'summary', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'a', 'br', 'p', 'div', 'span', 'strong', 'em', 'code', 'sup', 'sub']);
 const digest = (value) => createHash('sha256').update(value).digest('hex');
 const slash = (value) => value.split(path.sep).join('/');
 const json = (value) => `${JSON.stringify(value, null, 2)}\n`;
 const compare = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+// Cache only pure syntax for identical, freshly read source bytes. Extraction
+// never mutates these trees. Rendering, raw imports, catalogs, provenance and
+// file/symlink verification remain request-local; failures are never cached.
+const parsedMarkdown = new Map();
+function parseAgentMarkdown(source) {
+  const cached = parsedMarkdown.get(source);
+  if (cached) {
+    parsedMarkdown.delete(source);
+    parsedMarkdown.set(source, cached);
+    return cached;
+  }
+  const tree = mdxToMdast(source);
+  parsedMarkdown.set(source, tree);
+  if (parsedMarkdown.size > 256) parsedMarkdown.delete(parsedMarkdown.keys().next().value);
+  return tree;
+}
 
 function safeRelative(relative) {
   if (!relative || path.isAbsolute(relative) || relative.split(/[\\/]/).some((part) => !part || part === '..' || part.startsWith('.'))) {
@@ -43,12 +59,26 @@ function safeRelative(relative) {
 }
 
 async function readPublic(root, relative, inputs) {
+  return readPublicResolved(await realpath(root), relative, inputs);
+}
+
+// A generation resolves its root once. Every requested file still gets its own
+// realpath check, including parent directories, before reading fresh bytes.
+async function readPublicResolved(root, relative, inputs) {
   safeRelative(relative);
-  const filename = path.join(await realpath(root), relative);
+  const filename = path.join(root, relative);
   if (await realpath(filename) !== filename) throw new Error(`Agent context does not follow symbolic links: ${relative}`);
   const source = await readFile(filename, 'utf8');
   inputs?.set(relative, digest(source));
   return source;
+}
+
+async function readInBatches(entries, read) {
+  const values = [];
+  for (let index = 0; index < entries.length; index += 16) {
+    values.push(...await Promise.all(entries.slice(index, index + 16).map(read)));
+  }
+  return values;
 }
 
 async function walkFiles(directory, prefix = '') {
@@ -165,7 +195,7 @@ export async function extractAgentMarkdown(source, {
   resolveLink = (value) => value, inputs = new Map(), catalogs, extension,
 } = {}) {
   let tree;
-  try { tree = mdxToMdast(source); } catch (error) { throw new Error(`${filename}: cannot parse MDX: ${error.message}`, {cause: error}); }
+  try { tree = parseAgentMarkdown(source); } catch (error) { throw new Error(`${filename}: cannot parse MDX: ${error.message}`, {cause: error}); }
   const frontmatter = tree.children.find((node) => node.type === 'yaml');
   const metadata = frontmatter ? loadYaml(frontmatter.value, {json: true}) : {};
   if (!metadata || typeof metadata.title !== 'string') throw new Error(`${filename}: a string title is required`);
@@ -331,29 +361,32 @@ export function patternSections(markdown, names, filename) {
 }
 
 export async function generateAgentContext({root = defaultRoot, site = 'https://koperative-lab.github.io', base = '/', extension} = {}) {
-  root = path.resolve(root);
+  root = await realpath(path.resolve(root));
   const release = extension ? await extension.inspectSources(root) : await verifyReleaseBaseline({root});
   const url = urls(site, base);
   const inputs = new Map();
+  const read = (source) => readPublicResolved(root, source, inputs);
   // Curated membership and extraction logic change the documentation product
   // even when the input MDX is unchanged. Include those public owners in its
   // revision, rather than hashing just the source pages.
-  for (const source of [
+  await readInBatches([
     'apps/doc/webmusic/scripts/agent-context.mjs',
     'apps/doc/webmusic/scripts/agent-context-catalog.mjs',
     'apps/doc/webmusic/scripts/agent-context-release.mjs',
     'scripts/element-composition-policy.mjs', 'scripts/package-policy.mjs',
     ...(extension?.inputs ?? []),
-  ]) await readPublic(root, source, inputs);
+  ], read);
   const presenters = await catalogValues(root, 'apps/doc/shared/ui-presenter-catalog.ts', ['UI_PRESENTER_CATALOG'], inputs);
   const composition = await catalogValues(root, 'apps/doc/shared/ui-catalog.ts', ['UI_COMPOSITION_CATALOG'], inputs);
   const files = new Map();
   const pages = [];
   const packageVersions = Object.fromEntries(release.packages.map(({name, version}) => [name, version]));
-  for (const relative of await publicPages(root, extension)) {
+  const relativePages = await publicPages(root, extension);
+  const documents = await readInBatches(relativePages, (relative) => read(`${docsDirectory}/${relative}`));
+  for (const [index, relative] of relativePages.entries()) {
     const filename = `${docsDirectory}/${relative}`;
     const canonical = url.absolute(pageRoute(relative));
-    const page = await extractAgentMarkdown(await readPublic(root, filename, inputs), {
+    const page = await extractAgentMarkdown(documents[index], {
       filename, root, canonical, resolveLink: url.link, inputs, extension,
       catalogs: {presenters: presenters.UI_PRESENTER_CATALOG, composition: composition.UI_COMPOSITION_CATALOG},
     });
@@ -364,15 +397,17 @@ export async function generateAgentContext({root = defaultRoot, site = 'https://
     files.set(output, `# ${page.title}\n\n${page.description ? `> ${page.description}\n\n` : ''}Canonical documentation: ${canonical}\n\n${extension ? extension.provenance(release, owner) : `Release compatibility: ${Object.entries(owner ? {[owner]: packageVersions[owner]} : packageVersions).map(([name, version]) => `${name}@${version}`).join(', ')}. Source baseline: ${release.commit}.`}\n\n${page.body}`);
   }
   const catalog = componentCatalog(pages, presenters.UI_PRESENTER_CATALOG, composition.UI_COMPOSITION_CATALOG, extension);
-  for (const source of catalogSourcePaths(catalog)) {
-    assertPublicRuntimeSource(source, release);
-    files.set(sourceOutput(source), await readPublic(root, source, inputs));
+  const runtimeSources = catalogSourcePaths(catalog);
+  for (const source of runtimeSources) assertPublicRuntimeSource(source, release);
+  const runtimeContents = await readInBatches(runtimeSources, read);
+  for (const [index, source] of runtimeSources.entries()) {
+    files.set(sourceOutput(source), runtimeContents[index]);
   }
   for (const output of [...catalog.components.flatMap(({docs, source, styles}) => [...docs, ...source, ...styles]), ...catalog.theme.docs, ...catalog.theme.source]) {
     if (!files.has(output)) throw new Error(`Agent catalog references an output that was not generated: ${output}`);
   }
   files.set(catalogOutput, json(catalog));
-  files.set(licenseOutput, await readPublic(root, 'LICENSE', inputs));
+  files.set(licenseOutput, await read('LICENSE'));
   const inputsList = [...inputs].sort(([a], [b]) => compare(a, b)).map(([source, sha256]) => ({source, sha256}));
   const documentationRevision = digest(json(inputsList));
   const compatibility = extension ? `${extension.provenance(release)} Documentation revision ${documentationRevision}.` : `This context covers ${Object.entries(packageVersions).map(([name, version]) => `${name}@${version}`).join(', ')}. Runtime sources and package manifests match release ${release.commit}; documentation revision ${documentationRevision}. Check installed exports and declarations before coding. This is the current verified release, not an archive of arbitrary versions.`;

@@ -12,12 +12,12 @@
 import ElementPlayground from '../ElementPlayground.astro';
 import AudioPlayStage from '../AudioPlayStage.astro';
 
-const WAV = `${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`;
-const MP3 = `${import.meta.env.BASE_URL}mp3/Arabesque%20No.1.mp3`;
+const WAV = `${import.meta.env.BASE_URL}wav/webmusic-study-no-1.wav`;
+const MP3 = `${import.meta.env.BASE_URL}mp3/webmusic-study-no-1.mp3`;
 const ENTRIES = [
-  {id: 'wav-1', src: WAV, label: 'Arabesque WAV · pass 1'},
-  {id: 'wav-2', src: WAV, label: 'Arabesque WAV · pass 2'},
-  {id: 'mp3', src: MP3, label: 'Arabesque MP3 · streamed', streaming: true},
+  {id: 'wav-1', src: WAV, label: 'WebMusic Study WAV · pass 1'},
+  {id: 'wav-2', src: WAV, label: 'WebMusic Study WAV · pass 2'},
+  {id: 'mp3', src: MP3, label: 'WebMusic Study MP3 · streamed', streaming: true},
 ];
 const SETUP = `import {defineAudioPlayerElement, defineAudioPlaylistElement} from '@webmusic/audio/play/element';
 

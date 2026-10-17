@@ -50,8 +50,10 @@ function makeElement(): AudioPlayerElement & {events: Array<{type: string; detai
   };
   const el = element as unknown as Record<string, unknown>;
   el.isConnected = true;
-  el.getAttribute = () => null;
+  // Cancellation tests mock the loader and do not need a native decoder.
+  el.getAttribute = (name: string) => name === 'engine' ? 'media' : null;
   el.hasAttribute = () => false;
+  el.getRootNode = () => ({});
   el.attachShadow = () => ({
     innerHTML: '',
     querySelector: () => null,
@@ -61,6 +63,7 @@ function makeElement(): AudioPlayerElement & {events: Array<{type: string; detai
     element.events.push({type: event.type, detail: event.detail});
     return true;
   };
+  element.connectedCallback();
   return element;
 }
 

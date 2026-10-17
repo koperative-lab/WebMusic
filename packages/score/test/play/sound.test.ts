@@ -54,6 +54,26 @@ describe('Sound', () => {
     expect(calls).toEqual(['connect', 'on:60', 'off:60']);
   });
 
+  it('propagates explicit gate-retiming support instead of claiming its forwarding method is capable', () => {
+    const {destination} = mockCtx();
+    const unsupported = Sound.custom({noteOn: vi.fn(), retimeScheduledNote: vi.fn()});
+    unsupported.connect(destination);
+    expect(typeof unsupported.retimeScheduledNote).toBe('function');
+    expect(unsupported.supportsScheduledRetiming).toBe(false);
+    const supported = Sound.custom({noteOn: vi.fn(), supportsScheduledRetiming: true, retimeScheduledNote: vi.fn()});
+    supported.connect(destination);
+    expect(supported.supportsScheduledRetiming).toBe(true);
+    const layer = Sound.layer(
+      Sound.custom({noteOn: vi.fn(), supportsScheduledRetiming: true, retimeScheduledNote: vi.fn()}),
+      Sound.custom({noteOn: vi.fn(), retimeScheduledNote: vi.fn()}),
+    );
+    layer.connect(destination);
+    expect(layer.supportsScheduledRetiming).toBe(false);
+    unsupported.dispose();
+    supported.dispose();
+    layer.dispose();
+  });
+
   it('rejects a concurrent route instead of silently rerouting an active Sound', async () => {
     const connected: number[] = [];
     const released: number[] = [];
@@ -414,12 +434,14 @@ function synthCtx() {
       value: number;
       setValueAtTime: ReturnType<typeof vi.fn>;
       exponentialRampToValueAtTime: ReturnType<typeof vi.fn>;
+      linearRampToValueAtTime: ReturnType<typeof vi.fn>;
       setTargetAtTime: ReturnType<typeof vi.fn>;
       cancelScheduledValues: ReturnType<typeof vi.fn>;
       cancelAndHoldAtTime: ReturnType<typeof vi.fn>;
     };
     value.setValueAtTime = vi.fn(() => value);
     value.exponentialRampToValueAtTime = vi.fn(() => value);
+    value.linearRampToValueAtTime = vi.fn(() => value);
     value.setTargetAtTime = vi.fn(() => value);
     value.cancelScheduledValues = vi.fn(() => value);
     value.cancelAndHoldAtTime = vi.fn(() => value);
@@ -575,7 +597,7 @@ describe('Sound — synthesis & layering', () => {
     sound.noteOn(60, 100, 10, 10);
     sound.noteOn(60, 100, 10, 10);
     const envelopeGains = nodes.filter((candidate) =>
-      candidate.gain.setTargetAtTime.mock.calls.length > 0
+      candidate.gain.linearRampToValueAtTime.mock.calls.length > 0
     );
     envelopeGains[0].gain.cancelScheduledValues = vi.fn(() => {
       throw new Error('envelope release failed');

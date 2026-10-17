@@ -6,6 +6,8 @@
 
 import type {ReverbOptions} from './audio-contracts';
 import type {EffectKernelContract} from './effects/kernel-contract';
+import type {Effect as KernelEffect} from '@webmusic/kernel/effect';
+import {effectParameters} from './effects/parameters';
 import {
   buildAnalyserEffect,
   buildBitcrusherEffect,
@@ -59,7 +61,10 @@ export class Effect {
   /** Optional display label used by controls. */
   label?: string;
 
-  private constructor(private readonly factory: InternalEffectFactory) {}
+  private constructor(
+    private readonly factory: InternalEffectFactory,
+    readonly parameterDescriptors?: KernelEffect['parameterDescriptors'],
+  ) {}
 
   /** Realise this effect's nodes for a given context. */
   build(context: AudioContext): EffectNode {
@@ -90,11 +95,11 @@ export class Effect {
   }
 
   static gain(value = 1): Effect {
-    return new Effect((context) => buildGainEffect(context, value));
+    return new Effect((context) => buildGainEffect(context, value), effectParameters(['gain'], {gain: {defaultValue: value}}));
   }
 
   static panner(pan = 0): Effect {
-    return new Effect((context) => buildPannerEffect(context, pan));
+    return new Effect((context) => buildPannerEffect(context, pan), effectParameters(['pan'], {pan: {defaultValue: Math.max(-1, Math.min(1, pan))}}));
   }
 
   static analyser(options: AnalyserOptions = {}): Effect {
@@ -102,7 +107,9 @@ export class Effect {
   }
 
   static limiter(options: LimiterOptions = {}): Effect {
-    return new Effect((context) => buildLimiterEffect(context, options));
+    return new Effect((context) => buildLimiterEffect(context, options), effectParameters(['threshold', 'ratio'], {
+      threshold: {defaultValue: options.threshold ?? -3}, ratio: {defaultValue: 20},
+    }));
   }
 
   static bitcrusher(options: BitcrusherOptions = {}): Effect {
@@ -110,19 +117,31 @@ export class Effect {
   }
 
   static tremolo(options: TremoloOptions = {}): Effect {
-    return new Effect((context) => buildTremoloEffect(context, options));
+    return new Effect((context) => buildTremoloEffect(context, options), effectParameters(['rate', 'depth'], {
+      rate: {defaultValue: options.frequency ?? 5}, depth: {defaultValue: Math.max(0, Math.min(1, options.depth ?? 0.5))},
+    }));
   }
 
   static chorus(options: ChorusOptions = {}): Effect {
-    return new Effect((context) => buildChorusEffect(context, options));
+    return new Effect((context) => buildChorusEffect(context, options), effectParameters(['rate', 'depth', 'wet'], {
+      rate: {defaultValue: options.frequency ?? 0.8},
+      depth: {unit: 's', defaultValue: options.depth ?? 0.005, displayRange: {min: 0, max: 0.02}, step: 0.001},
+      wet: {defaultValue: options.wet ?? 0.5},
+    }));
   }
 
   static filter(options: FilterOptions = {}): Effect {
-    return new Effect((context) => buildFilterEffect(context, options));
+    return new Effect((context) => buildFilterEffect(context, options), effectParameters(['frequency', 'Q'], {
+      frequency: {defaultValue: options.frequency ?? 1000},
+      Q: {unit: !options.type || ['lowpass', 'highpass'].includes(options.type) ? 'dB' : 'ratio', defaultValue: options.Q ?? 1},
+    }));
   }
 
   static delay(options: DelayOptions = {}): Effect {
-    return new Effect((context) => buildDelayEffect(context, options));
+    return new Effect((context) => buildDelayEffect(context, options), effectParameters(['time', 'feedback', 'wet'], {
+      time: {defaultValue: options.delaySeconds ?? 0.25},
+      feedback: {defaultValue: options.feedback ?? 0.3}, wet: {defaultValue: options.wet ?? 0.3},
+    }));
   }
 
   static distortion(options: DistortionOptions = {}): Effect {
@@ -130,17 +149,23 @@ export class Effect {
   }
 
   static compressor(options: CompressorOptions = {}): Effect {
-    return new Effect((context) => buildCompressorEffect(context, options));
+    return new Effect((context) => buildCompressorEffect(context, options), effectParameters(['threshold', 'ratio'], {
+      threshold: {defaultValue: options.threshold ?? -24}, ratio: {defaultValue: options.ratio ?? 12},
+    }));
   }
 
   static reverb(options: ReverbOptions = {}): Effect {
-    return new Effect((context) => buildReverbEffect(context, options));
+    return new Effect((context) => buildReverbEffect(context, options), effectParameters(['wet', 'dry'], {
+      wet: {defaultValue: options.wet ?? 0.28}, dry: {defaultValue: options.dry ?? 0.82},
+    }));
   }
 
   /** Compose several effects in series; nullish entries are skipped. */
   static chain(...effects: Array<Effect | null | undefined>): Effect {
     const chain = effects.filter((effect): effect is Effect => Boolean(effect));
-    return new Effect((context) => buildEffectChain(context, chain));
+    return new Effect((context) => buildEffectChain(context, chain), Object.fromEntries(chain.flatMap((effect, index) =>
+      Object.entries(effect.parameterDescriptors ?? {}).map(([id, descriptor]) => [`${index}.${id}`, descriptor]),
+    )));
   }
 }
 

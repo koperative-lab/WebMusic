@@ -21,6 +21,8 @@ import {AudioMixer, type AudioMixerOptions} from '../headless/mixer';
 import type {PlayerLike} from '../headless/player';
 import type {AudioPlayer} from '../headless/audio-player';
 import {AudioPlayerConnection, type AudioPlayerTarget} from './internal/player-connection';
+import {ModuleAudioEnvironment, ModuleContext, ModuleRegistry, createConnectionLease, type ConnectionLease, type ModuleHandle} from '@webmusic/kernel/module';
+import {isModularComposition, provideModuleContext, observeModuleContext, notifyModuleContext, notifyModuleChange} from '@webmusic/kernel/element';
 import {
   WebMusicElement,
   boolAttr,
@@ -51,10 +53,11 @@ export interface AudioMixerMemberSpec {
 }
 
 const PROPS = ['player', 'mixer', 'members', 'audioContext', 'destination', 'masterVolume'] as const;
+let mixerElementSequence = 0;
 
 export class AudioMixerElement extends WebMusicElement {
   static get observedAttributes(): string[] {
-    return ['player', 'master-volume', 'autoplay', 'solo'];
+    return ['player', 'master-volume', 'autoplay', 'solo', 'composition'];
   }
 
   protected root?: ShadowRoot;
@@ -74,15 +77,27 @@ export class AudioMixerElement extends WebMusicElement {
   private contextRef?: AudioContext;
   private destinationRef?: AudioNode;
   private readonly subscribers = new Set<() => void>();
+  private modular = false;
+  private parentModuleContext?: ModuleContext;
+  private moduleContext?: ModuleContext;
+  private moduleEnvironment?: ModuleAudioEnvironment;
+  private moduleRegistry?: ModuleRegistry;
+  private moduleRegistration?: ConnectionLease;
+  private moduleRoute?: ConnectionLease;
+  private moduleHandle?: ModuleHandle;
+  private moduleReleases: Array<() => void> = [];
+  get module(): ModuleHandle | undefined { return this.modular ? this.moduleHandle : undefined; }
 
   protected override onMount(): void {
     // Register rollback before lazy-property setters can rebuild resources.
     this.own(() => { this.connection.disconnect(); this.teardown(); });
     upgradeProperties(this, PROPS);
     if (!this.root) this.root = this.attachShadow({mode: 'open'});
+    this.modular = isModularComposition(this);
+    if (this.modular) this.mountModules();
     if (!this._mixer && this.memberSpecs?.length) this.buildOwnedMixer();
     this.attach();
-    this.connection.connect();
+    if (!this.modular) this.connection.connect();
     if (boolAttr(this, 'autoplay')) this.startAutoplay();
   }
 
@@ -90,8 +105,15 @@ export class AudioMixerElement extends WebMusicElement {
    * The three attributes are live knobs, applied in place: rebuilding here
    * would restart the very stems this desk exists to keep aligned.
    */
-  attributeChangedCallback(name: string): void {
+  attributeChangedCallback(name: string, previous: string | null, value: string | null): void {
     if (!this.isConnected) return;
+    if (name === 'composition') {
+      if (previous === value) return;
+      super.disconnectedCallback();
+      super.connectedCallback();
+      notifyModuleContext(this);
+      return;
+    }
     if (name === 'player') { this.connection.refresh(); this.render(); return; }
     if (name === 'master-volume') {
       this.applyMasterVolume(numAttr(this, 'master-volume', 1, 0));
@@ -130,7 +152,7 @@ export class AudioMixerElement extends WebMusicElement {
     this.detach();
     this._mixer = undefined;
     this.memberSpecs = specs?.length ? [...specs] : undefined;
-    if (!this.memberSpecs) {
+    if (!this.memberSpecs && !this.modular) {
       if (this.isConnected) this.render();
       return;
     }
@@ -186,7 +208,8 @@ export class AudioMixerElement extends WebMusicElement {
 
   /** Seek every member to the same position; the mixer re-aligns them. */
   seek(seconds: number): void {
-    if (this.owner) this.owner.seek(seconds);
+    if (this.modular && this.moduleContext?.session) void this.moduleContext.session.seek(seconds).catch((error: unknown) => this.onMixerError(error));
+    else if (this.owner) this.owner.seek(seconds);
     else if (!this.connection.requested) this._mixer?.seek(seconds);
     this.notifyUI();
   }
@@ -248,7 +271,7 @@ export class AudioMixerElement extends WebMusicElement {
         this.notifyUI();
       },
       setSolo: (id) => this.applySolo(id),
-      ...(!this.connection.requested ? {
+      ...(!this.modular && !this.connection.requested ? {
         play: async () => { await mixer?.play(); this.notifyUI(); },
         pause: () => { mixer?.pause(); this.notifyUI(); },
         stop: () => { mixer?.stop(); this.notifyUI(); },
@@ -279,6 +302,91 @@ export class AudioMixerElement extends WebMusicElement {
     this.dispatch('error', error instanceof Error ? error : new Error(String(error)));
   }
 
+  private mountModules(): void {
+    this.moduleReleases.push(provideModuleContext(this, () => this.moduleContext));
+    this.moduleReleases.push(observeModuleContext(this, (parent, state) => {
+      if (parent === this.parentModuleContext && this.moduleContext) return;
+      if (parent && this.parentModuleContext && this.moduleContext &&
+        parent.audio === this.parentModuleContext.audio && parent.session === this.parentModuleContext.session &&
+        parent.admit === this.parentModuleContext.admit && parent.registry === this.parentModuleContext.registry) {
+        this.parentModuleContext = parent;
+        return;
+      }
+      this.moduleRoute?.release(); this.moduleRoute = undefined;
+      this.moduleRegistration?.release(); this.moduleRegistration = undefined;
+      this.detach();
+      this.moduleRegistry?.dispose();
+      this.moduleEnvironment?.dispose();
+      this.moduleEnvironment = undefined;
+      this.moduleContext = undefined;
+      this.parentModuleContext = parent;
+      if (state === 'pending') { notifyModuleContext(this); return; }
+      const borrowed = !this.ownsMixer ? this._mixer : undefined;
+      const audio = parent?.audio ?? (this.moduleEnvironment = new ModuleAudioEnvironment({
+        context: this.contextRef ?? borrowed?.peekAudioContext(),
+        ...(borrowed ? {create: () => borrowed.audioContext, owned: false} : {}),
+      }));
+      this.moduleRegistry = new ModuleRegistry();
+      const base = parent ?? new ModuleContext({id: `audio-desk-${++mixerElementSequence}`, audio});
+      this.moduleContext = base.derive({
+        id: `audio-desk-${++mixerElementSequence}`, registry: this.moduleRegistry, target: null,
+        admit: (module, port) => {
+          this.prepareModuleMixer();
+          return this._mixer!.admitAudio(module.id, port);
+        },
+      });
+      if (!this._mixer) this.buildOwnedMixer();
+      this.attach();
+      notifyModuleContext(this);
+    }));
+  }
+
+  private syncModuleMixer(): void {
+    const mixer = this._mixer;
+    if (!mixer || !this.moduleContext || this.moduleHandle?.id === mixer.module.id) return;
+    this.moduleRegistration?.release();
+    this.moduleHandle = {
+      id: mixer.module.id,
+      get inserts() { return mixer.module.inserts; },
+      getPort: (name) => mixer.module.getPort?.(name),
+      prepare: () => this.prepareModuleMixer(),
+      subscribe: (listener) => mixer.module.subscribe?.(listener) ?? (() => {}),
+    };
+    this.moduleRegistration = this.parentModuleContext?.registry.register(this.moduleHandle);
+    this.moduleContext = this.moduleContext.derive({
+      id: this.moduleContext.id,
+      target: this.moduleHandle,
+      // A new desk changes route ownership. Publish a new admission identity
+      // so existing descendants withdraw old channels before joining it.
+      admit: (module, port) => {
+        this.prepareModuleMixer();
+        return mixer.admitAudio(module.id, port);
+      },
+    });
+    notifyModuleChange(this);
+    notifyModuleContext(this);
+  }
+
+  private prepareModuleMixer(): void {
+    const mixer = this._mixer;
+    const context = this.moduleContext;
+    if (!mixer || !context) throw new Error('Audio mixer module is unresolved');
+    const port = mixer.outputPort;
+    if (port.context && port.context !== context.audio.prepare()) throw new Error('Audio mixer must share the module AudioContext');
+    if (!this.moduleRoute?.active) {
+      const parent = this.parentModuleContext;
+      if (parent?.admit) this.moduleRoute = parent.admit(this.moduleHandle!, port);
+      else {
+        const destination = parent?.destination?.() ?? this.destinationRef ?? context.audio.prepare().destination;
+        port.setDefault(destination);
+        this.moduleRoute = createConnectionLease(() => {
+          if (!port.disposed && port.defaultDestination === destination) port.setDefault(undefined);
+        });
+      }
+    }
+    notifyModuleChange(this);
+  }
+
   // --- wiring ---
 
   private attach(): void {
@@ -286,6 +394,7 @@ export class AudioMixerElement extends WebMusicElement {
     this.applyAttributes();
     this.subscribeMixer();
     this.render();
+    if (this.modular) this.syncModuleMixer();
   }
 
   private attachPlayer(player: AudioPlayer | undefined): void {
@@ -297,6 +406,7 @@ export class AudioMixerElement extends WebMusicElement {
   }
 
   private subscribeMixer(): void {
+    for (const release of this.offFns.splice(0)) release();
     const mixer = this._mixer;
     if (!mixer) return;
     this.offFns.push(
@@ -319,6 +429,9 @@ export class AudioMixerElement extends WebMusicElement {
   }
 
   private detach(): void {
+    this.moduleRoute?.release(); this.moduleRoute = undefined;
+    this.moduleRegistration?.release(); this.moduleRegistration = undefined;
+    this.moduleHandle = undefined;
     if (this.owner?.transport === this._mixer?.transport) this.owner?.setTransport(undefined);
     const subscriptions = this.offFns;
     const owned = this.ownsMixer ? this._mixer : undefined;
@@ -335,6 +448,12 @@ export class AudioMixerElement extends WebMusicElement {
   }
 
   private teardown(): void {
+    this.moduleRoute?.release(); this.moduleRoute = undefined;
+    this.moduleRegistration?.release(); this.moduleRegistration = undefined;
+    for (const release of this.moduleReleases.splice(0).reverse()) release();
+    this.moduleRegistry?.dispose(); this.moduleRegistry = undefined;
+    this.moduleEnvironment?.dispose(); this.moduleEnvironment = undefined;
+    this.moduleContext = undefined; this.parentModuleContext = undefined; this.moduleHandle = undefined;
     this.detach();
     this.mixerHandle?.destroy();
     this.mixerHandle = undefined;
@@ -342,14 +461,16 @@ export class AudioMixerElement extends WebMusicElement {
 
   private buildOwnedMixer(): void {
     const specs = this.memberSpecs;
-    if (!specs?.length) return;
+    if (!specs?.length && !this.modular) return;
     const mixer = this.createMixer({
       mediaAdapterFactory: browserMediaAdapterFactory,
       masterVolume: this.initialMasterVolume,
       ...(this.contextRef ? {audioContext: this.contextRef} : {}),
       ...(this.destinationRef ? {destination: this.destinationRef} : {}),
+      ...(this.modular && this.parentModuleContext ? {moduleContext: this.parentModuleContext} : {}),
+      ...(this.modular && !this.parentModuleContext && this.moduleContext ? {moduleContext: this.moduleContext} : {}),
     });
-    for (const spec of specs) this.addMember(mixer, spec);
+    for (const spec of specs ?? []) this.addMember(mixer, spec);
     this._mixer = mixer;
     this.ownsMixer = true;
   }
@@ -423,13 +544,14 @@ export class AudioMixerElement extends WebMusicElement {
     this.mixerHandle?.destroy();
     this.mixerHandle = this.mountMixerUI(this.root, this._mixer);
     this.appendCompatibilityStyle();
+    if (this.modular && !this.root.querySelector('slot')) this.root.append(this.ownerDocument.createElement('slot'));
   }
 
   private snapshot(mixer: AudioMixer | undefined): MixerState {
     const state = mixer?.snapshot();
     return {
       master: state?.masterVolume ?? this.initialMasterVolume,
-      disabled: !mixer || (this.connection.requested && !this.owner),
+      disabled: !mixer || (!this.modular && this.connection.requested && !this.owner),
       channels: (state?.members ?? []).map((member) => ({
         id: member.id,
         label: member.id,

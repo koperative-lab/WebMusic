@@ -28,7 +28,7 @@ The meter is not a LUFS or inter-sample true-peak measurement.
   defineAudioMeterElement();
 </script>
 
-<audio-player id="session" src="/mp3/Arabesque%20No.1.mp3" controls></audio-player>
+<audio-player id="session" src="/mp3/webmusic-study-no-1.mp3" controls></audio-player>
 <audio-meter player="#session"></audio-meter>
 ```
 
@@ -79,6 +79,20 @@ bins. The displayed values are normalized, not dBFS, LUFS or calibrated SPL.
 The presenter's frame loop reads while connected; changing a source builds a
 replacement before releasing the prior tap, and failed replacement preserves
 the working route.
+
+## Tap a module output
+
+`input="#desk" port="master"` selects a module's prepared output. The default
+port is `main`; rack/mixer buses also expose `master`. `.inputModule` accepts a
+`ModuleHandle` before the selector; null explicitly unbinds and undefined restores
+selector discovery. This can observe a neutral Score output as well as Audio.
+
+The tool adds a side tap, preserving the audible route. It does not call the
+module's `prepare()` or request a second context merely to display a pending
+surface. Missing explicit targets/ports remain pending without ancestor fallback.
+Removing the analyzer releases only its tap and UI resources. Existing explicit
+`.analyser` and legacy `player` modes retain their documented ownership.
+
 
 <details class="component-section">
 <summary>API</summary>

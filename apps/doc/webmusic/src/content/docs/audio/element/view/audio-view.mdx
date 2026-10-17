@@ -47,13 +47,13 @@ Switching drawing type retains the explicit height; the library defaults remain
   defineAudioPlayerElement();
 </script>
 
-<audio-player id="p" src="/wav/Arabesque%20No.1.wav" controls></audio-player>
+<audio-player id="p" src="/wav/webmusic-study-no-1.wav" controls></audio-player>
 <audio-view id="v" player="#p" type="waveform" pixels-per-second="100" interactive drag-mode="scrub"></audio-view>
 
 <script type="module">
   import { loadClipFromUrl } from '@webmusic/audio/play';
   import { computePeaks } from '@webmusic/audio/analyze';
-  const clip = await loadClipFromUrl('/wav/Arabesque%20No.1.wav');
+  const clip = await loadClipFromUrl('/wav/webmusic-study-no-1.wav');
   const view = /** @type {import('@webmusic/audio/view/element').AudioViewElement | null} */ (document.getElementById('v'));
   const channels = clip.channels();
   if (view && channels) view.peaks = computePeaks(channels, clip.sampleRate);
@@ -67,7 +67,7 @@ Switching drawing type retains the explicit height; the library defaults remain
 **Waveform** — the default. Give it a multi-resolution `AudioPeaks` pyramid and it draws a min/max waveform; with a bound `player` and `interactive`, it follows the playhead and turns clicks into `webaudio:seek`. Build the peaks once from the decoded channels with [`computePeaks`](/audio/api/analyze/):
 
 ```ts
-const clip = await loadClipFromUrl('/wav/Arabesque%20No.1.wav'); // @webmusic/audio/play
+const clip = await loadClipFromUrl('/wav/webmusic-study-no-1.wav'); // @webmusic/audio/play
 view.peaks = computePeaks(clip.channels()!, clip.sampleRate); // @webmusic/audio/analyze
 ```
 
@@ -90,7 +90,7 @@ This drawing is **precomputed only**: `src`, `peaks-src` and a bound player supp
 **Meter** — a live RMS-level (or `spectrum`) meter. It has no time axis and needs no precomputed data — instead it taps the **`AnalyserNode` of the player it is bound to**, reading it every animation frame. Resolution is structural: `<audio-view type="meter">` reads `.analyser` off the element named by `player="#id"` (or off that element's `.player`), so the target must expose an `AnalyserNode` — an [`AudioClipPlayer`](/audio/api/play/) has one at `.analyser`. **A meter only moves while audio is flowing — press play to see it react.**
 
 ```html
-<audio-player id="p" src="/wav/Arabesque%20No.1.wav" controls></audio-player>
+<audio-player id="p" src="/wav/webmusic-study-no-1.wav" controls></audio-player>
 <audio-view player="#p" type="meter" mode="level"></audio-view>
 ```
 
@@ -119,13 +119,13 @@ over borrowed data.
 
 ```html
 <!-- 1. Decode: the element loads and decodes through @webmusic/audio/play -->
-<audio-view type="waveform" src="/wav/Arabesque%20No.1.wav" interactive></audio-view>
+<audio-view type="waveform" src="/wav/webmusic-study-no-1.wav" interactive></audio-view>
 
 <!-- 2. No decode: BBC audiowaveform v2 JSON, hydrated straight into the pyramid -->
 <audio-view type="waveform" peaks-src="song.json" interactive></audio-view>
 
 <!-- 3. Bring your own: a player supplies the clip, or you assign .peaks -->
-<audio-player id="p" src="/wav/Arabesque%20No.1.wav" controls></audio-player>
+<audio-player id="p" src="/wav/webmusic-study-no-1.wav" controls></audio-player>
 <audio-view player="#p" type="waveform" interactive pixels-per-second="100"></audio-view>
 ```
 
@@ -202,7 +202,7 @@ a relative seek helper.
 `annotate` connects drag-to-create. A drag across the surface creates a `Region` and the element emits `webaudio:regionchange` carrying its **whole** region list — the ones it already had plus the new one, so a first drag can never silently drop a clip's existing regions:
 
 ```html
-<audio-view id="v" type="waveform" src="/wav/Arabesque%20No.1.wav" annotate></audio-view>
+<audio-view id="v" type="waveform" src="/wav/webmusic-study-no-1.wav" annotate></audio-view>
 ```
 
 ```ts
@@ -224,7 +224,7 @@ Zoom, offset and the visible window live in **one** headless `AudioTimeline` the
 
 ```ts
 view.visibleRange();            // { startSeconds, endSeconds } — or undefined
-view.panTo(30);                 // scroll so the window starts at 0:30
+view.panTo(30);                 // request 0:30; clamp so the visible window fits the clip
 view.setZoom(240);              // live re-zoom, keeping scroll + playhead
 view.zoom;                      // the scale actually drawn at — never 0
 view.addEventListener('webaudio:viewportchange', (event) => {

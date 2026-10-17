@@ -1,4 +1,5 @@
 import type {TickSource} from '@webmusic/kernel/tick';
+import type {ParamSurface} from '@webmusic/kernel/module';
 import type {Note, Score, TimePosition} from '../../core';
 import type {Effect} from './effects';
 import type {PlaybackListenerError, PlaybackOperationError} from './playback-events';
@@ -7,6 +8,10 @@ import type {PlaybackListenerError, PlaybackOperationError} from './playback-eve
 export type SynthRouteCleanup = () => void;
 
 export interface HeadlessSynth {
+  /** Every successful attack returns an exact, independently releasable occurrence handle. */
+  readonly supportsNoteOccurrences?: boolean;
+  /** Shared synchronous parameters actually supported by this backend. */
+  readonly params?: ParamSurface;
   /**
    * Attach this synth to one destination. A borrowed synth may return a route
    * cleanup callback; players invoke only that callback on disposal, rather
@@ -30,6 +35,10 @@ export interface HeadlessSynth {
    * pause, seek, loop edit, or rate edit cannot leak a stale future note.
    */
   supportsScheduledCancellation?: boolean;
+  /** Finite noteOn duration schedules the exact gate/release on the audio clock, without a later JS noteOff. */
+  readonly supportsScheduledDuration?: boolean;
+  /** Active finite gates can be lengthened or shortened by retimeScheduledNote without a new attack. */
+  readonly supportsScheduledRetiming?: boolean;
   cancelScheduledNote?(handle: unknown, time: number): void;
   /**
    * Retarget the hard source end for an already-started exact voice. `time`
@@ -39,6 +48,16 @@ export interface HeadlessSynth {
    */
   retimeScheduledNote?(handle: unknown, time: number): void;
   dispose?(): void;
+}
+
+/** Backend-specific timing; callback observations are never sample-accurate. */
+export interface ScoreSchedulingCapabilities {
+  readonly attacks: 'audio-clock' | 'callback';
+  readonly releases: 'audio-clock' | 'callback';
+  readonly loopBoundary: 'lookahead' | 'callback';
+  readonly cancellation: 'occurrence' | 'pitch';
+  /** A loop clips its outgoing gate and starts a new occurrence at the incoming phase. */
+  readonly crossingNotes: 'clip-and-retrigger';
 }
 
 /** Ownership of a synth supplied to a player or an interactive voice. */
@@ -125,6 +144,8 @@ export interface ScorePlayerOptions {
 export interface OscillatorSynthOptions {
   type?: OscillatorType;
   attackSeconds?: number;
+  decaySeconds?: number;
+  sustainLevel?: number;
   releaseSeconds?: number;
   gain?: number;
   detune?: number;
@@ -140,6 +161,8 @@ export interface SoundfontSynthOptions {
   fallback?: HeadlessSynth;
   gain?: number;
   attackSeconds?: number;
+  decaySeconds?: number;
+  sustainLevel?: number;
   releaseSeconds?: number;
   /** Maximum simultaneous sample fetch/decode operations. Default 4. */
   maxConcurrentLoads?: number;

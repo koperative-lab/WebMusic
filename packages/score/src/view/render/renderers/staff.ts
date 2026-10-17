@@ -44,6 +44,15 @@ function durationCode(duration: Duration): string {
   return String(Math.max(1, Math.min(256, 2 ** Math.round(Math.log2(value || 8)))));
 }
 
+function staffContext(element: HTMLDivElement): SVGContext {
+  const context = new SVGContext(element);
+  const createElementNS = element.ownerDocument.createElementNS.bind(element.ownerDocument);
+  // Resolve the DOM factory once for this context. Repeated document method
+  // lookups can rebuild named-property indexes after every inserted glyph.
+  context.create = ((tag: string) => createElementNS('http://www.w3.org/2000/svg', tag)) as SVGContext['create'];
+  return context;
+}
+
 /** Synchronous, notation-aware scrolling staff; playback remains borrowed. */
 export class StaffSVGVisualizer extends BaseVisualizer {
   private readonly container: HTMLDivElement;
@@ -156,7 +165,7 @@ export class StaffSVGVisualizer extends BaseVisualizer {
     makeScrollable(this.viewport, 'x');
     makeClipped(this.viewport, 'y');
     this.container.append(this.viewport);
-    this.context = new SVGContext(this.viewport);
+    this.context = staffContext(this.viewport);
     this.context.setFillStyle(INK).setStrokeStyle(INK);
     this.context.svg.dataset.webscoreStaffDrawing = '';
     this.context.svg.setAttribute('aria-hidden', 'true');
@@ -164,7 +173,7 @@ export class StaffSVGVisualizer extends BaseVisualizer {
     this.header.dataset.webscoreStaffHeader = '';
     this.header.style.cssText = 'position:absolute;left:0;top:0;pointer-events:none;overflow:hidden;';
     this.container.append(this.header);
-    this.headerContext = new SVGContext(this.header);
+    this.headerContext = staffContext(this.header);
     this.headerContext.setFillStyle(INK).setStrokeStyle(INK);
     this.headerContext.svg.setAttribute('aria-hidden', 'true');
     this.prepareMeasures();

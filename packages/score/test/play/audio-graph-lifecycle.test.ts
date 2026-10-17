@@ -286,16 +286,20 @@ describe('live AudioContext identity and graph transactions', () => {
     rack.dispose();
   });
 
-  it('removes the direct panner-to-destination route on normal ScorePlayer disposal', () => {
+  it('removes the local insert and managed destination routes on normal ScorePlayer disposal', () => {
     const audio = fakeAudioContext();
     const player = new ScorePlayer(score(), {audioContext: audio.context, synth: synth()});
     void player.context;
     const panner = audio.nodes.find((node) => node.kind === 'panner');
     if (!panner) throw new Error('expected panner');
+    const chain = player.inserts!;
+    const output = player.audioOutput!;
 
     player.dispose();
 
-    expect(panner.disconnect).toHaveBeenCalledWith(audio.destination);
+    expect(panner.disconnect).toHaveBeenCalledWith(chain.input);
+    expect(output.node.disconnect).toHaveBeenCalledWith(audio.destination);
+    expect(chain.disposed).toBe(true);
   });
 
   it('fails closed on a suspended InteractivePlayer until preload resumes it', async () => {

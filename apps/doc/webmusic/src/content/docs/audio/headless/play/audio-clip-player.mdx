@@ -107,7 +107,7 @@ composes this capability with centered geometry and pointer lifecycle.
 
 ## Time, ownership and contract source
 
-The player owns playback state on the clip-seconds axis. Its context is the audio
+An independent player owns playback state on the clip-seconds axis. Its context is the audio
 reference; it is not automatically the authority for every player on the page.
 Views follow its notifications or reader. Under native looping, `seconds` wraps
 while `clock.positionAt(t)` remains unwrapped. A seek before a buffer's scheduled
@@ -129,6 +129,57 @@ stream finishes normally. See [engine range rules](/audio/headless/play/engines/
 The public barrel and `packages/audio/src/play/headless/player.ts` define the value, option, state and event
 contracts described below. The reference does not turn private implementation
 fields into public API.
+
+## Shared Session scheduling
+
+Buffer playback can borrow a read-only
+[Session scheduling binding](/kernel/api/#session--webmusickernelsession).
+Register `prepare: () => player.preload()`,
+`activate: () => player.activateScheduling()` and
+`attachScheduling: binding => player.attachScheduling(binding)` on the Session
+participant. Preparation constructs decoded resources without resuming a suspended
+context. Activation resumes that context before the Session chooses its future
+origin. All participants must use that same AudioContext time reference; affine
+participant offsets and scales map Session seconds to clip seconds.
+
+While attached, `clock` reads the mapped, unwrapped Session clock. `seconds` folds
+the Session loop and clamps to the playable clip; it can remain at an endpoint
+during scheduled silence. Direct play, pause, stop, seek, rate and loop commands
+throw because the Session owns those changes. `beginScratch()` returns undefined.
+Use Session commands; gain, pan and effects remain local controls.
+
+`schedulingMode` distinguishes the actual backend:
+
+| Mode | Timing behavior |
+| --- | --- |
+| `independent` | Ordinary player-owned transport. |
+| `session-native` | Buffer sources start at the shared absolute origin. A mapped loop wholly inside the clip uses one continuous native looping source, including non-unit rates. |
+| `session-lookahead` | Negative mapped positions or loops extending outside the clip use bounded sources and silence for the non-playable span. A 25 ms worker-backed tick fills a 200 ms scheduling horizon; already scheduled starts use the audio clock, but a long scheduling stall can miss a future pass. |
+| `approximate-media` | HTML media playback has no native future-start primitive or shared sample clock. Use the Session's legacy transport participant coordination; `attachScheduling` rejects this backend. |
+
+Seek, pause, rate and loop changes invalidate queued sources before the Session
+commits a new anchor. A frozen AudioContext clock does not advance scheduling.
+Releasing the returned lease cancels only this player's sources and subscriptions;
+the borrowed Session remains unchanged and the player retains a paused local
+position and its effective mapped rate for subsequent independent playback.
+Disposal also releases that lease and never closes a borrowed context.
+Already sounding insert tails follow the effect's own decay; source cancellation
+does not forcibly erase a reverb or delay buffer. Timing describes graph scheduling,
+not hardware output latency, and rate changes do not preserve buffer pitch.
+
+## Realized effects and module output
+
+`setEffect(recipe)` updates the legacy compatibility slot of the prepared
+`insertChain`; explicit insert slots remain in place. `outputPort` exposes the
+prepared stable output for leased replacement, sends and taps. These are lazy
+resources: observing module capabilities does not prepare a graph.
+
+The `AudioPlayer` facade exposes `.module` for capability discovery. Its
+`insertChain` is available for its owned clip engine; a source-free or borrowed
+backend does not invent a chain. Explicit preparation and ownership follow the
+selected backend. Use [Kernel routing leases](/kernel/api/#module--webmusickernelmodule)
+when admitting an output to a mixer or adding a side tap.
+
 
 <details class="component-section">
 <summary>API</summary>
@@ -173,6 +224,8 @@ fields into public API.
 | `setLoop(loop)` | void | Validates/stores before readiness and updates an existing engine; rejected ranges leave the accepted option intact. |
 | `setPreservesPitch(flag)` | void | Stores before readiness; changes the media engine when active. |
 | `preload()` | `Promise<void>` | Builds/prepares the graph without starting sound or bypassing later resume/readiness requirements. |
+| `activateScheduling()` | `Promise<void>` | Resumes the selected context for Session admission; does not start playback or mutate any transport clock. Register as the participant's activation callback. |
+| `attachScheduling(binding)` | ConnectionLease | Borrow a prepared Session scheduling binding. Buffer engine only; rejects a second active attachment. Release cancels this player's queued sources without changing the Session. |
 
 **State**
 
@@ -185,6 +238,10 @@ fields into public API.
 | `playing` | boolean | Ordinary engine running state; false before readiness and while a scratch session suspends it. |
 | `scratching` | readonly boolean | Whether an exclusive scratch session currently owns audible playback, including readiness and release inertia. |
 | `clock` | TransportClockReader or undefined | Buffer engine only, after graph creation; unwrapped under native looping. |
+| `timingCapabilities` | PlaybackTimingCapabilities | Resource-free declaration for the selected backend: engine kind and shared-clock, future-start and native-loop support. |
+| `schedulingMode` | PlaybackSchedulingMode | Current independent, native Session, lookahead Session or approximate media mode, as described above. |
+| `followsSession` | boolean | Whether this player currently owns an active scheduling attachment. |
+| `playbackRate` | number | Effective mapped Session rate while attached; configured independent rate otherwise. |
 | `analyser` | AnalyserNode | Materializes and exposes the player-owned tap; borrowers must not disconnect it. |
 
 **Events and subscriptions**
@@ -208,6 +265,8 @@ fields into public API.
 | --- | --- | --- |
 | `dispose()` | void | Idempotent; invalidates pending work, stops timers, releases graph/listeners, and closes only its own context. Release failures may throw after cleanup attempts. |
 | `PlayerEngineKind` | type | `'auto'`, `'buffer'` or `'media'`. |
+| `PlaybackSchedulingMode` | type | `'independent'`, `'session-native'`, `'session-lookahead'` or `'approximate-media'`. Exported from `/play/headless` and `/play`. |
+| `PlaybackTimingCapabilities` | type | Readonly `{engine: 'buffer' \| 'media' \| 'external', sharedSessionClock: boolean, futureStart: boolean, nativeLoop: boolean}`. Buffer declares all three guarantees; media and undeclared external transports declare none. Native-loop capability does not imply every mapped loop fits the clip. |
 | `PlayerTimeUpdate` | type | Numeric seconds, duration and progress fields. |
 | `AudioClipPlayerEvents` | type | Payload map listed above. |
 | `PlayerLike` | type | Shared structural control contract; optional capabilities must be checked before use. |

@@ -1,5 +1,6 @@
 import {describe, expect, it, vi} from 'vitest';
 import {Effect, insertEffect, resolveEffect} from '../../src/play/headless';
+import {InsertChain} from '@webmusic/kernel/effect';
 
 /** A mock AudioContext that records connect() edges between fake nodes. */
 function mockAudio() {
@@ -55,6 +56,28 @@ function mockAudio() {
 }
 
 describe('Effect factories', () => {
+  it('exposes practical display metadata without narrowing native parameter writes', () => {
+    const {ctx} = mockAudio();
+    for (const recipe of [Effect.gain(), Effect.panner(), Effect.filter(), Effect.delay(), Effect.reverb(), Effect.compressor(), Effect.tremolo(), Effect.chorus()]) {
+      const chain = new InsertChain(ctx);
+      chain.setCompatibility(recipe);
+      for (const handle of chain.instances[0].params) {
+        expect(handle.descriptor.unit).not.toBe('native');
+        expect(handle.descriptor.displayRange).toBeDefined();
+        expect(handle.descriptor.displayRange!.max).toBeLessThanOrEqual(12_000);
+      }
+      chain.dispose();
+    }
+    const chain = new InsertChain(ctx);
+    chain.setCompatibility(Effect.chain(Effect.gain(4), Effect.filter()));
+    const gain = chain.instances[0].params.get('0.gain')!;
+    expect(gain.descriptor.displayRange).toEqual({min: 0, max: 1});
+    expect(gain.descriptor.range.max).toBe(Number.MAX_VALUE);
+    gain.setBaseValue(8);
+    expect(gain.snapshot.baseValue).toBe(8);
+    expect(chain.instances[0].params.get('1.frequency')!.descriptor.unit).toBe('Hz');
+    chain.dispose();
+  });
   it('build single-node effects with input === output', () => {
     const {ctx} = mockAudio();
     for (const eff of [Effect.gain(0.5), Effect.filter({frequency: 800}), Effect.distortion(), Effect.compressor()]) {

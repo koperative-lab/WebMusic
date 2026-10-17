@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import {afterEach, describe, expect, it} from 'vitest';
+import {afterEach, describe, expect, it, vi} from 'vitest';
 import {Duration, Pitch, Rational, ScoreBuilder, VoiceId, type Score} from '../../src/core';
 import {
   ChordAnalysisElement, LiveChordAnalysisElement,
@@ -389,36 +389,52 @@ describe('focused Analyze displays — readings and controls', () => {
 
 
   it('does not reload the score when presentation attributes change', async () => {
-    // One `AbortController` per attempted `src` load — the source builds one
-    // only on that path, so counting them counts loads.
-    let loads = 0;
-    const Original = globalThis.AbortController;
-    globalThis.AbortController = class extends Original {
-      constructor() {
-        super();
-        loads += 1;
-      }
-    } as typeof AbortController;
+    // Observe the URL-load boundary: its internal cancellation machinery can
+    // create additional controllers without starting another score request.
+    const io = await import('../../src/io/load');
+    const score = melodyScore(C_MAJOR);
+    let resolveScore!: (score: Score) => void;
+    const pendingScore = new Promise<Score>((resolve) => { resolveScore = resolve; });
+    const load = vi.spyOn(io, 'loadScoreFromUrl').mockReturnValue(pendingScore);
+    const element = document.createElement(CHORDS) as ChordAnalysisElement;
     try {
-      const element = document.createElement(CHORDS) as ChordAnalysisElement;
       element.setAttribute('src', 'song.mid');
       document.body.append(element);
-      await flush();
-      expect(loads).toBe(1);
+      await vi.waitFor(() => expect(load).toHaveBeenCalledOnce());
+      expect(load.mock.calls[0][0]).toBe('song.mid');
+      const signal = load.mock.calls[0][1]?.signal;
+      expect(signal).toBeDefined();
+      expect(signal?.aborted).toBe(false);
 
       for (const [name, value] of Object.entries({window: '4', density: 'compact', scheme: 'dark', motion: 'stepped'})) {
         element.setAttribute(name, value);
         await flush();
+        expect(load).toHaveBeenCalledOnce();
+        expect(signal?.aborted).toBe(false);
       }
-      // Presentation changes preserve the loaded source and its pending request.
-      expect(loads).toBe(1);
 
       element.setAttribute('window', '4');
       await flush();
-      expect(loads).toBe(1);
-      element.remove();
+      expect(load).toHaveBeenCalledOnce();
+      expect(signal?.aborted).toBe(false);
+
+      resolveScore(score);
+      const renderedDuration = () => Number(element.querySelector('[role="slider"]')?.getAttribute('aria-valuemax'));
+      await vi.waitFor(() => expect(renderedDuration()).toBe(score.durationSeconds));
+      expect(element.querySelectorAll('.wui-harmony-flow__band').length).toBeGreaterThan(0);
+      element.selectRegion(0, 1);
+      const selection = element.selection;
+      expect(selection).toMatchObject({startQuarters: 0, endQuarters: 1});
+      element.setAttribute('window', '8');
+      element.setAttribute('scheme', 'light');
+      await flush();
+      expect(load).toHaveBeenCalledOnce();
+      expect(renderedDuration()).toBe(score.durationSeconds);
+      expect(element.selection).toEqual(selection);
     } finally {
-      globalThis.AbortController = Original;
+      element.remove();
+      resolveScore(score);
+      load.mockRestore();
     }
   });
 });

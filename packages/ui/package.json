@@ -1,6 +1,6 @@
 {
   "name": "@webmusic/ui",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Accessible, domain-neutral presenters and visual primitives for WebMusic Headless Components and Web Components.",
   "type": "module",
   "sideEffects": false,
@@ -268,7 +268,17 @@
         "default": "./dist/workbench.cjs"
       }
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./patch-editor": {
+      "import": {
+        "types": "./dist/patch-editor.d.ts",
+        "default": "./dist/patch-editor.js"
+      },
+      "require": {
+        "types": "./dist/patch-editor.d.cts",
+        "default": "./dist/patch-editor.cjs"
+      }
+    }
   },
   "files": [
     "dist",
@@ -276,7 +286,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsup src/index.ts src/analysis.ts src/envelope.ts src/eq.ts src/harmony.ts src/level-analyzer.ts src/lfo.ts src/macro.ts src/meter.ts src/minimap.ts src/mixer.ts src/note.ts src/oscilloscope.ts src/panel.ts src/parameter.ts src/pitch.ts src/playlist.ts src/recorder.ts src/spectrum-analyzer.ts src/stage.ts src/status.ts src/timeline.ts src/track-list.ts src/transient-analyzer.ts src/transport.ts src/workbench.ts --tsconfig tsconfig.build.json --format esm,cjs --dts --sourcemap --clean && node ../../scripts/package-artifacts.mjs --write",
+    "build": "tsup src/index.ts src/analysis.ts src/envelope.ts src/eq.ts src/harmony.ts src/level-analyzer.ts src/lfo.ts src/macro.ts src/meter.ts src/minimap.ts src/mixer.ts src/note.ts src/oscilloscope.ts src/panel.ts src/parameter.ts src/patch-editor.ts src/pitch.ts src/playlist.ts src/recorder.ts src/spectrum-analyzer.ts src/stage.ts src/status.ts src/timeline.ts src/track-list.ts src/transient-analyzer.ts src/transport.ts src/workbench.ts --tsconfig tsconfig.build.json --format esm,cjs --splitting --dts --sourcemap --clean && node ../../scripts/package-artifacts.mjs --write",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "prepack": "node ../../scripts/package-artifacts.mjs"

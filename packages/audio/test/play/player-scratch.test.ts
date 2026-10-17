@@ -248,6 +248,7 @@ describe('AudioClipPlayer audible scratch ownership', () => {
   it('bounds simultaneous voices, schedules their own end, and releases all graph resources', async () => {
     const {player, sources, gains, context} = setup();
     player.seek(3);
+    const permanentGainCount = gains.length;
     const scratch = player.beginScratch()!;
     for (let i = 0; i < 50; i++) scratch.moveToSeconds(3 + (i + 1) * 0.0001);
     expect(sources).toHaveLength(1);
@@ -255,7 +256,7 @@ describe('AudioClipPlayer audible scratch ownership', () => {
     expect(sources.every((s) => vi.mocked(s.stop).mock.calls.some(([when]) => typeof when === 'number' && when <= 0.1))).toBe(true);
     await scratch.end(false);
     expect(sources.every((s) => vi.mocked(s.disconnect).mock.calls.length > 0)).toBe(true);
-    expect(gains.slice(2).every((g) => vi.mocked(g.disconnect).mock.calls.length > 0)).toBe(true);
+    expect(gains.slice(permanentGainCount).every((g) => vi.mocked(g.disconnect).mock.calls.length > 0)).toBe(true);
     expect(context.close).not.toHaveBeenCalled();
   });
 

@@ -30,7 +30,7 @@ const node = () => ({connect: vi.fn(), disconnect: vi.fn()});
 class StubAudioContext {
   state = 'running';
   currentTime = 0;
-  destination = node();
+  destination = {...node(), context: this};
   resume = vi.fn(async () => {});
   close = vi.fn(async () => {});
   decodeAudioData = vi.fn(async () => ({
@@ -40,8 +40,8 @@ class StubAudioContext {
     duration: 1,
     getChannelData: () => new Float32Array(1_000),
   }));
-  createGain = vi.fn(() => ({...node(), gain: {value: 1}}));
-  createStereoPanner = vi.fn(() => ({...node(), pan: {value: 0}}));
+  createGain = vi.fn(() => ({...node(), context: this, gain: {value: 1}}));
+  createStereoPanner = vi.fn(() => ({...node(), context: this, pan: {value: 0}}));
   // `context` is what lets a borrowed player hand its own context back.
   createAnalyser = vi.fn(() => ({...node(), context: this, fftSize: 0, smoothingTimeConstant: 0}));
   createBuffer = vi.fn((channels: number, length: number, sampleRate: number) => ({
@@ -53,6 +53,7 @@ class StubAudioContext {
   }));
   createBufferSource = vi.fn(() => ({
     ...node(),
+    context: this,
     buffer: null,
     playbackRate: {value: 1},
     loop: false,

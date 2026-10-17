@@ -488,7 +488,7 @@ target elements remain caller-owned.
 
 | API | Kind | Use it for |
 | --- | --- | --- |
-| `createScorePlayer` / `ScorePlayer` / `Player` | Engine | Autonomous push-clock timeline engine. |
+| `createScorePlayer` / `ScorePlayer` / `Player` | Engine | Timeline engine with an autonomous clock or borrowed Session scheduling binding. `ScoreSchedulingCapabilities` declares native/callback timing. |
 | `createScorePlayerFromUrl(url, opts?)` | Engine | Load a file and build a `ScorePlayer`. |
 | `playScore(score, opts?)` / `playScoreFromUrl(url, opts?)` | Headless action | Create, start and return a caller-controlled `ScorePlayer`; failed startup disposes owned resources. |
 | `InteractivePlayer` / `createInteractivePlayer` | Engine | Event-driven pull engine: voices, sources, mixing, live score swap. |
@@ -496,6 +496,8 @@ target elements remain caller-owned.
 | `LoopPlayer` / `createLoopPlayer` | Transport | A–B loop region over a `ScorePlayer`, with finite-repeat counting. |
 | `AbPlayer` / `createAbPlayer` | Transport | Live zero-latency switching between named arrangements (built on `InteractivePlayer`). |
 | `LfoController` / `createLfoController`, `lfoWave` | Modulation | DOM-free LFO state, scheduling and borrowed-target modulation; pure waveform helper. |
+| `NoteInputController`, `SCORE_NOTE_INPUT`, `NoteInputTarget`, `NoteInputOccurrence` | Class / key / types (`@webmusic/score/play/headless`) | [Occurrence-safe live note input](/score/headless/play/score-player/#live-note-occurrences) with source-owned cleanup and explicit target preparation. |
+| `ParamLfoController`, `getParamLfoController`, `ParameterMacroController`, `getParameterMacroController` | Classes / shared-controller accessors (`@webmusic/score/play/headless`) | [Native LFO and macros over shared parameter handles](/score/headless/play/sound/#shared-parameter-controllers). `ParamLfoConfig`, `ParamLfoState`, `ParameterMacroTarget`, `ParameterMacroConfig` and `ParameterMacroState` describe their inputs/readback. |
 | `SynthPanelAudioGraph`, `SynthPanelAudioOptions`, `SynthPanelSection` | Headless class / types (`@webmusic/score/play/headless`) | [Effects/EQ graph with stable same-context ports](/score/headless/play/sound/#synth-backends-synthpanelaudiograph); separate from the stateless Play entry. |
 | `Sound` | Timbre | Uniform wrapper: `oscillator` / `samples` / `sfz` / `soundfont2` / `from` / `custom`. |
 | `OscillatorSynth`, `SoundfontSynth`, `RangeSampler` | Synth | Oscillator, per-note sampler, pitch-shifting range sampler. |
@@ -515,3 +517,18 @@ target elements remain caller-owned.
 | `createParserWorker`, `handleParseRequest` | IO (`@webmusic/score/io/worker-client`, `/worker-protocol`) | Parse off the main thread in a Web Worker (with in-process fallback). |
 | `parseMIDI` / `serializeMIDI`, `parseMusicXML` / `serializeMusicXML`, `parseMXL` / `serializeMXL`, `parseABC` / `serializeABC` | IO (`@webmusic/score/io`) | Each format ⇄ `Score`. |
 | `HeadlessSynth`, `ScorePlayerOptions`, `PlayerTimeUpdate`, `PlaybackTransport`, `InteractivePlayerOptions`, `RackOptions`, `RackAddOptions`, `LfoControllerOptions`, `LfoControllerState`, `LfoTarget`, `LfoShape`, `SynthPanelLfoErrorDetail`, `RenderOptions`, `RecordedNote`, `RecordToScoreOptions`, `EffectNode`, `ReverbOptions` / `DelayOptions` / `FilterOptions` / `DistortionOptions` / `CompressorOptions` / `LimiterOptions` / `AnalyserOptions` / `BitcrusherOptions` / `TremoloOptions` / `ChorusOptions`, `FmOptions` / `WavetableOptions` / `NoiseOptions` / `MidiOutOptions`, `ClockOptions` / `MidiInputOptions`, `ScoreFormat`, … | Types | Option, event, and contract shapes. |
+
+
+## Module composition
+
+The opt-in [module composition](/bridge/modular-composition/) keeps transport,
+audio routing, realized effect slots, parameter controls and analysis taps as
+separate borrowed relationships. Kernel owns neutral
+[ModuleContext and SessionTransport](/kernel/api/#module--webmusickernelmodule).
+
+`ScorePlayerModule` adapts one real engine; [its owning reference](/score/headless/play/score-player/#module-adapter)
+documents context, preparation, ports and disposal. `ScoreRackModule` supplies
+[a hierarchical audio bus](/score/headless/play/rack/#source-free-module-bus)
+without another transport registration. `ScoreEffectElement` and
+`defineScoreEffectElement` are Element exports for
+[one insert declaration](/score/element/play/score-effect/).

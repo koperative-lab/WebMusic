@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import {afterEach, describe, expect, it, vi} from 'vitest';
+import {SVGContext} from 'vexflow/bravura';
 import {Duration, NoteId, PartId, Pitch, Rational, ScoreBuilder, VoiceId, type Score} from '../../src/core';
 import {renderStaffVisualizer} from '../../src/view/render';
 
@@ -37,6 +38,29 @@ function rowY(row: Element): number { return Number(/translate\(0 (-?[\d.]+)\)/.
 afterEach(() => { document.body.replaceChildren(); vi.restoreAllMocks(); });
 
 describe('notation-aware staff systems', () => {
+  it('keeps each drawing in the SVG namespace without changing shared context factories or sibling views', () => {
+    const create = SVGContext.prototype.create;
+    const first = fixture(music([2]));
+    const second = fixture(music([1]));
+    expect(SVGContext.prototype.create).toBe(create);
+    for (const {host} of [first, second]) {
+      const drawing = host.querySelector<SVGSVGElement>('[data-webscore-staff-drawing]')!;
+      expect(drawing.querySelectorAll('g,path').length).toBeGreaterThan(0);
+      for (const node of [drawing, ...drawing.querySelectorAll('*')]) {
+        expect(node.namespaceURI).toBe('http://www.w3.org/2000/svg');
+        expect(node.ownerDocument).toBe(host.ownerDocument);
+      }
+    }
+    first.rendered.redrawAtTime!(0.5, false);
+    expect(first.host.querySelector('[data-webscore-note][data-active]')).not.toBeNull();
+    expect(second.host.querySelector('[data-active]')).toBeNull();
+    first.rendered.dispose!();
+    second.rendered.redrawAtTime!(0.5, false);
+    expect(second.host.querySelector('[data-webscore-note][data-active]')).not.toBeNull();
+    expect(SVGContext.prototype.create).toBe(create);
+    second.rendered.dispose!();
+  });
+
   it('connects the whole system and braces only adjacent staves of the same part', () => {
     const {host, rendered, rows} = fixture(music([2, 1]));
     expect(rows.map((row) => row.dataset.webscorePart)).toEqual(['0', '0', '1']);

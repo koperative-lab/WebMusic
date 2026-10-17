@@ -28,18 +28,18 @@ this player. Views and meters follow the same owner.
   defineAudioPlayerElement();
 </script>
 
-<audio-player src="/wav/Arabesque%20No.1.wav" controls></audio-player>
-<audio-player src="/wav/Arabesque%20No.1.wav" format="wav"></audio-player>
-<audio-player src="/wav/Arabesque%20No.1.wav" loop></audio-player>           <!-- loop the whole clip -->
-<audio-player src="/wav/Arabesque%20No.1.wav" loop="2.5,8"></audio-player>   <!-- A–B region (seconds) -->
-<audio-player src="/mp3/Arabesque%20No.1.mp3" engine="media"></audio-player> <!-- stream instead of decode -->
+<audio-player src="/wav/webmusic-study-no-1.wav" controls></audio-player>
+<audio-player src="/wav/webmusic-study-no-1.wav" format="wav"></audio-player>
+<audio-player src="/wav/webmusic-study-no-1.wav" loop></audio-player>           <!-- loop the whole clip -->
+<audio-player src="/wav/webmusic-study-no-1.wav" loop="2.5,8"></audio-player>   <!-- A–B region (seconds) -->
+<audio-player src="/mp3/webmusic-study-no-1.mp3" engine="media"></audio-player> <!-- stream instead of decode -->
 ```
 
 ## Linked composition
 
 ```html
 <audio-player id="session"></audio-player>
-<audio-playlist player="#session" src="/wav/Arabesque%20No.1.wav, /mp3/Arabesque%20No.1.mp3"></audio-playlist>
+<audio-playlist player="#session" src="/wav/webmusic-study-no-1.wav, /mp3/webmusic-study-no-1.mp3"></audio-playlist>
 <audio-meter player="#session"></audio-meter>
 ```
 
@@ -64,6 +64,28 @@ capability. This one is restyled entirely from page CSS:
 
 <AudioCustomStyleDemo />
 
+## Opt-in module composition
+
+Set `composition="modules"` before connection to give this player explicit
+module scope. A source-free outer player owns `SessionTransport`; a leaf with a
+source registers its actual engine once. Nested leaves borrow the nearest
+Session, including through layout wrappers and mixer scopes. `session="local"`
+creates an independent boundary. Legacy standalone behavior remains available
+when module composition is not selected.
+
+`controls="auto"` hides the transport of an inherited leaf, `show` displays a
+second control view of the same authority, and `hide` suppresses local chrome.
+These controls do not register another participant. `.sessionTransport` exposes
+the borrowed/owned authority and `.module` exposes the local capability handle;
+a source-free root has no fabricated audio output.
+
+Module-mode play/pause/stop/seek/rate commands delegate to the Session. Seek is
+on **Session seconds**; a module leaf adapter maps its own stable seconds axis.
+Unknown/live duration remains explicit on the Session snapshot instead of being
+reported as a known finite clip. Discovery does not prepare audio. See
+[modular composition](/bridge/modular-composition/) for a running mixed example.
+
+
 <details class="component-section">
 <summary>API</summary>
 
@@ -74,7 +96,7 @@ import { gain } from '@webmusic/audio/play/headless';
 import type { AudioPlayerElement } from '@webmusic/audio/play/element';
 
 const el = document.querySelector<AudioPlayerElement>('audio-player')!;
-el.clip = await loadClipFromUrl('/wav/Arabesque%20No.1.wav'); // drive a loaded AudioClip (skips src)
+el.clip = await loadClipFromUrl('/wav/webmusic-study-no-1.wav'); // drive a loaded AudioClip (skips src)
 el.effect = gain({ value: 0.8 });            // insert an effect into the graph
 el.setAttribute('volume', '0.8');            // master volume (live attribute)
 el.setAttribute('rate', '1.25');             // playback speed (live attribute)
@@ -86,7 +108,7 @@ await el.player?.play();                     // stable AudioPlayer facade
 | --- | --- | --- |
 | `src` | attribute | URL of an audio file (format inferred from the extension). Optional if you assign `.clip` / `.player`. |
 | `format` | attribute | Force the decode format (e.g. `wav` / `mp3`) when the extension is missing or wrong. |
-| `controls` | attribute | Shown by default; `controls="false"` (also `0`/`no`/`off`) hides the transport, leaving a headless element. Toggling it never remounts the transport, so the playhead survives. |
+| `controls` | attribute | Module mode uses `auto`, `show` and `hide` as above. Legacy mode is shown by default; `controls="false"` (also `0`/`no`/`off`) hides the transport, leaving a headless element. Toggling it never remounts the transport, so the playhead survives. |
 | `loop` | attribute | `loop` (whole clip) or `loop="a,b"` (an A–B region in seconds). Applied **live** — changing it keeps the playhead instead of rebuilding the player. |
 | `engine` | attribute | `auto` (default) / `buffer` (decoded) / `media` (streamed `<audio>`). |
 | `preserves-pitch` | attribute | Boolean — keep pitch constant when `rate` ≠ 1. Live on the media engine; a documented no-op on the buffer engine, whose `playbackRate` transposes by construction (this package ships no time-stretcher). |
@@ -99,7 +121,7 @@ await el.player?.play();                     // stable AudioPlayer facade
 | `.player` | property | Inject/read the central `AudioPlayer`; an injected instance stays caller-owned. The mounted element creates an empty player when needed, so companions can attach before data is loaded. |
 | `.setClip(clip)` / `.setTransport(transport)` | method | Select a clip or borrowed queue/mix backend through the Element. Nonempty replacement pauses the old backend; detaching a borrowed backend does not dispose it. |
 | `.transport` | readonly property | Currently borrowed AudioPlayerTransport, if any. |
-| `.effect` | property | An `Effect` inserted into the graph; reassigning rebuilds the player. |
+| `.effect` | property | An `Effect` recipe for the owned clip compatibility insert; reassigning updates that insert and preserves explicit slots. |
 | `.load(input)` | method | Load a non-URL `ArrayBuffer` / `Blob` imperatively. |
 | `.play(when?)` | method | Start playback. `when` is an absolute `AudioContext.currentTime`, sample-accurate on the buffer engine — the scheduling primitive a sync bridge needs. |
 | `.pause()` / `.stop()` | method | Transport. |

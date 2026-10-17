@@ -27,6 +27,8 @@ export {
   type AudioClipPlayerEvents,
   type PlayerTimeUpdate,
   type PlayerEngineKind,
+  type PlaybackTimingCapabilities,
+  type PlaybackSchedulingMode,
   type PlayerLike,
 } from './player';
 

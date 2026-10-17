@@ -10,17 +10,17 @@ import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
 >
   <div class="wui-row"><button class="wui-btn" data-play type="button">▶ Play</button><div class="wui-track"><div class="wui-track__fill" data-fill></div></div><span class="wui-readout" data-time>0.0s</span></div>
   <div slot="parameters" class="wm-pg__grid">
-    <div class="wm-pg__param"><span class="wm-pg__name">mute upper part</span><button class="wui-btn" data-mute="upper" data-variant="ghost" type="button" aria-pressed="false">Upper</button><span class="wm-pg__note">Mute the first Arabesque MIDI part through rack.mute(id, muted).</span></div><div class="wm-pg__param"><span class="wm-pg__name">mute lower part</span><button class="wui-btn" data-mute="lower" data-variant="ghost" type="button" aria-pressed="false">Lower</button><span class="wm-pg__note">Mute the second Arabesque MIDI part through rack.mute(id, muted).</span></div>
+    <div class="wm-pg__param"><span class="wm-pg__name">mute upper part</span><button class="wui-btn" data-mute="upper" data-variant="ghost" type="button" aria-pressed="false">Upper</button><span class="wm-pg__note">Mute the first WebMusic Study MIDI part through rack.mute(id, muted).</span></div><div class="wm-pg__param"><span class="wm-pg__name">mute lower part</span><button class="wui-btn" data-mute="lower" data-variant="ghost" type="button" aria-pressed="false">Lower</button><span class="wm-pg__note">Mute the second WebMusic Study MIDI part through rack.mute(id, muted).</span></div>
   </div>
 </HeadlessDemoFrame>
 
 <script>
   import {mountProgrammaticDemo, programmaticCode} from './programmatic-demo-lifecycle';
   import { createRack, ScorePlayer, Sound } from '@webmusic/score/play/headless';
-  import {arabesqueExcerpt, loadArabesqueScore} from '../headless/arabesque-score';
+  import {studyExcerpt, loadStudyScore} from '../headless/study-score';
 
   mountProgrammaticDemo('[data-programmatic-rack]', async (root, scope) => {
-    const score = arabesqueExcerpt(await loadArabesqueScore());
+    const score = studyExcerpt(await loadStudyScore());
     if (!scope.active) return;
     const [upper, lower] = score.parts;
 

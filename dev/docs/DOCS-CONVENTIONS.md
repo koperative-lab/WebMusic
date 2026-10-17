@@ -314,18 +314,20 @@ cross-browser support guarantees.
 
 | Asset | Use | What the author checks |
 |---|---|---|
-| `wav/Arabesque No.1.wav` | Decoded-audio demos | WAV takes the pure-JS decoder path, avoiding optional codec dependencies. The full recording is about 37 MB; avoid redundant decode and full-clip analysis |
-| `mp3/Arabesque No.1.mp3` | Native decode or media streaming | A supplied context supporting the format can use `decodeAudioData`; an optional WASM decoder is needed when no usable native path exists. Check peer installation and docs stubs in configuration |
-| `midi/Arabesque No.1.mid` | Score playback and analysis | Dense input can be expensive for SVG rendering |
-| `mxl/Arabesque No.1.mxl` | Staff/sheet demos requiring notation semantics | MIDI does not preserve equivalent original layout, clef, and staff metadata; follow the renderer's actual input requirements |
-| `soundfont/*.sf2` | Timbre demos | Large files; avoid redundant soundfont loads on one page |
+| `wav/webmusic-study-no-1.wav` | Decoded-audio demos | Original 32-second stereo PCM, about 5.6 MB. WAV takes the pure-JS decoder path; avoid redundant decode and full-clip analysis |
+| `mp3/webmusic-study-no-1.mp3` | Native decode or media streaming | Encoding of the same original PCM. A supplied context supporting the format can use `decodeAudioData`; an optional WASM decoder is needed when no usable native path exists |
+| `midi/webmusic-study-no-1.mid` | Score playback, analysis and Rack demos | Two independent musical parts, Upper and Lower, with 381 notes over sixteen bars |
+| `mxl/webmusic-study-no-1.mxl` | Staff/sheet demos requiring notation semantics | One piano part with two staves and the same notes/timing. MIDI does not preserve equivalent clef, direction and staff metadata |
 
 Native decoding, optional peers, and streaming are separate paths.
 `streaming:true` does not mean PCM samples are available to every analyzer. If a
 control requires extra data such as audiowaveform JSON for `peaks-src`, supply
 that data or explain why the control cannot work in this example.
-In browser links, percent-encode the space in the Arabesque filenames as `%20`;
-use `import.meta.env.BASE_URL` for site demo URLs so Pages subpaths resolve.
+Use `import.meta.env.BASE_URL` for site demo URLs so Pages subpaths resolve.
+The [asset inventory](../../apps/doc/webmusic/ASSETS.md) owns provenance,
+regeneration and distributed MIT notices. Run `npm run check:demo-assets`
+after package builds when changing media or its generator. No SoundFont is
+bundled; a timbre demo requiring one must supply a separately reviewed resource.
 
 ### Demo file ownership
 

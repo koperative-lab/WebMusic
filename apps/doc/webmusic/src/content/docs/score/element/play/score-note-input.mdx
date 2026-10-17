@@ -9,7 +9,9 @@ import NoteInputDemo from '../../../../../components/NoteInputDemo.astro';
 
 **`<score-note-input>`** is the discrete-note performance surface. Set `layout` to pick the rendering and interaction model; all layouts share multi-touch, drag glissando, per-note reference counting, and the same output contract (`webscore:noteon` / `webscore:noteoff` + `.onNote`). Every layout also accepts the boolean `keyboard` attribute for QWERTY musical typing (see **Keyboard** below).
 
-Its implementation keeps mapping rules and layout templates separate from DOM lifecycle and held-note interaction state, while the public element API remains unchanged.
+Its mapping rules and layout templates are separate from DOM lifecycle and
+held-note state. In a modular composition it can play the nearest instrument
+without an application callback; the same events remain available for observation.
 
 ## Live demo
 
@@ -53,6 +55,39 @@ Add the boolean `keyboard` attribute on **any** layout — Piano, Grid, or Chord
 <score-note-input layout="chords" keyboard></score-note-input>
 ```
 
+## Play the nearest instrument
+
+Inside a `composition="modules"` player scope, `routing="auto"` (the default)
+borrows the nearest module's `SCORE_NOTE_INPUT` capability. The first press
+prepares its sound and resumes its audio context; it does not start the score or
+Session transport. An instrument-less module is a boundary, so the input does
+not search outward for an unrelated sound.
+
+```html
+<score-player composition="modules" src="/midi/lead.mid">
+  <score-note-input keyboard></score-note-input>
+  <score-synth-panel sections="sound,envelope"></score-synth-panel>
+</score-player>
+```
+
+`target="#lead"` selects a module explicitly. `.moduleTarget` takes precedence:
+assign a borrowed `ModuleHandle`, `null` to unbind, or `undefined` to resume
+selector/context lookup. A missing or ambiguous explicit target stays unresolved.
+Selecting a target never allocates audio nodes by itself.
+
+Each press/release pair carries a stable `id`. Different input sources can hold
+the same pitch independently; removing, retargeting or changing one input's layout
+releases only its own occurrences. A release while preparation is pending cancels
+that pending attack, so a late load cannot leave a stuck note. Instruments must
+support exact voice release; an unsupported backend reports an error instead of
+silently releasing other same-pitch voices.
+
+The existing `.onNote` callback and DOM events still fire once for observation.
+`detail.routed` is true when automatic routing claimed the occurrence, including
+pending preparation. Set `routing="manual"` when your callback already plays an
+instrument. This prevents the same interaction from reaching both the automatic
+route and your own synth wiring. See [the shared sound example](/bridge/modular-composition/#sound-and-modulation).
+
 <details class="component-section">
 <summary>API</summary>
 
@@ -65,6 +100,7 @@ const player = new InteractivePlayer();
 player.addVoice('kbd', Sound.oscillator({ type: 'triangle' }));
 
 const el = document.querySelector<NoteInputElement>('score-note-input')!;
+el.routing = 'manual'; // This callback owns the audible route.
 el.setAttribute('map', 'a1=35,a2=36,z3=42'); // or el.pads = [{ midi: 35, label: 'BD' }, …]
 el.onNote = (midi, velocity, on) => {
   if (on) player.noteOn('kbd', midi, velocity, 3600); // sustain until release
@@ -80,11 +116,15 @@ el.onNote = (midi, velocity, on) => {
 | `map` | attribute / property | Compact grid map for `layout="grid"` — comma-separated `ref=midi` pairs such as `a1=35,z2=42` (`q` / `a` / `z` row, column `1`–`10`). Unmapped cells stay idle. Ignored when `.pads` is set. |
 | `velocity` | attribute | Velocity for triggered notes, 1–127 (default `100`; grid `110`). |
 | `row-interval` | attribute | Used by the exported `gridCellMidi` helper for custom isomorphic UIs (not the built-in `grid` layout). |
+| `target` | attribute | Explicit module selector in the current Document or ShadowRoot. Missing/ambiguous matches remain unresolved. |
+| `.moduleTarget` | property | Borrowed `ModuleHandle`; object overrides `target`, `null` unbinds and `undefined` resumes lookup. |
+| `routing` | attribute / property | `auto` (default) borrows the selected module's note-input capability; `manual` leaves audible wiring to the host. |
 | `.pads` | property | Override the grid pad map — `{ midi, label? }[]` (layout `grid`). Bottom-left = index `0`; only cells with `midi` play (blank / idle pads). Takes precedence over `map`. |
 | `.chords` | property | Override the chord set — `{ label, notes }[]` (layout `chords`). |
 | `.onNote(midi, velocity, on)` | property | Callback fired on every press (`on=true`) and release (`on=false`). |
 | `.releaseHeld()` | method | Release every held note (pointer, chord, and QWERTY holds). |
-| `webscore:noteon` / `webscore:noteoff` | event | Bubbling `CustomEvent`s with `detail = { midi, velocity }`. |
+| `webscore:noteon` / `webscore:noteoff` | event | Bubbling `CustomEvent`s with `detail = { id, midi, velocity, routed }`. `id` pairs the occurrence; `routed` identifies a claimed automatic route. |
+| `webscore:error` | event | Reports automatic target preparation or note dispatch failures. The input releases only the occurrences it owns. |
 
 Disconnecting or changing layout releases held notes and removes the old
 presenter's input listeners. Events and `.onNote` callbacks preserve attack

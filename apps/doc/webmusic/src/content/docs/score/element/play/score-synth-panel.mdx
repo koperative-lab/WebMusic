@@ -7,8 +7,10 @@ sidebar:
 
 import SynthPanelDemo from '../../../../../components/SynthPanelDemo.astro';
 
-`<score-synth-panel>` is a composable control surface for one synth voice. It does not choose a synthesizer
-for you: assign small descriptors and callbacks for the controls you want, then connect its optional
+`<score-synth-panel>` is a composable control surface for an instrument or effect.
+In module scope it borrows the target's shared parameters, ADSR, native LFO and
+macro controllers. Outside module scope, its standalone compatibility mode
+accepts descriptors and callbacks, then connects its optional
 effects / EQ bus to the audio graph you already own. This keeps the panel reusable with
 `OscillatorSynth`, a worklet, a sampler, or an application-specific engine.
 
@@ -18,8 +20,9 @@ macro presenters. Parameter descriptors, `LfoController`, `EqController` and the
 behavior behind those controls. The panel borrows its AudioContext and target callbacks;
 it creates no player or synth voice.
 
-The `sections` attribute is an ordered comma list. One element can show only the controls a view
-needs, or all six modules together:
+The `sections` attribute is an ordered comma list. One element can show only the
+controls a view needs. In standalone mode, assign the following properties;
+attached mode resolves the target's capabilities as described below.
 
 | Section | Assign | What appears |
 | --- | --- | --- |
@@ -30,7 +33,7 @@ needs, or all six modules together:
 | `lfo` | `.lfo` + `.target` | Shape, rate, depth, phase and run controls for a borrowed modulation target. |
 | `macros` | `.macros` | Knobs that map one normalized value onto several targets. |
 
-Changing `sections` re-renders the visible section presenters without disposing the panel's
+In standalone mode, changing `sections` re-renders the visible section presenters without disposing the panel's
 `LfoController`. Reordering sections or changing only `sound`, `envelope`, `lfo` or `macros`
 does not rebuild the audio chain. In particular, hiding `lfo` leaves an already-running controller active, so
 modulation continues; showing it again presents the same shape, rate, depth and phase. Disconnecting
@@ -84,13 +87,13 @@ retaining its configuration for a later render.
 
 ## Section state and lifetime
 
-Changing `sections` re-renders the visible presenters while preserving sound values, ADSR, EQ bands,
+In standalone mode, changing `sections` re-renders the visible presenters while preserving sound values, ADSR, EQ bands,
 effect parameters and macro positions. A running LFO also remains active when its section is hidden;
 showing it again restores the same shape, rate, depth and phase. Disconnecting the whole element
 tears down its audio nodes and LFO loop. Reconnecting creates a fresh stopped controller with the
 retained modulation settings.
 
-The panel borrows `.context`, `.target`, descriptor callbacks and every object they close over. It
+The standalone panel borrows `.context`, `.target`, descriptor callbacks and every object they close over. It
 never disposes your synth or target. It owns only the Web Audio nodes and UI presenters that it
 creates from those assignments.
 
@@ -124,6 +127,81 @@ lifetime. Failures from a still-mounted control reach `webscore:error`; obsolete
 rejections are contained after replacement or disconnect. The panel cannot undo side effects
 inside an application-supplied callback.
 
+## Attach to an existing module
+
+`target="#effect"` selects a module or realized effect instance; `.moduleTarget`
+accepts an object with higher precedence. Set that property to `null` to unbind,
+or `undefined` to resume selector/context lookup. Without an explicit selector,
+a panel in module scope borrows the nearest target. An unresolved explicit target
+stays unresolved and never creates a fallback audio graph.
+
+Attached `sound`/`effects` sections edit the target's exact `ParamHandle`s. Two
+panels share the same values and instance. Changing sections, hiding or removing
+a panel does not rebuild or dispose that target. `.module` exposes the selected
+handle and `.bindingState` is `standalone`, `unresolved` or `ready`; `input` and
+`output` are undefined in attached mode.
+
+`mode="insert"` explicitly selects the legacy standalone panel graph. Outside
+module scope with no target, legacy behavior remains the default. The existing
+`.target` **property** remains an LFO target; the new module object property is
+`.moduleTarget`, while HTML `target` is the selector.
+
+The attached envelope section uses the target's `attackSeconds`, `decaySeconds`,
+`sustainLevel` and `releaseSeconds` handles. Native Sound voices capture all four
+stages at onset; edits affect new notes. A target without these handles shows
+the unavailable capability. Attached EQ remains unavailable unless supplied by
+the target's effect parameters.
+
+### Attached LFO and macros
+
+`lfo-parameter="cutoff"` or `.lfoParameter = 'cutoff'` selects a shared parameter
+id; the default prefers `detune`, then the first audio-rate parameter.
+The Amount control or `.lfoAmount` sets the maximum additive excursion in its
+native unit, independently of its legal/display range. `.lfo.depth`
+scales that amount from 0 to 1, while `.lfo.rate` is Hz. Starting the LFO explicitly
+prepares the target if needed. Merely displaying the section creates no audio
+graph. Unsupported precision is shown as unavailable.
+An explicit start also prepares a target whose lazy instrument has not yet
+exposed its parameters. Stopping before preparation completes cancels that
+pending start.
+
+Changing the selected parameter cancels its pending preparation-time run intent
+and settings. A late completion cannot start modulation on the new selection or
+on a replacement handle with the same id. Already running parameter-owned LFOs
+retain their own state when the panel displays another parameter.
+Configuration queued before a target exposes parameters belongs to that module
+and connected lifetime. Replacing the target or removing the panel revokes it;
+the same module can still apply it when ready. Explicit configuration before the
+first mount, or a new assignment while detached, belongs to the next binding.
+
+Parameter ids for LFO and `.parameterMacros` resolve only in the selected
+module's `params`. They do not search its insert slots or manufacture namespaced
+aliases. To modulate an effect, target that effect's handle directly. A realized
+effect handle without an output/insert context also needs the borrowed
+`.context` for its native LFO; macros need only the parameter handles. Headless
+callers can connect a control signal directly through the effect's `ParamHandle`.
+
+The native LFO belongs to the parameter/context, so two panels edit the same
+controller. Hiding the section or removing either panel leaves it running.
+Releasing the target's audio context stops it; a later context needs an explicit
+restart. The phase readout is an audio-clock estimate; assigning phase in attached
+mode reports `webscore:error` because phase restoration across seek/loop is not supported.
+
+`.parameterMacros` accepts `{id, label?, value?, targets}` with targets
+`{parameter, min, max}` in each parameter's native unit. Panels with the same
+surface and macro id share one controller. The first definition establishes that
+id's mappings; a later conflicting definition reports `webscore:error`. Explicit initial `value`
+writes targets when that controller is first created. Subsequent direct parameter
+edits do not infer a new macro position.
+
+Base knobs and macro writes replace pending base automation for the handles they
+edit. LFO remains an independent additive mapping. A dashed outer arc and an
+accessible description show the predicted modulation range; neither claims a
+measurement of the effective audio-rate value. See [the sound and modulation
+example](/bridge/modular-composition/#sound-and-modulation) and the
+[Headless controllers](/score/headless/play/sound/#shared-parameter-controllers).
+
+
 <details class="component-section">
 <summary>API</summary>
 
@@ -148,6 +226,8 @@ player.destination = panel.input;
 // "envelope": wire the ADSR editor to the synth
 panel.apply = (e) => {
   synth.setParam('attackSeconds', e.attack);
+  synth.setParam('decaySeconds', e.decay);
+  synth.setParam('sustainLevel', e.sustain);
   synth.setParam('releaseSeconds', e.release);
 };
 
@@ -163,17 +243,23 @@ panel.macros = [{ label: 'OPEN', targets: [
 | Member | Kind | Description |
 | --- | --- | --- |
 | `sections` | attribute / property | Comma list of `sound` / `effects` / `envelope` / `eq` / `lfo` / `macros` (default `sound,effects`). Toggling re-renders; current values survive. |
-| `.sound` (alias `.params`) | property | `{ name, value, min, max, step?, unit?, options?, group?, apply }[]` — one knob each; `apply(value)` fires live and may return a promise. Failed current writes restore the prior displayed value without overwriting newer writes. |
-| `.context` | property | Borrowed `AudioContext` used to create the effects / EQ chain and stable boundary nodes. Replacing it releases the old graph. |
+| `target` / `.moduleTarget` | attribute / property | Selector or object selecting a borrowed module. Object wins; `null` unbinds and `undefined` resumes lookup. |
+| `mode` | attribute | `insert` forces standalone effects/EQ ownership; otherwise auto-select attached or standalone behavior. |
+| `.module` / `.bindingState` | property (get) | Selected borrowed handle and `standalone`, `unresolved` or `ready` state. |
+| `lfo-parameter` / `.lfoParameter` | attribute / property | Shared parameter id for attached native modulation. |
+| `.lfoAmount` | property | Nonnegative maximum excursion in the attached target's native units; default `1`. The attached Amount control edits the same shared state. |
+| `.parameterMacros` | property | Shared id-based `ParameterMacroConfig[]`; distinct from standalone callback `.macros`. |
+| `.sound` (alias `.params`) | property | Standalone `{ name, value, min, max, step?, unit?, options?, group?, apply }[]` — one knob each; `apply(value)` fires live and may return a promise. Failed current writes restore the prior displayed value without overwriting newer writes. Attached sound controls use the target's handles. |
+| `.context` | property | Borrowed `AudioContext` for the standalone effects / EQ chain. In attached mode it is a fallback for an explicit target without a prepared port/insert context. |
 | `.effects` (alias `.effect`) | property | `Effect[]` to chain and expose as knobs. |
-| `.input` / `.output` | property (get) | Stable entry / exit `AudioNode`s for the current `.context`. The internal effects → EQ path can rebuild without changing their identity; an empty path is dry. |
-| `.envelope` | property | Get / set the ADSR (`{ attack, decay, sustain, release }`). |
+| `.input` / `.output` | property (get) | Stable standalone entry / exit `AudioNode`s for the current `.context`; undefined when attached. The effects → EQ path can rebuild without changing identity; an empty path is dry. |
+| `.envelope` | property | Get / set standalone ADSR (`{ attack, decay, sustain, release }`). Attached controls edit the target handles directly. |
 | `.ranges` | property | Get / set per-stage envelope maxima in seconds (`{ attackMax, decayMax, releaseMax }`, default `2`). A live assignment repaints the graph. |
-| `.apply(env)` | property | Called on every envelope change. |
+| `.apply(env)` | property | Standalone callback for envelope edits. |
 | `.bands` | property | EQ bands `{ frequency, gain?, q? }[]` (default low / mid / high). |
-| `.lfo` | property | Get / set `{ shape, rate, depth, phase, running }`. Partial assignments update the mounted presenter; the getter returns current normalized state. |
-| `.target` | property | Borrowed LFO destination `{ min, max, value?, unit?, apply(value) }`. Assignment never applies eagerly; the panel never destroys it. |
-| `.macros` | property | `{ label?, value?, targets }[]` — each macro knob maps `0..1` into every target's range. |
+| `.lfo` | property | Get / set `{ shape, rate, depth, phase, running }`. Attached native mode shares state and rejects phase assignment through `webscore:error`; standalone mode retains its callback controller. |
+| `.target` | property | Standalone borrowed LFO destination `{ min, max, value?, unit?, apply(value) }`. Assignment never applies eagerly; the panel never destroys it. |
+| `.macros` | property | Standalone `{ label?, value?, targets }[]` — each macro knob maps `0..1` into callback targets. Attached mode uses `.parameterMacros`. |
 | `webscore:envelope` | event | `detail = { attack, decay, sustain, release }`. |
 | `webscore:macro` | event | `detail = { index, label, value }`. |
 | `webscore:lfo` | event | Full `.lfo` snapshot after a shape / rate / depth / running control change. Animation-frame phase changes and phase-only assignments do not emit an event. |

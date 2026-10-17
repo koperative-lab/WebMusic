@@ -70,6 +70,7 @@ indices `0…options.length - 1` and forces `step: 1`.
 | `parameters[].options?` | `readonly string[]` | Non-empty choice labels indexed by the control value. |
 | `parameters[].group?` | `string` | Group key and visible heading in grouped layout. |
 | `parameters[].disabled?` | `boolean` | Strict `true` disables this item without disabling its siblings. |
+| `parameters[].modulationRange?` | `{min: number, max: number}` | Declared modulation bounds in the parameter's units. Draws a dashed outer arc and accessible range description; never changes the base value or claims sampled effective output. |
 
 **Binding**
 
@@ -86,8 +87,8 @@ indices `0…options.length - 1` and forces `step: 1`.
 | `layout` | `'flat' \| 'grouped'` | `'flat'` | Chooses per-item borders or named group containers. |
 | `emptyLabel` | `string` | `'No parameters'` | Placeholder text when `parameters` is empty. |
 | `formatValue` | `(parameter, value) => string` | Built-in choice/numeric formatter | Formats the visible readout and `aria-valuetext`; thrown errors are reported before the built-in fallback is used. |
-| `classNames` | `ParameterRackClassNames` | `{}` | Adds compatibility classes for all thirteen presenter node kinds. |
-| `parts` | `ParameterRackParts` | `{}` | Adds part tokens for all thirteen presenter node kinds. |
+| `classNames` | `ParameterRackClassNames` | `{}` | Adds compatibility classes for presenter node kinds, including `modulation`. |
+| `parts` | `ParameterRackParts` | `{}` | Adds part tokens for presenter node kinds, including `modulation`. |
 | `onError` | `(error: unknown) => void` | — | Receives snapshot, duplicate-id, formatter, command, subscription, stabilization and cleanup failures. |
 | `stylesheet` | `boolean` | `true` | Installs the presenter's stylesheet unless explicitly `false`, for a light-DOM host that cannot inject CSS into its page. |
 
@@ -152,6 +153,7 @@ Supply the exported stylesheet or your own CSS from the host when opting out.
 | `--wm-parameter-track` | literal | `#dcdcdc` | Knob background arc. |
 | `--wm-parameter-stroke` | literal | `5` | Track and fill SVG stroke width. |
 | `--wm-parameter-fill` | `--wm-accent` | `#999` | Filled value arc. |
+| `--wm-parameter-modulation` | `--wm-accent` | `#999` | Dashed predicted modulation-range arc. |
 | `--wm-accent` | literal | `#999` | Shared fill fallback. |
 | `--wm-parameter-pointer` | `--wm-foreground` | `#111` | Radial pointer. |
 | `--wm-focus` | `--wm-focus-ring` | `currentColor` | Focus-within outline. |
@@ -173,6 +175,7 @@ Supply the exported stylesheet or your own CSS from the host when opting out.
 | Knob wrapper | `.wui-parameter-rack__control` | `control` |
 | Track path | `.wui-parameter-rack__track` | `track` |
 | Fill path | `.wui-parameter-rack__fill` | `fill` |
+| Modulation path | `.wui-parameter-rack__modulation` | `modulation` |
 | Pointer line | `.wui-parameter-rack__pointer` | `pointer` |
 | Native range | `.wui-parameter-rack__input` | `input` |
 | Value readout | `.wui-parameter-rack__value` | `value` |
@@ -183,9 +186,9 @@ Every empty state is a live region — `role="status"`, `aria-live="polite"` —
 **Parts**
 
 `parts` adds tokens beside the matching canonical names: `root`, `group`, `group-label`, `items`,
-`item`, `label`, `control`, `track`, `fill`, `pointer`, `input`, `value`, and `empty`. The camel-case
+`item`, `label`, `control`, `track`, `fill`, `modulation`, `pointer`, `input`, `value`, and `empty`. The camel-case
 keys are `root`, `group`, `groupLabel`, `items`, `item`, `label`, `control`, `track`, `fill`,
-`pointer`, `input`, `value`, and `empty`.
+`modulation`, `pointer`, `input`, `value`, and `empty`.
 
 </details>
 

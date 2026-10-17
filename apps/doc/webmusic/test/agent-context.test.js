@@ -173,7 +173,7 @@ describe('agent context release and output contracts', () => {
     expect([...plain.files]).toEqual([...repeated.files]);
     expect(pages.files.get('llms.txt')).toContain('https://docs.example.test/WebMusic/agent-context/quick-start.md');
     expect(plain.files.get('llms.txt')).toContain('https://docs.example.test/agent-context/quick-start.md');
-    expect(pages.files.get('agent-context/quick-start.md')).toContain('https://docs.example.test/WebMusic/mxl/Arabesque%20No.1.mxl');
+    expect(pages.files.get('agent-context/quick-start.md')).toContain('https://docs.example.test/WebMusic/mxl/webmusic-study-no-1.mxl');
     expect(pages.files.get('agent-context/uikit/catalog.md')).toContain('| Presenter | Group | Purpose |');
     expect(pages.files.get('agent-context/uikit/catalog.md')).toContain('@webmusic/ui/transport');
     expect(pages.files.get('agent-context/score/api/play.md')).toContain('renderScoreToBuffer');
@@ -182,6 +182,15 @@ describe('agent context release and output contracts', () => {
       expect(page).toContain('[Interactive example on the documentation page]');
       expect(page).not.toContain('<AudioAnalyzeFeaturePlayground');
     }
+    for (const route of ['score/element/play/score-effect', 'audio/element/play/audio-effect', 'bridge/modular-composition']) {
+      const page = pages.files.get(`agent-context/${route}.md`);
+      expect(page).toContain(`[Interactive example on the documentation page](https://docs.example.test/WebMusic/${route}/)`);
+      expect(page).not.toContain('<ModularCompositionDemo');
+      expect(page).not.toContain('<ModularModulationDemo');
+      expect(page).not.toContain('<ModularProjectDemo');
+    }
+    expect(pages.files.get('agent-context/bridge/modular-composition.md')).toContain('## Save and edit a project');
+    expect(pages.files.get('agent-context/bridge/modular-composition.md')).toContain('## Sound and modulation');
     const sourcePackages = {
       '@webmusic/kernel': 'platform/kernel',
       '@webmusic/ui': 'packages/ui',
@@ -248,7 +257,26 @@ describe('agent context release and output contracts', () => {
     expect(generated.files.has('llms.txt')).toBe(true);
     expect(generated.manifest.inputs.some((input) => input.source.startsWith('.'))).toBe(false);
     await write(directory, 'apps/doc/webmusic/scripts/agent-context-catalog.mjs', '// A reviewed recipe selection change.\n');
-    expect((await generateAgentContext({root: directory, extension: audioBridgeContext})).manifest.documentationRevision).not.toBe(generated.manifest.documentationRevision);
+    const pagePath = 'apps/doc/webmusic/src/content/docs/index.mdx';
+    const importerPath = 'apps/doc/webmusic/src/content/docs/quick-start.mdx';
+    const unchangedImporter = await readFile(path.join(directory, importerPath), 'utf8');
+    const helperPath = 'apps/doc/webmusic/src/components/quick-start-player-client.ts';
+    const runtimePath = 'packages/score/src/play/element/score-player.ts';
+    const editedPage = `${await readFile(path.join(directory, pagePath), 'utf8')}\nFresh reference revision.\n`;
+    await write(directory, pagePath, editedPage);
+    await write(directory, helperPath, 'export const freshRawHelper = true;\n');
+    const editedRuntime = `${await readFile(path.join(directory, runtimePath), 'utf8')}\n// Fresh runtime revision.\n`;
+    await write(directory, runtimePath, editedRuntime);
+    const fresh = await generateAgentContext({root: directory, extension: audioBridgeContext});
+    expect(fresh.manifest.documentationRevision).not.toBe(generated.manifest.documentationRevision);
+    expect(fresh.manifest.sourceSnapshot.revision).not.toBe(generated.manifest.sourceSnapshot.revision);
+    expect(fresh.files.get('agent-context/index.md')).toContain('Fresh reference revision.');
+    expect(await readFile(path.join(directory, importerPath), 'utf8')).toBe(unchangedImporter);
+    expect(fresh.files.get('agent-context/quick-start.md')).toContain('freshRawHelper');
+    expect(fresh.files.get(`agent-context/source/${runtimePath}.txt`)).toBe(editedRuntime);
+    await rm(path.join(directory, helperPath));
+    await symlink(path.join(directory, 'LICENSE'), path.join(directory, helperPath));
+    await expect(extractAgentMarkdown(unchangedImporter, {root: directory, filename: importerPath})).rejects.toThrow(/does not follow symbolic links/);
   });
 
   it('separates task discovery, complete references, components and focused patterns', async () => {
@@ -360,31 +388,50 @@ describe('agent context release and output contracts', () => {
     expect(await query({host: 'attacker.example'})).toContain('http://localhost:4322/WebMusic/agent-context/audio/index.md');
   });
 
-  it('serves generated files in development with the configured base and no stale cache', async () => {
-    const integration = agentContext({extension: audioBridgeContext});
-    integration.hooks['astro:config:done']({config: {root: new URL('../', import.meta.url), site: 'https://docs.example.test', base: '/WebMusic/'}});
-    let middleware;
-    await integration.hooks['astro:server:setup']({server: {middlewares: {use: (handler) => { middleware = handler; }}}});
-    const headers = {};
-    let result;
-    let nextCalled = false;
-    const response = {setHeader: (key, value) => { headers[key] = value; }, end: (contents) => { result = contents; }};
-    await middleware({url: '/WebMusic/llms.txt'}, response, (error) => { if (error) throw error; nextCalled = true; });
-    expect(nextCalled).toBe(false);
-    expect(result).toContain('https://docs.example.test/WebMusic/agent-context/quick-start.md');
-    for (const filename of ['llms-full.txt', 'llms-components.txt', 'llms-patterns.txt', 'agent-context/catalog.json', 'agent-context/agent-toolkit/agents-md.md']) {
-      result = undefined;
-      await middleware({url: `/WebMusic/${filename}`}, response, (error) => { if (error) throw error; nextCalled = true; });
+  describe('development generated-file middleware', () => {
+    const setup = async () => {
+      const integration = agentContext({extension: audioBridgeContext});
+      integration.hooks['astro:config:done']({config: {root: new URL('../', import.meta.url), site: 'https://docs.example.test', base: '/WebMusic/'}});
+      let middleware;
+      await integration.hooks['astro:server:setup']({server: {middlewares: {use: (handler) => { middleware = handler; }}}});
+      return async (url) => {
+        const headers = {};
+        let result;
+        let nextCalled = false;
+        const response = {setHeader: (key, value) => { headers[key] = value; }, end: (contents) => { result = contents; }};
+        await middleware({url}, response, (error) => { if (error) throw error; nextCalled = true; });
+        return {headers, result, nextCalled};
+      };
+    };
+
+    // Each route triggers a fresh full generation. Keep independent HTTP
+    // contracts separately timed instead of combining seven generations.
+    it.each([
+      '/WebMusic/llms.txt',
+      '/WebMusic/llms-full.txt',
+      '/WebMusic/llms-components.txt',
+      '/WebMusic/llms-patterns.txt',
+      '/WebMusic/agent-context/catalog.json',
+      '/WebMusic/agent-context/agent-toolkit/agents-md.md',
+      '/llms.txt',
+    ])('serves %s with the configured base and no-store headers', async (url) => {
+      const query = await setup();
+      const {headers, result, nextCalled} = await query(url);
       expect(nextCalled).toBe(false);
       expect(result).toBeTruthy();
-      expect(headers['Content-Type']).toBe(filename.endsWith('.json') ? 'application/json; charset=utf-8' : 'text/plain; charset=utf-8');
-    }
-    expect(headers['Cache-Control']).toBe('no-store');
-    result = undefined;
-    await middleware({url: '/llms.txt'}, response, (error) => { if (error) throw error; nextCalled = true; });
-    expect(nextCalled).toBe(false);
-    expect(result).toContain('https://docs.example.test/WebMusic/agent-context/quick-start.md');
-    await middleware({url: '/unrelated/'}, response, () => { nextCalled = true; });
-    expect(nextCalled).toBe(true);
+      expect(headers['Content-Type']).toBe(url.endsWith('.json') ? 'application/json; charset=utf-8' : 'text/plain; charset=utf-8');
+      expect(headers['Cache-Control']).toBe('no-store');
+      if (url.endsWith('/llms.txt')) {
+        expect(result).toContain('https://docs.example.test/WebMusic/agent-context/quick-start.md');
+      }
+    });
+
+    it('passes unrelated requests to the next middleware', async () => {
+      const query = await setup();
+      const {headers, result, nextCalled} = await query('/unrelated/');
+      expect(nextCalled).toBe(true);
+      expect(result).toBeUndefined();
+      expect(headers).toEqual({});
+    });
   });
 });

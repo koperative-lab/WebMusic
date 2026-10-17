@@ -34,10 +34,10 @@ function runDemo(file: string, modules: Record<string, unknown>): void {
   }).outputText;
   const require = (name: string): unknown => {
     if (name.endsWith('/demo-lifecycle')) return {mountDemos: mount};
-    if (name.endsWith('/arabesque-score')) return {
-      loadArabesqueScore: async () => fixtureScore,
-      arabesqueExcerpt: () => fixtureScore,
-      arabesqueUrl: () => '/midi/Arabesque%20No.1.mid',
+    if (name.endsWith('/study-score')) return {
+      loadStudyScore: async () => fixtureScore,
+      studyExcerpt: () => fixtureScore,
+      studyUrl: () => '/midi/webmusic-study-no-1.mid',
     };
     if (name.endsWith('/programmatic-demo-lifecycle')) return {
       mountProgrammaticDemo: (selector: string, setup: (root: HTMLElement, scope: DemoScope) => void | Promise<void>) => {

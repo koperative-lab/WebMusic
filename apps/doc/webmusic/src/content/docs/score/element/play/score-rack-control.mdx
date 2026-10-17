@@ -119,6 +119,22 @@ document.querySelector<RackControlElement>('score-rack-control')!.rack = rack;
 Add or remove a member later and the desk redraws its strips; move a level from anywhere and the
 faders follow.
 
+## A module bus inside a Session
+
+Inside `composition="modules"`, this desk provides a `ScoreRackModule` through
+`.module`. It admits Score or Audio module outputs into channel gains and one
+master insert/output bus. Nesting another bus admits that one bus output;
+it does not duplicate descendant transport registrations. The desk passes the
+ancestor Session through rather than choosing a child as master.
+
+Direct `score-effect` or `audio-effect` declarations target the master chain.
+An external analyzer can use `input="#desk" port="master"`. A local player owns
+its own insert; moving an effect under that player changes its declared owner,
+not its HTML slot semantics. Direct `score-rack-part` declarations also work in module mode: each resolves
+to one actual ScorePlayerModule, with its `.module` available for explicit
+targeting. Outside module mode, `.rack` and declarations retain the legacy Rack contract. See [the mixed example](/bridge/modular-composition/).
+
+
 <details class="component-section">
 <summary>API</summary>
 

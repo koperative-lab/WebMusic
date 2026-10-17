@@ -18,6 +18,7 @@ export {
   type AudioPlaylistTrackDetail,
 } from './audio-playlist';
 export {AudioMixerElement, defineAudioMixerElement, type AudioMixerMemberSpec} from './audio-mixer';
+export {AudioEffectElement, defineAudioEffectElement} from './audio-effect';
 export {
   AudioRecorderElement,
   defineAudioRecorderElement,
@@ -32,6 +33,7 @@ import {defineAudioPlayerElement} from './audio-player';
 import {defineAudioPlaylistElement} from './audio-playlist';
 import {defineAudioMixerElement} from './audio-mixer';
 import {defineAudioRecorderElement} from './audio-recorder';
+import {defineAudioEffectElement} from './audio-effect';
 
 /**
  * Register every `@webmusic/audio/play` custom element at its default tag — the
@@ -44,6 +46,7 @@ export function defineAllAudioElements(): void {
   defineAudioPlaylistElement();
   defineAudioMixerElement();
   defineAudioRecorderElement();
+  defineAudioEffectElement();
 }
 
 export type {AudioPlayerTarget} from './internal/player-connection';

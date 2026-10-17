@@ -59,8 +59,11 @@ npm run check:external-install
 ```
 
 `check` builds the packages and checks their source, tests, export maps,
-licenses and release metadata. `docs:build` validates the documentation
-build. Repeat the production audit and external install against the release
+licenses, original demo assets and release metadata. `docs:build` verifies the
+public asset inventory and validates the documentation build. Review changed
+media against the [asset provenance and regeneration rules](../../apps/doc/webmusic/ASSETS.md);
+changing manifest hashes alone does not approve replacement files.
+Repeat the production audit and external install against the release
 checkout. CI also runs external-install and a full dependency audit; the separate
 production audit command remains a manual release check.
 
@@ -71,7 +74,10 @@ under `node16` and `bundler` resolution. Optional React peers are installed
 for those entries. Kernel additionally checks ESM and CommonJS declarations
 under `node16` and `nodenext` with `skipLibCheck: false`, and its pure event/clock
 subpaths without DOM types. Both runtime formats check that Kernel's root and
-subpaths re-export identical values within that format. This catches packaging
+subpaths re-export identical values within that format. UI root and patch-editor
+entries must likewise share presenter identity. Audio WAV loading is exercised
+through the play entry and admitted by Bridge's project factory in both formats,
+including lazy allocation and registration cleanup. This catches packaging
 faults hidden by workspace links;
 it is not a registry-publication or provenance check. It requires network
 access. Add `-- --keep` to retain its temporary project for diagnosis.

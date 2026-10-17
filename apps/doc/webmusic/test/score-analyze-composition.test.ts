@@ -18,7 +18,7 @@ describe('Score Analyze live-tool demos', () => {
     for (const tag of tags) {
       const page = read(`src/content/docs/score/element/analyze/${tag}.mdx`);
       expect(page).toContain(`<AnalysisFeaturePlayground tag="${tag}" />`);
-      expect(page).toContain('<score-player id="piece" src="/midi/Arabesque%20No.1.mid"></score-player>');
+      expect(page).toContain('<score-player id="piece" src="/midi/webmusic-study-no-1.mid"></score-player>');
       expect(page).toContain(`<${tag} player="#piece"`);
       expect(page).not.toContain('/xml/pattern-recurrence.musicxml');
     }
@@ -29,7 +29,7 @@ describe('Score Analyze live-tool demos', () => {
     expect(demo).toContain('markup="[data-demo-composition]"');
     expect(demo).toContain('<ElementComposition>');
     expect(demo.match(/<score-player\b/g)).toHaveLength(1);
-    expect(demo).toContain('const SRC = `${import.meta.env.BASE_URL}midi/Arabesque%20No.1.mid`;');
+    expect(demo).toContain('const SRC = `${import.meta.env.BASE_URL}midi/webmusic-study-no-1.mid`;');
     expect(demo).toContain('<score-player id={playerId} src={SRC}></score-player>');
     for (const tag of tags) expect(demo).toContain(`<${tag} player={`);
     expect(demo).not.toContain('<motif-analysis');
@@ -40,7 +40,7 @@ describe('Score Analyze live-tool demos', () => {
   });
 
   it('uses MIDI that contains playable notes', async () => {
-    const bytes = readFileSync(resolve(root, 'public/midi/Arabesque No.1.mid'));
+    const bytes = readFileSync(resolve(root, 'public/midi/webmusic-study-no-1.mid'));
     const score = await loadScore(bytes, {format: 'midi'});
     expect(score.notes.length).toBeGreaterThan(0);
     expect(score.durationSeconds).toBeGreaterThan(0);

@@ -46,6 +46,8 @@ export interface Soundfont2Options extends SoundOptions {
 
 export interface SfzOptions extends SoundOptions {
   attackSeconds?: number;
+  decaySeconds?: number;
+  sustainLevel?: number;
   releaseSeconds?: number;
   /** Maximum bytes read for the `.sfz` definition itself. Default 1 MiB. */
   maxSfzBytes?: number;
@@ -71,6 +73,8 @@ export interface FmOptions extends SoundOptions {
   carrierType?: OscillatorType;
   modulatorType?: OscillatorType;
   attackSeconds?: number;
+  decaySeconds?: number;
+  sustainLevel?: number;
   releaseSeconds?: number;
 }
 
@@ -80,6 +84,8 @@ export interface WavetableOptions extends SoundOptions {
   /** Sine partial amplitudes (PeriodicWave imag terms). */
   imag?: number[];
   attackSeconds?: number;
+  decaySeconds?: number;
+  sustainLevel?: number;
   releaseSeconds?: number;
 }
 
@@ -89,6 +95,8 @@ export interface NoiseOptions extends SoundOptions {
   /** Band-pass resonance when `pitched`. Default 8. */
   Q?: number;
   attackSeconds?: number;
+  decaySeconds?: number;
+  sustainLevel?: number;
   releaseSeconds?: number;
 }
 

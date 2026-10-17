@@ -1,0 +1,274 @@
+---
+title: Modular composition
+description: Compose Score and Audio leaves under one source-free Session, mix them once, and share realized effect controls and analysis taps.
+---
+
+import ModularCompositionDemo from '../../../components/ModularCompositionDemo.astro';
+import ModularModulationDemo from '../../../components/ModularModulationDemo.astro';
+import ModularProjectDemo from '../../../components/ModularProjectDemo.astro';
+
+The outer player supplies transport without inventing a score or clip. The desk
+mixes real Score and Audio sources into one bus, including an original
+`score-rack-part` declaration. Its two effect declarations create one
+reverb and one filter; the two room panels borrow the same reverb parameters.
+The spectrum analyzer taps that bus without replacing its audible route.
+
+This opt-in API is prepared for `0.3.0`. Use matching built workspace packages
+until publication; published `0.2.0` foundations do not provide the required
+module and Session entries. This page does not establish registry availability.
+
+<ModularCompositionDemo />
+
+## Try the composition
+
+1. Press the outer **Play** button. Resource preparation finishes before the
+   Session establishes a shared scheduled origin for the participants.
+2. Move the desk's member and master faders. The children keep one Session
+   transport; a mixer does not register either leaf a second time.
+3. Change a room parameter in either panel. Both panels observe the same
+   `ParamHandle`; hiding or removing one panel leaves the effect sounding.
+4. Pause and seek from the outer transport. Nested controls, when explicitly
+   shown with `controls="show"`, send commands to that same authority.
+
+The MIDI and WAV are existing local demo assets. Both domain adapters explicitly
+use offset 0 and scale 1 on their stable seconds axes. Score uses nominal Score
+seconds and Audio uses clip seconds; this 1:1 mapping does not establish beat
+alignment between independently authored performances. For explicit master/follower
+assembly and semantic conversion, use [the Bridge composition](/bridge/composition/).
+The spectrum is a sampled FFT display, not calibrated sound pressure.
+
+## Write the composition
+
+```html
+<script type="module">
+  import '@webmusic/score/play/auto';
+  import '@webmusic/audio/play/auto';
+  import '@webmusic/audio/analyze/auto';
+</script>
+
+<score-player composition="modules" controls="show" time-control="full">
+  <score-rack-control id="desk" master mute solo>
+    <score-player src="/midi/webmusic-study-no-1.mid"></score-player>
+    <audio-player src="/wav/webmusic-study-no-1.wav"></audio-player>
+    <score-rack-part id="pad" src="/midi/webmusic-study-no-1.mid" sound="triangle"></score-rack-part>
+    <score-effect id="room" type="reverb" wet="0.15" dry="1"></score-effect>
+    <audio-effect type="filter" frequency="6000"></audio-effect>
+  </score-rack-control>
+</score-player>
+
+<score-synth-panel target="#room" sections="effects"></score-synth-panel>
+<score-synth-panel target="#room" sections="effects"></score-synth-panel>
+<audio-spectrum-analyzer input="#desk" port="master"></audio-spectrum-analyzer>
+```
+
+Use your site's base path for asset URLs. `composition="modules"` opts the outer
+player into module scope; ordinary layout wrappers preserve that scope. A child
+with `session="local"` establishes an independent Session boundary. Configure
+scope before connecting a playing composition; moving a running engine between
+authorities is not a silent handoff.
+
+## Independent relationships
+
+| Relationship | API | Ownership |
+| --- | --- | --- |
+| Transport | `SessionTransport` participant lease | One registration per actual engine; every control forwards to the authority. |
+| Audio routing | `AudioOutputPort.replace()`, `send()`, `tap()` | Routing leases own precise connections, never source engines. |
+| Mixing | Rack/mixer admission | One channel per admitted output; a nested bus is one upstream output. |
+| Effect declaration | `score-effect` / `audio-effect` | One stable slot in the selected module's realized `InsertChain`. |
+| Parameter view | `score-synth-panel target="#room"` | Borrowed handles; no second DSP graph. |
+| Analysis | `input="#desk" port="master"` | A side tap on an already prepared port. |
+
+An explicit object target wins over a selector; an explicit `null` unbinds.
+An unresolved explicit selector stays pending instead of falling back to a
+different ancestor. Discovery does not create or resume an AudioContext.
+
+## Duration, commands and cleanup
+
+The aggregate axis is **Session seconds**. Participant adapters explicitly map
+their local seconds with offset and positive scale. Finite member endpoints
+determine duration; unknown data reports `null`, and live/unbounded input reports
+`Infinity`. The default end policy needs every finite member's actual ended
+signal; paused does not mean ended. A caller may choose a finite position end
+policy or explicit Session range. The Audio Element adapter explicitly uses
+position-based completion. Sessions with no timed participants, or with live or
+unbounded participants, require stop unless an explicit range applies. A
+source-free root with finite leaf participants can end naturally.
+
+Loading leaves reserve source readiness before they have an engine. These
+reservations do not count as transport participants. The Session keeps duration
+unknown, waits before starting and cannot finish from only its already loaded
+finite members. A load failure rejects startup visibly; cancellation or a new
+source releases the obsolete reservation.
+
+Commands return the existing committed/superseded outcome or reject on failure.
+Native Score and Audio participants consume the Session's read-only scheduling
+anchor. An invalidation epoch cancels old work before a new anchor is armed;
+future loop segments let lookahead schedulers prepare the next pass. Native
+buffer loops stay on the audio clock. Media/external participants retain
+approximate coordination, and lookahead work can underrun after a long scheduling
+stall. Shared timing does not compensate output-device or plugin latency.
+
+Removing a member unregisters it and cancels only its future work. Borrowed
+engines are never disposed by the Session. An in-flight start retains its engine
+identity until the lease's `settled` promise resolves; failed cancellation stays
+blocked and can be retried through `release()`. Removing an effect declaration
+removes its slot; removing an attached panel only removes UI subscriptions.
+
+## Sound and modulation
+
+The same instrument can receive a score phrase and live note input. Its two
+panels share the actual Sound parameter handles, per-note ADSR and Brightness
+macro. The LFO adds an audio-rate signal to the cutoff's base value; automation
+schedules that base on the audio context clock. Neither operation replaces the
+instrument or resets playback.
+
+<ModularModulationDemo />
+
+1. Play the phrase, or use the keyboard. The input borrows the nearest module's
+   instrument automatically; its events are still available for observation.
+2. Edit Attack, Decay, Sustain or Release, then play another note. Each voice
+   captures its own envelope at onset. Releasing during attack or decay starts
+   the release from that voice's current level.
+3. Start the LFO. The cutoff's predicted modulation range appears beside its
+   base control. Its depth uses Hz; the effective audio-rate value is explicitly
+   unavailable, rather than being inferred from `AudioParam.value`.
+4. Turn Brightness in either panel. It changes cutoff and resonance through the
+   same shared handles. Hide the second panel: voice and modulation ownership
+   stay with the instrument.
+5. Hold a note and press **Sweep cutoff for 2 seconds**. Press **Hold automation
+   here** during the sweep to keep its modeled current base. LFO remains an
+   independent additive mapping. Turning a base knob or macro replaces the
+   pending automation for the parameters it edits.
+
+The demo owns one Sound and one short Score. It creates no audio context until
+play, live input, LFO start or a sweep explicitly prepares audio. On navigation
+it stops/removes the player and disposes the Sound. The second panel is only
+another view, so it never owns the instrument's DSP.
+
+### Configure attached controls
+
+```ts
+import {Sound} from '@webmusic/score/play/headless';
+import type {ScorePlayerElement, SynthPanelElement} from '@webmusic/score/play/element';
+
+const player = document.querySelector<ScorePlayerElement>('#lead')!;
+const panel = document.querySelector<SynthPanelElement>('#controls')!;
+const sound = Sound.oscillator({attackSeconds: 0.08, decaySeconds: 0.3,
+  sustainLevel: 0.45, releaseSeconds: 0.4, cutoff: 1200});
+player.sound = sound;
+panel.moduleTarget = player.module;
+panel.lfoParameter = 'cutoff';
+panel.lfoAmount = 400; // Hz at full depth
+panel.lfo = {rate: 2, depth: 0.5, running: false};
+panel.parameterMacros = [{id: 'brightness', label: 'Brightness', targets: [
+  {parameter: 'cutoff', min: 600, max: 4000},
+  {parameter: 'resonance', min: 0.7, max: 3},
+]}];
+
+// Retain Sound while its player is in use; dispose it after removing that player.
+```
+
+Use [`ParamHandle`, `ControlLFO` and `ParamMacro`](/kernel/api/#shared-parameters)
+directly for Headless or custom UI, including Audio effect parameters. Native
+control signals are domain-neutral; connecting them requires compatible units,
+an explicit mapping depth and the same audio context. A legacy callback target
+keeps its declared callback timing and does not silently become audio-rate.
+
+## Save and edit a project
+
+This example uses the same module and parameter contracts without Elements.
+A short generated Score and an Audio pulse feed a master bus. The melody's
+explicit replacement route passes through a filter; the pulse and filter use
+their context's normal routes. A Session-relative sweep controls filter frequency,
+and a Session LFO adds a 20-cent vibrato to the melody.
+
+<ModularProjectDemo />
+
+1. **Open demo project**, then **Play**. The two sources, four-second filter
+   sweep and vibrato use one Session position. Change speed, pause or seek;
+   paused seek also reconstructs the automation base. The LFO produces zero
+   while paused and reconstructs phase when playback resumes.
+2. Disconnect the melody's explicit filter route. Its current normal route to
+   the master bus returns. Connect the melody output to the filter input with
+   **Replace default** to restore it. Use port buttons or the native select form.
+   Dashed default routes are read-only; they belong to context admission.
+3. Focus a module heading and use arrow keys to move it, or drag it. Edit the
+   melody's name or Mix level macro, then **Save in this browser**. Move a card
+   or edit a route, then **Load saved project**.
+   Stable IDs restore the saved routes and layout. Restoring leaves playback
+   paused and replaces the owned graph; merely moving a card preserves it.
+4. **Export JSON**, then use **Import JSON** with that file. The document stores
+   plugin versions, asset references, parameter bases, routes, modulation,
+   automation and Session state, including its unwrapped position across loop
+   iterations. The displayed position remains folded into the loop. This demo supplies the generated assets by URI;
+   importing an unrelated asset URI fails visibly and keeps the previous graph.
+5. **Try a missing module**. The filter, incident connection and automation
+   remain in the project with unresolved diagnostics. **Make module available**
+   registers the demo's trusted factory and retries the same document. It does
+   not download or execute code from the JSON.
+
+The browser save is this page's localStorage entry; export/import uses its own
+file controls. Kernel owns neither storage nor an undo stack. Navigation destroys
+the presenter and project runtime, then closes this demo's owned audio environment.
+The project runtime itself only borrows that environment.
+
+### Compose the runtime and editor
+
+```ts
+import {createWebMusicProjectPlugins} from '@webmusic/bridge';
+import {ModuleAudioEnvironment, ModuleProjectRuntime, ProjectPluginRegistry,
+  createProjectEditorBinding} from '@webmusic/kernel/module';
+import {mountPatchEditor} from '@webmusic/ui/patch-editor';
+
+const audio = new ModuleAudioEnvironment();
+const plugins = new ProjectPluginRegistry();
+const registrations = createWebMusicProjectPlugins().map(factory => plugins.register(factory));
+const runtime = new ModuleProjectRuntime({audio, plugins,
+  resolveAsset: (reference, signal) => applicationAssets.resolve(reference, signal),
+});
+const editor = mountPatchEditor(host, createProjectEditorBinding(runtime));
+await runtime.restore(savedProject); // Prepare a candidate; commit paused by default.
+
+// On teardown, the application releases what it owns, in this order.
+editor.destroy();
+runtime.dispose();
+for (const registration of registrations) registration.release();
+audio.dispose();
+```
+
+[`ModuleProjectRuntime`](/kernel/api/#project-runtime) validates and stages a
+candidate before replacing the working graph. Factory or asset failure preserves
+that graph; missing plugins remain unresolved and recoverable. The
+[standard factories](/bridge/api/#project-module-factories) resolve exact
+ID/version pairs. The [editor adapter](/kernel/api/#project-editor-binding)
+projects real ports and mappings into UI Kit's structural binding without
+transferring resource ownership to the presenter.
+
+## Timing and replacement boundaries
+
+Occurrence-safe note input, native per-voice ADSR, parameter CV buses, audio-rate
+LFOs, macros, absolute audio-clock automation, shared Session scheduling,
+Session-relative automation/phase and versioned project editing are implemented.
+The preceding Sound demo intentionally uses absolute audio-clock automation and
+a free-running LFO; the project demo uses Session-relative time. The attached
+panel's existing LFO remains free-running. `SessionLFO` is an explicit Headless
+or project-module choice; visible controls do not infer that policy.
+
+Native Score scheduling clips note gates at a loop boundary and retriggers the
+next pass; backend release envelopes may extend beyond the gate. Audio buffers
+use native looping where supported and bounded lookahead for other windows.
+Media engines and callback instruments retain their declared precision.
+Saved state does not capture active voices, sample payloads or a live audio
+context. Restoring a graph can cut its previous effects' tails; it does not
+promise an automatic crossfade, acoustic latency compensation or uninterrupted
+device output. For an application-owned effect bus that needs an explicit
+crossfade/tail budget, use
+[`TransitionInsertChain`](/kernel/api/#explicit-effect-transitions). It creates
+fresh effect generations; it does not silently migrate parameter or CV handles.
+
+## Related
+
+- [Kernel module and Session contracts](/kernel/api/#module--webmusickernelmodule)
+- [Score effect declaration](/score/element/play/score-effect/)
+- [Audio effect declaration](/audio/element/play/audio-effect/)
+- [Explicit Score/Audio semantic coordination](/bridge/composition/)

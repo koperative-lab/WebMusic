@@ -5,7 +5,7 @@ import {
 
 const PART_TAG = 'score-rack-part';
 const PART_ATTRIBUTES = ['id', 'src', 'format', 'sound'] as const;
-const DEFAULT_SOURCE = `${import.meta.env.BASE_URL}midi/Arabesque%20No.1.mid`;
+const DEFAULT_SOURCE = `${import.meta.env.BASE_URL}midi/webmusic-study-no-1.mid`;
 const DEFAULT_SOUND = 'triangle';
 
 type PartAttribute = (typeof PART_ATTRIBUTES)[number];

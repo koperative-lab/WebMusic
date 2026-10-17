@@ -777,7 +777,7 @@ The core install stays lean; each optional peer unlocks one capability:
 | `spessasynth_lib` | `^4.0.0` | `Sound.soundfont2()` — `.sf2` / `.sf3` SoundFont playback (see the `workletUrl` recipe above). |
 | `tone` | `>=14.0.0` | `TonePlayer` — playback on an injected `Tone.Transport`, and `Sound.from(toneInstrument)`. |
 | `react` | `>=18` | `@webmusic/score/react` hooks and components. |
-| `@webmusic/ui` | `^0.2.0` | `/element`, `/auto`, visible analysis elements and default Web Component presenters. |
+| `@webmusic/ui` | `^0.3.0` | `/element`, `/auto`, visible analysis elements and default Web Component presenters. |
 
 Everything else — parsing, the built-in oscillator / FM / wavetable / sampler
 sounds, Headless views and analysis — works without optional peers.

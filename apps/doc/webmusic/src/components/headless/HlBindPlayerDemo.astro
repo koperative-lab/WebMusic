@@ -3,10 +3,10 @@
 // waveform (computePeaks → renderWaveformVisualizer) into a .wui-surface, builds
 // an AudioClipPlayer over the same clip, then binds the two so the playhead
 // follows playback and clicking the surface seeks. Card chrome is the shared
-// docs UI kit (apps/doc/shared/ui.css); clip loads from the bundled Arabesque WAV.
+// docs UI kit (apps/doc/shared/ui.css); clip loads from the bundled WebMusic Study WAV.
 import LiveDemoCanvas from '../LiveDemoCanvas.astro';
 
-const SRC = `${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`;
+const SRC = `${import.meta.env.BASE_URL}wav/webmusic-study-no-1.wav`;
 ---
 
 <div class="wui-panel wui-panel--flow not-content">

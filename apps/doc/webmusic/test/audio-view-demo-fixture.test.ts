@@ -164,7 +164,7 @@ describe('actual Audio View demo wiring', () => {
     player.stop = vi.fn();
     runDemo('AudioViewDemo');
     await flush();
-    expect(mocks.decode.mock.calls[0][0]).toBe('/wav/Arabesque%20No.1.wav');
+    expect(mocks.decode.mock.calls[0][0]).toBe('/wav/webmusic-study-no-1.wav');
     expect(view.peaks).toBeDefined();
     expect(player.clip).toBe(clip);
     expect(mocks.analyze).toHaveBeenCalledOnce();

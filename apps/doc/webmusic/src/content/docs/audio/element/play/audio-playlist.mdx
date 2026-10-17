@@ -25,16 +25,16 @@ context across entries and reuses its tested auto-advance/prefetch behavior.
 
 <audio-player id="session"></audio-player>
 <audio-playlist player="#session" loop>
-  <li data-id="wav-1" data-src="/wav/Arabesque%20No.1.wav">Arabesque WAV · pass 1</li>
-  <li data-id="wav-2" data-src="/wav/Arabesque%20No.1.wav">Arabesque WAV · pass 2</li>
-  <li data-id="mp3" data-src="/mp3/Arabesque%20No.1.mp3" data-streaming>Arabesque MP3 · streamed</li>
+  <li data-id="wav-1" data-src="/wav/webmusic-study-no-1.wav">WebMusic Study WAV · pass 1</li>
+  <li data-id="wav-2" data-src="/wav/webmusic-study-no-1.wav">WebMusic Study WAV · pass 2</li>
+  <li data-id="mp3" data-src="/mp3/webmusic-study-no-1.mp3" data-streaming>WebMusic Study MP3 · streamed</li>
 </audio-playlist>
 ```
 
 The entries live in light DOM, so the markup degrades to a plain list without JavaScript. A comma-separated `src` works for the simple case, and `.entries` takes over from code:
 
 ```html
-<audio-playlist player="#session" src="/wav/Arabesque%20No.1.wav, /mp3/Arabesque%20No.1.mp3"></audio-playlist>
+<audio-playlist player="#session" src="/wav/webmusic-study-no-1.wav, /mp3/webmusic-study-no-1.mp3"></audio-playlist>
 ```
 
 ```ts
@@ -43,11 +43,11 @@ import type {AudioPlaylistElement} from '@webmusic/audio/play/element';
 
 const list = document.querySelector<AudioPlaylistElement>('audio-playlist');
 if (!list) throw new Error('Audio playlist not found');
-const clip = await loadClipFromUrl('/wav/Arabesque%20No.1.wav');
+const clip = await loadClipFromUrl('/wav/webmusic-study-no-1.wav');
 list.entries = [
-  { id: 'a', label: 'Arabesque WAV · loaded', clip },
-  { id: 'b', label: 'Arabesque WAV · queued', src: '/wav/Arabesque%20No.1.wav' },
-  { id: 'c', label: 'Arabesque MP3 · streamed', src: '/mp3/Arabesque%20No.1.mp3', streaming: true },
+  { id: 'a', label: 'WebMusic Study WAV · loaded', clip },
+  { id: 'b', label: 'WebMusic Study WAV · queued', src: '/wav/webmusic-study-no-1.wav' },
+  { id: 'c', label: 'WebMusic Study MP3 · streamed', src: '/mp3/webmusic-study-no-1.mp3', streaming: true },
 ];
 await list.play();
 ```

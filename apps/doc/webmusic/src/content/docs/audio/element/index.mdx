@@ -30,7 +30,7 @@ mixer display selection and mix controls without a duplicate transport bar.
 | [`<audio-playlist>`](/audio/element/play/audio-playlist/) | `defineAudioPlaylistElement(tag?)` | Queue selection, auto-advance, list loop and prefetch, attached to the player. |
 | [`<audio-mixer>`](/audio/element/play/audio-mixer/) | `defineAudioMixerElement(tag?)` | Master/member volume, mute and solo for the player's mix backend. |
 | [`<audio-recorder>`](/audio/element/play/audio-recorder/) | `defineAudioRecorderElement(tag?)` | Capture microphone input and audition the finished take through the player. |
-| — | `defineAllAudioElements()` | Register all four Play tags. |
+| — | `defineAllAudioElements()` | Register the Play tags, including the nonvisual effect declaration. |
 
 Imports come from `@webmusic/audio/play/element`; `/play/auto` registers them on
 import.
@@ -39,6 +39,14 @@ Play events use `webaudio:*` CustomEvents with `bubbles: true` and `composed: tr
 Queues keep their sequencing policy and mixers keep their member state. The
 central facade does not add a clock or promise sample-accurate group playback.
 The compact meter is an [Analyze tool](#analyze), not another transport.
+
+### Effect declarations and module scope
+
+[`<audio-effect>`](/audio/element/play/audio-effect/) is a nonvisual insert declaration,
+registered by `defineAudioEffectElement()` from `@webmusic/audio/play/element` and included
+in the auto-registration entry. Players opt in with `composition="modules"`;
+[the shared example](/bridge/modular-composition/) shows inherited transport,
+master inserts, attached parameter panels and output taps.
 
 ## Analyze
 
@@ -79,7 +87,7 @@ point regions and assign them to [`<audio-view>.regions`](/audio/element/view/au
   import '@webmusic/audio/analyze/auto';
 </script>
 
-<audio-player id="session" src="/wav/Arabesque%20No.1.wav" controls></audio-player>
+<audio-player id="session" src="/wav/webmusic-study-no-1.wav" controls></audio-player>
 <audio-level-analyzer player="#session"></audio-level-analyzer>
 <audio-meter player="#session"></audio-meter>
 <audio-oscilloscope player="#session"></audio-oscilloscope>

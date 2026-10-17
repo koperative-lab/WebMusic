@@ -181,22 +181,22 @@ describe('score-rack-control nested playground', () => {
     const addButton = panel.querySelector<HTMLButtonElement>('[data-rc-add]')!;
     addButton.click();
 
-    expect(draftControl(panel, 'src').value).toBe('/WebMusic/midi/Arabesque%20No.1.mid');
+    expect(draftControl(panel, 'src').value).toBe('/WebMusic/midi/webmusic-study-no-1.mid');
     type(draftControl(panel, 'id'), 'strings');
     submitDraft(panel);
 
-    expect(directParts(panel).at(-1)?.getAttribute('src')).toBe('/WebMusic/midi/Arabesque%20No.1.mid');
-    expect(cardControl(panel, 'rack-part-4', 'src').value).toBe('/WebMusic/midi/Arabesque%20No.1.mid');
+    expect(directParts(panel).at(-1)?.getAttribute('src')).toBe('/WebMusic/midi/webmusic-study-no-1.mid');
+    expect(cardControl(panel, 'rack-part-4', 'src').value).toBe('/WebMusic/midi/webmusic-study-no-1.mid');
     const copied = document.createElement('template');
     copied.innerHTML = panel.querySelector('[data-pg-markup]')?.textContent ?? '';
     expect(copied.content.querySelector('score-rack-part#strings')?.getAttribute('src'))
-      .toBe('/WebMusic/midi/Arabesque%20No.1.mid');
+      .toBe('/WebMusic/midi/webmusic-study-no-1.mid');
 
     addButton.click();
     type(draftControl(panel, 'src'), '/custom.mid');
     panel.querySelector<HTMLButtonElement>('[data-pg-reset]')!.click();
     addButton.click();
-    expect(draftControl(panel, 'src').value).toBe('/WebMusic/midi/Arabesque%20No.1.mid');
+    expect(draftControl(panel, 'src').value).toBe('/WebMusic/midi/webmusic-study-no-1.mid');
   });
 
   it('keeps draft controls inert, then creates a configured part and stable-scoped card', () => {

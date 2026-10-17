@@ -56,6 +56,7 @@ The public capability families are:
 | Offline render | `renderScoreToClip` | symbolic → audio |
 | Timeline conversion | `beatGridFromTimeMap`, `timeMapFromBeatGrid` | either way |
 | Score assembly | `scoreFromTranscription` | estimated note events → symbolic |
+| Modular project factories | `createWebMusicProjectPlugins` | trusted Score/Audio modules for Kernel project restore |
 
 Source map:
 
@@ -65,11 +66,16 @@ Source map:
 | `src/audio-master.ts` | Axis-translating adapters for the reversed pairing |
 | `src/mapping.ts` | `TimeMap` ↔ `BeatGrid` conversion |
 | `src/transcription.ts` | Transcribed note events → a validated `Score` |
+| `src/project.ts` | Exact-version project factories; application-resolved domain assets and borrowed Session context |
 | `src/transport-contracts.ts` | Compile-time pins: the real players satisfy the role contracts |
 
 ---
 
 ## 3. The layering: choreography in the kernel, assembly in the bridge
+
+The modular project path uses Kernel's Session scheduling and staged project
+runtime. Bridge contributes domain-aware factories; the application resolves
+assets and owns storage. This path does not redefine the legacy pairing below.
 
 `TransportGroup` in [`@webmusic/kernel/sync`](../platform/kernel/src/sync.ts)
 owns domain-neutral coordination. Bridge adapts real domain players onto its

@@ -17,6 +17,7 @@ function synthContext() {
     value: 1,
     setValueAtTime: vi.fn(),
     exponentialRampToValueAtTime: vi.fn(),
+    linearRampToValueAtTime: vi.fn(),
     cancelScheduledValues: vi.fn(),
   });
   const gains: Array<{gain: ReturnType<typeof param>; connect: ReturnType<typeof vi.fn>}> = [];

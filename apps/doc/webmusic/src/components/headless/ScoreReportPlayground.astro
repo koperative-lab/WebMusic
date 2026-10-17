@@ -22,8 +22,8 @@ import LiveDemoCanvas from '../LiveDemoCanvas.astro';
     </label>
     <label>Source
       <select data-score-variant>
-        <option value="midi">Arabesque No. 1 · MIDI</option>
-        <option value="mxl">Arabesque No. 1 · MXL</option>
+        <option value="midi">WebMusic Study No. 1 · MIDI</option>
+        <option value="mxl">WebMusic Study No. 1 · MXL</option>
       </select>
     </label>
     <label data-histogram-control hidden>Distribution
@@ -57,7 +57,7 @@ import LiveDemoCanvas from '../LiveDemoCanvas.astro';
   import {mountDemos} from '../demo-lifecycle';
   import {distributions, rhythmPatterns} from '@webmusic/score/analyze';
   import {createScoreReport} from '@webmusic/score/analyze/headless';
-  import {loadArabesqueScore, type ArabesqueFormat} from './arabesque-score';
+  import {loadStudyScore, type StudyFormat} from './study-score';
   import {
     analysisStyle,
     createAnalysisRoot,
@@ -84,10 +84,10 @@ import LiveDemoCanvas from '../LiveDemoCanvas.astro';
 
     const render = async () => {
       const request = ++generation;
-      status.textContent = 'Loading Arabesque No. 1...';
+      status.textContent = 'Loading WebMusic Study No. 1...';
       let score;
       try {
-        score = await loadArabesqueScore(variant.value as ArabesqueFormat);
+        score = await loadStudyScore(variant.value as StudyFormat);
       } catch (error) {
         if (scope.active && request === generation) status.textContent = error instanceof Error ? error.message : String(error);
         return;
@@ -129,7 +129,7 @@ import LiveDemoCanvas from '../LiveDemoCanvas.astro';
         const report = createScoreReport(score);
         renderSummaryCard({title: report.title ?? 'Score report', subtitle: report.composer, rows: report.rows}, surface);
         result = report;
-        status.textContent = 'Formatted facts for the selected Arabesque format. Changing the source recomputes the report.';
+        status.textContent = 'Formatted facts for the selected WebMusic Study format. Changing the source recomputes the report.';
         invocation.textContent = 'createScoreReport(score)';
       }
       data.textContent = JSON.stringify(result, null, 2);

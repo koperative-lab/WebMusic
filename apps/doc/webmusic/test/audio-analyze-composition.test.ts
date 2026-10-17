@@ -13,7 +13,7 @@ const tags = [
   'audio-transient-analyzer',
 ] as const;
 const read = (path: string) => readFileSync(resolve(root, path), 'utf8');
-const mp3 = '/mp3/Arabesque%20No.1.mp3';
+const mp3 = '/mp3/webmusic-study-no-1.mp3';
 
 describe('Audio Analyze live-tool demos', () => {
   it('documents exactly the task-specific Element tags', () => {
@@ -45,8 +45,8 @@ describe('Audio Analyze live-tool demos', () => {
     expect(demo).toContain('defineAudioPlayerElement()');
     expect(demo).toContain('defineAllAudioElements()');
     expect(demo).not.toContain('<audio-analysis ');
-    expect(demo).toContain('mp3/Arabesque%20No.1.mp3');
-    expect(statSync(resolve(root, 'public/mp3/Arabesque No.1.mp3')).size).toBeGreaterThan(0);
-    expect(statSync(resolve(root, 'public/wav/Arabesque No.1.wav')).size).toBeGreaterThan(0);
+    expect(demo).toContain('mp3/webmusic-study-no-1.mp3');
+    expect(statSync(resolve(root, 'public/mp3/webmusic-study-no-1.mp3')).size).toBeGreaterThan(0);
+    expect(statSync(resolve(root, 'public/wav/webmusic-study-no-1.wav')).size).toBeGreaterThan(0);
   });
 });

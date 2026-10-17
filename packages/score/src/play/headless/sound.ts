@@ -5,6 +5,9 @@
 // ============================================================================
 
 import {OscillatorSynth} from './oscillator-synth';
+import {ParamHandle, ParamSurface, type ConnectionLease} from '@webmusic/kernel/module';
+import {createOscillatorParameters} from './internal/oscillator-parameters';
+import {createEnvelopeParameters} from './internal/envelope-parameters';
 import {SoundfontSynth} from './soundfont-synth';
 import {isHeadlessSynth, toneAdapter} from './sounds/adapters';
 import type {
@@ -40,6 +43,7 @@ interface ActiveSoundRoute {
   gain: GainNode;
   destination: AudioNode;
   backendRoute?: () => void;
+  gainBinding: ConnectionLease;
   released: boolean;
 }
 
@@ -70,6 +74,9 @@ export type {
  * contract with live per-voice gain and asynchronous readiness.
  */
 export class Sound implements HeadlessSynth {
+  /** Stable configuration: bus gain plus any supported instrument handles. */
+  readonly params: ParamSurface;
+  private readonly busGain: ParamHandle;
   private readonly factory: SoundBackendFactory;
   private backend?: SoundBackend;
   private gain?: GainNode;
@@ -85,9 +92,18 @@ export class Sound implements HeadlessSynth {
     context: AudioContext,
   ) => Promise<void> | void;
 
-  private constructor(factory: SoundBackendFactory, options: SoundOptions = {}) {
+  private constructor(factory: SoundBackendFactory, options: SoundOptions = {}, instrumentParams?: ParamSurface, private readonly ownsBackend = false) {
     this.factory = factory;
     this.gainValue = options.gain ?? 1;
+    this.busGain = new ParamHandle({
+      id: 'busGain', label: 'Sound gain', unit: 'ratio',
+      range: {min: Math.min(0, this.gainValue), max: Number.MAX_VALUE},
+      displayRange: {min: 0, max: 1},
+      defaultValue: this.gainValue, step: 0.01, updateTiming: 'scheduled', modulation: 'audio-rate',
+    }, {apply: (value) => {
+      this.gainValue = value;
+    }});
+    this.params = new ParamSurface([this.busGain, ...(instrumentParams?.handles ?? [])]);
   }
 
   /** Built-in oscillator synth — the simplest custom synthesis timbre. */
@@ -95,7 +111,8 @@ export class Sound implements HeadlessSynth {
     options: OscillatorSynthOptions = {},
     sound: SoundOptions = {},
   ): Sound {
-    return new Sound((context) => new OscillatorSynth(context, options), sound);
+    const params = createOscillatorParameters(options);
+    return new Sound((context) => new OscillatorSynth(context, options, params), sound, params, true);
   }
 
   /** One audio sample per exact MIDI note. */
@@ -104,17 +121,19 @@ export class Sound implements HeadlessSynth {
     options: Omit<SoundfontSynthOptions, 'samples'> = {},
     sound: SoundOptions = {},
   ): Sound {
+    const params = createEnvelopeParameters(options, 0.004, 0.08);
     return new Sound(
-      (context) => new SoundfontSynth(context, {...options, samples: map}),
-      sound,
+      (context) => new SoundfontSynth(context, {...options, samples: map}, params),
+      sound, params, true,
     );
   }
 
   /** Load a key-ranged, pitch-shifted sampler from an SFZ instrument. */
   static sfz(url: string, options: SfzOptions = {}): Sound {
+    const params = createEnvelopeParameters(options, 0.004, 0.12);
     return new Sound(
-      (context) => new RangeSampler(context, options),
-      options,
+      (context) => new RangeSampler(context, options, params),
+      options, params, true,
     ).withAsyncSetup(async (backend, context) => {
       const {parseSfz, resolveSfzZones} = await import('../core/sfz');
       const maxSfzBytes = positiveSafeIntegerOption('Sound.sfz', 'maxSfzBytes', options.maxSfzBytes, 1_000_000);
@@ -208,6 +227,15 @@ export class Sound implements HeadlessSynth {
         return () => releaseRouteCleanups(cleanups);
       },
       disconnect: () => runLayerOperations(sounds, (sound) => sound.disconnect()),
+      get supportsNoteOccurrences() {
+        return sounds.length > 0 && sounds.every((sound) => sound.supportsNoteOccurrences);
+      },
+      get supportsScheduledDuration() {
+        return sounds.length > 0 && sounds.every((sound) => sound.supportsScheduledDuration);
+      },
+      get supportsScheduledRetiming() {
+        return sounds.length > 0 && sounds.every((sound) => sound.supportsScheduledRetiming);
+      },
       get supportsScheduledCancellation() {
         return sounds.length > 0 && sounds.every((sound) => sound.supportsScheduledCancellation);
       },
@@ -270,17 +298,20 @@ export class Sound implements HeadlessSynth {
 
   /** Two-operator frequency-modulation synthesis. */
   static fm(options: FmOptions = {}): Sound {
-    return new Sound((context) => new FmBackend(context, options), options);
+    const params = createEnvelopeParameters(options, 0.005, 0.12);
+    return new Sound((context) => new FmBackend(context, options, params), options, params, true);
   }
 
   /** PeriodicWave wavetable synthesis. */
   static wavetable(options: WavetableOptions = {}): Sound {
-    return new Sound((context) => new WavetableBackend(context, options), options);
+    const params = createEnvelopeParameters(options, 0.008, 0.1);
+    return new Sound((context) => new WavetableBackend(context, options, params), options, params, true);
   }
 
   /** Filtered white-noise synthesis. */
   static noise(options: NoiseOptions = {}): Sound {
-    return new Sound((context) => new NoiseBackend(context, options), options);
+    const params = createEnvelopeParameters(options, 0.001, 0.12);
+    return new Sound((context) => new NoiseBackend(context, options, params), options, params, true);
   }
 
   /** Route note events to Web MIDI instead of producing audio. */
@@ -295,8 +326,9 @@ export class Sound implements HeadlessSynth {
     const gain = context.createGain();
     let backend: SoundBackend | undefined;
     let backendRoute: (() => void) | undefined;
+    let gainBinding: ConnectionLease | undefined;
     try {
-      gain.gain.value = this.gainValue;
+      gainBinding = this.busGain.bindAudioParam(context, gain.gain, {lazy: true});
       gain.connect(destination);
       backend = this.factory(context);
       const connected = backend.connect?.(gain);
@@ -306,6 +338,7 @@ export class Sound implements HeadlessSynth {
         gain,
         destination,
         backendRoute,
+        gainBinding,
         released: false,
       };
       this.backend = backend;
@@ -337,6 +370,8 @@ export class Sound implements HeadlessSynth {
       } catch {
         // A failed backend setup must not leave this private gain attached.
       }
+      gainBinding?.release();
+      this.busGain.releaseAudio(context);
       this.clearConnectionState();
       throw error;
     }
@@ -391,6 +426,16 @@ export class Sound implements HeadlessSynth {
     this.backend?.noteOffById?.(handle, time);
   }
 
+  get supportsNoteOccurrences(): boolean {
+    return (this.backend?.supportsNoteOccurrences === true && typeof this.backend.noteOffById === 'function') || this.supportsScheduledCancellation;
+  }
+
+  get supportsScheduledDuration(): boolean { return this.backend?.supportsScheduledDuration === true; }
+
+  get supportsScheduledRetiming(): boolean {
+    return this.backend?.supportsScheduledRetiming === true && typeof this.backend.retimeScheduledNote === 'function';
+  }
+
   /** Propagate exact AudioContext-clock lookahead only from capable backends. */
   get supportsScheduledCancellation(): boolean {
     return this.backend?.supportsScheduledCancellation === true &&
@@ -427,8 +472,8 @@ export class Sound implements HeadlessSynth {
     let firstError: unknown;
     if (teardownFirst) {
       try {
-        if (globallyDisposed) backend?.dispose?.();
-        else backend?.disconnect?.();
+        if (globallyDisposed && !(route && this.ownsBackend)) backend?.dispose?.();
+        else if (!globallyDisposed) backend?.disconnect?.();
       } catch (error) {
         firstError = error;
       }
@@ -441,8 +486,8 @@ export class Sound implements HeadlessSynth {
     }
     if (!teardownFirst) {
       try {
-        if (globallyDisposed) backend?.dispose?.();
-        else backend?.disconnect?.();
+        if (globallyDisposed && !(route && this.ownsBackend)) backend?.dispose?.();
+        else if (!globallyDisposed) backend?.disconnect?.();
       } catch (error) {
         firstError ??= error;
       }
@@ -453,8 +498,7 @@ export class Sound implements HeadlessSynth {
 
   /** Set this sound's bus gain, live when already connected. */
   setGain(value: number): this {
-    this.gainValue = Math.max(0, value);
-    if (this.gain) this.gain.gain.value = this.gainValue;
+    this.busGain.setBaseValue(Math.max(0, value));
     return this;
   }
 
@@ -497,6 +541,11 @@ export class Sound implements HeadlessSynth {
       // backend cleanup failure to the caller.
       cleanupError = error;
     }
+    if (this.ownsBackend) {
+      try { route.backend.dispose?.(); } catch (error) { cleanupError ??= error; }
+    }
+    try { route.gainBinding.release(); } catch (error) { cleanupError ??= error; }
+    try { this.busGain.releaseAudio(route.destination.context); } catch (error) { cleanupError ??= error; }
     try {
       route.gain.disconnect(route.destination);
     } catch {

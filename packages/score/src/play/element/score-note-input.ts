@@ -4,11 +4,14 @@
 // The custom element owns host lifecycle, headless mapping and event dispatch.
 // The UI presenter owns DOM, focus, pointer/key holding, pressed state and ARIA.
 // Every layout emits
-// `webscore:noteon` / `webscore:noteoff` with `{midi, velocity}`.
+// `webscore:noteon` / `webscore:noteoff` with `{id, midi, velocity, routed}`.
 // ============================================================================
 
 import {numAttr} from './internal/base';
 import {HTMLElementBase, upgradeProperties} from './internal/base';
+import {observeModuleContext, observeModuleTarget} from '@webmusic/kernel/element';
+import type {ModuleHandle} from '@webmusic/kernel/module';
+import {NoteInputController, SCORE_NOTE_INPUT} from '../headless/note-input';
 import {
   mountNoteSurface,
   type NoteGridCell,
@@ -36,6 +39,7 @@ import {
   type NoteInputDetail,
   type NoteInputLayout,
   type NoteInputPad,
+  type NoteInputTarget,
 } from '../core/note-input-model';
 import {noteName} from './internal/note-names';
 
@@ -96,7 +100,7 @@ const NOTE_INPUT_COMPATIBILITY_STYLE = `
 
 export class NoteInputElement extends HTMLElementBase {
   static get observedAttributes(): string[] {
-    return ['layout', 'start', 'end', 'velocity', 'row-interval', 'keyboard', 'map'];
+    return ['layout', 'start', 'end', 'velocity', 'row-interval', 'keyboard', 'map', 'target', 'routing'];
   }
 
   /** Optional callback fired on every press/release. */
@@ -113,27 +117,107 @@ export class NoteInputElement extends HTMLElementBase {
   private renderRevision = 0;
   private dispatching = false;
   private readonly noteQueue: Array<{detail: NoteInputDetail; on: boolean}> = [];
+  private readonly held = new Map<number, NoteInputDetail & {id: string}>();
+  private readonly controller = new NoteInputController({onError: error => this.reportError(error)});
+  private explicitModuleTarget?: ModuleHandle | null;
+  private resolutionRelease?: () => void;
+  private targetRelease?: () => void;
+  private noteTarget?: NoteInputTarget;
+  private bindingGeneration = 0;
+
+  /** Explicit borrowed module; null deliberately disables automatic routing. */
+  get moduleTarget(): ModuleHandle | null | undefined { return this.explicitModuleTarget; }
+  set moduleTarget(target: ModuleHandle | null | undefined) {
+    if (target === this.explicitModuleTarget) return;
+    this.explicitModuleTarget = target;
+    if (this.isConnected) this.bind();
+  }
+
+  /** `manual` keeps events/callbacks while disabling the automatic instrument route. */
+  get routing(): 'auto' | 'manual' { return this.getAttribute('routing') === 'manual' ? 'manual' : 'auto'; }
+  set routing(value: 'auto' | 'manual') { this.setAttribute('routing', value); }
 
   connectedCallback(): void {
-    upgradeProperties(this, ['onNote', 'chords', 'pads']);
+    upgradeProperties(this, ['onNote', 'chords', 'pads', 'moduleTarget', 'routing']);
     if (!this.root) this.root = this.attachShadow({mode: 'open'});
     this.render();
+    this.bind();
   }
 
   disconnectedCallback(): void {
     this.renderRevision += 1;
     const handle = this.handle;
     this.handle = undefined;
-    handle?.destroy();
+    try { handle?.destroy(); } finally {
+      this.releaseBinding();
+      this.controller.releaseAll();
+    }
   }
 
-  attributeChangedCallback(): void {
-    if (this.isConnected) this.render();
+  attributeChangedCallback(name: string): void {
+    if (!this.isConnected) return;
+    if (name === 'target' || name === 'routing') this.bind();
+    else this.render();
   }
 
   /** Release every held note and forget pointer, chord, and keyboard state. */
   releaseHeld(): void {
     this.handle?.releaseAll();
+  }
+
+  private releaseBinding(): void {
+    this.bindingGeneration += 1;
+    const releases = [this.resolutionRelease, this.targetRelease];
+    this.resolutionRelease = this.targetRelease = undefined;
+    this.noteTarget = undefined;
+    this.controller.setTarget(undefined);
+    for (const release of releases) {
+      try { release?.(); } catch (error) { this.reportError(error); }
+    }
+  }
+
+  private bind(): void {
+    this.releaseHeld();
+    this.releaseBinding();
+    if (!this.isConnected || this.routing === 'manual') return;
+    const generation = this.bindingGeneration;
+    let previous: ModuleHandle | undefined;
+    const bind = (target: ModuleHandle | undefined): void => {
+      if (generation !== this.bindingGeneration || !this.isConnected) return;
+      if (target !== previous) this.releaseHeld();
+      previous = target;
+      this.targetRelease?.();
+      this.targetRelease = undefined;
+      const refresh = (): void => {
+        if (generation !== this.bindingGeneration || !this.isConnected) return;
+        const next = target?.capabilities?.get(SCORE_NOTE_INPUT);
+        if (next !== this.noteTarget) this.releaseHeld();
+        if (generation !== this.bindingGeneration || !this.isConnected) return;
+        this.noteTarget = next;
+        this.controller.setTarget(next);
+      };
+      refresh();
+      const release = target?.subscribe?.(refresh);
+      if (generation === this.bindingGeneration && this.isConnected) this.targetRelease = release;
+      else release?.();
+    };
+    let release: (() => void) | undefined;
+    try {
+      if (this.explicitModuleTarget !== undefined) bind(this.explicitModuleTarget ?? undefined);
+      else if (this.hasAttribute('target')) {
+        release = observeModuleTarget(this, this.getAttribute('target') ?? '', bind);
+      } else {
+        release = observeModuleContext(this, context => bind(context?.target));
+      }
+      if (generation === this.bindingGeneration && this.isConnected) this.resolutionRelease = release;
+      else release?.();
+    } catch (error) { this.reportError(error); }
+  }
+
+  private reportError(error: unknown): void {
+    this.dispatchEvent(new CustomEvent('webscore:error', {
+      detail: {operation: 'score-note-input', error}, bubbles: true, composed: true,
+    }));
   }
 
   get layout(): NoteInputLayout {
@@ -280,7 +364,30 @@ export class NoteInputElement extends HTMLElementBase {
   }
 
   private fire(midi: number, on: boolean): void {
-    this.noteQueue.push({detail: {midi, velocity: this.velocity}, on});
+    const revision = this.renderRevision;
+    let detail: NoteInputDetail & {id: string};
+    if (on) {
+      if (this.held.has(midi)) return;
+      const routed = this.controller.connected;
+      detail = {...this.controller.press(midi, this.velocity), routed};
+      // Event consumers may decorate their payload; never expose the record
+      // whose identity determines which borrowed instrument gate we release.
+      this.held.set(midi, {...detail});
+    } else {
+      const held = this.held.get(midi);
+      if (!held) return;
+      this.held.delete(midi);
+      this.controller.release(held.id);
+      detail = {...held, velocity: this.velocity};
+    }
+    this.noteQueue.push({detail, on});
+    // A target's preparation or error observer can synchronously remove this
+    // surface before press() returns its id. Publish that attack/release pair
+    // in order and do not leave a phantom hold behind on reconnect.
+    if (on && (revision !== this.renderRevision || !this.isConnected)) {
+      this.fire(midi, false);
+      return;
+    }
     if (this.dispatching) return;
     this.dispatching = true;
     let failed = false;

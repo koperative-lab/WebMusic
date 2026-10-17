@@ -15,7 +15,7 @@ function score(transpose: number) {
 }
 
 function audio() {
-  const param = () => ({value: 1, setValueAtTime() {}, exponentialRampToValueAtTime() {}, cancelScheduledValues() {}});
+  const param = () => ({value: 1, setValueAtTime() {}, exponentialRampToValueAtTime() {}, linearRampToValueAtTime() {}, cancelScheduledValues() {}});
   const node = () => ({gain: param(), pan: param(), connect(destination: unknown) { return destination; }, disconnect() {}});
   const channel = new Float32Array(100);
   const sample: AudioBuffer = {

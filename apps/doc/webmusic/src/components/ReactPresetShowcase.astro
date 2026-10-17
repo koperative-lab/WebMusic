@@ -27,7 +27,7 @@ const canvasSize =
 <script>
   import React from 'react';
   import { createRoot } from 'react-dom/client';
-  import { arabesqueExcerpt, loadArabesqueScore } from './headless/arabesque-score';
+  import { studyExcerpt, loadStudyScore } from './headless/study-score';
   import {
     AnalysisSummary,
     SimplePianoRoll,
@@ -37,7 +37,7 @@ const canvasSize =
     SimpleWaterfall,
   } from '@webmusic/score/react';
 
-  const demoScore = loadArabesqueScore('mxl').then((score) => arabesqueExcerpt(score, 16));
+  const demoScore = loadStudyScore('mxl').then((score) => studyExcerpt(score, 16));
 
   const renderPreset = async (root: HTMLElement) => {
     if (root.dataset.initialized) return;
@@ -49,7 +49,7 @@ const canvasSize =
     try {
       score = await demoScore;
     } catch {
-      mount.textContent = 'Could not load the Arabesque score.';
+      mount.textContent = 'Could not load the WebMusic Study score.';
       return;
     }
     if (!root.isConnected) return;

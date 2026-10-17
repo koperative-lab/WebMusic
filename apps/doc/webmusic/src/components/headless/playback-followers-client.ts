@@ -1,6 +1,6 @@
 import {type Score, type ScorePlaybackSource} from '@webmusic/score';
 import {followerDemoScore} from './demo-score';
-import {loadArabesqueScore} from './arabesque-score';
+import {loadStudyScore} from './study-score';
 import {renderNoteChips} from './musical-stage';
 import {createAnalysisFollower, type AnalysisFollower} from '@webmusic/score/analyze/headless';
 import {ScorePlayer} from '@webmusic/score/play/headless';
@@ -237,7 +237,7 @@ export function createPlaybackFollowerDemo(kind: Kind, fixture?: Score): Headles
       },
     };
     };
-    return fixture ? start(fixture) : loadArabesqueScore().then(start);
+    return fixture ? start(fixture) : loadStudyScore().then(start);
   };
 }
 

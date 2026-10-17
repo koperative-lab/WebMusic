@@ -5,12 +5,41 @@ work and does not establish npm publication, a release tag or a deployment.
 
 ## Unreleased
 
+- Prepare the shared `0.3.0` modular release for Kernel, UI Kit, Score, Audio
+  and Bridge. Internal package ranges now require `^0.3.0`; published `0.2.0`
+  foundations do not contain the new module, Session and patch-editor entries.
+- Add opt-in nested player/Rack composition, stable effect chains, shared
+  parameter surfaces, occurrence-owned note input, full amplitude envelopes,
+  native modulation and Session-relative automation.
+- Add versioned project save/restore, missing-plugin recovery and an accessible
+  audio/CV patch editor, while applications retain storage and undo ownership.
+- Repair advancing-clock automation, borrowed-group mixer gain, pending LFO
+  target replacement, post-edit parameter notifications, project serialization
+  limits, meter selector lifetimes and editor/demo recovery. See the
+  [0.3.0 migration guide](dev/release/0.3.0.md) for adoption and release gates.
+- Preserve manual automation takeover in saved project notifications, bound
+  completed envelope history, and handle clock advancement and reentrant
+  player/Rack/mixer preparation. Explicit attached LFO starts prepare lazy
+  instruments. CommonJS entries share Audio model and UI presenter identity;
+  older editor completions preserve newer command selections.
+
+- Guard initial automation attachment against reentrant pause/stop/seek and
+  mixer preparation against a nested owner replacing its channel.
+- Replace unresolved public resources with original MIT-licensed study media,
+  with reproducibility and license checks in source and site builds. A scoped
+  Expressive Code PostCSS override removes the vulnerable selector-parser chain.
+
+### Earlier source preparation
+
+The following entries retain earlier source-integration work. They are not a
+registry inventory or a claim that those changes remain unpublished.
+
 - Integrate Audio and the Score–Audio Bridge into the main source tree, with
   documentation and package checks for all five library packages. This source
   merge does not publish the two additional npm packages.
-- Add Audio and Bridge documentation demos. The imported Arabesque and
-  SoundFont assets still require verified redistribution records before site
-  publication.
+- Add Audio and Bridge documentation demos. Their initially imported Arabesque
+  and SoundFont resources were later replaced or removed; the current public
+  asset inventory records the original study and its license.
 - Preserve untimed Element note activity and post-render OSMD cancellation;
   avoid replaying the engraving cursor for every forward playback frame.
 - Coalesce reentrant Timeline, Status and Minimap text refreshes, and release
@@ -64,8 +93,9 @@ work and does not establish npm publication, a release tag or a deployment.
 - Remove the unused local font and static license copies; keep asset provenance
   in source configuration and embed original-resource licenses in downloads.
 - Run quality checks and a documentation build on every branch push and pull
-  request; deploy GitHub Pages from successful official `main` runs, with a
-  manual workflow trigger and deployment permissions limited to the deploy job.
+  request; deploy GitHub Pages only from a successful explicit manual dispatch
+  on official `main` with `deploy_pages` selected. Deployment permissions remain
+  limited to the deploy job.
 
 No published release is asserted by this changelog. Follow the
 [publishing procedure](CONTRIBUTING.md#releasing) to verify release identity and

@@ -26,7 +26,7 @@ current API establishes inter-sample true peak.
   defineAudioLevelAnalyzerElement();
 </script>
 
-<audio-player id="session" src="/mp3/Arabesque%20No.1.mp3" controls></audio-player>
+<audio-player id="session" src="/mp3/webmusic-study-no-1.mp3" controls></audio-player>
 <audio-level-analyzer player="#session" threshold-dbfs="-12"></audio-level-analyzer>
 ```
 
@@ -51,6 +51,20 @@ unavailable. The element stops its own polling and subscriptions on rebind or
 disconnect without stopping the player. `player` must resolve uniquely in
 the current Document or ShadowRoot; invalid or ambiguous selectors remain
 unbound, and later target changes are observed.
+
+## Tap a module output
+
+`input="#desk" port="master"` selects a module's prepared output. The default
+port is `main`; rack/mixer buses also expose `master`. `.inputModule` accepts a
+`ModuleHandle` before the selector; null explicitly unbinds and undefined restores
+selector discovery. This can observe a neutral Score output as well as Audio.
+
+The tool adds a side tap, preserving the audible route. It does not call the
+module's `prepare()` or request a second context merely to display a pending
+surface. Missing explicit targets/ports remain pending without ancestor fallback.
+Removing the analyzer releases only its tap and UI resources. Existing explicit
+`.analyser` and legacy `player` modes retain their documented ownership.
+
 
 <details class="component-section">
 <summary>API</summary>

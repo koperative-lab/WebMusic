@@ -6,6 +6,12 @@ Related decisions: DEC-016 and DEC-045.
 Source and public types: [Play source](../../packages/score/src/play/).
 Owning reference and demos: [Play Elements](../../apps/doc/webmusic/src/content/docs/score/element/index.mdx#play).
 
+DEC-047 adds opt-in [modular composition](MODULAR-COMPOSITION.md): nested
+players, shared effect instances and Session membership. The existing behavior
+below, including legacy Rack seek axes and standalone Synth Panel ports/sections,
+remains the compatibility baseline outside `composition="modules"`. Current
+public signatures belong to the owning references; STATUS records verification.
+
 ## User task and boundary
 
 Play provides transport, mixing, performance input, capture and sound editing.

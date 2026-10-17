@@ -1,0 +1,132 @@
+---
+import LiveDemoCanvas from './LiveDemoCanvas.astro';
+---
+
+<section class="not-content modulation-demo" data-modulation-demo>
+  <LiveDemoCanvas label="One instrument, shared envelope and modulation">
+    <div data-modulation-host></div>
+    <div class="modulation-demo__commands">
+      <button class="wui-btn" type="button" data-modulation-sweep>Sweep cutoff for 2 seconds</button>
+      <button class="wui-btn" type="button" data-modulation-cancel>Hold automation here</button>
+      <button class="wui-btn" type="button" data-modulation-panel-toggle aria-pressed="false">Hide second panel</button>
+    </div>
+    <p class="modulation-demo__readout" data-modulation-values>Instrument controls are ready. Play the phrase or hold a keyboard note.</p>
+  </LiveDemoCanvas>
+  <p data-modulation-feedback role="status">The keyboard plays the same instrument as the phrase. Start the LFO in the panel, then edit Brightness or schedule a cutoff sweep.</p>
+</section>
+
+<script>
+  import {Duration, MeasureId, PartId, Pitch, Rational, ScoreBuilder, VoiceId} from '@webmusic/score';
+  import {Sound} from '@webmusic/score/play/headless';
+  import {defineAllElements, type ScorePlayerElement, type SynthPanelElement} from '@webmusic/score/play/element';
+  import {mountDemos} from './demo-lifecycle';
+
+  defineAllElements();
+
+  mountDemos('[data-modulation-demo]', (root, scope) => {
+    const host = root.querySelector<HTMLElement>('[data-modulation-host]')!;
+    const values = root.querySelector<HTMLElement>('[data-modulation-values]')!;
+    const feedback = root.querySelector<HTMLElement>('[data-modulation-feedback]')!;
+    const report = (error: unknown) => {
+      feedback.textContent = error instanceof Error ? error.message : String(error);
+    };
+    scope.listen(root, 'webscore:error', (event) => {
+      const detail = (event as CustomEvent<{error: unknown}>).detail;
+      report(detail.error);
+    });
+
+    const builder = new ScoreBuilder();
+    const part = builder.addPart({id: PartId('modulation-voice'), name: 'Shared instrument'});
+    builder.addTempo({atQuarters: Rational.ZERO, bpm: 100});
+    builder.addMeasure({id: MeasureId('modulation-bar'), number: 1,
+      onsetQuarters: Rational.ZERO, durationQuarters: new Rational(4),
+      timeSignature: {numerator: 4, denominator: 4}});
+    builder.addNote(part, {id: builder.newNoteId(), voice: VoiceId('voice'),
+      pitch: Pitch.parse('C4'), onsetQuarters: Rational.ZERO, duration: Duration.whole()});
+
+    const sound = Sound.oscillator({type: 'sawtooth', gain: 0.12, cutoff: 1200,
+      attackSeconds: 0.08, decaySeconds: 0.3, sustainLevel: 0.45, releaseSeconds: 0.4});
+    scope.add(() => sound.dispose());
+    const player = document.createElement('score-player') as ScorePlayerElement;
+    player.setAttribute('composition', 'modules');
+    player.setAttribute('controls', 'show');
+    player.setAttribute('time-control', 'full');
+    player.setAttribute('data-modulation-player', '');
+    player.sound = sound;
+    player.score = builder.build();
+    player.innerHTML = `
+      <score-note-input keyboard start="48" end="71" data-modulation-input></score-note-input>
+      <div class="modulation-demo__panels">
+        <div><h3>Instrument and modulation</h3><score-synth-panel sections="sound,envelope,lfo,macros" data-modulation-panel></score-synth-panel></div>
+        <div data-modulation-secondary><h3>The same instrument</h3><score-synth-panel sections="sound,envelope,macros" data-modulation-mirror></score-synth-panel></div>
+      </div>`;
+    const panels = [...player.querySelectorAll<SynthPanelElement>('score-synth-panel')];
+    for (const panel of panels) {
+      panel.lfoParameter = 'cutoff';
+      panel.lfoAmount = 400;
+      panel.lfo = {rate: 2, depth: 0.5, running: false};
+      panel.parameterMacros = [{id: 'brightness', label: 'Brightness', targets: [
+        {parameter: 'cutoff', min: 600, max: 4000},
+        {parameter: 'resonance', min: 0.7, max: 3},
+      ]}];
+    }
+    host.replaceChildren(player);
+    scope.add(() => { player.stop(); player.remove(); });
+
+    const cutoff = sound.params.get('cutoff')!;
+    const paint = () => {
+      const state = cutoff.snapshot;
+      const range = state.modulationRange;
+      values.textContent = `Cutoff base: ${state.baseValue.toFixed(0)} Hz · ${range
+        ? `modulation range: ${range.min.toFixed(0)}–${range.max.toFixed(0)} Hz`
+        : 'no modulation mapping'} · effective audio-rate value: unavailable`;
+    };
+    paint();
+    scope.add(cutoff.subscribe(paint));
+    const readoutTimer = window.setInterval(paint, 250);
+    scope.add(() => window.clearInterval(readoutTimer));
+
+    scope.listen(root.querySelector('[data-modulation-sweep]')!, 'click', async () => {
+      try {
+        await player.module?.prepare?.();
+        if (!scope.active) return;
+        const context = player.module?.getPort?.('output')?.context as AudioContext | undefined;
+        if (!context) throw new Error('The instrument has no prepared audio context.');
+        await context.resume();
+        if (!scope.active) return;
+        const now = context.currentTime;
+        cutoff.scheduleAutomation(context, [
+          {type: 'set', value: 600, time: now},
+          {type: 'linear', value: 4000, time: now + 2},
+        ], now);
+        feedback.textContent = 'Cutoff sweeps from 600 to 4000 Hz over two audio-clock seconds. Hold a note to hear it; LFO adds to the same base.';
+        paint();
+      } catch (error) { report(error); }
+    });
+    scope.listen(root.querySelector('[data-modulation-cancel]')!, 'click', () => {
+      try {
+        cutoff.cancelAutomation();
+        feedback.textContent = 'Automation holds its modeled current base. The LFO mapping remains independent.';
+        paint();
+      } catch (error) { report(error); }
+    });
+    const toggle = root.querySelector<HTMLButtonElement>('[data-modulation-panel-toggle]')!;
+    const secondary = player.querySelector<HTMLElement>('[data-modulation-secondary]')!;
+    scope.listen(toggle, 'click', () => {
+      secondary.hidden = !secondary.hidden;
+      toggle.setAttribute('aria-pressed', String(secondary.hidden));
+      toggle.textContent = secondary.hidden ? 'Show second panel' : 'Hide second panel';
+      feedback.textContent = 'Panel visibility changes presentation. The instrument, envelope, LFO and mappings keep their owners.';
+    });
+  });
+</script>
+
+<style>
+  .modulation-demo__commands { display: flex; flex-wrap: wrap; gap: .5rem; margin-block: 1rem; }
+  .modulation-demo__readout { font: .8rem/1.5 var(--wui-font-mono); overflow-wrap: anywhere; }
+  .modulation-demo :global(score-player), .modulation-demo :global(score-note-input) { display: block; }
+  .modulation-demo :global(score-note-input) { margin-block: 1rem; }
+  .modulation-demo :global(.modulation-demo__panels) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+  .modulation-demo :global(.modulation-demo__panels h3) { margin: 0 0 .5rem; font-size: .9rem; }
+  @media (max-width: 720px) { .modulation-demo :global(.modulation-demo__panels) { grid-template-columns: 1fr; } }
+</style>

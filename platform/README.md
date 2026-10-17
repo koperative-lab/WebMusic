@@ -32,15 +32,17 @@ migration checklist.
 | Kernel entry | Shared capability / origin | Policy retained by domains or callers |
 |---|---|---|
 | `/events` | Typed `EventEmitter`, unified from the hardened Score implementation; Score core re-exports it. | Event names, payloads and the choice of `emit` versus `emitSafely`. |
-| `/element` | `HTMLElementBase`, `WebMusicElement`, `upgradeProperty/Properties`, attribute readers and `defineOnce`, replacing local element helpers. Implementation is `src/elements.ts`; public spelling is `/element`. | Shadow DOM, themes, attributes, presenters, domain state and special teardown order. |
+| `/element` | `HTMLElementBase`, `WebMusicElement`, `upgradeProperty/Properties`, attribute readers, `defineOnce` and scoped ModuleContext/target discovery. Implementation is `src/elements.ts`; public spelling is `/element`. | Shadow DOM presentation, themes, attributes, domain state and special teardown order. Discovery lends capabilities without preparing audio. |
 | `/worker` | `WorkerLike`, `RequestTracker` correlation, and `dedicatedWorkerScope()` detection. | Protocol versions, cancellation, latest-wins, restart and replacement; Score analyze's session model remains distinct. |
 | `/audio-context` | SSR-safe `getAudioContextConstructor` and `createWebAudioContext`. | Liveness, resume, creation versus borrowing, and closure; sharing the helper does not share a context instance. |
 | `/player` | Structural `PlayerLike`, timed/stateful/rate/volume/disposable capability interfaces and guards. | Musical time, backends, loading and domain events; `InteractivePlayer` need not pretend to own a timeline. |
-| `/effect` | `Effect` / `EffectNodes` over `BaseAudioContext`, allowing a recipe to serve live or offline graphs. | Effect catalogs, chain/insert helpers, parameters, replacement, rollback and release. Shared recipes do not imply shared live nodes. |
+| `/effect` | `Effect` / `EffectNodes` over `BaseAudioContext`, plus the modular `InsertChain` and effect-instance lifecycle used by both domains. | Effect catalogs, DSP algorithms, backend-specific switching/tail policies and legacy chain adapters. Sharing a recipe does not share its live instance. |
+| `/module` | Structural module/context/route/parameter contracts; versioned project schema, staged runtime, exact plugin registry and structural editor projection. | Domain models/factories, asset loading, instrument capabilities, parameter-to-DSP adapters, storage and undo. Registration does not grant disposal rights. |
 | `/transport` | `TransportClock` affine anchors and `TimelineMapping`. | Score quarters/nominal seconds, Audio clip seconds/samples, duration clamping and loop policy. |
 | `/tick` | Worker-backed wakeups and main-thread fallback. | Lookahead horizons, note commitments, boundaries and UI refresh cadence; each instance has an owner responsible for stopping it. |
 | `/meter` | `AnalyserMeter`, byte-domain RMS/peak, subtractive peak hold and `aggregateSpectrumBars`, extracted from Score/Audio analyser taps. | Public frames, default scale/decay, spectrum-bar floors and error policy; Audio PCM `calculateLevelMeter` belongs in Audio when migrated. |
 | `/sync` | `TransportGroup` roles, N followers, fixed offsets, rate/drift reconciliation, command serialization, generations and intent; `MirrorClockMaster` for clockless adaptation. | Score/Audio axis conversion, the shared rate's domain limits, model conversion and application session assembly. |
+| `/session` | Source-free SessionTransport, mapped read-only scheduling anchors, invalidation epochs and Session-relative automation/phase. | Domain participant adapters, content/time conversions, audio routing and backend scheduling precision. A Session does not fabricate source data or an audio master output. |
 
 `dedicatedWorkerScope()` serves Score `io`/`analyze` and Audio `play`/`analyze`
 runtimes.
@@ -52,6 +54,16 @@ Meter extraction unifies the algorithm and tap. Score's
 `LevelMeterController` publishes `{level, peak, peakHold}`. The Audio adapter's
 `{rms, peak, peakHold, level}` frame and PCM analysis's multiplicative retention
 remain distinct from an analyser's absolute per-read peak decay.
+
+The modular entries follow
+[DEC-047](../dev/DECISIONS.md#dec-047--modular-composition-separates-resources-routing-and-session-authority)
+and the [composition contract](../dev/design/MODULAR-COMPOSITION.md). Their
+admission is based on the common contract used by Score and Audio, rather than
+moving either domain's models into Kernel. The new InsertChain does not replace
+every legacy effect helper: adapters preserve the existing effect stage, public
+catalog and owned/borrowed cleanup policy. Audio environments close only contexts
+they create; registries and Sessions do not dispose borrowed players. Graph
+readiness, resource ownership and Session membership remain separate.
 
 ## Keeping contracts aligned
 
@@ -83,12 +95,20 @@ than copying queues and drift monitors.
 The accepted rule is one authoritative timeline per session, with independent
 sessions. The current Kernel group reads one structural master as its position
 authority and coordinates participants against one reference clock. The Score
-scheduler and Audio buffer engine each own a private `TransportClock`; Bridge
-factories coordinate both master directions.
+scheduler and Audio buffer engine retain private clocks for independent playback;
+the legacy Bridge sync factories coordinate both master directions.
 
-`TransportClock` has no anchor-change event, epoch or write-ownership protocol.
-Same-instance injection, invalidation/rescheduling of committed audio, and
-sample-accurate loop wrap are specified as technical gaps in
-[shared-clock-injection.md](shared-clock-injection.md). They are implementation
-and acceptance gaps within the accepted direction, not a reason to describe that
-direction as undecided. Progress belongs in [STATUS.md](../dev/STATUS.md).
+Modular composition also has a source-free SessionTransport conductor. It owns
+the Session position axis and coordinates explicitly mapped participants without
+selecting the first source as a hidden master. It does not connect their audio
+outputs. Native participants borrow `SessionSchedulingBinding`: one mapped,
+read-only authority with invalidation epochs and future loop segments. Domain-aware mappings still
+belong in Bridge; sharing neutral audio/control ports does not require them.
+
+`TransportClock` remains pure math; `SessionSchedulingBinding` supplies the
+write-ownership/invalidation protocol around it. Native consumers retract and
+re-arm their own submitted work, while media/external followers keep approximate
+coordination. [The shared-clock design](shared-clock-injection.md) states loop,
+lookahead, latency and tail boundaries. [DEC-048](../dev/DECISIONS.md#dec-048--session-scheduling-is-a-borrowed-anchor-projects-store-declarative-identity)
+also adds versioned project restoration without moving domain factories or app
+storage into Kernel. Evidence belongs in [STATUS.md](../dev/STATUS.md).

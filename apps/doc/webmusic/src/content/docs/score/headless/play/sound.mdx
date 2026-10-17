@@ -86,6 +86,83 @@ pending sends and attempts every sounding release. MIDI 1.0 device behavior
 for overlapping equal pitches is device-dependent; the adapter preserves the
 matching message count but cannot assign a hardware voice id.
 
+## Shared instrument parameters
+
+`HeadlessSynth.params` optionally exposes a borrowed `ParamSurface`. Every `Sound`
+has a stable audio-rate `busGain` handle. Native oscillator, sample-map, SFZ, FM,
+wavetable and noise Sounds expose all four envelope handles before connection.
+`Sound.oscillator()` additionally exposes `gain`,
+`detune`, `cutoff`, `resonance`, `attackSeconds`, `decaySeconds`, `sustainLevel`
+and `releaseSeconds` before audio
+connection. These are the same instrument handles used by its oscillator backend,
+not copied UI values. `setGain()` updates the bus handle and live bus gain,
+including supported positive gain boosts.
+
+The oscillator's gain, detune, cutoff and resonance handles drive current and
+future voices through shared audio-rate control buses. Each voice captures its
+Attack, Decay, Sustain and Release settings at onset. Editing the envelope affects
+subsequent attacks and never replaces an active voice's envelope.
+The parameter handles retain the Sound's reusable configuration across backend
+reconnection. `Sound.dispose()` releases its audio resources while retaining
+those reusable configuration handles.
+
+`OscillatorSynth(context, options?, sharedParams?)` can borrow a surface with all
+eight instrument keys above. Missing keys reject; a borrowed surface is not disposed
+with that backend. The default self-created backend surface is owned and disposed
+with it. An attached [panel](/score/element/play/score-synth-panel/#attach-to-an-existing-module)
+uses the same sound and ADSR handles.
+
+### Per-note ADSR and held notes
+
+Native oscillator, sample-map, SFZ, FM, wavetable and noise voices use a linear
+Attack → Decay → Sustain → Release envelope. `decaySeconds` defaults to `0` and
+`sustainLevel` to `1`, preserving the previous attack/release shape by default.
+Attack, decay and release use seconds; sustain is a level ratio from `0` to `1`.
+Zero-length stages transition immediately. A release during attack or decay starts
+from that voice's actual envelope level, then reaches exact zero after release.
+
+Pass `Infinity` as the duration for a held native voice, keep the returned handle,
+and release with `noteOffById(handle, time)`. Two attacks at the same pitch have
+independent handles. Pitch-only `noteOff(midi, time)` remains the compatibility
+operation for every matching voice. Sample playback still ends when its source
+buffer ends; a held gate does not make a one-shot sample loop. External instruments
+and MIDI devices retain their own envelope and voice capabilities.
+
+## Shared parameter controllers
+
+`ParamLfoController` and `ParameterMacroController` adapt Kernel's native control
+primitives to the shared parameter surface used by attached synth panels. Their
+state belongs to the parameter/module lifetime; mounting another panel borrows
+that state rather than constructing another audible modulation path.
+
+| Export / member | Contract |
+| --- | --- |
+| `new ParamLfoController(target, context, config?)` | Own a controller over one borrowed audio-rate `ParamHandle` and `BaseAudioContext`. Construction is silent until running is explicitly requested. |
+| `getParamLfoController(target, context)` | Obtain the shared controller for that handle/context. Views borrow this instance and never dispose it. |
+| `target` / `context` / `isDisposed` | Borrowed endpoints and controller lifetime. |
+| `configure(config)` / `setRunning(running)` | `ParamLfoConfig`: `shape` (`sine`, `triangle`, `square`, `saw`), `rate` 0.05…12 Hz, `depth` 0…1, nonnegative `amount` in native parameter units, and `running`. |
+| `snapshot()` | `ParamLfoState`: shape/rate/depth/amount/running, estimated audio-clock `phase`, and `rateCapability: 'audio-rate'`. Defaults are sine, 1 Hz, depth 0.6, amount `1` native unit, stopped. Amount is independent of the target's legal/display range. |
+| `subscribe(notify)` | Observe later configuration changes; phase sampling is the display's choice and does not drive DSP. |
+| `dispose()` | Release owned LFO/mapping/subscriptions, retaining the target. Target disposal also disposes this controller; releasing its audio bus stops the current run. |
+| `new ParameterMacroController(surface, config)` | Own a macro over a borrowed `ParamSurface`. `ParameterMacroConfig` has `id`, optional `label`/`value`, and `ParameterMacroTarget[]` entries `{parameter, min, max}`. |
+| `getParameterMacroController(surface, config)` | Borrow the shared controller for the surface/id. The first definition wins; a conflicting label or mapping rejects. |
+| `id` / `matches(config)` | Stable id and whether another definition describes the same label/mapping. |
+| `snapshot()` | `ParameterMacroState`: id, label, normalized value, disabled state and each target's actual base value/label/unit. |
+| `setValue(value)` | Require 0…1, map into target native-unit endpoints and write their shared bases. |
+| `subscribe(notify)` / `dispose()` | Observe later updates; dispose owned subscriptions without disposing any target. Target disposal invalidates the controller. |
+
+An explicit macro initial `value` applies once when its shared controller is first
+created. Omitting it starts the thumb at zero without changing target values.
+Later panels do not reapply an initial value. Direct target edits refresh target
+readouts without inventing a reverse-mapped macro position.
+
+The native LFO's excursion is `depth * amount`, added to the target base. A running
+controller uses the audio thread, without animation-frame writes. Stopping it
+releases the mapping; a subsequent start begins a new native oscillator. Phase
+restoration, transport synchronization and seek-aware automation are separate
+contracts. See [Kernel modulation](/kernel/api/#native-control-signals-and-automation)
+for units, scheduled base automation, declared rate and unavailable effective readback.
+
 <details class="component-section">
 <summary>API</summary>
 
@@ -112,14 +189,15 @@ The constructor is private. All eleven factories return `Sound`.
 | Type / member | Default | Description |
 | --- | --- | --- |
 | `SoundOptions.gain` | `1` | Initial linear bus gain, independent of a backend's gain option. |
-| `FmOptions` | `ratio: 2`, `index: 200`, both oscillator types `'sine'`, attack `0.005`, release `0.12` | `ratio` is modulator/carrier frequency ratio; `index` is frequency deviation in Hz. `carrierType`, `modulatorType`, `attackSeconds`, `releaseSeconds`, and inherited `gain` complete the options. |
-| `WavetableOptions` | `real: [0, 1, 0.5, 0.25, 0.12]`, zero-filled `imag`, attack `0.008`, release `0.1` | `real`/`imag` are cosine/sine partial arrays; also accepts `attackSeconds`, `releaseSeconds`, and `gain`. |
-| `NoiseOptions` | `pitched: true`, `Q: 8`, attack `0.001`, release `0.12` | Filter selection/resonance, `attackSeconds`, `releaseSeconds`, and `gain`. |
+| `FmOptions` | `ratio: 2`, `index: 200`, both oscillator types `'sine'`, attack `0.005`, decay `0`, sustain `1`, release `0.12` | `ratio` is modulator/carrier frequency ratio; `index` is frequency deviation in Hz. `carrierType`, `modulatorType`, `attackSeconds`, `decaySeconds`, `sustainLevel`, `releaseSeconds`, and inherited `gain` complete the options. |
+| `WavetableOptions` | `real: [0, 1, 0.5, 0.25, 0.12]`, zero-filled `imag`, attack `0.008`, decay `0`, sustain `1`, release `0.1` | `real`/`imag` are cosine/sine partial arrays; also accepts `attackSeconds`, `decaySeconds`, `sustainLevel`, `releaseSeconds`, and `gain`. |
+| `NoiseOptions` | `pitched: true`, `Q: 8`, attack `0.001`, decay `0`, sustain `1`, release `0.12` | Filter selection/resonance, `attackSeconds`, `decaySeconds`, `sustainLevel`, `releaseSeconds`, and `gain`. |
 | `Soundfont2Options` | `channel: 0`, `program: 0`, `gain: 1` | MIDI channel 0–15 and program 0–127; optional `workletUrl: string \| URL` or `registerWorklet(context)` callback, and `maxSoundFontBytes` (128 MiB). |
 | `MidiOutOptions` | `channel: 0`, first available output | `output?: MidiOutputLike`; otherwise requests Web MIDI access. Channel is masked to four bits. Inherited bus `gain` does not scale MIDI messages. |
 | `MidiOutputLike` | — | Structural `send(data: number[] \| Uint8Array, timestamp?)` output; the wrapper never closes it. |
 | `ToneInstrumentLike` | — | Optional `triggerAttack`, `triggerRelease`, `connect`, `disconnect`, and `dispose` methods. Attack receives a note name and normalized 0–1 velocity. |
 | `SfzOptions.attackSeconds` / `releaseSeconds` / `gain` | `0.004` / `0.12` / `1` | Sample envelope and Sound bus gain. |
+| `SfzOptions.decaySeconds` / `sustainLevel` | `0` / `1` | Decay duration in seconds and sustained level ratio. |
 | `SfzOptions.maxSfzBytes` | `1_000_000` bytes | Definition response limit. |
 | `SfzOptions.maxZones` / `maxConcurrentLoads` | `512` / `4` | Maximum regions and concurrent sample fetch/decode jobs. |
 | `SfzOptions.maxSampleBytes` / `maxTotalSampleBytes` | 32 / 128 MiB | Per-sample and total unique source-byte limits. |
@@ -139,7 +217,7 @@ selection helpers are documented with `RangeSampler`.
 | `preload(): Promise<void>` | command | Waits for connected setup/backend loading; retries after a previous load failure. |
 | `ready: Promise<void>` | state | Current loading result; rejects when unconnected or when the last setup failed. |
 | `setGain(value): this` | command | Sets the bus gain immediately, clamping negative values to zero; no upper clamp. |
-| `noteOn(midi, velocity, time, durationSeconds)` | command | Forwards the attack; exposes its handle only if the backend supports exact-handle release. Before connection it returns `undefined`. |
+| `noteOn(midi, velocity, time, durationSeconds)` | command | Forwards the attack; exposes its handle only if the backend supports exact-handle release. Native voices accept `Infinity` for a held gate. Before connection it returns `undefined`. |
 | `noteOff(midi, time)` | command | Forwards pitch release when available. |
 | `noteOffById(handle, time)` | command | Forwards exact-voice release when available. |
 | `supportsScheduledCancellation` | state | True only when the connected backend opts in and supplies cancellation and exact release. False before connection. |
@@ -193,10 +271,12 @@ against the context clock; MIDI/timer adapters need different dispatch behavior.
 
 #### Synth backends LfoController
 
-`LfoController` owns a repeating control-rate callback, not an AudioNode
+The compatibility `LfoController` owns a repeating control-rate callback, not an AudioNode
 oscillator. It can drive any borrowed `LfoTarget` through `apply(value)`.
 Modulation is centered between the target's `min` and `max`, with amplitude
 scaled by depth; the compatibility `value` field does not set the center.
+Use the [Kernel parameter modulation runtime](/kernel/api/#shared-parameters)
+for native audio-rate control of shared parameters and polyphonic voices.
 
 ```ts
 import {createLfoController} from '@webmusic/score/play/headless';
@@ -283,7 +363,10 @@ const dispose = () => {
 | `disconnect?()` | Optional backend-wide route disconnection. |
 | `noteOff?(midi, time)` | Optional pitch-based release. |
 | `noteOffById?(handle, time)` | Optional exact-voice release, needed when overlapping equal pitches must remain independent. |
+| `supportsNoteOccurrences?` | Explicit exact-held-voice guarantee used by automatic note input; native backends advertise it, while a sample backend also requires an exact-release fallback. `Sound.layer` requires every child to support it. |
 | `supportsScheduledCancellation?` | Explicit opt-in to player lookahead. True requires a unique, non-null attack handle, exact release, and cancellation that can silence an attack before it sounds. |
+| `supportsScheduledDuration?` | Explicit guarantee that `durationSeconds` schedules the logical gate end against audio time; Session scheduling can then preserve native release deadlines across late visual callbacks. Release tails remain backend-owned. |
+| `supportsScheduledRetiming?` | Explicit guarantee that `retimeScheduledNote` can shorten or lengthen an active finite gate without another attack. Shared Session rate edits preserve an active voice only with this flag and scheduled-duration support; other backends cancel/retrigger at the new anchor. |
 | `cancelScheduledNote?(handle, time)` | Retracts a scheduled voice; stronger than allowing it to play a release tail after a future onset. |
 | `retimeScheduledNote?(handle, time)` | Moves an active voice's logical note-off; the backend accounts for its release tail. |
 | `preload?(notes?)` | Optional `PreloadableHeadlessSynth` readiness. Native/offline playback supplies sounding-pitch notes with original ids and other data; direct callers supply the pitches they intend to play. |
@@ -299,14 +382,16 @@ See each concrete backend for the subset implemented.
 | `new OscillatorSynth(context, options?)` / `createOscillatorSynth(context, options?)` | — | Borrow a context; create a polyphonic oscillator output bus. |
 | `OscillatorSynthOptions.type` | `'triangle'` | Web Audio oscillator type. |
 | `attackSeconds` / `releaseSeconds` | `0.012` / `0.08` | Per-voice envelope timing. |
+| `decaySeconds` / `sustainLevel` | `0` / `1` | Per-voice decay duration in seconds and sustain ratio from `0` to `1`. |
 | `gain` / `detune` | `0.16` / `0` | Voice gain and cents of detuning. |
-| `cutoff` / `resonance` | `20000` / `0.7` | Low-pass cutoff in Hz and Q. |
-| `setParam(key, value)` | — | Oscillator-only option update; changes subsequent attacks. |
+| `cutoff` / `resonance` | `20000` / `0.7` | Low-pass cutoff in Hz and the native low-pass `Q` parameter in dB. This is not a dimensionless resonance ratio. |
+| `setParam(key, value)` | — | Oscillator option update. Gain/detune/cutoff/resonance update the shared current/future voice bus; type and ADSR are captured by subsequent attacks. |
 | `new SoundfontSynth(context, options?)` / `createSoundfontSynth(context, options?)` | — | Exact-MIDI samples with a fallback instrument. This is a sample map, not an SF2 loader. |
 | `SoundfontSynthOptions.samples` | No map | `Record<number \| string, SoundfontSample>`. A sample is a URL string, `ArrayBuffer`, or `AudioBuffer`. |
 | `resolveSample(midi)` | Absent | Returns a `SoundfontSample` or `undefined`; takes precedence over the map. |
 | `fallback` | New `OscillatorSynth` | Used when a pitch has no loaded sample. Its route is connected to the sample bus; the sample synth calls its `dispose()` during teardown. Do not supply a shared fallback unless that ownership is intended. |
 | `gain` / `attackSeconds` / `releaseSeconds` | `1` / `0.004` / `0.08` | Sample envelope settings. |
+| `SoundfontSynthOptions.decaySeconds` / `sustainLevel` | `0` / `1` | Sample decay duration and sustain ratio. |
 | `maxConcurrentLoads` | `4` | Concurrent fetch/decode jobs. |
 | `maxSampleBytes` / `maxTotalSampleBytes` | 32 / 128 MiB | Per-sample and aggregate source-byte limits. |
 | `maxDecodedSampleBytes` / `maxTotalDecodedSampleBytes` | 64 / 256 MiB | Per-sample and retained PCM limits. |

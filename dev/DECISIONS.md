@@ -1599,6 +1599,161 @@ five-package manifests, public exports and Agent Toolkit source-snapshot
 claims. Verify CI and deployment on the exact target commit separately; none
 of these checks establishes npm publication or live device/audio behavior.
 
+## DEC-047 — Modular composition separates resources, routing and Session authority
+
+**Date / status:** 2026-10-14; accepted contract baseline for the maintainer's
+modular redesign. The 2026-10-15 first-delivery implementation adds opt-in
+runtime APIs; existing default composition remains unchanged. Current
+verification is recorded in [STATUS](STATUS.md).
+
+**Problem:** nested players, Rack controls, synth panels and analysis need to
+reuse existing engines, effects and parameters. DOM containment and shared
+configuration alone cannot determine resource ownership, audio routing or
+transport authority, and can create duplicate processing or scheduling.
+
+**Decision:** use capability-based Headless modules with stable identity,
+typed ports, parameter handles and precise connection/registration leases.
+Keep DOM layout, resource ownership, signal connections and Session membership
+independent. Borrowed source data, player resources and scheduling authority
+are separate capabilities. Source role and Session ownership are separate
+configuration dimensions.
+
+Headless callers pass a ModuleContext; Elements discover borrowed capabilities
+through one scoped request protocol without hard-coded provider tags. A Rack
+provides channels, a real summing/master bus and default route slots. Explicit
+patches replace only named defaults; taps and sends are independent. Failed
+replacement preserves the working graph, and a lost explicit target never
+silently restores speaker output or borrows another target.
+
+In the new opt-in mode, the outermost player supplies Session authority and
+nested players participate unless explicitly independent. A source-free root
+uses a Headless SessionTransport; it fabricates neither a Score nor an audio
+output and does not select its first child as master. Each engine registers once.
+Rack mixes and passes through Session authority. A Session provider is not an
+implicit audio master; common processing uses an explicit Rack/bus.
+
+Effect definitions and live EffectInstances remain distinct. A shared InsertChain
+contract preserves same-context boundary ports, candidate rollback and the
+existing `.effect` stage through a compatibility slot. Attached panels edit the
+same parameter/effect instances and own no target DSP; standalone insert hosts
+retain ownership of their Headless runtime and existing port/section semantics.
+ParamSurface enumerates parameter handles; ParamMapping defines controller
+scaling and modulation, rather than conflating those ranges with parameter limits.
+
+**Alternatives considered:** infer all relationships from DOM tags; rebuild
+players when effects change; copy effect recipes into each panel; make every
+Rack a transport; or introduce a generic framework and move all DSP into Kernel
+before reconciling domain lifecycle contracts. These choices couple independent
+resources or hide duplicate state and unsupported behavior.
+
+**Consequences:** the contract adds an opt-in composition path. Existing Score
+Play roles (DEC-016), legacy Rack seek axes, and AudioPlayer's single-backend
+facade without an additional clock (DEC-029) remain intact outside that path.
+Session commands extend DEC-018's axis, revision and cancellation guarantees;
+same-instance clock consumption remains governed by the existing clock design.
+One member leaving cancels only its own scheduled work.
+
+Score and Audio remain independent packages. Neutral audio/control capabilities
+can interoperate structurally; Bridge owns composition requiring both domain
+models or time mappings. UI keeps structural bindings without importing Kernel
+or domain types. Shared effect mechanisms are extracted only after lifecycle
+behavior is reconciled. The first delivery adds Kernel `/module` and `/session`,
+with shared InsertChain in `/effect`, and domain Play adapters. It introduces
+no mandatory DSP package, retired tags or wholesale effect-catalog migration.
+
+**Owner:** [Modular composition](design/MODULAR-COMPOSITION.md),
+[Architecture](ARCHITECTURE.md), the two Play contracts and [Status](STATUS.md).
+The modular contract owns invariants and target examples; concrete signatures
+and public entries are reviewed with their implementing steps.
+
+**Verification implications:** the contract's MC-01 through MC-19 scenarios
+cover capability discovery, resource leases, exact routes, effect sharing,
+Session registration, compatibility and later sound/precision work. Add focused
+tests with each implementation and perform combined browser/audio acceptance for
+the first delivery. Step one established the documented baseline; the runtime
+steps require independent focused and combined evidence. Neither a static
+check nor an implementation decision establishes audible timing precision.
+
+## DEC-048 — Session scheduling is a borrowed anchor; projects store declarative identity
+
+**Date / status:** 2026-10-15; accepted for the maintainer's third modular
+delivery (steps 11–12). Current verification belongs in [STATUS](STATUS.md).
+
+**Problem:** a shared start command alone cannot invalidate notes, source starts
+or automation already submitted to the audio system. Saving live objects cannot
+restore their ownership, and a visual connection editor must not introduce a
+second graph or transport authority.
+
+**Decision:** keep one Session command writer and lend schedulers an immutable
+`SessionSchedulingBinding`. Its authority identity, local named axis, epoch and
+reference-time anchor are distinct from presentation revisions. Invalidate old
+scheduled work before publishing the new anchor. Map Session seconds to local
+seconds explicitly, with finite offset and positive scale. The continuous clock
+and loop-folded scheduling segments are separate reads. Native schedulers can
+submit work on both sides of a loop before its boundary; legacy followers retain
+their explicit coordinated fallback.
+
+Session-bound automation and cyclic modulation derive time from this binding,
+with declared pause, seek and loop semantics. This does not upgrade a media
+element, external instrument or callback-only parameter to native audio-rate
+precision. Release tails and graph switching retain explicit backend limits;
+successful scheduling does not establish acoustic synchronization at a device.
+
+Effect switching is explicit: ordinary InsertChain keeps instance reuse and
+immediate retirement, while `TransitionInsertChain` creates fresh owned
+generations with native linear crossfade and an optional finite tail budget.
+External ports remain stable; parameter/CV/automation identity stays with its
+generation. Retiring graphs are bounded and clean up on the audio clock. This
+policy does not silently change every existing component effect setter.
+
+Kernel owns a versioned, bounded JSON `ModuleProject` contract and its realized
+`ModuleProjectRuntime`. The document records stable module/context/port IDs,
+exact plugin versions, asset references, base parameters, connections, modulation,
+macros, automation and Session state. Layout is separate from routing. A
+factory registry resolves code already supplied by the application; project data
+never loads executable code. The application resolves assets and owns storage,
+file import/export, history and undo.
+
+Restore validates data and stages a fresh graph behind its own output boundary.
+The staged graph owns its Session, modules and leases while borrowing the audio
+environment. Failed or superseded work releases only its candidates. Missing
+plugins and unsupported endpoints remain inspectable unresolved records; their
+specifications survive export and explicit retry. A restored Session is paused
+unless the caller explicitly requests playback. Commit and retirement are
+logical graph operations, not a hardware-atomic or crossfaded audio transaction.
+
+UI Kit exposes a structural patch-editor binding. The presenter displays
+authoritative state and submits connect, disconnect and layout commands; it owns
+only DOM and subscriptions. Native select controls and named port buttons offer
+keyboard equivalents, layout movement keeps stable IDs, and unresolved routes
+remain visible with text diagnostics.
+
+**Alternatives considered:** lend every engine a writable clock; let watcher
+ticks define native loop boundaries; serialize AudioNodes or component trees;
+execute plugin URLs from a saved document; or let the editor own a parallel
+graph. Each obscures cancellation, resource ownership or recoverable identity.
+
+**Consequences:** DEC-047's separation of context, audio and transport remains.
+Kernel is domain-neutral; Bridge supplies factories that know Score and Audio,
+and UI imports neither. Existing standalone clocks, absolute audio-clock
+automation and legacy group APIs retain their contracts. Projects do not include
+sample payloads, device state, current voices or undo stacks. Renaming and layout
+changes need not recreate DSP; topology restoration may replace owned engines
+and cut their tails. Unsupported schema/plugin versions require explicit
+migration or registration rather than guessed compatibility.
+
+**Owner:** [Shared-clock design](../platform/shared-clock-injection.md),
+[Modular composition](design/MODULAR-COMPOSITION.md), the Kernel/Bridge/UI public
+references and [Status](STATUS.md).
+
+**Verification implications:** exercise cancellation before re-arming,
+non-unit rate/offset mapping, loop-crossing work and independent authorities.
+Verify rendered/submitted timing separately from UI notifications. Round-trip
+projects with renamed/reordered modules, missing plugins, failed asset loads,
+late restores and borrowed contexts. Test keyboard wiring, focus, diagnostics,
+narrow layouts and restoration through the public runnable example. Static
+checks alone establish neither sound precision nor device behavior.
+
 ## Recording the next decision
 
 Add an identifier, date, status, problem, chosen contract, considered alternatives, consequences, owning document, and verification implications. A proposed choice does not change a public API. If a choice supersedes this register, retain its old identifier and point to the replacement; do not rewrite historical evidence as though the new choice always existed.

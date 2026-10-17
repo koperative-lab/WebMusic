@@ -10,8 +10,8 @@ import type {PitchView, ScoreMapView} from '@webmusic/score/view/headless';
 import type {HeadlessDemoInstance} from '../src/lib/headless-playground-client';
 import {createPlaybackFollowerDemo} from '../src/components/headless/playback-followers-client';
 
-const file = resolve(dirname(fileURLToPath(import.meta.url)), '../public/midi/Arabesque No.1.mid');
-const source = (await loadScore(readFileSync(file), {format: 'midi'})).withMetadata({title: 'Arabesque No. 1'});
+const file = resolve(dirname(fileURLToPath(import.meta.url)), '../public/midi/webmusic-study-no-1.mid');
+const source = (await loadScore(readFileSync(file), {format: 'midi'})).withMetadata({title: 'WebMusic Study No. 1'});
 const demos: HeadlessDemoInstance[] = [];
 afterEach(() => {
   for (const demo of demos.splice(0)) demo.dispose();
@@ -37,7 +37,7 @@ describe('real Analyze/View Headless demonstrations', () => {
   it('hydrates analysis from its real player, adapts score selection and reports read-only seek failure', async () => {
     const {demo, stage, invoke} = setup('analysis-follower');
     const follower = demo.object as unknown as AnalysisFollower;
-    expect(follower.state.score?.metadata.title).toBe('Arabesque No. 1');
+    expect(follower.state.score?.metadata.title).toBe('WebMusic Study No. 1');
     expect(follower.state.result?.chords.length).toBeGreaterThan(0);
     stage.querySelector<HTMLButtonElement>('[data-follow-owner-seek]')!.click();
     await flush();

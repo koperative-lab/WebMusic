@@ -33,6 +33,7 @@ const state = vi.hoisted(() => ({
     setRate: vi.fn(),
     setVolume: vi.fn(),
     setPan: vi.fn(),
+    setEffect: vi.fn(),
     setLoop: vi.fn(),
     clearLoop: vi.fn(),
   },
@@ -149,6 +150,8 @@ function mount(
   const attributes = {...options.attributes};
   connectable.isConnected = false;
   element.getAttribute = (name: string) => attributes[name] ?? null;
+  element.hasAttribute = (name: string) => name in attributes;
+  element.getRootNode = () => element;
   element.setAttribute = (name: string, value: string) => {
     attributes[name] = value;
     if (element.isConnected) element.attributeChangedCallback(name);
@@ -399,7 +402,7 @@ describe('<score-player> transport events', () => {
     element.disconnectedCallback();
   });
 
-  it('passes an assigned effect chain to the mounted ScorePlayer', async () => {
+  it('replaces the mounted ScorePlayer effect without remounting its transport', async () => {
     const effect = Effect.chain(Effect.reverb({wet: 0.3}), Effect.gain(0.8));
     const {element} = mount({id: 'effect-chain'} as unknown as Score);
     await flush();
@@ -408,7 +411,9 @@ describe('<score-player> transport events', () => {
     await flush();
 
     expect(element).toBeInstanceOf(ScorePlayerElement);
-    expect(state.options.at(-1)?.effect).toBe(effect);
+    expect(state.player.setEffect).toHaveBeenCalledWith(effect);
+    expect(state.options).toHaveLength(1);
+    expect(state.destroy).not.toHaveBeenCalled();
     element.disconnectedCallback();
   });
 

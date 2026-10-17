@@ -10,6 +10,11 @@ import {
   type RackShareDetail,
 } from "./internal/rack-part";
 import {boolAttr, WebMusicElement, upgradeProperties} from "./internal/base";
+import {isModularComposition, observeModuleContext, provideModuleContext, notifyModuleContext, notifyModuleChange} from '@webmusic/kernel/element';
+import {ModuleAudioEnvironment, ModuleContext, type ModuleHandle} from '@webmusic/kernel/module';
+import {ScoreRackModule} from '../headless/score-rack-module';
+import {ScorePlayerModule} from '../headless/score-module';
+import {sameModuleScope} from './internal/module-scope';
 
 const STYLE = `
 :host { display:block; box-sizing:border-box; inline-size:100%; min-inline-size:0; max-inline-size:100%; }
@@ -80,8 +85,29 @@ export class RackControlElement extends WebMusicElement {
    * the same.
    */
   private readonly declared = new Map<RackPartElementLike, RackPartDeclaration>();
+  private modular = false;
+  private moduleRack?: ScoreRackModule;
+  private modularContext?: ModuleContext;
+  private modularUpstream?: ModuleContext;
+  private fallbackAudio?: ModuleAudioEnvironment;
+  private unsubscribeModule?: () => void;
+  private readonly moduleParts = new Map<RackPartElementLike, {declaration: RackPartDeclaration; module: ScorePlayerModule}>();
+
+  get module(): ModuleHandle | undefined { return this.moduleRack; }
+
+  /** Borrow the real engine module represented by a direct child declaration. */
+  rackPartModule(part: RackPartElementLike): ModuleHandle | undefined {
+    return this.moduleParts.get(part)?.module;
+  }
+
+  override disconnectedCallback(): void {
+    if (!this.modular) { super.disconnectedCallback(); return; }
+    queueMicrotask(() => { if (!this.isConnected) super.disconnectedCallback(); });
+  }
 
   protected override onMount(): void {
+    this.modular = isModularComposition(this);
+    if (this.modular) { this.mountModular(); return; }
     this.own(() => { this.handle?.destroy(); this.handle = undefined; });
     this.own(() => { this.unsubscribeMembers?.(); this.unsubscribeMembers = undefined; });
     this.own(() => { this.observer?.disconnect(); this.observer = undefined; });
@@ -141,6 +167,12 @@ export class RackControlElement extends WebMusicElement {
    * property deliberately updates that rack's master effect in place.
    */
   set effect(effect: Effect | undefined) {
+    if (this.moduleRack) {
+      this.moduleRack.setEffect(effect);
+      this.effectAssigned = true;
+      this.assignedEffect = effect;
+      return;
+    }
     const rack = this.rack;
     if (rack) {
       try { rack.setEffect(effect); }
@@ -157,6 +189,7 @@ export class RackControlElement extends WebMusicElement {
   }
 
   get effect(): Effect | undefined {
+    if (this.moduleRack) return this.moduleRack.effect;
     const rack = this.rack;
     return rack ? rack.effect : this.assignedEffect;
   }
@@ -218,6 +251,7 @@ export class RackControlElement extends WebMusicElement {
    * sound actually changed.
    */
   private reconcile(): void {
+    if (this.modular) { this.reconcileModuleParts(); return; }
     const declarations: Array<{part: RackPartElementLike; declaration: RackPartDeclaration}> = [];
     for (const part of Array.from(this.children).filter(isRackPart)) {
       try {
@@ -312,6 +346,11 @@ export class RackControlElement extends WebMusicElement {
     const written = new Map<string, number>();
     for (const child of Array.from(this.children)) {
       if (!isRackPart(child)) continue;
+      if (this.modular) {
+        const record = this.moduleParts.get(child);
+        if (record) written.set(record.module.id, written.size);
+        continue;
+      }
       const declaration = child.rackPartDeclaration();
       if (declaration) written.set(declaration.id, written.size);
     }
@@ -328,13 +367,14 @@ export class RackControlElement extends WebMusicElement {
       // Rendered FROM the rack, not from a copy: a member's level is readable
       // now, so nothing here can drift from the gain node it controls.
       snapshot: () => {
-        const rack = this.rack;
-        const members = this.inWrittenOrder(rack?.list() ?? []);
+        const rack = this.moduleRack ?? this.rack;
+        const members = this.inWrittenOrder<{id: string; volume: number; muted: boolean; solo: boolean}>(rack?.list() ?? []);
+        const labels = new Map([...this.moduleParts.values()].map(({declaration, module}) => [module.id, declaration.id]));
         return {
           master: rack?.masterVolume ?? 1,
           channels: members.map((member) => ({
             id: member.id,
-            label: member.id,
+            label: labels.get(member.id) ?? member.id,
             value: member.volume,
             muted: member.muted,
             solo: member.solo,
@@ -342,9 +382,9 @@ export class RackControlElement extends WebMusicElement {
           disabled: !rack,
         };
       },
-      setMaster: (value) => { this.rack?.setMasterVolume(value); },
-      setChannel: (id, value) => { this.rack?.setVolume(id, value); },
-      ...(boolAttr(this, "mute", true) ? {setMuted: (id: string, muted: boolean) => { this.rack?.mute(id, muted); }} : {}),
+      setMaster: (value) => { (this.moduleRack ?? this.rack)?.setMasterVolume(value); },
+      setChannel: (id, value) => { (this.moduleRack ?? this.rack)?.setVolume(id, value); },
+      ...(boolAttr(this, "mute", true) ? {setMuted: (id: string, muted: boolean) => { (this.moduleRack ?? this.rack)?.mute(id, muted); }} : {}),
       // Mute and solo appear only when the binding can act on them, so the
       // attributes that show them are spelled as the commands being present.
       // The presenter's solo is EXCLUSIVE and clears with `null`, while the
@@ -353,7 +393,7 @@ export class RackControlElement extends WebMusicElement {
       ...(boolAttr(this, "solo", true)
         ? {
             setSolo: (id: string | null) => {
-              const rack = this.rack;
+              const rack = this.moduleRack ?? this.rack;
               if (!rack) return;
               for (const member of rack.list()) rack.solo(member.id, member.id === id);
             },
@@ -405,6 +445,98 @@ export class RackControlElement extends WebMusicElement {
   private appendStyle(root: ShadowRoot): void {
     if (!this.compatibilityStyle) { this.compatibilityStyle = root.ownerDocument.createElement("style"); this.compatibilityStyle.textContent = STYLE; }
     root.append(this.compatibilityStyle);
+  }
+
+  private mountModular(): void {
+    this.own(() => this.releaseModuleRack());
+    this.own(() => { this.handle?.destroy(); this.handle = undefined; });
+    upgradeProperties(this, ['effect']);
+    if (!this.root) this.root = this.attachShadow({mode: 'open'});
+    this.own(provideModuleContext(this, () => this.modularContext));
+    this.own(observeModuleContext(this, (upstream, state) => {
+      if (!upstream && state === 'missing' && this.fallbackAudio && this.modularUpstream) return;
+      if (sameModuleScope(upstream, this.modularUpstream)) { this.modularUpstream = upstream; return; }
+      this.releaseModuleRack();
+      if (!upstream && state === 'missing') {
+        this.fallbackAudio = new ModuleAudioEnvironment();
+        upstream = new ModuleContext({id: 'score-rack-root', audio: this.fallbackAudio});
+      }
+      this.modularUpstream = upstream;
+      if (upstream) {
+        this.moduleRack = new ScoreRackModule(upstream, {effect: this.assignedEffect, onError: (error) => this.reportError(error)});
+        this.modularContext = this.moduleRack.context;
+        this.unsubscribeModule = this.moduleRack.subscribe(() => {
+          this.notifyMembers?.();
+          notifyModuleChange(this);
+        });
+        this.reconcileModuleParts();
+      }
+      notifyModuleContext(this);
+      notifyModuleChange(this);
+      this.notifyMembers?.();
+    }));
+    this.addEventListener(RACK_PART_EVENT, this.onPartChanged);
+    this.own(() => this.removeEventListener(RACK_PART_EVENT, this.onPartChanged));
+    if (typeof MutationObserver !== 'undefined') {
+      const observer = new MutationObserver(() => this.reconcileModuleParts());
+      observer.observe(this, {childList: true});
+      this.own(() => observer.disconnect());
+    }
+    this.mountUI();
+    this.reconcileModuleParts();
+  }
+
+  private reconcileModuleParts(): void {
+    const context = this.modularContext;
+    if (!context) return;
+    const parts = Array.from(this.children).filter(isRackPart);
+    for (const [part, record] of [...this.moduleParts]) {
+      if (parts.includes(part)) continue;
+      this.moduleParts.delete(part);
+      record.module.dispose();
+      notifyModuleChange(part);
+    }
+    for (const part of parts) {
+      try {
+        const declaration = part.rackPartDeclaration();
+        const previous = this.moduleParts.get(part);
+        if (!declaration) {
+          previous?.module.dispose();
+          this.moduleParts.delete(part);
+          notifyModuleChange(part);
+          continue;
+        }
+        if (previous?.declaration.score === declaration.score && previous.declaration.sound === declaration.sound) {
+          previous.declaration = declaration;
+          continue;
+        }
+        previous?.module.dispose();
+        this.moduleParts.delete(part);
+        const module = new ScorePlayerModule(declaration.score, {
+          context, synth: declaration.sound, onError: (error) => this.reportError(error),
+        });
+        this.moduleParts.set(part, {declaration, module});
+        notifyModuleChange(part);
+      } catch (error) { this.reportError(error); }
+    }
+    this.notifyMembers?.();
+  }
+
+  private releaseModuleRack(): void {
+    this.unsubscribeModule?.();
+    this.unsubscribeModule = undefined;
+    const parts = [...this.moduleParts.values()];
+    const rack = this.moduleRack;
+    const audio = this.fallbackAudio;
+    this.moduleParts.clear();
+    this.moduleRack = undefined;
+    this.modularContext = undefined;
+    this.modularUpstream = undefined;
+    this.fallbackAudio = undefined;
+    const clean = (callback: () => void) => { try { callback(); } catch (error) { this.reportError(error); } };
+    for (const record of parts) clean(() => record.module.dispose());
+    clean(() => rack?.dispose());
+    clean(() => audio?.dispose());
   }
 }
 

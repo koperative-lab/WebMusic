@@ -3,6 +3,24 @@ export type NoteInputLayout = 'piano' | 'grid' | 'chords';
 export interface NoteInputDetail {
   midi: number;
   velocity: number;
+  /** Present on Element events; stable for this attack and its matching release. */
+  id?: string;
+  /** True when the module route accepted the occurrence, including pending preparation. */
+  routed?: boolean;
+}
+
+/** One gate occurrence, independent of any other source playing the same pitch. */
+export interface NoteInputOccurrence {
+  readonly id: string;
+  readonly midi: number;
+  readonly velocity: number;
+}
+
+/** Borrowed exact-voice endpoint. It never interprets a release as a MIDI-wide stop. */
+export interface NoteInputTarget {
+  prepare(): Promise<void>;
+  noteOn(note: NoteInputOccurrence): void;
+  noteOff(id: string): void;
 }
 
 export interface NoteInputChord {

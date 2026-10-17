@@ -58,8 +58,11 @@ export interface SyncMasterTransport {
    * into the paused state and reports 'resume after seek' through
    * {@link TransportGroupOptions.onOperationError}. While playing, the
    * group passes a proposed re-entry time the same way {@link play} does.
+   * A continuous shared-anchor master also receives `isCurrent`: apply the
+   * queued position change, but publish scheduling work only while it returns
+   * true. A later command may already own the invalidation epoch.
    */
-  seekPosition(position: number, when?: number): void | Promise<void>;
+  seekPosition(position: number, when?: number, isCurrent?: () => boolean): void | Promise<void>;
   setRate?(rate: number): void;
   /** Current position on the master's axis. */
   readonly position: number;
@@ -74,6 +77,12 @@ export interface SyncMasterTransport {
    * observed master stop.
    */
   reconcile?(now: number): 'ok' | 'stalled';
+  /** Continuous shared-anchor masters schedule loop passes themselves. */
+  readonly continuousLoop?: boolean;
+  /** Synchronous cancellation before any command mutates the shared anchor. */
+  invalidate?(command: TransportCommand): void;
+  /** Apply queued loop metadata; publish scheduling work only while isCurrent returns true. */
+  loopChanged?(loop: Readonly<SyncLoopRegion> | null, isCurrent?: () => boolean): void;
   dispose?(): void;
 }
 
@@ -356,18 +365,21 @@ export class TransportGroup {
     const revision = ++this.#revision;
     this.#lastCommandRevision = revision;
     this.#pendingCommands.add(revision);
+    let invalidationError: unknown;
+    try { this.#master.invalidate?.(command); } catch (error) { invalidationError = error; }
     this.#publish({type: 'invalidate', revision, command, snapshot: this.snapshot});
     let operation: Promise<void> | void = undefined;
     try {
+      if (invalidationError !== undefined) throw invalidationError;
       // An observer may synchronously replace this command or dispose us.
       if (revision === this.#revision && !this.#disposed) {
         switch (command.type) {
           case 'play': operation = this.#play(strict); break;
           case 'pause': operation = this.#pause(); break;
           case 'stop': operation = this.#stop(); break;
-          case 'seek': operation = this.#seek(command.position, strict); break;
+          case 'seek': operation = this.#seek(command.position, strict, revision); break;
           case 'rate': operation = this.#setRate(command.rate, strict, revision); break;
-          case 'loop': operation = this.#setLoop(command.loop); break;
+          case 'loop': operation = this.#setLoop(command.loop, revision); break;
         }
       }
     } catch (error) {
@@ -458,10 +470,12 @@ export class TransportGroup {
     void this.#dispatch({type: 'loop', loop}, false).catch((error: unknown) => this.#reportOperationError('loop', error));
   }
 
-  #setLoop(loop: SyncLoopRegion | null): void {
+  #setLoop(loop: SyncLoopRegion | null, revision: number, queued = false): void | Promise<void> {
+    if (this.#master.continuousLoop && !queued) return this.#enqueueCommand(() => this.#setLoop(loop, revision, true));
     this.#assertActive();
     if (loop) assertValidLoop(loop);
     this.#loop = loop ? {...loop} : null;
+    this.#master.loopChanged?.(this.loop, () => !this.#disposed && revision === this.#revision);
     // A master may have stopped outside the group just before this call;
     // preserve the watcher until that stop is reconciled against our intent.
     if (this.#intent === 'playing') {
@@ -562,7 +576,7 @@ export class TransportGroup {
     await this.#dispatch({type: 'seek', position}, false);
   }
 
-  async #seek(position: number, strict: boolean): Promise<void> {
+  async #seek(position: number, strict: boolean, revision: number): Promise<void> {
     this.#assertActive();
     assertFiniteNonNegative('position', position);
     this.#pendingTransitions += 1;
@@ -577,6 +591,7 @@ export class TransportGroup {
         await this.#master.seekPosition(
           position,
           wasRunning ? this.#now() + this.#leadIn : undefined,
+          ...(this.#master.continuousLoop ? [() => !this.#disposed && revision === this.#revision] : []),
         );
         const settled = this.#readSettledMasterPosition();
         if (!this.#isCurrent(generation)) {
@@ -793,6 +808,9 @@ export class TransportGroup {
   }
 
   #localPosition(record: FollowerRecord, masterPosition: number): number {
+    if (this.#master.continuousLoop && this.#loop && masterPosition >= this.#loop.endSeconds) {
+      masterPosition = this.#loop.startSeconds + (masterPosition - this.#loop.startSeconds) % (this.#loop.endSeconds - this.#loop.startSeconds);
+    }
     return this.#wrapLocal(record, record.offset + masterPosition * record.scale);
   }
 
@@ -943,7 +961,7 @@ export class TransportGroup {
   }
 
   #handleMasterStopped(): void {
-    if (this.#loop && !this.#wrapping) {
+    if (this.#loop && !this.#wrapping && !this.#master.continuousLoop) {
       this.#wrap(this.#loop.startSeconds);
     } else {
       this.#settleMasterStopped();
@@ -952,7 +970,7 @@ export class TransportGroup {
 
   #checkLoop(): void {
     const loop = this.#loop;
-    if (!loop || this.clock.paused || this.#wrapping || this.#pendingTransitions > 0) return;
+    if (!loop || this.#master.continuousLoop || this.clock.paused || this.#wrapping || this.#pendingTransitions > 0) return;
     if (this.clock.positionAt(this.#now()) >= loop.endSeconds) {
       this.#wrap(loop.startSeconds);
     }

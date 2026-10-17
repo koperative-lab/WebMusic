@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 3,
+  "title": "WebMusic Study No. 1",
+  "author": "WebMusic Contributors",
+  "generator": {
+    "path": "scripts/demo-assets.mjs",
+    "sha256": "d31fc9075f88d3c9aba0de594e922ed7a50a794296721fbef9cef2929073f0d0"
+  },
+  "originalStudyCommit": "b714a004a0f604ad6717704d237cee3409ad14d1",
+  "musicalTiming": {
+    "measures": 16,
+    "beatsPerMeasure": 4,
+    "quarterNotesPerMinute": 120,
+    "durationSeconds": 32
+  },
+  "assets": [
+    {
+      "path": "midi/webmusic-study-no-1.mid",
+      "title": "WebMusic Study No. 1 (MIDI; Upper and Lower parts)",
+      "author": "WebMusic Contributors",
+      "source": "scripts/demo-assets.mjs",
+      "license": "MIT",
+      "sourceLicenseFile": "LICENSE",
+      "distributedLicenseFile": "licenses/DEMO_ASSETS_MIT.txt",
+      "sha256": "0af97f5390cb6a18e28aacb0889d4c08deeb22ed7fe8ac3ddf7692a13ccc562d"
+    },
+    {
+      "path": "mxl/webmusic-study-no-1.mxl",
+      "title": "WebMusic Study No. 1 (MusicXML; piano with two staves)",
+      "author": "WebMusic Contributors",
+      "source": "scripts/demo-assets.mjs",
+      "license": "MIT",
+      "sourceLicenseFile": "LICENSE",
+      "distributedLicenseFile": "licenses/DEMO_ASSETS_MIT.txt",
+      "sha256": "9cb9849792d44f7aae4414be10331a346921a83dfe5c486edc26aa3d589ee52f"
+    },
+    {
+      "path": "wav/webmusic-study-no-1.wav",
+      "title": "WebMusic Study No. 1 (synthesized stereo PCM)",
+      "author": "WebMusic Contributors",
+      "source": "scripts/demo-assets.mjs",
+      "license": "MIT",
+      "sourceLicenseFile": "LICENSE",
+      "distributedLicenseFile": "licenses/DEMO_ASSETS_MIT.txt",
+      "sha256": "445b82324fd49ce39d0a0e4a5304c1d4467d753f97587f8f3bdc22204fd7210f"
+    },
+    {
+      "path": "mp3/webmusic-study-no-1.mp3",
+      "title": "WebMusic Study No. 1 (MP3)",
+      "author": "WebMusic Contributors",
+      "source": "scripts/demo-assets.mjs; libmp3lame encoding of wav/webmusic-study-no-1.wav, 128 kbps stereo, ID3v2.3",
+      "license": "MIT",
+      "sourceLicenseFile": "LICENSE",
+      "distributedLicenseFile": "licenses/DEMO_ASSETS_MIT.txt",
+      "sha256": "2a8d6eb85eefec8d385edf365004c45b7a6800c693e16f9209d1dea194658196"
+    },
+    {
+      "path": "favicon.svg",
+      "title": "WebMusic note icon",
+      "author": "WebMusic Contributors",
+      "source": "Original SVG paths retained from repository commit b714a004a0f604ad6717704d237cee3409ad14d1",
+      "license": "MIT",
+      "sourceLicenseFile": "LICENSE",
+      "distributedLicenseFile": "licenses/DEMO_ASSETS_MIT.txt",
+      "sha256": "3d81ddf500aae3a6f7638d7ee65ad36dc81155336970fd57e8ed407138cc68d0"
+    },
+    {
+      "path": "licenses/DEMO_ASSETS_MIT.txt",
+      "title": "WebMusic demo asset MIT license",
+      "author": "WebMusic Contributors",
+      "source": "LICENSE",
+      "license": "MIT",
+      "sourceLicenseFile": "LICENSE",
+      "distributedLicenseFile": "licenses/DEMO_ASSETS_MIT.txt",
+      "sha256": "a0fd694fd9a9675a185a7e7daa757f52328f79d6739fe1fce01084cf233de3c7"
+    }
+  ]
+}

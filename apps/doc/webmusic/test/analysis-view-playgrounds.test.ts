@@ -8,8 +8,8 @@ import {mountDemos} from '../src/components/demo-lifecycle';
 import {mountAnalysisSessionDemo, mountLiveTrackersDemo, mountScoreWindowDemo} from '../src/components/headless/analysis-view-playgrounds-client';
 import type {DemoScope} from '../src/components/demo-lifecycle';
 
-const file = resolve(dirname(fileURLToPath(import.meta.url)), '../public/midi/Arabesque No.1.mid');
-const source = (await loadScore(readFileSync(file), {format: 'midi'})).withMetadata({title: 'Arabesque No. 1'});
+const file = resolve(dirname(fileURLToPath(import.meta.url)), '../public/midi/webmusic-study-no-1.mid');
+const source = (await loadScore(readFileSync(file), {format: 'midi'})).withMetadata({title: 'WebMusic Study No. 1'});
 const cleanups: Array<() => void> = [];
 let id = 0;
 afterEach(() => { for (const cleanup of cleanups.splice(0)) cleanup(); document.body.replaceChildren(); });
@@ -47,20 +47,20 @@ describe('Headless analysis and score-window live demos', () => {
     expect(root.querySelector('[data-hl-readout]')?.textContent).toContain("Pitch.parse('F#5')");
     change('[data-session-score]', 'extended');
     expect(handle.model).toBe(original);
-    expect(original.score.metadata.title).toBe('Arabesque No. 1');
+    expect(original.score.metadata.title).toBe('WebMusic Study No. 1');
     expect(original.score.notes.length).toBeGreaterThan(originalScore.notes.length);
     change('[data-session-window]', '1');
     expect(handle.model).not.toBe(original);
     expect(root.querySelector('[data-session-detail]')?.textContent).toContain('window 1 quarters');
     reset();
-    expect(handle.model.score.metadata.title).toBe('Arabesque No. 1');
+    expect(handle.model.score.metadata.title).toBe('WebMusic Study No. 1');
     expect(root.querySelector('[data-session-summary]')?.textContent).toContain('0 score updates');
     expect(root.querySelector('[data-hl-readout]')?.textContent).toContain('windowQuarters: 2');
     const resetModel = handle.model;
     dispose();
     change('[data-session-score]', 'extended');
     expect(handle.model).toBe(resetModel);
-    expect(handle.model.score.metadata.title).toBe('Arabesque No. 1');
+    expect(handle.model.score.metadata.title).toBe('WebMusic Study No. 1');
   });
 
   it('feeds real held chords and heard-note key analysis, preserves history on release and clears it on reset', () => {

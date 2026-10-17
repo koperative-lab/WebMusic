@@ -1,9 +1,8 @@
 // ============================================================================
 // Effect — composable post-processing inserted between a player's output bus and
-// the destination. The contract itself lives in the shared kernel (bundled at
-// build time), so a WebScore effect instance can be passed straight to a
-// WebAudio player (and vice versa) by construction, while the published
-// packages share zero runtime code. Builtins are lazy recipes — they touch no
+// the destination. The contract lives in the shared Kernel peer, so a Score
+// effect can be passed straight to an Audio player (and vice versa) by shape.
+// Builtins are lazy recipes — they touch no
 // AudioContext until the player wires its graph.
 // ============================================================================
 
@@ -37,9 +36,10 @@ export interface CompressorOptions {
 }
 
 /** Wrap a factory function as an Effect. The escape hatch / shared internal ctor. */
-function makeEffect(factory: EffectFactory, label?: string): Effect {
+function makeEffect(factory: EffectFactory, label?: string, parameterDescriptors?: Effect['parameterDescriptors']): Effect {
   return {
     ...(label !== undefined ? {label} : {}),
+    ...(parameterDescriptors !== undefined ? {parameterDescriptors} : {}),
     createAudioNodes(context: BaseAudioContext): EffectNodes {
       return factory(context);
     },
@@ -58,7 +58,7 @@ export function gain(options: GainOptions | number = {}): Effect {
     const g = ctx.createGain();
     g.gain.value = value;
     return {input: g, output: g, params: {gain: g.gain}};
-  }, 'Gain');
+  }, 'Gain', {gain: {unit: 'linear-gain', defaultValue: value, displayRange: {min: 0, max: 2}, step: 0.01}});
 }
 
 /** A biquad filter (lowpass by default). */
@@ -70,7 +70,11 @@ export function filter(options: FilterOptions = {}): Effect {
     f.Q.value = options.Q ?? 1;
     if (options.gain != null) f.gain.value = options.gain;
     return {input: f, output: f, params: {frequency: f.frequency, Q: f.Q, gain: f.gain}};
-  }, 'Filter');
+  }, 'Filter', {
+    frequency: {unit: 'Hz', defaultValue: options.frequency ?? 1000, displayRange: {min: 20, max: 12_000}, step: 1},
+    Q: {unit: !options.type || ['lowpass', 'highpass'].includes(options.type) ? 'dB' : 'ratio', defaultValue: options.Q ?? 1, displayRange: {min: 0.1, max: 20}, step: 0.1},
+    gain: {unit: 'dB', defaultValue: options.gain ?? 0, displayRange: {min: -24, max: 24}, step: 0.1},
+  });
 }
 
 /** A feedback delay with wet/dry mix. */
@@ -88,12 +92,18 @@ export function delay(options: DelayOptions = {}): Effect {
     const dry = ctx.createGain();
     dry.gain.value = options.dry ?? 1;
 
-    input.connect(dry).connect(output);
-    input.connect(node);
-    node.connect(feedback).connect(node); // feedback loop
-    node.connect(wet).connect(output);
-    return {input, output, params: {time: node.delayTime, feedback: feedback.gain, wet: wet.gain}};
-  }, 'Delay');
+    const edges: EffectEdge[] = [
+      [input, dry], [dry, output], [input, node], [node, feedback],
+      [feedback, node], [node, wet], [wet, output],
+    ];
+    const dispose = connectOwnedEdges(edges);
+    return {input, output, params: {time: node.delayTime, feedback: feedback.gain, wet: wet.gain, dry: dry.gain}, dispose};
+  }, 'Delay', {
+    time: {unit: 's', range: {min: 0, max: Math.max(1, (options.delaySeconds ?? 0.25) + 1)}, defaultValue: options.delaySeconds ?? 0.25, displayRange: {min: 0, max: 1}, step: 0.01},
+    feedback: {unit: 'linear-gain', defaultValue: options.feedback ?? 0.3, displayRange: {min: 0, max: 0.95}, step: 0.01},
+    wet: {unit: 'linear-gain', defaultValue: options.wet ?? 0.3, displayRange: {min: 0, max: 1}, step: 0.01},
+    dry: {unit: 'linear-gain', defaultValue: options.dry ?? 1, displayRange: {min: 0, max: 1}, step: 0.01},
+  });
 }
 
 /** A dynamics compressor. */
@@ -105,8 +115,14 @@ export function compressor(options: CompressorOptions = {}): Effect {
     if (options.ratio != null) c.ratio.value = options.ratio;
     if (options.attack != null) c.attack.value = options.attack;
     if (options.release != null) c.release.value = options.release;
-    return {input: c, output: c, params: {threshold: c.threshold, ratio: c.ratio}};
-  }, 'Compressor');
+    return {input: c, output: c, params: {threshold: c.threshold, knee: c.knee, ratio: c.ratio, attack: c.attack, release: c.release}};
+  }, 'Compressor', {
+    threshold: {unit: 'dB', defaultValue: options.threshold ?? -24, displayRange: {min: -60, max: 0}, step: 0.1},
+    knee: {unit: 'dB', defaultValue: options.knee ?? 30, displayRange: {min: 0, max: 40}, step: 0.1},
+    ratio: {unit: 'ratio', defaultValue: options.ratio ?? 12, displayRange: {min: 1, max: 20}, step: 0.1},
+    attack: {unit: 's', defaultValue: options.attack ?? 0.003, displayRange: {min: 0, max: 1}, step: 0.001},
+    release: {unit: 's', defaultValue: options.release ?? 0.25, displayRange: {min: 0, max: 1}, step: 0.01},
+  });
 }
 
 /** Compose several effects in series; nullish entries are skipped. */
@@ -117,14 +133,64 @@ export function chainEffects(...effects: Array<Effect | null | undefined>): Effe
       const g = ctx.createGain();
       return {input: g, output: g};
     }
-    const nodes = list.map((e) => e.createAudioNodes(ctx));
-    for (let i = 0; i < nodes.length - 1; i++) nodes[i].output.connect(nodes[i + 1].input);
+    const nodes: EffectNodes[] = [];
+    let disconnect: (() => void) | undefined;
+    try {
+      for (const effect of list) nodes.push(effect.createAudioNodes(ctx));
+      disconnect = connectOwnedEdges(nodes.slice(0, -1).map((node, index) => [node.output, nodes[index + 1].input]));
+    } catch (error) {
+      for (const node of [...nodes].reverse()) {
+        try { node.dispose?.(); } catch { /* Preserve the construction failure. */ }
+      }
+      throw error;
+    }
+    let disposed = false;
     return {
       input: nodes[0].input,
       output: nodes[nodes.length - 1].output,
+      params: Object.fromEntries(nodes.flatMap((node, index) =>
+        Object.entries(node.params ?? {}).map(([id, parameter]) => [`${index}.${id}`, parameter]),
+      )),
       dispose: () => {
-        for (const n of nodes) n.dispose?.();
+        if (disposed) return;
+        disposed = true;
+        let failure: unknown;
+        try { disconnect?.(); } catch (error) { failure = error; }
+        for (const node of nodes) {
+          try { node.dispose?.(); } catch (error) { failure ??= error; }
+        }
+        if (failure !== undefined) throw failure;
       },
     };
-  }, 'Chain');
+  }, 'Chain', Object.fromEntries(list.flatMap((effect, index) =>
+    Object.entries(effect.parameterDescriptors ?? {}).map(([id, descriptor]) => [`${index}.${id}`, descriptor]),
+  )));
+}
+
+type EffectEdge = readonly [AudioNode, AudioNode];
+
+/** Own only declared internal edges; preserve unrelated borrowed branches. */
+function connectOwnedEdges(edges: readonly EffectEdge[]): () => void {
+  const attempted: EffectEdge[] = [];
+  try {
+    for (const edge of edges) {
+      attempted.push(edge);
+      edge[0].connect(edge[1]);
+    }
+  } catch (error) {
+    for (const [source, destination] of attempted.reverse()) {
+      try { source.disconnect(destination); } catch { /* Preserve the connect failure. */ }
+    }
+    throw error;
+  }
+  let disposed = false;
+  return () => {
+    if (disposed) return;
+    disposed = true;
+    let failure: unknown;
+    for (const [source, destination] of [...attempted].reverse()) {
+      try { source.disconnect(destination); } catch (error) { failure ??= error; }
+    }
+    if (failure !== undefined) throw failure;
+  };
 }

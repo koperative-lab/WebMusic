@@ -21,6 +21,8 @@ export interface ParameterRackItem {
   options?: readonly string[];
   group?: string;
   disabled?: boolean;
+  /** Declared modulation bounds in parameter units, not measured output. */
+  modulationRange?: Readonly<{min: number; max: number}>;
 }
 
 export interface ParameterRackState {
@@ -46,6 +48,7 @@ export interface ParameterRackClassNames {
   control?: string;
   track?: string;
   fill?: string;
+  modulation?: string;
   pointer?: string;
   input?: string;
   value?: string;
@@ -62,6 +65,7 @@ export interface ParameterRackParts {
   control?: string;
   track?: string;
   fill?: string;
+  modulation?: string;
   pointer?: string;
   input?: string;
   value?: string;
@@ -117,6 +121,7 @@ interface ParameterNodes {
   item: HTMLElement;
   input: HTMLInputElement;
   fill: SVGPathElement;
+  modulation: SVGPathElement;
   pointer: SVGLineElement;
   value: HTMLElement;
 }
@@ -219,6 +224,13 @@ ${componentSurfaceCss('parameter', {
   stroke-width: var(--wm-parameter-stroke, 5);
   stroke-linecap: butt;
 }
+.wui-parameter-rack__modulation {
+  fill: none;
+  stroke: var(--wm-parameter-modulation, var(--wm-accent, #999));
+  stroke-width: 2;
+  stroke-dasharray: 2 1;
+  stroke-linecap: butt;
+}
 .wui-parameter-rack__pointer {
   stroke: var(--wm-parameter-pointer, var(--wm-foreground, #111));
   stroke-width: 3;
@@ -259,7 +271,8 @@ ${componentSurfaceCss('parameter', {
   .wui-parameter-rack__group,
   .wui-parameter-rack[data-layout='flat'] > .wui-parameter-rack__item { border-color: CanvasText; }
   .wui-parameter-rack__track { stroke: GrayText; }
-  .wui-parameter-rack__fill { stroke: Highlight; }
+  .wui-parameter-rack__fill,
+  .wui-parameter-rack__modulation { stroke: Highlight; }
   .wui-parameter-rack__pointer { stroke: CanvasText; }
 }
 `;
@@ -356,6 +369,12 @@ function createSvg(
   setParts(fill, "fill", parts?.fill);
   fill.setAttribute("fill", "none");
 
+  const modulation = document.createElementNS(SVG_NS, "path");
+  modulation.classList.add("wui-parameter-rack__modulation");
+  addClassNames(modulation, classes?.modulation);
+  setParts(modulation, "modulation", parts?.modulation);
+  modulation.setAttribute("fill", "none");
+
   const pointer = document.createElementNS(SVG_NS, "line");
   pointer.classList.add("wui-parameter-rack__pointer");
   addClassNames(pointer, classes?.pointer);
@@ -364,8 +383,8 @@ function createSvg(
   pointer.setAttribute("y1", String(KNOB_CY));
   pointer.setAttribute("x2", String(KNOB_CX));
   pointer.setAttribute("y2", String(KNOB_CY));
-  svg.append(track, fill, pointer);
-  return { svg, fill, pointer };
+  svg.append(track, fill, modulation, pointer);
+  return { svg, fill, modulation, pointer };
 }
 
 /**
@@ -447,6 +466,18 @@ export function mountParameterRack(
     record.input.value = String(current);
     record.value.textContent = text;
     record.input.setAttribute("aria-valuetext", text);
+    const range = parameter.modulationRange;
+    const validRange = range && Number.isFinite(range.min) && Number.isFinite(range.max) && range.min <= range.max;
+    if (validRange && parameter.max > parameter.min) {
+      const span = parameter.max - parameter.min;
+      const start = KNOB_START + (clamp(range.min, parameter.min, parameter.max) - parameter.min) / span * (KNOB_END - KNOB_START);
+      const end = KNOB_START + (clamp(range.max, parameter.min, parameter.max) - parameter.min) / span * (KNOB_END - KNOB_START);
+      record.modulation.setAttribute("d", end > start ? arcPath(19, start, end) : "");
+      record.input.setAttribute("aria-description", `Modulation range ${defaultFormat(parameter, range.min)} to ${defaultFormat(parameter, range.max)}; effective value is not measured.`);
+    } else {
+      record.modulation.setAttribute("d", "");
+      record.input.removeAttribute("aria-description");
+    }
     return true;
   };
 
@@ -482,7 +513,7 @@ export function mountParameterRack(
     control.className = "wui-parameter-rack__control";
     addClassNames(control, options.classNames?.control);
     setParts(control, "control", options.parts?.control);
-    const { svg, fill, pointer } = createSvg(
+    const { svg, fill, modulation, pointer } = createSvg(
       document,
       options.classNames,
       options.parts,
@@ -507,7 +538,7 @@ export function mountParameterRack(
     setParts(value, "value", options.parts?.value);
     item.append(label, control, value);
 
-    const record = { id: parameter.id, item, input, fill, pointer, value };
+    const record = { id: parameter.id, item, input, fill, modulation, pointer, value };
     targetNodes.push(record);
     listen(
       input,

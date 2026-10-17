@@ -137,6 +137,8 @@ class StubNode {
     this.tagName = tag.toUpperCase();
   }
 
+  getRootNode(): StubNode { return this; }
+
   get ownerDocument(): Document {
     return document;
   }
@@ -315,6 +317,7 @@ function createHost<T>(Ctor: new () => T, attrs: Record<string, string> = {}): H
   const target = el as unknown as Record<string, unknown>;
   target.isConnected = false;
   target.children = [];
+  target.getRootNode = () => el;
   target.getAttribute = (name: string) => attributes[name] ?? null;
   target.hasAttribute = (name: string) => name in attributes;
   target.setAttribute = (name: string, value: string) => {
@@ -1591,9 +1594,7 @@ describe('<score-rack-part>', () => {
       sound: 'triangle',
     });
     (host.el as {id: string}).id = 'lead';
-    (host.el as unknown as {parentElement: {tagName: string}}).parentElement = {
-      tagName: 'score-rack-control',
-    };
+    (host.el as unknown as {parentElement: StubNode}).parentElement = new StubNode('score-rack-control');
     host.connect();
     await flush();
 

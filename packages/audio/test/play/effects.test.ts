@@ -1,4 +1,5 @@
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it, vi} from 'vitest';
+import {InsertChain} from '@webmusic/kernel/effect';
 import {
   chainEffects,
   compressor,
@@ -20,7 +21,7 @@ interface FakeNode {
   readonly kind: string;
   readonly connectedTo: FakeNode[];
   connect(target: FakeNode): FakeNode;
-  disconnect(): void;
+  disconnect(target?: FakeNode): void;
   [param: string]: unknown;
 }
 
@@ -36,8 +37,9 @@ function makeNode(kind: string, params: Record<string, {value: number}> = {}): F
       this.connectedTo.push(target);
       return target;
     },
-    disconnect() {
-      this.connectedTo.length = 0;
+    disconnect(target?: FakeNode) {
+      if (target === undefined) this.connectedTo.length = 0;
+      else this.connectedTo.splice(0, this.connectedTo.length, ...this.connectedTo.filter((node) => node !== target));
     },
     ...params,
   };
@@ -126,6 +128,38 @@ describe('effect builtins', () => {
     e.createAudioNodes(ctx);
     expect(built).toBe(true);
   });
+
+  it('exposes real units and configured defaults through shared live handles', () => {
+    const ctx = fakeContext();
+    const chain = new InsertChain(ctx);
+    chain.replace([
+      {id: 'filter', recipe: filter({frequency: 800, gain: -3})},
+      {id: 'delay', recipe: delay({delaySeconds: 0.2})},
+      {id: 'compressor', recipe: compressor({threshold: -18})},
+    ]);
+    expect(chain.instances[0].params.get('frequency')!.descriptor).toMatchObject({unit: 'Hz', defaultValue: 800});
+    expect(chain.instances[0].params.get('frequency')!.descriptor.displayRange).toEqual({min: 20, max: 12_000});
+    expect(chain.instances[0].params.get('gain')!.descriptor.unit).toBe('dB');
+    expect(chain.instances[1].params.get('time')!.descriptor.unit).toBe('s');
+    expect(chain.instances[1].params.get('feedback')!.descriptor.displayRange).toEqual({min: 0, max: 0.95});
+    expect(chain.instances[2].params.get('threshold')!.snapshot.baseValue).toBe(-18);
+    expect(chain.instances[2].params.get('attack')!.descriptor.unit).toBe('s');
+    chain.instances[1].params.get('wet')!.setBaseValue(0.7);
+    expect(chain.instances[1].nodes.params!.wet.value).toBe(0.7);
+    chain.dispose();
+  });
+
+  it('releases the delay feedback loop once while preserving external branches', () => {
+    const ctx = fakeContext();
+    const nodes = delay().createAudioNodes(ctx);
+    const external = makeNode('external');
+    const input = nodes.input as unknown as FakeNode;
+    input.connect(external);
+    nodes.dispose!();
+    nodes.dispose!();
+    expect(input.connectedTo).toEqual([external]);
+    expect(ctx.created.filter((node) => node !== input).flatMap((node) => node.connectedTo)).toEqual([]);
+  });
 });
 
 describe('chainEffects', () => {
@@ -151,6 +185,64 @@ describe('chainEffects', () => {
     const nodes = chainEffects().createAudioNodes(ctx);
     expect(nodes.input).toBe(nodes.output);
     expect((nodes.input as unknown as FakeNode).kind).toBe('gain');
+  });
+
+  it('keeps parameter names unique and preserves metadata across composed recipes', () => {
+    const ctx = fakeContext();
+    const runtime = new InsertChain(ctx);
+    runtime.setCompatibility(chainEffects(gain(0.5), filter()));
+    expect(runtime.instances[0].params.get('0.gain')!.descriptor.unit).toBe('linear-gain');
+    expect(runtime.instances[0].params.get('0.gain')!.descriptor.displayRange).toEqual({min: 0, max: 2});
+    expect(runtime.instances[0].params.get('1.frequency')!.descriptor.unit).toBe('Hz');
+    runtime.instances[0].params.get('0.gain')!.setBaseValue(0.75);
+    expect(runtime.instances[0].nodes.params!['0.gain'].value).toBe(0.75);
+    runtime.dispose();
+  });
+
+  it('cleans earlier graphs after a factory failure and preserves that failure', () => {
+    const ctx = fakeContext();
+    const first = ctx.createGain();
+    const dispose = vi.fn(() => { throw new Error('cleanup'); });
+    const failure = new Error('factory');
+    const chain = chainEffects(
+      customEffect({input: first, output: first, dispose}),
+      customEffect(() => { throw failure; }),
+    );
+    expect(() => chain.createAudioNodes(ctx)).toThrow(failure);
+    expect(dispose).toHaveBeenCalledOnce();
+  });
+
+  it('rolls back a connect that mutates before throwing', () => {
+    const ctx = fakeContext();
+    const first = ctx.createGain() as unknown as FakeNode;
+    const second = ctx.createGain();
+    first.connect = (target) => { first.connectedTo.push(target); throw new Error('connect'); };
+    const dispose = vi.fn();
+    const chain = chainEffects(
+      customEffect({input: first as unknown as AudioNode, output: first as unknown as AudioNode, dispose}),
+      customEffect({input: second, output: second, dispose}),
+    );
+    expect(() => chain.createAudioNodes(ctx)).toThrow('connect');
+    expect(first.connectedTo).toEqual([]);
+    expect(dispose).toHaveBeenCalledTimes(2);
+  });
+
+  it('continues disposal after a child failure without disconnecting unrelated branches', () => {
+    const ctx = fakeContext();
+    const first = ctx.createGain();
+    const second = ctx.createGain();
+    const external = ctx.createGain();
+    first.connect(external);
+    const disposeFirst = vi.fn(() => { throw new Error('first cleanup'); });
+    const disposeSecond = vi.fn();
+    const nodes = chainEffects(
+      customEffect({input: first, output: first, dispose: disposeFirst}),
+      customEffect({input: second, output: second, dispose: disposeSecond}),
+    ).createAudioNodes(ctx);
+    expect(() => nodes.dispose!()).toThrow('first cleanup');
+    expect(() => nodes.dispose!()).not.toThrow();
+    expect(disposeSecond).toHaveBeenCalledOnce();
+    expect((first as unknown as FakeNode).connectedTo).toEqual([external]);
   });
 });
 

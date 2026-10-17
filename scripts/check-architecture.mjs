@@ -30,7 +30,7 @@ const rootManifest = JSON.parse(await readFile(path.join(root, 'package.json'), 
 // presenter between classes remains a reviewed information-architecture change.
 const uiPresenterClassPolicy = Object.freeze({
   'transport-time': ['transport', 'timeline', 'minimap', 'playlist', 'track-list'],
-  'parameters-gestures': ['parameter', 'macro', 'envelope', 'lfo', 'eq'],
+  'parameters-gestures': ['parameter', 'macro', 'envelope', 'lfo', 'eq', 'patch-editor'],
   'mixing-capture': ['mixer', 'meter', 'recorder'],
   notes: ['note'],
   'views-analysis': ['analysis', 'pitch', 'harmony', 'level-analyzer', 'oscilloscope', 'spectrum-analyzer', 'transient-analyzer'],

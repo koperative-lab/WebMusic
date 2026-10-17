@@ -19,7 +19,7 @@ listed in their sections below.
 
 ## Play
 
-The elements of [`@webmusic/score/play`](/score/api/play/). **Five elements cover the capability, one per job**, with an individual reference and live demo for each.
+The elements of [`@webmusic/score/play`](/score/api/play/). **Five interactive elements and one effect declaration cover the capability**, with an individual reference and live demo for each.
 
 | Element | Job |
 | --- | --- |
@@ -47,6 +47,14 @@ recorder page owns that composition and its recording contract.
 | [`<score-synth-panel>`](/score/element/play/score-synth-panel/) | `defineSynthPanelElement(tag?)` | Control panel — `sections` sound / effects / envelope / eq / lfo / macros. |
 | — | `defineAllElements()` | Register every element at its default tag (what `@webmusic/score/play/auto` calls). |
 
+### Effect declarations and module scope
+
+[`<score-effect>`](/score/element/play/score-effect/) is a nonvisual insert declaration,
+registered by `defineScoreEffectElement()` from `@webmusic/score/play/element` and included
+in the auto-registration entry. Players opt in with `composition="modules"`;
+[the shared example](/bridge/modular-composition/) shows inherited transport,
+master inserts, attached parameter panels and output taps.
+
 ## Analyze
 
 Choose one tool for the musical question you want to inspect. Each tag renders
@@ -72,7 +80,7 @@ Whole-score summaries, histograms and rhythmic-vocabulary reports use the [Headl
   definePitchViewElement();
 </script>
 
-<score-player id="piece" src="/midi/Arabesque%20No.1.mid"></score-player>
+<score-player id="piece" src="/midi/webmusic-study-no-1.mid"></score-player>
 <score-chord-analysis player="#piece"></score-chord-analysis>
 <score-pitch-view type="keyboard" player="#piece" low="48" high="84"></score-pitch-view>
 <score-pitch-view type="staff" player="#piece" system="grand"></score-pitch-view>
@@ -127,7 +135,7 @@ notes. `score-sheet-view` requires explicit `.score` or `src` and follows player
 it does not borrow the player's loaded score.
 
 ```html
-<score-player id="p" src="/mxl/Arabesque%20No.1.mxl"></score-player>
+<score-player id="p" src="/mxl/webmusic-study-no-1.mxl"></score-player>
 <score-view type="staff" player="#p"></score-view>
 <score-view type="map" player="#p"></score-view>
 <score-pitch-view type="keyboard" player="#p" low="48" high="84"></score-pitch-view>
