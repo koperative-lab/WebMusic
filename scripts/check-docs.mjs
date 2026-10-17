@@ -21,6 +21,7 @@ import {existsSync, readFileSync, readdirSync, statSync} from 'node:fs';
 import {join, relative, dirname} from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {headlessDocProblems} from './headless-docs-policy.mjs';
+import {requiredFeatureLayers} from './package-policy.mjs';
 import {declaredAgentContextPaths} from '../apps/doc/webmusic/scripts/agent-context.mjs';
 import {audioBridgeContext} from '../apps/doc/webmusic/scripts/agent-context-audio-bridge.mjs';
 
@@ -117,7 +118,8 @@ function observedAttributes(source, file, seen = new Set()) {
 function elementSources() {
   const byTag = {};
   for (const family of ['score', 'audio']) {
-    for (const capability of ['play', 'view', 'analyze']) {
+    for (const [capability, layers] of Object.entries(requiredFeatureLayers[`@webmusic/${family}`] ?? {})) {
+      if (!layers.element) continue;
       const dir = `packages/${family}/src/${capability}/element`;
       for (const name of readdirSync(abs(dir))) {
         if (!name.endsWith('.ts')) continue;
@@ -130,7 +132,8 @@ function elementSources() {
 }
 
 async function checkParams(sources) {
-  const groups = ['score-play', 'score-view', 'score-analyze', 'audio-play', 'audio-view', 'audio-analyze'];
+  const groups = ['score', 'audio'].flatMap((family) => Object.entries(requiredFeatureLayers[`@webmusic/${family}`] ?? {})
+    .filter(([, layers]) => layers.element).map(([capability]) => `${family}-${capability}`));
   const catalog = {};
   for (const group of groups) {
     const module = await load(`apps/doc/webmusic/src/lib/params/${group}.ts`);
@@ -292,7 +295,7 @@ function checkTitles(files) {
 function checkCapabilityGroups(files) {
   const groups = {};
   for (const file of files) {
-    const match = /^(score|audio)\/element\/(play|analyze|view)\/([a-z-]+)\.mdx$/.exec(relative(DOCS, file));
+    const match = /^(score|audio)\/element\/(play|analyze|view|edit)\/([a-z-]+)\.mdx$/.exec(relative(DOCS, file));
     if (!match) continue;
     const [, family, capability, name] = match;
     if (name === 'index') {
@@ -736,7 +739,7 @@ const pages = collectPages(files);
 await checkCatalogs(pages, paramsCatalog);
 checkElementPages(files, paramsCatalog);
 for (const message of headlessDocProblems({
-  pages: files.filter((file) => file.startsWith(`${DOCS}/score/headless/`)).map((file) => ({file, source: read(file)})),
+  pages: files.filter((file) => file.startsWith(`${DOCS}/score/headless/`) || file.startsWith(`${DOCS}/audio/headless/edit/`)).map((file) => ({file, source: read(file)})),
   readFile: read,
   frameFile: 'apps/doc/webmusic/src/components/HeadlessDemoFrame.astro',
 })) fail('headless-page', message);
@@ -758,8 +761,10 @@ checkRootEntryCoverage(`${DOCS}/uikit/api.mdx`, 'packages/ui/package.json', '@we
 // title rule instead. Every root EXPORT is listed in its API Reference table,
 // which no check verifies yet — the same gap the other API pages have.
 checkRootEntryCoverage(`${DOCS}/bridge/api.mdx`, 'bridges/score-audio/package.json', '@webmusic/bridge');
-for (const family of ['score', 'audio']) {
-  for (const capability of ['play', 'analyze', 'view']) {
+for (const [packageName, capabilities] of Object.entries(requiredFeatureLayers)) {
+  const family = packageName.slice('@webmusic/'.length);
+  for (const [capability, layers] of Object.entries(capabilities)) {
+    if (!layers.headless) continue;
     checkHeadlessExports(family, capability);
   }
 }

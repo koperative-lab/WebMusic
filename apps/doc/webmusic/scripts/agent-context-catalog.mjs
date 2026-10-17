@@ -18,6 +18,7 @@ const headlessSources = {
   'analyze/analysis-session': ['session', 'report'],
   'analyze/analysis-follower': ['follower', 'transport-clock'],
   'view/score-map-view': ['score-map'],
+  'view/score-view': ['score-view', 'score-editing'],
 };
 const themeSources = ['styles', 'internal/palette', 'internal/surface', 'internal/control']
   .map((name) => `packages/ui/src/${name}.ts`);
@@ -45,7 +46,7 @@ export function componentCatalog(pages, presenters, composition, extension) {
     });
   });
   for (const page of pages) {
-    const match = /^\/score\/headless\/(play|analyze|view)\/([^/]+)\/$/.exec(page.route);
+    const match = /^\/score\/headless\/(play|analyze|view|edit)\/([^/]+)\/$/.exec(page.route);
     if (!match) continue;
     const [, family, name] = match;
     const sources = (headlessSources[`${family}/${name}`] ?? [name]).map((module) => `packages/score/src/${family}/headless/${module}.ts`);

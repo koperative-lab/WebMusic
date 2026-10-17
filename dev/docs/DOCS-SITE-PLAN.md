@@ -48,7 +48,8 @@ UI Kit provides presentation; Kernel exposes shared platform contracts.
 | Platform package | Bridge, Kernel | Overview, API; Bridge also has a domain Headless group |
 
 Within each family's Web Components and Headless groups, capabilities are ordered
-**Play, Analyze, View**. Score also has I/O API pages; React belongs to the API
+**Edit, Play, Analyze, View**, omitting capabilities whose form is not implemented.
+Score also has I/O API pages; React belongs to the API
 reference. Published subpaths, rather than an aspirational list, determine which
 forms actually exist.
 

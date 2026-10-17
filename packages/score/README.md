@@ -2,7 +2,7 @@
 
 **Symbolic music for the web.** One package: an immutable `Score` model,
 MIDI / MusicXML / MXL / ABC import and export, two playback engines, staff /
-piano-roll / waterfall views, musical analysis, Web Components, and React
+piano-roll / waterfall views, document editing, musical analysis, Web Components, and React
 bindings.
 
 ```bash
@@ -63,7 +63,7 @@ Use the owning public reference and exported types to establish implemented beha
 ## Which entry do I import?
 
 Subpaths follow a two-level grammar. The **first level is a capability** —
-`io`, `view`, `play`, `analyze`, `react`; the package root is the core model.
+`io`, `edit`, `view`, `play`, `analyze`, `react`; the package root is the core model.
 The **second level is a form** of that capability: **`headless`** is stateful
 code with no UI DOM (operations still have entry-specific environment and
 resource requirements); **`element`** is Web
@@ -72,9 +72,9 @@ browser input to a player; **`auto`** registers all elements as an import
 side effect; **`global`** is the CDN IIFE bundle; and **`worker`** /
 **`worker-client`** / **`worker-protocol`** are the Worker trio — the
 self-registering Worker runtime, the main-thread client, and the pure wire
-types. Each capability's *root* (`@webmusic/score/io`, `…/view`, `…/play`,
-`…/analyze`) is its stateless API: data in, data out, no DOM, no engine
-state.
+types. Each capability's *root* is its supported code API. Most provide stateless
+functions; `@webmusic/score/edit` also exposes the deliberate `ScoreEditor`
+convenience facade alongside pure operations. All these API entries are DOM-free.
 
 | Entry | What it is |
 |---|---|
@@ -85,6 +85,10 @@ state.
 | `@webmusic/score/io/worker-client` | Main-thread parser Worker client (`createParserWorker`). |
 | `@webmusic/score/io/worker-protocol` | Pure parser wire types and constants for custom hosts. |
 | `@webmusic/score/io/worker` | Self-registering parser Worker runtime. |
+| `@webmusic/score/edit` | Atomic note operations, document contracts, position maps and the `ScoreEditor` facade. |
+| `@webmusic/score/edit/headless` | Persistent `ScoreEditor`, bounded history, checkpoints and draft/selection sessions. |
+| `@webmusic/score/edit/element` | Nonvisual `<score-document>` loading and ownership, plus registration helpers. |
+| `@webmusic/score/edit/auto` | Import for side effect: registers `<score-document>`. |
 | `@webmusic/score/view` | Stateless view API: layout geometry, note sequences, types. |
 | `@webmusic/score/view/headless` | Score windows, map navigation and held-pitch state with optional borrowed playback; no DOM. |
 | `@webmusic/score/view/render` | Imperative browser visualizers (SVG / canvas / OSMD). |
@@ -156,7 +160,10 @@ const score = builder.build();
 Share the result between a player, a renderer, and an analyzer without one
 consumer mutating another's data. `score.withMetadata(...)` returns a
 modified copy; `scoreFromJSON(score.toJSON())` round-trips it, with a schema
-marker (`v0.1`), runtime validation, and coded `ScoreJSONError` rejections.
+marker (`v0.2`), runtime validation, and coded `ScoreJSONError` rejections. The
+reader also migrates `v0.1` and unmarked legacy input. Effective note velocity
+is `velocityOverride ?? performed?.velocity ?? 80`; an override never creates
+absolute performed timing.
 
 Time, queries, events:
 
@@ -248,6 +255,43 @@ failures keep their class and stable `code` across the Worker boundary;
 other structured remote failures reject with `ParserWorkerRemoteError`. Wire
 types live at `@webmusic/score/io/worker-protocol`; the self-registering
 runtime at `@webmusic/score/io/worker`.
+
+## Document editing (`@webmusic/score/edit`)
+
+`createScoreEditor(score, options?)` owns one committed immutable Score and
+document revision. It supports atomic insert/delete/move/resize/transpose/velocity/
+quantize commands, bounded undo/redo (100 transactions by default), application
+checkpoints and separate interaction drafts. It allocates no player, clock or DOM.
+
+```ts
+import {createScoreEditor} from '@webmusic/score/edit/headless';
+
+const editor = createScoreEditor(score);
+const note = editor.score.notes.find((candidate) => candidate.pitch !== null);
+if (note) {
+  const result = editor.transaction('Move note', (tx) => {
+    tx.add({type: 'move-notes', noteIds: [note.id], deltaQuarters: [1, 4]});
+  });
+  if (result.status === 'failed') console.error(result.error.code);
+}
+const editedScore = editor.score;
+// Keep editedScore for serialization or an explicitly created consumer.
+editor.dispose();
+```
+
+Effective timing edits make written time authoritative for changed notes while
+preserving their effective velocity. Unchanged notes keep their performed timing.
+Native ScorePlayer borrows the editor through `setDocumentSource(editor)`.
+For HTML, `<score-document>` owns loading and editor disposal; `score-player`
+and `score-view` accept `editor="#document-id"`. Piano-roll and staff Views enable
+editing with `editable`. Staff entry uses an explicit input mode and supports
+simple note/rest entry with voice completion inside authored measures. It rejects
+unsupported structures and unmeasured MIDI rather than inferring notation.
+Playback applies revisions while paused and requires
+an explicit later Play action. See the
+[Edit API](https://github.com/koperative-lab/WebMusic/blob/main/apps/doc/webmusic/src/content/docs/score/api/edit.mdx)
+and [ScoreEditor](https://github.com/koperative-lab/WebMusic/blob/main/apps/doc/webmusic/src/content/docs/score/headless/edit/score-editor.mdx)
+for complete commands, failures and ownership.
 
 ## Views (`@webmusic/score/view`)
 

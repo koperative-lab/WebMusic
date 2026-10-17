@@ -51,7 +51,7 @@ describe('AudioPlayer stable source ownership', () => {
     expect(player.clock).toBeUndefined();
     expect(ctx.createAnalyser).not.toHaveBeenCalled();
     player.setClip(first);
-    expect(changes).toEqual([{clip: first, revision: 1}]);
+    expect(changes).toEqual([{kind: 'clip', clip: first, revision: 1}]);
     player.dispose();
     expect(ctx.close).not.toHaveBeenCalled();
   });
@@ -132,7 +132,7 @@ describe('AudioPlayer terminal observations', () => {
     player.dispose();
     player.dispose();
     expect(source).toHaveBeenCalledOnce();
-    expect(source).toHaveBeenCalledWith({clip: undefined, revision: 1});
+    expect(source).toHaveBeenCalledWith({kind: 'empty', clip: undefined, revision: 1});
     expect(states).toEqual([false]);
     expect(times).toEqual([{seconds: 0, duration: 0, progress: 0}]);
     expect(player.clip).toBeUndefined();
@@ -151,7 +151,7 @@ describe('AudioPlayer terminal observations', () => {
     player.on('sourcechange', followingSource);
     player.on('timeupdate', finalTime);
     expect(() => player.dispose()).toThrow(failure);
-    expect(followingSource).toHaveBeenCalledWith({clip: undefined, revision: 1});
+    expect(followingSource).toHaveBeenCalledWith({kind: 'empty', clip: undefined, revision: 1});
     expect(finalTime).toHaveBeenCalledWith({seconds: 0, duration: 0, progress: 0});
     expect(output.disconnect).toHaveBeenCalledOnce();
     expect(player.analyser).toBeUndefined();
@@ -178,7 +178,7 @@ describe('AudioPlayer borrowed transport authority', () => {
     const changes = vi.fn();
     player.on('sourcechange', changes);
     notify();
-    expect(changes).toHaveBeenCalledWith({clip: source.clip, revision: 2});
+    expect(changes).toHaveBeenCalledWith({kind: 'clip', clip: source.clip, revision: 2});
     player.dispose();
     expect(source.playing).toBe(true);
     expect(source.pause).not.toHaveBeenCalled();

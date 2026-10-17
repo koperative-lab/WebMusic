@@ -8,6 +8,8 @@ pitches, durations and voices, read from MIDI, MusicXML, MXL or ABC. The
 play, analyze, and view capabilities support Web Components, Headless objects,
 and APIs. Combine the APIs with [UI presenters](/uikit/) or your own interface;
 integration entries such as React build on the same contracts.
+Edit provides one document owner through API, Headless and a nonvisual HTML
+declaration; Score player, piano-roll editing and staff input can borrow that document.
 
 For a working player with notation and a keyboard, start with
 [Quick Start](/quick-start/). This page covers package selection and setup.
@@ -16,11 +18,12 @@ For a working player with notation and a keyboard, start with
 
 | Capability | What it covers | Forms |
 | --- | --- | --- |
+| **edit** | Own an immutable document, commit note commands, undo/redo, keep checkpoints and preview interaction drafts. | [Web Components](/score/element/#edit) · [Headless](/score/headless/#edit) · [API](/score/api/edit/) |
 | **play** | Turn a `Score` into sound: push and pull engines, timbres, effect chains, racks, offline WAV render, capture of performed note events into a `Score`. | [Web Components](/score/element/#play) · [Headless](/score/headless/#play) · [API](/score/api/play/) |
 | **analyze** | Ask a `Score` questions: key, chords, roman numerals, motifs, rhythm figures, voice-leading issues, distributions and summaries. | [Web Components](/score/element/#analyze) · [Headless](/score/headless/#analyze) · [API](/score/api/analyze/) |
 | **view** | Draw a `Score`: piano roll, staff, waterfall, engraved notation, whole-piece maps and thumbnails. | [Web Components](/score/element/#view) · [Headless](/score/headless/#view) · [API](/score/api/view/) |
 | **io** | Format detection and MIDI, MusicXML, MXL and ABC parsing/serialization, with worker-backed parsing. | [API](/score/api/io/) |
-| **react** | The same capabilities as React components and hooks. | [API](/score/api/react/) |
+| **react** | Existing Play, Analyze and View composition as React components and hooks. | [API](/score/api/react/) |
 
 The package root is the model itself — `Score`, `Rational`, `Pitch`,
 `Duration`, `TimeMap`, queries and JSON — and it touches no browser API. See
@@ -30,9 +33,10 @@ entry.
 ## What Score is not
 
 Score does not decode recorded audio or analyze PCM waveforms. It synthesizes
-notes and can export their sound as WAV. Audio-file processing and cross-domain
-Bridge coordination remain accepted future directions; those packages and their
-public references have not been migrated into this first-release checkout.
+notes and can export their sound as WAV. [Audio](/audio/) owns decoded audio,
+sequence editing and waveform processing. [Bridge](/bridge/) owns operations
+that coordinate Score and Audio, including synchronization and conversion.
+These packages have their own public references and resource contracts.
 
 ## Install
 
@@ -78,7 +82,7 @@ third-party dependencies from your configured registry. Continue with the
 
 ### Entries and optional peers
 
-`io`, `play`, `analyze`, `view`, and `react` are export subpaths of that one installed package; use their public import paths rather than installing them separately.
+`io`, `edit`, `play`, `analyze`, `view`, and `react` are export subpaths of that one installed package; use their public import paths rather than installing them separately.
 
 `@webmusic/kernel` is required. Add optional peers for the entries and features
 you use; importing a visual Element requires `@webmusic/ui`.
@@ -106,8 +110,9 @@ and shared theming.
 
 ### With a bundler
 
-Importing `@webmusic/score/play/auto` registers all **Play** elements at their
-default names. It does not register Analyze or View elements. Use their
+Importing `@webmusic/score/edit/auto` registers `<score-document>`;
+`@webmusic/score/play/auto` registers all **Play** elements at their default names.
+Neither registers Analyze or View elements. Use their
 `@webmusic/score/analyze/element` and `@webmusic/score/view/element` entries and
 call the registration functions listed in the inventory.
 
@@ -116,7 +121,7 @@ call the registration functions listed in the inventory.
 Import an individual `define*` function from the capability's `/element` entry
 to register a selected tag or choose a custom tag name. The group registration
 functions register their default names; `defineAllElements()` does not accept
-custom names. See the [Play](/score/element/#play),
+custom names. See the [Edit](/score/element/#edit), [Play](/score/element/#play),
 [Analyze](/score/element/#analyze) and [View](/score/element/#view) registration
 references.
 

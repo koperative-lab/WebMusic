@@ -4,6 +4,7 @@
   "description": "Digital audio for the web: immutable clip model, mp3/wav/ogg/flac decoding via optional WASM peers, playback, MIR analysis, transcription, views, Web Components and React bindings.",
   "type": "module",
   "sideEffects": [
+    "./src/edit/element/auto.ts",
     "./src/play/worker.ts",
     "./src/analyze/worker.ts",
     "./src/view/element/auto.ts",
@@ -255,7 +256,47 @@
       "types": "./dist/analyze/element/global.d.ts",
       "default": "./dist/analyze/auto.global.js"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./edit": {
+      "import": {
+        "types": "./dist/edit/index.d.ts",
+        "default": "./dist/edit/index.js"
+      },
+      "require": {
+        "types": "./dist/edit/index.d.cts",
+        "default": "./dist/edit/index.cjs"
+      }
+    },
+    "./edit/headless": {
+      "import": {
+        "types": "./dist/edit/headless/index.d.ts",
+        "default": "./dist/edit/headless/index.js"
+      },
+      "require": {
+        "types": "./dist/edit/headless/index.d.cts",
+        "default": "./dist/edit/headless/index.cjs"
+      }
+    },
+    "./edit/element": {
+      "import": {
+        "types": "./dist/edit/element/index.d.ts",
+        "default": "./dist/edit/element/index.js"
+      },
+      "require": {
+        "types": "./dist/edit/element/index.d.cts",
+        "default": "./dist/edit/element/index.cjs"
+      }
+    },
+    "./edit/auto": {
+      "import": {
+        "types": "./dist/edit/element/auto.d.ts",
+        "default": "./dist/edit/element/auto.js"
+      },
+      "require": {
+        "types": "./dist/edit/element/auto.d.cts",
+        "default": "./dist/edit/element/auto.cjs"
+      }
+    }
   },
   "files": [
     "dist",

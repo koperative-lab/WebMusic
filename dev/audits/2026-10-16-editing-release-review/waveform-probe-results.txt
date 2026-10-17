@@ -1,0 +1,60 @@
+
+ RUN  v5.0.2 /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/audio
+
+ ❯ test/view/root-release-waveform-probe.test.ts (2 tests | 2 failed) 36ms
+   ❯ release readiness numeric playback probe (2)
+     × preserves the pending range across playback notifications while focus moves between fields 29ms
+     × preserves pending gain after Tab to its Apply button across playback notification 6ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/view/root-release-waveform-probe.test.ts > release readiness numeric playback probe > preserves the pending range across playback notifications while focus moves between fields
+AssertionError: expected { startFrame: +0, endFrame: 303 } to deeply equal { startFrame: 101, endFrame: 303 }
+
+- Expected
++ Received
+
+  {
+    "endFrame": 303,
+-   "startFrame": 101,
++   "startFrame": 0,
+  }
+
+ ❯ test/view/root-release-waveform-probe.test.ts:65:49
+     63|     handle.updatePlayback(binding, .25);
+     64|     button(host,'Select frames').click();
+     65|     expect(editing.state.interaction.selection).toEqual({startFrame:10…
+       |                                                 ^
+     66|   });
+     67|   it('preserves pending gain after Tab to its Apply button across play…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/view/root-release-waveform-probe.test.ts > release readiness numeric playback probe > preserves pending gain after Tab to its Apply button across playback notification
+AssertionError: expected { kind: 'asset', …(6) } to match object { gain: 0.25 }
+(6 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "gain": 0.25,
++   "gain": 1,
+  }
+
+ ❯ test/view/root-release-waveform-probe.test.ts:74:53
+     72|     const apply=button(host,'Apply segment gain'); apply.focus();
+     73|     handle.updatePlayback(binding, .25); apply.click();
+     74|     expect(model.getSnapshot().content.segments[0]).toMatchObject({gai…
+       |                                                     ^
+     75|   });
+     76| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed (2)
+   Start at  00:26:19
+   Duration  929ms (environment 69%, transform 23%, tests 4%, import 4%, worker 1%)
+

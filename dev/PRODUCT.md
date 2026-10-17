@@ -47,6 +47,24 @@ without playback. This is the accepted composition direction in
 [Player binding](design/PLAYER-BINDING.md), not a claim that every current Element already
 supports the target syntax; delivery gaps belong to [STATUS](STATUS.md).
 
+Editing adds a document owner shared by these same integration choices. Under
+DEC-047, the accepted target is a persistent domain editor that commits content
+and can provide bounded history for one document. Play borrows its current
+content and reports the revision actually applied for playback; View borrows
+content and edit commands. Existing piano-roll and waveform Views gain optional
+editing interaction, while nonvisual document Elements provide declarative HTML
+ownership. Custom applications use the same contracts without those Elements.
+The [editing design](design/EDIT-COMPONENTS.md) specifies this target;
+[STATUS](STATUS.md), EDIT-01, records delivery. Score editing, native document-bound playback, HTML declarations and piano-roll
+interaction are documented in [Score Edit](../apps/doc/webmusic/src/content/docs/score/api/edit.mdx)
+and [Score View](../apps/doc/webmusic/src/content/docs/score/element/view/score-view.mdx).
+Audio sequence editing, local processing and WAV export are documented in
+[Audio Edit](../apps/doc/webmusic/src/content/docs/audio/api/edit.mdx) and
+[Audio View](../apps/doc/webmusic/src/content/docs/audio/element/view/audio-view.mdx).
+Bounded staff input under DEC-048 uses the same Score document and history,
+with explicit note-entry focus, written durations and voice/rest completion
+inside authored measures. It does not imply complete MuseScore parity.
+
 ## One session's time and data
 
 Score represents symbolic music; Audio represents digital audio. Each retains its own data model and units. Static musical data does not need to own a running clock. Playback, recording, analysis followers, and views participating in one session should follow one authoritative transport timeline, mapped explicitly to beats, audio seconds, or sample positions.
@@ -55,17 +73,30 @@ Bridge owns work involving both domains: synchronization, timeline mapping, offl
 
 An application can run multiple independent sessions. Common timing applies to participants that must act together, rather than requiring every preview or artwork in a process to share a global singleton. The current coordination mechanism and the further injection design are described in [Architecture](ARCHITECTURE.md) and [Shared-clock injection](../platform/shared-clock-injection.md).
 
+An editing document does not own a playback clock. Its committed revision and
+the player's applied revision are separate observable states. The first editing
+workflow pauses while preparing changed content and remains paused after applying
+it. A failed playback update leaves the edit available for correction and export;
+the player must not present older content as the current revision.
+
 ## Composition scenarios
 
 | Scenario | Toolkit composition | Application responsibilities |
 |---|---|---|
 | Score audition and explanation | Score loading/building, player, view, analysis, transport UI | Content sources, teaching narrative, interaction sequencing |
-| Sample editing and analysis demo | AudioClip, player, waveform, regions, analysis, meter | Asset management, edit history, operational layout |
+| Sample editing and analysis demo | AudioClip, player, waveform, regions, analysis, meter, document editor and optional local history | Asset persistence, project/global history, operational layout |
 | Synchronized notation and recording | Score, AudioClip, Bridge, views from both families | Alignment source, offsets, tempo/BeatGrid interpretation and calibration |
-| Online music workstation | Parts/tracks, mixing, effects, recording, session time, composable controls | Arrangement/session project model, commands and undo, persistence, export workflow, plugin orchestration |
+| Online music workstation | Parts/tracks, mixing, effects, recording, session time, composable controls; domain edit commands and local history | Arrangement/session project model, project commands and cross-document undo, persistence, export workflow, plugin orchestration |
 | Musical installation | Input drivers, interactive player, parameter mapping, score/audio data, arbitrary visual surfaces | Artistic rules, sensor integration, spatial and visual language, deployment conditions |
 
 These are composition directions, not a list of completed application features. STATUS records capability readiness.
+
+Single-document history is optional: an application may own its history policy
+and integrate editor transactions into a larger command system. Project-wide
+undo, persistence and collaboration remain application responsibilities. Audio
+editing starts with retained assets and an immutable contiguous sequence of
+segment references, so ordinary edits and undo do not copy complete PCM buffers.
+This single-file model does not itself supply multi-track arrangement or mixing.
 
 ## Existing resources as building blocks
 

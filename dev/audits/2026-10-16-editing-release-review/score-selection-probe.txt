@@ -1,0 +1,37 @@
+// @vitest-environment jsdom
+import {expect, it} from 'vitest';
+import {Duration, NoteId, PartId, Pitch, Rational, ScoreBuilder, VoiceId} from '../../src/core';
+import {createScoreEditor} from '../../src/edit/headless';
+import {createScoreViewEditing} from '../../src/view/headless';
+import {mountPianoRollEditor} from '../../src/view/render/piano-roll-editor';
+
+it('keeps selected note values aligned when another consumer changes the shared selection', () => {
+  const builder = new ScoreBuilder(); const part = PartId('p');
+  builder.addPart({id: part, name: 'Piano'});
+  for (const [id, onset, midi] of [['a', 0, 60], ['b', 3, 64]] as const) builder.addNote(part, {
+    id: NoteId(id), onsetQuarters: new Rational(onset), pitch: Pitch.fromMidi(midi),
+    duration: Duration.quarter(), voice: VoiceId('1'),
+  });
+  const editor = createScoreEditor(builder.build());
+  const shared = editor.createInteractionSession();
+  const editing = createScoreViewEditing(editor, {editable: true, interactionSession: shared});
+  const host = document.createElement('div'); document.body.append(host);
+  const renderer = mountPianoRollEditor(host, editing);
+  try {
+    editing.select([NoteId('a')]);
+    const pitch = host.querySelector<HTMLInputElement>('[aria-label="Written MIDI pitch"]')!;
+    const onset = host.querySelector<HTMLInputElement>('[aria-label="Onset (quarters)"]')!;
+    const picker = host.querySelector<HTMLSelectElement>('[aria-label="Select existing note"]')!;
+    pitch.focus();
+    shared.setSelection([NoteId('b')]);
+    const before = {selected: picker.value, onset: onset.value, pitch: pitch.value};
+    [...host.querySelectorAll('button')].find((button) => button.textContent === 'Apply to selected note')!.click();
+    console.log('shared selection form probe', {before, after: {
+      a: [editor.score.getNote(NoteId('a'))!.onsetQuarters.toString(), editor.score.getNote(NoteId('a'))!.pitch.midi],
+      b: [editor.score.getNote(NoteId('b'))!.onsetQuarters.toString(), editor.score.getNote(NoteId('b'))!.pitch.midi],
+      revision: editor.getSnapshot().documentRevision,
+    }});
+    expect(editor.score.getNote(NoteId('b'))!.onsetQuarters.toString()).toBe('3');
+    expect(editor.score.getNote(NoteId('b'))!.pitch.midi).toBe(64);
+  } finally { renderer.dispose(); editing.dispose(); shared.dispose(); editor.dispose(); host.remove(); }
+});

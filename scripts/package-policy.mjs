@@ -72,6 +72,10 @@ export const expectedPublicEntries = Object.freeze({
     "./io/worker-client",
     "./io/worker-protocol",
     "./io/worker",
+    "./edit",
+    "./edit/headless",
+    "./edit/element",
+    "./edit/auto",
     "./view",
     "./view/headless",
     "./view/render",
@@ -94,6 +98,10 @@ export const expectedPublicEntries = Object.freeze({
   ],
   "@webmusic/audio": [
     ".",
+    "./edit",
+    "./edit/headless",
+    "./edit/element",
+    "./edit/auto",
     "./view",
     "./view/headless",
     "./view/render",
@@ -144,6 +152,7 @@ export const capabilityDependencies = Object.freeze({
     root: ["core"],
     core: [],
     io: ["core"],
+    edit: ["core", "io"],
     view: ["core", "io"],
     play: ["core", "io"],
     analyze: ["core", "io"],
@@ -152,6 +161,7 @@ export const capabilityDependencies = Object.freeze({
   "@webmusic/audio": Object.freeze({
     root: ["core"],
     core: [],
+    edit: ["core"],
     view: ["core", "play"],
     play: ["core"],
     analyze: ["core", "play"],
@@ -165,8 +175,9 @@ export const domainFamilies = Object.freeze(
 );
 
 /**
- * Every concrete feature capability has the same four source
- * responsibilities. `core` is deliberately internal: it is the reusable
+ * Established visual feature capabilities have four source responsibilities.
+ * Incremental capabilities list only their implemented layers below.
+ * `core` is deliberately internal: it is the reusable
  * implementation floor, not an additional semver surface. The capability
  * ROOT is the API (`./api` is not published; `src/api/` stays as the
  * internal implementation the root barrel forwards).
@@ -187,8 +198,16 @@ const featureLayersFor = (capabilities) =>
   );
 
 export const requiredFeatureLayers = Object.freeze({
-  "@webmusic/score": featureLayersFor(["play", "analyze", "view"]),
-  "@webmusic/audio": featureLayersFor(["play", "analyze", "view"]),
+  "@webmusic/score": Object.freeze({
+    ...featureLayersFor(["play", "analyze", "view"]),
+    edit: Object.freeze({
+      core: "edit/core/index.ts",
+      api: "edit/api/index.ts",
+      headless: "edit/headless/index.ts",
+      element: "edit/element/index.ts",
+    }),
+  }),
+  "@webmusic/audio": featureLayersFor(["play", "analyze", "view", "edit"]),
 });
 
 /**
@@ -270,8 +289,9 @@ export const expectedWorkspaceDependencies = Object.freeze({
 export const expectedSideEffectEntries = Object.freeze({
   "@webmusic/kernel": [],
   "@webmusic/ui": [],
-  "@webmusic/score": ["./io/worker", "./analyze/worker", "./play/auto", "./play/global"],
+  "@webmusic/score": ["./io/worker", "./analyze/worker", "./edit/auto", "./play/auto", "./play/global"],
   "@webmusic/audio": [
+    "./edit/auto",
     "./view/auto",
     "./view/global",
     "./play/auto",
@@ -330,6 +350,10 @@ export const domFreeEntrySources = Object.freeze({
     "io/formats/index.ts",
     "io/worker-client.ts",
     "io/worker-protocol.ts",
+    "edit/index.ts",
+    "edit/core/index.ts",
+    "edit/api/index.ts",
+    "edit/headless/index.ts",
     "play/index.ts",
     "play/core/index.ts",
     "play/api/index.ts",
@@ -346,6 +370,12 @@ export const domFreeEntrySources = Object.freeze({
     "view/headless/index.ts",
   ],
   "@webmusic/audio": [
+    "index.ts",
+    "core/index.ts",
+    "edit/index.ts",
+    "edit/core/index.ts",
+    "edit/api/index.ts",
+    "edit/headless/index.ts",
     "view/index.ts",
     "view/core/index.ts",
     "view/api/index.ts",
@@ -374,8 +404,12 @@ export const domFreeEntrySources = Object.freeze({
  * through runtime imports. Paths are relative to the package source root. */
 export const forbiddenEntryReachability = Object.freeze({
   "@webmusic/score": {
-    "index.ts": ["io/", "view/", "play/", "analyze/", "react/"],
+    "index.ts": ["io/", "edit/", "view/", "play/", "analyze/", "react/"],
     "io/index.ts": ["io/worker-client.ts", "io/worker-protocol.ts", "io/worker.ts"],
+    "edit/index.ts": ["edit/element/", "edit/render/"],
+    "edit/core/index.ts": ["edit/api/", "edit/headless/", "edit/element/", "edit/render/"],
+    "edit/api/index.ts": ["edit/element/", "edit/render/"],
+    "edit/headless/index.ts": ["edit/api/", "edit/element/", "edit/render/"],
     "play/index.ts": [
       "play/drivers.ts",
       "play/headless/interactive-player.ts",
@@ -403,7 +437,11 @@ export const forbiddenEntryReachability = Object.freeze({
     "view/headless/index.ts": ["view/render/", "view/element/"],
   },
   "@webmusic/audio": {
-    "index.ts": ["view/", "play/", "analyze/", "react/"],
+    "index.ts": ["edit/", "view/", "play/", "analyze/", "react/"],
+    "edit/index.ts": ["play/", "edit/element/", "edit/render/"],
+    "edit/core/index.ts": ["play/", "edit/api/", "edit/headless/", "edit/element/", "edit/render/"],
+    "edit/api/index.ts": ["play/", "edit/element/", "edit/render/"],
+    "edit/headless/index.ts": ["play/", "edit/api/", "edit/element/", "edit/render/"],
     "play/index.ts": ["play/element/", "play/worker.ts"],
     "play/core/index.ts": ["play/headless/", "play/element/"],
     "play/api/index.ts": ["play/element/"],

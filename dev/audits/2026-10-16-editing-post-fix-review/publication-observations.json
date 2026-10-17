@@ -1,0 +1,54 @@
+{
+  "recordType": "summary of observed read-only command results; not raw output",
+  "reviewDate": "2026-10-16",
+  "timeZone": "America/New_York",
+  "packages": {
+    "@webmusic/kernel": {
+      "command": "npm view @webmusic/kernel version dist-tags --json",
+      "version": "0.2.0",
+      "dist-tags": {
+        "latest": "0.2.0"
+      }
+    },
+    "@webmusic/ui": {
+      "command": "npm view @webmusic/ui version dist-tags --json",
+      "version": "0.2.0",
+      "dist-tags": {
+        "latest": "0.2.0"
+      }
+    },
+    "@webmusic/score": {
+      "command": "npm view @webmusic/score version dist-tags --json",
+      "version": "0.2.0",
+      "dist-tags": {
+        "latest": "0.2.0"
+      }
+    },
+    "@webmusic/audio": {
+      "command": "npm view @webmusic/audio version dist-tags --json",
+      "version": "0.2.0",
+      "dist-tags": {
+        "latest": "0.2.0"
+      }
+    },
+    "@webmusic/bridge": {
+      "command": "npm view @webmusic/bridge version dist-tags --json",
+      "version": "0.2.0",
+      "dist-tags": {
+        "latest": "0.2.0"
+      }
+    }
+  },
+  "remoteTag": {
+    "command": "git ls-remote --tags origin 'refs/tags/v0.2.0' 'refs/tags/v0.2.0^{}'",
+    "tagObject": "0e713e89480d99a26f8ab1cb7823a6a329a87fb0",
+    "commit": "2e06a571d9d0b4bcb820aa685c66adedb8456bfa"
+  },
+  "identity": {
+    "command": "npm whoami",
+    "exitCode": 1,
+    "error": "E401 Unauthorized",
+    "publishScopeRightsVerified": false
+  },
+  "mutationsPerformed": false
+}

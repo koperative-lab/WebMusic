@@ -53,3 +53,9 @@ export {
 // Utilities
 export {makeId} from './utils/id';
 export {invariant, clamp} from './utils/invariants';
+
+// Document-owned sequence editing and read-only playback contracts.
+export * from './sequence';
+export * from './editing';
+export * from './audio-position-map';
+export * from './document-playback';

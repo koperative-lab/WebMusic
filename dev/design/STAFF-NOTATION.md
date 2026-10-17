@@ -9,7 +9,7 @@ browser and accessibility coverage remains open; this is not full MuseScore pari
 Layer and public entry: Score View core projection and browser `/render`
 adapter, composed by `<score-view type="staff">`.
 
-Related decisions: DEC-015, DEC-024.
+Related decisions: DEC-015, DEC-024, DEC-048.
 
 Source and public types: [notation projection](../../packages/score/src/view/core/staff-notation.ts),
 [beam grouping](../../packages/score/src/view/core/staff-beaming.ts),
@@ -30,6 +30,12 @@ scrolling notation: written note values, beam groups, tuplets, rests, voices,
 timed clefs, supported expressions and measure boundaries. The existing `staff` type owns this result; no
 additional Element, renderer-selection option or embedded control is needed.
 `score-sheet-view` retains its separate optional OSMD page-engraving workflow.
+
+Opt-in staff note entry reuses this renderer under DEC-048. Its local cursor,
+voice/duration controls and document-owned semantic transactions are specified
+in [Editing contracts](EDIT-COMPONENTS.md#staff-notation-entry). Drawing support
+for an imported structure does not imply editing support for that structure.
+Passive rendering and the dated evidence below retain their original scope.
 
 The previous renderer reduced notation to pitch and quantized note lengths.
 It could not reconstruct the source's written eighth-note triplets or clefs

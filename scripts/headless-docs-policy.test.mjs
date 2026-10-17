@@ -70,6 +70,16 @@ test('validates dense orders independently in each capability and rejects Overvi
   assert.ok(check([page(body, 1, 'docs/score/headless/play/index.mdx')]).some((failure) => failure.includes('Overview leaf')));
 });
 
+test('Edit Headless pages retain the same demo, reference and ordering requirements', () => {
+  const edit = 'docs/score/headless/edit/score-editor.mdx';
+  const audioEdit = 'docs/audio/headless/edit/audio-clip-editor.mdx';
+  assert.deepEqual(check([page(body, 1, edit), page(body, 1, audioEdit)]), []);
+  assert.ok(check([page(body.replace('<PlayerPlayground />', ''), 1, audioEdit)]).some((failure) => failure.includes('found 0')));
+  assert.ok(check([page(body.replace('<PlayerPlayground />', ''), 1, edit)])
+    .some((failure) => failure.includes('found 0')));
+  assert.ok(check([page(body, 2, edit)]).some((failure) => failure.includes('Headless orders')));
+});
+
 test('an unused frame import, missing import or import cycle cannot satisfy frame reachability', () => {
   for (const source of [
     `---\nimport Frame from './HeadlessDemoFrame.astro';\n---\n<div>Unused import</div>`,

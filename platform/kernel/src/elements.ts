@@ -249,6 +249,61 @@ export function defineOnce(tag: string, ctor: CustomElementConstructor): void {
 
 export type ElementTargetState = 'ready' | 'missing' | 'invalid' | 'ambiguous';
 
+/** A selected element may exist before its non-reflected source is available. */
+export type ElementSourceState = ElementTargetState | 'unavailable';
+
+export interface ElementSourceOptions<T> {
+  /** An explicit value takes precedence. Only undefined enables selector lookup. */
+  readonly source?: unknown;
+  readonly selector?: string;
+  readonly property: string;
+  /** Domain validation belongs to the consumer; Kernel has no domain types. */
+  readonly accepts: (value: unknown) => value is T;
+}
+
+export interface ElementSourceResolution<T> {
+  readonly state: ElementSourceState;
+  readonly source?: T;
+  readonly target?: Element;
+  readonly error?: unknown;
+}
+
+/**
+ * Resolve an explicit source or a selected element's public object property.
+ * Captures one configuration; dispose and rebind when that configuration changes.
+ * Does not subscribe to, own, or dispose the borrowed domain source. Source
+ * changes on the same target use the existing webmusic:sourcechange protocol.
+ */
+export function observeElementSource<T>(
+  host: Element,
+  options: ElementSourceOptions<T>,
+  listener: (resolution: ElementSourceResolution<T>) => void,
+): () => void {
+  const read = (value: unknown, target?: Element): ElementSourceResolution<T> => {
+    if (value === undefined) return {state: 'unavailable', target};
+    try {
+      return options.accepts(value)
+        ? {state: 'ready', source: value, target}
+        : {state: 'invalid', target, error: new TypeError(`Invalid ${options.property} source`)};
+    } catch (error) { return {state: 'invalid', target, error}; }
+  };
+  if (options.source !== undefined) {
+    listener(read(options.source));
+    return () => {};
+  }
+  if (!options.selector) {
+    listener({state: 'missing'});
+    return () => {};
+  }
+  return observeElementTarget(host, options.selector, (target, state) => {
+    if (!target || state !== 'ready') { listener({state, target}); return; }
+    let resolution: ElementSourceResolution<T>;
+    try { resolution = read((target as unknown as Record<string, unknown>)[options.property], target); }
+    catch (error) { resolution = {state: 'invalid', target, error}; }
+    listener(resolution);
+  });
+}
+
 /** Release the host callback even if an unknown custom element is never defined. */
 function observeDefinition(registry: CustomElementRegistry, name: string, onReady: () => void): () => void {
   let callback: (() => void) | undefined = onReady;

@@ -145,6 +145,43 @@ detaching must not silently change who owns that data or discard a caller's
 assignment. The precedence choice and migration rules must be shared by the
 Element and programmatic usage paths.
 
+## Document-bound editing extension
+
+[DEC-047](../DECISIONS.md#dec-047--document-owned-editing-and-borrowed-playback)
+accepts an additional source path, implemented for native Score playback and
+Score View. Audio delivery remains tracked in [STATUS](../STATUS.md), EDIT-01. [Editing contracts](EDIT-COMPONENTS.md) own its
+full command, position-map and resource protocol. This extends the direction of
+data borrowing without changing the passive source precedence above.
+
+The editor owns committed document content. Play borrows a Core read-only source,
+retains the snapshot actually applied, and owns the same transport and clock.
+An editor-bound View renders the document and local drafts, taking only compatible
+time/active state from its optional player. It must not reload the editor's URL
+or borrow the player's older snapshot as the current editable document.
+
+`documentId` and `documentRevision` are separate from publication and playback
+source-replacement revisions. An edit can be committed before Play has adopted
+it. The first protocol pauses, prepares and atomically applies mapped content,
+then stays paused. Requested/applied identity and applied/superseded/failed
+completion are observable. Pending or failed application gates stale playback;
+new transport commands cannot be overwritten by delayed preparation. Maps compose
+from the last applied revision, even across undo and skipped requests.
+
+Editor binding with independent data or `src` is an explicit conflict. Editor
+binding plus a player is valid composition, but playback overlays/seeks require
+matching document identity/revision and a verified coordinate mapping. Identity
+alone does not establish repeated-occurrence compatibility. A mismatch leaves
+document editing usable and reports playback unavailable. The first Score
+integration supports the native single-Score engine, not controller/Rack sources.
+Audio sequence sources do not pretend to be a single AudioClip.
+
+Object injection and the `editor` selector reach the same Core contract. Nonvisual
+document declarations own their editors; Views and Players borrow them. Existing
+selector root, late-upgrade, replacement, ambiguity and cleanup rules apply. A
+View still owns no player/clock and a Player never gains edit authority merely by
+observing a document. Source conflicts and lifecycle details use the editing
+contract, not implicit precedence between new and old source kinds.
+
 ## Attachment and lifecycle
 
 Attachment needs both an initial snapshot and subsequent updates. A component

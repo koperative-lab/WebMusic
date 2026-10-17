@@ -9,6 +9,9 @@ export {
   type ScoreViewTimeRange,
 } from './score-view';
 export type {ScoreViewType} from '../core/types';
+export {createScoreViewEditing, scoreDocumentPlaybackCompatible,
+  type ScoreViewEditing, type ScoreViewEditingOptions, type ScoreViewEditingState} from './score-editing';
+export {createStaffViewEditing, type StaffViewEditing, type StaffViewEditingOptions, type StaffViewEditingState} from './staff-editing';
 export {
   createPitchView,
   type PitchView,

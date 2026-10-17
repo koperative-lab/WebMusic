@@ -1,0 +1,13 @@
+
+> @webmusic/audio@0.2.0 test
+> vitest run test/core/sequence.test.ts test/edit test/play/document-binding.test.ts
+
+
+ RUN  v5.0.2 /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/audio
+
+
+ Test Files  7 passed (7)
+      Tests  127 passed (127)
+   Start at  01:01:48
+   Duration  476ms (transform 57%, environment 25%, import 9%, tests 9%, worker 1%)
+

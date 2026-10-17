@@ -1,0 +1,76 @@
+// @vitest-environment jsdom
+import {afterEach, beforeAll, beforeEach, describe, expect, it, vi} from 'vitest';
+import {createAudioClip, createRegion, type AudioDocumentPlaybackBinding, type AudioPeaks} from '../../src/core';
+import {createAudioClipEditor} from '../../src/edit/headless';
+import {createAudioViewEditing} from '../../src/view/headless/audio-editing';
+import type {AudioViewport, AudioWaveformSource, WaveformRenderOptions} from '../../src/view/core/types';
+
+const spies = vi.hoisted(() => ({render: vi.fn()}));
+vi.mock('../../src/view/render/waveform', () => ({renderWaveformVisualizer: spies.render}));
+import {mountWaveformEditor} from '../../src/view/render/waveform-editor';
+import {defineAudioViewElement, type AudioViewElement} from '../../src/view/element/audio-view';
+
+const cleanups: (() => void)[] = [];
+beforeAll(() => defineAudioViewElement('editing-audio-view'));
+beforeEach(() => {
+  spies.render.mockImplementation((host: HTMLElement, _source: AudioPeaks | AudioWaveformSource, options: WaveformRenderOptions) => {
+    const node = document.createElement('div'); node.dataset.wave = ''; host.append(node);
+    let zoom = options.pixelsPerSecond ?? 100, start = 0;
+    const listeners = new Set<(value: AudioViewport) => void>();
+    const viewport = () => ({startSeconds: start, endSeconds: start + 4});
+    return {redraw: vi.fn(), redrawFrame: vi.fn(), setPlayheadMode: vi.fn(), setPlayheadVisible: vi.fn(),
+      setZoom(value: number) { zoom = value; for (const listener of listeners) listener(viewport()); },
+      setOffset(value: number) { start = value; for (const listener of listeners) listener(viewport()); },
+      setRegions: vi.fn(), viewport, hitTest: (x: number) => ({seconds: start + x / zoom}),
+      onViewportChange(listener: (value: AudioViewport) => void) { listeners.add(listener); return () => listeners.delete(listener); },
+      dispose: vi.fn(() => node.remove()),
+    };
+  });
+});
+afterEach(() => {
+  document.body.replaceChildren();
+  for (const cleanup of cleanups.splice(0)) cleanup();
+  spies.render.mockReset(); vi.restoreAllMocks();
+});
+function editor() {
+  const value = createAudioClipEditor(createAudioClip({sampleRate: 100, channelData: [new Float32Array(1000).fill(.5)]}));
+  cleanups.push(() => value.dispose()); return value;
+}
+function mount() {
+  const model = editor(), editing = createAudioViewEditing(model, {editable: true});
+  const host = document.createElement('div'); document.body.append(host);
+  const onPreview = vi.fn(), onCommit = vi.fn(), onError = vi.fn();
+  const handle = mountWaveformEditor(host, editing, {pixelsPerSecond: 100, onPreview, onCommit, onError});
+  cleanups.push(() => { handle.dispose(); editing.dispose(); });
+  return {model, editing, host, handle, onPreview, onCommit, onError};
+}
+function field(root: ParentNode, label: string, value: string) { const input = root.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)!; input.value = value; return input; }
+function button(root: ParentNode, label: string) { return [...root.querySelectorAll('button')].find((value) => value.textContent === label)!; }
+function pointer(surface: HTMLElement, type: string, x: number, id = 1) {
+  const event = new MouseEvent(type, {bubbles: true, cancelable: true, clientX: x, clientY: 10, button: 0});
+  Object.defineProperty(event, 'pointerId', {value: id}); surface.dispatchEvent(event);
+}
+function key(surface: HTMLElement, key: string, options: KeyboardEventInit = {}) { surface.dispatchEvent(new KeyboardEvent('keydown', {key, bubbles: true, cancelable: true, ...options})); }
+
+
+describe('release lifecycle probes', () => {
+  it('source notification cleanup honors a newer explicit editor', () => {
+    const a = editor(), b = editor(), c = editor();
+    const owner = Object.assign(document.createElement('div'), {editor: a}); owner.id = 'owner'; document.body.append(owner);
+    const view = document.createElement('editing-audio-view') as AudioViewElement; view.setAttribute('editor', '#owner'); view.editable = true; document.body.append(view);
+    view.interactionSession!.subscribe(snapshot => { if (snapshot.disposed) view.editor = c; });
+    owner.editor = b; owner.dispatchEvent(new CustomEvent('webmusic:sourcechange', {bubbles: true}));
+    expect(view.editor).toBe(c);
+    expect(view.interactionSession!.getSnapshot().documentId).toBe(c.getSnapshot().documentId);
+  });
+  it('direct replacement disposes every intermediate owned interaction session', () => {
+    const a = editor(), b = editor(), c = editor();
+    const made: ReturnType<typeof c.createInteractionSession>[] = [];
+    const create = c.createInteractionSession.bind(c); vi.spyOn(c, 'createInteractionSession').mockImplementation(() => { const session = create(); made.push(session); return session; });
+    const view = document.createElement('editing-audio-view') as AudioViewElement; view.editor = a; view.editable = true; document.body.append(view);
+    view.interactionSession!.subscribe(snapshot => { if (snapshot.disposed) view.editor = c; });
+    view.editor = b; view.remove();
+    expect(made.length).toBeGreaterThan(0);
+    expect(made.every(session => session.getSnapshot().disposed)).toBe(true);
+  });
+});

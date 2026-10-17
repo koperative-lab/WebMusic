@@ -18,3 +18,5 @@ export {
   renderScoreVisualizer,
   type ScoreVisualizerRenderOptions,
 } from './score-visualizer';
+export {mountPianoRollEditor, type PianoRollEditingOptions, type PianoRollEditingHandle} from './piano-roll-editor';
+export {mountStaffEditor, type StaffEditingOptions, type StaffEditingHandle} from './staff-editor';

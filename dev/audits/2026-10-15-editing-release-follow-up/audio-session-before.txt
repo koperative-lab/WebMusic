@@ -1,0 +1,107 @@
+
+> @webmusic/audio@0.2.0 test
+> vitest run test/edit/review-release-probe.test.ts
+
+
+ RUN  v5.0.2 /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/audio
+
+stdout | test/edit/review-release-probe.test.ts > temporary release review > does not retain a new draft after retiring the old lease disposes the session
+after-cleanup { assets: 1, bytes: 32, leases: 1 } disposed true draft true
+
+stdout | test/edit/review-release-probe.test.ts > temporary release review > keeps a session disposed when invalidating its draft releases an adapter
+commit committed editor disposed session false { assets: 0, bytes: 0, leases: 0 }
+
+stdout | test/edit/review-release-probe.test.ts > temporary release review > does not orphan a nested preview lease during old draft retirement
+outer preview nested preview
+nested-after-cleanup { assets: 1, bytes: 32, leases: 1 }
+
+ ❯ test/edit/review-release-probe.test.ts (3 tests | 3 failed) 9ms
+   ❯ temporary release review (3)
+     × does not retain a new draft after retiring the old lease disposes the session 6ms
+     × keeps a session disposed when invalidating its draft releases an adapter 1ms
+     × does not orphan a nested preview lease during old draft retirement 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/edit/review-release-probe.test.ts > temporary release review > does not retain a new draft after retiring the old lease disposes the session
+AssertionError: expected { assets: 1, bytes: 32, leases: 1 } to deeply equal { assets: +0, bytes: +0, leases: +0 }
+
+- Expected
++ Received
+
+  {
+-   "assets": 0,
+-   "bytes": 0,
+-   "leases": 0,
++   "assets": 1,
++   "bytes": 32,
++   "leases": 1,
+  }
+
+ ❯ test/edit/review-release-probe.test.ts:30:30
+     28|     session.dispose(); editor.dispose();
+     29|     console.log('after-cleanup', store.getStats(), 'disposed', session…
+     30|     expect(store.getStats()).toEqual({assets: 0, bytes: 0, leases: 0});
+       |                              ^
+     31|     expect(session.getSnapshot().draft).toBeUndefined();
+     32|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  test/edit/review-release-probe.test.ts > temporary release review > keeps a session disposed when invalidating its draft releases an adapter
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ test/edit/review-release-probe.test.ts:41:44
+     39|     expect(result.status).toBe('committed');
+     40|     expect(editor.getSnapshot().status).toBe('disposed');
+     41|     expect(session.getSnapshot().disposed).toBe(true);
+       |                                            ^
+     42|   });
+     43|   it('does not orphan a nested preview lease during old draft retireme…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  test/edit/review-release-probe.test.ts > temporary release review > does not orphan a nested preview lease during old draft retirement
+AssertionError: expected { assets: 1, bytes: 32, leases: 1 } to deeply equal { assets: +0, bytes: +0, leases: +0 }
+
+- Expected
++ Received
+
+  {
+-   "assets": 0,
+-   "bytes": 0,
+-   "leases": 0,
++   "assets": 1,
++   "bytes": 32,
++   "leases": 1,
+  }
+
+ ❯ test/edit/review-release-probe.test.ts:51:30
+     49|     session.dispose(); editor.dispose();
+     50|     console.log('nested-after-cleanup', store.getStats());
+     51|     expect(store.getStats()).toEqual({assets: 0, bytes: 0, leases: 0});
+       |                              ^
+     52|   });
+     53|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed (3)
+   Start at  23:36:24
+   Duration  178ms (transform 76%, import 13%, tests 9%, worker 2%)
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/audio
+npm error workspace @webmusic/audio@0.2.0
+npm error location /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/audio
+npm error command failed
+npm error command sh -c vitest run test/edit/review-release-probe.test.ts

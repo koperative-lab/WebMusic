@@ -7,6 +7,8 @@ sidebar:
 
 import ScoreViewDemo from '../../../../../components/ScoreViewDemo.astro';
 import WaterfallKeyboardDemo from '../../../../../components/WaterfallKeyboardDemo.astro';
+import ScoreEditingDemo from '../../../../../components/elements/ScoreEditingDemo.astro';
+import StaffEditingDemo from '../../../../../components/elements/StaffEditingDemo.astro';
 
 `<score-view>` displays a loaded score as `piano-roll` (default), `staff`, `waterfall`, `map` or `thumbnail`. Each instance renders one surface. Select `type` in the demo’s external Parameters; only relevant drawing controls appear, and switching back restores their retained values.
 
@@ -32,7 +34,7 @@ The demo contains one player and one score view. Expand the player’s Parameter
 
 ## Annotations and compact layout
 
-All five types show supported directions retained in the Score: words such as
+All five passive types show supported directions retained in the Score: words such as
 `rit.`, rehearsal labels, dynamics, metronome marks, pedal signs/lines and
 crescendo/diminuendo hairpins. The staff places them around notation; the other
 types place them along their time axis with compact labels and span lines.
@@ -59,6 +61,14 @@ an explicit height still defines the application’s viewport.
 
 Time, pitch and instrument dimensions are separate. Changing a note's displayed
 length does not change its duration or playback rate.
+
+An editor-bound piano roll instead uses written quarter-note coordinates, with
+`.options.pixelsPerQuarter` (default `64`) and `.options.editingGrid` (default
+`[1, 4]`). Its pitch lanes default to `20px`; explicit `note-height`, `min-pitch`
+and `max-pitch` still apply. Its default range includes MIDI 48–84 and expands
+to include the notes. `pixels-per-second` and `note-spacing` belong to the
+passive renderers below. The editing grid currently draws notes and a quarter
+ruler; expressive annotation strips remain on the passive views.
 
 | Surface / dimension | Attribute | Effect |
 | --- | --- | --- |
@@ -262,7 +272,7 @@ but time changes do not redraw the thumbnail.
 
 ## Data and playback
 
-Source precedence is explicit `.score`, then `src`, then the selected player’s resolved score. Explicit URLs load through [`@webmusic/score/io`](/score/api/io/). A player-only view borrows data without another fetch. Changing `type` reuses the resolved score and player snapshot while replacing the old presentation.
+Without an editor, source precedence is explicit `.score`, then `src`, then the selected player’s resolved score. Explicit URLs load through [`@webmusic/score/io`](/score/api/io/). A player-only view borrows data without another fetch. Changing `type` reuses the resolved score and player snapshot while replacing the old presentation.
 
 The `player` selector must resolve uniquely in the current Document or ShadowRoot. Native snapshots initialize position, including paused state, then data/state/time updates keep it current. Late or replaced targets rebind; invalid or ambiguous selectors remain unbound. Disconnect cancels pending work and releases owned subscriptions and renderers without stopping playback. No type creates a player or audio resource. Only `map` sends seek commands.
 
@@ -276,6 +286,150 @@ target replacing its `.playback` property dispatches `webmusic:sourcechange`.
 
 Missing source data displays a waiting status. The three note views show an empty status for a score without notes, and load or drawing failures show an accessible error message. Replacing the source or drawing options retries the applicable work. Disconnect also releases the waterfall resize observer.
 
+## Piano-roll editing
+
+Bind a [Score document](/score/element/edit/score-document/) and add `editable`
+to edit its existing piano-roll surface. The document owns content and history;
+the View borrows its Core editor port. The second composition demonstrates this
+different source relationship while retaining the passive main demo above.
+
+<ScoreEditingDemo />
+
+```html
+<script type="module">
+  import {defineScoreDocumentElement} from '@webmusic/score/edit/element';
+  import {defineScoreViewElement} from '@webmusic/score/view/element';
+  defineScoreDocumentElement();
+  defineScoreViewElement();
+</script>
+<score-document id="notes" src="/midi/Arabesque%20No.1.mid"></score-document>
+<score-view editor="#notes" type="piano-roll" editable></score-view>
+<score-view editor="#notes" type="staff"></score-view>
+```
+
+Click selects; Shift-click adds/removes a note. Drag a note to move it in time
+and pitch; drag its right edge to resize. Double-click empty space inserts a
+quarter note. Alt-drag inserts a note with a previewed duration. Timing snaps to
+the rational editing grid. The focused grid handles arrows, Shift+Left/Right
+for duration, Delete/Backspace, Ctrl/Cmd+A, Ctrl/Cmd+Z, Shift+Ctrl/Cmd+Z and
+Ctrl/Cmd+Y. Keyboard input in the numeric form or elsewhere is not intercepted.
+
+The **Note values and keyboard alternatives** disclosure includes a native
+**Select existing note** menu. Open the disclosure with the keyboard, tab to
+the menu and choose a note using its native keys. Labels identify the part name
+and number, written pitch, quarter onset, voice and note number; notes are ordered
+by part, onset and pitch, with stable ordering for ties. Selecting a note updates
+the value fields without changing content
+or history. **No selection** clears selection; a multi-selection made elsewhere
+appears as a summary until you choose one note or clear it. Deletion removes its
+option, and undo restores the option without restoring selection.
+
+Numeric fields belong to the selected note at its committed document revision.
+A different selection or document revision refreshes them, including external
+edits and undo/redo, without moving focus. Playback and focus changes preserve
+unsubmitted values for the same target and revision. Shared previews appear on
+the grid but do not replace this committed numeric baseline. With no single
+selected note, Apply is disabled and the fields remain usable as insertion values.
+
+The labeled onset/duration fields accept integers, decimals or fractions;
+other controls provide written MIDI pitch, velocity, insertion part and
+edit/history buttons. Apply changes one
+selected note; insertion uses the chosen part's first voice, or voice `1` for
+an empty part. A document needs a part before notes can be inserted. Unsupported
+tie/tuplet/grace repairs fail visibly through the same semantic commands.
+
+A drag publishes revision-bound `editpreview` drafts and adds one history item
+on successful completion. Escape, pointer cancellation, lost capture, focus/window
+blur, viewport size changes, mode/options changes, detach and a changed document revision cancel the
+gesture. A failed latest preview cannot commit an earlier valid preview.
+The grid redraws newly visible notes when its containing viewport changes size.
+Selection has a heavier outline, drafts have dashed outlines, and a live status
+reports selection, drafts and failures. The empty editor still exposes the grid
+and numeric insertion controls.
+
+Each View owns an interaction session by default. Assign the same
+`.interactionSession` from the bound editor to share selection and drafts across
+surfaces. Foreign-document sessions are rejected. Disconnect disposes only a
+View-created session; a supplied session and editor remain caller-owned.
+Replacing or clearing this property restores the compatible player's current
+position immediately, including while paused. Clearing it creates a new
+View-owned session; it does not dispose the previously supplied session.
+If a cleanup callback synchronously requests another editor or reconnects the
+View, the newer attachment remains active; the old cleanup releases only its
+own session, subscriptions and presentation.
+Selection is pruned when notes disappear and is not restored by undo.
+
+`.editor` takes precedence over the `editor` selector; assigning `undefined`
+restores selector lookup. Selectors require one target in the current root and
+track late insertion, removal and `webmusic:sourcechange`. An editor alongside
+independent `.score` or `src` is `source-conflict`: object setters reject it
+before replacement, and conflicting attributes disable editing until corrected.
+No View creates an editor implicitly. Read-only editor binding works for all
+types; `editable` is supported for piano roll and staff.
+
+An optional player contributes time only when its applied document ID and
+revision exactly match, its binding is ready, and `documentCoordinates` is true.
+Pending, failed, foreign or repeat-expanded unmapped playback suppresses
+playheads, active notes and map seeking. The editor's newly committed content
+stays visible while playback catches up. `editcommit` reports a document commit,
+not playback readiness.
+
+## Staff input
+
+Use `type="staff" editable` with the same document owner. The notation surface
+retains its own input cursor, duration, octave, accidental, part, voice and
+staff; document content and undo history remain shared with the piano roll.
+The demo uses an original two-measure MusicXML fixture: four quarter notes in
+the first measure and a whole rest in the second. Its separate document keeps
+the MIDI example above independent.
+
+<StaffEditingDemo />
+
+```html
+<score-document id="notation" src="/musicxml/StaffEditing.musicxml"></score-document>
+<score-view type="staff" editor="#notation" editable></score-view>
+<score-view type="piano-roll" editor="#notation" editable></score-view>
+```
+
+Focus **Staff note input** and press **N** to enable note input, then **A–G**
+to enter a spelled pitch. **1–7** choose whole through sixty-fourth note
+values; **0** enters a rest. Left/Right moves the cursor by the
+current duration, Up/Down changes the octave, and Escape exits note input.
+Ctrl/Cmd+Z, Shift+Ctrl/Cmd+Z and Ctrl/Cmd+Y operate the shared document history.
+The shortcuts apply only to the focused notation surface, never to text fields.
+
+The labeled fields and buttons supply the same commands without shortcuts:
+choose **Insert into part**, **Voice**, **Staff**, **Cursor (quarters)**,
+**Duration (quarters)**, **Dots**, **Octave**, **Accidental** and **Pitch letter**,
+then **Insert note** or **Insert rest**. Selecting an existing event sets the
+input position; **Delete selected** replaces its span with a rest. A committed
+entry advances the cursor. Input changes publish `editcommit` or `editerror`;
+staff entry is atomic and has no drag preview.
+
+An entry must fit completely inside one existing authored measure. Entering
+within a rest splits it as necessary and fills the selected voice/staff's gaps
+with actual written rests. It may replace fully covered notes, but cannot cut
+through a sounding note. Enter **Voice** `2` to add an independent voice while
+retaining the imported first voice. Every note/rest entry and its rest repair
+use one undo item.
+Set the cursor to `4` in the demo to enter the second measure, or use Undo in
+either surface to restore the previous document.
+
+This first notation-input subset supports simple monophonic measure/voice/staff
+lanes. Chords, ties, tuplets, grace notes, authored beams/slurs, hidden or
+unpitched events, cross-bar entry and arbitrary voice repair fail explicitly.
+Staff editing does not reconstruct measures from MIDI: after importing MIDI in
+this demo, the roll remains editable, but staff entry reports the missing
+authored-measure requirement. Reload the configured MusicXML source to restore
+its notation. Export MIDI retains playback notes and loses written rests,
+voices and other notation details; it does not mark this notation document
+saved. **Export MusicXML** retains supported staff-entry notation, voices and
+rests on the demo's binary quarter grid and marks the exported content identity
+saved. The demo requests 960 divisions per quarter, preserving positions down
+to 1/64 quarter and double-dotted sixty-fourths exactly. Imported arbitrary
+rhythms retain the serializer's fixed-resolution limits. A download request
+does not confirm that the browser finished writing a file.
+
 <details class="component-section">
 <summary>API</summary>
 
@@ -283,6 +437,9 @@ Missing source data displays a waiting status. The three note views show an empt
 | --- | --- | --- |
 | `src` / `format` | attributes | Explicit MIDI / MusicXML / MXL / ABC URL and optional parser override. |
 | `player` | attribute | Unique source/position selector; explicit score input retains precedence. |
+| `editor` / `.editor` | selector attribute / writable property | Borrow a `ScoreEditorPort`; object wins, `undefined` restores selector resolution. Cannot coexist with independent `.score` or `src`. |
+| `editable` / `.editable` | boolean attribute / property | Default false. Enable mutation commands for a ready editor-bound piano roll or staff; never creates an editor. |
+| `.interactionSession` | writable property | Optional same-document `ScoreInteractionSession`; getter returns the supplied or View-created session. Supplied sessions are borrowed. |
 | `type` / `.type` | attribute / writable property | `piano-roll`, `staff`, `waterfall`, `map` or `thumbnail`; unknown values use piano-roll. |
 | `width` / `height` | attributes | Bare numbers are px; CSS lengths pass through. Width defaults to 100%; height follows the drawing. Thumbnail uses 3rem plus any annotation strip. A fixed height makes a taller surface scroll within its box. |
 | `show-annotations` | attribute | All types; default true. `false` hides score directions and removes their reserved space. Absent, empty or `true` shows them. `.options.showAnnotations` takes precedence. |
@@ -292,7 +449,7 @@ Missing source data displays a waiting status. The three note views show an empt
 | `scroll-type` | attribute | Staff only: `page` (default), `note` or `bar`. |
 | `split-staves` | attribute | Staff only; default true. Preserve source staff assignments within each part. `false` combines that part’s staves; absent, empty or `true` preserves them. `.options.splitStaves` takes precedence. |
 | `pixels-per-second` | attribute | Piano-roll/waterfall pixels per second; default 30. Staff uses notation-aware spacing; a positive value requests `value × 60 / initialQpm` pixels per quarter, with extra space where glyphs require it. |
-| `note-height` | attribute | Piano-roll note height or staff notation scale; default 6px. |
+| `note-height` | attribute | Piano-roll note height or staff notation scale; default 6px for passive views, 20px for the editor grid. |
 | `note-spacing` | attribute | Piano-roll/waterfall note-length gap or staff notation spacing; default 1px. |
 | `min-pitch` / `max-pitch` | attributes | Piano-roll/waterfall MIDI pitch limits; unspecified bounds come from the score. Explicit waterfall bounds are exact and take precedence over automatic octave range selection. |
 | `white-note-width` | attribute | Waterfall natural-note pitch-column width; fits the container by default. A positive explicit natural or accidental width fixes pitch scale. |
@@ -300,6 +457,10 @@ Missing source data displays a waiting status. The three note views show an empt
 | `default-key` | attribute | Staff fallback major-key index, 0…11 by chromatic pitch class (0 = C, 1 = D♭, 2 = D); default 0. This is not a fifths count. |
 | `note-color` / `active-note-color` | attributes | Score-renderer idle/active colors; the Element’s active default is red `rgb(240, 84, 119)`. `note-color` also styles thumbnail. Map uses timeline tokens. |
 | `.score` | writable property | Assign a loaded Score; overrides `src` and player data, cancelling obsolete loads. |
+| `.options.pixelsPerQuarter` / `.options.editingGrid` | properties | Editor piano-roll scale (positive pixels/quarter, default 64) and positive rational snap grid (default `[1, 4]`). |
+| `data-editor-state` | reflected state | `ready`, `missing`, `invalid`, `ambiguous`, `unavailable` or `source-conflict`. |
+| `data-editable-state` | reflected state | `readonly`, `ready`, `unsupported-type` or `unavailable`. |
+| `data-playback-state` | reflected state | Editor playback compatibility: `unbound`, `ready` or `pending`. |
 | `configure(configuration)` | method | Atomically select `piano-roll`, `staff` or `waterfall` and replace optional mode-specific `.options`. Invalid modes, malformed options and unsupported keys throw `TypeError` before changing the view. Map/thumbnail use `.type`, `.options` and their attributes. |
 | `.options` | writable property | `ScoreViewRenderOptions` override note-renderer attributes; map/thumbnail also honor `showAnnotations`, `noteRGB` and `noteColor`; see the [renderer API](/score/api/view/). |
 | `.currentTime` | read-only property | Current nominal score position in seconds. |
@@ -321,9 +482,16 @@ const configuredView = new ScoreViewElement();
 configuredView.configure({type: 'staff', options: {splitStaves: true, showAnnotations: false}});
 ```
 
-**Events.** Only map emits `webscore:seek`: `{quarters, seconds}`, bubbling and composed, with nominal seconds. Other types are passive displays.
+**Events.** Map emits `webscore:seek`: `{quarters, seconds}` in nominal time.
+Editing emits `editpreview` with the successful `ScoreDraftResult` (`status:
+"preview"`, interaction snapshot), `editcommit` with the committed
+`ScoreEditResult` (`status: "committed"`, document snapshot and change), and
+`editerror` with `{error}`. No `editcommit` is emitted for cancellation, failure
+or a no-op. All four events bubble and are composed. Staff input emits commits
+and errors, with no preview event; waterfall, map and thumbnail have no mutation
+gestures.
 
-**Accessibility.** The map uses the shared [timeline interaction](/uikit/transport-time/timeline/). Other types provide labeled graphics and current-position highlighting where applicable; thumbnail adds no interactive controls. Native external Parameters configure the selected drawing.
+**Accessibility.** The map uses the shared [timeline interaction](/uikit/transport-time/timeline/). The editor grid and staff-input surface are focusable with a named application role, instructions and a live status; labeled controls supply alternatives to surface shortcuts. Staff note input has an explicit on/off button. Passive types provide labeled graphics and current-position highlighting where applicable; thumbnail adds no interactive controls.
 
 </details>
 
@@ -349,6 +517,18 @@ For staff, piano-roll and waterfall, `--wm-score-view-background` overrides the 
 Map density cells use `--wm-score-view-map`, falling back to `--wm-accent`. Their opacity still represents density. Explicit `.options.noteColor`, `.options.noteRGB` and `note-color` override that default, in that order. Thumbnail follows the same explicit precedence with its separate default above.
 
 All five types use live CSS paint expressions: changing a class, ancestor token or inline custom property updates the existing drawing without reloading the score or moving its cursor. These are light-DOM nodes: target `[part~="root"]` / `[part~="surface"]` on the presenter, and `[part~="drawing"]` on full note views and thumbnail, using ordinary selectors rather than shadow-DOM `::part()`.
+
+The editor exposes light-DOM parts `editor`, `editing-instructions`,
+`editing-viewport`, `editing-surface`, `editing-status` and `note-properties`.
+Its viewport uses `--wm-score-view-background` then `--wm-surface`, and the border
+uses `--wm-border`. Note paint follows the existing note/active-note tokens and
+explicit color options. Preserve visible focus and the selected/draft outlines
+when styling the grid.
+
+The staff editor also exposes `staff-input-surface` and `staff-input-controls`
+parts around its focusable notation and labeled command disclosure. It reuses
+the existing staff drawing, colors and scrolling. Preserve its visible focus,
+selected-note outlines and input cursor when styling it.
 
 ```css
 score-view {

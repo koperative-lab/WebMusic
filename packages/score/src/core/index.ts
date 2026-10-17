@@ -12,6 +12,16 @@ export {Score, type ScoreData} from './model/Score';
 export {ScoreBuilder} from './model/ScoreBuilder';
 export {ScoreEditSession} from './model/ScoreEditSession';
 export {
+  ScoreEditError, createScorePositionMap, composeScorePositionMaps, mapScorePosition,
+  isScoreDocumentSource, isScoreEditorPort,
+  type ScoreQuarterValue, type ScoreNoteInput, type ScoreNotationDuration, type ScoreNotationEntry, type ScoreEditOperation, type ScoreRevisionGuard,
+  type ScoreEditCommand, type ScoreEditErrorCode, type ScorePositionMap, type ScoreMappedPosition,
+  type ScoreDocumentChange, type ScoreDocumentSnapshot, type ScoreDocumentSource,
+  type ScoreEditorState, type ScoreEditFailure, type ScoreEditResult, type ScoreEditTransaction,
+  type ScoreCheckpoint, type ScoreInteractionSnapshot, type ScoreDraftResult,
+  type ScoreInteractionSession, type ScoreEditorPort,
+} from './editing';
+export {
   validateScore,
   assertValidScore,
   type ScoreValidationIssue,
@@ -38,6 +48,10 @@ export {expandRepeats, playedDurationSeconds} from './transform/expandRepeats';
 export {EventEmitter, type EventListenerFailureMode} from './events/EventEmitter';
 export {
   observeScorePlayback,
+  ScoreDocumentApplicationError,
+  type ScoreDocumentRevision,
+  type ScoreDocumentPlaybackBinding,
+  type ScoreDocumentApplicationResult,
   type ScorePlaybackSource,
   type ScorePlaybackSnapshot,
   type ScorePlaybackNote,

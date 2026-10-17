@@ -1,6 +1,6 @@
 ---
 title: AudioPlayer
-description: 'A stable playback owner over a replaceable clip or borrowed queue/mix transport.'
+description: 'A stable playback owner over clips, borrowed group transports and revisioned editing sequences.'
 sidebar:
   order: 1
 ---
@@ -8,7 +8,7 @@ sidebar:
 import HlAudioPlayerDemo from '../../../../../components/headless/HlAudioPlayerDemo.astro';
 
 `AudioPlayer` is the central Audio command surface. It retains one identity while
-its clip changes, or delegates to an existing queue/mix backend. It creates no
+its clip changes, borrows an editing document, or delegates to an existing queue/mix backend. It creates no
 second transport clock. Use [`AudioClipPlayer`](/audio/headless/play/audio-clip-player/)
 when an immutable single-clip engine is all the application needs.
 
@@ -65,6 +65,70 @@ active entry and exposes that clip. A mix uses its group axis and has no single
 clip or aggregate analyser. Unsupported analyser/clock/scratch capabilities are absent; unsupported live control setters throw rather than silently succeeding.
 Sharing this facade does not complete shared-clock injection across mix members.
 
+## Edited sequence playback
+
+```ts
+import {createAudioClipEditor} from '@webmusic/audio/edit/headless';
+import {AudioPlayer} from '@webmusic/audio/play/headless';
+import {loadClipFromUrl} from '@webmusic/audio/play';
+
+const clip = await loadClipFromUrl('/wav/Arabesque%20No.1.wav');
+const editor = createAudioClipEditor(clip);
+const player = new AudioPlayer();
+player.setDocumentSource(editor);
+await player.waitForDocumentRevision(editor.getSnapshot());
+editor.transaction('Insert silence', (transaction) => transaction.add({
+  type: 'insert-silence', frame: 0, length: clip.sampleRate, id: 'opening-silence',
+}));
+const result = await player.waitForDocumentRevision(editor.getSnapshot());
+if (result.status === 'applied') await player.play();
+player.dispose(); // releases playback leases; never disposes editor
+editor.dispose();
+```
+
+The player owns a segment-aware transport behind its existing borrowed-transport
+interface. Revisions preserve that transport and clock identity. Document
+replacement, detachment and disposal release this owned transport, its scheduled
+voices, cached chunks and asset leases. The editor and an injected context stay
+caller-owned. `.clip` is undefined for a sequence; it never pretends the first
+asset is the document. Read `.source.kind` to distinguish `empty`, `clip` and
+`sequence`. Clip-only companions are unavailable; an editor-bound waveform reads
+the sequence, and meters can follow the graph after explicit play/preload.
+
+Applying an edit pauses playback, cancels scheduled work, validates and retains
+sequence references, then publishes the exact applied document ID/revision.
+It reads no PCM and creates/resumes no AudioContext. Applied revisions stay
+paused. `play()` during preparation or a failed application rejects with
+`AudioDocumentApplicationError` code `not-ready`. A failure retains the last
+applied snapshot and the edited document; retry explicitly. Same-source assignment
+is a no-op. Detachment clears the sequence instead of restoring an earlier clip.
+If releasing an obsolete attempt synchronously attaches another document, the
+old disposal notification cannot clear the new request. Revision waits and
+explicit retries continue to target the new attachment.
+
+Position maps compose across skipped revisions, failure and undo. Positions inside
+deleted content collapse to the deletion boundary with left affinity; undo does
+not reconstruct that lost position. Stop/seek during preparation override older
+position intent. Missing map chains reset to zero and clear loops, reported as
+`positionPolicy: 'reset-origin'`; valid maps report `preserve-frame`. Collapsed or
+inverted mapped loop ranges are disabled. Rate, gain, pan and valid loops survive
+adoption. Sequence seeks and loop bounds round to the nearest output frame;
+loop ends also clamp to the sequence length. Scheduling and reported positions
+use these same accepted bounds. A loop that collapses after rounding is rejected.
+
+Playback reads bounded chunks with segment gain, linear envelopes and silence
+through the same Core range reader as explicit WAV rendering. The default chunk
+is 16,384 frames; `preparedBytesLimit` defaults to 64 MiB across active and inactive
+PCM chunks. Inactive chunks are evicted in least-recently-used order before allocation;
+active chunks remain pinned. A chunk larger than the budget fails document
+application. A running allocation that cannot fit fails playback and stops voices.
+No revision stores a full rendered sequence. Scheduling uses a 200 ms lookahead,
+25 ms timer and at most 512 scheduled voices; excessively short loops are rejected
+before starting, and density is rechecked on rate changes. Browser timer throttling
+can still interrupt live audio; this is not a seamless background-rendering engine.
+Sequence rate changes transpose; `setPreservesPitch(true)` is unsupported and
+throws. Sequence scratch sessions are unavailable.
+
 <details class="component-section">
 <summary>API</summary>
 
@@ -72,10 +136,15 @@ Sharing this facade does not complete shared-clock injection across mix members.
 
 | Member | Contract |
 | --- | --- |
-| `new AudioPlayer(clip?, options?)` / `createAudioPlayer(clip?, options?)` | Empty by default. `AudioPlayerOptions` uses the [clip engine options](/audio/headless/play/audio-clip-player/): context/destination, engine, media adapter, rate, volume, pan, loop, pitch preservation and effects. |
+| `new AudioPlayer(clip?, options?)` / `createAudioPlayer(clip?, options?)` | Empty by default. `AudioPlayerOptions` uses the [clip engine options](/audio/headless/play/audio-clip-player/): context/destination, engine, media adapter, rate, volume, pan, loop, pitch preservation and effects. Adds positive safe-integer `chunkFrames` (16,384) and `preparedBytesLimit` (67,108,864 bytes) for document sequences. |
 | `setClip(clip \| undefined)` | Replace the selected source; undefined clears it. Source replacement invalidates the old owned playback and scratch work. |
 | `setTransport(transport \| undefined)` | Borrow an `AudioPlayerTransport`; undefined detaches the selected borrowed backend. Direct and indirect facade borrowing cycles are rejected. |
-| `clip` / `transport` | Readonly selected clip or borrowed transport; a mix returns no clip. |
+| `clip` / `transport` | Readonly selected clip or selected transport; sequences and mixes return no clip. Document playback owns its transport even though this property exposes the borrowed facade path. |
+| `source` | `AudioPlaybackSourceSnapshot`: `{kind: 'empty', clip: undefined, revision}`, `{kind: 'clip', clip, revision}`, or `{kind: 'sequence', clip: undefined, sequence, assets, documentId, documentRevision, revision}`. `revision` counts source publications, independently of the document revision. |
+| `setDocumentSource(source \| undefined)` / `documentSource` | Borrow a Core `AudioDocumentSource`. Independent clip/transport conflicts reject before replacement. Undefined detaches and releases the owned sequence engine. |
+| `documentBinding` | `{status, attempt, requested?, applied?, positionPolicy?, documentCoordinates, error?}`. Status is `empty`, `preparing`, `ready` or `error`; requested/applied values are `{documentId, documentRevision}`. Coordinates are usable only when ready. |
+| `waitForDocumentRevision(target)` | Observe the current requested revision; resolves `applied`, `superseded` or `failed`, with target and attempt. Unknown future revisions fail with `unknown-revision`; obsolete targets and detach/dispose resolve superseded. Applied confirms the exact target is active at settlement. |
+| `retryDocumentApplication()` | New attempt for the current requested revision. Earlier failed results stay terminal; new waiters observe the retry. |
 
 ### Commands and state
 
@@ -86,7 +155,7 @@ Sharing this facade does not complete shared-clock injection across mix members.
 | `seek(seconds)` / `seekFraction(fraction)` / `scrub(deltaSeconds)` | Delegate seeks on the selected content axis. Fraction clamps to 0–1; scrub is a relative seek, not scratch audio. |
 | `preload()` | Prepare the selected backend without starting sound, when supported. |
 | `setVolume(value)` / `setRate(value)` / `setPan(value)` | Set clip controls; rate clamps to 0.25–4, pan to −1–1, volume is nonnegative. Nonfinite input throws. A selected borrowed backend must expose the requested setter or the command throws without committing a new retained setting. |
-| `setLoop(loop)` / `setPreservesPitch(value)` | Clip configuration. Queue loop belongs to the queue's list policy; do not infer group loop/pan/pitch support. |
+| `setLoop(loop)` / `setPreservesPitch(value)` | Clip/sequence configuration; sequence loop is explicit transport capability. Queue loop belongs to the queue's list policy; do not infer group loop/pan/pitch support. |
 | `beginScratch()` / `scratching` | Borrow the selected backend's optional scratch session. See [scratch sessions](/audio/headless/play/audio-clip-player/#scratch-sessions). |
 | `seconds` / `currentTime` / `duration` / `progress` | Live position, duration and fraction; zero for empty input. |
 | `playing` | Selected backend's playback state. |
@@ -98,7 +167,8 @@ Sharing this facade does not complete shared-clock injection across mix members.
 ### Events and lifecycle
 
 `on`, `once` and `off` use `AudioPlayerEvents`; `on`/`once` return an unsubscribe.
-`sourcechange` carries `{clip, revision}`, `statechange` carries `{playing}`, and
+`sourcechange` carries the discriminated `.source` snapshot, including same-transport document revisions.
+`documentstatechange` carries `.documentBinding`; `statechange` carries `{playing}`, and
 `timeupdate` carries `{seconds, duration, progress}`. Notifications are synchronous;
 read current state again after reentrant callbacks. Source observation does not
 start playback. `load` carries `{duration}`; `end` carries the clip or undefined
@@ -106,13 +176,16 @@ for a backend without one. `regionenter`, `regionleave` and `beat` forward clip
 annotations. `error` carries an Error from the selected backend.
 
 `dispose()` is terminal and idempotent. It releases subscriptions, observation,
-owned engine/output and only an internally created context. A supplied context
+owned clip/sequence engines, output, asset leases and only an internally created context. A supplied context
 and borrowed transport remain caller-owned. Dispose owners separately in their
 application lifetime. Cleanup must not reclaim a source selected by a callback.
+Retired lease cleanup failures emit `error` without changing an adopted revision
+to failed. Terminal cleanup continues through a throwing asset release, then
+reports the first cleanup error to the caller.
 
 `AudioPlayerTransport` requires seconds/duration/playing, play/pause/stop/seek.
 Optional clip/currentClip, analyser, clock, configuration, preload/scratch and
-subscribe/onEnd/onError ports expose backend capabilities without DOM. An
+subscribe/onLoad/onEnd/onError ports expose backend capabilities without DOM. An
 `AudioPlaylist` implements this contract; use `AudioMixer.transport` for a mix.
 
 </details>
@@ -120,6 +193,7 @@ subscribe/onEnd/onError ports expose backend capabilities without DOM. An
 ## Related
 
 [`<audio-player>`](/audio/element/play/audio-player/) ·
+[AudioClipEditor](/audio/headless/edit/audio-clip-editor/) ·
 [AudioClipPlayer](/audio/headless/play/audio-clip-player/) ·
 [AudioPlaylist](/audio/headless/play/audio-playlist/) ·
 [AudioMixer](/audio/headless/play/audio-mixer/) ·

@@ -25,3 +25,4 @@ export {
   type MountAudioTimelineOptions,
   type AudioTimelinePresenterHandle,
 } from './audio-timeline';
+export {mountWaveformEditor, type WaveformEditingHandle, type WaveformEditingOptions} from './waveform-editor';

@@ -3,7 +3,7 @@ title: '@webmusic/audio/view'
 description: Audio visualization — retained visualizers, fitted overview and live-frame helpers, Headless view models/controllers, structural bindings, virtualization and colormaps.
 ---
 
-`@webmusic/audio/view` is the **visualization** capability of the `@webmusic/audio` package. The capability root exports colormaps, viewport math and data contracts. Its `/render` subpath draws precomputed analysis data onto a Canvas — a min/max **waveform**, an STFT **spectrogram**, and a live **level/spectrum meter**. Two drop-in Web Components live under [Web Components → View](/audio/element/#view): `<audio-view>` and `<audio-live-view>`. The standalone [`<audio-meter>`](/audio/element/analyze/audio-meter/) is now listed with live Analyze tools; its existing `view/element` and `view/auto` entries remain compatibility paths.
+`@webmusic/audio/view` is the **visualization** capability of the `@webmusic/audio` package. The capability root exports colormaps, viewport math and data contracts; `/headless` supplies document-editing controllers. Its `/render` subpath draws precomputed analysis data onto a Canvas — a min/max **waveform**, an STFT **spectrogram**, and a live **level/spectrum meter**. Two drop-in Web Components live under [Web Components → View](/audio/element/#view): `<audio-view>` and `<audio-live-view>`. The standalone [`<audio-meter>`](/audio/element/analyze/audio-meter/) is now listed with live Analyze tools; its existing `view/element` and `view/auto` entries remain compatibility paths.
 
 It is **bring-your-own-data**: the renderers consume the typed-array structures produced by [`@webmusic/audio/analyze`](/audio/api/analyze/) (the `AudioPeaks` pyramid and `SpectrogramData`), but `@webmusic/audio/view` does **not** depend on `@webmusic/audio/analyze` — the spectrogram payload is declared structurally here. Playback lives in [`@webmusic/audio/play`](/audio/api/play/), while the renderer binding talks to a structural `ViewPlayerBinding` interface and does not import the play capability. The optional `<audio-view src="…">` convenience resolves `@webmusic/audio/play` dynamically. All renderer DOM work is confined to call time, so importing the capability root or `/headless` remains safe in non-browser environments.
 
@@ -15,7 +15,7 @@ The root model and this capability ship in that one package. `<audio-view src="�
 
 The view capability has these entry points — the [package subpath table](/audio/api/#package-subpaths) lists them with every other `@webmusic/audio` entry:
 
-The `@webmusic/audio/view` root is the stateless API; `/element` is the opt-in styled Web Component entry. These boundaries keep code-only consumers free of element registration and skin code.
+The `@webmusic/audio/view` root supplies stateless data functions and public types; `/element` is the opt-in styled Web Component entry. These boundaries keep code-only consumers free of element registration and skin code.
 
 ---
 
@@ -43,6 +43,7 @@ Every `render*Visualizer` returns a `RenderedAudioVisualizer` — the digital-au
 | `redrawFrame?` | `(playheadSeconds, scrollIntoView?) => void` | Draw a position sampled in the current display frame without queuing another frame. Waveform implements this synchronous path; other visualizers retain the `redraw` fallback. |
 | `setZoom` | `(pixelsPerSecond) => void` | Change the horizontal scale and repaint. |
 | `setPlayheadMode?` | `(mode: 'position' \| 'center') => void` | Change time-axis cursor geometry without replacing the canvas; center keeps the line fixed while content moves. |
+| `setPlayheadVisible?` | `(visible: boolean) => void` | Waveform-only visibility gate for cursor, progress and history paint while document playback is pending. |
 | `setRegions` | `(regions) => void` | Replace the overlaid regions/markers and repaint the overlay. |
 | `hitTest` | `(x, y) => { seconds, region? }` | Map a pointer position (CSS px relative to the surface) to a time and, when inside one, the region under it. |
 | `setOffset?` | `(startSeconds) => void` | In position mode, scroll so the window starts there, clamped to the clip. Ignored in center mode. |
@@ -100,6 +101,119 @@ rendered.setZoom(200);           // zoom in
 | `devicePixelRatio` | `window.devicePixelRatio` | DPR override. |
 
 The colour defaults are deliberately **neutral**. A direct caller can supply a palette through these options. [`<audio-view>`](/audio/element/view/audio-view/) supplies shared semantic CSS tokens, with neutral gray waveform/progress fallbacks and a red playhead, so its default drawing follows the surrounding theme. Explicit color options remain authoritative. The waveform always paints only the columns in view, so it takes no `virtualization` switch — that option is the spectrogram's.
+
+## Document editing
+
+`createAudioViewEditing(editor, options?)`, available from
+`/view/headless`, borrows a Core `AudioClipEditorPort`. It owns only View
+interaction, creates no player/context, and is independent of the concrete Edit
+implementation. `editable` defaults to `false`; `interactionSession` optionally
+borrows an existing same-document session, otherwise the controller creates and
+owns one. A disposed document or foreign/disposed session is rejected.
+
+| Member | Contract |
+| --- | --- |
+| `editor`, `session`, `state` | Borrowed editor, active interaction session and current `AudioViewEditingState`. |
+| `state.document`, `state.interaction`, `state.history` | Current committed snapshot, range/draft session snapshot and editor-owned history. |
+| `state.editable`, `state.available`, `state.error?` | Input enablement, readiness and latest command failure. |
+| `setEditable(boolean)` | Enable mutation; disabling cancels an active draft. |
+| `select({startFrame, endFrame})` | Set a half-open output-frame selection. Frames must be nonnegative safe integers within the document. No content revision is created. |
+| `preview(operations)` | Return `AudioDraftResult`; draft changes remain outside committed content. |
+| `commit(label?)`, `cancel()` | Commit the current draft as one transaction, or discard it. |
+| `execute(label, operations)` | Submit an atomic command against the current document ID/revision. |
+| `undo()`, `redo()`, `cut()`, `paste()` | Return `AudioEditResult`; cut uses selection and paste inserts at its start. Requires editable state. |
+| `copy()` | Copy selection to the editor-owned clipboard; returns `{status: 'copied', length}` or a typed failure. Releases its independent returned asset lease immediately. |
+| `subscribe(listener)` | Synchronous initial state then ordered changes; returns an idempotent unsubscribe. |
+| `dispose()` | Unsubscribe and dispose only an owned session. Repeated calls are safe; editor and borrowed session survive. |
+
+Mutation results are `committed`, `noop` or `failed`; failures do not create
+history. A failed result retains its own typed error even if a synchronous
+subscriber clears `state.error`. Local selections and drafts do not mark content dirty. A conflicting
+revision cancels the draft. `audioDocumentPlaybackCompatible(document, binding)`
+returns true only for a ready document and binding with exact applied document
+ID/revision and `documentCoordinates: true`. Use it to gate transport overlays
+and document-coordinate seeks; it does not issue a player command.
+
+```ts
+import {createAudioClip} from '@webmusic/audio';
+import {createAudioClipEditor} from '@webmusic/audio/edit/headless';
+import {createAudioViewEditing} from '@webmusic/audio/view/headless';
+
+const editor = createAudioClipEditor(createAudioClip({
+  sampleRate: 48000, channelData: [new Float32Array(48000)],
+}));
+const view = createAudioViewEditing(editor, {editable: true});
+view.select({startFrame: 12000, endFrame: 36000});
+const result = view.execute('Keep selected audio', [{
+  type: 'trim', startFrame: 12000, endFrame: 36000,
+}]);
+if (result.status === 'failed') console.error(result.error.code);
+view.dispose();
+editor.dispose();
+```
+
+### Sequence waveform ranges
+
+`createAudioSequenceWaveform(sequence, assets, options?)`, exported from
+`/view/headless`, implements `AudioWaveformSource`. Both
+`renderWaveformVisualizer(container, peaksOrSource, options?)` and
+`createWaveformViewModel(peaksOrSource, options?)` accept it alongside the
+existing peaks pyramid. The source exposes `sequence`, `sampleRate`, `channels`,
+`frameCount`, `readPeaks(startFrame, endFrame)`, `setSequence(sequence)` and
+`dispose()`. `readPeaks` returns one `{min, max}` per channel for a valid half-open
+frame range. Empty ranges return zero extrema. No clock or DOM is created.
+
+The source retains the current root's asset lease and borrows the reader. A
+replacement retains new assets before releasing old ones; sample rate and
+channel layout must stay identical. Disposal releases the lease and cache.
+The waveform reads only requested source ranges, in copies of at most 256
+frames per channel. A lazy hierarchy reuses immutable extrema across revisions;
+`cacheEntries` defaults to 16384 and must be a positive safe integer. Eviction
+may require rereading a later viewport. Silence requires no PCM access; gains
+and envelopes transform cached ranges. Varying envelopes conservatively bound
+extrema inside each column, rather than claiming exact sample extrema at every
+zoom. Source creation, structural replacement and empty/hidden views do not
+materialize complete PCM or build a full output peaks pyramid. A viewport
+showing a whole long asset can still require its first full sample scan through
+bounded chunks.
+
+### Waveform editor renderer — `@webmusic/audio/view/render`
+
+`mountWaveformEditor(container, editing, options?)` combines the existing
+waveform painter with selection, a trim preview, numeric frame controls and
+semantic commands. It borrows the `AudioViewEditing` controller and owns DOM,
+listeners and a sequence waveform source. `WaveformEditingOptions` extends
+`WaveformRenderOptions` with `editingStepFrames` (positive safe integer, default
+1) and `onPreview`, `onCommit`, `onError` callbacks. Its
+`WaveformEditingHandle` extends `ViewportAudioVisualizer` with `element`,
+`surface`, `updatePlayback(binding?, seconds?)` and `cancel()`.
+
+`updatePlayback` applies the exact-revision compatibility gate; callers supply
+observed time, never an inferred clock. Playback updates preserve pending numeric
+range and gain inputs while focus moves between fields and command buttons.
+A new shared selection refreshes both range endpoints; a committed revision
+refreshes range and gain, and choosing another segment refreshes its gain.
+Segment labels follow committed type and frame length, including trim and
+undo/redo that retain segment IDs; a surviving selected segment remains selected.
+Commands prepared before a revision change during draft cancellation fail with
+`revision-conflict` rather than applying stale values to the new content. If a
+cancellation subscriber changes the command's target without changing content,
+the prepared command is discarded without a commit: Trim/Delete require the
+same start and end frames, Split/Insert silence require the same start frame,
+and Gain/Fade require the same selected segment. Changes to unrelated controls
+do not discard the command, and playback updates still preserve pending inputs.
+Disposal disables commands before cancelling the surface's gesture, so
+cancellation subscribers cannot commit through the retiring renderer.
+Pointer trim produces one transaction on
+release. Explicit `cancel()` discards the session draft. Lifecycle cancellation
+(blur, zoom or disposal) cancels only this surface's active gesture, preserving
+another consumer's draft when this surface is passive. Revision replacement
+invalidates the session draft. `dispose()`
+removes the surface, subscriptions and cache/asset lease, and leaves the borrowed
+controller/editor alive. Dispose the controller separately when owned by the
+application. See the [Element workflow](/audio/element/view/audio-view/#waveform-editing)
+for controls, keyboard commands and public styling parts. Processing and WAV
+export remain explicit [Edit operations](/audio/api/edit/).
 
 ## Render a spectrogram
 
@@ -355,6 +469,8 @@ values of [`/view/headless`](/audio/headless/#view).
 
 | Export | Kind | Use it for |
 | --- | --- | --- |
+| `AudioViewEditing`, `AudioViewEditingOptions`, `AudioViewEditingState` | Types | [Borrowed editor, session, state and command facade](#document-editing). |
+| `AudioSequenceWaveform`, `AudioSequenceWaveformOptions`, `AudioWaveformSource` | Types | [Bounded frame-range waveform source](#sequence-waveform-ranges). |
 | `peaksFromWaveformData` | Interop | Hydrate BBC `audiowaveform` v2 JSON into an `AudioPeaks` pyramid without decoding. |
 | `viridis`, `magma`, `grayscale`, `colormapByName` | Colormap functions | Built-in color maps and name lookup. |
 | `bufferedScrollRange`, `visibleColumnRange`, `visibleTimeRange` | Windowing functions | Compute virtualized pixel, column and time ranges. |
@@ -373,6 +489,8 @@ values of [`/view/headless`](/audio/headless/#view).
 
 | Export | Kind | Use it for |
 | --- | --- | --- |
+| `mountWaveformEditor` | Renderer | [Frame-range interaction over a borrowed editor](#waveform-editor-renderer--webmusicaudioviewrender). |
+| `WaveformEditingHandle`, `WaveformEditingOptions` | Types | Editing renderer configuration, callbacks and lifecycle. |
 | `renderWaveformVisualizer`, `renderSpectrogramVisualizer`, `renderLoudnessMeter` | Renderers | Retained Canvas waveform, spectrogram and live meter surfaces. |
 | `paintWaveformOverview`, `paintLiveProjection` | Paint adapters | Draw into caller-owned frames without creating DOM. |
 | `bindPlayerToWaveform`, `bindAudioTimelineViewport` | Bindings | Follow player position or a timeline viewport; release their subscriptions on teardown. |
@@ -384,4 +502,6 @@ values of [`/view/headless`](/audio/headless/#view).
 The `/view/headless` values have one explanation owner in the
 [Headless View inventory](/audio/headless/#view), including `AudioTimeline`,
 `WaveformViewModel`, `SpectrogramViewModel`, live projection helpers and peaks
-readers. The root only re-exports their **types** as listed above.
+readers. The root re-exports their **types** as listed above. The `createAudioViewEditing`,
+`audioDocumentPlaybackCompatible` and `createAudioSequenceWaveform` runtime
+values belong only to `/view/headless`; their full contracts are documented above.

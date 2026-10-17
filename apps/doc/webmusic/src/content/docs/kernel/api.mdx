@@ -63,6 +63,9 @@ Also here: `upgradeProperty`/`upgradeProperties` for the
 set-before-upgrade pitfall, `numAttr`/`boolAttr`/`cssSizeAttr` attribute
 readers, and `defineOnce` idempotent registration. Importing this entry
 registers nothing and is SSR-safe; subclassing works in Node.
+Browser-only [`observeElementTarget`](#element-target-discovery) and
+[`observeElementSource`](#borrowed-element-sources) reuse the same root-scoped
+discovery and source-change protocol without importing a domain model.
 
 ## worker — @webmusic/kernel/worker
 
@@ -303,3 +306,47 @@ callbacks. Call it on host disconnection, selector changes or moving the host to
 another root; create a new observation after reconnecting. An initial listener
 exception releases the observer before being rethrown. This helper never disposes
 the selected target or grants authority to its commands.
+
+### Borrowed Element sources
+
+`observeElementSource<T>(host, options, listener)` adapts an explicit object or
+a selected element's public property to `ElementSourceResolution<T>`. It builds
+on `observeElementTarget`; it does not subscribe to or dispose the domain source.
+The consumer supplies a type guard and owns any content/state subscriptions.
+
+| `ElementSourceOptions<T>` field | Contract |
+|---|---|
+| `source?: unknown` | Explicit source takes precedence. Only `undefined` enables selector lookup; invalid explicit values never fall back. |
+| `selector?: string` | One unique target in the host Document/ShadowRoot. Missing/empty selector reports `missing`. |
+| `property: string` | Public property to read from the selected target, such as `editor`. |
+| `accepts(value): value is T` | Domain validation. A false result or exception reports `invalid`; Kernel supplies no domain-specific check. |
+
+The listener receives the current resolution synchronously, then selector
+replacement, late upgrade or `webmusic:sourcechange` updates. The exported
+`ElementSourceState` is `ready | missing | invalid | ambiguous | unavailable`.
+`ElementSourceResolution<T>` contains `state`, optional validated `source`,
+optional selected `target`, and optional `error`. A target with an undefined
+property is `unavailable`; malformed or throwing property reads are `invalid`.
+Invalid CSS and ambiguous targets retain the discovery states above.
+
+The helper captures its options for one binding. Its idempotent cleanup stops
+discovery; call it and create a new binding when properties/selectors change or
+the host reconnects in another root. Listener exceptions propagate; an initial
+exception cleans up discovery. Source disposal is the domain owner's job, and
+runtime readiness still comes from that domain's snapshots.
+
+```ts
+import {observeElementSource} from '@webmusic/kernel/element';
+import {isScoreDocumentSource} from '@webmusic/score';
+
+const host = document.querySelector('score-player');
+if (host) {
+  const stop = observeElementSource(host, {
+    selector: '#document', property: 'editor', accepts: isScoreDocumentSource,
+  }, ({state, source}) => {
+    console.log(state, source?.getSnapshot().documentRevision);
+  });
+  // Retain stop for this host's teardown or configuration change.
+  stop();
+}
+```

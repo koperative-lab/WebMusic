@@ -6,6 +6,9 @@ import {
   ScoreBuilder,
   locateSeconds,
   locateTick,
+  noteDurationSeconds,
+  noteOnsetSeconds,
+  noteVelocity,
   secondsToTick,
   tickToSeconds,
 } from '../../src/core';
@@ -84,5 +87,48 @@ describe('compat tick projections', () => {
     expect(pos96.tick).toBe(480); // 5 quarters at 96 ppq
     expect(pos96.measure).toBe(2);
     expect(pos96.beat).toBeCloseTo(2);
+  });
+});
+
+describe('independent note velocity', () => {
+  it('keeps velocity-only edits responsive to tempo changes across a note', () => {
+    const builder = new ScoreBuilder();
+    const partId = builder.addPart({id: builder.newPartId(), name: 'Piano'});
+    const id = builder.newNoteId();
+    const firstMeasure = builder.newMeasureId();
+    const secondMeasure = builder.newMeasureId();
+    builder.addMeasure({
+      id: firstMeasure, number: 1, onsetQuarters: Rational.ZERO,
+      durationQuarters: new Rational(2), tempo: {bpm: 120},
+    });
+    builder.addMeasure({
+      id: secondMeasure, number: 2, onsetQuarters: new Rational(2),
+      durationQuarters: new Rational(2), tempo: {bpm: 60},
+    });
+    builder.addNote(partId, {
+      id, pitch: Pitch.parse('C4'), onsetQuarters: Rational.ONE,
+      duration: Duration.half(), voice: builder.newVoiceId(),
+    });
+    const original = builder.build();
+    const edited = original.edit((tx) => tx.updateNote(id, {velocityOverride: 110}));
+    expect(edited.getNote(id)?.performed).toBeUndefined();
+    expect(noteVelocity(edited.getNote(id)!)).toBe(110);
+    expect(noteOnsetSeconds(edited.getNote(id)!, edited)).toBeCloseTo(0.5);
+    expect(noteDurationSeconds(edited.getNote(id)!, edited)).toBeCloseTo(1.5);
+
+    const slower = edited.edit((tx) => {
+      tx.updateMeasure(firstMeasure, {tempo: {bpm: 60}});
+      tx.updateMeasure(secondMeasure, {tempo: {bpm: 30}});
+    });
+    expect(noteOnsetSeconds(slower.getNote(id)!, slower)).toBeCloseTo(1);
+    expect(noteDurationSeconds(slower.getNote(id)!, slower)).toBeCloseTo(3);
+    expect(noteVelocity(slower.getNote(id)!)).toBe(110);
+    expect(noteVelocity(original.getNote(id)!)).toBe(80);
+
+    const performed = edited.getNote(id)!.with({performed: {onsetSec: 0.52, durationSec: 1.4, velocity: 70}});
+    expect(noteVelocity(performed)).toBe(110);
+    expect(noteVelocity(performed.with({velocityOverride: undefined}))).toBe(70);
+    expect(noteOnsetSeconds(performed, slower)).toBe(0.52);
+    expect(noteDurationSeconds(performed, slower)).toBe(1.4);
   });
 });

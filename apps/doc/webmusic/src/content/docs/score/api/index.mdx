@@ -10,7 +10,8 @@ It is intentionally thin. Functional APIs live in capability subpaths of the sam
 - **Playback utilities** (SFZ, recorded-note conversion, offline rendering) live in [`@webmusic/score/play`](/score/api/play/). Stateful engines and effects use `@webmusic/score/play/headless`; browser transport adapters use `/play/drivers`.
 - **Analysis** (`summarizeScore`, `chordTimeline`, key/chord/roman/motif/voice-leading) lives in [`@webmusic/score/analyze`](/score/api/analyze/).
 - **File loading** (MIDI, MusicXML, MXL, ABC) lives in [`@webmusic/score/io`](/score/api/io/).
-- **Layout and projections** live in [`@webmusic/score/view`](/score/api/view/). Each capability's `/element` entry supplies its Web Components; [`@webmusic/score/react`](/score/api/react/) supplies React adapters.
+- **Document editing** lives in [`@webmusic/score/edit`](/score/api/edit/), with persistent state and history in `@webmusic/score/edit/headless`.
+- **Layout and projections** live in [`@webmusic/score/view`](/score/api/view/). Play, Analyze and View supply `/element` entries; [`@webmusic/score/react`](/score/api/react/) supplies their React adapters.
 
 Install `@webmusic/score` once, then import the root model or a capability entry such as `@webmusic/score/play` as needed.
 
@@ -29,6 +30,10 @@ capability pages below document what is inside each entry.
 | `@webmusic/score/io/load` | code-only sub-entry | The loader surface on its own, for consumers that want only `loadScore`. |
 | `@webmusic/score/io/formats` | code-only sub-entry | Per-format parsers and serializers (MIDI, MusicXML, MXL, ABC). |
 | `@webmusic/score/io/worker-client` · `@webmusic/score/io/worker-protocol` · `@webmusic/score/io/worker` | worker triple | Off-main-thread parsing: the client, the wire protocol, and the worker runtime. |
+| `@webmusic/score/edit` | [capability root](/score/api/edit/) | Atomic note operations, document contracts, position maps and the editor facade. |
+| `@webmusic/score/edit/headless` | [Headless](/score/headless/#edit) | `ScoreEditor`, `createScoreEditor`, history, checkpoints and interaction sessions. |
+| `@webmusic/score/edit/element` | [Web Component](/score/element/edit/score-document/) | Nonvisual `<score-document>` loading, ownership and registration helpers. |
+| `@webmusic/score/edit/auto` | registration | Imports and registers the default document declaration on evaluation. |
 | `@webmusic/score/play` | [capability root](/score/api/play/) | Stateless playback: SFZ parsing, offline WAV render, recording → `Score`. |
 | `@webmusic/score/play/headless` | [Headless](/score/headless/#play) | `ScorePlayer`, `InteractivePlayer`, `Rack`, `Sound`, `Effect`, `LfoController`, `PlayerController`. |
 | `@webmusic/score/play/drivers` | code-only sub-entry | Browser transport adapters: scroll, pointer, orientation, arbitrary values. |
@@ -44,10 +49,11 @@ capability pages below document what is inside each entry.
 | `@webmusic/score/view/headless` | [Headless](/score/headless/#view) | `createScoreView`, `createActiveNoteTracker`. |
 | `@webmusic/score/view/render` | code-only sub-entry | Imperative DOM/canvas/SVG renderers and the player binding. |
 | `@webmusic/score/view/element` | [Web Components](/score/element/#view) | `<score-view>`, `<score-pitch-view>` and `<score-sheet-view>`. |
-| `@webmusic/score/react` | [capability root](/score/api/react/) | React components and hooks over the four capabilities; React is an optional peer. |
+| `@webmusic/score/react` | [capability root](/score/api/react/) | React components and hooks for the existing I/O, Play, Analyze and View composition; React is an optional peer. |
 
-Score has no `/view/auto` or `/view/global`, and no `/analyze/auto`: only the
-play capability ships registration and IIFE conveniences.
+Score has no `/view/auto` or `/view/global`, and no `/analyze/auto`.
+Edit and Play supply automatic registration; only Play supplies a browser IIFE.
+Edit has no React wrapper.
 
 ## Install
 
@@ -144,6 +150,11 @@ const values = {
 
 `Score`, `Part`, `Measure`, and `Note` are immutable runtime objects. Share the same score between a player, renderer, analyzer, worker, or API process without letting one consumer mutate the original data.
 
+`NoteData.velocityOverride` is an optional integer from 1 to 127. `Note.velocity`
+and `noteVelocity(note)` resolve `velocityOverride ?? performed?.velocity ?? 80`.
+An override does not create or change performed onset/duration. Clear it with
+`note.with({velocityOverride: undefined})`; the Edit command uses `velocity: null`.
+
 JSON-like metadata extensions are recursively snapshotted, including own keys
 such as `__proto__` and null-prototype records. Nonplain application values such
 as `Date`, `Map` or class instances remain borrowed; this is not a general-purpose
@@ -172,14 +183,24 @@ console.log({
 });
 ```
 
-`Score.toJSON()` emits the exact `SCORE_JSON_SCHEMA_ID` (`v0.1`).
-`scoreFromJSON()` also accepts an unmarked legacy payload, but rejects an
+`Score.toJSON()` emits the exact `SCORE_JSON_SCHEMA_ID` (`v0.2`), including an
+authored velocity override when present. `scoreFromJSON()` accepts exact v0.2
+and v0.1 markers and unmarked legacy payloads, but rejects an
 unknown marked version with `ScoreJSONError.code === 'unsupported-schema'`;
 future schema versions require an explicit migration rather than prefix-based
 guessing. Every present known field is checked at runtime: malformed metadata,
 notation, tempo, meter, and Note values reject with `code === 'invalid-json'`.
 Open values under `metadata.custom` and extended `metadata.encoding` records
 remain available for integrations.
+
+This migration reads older data but does not make newer data readable by older
+packages. The published `@webmusic/score@0.2.0` reader accepts schema v0.1 and
+rejects v0.2 with `unsupported-schema`. Every new `toJSON()` result uses v0.2,
+including a Score with no edits or velocity override. Upgrade all consumers of
+shared stored JSON before enabling v0.2 writers, or keep old and new storage
+flows separate during the transition. Do not remove or relabel `$schema` to
+make an old reader accept the payload: it can silently discard new fields.
+The JSON schema version is independent of the npm package version.
 
 When every serialized tempo/meter entry declares provenance, an
 `explicit: false` entry must equal the Measure metadata it claims to derive
@@ -190,7 +211,7 @@ TimeMap with missing provenance stays conservatively independent.
 
 ## Batch Edits With `score.edit`
 
-For interactive editing (e.g. dragging a note per animation frame), use `score.edit(fn)` instead of rebuilding a `Part` by hand. The transaction object (`ScoreEditSession`) buffers note and measure operations and applies them in one incremental rebuild at commit: touched parts are reprocessed, and untouched parts can share their indexes. Cost depends on the edits and affected parts. The original score is never modified; `edit` returns a new immutable `Score` (or the same instance if no operations were buffered). Unknown ids throw with a clear error.
+`score.edit(fn)` is a short-lived synchronous batch primitive. The transaction object (`ScoreEditSession`) buffers note and measure operations and applies them in one incremental rebuild at commit: touched parts are reprocessed, and untouched parts can share their indexes. Cost depends on the edits and affected parts. The original score is never modified; `edit` returns a new immutable `Score` (or the same instance if no operations were buffered). Unknown ids throw with a clear error. For persistent document identity, semantic timing edits, undo or interaction drafts, use [ScoreEditor](/score/headless/edit/score-editor/).
 
 ```ts
 import { Duration, Pitch, Rational } from '@webmusic/score';
@@ -222,6 +243,8 @@ failure or commit failure; retaining it does not permit later edits. Patches
 change only the named fields: changing notated onset does not rewrite absolute
 `performed.onsetSec`, and moving or removing a measure does not automatically move
 or remove its notes. An application that edits both projections must update both.
+The [Edit operation API](/score/api/edit/#atomic-note-operations) supplies that
+timing policy for supported note commands without changing this low-level primitive.
 
 ## Convert Musical Time
 
@@ -481,6 +504,10 @@ set and reports both synchronous throws and rejected listener Promises through
 | `Duration` | Primitive | Whole, half, quarter, eighth, dotted, and triplet durations. |
 | `ScoreBuilder` | Builder | Build scores from generators and importers. |
 | `ScoreEditSession` | Transaction | Buffer synchronous edits; normally obtained from `score.edit`. |
+| `ScoreEditError` | Error | Coded command/position-map failures; see [Edit API](/score/api/edit/). |
+| `ScoreDocumentApplicationError` | Error | Coded document playback application failures; see [document revision observation](#document-revision-observation). |
+| `isScoreDocumentSource`, `isScoreEditorPort` | Type guards | Validate shared document read or command ports and their current Score snapshot; see [Edit ports](/score/api/edit/#document-ports-and-commands). |
+| `createScorePositionMap`, `composeScorePositionMaps`, `mapScorePosition` | Position maps | [Create, compose and apply document transitions](/score/api/edit/#position-maps) without importing Edit implementation. |
 | `Score` | Model | Top-level immutable score with metadata, parts, measures, and a time map. |
 | `Part` | Model | Instrument or voice container with notes, MIDI program, and staff count. |
 | `Measure` | Model | Measure number, onset, duration, meter, key, tempo, and repeats. |
@@ -529,6 +556,13 @@ instance types.
 | `TempoChange`, `TimeSignatureChange`, `KeySignatureChange`, `TimePosition` | Compatibility projections at a declared PPQ. |
 | `EventListenerFailureMode` | Listener error handling in EventEmitter. |
 | `ScorePlaybackSource`, `ScorePlaybackSnapshot`, `ScorePlaybackNote`, `ScorePlaybackReadiness`, `ScorePlaybackState` | Shared playback observation, detailed below. |
+| `ScoreDocumentRevision`, `ScoreDocumentPlaybackBinding`, `ScoreDocumentApplicationResult` | Requested/applied document identity, readiness and application outcomes, [detailed below](#document-revision-observation). |
+| `ScoreQuarterValue`, `ScoreNoteInput`, `ScoreEditOperation`, `ScoreEditCommand`, `ScoreRevisionGuard` | [Exact semantic editing inputs](/score/api/edit/#atomic-note-operations). |
+| `ScoreNotationDuration`, `ScoreNotationEntry` | [Written-note/rest entry and notation duration](/score/api/edit/#written-notation-entry). |
+| `ScoreDocumentSource`, `ScoreDocumentSnapshot`, `ScoreDocumentChange`, `ScoreEditorPort`, `ScoreEditorState` | [Document read/command contracts](/score/api/edit/#document-ports-and-commands); the concrete owner is exported separately from Edit. |
+| `ScoreEditResult`, `ScoreEditFailure`, `ScoreEditErrorCode`, `ScoreEditTransaction`, `ScoreCheckpoint` | [ScoreEditor outcomes, transactions and checkpoints](/score/headless/edit/score-editor/). |
+| `ScoreInteractionSession`, `ScoreInteractionSnapshot`, `ScoreDraftResult` | [Selection and draft session contracts](/score/headless/edit/score-editor/). |
+| `ScorePositionMap`, `ScoreMappedPosition` | [Document revision maps and rational-position results](/score/api/edit/#position-maps). |
 
 `scoreTempos(score, ppq?)` and the cached `score.tempos` expose quarter notes per
 minute: `TempoEntry.bpm * (TempoEntry.unit ?? 1)`. For example, half note = 60
@@ -565,6 +599,8 @@ Play, Analyze, View, DOM or an audio engine. Native
 | `rate` | Playback speed relative to the score; `null` means unavailable. |
 | `activeNotes` | Immutable `ScorePlaybackNote[]` for sounding occurrences, not future scheduled attacks. |
 | `error` | Optional failure value supplied by the owner. |
+| `documentId` / `documentRevision` | Optional identity/revision actually adopted for playback. Independent static playback has no fabricated document identity. |
+| `documentBinding` | Optional `ScoreDocumentPlaybackBinding`, distinguishing requested content from content already applied. |
 
 Each `ScorePlaybackNote` has `occurrenceId`, `noteId`, `partId`, sounding `midi`,
 `nominalStartSeconds` and `nominalEndSeconds`. Equal pitches in different parts or
@@ -589,3 +625,34 @@ coordinated group, route commands through that group rather than directly seekin
 one participant. The [Kernel transport group](/kernel/api/#sync--webmusickernelsync)
 provides that command authority. Native controller/Rack modes without a single
 resolved Score report the missing capability as unavailable.
+
+### Document revision observation
+
+Document editing and playback preparation advance separately. The document's
+`documentRevision` is distinct from playback publication `revision` and source
+replacement `sourceRevision`. An editing follower must compare both document
+identity and revision before using playback time against current document content.
+
+`ScoreDocumentRevision` is `{documentId: string, documentRevision: number}`.
+`ScoreDocumentPlaybackBinding` contains:
+
+| Member | Meaning |
+|---|---|
+| `status` | `empty`, `preparing`, `ready` or `error`. |
+| `attempt` | Application-attempt generation; retrying a revision creates another attempt. |
+| `requested` | Optional latest requested document identity/revision. |
+| `applied` | Optional last document identity/revision adopted by playback. |
+| `positionPolicy` | Optional `preserve-quarter` or `reset-origin` policy used for application. |
+| `documentCoordinates` | True only for ready/current playback with a valid unexpanded authored-document mapping; matching IDs alone do not establish this. |
+| `error` | Optional application failure. Edited content and the last applied playback snapshot remain distinct. |
+
+`ScoreDocumentApplicationResult` reports `applied` with `target`, `attempt` and
+`positionPolicy`; `superseded` with optional `target` and `attempt`; or `failed`
+with optional `target`, `attempt` and `error`. These outcomes belong to the
+[native player's wait/retry methods](/score/headless/play/score-player/).
+
+`ScoreDocumentApplicationError` carries a readable message and `.code`:
+`unknown-revision`, `not-ready`, `disposed`, `invalid-source`,
+`invalid-snapshot`, `document-disposed` or `source-conflict`. Core defines the
+observation/result types; playback preparation, pausing and command gating belong
+to Play, and the editor retains ownership of committed musical content.

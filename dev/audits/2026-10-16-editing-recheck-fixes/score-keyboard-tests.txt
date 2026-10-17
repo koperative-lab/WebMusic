@@ -1,0 +1,13 @@
+
+> @webmusic/score@0.2.0 test
+> vitest run test/view/editing.test.ts test/view/editor-player-integration.test.ts test/view/staff-editor-integration.test.ts
+
+
+ RUN  v5.0.2 /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/score
+
+
+ Test Files  3 passed (3)
+      Tests  47 passed (47)
+   Start at  14:55:24
+   Duration  1.78s (environment 40%, transform 27%, tests 25%, import 7%)
+

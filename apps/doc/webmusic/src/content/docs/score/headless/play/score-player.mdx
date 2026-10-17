@@ -54,13 +54,68 @@ capability's other entry points.
 `player.playback` exposes the [shared nonvisual source](/score/api/#shared-playback-observation).
 Its subscription immediately supplies current data, position and active note
 occurrences, including when a consumer attaches while paused or already playing.
-Unsubscribing leaves the player alive. The immutable score is fixed for this
-player's lifetime; a new player is a new source.
+Unsubscribing leaves the player alive. A static input stays fixed unless the
+player is explicitly attached to a document source below.
 
 Use `player.playback.seekNominal(seconds)` for an observed command that rejects a
 failed restart. The older direct `seek`/`seekNominal` methods retain their
 compatibility behavior: runtime restart failures use the operation-error channel
 and may resolve with playback paused. All new bindings name their time axis.
+
+## Apply document revisions
+
+`setDocumentSource(source)` borrows the Core `ScoreDocumentSource` contract,
+including a [ScoreEditor](/score/headless/edit/score-editor/), without owning
+its history or importing Edit. The native player, scheduler, clock and synth
+keep their identities across successful revisions.
+
+```ts
+import {createScoreEditor} from '@webmusic/score/edit/headless';
+import {ScorePlayer} from '@webmusic/score/play/headless';
+
+const editor = createScoreEditor(score);
+const player = new ScorePlayer(editor.score);
+player.setDocumentSource(editor);
+const snapshot = editor.getSnapshot();
+const outcome = await player.waitForDocumentRevision({
+  documentId: snapshot.documentId,
+  documentRevision: snapshot.documentRevision,
+});
+// A user gesture can call player.play() after outcome.status === 'applied'.
+player.dispose(); // releases its subscription; editor remains caller-owned
+editor.dispose();
+```
+
+Each requested revision pauses playback, cancels scheduled voices and prepares
+its timeline. Successful adoption stays paused. `play()` rejects while the
+binding is preparing or failed; updating a document alone neither creates nor
+resumes an AudioContext. An already prepared synth may preload the candidate's
+pitches. Its backend has no abort contract: obsolete preload work may finish in
+the borrowed cache, but its result cannot adopt an obsolete timeline.
+
+`documentBinding` distinguishes `requested` from `applied` revisions and exposes
+`status`, `attempt`, `positionPolicy`, `documentCoordinates` and optional `error`.
+A failed candidate leaves the last applied Score observable, with playback
+unavailable. The snapshot's top-level `documentId` and `documentRevision` identify
+only applied content. Ordinary static playback has no document identity.
+
+`waitForDocumentRevision(target)` settles as `applied`, `superseded` or `failed`;
+an unknown future target fails instead of waiting indefinitely. Explicit
+`retryDocumentApplication()` starts a new attempt for the latest source snapshot;
+assigning the same source is a no-op. A newer source/revision or disposal
+supersedes unfinished attempts. These result promises resolve to tagged outcomes;
+invalid setter input throws.
+
+Unexpanded playback preserves the authored quarter position and maps loop
+boundaries through commits, including skipped/failed revisions and undo. Seek,
+stop, rate and loop commands during preparation retain their latest intent.
+Missing mapping or expanded repeats report `reset-origin`, reset to zero and
+clear the loop; repeat playback reports `documentCoordinates: false` so an
+editable view can suppress incompatible overlays.
+
+`setDocumentSource(undefined)` unsubscribes and makes the last applied Score a
+static source. It never restores an older constructor input. Disposing the
+borrowed document disables playback until a usable source is attached.
 
 ## Time and resource roles
 
@@ -108,6 +163,9 @@ backends receive notes just in time. The full backend contract is on
 
 | Member | Return | Contract |
 | --- | --- | --- |
+| `setDocumentSource(source \| undefined)` | `void` | Attach/detach a borrowed Core document; see [revision application](#apply-document-revisions). |
+| `waitForDocumentRevision(target)` | `Promise<ScoreDocumentApplicationResult>` | Wait for a known document ID/revision and attempt outcome. |
+| `retryDocumentApplication()` | `Promise<ScoreDocumentApplicationResult>` | Retry the latest source snapshot with a fresh attempt. |
 | `preload()` | `Promise<void>` | Builds the timeline/graph and awaits sample readiness for sounding pitches, including part transposition; use `play()` to start and resume audio. |
 | `play(when?)` | `Promise<void>` | Prepares audio and starts or arms playback at absolute AudioContext seconds. |
 | `pause()` · `stop()` | `void` | Pause preserves the point; stop resets to the beginning. |
@@ -122,6 +180,7 @@ backends receive notes just in time. The full backend contract is on
 | Member | Type / meaning |
 | --- | --- |
 | `playback` | Borrowed `ScorePlaybackSource`: resolved score, coherent snapshot/subscription and optional nominal seek; see [shared contract](/score/api/#shared-playback-observation). Reading it does not create an audio graph. |
+| `documentSource` · `documentBinding` | Borrowed source and its requested/applied preparation state. |
 | `context` | Lazily realised `AudioContext`. |
 | `clock` | Read-only transport clock; nominal score-second position against AudioContext time. |
 | `currentTime` | Musical `TimePosition`. |

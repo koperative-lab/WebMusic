@@ -7,15 +7,34 @@ The drop-in custom elements of `@webmusic/score` — place a tag on the page, no
 JavaScript wiring required. Each capability ships its elements from its
 `/element` subpath, so the capability root tree-shakes free of DOM code. To load
 and register them — via a CDN script, a bundler, or individual `define*` calls —
-see [Score setup](/score/#drop-in-web-components). Only `play` publishes `/auto` and
-`/global` entries; register the analyze and view tags with the `defineAll*` functions
+see [Score setup](/score/#drop-in-web-components). Edit and Play publish `/auto`;
+only Play publishes `/global`. Register the analyze and view tags with the `defineAll*` functions
 listed in their sections below.
 
 | Capability | Elements |
 | --- | --- |
+| [Edit](#edit) | A nonvisual owner for one editable Score document shared by players and views. |
 | [Play](#play) | Playing a score: the transport, a rack mixer, note input, recording and synth control. |
 | [Analyze](#analyze) | Following a performance: chord progression and the current sounding chord. |
 | [View](#view) | Whole-score representations, held-pitch representations and optional sheet engraving. |
+
+## Edit
+
+[`@webmusic/score/edit/element`](/score/api/edit/) supplies the HTML document
+owner. It uses the same [ScoreEditor](/score/headless/edit/score-editor/) as custom
+applications and renders no interface. Piano-roll interaction belongs to the
+existing [Score view](/score/element/view/score-view/).
+
+| Element | Job | Register |
+|---|---|---|
+| [`<score-document>`](/score/element/edit/score-document/) | Load or accept a Score and own its editor for the connected lifetime. | `defineScoreDocumentElement(tag?)` |
+| — | Register the default document declaration. | `defineAllElements()` from `@webmusic/score/edit/element` |
+
+Import `@webmusic/score/edit/auto` for default registration. Borrow the document
+through `editor="#document-id"` on a player/view, or pass a Core document port
+through its `.editor` property. The document declaration owns disposal; borrowers
+release their subscriptions. The owning leaf explains load failures, replacement
+and reconnect behavior.
 
 ## Play
 
@@ -198,5 +217,5 @@ Use `::part(...)` for the documented parts of Shadow DOM components such as
 DOM: target their public `[part~="..."]` hooks instead. Do not select private
 UIKit child classes. UIKit can also be mounted directly with the same variables,
 parts and named handle nodes; see [UIKit styling](/uikit/).
-`score-rack-part` is a nonvisual declaration. Demo wrapper elements inherit their
+`score-document` and `score-rack-part` are nonvisual declarations. Demo wrapper elements inherit their
 theme into the components they compose.

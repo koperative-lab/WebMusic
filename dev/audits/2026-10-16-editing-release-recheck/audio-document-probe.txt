@@ -1,0 +1,17 @@
+// @vitest-environment jsdom
+import {afterEach, expect, it} from 'vitest';
+import {createAudioClip} from '../../src/core';
+import {defineAudioDocumentElement, type AudioDocumentElement} from '../../src/edit/element';
+defineAudioDocumentElement('release-abort-audio-document');
+afterEach(()=>document.body.replaceChildren());
+it('retains the most recent explicit clip when cancelling an injected load reenters',()=>{
+ const oldInput=createAudioClip({sampleRate:8000,channelData:[new Float32Array(80)]});
+ const latestInput=createAudioClip({sampleRate:8000,channelData:[new Float32Array(160)]});
+ const owner=document.createElement('release-abort-audio-document') as AudioDocumentElement;
+ owner.loader=(_url,options)=>{options!.signal!.addEventListener('abort',()=>{owner.clip=latestInput;},{once:true});return new Promise(()=>{});};
+ owner.src='/pending.wav';document.body.append(owner);
+ expect(owner.status).toBe('loading');
+ owner.clip=oldInput;
+ expect(owner.clip).toBe(latestInput);
+ expect(owner.editor!.getSnapshot().content.length).toBe(160);
+});

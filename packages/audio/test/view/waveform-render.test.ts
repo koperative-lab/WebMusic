@@ -97,6 +97,28 @@ afterEach(() => {
 });
 
 describe('renderWaveformVisualizer raster stability', () => {
+  it('reads only visible frames from a sequence waveform source and gates playback paint', () => {
+    const {composites} = stubCanvas();
+    const host = mountHost(20);
+    const readPeaks = vi.fn((_start: number, _end: number) => [{min: -.5, max: .5}]);
+    const visualizer = renderWaveformVisualizer(host, {sampleRate: 100, channels: 1, frameCount: 10000, readPeaks}, {
+      pixelsPerSecond: 100, waveColor: '#123456', progressColor: '#abcdef',
+    });
+    expect(readPeaks).toHaveBeenCalled();
+    expect(readPeaks.mock.calls.length).toBeLessThanOrEqual(21);
+    expect(readPeaks.mock.calls.every(([start, end]) => start >= 0 && end <= 21)).toBe(true);
+    visualizer.setPlayheadVisible?.(false); visualizer.redraw(2); visualizer.redraw();
+    expect([...new Set(composites.at(-1)!.fills.map((fill) => fill.color))]).toEqual(['rgb(18, 52, 86)']);
+    visualizer.setOffset(10); readPeaks.mockClear(); visualizer.redraw();
+    expect(readPeaks.mock.calls.every(([start, end]) => start >= 1000 && end <= 1021)).toBe(true);
+    visualizer.dispose();
+  });
+
+  it('does not request samples for an empty sequence source', () => {
+    stubCanvas(); const host = mountHost(200), readPeaks = vi.fn(() => [{min: 0, max: 0}]);
+    const visualizer = renderWaveformVisualizer(host, {sampleRate: 48000, channels: 1, frameCount: 0, readPeaks});
+    visualizer.redraw(); expect(readPeaks).not.toHaveBeenCalled(); visualizer.dispose();
+  });
   it.each([0.75, 1, 1.25, 2])('keeps adjacent translucent bars on integer texels at DPR %s', (dpr) => {
     const {canvases, composites, operations} = stubCanvas();
     const host = mountHost(400);

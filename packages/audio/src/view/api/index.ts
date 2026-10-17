@@ -38,6 +38,7 @@ export {
 export {peaksFromWaveformData} from '../../core';
 
 export type {
+  AudioWaveformSource,
   AudioViewportSnapshot,
   AudioViewportUpdate,
   AudioViewportSubscriber,
@@ -83,3 +84,9 @@ export type {
   BindAudioTimelineOptions,
   PlayheadTarget,
 } from '../headless/binding';
+export type {
+  AudioViewEditing, AudioViewEditingOptions, AudioViewEditingState,
+} from '../headless/audio-editing';
+export type {
+  AudioSequenceWaveform, AudioSequenceWaveformOptions,
+} from '../headless/sequence-waveform';

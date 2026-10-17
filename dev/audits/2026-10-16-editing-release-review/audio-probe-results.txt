@@ -1,0 +1,85 @@
+
+ RUN  v5.0.2 /Users/mamingchen/.codex/worktrees/cd78/WebMusic
+
+ ❯ packages/audio/test/edit/review-audio-release-readiness.test.ts (2 tests | 2 failed) 8ms
+   ❯ release readiness probes (2)
+     × does not return failure with a silently adopted root when history accounting throws 6ms
+     × does not orphan a new clipboard created from the previous clipboard release callback 2ms
+ ❯ packages/audio/test/play/review-audio-release-readiness.test.ts (1 test | 1 failed) 7ms
+   ❯ release readiness probes (1)
+     × preserves a new attachment selected by retired attempt cleanup while old source disposes 6ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/audio/test/edit/review-audio-release-readiness.test.ts > release readiness probes > does not return failure with a silently adopted root when history accounting throws
+AssertionError: expected 1 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ packages/audio/test/edit/review-audio-release-readiness.test.ts:27:53
+     25|       expect(observed).toEqual([0]);
+     26|       expect(editor.getState().document.documentRevision).toBe(0);
+     27|       expect(editor.getSnapshot().documentRevision).toBe(0);
+       |                                                     ^
+     28|     } finally {failAccounting = false; editor.dispose(); initial.relea…
+     29|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  packages/audio/test/edit/review-audio-release-readiness.test.ts > release readiness probes > does not orphan a new clipboard created from the previous clipboard release callback
+AssertionError: expected { assets: 1, bytes: 32, leases: 1 } to deeply equal { assets: +0, bytes: +0, leases: +0 }
+
+- Expected
++ Received
+
+  {
+-   "assets": 0,
+-   "bytes": 0,
+-   "leases": 0,
++   "assets": 1,
++   "bytes": 32,
++   "leases": 1,
+  }
+
+ ❯ packages/audio/test/edit/review-audio-release-readiness.test.ts:46:30
+     44|     editor.clearClipboard();
+     45|     editor.dispose(); initial.release(); store.dispose();
+     46|     expect(store.getStats()).toEqual({assets: 0, bytes: 0, leases: 0});
+       |                              ^
+     47|   });
+     48| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  packages/audio/test/play/review-audio-release-readiness.test.ts > release readiness probes > preserves a new attachment selected by retired attempt cleanup while old source disposes
+AssertionError: expected { status: 'superseded', …(2) } to match object { status: 'applied' }
+(4 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "status": "applied",
++   "status": "superseded",
+  }
+
+ ❯ packages/audio/test/play/review-audio-release-readiness.test.ts:37:76
+     35|       expect(player.source).toMatchObject({kind: 'sequence', documentI…
+     36|       expect(player.documentBinding.status).toBe('ready');
+     37|       expect(await player.waitForDocumentRevision(b.source.getSnapshot…
+       |                                                                            ^
+     38|     } finally {player.dispose(); a.assets.dispose(); b.assets.dispose(…
+     39|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  3 failed (3)
+   Start at  00:27:33
+   Duration  246ms (transform 79%, import 14%, tests 6%, worker 2%)
+

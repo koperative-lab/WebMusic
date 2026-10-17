@@ -1,0 +1,27 @@
+import {Duration, NoteId, PartId, Pitch, Rational, ScoreBuilder, VoiceId} from '/Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/score/src/core/index.ts';
+import {createScoreEditor} from '/Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/score/src/edit/headless/index.ts';
+import {createScoreViewEditing} from '/Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/score/src/view/headless/score-editing.ts';
+import {mountPianoRollEditor} from '/Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/score/src/view/render/piano-roll-editor.ts';
+import {createAudioClip} from '/Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/audio/src/core/index.ts';
+import {createAudioClipEditor} from '/Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/audio/src/edit/headless/index.ts';
+import {createAudioViewEditing} from '/Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/audio/src/view/headless/audio-editing.ts';
+import {mountWaveformEditor} from '/Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/audio/src/view/render/waveform-editor.ts';
+const s = document.querySelector<HTMLElement>('#score')!, a = document.querySelector<HTMLElement>('#audio')!;
+const builder = new ScoreBuilder(), p = PartId('p'); builder.addPart({id:p,name:'Piano'});
+for(const [id,at,midi] of [['a',0,60],['b',3,64]] as const) builder.addNote(p,{id:NoteId(id),pitch:Pitch.fromMidi(midi),onsetQuarters:new Rational(at),duration:Duration.quarter(),voice:VoiceId('v')});
+const score = createScoreEditor(builder.build()), shared=score.createInteractionSession();
+const scoreView=createScoreViewEditing(score,{editable:true,interactionSession:shared});
+const roll=mountPianoRollEditor(s,scoreView,{minPitch:58,maxPitch:68,pixelsPerQuarter:90});
+shared.setSelection([NoteId('a')]); s.querySelector('details')!.open=true;
+const audio=createAudioClipEditor(createAudioClip({sampleRate:1000,channelData:[Float32Array.from({length:10000},(_,i)=>Math.sin(i*.05)*.5)]}));
+const audioView=createAudioViewEditing(audio,{editable:true});
+const wave=mountWaveformEditor(a,audioView,{pixelsPerSecond:60,height:100});
+a.querySelector('details')!.open=true;
+const scoreStatus=document.querySelector('#score-state')!, audioStatus=document.querySelector('#audio-state')!;
+function showScore(){scoreStatus.textContent=score.score.parts[0].notes.map(n=>`${n.id}: quarter ${n.onsetQuarters}, pitch ${n.pitch.midi}`).join(' | ')+` | revision ${score.getSnapshot().documentRevision}`;}
+function showAudio(){audioStatus.textContent=`Selection ${audioView.state.interaction.selection.startFrame}–${audioView.state.interaction.selection.endFrame} | length ${audio.sequence.length} | gains ${audio.sequence.segments.map(x=>x.kind==='asset'?x.gain:'silence').join(', ')} | revision ${audio.getSnapshot().documentRevision}`;}
+score.subscribeState(showScore); audioView.subscribe(showAudio);showScore();showAudio();
+function action(id:string,fn:()=>void){const b=document.getElementById(id)!;b.addEventListener('mousedown',e=>e.preventDefault());b.addEventListener('click',fn);}
+action('select-b',()=>{shared.setSelection([NoteId('b')]);document.querySelector('#selection-event')!.textContent=`Shared session selected b; focus remains ${document.activeElement?.getAttribute('aria-label')}`;});
+action('refresh-audio',()=>{const d=audio.getSnapshot();wave.updatePlayback({status:'ready',attempt:1,documentCoordinates:true,applied:{documentId:d.documentId,documentRevision:d.documentRevision}},.25);document.querySelector('#playback-event')!.textContent='Public updatePlayback synchronized at 0.25 seconds.';});
+window.addEventListener('pagehide',()=>{roll.dispose();scoreView.dispose();shared.dispose();score.dispose();wave.dispose();audioView.dispose();audio.dispose();});

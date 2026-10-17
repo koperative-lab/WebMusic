@@ -6,7 +6,7 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {setTimeout as delay} from 'node:timers/promises';
 import {test} from 'node:test';
-import {launchDocs, runCommand, startAstro, withStartupLock} from './docs-dev.mjs';
+import {launchDocs, runCommand, startAstro, startCommand, withStartupLock} from './docs-dev.mjs';
 
 async function fixture(t) {
   const directory = await mkdtemp(path.join(tmpdir(), 'webmusic-dev-start-'));
@@ -142,22 +142,130 @@ test('interrupting a build stops its process tree before another start', {skip: 
   const intermediate = `require('node:child_process').spawn(process.execPath,['-e',${JSON.stringify(grandchild)}], {stdio:'inherit'}); setInterval(()=>{},1000);`;
   await writeFile(script, `import {withStartupLock,runCommand} from ${JSON.stringify(moduleUrl)};
 try { await withStartupLock(${JSON.stringify(directory)}, () => runCommand(process.execPath,['-e', ${JSON.stringify(intermediate)}], {processGroup:true})); }
-catch (error) { process.exitCode=error.exitCode??1; }
+catch (error) { if (error.exitCode !== 143) console.error(error.stack, JSON.stringify({code:error.code,syscall:error.syscall,exitCode:error.exitCode})); process.exitCode=error.exitCode??1; }
 `);
   const child = spawn(process.execPath, [script], {stdio: ['ignore', 'pipe', 'pipe']});
+  let stderr = '';
+  child.stderr.on('data', (chunk) => { stderr += chunk; });
   const exited = once(child, 'exit');
   await once(child.stdout, 'data');
   const grandchildPid = Number(await readFile(pidFile, 'utf8'));
   t.after(() => { try { process.kill(grandchildPid, 'SIGKILL'); } catch { /* Already exited. */ } });
   child.kill('SIGTERM');
   const [code, signal] = await exited;
-  assert.equal(code, 143);
+  assert.equal(code, 143, `Interrupted build exited with ${code} (${signal ?? 'no signal'}):\n${stderr}`);
   assert.equal(signal, null);
   assert.equal(await withStartupLock(directory, () => {
     assert.throws(() => process.kill(grandchildPid, 0), {code: 'ESRCH'});
     return 'recovered';
   }), 'recovered');
 });
+
+function mockGroupKill(t, child, action) {
+  assert.ok(Number.isSafeInteger(child.pid) && child.pid > 0);
+  const nativeKill = process.kill.bind(process);
+  t.mock.method(process, 'kill', (pid, signal) => pid === -child.pid
+    ? action(signal, () => nativeKill(pid, signal))
+    : nativeKill(pid, signal));
+}
+
+function deniedGroup() {
+  return Object.assign(new Error('kill EPERM'), {code: 'EPERM', syscall: 'kill'});
+}
+
+test('a transient post-exit process-group probe denial preserves the interrupted command result',
+  {skip: process.platform === 'win32', timeout: 3000}, async (t) => {
+    const directory = await fixture(t);
+    let denied = false;
+    let confirmedGone = false;
+    await assert.rejects(withStartupLock(directory, () => {
+      const running = startCommand(process.execPath, ['-e', 'process.exit(143)'],
+        {quiet: true, processGroup: true, cleanupTimeoutMs: 500});
+      mockGroupKill(t, running.child, (signal, native) => {
+        if (signal === 0 && !denied) { denied = true; throw deniedGroup(); }
+        try { return native(); } catch (error) {
+          if (error.code === 'ESRCH') confirmedGone = true;
+          throw error;
+        }
+      });
+      return running.finished;
+    }), (error) => error.exitCode === 143);
+    assert.equal(denied, true);
+    assert.equal(confirmedGone, true);
+    assert.equal(await withStartupLock(directory, () => 'recovered'), 'recovered');
+    assert.deepEqual(await readdir(path.join(directory, '.astro')), []);
+  });
+
+test('a transient post-exit SIGTERM denial waits for the process group to disappear',
+  {skip: process.platform === 'win32', timeout: 3000}, async (t) => {
+    let initialProbe = true;
+    let denied = false;
+    let confirmedGone = false;
+    const running = startCommand(process.execPath, ['-e', 'process.exit(143)'],
+      {quiet: true, processGroup: true, cleanupTimeoutMs: 500});
+    mockGroupKill(t, running.child, (signal, native) => {
+      if (signal === 0 && initialProbe) { initialProbe = false; return true; }
+      if (signal === 'SIGTERM' && !denied) { denied = true; throw deniedGroup(); }
+      try { return native(); } catch (error) {
+        if (error.code === 'ESRCH') confirmedGone = true;
+        throw error;
+      }
+    });
+    await assert.rejects(running.finished, (error) => error.exitCode === 143);
+    assert.equal(denied, true);
+    assert.equal(confirmedGone, true);
+  });
+
+test('persistent process-group denial fails cleanup and blocks another build even after its owner exits',
+  {skip: process.platform === 'win32', timeout: 3000}, async (t) => {
+    const directory = await fixture(t);
+    const denial = deniedGroup();
+    const signals = [];
+    let groupId;
+    await assert.rejects(withStartupLock(directory, () => {
+      const running = startCommand(process.execPath, ['-e', 'process.exit(143)'],
+        {quiet: true, processGroup: true, cleanupTimeoutMs: 40});
+      groupId = running.child.pid;
+      mockGroupKill(t, running.child, (signal) => { signals.push(signal); throw denial; });
+      return running.finished;
+    }), (error) => {
+      assert.equal(error.code, 'ERR_DEV_PROCESS_GROUP_CLEANUP');
+      assert.equal(error.exitCode, 1);
+      assert.equal(error.processGroupId, groupId);
+      assert.equal(error.cause, denial);
+      assert.equal(error.commandError.exitCode, 143);
+      return true;
+    });
+    assert.ok(signals.includes(0), 'The group probe must not mistake denied observation for disappearance');
+    assert.ok(signals.includes('SIGKILL'), 'The final termination attempt must not be mistaken for success when denied');
+    const lock = path.join(directory, '.astro/webmusic-dev-start');
+    const marker = JSON.parse(await readFile(path.join(lock, 'cleanup-failed.json'), 'utf8'));
+    assert.equal(marker.processGroupId, groupId);
+    assert.deepEqual(await readdir(lock), ['cleanup-failed.json']);
+    // Use the reaped child PID to prove stale-owner recovery cannot erase this
+    // unresolved-cleanup barrier merely because its original launcher has died.
+    await writeFile(path.join(lock, `${groupId}-deadbeef`), '');
+    let restarted = false;
+    await assert.rejects(withStartupLock(directory, () => { restarted = true; }, {timeout: 50, poll: 1}), /cleanup|process group/i);
+    assert.equal(restarted, false);
+    assert.equal((await readdir(lock)).includes('cleanup-failed.json'), true);
+    assert.deepEqual(await readdir(path.join(directory, '.astro')), ['webmusic-dev-start']);
+  });
+
+test('successful deadline SIGKILL preserves the command result and releases startup coordination',
+  {skip: process.platform === 'win32', timeout: 3000}, async (t) => {
+    const directory = await fixture(t);
+    const signals = [];
+    await assert.rejects(withStartupLock(directory, () => {
+      const running = startCommand(process.execPath, ['-e', 'process.exit(143)'],
+        {quiet: true, processGroup: true, cleanupTimeoutMs: 40});
+      mockGroupKill(t, running.child, (signal) => { signals.push(signal); return true; });
+      return running.finished;
+    }), (error) => error.exitCode === 143);
+    assert.equal(signals.filter((signal) => signal === 'SIGKILL').length, 1);
+    assert.equal(await withStartupLock(directory, () => 'recovered'), 'recovered');
+    assert.deepEqual(await readdir(path.join(directory, '.astro')), []);
+  });
 
 test('all npm entry points route through the same startup coordinator without predev stop', async () => {
   const root = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));

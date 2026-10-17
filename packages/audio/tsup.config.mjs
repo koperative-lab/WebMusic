@@ -8,6 +8,10 @@ import {defineConfig} from 'tsup';
  */
 export const moduleEntries = [
   'src/index.ts',
+  'src/edit/index.ts',
+  'src/edit/headless/index.ts',
+  'src/edit/element/index.ts',
+  'src/edit/element/auto.ts',
   'src/view/index.ts',
   'src/view/headless/index.ts',
   'src/view/render/index.ts',

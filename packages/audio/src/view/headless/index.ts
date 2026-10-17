@@ -67,3 +67,11 @@ export {
   type BindAudioTimelineOptions,
   type PlayheadTarget,
 } from './binding';
+
+export {
+  createAudioViewEditing, audioDocumentPlaybackCompatible,
+  type AudioViewEditing, type AudioViewEditingOptions, type AudioViewEditingState,
+} from './audio-editing';
+export {
+  createAudioSequenceWaveform, type AudioSequenceWaveform, type AudioSequenceWaveformOptions,
+} from './sequence-waveform';

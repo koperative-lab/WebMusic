@@ -1,0 +1,46 @@
+
+> @webmusic/score@0.2.0 test
+> vitest run test/view/release-lifecycle-review.test.ts
+
+
+ RUN  v5.0.2 /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/score
+
+ ❯ test/view/release-lifecycle-review.test.ts (2 tests | 1 failed) 100ms
+   × retains paused player position after assigning a same-document interaction session 70ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/view/release-lifecycle-review.test.ts > retains paused player position after assigning a same-document interaction session
+AssertionError: expected { viewTime: +0, playerTime: 1, …(2) } to deeply equal { viewTime: 1, playerTime: 1, …(2) }
+
+- Expected
++ Received
+
+  {
+    "playerTime": 1,
+-   "playhead": true,
+-   "renderedPlayback": "ready",
+-   "viewTime": 1,
++   "playhead": false,
++   "renderedPlayback": "unbound",
++   "viewTime": 0,
+  }
+
+ ❯ test/view/release-lifecycle-review.test.ts:20:232
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed (2)
+   Start at  22:58:30
+   Duration  999ms (transform 43%, environment 34%, import 12%, tests 11%)
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/score
+npm error workspace @webmusic/score@0.2.0
+npm error location /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/score
+npm error command failed
+npm error command sh -c vitest run test/view/release-lifecycle-review.test.ts

@@ -1,0 +1,35 @@
+Selected lines from the full check before the browser-discovered upload CSS repair.
+Source: /tmp/webmusic-editing-acceptance-check.log
+SHA-256: e35625ee019e4b13bc6477a6b506acfc9f5692c112c194b96816cc1653b554fe
+Line numbers refer to the complete source log; omitted build/test output is not reproduced.
+
+2: > check
+6: > check:source
+10: > check:format
+15: > check:lockfile
+20: > check:dev-server
+52: > check:architecture
+76: Architecture check passed for 5 packages and 437 source modules.
+78: > check:docs
+99: > check:dev-docs
+104: > check:site-notices
+1564: > check:doc-snippets
+1630: Result (176 files): 
+1651:  Test Files  14 passed (14)
+1652:       Tests  163 passed (163)
+1664:  Test Files  36 passed (36)
+1665:       Tests  653 passed (653)
+1681:  Test Files  198 passed (198)
+1682:       Tests  2268 passed (2268)
+1697:  Test Files  82 passed (82)
+1698:       Tests  984 passed (984)
+1714:  Test Files  7 passed (7)
+1715:       Tests  182 passed (182)
+1727:  Test Files  32 passed (32)
+1728:       Tests  255 passed (255)
+1736: > check:licenses
+1741: > check:packages
+1789: Package export check passed for 101 public entries.
+1790: Package artifact check passed for 5 package(s).
+1807: > check:release-manifests
+1827: Release manifests are consistent at 0.2.0.

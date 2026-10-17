@@ -27,6 +27,36 @@ function noteData(patch: Partial<NoteData> = {}): NoteData {
 }
 
 describe('Note runtime validation', () => {
+  it('validates independent velocity overrides and keeps performed attributes required', () => {
+    for (const velocityOverride of [0, 128, -1, 64.5, Number.NaN, Infinity, null, '80']) {
+      expect(() => new Note(noteData({velocityOverride: velocityOverride as number})))
+        .toThrow(/velocityOverride must be an integer from 1 to 127/);
+    }
+    expect(() => new Note(noteData({performed: {velocity: 80} as NoteData['performed']})))
+      .toThrow(/performed onsetSec/);
+    for (const velocityOverride of [1, 127]) {
+      expect(new Note(noteData({velocityOverride})).velocity).toBe(velocityOverride);
+    }
+  });
+
+  it('preserves velocity overrides through immutable updates without creating performed timing', () => {
+    const original = new Note(noteData());
+    const overridden = original.with({velocityOverride: 95});
+    const transposed = overridden.with({pitch: Pitch.parse('D4')});
+    expect(original.velocity).toBe(80);
+    expect(transposed.velocityOverride).toBe(95);
+    expect(transposed.velocity).toBe(95);
+    expect(transposed.performed).toBeUndefined();
+    expect(transposed.toJSON().velocityOverride).toBe(95);
+    expect(Object.isFrozen(transposed)).toBe(true);
+
+    const performed = overridden.with({performed: {onsetSec: 0.02, durationSec: 0.4, velocity: 70}});
+    expect(performed.velocity).toBe(95);
+    expect(performed.performed).toEqual({onsetSec: 0.02, durationSec: 0.4, velocity: 70});
+    expect(performed.with({velocityOverride: undefined}).velocity).toBe(70);
+    expect(overridden.with({velocityOverride: undefined}).velocity).toBe(80);
+  });
+
   it('rejects invalid performed timings before they reach a scheduler', () => {
     const invalid = [
       {onsetSec: Number.NaN, durationSec: 0.1, velocity: 80},

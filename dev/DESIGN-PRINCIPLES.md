@@ -22,6 +22,12 @@ own analysis or presentation state does not become another transport. The
 observation, permitted commands, and connection lifecycle. This is a design
 target; each public reference must identify the behavior actually implemented.
 
+For editing, the document editor owns committed content while Play owns the
+applied playback revision and transport. View borrows content/commands and keeps
+gesture drafts separate; a draft or retained playback snapshot is not another
+content authority. [Editing contracts](design/EDIT-COMPONENTS.md), accepted in
+DEC-047 and pending implementation, own local history and revision reconciliation.
+
 ## 3. Time is a cross-component protocol
 
 One session authority organizes play, pause, seek, rate, and loop. Score positions, audio seconds/samples, and device time have explicit mappings and units. A visual playhead projects musical time; scrolling, zooming, and highlighting must not implicitly rewrite playback intent.

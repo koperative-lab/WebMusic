@@ -1,0 +1,76 @@
+
+> @webmusic/score@0.2.0 test
+> vitest run test/view/editor-player-integration.test.ts
+
+
+ RUN  v5.0.2 /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/score
+
+ ❯ test/view/editor-player-integration.test.ts (11 tests | 4 failed) 290ms
+   ❯ editor, native Player and piano-roll integration (11)
+     × retains paused playback when interactionSession is assign 71ms
+     × retains paused playback when interactionSession is replace 29ms
+     × retains paused playback when interactionSession is clear 22ms
+     × preserves a newer interaction session requested while disposing the old owned session 19ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/view/editor-player-integration.test.ts > editor, native Player and piano-roll integration > retains paused playback when interactionSession is assign
+ FAIL  test/view/editor-player-integration.test.ts > editor, native Player and piano-roll integration > retains paused playback when interactionSession is replace
+ FAIL  test/view/editor-player-integration.test.ts > editor, native Player and piano-roll integration > retains paused playback when interactionSession is clear
+AssertionError: expected { viewTime: +0, playerTime: 1, …(2) } to deeply equal { viewTime: 1, playerTime: 1, …(2) }
+
+- Expected
++ Received
+
+  {
+    "playerTime": 1,
+-   "playhead": true,
+-   "renderedPlayback": "ready",
+-   "viewTime": 1,
++   "playhead": false,
++   "renderedPlayback": "unbound",
++   "viewTime": 0,
+  }
+
+ ❯ test/view/editor-player-integration.test.ts:46:8
+     44|       playhead: Boolean(view.querySelector('[data-playhead]')),
+     45|       renderedPlayback: view.querySelector('[part="editor"]')?.getAttr…
+     46|       .toEqual({viewTime: 1, playerTime: 1, playhead: true, renderedPl…
+       |        ^
+     47|     expect(view.getAttribute('data-playback-state')).toBe('ready');
+     48|     expect(view.interactionSession).not.toBe(old);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  test/view/editor-player-integration.test.ts > editor, native Player and piano-roll integration > preserves a newer interaction session requested while disposing the old owned session
+AssertionError: expected +0 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ test/view/editor-player-integration.test.ts:91:30
+     89|     expect(view.interactionSession).toBe(latest);
+     90|     expect(view.interactionSession.getSnapshot().selectedNoteIds).toEq…
+     91|     expect(view.currentTime).toBe(1);
+       |                              ^
+     92|     expect(view.querySelector('[data-playhead]')).not.toBeNull();
+     93|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 7 passed (11)
+   Start at  15:19:42
+   Duration  1.07s (transform 34%, tests 29%, environment 28%, import 8%)
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/score
+npm error workspace @webmusic/score@0.2.0
+npm error location /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/score
+npm error command failed
+npm error command sh -c vitest run test/view/editor-player-integration.test.ts

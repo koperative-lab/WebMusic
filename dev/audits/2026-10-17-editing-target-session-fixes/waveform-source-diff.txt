@@ -1,0 +1,108 @@
+--- /tmp/webmusic-waveform-editor-before.ts
++++ packages/audio/src/view/render/waveform-editor.ts
+@@ -71,16 +71,16 @@
+   const buttons: HTMLButtonElement[] = [];
+   const button = (label: string, action: () => void): HTMLButtonElement => {
+     const node = owner.createElement('button'); node.type = 'button'; node.textContent = label;
+-    node.addEventListener('click', () => { try { action(); } catch (error) { report(error); } });
++    node.addEventListener('click', () => { if (!active()) return; try { action(); } catch (error) { report(error); } });
+     buttons.push(node); form.append(node); return node;
+   };
+   button('Select frames', () => editing.select(numericRange()));
+   const split = button('Split at start', splitAtStart);
+-  const trim = button('Trim to selection', () => execute('Trim audio', [{type: 'trim', ...selected()}]));
++  const trim = button('Trim to selection', () => execute('Trim audio', [{type: 'trim', ...selected()}], 'range'));
+   const remove = button('Delete selection', deleteSelection);
+   button('Insert silence', () => execute('Insert silence', [{type: 'insert-silence', frame: selected().startFrame,
+-    length: frameValue(silence), id: makeId('segment'), rightId: makeId('segment')} ]));
+-  const applyGain = button('Apply segment gain', () => execute('Change segment gain', [{type: 'set-gain', segmentIds: [segment.value], gain: Number(gain.value)}]));
++    length: frameValue(silence), id: makeId('segment'), rightId: makeId('segment')}], 'start'));
++  const applyGain = button('Apply segment gain', () => execute('Change segment gain', [{type: 'set-gain', segmentIds: [segment.value], gain: Number(gain.value)}], 'segment'));
+   const fadeIn = button('Fade in segment', () => fade(true));
+   const fadeOut = button('Fade out segment', () => fade(false));
+   const copy = button('Copy', copySelection);
+@@ -121,27 +121,35 @@
+     if (result.status === 'failed') report(result.error);
+     else { message = result.status === 'committed' ? result.change.label : 'No change'; update(); if (result.status === 'committed') options.onCommit?.(result); }
+   }
+-  function execute(label: string, operations: readonly AudioEditOperation[]): void {
++  function commandTarget(target: 'range' | 'start' | 'segment'): string | number {
++    if (target === 'segment') return segment.value;
++    const range = selected();
++    return target === 'start' ? range.startFrame : `${range.startFrame}:${range.endFrame}`;
++  }
++  function execute(label: string, operations: readonly AudioEditOperation[], target: 'range' | 'start' | 'segment'): void {
+     if (!active()) return;
+-    const document = editing.state.document;
++    const document = editing.state.document, targetValue = commandTarget(target);
+     cancel();
+     if (!active()) return;
+     if (editing.state.document.documentRevision !== document.documentRevision) {
+       report(new AudioEditError('revision-conflict', 'The audio document changed before the command could be applied'));
+       return;
+     }
++    // Cancellation publishes synchronously. Only the coordinates used by this
++    // command must remain current; an unrelated range/segment change is safe.
++    if (commandTarget(target) !== targetValue) return;
+     completed(editing.execute(label, operations));
+   }
+   function copySelection(): void { const result = editing.copy(); if (result.status === 'failed') report(result.error); else { message = `Copied ${result.length} frames`; update(); } }
+   function deleteSelection(): void {
+     const {startFrame, endFrame} = selected();
+-    execute('Delete audio', [{type: 'splice', startFrame, deleteCount: endFrame - startFrame, segments: [], rightId: makeId('segment')}]);
++    execute('Delete audio', [{type: 'splice', startFrame, deleteCount: endFrame - startFrame, segments: [], rightId: makeId('segment')}], 'range');
+   }
+   function splitAtStart(): void {
+     let offset = 0;
+     for (const item of root.segments) {
+       const length = audioSegmentLength(item), frame = selected().startFrame - offset;
+-      if (frame > 0 && frame < length) { execute('Split audio', [{type: 'split', segmentId: item.id, frame, leftId: makeId('segment'), rightId: makeId('segment')}]); return; }
++      if (frame > 0 && frame < length) { execute('Split audio', [{type: 'split', segmentId: item.id, frame, leftId: makeId('segment'), rightId: makeId('segment')}], 'start'); return; }
+       offset += length;
+     }
+     message = 'Choose a frame inside a segment to split'; update();
+@@ -150,7 +158,7 @@
+     const item = root.segments.find((item) => item.id === segment.value);
+     if (!item || item.kind !== 'asset') return;
+     execute(inward ? 'Fade in' : 'Fade out', [{type: 'set-envelope', segmentId: item.id,
+-      points: [{frame: 0, gain: inward ? 0 : 1}, {frame: audioSegmentLength(item), gain: inward ? 1 : 0}]}]);
++      points: [{frame: 0, gain: inward ? 0 : 1}, {frame: audioSegmentLength(item), gain: inward ? 1 : 0}]}], 'segment');
+   }
+   function drawWaveform(): void {
+     const offset = waveform?.viewport().startSeconds ?? 0;
+@@ -230,9 +238,11 @@
+     keyboardSelection = undefined;
+     const current = gesture; gesture = undefined;
+     if (current) { try { if (surface.hasPointerCapture?.(current.id)) surface.releasePointerCapture(current.id); } catch { /* capture already lost */ } }
+-    if (!disposed && editing.state.available) {
++    // Teardown marks this handle inactive before notifying subscribers, but
++    // still releases its captured gesture. A disposed idle handle is inert.
++    if ((!disposed || current) && editing.state.available) {
+       editing.cancel();
+-      if (current && restore && current.revision === editing.state.document.documentRevision) editing.select(current.initial);
++      if (current && restore && editing.state.available && current.revision === editing.state.document.documentRevision) editing.select(current.initial);
+     }
+   }
+   function cancelGesture(): void {
+@@ -329,11 +339,16 @@
+     hitTest(x, y) { return waveform.hitTest(x, y); },
+     cancel,
+     dispose() {
+-      if (disposed) return; cancelGesture(); disposed = true; unsubscribe(); offViewport?.(); waveform.dispose(); source.dispose(); viewportListeners.clear();
+-      surface.removeEventListener('pointerdown', pointerdown); surface.removeEventListener('pointermove', pointermove);
+-      surface.removeEventListener('pointerup', pointerup); surface.removeEventListener('pointercancel', cancelled);
+-      surface.removeEventListener('lostpointercapture', cancelled); surface.removeEventListener('blur', cancelled);
+-      surface.removeEventListener('keydown', keydown); owner.defaultView?.removeEventListener('blur', cancelled); element.remove();
++      if (disposed) return;
++      disposed = true;
++      try { cancelGesture(); }
++      finally {
++        unsubscribe(); offViewport?.(); waveform.dispose(); source.dispose(); viewportListeners.clear();
++        surface.removeEventListener('pointerdown', pointerdown); surface.removeEventListener('pointermove', pointermove);
++        surface.removeEventListener('pointerup', pointerup); surface.removeEventListener('pointercancel', cancelled);
++        surface.removeEventListener('lostpointercapture', cancelled); surface.removeEventListener('blur', cancelled);
++        surface.removeEventListener('keydown', keydown); owner.defaultView?.removeEventListener('blur', cancelled); element.remove();
++      }
+     },
+   };
+ }

@@ -8,6 +8,7 @@ const digest = (value) => createHash('sha256').update(value).digest('hex');
 const json = (value) => `${JSON.stringify(value, null, 2)}\n`;
 const additions = ['packages/audio', 'bridges/score-audio'];
 const headlessSources = {
+  'edit/audio-clip-editor': ['audio-clip-editor'],
   'play/audio-player': ['audio-player'],
   'play/audio-clip-player': ['player'],
   'play/audio-mixer': ['mixer'],
@@ -78,6 +79,7 @@ export const audioBridgeContext = Object.freeze({
     'AudioAnalysisDemo', 'AudioAnalysisTimelinePlayground', 'AudioAnalysisViewDemo',
     'HlAudioPlayerDemo', 'AudioPlayerDemo', 'AudioRecorderDemo', 'AudioClipSummaryPlayground',
     'AudioCustomStyleDemo', 'AudioHistogramPlayground',
+    'AudioClipEditorHeadlessDemo', 'AudioDocumentPlayground', 'AudioEditingDemo',
     'AudioLiveViewPlayground', 'AudioMeterDemo', 'AudioMixerDemo',
     'AudioPlaylistPlayground', 'AudioViewDemo', 'AudioWorkbenchDemo',
     'MultibandWaveformDemo', 'WaveformExamplesDemo', 'IndependentLoopsDemo', 'ScoreAudioSyncDemo',
@@ -93,7 +95,7 @@ export const audioBridgeContext = Object.freeze({
   components(pages, record) {
     return pages.flatMap((page) => {
       if (page.route === '/bridge/headless/score-audio-sync/') return [record('headless/bridge/score-audio-sync', 'headless', page, ['sync', 'audio-master'].map((name) => `bridges/score-audio/src/${name}.ts`), {styles: false})];
-      const match = /^\/audio\/headless\/(play|analyze|view)\/([^/]+)\/$/.exec(page.route);
+      const match = /^\/audio\/headless\/(play|analyze|view|edit)\/([^/]+)\/$/.exec(page.route);
       if (!match) return [];
       const [, family, name] = match;
       const modules = headlessSources[`${family}/${name}`];
@@ -103,6 +105,7 @@ export const audioBridgeContext = Object.freeze({
   },
   functionalIndexGroup({route}) {
     if (route.startsWith('/bridge/')) return 'Coordinate Score and Audio';
+    if (/^\/audio\/(?:element|headless|api)\/edit\//.test(route)) return 'Edit audio documents and manage history';
     if (/^\/audio\/(?:element|headless|api)\/play\//.test(route)) return 'Play audio, record and mix';
     if (/^\/audio\/(?:element|headless|api)\/view\//.test(route)) return 'Display audio waveforms and spectral data';
     if (/^\/audio\/(?:element|headless|api)\/analyze\//.test(route)) return 'Analyze audio and follow playback';
@@ -111,6 +114,7 @@ export const audioBridgeContext = Object.freeze({
   patterns: [
     {title: 'Play a decoded audio clip from custom UI', page: 'audio/headless/play/audio-clip-player.mdx', sections: ['Import', 'Ownership and the tap', 'Scratch sessions']},
     {title: 'Attach an audio waveform and choose its interaction', page: 'audio/element/view/audio-view.mdx', sections: ['Three ways in', 'Dragging and seeking']},
+    {title: 'Edit an audio document and audition committed revisions', page: 'audio/element/view/audio-view.mdx', sections: ['Waveform editing']},
     {title: 'Coordinate Score and Audio from one session', page: 'bridge/composition.mdx', sections: ['Setup in your application', 'Three integration choices in one session', 'Independent loop lengths']},
   ],
   serverOrigin(server, request) {

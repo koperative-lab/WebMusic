@@ -13,15 +13,35 @@ see [Audio setup](/audio/#drop-in-web-components).
 
 | Capability | Elements |
 | --- | --- |
+| [Edit](#edit) | A nonvisual document owner shared by playback and optional waveform editing. |
 | [Play](#play) | A central player, attached queue/mix controls and recording. |
 | [Analyze](#analyze) | Five live signal tools for metering, waveform, spectrum and transient inspection. |
 | [View](#view) | Drawing audio: a multi-view stage for clips and regions, plus a live signal strip. |
+
+## Edit
+
+[`<audio-document>`](/audio/element/edit/audio-document/) loads and owns one
+`AudioClipEditor`. It has no visible surface, playback graph or clock. Bind
+`audio-player` and `audio-view` with `editor="#document"`; the waveform's
+`editable` attribute enables content gestures. Applications can instead inject
+one application-owned editor through each borrower's `.editor` property.
+
+| Element | Register | Purpose |
+| --- | --- | --- |
+| [`<audio-document>`](/audio/element/edit/audio-document/) | `defineAudioDocumentElement(tag?)` | Nonvisual loading, replacement and connected-lifetime document ownership. |
+| — | `defineAllAudioElements()` | Register the default Edit declaration. |
+
+Imports come from `@webmusic/audio/edit/element`; `/edit/auto` registers on import.
+Edit has no `/global` IIFE. Disconnecting a declaration disposes its owned editor;
+borrowers release their subscriptions but never dispose an application-owned editor.
+See [Waveform editing](/audio/element/view/audio-view/#waveform-editing) for the
+complete declaration/player/view composition and typed edit events.
 
 ## Play
 
 Use one [`audio-player`](/audio/element/play/audio-player/) for transport and
 connect the task-specific controls through `player="#session"` or `.player`.
-The player delegates to one clip, queue or mix backend. The linked playlist and
+The player delegates to one clip, document sequence, queue or mix backend. The linked playlist and
 mixer display selection and mix controls without a duplicate transport bar.
 
 | Element | Register | Purpose |
@@ -107,7 +127,7 @@ The **visualization** elements of [`@webmusic/audio/view`](/audio/api/view/). `<
 
 | Element | Purpose |
 | --- | --- |
-| [`<audio-view>`](/audio/element/view/audio-view/) | The projection stage — waveform, spectrogram or meter, chosen with `type`; follows a bound player, seeks, zooms, pans and annotates. |
+| [`<audio-view>`](/audio/element/view/audio-view/) | The projection stage — waveform, spectrogram or meter, chosen with `type`; follows a bound player, seeks, zooms, pans and annotates; an explicit editor enables optional waveform editing. |
 | [`<audio-live-view>`](/audio/element/view/audio-live-view/) | A scrolling projection of a live `AnalyserNode` — waveform or spectrogram. The only live *time-axis* surface here. |
 
 Inputs are component-specific. `<audio-view>` binds to playback through `player`;
@@ -115,7 +135,9 @@ Inputs are component-specific. `<audio-view>` binds to playback through `player`
 Use `<audio-view>`'s `.regions` and `annotate` support to display or create regions.
 
 Waveform views can use clip or peaks data, load clips through `src`, or draw
-precomputed `peaks-src` data without decoding audio.
+precomputed `peaks-src` data without decoding audio. An `editor` binding draws
+a reference sequence through bounded visible sample ranges; `editable` enables
+selection, trim, split, delete, silence, gain/fades, clipboard and local history.
 Analysis stays caller-owned: `<audio-view type="spectrogram">` requires
 `.spectrogram` data from [`@webmusic/audio/analyze`](/audio/api/analyze/) or another
 compatible producer. Binding a player supplies playback state, not that analysis.

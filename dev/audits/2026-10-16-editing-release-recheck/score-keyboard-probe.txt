@@ -1,0 +1,36 @@
+// @vitest-environment jsdom
+import {expect, it, vi} from 'vitest';
+import {Duration, NoteId, PartId, Pitch, Rational, ScoreBuilder, VoiceId} from '../../src/core';
+import {createScoreEditor} from '../../src/edit/headless';
+import {createScoreViewEditing} from '../../src/view/headless';
+import {mountPianoRollEditor} from '../../src/view/render/piano-roll-editor';
+
+it('does not apply a captured keyboard resize to a replacement document revision', () => {
+  const id = NoteId('a'); const part = PartId('p');
+  const builder = new ScoreBuilder(); builder.addPart({id: part, name: 'Piano'});
+  builder.addNote(part, {id, pitch: Pitch.fromMidi(60), onsetQuarters: Rational.ONE,
+    duration: Duration.quarter(), voice: VoiceId('v')});
+  const editor = createScoreEditor(builder.build());
+  const editing = createScoreViewEditing(editor, {editable: true});
+  const host = document.createElement('div'); document.body.append(host);
+  const commits = vi.fn(); const errors = vi.fn();
+  const renderer = mountPianoRollEditor(host, editing, {onCommit: commits, onError: errors});
+  editing.select([id]);
+  editing.preview([{type: 'move-notes', noteIds: [id], deltaQuarters: [1, 4]}]);
+  let pending = true;
+  const off = editing.session.subscribe((snapshot) => {
+    if (pending && !snapshot.draft) {
+      pending = false;
+      editor.transaction('External resize', (tx) => tx.add({type: 'resize-notes', noteIds: [id], durationQuarters: [4, 1]}));
+    }
+  });
+  renderer.surface.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowRight', shiftKey: true, bubbles: true}));
+  console.log(JSON.stringify({revision: editor.getSnapshot().documentRevision,
+    duration: editor.score.getNote(id)!.duration.quarters.toString(), commits: commits.mock.calls.length,
+    errors: errors.mock.calls.length}));
+  try {
+    expect(editor.score.getNote(id)!.duration.quarters.toString()).toBe('4');
+    expect(editor.getSnapshot().documentRevision).toBe(1);
+    expect(commits).not.toHaveBeenCalled();
+  } finally { off(); renderer.dispose(); editing.dispose(); editor.dispose(); host.remove(); }
+});

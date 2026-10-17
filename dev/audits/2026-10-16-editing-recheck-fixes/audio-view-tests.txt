@@ -1,0 +1,13 @@
+
+> @webmusic/audio@0.2.0 test
+> vitest run test/view/editor-lifecycle.test.ts test/view/waveform-editing.test.ts test/view/sequence-editing.test.ts
+
+
+ RUN  v5.0.2 /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/audio
+
+
+ Test Files  3 passed (3)
+      Tests  65 passed (65)
+   Start at  14:56:46
+   Duration  854ms (environment 45%, transform 33%, tests 16%, import 5%)
+

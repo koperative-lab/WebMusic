@@ -1,0 +1,103 @@
+---
+import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
+const code = `import {createAudioClip} from '@webmusic/audio';
+import {createAudioClipEditor} from '@webmusic/audio/edit/headless';
+const clip = createAudioClip({sampleRate: 8000, channelData: [new Float32Array(16)]});
+const editor = createAudioClipEditor(clip);
+editor.transaction('Append silence', tx => tx.add({type: 'insert-silence', frame: 16, length: 4, id: 'pause'}));
+editor.undo();
+editor.dispose();`;
+---
+<HeadlessDemoFrame entry="@webmusic/audio/edit/headless" name="AudioClipEditor" code={code}
+  hint="Edit a tiny generated PCM document. Structural history retains assets; it does not copy PCM. Reset creates a fresh document."
+  rootAttrs={{'data-audio-editor-demo': true}}>
+  <section aria-label="Audio document and history">
+    <p data-summary role="status">Preparing document.</p>
+    <ul data-segments aria-label="Audio segments"></ul>
+    <p data-last></p>
+  </section>
+  <Fragment slot="parameters">
+    <label>History limit <input data-limit type="number" value="100" min="1" step="1" /></label>
+    <label>Operations (JSON)
+      <textarea data-operations rows="5" spellcheck="false">{`[{"type":"insert-silence","frame":4,"length":2,"id":"pause","rightId":"tail"}]`}</textarea>
+    </label>
+    <div class="editor-actions">
+      <button class="wui-btn" data-action="execute" type="button">Execute</button>
+      <button class="wui-btn" data-action="preview" type="button">Preview</button>
+      <button class="wui-btn" data-action="commit" type="button">Commit draft</button>
+      <button class="wui-btn" data-action="cancel" type="button">Cancel draft</button>
+      <button class="wui-btn" data-action="undo" type="button">Undo</button>
+      <button class="wui-btn" data-action="redo" type="button">Redo</button>
+      <button class="wui-btn" data-action="saved" type="button">Mark saved</button>
+      <button class="wui-btn" data-action="checkpoint" type="button">Keep checkpoint</button>
+      <button class="wui-btn" data-action="restore" type="button">Restore checkpoint</button>
+    </div>
+  </Fragment>
+</HeadlessDemoFrame>
+<script>
+  import {createAudioClip, audioSegmentLength, type AudioCheckpoint, type AudioEditOperation, type AudioInteractionSession} from '@webmusic/audio';
+  import {createAudioClipEditor, type AudioClipEditor} from '@webmusic/audio/edit/headless';
+  import {mountDemos} from '../demo-lifecycle';
+  mountDemos('[data-audio-editor-demo]', (root, scope) => {
+    const summary = root.querySelector<HTMLElement>('[data-summary]')!;
+    const segments = root.querySelector<HTMLElement>('[data-segments]')!;
+    const last = root.querySelector<HTMLElement>('[data-last]')!;
+    const feedback = root.querySelector<HTMLElement>('[data-hl-feedback]')!;
+    const operations = root.querySelector<HTMLTextAreaElement>('[data-operations]')!;
+    const initialOperations = operations.value;
+    const limit = root.querySelector<HTMLInputElement>('[data-limit]')!;
+    let editor: AudioClipEditor, session: AudioInteractionSession, checkpoint: AudioCheckpoint | undefined;
+    let releases: Array<() => void> = [];
+    const message = (text: string) => {feedback.hidden = false; feedback.textContent = text;};
+    const release = () => {releases.splice(0).forEach(stop => stop()); checkpoint?.release(); checkpoint = undefined; session?.dispose(); editor?.dispose();};
+    const paint = () => {
+      if (!scope.active || !editor || !session) return;
+      const state = editor.getState(), draft = session.getSnapshot().draft;
+      const content = draft?.content ?? state.document.content;
+      summary.textContent = `${content.length} frames · revision ${state.document.documentRevision} · ${state.history.undoCount} undo / ${state.history.redoCount} redo · ${state.history.historyOnlyBytes} history-only bytes · ${state.dirty ? 'unsaved' : 'saved'}${draft ? ' · preview' : ''}`;
+      segments.replaceChildren(...content.segments.map(segment => {
+        const item = document.createElement('li'); item.textContent = `${segment.id}: ${segment.kind} · ${audioSegmentLength(segment)} frames`; return item;
+      }));
+      last.textContent = state.document.change ? `${state.document.change.origin}: ${state.document.change.label}` : 'No edits yet.';
+    };
+    const create = () => {
+      try {
+        const next = createAudioClipEditor(createAudioClip({sampleRate:8000, channelData:[Float32Array.from({length:16}, (_, i) => Math.sin(i * Math.PI / 4) * .5)]}), {history:{limit:Number(limit.value)}});
+        release(); editor = next; session = editor.createInteractionSession();
+        releases = [editor.subscribeState(paint), session.subscribe(paint)]; paint(); message('Fresh document ready.');
+      } catch (error) {message(String(error));}
+    };
+    scope.listen(root, 'click', (event) => {
+      const action = (event.target as Element | null)?.closest('[data-action]')?.getAttribute('data-action');
+      if (!action || !editor) return;
+      try {
+        let outcome: {status: string; error?: Error} | undefined;
+        if (action === 'execute' || action === 'preview') {
+          const input = JSON.parse(operations.value) as AudioEditOperation[];
+          const snapshot = editor.getSnapshot();
+          outcome = action === 'preview' ? session.preview(input) : editor.execute({version:1, documentId:snapshot.documentId,
+            expectedRevision:snapshot.documentRevision, label:'Demo edit', operations:input});
+        } else if (action === 'commit') outcome = session.commitDraft();
+        else if (action === 'cancel') session.cancelDraft();
+        else if (action === 'undo') outcome = editor.undo();
+        else if (action === 'redo') outcome = editor.redo();
+        else if (action === 'saved') editor.markSaved();
+        else if (action === 'checkpoint') {checkpoint?.release(); checkpoint = editor.createCheckpoint();}
+        else if (action === 'restore') {
+          if (!checkpoint) {message('Keep a checkpoint first.'); return;}
+          outcome = editor.restoreCheckpoint(checkpoint);
+        }
+        message(outcome ? `${outcome.status}${outcome.error ? `: ${outcome.error.message}` : ''}` : `${action} completed.`); paint();
+      } catch (error) {message(String(error));}
+    });
+    scope.listen(limit, 'change', create);
+    scope.listen(root, 'wm:headless-reset', () => {limit.value = '100'; operations.value = initialOperations; create();});
+    scope.add(release); create();
+  });
+</script>
+<style>
+  .editor-actions {display:flex; flex-wrap:wrap; gap:.5rem}
+  label {display:grid; gap:.25rem; min-width:0}
+  textarea {box-sizing:border-box; width:100%; font:inherit}
+  [data-summary], [data-segments] {overflow-wrap:anywhere}
+</style>

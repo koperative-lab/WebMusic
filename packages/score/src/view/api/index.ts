@@ -55,3 +55,5 @@ export type {
   ScoreViewTimeRange,
 } from '../headless/score-view';
 export type {PitchViewOptions, PitchViewState} from '../headless/pitch-view';
+export type {ScoreViewEditing, ScoreViewEditingOptions, ScoreViewEditingState} from '../headless/score-editing';
+export type {StaffViewEditing, StaffViewEditingOptions, StaffViewEditingState} from '../headless/staff-editing';

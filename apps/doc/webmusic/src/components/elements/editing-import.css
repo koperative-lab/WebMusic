@@ -1,0 +1,53 @@
+/* Documentation-only upload fields shared by the MIDI, staff and WAV demos. */
+:is([data-editing-demo], [data-audio-edit-demo]) .editing-import {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  flex: 0 1 18rem;
+  gap: .35rem;
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  color: var(--wui-ink);
+  font-family: var(--wui-font-ui);
+  font-size: var(--wui-size-control);
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+:is([data-editing-demo], [data-audio-edit-demo]) .editing-import input[type='file'] {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-height: calc(var(--wui-row-h) + 2rem);
+  padding: .35rem;
+  border: 1px solid var(--wui-line-control);
+  background: var(--wui-panel);
+  color: var(--wui-ink);
+  font: inherit;
+  font-weight: 400;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+:is([data-editing-demo], [data-audio-edit-demo]) .editing-import input[type='file']::file-selector-button {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--wui-row-h);
+  margin: 0 0 .35rem;
+  padding: .35rem .7rem;
+  border: 1px solid var(--wui-ink);
+  border-radius: 0;
+  background: var(--wui-ink);
+  color: var(--wui-on-ink);
+  font: inherit;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}

@@ -93,6 +93,136 @@ rendered.redraw(rendered.noteSequence.notes[0], true);
 rendered.clearActiveNotes();
 ```
 
+### Edit a piano roll
+
+`mountPianoRollEditor(host, editing, options?)` mounts a written-quarter SVG
+grid with selection, drag/resize/draw gestures, focused keyboard editing and
+labeled numeric note controls. The `editing` argument is a
+[`ScoreViewEditing`](/score/headless/view/score-view/#follow-an-editing-document)
+controller over a borrowed Core editor port. It creates no editor, player or
+clock. Plain note visualization remains on `renderPianoRollVisualizer`.
+
+```ts
+import {createScoreEditor} from '@webmusic/score/edit/headless';
+import {createScoreViewEditing} from '@webmusic/score/view/headless';
+import {mountPianoRollEditor} from '@webmusic/score/view/render';
+
+const editor = createScoreEditor(score);
+const editing = createScoreViewEditing(editor, {editable: true});
+const drawing = mountPianoRollEditor(document.querySelector<HTMLElement>('#notes')!, editing, {
+  pixelsPerQuarter: 64,
+  editingGrid: [1, 4],
+  onCommit: (result) => console.log(result.snapshot.documentRevision),
+});
+// During teardown:
+drawing.dispose();
+editing.dispose();
+editor.dispose();
+```
+
+| `PianoRollEditingOptions` member | Default | Contract |
+| --- | --- | --- |
+| `pixelsPerQuarter` | 64 | Finite positive pixel scale for written quarter positions. |
+| `noteHeight` | 20 | Finite positive pitch-lane height in pixels. |
+| `minPitch`, `maxPitch` | MIDI 48–84, expanded around notes | Safe integer bounds within 0–127, minimum no greater than maximum. |
+| `editingGrid` | `[1, 4]` | Positive exact rational quarter grid for pointer and keyboard timing. |
+| `noteColor`, `activeNoteColor` | Score View CSS tokens | CSS note fills; take precedence over the corresponding RGB channels. |
+| `noteRGB`, `activeNoteRGB` | token fallback | Optional `"r, g, b"` fills when the corresponding CSS color is absent. |
+| `onPreview(result)` | none | Successful preview `ScoreDraftResult`, including the revision-bound interaction snapshot. |
+| `onCommit(result)` | none | Committed `ScoreEditResult`; no call for cancellation, failure or no-op. |
+| `onError(error)` | none | Command or numeric-input failure. |
+
+`PianoRollEditingHandle` exposes `element` (the mounted section), `surface`
+(the focusable SVG), `updatePlayback(snapshot?)`, `cancel()` and `dispose()`.
+Playback updates draw time and active-note overlays only for ready, exactly
+matching applied document identity/revision with `documentCoordinates: true`.
+Passing `undefined` removes playback overlays. `cancel()` discards the session
+draft. Idempotent `dispose()` cancels this surface's active gesture, detaches its
+listeners and resize observer and removes its DOM; it leaves the borrowed controller/editor alive.
+A surface without an active gesture does not cancel another consumer's shared
+draft on disposal. Render options are fixed for that mounted surface.
+
+Where `ResizeObserver` is available, viewport size changes redraw newly visible
+notes without editing the document. A size change cancels this surface's active
+pointer gesture; it leaves another surface's shared draft intact.
+
+The **Note values and keyboard alternatives** controls include a native
+**Select existing note** menu, so keyboard users can choose an individual
+existing note before applying numeric edits or deleting it. Options identify
+part name/number, pitch, written-quarter onset, voice and note number, while
+their values retain stable note identity; selection alone does not
+commit content. The menu follows external selection and document changes,
+displays a multi-selection summary and offers **No selection**. It retains
+focus through updates; native menu keys do not run the grid's nudge shortcuts.
+Numeric fields track the committed selected note and document revision;
+selection or revision changes refresh that baseline. Other redraws preserve
+unsubmitted values, including when focus leaves the form. Shared previews do
+not replace the numeric baseline. Without a single selection, Apply is disabled
+and the fields remain insertion parameters. Numeric, keyboard, history and pointer
+commands capture their selection and document revision before cancelling a draft.
+A selection or revision change during cancellation rejects the pending command
+instead of applying captured values or history intent to newer content. Becoming
+read-only, unavailable or disposed also stops the pending command. Pointer setup
+rechecks the same context after focusing and selecting its target.
+
+The grid works with ready empty content when a Part exists. It uses written
+pitch and written quarters, even when imported notes have performed microtiming.
+The [Element editing section](/score/element/view/score-view/#piano-roll-editing)
+documents gestures, exact-value inputs, cancellation and supported semantic
+limits. Notes, selection and drafts are rendered here; expressive annotation
+strips remain on passive renderers.
+
+### Edit a staff
+
+`mountStaffEditor(host, input, options?)` composes the scrolling notation
+renderer with a written-note cursor, note/rest selection, focused keyboard
+input and labeled controls. The `input` argument is a borrowed
+[`StaffViewEditing`](/score/headless/view/staff-editing/) controller, which
+shares its underlying editor and history with other surfaces.
+
+```ts
+import {createScoreEditor} from '@webmusic/score/edit/headless';
+import {createScoreViewEditing, createStaffViewEditing} from '@webmusic/score/view/headless';
+import {mountStaffEditor} from '@webmusic/score/view/render';
+
+// score contains explicit authored measures and supported simple notation.
+const editor = createScoreEditor(score);
+const editing = createScoreViewEditing(editor, {editable: true});
+const input = createStaffViewEditing(editing);
+const drawing = mountStaffEditor(document.querySelector<HTMLElement>('#staff')!, input, {
+  onCommit: result => console.log(result.snapshot.documentRevision),
+  onError: error => console.error(error),
+});
+// During teardown:
+drawing.dispose();
+input.dispose();
+editing.dispose();
+editor.dispose();
+```
+
+`StaffEditingOptions` extends the existing `StaffRenderOptions`: notation
+scale, spacing, split-staff layout, annotation visibility and paint options
+keep their [staff-renderer defaults](#render-staff-notation).
+
+| Additional option | Default | Contract |
+| --- | --- | --- |
+| `onCommit(result)` | none | Called for a committed `ScoreEditResult`; not for no-op or failure. |
+| `onError(error)` | none | Reports command or input-field failures. |
+
+`StaffEditingHandle` exposes `element` (the mounted section), `surface`
+(the focusable input container), `updatePlayback(snapshot?)`, `cancel()` and
+`dispose()`. Playback overlays require exactly matching ready document identity
+and revision, with authored coordinates. Passing `undefined` clears playback
+overlays. `cancel()` exits note-input mode; every entry is already atomic and
+there is no pending staff draft. Idempotent `dispose()` releases listeners,
+the engraving surface and its DOM, leaving the borrowed controller/editor
+alive. Rendering options are fixed for that mount.
+
+The [Element's staff-input section](/score/element/view/score-view/#staff-input)
+documents keys, fields and semantic limits. This adapter creates no playback
+resource and does not infer authored measures from MIDI. The independent
+`renderStaffVisualizer` remains available for passive rendering.
+
 ### Renderer handle
 
 The render helpers return `RenderedScoreVisualizer<TVisualizer>`:
@@ -596,10 +726,17 @@ Score + MusicXML + OSMD constructor -> RenderedScoreVisualizer<OSMDLike>
 | `PitchViewType` | Type | `keyboard`, `staff` or `fretboard`. |
 | `ScoreViewSeekDetail` | Type | Map navigation event detail: `{quarters, seconds}`, with nominal seconds. |
 | `ScoreViewType`, `ScoreViewRenderOptions`, `parseColorAttr` | Element exports | The three note-renderer types, their option union and attribute-color parser; map/thumbnail do not extend the lower-level three-type model. |
-| `createScoreView(score, options?)` | Headless model | [Score window state](/score/headless/view/score-view/), from `@webmusic/score/view/headless`. |
+| `createScoreView(scoreOrEditor, options?)` | Headless model | [Score window and document state](/score/headless/view/score-view/), from `@webmusic/score/view/headless`. |
+| `createScoreViewEditing(editor, options?)` | Headless model | [Selection/draft controller](/score/headless/view/score-view/#follow-an-editing-document), from `/headless`. |
+| `createStaffViewEditing(editing, options?)` | Headless model | [Written-note cursor and voice input](/score/headless/view/staff-editing/), from `/headless`. |
+| `scoreDocumentPlaybackCompatible(document, playback?)` | Headless helper | Exact ready/applied revision and authored-coordinate compatibility, from `/headless`. |
 | `createScoreMapView(options?)` | Headless model | [Map navigation and source following](/score/headless/view/score-map-view/), from `/headless`. |
 | `createPitchView(options?)` | Headless model | [Current pitches and source following](/score/headless/view/pitch-view/), from `/headless`. |
 | `renderPianoRollVisualizer(score, svg, config?)` | Visualizer | Render an SVG piano roll and return a visualizer handle (from `@webmusic/score/view/render`). |
+| `mountPianoRollEditor(host, editing, options?)` | Interactive renderer | Mount the [document-backed grid](#edit-a-piano-roll), from `/render`. |
+| `PianoRollEditingOptions`, `PianoRollEditingHandle` | Render types | Editing geometry, callbacks, playback projection and cleanup, from `/render`. |
+| `mountStaffEditor(host, input, options?)` | Interactive renderer | Mount the [staff-input surface](#edit-a-staff), from `/render`. |
+| `StaffEditingOptions`, `StaffEditingHandle` | Render types | Staff rendering options, commit/error callbacks, playback projection and cleanup, from `/render`. |
 | `renderStaffVisualizer(score, container, config?)` | Visualizer | Render scrolling SVG staff notation from written Score data (from `@webmusic/score/view/render`). |
 | `renderWaterfallVisualizer(score, container, config?)` | Visualizer | Render falling notes on piano-style pitch columns, without an embedded keyboard (from `@webmusic/score/view/render`). |
 | `renderScoreThumbnail(surface, notes, options?)` | Renderer | Append a static fitted note preview with optional original Score directions; returns its SVG (from `@webmusic/score/view/render`). |
@@ -619,6 +756,8 @@ Score + MusicXML + OSMD constructor -> RenderedScoreVisualizer<OSMDLike>
 | `ScrollType` | Enum | Staff scroll behaviour (`PAGE` / `NOTE` / `BAR`) for `renderStaffVisualizer` (from `@webmusic/score/view/render`). |
 | `ScoreNoteSequence`, `ScoreSequenceNote` | Type | View-model sequence and note shapes. Score-derived sequence notes retain optional `noteId` and `partId` for exact playback identity; external legacy sequences may omit them. |
 | `ScoreViewOptions`, `ScoreViewState`, `ScoreViewTimeRange` | Type | Public configuration and immutable result contracts for `createScoreView` (type-only exports from `@webmusic/score/view`). |
+| `ScoreViewEditing`, `ScoreViewEditingOptions`, `ScoreViewEditingState` | Type | Core-port editing controller contracts, type-only from `/view` and also exported by `/view/headless`. |
+| `StaffViewEditing`, `StaffViewEditingOptions`, `StaffViewEditingState` | Type | Staff-input controller contracts, type-only from `/view` and also exported by `/view/headless`. |
 | `RenderedScoreVisualizer` | Type | The [renderer handle](#renderer-handle), including optional `redrawAtTime` for exact nominal-time activity. |
 | `PianoRollNote`, `WaterfallNote`, `StaffGlyph` | Type | Layout result shapes — geometry plus `startSeconds` / `durationSeconds`. |
 | `ScoreMap`, `ScoreMapCell`, `ScoreMapMark`, `ScoreMapOptions` | Type | Result and option shapes for `createScoreMap`. |

@@ -1,0 +1,144 @@
+---
+title: '<audio-document>'
+description: 'A nonvisual HTML declaration that loads and owns one editable Audio sequence document.'
+sidebar:
+  order: 1
+---
+
+import AudioDocumentPlayground from '../../../../../components/elements/AudioDocumentPlayground.astro';
+
+`<audio-document>` owns an [AudioClipEditor](/audio/headless/edit/audio-clip-editor/) while
+connected. It loads decoded audio from a URL, or accepts an AudioClip
+created by your application. It creates no player, AudioContext or visible UI. Decoded PCM is retained by its editor.
+
+Use the same declaration from [Audio player](/audio/element/play/audio-player/)
+and [Audio view](/audio/element/view/audio-view/) through their `editor` selector.
+Use a Headless editor when the document must outlive its HTML declaration.
+
+<AudioDocumentPlayground />
+
+## Import
+
+```html
+<script type="module">
+  import {defineAudioDocumentElement} from '@webmusic/audio/edit/element';
+  defineAudioDocumentElement();
+</script>
+
+<audio-document id="piece" src="/wav/Editing.wav"></audio-document>
+```
+
+`@webmusic/audio/edit/auto` registers the default tag as an import side effect.
+There is no Edit browser IIFE; see [Audio setup](/audio/#drop-in-web-components).
+This nonvisual Element needs no UI peer. WAV loads without an AudioContext;
+other codecs use the existing optional decoder availability. The declaration
+never creates a context. For native decoding, assign a caller-owned `.loader`
+closure that borrows your context.
+
+## Ownership and replacement
+
+The read-only `.editor` becomes available after loading succeeds. A replacement
+URL prepares a new editor before publishing it; failure retains the previous
+editor and `.loadedSrc`, while `.status` becomes `error` and `.error` explains
+the failed attempt. The configured `src` is not proof that this URL loaded.
+Explicit `.clip` takes precedence over `src` and `format`; assigning `undefined`
+restores URL loading. Changing history settings recreates the editor from the
+configured input, so it starts a new document identity and empty history.
+
+`webmusic:sourcechange` runs after the `.editor` getter changes and before the
+superseded editor is disposed. Consumers release the old subscription and read
+the new getter. They borrow the editor and must not dispose it. Late loads,
+reentrant replacement callbacks and disconnection cannot publish an obsolete
+editor over the current one. This also applies to synchronous AbortSignal
+listeners: a newer `.clip` assignment, URL retry or reconnection wins over the
+operation cancelling the old load. Superseded prepared editors are disposed,
+and a superseded `reload()` returns `{status: 'superseded'}`.
+
+Disconnect aborts pending loading, clears `.editor` and disposes the owned
+editor. The previous owner is detached before source/abort callbacks run; a
+reconnection awaiting URL loading does not retain an editor from the disconnected
+lifetime, even if its new load fails. Reconnection loads the configured input
+again with a new identity.
+Removing a borrowing View or Player only releases its own subscription.
+
+## Reuse the document
+
+Register the three independent capabilities, then reference the same owner:
+
+```html
+<script type="module">
+  import {defineAudioDocumentElement} from '@webmusic/audio/edit/element';
+  import {defineAudioPlayerElement} from '@webmusic/audio/play/element';
+  import {defineAudioViewElement} from '@webmusic/audio/view/element';
+  defineAudioDocumentElement();
+  defineAudioPlayerElement();
+  defineAudioViewElement();
+</script>
+
+<audio-document id="document" src="/wav/Editing.wav"></audio-document>
+<audio-player id="audition" editor="#document"></audio-player>
+<audio-view type="waveform" editor="#document" player="#audition" editable></audio-view>
+```
+
+Selectors resolve one target in the consumer's own Document or ShadowRoot,
+including late registration and insertion. Object properties support composition
+across roots. The [View reference](/audio/element/view/audio-view/) owns editing
+interaction, and the [Player reference](/audio/element/play/audio-player/) owns
+revision application and explicit playback after an edit.
+
+<details class="component-section">
+<summary>API</summary>
+
+`AudioDocumentElement`, `defineAudioDocumentElement(tag?)` and
+`defineAllAudioElements()` are exported by `@webmusic/audio/edit/element`.
+`defineAudioDocumentElement` defaults to `audio-document`; `defineAllAudioElements`
+registers that default. Importing this entry alone does not register tags.
+
+| Member | Kind | Default | Description |
+|---|---|---|---|
+| `src` | attribute / string property | empty | Audio URL. The property reflects the attribute; surrounding whitespace is trimmed for loading. No URL or explicit clip produces `empty`. |
+| `format` | attribute | auto | `wav`, `aiff`, `mp3`, `flac`, `ogg`, `opus`, `m4a`, `aac` or `webm`. Omit for loader detection. Other nonempty values fail; ignored with explicit `.clip`. |
+| `history` | attribute | enabled | Absent enables local undo. `false`, `0`, `no` or `off`, case-insensitively, disable it; other present values enable it. |
+| `history-limit` | attribute | `100` | Positive safe integer retained transaction limit across undo/redo; invalid values fail. Ignored while history is disabled. |
+| `clip` | property | `undefined` | Explicit immutable AudioClip input, taking precedence over URL loading. The getter returns this input; read current edited sequence through `.editor.getSnapshot().content`. While connected, invalid input throws before replacing the valid editor or configured clip; disconnected input is validated when loading begins. |
+| `loader` | property | default bounded loader | Optional `AudioDocumentLoader(url, options)` closure. Receives format, AbortSignal and resource limits; must return a decoded AudioClip. Undefined restores the default. Changing it reloads URL input. |
+| `loadOptions` | property | `{}` | `AudioDocumentLoadOptions`: maxInputBytes (128 MiB), maxDecodedFrames (30,000,000), maxDecodedBytes (256 MiB), maxChannels (32), timeoutMs (30,000). These are default-adapter limits; only configured overrides are passed to an injected loader, which must enforce them itself. `timeoutMs: 0` disables the default adapter timeout. Changing this property reloads URL input. |
+| `processors` | property | `[]` | Borrowed `AudioRangeProcessor` recipes for explicit selected-range processing. Replacing this array reloads the configured input. |
+| `editor` | read-only property | `undefined` | Owned `AudioClipEditor` after success; retained during a replacement load/error and cleared on empty input or disconnect. |
+| `status` | read-only property | `empty` | `AudioDocumentStatus`: `empty`, `loading`, `ready`, `error` or `disposed`. Also exposed as `data-state`. |
+| `error` | read-only property | `undefined` | Last load/configuration error; cleared on another attempt, successful direct replacement, clearing or disconnect. |
+| `loadedSrc` | read-only property | `undefined` | Last successfully loaded URL. Undefined for direct AudioClip input, empty state or disconnect; retained on failed URL replacement. |
+| `reload()` | method | — | Retry current input. A successful retry creates a new editor. Returns `Promise<AudioDocumentLoadResult>`; a disconnected/superseded request does not publish. |
+
+`AudioDocumentLoadResult` is `{status: 'ready', editor}`, `{status: 'empty'}`,
+`{status: 'superseded'}` or `{status: 'failed', error}`. URL decoding and resource
+limits follow [Audio loading](/audio/api/play/). There is no silent fallback after a
+URL, format or history-configuration failure.
+
+All events below bubble and have `composed: true`.
+
+| Event | `detail` | Meaning |
+|---|---|---|
+| `webmusic:sourcechange` | `null` | Connected availability, replacement or clearing; read `.editor` again. Document edits within the same editor use its subscriptions instead. |
+| `webaudio:documentstatechange` | `AudioDocumentStateDetail`: `{status, editor, loadedSrc, error}` | Loading/result state, including replacement failure with the previous editor retained. |
+| `webaudio:error` | `{operation: 'document-load', error}` | Current asynchronous/attribute-driven resolution failed. Stale or cancelled loads do not report errors. |
+
+The exported types are `AudioDocumentStatus`, `AudioDocumentLoadResult`,
+`AudioDocumentStateDetail`, `AudioDocumentLoader` and `AudioDocumentLoadOptions`. The declaration has no interactive controls, focus
+targets, keyboard commands or accessibility role. Applications provide their own
+visible loading/error status; the demo's live readout is application UI.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+The declaration sets its host to `display: none` when connected. It has no
+Shadow DOM, public parts, canvas or visual styling tokens. Style the borrowing
+player and views through their own contracts.
+
+</details>
+
+## Related
+
+[AudioClipEditor](/audio/headless/edit/audio-clip-editor/) · [Edit API](/audio/api/edit/) · [Waveform editing](/audio/element/view/audio-view/#waveform-editing)

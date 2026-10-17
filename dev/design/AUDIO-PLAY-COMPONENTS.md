@@ -12,7 +12,7 @@ and [Headless inventory](../../apps/doc/webmusic/src/content/docs/audio/headless
 
 | Component | Task and owner | Composition boundary |
 |---|---|---|
-| AudioPlayer / `audio-player` | Select and control one active clip, queue or mix | Stable Headless command facade; one transport presenter; borrows group backends |
+| AudioPlayer / `audio-player` | Select and control one active clip, queue, mix or editing document | Stable Headless command facade; one transport presenter; borrows group backends and owns its document sequence engine |
 | AudioPlaylist / `audio-playlist` | Select entries and sequence them | Supplies its queue backend to the linked player; linked UI shows selection without another transport |
 | AudioMixer / `audio-mixer` | Control simultaneous sources and gains | Supplies its mix backend to the linked player; Headless owns member/master gain, mute and solo |
 | AudioRecorder / `audio-recorder` | Acquire microphone input and retain a take | Owns capture resources; linked take audition uses the central player |
@@ -67,10 +67,11 @@ Explicit `.clip`, `.player` or successful URL/input loading selects the source;
 explicit assignment cancels pending loads. Clearing `.player` clears its resolved
 clip. Reassigning the same player does not transfer or destroy its ownership.
 
-The Element emits `webaudio:sourcechange` with `{clip, revision}` after resolved
-clip or player identity changes. Revision is local and monotonically increasing.
+The Element emits `webaudio:sourcechange` with the discriminated `.source` snapshot
+(`empty`, `clip` or `sequence`), including `clip` and publication `revision`, after
+resolved content, applied sequence revision or player identity changes. Revision is local and monotonically increasing.
 Source state is committed before callbacks; listeners reread current state under
-reentrancy. Initial attachment reads the current clip. Graph readiness remains
+reentrancy. Initial attachment reads `.source`; `.clip` remains available for clip-only followers. Graph readiness remains
 `webaudio:loaded`; source discovery does not allocate an audio graph. This bounded
 Audio contract follows [Player binding](PLAYER-BINDING.md) without copying Score
 models or claiming a complete shared nonvisual playback protocol.
@@ -85,6 +86,48 @@ solo identity and effective gains; `change` invalidates that readback. Elements
 retain presentation subscriptions, not duplicate volume/mute/solo maps. Multiple
 presenters and custom UI observe the same Headless object. A source's direct
 out-of-band gain changes are not a second mixer-state authority.
+
+## Accepted document playback target (DEC-047)
+
+[Editing capabilities](EDIT-COMPONENTS.md) and
+[DEC-047](../DECISIONS.md#dec-047--document-owned-editing-and-borrowed-playback)
+define the document-owned audio sequence and borrowed playback implemented in P3.
+Current verification belongs to [STATUS EDIT-01](../STATUS.md). Public members and
+limits are owned by [AudioPlayer](../../apps/doc/webmusic/src/content/docs/audio/headless/play/audio-player.mdx)
+and [its Element](../../apps/doc/webmusic/src/content/docs/audio/element/play/audio-player.mdx);
+clip/queue/mix use remains supported.
+
+`AudioClipEditor` owns immutable asset/segment content, transactions and optional
+local history. The nonvisual `audio-document` declaration creates and loads that
+owner; applications may instead supply a Headless owner. Play borrows its Core
+read-only source contract, never the concrete editor implementation or editing
+commands. Play retains sound, graph and transport authority. Detaching a borrower
+releases its subscriptions and snapshot/asset leases without disposing the editor.
+
+On a content commit, the Play binding pauses, prepares the requested revision,
+applies its scheduling snapshot and mapped position/loop state atomically, then
+remains paused. It exposes requested and applied document revisions separately
+from the existing source-publication revision. Ordinary playback is gated while
+content and playback revisions differ or preparation has failed; edits remain
+available and retry is explicit. Superseded work cannot publish an applied
+revision or resume playback. Position maps compose from the last applied revision,
+including skipped commits and undo; later transport commands retain authority.
+
+Audio source observation distinguishes an empty source, an AudioClip and a
+document sequence. Applying a new document revision notifies observers even when
+the transport object is unchanged. A sequence exposes no fabricated single clip:
+the first asset must not stand in for the whole document, and clip-only consumers
+report unavailable data until the caller explicitly renders a compatible clip.
+The sequence engine schedules bounded asset ranges without rendering the whole
+document on commit, seek or undo. Playback caches and initial decode have separate
+budgets; asset leases keep data alive while playback still uses it. The default
+chunk size is 16,384 frames, with a 64 MiB combined active/inactive cache budget,
+200 ms lookahead and a 512-voice scheduling cap. Very short loops and unsupported
+pitch preservation reject explicitly. Graph readiness occurs only after explicit
+play/preload and notifies meter followers through the existing load event. The
+engine owns its scheduler and nodes; the facade closes only a context it created.
+Editor replacement/detach releases the owned sequence engine despite its use of
+the facade's borrowed transport interface.
 
 ## Commands and time
 

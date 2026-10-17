@@ -1,0 +1,144 @@
+---
+title: 'createStaffViewEditing'
+description: 'A written-note cursor, duration and voice controller over a borrowed Score editing session.'
+sidebar:
+  order: 4
+---
+
+import StaffInputHeadlessDemo from '../../../../../components/headless/StaffInputHeadlessDemo.astro';
+
+`createStaffViewEditing(editing, options?)` supplies staff-input state for custom
+UI. It borrows a [ScoreViewEditing](/score/headless/view/score-view/#follow-an-editing-document)
+controller and its document. Entering a note or rest submits the same atomic
+[`enter-notation` operation](/score/api/edit/#written-notation-entry) used by
+the built-in staff surface, so the piano roll and staff share content and undo.
+This object creates no renderer, DOM listeners, player, clock or history stack.
+
+<StaffInputHeadlessDemo />
+
+## Import
+
+```ts
+import {MeasureId, PartId, Rational, ScoreBuilder} from '@webmusic/score';
+import {createScoreEditor} from '@webmusic/score/edit/headless';
+import {createScoreViewEditing, createStaffViewEditing} from '@webmusic/score/view/headless';
+
+const builder = new ScoreBuilder();
+builder.addPart({id: PartId('piano'), name: 'Piano', staves: 1});
+builder.addMeasure({id: MeasureId('bar-1'), number: 1,
+  onsetQuarters: Rational.ZERO, durationQuarters: new Rational(4),
+  timeSignature: {numerator: 4, denominator: 4}});
+const editor = createScoreEditor(builder.build());
+const editing = createScoreViewEditing(editor, {editable: true});
+const input = createStaffViewEditing(editing);
+const off = input.subscribe(state => console.log(state.onsetQuarters.toString()));
+const result = input.insertPitch('C');
+if (result.status === 'failed') console.error(result.error.message);
+// Keep these objects for the UI lifetime; release in borrowing order:
+off();
+input.dispose();
+editing.dispose();
+editor.dispose();
+```
+
+## Cursor, voice and notation
+
+Input state uses written rational quarters. A successful pitch/rest entry
+advances the cursor by the selected dotted duration unless a synchronous
+observer has already supplied newer input settings. Selection moves the
+cursor to an existing event and copies its part, voice, staff, duration and
+pitched octave/accidental. `deleteSelected` replaces exactly one selected
+event with a rest using the captured event's part, voice, staff, position and
+duration. It leaves the cursor at that event unless a synchronous observer
+supplies newer input settings; those settings cannot redirect the deletion. These are semantic
+commands; keyboard shortcuts and pointer hit testing belong to the renderer.
+
+The target must be one existing authored measure, part and staff; its voice
+may already exist or be a new nonempty voice identity.
+Entries cannot cross its end, implicitly extend the piece or reconstruct a
+measure grid from MIDI. Fully covered notes are replaced; partial overlap
+with a sounding note fails. Rest splitting and gap filling preserve a complete
+simple monophonic voice/staff inside that measure. Other voices/staves remain
+unchanged. Ties, tuplets, chords, grace notes and other unsupported structures
+fail through the [notation operation's validation](/score/api/edit/#written-notation-entry).
+
+Setting an accidental chooses explicit spelling; it does not infer the key's
+alteration. Input octaves range from `-1` to `9`, but each entered pitch must
+still fit MIDI `0–127`. Readiness means the local controller and borrowed
+document are available; an individual command can still reject an unsupported
+measure. Changing cursor or input settings does not create undo history.
+
+## Ownership and failures
+
+The caller creates and releases `editing` and its editor. This controller owns
+only local input state, its editing subscription and its listeners. Several
+staff controllers can retain separate cursors while sharing one editing
+session's selected event and one document's history.
+
+Construction and local setters throw `ScoreEditError` for invalid input.
+`insertPitch`, `insertRest`, `deleteSelected`, `undo` and `redo` return
+`ScoreEditResult` (`committed`, `noop` or `failed`) and expose their latest
+failure on `state.error`. Disabled editing retains input state but rejects
+document mutation through the borrowed controller. Successful local changes
+clear the local error. There is no independent draft buffer in this controller.
+A failed command retains its own `ScoreEditError` in the returned result even
+when a synchronous subscriber clears the local error before the command returns.
+
+<details class="component-section">
+<summary>API</summary>
+
+**Construction** — `createStaffViewEditing(editing, options?): StaffViewEditing`.
+The `editing` argument must be an available `ScoreViewEditing`.
+
+| `StaffViewEditingOptions` member | Default | Contract |
+| --- | --- | --- |
+| `partId` | First Score part | Existing target `PartId`; absent if the Score has no parts. |
+| `voice` | First note's voice in the part, else `VoiceId('1')` | Nonempty voice identity; a new voice is allowed. |
+| `staff` | `1` | Positive integer. Entry validates the selected part's staff range. |
+| `onsetQuarters` | `[0, 1]` | Reduced exact rational nonnegative cursor position. |
+| `baseQuarters` | `[1, 1]` | Written base from whole through sixty-fourth: 4, 2, 1, 1/2, 1/4, 1/8 or 1/16 quarters. |
+| `dots` | `0` | Integer 0–2 applied to the written duration. |
+| `octave` | `4` | Integer -1–9; resulting pitch must also fit MIDI 0–127. |
+| `alter` | `0` | `Alter`: -2 double flat, -1 flat, 0 natural, 1 sharp, 2 double sharp. |
+
+| Member | Kind | Contract |
+| --- | --- | --- |
+| `editing` | getter | The borrowed `ScoreViewEditing`; never disposed by this controller. |
+| `state` | getter | Frozen `StaffViewEditingState`, described below. |
+| `setCursor(onsetQuarters)` | command | Set nonnegative reduced rational quarters; entry validates measure containment. |
+| `setPart(partId)` | command | Choose an existing part and reset staff to 1. |
+| `setVoice(voice)` | command | Choose a nonempty `VoiceId` without changing Score content. |
+| `setStaff(staff)` | command | Choose a positive staff number; entry validates its range. |
+| `setDuration(baseQuarters, dots = 0)` | command | Set a supported written base and dot count. |
+| `setOctave(octave)` | command | Set the octave for subsequent pitch input. |
+| `setAlter(alter)` | command | Set explicit accidental spelling for subsequent pitch input. |
+| `select(noteId)` | command | Select an existing event in the shared session and copy its input position/settings. |
+| `insertPitch(step)` | command | Enter `Step` A–G with the current octave/alteration; return `ScoreEditResult`. |
+| `insertRest()` | command | Enter a rest with the current duration; return `ScoreEditResult`. |
+| `deleteSelected()` | command | Replace exactly one selected event with rest notation; return `ScoreEditResult`. |
+| `undo()` / `redo()` | commands | Delegate to the document's history; return `ScoreEditResult`. |
+| `subscribe(listener)` | subscription | Deliver current state synchronously, then local/document updates; return idempotent unsubscribe. Listener errors are reported to the console and isolated. |
+| `dispose()` | lifecycle | Idempotently release the subscription/listeners and mark local state unavailable; retain borrowed objects. No terminal notification. |
+
+`StaffViewEditingState` contains `document: ScoreDocumentSnapshot`,
+`available`, `editable`, optional `partId`, `voice`, `staff`,
+`onsetQuarters: Rational`, `duration: Duration`, `octave`, `alter` and optional
+`error: ScoreEditError`. Document content and revision follow the shared editor.
+Read `duration.base`, `duration.dots` and `duration.quarters` to distinguish
+written duration from its final quarter length. The last state remains readable
+after disposal. Later setters, selection and new subscriptions throw; mutation
+commands return a failed result.
+
+The factory and `StaffViewEditing`, `StaffViewEditingOptions`,
+`StaffViewEditingState` are exported from `@webmusic/score/view/headless`.
+The three types are also exported from `@webmusic/score/view`.
+
+</details>
+
+## Related
+
+[`<score-view type="staff" editable>`](/score/element/view/score-view/#staff-input)
+composes this controller with the staff renderer and browser input.
+[`mountStaffEditor`](/score/api/view/#edit-a-staff) provides that surface for
+imperative composition. [ScoreEditor](/score/headless/edit/score-editor/) owns
+the document, transactions and history.

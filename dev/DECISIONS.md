@@ -15,6 +15,10 @@ branch's tracked files before making a delivery claim.
 
 **Consequence:** application concerns such as project persistence, undo, collaboration, and arrangement/session editing need explicit application-layer designs. They are not implied by the existence of a player or mixer.
 
+**2026-10-13 refinement:** [DEC-047](#dec-047--document-owned-editing-and-borrowed-playback)
+assigns optional single-document history to domain editors. Project/global
+history, persistence and collaboration retain the application boundary above.
+
 **Owner:** [Product](PRODUCT.md).
 
 ## DEC-002 — Three interoperable integration choices
@@ -278,6 +282,11 @@ demos, external Parameters, reset behavior and redirects.
 ## DEC-015 — Type-selected Score View families
 
 **Date / status:** 2026-09-08; accepted.
+
+**2026-10-13 extension:** [DEC-047](#dec-047--document-owned-editing-and-borrowed-playback)
+adds optional document-bound editing and focused keyboard interaction to existing
+View surfaces. The original passive usage below remains valid; runtime editing
+is pending under STATUS EDIT-01.
 
 **Problem:** separate tags for keyboard, current-note staff and fretboard repeat
 one held-note input contract. Separate map and thumbnail tags repeat Score input
@@ -1598,6 +1607,125 @@ external consumer check and dependency audit on the merged tree. Check the
 five-package manifests, public exports and Agent Toolkit source-snapshot
 claims. Verify CI and deployment on the exact target commit separately; none
 of these checks establishes npm publication or live device/audio behavior.
+
+<a id="dec-047--document-owned-editing-and-borrowed-playback-proposed"></a>
+
+## DEC-047 — Document-owned editing and borrowed playback
+
+**Date / status:** 2026-10-13; accepted design in P0 following the maintainer's
+request to start the first planned step. Runtime implementation was pending
+at acceptance. P1 and P2 delivery and verification are now tracked by
+[STATUS EDIT-01](STATUS.md) and the [editing contracts](design/EDIT-COMPONENTS.md).
+
+**Problem:** existing immutable Score/Audio edits and View interactions do not
+provide persistent document ownership, undo, editable surfaces or a protocol
+for applying new content to playback. Audio history based on complete PCM
+snapshots would multiply memory use even for single-file editing.
+
+**Chosen contract:** introduce domain Headless editors that own document
+identity, monotonic content revision, transactions and optional bounded local
+history. Play borrows a Core read-only document source and separately reports
+the revision it has actually applied. View borrows document state and commands;
+initial editing extends the existing piano-roll and waveform surfaces. A
+nonvisual `score-document` / `audio-document` declaration supplies an HTML path
+with explicit ownership. `.editor` and `editor` select content; `editable` only
+enables View mutation. Conflicting independent sources fail explicitly. The first
+playback integration pauses, prepares and applies content, remains paused, and
+reports applied, superseded or failed. Stale/failed playback stays gated until
+reconciliation; it does not promise seamless live replacement.
+
+Audio documents use shared assets and immutable segment references from the
+first editor. Segment-aware playback avoids full-output rendering per commit.
+Local DSP may produce bounded new assets; export explicitly renders output.
+Project-wide history, persistence and collaboration remain application-owned.
+Core ports keep Play/View independent of concrete Edit implementations. Audio
+loading has one browser-declaration adapter to the existing Play loader, with an
+exact importer/target/symbol exception and no code-only Edit reachability.
+
+Musical note timing edits remove the edited note's absolute performed overlay,
+use written quarters and preserve effective velocity in `velocityOverride`.
+Pitch/velocity-only edits retain performed timing. The model extension ships with
+Score JSON v0.2 migration in P1. History defaults to 100 transactions; audio uses
+asset retention budgets. Position maps compose from the last applied revision;
+missing/repeat mappings explicitly reset position and clear loops. These rules
+and their failure/lifecycle details belong to the editing design.
+
+**Alternatives considered:** private View-owned editors; duplicate visual
+editor tags for every existing surface; application-only playback glue; full
+PCM undo snapshots; and immediate live replacement or complete DAW scope.
+Each leaves unclear ownership, duplicates behavior or couples the first useful
+editing workflow to substantially broader work.
+
+**Consequences:** refine DEC-001's application-only undo boundary: optional
+single-document history is domain-owned; global/project history remains in the
+application. Extend DEC-015's passive View contract with opt-in editing and local
+keyboard interaction, without making a toolbar mandatory. Extend DEC-011/017
+with document ownership and applied-revision compatibility while preserving
+existing passive source precedence. Staff input and multi-track editing retain
+separate scope decisions. Product, Architecture and family/binding owners adopt
+this target in P0. Actual exports, executable policies, references and demos
+change together when each implementation layer exists, not as empty scaffolds.
+
+**Owner:** [Editing contracts](design/EDIT-COMPONENTS.md). The
+[dated proposal and implementation sequence](plans/2026-10-13-editing-capabilities.md)
+retains the planning baseline.
+[STATUS](STATUS.md), EDIT-01, owns current delivery tracking.
+
+**Verification implications:** demonstrate MIDI edit/undo/playback/export
+consistency, document/playback revision acknowledgement and failed/canceled
+replacement behavior; demonstrate Audio structural history and playback without
+full-PCM copies per edit. Verify source conflicts, late binding, resource release,
+keyboard/pointer behavior and application-owned history through all supported
+integration forms. Accepted target syntax must not enter current public
+references as though it were shipped.
+
+## DEC-048 — Staff input inside the existing Score View
+
+**Date / status:** 2026-10-15; accepted for P4 implementation. Current
+verification and remaining interaction checks belong to [STATUS](STATUS.md), EDIT-01.
+
+**Problem:** notation entry needs an explicit input mode, written spelling,
+duration, staff and voice, plus measure completion. Piano-roll gestures do not
+provide those semantics. A separate tag would duplicate the same document,
+player binding and scrolling notation renderer without establishing a different
+resource lifecycle.
+
+**Chosen contract:** retain `<score-view type="staff" editor="#document" editable>`.
+A separate nonvisual staff-input controller owns only local cursor and entry
+settings. A browser adapter reuses the existing scrolling staff renderer and
+handles keyboard input only on its focused input surface. Enabling `editable`
+permits editing; an explicit note-input mode arms A–G entry. Escape disarms it.
+The shared `ScoreEditor` remains the sole content and history owner, so undo from
+either staff or piano roll can reverse the other surface's latest command.
+
+An atomic notation-entry command uses rational written quarters and preserves
+pitch spelling and duration notation. It fills the chosen voice/staff's gaps
+inside an existing measure with actual rest notes. Other voices and staves are
+unchanged. Entry cannot cross a measure boundary or silently truncate sounding
+notes. Unsupported tied, tuplet, grace, chord and other grouped structures fail
+explicitly. MIDI-derived synthetic display bars are not authored measures;
+this first input contract requires a real measure grid supplied by MusicXML or
+the application. It does not infer a notation score from arbitrary MIDI.
+
+**Alternatives considered:** a new `score-staff-editor` tag; reusing piano-roll
+shortcuts; storing auto-rests only in renderer state; and automatically rewriting
+complex or unmeasured music. The chosen boundary shares existing resources while
+keeping notation operations explicit and atomic.
+
+**Consequences:** extends DEC-047's editable View subset to staff without adding
+an Element or an Edit-to-View dependency. The optional OSMD sheet renderer stays
+separate and passive. Complete engraving, chord/tie/tuplet authoring, measure-grid
+editing and page layout remain outside this bounded P4 delivery.
+
+**Owner:** [Editing contracts](design/EDIT-COMPONENTS.md),
+[Score View family](design/VIEW-COMPONENTS.md) and
+[scrolling notation](design/STAFF-NOTATION.md).
+
+**Verification implications:** test local focus and armed entry, pitch/duration
+shortcuts, exact rests and independent voices, structural rejection, shared undo,
+playback revision application and MIDI silence for rests. Verify passive staff
+and separate input instances retain their behavior. Browser keyboard evidence,
+pointer behavior and visual/accessibility acceptance are recorded separately.
 
 ## Recording the next decision
 

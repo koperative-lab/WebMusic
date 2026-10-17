@@ -27,7 +27,8 @@ const demoComponents = new Set([
   'AnalysisFeaturePlayground', 'AudioAnalyzeFeaturePlayground', 'NoteInputDemo', 'ScoreRecorderDemo', 'SheetViewPlayground', 'RackControlDemo',
   'SynthPanelDemo', 'LiveTrackersPlayground', 'AnalysisSessionPlayground',
   'PitchViewPlayground', 'ReactPresetShowcase', 'ScoreViewDemo', 'WaterfallKeyboardDemo',
-  'UiPresenterLiveDemo', 'ScoreReportPlayground', 'ProgrammaticTransportDriverDemo',
+  'UiPresenterLiveDemo', 'ScoreReportPlayground', 'ProgrammaticTransportDriverDemo', 'ScoreEditorHeadlessDemo', 'ScoreDocumentPlayground', 'ScoreEditingDemo',
+  'StaffEditingDemo', 'StaffInputHeadlessDemo',
 ]);
 const htmlElements = new Set(['details', 'summary', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'a', 'br', 'p', 'div', 'span', 'strong', 'em', 'code', 'sup', 'sub']);
 const digest = (value) => createHash('sha256').update(value).digest('hex');

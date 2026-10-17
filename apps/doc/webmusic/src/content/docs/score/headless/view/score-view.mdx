@@ -7,7 +7,7 @@ sidebar:
 
 import ScoreWindowPlayground from '../../../../../components/headless/ScoreWindowPlayground.astro';
 
-`createScoreView(score, options?)` is the state a score view needs, without
+`createScoreView(scoreOrEditor, options?)` is the state a score view needs, without
 the view. It flattens the `Score` into a note sequence once, then answers two
 questions as the piece plays: **what is inside the viewport**, and **what is
 sounding right now**. Your framework subscribes and draws.
@@ -86,7 +86,7 @@ position and active-note identity. For application-managed observation, call
 `updatePlayback(snapshot)` with values from the
 [shared source](/score/api/#shared-playback-observation).
 
-The view's Score is fixed: source replacement requires a new view for the new
+For a plain Score input the view's Score is fixed: replacement requires a new view for the new
 Score. A snapshot with a different Score cannot silently apply its notes to this
 sequence. This binding reads state only; `view.seek()` remains local projection,
 while playback navigation must use the source's authorized seek command.
@@ -116,18 +116,64 @@ axis. Use a player's nominal position/onset when playback rate changes;
 rate-scaled transport seconds describe a different axis. `seek()` derives
 the notes sounding at the requested point, while `noteOn` consumes an exact
 sequence onset (within a one-microsecond matching tolerance). The score is
-fixed for the lifetime of a view; create a new model for an edited score.
+fixed for a plain Score input. An editor input automatically updates the model
+after content changes and local drafts.
+
+## Follow an editing document
+
+Pass an existing [ScoreEditor](/score/headless/edit/score-editor/) or structural
+`ScoreEditorPort` instead of a Score. The facade remains stable while `.score`,
+`.sequence` and visible notes follow its committed content plus the attached
+session's draft. `editable` defaults to false. The editor remains the sole
+document/history owner; the View creates no implicit editor or playback resources.
+
+```ts
+import {createScoreEditor} from '@webmusic/score/edit/headless';
+import {createScoreView} from '@webmusic/score/view/headless';
+
+const editor = createScoreEditor(score);
+const view = createScoreView(editor, {editable: true});
+const note = editor.score.parts[0]?.notes[0];
+if (note) {
+  view.editing!.select([note.id]);
+  view.editing!.preview([{type: 'move-notes', noteIds: [note.id], deltaQuarters: [1, 4]}]);
+  view.editing!.commit('Move note');
+}
+view.dispose();
+editor.dispose();
+```
+
+Each view owns a new interaction session unless `interactionSession` supplies
+a same-document session. Disposal releases the owned session; supplied sessions
+remain alive. A foreign or disposed session is rejected. Shared sessions expose
+the same selection and draft to each consumer. Selection and preview do not
+change content revision or history, and document changes invalidate drafts.
+Piano-roll and staff modes can both expose editor commands. Switching to
+waterfall disables editing and cancels its draft; switching back restores the
+prior editing flag. Staff cursor, voice and written-note entry are supplied by
+the separately composed [createStaffViewEditing](/score/headless/view/staff-editing/)
+controller; selecting staff alone does not create a cursor or musical commands.
+
+With `playback`, `state.playbackAvailable` is true only for a ready binding with
+matching applied document ID/revision and valid authored coordinates. The helper
+`scoreDocumentPlaybackCompatible(document, playback?)` performs that same check.
+During mismatch/preparation/error or unmapped repeat playback, active notes clear
+and the local playback projection resets to zero. Read `playbackAvailable` before
+drawing a playhead; zero is not a substitute for a compatible clock. `seek()`
+remains a local projection and never sends a transport command.
 
 <details class="component-section">
 <summary>API</summary>
 
-**Construction** — `createScoreView(score: Score, options?: ScoreViewOptions)`
+**Construction** — `createScoreView(score: Score | ScoreEditorPort, options?: ScoreViewOptions)`
 
 | Member | Kind | Default | Description |
 | --- | --- | --- | --- |
 | `type` | option | `'piano-roll'` | `'piano-roll'`, `'staff'` or `'waterfall'`; picks how a renderer should read the sequence. |
 | `viewport` | option | whole piece | `{startTime, endTime}` in seconds. |
 | `playback` | option | none | Borrow a `ScorePlaybackSource`; synchronously apply the initial snapshot and follow updates without DOM. |
+| `editable` | option | false | Editor input only: enable interaction commands for piano-roll/staff modes. Waterfall disables the effective flag. |
+| `interactionSession` | option | owned session | Editor input only: borrow a same-document `ScoreInteractionSession` to share selection/drafts. |
 
 **Commands**
 
@@ -149,6 +195,9 @@ fixed for the lifetime of a view; create a new model for an edited score.
 | Member | Kind | Description |
 | --- | --- | --- |
 | `score` | state | The borrowed `Score`. |
+| `editing` | state | `ScoreViewEditing` for an editor input; absent for a plain Score input. |
+| `state.editing` | state | Editor interaction state; absent for plain Score input. |
+| `state.playbackAvailable` | state | Editor-bound playback compatibility; absent for plain Score input. |
 | `sequence` | state | The flattened sounding-note `ScoreNoteSequence`, computed once; full written notation remains on `score`. |
 | `state` | state | The current immutable `ScoreViewState`. |
 | `state.type` · `state.sequence` | state | Selected drawing mode and the model's flattened sequence. |
@@ -188,6 +237,34 @@ new subscriptions throw. It does not dispose the score or an external player.
 Local disposal completes before calling the borrowed subscription's cleanup. If
 that cleanup throws, its error propagates once, the view stays disposed, and late
 source callbacks are ignored.
+
+**Editing controller** — `createScoreViewEditing(editor, options?): ScoreViewEditing`
+is also exported independently when a renderer needs document interaction
+without the sounding-note sequence. It uses the same `ScoreViewEditingOptions`
+(`editable?: boolean`, `interactionSession?: ScoreInteractionSession`) as the
+editor-bound view. Construction requires a ready document.
+
+| Member | Kind | Description |
+| --- | --- | --- |
+| `editor` / `session` | getters | Borrowed Core editor and owned/borrowed interaction session. |
+| `state` | state | Frozen `ScoreViewEditingState`: `document`, `interaction`, `history`, `editable`, `available`, optional typed `error`. `available` describes live document/session availability independently of the editing flag. |
+| `setEditable(value)` | command | Enable/disable mutation commands; disabling cancels the draft. Throws if unavailable. |
+| `select(noteIds)` | command | Validate and replace session selection without editing content. Throws for unknown notes or unavailable sessions. |
+| `preview(operations)` | command | Return a `ScoreDraftResult`; successful candidates remain outside committed history. |
+| `commit(label?)` | command | Submit the session draft as one `ScoreEditResult`; default label `Edit notes`. |
+| `cancel()` | command | Clear the session draft and local error; inert after disposal/unavailability. |
+| `execute(label, operations)` | command | Submit one guarded atomic edit against the current document revision; returns `ScoreEditResult`. |
+| `undo()` / `redo()` | commands | Delegate to the document's history; return `ScoreEditResult`. |
+| `subscribe(listener)` | subscription | Immediate current editing state, then changes; returns idempotent unsubscribe. Listener errors are reported to the console and isolated from commits. |
+| `dispose()` | lifecycle | Idempotently detach observation, dispose only an owned session and clear listeners. Last state remains readable with `available: false`. Never disposes the editor or a supplied session. |
+
+Mutation commands return typed `failed` results while editing is disabled or
+the document is unavailable. They preserve the underlying editor's validation,
+revision conflict and unsupported-structure errors. Void commands throw where
+shown. Each failed result retains its own typed error even if a synchronous
+subscriber clears `state.error`. `ScoreViewEditing`, `ScoreViewEditingOptions`, `ScoreViewEditingState`,
+`createScoreViewEditing` and `scoreDocumentPlaybackCompatible` are exported from
+`/view/headless`; the three types are also available from `/view`.
 
 </details>
 

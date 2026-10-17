@@ -55,6 +55,9 @@ export class StaffSVGVisualizer extends BaseVisualizer {
   private viewport!: HTMLDivElement;
   private header!: HTMLDivElement;
   private playhead!: HTMLDivElement;
+  private inputCursor!: HTMLDivElement;
+  private inputPosition?: {quarters: number; partId: PartId; staff: number};
+  private selectedIds = new Set<string>();
   private rows: SVGGElement[] = [];
   private rowInk: StaffInkBounds[][] = [];
   private rowY: number[] = [];
@@ -115,6 +118,25 @@ export class StaffSVGVisualizer extends BaseVisualizer {
     this.position = undefined;
     this.followRequested = false;
     if (this.playhead) this.playhead.hidden = true;
+  }
+  /** A local authored-position marker; it never changes playback time. */
+  public setEditingCursor(position?: {quarters: number; partId: PartId; staff: number}, follow = false): void {
+    if (this.disposed) return;
+    this.inputPosition = position;
+    if (position && follow) this.follow(this.xAtQuarter(position.quarters) * this.scale, position.quarters);
+    this.paintInputCursor();
+  }
+  /** Selection is independent of the sounding-note highlight. */
+  public setSelectedNotes(noteIds: readonly NoteId[]): void {
+    if (this.disposed) return;
+    this.selectedIds = new Set(noteIds);
+    for (const element of this.container.querySelectorAll<SVGElement>('[data-note-id]')) {
+      const selected = this.selectedIds.has(element.dataset.noteId!);
+      element.toggleAttribute('data-selected', selected);
+      element.style.filter = selected ? 'drop-shadow(0 0 2px var(--wm-accent, #4869d8))' : '';
+      element.style.stroke = selected ? 'currentColor' : '';
+      element.style.strokeWidth = selected ? '1px' : '';
+    }
   }
   public override dispose(): void {
     if (this.disposed) return;
@@ -182,6 +204,13 @@ export class StaffSVGVisualizer extends BaseVisualizer {
     this.playhead.style.cssText = 'position:absolute;top:0;bottom:0;width:2px;pointer-events:none;background:var(--webscore-staff-active);';
     this.playhead.hidden = true;
     this.container.append(this.playhead);
+    this.inputCursor = document.createElement('div');
+    this.inputCursor.dataset.staffInputCursor = '';
+    this.inputCursor.setAttribute('aria-hidden', 'true');
+    this.inputCursor.style.cssText = 'position:absolute;width:3px;pointer-events:none;background:var(--wm-accent,#4869d8);';
+    this.inputCursor.hidden = true;
+    this.container.append(this.inputCursor);
+    this.setSelectedNotes([...this.selectedIds].map(NoteId));
     const scroll = (): void => { this.followRequested = false; this.paintViewport(); };
     this.viewport.addEventListener('scroll', scroll, {passive: true});
     this.cleanups.push(() => this.viewport.removeEventListener('scroll', scroll));
@@ -426,7 +455,10 @@ export class StaffSVGVisualizer extends BaseVisualizer {
           draw.note.draw();
           const group = draw.note.getSVGElement();
           if (draw.event.notes.every((note) => note.printObject === false)) group?.setAttribute('visibility', 'hidden');
-          if (group) { group.dataset.webscoreOnset = draw.event.onsetQuarters.toString(); group.dataset.webscoreVoice = draw.voice; }
+          if (group) {
+            group.dataset.webscoreOnset = draw.event.onsetQuarters.toString(); group.dataset.webscoreVoice = draw.voice;
+            if (draw.event.rest && draw.event.notes[0]) group.dataset.noteId = String(draw.event.notes[0].id);
+          }
           const ids = draw.event.notes.filter((note) => !note.rest).map((note) => String(note.id));
           this.register(group, ids);
           draw.note.noteHeads.forEach((head, i) => {
@@ -735,12 +767,29 @@ export class StaffSVGVisualizer extends BaseVisualizer {
     let quarter = this.measures[measure]?.start ?? 0;
     for (const anchor of this.anchors) if (anchor.x <= leftEdge) quarter = anchor.quarter; else break;
     this.drawHeader(measure, quarter);
+    this.paintInputCursor();
     if (!this.playhead || this.position === undefined) return;
     const x = this.xAtQuarter(secondsToQuarters(this.noteSequence.tempos, Math.max(0, this.position))) * this.scale - scroll;
     const width = this.viewport.clientWidth || this.container.getBoundingClientRect().width;
     this.playhead.hidden = this.position < 0 || this.position > this.noteSequence.totalTime || x < this.headerWidth * this.scale || (width > 0 && x > width);
     this.playhead.style.left = `${x}px`;
     this.playhead.dataset.time = String(this.position);
+  }
+  private paintInputCursor(): void {
+    if (!this.inputCursor || this.disposed) return;
+    const position = this.inputPosition;
+    const layer = position ? this.projection.layers.findIndex((layer) =>
+      this.source.parts[layer.partIndex]?.id === position.partId &&
+      (this.staffConfig.splitStaves === false || layer.staff === position.staff)) : -1;
+    if (!position || layer < 0) { this.inputCursor.hidden = true; return; }
+    const x = this.xAtQuarter(position.quarters) * this.scale - this.viewport.scrollLeft;
+    const width = this.viewport.clientWidth || this.container.getBoundingClientRect().width;
+    this.inputCursor.hidden = x < this.headerWidth * this.scale || (width > 0 && x > width);
+    this.inputCursor.style.left = `${x}px`;
+    this.inputCursor.style.top = `${(this.rowY[layer] + 30) * this.scale}px`;
+    this.inputCursor.style.height = `${60 * this.scale}px`;
+    this.inputCursor.dataset.quarters = String(position.quarters);
+    this.inputCursor.dataset.staff = String(position.staff);
   }
 }
 

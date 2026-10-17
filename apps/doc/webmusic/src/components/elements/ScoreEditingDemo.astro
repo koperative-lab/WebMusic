@@ -1,0 +1,175 @@
+---
+import ElementPlayground from '../ElementPlayground.astro';
+import './editing-import.css';
+interface Props {
+  sourcePath?: string;
+  idPrefix?: string;
+  staffEditable?: boolean;
+}
+const {sourcePath = 'midi/Editing.mid', idPrefix = 'editing', staffEditable = false} = Astro.props;
+const source = `${import.meta.env.BASE_URL}${sourcePath}`;
+const documentId = `${idPrefix}-document`;
+const playerId = `${idPrefix}-player`;
+---
+
+<ElementPlayground tag="score-view" target={staffEditable ? '[data-editing-staff]' : '[data-editing-roll]'} markup="[data-editing-composition]"
+  companions={[{tag: 'score-player', target: '[data-editing-player]'}, {tag: 'score-document', target: '[data-editing-document]'}]}>
+  <section data-editing-demo data-editing-notation={staffEditable || undefined} aria-label={staffEditable ? 'Shared staff and piano-roll editing workflow' : 'MIDI editing workflow'}>
+    <div data-editing-composition data-pg-fragment>
+      <score-document data-editing-document id={documentId} src={source}></score-document>
+      <score-player data-editing-player id={playerId} editor={`#${documentId}`} time-control="full"></score-player>
+      <score-view data-editing-roll editor={`#${documentId}`} player={`#${playerId}`} type="piano-roll" editable note-height="18" min-pitch="58" max-pitch="74"></score-view>
+      <score-view data-editing-staff editor={`#${documentId}`} player={`#${playerId}`} type="staff" editable={staffEditable}></score-view>
+    </div>
+    <p data-editing-status role="status">{staffEditable ? 'Loading the two-measure notation example.' : 'Loading the eight-note MIDI example.'}</p>
+    <div class="editing-actions">
+      <label class="editing-import">Import MIDI <input data-editing-import type="file" accept=".mid,.midi,audio/midi" aria-label="Import MIDI" /></label>
+      <button class="wui-btn" data-editing-export type="button">Export MIDI</button>
+      {staffEditable && <button class="wui-btn" data-editing-export-notation type="button">Export MusicXML</button>}
+      <button class="wui-btn" data-editing-restore type="button">Reload configured source</button>
+    </div>
+    <p data-editing-result aria-live="polite">{staffEditable
+      ? 'Enter notes or rests in either measure, then press Play. Both surfaces share the document and undo history. Importing MIDI retains piano-roll editing; staff entry needs authored measures.'
+      : 'Edit the roll, then press Play to hear the committed version. The staff follows the same document.'}</p>
+  </section>
+</ElementPlayground>
+
+<script>
+  import {defineScoreDocumentElement, type ScoreDocumentElement} from '@webmusic/score/edit/element';
+  import {defineScorePlayerElement, type ScorePlayerElement} from '@webmusic/score/play/element';
+  import {defineScoreViewElement} from '@webmusic/score/view/element';
+  import {loadScore, serializeMIDI, serializeMusicXML, assertScoreInputByteLength, DEFAULT_LOAD_SCORE_LIMITS} from '@webmusic/score/io';
+  import {mountDemos} from '../demo-lifecycle';
+  import {PLAYGROUND_RESET_EVENT} from '../playground-client';
+  defineScoreDocumentElement(); defineScorePlayerElement(); defineScoreViewElement();
+  mountDemos('[data-editing-demo]', (root, scope) => {
+    const owner = root.querySelector<ScoreDocumentElement>('[data-editing-document]')!;
+    const player = root.querySelector<ScorePlayerElement>('[data-editing-player]')!;
+    const status = root.querySelector<HTMLElement>('[data-editing-status]')!;
+    const result = root.querySelector<HTMLElement>('[data-editing-result]')!;
+    const upload = root.querySelector<HTMLInputElement>('[data-editing-import]')!;
+    const exportButton = root.querySelector<HTMLButtonElement>('[data-editing-export]')!;
+    const notationExportButton = root.querySelector<HTMLButtonElement>('[data-editing-export-notation]');
+    const notationDocument = root.hasAttribute('data-editing-notation');
+    let stop: (() => void) | undefined;
+    let generation = 0;
+    let importGeneration = 0;
+    let importController: AbortController | undefined;
+    let downloadUrl: string | undefined;
+    const initialResult = result.textContent;
+    let transientBindingError = false;
+    const showResult = (message: string, transient = false): void => {
+      transientBindingError = transient;
+      result.textContent = message;
+    };
+    const paint = (): void => {
+      if (!scope.active) return;
+      const state = owner.editor?.getState();
+      const binding = player.documentBinding;
+      status.textContent = state
+        ? `Document ${owner.status} · ${state.document.content.notes.length} notes · revision ${state.document.documentRevision} · playback ${binding?.status ?? 'empty'}${binding?.applied ? ` (revision ${binding.applied.documentRevision})` : ''} · ${state.dirty ? 'unsaved' : 'saved'}`
+        : `Document ${owner.status}.`;
+      exportButton.disabled = !state || state.document.status !== 'ready';
+      if (notationExportButton) notationExportButton.disabled = exportButton.disabled;
+      if (transientBindingError && state?.document.status === 'ready' && binding?.status === 'ready'
+        && binding.applied?.documentId === state.document.documentId
+        && binding.applied?.documentRevision === state.document.documentRevision) {
+        showResult(initialResult ?? 'The document is ready to edit and play.');
+      }
+    };
+    const attach = (): void => {
+      generation += 1; stop?.(); stop = undefined;
+      const current = generation;
+      const editor = owner.editor;
+      if (editor) {
+        const release = editor.subscribeState(() => { if (scope.active && current === generation) paint(); });
+        if (scope.active && current === generation) stop = release; else release();
+      }
+      paint();
+    };
+    const invalidateImport = (): void => {
+      importGeneration += 1;
+      importController?.abort(); importController = undefined;
+    };
+    scope.listen(owner, 'webmusic:sourcechange', attach);
+    scope.listen(owner, 'webscore:documentstatechange', () => {
+      // A newly requested URL supersedes import; completion of an older URL
+      // must not silently cancel a file the user has just selected.
+      if (owner.status === 'loading') invalidateImport();
+      paint();
+    });
+    scope.listen(player, 'webscore:documentstatechange', paint);
+    scope.listen(root, 'webscore:error', (event) => {
+      const error = (event as CustomEvent<{error: unknown}>).detail.error;
+      const transient = event.target === player && error instanceof Error && 'code' in error && error.code === 'not-ready';
+      showResult(error instanceof Error ? error.message : String(error), transient);
+    });
+    scope.listen(upload, 'change', async () => {
+      const file = upload.files?.[0]; if (!file) return;
+      invalidateImport();
+      const current = importGeneration;
+      const controller = new AbortController(); importController = controller;
+      const inputScore = owner.score;
+      const configuration = ['src', 'format', 'history', 'history-limit'].map((name) => owner.getAttribute(name));
+      const currentInput = () => scope.active && current === importGeneration && owner.score === inputScore
+        && ['src', 'format', 'history', 'history-limit'].every((name, index) => owner.getAttribute(name) === configuration[index]);
+      try {
+        assertScoreInputByteLength(file.size, DEFAULT_LOAD_SCORE_LIMITS.maxInputBytes, 'MIDI file');
+        const bytes = await file.arrayBuffer();
+        if (!currentInput()) return;
+        const score = await loadScore(bytes, {format: 'midi', signal: controller.signal});
+        if (!currentInput()) return;
+        owner.score = score;
+        if (scope.active && current === importGeneration && owner.score === score) showResult(`Imported ${file.name}.`);
+      } catch (error) {
+        if (scope.active && current === importGeneration) showResult(error instanceof Error ? error.message : String(error));
+      } finally {
+        if (importController === controller) importController = undefined;
+        if (scope.active && current === importGeneration) upload.value = '';
+      }
+    });
+    const exportScore = (format: 'midi' | 'musicxml'): void => {
+      const editor = owner.editor; if (!editor) return;
+      try {
+        const snapshot = editor.getSnapshot();
+        const payload = format === 'musicxml' ? serializeMusicXML(snapshot.content, {ppq: 960}) : new Uint8Array(serializeMIDI(snapshot.content));
+        if (downloadUrl) URL.revokeObjectURL(downloadUrl);
+        downloadUrl = URL.createObjectURL(new Blob([payload], {type: format === 'musicxml' ? 'application/vnd.recordare.musicxml+xml' : 'audio/midi'}));
+        const link = document.createElement('a'); link.href = downloadUrl; link.download = format === 'musicxml' ? 'edited-score.musicxml' : 'edited-score.mid';
+        link.click();
+        if ((!notationDocument || format === 'musicxml') && owner.editor === editor && editor.getSnapshot().status === 'ready' && editor.getSnapshot().contentId === snapshot.contentId) editor.markSaved();
+        if (scope.active) showResult(format === 'musicxml'
+          ? `MusicXML export requested for revision ${snapshot.documentRevision}. The file retains supported staff-entry notation, voices and rests on the demo's binary quarter grid.`
+          : `Export requested for revision ${snapshot.documentRevision}. MIDI exports playback data; it does not preserve every notation detail.${notationDocument ? ' This performance export leaves the notation document unsaved; use Export MusicXML to save notation.' : ''}`);
+      } catch (error) {
+        if (scope.active) showResult(error instanceof Error ? error.message : String(error));
+      }
+    };
+    scope.listen(exportButton, 'click', () => exportScore('midi'));
+    if (notationExportButton) scope.listen(notationExportButton, 'click', () => exportScore('musicxml'));
+    const restore = async (): Promise<void> => {
+      invalidateImport(); upload.value = '';
+      owner.score = undefined;
+      const pending = owner.reload();
+      const current = importGeneration;
+      showResult('Reloading the configured source.');
+      const outcome = await pending;
+      if (!scope.active || current !== importGeneration) return;
+      showResult(outcome.status === 'ready' ? 'Configured source reloaded.'
+        : outcome.status === 'failed' ? String(outcome.error) : `Reload ${outcome.status}.`);
+    };
+    scope.listen(root.querySelector('[data-editing-restore]')!, 'click', restore);
+    scope.listen(root.closest('[data-wm-pg]')!, PLAYGROUND_RESET_EVENT, () => {
+      invalidateImport();
+      queueMicrotask(() => { if (scope.active) scope.run(restore()); });
+    });
+    scope.add(() => { generation += 1; invalidateImport(); stop?.(); if (downloadUrl) URL.revokeObjectURL(downloadUrl); });
+    attach();
+  });
+</script>
+
+<style>
+  [data-editing-demo], [data-editing-composition] { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; min-width: 0; }
+  [data-editing-demo] p { margin: 0; font-size: .85rem; overflow-wrap: anywhere; }
+  .editing-actions { display: flex; align-items: flex-start; gap: .5rem; flex-wrap: wrap; }
+</style>

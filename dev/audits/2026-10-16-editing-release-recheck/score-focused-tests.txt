@@ -1,0 +1,17 @@
+
+> @webmusic/score@0.2.0 test
+> vitest run test/edit test/play/document-binding.test.ts test/view/staff-editing.test.ts test/view/staff-editing-render.test.ts test/view/staff-editor-integration.test.ts test/view/editing.test.ts test/view/editor-player-integration.test.ts test/core/serialize.test.ts test/core/model-validation.test.ts test/core/compat.test.ts
+
+
+ RUN  v5.0.2 /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/score
+
+
+ Test Files  15 passed (15)
+      Tests  177 passed (177)
+   Start at  01:01:37
+   Duration  1.80s (environment 37%, transform 36%, tests 17%, import 9%, worker 1%)
+
+  Transform  transforming modules took 3.98s · 36% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+

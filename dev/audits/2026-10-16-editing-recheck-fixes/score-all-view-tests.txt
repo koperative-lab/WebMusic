@@ -1,0 +1,17 @@
+
+> @webmusic/score@0.2.0 test
+> vitest run test/view
+
+
+ RUN  v5.0.2 /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/score
+
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+
+ Test Files  51 passed (51)
+      Tests  549 passed (549)
+   Start at  14:57:46
+   Duration  4.02s (environment 42%, tests 27%, transform 20%, import 11%, worker 1%)
+
+    Isolate  51 workers spawned · ~384ms startup each (spawn + environment, per file)
+             at least ~1.39s faster with isolate: false — reuses workers across files instead of one per file
+

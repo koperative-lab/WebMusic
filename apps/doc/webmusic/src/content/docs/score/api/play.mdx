@@ -484,6 +484,18 @@ not the `InteractivePlayer` in the earlier independent example. These
 browser adapters own their installed event bindings; the transport and
 target elements remain caller-owned.
 
+## Editable document playback
+
+Native `ScorePlayer.setDocumentSource(source)` borrows the Core document port.
+Each revision pauses, prepares and adopts into the same player and clock, then
+stays paused. Requested and applied revisions are distinct; explicit wait/retry
+operations return tagged outcomes. See the [complete Headless contract](/score/headless/play/score-player/#apply-document-revisions)
+for position maps, failed preparation, resource ownership and repeat fallback.
+The [Element binding](/score/element/play/score-player/#play-an-editable-document)
+adds `.editor` and `editor="#id"` without copying edited data into a second owner.
+This contract belongs to the native player; Rack, controller and TonePlayer
+sources do not implicitly acquire document editing.
+
 ## API Reference
 
 | API | Kind | Use it for |

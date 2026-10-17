@@ -10,6 +10,15 @@
 
 import type {Region} from '../../core';
 
+/** Bounded, read-only waveform input for reference-based audio sequences. */
+export interface AudioWaveformSource {
+  readonly sampleRate: number;
+  readonly channels: number;
+  readonly frameCount: number;
+  /** Conservative per-channel extrema for the requested half-open frame range. */
+  readPeaks(startFrame: number, endFrame: number): readonly {readonly min: number; readonly max: number}[];
+}
+
 /** Names of the built-in spectrogram colormaps. */
 export type ColormapName = 'viridis' | 'magma' | 'grayscale' | 'gray';
 
@@ -78,6 +87,8 @@ export interface RenderedAudioVisualizer {
    * padding, and ignores independent panning. Default is position.
    */
   setPlayheadMode?(mode: 'position' | 'center'): void;
+  /** Hide playback paint while the displayed document has no matching applied revision. */
+  setPlayheadVisible?(visible: boolean): void;
   /** Change the horizontal scale (pixels per second) and repaint. */
   setZoom(pixelsPerSecond: number): void;
   /** Replace the overlaid regions/markers and repaint the overlay. */

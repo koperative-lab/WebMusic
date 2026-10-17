@@ -81,7 +81,7 @@ export function noteEndSeconds(note: Note, score: Score): number {
 }
 
 export function noteVelocity(note: Note): number {
-  return note.performed?.velocity ?? 80;
+  return note.velocity;
 }
 
 export function noteVoiceString(note: Note): string {

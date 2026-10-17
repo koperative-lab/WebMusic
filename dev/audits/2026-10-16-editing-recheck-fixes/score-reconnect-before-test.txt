@@ -1,0 +1,44 @@
+
+> @webmusic/score@0.2.0 test
+> vitest run test/edit/reconnect-owner-review-probe.test.ts
+
+
+ RUN  v5.0.2 /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/score
+
+stdout | test/edit/reconnect-owner-review-probe.test.ts > releases the disconnected lifetime owner when abort only reconnects into a failing URL load
+{"connected":true,"status":"error","previousStatus":"ready","retainsPrevious":true,"calls":2}
+
+ ❯ test/edit/reconnect-owner-review-probe.test.ts (1 test | 1 failed) 12ms
+   × releases the disconnected lifetime owner when abort only reconnects into a failing URL load 12ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/edit/reconnect-owner-review-probe.test.ts > releases the disconnected lifetime owner when abort only reconnects into a failing URL load
+AssertionError: expected 'ready' to be 'disposed' // Object.is equality
+
+Expected: "disposed"
+Received: "ready"
+
+ ❯ test/edit/reconnect-owner-review-probe.test.ts:28:43
+     26|   try {
+     27|     expect(element.isConnected).toBe(true);
+     28|     expect(previous.getSnapshot().status).toBe('disposed');
+       |                                           ^
+     29|     expect(element.editor).toBeUndefined();
+     30|     expect(element.status).toBe('error');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed (1)
+   Start at  14:57:02
+   Duration  719ms (environment 71%, transform 23%, import 4%, tests 2%)
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/score
+npm error workspace @webmusic/score@0.2.0
+npm error location /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/score
+npm error command failed
+npm error command sh -c vitest run test/edit/reconnect-owner-review-probe.test.ts

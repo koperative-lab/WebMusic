@@ -1,0 +1,60 @@
+
+ RUN  v5.0.2 /Users/mamingchen/.codex/worktrees/cd78/WebMusic
+
+stdout | packages/audio/test/view/release-waveform-target-review-probe.test.ts > release review: stale waveform command targets > abandons Trim to selection if shared draft cancellation redirects the selection
+Trim to selection {"revision":1,"length":200,"selection":{"startFrame":200,"endFrame":200},"segments":[{"kind":"asset","id":"segment_3klnyxje3_2","assetId":"asset_3klnyxje3_1","sourceStart":100,"sourceEnd":300,"gain":1,"envelope":[]}]}
+
+stdout | packages/audio/test/view/release-waveform-target-review-probe.test.ts > release review: stale waveform command targets > abandons Delete selection if shared draft cancellation redirects the selection
+Delete selection {"revision":1,"length":800,"selection":{"startFrame":300,"endFrame":600},"segments":[{"kind":"asset","id":"segment_3klotxje3_9","assetId":"asset_3klotxje3_8","sourceStart":0,"sourceEnd":100,"gain":1,"envelope":[]},{"kind":"asset","id":"segment_3klowxje3_d","assetId":"asset_3klotxje3_8","sourceStart":300,"sourceEnd":1000,"gain":1,"envelope":[]}]}
+
+stdout | packages/audio/test/view/release-waveform-target-review-probe.test.ts > release review: stale waveform command targets > abandons captured gain when cancellation redirects the chosen segment
+gain {"revision":2,"selected":"right","segments":[{"kind":"asset","id":"left","assetId":"asset_3kloyxje3_g","sourceStart":0,"sourceEnd":500,"gain":0.25,"envelope":[]},{"kind":"asset","id":"right","assetId":"asset_3kloyxje3_g","sourceStart":500,"sourceEnd":1000,"gain":1,"envelope":[]}]}
+
+ ❯ packages/audio/test/view/release-waveform-target-review-probe.test.ts (3 tests | 3 failed) 47ms
+   ❯ release review: stale waveform command targets (3)
+     × abandons Trim to selection if shared draft cancellation redirects the selection 31ms
+     × abandons Delete selection if shared draft cancellation redirects the selection 5ms
+     × abandons captured gain when cancellation redirects the chosen segment 8ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/audio/test/view/release-waveform-target-review-probe.test.ts > release review: stale waveform command targets > abandons Trim to selection if shared draft cancellation redirects the selection
+ FAIL  packages/audio/test/view/release-waveform-target-review-probe.test.ts > release review: stale waveform command targets > abandons Delete selection if shared draft cancellation redirects the selection
+AssertionError: expected 1 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ packages/audio/test/view/release-waveform-target-review-probe.test.ts:68:52
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  packages/audio/test/view/release-waveform-target-review-probe.test.ts > release review: stale waveform command targets > abandons captured gain when cancellation redirects the chosen segment
+AssertionError: expected 2 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 2
+
+ ❯ packages/audio/test/view/release-waveform-target-review-probe.test.ts:89:52
+     87|       button(host, 'Apply segment gain').click();
+     88|       console.log('gain', JSON.stringify({revision: model.getSnapshot(…
+     89|       expect(model.getSnapshot().documentRevision).toBe(1);
+       |                                                    ^
+     90|       expect(model.sequence.segments).toMatchObject([{id: 'left', gain…
+     91|     } finally { off(); }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed (3)
+   Start at  22:59:59
+   Duration  802ms (environment 61%, transform 27%, tests 7%, import 5%)
+

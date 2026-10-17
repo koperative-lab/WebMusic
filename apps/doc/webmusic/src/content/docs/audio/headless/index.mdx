@@ -6,11 +6,12 @@ sidebar:
 ---
 
 Headless components are the code-only domain objects behind the elements:
-engines, runners, and renderers imported from
+editors, engines, sessions and projection models imported from
 `@webmusic/audio/<capability>/headless`. They never touch the DOM.
 
 | Capability | Contents |
 | --- | --- |
+| [Edit](#edit) | `AudioClipEditor`: immutable reference sequences, history, interaction sessions and explicit range processing. |
 | [Play](#play) | `AudioPlayer`, clip/queue/mix backends, `AudioRecorder` and engines. |
 | [Analyze](#analyze) | Cached analysis sessions, a main-thread realtime sampler and a streaming transient detector; worker clients use their own entry. |
 | [View](#view) | Timeline/view models and pure projection helpers; renderers use the separate /render entry. |
@@ -29,6 +30,24 @@ types, signatures, defaults, unique explanation ownership or lifecycle coverage
 are complete. Those require source review. Browser renderers belong to
 [API / View](/audio/api/view/), and application composition can use
 [UI Kit](/uikit/) without changing domain ownership.
+
+## Edit
+
+`@webmusic/audio/edit/headless` owns one editable document without a clock or
+visual surface. A decoded clip becomes retained immutable assets plus a
+contiguous sequence; ordinary edits and history share those assets. A player and
+waveform view borrow the Core read/command ports. Local processing and WAV
+export are explicit operations, never an implicit step in structural editing.
+
+| Export | Kind | Page |
+| --- | --- | --- |
+| `AudioClipEditor` · `createAudioClipEditor` | class · factory | [AudioClipEditor](/audio/headless/edit/audio-clip-editor/) |
+| `AudioClipEditorOptions` | type | [Editor options, history and processing](/audio/headless/edit/audio-clip-editor/) |
+
+Core sequence/asset/operation/session contracts are also selected by the
+[Edit API](/audio/api/edit/). The editor owns its document and local history;
+borrowed asset readers and external checkpoint/clipboard leases retain their
+explicit cleanup responsibilities.
 
 ## Play
 
@@ -56,7 +75,7 @@ that produce a clip in the first place are on
 
 | Exported types | Explanation owner |
 | --- | --- |
-| `AudioPlayerOptions`, `AudioPlayerTransport`, `AudioPlayerEvents` | [AudioPlayer](/audio/headless/play/audio-player/) |
+| `AudioPlayerOptions`, `AudioPlayerTransport`, `AudioPlayerEvents`, `AudioPlayerSourceDetail` | [AudioPlayer](/audio/headless/play/audio-player/) |
 | `AudioClipPlayerOptions`, `AudioClipPlayerEvents`, `AudioScratchSession`, `PlayerTimeUpdate`, `PlayerEngineKind`, `PlayerLike` | [AudioClipPlayer](/audio/headless/play/audio-clip-player/) |
 | `AudioPlaylistOptions`, `AudioPlaylistEvents`, `AudioPlaylistEntry`, `AudioPlaylistEntryStatus` | [AudioPlaylist](/audio/headless/play/audio-playlist/) |
 | `AudioMixerOptions`, `AudioMixerEvents`, `MixerMemberInit`, `AudioMixerSnapshot`, `AudioMixerMemberSnapshot` | [AudioMixer](/audio/headless/play/audio-mixer/) |
@@ -75,6 +94,7 @@ usually the first decision:
 
 | You have | Reach for |
 | --- | --- |
+| one editable sequence | [`AudioPlayer.setDocumentSource`](/audio/headless/play/audio-player/), borrowing its editor |
 | one clip | [`AudioClipPlayer`](/audio/headless/play/audio-clip-player/) |
 | several clips whose start/seek commands should be coordinated | [`AudioMixer`](/audio/headless/play/audio-mixer/) |
 | several clips that should play **in order** | [`AudioPlaylist`](/audio/headless/play/audio-playlist/) |
@@ -142,6 +162,8 @@ subscriptions and returns unsubscribe(). None draws or creates a playback clock.
 | `bindPlayerToAudioTimeline` | binding | [AudioTimeline](/audio/headless/view/audio-timeline/) |
 | `WaveformViewModel` · `createWaveformViewModel` · `fitWaveformColumns` | class · factory · helper | [View models](/audio/headless/view/view-models/) |
 | `SpectrogramViewModel` · `createSpectrogramViewModel` | class · factory | [View models](/audio/headless/view/view-models/) |
+| `createAudioViewEditing` · `audioDocumentPlaybackCompatible` | interaction controller · compatibility gate | [Document editing](/audio/api/view/#document-editing) |
+| `createAudioSequenceWaveform` | range source | [Sequence waveform ranges](/audio/api/view/#sequence-waveform-ranges) |
 | `computeClipPeaks` · `peaksDuration` | functions | [Peaks](/audio/headless/view/peaks/) |
 | `LiveViewController` · `createLiveViewController` · `LiveScrollBuffer` | classes · factory | [Live projection](/audio/headless/view/live-projection/) |
 | `frequencyColumn` · `timeDomainColumn` | column builders | [Live projection](/audio/headless/view/live-projection/) |
@@ -153,6 +175,8 @@ subscriptions and returns unsubscribe(). None draws or creates a playback clock.
 | `AudioMeterControllerOptions`, `AudioMeterConfiguration`, `AudioMeterLevelFrame`, `LevelMeterFrame`, `LevelMeterOptions`, `SpectrumBarsOptions` | [Metering](/audio/headless/view/audio-meter/) |
 | `AudioTimelineOptions`, `AudioTimelineSnapshot`, `AudioTimelineHit`, `AudioTimelineGeometryUpdate`, `AudioTimelineSubscriber`, `AudioTimelineBinding`, `BindAudioTimelineOptions`, `PlayheadTarget` | [AudioTimeline](/audio/headless/view/audio-timeline/) |
 | `WaveformViewModelOptions`, `WaveformColumn`, `WaveformChannelPeak`, `SpectrogramViewModelOptions`, `SpectrogramFrameView` | [View models](/audio/headless/view/view-models/) |
+| `AudioViewEditing`, `AudioViewEditingOptions`, `AudioViewEditingState` | [Document editing](/audio/api/view/#document-editing) |
+| `AudioSequenceWaveform`, `AudioSequenceWaveformOptions` | [Sequence waveform ranges](/audio/api/view/#sequence-waveform-ranges) |
 | `LiveColumn`, `LiveProjectionType`, `LiveScrollOptions`, `LiveViewControllerOptions` | [Live projection](/audio/headless/view/live-projection/) |
 
 The source barrel is `packages/audio/src/view/headless/index.ts`. AudioPeaks and
@@ -161,7 +185,7 @@ belongs to the [View API](/audio/api/view/). Pure functions such as computeClipP
 and fitWaveformColumns have no lifecycle/events. Model query results do not imply
 an internal refresh timer.
 
-`AudioTimeline` and the view models describe a **clip you already have**;
+`AudioTimeline` and the view models describe a clip or sequence you already have;
 `LiveViewController` describes a signal arriving now. The split is the same
 one the analyze capability makes, for the same reason: a clip has a length and
 a live signal does not.

@@ -1,0 +1,1464 @@
+
+> @webmusic/score@0.2.0 test
+> vitest run test/edit/score-document.test.ts
+
+
+ RUN  v5.0.2 /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/score
+
+ ❯ test/edit/score-document.test.ts (13 tests | 4 failed) 33ms
+   ❯ ScoreDocumentElement (13)
+     × keeps the latest explicit input and disposes the candidate superseded by an abort callback 4ms
+     × returns superseded when retry cancellation installs a newer explicit input 3ms
+     × releases an explicit candidate if cancellation disconnects the declaration 1ms
+     × keeps a fresh owner when an abort callback reconnects during disconnect 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/edit/score-document.test.ts > ScoreDocumentElement > keeps the latest explicit input and disposes the candidate superseded by an abort callback
+AssertionError: expected 62 to be 64 // Object.is equality
+
+- Expected
++ Received
+
+- 64
++ 62
+
+ ❯ test/edit/score-document.test.ts:162:46
+    160|     const editor = element.editor!;
+    161|     expect(element.score).toBe(latest);
+    162|     expect(editor.score.notes[0].pitch.midi).toBe(64);
+       |                                              ^
+    163|     expect(element.status).toBe('ready'); expect(changes).toHaveBeenCa…
+    164|     const abandoned = dispose.mock.contexts.find((value) => value !== …
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  test/edit/score-document.test.ts > ScoreDocumentElement > returns superseded when retry cancellation installs a newer explicit input
+AssertionError: expected { status: 'ready', …(1) } to deeply equal { status: 'superseded' }
+
+- Expected
++ Received
+
+  {
+-   "status": "superseded",
++   "editor": ScoreEditor {
++     "busy": false,
++     "checkpoints": WeakSet {},
++     "historyEnabled": true,
++     "historyLimit": 100,
++     "onListenerError": undefined,
++     "pendingPublication": false,
++     "publishedSnapshot": {
++       "content": {
++         "$schema": "https://webscore.dev/schema/score/v0.2",
++         "id": "s_41ngpx16y_12",
++         "measures": [],
++         "metadata": {},
++         "parts": [
++           {
++             "abbreviation": undefined,
++             "clefChanges": undefined,
++             "directions": undefined,
++             "id": "part",
++             "midiChannel": undefined,
++             "midiProgram": undefined,
++             "name": "Part",
++             "notes": [
++               {
++                 "articulations": undefined,
++                 "beams": undefined,
++                 "chord": undefined,
++                 "duration": {
++                   "base": [
++                     1,
++                     1,
++                   ],
++                   "dots": 0,
++                   "tuplet": [
++                     1,
++                     1,
++                   ],
++                 },
++                 "dynamic": undefined,
++                 "grace": undefined,
++                 "id": "note",
++                 "lyric": undefined,
++                 "onsetQuarters": [
++                   0,
++                   1,
++                 ],
++                 "ornaments": undefined,
++                 "performed": undefined,
++                 "pitch": {
++                   "alter": 0,
++                   "octave": 4,
++                   "step": "E",
++                 },
++                 "printObject": undefined,
++                 "rest": undefined,
++                 "restDisplay": undefined,
++                 "slur": undefined,
++                 "staff": undefined,
++                 "stem": undefined,
++                 "tags": undefined,
++                 "tie": undefined,
++                 "tiePlacement": undefined,
++                 "tupletId": undefined,
++                 "tupletMarks": undefined,
++                 "unpitched": undefined,
++                 "velocityOverride": undefined,
++                 "voice": "voice",
++               },
++             ],
++             "staves": 1,
++             "transpose": undefined,
++           },
++         ],
++         "timeMap": {
++           "meters": [
++             {
++               "atQuarters": [
++                 0,
++                 1,
++               ],
++               "measureNumber": 1,
++               "timeSignature": {
++                 "denominator": 4,
++                 "numerator": 4,
++               },
++             },
++           ],
++           "tempi": [
++             {
++               "atQuarters": [
++                 0,
++                 1,
++               ],
++               "bpm": 120,
++               "unit": undefined,
++             },
++           ],
++         },
++       },
++       "contentId": "score-content_41ngpx16y_16",
++       "documentId": "score-document_41ngpx16y_15",
++       "documentRevision": 0,
++       "status": "ready",
++     },
++     "publishing": false,
++     "redoStack": [],
++     "savedContentId": "score-content_41ngpx16y_16",
++     "sessions": Set {},
++     "snapshot": {
++       "content": {
++         "$schema": "https://webscore.dev/schema/score/v0.2",
++         "id": "s_41ngpx16y_12",
++         "measures": [],
++         "metadata": {},
++         "parts": [
++           {
++             "abbreviation": undefined,
++             "clefChanges": undefined,
++             "directions": undefined,
++             "id": "part",
++             "midiChannel": undefined,
++             "midiProgram": undefined,
++             "name": "Part",
++             "notes": [
++               {
++                 "articulations": undefined,
++                 "beams": undefined,
++                 "chord": undefined,
++                 "duration": {
++                   "base": [
++                     1,
++                     1,
++                   ],
++                   "dots": 0,
++                   "tuplet": [
++                     1,
++                     1,
++                   ],
++                 },
++                 "dynamic": undefined,
++                 "grace": undefined,
++                 "id": "note",
++                 "lyric": undefined,
++                 "onsetQuarters": [
++                   0,
++                   1,
++                 ],
++                 "ornaments": undefined,
++                 "performed": undefined,
++                 "pitch": {
++                   "alter": 0,
++                   "octave": 4,
++                   "step": "E",
++                 },
++                 "printObject": undefined,
++                 "rest": undefined,
++                 "restDisplay": undefined,
++                 "slur": undefined,
++                 "staff": undefined,
++                 "stem": undefined,
++                 "tags": undefined,
++                 "tie": undefined,
++                 "tiePlacement": undefined,
++                 "tupletId": undefined,
++                 "tupletMarks": undefined,
++                 "unpitched": undefined,
++                 "velocityOverride": undefined,
++                 "voice": "voice",
++               },
++             ],
++             "staves": 1,
++             "transpose": undefined,
++           },
++         ],
++         "timeMap": {
++           "meters": [
++             {
++               "atQuarters": [
++                 0,
++                 1,
++               ],
++               "measureNumber": 1,
++               "timeSignature": {
++                 "denominator": 4,
++                 "numerator": 4,
++               },
++             },
++           ],
++           "tempi": [
++             {
++               "atQuarters": [
++                 0,
++                 1,
++               ],
++               "bpm": 120,
++               "unit": undefined,
++             },
++           ],
++         },
++       },
++       "contentId": "score-content_41ngpx16y_16",
++       "documentId": "score-document_41ngpx16y_15",
++       "documentRevision": 0,
++       "status": "ready",
++     },
++     "sourceListeners": Set {},
++     "state": {
++       "dirty": false,
++       "document": {
++         "content": {
++           "$schema": "https://webscore.dev/schema/score/v0.2",
++           "id": "s_41ngpx16y_12",
++           "measures": [],
++           "metadata": {},
++           "parts": [
++             {
++               "abbreviation": undefined,
++               "clefChanges": undefined,
++               "directions": undefined,
++               "id": "part",
++               "midiChannel": undefined,
++               "midiProgram": undefined,
++               "name": "Part",
++               "notes": [
++                 {
++                   "articulations": undefined,
++                   "beams": undefined,
++                   "chord": undefined,
++                   "duration": {
++                     "base": [
++                       1,
++                       1,
++                     ],
++                     "dots": 0,
++                     "tuplet": [
++                       1,
++                       1,
++                     ],
++                   },
++                   "dynamic": undefined,
++                   "grace": undefined,
++                   "id": "note",
++                   "lyric": undefined,
++                   "onsetQuarters": [
++                     0,
++                     1,
++                   ],
++                   "ornaments": undefined,
++                   "performed": undefined,
++                   "pitch": {
++                     "alter": 0,
++                     "octave": 4,
++                     "step": "E",
++                   },
++                   "printObject": undefined,
++                   "rest": undefined,
++                   "restDisplay": undefined,
++                   "slur": undefined,
++                   "staff": undefined,
++                   "stem": undefined,
++                   "tags": undefined,
++                   "tie": undefined,
++                   "tiePlacement": undefined,
++                   "tupletId": undefined,
++                   "tupletMarks": undefined,
++                   "unpitched": undefined,
++                   "velocityOverride": undefined,
++                   "voice": "voice",
++                 },
++               ],
++               "staves": 1,
++               "transpose": undefined,
++             },
++           ],
++           "timeMap": {
++             "meters": [
++               {
++                 "atQuarters": [
++                   0,
++                   1,
++                 ],
++                 "measureNumber": 1,
++                 "timeSignature": {
++                   "denominator": 4,
++                   "numerator": 4,
++                 },
++               },
++             ],
++             "tempi": [
++               {
++                 "atQuarters": [
++                   0,
++                   1,
++                 ],
++                 "bpm": 120,
++                 "unit": undefined,
++               },
++             ],
++           },
++         },
++         "contentId": "score-content_41ngpx16y_16",
++         "documentId": "score-document_41ngpx16y_15",
++         "documentRevision": 0,
++         "status": "ready",
++       },
++       "history": {
++         "canRedo": false,
++         "canUndo": false,
++         "enabled": true,
++         "limit": 100,
++         "redoCount": 0,
++         "trimmedCount": 0,
++         "undoCount": 0,
++       },
++     },
++     "stateListeners": Set {},
++     "trimmedCount": 0,
++     "undoStack": [],
++   },
++   "status": "ready",
+  }
+
+ ❯ test/edit/score-document.test.ts:178:36
+    176|     });
+    177|     element.src = '/pending.mid'; document.body.append(element);
+    178|     expect(await element.reload()).toEqual({status: 'superseded'});
+       |                                    ^
+    179|     expect(element.editor).toBe(newest); expect(newest!.getSnapshot().…
+    180|     pending.resolve(score()); await flush(); expect(element.editor).to…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  test/edit/score-document.test.ts > ScoreDocumentElement > releases an explicit candidate if cancellation disconnects the declaration
+AssertionError: expected ScoreEditor{ undoStack: [], …(16) } to be undefined
+
+- Expected:
+undefined
+
++ Received:
+ScoreEditor {
+  "busy": false,
+  "checkpoints": WeakSet {},
+  "historyEnabled": true,
+  "historyLimit": 100,
+  "onListenerError": undefined,
+  "pendingPublication": false,
+  "publishedSnapshot": {
+    "content": Score {
+      "_keySignatures": [],
+      "_measureById": Map {},
+      "_partById": Map {
+        "part" => Part {
+          "abbreviation": undefined,
+          "clefChanges": undefined,
+          "directions": undefined,
+          "id": "part",
+          "midiChannel": undefined,
+          "midiProgram": undefined,
+          "name": "Part",
+          "notes": [
+            Note {
+              "articulations": undefined,
+              "beams": undefined,
+              "chord": undefined,
+              "duration": Duration {
+                "base": [Rational],
+                "dots": 0,
+                "quarters": [Rational],
+                "tuplet": [Array],
+              },
+              "dynamic": undefined,
+              "grace": undefined,
+              "id": "note",
+              "lyric": undefined,
+              "onsetQuarters": Rational {
+                "den": 1,
+                "num": 0,
+              },
+              "ornaments": undefined,
+              "performed": undefined,
+              "pitch": Pitch {
+                "alter": 0,
+                "octave": 4,
+                "step": "D",
+              },
+              "printObject": undefined,
+              "rest": undefined,
+              "restDisplay": undefined,
+              "slur": undefined,
+              "staff": undefined,
+              "stem": undefined,
+              "tags": undefined,
+              "tie": undefined,
+              "tiePlacement": undefined,
+              "tupletId": undefined,
+              "tupletMarks": undefined,
+              "unpitched": undefined,
+              "velocityOverride": undefined,
+              "voice": "voice",
+            },
+          ],
+          "staves": 1,
+          "transpose": undefined,
+        },
+      },
+      "_tempos": [
+        {
+          "bpm": 120,
+          "tick": 0,
+        },
+      ],
+      "_timeSignatures": [
+        {
+          "denominator": 4,
+          "numerator": 4,
+          "tick": 0,
+        },
+      ],
+      "id": "s_41ngsx16y_17",
+      "measures": [],
+      "metadata": {},
+      "parts": [
+        Part {
+          "abbreviation": undefined,
+          "clefChanges": undefined,
+          "directions": undefined,
+          "id": "part",
+          "midiChannel": undefined,
+          "midiProgram": undefined,
+          "name": "Part",
+          "notes": [
+            Note {
+              "articulations": undefined,
+              "beams": undefined,
+              "chord": undefined,
+              "duration": Duration {
+                "base": [Rational],
+                "dots": 0,
+                "quarters": [Rational],
+                "tuplet": [Array],
+              },
+              "dynamic": undefined,
+              "grace": undefined,
+              "id": "note",
+              "lyric": undefined,
+              "onsetQuarters": Rational {
+                "den": 1,
+                "num": 0,
+              },
+              "ornaments": undefined,
+              "performed": undefined,
+              "pitch": Pitch {
+                "alter": 0,
+                "octave": 4,
+                "step": "D",
+              },
+              "printObject": undefined,
+              "rest": undefined,
+              "restDisplay": undefined,
+              "slur": undefined,
+              "staff": undefined,
+              "stem": undefined,
+              "tags": undefined,
+              "tie": undefined,
+              "tiePlacement": undefined,
+              "tupletId": undefined,
+              "tupletMarks": undefined,
+              "unpitched": undefined,
+              "velocityOverride": undefined,
+              "voice": "voice",
+            },
+          ],
+          "staves": 1,
+          "transpose": undefined,
+        },
+      ],
+      "timeMap": TimeMap {
+        "_meterMeasureStarts": [
+          1,
+        ],
+        "_meterStartsQ": [
+          0,
+        ],
+        "_tempoStartsQ": [
+          0,
+        ],
+        "_tempoStartsSec": [
+          0,
+        ],
+        "meters": [
+          {
+            "atQuarters": Rational {
+              "den": 1,
+              "num": 0,
+            },
+            "measureNumber": 1,
+            "timeSignature": {
+              "denominator": 4,
+              "numerator": 4,
+            },
+          },
+        ],
+        "tempi": [
+          {
+            "atQuarters": Rational {
+              "den": 1,
+              "num": 0,
+            },
+            "bpm": 120,
+          },
+        ],
+      },
+    },
+    "contentId": "score-content_41ngsx16y_19",
+    "documentId": "score-document_41ngsx16y_18",
+    "documentRevision": 0,
+    "status": "ready",
+  },
+  "publishing": false,
+  "redoStack": [],
+  "savedContentId": "score-content_41ngsx16y_19",
+  "sessions": Set {},
+  "snapshot": {
+    "content": Score {
+      "_keySignatures": [],
+      "_measureById": Map {},
+      "_partById": Map {
+        "part" => Part {
+          "abbreviation": undefined,
+          "clefChanges": undefined,
+          "directions": undefined,
+          "id": "part",
+          "midiChannel": undefined,
+          "midiProgram": undefined,
+          "name": "Part",
+          "notes": [
+            Note {
+              "articulations": undefined,
+              "beams": undefined,
+              "chord": undefined,
+              "duration": Duration {
+                "base": [Rational],
+                "dots": 0,
+                "quarters": [Rational],
+                "tuplet": [Array],
+              },
+              "dynamic": undefined,
+              "grace": undefined,
+              "id": "note",
+              "lyric": undefined,
+              "onsetQuarters": Rational {
+                "den": 1,
+                "num": 0,
+              },
+              "ornaments": undefined,
+              "performed": undefined,
+              "pitch": Pitch {
+                "alter": 0,
+                "octave": 4,
+                "step": "D",
+              },
+              "printObject": undefined,
+              "rest": undefined,
+              "restDisplay": undefined,
+              "slur": undefined,
+              "staff": undefined,
+              "stem": undefined,
+              "tags": undefined,
+              "tie": undefined,
+              "tiePlacement": undefined,
+              "tupletId": undefined,
+              "tupletMarks": undefined,
+              "unpitched": undefined,
+              "velocityOverride": undefined,
+              "voice": "voice",
+            },
+          ],
+          "staves": 1,
+          "transpose": undefined,
+        },
+      },
+      "_tempos": [
+        {
+          "bpm": 120,
+          "tick": 0,
+        },
+      ],
+      "_timeSignatures": [
+        {
+          "denominator": 4,
+          "numerator": 4,
+          "tick": 0,
+        },
+      ],
+      "id": "s_41ngsx16y_17",
+      "measures": [],
+      "metadata": {},
+      "parts": [
+        Part {
+          "abbreviation": undefined,
+          "clefChanges": undefined,
+          "directions": undefined,
+          "id": "part",
+          "midiChannel": undefined,
+          "midiProgram": undefined,
+          "name": "Part",
+          "notes": [
+            Note {
+              "articulations": undefined,
+              "beams": undefined,
+              "chord": undefined,
+              "duration": Duration {
+                "base": [Rational],
+                "dots": 0,
+                "quarters": [Rational],
+                "tuplet": [Array],
+              },
+              "dynamic": undefined,
+              "grace": undefined,
+              "id": "note",
+              "lyric": undefined,
+              "onsetQuarters": Rational {
+                "den": 1,
+                "num": 0,
+              },
+              "ornaments": undefined,
+              "performed": undefined,
+              "pitch": Pitch {
+                "alter": 0,
+                "octave": 4,
+                "step": "D",
+              },
+              "printObject": undefined,
+              "rest": undefined,
+              "restDisplay": undefined,
+              "slur": undefined,
+              "staff": undefined,
+              "stem": undefined,
+              "tags": undefined,
+              "tie": undefined,
+              "tiePlacement": undefined,
+              "tupletId": undefined,
+              "tupletMarks": undefined,
+              "unpitched": undefined,
+              "velocityOverride": undefined,
+              "voice": "voice",
+            },
+          ],
+          "staves": 1,
+          "transpose": undefined,
+        },
+      ],
+      "timeMap": TimeMap {
+        "_meterMeasureStarts": [
+          1,
+        ],
+        "_meterStartsQ": [
+          0,
+        ],
+        "_tempoStartsQ": [
+          0,
+        ],
+        "_tempoStartsSec": [
+          0,
+        ],
+        "meters": [
+          {
+            "atQuarters": Rational {
+              "den": 1,
+              "num": 0,
+            },
+            "measureNumber": 1,
+            "timeSignature": {
+              "denominator": 4,
+              "numerator": 4,
+            },
+          },
+        ],
+        "tempi": [
+          {
+            "atQuarters": Rational {
+              "den": 1,
+              "num": 0,
+            },
+            "bpm": 120,
+          },
+        ],
+      },
+    },
+    "contentId": "score-content_41ngsx16y_19",
+    "documentId": "score-document_41ngsx16y_18",
+    "documentRevision": 0,
+    "status": "ready",
+  },
+  "sourceListeners": Set {},
+  "state": {
+    "dirty": false,
+    "document": {
+      "content": Score {
+        "_keySignatures": [],
+        "_measureById": Map {},
+        "_partById": Map {
+          "part" => Part {
+            "abbreviation": undefined,
+            "clefChanges": undefined,
+            "directions": undefined,
+            "id": "part",
+            "midiChannel": undefined,
+            "midiProgram": undefined,
+            "name": "Part",
+            "notes": [
+              Note {
+                "articulations": undefined,
+                "beams": undefined,
+                "chord": undefined,
+                "duration": [Duration],
+                "dynamic": undefined,
+                "grace": undefined,
+                "id": "note",
+                "lyric": undefined,
+                "onsetQuarters": [Rational],
+                "ornaments": undefined,
+                "performed": undefined,
+                "pitch": [Pitch],
+                "printObject": undefined,
+                "rest": undefined,
+                "restDisplay": undefined,
+                "slur": undefined,
+                "staff": undefined,
+                "stem": undefined,
+                "tags": undefined,
+                "tie": undefined,
+                "tiePlacement": undefined,
+                "tupletId": undefined,
+                "tupletMarks": undefined,
+                "unpitched": undefined,
+                "velocityOverride": undefined,
+                "voice": "voice",
+              },
+            ],
+            "staves": 1,
+            "transpose": undefined,
+          },
+        },
+        "_tempos": [
+          {
+            "bpm": 120,
+            "tick": 0,
+          },
+        ],
+        "_timeSignatures": [
+          {
+            "denominator": 4,
+            "numerator": 4,
+            "tick": 0,
+          },
+        ],
+        "id": "s_41ngsx16y_17",
+        "measures": [],
+        "metadata": {},
+        "parts": [
+          Part {
+            "abbreviation": undefined,
+            "clefChanges": undefined,
+            "directions": undefined,
+            "id": "part",
+            "midiChannel": undefined,
+            "midiProgram": undefined,
+            "name": "Part",
+            "notes": [
+              Note {
+                "articulations": undefined,
+                "beams": undefined,
+                "chord": undefined,
+                "duration": [Duration],
+                "dynamic": undefined,
+                "grace": undefined,
+                "id": "note",
+                "lyric": undefined,
+                "onsetQuarters": [Rational],
+                "ornaments": undefined,
+                "performed": undefined,
+                "pitch": [Pitch],
+                "printObject": undefined,
+                "rest": undefined,
+                "restDisplay": undefined,
+                "slur": undefined,
+                "staff": undefined,
+                "stem": undefined,
+                "tags": undefined,
+                "tie": undefined,
+                "tiePlacement": undefined,
+                "tupletId": undefined,
+                "tupletMarks": undefined,
+                "unpitched": undefined,
+                "velocityOverride": undefined,
+                "voice": "voice",
+              },
+            ],
+            "staves": 1,
+            "transpose": undefined,
+          },
+        ],
+        "timeMap": TimeMap {
+          "_meterMeasureStarts": [
+            1,
+          ],
+          "_meterStartsQ": [
+            0,
+          ],
+          "_tempoStartsQ": [
+            0,
+          ],
+          "_tempoStartsSec": [
+            0,
+          ],
+          "meters": [
+            {
+              "atQuarters": Rational {
+                "den": 1,
+                "num": 0,
+              },
+              "measureNumber": 1,
+              "timeSignature": {
+                "denominator": 4,
+                "numerator": 4,
+              },
+            },
+          ],
+          "tempi": [
+            {
+              "atQuarters": Rational {
+                "den": 1,
+                "num": 0,
+              },
+              "bpm": 120,
+            },
+          ],
+        },
+      },
+      "contentId": "score-content_41ngsx16y_19",
+      "documentId": "score-document_41ngsx16y_18",
+      "documentRevision": 0,
+      "status": "ready",
+    },
+    "history": {
+      "canRedo": false,
+      "canUndo": false,
+      "enabled": true,
+      "limit": 100,
+      "redoCount": 0,
+      "trimmedCount": 0,
+      "undoCount": 0,
+    },
+  },
+  "stateListeners": Set {},
+  "trimmedCount": 0,
+  "undoStack": [],
+}
+
+ ❯ test/edit/score-document.test.ts:192:28
+    190|     const dispose = vi.spyOn(ScoreEditor.prototype, 'dispose');
+    191|     element.score = score(62);
+    192|     expect(element.editor).toBeUndefined(); expect(element.status).toB…
+       |                            ^
+    193|     expect(dispose).toHaveBeenCalledTimes(1);
+    194|     expect(dispose.mock.contexts[0].getSnapshot().status).toBe('dispos…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  test/edit/score-document.test.ts > ScoreDocumentElement > keeps a fresh owner when an abort callback reconnects during disconnect
+AssertionError: expected undefined to be ScoreEditor{ undoStack: [], …(16) } // Object.is equality
+
+- Expected:
+ScoreEditor {
+  "busy": false,
+  "checkpoints": WeakSet {},
+  "historyEnabled": true,
+  "historyLimit": 100,
+  "onListenerError": undefined,
+  "pendingPublication": false,
+  "publishedSnapshot": {
+    "content": Score {
+      "_keySignatures": [],
+      "_measureById": Map {},
+      "_partById": Map {
+        "part" => Part {
+          "abbreviation": undefined,
+          "clefChanges": undefined,
+          "directions": undefined,
+          "id": "part",
+          "midiChannel": undefined,
+          "midiProgram": undefined,
+          "name": "Part",
+          "notes": [
+            Note {
+              "articulations": undefined,
+              "beams": undefined,
+              "chord": undefined,
+              "duration": Duration {
+                "base": [Rational],
+                "dots": 0,
+                "quarters": [Rational],
+                "tuplet": [Array],
+              },
+              "dynamic": undefined,
+              "grace": undefined,
+              "id": "note",
+              "lyric": undefined,
+              "onsetQuarters": Rational {
+                "den": 1,
+                "num": 0,
+              },
+              "ornaments": undefined,
+              "performed": undefined,
+              "pitch": Pitch {
+                "alter": 0,
+                "octave": 4,
+                "step": "E",
+              },
+              "printObject": undefined,
+              "rest": undefined,
+              "restDisplay": undefined,
+              "slur": undefined,
+              "staff": undefined,
+              "stem": undefined,
+              "tags": undefined,
+              "tie": undefined,
+              "tiePlacement": undefined,
+              "tupletId": undefined,
+              "tupletMarks": undefined,
+              "unpitched": undefined,
+              "velocityOverride": undefined,
+              "voice": "voice",
+            },
+          ],
+          "staves": 1,
+          "transpose": undefined,
+        },
+      },
+      "_tempos": [
+        {
+          "bpm": 120,
+          "tick": 0,
+        },
+      ],
+      "_timeSignatures": [
+        {
+          "denominator": 4,
+          "numerator": 4,
+          "tick": 0,
+        },
+      ],
+      "id": "s_41ngtx16y_1a",
+      "measures": [],
+      "metadata": {},
+      "parts": [
+        Part {
+          "abbreviation": undefined,
+          "clefChanges": undefined,
+          "directions": undefined,
+          "id": "part",
+          "midiChannel": undefined,
+          "midiProgram": undefined,
+          "name": "Part",
+          "notes": [
+            Note {
+              "articulations": undefined,
+              "beams": undefined,
+              "chord": undefined,
+              "duration": Duration {
+                "base": [Rational],
+                "dots": 0,
+                "quarters": [Rational],
+                "tuplet": [Array],
+              },
+              "dynamic": undefined,
+              "grace": undefined,
+              "id": "note",
+              "lyric": undefined,
+              "onsetQuarters": Rational {
+                "den": 1,
+                "num": 0,
+              },
+              "ornaments": undefined,
+              "performed": undefined,
+              "pitch": Pitch {
+                "alter": 0,
+                "octave": 4,
+                "step": "E",
+              },
+              "printObject": undefined,
+              "rest": undefined,
+              "restDisplay": undefined,
+              "slur": undefined,
+              "staff": undefined,
+              "stem": undefined,
+              "tags": undefined,
+              "tie": undefined,
+              "tiePlacement": undefined,
+              "tupletId": undefined,
+              "tupletMarks": undefined,
+              "unpitched": undefined,
+              "velocityOverride": undefined,
+              "voice": "voice",
+            },
+          ],
+          "staves": 1,
+          "transpose": undefined,
+        },
+      ],
+      "timeMap": TimeMap {
+        "_meterMeasureStarts": [
+          1,
+        ],
+        "_meterStartsQ": [
+          0,
+        ],
+        "_tempoStartsQ": [
+          0,
+        ],
+        "_tempoStartsSec": [
+          0,
+        ],
+        "meters": [
+          {
+            "atQuarters": Rational {
+              "den": 1,
+              "num": 0,
+            },
+            "measureNumber": 1,
+            "timeSignature": {
+              "denominator": 4,
+              "numerator": 4,
+            },
+          },
+        ],
+        "tempi": [
+          {
+            "atQuarters": Rational {
+              "den": 1,
+              "num": 0,
+            },
+            "bpm": 120,
+          },
+        ],
+      },
+    },
+    "contentId": "score-content_41ngtx16y_1c",
+    "documentId": "score-document_41ngtx16y_1b",
+    "documentRevision": 0,
+    "status": "disposed",
+  },
+  "publishing": false,
+  "redoStack": [],
+  "savedContentId": "score-content_41ngtx16y_1c",
+  "sessions": Set {},
+  "snapshot": {
+    "content": Score {
+      "_keySignatures": [],
+      "_measureById": Map {},
+      "_partById": Map {
+        "part" => Part {
+          "abbreviation": undefined,
+          "clefChanges": undefined,
+          "directions": undefined,
+          "id": "part",
+          "midiChannel": undefined,
+          "midiProgram": undefined,
+          "name": "Part",
+          "notes": [
+            Note {
+              "articulations": undefined,
+              "beams": undefined,
+              "chord": undefined,
+              "duration": Duration {
+                "base": [Rational],
+                "dots": 0,
+                "quarters": [Rational],
+                "tuplet": [Array],
+              },
+              "dynamic": undefined,
+              "grace": undefined,
+              "id": "note",
+              "lyric": undefined,
+              "onsetQuarters": Rational {
+                "den": 1,
+                "num": 0,
+              },
+              "ornaments": undefined,
+              "performed": undefined,
+              "pitch": Pitch {
+                "alter": 0,
+                "octave": 4,
+                "step": "E",
+              },
+              "printObject": undefined,
+              "rest": undefined,
+              "restDisplay": undefined,
+              "slur": undefined,
+              "staff": undefined,
+              "stem": undefined,
+              "tags": undefined,
+              "tie": undefined,
+              "tiePlacement": undefined,
+              "tupletId": undefined,
+              "tupletMarks": undefined,
+              "unpitched": undefined,
+              "velocityOverride": undefined,
+              "voice": "voice",
+            },
+          ],
+          "staves": 1,
+          "transpose": undefined,
+        },
+      },
+      "_tempos": [
+        {
+          "bpm": 120,
+          "tick": 0,
+        },
+      ],
+      "_timeSignatures": [
+        {
+          "denominator": 4,
+          "numerator": 4,
+          "tick": 0,
+        },
+      ],
+      "id": "s_41ngtx16y_1a",
+      "measures": [],
+      "metadata": {},
+      "parts": [
+        Part {
+          "abbreviation": undefined,
+          "clefChanges": undefined,
+          "directions": undefined,
+          "id": "part",
+          "midiChannel": undefined,
+          "midiProgram": undefined,
+          "name": "Part",
+          "notes": [
+            Note {
+              "articulations": undefined,
+              "beams": undefined,
+              "chord": undefined,
+              "duration": Duration {
+                "base": [Rational],
+                "dots": 0,
+                "quarters": [Rational],
+                "tuplet": [Array],
+              },
+              "dynamic": undefined,
+              "grace": undefined,
+              "id": "note",
+              "lyric": undefined,
+              "onsetQuarters": Rational {
+                "den": 1,
+                "num": 0,
+              },
+              "ornaments": undefined,
+              "performed": undefined,
+              "pitch": Pitch {
+                "alter": 0,
+                "octave": 4,
+                "step": "E",
+              },
+              "printObject": undefined,
+              "rest": undefined,
+              "restDisplay": undefined,
+              "slur": undefined,
+              "staff": undefined,
+              "stem": undefined,
+              "tags": undefined,
+              "tie": undefined,
+              "tiePlacement": undefined,
+              "tupletId": undefined,
+              "tupletMarks": undefined,
+              "unpitched": undefined,
+              "velocityOverride": undefined,
+              "voice": "voice",
+            },
+          ],
+          "staves": 1,
+          "transpose": undefined,
+        },
+      ],
+      "timeMap": TimeMap {
+        "_meterMeasureStarts": [
+          1,
+        ],
+        "_meterStartsQ": [
+          0,
+        ],
+        "_tempoStartsQ": [
+          0,
+        ],
+        "_tempoStartsSec": [
+          0,
+        ],
+        "meters": [
+          {
+            "atQuarters": Rational {
+              "den": 1,
+              "num": 0,
+            },
+            "measureNumber": 1,
+            "timeSignature": {
+              "denominator": 4,
+              "numerator": 4,
+            },
+          },
+        ],
+        "tempi": [
+          {
+            "atQuarters": Rational {
+              "den": 1,
+              "num": 0,
+            },
+            "bpm": 120,
+          },
+        ],
+      },
+    },
+    "contentId": "score-content_41ngtx16y_1c",
+    "documentId": "score-document_41ngtx16y_1b",
+    "documentRevision": 0,
+    "status": "disposed",
+  },
+  "sourceListeners": Set {},
+  "state": {
+    "dirty": false,
+    "document": {
+      "content": Score {
+        "_keySignatures": [],
+        "_measureById": Map {},
+        "_partById": Map {
+          "part" => Part {
+            "abbreviation": undefined,
+            "clefChanges": undefined,
+            "directions": undefined,
+            "id": "part",
+            "midiChannel": undefined,
+            "midiProgram": undefined,
+            "name": "Part",
+            "notes": [
+              Note {
+                "articulations": undefined,
+                "beams": undefined,
+                "chord": undefined,
+                "duration": [Duration],
+                "dynamic": undefined,
+                "grace": undefined,
+                "id": "note",
+                "lyric": undefined,
+                "onsetQuarters": [Rational],
+                "ornaments": undefined,
+                "performed": undefined,
+                "pitch": [Pitch],
+                "printObject": undefined,
+                "rest": undefined,
+                "restDisplay": undefined,
+                "slur": undefined,
+                "staff": undefined,
+                "stem": undefined,
+                "tags": undefined,
+                "tie": undefined,
+                "tiePlacement": undefined,
+                "tupletId": undefined,
+                "tupletMarks": undefined,
+                "unpitched": undefined,
+                "velocityOverride": undefined,
+                "voice": "voice",
+              },
+            ],
+            "staves": 1,
+            "transpose": undefined,
+          },
+        },
+        "_tempos": [
+          {
+            "bpm": 120,
+            "tick": 0,
+          },
+        ],
+        "_timeSignatures": [
+          {
+            "denominator": 4,
+            "numerator": 4,
+            "tick": 0,
+          },
+        ],
+        "id": "s_41ngtx16y_1a",
+        "measures": [],
+        "metadata": {},
+        "parts": [
+          Part {
+            "abbreviation": undefined,
+            "clefChanges": undefined,
+            "directions": undefined,
+            "id": "part",
+            "midiChannel": undefined,
+            "midiProgram": undefined,
+            "name": "Part",
+            "notes": [
+              Note {
+                "articulations": undefined,
+                "beams": undefined,
+                "chord": undefined,
+                "duration": [Duration],
+                "dynamic": undefined,
+                "grace": undefined,
+                "id": "note",
+                "lyric": undefined,
+                "onsetQuarters": [Rational],
+                "ornaments": undefined,
+                "performed": undefined,
+                "pitch": [Pitch],
+                "printObject": undefined,
+                "rest": undefined,
+                "restDisplay": undefined,
+                "slur": undefined,
+                "staff": undefined,
+                "stem": undefined,
+                "tags": undefined,
+                "tie": undefined,
+                "tiePlacement": undefined,
+                "tupletId": undefined,
+                "tupletMarks": undefined,
+                "unpitched": undefined,
+                "velocityOverride": undefined,
+                "voice": "voice",
+              },
+            ],
+            "staves": 1,
+            "transpose": undefined,
+          },
+        ],
+        "timeMap": TimeMap {
+          "_meterMeasureStarts": [
+            1,
+          ],
+          "_meterStartsQ": [
+            0,
+          ],
+          "_tempoStartsQ": [
+            0,
+          ],
+          "_tempoStartsSec": [
+            0,
+          ],
+          "meters": [
+            {
+              "atQuarters": Rational {
+                "den": 1,
+                "num": 0,
+              },
+              "measureNumber": 1,
+              "timeSignature": {
+                "denominator": 4,
+                "numerator": 4,
+              },
+            },
+          ],
+          "tempi": [
+            {
+              "atQuarters": Rational {
+                "den": 1,
+                "num": 0,
+              },
+              "bpm": 120,
+            },
+          ],
+        },
+      },
+      "contentId": "score-content_41ngtx16y_1c",
+      "documentId": "score-document_41ngtx16y_1b",
+      "documentRevision": 0,
+      "status": "disposed",
+    },
+    "history": {
+      "canRedo": false,
+      "canUndo": false,
+      "enabled": true,
+      "limit": 100,
+      "redoCount": 0,
+      "trimmedCount": 0,
+      "undoCount": 0,
+    },
+  },
+  "stateListeners": Set {},
+  "trimmedCount": 0,
+  "undoStack": [],
+}
+
++ Received:
+undefined
+
+ ❯ test/edit/score-document.test.ts:207:68
+    205|     });
+    206|     element.src = '/pending.mid'; document.body.append(element); eleme…
+    207|     expect(element.isConnected).toBe(true); expect(element.editor).toB…
+       |                                                                    ^
+    208|     expect(newest!.getSnapshot().status).toBe('ready'); expect(element…
+    209|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  4 failed | 9 passed (13)
+   Start at  14:53:14
+   Duration  777ms (environment 69%, transform 22%, tests 5%, import 4%)
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/score
+npm error workspace @webmusic/score@0.2.0
+npm error location /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/score
+npm error command failed
+npm error command sh -c vitest run test/edit/score-document.test.ts

@@ -1,7 +1,7 @@
 # Headless page template
 
 This is the content contract for code-object pages under
-`apps/doc/webmusic/src/content/docs/{score,audio}/headless/{play,analyze,view}/`,
+`apps/doc/webmusic/src/content/docs/{score,audio}/headless/<capability>/`,
 for the family inventory at `{score,audio}/headless/index.mdx` that routes to
 them, and for the Bridge's `bridge/headless/` documentation. Product layers and
 component design belong in [PRODUCT.md](../PRODUCT.md),

@@ -60,7 +60,9 @@ That is the whole setup. To see what any attribute does to a live element, use t
 
 ## Four ways to drive it
 
-The element resolves exactly one source of music, in a fixed order of precedence. The first one present wins and the rest are ignored:
+Without an editor binding, the element uses the following legacy precedence.
+An `editor` input is a separate exclusive mode: combining it with any source
+below is a source conflict.
 
 | Precedence | Source | What the element owns |
 | --- | --- | --- |
@@ -87,6 +89,43 @@ seconds, clamped to its own end. `seek(seconds)` uses that same axis.
 Member command coordination does not replace their separate Headless clocks
 with one shared clock.
 
+## Play an editable document
+
+Register the nonvisual owner through `@webmusic/score/edit/element`, alongside
+Play and View. No application revision-copying code is required:
+
+```html
+<score-document id="song" src="/midi/Editing.mid"></score-document>
+<score-player id="audition" editor="#song"></score-player>
+<score-view editor="#song" player="#audition" editable></score-view>
+```
+
+Alternatively assign `player.editor = editor` with a Core `ScoreDocumentSource`.
+The explicit object wins over the selector; assigning `undefined` restores
+selector discovery. Selectors resolve in the same Document or ShadowRoot,
+follow late upgrades, replacement and `webmusic:sourcechange`, and release their
+subscriptions on disconnect. The player never disposes the borrowed editor.
+
+An empty, invalid, missing or ambiguous selector disables playback with an
+observable error; it does not fall back to `src`. `.editor` conflicts with
+`.score`, `src` (even empty), `.rack`, a nested Rack or `.controller`. Conflicting
+property writes throw before changing configuration. A conflicting attribute
+retains the mounted engine but rejects play and seek commands until corrected.
+
+An edit pauses and prepares the new revision in the same native engine. It
+stays paused after successful application; press Play again to audition it.
+`.documentBinding` and `webscore:documentstatechange` expose `preparing`, `ready`
+and `error`, with separate requested/applied identities. `.playback` contains
+only applied document identity and rejects playing an outdated revision.
+`waitForDocumentRevision(target)` and `retryDocumentApplication()` return the
+native [application outcomes](/score/headless/play/score-player/#apply-document-revisions).
+They await an in-progress Element mount; disconnect or source replacement
+supersedes that wait. An unmounted/static Element may have no document binding.
+
+The [editable View demo](/score/element/view/score-view/#piano-roll-editing)
+combines import, editing, undo, audition and MIDI export. Audio resource property
+changes still rebuild the engine; ordinary document commits preserve it.
+
 ## Share data and state with companions
 
 `.playback` is the stable [ScorePlaybackSource](/score/api/#shared-playback-observation)
@@ -105,8 +144,8 @@ Companions can borrow that data without repeating `src`:
 ```
 
 Register each tag through its owning `/element` entry. A follower borrows the
-player and never disposes it. Native replacement releases the previous owner before loading the next. Loading
-and failure have explicit readiness and no committed Score; failure is not
+player and never disposes it. Static-source replacement releases the previous owner before loading the next. Loading
+and failure in that mode have explicit readiness and no committed Score; failure is not
 successful empty data. Source revisions change when the committed owner
 changes, including teardown; callbacks from old owners cannot restore them.
 
@@ -118,7 +157,7 @@ readiness and revision changes through the nonvisual contract.
 
 The element is careful about what it disposes, because most of what it plays through belongs to somebody else:
 
-- **Borrowed.** `.controller`, `.rack`, `.sound`, `.audioContext` and `.destination` remain caller-owned. A nested desk owns its automatically created Rack. Unmounting the player's Rack transport stops its playback but does not dispose the Rack; borrowed controller mode only releases the UI binding.
+- **Borrowed.** `.editor`, `.controller`, `.rack`, `.sound`, `.audioContext` and `.destination` remain caller-owned. A nested desk owns its automatically created Rack. Unmounting the player's Rack transport stops its playback but does not dispose the Rack; borrowed controller mode only releases the UI binding.
 - **Owned.** Native player engines, mounted controls and resources created by the element are released on teardown. A SoundFont synth/context pair is cached against its template while mounted, then disposed by its owner. Scores are immutable data, not disposable engines.
 - **Native settings survive a remount.** Stored `rate`, `volume`, `pan` and `loop` values are applied when a native player mounts. They do not reconfigure Rack members. Controller mounting preserves the owner's settings; an explicit `.rate` write delegates to `controller.setRate()`.
 
@@ -135,6 +174,9 @@ The source attributes are read only while a source is being resolved; assigning 
 
 | Member | Kind | Default | Description |
 | --- | --- | --- | --- |
+| `editor` / `.editor` | selector attribute / Core source property | — | Exclusive document source; explicit object wins, `undefined` restores selector discovery. |
+| `.documentBinding` | read-only property | `undefined` before a mount | Requested/applied revisions and attempt state; no source ownership. |
+| `waitForDocumentRevision(target)` / `retryDocumentApplication()` | methods | tagged outcome Promise | Wait for a known revision or explicitly retry preparation. |
 | `src` | attribute | — | URL of a MIDI / MusicXML / MXL / ABC file. Optional when a source property is assigned. |
 | `format` | attribute | extension, else byte sniff | Force `midi` / `mxl` / `musicxml` / `abc`. Passed through unvalidated; an unsupported value fails the load. |
 | `sound-font` | attribute | the built-in oscillator synth | Sample URL template containing `{midi}`, one file per note (`/sf/{midi}.mp3`). A template without `{midi}` is ignored, as is any value once `.sound` is set. |
@@ -189,6 +231,7 @@ native note/state/navigation events are non-composed.
 
 | Event | Detail | Fires when |
 | --- | --- | --- |
+| `webscore:documentstatechange` | `ScoreDocumentPlaybackBinding` | Document preparation, failure or application state changes; bubbles and is composed. |
 | `webscore:noteon` | `{ midi, startTime }` | A note starts. `startTime` is its onset in nominal score seconds, which is what a bound view matches on. |
 | `webscore:noteoff` | `{ midi, startTime }` | The same note releases. |
 | `webscore:timeupdate` | `{ nominalSeconds, transportSeconds, transportDurationSeconds, progress, rate, playing }` | Every cursor tick, and once per seek. `seconds` and `duration` are deprecated aliases of `nominalSeconds` and `transportDurationSeconds` — two different domains, so never pair them. |
@@ -197,7 +240,7 @@ native note/state/navigation events are non-composed.
 | `webscore:seek` | none | A non-controller `seek`, `seekNominal` or `seekFraction` command is issued, or the native seek bar commits pointer/keyboard navigation; read the current snapshot for units and position. |
 | `webscore:stop` | none | A non-controller stop command is issued. |
 | `webscore:end` | — | The piece finished playing. |
-| `webscore:error` | `{operation: 'seek' \| 'playback', error}` | `seek` reports asynchronous native failures from void seek commands; `playback` reports mounted playback/controller errors, including Rack transport failures. |
+| `webscore:error` | `{operation: 'seek' \| 'playback', error}` | `seek` reports asynchronous native failures and declaration source errors from void seek commands; `playback` reports mounted playback/controller errors, including Rack transport failures. |
 
 **Subclassing.** `ScorePlayerElement` is exported from `/element` without registering a tag, and exposes protected seams for the two things a custom player usually needs to change: which UI is mounted (`mountScore()`, `mountRack()`, `mountController()`, and `replaceHandle()` to swap one safely) and where the music comes from (`resolveScore()`, `buildSynth()`). `render()` and `teardown()` bracket the whole lifecycle if you need to wrap it.
 

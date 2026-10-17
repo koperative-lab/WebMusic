@@ -8,6 +8,16 @@ another checkout. [STATUS](../STATUS.md) owns current gaps;
 
 | Date | Records | Evidence and reading boundary |
 |---|---|---|
+| 2026-10-17 | [Editing target/session repairs](2026-10-17-editing-target-session-fixes.md) | Fixes stale waveform command targets, cancellation-time disposal reentry and paused Score session replacement; regression evidence and finite release exit criteria. |
+| 2026-10-16 | [Editing post-fix release review](2026-10-16-editing-post-fix-review.md) | Two new P2 waveform-target and paused Score-session defects, with failing probes, current package checks and separately tracked publication prerequisites. |
+| 2026-10-16 | [Editing recheck repairs](2026-10-16-editing-recheck-fixes.md) | Follow-up repairs and regression evidence for View rebinding, document abort callbacks, piano-roll commands, Audio history cleanup and segment labels. |
+| 2026-10-16 | [Editing release recheck](2026-10-16-editing-release-recheck.md) | Four new P2 callback/rebinding/keyboard/history findings and a stale waveform label, with failing probes, current maintained tests and bounded WAV import/edit evidence. |
+| 2026-10-16 | [Editing release fixes](2026-10-16-editing-release-fixes.md) | Repairs the five reproduced release-review findings, adds migration guidance and retains current regression/browser and artifact verification separately from publication. |
+| 2026-10-16 | [Editing release review](2026-10-16-editing-release-review.md) | Five new reproduced selection, callback, atomicity and playback-binding defects; registry compatibility inspection and actual MIDI import/edit/download evidence, with package publication and site deployment boundaries. |
+| 2026-10-15 | [Editing release-readiness follow-up](2026-10-15-editing-release-follow-up.md) | Audio interaction-session lease handoff and piano-roll keyboard selection repairs; current artifact checks and registry/authentication observations remain distinct from publication and deployment. |
+| 2026-10-15 | [Editing review fixes](2026-10-15-editing-review-fixes.md) | Six reproduced lifecycle, command-target, shared-session, source-conflict, keyboard-selection and failure-result findings; repairs and current verification are separate from earlier interaction evidence. |
+| 2026-10-15 | [Editing interaction acceptance and startup cleanup](2026-10-15-editing-interaction-acceptance.md) | Follow-up to P2–P4: retained intermittent startup-failure reproduction, macOS process-group probe, bounded cleanup changes and pending interaction/visual acceptance. Prior editing audits remain unchanged. |
+| 2026-10-15 | [Staff-input editing P4](2026-10-15-staff-editing-p4.md) | Bounded notation entry, shared Score history/playback, staff Element boundary and current automated/browser evidence; distinguishes supported entry from complete engraving. |
 | 2026-09-05 | [Project audit](2026-09-05/README.md), [repairs](2026-09-05/FIXES.md), [code alignment](2026-09-05/CODE-ALIGNMENT.md) | Read the original findings with the later repair records. Raw reproductions and logs remain in [evidence](2026-09-05/evidence/) and [repair evidence](2026-09-05/repair-evidence/); the [portable evidence manifest](2026-09-05/evidence/portable-evidence.json) locates retained log copies. |
 | 2026-09-05 | [Development documentation review](2026-09-05/DEV-DOCS-REVIEW.md), [documentation reorganization](2026-09-05/DOCUMENTATION-REORGANIZATION.md) | Ownership, source alignment, checker coverage and the limits of the recorded documentation pass. |
 | 2026-09-06 | [Documentation synchronization](2026-09-06/DOCUMENTATION-SYNC.md) | Branch-specific documentation checks; shared guidance did not merge runtime implementations. |
@@ -34,6 +44,9 @@ another checkout. [STATUS](../STATUS.md) owns current gaps;
 | 2026-09-26 | [Score Analyze inspection redesign](2026-09-26/SCORE-ANALYZE-INSPECTION.md) | DEC-038 five-tool inventory, reusable interval/rhythm inspection, current-tree checks and bounded desktop/mobile browser evidence. |
 | 2026-09-28 | [Local CI lint and attribution repair](2026-09-28/CI-LINT-AND-ATTRIBUTION.md) | Seven Score/UI diagnostics and Koperative metadata repaired in the dev tree and a local main worktree; Node 24 gates and main's release-baseline boundary are recorded separately. |
 | 2026-09-29 | [Five-package 0.2.0 preparation](2026-09-29/RELEASE-0.2.0-PREPARATION.md) | Release metadata, Audio license notices, prepack guards, actual npm migration comparison and local release gates; publication and final registry verification remain manual. |
+| 2026-10-15 | [Score editing P2](2026-10-15-score-editing-p2.md) | Document-bound native playback, HTML ownership and piano-roll editing; workspace/package checks, desktop/narrow browser interaction and measured offline PCM/MIDI round trips. The full gate's existing dev-server process-tree failure and live-audio/device acceptance limits are explicit. |
+
+| 2026-10-15 | [Audio editing P3](2026-10-15-audio-editing-p3.md) | Asset/sequence history, document playback, waveform editing, processing and WAV export; full checks, external install and native offline PCM equality, with explicit pointer/screenshot/device limits. |
 
 For a new audit, record the commit or working-tree baseline, scope, environment,
 procedure, findings and actual command outcomes. Distinguish source inspection,

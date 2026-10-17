@@ -1,0 +1,58 @@
+<!doctype html><html lang="en"><head><title>Audio P3 verification</title></head><body>
+<h1>Audio P3 native PCM verification</h1><button id="run">Run sequence playback/export check</button><pre id="result">Ready</pre>
+<audio-document id="qa-document" src="/wav/Editing.wav"></audio-document>
+<section aria-label="Narrow waveform verification" style="width:320px;font:16px system-ui">
+<audio-player editor="#qa-document"></audio-player><audio-view editor="#qa-document" editable></audio-view></section>
+<section aria-label="Medium waveform verification" style="width:480px;font:16px system-ui">
+<audio-view editor="#qa-document" editable></audio-view></section>
+<script>
+import {defineAudioDocumentElement} from '@webmusic/audio/edit/element';
+import {defineAudioPlayerElement} from '@webmusic/audio/play/element';
+import {defineAudioViewElement} from '@webmusic/audio/view/element';
+defineAudioDocumentElement();defineAudioPlayerElement();defineAudioViewElement();
+import {createAudioClip} from '@webmusic/audio';
+import {createAudioClipEditor, exportAudioSequenceWav, renderAudioSequence} from '@webmusic/audio/edit';
+import {AudioPlayer} from '@webmusic/audio/play/headless';
+import {parseWav} from '@webmusic/audio/play';
+const run = document.querySelector<HTMLButtonElement>('#run')!;
+run.onclick = async () => {
+ run.disabled = true;
+ const output = document.querySelector('#result')!;
+ try {
+  const sr = 48000;
+  const samples = Float32Array.from({length: 512}, (_,i)=>Math.sin(i * Math.PI / 32)*.4);
+  const editor = createAudioClipEditor(createAudioClip({sampleRate:sr,channelData:[samples,samples]}));
+  const original = editor.sequence.segments[0].id;
+  const result = editor.transaction('Cut, silence, gain and envelope', tx => {
+   tx.add({type:'splice',startFrame:128,deleteCount:128,segments:[],rightId:'tail'});
+   tx.add({type:'insert-silence',frame:128,length:64,id:'pause'});
+   tx.add({type:'set-gain',segmentIds:[original,'tail'],gain:.5});
+   tx.add({type:'set-envelope',segmentId:'tail',points:[{frame:0,gain:0},{frame:256,gain:1}]});
+  });
+  if(result.status!=='committed')throw new Error('Edit failed');
+  const expected = await renderAudioSequence(editor.sequence,editor.getSnapshot().assets);
+  const wav = parseWav(await exportAudioSequenceWav(editor.sequence,editor.getSnapshot().assets,{bitDepth:32,float:true}));
+  const offline = new OfflineAudioContext(2,editor.sequence.length*3,sr);
+  // A browser-native offline graph uses the live scheduling interface without a device clock/resume.
+  const context = new Proxy(offline,{get(target,key){if(key==='state')return 'running';if(key==='resume')return async()=>{};
+    const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;}}) as unknown as AudioContext;
+  const player=new AudioPlayer(undefined,{audioContext:context});player.setDocumentSource(editor);
+  await player.waitForDocumentRevision(editor.getSnapshot()); const transport=player.transport;
+  player.setLoop(true);await player.play();const native=await offline.startRendering();player.pause();
+  let maxPlaybackError=0,maxWavError=0;
+  for(let channel=0;channel<2;channel++){
+   const nativeChannel=native.getChannelData(channel), wanted=expected.channelData[channel];
+   for(let i=0;i<nativeChannel.length;i++)maxPlaybackError=Math.max(maxPlaybackError,Math.abs(nativeChannel[i]-wanted[i%wanted.length]));
+   for(let i=0;i<wanted.length;i++)maxWavError=Math.max(maxWavError,Math.abs(wav.channelData[channel][i]-wanted[i]));
+  }
+  editor.undo();await player.waitForDocumentRevision(editor.getSnapshot());
+  const undoFrames=player.source.kind==='sequence'?player.source.sequence.length:-1;
+  const stableTransport=transport===player.transport;
+  editor.redo();await player.waitForDocumentRevision(editor.getSnapshot());
+  const redoFrames=player.source.kind==='sequence'?player.source.sequence.length:-1;
+  player.dispose();editor.dispose();
+  output.textContent=JSON.stringify({status:maxPlaybackError<1e-5&&maxWavError===0&&stableTransport&&undoFrames===512&&redoFrames===448?'passed':'failed',
+   sampleRate:sr,channels:2,outputFrames:expected.channelData[0].length,loopCycles:3,maxPlaybackError,maxWavError,undoFrames,redoFrames,stableTransport},null,2);
+ }catch(error){output.textContent=String(error);}finally{run.disabled=false;}
+};
+</script></body></html>

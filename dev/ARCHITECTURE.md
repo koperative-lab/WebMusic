@@ -127,18 +127,20 @@ The capability DAG is enforced by `capabilityDependencies` in
 |---|---|
 | `core` | None |
 | `io` | `core` |
+| `edit` | `core`, `io`; Core/API/Headless behavior and nonvisual Element declarations |
 | `view`, `play`, `analyze` | `core`, `io`; the three siblings do not import one another |
-| `react` | All Score capabilities |
+| `react` | `core`, `io`, `view`, `play`, `analyze`; Edit has no React adapter yet |
 
 | Audio capability | May depend on |
 |---|---|
 | `core` | None |
+| `edit` | `core`; one exact Element loading adapter exception described below |
 | `play` | `core` |
 | `view`, `analyze` | `core`, `play` |
-| `react` | All Audio capabilities |
+| `react` | `core`, `view`, `play`, `analyze`; Edit has no React adapter yet |
 
 Audio Play exposes a stable `AudioPlayer` command facade over its selected clip,
-queue or mix backend. Linked playlist/mixer/recorder Elements compose with that
+queue, mix or document sequence backend. Linked playlist/mixer/recorder Elements compose with that
 owner; they do not add another transport presenter or clock. View retains the
 nonvisual `AudioMeterController` and the `audio-view type="meter"` projection.
 The independent `audio-meter` tag is a compact Analyze monitor beside sampled
@@ -150,6 +152,73 @@ compatibility adapter; legacy View Element imports may still register the same
 tag. This is not a blanket Analyze-to-View dependency or permission for other
 Analyze layers to import View. See [Audio Play](design/AUDIO-PLAY-COMPONENTS.md),
 [Audio Analyze](design/AUDIO-ANALYZE-COMPONENTS.md), DEC-029 and DEC-037.
+
+### Editing capabilities
+
+Score and Audio Edit supply Core/API/Headless behavior through `/edit` and
+`/edit/headless`, plus `/edit/element` declarations and `/edit/auto` registration.
+Native Score Play, Audio sequence Play and their editable Views borrow the Core
+document ports. Score piano-roll, bounded staff input and Audio waveform editing
+share this ownership. Staff's local input controller and scrolling renderer use
+the existing Score View under DEC-048. The detailed contract belongs to
+[Editing components](design/EDIT-COMPONENTS.md), and [STATUS](STATUS.md), EDIT-01,
+tracks implementation.
+
+`ScoreEditor` and `AudioClipEditor` live in their domain's `edit/headless` layer.
+Each is the only owner that commits its document content, identity and monotonic
+revision. Domain Core owns immutable snapshots, read/command ports and position
+maps. Play and View consume these Core contracts without importing a concrete
+Edit implementation. An editor owns no player, transport or visual surface.
+Retained history roots and a player's last applied snapshot can coexist without
+creating additional commit authorities.
+
+| Editing dependency | Boundary |
+|---|---|
+| Score `edit` → `core`, `io` | Persistent editing and semantic commands reuse the domain model and format boundary. |
+| Audio `edit/headless` → `core` | Asset readers and processing/loading services are injected through nonvisual ports. |
+| Play/View → Core document ports | Play prepares content for sound; View supplies interaction and rendering. Neither imports Edit implementation. |
+| Edit Element → its lower Edit layers | Nonvisual declarations create or load an editor and own its connected lifetime. |
+
+Audio loading belongs to Play. The implemented browser exception is the
+exact adapter edge from
+`packages/audio/src/edit/element/internal/audio-document-loader.ts` to
+`packages/audio/src/play/api/load.ts`, importing `loadClipFromUrl` only. This
+does not add a general Audio Edit-to-Play dependency. No Core, API or Headless
+entry may reach this adapter. The adapter fixes `streaming: false`, forwards
+AbortSignal/resource limits and creates no implicit AudioContext. Native decoding
+requires an injected loader closure that borrows the caller's context.
+[scripts/audio-document-import-policy.mjs](../scripts/audio-document-import-policy.mjs)
+checks the exact package, importer, resolved target and sole static runtime import
+symbol; its regression tests reject other symbols, dynamic imports and barrels.
+`forbiddenEntryReachability` in package policy separately prevents the Audio root
+and Edit Core/API/Headless entries from reaching Play or the Element adapter.
+The shared pure WAV codec resides in Audio Core; public Play codec exports remain
+compatible, and Edit rendering does not depend on Play.
+
+Local history is optional and bounded to one document. Applications retain
+project-wide commands, cross-document history and persistence. Audio documents
+use shared immutable assets and contiguous segment/silence references from the
+first editor. Undo retains structural roots rather than a complete PCM copy per
+edit. Segment playback belongs to Play. Its binding owns one lazy engine/clock and
+leases; revisions adopt references without PCM reads or context creation. Bounded
+chunks are prepared only by explicit playback/preload, with a shared active/inactive
+allocation budget. The facade's source snapshot distinguishes empty/clip/sequence,
+including same-transport document revisions; a sequence exposes no fake clip.
+Local processing creates explicit
+new assets through a processing port. Export materializes output deliberately.
+Existing `Region` semantics remain cues or spans rather than clip placement.
+
+Document identity and revision are distinct from playback publication `revision`
+and source-replacement `sourceRevision`. A Play binding observes a requested
+document revision, pauses, prepares a candidate, then atomically installs it with
+the mapped transport position and remains paused. It separately acknowledges the
+applied revision; pending or failed application gates playback of stale content.
+Preparation failure preserves the committed edit, while cancellation or a newer
+transport command prevents stale asynchronous work from restoring old state.
+Position maps compose from the last applied revision to the target revision,
+including intervening undo or skipped applications; the design specifies the
+reset policy when that mapping is unavailable. No editor allocates another clock
+to hide this transition.
 
 ## Time: one authority per session
 
@@ -260,6 +329,14 @@ bindings and missing contracts. A companion owns its projection and subscription
 Play retains playback mutation and resource ownership. Data-only analysis and
 static views remain usable without a player.
 
+For an edit-enabled composition, the editor owns committed content and Play
+borrows it through the document source. Existing View Elements gain an optional
+editor binding; `editable` enables mutation gestures against that binding.
+`score-document` and `audio-document` are the implemented nonvisual owner tags
+under DEC-047. The View owns neither an implicit editor
+nor the lifetime of a borrowed editor. These bindings preserve passive usage and
+report explicit content-source conflicts instead of silently switching owners.
+
 Implement the binding within the capability DAG: Score's View and Analyze must
 not import Play implementation or types. The shared Score playback-source
 contract belongs in Score core and its existing model export; Play implements it
@@ -299,6 +376,15 @@ are not public aliases. Kernel exports `/events`, `/element`, `/worker`,
 `/audio-context`, `/player`, `/effect`, `/meter`, `/transport`, `/tick` and `/sync`.
 Bridge currently exports its capabilities from its package root. Exact entry sets
 are reconciled between manifests and `expectedPublicEntries`.
+
+Both domains expose `/edit`, `/edit/headless`, `/edit/element` and `/edit/auto`
+with implemented behavior and declarations. Neither Edit capability publishes a
+`/global` IIFE or React adapter. Do not publish empty entries or require an unimplemented Element
+layer for symmetry. Each increment updates manifests, tsup mappings, entry and
+layer policy, composition membership, catalogs and owning references together.
+The four Edit layers (Core/API/Headless/Element) have corresponding build,
+registration side-effect, dependency, reachability and composition checks; Edit
+has no renderer layer because existing View owns editing presentation.
 
 Non-IIFE entries use nested conditions:
 

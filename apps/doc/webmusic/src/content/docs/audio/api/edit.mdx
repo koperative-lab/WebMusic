@@ -1,0 +1,136 @@
+---
+title: '@webmusic/audio/edit'
+description: 'Immutable audio sequences, bounded asset leases, transactional editing, local processing and explicit WAV export.'
+---
+
+Audio Edit owns an editable **sequence of asset references and silence**. Structural edits retain existing PCM, and undo/redo travels between immutable sequence roots. Rendering and sample processing allocate audio only when explicitly requested. A single-file editor uses this same contiguous sequence model.
+
+Install `@webmusic/audio`; [Audio setup](/audio/#install) owns package and optional decoder installation. Edit API and Headless do not require the UI peer. The [root API inventory](/audio/api/) lists every package entry.
+
+## Entry map
+
+| Entry | Responsibility |
+| --- | --- |
+| `@webmusic/audio` | Sequence, assets, document snapshots, commands, position maps and playback-source contracts. Core remains DOM-free. |
+| `@webmusic/audio/edit` | Core editing contracts, `applyAudioOperations`, `createAudioClipEditor`, selected-range processors, rendering and WAV export. |
+| `@webmusic/audio/edit/headless` | [`AudioClipEditor`](/audio/headless/edit/audio-clip-editor/) and its options; no renderer or browser registration. |
+| `@webmusic/audio/edit/element` | [`AudioDocumentElement`](/audio/element/edit/audio-document/), its loader types and explicit registration functions. |
+| `@webmusic/audio/edit/auto` | Registers `<audio-document>` on import. There is no Edit global/IIFE entry. |
+
+## Start from decoded audio
+
+```ts
+import {createAudioClip} from '@webmusic/audio';
+import {createAudioClipEditor, createAudioRangeProcessor, exportAudioSequenceWav} from '@webmusic/audio/edit';
+
+const clip = createAudioClip({sampleRate: 8000, channelData: [new Float32Array(8000)]});
+const editor = createAudioClipEditor(clip, {processors: [createAudioRangeProcessor('normalize')]});
+const initial = editor.getSnapshot();
+editor.execute({version: 1, documentId: initial.documentId, expectedRevision: initial.documentRevision,
+  label: 'Append silence', operations: [{type: 'insert-silence', frame: 8000, length: 4000, id: 'pause'}]});
+const snapshot = editor.getSnapshot();
+const wav = await exportAudioSequenceWav(snapshot.content, snapshot.assets);
+console.log(wav.byteLength);
+editor.dispose();
+```
+
+For URL/file decoding use [Audio Play loading](/audio/api/play/#load--decode). Edit API and Headless never import Play or create an audio context. The nonvisual `<audio-document>` browser adapter can load a URL through the existing bounded decoder. The [waveform editing demo](/audio/element/view/audio-view/#waveform-editing) composes one document, player and view.
+
+## Sequence and asset contracts
+
+All positions are **integer frames at the sequence's sample rate**. Ranges are half-open `[startFrame, endFrame)`. Segments are ordered and contiguous: there are no implicit gaps, absolute timeline starts, tracks or overlaps. Use a silence segment for a gap. Zero-length segments are removed; an empty sequence retains its format and is valid.
+
+| API / type | Contract |
+| --- | --- |
+| `AudioSequenceFormat` | Positive `sampleRate` and explicit ordered `channelLayout: readonly string[]`. Assets must match both exactly; no implicit resampling or channel conversion. |
+| `AudioSequence`, `AudioSequenceInit` | Format, `segments`, `annotations`; normalized output adds total `length` and freezes copied metadata. Input arrays default empty. |
+| `AudioSequenceSegment`, `AudioSequenceSegmentInput` | Asset or silence. Input gain/envelope may be omitted; normalized asset segments always contain both. |
+| `AudioAssetSegment` | `kind: 'asset'`, stable `id`, `assetId`, half-open `sourceStart`/`sourceEnd`, finite nonnegative `gain` (default 1), `envelope` (default empty). |
+| `AudioSilenceSegment` | `kind: 'silence'`, stable `id`, `length`. |
+| `AudioEnvelopePoint` | Segment-local integer `frame` and nonnegative `gain`; points strictly increase through the segment end. Linear interpolation; outside the listed points the boundary gain is held. |
+| `AudioSequenceAnnotation` | `id`, `startFrame`, optional nonempty `endFrame`, explicit `anchoring: 'content' \| 'fixed'`, optional `label`. Existing `Region` objects keep their meaning. |
+| `createAudioSequence(init, assets?)` | Validate and freeze metadata; when a reader is supplied, validate asset existence, bounds and exact format. |
+| `createMemoryAudioAssetStore()` | Own a registry of immutable decoded clips. Registration retains clip backing storage without copying complete PCM. Streaming clips are rejected. |
+| `AudioAssetDescriptor` | `id`, format, `length`, `byteLength` of whole retained backing buffers, including the unsliced backing of a zero-copy clip slice. |
+| `AudioAssetReader` | `getDescriptor(id)`, `getReferenceCount(id)`, `read(id, startFrame, destinations)`, `retain(ids)`. Reads copy into equal-length caller-owned channels; backing samples are never exposed. |
+| `AudioAssetStore` | Reader plus `registerClip(clip, {id?, channelLayout?}?)`, `getStats()`, `dispose()`. Registration returns an initial caller-owned lease. Stats report assets, backing bytes summed per asset and the sum of per-asset lease references. Distinct assets sharing buffers are conservatively charged separately. |
+| `AudioAssetLease` | `assetIds`, `released`, idempotent `release()`. A retained asset survives owner/store disposal. Store disposal prevents new registrations; retained reads remain valid. |
+| `retainAudioSequence(sequence, assets)` | Retain each referenced asset once; caller releases the returned lease. |
+| `readAudioSequenceRange(sequence, assets, startFrame, destinations)` | Copy a bounded range, applying gain/envelopes and filling silence. Does not retain implicitly; the caller must keep a live lease. |
+| `audioSequenceAssetIds(sequence)` | Distinct referenced asset IDs. |
+| `audioChannelLayout(channels)` | `['mono']`, `['left', 'right']`, or ordered `channel-N` names for larger channel counts. |
+| `audioSegmentLength(segment)`, `audioEnvelopeGain(points, frame)`, `sameAudioFormat(a, b)` | Segment extent, interpolated gain and exact format comparison. |
+| `audioClipRegionsToFrameAnnotations(clip, anchoring)` | Explicit nearest-frame conversion from clip regions; requires the caller to select anchoring and rejects out-of-bounds regions. |
+| `frameInteger(value, name?)`, `frameRange(start, length, extent)` | Validate nonnegative safe integer frames and a start/length range within an extent. |
+| `AudioSequenceError` | Typed sequence/format/asset/range/disposal error. |
+
+Backing-byte accounting uses a private cross-bundle Core capability; incompatible legacy clips without this capability fail explicitly rather than silently undercounting memory. The store counts each asset retained by a lease, including current content, history, clipboard, checkpoints, drafts, playback and rendering jobs. [Editor history limits](/audio/headless/edit/audio-clip-editor/#revisions-history-and-ownership) count assets held **solely by history**, so shared references are not charged repeatedly. Keep a lease while consuming a snapshot asynchronously; a snapshot alone does not retain PCM.
+
+## Atomic commands and position maps
+
+`AudioEditCommand` is a JSON-safe version-1 envelope containing `documentId`, `expectedRevision`, `label` and `operations`. Invalid commands fail atomically. Stable segment IDs and split IDs are explicit so replay does not generate a different sequence.
+
+| `AudioEditOperation.type` | Fields and behavior |
+| --- | --- |
+| `splice` | `startFrame`, `deleteCount`, replacement `segments`, optional `annotations` relative to the inserted range, optional `rightId`. Splits a containing segment when needed; `rightId` is required if both surviving sides need distinct identities. |
+| `split` | `segmentId`, segment-local `frame`, `leftId`, `rightId`. Requires an interior split point. |
+| `trim` | `startFrame`, `endFrame`: retain only that sequence range and shift it to frame 0. |
+| `insert-silence` | `frame`, `length`, stable `id`, optional `rightId`; insertion into a segment follows the same split identity rule. |
+| `set-gain` | `segmentIds`, finite nonnegative `gain`; modifies metadata, never asset samples. |
+| `set-envelope` | `segmentId`, ordered segment-local `points`; modifies one asset segment's envelope. |
+
+Splits and trims crop/rebase envelopes and preserve boundary values. Content-anchored annotations follow splices; deleted points and collapsed spans are removed. Fixed annotations keep numeric frame positions clamped to the new end; a collapsed fixed span becomes a point. Undo restores prior metadata, including deleted annotations.
+
+`applyAudioOperations(sequence, assets, operations)` is the pure atomic primitive. It returns `{content, operations, steps}`; it does not own leases or history. [`AudioClipEditor`](/audio/headless/edit/audio-clip-editor/) wraps it with revision guards and lifecycle ownership.
+
+| API / type | Contract |
+| --- | --- |
+| `AudioPositionStep` | Splice (`startFrame`, `deleteCount`, `insertCount`, resulting `length`) or reset (`length`). |
+| `AudioPositionMap` | `documentId`, `fromRevision`, `toRevision`, ordered `steps`. |
+| `createAudioPositionMap(documentId, fromRevision, toRevision, steps)` | Validate/freeze a map for one document. |
+| `composeAudioPositionMaps(...maps)` | Compose contiguous revisions of the same document; rejects gaps or identity mismatch. |
+| `mapAudioPosition(map, frame, affinity?)` | Returns `AudioMappedPosition`: `{frame, deleted, positionPolicy}`. Default affinity is `'right'`; `'left'` keeps an insertion boundary before inserted content. Reset maps report `'reset-origin'`. |
+| `AudioDocumentChange` | Edit/undo/redo/restore origin, label, revisions, operations, affected frame ranges and position map. |
+| `AudioDocumentSnapshot`, `AudioDocumentSource` | Immutable content identity/revision plus borrowed assets; `getSnapshot()` and immediate `subscribe()`, returning unsubscribe. Ready empty content differs from disposed ownership. |
+| `AudioClipEditorPort`, `isAudioClipEditorPort`, `isAudioDocumentSource` | Structural composition contracts and runtime guards; no `instanceof` dependency between bundles. |
+| `AudioRevisionGuard`, `AudioEditTransaction`, `AudioEditResult`, `AudioEditFailure`, `AudioEditError`, `AudioEditErrorCode` | Guarded atomic editing, transaction builder, committed/noop/failed results and typed errors. |
+| `AudioClipEditor`, `createAudioClipEditor`, `AudioClipEditorOptions` | The concrete owner, constructor options and factory; complete reference on [AudioClipEditor](/audio/headless/edit/audio-clip-editor/). |
+| `AudioEditorState`, `AudioCheckpoint`, `AudioClipboard`, `AudioFrameRange` | Editor state and explicit retained resource handles, documented on the Headless page. |
+| `AudioInteractionSession`, `AudioInteractionSnapshot`, `AudioDraftResult` | Per-view selection/draft state; preview does not advance the document. |
+
+Playback-source types are owned by the [Audio Play API](/audio/api/play/#editable-document-playback). View and player borrow the same owner; each committed revision pauses and replaces playback data. Neither receives a second writable document.
+
+## Selected-range processing
+
+`createAudioRangeProcessor('normalize' | 'reverse')` returns a version-1 `AudioRangeProcessor` for explicit registration with an editor. Normalize accepts `{targetPeak?: number}` (default `0.95`, range 0–1), using one peak/factor across all selected channels. Reverse accepts `{}` and reverses each selected channel. Both preserve length, declare zero handles/latency/tail, yield between bounded work blocks, and support cancellation. They do not allocate a Web Audio context.
+
+Custom `AudioRangeProcessor` implementations provide `id`, positive integer `version`, `plan(request)` and asynchronous `process(input)`. The plan declares input handles, raw output length, latency and tail **before allocation**. The editor checks the total input/output byte budget, passes copied input and an abort signal, then validates output format/length. `AudioProcessingRequest` includes document/revision guard, selected range, processor ID/version, JSON parameters and output asset/segment IDs. Default `tailPolicy: 'trim'` keeps selected duration; `'extend'` includes a declared tail. Only one job runs per editor. `AudioProcessingResult` adds cancelled/superseded outcomes to ordinary edit results. See [processing lifecycle](/audio/headless/edit/audio-clip-editor/#explicit-range-processing).
+
+| Processing contract | Fields and units |
+| --- | --- |
+| `AudioProcessingRequest` | `documentId`, `expectedRevision`, `startFrame`, `endFrame`, `processorId`, `processorVersion`, JSON `parameters`, fixed output `assetId` and `segmentId`; optional `rightId`, `tailPolicy` and `label`. Interior replacement requires `rightId` when it leaves two fragments of one segment. |
+| `plan(request)` input | `rangeLength` in frames, `sampleRate`, ordered `channelLayout`, `parameters` and resolved `tailPolicy`. |
+| `plan(request)` result | Nonnegative integer `inputBefore`, `inputAfter`, `outputLength`, `latencyFrames`, `tailFrames`. Raw `outputLength` must equal `latencyFrames + rangeLength + tailFrames`. |
+| `process(input)` | Copied planar `channels`, `sampleRate`, `selectionOffset` inside those channels, `selectionLength`, `parameters`, `signal`; returns `Promise<AudioClip>`. Required input handles are clamped to the document boundaries. |
+
+The editor removes the declared latency from the returned asset segment. It trims the declared tail by default; `tailPolicy: 'extend'` increases the output range and emits a splice map. Processing a sequence with a borrowed reader additionally requires that reader to implement `registerClip`, so the result can enter the same asset store. This method belongs to the concrete `AudioClipEditor`; the Core `AudioClipEditorPort` exposes editing and interaction without processor ownership.
+
+`ClipEditSession` remains available for callers intentionally materializing a new clip; it is not document history. Undo/redo retains processing output, never reruns a callback. Effects for live playback remain in Play.
+
+## Rendering and WAV export
+
+| API / type | Contract |
+| --- | --- |
+| `renderAudioSequence(sequence, assets, options?)` | Promise of `RenderedAudioSequence`: sample rate, channel layout and caller-owned mutable channel arrays. Applies sequence gain, envelope and silence. |
+| `exportAudioSequenceWav(sequence, assets, options?)` | Promise of an `ArrayBuffer`; renders the selected range and encodes WAV. Default 16-bit integer PCM; 24/32-bit integer and 32-bit float supported. Empty output is a valid header-only WAV. |
+| `AudioSequenceRenderOptions` | Optional `startFrame` (0), `endFrame` (sequence length), `maxBytes` (256 MiB), `chunkFrames` (65,536), `signal`. |
+| `AudioSequenceWavOptions` | Render options plus `bitDepth: 16 \| 24 \| 32` (16), `float` (false; requires 32). Budget counts both float PCM and WAV output allocations. |
+| `RenderedAudioSequence` | `{sampleRate, channelLayout, channelData}`; sample arrays are newly owned by the caller and do not expose retained source PCM. |
+
+Rendering retains source assets until completion/failure, performs bounded reads, yields between chunks and releases its lease on cancellation. Invalid ranges/options and excessive allocation fail before sample reads. Export rejects unsupported RIFF dimensions instead of overflowing header fields. No browser download is implicit. Saving an exported revision is an application choice: call `markSaved()` only if that content is still current.
+
+## Related
+
+- [AudioClipEditor options, commands, history and cleanup](/audio/headless/edit/audio-clip-editor/)
+- [Declarative document owner](/audio/element/edit/audio-document/)
+- [Waveform editing and playback composition](/audio/element/view/audio-view/#waveform-editing)

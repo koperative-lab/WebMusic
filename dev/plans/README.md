@@ -14,6 +14,7 @@ context rather than its scope.
 
 | Record | Historical scope | Current starting point |
 |---|---|---|
+| [Editing capabilities — 2026-10-13](2026-10-13-editing-capabilities.md) | Original proposal and P0–P8 sequence; P0 promoted to accepted design, with the current work consolidated into five phases P0–P4 | [Editing contracts and current roadmap](../design/EDIT-COMPONENTS.md#implementation-and-reference-delivery), DEC-047 and STATUS EDIT-01 |
 | [Analysis workbench design](analysis-workbench-design.md) | Chordio workbench proposal and its visual prototype | [Analyze design](../design/ANALYZE-COMPONENTS.md) |
 | [Analysis implementation brief](analysis-workbench-implementation-brief.md) | Source comparisons, implementation choices and verification notes | Analyze design and the owning references in [COMPONENTS](../COMPONENTS.md) |
 | [Analysis workbench wiring](analysis-workbench-wiring.md) | Earlier composition and dependency proposal | [Architecture](../ARCHITECTURE.md) and [player binding](../design/PLAYER-BINDING.md) |

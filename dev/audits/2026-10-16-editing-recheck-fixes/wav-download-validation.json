@@ -1,0 +1,28 @@
+{
+  "source": {
+    "path": "apps/doc/webmusic/public/wav/Editing.wav",
+    "bytes": 96044,
+    "encoding": 1,
+    "channels": 1,
+    "sampleRate": 8000,
+    "bits": 16,
+    "frames": 48000
+  },
+  "download": {
+    "path": "/Users/mamingchen/Downloads/edited-audio.wav",
+    "bytes": 16044,
+    "encoding": 1,
+    "channels": 1,
+    "sampleRate": 8000,
+    "bits": 16,
+    "frames": 8000
+  },
+  "expectedEdit": {
+    "trimStartFrame": 8000,
+    "trimEndFrame": 16000,
+    "gain": 0.5,
+    "revision": 4
+  },
+  "maxInt16SampleError": 0.5,
+  "passed": true
+}

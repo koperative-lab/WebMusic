@@ -18,6 +18,7 @@ export const SCORE_PLAY_PARAMS: ElementParamCatalog = {
         fallback: 'nothing plays until you assign .score, .rack or .controller',
         note: 'URL of a MIDI / MusicXML / MXL / ABC file, loaded through the sibling @webmusic/score/io capability.',
       },
+      {name: 'editor', kind: 'text', placeholder: '#score-document', fallback: 'standalone playback source', note: 'Borrow a Score document from the selected owner. Conflicts with src, .score, Rack and controller inputs; .editor takes precedence over this selector.'},
       {
         name: 'format',
         kind: 'enum',

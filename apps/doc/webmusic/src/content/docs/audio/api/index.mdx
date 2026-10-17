@@ -3,11 +3,12 @@ title: '@webmusic/audio'
 description: The thin, DOM-free Audio root — immutable AudioClip model, regions, beat grid, peaks types, a typed event emitter, and JSON serialization.
 ---
 
-The `@webmusic/audio` root is the **foundation** of Audio: the immutable `AudioClip` model, `Region` markers, the `BeatGrid` time map, the `ClipEditSession` editing transaction, the `AudioPeaks` waveform pyramid type, a typed `EventEmitter`, and JSON serialization. This root entry touches no browser APIs (no `AudioContext`, no `AudioBuffer`), so it is safe in Node, workers, and SSR.
+The `@webmusic/audio` root is the **foundation** of Audio: sequence/asset/document contracts and the immutable `AudioClip` model, `Region` markers, the `BeatGrid` time map, the `ClipEditSession` editing transaction, the `AudioPeaks` waveform pyramid type, a typed `EventEmitter`, and JSON serialization. This root entry touches no browser APIs (no `AudioContext`, no `AudioBuffer`), so it is safe in Node, workers, and SSR.
 
 It is intentionally thin. Functional APIs live in capability subpaths of the same package:
 
 - **Decode, loading, playback, mixing, recording, effects, and audio export** live in [`@webmusic/audio/play`](/audio/api/play/).
+- **Document editing, history, range processing and sequence WAV export** live in [`@webmusic/audio/edit`](/audio/api/edit/).
 - **Analysis** (peak computation, tempo/beat detection, …) lives in `@webmusic/audio/analyze`.
 - **Visualization** lives in `@webmusic/audio/view`; its Web Components and those from [`@webmusic/audio/play`](/audio/api/play/) live under each capability's `/element` subpath.
 
@@ -24,6 +25,10 @@ capability pages below document what is inside each entry.
 | Entry | Form | What is there |
 | --- | --- | --- |
 | `@webmusic/audio` | package root | `AudioClip`, `Region`, `BeatGrid`, `ClipEditSession`, `AudioPeaks`, events, JSON — this page. |
+| `@webmusic/audio/edit` | [capability root](/audio/api/edit/) | Immutable sequences/assets, commands, local history, selected-range processing and WAV export. |
+| `@webmusic/audio/edit/headless` | [Headless](/audio/headless/edit/audio-clip-editor/) | `AudioClipEditor`. |
+| `@webmusic/audio/edit/element` | [Web Component](/audio/element/edit/audio-document/) | Nonvisual `<audio-document>` owner. |
+| `@webmusic/audio/edit/auto` | registration | Registers `<audio-document>` on evaluation; no Edit global/IIFE entry. |
 | `@webmusic/audio/play` | [capability root](/audio/api/play/) | Decoding and loading, playback engines, mixing, recording, effects, WAV export. |
 | `@webmusic/audio/play/headless` | [Headless](/audio/headless/#play) | `AudioClipPlayer`, `AudioMixer`, `AudioRecorder`, the playlist controller, `Effect`. |
 | `@webmusic/audio/play/element` | [Web Components](/audio/element/#play) | `<audio-player>`, `<audio-playlist>`, `<audio-mixer>`, `<audio-recorder>`. |
@@ -45,7 +50,7 @@ capability pages below document what is inside each entry.
 | `@webmusic/audio/view/global` | browser IIFE | `<script>`-tag bundle exposing `WebMusicAudioView`. |
 | `@webmusic/audio/react` | [capability root](/audio/api/react/) | React components and hooks over the three capabilities; React is an optional peer. |
 
-Unlike Score, all three Audio capabilities ship `/auto` and `/global`, and
+Audio Play, Analyze and View ship `/auto` and `/global`; Edit ships `/auto` only.
 Audio has no `/io` — decoding lives inside `play`.
 
 ## Install
@@ -214,6 +219,15 @@ const uniform = BeatGrid.fromTempo(96, /* durationSeconds */ 8, /* offsetSeconds
 `beatGridMapping(grid)` adapts the grid to Kernel's `TimelineMapping` shape:
 `positionToSeconds` takes beats, and `secondsToPosition` returns beats. The
 adapter borrows the immutable grid and creates no running clock.
+
+## Editable documents and bounded assets
+
+The root also exports `AudioSequence`, asset readers/stores/leases, document and
+editor ports, command/result types, frame position maps and playback binding
+contracts. Their complete member references belong to [Audio Edit](/audio/api/edit/)
+and [document playback](/audio/api/play/#editable-document-playback). Use
+`AudioClipEditor` for a mutable document owner with structural history; it retains
+PCM references across edits rather than storing a new clip for every revision.
 
 ## ClipEditSession — buffered, non-destructive edits
 

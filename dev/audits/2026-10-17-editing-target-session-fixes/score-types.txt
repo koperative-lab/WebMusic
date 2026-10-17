@@ -1,0 +1,4 @@
+
+> @webmusic/score@0.2.0 typecheck
+> tsc --noEmit
+

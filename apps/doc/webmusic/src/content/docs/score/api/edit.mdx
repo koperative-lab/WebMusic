@@ -1,0 +1,218 @@
+---
+title: '@webmusic/score/edit'
+description: 'Atomic note operations, document contracts, rational position maps and the persistent ScoreEditor facade.'
+---
+
+Score Edit applies semantic note operations to immutable Scores. Its pure
+function supports application-owned state; its `ScoreEditor` facade adds one
+document owner, revision guards, local history and interaction drafts. It creates
+no player, clock, loader or DOM surface.
+
+Install `@webmusic/score` as described in [Install](/score/#install). Edit needs
+no optional UI, framework or audio-engine peer. The code entries remain
+nonvisual; the [document Element](/score/element/edit/score-document/) owns HTML
+loading, while [Score player](/score/headless/play/score-player/) and
+[Score view](/score/element/view/score-view/) borrow the shared Core ports.
+
+## Entry map
+
+The [package entry map](/score/api/#package-subpaths) owns the complete inventory.
+
+| Entry | Purpose | Reference |
+|---|---|---|
+| `@webmusic/score/edit` | Pure operations, position maps, Core document types and the editor facade | This page |
+| `@webmusic/score/edit/headless` | `ScoreEditor`, `createScoreEditor` and their related types | [Headless inventory](/score/headless/#edit) and [ScoreEditor](/score/headless/edit/score-editor/) |
+| `@webmusic/score/edit/element` | Nonvisual `ScoreDocumentElement` and registration helpers | [Document declaration](/score/element/edit/score-document/) |
+| `@webmusic/score/edit/auto` | Register the default document declaration on import | [Element registration](/score/element/#edit) |
+| `@webmusic/score` | Immutable models and shared document ports/maps; no editor implementation | [Core API](/score/api/) |
+
+There is no `/edit/render`, `/edit/global`, `/edit/api` or Edit React wrapper.
+
+## Atomic note operations
+
+`applyScoreOperations(score, operations)` returns a candidate `score`, a
+defensive immutable snapshot of `operations`, and `affectedNoteIds`. Operations
+run in order; invalid input throws `ScoreEditError` without modifying the source.
+The helper has no document identity, revision, history or subscriptions. Use
+`ScoreEditor.execute` when the operation must also commit to an owned document.
+
+Every operation has the following exact fields. IDs refer to authored notes,
+not repeat-expanded playback occurrences. Insertions supply their own stable IDs.
+
+| `type` | Fields | Meaning |
+|---|---|---|
+| `insert-notes` | `notes: ScoreNoteInput[]` | Add notes to existing parts. Each input has `id`, `partId`, written `pitch: {step, alter, octave}`, `onsetQuarters`, `durationQuarters`, `voice`, and optional `velocity`. |
+| `delete-notes` | `noteIds` | Remove the named notes. |
+| `move-notes` | `noteIds`, `deltaQuarters` | Shift written onset by exact rational quarters, retaining Duration notation. |
+| `resize-notes` | `noteIds`, `durationQuarters` | Set a positive exact quarter duration for simple notes. |
+| `transpose-notes` | `noteIds`, `semitones` | Transpose written pitch by an integer number of semitones. |
+| `set-velocity` | `noteIds`, `velocity` | Set integer velocity 1–127; `null` clears the authored override. |
+| `quantize-notes` | `noteIds`, optional `grid`, `origin`, `target` | Snap onset, duration, or both to a rational grid. Defaults: grid `[1,4]`, origin `[0,1]`, target `'onset'`; ties round forward. |
+| `enter-notation` | `entry: ScoreNotationEntry` | Enter a spelled note or rest in one existing measure and one voice/staff, replacing fully covered events and filling remaining gaps with written rests. |
+
+`ScoreQuarterValue` is a reduced safe-integer `[numerator, denominator]` pair
+with positive denominator. Onsets cannot become negative and ordinary-note
+durations must remain positive. Invalid/unknown IDs, duplicate insertion IDs,
+unsupported operation fields or structures reject the whole batch. Commands do
+not repair partial ties, tuplets or grace notation. Only `enter-notation` fills
+the selected measure/voice/staff with written rests; ordinary piano-roll
+operations retain their event-editing behavior.
+Insertion and transposition are limited to MIDI pitches 0–127. Transposition
+rejects tied, rest and unpitched notes. Quantization origin affects onset only;
+duration quantization uses origin zero, and a duration rounded to zero rejects.
+
+An effective move, resize or quantize makes written time authoritative for each
+changed note: it removes absolute `performed` timing and retains the prior
+effective velocity in `velocityOverride`. Sounding duration follows the new
+quarter endpoints through the TimeMap, including interior tempo changes.
+Pitch-only, velocity-only and no-op timing operations preserve performed timing;
+untouched notes retain imported microtiming. Effective velocity is
+`velocityOverride ?? performed?.velocity ?? 80`.
+
+This standalone example creates an explicit input and computes a candidate:
+
+```ts
+import {Duration, NoteId, PartId, Pitch, Rational, ScoreBuilder, VoiceId} from '@webmusic/score';
+import {applyScoreOperations} from '@webmusic/score/edit';
+
+const partId = PartId('piano');
+const noteId = NoteId('opening-note');
+const builder = new ScoreBuilder();
+builder.addPart({id: partId, name: 'Piano', midiProgram: 0, staves: 1});
+builder.addNote(partId, {
+  id: noteId, pitch: Pitch.parse('C4'), onsetQuarters: Rational.ZERO,
+  duration: Duration.quarter(), voice: VoiceId('melody'),
+});
+const original = builder.build();
+const result = applyScoreOperations(original, [
+  {type: 'move-notes', noteIds: [noteId], deltaQuarters: [1, 4]},
+  {type: 'set-velocity', noteIds: [noteId], velocity: 96},
+]);
+console.log(original.getNote(noteId)?.onsetQuarters.toString()); // 0
+console.log(result.score.getNote(noteId)?.onsetQuarters.toString()); // 1/4
+```
+
+## Written notation entry
+
+`enter-notation` uses `ScoreNotationEntry`: a new `id`, existing `partId`,
+`voice`, optional one-based `staff`, `onsetQuarters`, `duration`, and `pitch`.
+`pitch` is the same spelled `{step, alter, octave}` as ordinary note insertion;
+`null` enters a rest. Optional `velocity` sets a pitched note's authored
+velocity. `ScoreNotationDuration` has `base: ScoreQuarterValue` and optional
+`dots` (default `0`); supported bases are whole through sixty-fourth notes
+(`[4,1]` through `[1,16]`), with zero, one or two dots. These are notation
+values, so the sounded duration includes their dots.
+
+Entry requires an existing positive authored measure containing the complete
+duration. It does not infer measures from a MIDI time signature or extend the
+piece. The selected measure/voice/staff must be simple and monophonic. Fully
+covered notes are replaced; an overlap that would cut a sounding note is
+rejected. Existing rests may be split, and remaining gaps become actual rests
+with deterministic IDs and written durations. Other voices and staves remain
+unchanged. Automatic completion requires exact gaps on a 1/64-quarter grid and
+generates at most 256 rests per operation. It can use smaller rest values than
+the offered input bases. One entry, including rest repair, is one atomic
+operation. A controller entry commits one history item; a transaction containing
+several entries shares one item, and the pure helper creates no history.
+
+Ties, tuplets, grace notes, chords, authored beams, slurs, hidden or unpitched
+notation, events crossing a measure boundary and unrepresentable rest gaps
+are outside this entry subset. Replacing events with expressive annotations
+also rejects rather than discarding them. These structures fail explicitly instead of
+silently losing notation. The [staff input controller](/score/headless/view/staff-editing/)
+supplies cursor, duration and voice state for a custom interface over this
+same operation; it does not create another Score or history.
+
+## Document ports and commands
+
+`ScoreDocumentSource` exposes `getSnapshot()` and synchronous `subscribe`.
+`ScoreEditorPort` adds state, commands, history and interaction-session creation.
+These interfaces live in Core so another capability can read a document without
+depending on the editor implementation. Native ScorePlayer accepts the read-only
+port; editable Score views require the command/session port.
+
+`isScoreDocumentSource(value)` checks the required reader/subscriber methods and
+the current snapshot: nonempty document/content identity, a nonnegative safe
+revision, `ready` or `disposed` status and a Score instance. `isScoreEditorPort`
+also checks every required state, command, history and session method. Both
+return `false` for malformed values or throwing getters. These structural type
+guards do not subscribe, mutate, or establish readiness: a disposed source can
+satisfy the port shape, so consumers still inspect its snapshot status.
+
+A `ScoreEditCommand` carries `version: 1`, `documentId`, `expectedRevision`,
+`label` and `operations`. `execute` validates the complete serializable envelope
+and commits atomically. `ScoreEditResult` is `committed` with a snapshot/change,
+`noop` with the unchanged snapshot, or `failed` with a `ScoreEditError`. Command
+errors are results; the pure helper throws. The [ScoreEditor reference](/score/headless/edit/score-editor/)
+owns revision, subscription, checkpoint and disposal details.
+
+`ScoreDocumentSnapshot` contains `documentId`, `documentRevision`, `contentId`,
+`content`, `status: 'ready' | 'disposed'`, and optional last `change`.
+`ScoreDocumentChange` contains `origin`, `label`, from/to revisions, operations,
+affected note IDs and a position map. Undo/redo/restore changes identify their
+origin and do not replay the original edit operations.
+
+## Position maps
+
+Position maps describe content transitions in rational musical quarters. They
+do not seek or reschedule a player.
+
+| Function | Contract |
+|---|---|
+| `createScorePositionMap(documentId, fromRevision, toRevision, extent, policy?)` | Create a frozen map. Revisions are nonnegative safe integers with `toRevision > fromRevision`; `extent` is a nonnegative `Rational`. Policy defaults to `'preserve-quarter'`; `'reset-origin'` explicitly resets. |
+| `composeScorePositionMaps(...maps)` | Require a nonempty, continuous revision chain for one document. Preserve intermediate clamps so an undo cannot reconstruct a lost position. The composed representation is bounded independently of undo history. |
+| `mapScorePosition(map, position)` | Accept a nonnegative `Rational`; return `{quarters, clamped, positionPolicy}`. Preserved positions clamp to extent; reset policy returns the origin. |
+
+Malformed maps or positions throw `ScoreEditError('invalid-command', ...)`.
+A mismatched document or discontinuous composition throws `revision-conflict`.
+The document source publishes maps with changes; consumers retain or compose
+them themselves rather than expecting the editor to retain an unbounded log.
+
+```ts
+import {Rational} from '@webmusic/score';
+import {createScorePositionMap, composeScorePositionMaps, mapScorePosition} from '@webmusic/score/edit';
+
+const shorter = createScorePositionMap('example', 0, 1, new Rational(2));
+const restored = createScorePositionMap('example', 1, 2, new Rational(4));
+const result = mapScorePosition(composeScorePositionMaps(shorter, restored), new Rational(3));
+console.log(result.quarters.toString(), result.clamped); // 2, true
+```
+
+## API Reference
+
+All exports below belong to `@webmusic/score/edit`.
+
+| Export | Kind | Use it for |
+|---|---|---|
+| `applyScoreOperations` | function | [Compute an atomic candidate](#atomic-note-operations). |
+| `ScoreEditor` | class | [Own one editing document](/score/headless/edit/score-editor/). |
+| `createScoreEditor` | factory | [Construct the same owner](/score/headless/edit/score-editor/#import). |
+| `ScoreEditorOptions` | type | [History limit and listener error handling](/score/headless/edit/score-editor/). |
+| `ScoreEditError` | class | Coded edit failure; `.code` is a `ScoreEditErrorCode`. |
+| `isScoreDocumentSource` | type guard | Validate a read port and its current Score snapshot. |
+| `isScoreEditorPort` | type guard | Validate the complete document command/session port. |
+| `createScorePositionMap` | function | [Create a content-position transition](#position-maps). |
+| `composeScorePositionMaps` | function | [Compose a continuous revision chain](#position-maps). |
+| `mapScorePosition` | function | [Apply a position transition](#position-maps). |
+| `ScoreQuarterValue` | type | [Exact rational command coordinates](#atomic-note-operations). |
+| `ScoreNoteInput` | type | [Insertion data with explicit IDs](#atomic-note-operations). |
+| `ScoreNotationEntry` | type | [Spelled note/rest entry in one measure](#written-notation-entry). |
+| `ScoreNotationDuration` | type | [Written base and dot count](#written-notation-entry). |
+| `ScoreEditOperation` | type | [Semantic operation union](#atomic-note-operations). |
+| `ScoreEditCommand` | type | [Versioned atomic command envelope](#document-ports-and-commands). |
+| `ScoreRevisionGuard` | type | Document identity and expected revision for a command. |
+| `ScoreEditErrorCode` | type | [Failure categories](/score/headless/edit/score-editor/#failures-and-lifecycle). |
+| `ScoreEditFailure` | type | `{status: 'failed', error}` result. |
+| `ScoreEditResult` | type | Committed, no-op or failed outcome. |
+| `ScorePositionMap` | type | Frozen document/revision map and steps. |
+| `ScoreMappedPosition` | type | Mapped rational position, clamp flag and policy. |
+| `ScoreDocumentSource` | type | Read-only document snapshot and subscription port. |
+| `ScoreDocumentSnapshot` | type | Current content identity, revision, status and last change. |
+| `ScoreDocumentChange` | type | Origin, operations, affected IDs and map for one transition. |
+| `ScoreEditorPort` | type | Read/command interface implemented by `ScoreEditor`. |
+| `ScoreEditorState` | type | Document, dirty flag and bounded history state. |
+| `ScoreEditTransaction` | type | Synchronous transaction builder with `add(operation)`. |
+| `ScoreCheckpoint` | type | Same-editor in-memory root for external history. |
+| `ScoreInteractionSession` | type | Local selection and preview/commit/cancel commands. |
+| `ScoreInteractionSnapshot` | type | Owning `documentId`, selected IDs, disposal state and optional draft. |
+| `ScoreDraftResult` | type | Preview snapshot or structured edit failure. |

@@ -64,6 +64,21 @@ function buildRichScore() {
 }
 
 describe('scoreFromJSON rich round-trip', () => {
+  it('round-trips velocity overrides with and without performed timing under schema v0.2', () => {
+    const original = buildRichScore();
+    const score = original.edit((tx) => {
+      tx.updateNote(original.notes[0].id, {velocityOverride: 45});
+      tx.updateNote(original.notes[1].id, {velocityOverride: 127});
+    });
+    const encoded = JSON.parse(JSON.stringify(score));
+    expect(encoded.$schema).toBe('https://webscore.dev/schema/score/v0.2');
+    const restored = scoreFromJSON(encoded);
+    expect(restored.notes.map((note) => note.velocity)).toEqual([45, 127]);
+    expect(restored.notes[0].performed).toEqual(original.notes[0].performed);
+    expect(restored.notes[1].performed).toBeUndefined();
+    expect(restored.toJSON()).toEqual(score.toJSON());
+  });
+
   it('preserves performed/articulations/tie/slur/repeat/volta/keySignature', () => {
     const score = buildRichScore();
     const back = scoreFromJSON(JSON.parse(JSON.stringify(score)));
@@ -230,6 +245,40 @@ describe('scoreFromJSON validation', () => {
     delete j.$schema;
     expect(() => scoreFromJSON(j)).not.toThrow();
   });
+
+  it.each(['https://webscore.dev/schema/score/v0.1', undefined])(
+    'migrates legacy schema %s to the current writer without losing velocity',
+    ($schema) => {
+      const json = valid();
+      if ($schema === undefined) delete json.$schema;
+      else json.$schema = $schema;
+      const migrated = scoreFromJSON(json);
+      expect(migrated.notes.map((note) => note.velocity)).toEqual([90, 80]);
+      expect(migrated.toJSON().$schema).toBe('https://webscore.dev/schema/score/v0.2');
+
+      // Recognized fields are validated and preserved even on legacy-marked input.
+      json.parts[0].notes[0].velocityOverride = 33;
+      expect(scoreFromJSON(json).notes[0].velocity).toBe(33);
+      expect(scoreFromJSON(json).toJSON().parts[0].notes[0].velocityOverride).toBe(33);
+      json.parts[0].notes[0].velocityOverride = 0;
+      expect(() => scoreFromJSON(json)).toThrow(/velocityOverride/);
+    },
+  );
+
+  it.each([0, 128, -1, 64.5, Number.NaN, Infinity, null, '80'])(
+    'rejects malformed velocity override %s with invalid-json',
+    (velocityOverride) => {
+      const json = valid();
+      json.parts[0].notes[0].velocityOverride = velocityOverride;
+      expect(() => scoreFromJSON(json)).toThrow(/velocityOverride/);
+      try {
+        scoreFromJSON(json);
+      } catch (error) {
+        expect(error).toBeInstanceOf(ScoreJSONError);
+        expect((error as ScoreJSONError).code).toBe('invalid-json');
+      }
+    },
+  );
 
   it('rejects a part without its required name', () => {
     const j = valid();

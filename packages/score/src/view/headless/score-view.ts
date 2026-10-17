@@ -1,4 +1,5 @@
-import {observeScorePlayback, type Score, type ScorePlaybackSnapshot, type ScorePlaybackSource} from '../../core';
+import {isScoreEditorPort, observeScorePlayback, type Score, type ScoreEditorPort, type ScorePlaybackSnapshot, type ScorePlaybackSource} from '../../core';
+import {createScoreViewEditing, scoreDocumentPlaybackCompatible, type ScoreViewEditing, type ScoreViewEditingOptions, type ScoreViewEditingState} from './score-editing';
 import {scoreToNoteSequence} from '../core/note-sequence';
 import type {
   ScoreNoteSequence,
@@ -22,7 +23,7 @@ export interface ScoreViewTimeRange {
 }
 
 /** Initial state for a code-only score view. */
-export interface ScoreViewOptions {
+export interface ScoreViewOptions extends ScoreViewEditingOptions {
   type?: ScoreViewType;
   viewport?: ScoreViewTimeRange;
   /** Borrow a native source for this same immutable score. Never owns playback. */
@@ -31,6 +32,9 @@ export interface ScoreViewOptions {
 
 /** Immutable state published by {@link ScoreView}. */
 export interface ScoreViewState {
+  readonly editing?: ScoreViewEditingState;
+  /** Present for editor-bound views; false suppresses stale playback overlays. */
+  readonly playbackAvailable?: boolean;
   readonly type: ScoreViewType;
   readonly sequence: ScoreNoteSequence;
   readonly currentTime: number;
@@ -53,6 +57,7 @@ export type ScoreViewListener = (state: ScoreViewState) => void;
  * immutable snapshots to React, Canvas, SVG, a terminal, or any other renderer.
  */
 export interface ScoreView {
+  readonly editing?: ScoreViewEditing;
   readonly score: Score;
   readonly sequence: ScoreNoteSequence;
   readonly state: ScoreViewState;
@@ -72,7 +77,8 @@ export interface ScoreView {
 }
 
 /** Create a stateful, UI-independent score view for direct use in code. */
-export function createScoreView(score: Score, options: ScoreViewOptions = {}): ScoreView {
+export function createScoreView(score: Score | ScoreEditorPort, options: ScoreViewOptions = {}): ScoreView {
+  if (isScoreEditorPort(score)) return createDocumentScoreView(score, options);
   const sequence = scoreToNoteSequence(score);
   const listeners = new Set<ScoreViewListener>();
   const activeNotes = new Set<ScoreSequenceNote>();
@@ -239,6 +245,94 @@ export function createScoreView(score: Score, options: ScoreViewOptions = {}): S
   };
   if (options.playback) unbindPlayback = observeScorePlayback(options.playback, (state) => { view.updatePlayback(state); });
   return view;
+}
+
+function createDocumentScoreView(editor: ScoreEditorPort, options: ScoreViewOptions): ScoreView {
+  validateType(options.type ?? 'piano-roll');
+  if (options.viewport) validateViewport(options.viewport);
+  let type = options.type ?? 'piano-roll';
+  let editingRequested = options.editable ?? false;
+  const editing = createScoreViewEditing(editor, {...options, editable: editingRequested && (type === 'piano-roll' || type === 'staff')});
+  let current = createScoreView(editor.getSnapshot().content, {type: options.type, viewport: options.viewport});
+  let disposed = false;
+  let playback: ScorePlaybackSnapshot | undefined;
+  let available = false;
+  const listeners = new Set<ScoreViewListener>();
+  let state: ScoreViewState = snapshot();
+  function snapshot(): ScoreViewState {
+    return Object.freeze({...current.state, editing: editing.state, playbackAvailable: available});
+  }
+  function publish(): ScoreViewState {
+    const next = state = snapshot();
+    for (const listener of [...listeners]) {
+      if (disposed || state !== next) break;
+      if (listeners.has(listener)) listener(next);
+    }
+    return state;
+  }
+  const offEditing = editing.subscribe((value) => {
+    if (disposed) return;
+    const score = value.interaction.draft?.content ?? value.document.content;
+    if (current.score !== score) {
+      const viewport = current.state.viewport;
+      current.dispose();
+      current = createScoreView(score, {type, viewport});
+    }
+    available = scoreDocumentPlaybackCompatible(value.document, playback);
+    if (available && playback) current.updatePlayback({...playback, score});
+    else current.reset();
+    publish();
+  });
+  const updatePlayback = (value: ScorePlaybackSnapshot): ScoreViewState => {
+    if (disposed) throw new Error('ScoreView has been disposed.');
+    playback = value;
+    available = scoreDocumentPlaybackCompatible(editing.state.document, value);
+    if (available) current.updatePlayback({...value, score: current.score});
+    else current.reset();
+    return publish();
+  };
+  let offPlayback: (() => void) | undefined;
+  try {
+    if (options.playback) offPlayback = observeScorePlayback(options.playback, updatePlayback);
+  } catch (error) {
+    offEditing(); editing.dispose(); current.dispose();
+    throw error;
+  }
+  return {
+    editing,
+    get score() { return current.score; },
+    get sequence() { return current.sequence; },
+    get state() { return state; },
+    setType(value) {
+      validateType(value);
+      if (type === 'piano-roll' || type === 'staff') editingRequested = editing.state.editable;
+      type = value; current.setType(value);
+      if (editing.state.available) editing.setEditable(editingRequested && (value === 'piano-roll' || value === 'staff'));
+      return publish();
+    },
+    setViewport(start, end) { current.setViewport(start, end); return publish(); },
+    clearViewport() { current.clearViewport(); return publish(); },
+    seek(seconds) { current.seek(seconds); return publish(); },
+    noteOn(midi, start) { const note = current.noteOn(midi, start); publish(); return note; },
+    noteOff(midi, start) { current.noteOff(midi, start); publish(); },
+    clearActiveNotes() { current.clearActiveNotes(); publish(); },
+    end() { current.end(); publish(); },
+    reset() { current.reset(); publish(); },
+    subscribe(listener) {
+      if (disposed) throw new Error('ScoreView has been disposed.');
+      listeners.add(listener);
+      return () => { listeners.delete(listener); };
+    },
+    updatePlayback,
+    dispose() {
+      if (disposed) return;
+      disposed = true;
+      offEditing();
+      try { editing.dispose(); } finally {
+        current.dispose(); state = snapshot(); listeners.clear(); offPlayback?.();
+      }
+    },
+  };
 }
 
 function validateViewport(viewport: ScoreViewTimeRange): Readonly<ScoreViewTimeRange> {

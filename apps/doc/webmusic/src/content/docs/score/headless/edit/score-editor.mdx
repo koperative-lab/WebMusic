@@ -1,0 +1,198 @@
+---
+title: 'ScoreEditor'
+description: 'One immutable Score document with atomic commands, bounded undo, checkpoints and independent selection/draft sessions.'
+sidebar:
+  order: 1
+---
+
+import ScoreEditorHeadlessDemo from '../../../../../components/headless/ScoreEditorHeadlessDemo.astro';
+
+`ScoreEditor` owns the current immutable Score, document identity, monotonic
+revision and optional local history. `createScoreEditor(score, options?)` returns
+the same class. Construction takes an already loaded Score; neither form loads
+files, creates audio resources nor mounts UI.
+
+Use this owner when several custom surfaces edit one document. Use the pure
+[`applyScoreOperations`](/score/api/edit/#atomic-note-operations) helper when
+your application owns the entire state/history model. Existing `score.edit`
+remains a short-lived batch primitive. [ScorePlayer](/score/headless/play/score-player/)
+can borrow this owner through `setDocumentSource(editor)`; the
+[document Element](/score/element/edit/score-document/) supplies HTML ownership
+for players and [editable Score views](/score/element/view/score-view/).
+
+<ScoreEditorHeadlessDemo />
+
+## Import
+
+The same class and factory are also available from `@webmusic/score/edit`.
+This complete example creates a note, commits one transaction, then undoes it:
+
+```ts
+import {Duration, NoteId, PartId, Pitch, Rational, ScoreBuilder, VoiceId} from '@webmusic/score';
+import {createScoreEditor} from '@webmusic/score/edit/headless';
+
+const partId = PartId('piano');
+const noteId = NoteId('opening-note');
+const builder = new ScoreBuilder();
+builder.addPart({id: partId, name: 'Piano', midiProgram: 0, staves: 1});
+builder.addNote(partId, {
+  id: noteId, pitch: Pitch.parse('C4'), onsetQuarters: Rational.ZERO,
+  duration: Duration.quarter(), voice: VoiceId('melody'),
+});
+const editor = createScoreEditor(builder.build(), {history: {limit: 100}});
+const unsubscribe = editor.subscribeState((state) => {
+  console.log(state.document.documentRevision, state.dirty, state.history.canUndo);
+});
+const result = editor.transaction('Move note', (tx) => {
+  tx.add({type: 'move-notes', noteIds: [noteId], deltaQuarters: [1, 4]});
+});
+if (result.status === 'failed') throw result.error;
+editor.undo();
+unsubscribe();
+editor.dispose();
+```
+
+In an application, keep the editor for the document lifetime and dispose it
+during teardown. Immutable Score values retained by the caller remain readable.
+Importing a replacement creates a new editor with a new document identity.
+
+## Revisions, history and drafts
+
+An editor starts ready at revision `0` and `dirty: false`. Effective commands,
+undo, redo and checkpoint restoration increment the revision. Undo restores an
+earlier content identity at a new revision. `markSaved` tracks content identity,
+so undoing back to the saved root clears dirty state. A net-zero batch is a no-op:
+it does not add history, increment revision or discard redo.
+
+`execute` requires a document/revision guard. The convenience transaction,
+undo, redo and restore methods accept an optional guard; omit it only when the
+caller intentionally operates on the current state. A transaction callback is
+synchronous, snapshots each operation when added and cannot nest or cross an
+`await`. The callback's builder closes when the callback returns or throws.
+
+History defaults to 100 retained transactions across undo and redo. A new edit
+after undo discards the redo branch; trimming the oldest retained transaction
+increments `trimmedCount`. `history: false` disables local undo/redo. For
+application history, hold checkpoints returned by this editor and restore them
+explicitly. An effective restore clears local undo/redo, publishes origin
+`'restore'`, and supplies a `reset-origin` position map. Restoring the current
+content identity is a no-op; a different checkpoint identity is restored even
+when its musical values match. Checkpoints are opaque
+in-memory handles: copies, serialized values and checkpoints from another editor
+cannot be restored. They need no separate dispose method; release references
+when your application no longer needs their Score roots.
+
+Each interaction session starts with an empty selection and no draft. Preview
+always computes from the latest committed Score, never from the previous draft.
+Committing a draft is one atomic edit. Any committed document change cancels
+all session drafts and retains only surviving selected note IDs. Selection,
+preview and cancellation do not alter document revision, dirty state or history.
+Share a session explicitly when multiple surfaces should share selection.
+Every session snapshot carries its owner's `documentId`, including after
+disposal. A borrowing surface can reject a session from another document before
+reusing its selection or drafts; IDs alone are not sufficient to match notes.
+
+## Failures and lifecycle
+
+`execute`, `transaction`, `undo`, `redo`, `restoreCheckpoint` and `commitDraft`
+return `ScoreEditResult`: `committed`, `noop` or `failed`. `preview` returns
+`preview` or `failed`. A failure carries `ScoreEditError.code` and a readable
+message. Codes are `invalid-command`, `invalid-score`, `unknown-note`,
+`unknown-part`, `duplicate-id`, `unsupported-structure`, `revision-conflict`,
+`document-mismatch`, `disposed`, `reentrant-command`, `history-disabled`,
+`invalid-checkpoint` and `transaction-aborted`.
+
+Construction and void-returning auxiliary mutations throw on invalid use.
+`createCheckpoint` throws after disposal. Passing a nonfunction subscriber
+throws `TypeError`. Observer exceptions are isolated and reported through
+`onListenerError`, defaulting to `console.error`; they do not undo a commit or
+prevent other observers from receiving it. Synchronous content mutation inside
+a publication fails with `reentrant-command`; schedule later work after the
+callback instead.
+
+Subscriptions register before delivering the current value synchronously and
+return idempotent unsubscribe functions. `subscribe` reports content changes
+and disposal; `subscribeState` additionally reports saved-state and history-only
+changes such as `markSaved` and `clearHistory`.
+Disposal publishes the terminal snapshot, disposes interaction sessions and
+clears listeners/history. Read methods remain available after disposal; a new
+subscription receives terminal state once without being retained. The editor
+never disposes a borrowed player or caller-owned Score.
+
+<details class="component-section">
+<summary>API</summary>
+
+**Construction** — `new ScoreEditor(score, options?)` or
+`createScoreEditor(score, options?): ScoreEditor`.
+
+| Member | Kind | Default | Description |
+|---|---|---|---|
+| `score` | input | required | Valid immutable Score retained as the initial root. |
+| `history` | option | `{limit: 100}` | `false` disables local history; otherwise `limit` is a positive safe integer. |
+| `onListenerError` | option | `console.error` | `(error: unknown) => void`; observes subscriber exceptions. An error in this handler is itself reported to the console. |
+
+**Commands and checkpoints**
+
+| Member | Kind | Description |
+|---|---|---|
+| `execute(command)` | command | Apply a version-1 `ScoreEditCommand` with required document identity, expected revision, label and ordered operations. Returns `ScoreEditResult`. |
+| `transaction(label, build, guard?)` | command | Collect operations through `ScoreEditTransaction.add(operation)` and atomically apply them after the synchronous callback. Returns `ScoreEditResult`. |
+| `undo(guard?)` | command | Restore the prior retained root at a new revision; empty history is `noop`, disabled history is `failed`. |
+| `redo(guard?)` | command | Restore the next retained root at a new revision; empty history is `noop`, disabled history is `failed`. |
+| `markSaved()` | command | Record the current content identity as saved; does not write a file or increment revision. |
+| `clearHistory()` | command | Clear both local stacks without changing content, revision, saved identity or cumulative trimming count. |
+| `createCheckpoint()` | command | Return an immutable `ScoreCheckpoint` issued by this editor. Contains document/content identity and Score, with issuance validated on restore. |
+| `restoreCheckpoint(checkpoint, guard?)` | command | Restore a same-editor checkpoint; the current content identity is `noop`, otherwise clear local history and publish a new revision. Returns `ScoreEditResult`. |
+| `createInteractionSession()` | factory | Create an independently disposable session; its selection/draft starts empty. |
+
+**State and observation**
+
+| Member | Kind | Description |
+|---|---|---|
+| `score` | getter | Current committed immutable Score. |
+| `getSnapshot()` | reader | `ScoreDocumentSnapshot`: document/content identity, revision, Score, `ready`/`disposed` status and optional last change. |
+| `getState()` | reader | `ScoreEditorState`: `document`, `dirty`, and `history`. |
+| `history.enabled`, `history.limit` | state | Whether local history is enabled and its retained transaction limit; disabled history has limit `0`. |
+| `history.undoCount`, `history.redoCount` | state | Retained transaction counts. |
+| `history.trimmedCount` | state | Cumulative oldest-transaction removals caused by the limit. |
+| `history.canUndo`, `history.canRedo` | state | Whether a retained action is available while the editor is ready. |
+| `subscribe(listener)` | subscription | Current document snapshot immediately, then publications; returns unsubscribe. |
+| `subscribeState(listener)` | subscription | Current editor state immediately, then publications; returns unsubscribe. |
+| `dispose()` | lifecycle | Idempotent terminal publication and release of local sessions, stacks and listeners. |
+
+**`ScoreInteractionSession`**
+
+| Member | Kind | Description |
+|---|---|---|
+| `getSnapshot()` | reader | `ScoreInteractionSnapshot`: owning `documentId`, `selectedNoteIds`, `disposed`, optional draft containing base `documentRevision`, candidate Score and operations. |
+| `subscribe(listener)` | subscription | Immediate current session snapshot, then updates; returns unsubscribe. |
+| `setSelection(noteIds)` | command | Validate existing IDs and deduplicate selection; throws on unknown notes or disposed session. |
+| `preview(operations)` | command | Compute an uncommitted candidate and publish `ScoreDraftResult`; failures leave committed content unchanged. |
+| `commitDraft(label?)` | command | Default label `'Edit notes'`. Clear the draft and submit its guarded operations; absent draft is `noop`. |
+| `cancelDraft()` | command | Discard the draft; a live session with no draft is unchanged. Throws after disposal or during its own publication. |
+| `dispose()` | lifecycle | Clear selection/draft, publish disposal, release listeners and detach from the editor; does not dispose the editor. |
+
+`ScoreRevisionGuard`, `ScoreEditCommand`, `ScoreEditOperation`, `ScoreEditResult`,
+`ScoreEditTransaction`, `ScoreDocumentSource`, `ScoreDocumentSnapshot`,
+`ScoreDocumentChange`, `ScoreEditorPort`, `ScoreCheckpoint`,
+`ScoreInteractionSession`, `ScoreInteractionSnapshot` and `ScoreDraftResult`
+are re-exported from this Headless entry with `ScoreEditorOptions` and
+`ScoreEditorState`. Operation fields, source fields and position-map helpers
+are detailed in the [Edit API](/score/api/edit/). `ScoreEditError` and the pure
+helpers are exported from `/edit` or the Core root as documented there, rather
+than from this Headless barrel.
+The Core predicates `isScoreDocumentSource` and `isScoreEditorPort` are also
+re-exported by `/edit`, with their runtime checks documented in the
+[Edit API](/score/api/edit/#document-ports-and-commands).
+
+</details>
+
+## Related
+
+[Score I/O](/score/api/io/) loads the initial Score and exports an explicit
+committed snapshot. [Score Core](/score/api/#batch-edits-with-scoreedit) supplies
+the lower-level batch primitive. [Score views](/score/element/view/score-view/)
+borrow this editor for piano-roll and staff input.
+[ScoreDocument](/score/element/edit/score-document/) supplies an HTML owner,
+and [ScorePlayer](/score/headless/play/score-player/) applies committed revisions
+through its document binding.

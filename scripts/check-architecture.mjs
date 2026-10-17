@@ -16,9 +16,11 @@ import {
   requiredFeatureLayers,
   staticOptionalPeerEntries,
 } from './package-policy.mjs';
-import {elementCompositionPolicy, standaloneUiPresenters} from './element-composition-policy.mjs';
+import {elementCompositionPolicy, standaloneUiPresenters, sourceWithoutOwnedFocusWrite} from './element-composition-policy.mjs';
 import {releasePackageNames} from './release-packages.mjs';
 import {manifestBoundaryProblems, unpublishedWorkspacePackage} from './release-surface.mjs';
+import {isIdentifierReference, isRuntimeIdentifierReference} from './architecture-identifiers.mjs';
+import {allowsAudioDocumentLoaderImport} from './audio-document-import-policy.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const errors = [];
@@ -272,6 +274,13 @@ async function inspectModule(file) {
           specifier: node.moduleSpecifier.text,
           dynamic: false,
           runtime: !isTypeOnlyDeclaration(node),
+          symbols: ts.isImportDeclaration(node) && node.importClause
+            ? [
+              ...(node.importClause.name ? ['default'] : []),
+              ...(node.importClause.namedBindings && ts.isNamedImports(node.importClause.namedBindings)
+                ? node.importClause.namedBindings.elements.map((item) => (item.propertyName ?? item.name).text)
+                : node.importClause.namedBindings ? ['*'] : []),
+            ] : [],
         });
       }
     } else if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
@@ -419,35 +428,6 @@ function uiMethodFeature(name) {
   return undefined;
 }
 
-function isIdentifierReference(node) {
-  const parent = node.parent;
-  if (!parent) return false;
-  if (
-    (ts.isVariableDeclaration(parent) || ts.isParameter(parent) ||
-      ts.isFunctionDeclaration(parent) || ts.isClassDeclaration(parent) ||
-      ts.isInterfaceDeclaration(parent) || ts.isTypeAliasDeclaration(parent) ||
-      ts.isPropertyDeclaration(parent) || ts.isPropertySignature(parent) ||
-      ts.isMethodDeclaration(parent) || ts.isMethodSignature(parent) ||
-      ts.isImportClause(parent) || ts.isImportSpecifier(parent) ||
-      ts.isBindingElement(parent)) && parent.name === node
-  ) return false;
-  if (ts.isPropertyAccessExpression(parent) && parent.name === node) return false;
-  if (ts.isPropertyAssignment(parent) && parent.name === node && !ts.isComputedPropertyName(parent.name)) return false;
-  return true;
-}
-
-function isRuntimeIdentifierReference(node) {
-  for (let current = node.parent; current; current = current.parent) {
-    if (ts.isTypeNode(current)) return false;
-    if (ts.isExpressionStatement(current) || ts.isStatement(current) || ts.isSourceFile(current)) break;
-  }
-  const parent = node.parent;
-  if (ts.isPropertyAccessExpression(parent) && parent.name === node) return false;
-  if (ts.isPropertyAssignment(parent) && parent.name === node && !ts.isComputedPropertyName(parent.name)) return false;
-  if (ts.isMethodDeclaration(parent) && parent.name === node) return false;
-  return true;
-}
-
 function isTypeOnlyDeclaration(node) {
   if (ts.isImportDeclaration(node)) {
     const clause = node.importClause;
@@ -520,13 +500,14 @@ function checkFeatureLayers(name, pkg) {
       }
     }
 
-    // The capability root export maps to <capability>/index.ts; headless and
-    // element layers keep their own public subpaths.
+    // Require only explicitly implemented public layers. Exact export policy
+    // still rejects additional unreviewed subpaths such as Edit Element.
     for (const [layer, subpath] of Object.entries({
       api: `./${capability}`,
       headless: `./${capability}/headless`,
       element: `./${capability}/element`,
     })) {
+      if (!sources[layer]) continue;
       const target = pkg.manifest.exports?.[subpath];
       if (!target || typeof target !== 'object') {
         errors.push(`${name} is missing public ${layer} layer export ${subpath}.`);
@@ -641,6 +622,7 @@ function checkCapabilityBoundaries(name, pkg) {
       if (!resolved) continue;
       const targetRelative = path.relative(pkg.sourceRoot, resolved).replaceAll(path.sep, '/');
       const target = capabilityOf(targetRelative);
+      if (allowsAudioDocumentLoaderImport(name, relative, targetRelative, imported)) continue;
       if (name === '@webmusic/audio' && relative === 'analyze/element/audio-meter.ts' &&
         targetRelative === 'view/element/audio-meter.ts') continue;
       if (target !== capability && target !== 'root' && !allowed.includes(target)) {
@@ -1057,7 +1039,7 @@ async function checkElementComposition() {
   // dependency closure and presenter ownership below remain the public gates.
   for (const entry of elementCompositionPolicy) {
     if (!domainFamilies.includes(entry.family.toLowerCase())
-      || !['Play', 'Analyze', 'View'].includes(entry.capability)) {
+      || !['Play', 'Analyze', 'View', 'Edit'].includes(entry.capability)) {
       errors.push(`Element composition policy has an unknown family/capability for <${entry.tag}>.`);
     } else if (!entry.source.startsWith(
       `packages/${entry.family.toLowerCase()}/src/${entry.capability.toLowerCase()}/element/`,
@@ -1120,7 +1102,7 @@ async function checkElementComposition() {
 
     const reachesDomainBehavior = [...architecturalReachable].some((file) => {
       const relative = relativeToRoot(file);
-      return new RegExp(`^packages/${entry.family.toLowerCase()}/src/(?:core/|(?:play|analyze|view)/(?:core|headless)/)`).test(relative);
+      return new RegExp(`^packages/${entry.family.toLowerCase()}/src/(?:core/|(?:play|analyze|view|edit)/(?:core|headless)/)`).test(relative);
     });
     if (!reachesDomainBehavior) {
       errors.push(`<${entry.tag}> does not reach a reusable domain core/headless module.`);
@@ -1146,7 +1128,7 @@ async function checkElementComposition() {
     for (const file of staticallyReachable) {
       const relative = relativeToRoot(file);
       if (!relative.startsWith(`packages/${entry.family.toLowerCase()}/src/`)) continue;
-      const text = await readFile(file, 'utf8');
+      const text = sourceWithoutOwnedFocusWrite(entry.tag, relative, await readFile(file, 'utf8'));
       for (const [pattern, description] of sliderAriaBans) {
         if (pattern.test(text)) {
           errors.push(
@@ -1159,7 +1141,7 @@ async function checkElementComposition() {
     const forbiddenTags = new Set(['button', 'input', 'select', 'option', 'canvas', 'svg']);
     for (const file of reachable) {
       const relative = relativeToRoot(file);
-      if (!new RegExp(`^packages/${entry.family.toLowerCase()}/src/(?:play|analyze|view)/element/`).test(relative)) continue;
+      if (!new RegExp(`^packages/${entry.family.toLowerCase()}/src/(?:play|analyze|view|edit)/element/`).test(relative)) continue;
       const inspected = modules.get(file);
       const directTags = new Set([
         ...[...inspected.createdElementTags].filter((tag) => forbiddenTags.has(tag)),

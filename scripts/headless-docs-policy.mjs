@@ -56,7 +56,7 @@ export function headlessDocProblems({pages, readFile, frameFile}) {
   };
 
   for (const {file, source: raw} of pages) {
-    const match = /(?:^|\/)([^/]+)\/headless\/(play|analyze|view)\/([^/]+)\.mdx$/.exec(file);
+    const match = /(?:^|\/)([^/]+)\/headless\/(edit|play|analyze|view)\/([^/]+)\.mdx$/.exec(file);
     if (!match) continue;
     const [, family, capability, name] = match;
     if (name === 'index') {

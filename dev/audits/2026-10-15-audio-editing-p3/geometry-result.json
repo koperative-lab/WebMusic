@@ -1,0 +1,10 @@
+{
+  "evidence": "Browser DOM geometry with editing controls expanded; not screenshot acceptance",
+  "containers": [
+    {"width": 320, "hostWidth": 320, "overflowingControls": []},
+    {"width": 480, "hostWidth": 480, "overflowingControls": []}
+  ],
+  "viewportOverride": "Requested 480x900, but browser still reported 1280 CSS px; override reset",
+  "screenshot": "Both screenshot APIs returned Unable to capture screenshot",
+  "pointerInput": "Input.dispatchMouseEvent timed out; keyboard input remained operational"
+}

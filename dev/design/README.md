@@ -5,9 +5,17 @@ with [Product](../PRODUCT.md), [Design principles](../DESIGN-PRINCIPLES.md) and
 [Architecture](../ARCHITECTURE.md). [Decisions](../DECISIONS.md) records accepted
 choices; [STATUS](../STATUS.md) distinguishes delivery from target design.
 
+DEC-047 accepts the document/editor, playback and editable-View contracts below.
+The [current five-phase roadmap](EDIT-COMPONENTS.md#implementation-and-reference-delivery)
+groups delivery as P0 design, P1 Score foundation, P2 Score editing workflow,
+P3 Audio single-file workflow and P4 staff editing. STATUS EDIT-01 tracks actual
+delivery. The [dated proposal](../plans/2026-10-13-editing-capabilities.md) retains
+its original phase sequence and alternatives.
+
 | Contract | Use |
 |---|---|
 | [COMPONENT-DESIGN.md](COMPONENT-DESIGN.md) | Design questions, a copyable contract template and acceptance scenarios for any component |
+| [EDIT-COMPONENTS.md](EDIT-COMPONENTS.md) | Document ownership, commands/history, editable Views, playback revision application and asset-backed audio editing |
 | [PLAYER-BINDING.md](PLAYER-BINDING.md) | Borrowing Play data, state and time, including ownership, standalone use and open binding choices |
 | [ANALYZE-COMPONENTS.md](ANALYZE-COMPONENTS.md) | Score's live analysis roles, sibling composition and Headless report boundary |
 | [VIEW-COMPONENTS.md](VIEW-COMPONENTS.md) | Score's type-selected representations and separate engraving/view responsibilities |

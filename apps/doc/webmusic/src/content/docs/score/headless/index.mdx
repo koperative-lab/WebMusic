@@ -9,6 +9,7 @@ engines, sessions, controllers and their supporting helpers imported from
 
 | Capability | Contents |
 | --- | --- |
+| [Edit](#edit) | `ScoreEditor`, atomic document commands, local history and interaction drafts. |
 | [Play](#play) | `ScorePlayer`, `TonePlayer`, controllers, rack, tempo. |
 | [Analyze](#analyze) | Analysis sessions, playback followers, live trackers, workers and presentation prediction. |
 | [View](#view) | Score windows, map navigation, current-pitch views and held-note tracking. |
@@ -25,6 +26,25 @@ page. `check:docs` checks that each exported value name occurs in backticks on
 this page or on a page in the capability's directory; it does not verify the
 linked page's signatures, type coverage, unique reference ownership or
 completeness. Those require source review.
+
+## Edit
+
+`@webmusic/score/edit/headless` supplies the persistent owner for one immutable
+Score document. It has no DOM, loading or playback resources. Its read-only
+source and command ports live in Core; native ScorePlayer and editable Score
+views borrow those interfaces without importing the editor implementation.
+
+| Export | Kind | Page |
+|---|---|---|
+| `ScoreEditor` · `createScoreEditor` | class · factory | [ScoreEditor](/score/headless/edit/score-editor/) |
+
+`ScoreEditorOptions`, `ScoreEditorState`, `ScoreEditorPort`,
+`ScoreDocumentSource`, `ScoreDocumentSnapshot`, `ScoreDocumentChange`,
+`ScoreEditCommand`, `ScoreEditOperation`, `ScoreEditResult`,
+`ScoreEditTransaction`, `ScoreRevisionGuard`, `ScoreCheckpoint`,
+`ScoreInteractionSession`, `ScoreInteractionSnapshot` and `ScoreDraftResult`
+are owned by the same reference. The pure operation and position-map functions
+belong to the [Edit API](/score/api/edit/).
 
 ## Play
 
@@ -159,7 +179,11 @@ no canvas, no styles — that is the rule every `/headless` entry follows, and
 here it is the whole point, because your framework owns the surface.
 
 Import from `@webmusic/score/view/headless`. `createScoreView` owns sequence
-and viewport state for one Score. `createScoreMapView` follows score replacement
+and viewport state for one Score or a borrowed editing document.
+`createScoreViewEditing` supplies its selection/draft controller independently.
+`createStaffViewEditing` adds a local written-note cursor and voice input over
+that controller without creating another editor/history.
+`createScoreMapView` follows score replacement
 and delegates quarter-note navigation. `createPitchView` follows held pitches
 without needing a score for manual input. Each releases its subscriptions through
 `dispose()` and leaves borrowed playback with its owner. The smaller
@@ -169,17 +193,23 @@ dispose method. None owns an audio or playback clock.
 | Export | Kind | Page |
 | --- | --- | --- |
 | `createScoreView` | view model | [createScoreView](/score/headless/view/score-view/) |
+| `createScoreViewEditing` | document interaction model | [Editing controller](/score/headless/view/score-view/#follow-an-editing-document) |
+| `createStaffViewEditing` | notation input model | [Staff input](/score/headless/view/staff-editing/) |
+| `scoreDocumentPlaybackCompatible` | compatibility helper | [Document revision gating](/score/headless/view/score-view/#follow-an-editing-document) |
 | `createScoreMapView` | navigation model | [createScoreMapView](/score/headless/view/score-map-view/) |
 | `createPitchView` | held-pitch model | [createPitchView](/score/headless/view/pitch-view/) |
 | `createActiveNoteTracker` | tracker | [createActiveNoteTracker](/score/headless/view/pitch-view/#active-note-tracker) |
 
 Types (`ScoreView`, `ScoreViewOptions`, `ScoreViewState`,
-`ScoreViewTimeRange`, `ScoreViewType`, `ScoreViewListener`, `ActiveNoteState`,
+`ScoreViewTimeRange`, `ScoreViewType`, `ScoreViewListener`, `ScoreViewEditing`,
+`ScoreViewEditingOptions`, `ScoreViewEditingState`, `ActiveNoteState`,
 `ActiveNoteTracker`, `ActiveNoteListener`) are described with the object that
 produces them. `ScoreMapView`, `ScoreMapViewOptions`, `ScoreMapViewState`,
 `ScoreMapViewListener` and `ScoreMapSeekOutcome` belong to the map-view page;
 `PitchView`, `PitchViewOptions`, `PitchViewState` and `PitchViewListener` belong
 to the pitch-view page.
+`StaffViewEditing`, `StaffViewEditingOptions` and `StaffViewEditingState` belong
+to the [staff-input reference](/score/headless/view/staff-editing/).
 
 ### Not here: the renderers
 

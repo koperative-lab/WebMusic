@@ -1,6 +1,7 @@
 import {peakCount, peaksLevelForResolution, readPeak, type AudioPeaks, type Region} from '../../core';
 import {AudioTimeline, type AudioTimelineOptions} from './timeline';
 import {peaksDuration} from './peaks';
+import type {AudioWaveformSource} from '../core/types';
 
 export interface WaveformViewModelOptions
   extends Omit<AudioTimelineOptions, 'durationSeconds'> {
@@ -25,15 +26,15 @@ export interface WaveformColumn {
 /** Calculates visible min/max columns without choosing a drawing technology. */
 export class WaveformViewModel {
   readonly timeline: AudioTimeline;
-  readonly #peaks: AudioPeaks;
+  readonly #peaks: AudioPeaks | AudioWaveformSource;
   readonly #mergeChannels: boolean;
 
-  constructor(peaks: AudioPeaks, options: WaveformViewModelOptions = {}) {
+  constructor(peaks: AudioPeaks | AudioWaveformSource, options: WaveformViewModelOptions = {}) {
     this.#peaks = peaks;
     this.#mergeChannels = options.mergeChannels ?? false;
     this.timeline = new AudioTimeline({
       ...options,
-      durationSeconds: options.durationSeconds ?? peaksDuration(peaks),
+      durationSeconds: options.durationSeconds ?? ('readPeaks' in peaks ? peaks.frameCount / peaks.sampleRate : peaksDuration(peaks)),
     });
   }
 
@@ -44,25 +45,33 @@ export class WaveformViewModel {
     if (state.viewportWidth <= 0 || visible.endSeconds <= visible.startSeconds) return [];
 
     const samplesPerPixel = this.#peaks.sampleRate / state.pixelsPerSecond;
-    const level = peaksLevelForResolution(this.#peaks, samplesPerPixel);
-    const count = peakCount(level, this.#peaks.channels);
+    const source = 'readPeaks' in this.#peaks ? this.#peaks : undefined;
+    const level = 'levels' in this.#peaks ? peaksLevelForResolution(this.#peaks, samplesPerPixel) : undefined;
+    const count = level ? peakCount(level, this.#peaks.channels) : source!.frameCount;
     const startX = Math.floor(visible.startSeconds * state.pixelsPerSecond);
     const endX = Math.ceil(visible.endSeconds * state.pixelsPerSecond);
     const result: WaveformColumn[] = [];
 
     for (let x = startX; x < endX; x += 1) {
       const seconds = x / state.pixelsPerSecond;
-      const firstSample = seconds * this.#peaks.sampleRate;
-      const lastSample = ((x + 1) / state.pixelsPerSecond) * this.#peaks.sampleRate;
-      const firstPeak = Math.max(0, Math.floor(firstSample / level.samplesPerPeak));
-      const lastPeak = Math.min(count - 1, Math.max(firstPeak, Math.ceil(lastSample / level.samplesPerPeak) - 1));
+      const firstSample = x * samplesPerPixel;
+      const lastSample = (x + 1) * samplesPerPixel;
+      if (source) {
+        const channelPeaks = source.readPeaks(Math.max(0, Math.floor(firstSample)), Math.min(source.frameCount, Math.ceil(lastSample)));
+        const peaks = this.#mergeChannels ? [mergePeaks(channelPeaks)] : channelPeaks;
+        const region = this.timeline.hitTest(x - state.offsetPixels).region;
+        result.push(region ? {x, seconds, peaks, region} : {x, seconds, peaks});
+        continue;
+      }
+      const firstPeak = Math.max(0, Math.floor(firstSample / level!.samplesPerPeak));
+      const lastPeak = Math.min(count - 1, Math.max(firstPeak, Math.ceil(lastSample / level!.samplesPerPeak) - 1));
       if (firstPeak >= count || count === 0) continue;
       const channelPeaks: WaveformChannelPeak[] = [];
       for (let channel = 0; channel < this.#peaks.channels; channel += 1) {
         let min = Number.POSITIVE_INFINITY;
         let max = Number.NEGATIVE_INFINITY;
         for (let peakIndex = firstPeak; peakIndex <= lastPeak; peakIndex += 1) {
-          const peak = readPeak(level, this.#peaks.channels, channel, peakIndex);
+          const peak = readPeak(level!, this.#peaks.channels, channel, peakIndex);
           if (peak.min < min) min = peak.min;
           if (peak.max > max) max = peak.max;
         }
@@ -80,7 +89,7 @@ export class WaveformViewModel {
 }
 
 export function createWaveformViewModel(
-  peaks: AudioPeaks,
+  peaks: AudioPeaks | AudioWaveformSource,
   options?: WaveformViewModelOptions,
 ): WaveformViewModel {
   return new WaveformViewModel(peaks, options);

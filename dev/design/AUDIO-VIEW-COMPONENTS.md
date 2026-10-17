@@ -22,6 +22,48 @@ when those interactions are useful. Core/Headless project numeric data without
 DOM; Render owns canvas/browser work; Elements compose these capabilities with
 neutral UIKit presenters. DEC-044 retires the three narrower Audio View tags.
 
+## Accepted editing target (DEC-047)
+
+[Editing capabilities](EDIT-COMPONENTS.md) and
+[DEC-047](../DECISIONS.md#dec-047--document-owned-editing-and-borrowed-playback)
+define the optional editor binding implemented for `audio-view`, with `editable`
+enabling supported waveform commands. [STATUS EDIT-01](../STATUS.md) owns current
+verification. Actual commands, numeric controls and limits belong to the
+[View Element](../../apps/doc/webmusic/src/content/docs/audio/element/view/audio-view.mdx)
+and [Headless reference](../../apps/doc/webmusic/src/content/docs/audio/headless/view/view-models.mdx).
+Existing behavior remains the default without an editor. This decision adds no standalone visual audio-editor Element.
+
+The nonvisual `audio-document` declaration owns and loads an `AudioClipEditor`;
+object injection supports an application-owned editor. A View borrows Core
+document state/commands and an optional player, retaining only its viewport,
+focus, gestures and draft presentation. Editor binding without `editable` displays
+committed content without content-mutation gestures. `editable` without a ready
+editor is unavailable; simultaneous editor and independent explicit data/`src`
+is a configuration conflict. A borrower never disposes the editor or player.
+
+Document content is an immutable sequence of asset references and silence spans.
+Structural edits and history share PCM; gain/fades may be segment parameters,
+and local processing creates assets only for the required range and processing
+context. View projects that sequence through bounded waveform reads without materializing
+the complete output. Segment metadata changes rebuild coordinates; queried ranges
+read the appropriate immutable asset samples, silence, gains and envelopes.
+Spectrogram/meter editing and spectral repair are outside this delivered waveform
+contract. Reference sharing does not promise that every redraw avoids sample reads.
+
+One gesture updates a draft and commits once on release; cancellation or a
+conflicting revision discards it. Content editing, seeking, scrubbing and region
+annotation have distinct tools and cannot claim the same primary-pointer gesture.
+The current `annotate`/`webaudio:regionchange` interaction remains a region-display
+contract, not a PCM edit or an implicit document commit. Document annotations
+change only through explicit editor commands. Mode changes cancel active drafts.
+
+The player consumes a read-only sequence source and reports its applied document
+revision under the [Audio Play target](AUDIO-PLAY-COMPONENTS.md#accepted-document-playback-target-dec-047).
+View can display newer committed content during preparation, but withholds
+incompatible seek commands and playback overlays until document identities and
+revisions match and the coordinate mapping is valid. The editor owns content; Play owns time and
+sound. View creates no player, audio graph or second clock.
+
 ## Meter boundary and player binding
 
 `AudioMeterController` and its pure level/spectrum helpers belong to

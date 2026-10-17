@@ -1,8 +1,8 @@
 # Score Play component responsibilities
 
-Status: implemented, including responsive presenter changes; browser and real-device acceptance pending.
+Status: existing Play surfaces implemented, including responsive presenter changes; browser and real-device acceptance pending. Document-bound playback below is an accepted target, with runtime implementation pending.
 Layer and public entry: Score Play Headless, Elements and UI bindings.
-Related decisions: DEC-016 and DEC-045.
+Related decisions: DEC-016, DEC-045 and DEC-047.
 Source and public types: [Play source](../../packages/score/src/play/).
 Owning reference and demos: [Play Elements](../../apps/doc/webmusic/src/content/docs/score/element/index.mdx#play).
 
@@ -46,6 +46,42 @@ Analyze/View borrow the native player's resolved Score and state through the
 [existing binding contract](PLAYER-BINDING.md). A Rack or arbitrary controller
 has no complete single-score snapshot in this checkout. Transport support is
 not a claim of uniform companion data support.
+
+## Document-bound playback: accepted target
+
+[Editing contracts](EDIT-COMPONENTS.md) and
+[DEC-047](../DECISIONS.md#dec-047--document-owned-editing-and-borrowed-playback)
+define the accepted editing integration. [STATUS](../STATUS.md), EDIT-01,
+tracks its pending runtime delivery; the following is not an existing API.
+
+`ScoreEditor` owns committed document content. The native single-Score
+`ScorePlayer` borrows its Core read-only source and reports the document revision
+actually applied to playback, separately from the existing playback `revision`
+and `sourceRevision`. Play does not import the concrete Edit implementation.
+The future `.editor` / `editor` selector binding rejects controller or Rack
+configuration before changing a working owner; those modes and other Headless
+engines are outside this first integration.
+
+Content updates retain the existing player, scheduler, clock reader and audio
+graph. They pause playback, prepare a candidate timeline, apply the revision and
+mapped transport state coherently, then remain paused. Preparation must not
+resume an AudioContext merely because content changed. Position maps compose
+from the last applied revision, including skipped revisions and undo/redo.
+Newer stop, seek, rate or loop commands supersede captured transport intent;
+completion cannot restore an old position or restart playback.
+
+Revision application reports applied, superseded or failed for the requested revision.
+Failure preserves edited content and the last applied revision for diagnosis,
+but gates playback until retry or explicit detachment resolves the mismatch.
+For repeat-expanded playback without an authored-to-occurrence mapping, revision
+application resets to origin and clears loops. Document-coordinate seeking and
+occurrence overlays remain unavailable without that mapping; passive
+followers can still use the actual playback projection.
+
+Acceptance must prove stable owner/clock identity, failed and superseded
+preparation, stop-to-origin during preparation, non-unit rate and variable tempo,
+and cleanup that releases only owned resources. Existing source replacement
+behavior does not establish these guarantees.
 
 ## Inputs, outputs and units
 
@@ -134,7 +170,7 @@ testing and final visual acceptance remain pending.
 
 | Resource | Owner and release |
 |---|---|
-| Native score engine and default audio resources | Player facade; destroy on replacement/disconnect, close only owned resources |
+| Native score engine and default audio resources | Player facade; destroy on owner replacement/disconnect, close only owned resources |
 | Rack | Borrowed by transport; facade destruction stops its transport but does not dispose the Rack; desk disposes only a Rack it created |
 | PlayerController | Borrowed; unmount subscriptions/UI without stopping or disposing it |
 | Recorder source / MIDI port | Borrowed; remove only the current binding's listeners/handler; restore its predecessor when still owned |

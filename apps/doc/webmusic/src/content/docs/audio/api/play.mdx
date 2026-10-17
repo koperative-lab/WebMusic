@@ -19,7 +19,7 @@ exist for bundlers and custom hosts that want exactly one seam.
 
 ## Load & decode
 
-Players take an `AudioClip`, not a file. Conversion lives in one place so the same parsed clip feeds a player, a mixer, an exporter, and a waveform view. `loadClip` accepts raw bytes, a `Blob`/`File`, or an already-decoded `AudioBuffer`; `loadClipFromUrl` fetches for decoded clips and skips the fetch when `streaming: true`. For bytes, an explicit `format` wins, followed by **magic bytes** (`detectAudioFormat`) and then a file hint. For URLs, an explicit `format` wins, followed by the **extension** (`formatFromExtension`) and then byte sniffing after fetch.
+Standalone players take an `AudioClip`; document playback borrows an `AudioDocumentSource`. Loading bytes remains explicit. Conversion lives in one place so the same parsed clip feeds a player, a mixer, an exporter, and a waveform view. `loadClip` accepts raw bytes, a `Blob`/`File`, or an already-decoded `AudioBuffer`; `loadClipFromUrl` fetches for decoded clips and skips the fetch when `streaming: true`. For bytes, an explicit `format` wins, followed by **magic bytes** (`detectAudioFormat`) and then a file hint. For URLs, an explicit `format` wins, followed by the **extension** (`formatFromExtension`) and then byte sniffing after fetch.
 
 ```ts
 import { loadClip, loadClipFromUrl, detectAudioFormat, formatFromExtension } from '@webmusic/audio/play';
@@ -94,6 +94,18 @@ engines and the effect builders live on `@webmusic/audio/play/headless` and
 are documented one page each under
 [Headless › Play](/audio/headless/#play). This page documents the stateless
 half — decoding, loading, WAV bytes and the offline export.
+
+## Editable document playback
+
+The stable `AudioPlayer` also accepts `setDocumentSource(editor)` through Core's
+read-only `AudioDocumentSource`. Its sequence engine applies revisions without
+whole-output rendering or implicit context creation. It pauses on edits and
+exposes requested/applied identities, retry outcomes and the discriminated
+`AudioPlaybackSourceSnapshot` (`empty | clip | sequence`). A sequence has no fake
+`.clip`; use editor-aware waveform views and explicit
+[Edit rendering/export](/audio/api/edit/) for static PCM analysis or WAV bytes.
+See [document playback](/audio/headless/play/audio-player/#edited-sequence-playback)
+for the full resource limits, position mapping, loop and lifecycle contract.
 
 ## Export — render to WAV (and offline effects)
 
@@ -207,6 +219,7 @@ client and protocol also have dedicated subpaths in the
 | `DEFAULT_MAX_INPUT_BYTES`, `DEFAULT_MAX_DECODED_FRAMES`, `DEFAULT_MAX_DECODED_BYTES`, `DEFAULT_MAX_CHANNELS`, `DEFAULT_REQUEST_TIMEOUT_MS` | Constants | Default resource ceilings: 128 MiB input, 30 million frames per channel, 256 MiB decoded PCM, 32 channels, and 30 seconds per request. |
 | `AudioResourceLimits`, `AudioFetchOptions` | Types | Size/cancellation limits and fetch timeout; `timeoutMs: 0` disables the fetch timeout. |
 | `PlayerLike`, `PlaybackEngine`, `MediaPlaybackAdapter`, `MediaPlaybackAdapterFactory` | Types | Structural player, engine and injected media-host contracts; see [Headless Play](/audio/headless/#play). |
+| `AudioPlayerOptions`, `AudioPlayerEvents`, `AudioPlayerSourceDetail`, `AudioPlayerTransport` | Types | Stable player controls/source observation; sequence chunk budget/read size and explicit borrowed transport capabilities. Core owns the document/binding/result/source snapshot types. |
 | `AudioClipPlayerOptions`, `AudioClipPlayerEvents`, `AudioScratchSession`, `PlayerTimeUpdate`, `PlayerEngineKind` | Types | Player option / event / engine and [scratch-session](/audio/headless/play/audio-clip-player/#scratch-sessions) shapes. |
 | `AudioMixerOptions`, `AudioMixerEvents`, `MixerMemberInit` | Types | Mixer option / event / member shapes. |
 | `AudioRecorderOptions`, `AudioRecorderEvents` | Types | Recorder option / event shapes. |

@@ -1,0 +1,278 @@
+
+> @webmusic/audio@0.2.0 test
+> vitest run test/view/release-surface-probe.test.ts
+
+
+ RUN  v5.0.2 /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/audio
+
+ ❯ test/view/release-surface-probe.test.ts (2 tests | 2 failed) 50ms
+   ❯ release lifecycle probes (2)
+     × source notification cleanup honors a newer explicit editor 40ms
+     × direct replacement disposes every intermediate owned interaction session 8ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/view/release-surface-probe.test.ts > release lifecycle probes > source notification cleanup honors a newer explicit editor
+AssertionError: expected AudioClipEditor{ undoStack: [], …(22) } to be AudioClipEditor{ undoStack: [], …(22) } // Object.is equality
+
+- Expected
++ Received
+
+@@ -10,11 +10,11 @@
+    },
+    "busy": false,
+    "checkpoints": WeakSet {},
+    "currentLease": {
+      "assetIds": [
+-       "asset_4218ggk9t_b",
++       "asset_4218ggk9t_6",
+      ],
+      "release": [Function release],
+      "released": false,
+    },
+    "historyByteLimit": 268435456,
+@@ -50,28 +50,28 @@
+        ],
+        "length": 1000,
+        "sampleRate": 100,
+        "segments": [
+          {
+-           "assetId": "asset_4218ggk9t_b",
++           "assetId": "asset_4218ggk9t_6",
+            "envelope": [],
+            "gain": 1,
+-           "id": "segment_4218ggk9t_c",
++           "id": "segment_4218ggk9t_7",
+            "kind": "asset",
+            "sourceEnd": 1000,
+            "sourceStart": 0,
+          },
+        ],
+      },
+-     "contentId": "audio-content_4218ggk9t_e",
+-     "documentId": "audio-document_4218ggk9t_d",
++     "contentId": "audio-content_4218ggk9t_9",
++     "documentId": "audio-document_4218ggk9t_8",
+      "documentRevision": 0,
+      "status": "ready",
+    },
+    "publishing": false,
+    "redoStack": [],
+-   "savedContentId": "audio-content_4218ggk9t_e",
++   "savedContentId": "audio-content_4218ggk9t_9",
+    "sessions": Set {
+      InteractionSession {
+        "busy": false,
+        "editor": AudioClipEditor {
+          "assets": {
+@@ -85,11 +85,11 @@
+          },
+          "busy": false,
+          "checkpoints": WeakSet {},
+          "currentLease": {
+            "assetIds": [
+-             "asset_4218ggk9t_b",
++             "asset_4218ggk9t_6",
+            ],
+            "release": [Function release],
+            "released": false,
+          },
+          "historyByteLimit": 268435456,
+@@ -125,28 +125,28 @@
+              ],
+              "length": 1000,
+              "sampleRate": 100,
+              "segments": [
+                {
+-                 "assetId": "asset_4218ggk9t_b",
++                 "assetId": "asset_4218ggk9t_6",
+                  "envelope": [],
+                  "gain": 1,
+-                 "id": "segment_4218ggk9t_c",
++                 "id": "segment_4218ggk9t_7",
+                  "kind": "asset",
+                  "sourceEnd": 1000,
+                  "sourceStart": 0,
+                },
+              ],
+            },
+-           "contentId": "audio-content_4218ggk9t_e",
+-           "documentId": "audio-document_4218ggk9t_d",
++           "contentId": "audio-content_4218ggk9t_9",
++           "documentId": "audio-document_4218ggk9t_8",
+            "documentRevision": 0,
+            "status": "ready",
+          },
+          "publishing": false,
+          "redoStack": [],
+-         "savedContentId": "audio-content_4218ggk9t_e",
++         "savedContentId": "audio-content_4218ggk9t_9",
+          "sessions": [Circular],
+          "snapshot": {
+            "assets": {
+              "dispose": [Function dispose],
+              "getDescriptor": [Function getDescriptor],
+@@ -163,22 +163,22 @@
+              ],
+              "length": 1000,
+              "sampleRate": 100,
+              "segments": [
+                {
+-                 "assetId": "asset_4218ggk9t_b",
++                 "assetId": "asset_4218ggk9t_6",
+                  "envelope": [],
+                  "gain": 1,
+-                 "id": "segment_4218ggk9t_c",
++                 "id": "segment_4218ggk9t_7",
+                  "kind": "asset",
+                  "sourceEnd": 1000,
+                  "sourceStart": 0,
+                },
+              ],
+            },
+-           "contentId": "audio-content_4218ggk9t_e",
+-           "documentId": "audio-document_4218ggk9t_d",
++           "contentId": "audio-content_4218ggk9t_9",
++           "documentId": "audio-document_4218ggk9t_8",
+            "documentRevision": 0,
+            "status": "ready",
+          },
+          "sourceListeners": Set {},
+          "state": {
+@@ -204,22 +204,22 @@
+                ],
+                "length": 1000,
+                "sampleRate": 100,
+                "segments": [
+                  {
+-                   "assetId": "asset_4218ggk9t_b",
++                   "assetId": "asset_4218ggk9t_6",
+                    "envelope": [],
+                    "gain": 1,
+-                   "id": "segment_4218ggk9t_c",
++                   "id": "segment_4218ggk9t_7",
+                    "kind": "asset",
+                    "sourceEnd": 1000,
+                    "sourceStart": 0,
+                  },
+                ],
+              },
+-             "contentId": "audio-content_4218ggk9t_e",
+-             "documentId": "audio-document_4218ggk9t_d",
++             "contentId": "audio-content_4218ggk9t_9",
++             "documentId": "audio-document_4218ggk9t_8",
+              "documentRevision": 0,
+              "status": "ready",
+            },
+            "history": {
+              "assetByteLimit": 268435456,
+@@ -247,11 +247,11 @@
+        "publishing": false,
+        "release": [Function anonymous],
+        "report": [Function anonymous],
+        "snapshot": {
+          "disposed": false,
+-         "documentId": "audio-document_4218ggk9t_d",
++         "documentId": "audio-document_4218ggk9t_8",
+          "selection": {
+            "endFrame": 0,
+            "startFrame": 0,
+          },
+        },
+@@ -274,22 +274,22 @@
+        ],
+        "length": 1000,
+        "sampleRate": 100,
+        "segments": [
+          {
+-           "assetId": "asset_4218ggk9t_b",
++           "assetId": "asset_4218ggk9t_6",
+            "envelope": [],
+            "gain": 1,
+-           "id": "segment_4218ggk9t_c",
++           "id": "segment_4218ggk9t_7",
+            "kind": "asset",
+            "sourceEnd": 1000,
+            "sourceStart": 0,
+          },
+        ],
+      },
+-     "contentId": "audio-content_4218ggk9t_e",
+-     "documentId": "audio-document_4218ggk9t_d",
++     "contentId": "audio-content_4218ggk9t_9",
++     "documentId": "audio-document_4218ggk9t_8",
+      "documentRevision": 0,
+      "status": "ready",
+    },
+    "sourceListeners": Set {},
+    "state": {
+@@ -315,22 +315,22 @@
+          ],
+          "length": 1000,
+          "sampleRate": 100,
+          "segments": [
+            {
+-             "assetId": "asset_4218ggk9t_b",
++             "assetId": "asset_4218ggk9t_6",
+              "envelope": [],
+              "gain": 1,
+-             "id": "segment_4218ggk9t_c",
++             "id": "segment_4218ggk9t_7",
+              "kind": "asset",
+              "sourceEnd": 1000,
+              "sourceStart": 0,
+            },
+          ],
+        },
+-       "contentId": "audio-content_4218ggk9t_e",
+-       "documentId": "audio-document_4218ggk9t_d",
++       "contentId": "audio-content_4218ggk9t_9",
++       "documentId": "audio-document_4218ggk9t_8",
+        "documentRevision": 0,
+        "status": "ready",
+      },
+      "history": {
+        "assetByteLimit": 268435456,
+
+ ❯ test/view/release-surface-probe.test.ts:63:25
+     61|     view.interactionSession!.subscribe(snapshot => { if (snapshot.disp…
+     62|     owner.editor = b; owner.dispatchEvent(new CustomEvent('webmusic:so…
+     63|     expect(view.editor).toBe(c);
+       |                         ^
+     64|     expect(view.interactionSession!.getSnapshot().documentId).toBe(c.g…
+     65|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  test/view/release-surface-probe.test.ts > release lifecycle probes > direct replacement disposes every intermediate owned interaction session
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ test/view/release-surface-probe.test.ts:74:67
+     72|     view.editor = b; view.remove();
+     73|     expect(made.length).toBeGreaterThan(0);
+     74|     expect(made.every(session => session.getSnapshot().disposed)).toBe…
+       |                                                                   ^
+     75|   });
+     76| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed (2)
+   Start at  01:00:12
+   Duration  640ms (environment 55%, transform 30%, tests 9%, import 5%)
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/audio
+npm error workspace @webmusic/audio@0.2.0
+npm error location /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/audio
+npm error command failed
+npm error command sh -c vitest run test/view/release-surface-probe.test.ts

@@ -1,0 +1,171 @@
+---
+import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
+const code = `import {createScoreViewEditing, createStaffViewEditing} from '@webmusic/score/view/headless';
+// editor owns the two-measure Score shown above.
+const editing = createScoreViewEditing(editor, {editable: true});
+const input = createStaffViewEditing(editing);
+// On an input command: input.insertPitch('C');
+// Teardown: input.dispose(); editing.dispose(); editor.dispose();`;
+---
+
+<HeadlessDemoFrame entry="@webmusic/score/view/headless" name="createStaffViewEditing" code={code}
+  hint="Enter notes or rests into an empty two-measure document. This custom form uses the Headless controller directly and creates no audio or staff renderer. Reset recreates the document."
+  rootAttrs={{'data-staff-input-demo': true}}>
+  <section aria-label="Staff input state">
+    <p data-summary role="status">Preparing input.</p>
+    <ul data-notes aria-label="Written notes and rests"></ul>
+    <p data-change></p>
+  </section>
+  <div class="staff-input-fields" slot="parameters">
+    <label>Part <select data-part><option value="piano">Piano</option></select></label>
+    <label>Voice <input data-voice value="1" /></label>
+    <label>Staff <input data-staff type="number" min="1" max="1" step="1" value="1" /></label>
+    <label>Cursor (quarters) <input data-cursor value="0" /></label>
+    <label>Duration base (quarters)
+      <select data-duration>
+        <option value="4">Whole: 4</option><option value="2">Half: 2</option>
+        <option value="1" selected>Quarter: 1</option><option value="1/2">Eighth: 1/2</option>
+        <option value="1/4">Sixteenth: 1/4</option><option value="1/8">Thirty-second: 1/8</option>
+        <option value="1/16">Sixty-fourth: 1/16</option>
+      </select>
+    </label>
+    <label>Dots <select data-dots><option value="0">0</option><option value="1">1</option><option value="2">2</option></select></label>
+    <label>Octave <input data-octave type="number" min="-1" max="9" step="1" value="4" /></label>
+    <label>Accidental <select data-alter><option value="-2">Double flat</option><option value="-1">Flat</option><option value="0" selected>Natural</option><option value="1">Sharp</option><option value="2">Double sharp</option></select></label>
+    <label>Pitch letter <select data-pitch>{['C', 'D', 'E', 'F', 'G', 'A', 'B'].map(letter => <option>{letter}</option>)}</select></label>
+    <label>Selected event <select data-selected><option value="">No selection</option></select></label>
+    <label><input data-editable type="checkbox" checked /> Editable</label>
+    <div class="staff-input-actions">
+      <button class="wui-btn" data-action="note" type="button">Insert note</button>
+      <button class="wui-btn" data-action="rest" type="button">Insert rest</button>
+      <button class="wui-btn" data-action="delete" type="button">Delete selected</button>
+      <button class="wui-btn" data-action="undo" type="button">Undo</button>
+      <button class="wui-btn" data-action="redo" type="button">Redo</button>
+      <button class="wui-btn" data-action="dispose" type="button">Dispose input</button>
+    </div>
+  </div>
+</HeadlessDemoFrame>
+
+<script>
+  import {MeasureId, NoteId, PartId, Rational, ScoreBuilder, VoiceId, type Alter, type Step, type ScoreQuarterValue} from '@webmusic/score';
+  import {createScoreEditor, type ScoreEditor} from '@webmusic/score/edit/headless';
+  import {createScoreViewEditing, createStaffViewEditing, type ScoreViewEditing, type StaffViewEditing} from '@webmusic/score/view/headless';
+  import {mountDemos} from '../demo-lifecycle';
+
+  mountDemos('[data-staff-input-demo]', (root, scope) => {
+    const field = (name: string) => root.querySelector<HTMLInputElement | HTMLSelectElement>(`[data-${name}]`)!;
+    const cursor = field('cursor'), duration = field('duration'), dots = field('dots'), octave = field('octave');
+    const alter = field('alter'), voice = field('voice'), staff = field('staff'), part = field('part');
+    const selection = field('selected') as HTMLSelectElement;
+    const editable = field('editable') as HTMLInputElement;
+    const summary = root.querySelector<HTMLElement>('[data-summary]')!;
+    const notes = root.querySelector<HTMLElement>('[data-notes]')!;
+    const change = root.querySelector<HTMLElement>('[data-change]')!;
+    const feedback = root.querySelector<HTMLElement>('[data-hl-feedback]')!;
+    let editor: ScoreEditor | undefined, editing: ScoreViewEditing | undefined, input: StaffViewEditing | undefined;
+    let releases: Array<() => void> = [];
+    const pendingFields = new Set<HTMLElement>();
+    const invalidFields = new Map<HTMLElement, unknown>();
+    const fieldActions = new Map<HTMLElement, () => void>();
+    const message = (text: string): void => {feedback.hidden = false; feedback.textContent = text;};
+    const quarters = (value: string): ScoreQuarterValue => {
+      const match = /^\s*(-?\d+)(?:\/(\d+))?\s*$/.exec(value);
+      if (!match) throw new Error('Use integer or fraction quarter values, such as 1/2.');
+      return [Number(match[1]), Number(match[2] ?? 1)];
+    };
+    const paint = (): void => {
+      if (!scope.active || !input || !editor || !editing) return;
+      const state = input.state, history = editor.getState().history;
+      summary.textContent = `revision ${state.document.documentRevision} · cursor q${state.onsetQuarters.toString()} · voice ${state.voice}, staff ${state.staff} · ${state.available ? 'available' : 'unavailable'} · ${state.editable ? 'editable' : 'read-only'} · ${history.undoCount} undo / ${history.redoCount} redo`;
+      const sync = (element: HTMLInputElement | HTMLSelectElement, value: string): void => {
+        if (!pendingFields.has(element)) {element.value = value; invalidFields.delete(element);}
+      };
+      sync(cursor, state.onsetQuarters.toString()); sync(duration, state.duration.base.toString());
+      sync(dots, String(state.duration.dots)); sync(octave, String(state.octave)); sync(alter, String(state.alter));
+      sync(voice, state.voice); sync(staff, String(state.staff)); sync(part, state.partId ?? '');
+      if (!pendingFields.has(editable)) editable.checked = state.editable;
+      const events = [...state.document.content.allNotes()];
+      notes.replaceChildren(...events.map(note => {
+        const item = document.createElement('li');
+        item.textContent = `${note.rest ? 'rest' : note.pitch.toString()} · q${note.onsetQuarters.toString()} · duration ${note.duration.quarters.toString()} · voice ${note.voice} · ${note.id}`;
+        return item;
+      }));
+      const selectedValue = selection.value;
+      selection.replaceChildren(new Option('No selection', ''), ...events.map(note => new Option(`${note.rest ? 'rest' : note.pitch.toString()} at ${note.onsetQuarters.toString()} (${note.voice})`, note.id)));
+      selection.value = pendingFields.has(selection) ? selectedValue : editing.state.interaction.selectedNoteIds[0] ?? '';
+      change.textContent = state.document.change ? `${state.document.change.origin}: ${state.document.change.label}` : 'No committed change.';
+      root.querySelector<HTMLButtonElement>('[data-action="undo"]')!.disabled = !state.available || !history.canUndo;
+      root.querySelector<HTMLButtonElement>('[data-action="redo"]')!.disabled = !state.available || !history.canRedo;
+    };
+    const release = (): void => {
+      releases.splice(0).forEach(stop => stop()); input?.dispose(); editing?.dispose(); editor?.dispose();
+      input = undefined; editing = undefined; editor = undefined;
+    };
+    const create = (): void => {
+      release();
+      pendingFields.clear(); invalidFields.clear();
+      field('pitch').value = 'C';
+      const builder = new ScoreBuilder();
+      builder.addPart({id: PartId('piano'), name: 'Piano', midiProgram: 0, staves: 1});
+      for (let index = 0; index < 2; index++) builder.addMeasure({
+        id: MeasureId(`measure-${index + 1}`), number: index + 1, onsetQuarters: new Rational(index * 4),
+        durationQuarters: new Rational(4), timeSignature: {numerator: 4, denominator: 4}, clef: {sign: 'G', line: 2},
+      });
+      editor = createScoreEditor(builder.build()); editing = createScoreViewEditing(editor, {editable: true});
+      input = createStaffViewEditing(editing); releases = [input.subscribe(paint), editor.subscribeState(paint)];
+      paint(); message('Ready. Enter a note, or use voice 2 to preserve the first voice.');
+    };
+    const changeField = (element: HTMLElement, command: () => void): void => {
+      fieldActions.set(element, command);
+      scope.listen(element, 'input', () => {pendingFields.add(element);});
+      scope.listen(element, 'change', () => {
+        pendingFields.add(element);
+        try {command(); pendingFields.delete(element); invalidFields.delete(element); message('Input state updated.');}
+        catch (error) {invalidFields.set(element, error); message(String(error));}
+        paint();
+      });
+    };
+    changeField(selection, () => {if (selection.value) input?.select(NoteId(selection.value)); else editing?.select([]);});
+    changeField(part, () => input?.setPart(PartId(part.value)));
+    changeField(voice, () => input?.setVoice(VoiceId(voice.value)));
+    changeField(staff, () => input?.setStaff(Number(staff.value)));
+    changeField(cursor, () => input?.setCursor(quarters(cursor.value)));
+    changeField(duration, () => input?.setDuration(quarters(duration.value), Number(dots.value)));
+    changeField(dots, () => input?.setDuration(quarters(duration.value), Number(dots.value)));
+    changeField(octave, () => input?.setOctave(Number(octave.value)));
+    changeField(alter, () => input?.setAlter(Number(alter.value) as Alter));
+    changeField(editable, () => editing?.setEditable(editable.checked));
+    const applyPending = (): void => {
+      const active = root.ownerDocument.activeElement;
+      for (const [element, command] of fieldActions) {
+        if (!pendingFields.has(element) && element !== active) continue;
+        pendingFields.add(element);
+        try {command(); pendingFields.delete(element); invalidFields.delete(element);}
+        catch (error) {invalidFields.set(element, error); throw error;}
+      }
+      if (invalidFields.size) throw invalidFields.values().next().value;
+    };
+    scope.listen(root, 'click', event => {
+      const action = (event.target as Element | null)?.closest('[data-action]')?.getAttribute('data-action');
+      if (!action || !input) return;
+      try {
+        if (action === 'note' || action === 'rest' || action === 'delete') applyPending();
+        const result = action === 'note' ? input.insertPitch(field('pitch').value as Step)
+          : action === 'rest' ? input.insertRest() : action === 'delete' ? input.deleteSelected() : action === 'undo' ? input.undo()
+          : action === 'redo' ? input.redo() : undefined;
+        if (action === 'dispose') input.dispose();
+        message(result ? `${result.status}${result.status === 'failed' ? `: ${result.error.message}` : ''}` : 'Input disposed; Reset creates another controller.');
+      } catch (error) {message(String(error));}
+      paint();
+    });
+    scope.listen(root, 'wm:headless-reset', create); scope.add(release); create();
+  });
+</script>
+
+<style>
+  .staff-input-fields {display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,12rem),1fr)); gap:.75rem; min-width:0}
+  .staff-input-fields label {display:grid; gap:.25rem; min-width:0; font-size:.85rem}
+  .staff-input-fields input, .staff-input-fields select {box-sizing:border-box; min-width:0; max-width:100%}
+  .staff-input-actions {display:flex; flex-wrap:wrap; gap:.5rem; grid-column:1/-1}
+  [data-summary], [data-notes], [data-change] {overflow-wrap:anywhere}
+</style>

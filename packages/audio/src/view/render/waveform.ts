@@ -30,6 +30,7 @@ import {secondsToPixel, pixelToSeconds, clampCanvasBackingSize, MAX_CANVAS_DIMEN
 import {computeFrameColors, type FrameColors} from '../core/waveform-color';
 import type {
   AudioViewport,
+  AudioWaveformSource,
   SpectrogramData,
   ViewportAudioVisualizer,
   WaveformRenderOptions,
@@ -58,7 +59,7 @@ interface ResolvedRegion {
  */
 export function renderWaveformVisualizer(
   container: HTMLElement,
-  peaks: AudioPeaks,
+  peaks: AudioPeaks | AudioWaveformSource,
   options: WaveformRenderOptions = {},
 ): ViewportAudioVisualizer {
   let pixelsPerSecond = options.pixelsPerSecond ?? DEFAULTS.pixelsPerSecond;
@@ -70,7 +71,9 @@ export function renderWaveformVisualizer(
   const backgroundColor = options.backgroundColor;
   const scrollable = options.scrollable ?? true;
   let playheadMode = options.playheadMode ?? 'position';
-  const duration = options.durationSeconds ?? peaksDuration(peaks);
+  const sequenceSource = 'readPeaks' in peaks ? peaks : undefined;
+  const pyramid = 'levels' in peaks ? peaks : undefined;
+  const duration = options.durationSeconds ?? (sequenceSource ? sequenceSource.frameCount / sequenceSource.sampleRate : peaksDuration(pyramid!));
 
   // Frequency-based colouring (miniMeter-style multi-band / colormap). Computed
   // once per frame here — the per-column paint loop only does an array lookup.
@@ -96,6 +99,7 @@ export function renderWaveformVisualizer(
 
   let regions: ResolvedRegion[] = [];
   let playheadSeconds = 0;
+  let playheadVisible = true;
   // CSS px of clip scrolled past the left edge — the single, fractional source of
   // truth the waveform and the playhead are both drawn from.
   let renderOffset = 0;
@@ -338,11 +342,11 @@ export function renderWaveformVisualizer(
 
     // Choose the pyramid level whose peaks are closest to one-per-pixel.
     const samplesPerPixel = peaks.sampleRate / (pixelsPerSecond * rasterScaleX);
-    const level = peaksLevelForResolution(peaks, samplesPerPixel);
-    const total = peakCount(level, peaks.channels);
-    const secondsPerPeak = level.samplesPerPeak / peaks.sampleRate;
+    const level = pyramid ? peaksLevelForResolution(pyramid, samplesPerPixel) : undefined;
+    const total = level ? peakCount(level, peaks.channels) : sequenceSource!.frameCount;
+    const secondsPerPeak = level ? level.samplesPerPeak / peaks.sampleRate : 1 / peaks.sampleRate;
     const channels = peaks.channels;
-    const peakData = level.data;
+    const peakData = level?.data;
     const playheadCol = secondsToPixel(playheadSeconds, pixelsPerSecond) * rasterScaleX - intOff;
 
     // Lanes: one centred waveform in `merge`, or a stacked stereo pair in
@@ -376,7 +380,7 @@ export function renderWaveformVisualizer(
     // Recent-history glow: full brightness within `historyTrail` seconds behind
     // the playhead, dimmed elsewhere — a trailing window that follows playback.
     const historyFactor = (seconds: number): number => {
-      if (historyTrail <= 0) return 1;
+      if (!playheadVisible || historyTrail <= 0) return 1;
       const behind = playheadSeconds - seconds;
       return behind >= 0 && behind <= historyTrail ? 1 : HISTORY_DIM;
     };
@@ -387,7 +391,7 @@ export function renderWaveformVisualizer(
       x: number,
       factor: number,
     ): string => {
-      if (!colors) return x <= playheadCol ? progressPaint : wavePaint;
+      if (!colors) return playheadVisible && x <= playheadCol ? progressPaint : wavePaint;
       let fi = colors.frameStep > 0 ? Math.round((seconds - colors.startTime) / colors.frameStep) : 0;
       if (fi < 0) fi = 0;
       else if (fi >= colors.frames) fi = colors.frames - 1;
@@ -419,6 +423,8 @@ export function renderWaveformVisualizer(
         if (playheadMode === 'center' && (seconds < 0 || seconds >= duration)) continue;
         const peakIndex = Math.floor(seconds / secondsPerPeak);
         if (peakIndex < 0 || peakIndex >= total) continue;
+        const sequencePeaks = sequenceSource?.readPeaks(Math.max(0, Math.floor((intOff + x) * samplesPerPixel)),
+          Math.min(sequenceSource.frameCount, Math.max(1, Math.ceil((intOff + x + 1) * samplesPerPixel))));
         const factor = historyFactor(seconds);
         for (const lane of lanes) {
           let lo = Infinity;
@@ -429,15 +435,15 @@ export function renderWaveformVisualizer(
           if (lane.channel < 0) {
             for (let c = 0; c < channels; c += 1) {
               const base = (peakIndex * channels + c) * 2;
-              const min = peakData[base] / 128;
-              const max = peakData[base + 1] / 128;
+              const min = sequencePeaks ? sequencePeaks[c].min : peakData![base] / 128;
+              const max = sequencePeaks ? sequencePeaks[c].max : peakData![base + 1] / 128;
               if (min < lo) lo = min;
               if (max > hi) hi = max;
             }
           } else {
             const base = (peakIndex * channels + lane.channel) * 2;
-            lo = peakData[base] / 128;
-            hi = peakData[base + 1] / 128;
+            lo = sequencePeaks ? sequencePeaks[lane.channel].min : peakData![base] / 128;
+            hi = sequencePeaks ? sequencePeaks[lane.channel].max : peakData![base + 1] / 128;
           }
           if (!Number.isFinite(lo) || !Number.isFinite(hi)) continue;
           const yTop = Math.max(0, lane.center - hi * lane.half);
@@ -472,7 +478,7 @@ export function renderWaveformVisualizer(
       ? measuredViewportWidth() / 2
       : secondsToPixel(playheadSeconds, pixelsPerSecond) - renderOffset;
     overlay.style.transform = `translateX(${playheadX}px)`;
-    overlay.style.opacity = playheadX < -1 || playheadX > viewport + 1 ? '0' : '1';
+    overlay.style.opacity = !playheadVisible || playheadX < -1 || playheadX > viewport + 1 ? '0' : '1';
   };
 
   /** Center the viewport on the playhead, clamped at both ends. */
@@ -554,6 +560,11 @@ export function renderWaveformVisualizer(
   };
 
   return {
+    setPlayheadVisible(visible: boolean): void {
+      if (disposed || playheadVisible === visible) return;
+      playheadVisible = visible;
+      schedulePaint();
+    },
     redraw(nextPlayhead?: number, scrollIntoView?: boolean): void {
       if (disposed) return;
       if (nextPlayhead === undefined) {

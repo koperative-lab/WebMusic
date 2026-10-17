@@ -1,0 +1,163 @@
+---
+import ElementPlayground from '../ElementPlayground.astro';
+import './editing-import.css';
+const source = `${import.meta.env.BASE_URL}wav/Editing.wav`;
+---
+
+<ElementPlayground tag="audio-view" target="[data-audio-edit-view]" markup="[data-audio-edit-composition]"
+  companions={[{tag: 'audio-player', target: '[data-audio-edit-player]'}, {tag: 'audio-document', target: '[data-audio-edit-document]'}]}>
+  <section data-audio-edit-demo aria-label="Audio editing workflow">
+    <div data-audio-edit-composition data-pg-fragment>
+      <audio-document data-audio-edit-document id="audio-edit-document" src={source}></audio-document>
+      <audio-player data-audio-edit-player id="audio-edit-player" editor="#audio-edit-document"></audio-player>
+      <audio-view data-audio-edit-view editor="#audio-edit-document" player="#audio-edit-player" type="waveform" editable></audio-view>
+    </div>
+    <p data-audio-edit-status role="status">Loading the six-second audio example.</p>
+    <div class="audio-edit-actions">
+      <label class="editing-import">Import WAV <input data-audio-edit-import type="file" accept=".wav,audio/wav" aria-label="Import WAV" /></label>
+      <button class="wui-btn" data-audio-edit-process="normalize" type="button">Normalize selection</button>
+      <button class="wui-btn" data-audio-edit-process="reverse" type="button">Reverse selection</button>
+      <button class="wui-btn" data-audio-edit-cancel type="button">Cancel processing</button>
+      <button class="wui-btn" data-audio-edit-export type="button">Export WAV</button>
+      <button class="wui-btn" data-audio-edit-restore type="button">Reload configured source</button>
+    </div>
+    <p data-audio-edit-result aria-live="polite">Select a range, then cut, trim, change gain or process it. Edits pause playback; press Play to hear the committed version.</p>
+  </section>
+</ElementPlayground>
+
+<script>
+  import {defineAudioDocumentElement, type AudioDocumentElement} from '@webmusic/audio/edit/element';
+  import {defineAudioPlayerElement, type AudioPlayerElement} from '@webmusic/audio/play/element';
+  import {defineAudioViewElement, type AudioViewElement} from '@webmusic/audio/view/element';
+  import {createAudioRangeProcessor, exportAudioSequenceWav} from '@webmusic/audio/edit';
+  import {loadClip} from '@webmusic/audio/play';
+  import {mountDemos} from '../demo-lifecycle';
+  import {PLAYGROUND_RESET_EVENT} from '../playground-client';
+  defineAudioDocumentElement(); defineAudioPlayerElement(); defineAudioViewElement();
+  mountDemos('[data-audio-edit-demo]', (root, scope) => {
+    const owner = root.querySelector<AudioDocumentElement>('[data-audio-edit-document]')!;
+    const player = root.querySelector<AudioPlayerElement>('[data-audio-edit-player]')!;
+    const view = root.querySelector<AudioViewElement>('[data-audio-edit-view]')!;
+    const status = root.querySelector<HTMLElement>('[data-audio-edit-status]')!;
+    const result = root.querySelector<HTMLElement>('[data-audio-edit-result]')!;
+    const upload = root.querySelector<HTMLInputElement>('[data-audio-edit-import]')!;
+    const exportButton = root.querySelector<HTMLButtonElement>('[data-audio-edit-export]')!;
+    const cancelButton = root.querySelector<HTMLButtonElement>('[data-audio-edit-cancel]')!;
+    const processButtons = root.querySelectorAll<HTMLButtonElement>('[data-audio-edit-process]');
+    const initialMessage = result.textContent;
+    let bindingError: string | undefined;
+    owner.processors = [createAudioRangeProcessor('normalize'), createAudioRangeProcessor('reverse')];
+    let stop: (() => void) | undefined;
+    let generation = 0, importGeneration = 0, jobId = 0;
+    let importController: AbortController | undefined, exportController: AbortController | undefined;
+    let downloadUrl: string | undefined;
+    const show = (message: string) => {if (scope.active) {bindingError = undefined; result.textContent = message;}};
+    const paint = (): void => {
+      if (!scope.active) return;
+      const state = owner.editor?.getState(), binding = player.documentBinding;
+      status.textContent = state
+        ? `Document ${owner.status} · ${state.document.content.length} frames · revision ${state.document.documentRevision} · playback ${binding?.status ?? 'empty'}${binding?.applied ? ` (revision ${binding.applied.documentRevision})` : ''} · ${state.dirty ? 'unsaved' : 'saved'}`
+        : `Document ${owner.status}.`;
+      exportButton.disabled = !state || state.document.status !== 'ready' || !!exportController;
+      cancelButton.disabled = !state?.processing;
+      for (const button of processButtons) button.disabled = !state || state.document.status !== 'ready' || state.processing;
+      if (bindingError && result.textContent === bindingError && state?.document.status === 'ready' && binding?.status === 'ready'
+        && binding.applied?.documentId === state.document.documentId && binding.applied.documentRevision === state.document.documentRevision) {
+        bindingError = undefined; result.textContent = initialMessage;
+      }
+    };
+    const attach = (): void => {
+      generation += 1; stop?.(); stop = undefined; exportController?.abort();
+      const current = generation, editor = owner.editor;
+      if (editor) {
+        const release = editor.subscribeState(() => {if (scope.active && current === generation) paint();});
+        if (scope.active && current === generation) stop = release; else release();
+      }
+      paint();
+    };
+    const invalidateImport = (): void => {
+      importGeneration += 1; importController?.abort(); importController = undefined;
+    };
+    scope.listen(owner, 'webmusic:sourcechange', attach);
+    scope.listen(owner, 'webaudio:documentstatechange', () => {
+      if (owner.status === 'loading') invalidateImport();
+      paint();
+    });
+    scope.listen(player, 'webaudio:documentstatechange', paint);
+    scope.listen(root, 'webaudio:error', event => {
+      const detail: unknown = (event as CustomEvent).detail;
+      const error = detail && typeof detail === 'object' && 'error' in detail ? detail.error : detail;
+      show(error instanceof Error ? error.message : String(error));
+      if (error instanceof Error && 'code' in error && error.code === 'not-ready') bindingError = error.message;
+    });
+    scope.listen(upload, 'change', async () => {
+      const file = upload.files?.[0]; if (!file) return;
+      invalidateImport(); const current = importGeneration;
+      const controller = new AbortController(); importController = controller;
+      const input = owner.clip;
+      const attributes = ['src', 'format', 'history', 'history-limit'];
+      const configuration = attributes.map(name => owner.getAttribute(name));
+      const valid = () => scope.active && current === importGeneration && owner.clip === input
+        && attributes.every((name, index) => owner.getAttribute(name) === configuration[index]);
+      try {
+        const clip = await loadClip(file, {format: 'wav', signal: controller.signal});
+        if (!valid()) return;
+        owner.clip = clip;
+        if (valid() || owner.clip === clip && scope.active && current === importGeneration) show(`Imported ${file.name}.`);
+      } catch (error) {if (valid()) show(error instanceof Error ? error.message : String(error));}
+      finally {if (importController === controller) importController = undefined; if (scope.active && current === importGeneration) upload.value = '';}
+    });
+    for (const button of processButtons) {
+      scope.listen(button, 'click', async () => {
+        const editor = owner.editor, interaction = view.interactionSession?.getSnapshot(), selection = interaction?.selection;
+        if (!editor || !selection || selection.startFrame === selection.endFrame) {show('Select a nonempty range first.'); return;}
+        const snapshot = editor.getSnapshot();
+        if (view.editor !== editor || interaction?.documentId !== snapshot.documentId || interaction.disposed) {
+          show('Bind the waveform to this audio document before processing its selection.'); return;
+        }
+        const id = ++jobId;
+        const kind = button.dataset.audioEditProcess!;
+        show(`Processing selection: ${kind}.`);
+        const outcome = await editor.processRange({documentId: snapshot.documentId, expectedRevision: snapshot.documentRevision,
+          ...selection, processorId: kind, processorVersion: 1, parameters: kind === 'normalize' ? {targetPeak: .95} : {},
+          assetId: `processed-asset-${id}`, segmentId: `processed-segment-${id}`, rightId: `processed-tail-${id}`, label: kind});
+        if (scope.active && owner.editor === editor) show(outcome.status === 'failed' ? outcome.error.message : `Processing ${outcome.status}.`);
+      });
+    }
+    scope.listen(cancelButton, 'click', () => {owner.editor?.cancelProcessing();});
+    scope.listen(exportButton, 'click', async () => {
+      const editor = owner.editor; if (!editor) return;
+      exportController?.abort(); const controller = new AbortController(); exportController = controller; paint();
+      try {
+        const snapshot = editor.getSnapshot();
+        const bytes = await exportAudioSequenceWav(snapshot.content, snapshot.assets, {signal: controller.signal});
+        if (!scope.active || controller.signal.aborted || owner.editor !== editor) return;
+        if (downloadUrl) URL.revokeObjectURL(downloadUrl);
+        downloadUrl = URL.createObjectURL(new Blob([bytes], {type: 'audio/wav'}));
+        const link = document.createElement('a'); link.href = downloadUrl; link.download = 'edited-audio.wav'; link.click();
+        if (editor.getSnapshot().status === 'ready' && editor.getSnapshot().contentId === snapshot.contentId) editor.markSaved();
+        show(`WAV export requested for revision ${snapshot.documentRevision}.`);
+      } catch (error) {if (!controller.signal.aborted) show(error instanceof Error ? error.message : String(error));}
+      finally {if (exportController === controller) exportController = undefined; paint();}
+    });
+    const restore = async (): Promise<void> => {
+      invalidateImport(); upload.value = ''; owner.clip = undefined;
+      const pending = owner.reload(), current = importGeneration; show('Reloading configured source.');
+      const outcome = await pending;
+      if (scope.active && current === importGeneration) show(outcome.status === 'ready' ? 'Configured source reloaded.'
+        : outcome.status === 'failed' ? String(outcome.error) : `Reload ${outcome.status}.`);
+    };
+    scope.listen(root.querySelector('[data-audio-edit-restore]')!, 'click', restore);
+    scope.listen(root.closest('[data-wm-pg]')!, PLAYGROUND_RESET_EVENT, () => {
+      invalidateImport(); queueMicrotask(() => {if (scope.active) scope.run(restore());});
+    });
+    scope.add(() => {generation += 1; invalidateImport(); exportController?.abort(); owner.editor?.cancelProcessing(); stop?.(); if (downloadUrl) URL.revokeObjectURL(downloadUrl);});
+    attach();
+  });
+</script>
+
+<style>
+  [data-audio-edit-demo], [data-audio-edit-composition] {display:grid;grid-template-columns:minmax(0,1fr);gap:1rem;min-width:0;}
+  [data-audio-edit-demo] p {margin:0;font-size:.85rem;overflow-wrap:anywhere;}
+  .audio-edit-actions {display:flex;align-items:flex-start;gap:.5rem;flex-wrap:wrap;}
+</style>

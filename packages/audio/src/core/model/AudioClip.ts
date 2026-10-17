@@ -16,6 +16,7 @@ const audioBufferCache = new WeakMap<AudioClip, {context: BaseAudioContext; buff
 // copy capability travels with its clip; Symbol.for gives every entry the same
 // key without registering or exposing PCM in a process-global map.
 const PCM_COPY = Symbol.for('@webmusic/audio/clip-copy-pcm-range');
+const PCM_RETAINED_BYTES = Symbol.for('@webmusic/audio/clip-retained-pcm-bytes');
 
 // Public construction defensively copies PCM so callers cannot mutate an
 // "immutable" clip through the arrays they passed in. Functional updates inside
@@ -169,6 +170,13 @@ export class AudioClip {
     } else destination.set(source.subarray(startFrame, startFrame + destination.length));
   }
 
+  /** Internal accounting includes whole backing buffers retained by zero-copy slices. */
+  private [PCM_RETAINED_BYTES](): number {
+    invariant(this._channels !== null, 'Cannot account for a streaming clip without decoded PCM');
+    const buffers = new Set(this._channels.map((channel) => channel.buffer));
+    return [...buffers].reduce((bytes, buffer) => bytes + buffer.byteLength, 0);
+  }
+
   /** Defensive copies of all channels, or `null` when streaming-only. */
   channels(): Float32Array[] | null {
     return this._channels ? this._channels.map((channel) => Float32Array.from(channel)) : null;
@@ -301,6 +309,16 @@ export function copyClipPcmRange(
   const copy: unknown = Reflect.get(clip, PCM_COPY);
   invariant(typeof copy === 'function', 'Clip does not provide an internal PCM copy capability');
   copy.call(clip, channel, startFrame, destination, reverse);
+}
+
+/** @internal Retained backing size, without exposing buffers or allocating PCM. */
+export function retainedClipPcmBytes(clip: AudioClip): number {
+  const account: unknown = Reflect.get(clip, PCM_RETAINED_BYTES);
+  invariant(typeof account === 'function', 'Clip does not provide retained PCM byte accounting');
+  const bytes: unknown = account.call(clip);
+  invariant(typeof bytes === 'number' && Number.isSafeInteger(bytes) && bytes >= 0,
+    'Retained PCM byte accounting must be a non-negative safe integer');
+  return bytes as number;
 }
 
 /** Build an {@link AudioClip} (alias of the constructor for the `createX` convention). */

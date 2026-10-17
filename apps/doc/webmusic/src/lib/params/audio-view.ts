@@ -70,6 +70,14 @@ export const AUDIO_VIEW_PARAMS: ElementParamCatalog = {
         note: 'Selector of a player: live position/activity supports display-frame following; event-only targets keep their timeupdate cadence. The meter borrows .analyser.',
       },
       {
+        name: 'editor', kind: 'text', placeholder: '#audio-document', fallback: 'no editable document',
+        note: 'Same-root selector of one owner exposing an AudioClipEditorPort. Conflicts with independent src/peaks/clip data; .editor overrides this selector.',
+      },
+      {
+        name: 'editable', kind: 'bool', fallback: 'off',
+        note: 'Enable frame selection and waveform editing with a ready editor. No editor is created implicitly; annotate suspends content gestures.',
+      },
+      {
         name: 'interactive',
         kind: 'bool',
         fallback: 'off',
@@ -271,6 +279,8 @@ export const AUDIO_VIEW_PARAMS: ElementParamCatalog = {
       },
     ],
     properties: [
+      {name: 'editor', note: 'Borrow an AudioClipEditorPort. Undefined restores the selector; disconnection never disposes the owner.'},
+      {name: 'interactionSession', note: 'Optional shared AudioInteractionSession for range selection/drafts. Otherwise this View owns a local session.'},
       {name: 'clip', note: 'An AudioClip you already have; cancels any in-flight src load.'},
       {name: 'peaks', note: 'An AudioPeaks pyramid. Wins over src and peaks-src alike.'},
       {name: 'spectrogram', note: 'SpectrogramData — the only way into type="spectrogram".'},
@@ -283,6 +293,9 @@ export const AUDIO_VIEW_PARAMS: ElementParamCatalog = {
       {name: 'setZoom()', note: 'Live re-scale keeping scroll and playhead; reflects pixels-per-second.'},
     ],
     events: [
+      {name: 'webaudio:editpreview', note: 'AudioDraftResult with status preview: a revision-bound trim preview; committed content is unchanged.'},
+      {name: 'webaudio:editcommit', note: 'AudioEditResult with status committed: one successful semantic transaction, separate from playback application.'},
+      {name: 'webaudio:editerror', note: '{error} from a rejected edit or invalid frame input.'},
       {name: 'webaudio:seek', note: '{seconds, region?}: keys, ordinary clicks and seek drags announce requests before the command. Scratch-session clicks and scrub drags report accepted seconds afterward; fallback scrub clicks keep request order. pan never seeks.'},
       {name: 'webaudio:regionchange', note: "{regions} after an annotate drag — the element's whole list, not just the new one."},
       {name: 'webaudio:viewportchange', note: '{startSeconds, endSeconds} whenever the window moves, by user pan/zoom or by panTo()/setZoom().'},

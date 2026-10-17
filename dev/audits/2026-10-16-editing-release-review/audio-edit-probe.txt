@@ -1,0 +1,48 @@
+import {describe, expect, it} from 'vitest';
+import {createAudioClip, createMemoryAudioAssetStore, createAudioSequence} from '../../src/core';
+import {createAudioClipEditor} from '../../src/edit/headless/audio-clip-editor';
+
+describe('release readiness probes', () => {
+  it('does not return failure with a silently adopted root when history accounting throws', () => {
+    const store = createMemoryAudioAssetStore();
+    const initial = store.registerClip(createAudioClip({sampleRate: 8000, channelData: [new Float32Array(8)]}), {id: 'a'});
+    const sequence = createAudioSequence({sampleRate: 8000, channelLayout: ['mono'], segments: [
+      {kind: 'asset', id: 's', assetId: 'a', sourceStart: 0, sourceEnd: 8},
+    ]}, store);
+    let failAccounting = false;
+    const assets = {...store, getReferenceCount(id: string) {
+      if (failAccounting) throw new Error('Asset accounting temporarily unavailable');
+      return store.getReferenceCount(id);
+    }};
+    const editor = createAudioClipEditor(sequence, {assets});
+    const observed: number[] = [];
+    editor.subscribe((snapshot) => observed.push(snapshot.documentRevision));
+    try {
+      failAccounting = true;
+      const result = editor.execute({version: 1, documentId: editor.getSnapshot().documentId, expectedRevision: 0,
+        label: 'Gain', operations: [{type: 'set-gain', segmentIds: ['s'], gain: .5}]});
+      expect(result.status).toBe('failed');
+      expect(observed).toEqual([0]);
+      expect(editor.getState().document.documentRevision).toBe(0);
+      expect(editor.getSnapshot().documentRevision).toBe(0);
+    } finally {failAccounting = false; editor.dispose(); initial.release(); store.dispose();}
+  });
+  it('does not orphan a new clipboard created from the previous clipboard release callback', () => {
+    const store = createMemoryAudioAssetStore();
+    const initial = store.registerClip(createAudioClip({sampleRate: 8000, channelData: [new Float32Array(8)]}), {id: 'a'});
+    const sequence = createAudioSequence({sampleRate: 8000, channelLayout: ['mono'], segments: [
+      {kind: 'asset', id: 's', assetId: 'a', sourceStart: 0, sourceEnd: 8},
+    ]}, store);
+    let callback: (() => void) | undefined;
+    const assets = {...store, retain(ids: readonly string[]) {
+      const lease = store.retain(ids);
+      return {...lease, release() {lease.release(); const invoke = callback; callback = undefined; invoke?.();}};
+    }};
+    const editor = createAudioClipEditor(sequence, {assets});
+    editor.copy({startFrame: 0, endFrame: 4}).release();
+    callback = () => {editor.copy({startFrame: 4, endFrame: 8}).release();};
+    editor.clearClipboard();
+    editor.dispose(); initial.release(); store.dispose();
+    expect(store.getStats()).toEqual({assets: 0, bytes: 0, leases: 0});
+  });
+});

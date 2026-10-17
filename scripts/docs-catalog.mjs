@@ -3,7 +3,7 @@ import {execFileSync} from 'node:child_process';
 import {existsSync, lstatSync, readFileSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
-import {packageDirectories} from './package-policy.mjs';
+import {packageDirectories, requiredFeatureLayers} from './package-policy.mjs';
 import {elementCompositionPolicy} from './element-composition-policy.mjs';
 import {UI_COMPOSITION_CATALOG} from '../apps/doc/shared/ui-catalog.ts';
 import {UI_PRESENTER_CATALOG} from '../apps/doc/shared/ui-presenter-catalog.ts';
@@ -90,7 +90,8 @@ async function componentIndex(files) {
   const output = OUTPUTS[0];
   const params = {};
   for (const family of ['score', 'audio']) {
-    for (const capability of ['play', 'analyze', 'view']) {
+    for (const [capability, layers] of Object.entries(requiredFeatureLayers[`@webmusic/${family}`] ?? {})) {
+      if (!layers.element) continue;
       const file = path.join(ROOT, `apps/doc/webmusic/src/lib/params/${family}-${capability}.ts`);
       const module = await import(pathToFileURL(file).href);
       Object.assign(params, Object.values(module)[0]);
@@ -109,7 +110,8 @@ async function componentIndex(files) {
     '## Web Components', '',
   ];
   for (const family of ['Score', 'Audio']) {
-    for (const capability of ['Play', 'Analyze', 'View']) {
+    for (const capability of ['Edit', 'Play', 'Analyze', 'View']) {
+      if (!UI_COMPOSITION_CATALOG.some((entry) => entry.family === family && entry.capability === capability)) continue;
       lines.push(`### ${family} / ${capability}`, '');
       for (const entry of UI_COMPOSITION_CATALOG.filter((e) => e.family === family && e.capability === capability)) {
         const policy = elementCompositionPolicy.find((e) => e.tag === entry.tag);

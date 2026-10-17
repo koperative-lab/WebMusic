@@ -1,0 +1,104 @@
+---
+import ElementPlayground from '../ElementPlayground.astro';
+const source = `${import.meta.env.BASE_URL}midi/Arabesque%20No.1.mid`;
+---
+
+<ElementPlayground tag="score-document" class="document-demo">
+  <div data-document-demo class="document-demo__summary">
+    <score-document src={source}></score-document>
+    <p data-document-status role="status">Loading document.</p>
+    <p data-document-identity></p>
+    <ul data-document-notes aria-label="First notes in the document"></ul>
+    <p data-document-result aria-live="polite">This declaration has no sound or visual surface. These readouts belong to the demo.</p>
+  </div>
+  <div slot="controls" class="document-demo__actions">
+    <button type="button" class="wui-btn" data-document-action="move">Move first note +¼ quarter</button>
+    <button type="button" class="wui-btn" data-document-action="undo">Undo</button>
+    <button type="button" class="wui-btn" data-document-action="reload">Reload</button>
+  </div>
+</ElementPlayground>
+
+<script>
+  import {defineScoreDocumentElement, type ScoreDocumentElement} from '@webmusic/score/edit/element';
+  import {mountDemos} from '../demo-lifecycle';
+  import {PLAYGROUND_RESET_EVENT} from '../playground-client';
+
+  defineScoreDocumentElement();
+  mountDemos('[data-document-demo]', (root, scope) => {
+    const owner = root.querySelector<ScoreDocumentElement>('score-document')!;
+    const panel = root.closest<HTMLElement>('[data-wm-pg]')!;
+    const status = root.querySelector<HTMLElement>('[data-document-status]')!;
+    const identity = root.querySelector<HTMLElement>('[data-document-identity]')!;
+    const notes = root.querySelector<HTMLElement>('[data-document-notes]')!;
+    const result = root.querySelector<HTMLElement>('[data-document-result]')!;
+    let unsubscribe: (() => void) | undefined;
+    let sourceGeneration = 0;
+    let actionGeneration = 0;
+    const paint = (): void => {
+      if (!scope.active) return;
+      const state = owner.editor?.getState();
+      status.textContent = `${owner.status}${state ? ` · ${state.document.content.notes.length} notes · revision ${state.document.documentRevision} · ${state.dirty ? 'unsaved' : 'saved'} · ${state.history.undoCount} undo` : ''}`;
+      identity.textContent = state ? `${state.document.documentId} · loaded URL: ${owner.loadedSrc ?? 'programmatic Score'}` : 'No document owner available.';
+      notes.replaceChildren(...(state?.document.content.notes.slice(0, 5) ?? []).map((note) => {
+        const item = document.createElement('li');
+        item.textContent = `${note.id}: ${note.pitch?.toString() ?? 'rest'} at ${note.onsetQuarters.toString()} quarters`;
+        return item;
+      }));
+      for (const action of ['move', 'undo']) {
+        const button = panel.querySelector<HTMLButtonElement>(`[data-document-action="${action}"]`)!;
+        button.disabled = owner.status !== 'ready' || !state || (action === 'undo' && !state.history.canUndo);
+      }
+      if (owner.error) result.textContent = owner.error instanceof Error ? owner.error.message : String(owner.error);
+    };
+    const attach = (): void => {
+      const generation = ++sourceGeneration;
+      unsubscribe?.(); unsubscribe = undefined;
+      const editor = owner.editor;
+      if (editor) {
+        const stop = editor.subscribeState(() => {
+          if (generation === sourceGeneration && owner.editor === editor) paint();
+        });
+        if (generation === sourceGeneration && scope.active) unsubscribe = stop;
+        else stop();
+      }
+      paint();
+    };
+    scope.listen(owner, 'webmusic:sourcechange', attach);
+    scope.listen(owner, 'webscore:documentstatechange', () => {
+      if (owner.status !== 'error') result.textContent = owner.status === 'ready'
+        ? 'Document ready. Edit or undo with the controls below.' : `Document ${owner.status}.`;
+      paint();
+    });
+    scope.listen(panel, 'click', async (event) => {
+      const action = (event.target as Element | null)?.closest('[data-document-action]')?.getAttribute('data-document-action');
+      if (!action) return;
+      const generation = ++actionGeneration;
+      if (action === 'reload') {
+        const outcome = await owner.reload();
+        if (scope.active && generation === actionGeneration) result.textContent = `Reload: ${outcome.status}.`;
+        return;
+      }
+      const editor = owner.editor;
+      if (!editor) return;
+      const note = editor.score.notes.find((candidate) => candidate.pitch !== null && !candidate.tie);
+      const outcome = action === 'undo' ? editor.undo() : note
+        ? editor.transaction('Move first note', (tx) => tx.add({type: 'move-notes', noteIds: [note.id], deltaQuarters: [1, 4]}))
+        : undefined;
+      result.textContent = outcome ? `${outcome.status}${outcome.status === 'failed' ? `: ${outcome.error.message}` : ''}.` : 'No editable note is available.';
+    });
+    scope.listen(panel, PLAYGROUND_RESET_EVENT, () => {
+      actionGeneration += 1;
+      result.textContent = 'Resetting the document.';
+      // The shared frame restores attributes immediately after this event.
+      queueMicrotask(() => { if (scope.active) void owner.reload(); });
+    });
+    scope.add(() => { sourceGeneration += 1; actionGeneration += 1; unsubscribe?.(); });
+    attach();
+  });
+</script>
+
+<style>
+  .document-demo__summary { display: grid; gap: .5rem; min-width: 0; font-size: .85rem; }
+  .document-demo__summary p, .document-demo__summary ul { margin: 0; overflow-wrap: anywhere; }
+  .document-demo__actions { display: flex; flex-wrap: wrap; gap: .5rem; grid-column: 1 / -1; }
+</style>

@@ -1,0 +1,180 @@
+---
+import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
+const code = `import {createScoreEditor} from '@webmusic/score/edit/headless';
+// score is the four-note document shown above.
+const editor = createScoreEditor(score, {history: {limit: 100}});
+const session = editor.createInteractionSession();
+// On teardown: session.dispose(); editor.dispose();`;
+---
+
+<HeadlessDemoFrame
+  entry="@webmusic/score/edit/headless"
+  name="ScoreEditor"
+  hint="Edit the operations below, then commit or preview. This document demo is silent; the Score view editing demo adds playback. Changing history options creates a fresh document."
+  code={code}
+  rootAttrs={{'data-score-editor-demo': true}}
+>
+  <section class="wm-editor-demo" aria-label="Editable Score document">
+    <p data-edit-summary role="status">Preparing document.</p>
+    <ul data-edit-notes aria-label="Current notes"></ul>
+    <p data-edit-selection></p>
+    <p data-edit-last></p>
+  </section>
+  <Fragment slot="parameters">
+    <fieldset class="wm-editor-demo__fields">
+      <legend>Document options</legend>
+      <label><input type="checkbox" data-edit-history checked /> Local history</label>
+      <label>History limit <input type="number" data-edit-limit value="100" min="1" step="1" /></label>
+    </fieldset>
+    <fieldset class="wm-editor-demo__fields">
+      <legend>Commands and draft</legend>
+      <label>Operations (JSON)
+        <textarea data-edit-operations rows="5" spellcheck="false">{`[{"type":"move-notes","noteIds":["note-1"],"deltaQuarters":[1,4]}]`}</textarea>
+      </label>
+      <div class="wm-editor-demo__actions">
+        <button class="wui-btn" type="button" data-edit-action="execute">Execute</button>
+        <button class="wui-btn" type="button" data-edit-action="transaction">Transaction</button>
+        <button class="wui-btn" type="button" data-edit-action="preview">Preview</button>
+        <button class="wui-btn" type="button" data-edit-action="commit">Commit draft</button>
+        <button class="wui-btn" type="button" data-edit-action="cancel">Cancel draft</button>
+      </div>
+      <label>Selection
+        <select data-edit-select><option value="">No selection</option></select>
+      </label>
+      <div class="wm-editor-demo__actions">
+        <button class="wui-btn" type="button" data-edit-action="undo">Undo</button>
+        <button class="wui-btn" type="button" data-edit-action="redo">Redo</button>
+        <button class="wui-btn" type="button" data-edit-action="saved">Mark saved</button>
+        <button class="wui-btn" type="button" data-edit-action="clear">Clear history</button>
+        <button class="wui-btn" type="button" data-edit-action="checkpoint">Keep checkpoint</button>
+        <button class="wui-btn" type="button" data-edit-action="restore">Restore checkpoint</button>
+        <button class="wui-btn" type="button" data-edit-action="dispose">Dispose</button>
+      </div>
+    </fieldset>
+  </Fragment>
+</HeadlessDemoFrame>
+
+<script>
+  import {Duration, NoteId, PartId, Pitch, Rational, ScoreBuilder, VoiceId, type ScoreEditOperation} from '@webmusic/score';
+  import {createScoreEditor, type ScoreEditor, type ScoreCheckpoint, type ScoreInteractionSession} from '@webmusic/score/edit/headless';
+  import {mountDemos} from '../demo-lifecycle';
+
+  mountDemos('[data-score-editor-demo]', (root, scope) => {
+    const history = root.querySelector<HTMLInputElement>('[data-edit-history]')!;
+    const limit = root.querySelector<HTMLInputElement>('[data-edit-limit]')!;
+    const operations = root.querySelector<HTMLTextAreaElement>('[data-edit-operations]')!;
+    const selection = root.querySelector<HTMLSelectElement>('[data-edit-select]')!;
+    const summary = root.querySelector<HTMLElement>('[data-edit-summary]')!;
+    const notes = root.querySelector<HTMLElement>('[data-edit-notes]')!;
+    const last = root.querySelector<HTMLElement>('[data-edit-last]')!;
+    const selected = root.querySelector<HTMLElement>('[data-edit-selection]')!;
+    const feedback = root.querySelector<HTMLElement>('[data-hl-feedback]')!;
+    const readout = root.querySelector<HTMLElement>('[data-hl-readout]')!;
+    let editor: ScoreEditor | undefined;
+    let session: ScoreInteractionSession | undefined;
+    let checkpoint: ScoreCheckpoint | undefined;
+    let subscriptions: Array<() => void> = [];
+    const message = (text: string): void => { feedback.hidden = !text; feedback.textContent = text; };
+    const release = (): void => {
+      for (const unsubscribe of subscriptions.splice(0)) unsubscribe();
+      session?.dispose();
+      editor?.dispose();
+      session = undefined;
+      editor = undefined;
+      checkpoint = undefined;
+    };
+    const paint = (): void => {
+      if (!editor || !session || !scope.active) return;
+      const state = editor.getState();
+      const interaction = session.getSnapshot();
+      const content = interaction.draft?.content ?? state.document.content;
+      summary.textContent = `${state.document.status} · revision ${state.document.documentRevision} · ${state.dirty ? 'unsaved' : 'saved'} · ${state.history.undoCount} undo / ${state.history.redoCount} redo · ${state.history.trimmedCount} trimmed`;
+      notes.replaceChildren(...content.notes.map((note) => {
+        const item = document.createElement('li');
+        item.textContent = `${note.id}: ${note.pitch?.toString() ?? 'rest'} · q${note.onsetQuarters.toString()} · velocity ${note.velocity}`;
+        return item;
+      }));
+      selected.textContent = `Selection: ${interaction.selectedNoteIds.join(', ') || 'none'}${interaction.draft ? ' · showing uncommitted preview' : ''}`;
+      last.textContent = state.document.change
+        ? `Last change: ${state.document.change.origin} / ${state.document.change.label}` : 'No committed change yet.';
+      selection.replaceChildren(new Option('No selection', ''), ...editor.score.notes.map((note) => new Option(String(note.id), String(note.id))));
+      selection.value = interaction.selectedNoteIds[0] ?? '';
+      for (const action of ['undo', 'redo', 'restore']) {
+        const button = root.querySelector<HTMLButtonElement>(`[data-edit-action="${action}"]`)!;
+        button.disabled = state.document.status === 'disposed' || (action === 'undo' ? !state.history.canUndo : action === 'redo' ? !state.history.canRedo : !checkpoint);
+      }
+    };
+    const create = (): void => {
+      const historyLimit = Number(limit.value);
+      if (history.checked && (!Number.isSafeInteger(historyLimit) || historyLimit < 1)) {
+        message('History limit must be a positive safe integer.');
+        return;
+      }
+      release();
+      const builder = new ScoreBuilder();
+      const partId = PartId('piano');
+      builder.addPart({id: partId, name: 'Piano', midiProgram: 0, staves: 1});
+      ['C4', 'E4', 'G4', 'C5'].forEach((pitch, index) => builder.addNote(partId, {
+        id: NoteId(`note-${index + 1}`), pitch: Pitch.parse(pitch), onsetQuarters: new Rational(index),
+        duration: Duration.quarter(), voice: VoiceId('melody'),
+      }));
+      const options = {history: history.checked ? {limit: historyLimit} : false as const};
+      editor = createScoreEditor(builder.build(), {...options, onListenerError: (error) => message(String(error))});
+      session = editor.createInteractionSession();
+      subscriptions = [editor.subscribeState(paint), session.subscribe(paint)];
+      readout.textContent = `import {createScoreEditor} from '@webmusic/score/edit/headless';\n// score is the four-note document shown above.\nconst editor = createScoreEditor(score, ${JSON.stringify(options)});\nconst session = editor.createInteractionSession();\n// On teardown: session.dispose(); editor.dispose();`;
+      message('Fresh document ready.');
+      paint();
+    };
+    scope.listen(root, 'click', (event) => {
+      const button = event.target instanceof Element ? event.target.closest<HTMLButtonElement>('[data-edit-action]') : null;
+      if (!button || !editor || !session) return;
+      try {
+        let result: {status: string; error?: Error} | undefined;
+        const action = button.dataset.editAction;
+        if (action === 'execute' || action === 'transaction' || action === 'preview') {
+          const input = JSON.parse(operations.value) as ScoreEditOperation[];
+          const snapshot = editor.getSnapshot();
+          result = action === 'execute' ? editor.execute({version: 1, documentId: snapshot.documentId,
+            expectedRevision: snapshot.documentRevision, label: 'Demo note edit', operations: input})
+            : action === 'transaction' ? editor.transaction('Demo transaction', (tx) => { for (const operation of input) tx.add(operation); })
+            : session.preview(input);
+        } else if (action === 'commit') result = session.commitDraft();
+        else if (action === 'cancel') session.cancelDraft();
+        else if (action === 'undo') result = editor.undo();
+        else if (action === 'redo') result = editor.redo();
+        else if (action === 'saved') editor.markSaved();
+        else if (action === 'clear') editor.clearHistory();
+        else if (action === 'checkpoint') checkpoint = editor.createCheckpoint();
+        else if (action === 'restore' && checkpoint) result = editor.restoreCheckpoint(checkpoint);
+        else if (action === 'dispose') editor.dispose();
+        message(result ? `${result.status}${result.error ? `: ${result.error.message}` : ''}` : `${action} completed.`);
+        paint();
+      } catch (error) { message(error instanceof Error ? error.message : String(error)); }
+    });
+    scope.listen(selection, 'change', () => {
+      try { session?.setSelection(selection.value ? [NoteId(selection.value)] : []); }
+      catch (error) { message(error instanceof Error ? error.message : String(error)); }
+    });
+    scope.listen(history, 'change', create);
+    scope.listen(limit, 'change', create);
+    scope.listen(root, 'wm:headless-reset', () => {
+      history.checked = true;
+      limit.value = '100';
+      operations.value = '[{"type":"move-notes","noteIds":["note-1"],"deltaQuarters":[1,4]}]';
+      create();
+    });
+    scope.add(release);
+    create();
+  });
+</script>
+
+<style>
+  .wm-editor-demo { display: grid; gap: .5rem; font-size: .85rem; min-width: 0; }
+  .wm-editor-demo p, .wm-editor-demo ul { margin: 0; }
+  .wm-editor-demo li { overflow-wrap: anywhere; }
+  .wm-editor-demo__fields { display: grid; gap: .5rem; }
+  .wm-editor-demo__fields label { display: grid; gap: .25rem; font-size: .8rem; }
+  .wm-editor-demo__fields textarea { width: 100%; box-sizing: border-box; font: inherit; }
+  .wm-editor-demo__actions { display: flex; flex-wrap: wrap; gap: .4rem; }
+</style>

@@ -1,0 +1,134 @@
+---
+title: '<score-document>'
+description: 'A nonvisual HTML declaration that loads and owns one editable Score document.'
+sidebar:
+  order: 1
+---
+
+import ScoreDocumentPlayground from '../../../../../components/elements/ScoreDocumentPlayground.astro';
+
+`<score-document>` owns a [ScoreEditor](/score/headless/edit/score-editor/) while
+connected. It loads MIDI, MusicXML, MXL or ABC from a URL, or accepts a Score
+created by your application. It creates no player, audio resources or visible UI.
+
+Use the same declaration from [Score player](/score/element/play/score-player/)
+and [Score view](/score/element/view/score-view/) through their `editor` selector.
+Use a Headless editor when the document must outlive its HTML declaration.
+
+<ScoreDocumentPlayground />
+
+## Import
+
+```html
+<script type="module">
+  import {defineScoreDocumentElement} from '@webmusic/score/edit/element';
+  defineScoreDocumentElement();
+</script>
+
+<score-document id="piece" src="/midi/Arabesque%20No.1.mid"></score-document>
+```
+
+`@webmusic/score/edit/auto` registers the default tag as an import side effect.
+There is no Edit browser IIFE; see [Score setup](/score/#drop-in-web-components).
+This nonvisual Element needs no optional UI or audio-engine peer.
+
+## Ownership and replacement
+
+The read-only `.editor` becomes available after loading succeeds. A replacement
+URL prepares a new editor before publishing it; failure retains the previous
+editor and `.loadedSrc`, while `.status` becomes `error` and `.error` explains
+the failed attempt. The configured `src` is not proof that this URL loaded.
+Explicit `.score` takes precedence over `src` and `format`; assigning `undefined`
+restores URL loading. Changing history settings recreates the editor from the
+configured input, so it starts a new document identity and empty history.
+
+`webmusic:sourcechange` runs after the `.editor` getter changes and before the
+superseded editor is disposed. Consumers release the old subscription and read
+the new getter. They borrow the editor and must not dispose it. Late loads,
+reentrant replacement callbacks and disconnection cannot publish an obsolete
+editor over the current one. This also applies to synchronous AbortSignal
+listeners: a newer `.score` assignment, URL retry or reconnection wins over the
+operation cancelling the old load. Superseded prepared editors are disposed,
+and a superseded `reload()` returns `{status: 'superseded'}`.
+
+Disconnect aborts pending loading, clears `.editor` and disposes the owned
+editor. The previous owner is detached before source/abort callbacks run; a
+reconnection awaiting URL loading does not retain an editor from the disconnected
+lifetime, even if its new load fails. Reconnection loads the configured input
+again with a new identity.
+Removing a borrowing View or Player only releases its own subscription.
+
+## Reuse the document
+
+Register the three independent capabilities, then reference the same owner:
+
+```html
+<script type="module">
+  import {defineScoreDocumentElement} from '@webmusic/score/edit/element';
+  import {defineScorePlayerElement} from '@webmusic/score/play/element';
+  import {defineScoreViewElement} from '@webmusic/score/view/element';
+  defineScoreDocumentElement();
+  defineScorePlayerElement();
+  defineScoreViewElement();
+</script>
+
+<score-document id="document" src="/midi/Arabesque%20No.1.mid"></score-document>
+<score-player id="audition" editor="#document"></score-player>
+<score-view type="piano-roll" editor="#document" player="#audition" editable></score-view>
+```
+
+Selectors resolve one target in the consumer's own Document or ShadowRoot,
+including late registration and insertion. Object properties support composition
+across roots. The [View reference](/score/element/view/score-view/) owns editing
+interaction, and the [Player reference](/score/element/play/score-player/) owns
+revision application and explicit playback after an edit.
+
+<details class="component-section">
+<summary>API</summary>
+
+`ScoreDocumentElement`, `defineScoreDocumentElement(tag?)` and
+`defineAllElements()` are exported by `@webmusic/score/edit/element`.
+`defineScoreDocumentElement` defaults to `score-document`; `defineAllElements`
+registers that default. Importing this entry alone does not register tags.
+
+| Member | Kind | Default | Description |
+|---|---|---|---|
+| `src` | attribute / string property | empty | Score URL. The property reflects the attribute; surrounding whitespace is trimmed for loading. No URL or explicit Score produces `empty`. |
+| `format` | attribute | auto | `midi`, `musicxml`, `mxl` or `abc`. Omit for loader detection. Other nonempty values fail; ignored with explicit `.score`. |
+| `history` | attribute | enabled | Absent enables local undo. `false`, `0`, `no` or `off`, case-insensitively, disable it; other present values enable it. |
+| `history-limit` | attribute | `100` | Positive safe integer retained transaction limit across undo/redo; invalid values fail. Ignored while history is disabled. |
+| `score` | property | `undefined` | Explicit immutable Score input, taking precedence over URL loading. The getter returns this input; read current edited content through `.editor.score`. Invalid assignment throws before replacing the valid editor or configured Score. |
+| `editor` | read-only property | `undefined` | Owned `ScoreEditor` after success; retained during a replacement load/error and cleared on empty input or disconnect. |
+| `status` | read-only property | `empty` | `ScoreDocumentStatus`: `empty`, `loading`, `ready`, `error` or `disposed`. Also exposed as `data-state`. |
+| `error` | read-only property | `undefined` | Last load/configuration error; cleared on another attempt, successful direct replacement, clearing or disconnect. |
+| `loadedSrc` | read-only property | `undefined` | Last successfully loaded URL. Undefined for direct Score input, empty state or disconnect; retained on failed URL replacement. |
+| `reload()` | method | — | Retry current input. A successful retry creates a new editor. Returns `Promise<ScoreDocumentLoadResult>`; a disconnected/superseded request does not publish. |
+
+`ScoreDocumentLoadResult` is `{status: 'ready', editor}`, `{status: 'empty'}`,
+`{status: 'superseded'}` or `{status: 'failed', error}`. URL parsing and resource
+limits follow [Score I/O](/score/api/io/). There is no silent fallback after a
+URL, format or history-configuration failure.
+
+All events below bubble and have `composed: false`.
+
+| Event | `detail` | Meaning |
+|---|---|---|
+| `webmusic:sourcechange` | `null` | Connected availability, replacement or clearing; read `.editor` again. Document edits within the same editor use its subscriptions instead. |
+| `webscore:documentstatechange` | `ScoreDocumentStateDetail`: `{status, editor, loadedSrc, error}` | Loading/result state, including replacement failure with the previous editor retained. |
+| `webscore:error` | `{operation: 'document-load', error}` | Current asynchronous/attribute-driven resolution failed. Stale or cancelled loads do not report errors. |
+
+The exported types are `ScoreDocumentStatus`, `ScoreDocumentLoadResult` and
+`ScoreDocumentStateDetail`. The declaration has no interactive controls, focus
+targets, keyboard commands or accessibility role. Applications provide their own
+visible loading/error status; the demo's live readout is application UI.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+The declaration sets its host to `display: none` when connected. It has no
+Shadow DOM, public parts, canvas or visual styling tokens. Style the borrowing
+player and views through their own contracts.
+
+</details>

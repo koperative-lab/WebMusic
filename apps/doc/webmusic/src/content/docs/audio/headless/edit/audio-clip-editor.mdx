@@ -1,0 +1,182 @@
+---
+title: AudioClipEditor
+description: One immutable Audio sequence with structural history, explicit asset leases, range processing and interaction sessions.
+sidebar:
+  order: 1
+---
+
+import AudioClipEditorHeadlessDemo from '../../../../../components/headless/AudioClipEditorHeadlessDemo.astro';
+
+`AudioClipEditor` owns one editable contiguous sequence. `createAudioClipEditor`
+returns the same class. Edits and history retain immutable asset references;
+they do not save a complete PCM copy per edit. Construction creates no player,
+AudioContext, worker or UI. Existing `ClipEditSession` remains a separate,
+materializing clip-transform API.
+
+<AudioClipEditorHeadlessDemo />
+
+## Import
+
+```ts
+import {createAudioClip} from '@webmusic/audio';
+import {createAudioClipEditor} from '@webmusic/audio/edit/headless';
+
+const clip = createAudioClip({sampleRate: 8000, channelData: [new Float32Array(8000)]});
+const editor = createAudioClipEditor(clip, {history: {limit: 100}});
+const stop = editor.subscribeState(state => console.log(state.document.documentRevision));
+editor.transaction('Append silence', tx => tx.add({
+  type: 'insert-silence', frame: 8000, length: 4000, id: 'pause',
+}));
+editor.undo();
+stop();
+editor.dispose();
+```
+
+The factory and class are also exported by `@webmusic/audio/edit`.
+A decoded `AudioClip` creates an owned memory store without another PCM copy.
+An `AudioSequence` input requires `options.assets`, a borrowed asset reader;
+its sample rate and ordered channel layout must match every referenced asset.
+Supplying `assets` together with a decoded clip is rejected; construct a sequence
+when you need to share an existing store.
+Streaming clips cannot become editable assets. Empty sequences require an
+explicit format and remain valid ready documents.
+
+## Revisions, history and ownership
+
+Document identity is fixed for one editor; import/replacement creates a new
+editor. Effective commands, undo/redo and checkpoint restoration increment
+`documentRevision`. No-ops do not increment or discard redo. `contentId`
+identifies an immutable root; `markSaved()` records that identity, so undoing
+back to it clears dirty state. Commands specify the expected document and
+revision. Transactions are synchronous, atomic, non-nesting and cannot cross
+`await`; failed operations do not partially commit.
+Disposal is terminal, including disposal from processor abort listeners or
+borrowed asset cleanup callbacks. A command interrupted before content adoption
+fails with `disposed` and releases its candidate leases; it cannot revive the
+editor or publish a later ready revision.
+Both `getSnapshot()` and `getState()` expose disposal before cleanup callbacks
+run, including their synchronous initial subscription values.
+
+History defaults to 100 transactions across undo and redo and 256 MiB of assets
+retained solely by history. Byte accounting includes complete retained backing
+buffers, even for zero-copy clip slices; different assets sharing a buffer are
+conservatively counted separately. Oldest history is pruned to meet those limits
+on editor state transitions. Releasing an external lease can make an asset
+history-only without notifying the editor; the next state transition updates
+accounting and enforces the budget.
+Current content, clipboard, external checkpoints and active playback leases are
+not counted as history-only ownership. This budget is not a limit on total
+browser memory. `history: false` disables local history. A new effective edit
+after undo releases the abandoned redo branch. `clearHistory()` holds the command
+guard through lease cleanup and error reporting: synchronous nested edits fail
+with `reentrant-command`, so clearing cannot recreate history or change content.
+Disposal during cleanup remains terminal, and each detached history lease is
+still released.
+
+History accounting is validated before content adoption, including the leases
+that the edit will retire. An accounting failure leaves the original content,
+undo/redo stacks and revision guard available for retry. If a cleanup callback
+causes accounting to fail after adoption, the command remains committed and
+publishes consistent document/state snapshots; the editor reports the error
+through `onListenerError` and clears the remaining history, increasing
+`trimmedCount`, so unmeasurable assets cannot exceed the history budget.
+
+Checkpoints hold explicit leases. Call `checkpoint.release()` when finished;
+restoring a foreign, copied or released handle fails. Effective restoration
+clears local history and reports `origin: 'restore'` with a reset position map.
+Clipboard storage is one retained range per editor; replacement, clear and
+disposal release it. `copy()` also returns an independent caller-owned lease:
+release that handle even when only the internal clipboard is needed. Releasing
+the returned handle does not clear the editor clipboard. Clearing the internal
+clipboard detaches its lease before cleanup and rejects nested commands from
+that cleanup with `reentrant-command`. Copied annotations
+intersect the selected range and are rebased; paste assigns new IDs. Playback, export and custom consumers retain their own
+asset leases when keeping roots beyond a notification callback.
+
+Interaction sessions hold a frame selection and optional uncommitted draft.
+Preview does not mutate content or history. Commit applies one transaction;
+external changes cancel drafts and map the selection. Share a session explicitly
+when several views should share selection. Views never own the borrowed editor.
+Session commands cannot nest inside another session command or its asset adapter
+callbacks, or run during a session subscription callback; they fail with
+`reentrant-command`. Draft replacement,
+cancellation and disposal release their asset leases even when an adapter callback
+disposes the session or changes the document. Session disposal is terminal before
+cleanup callbacks run, including for new synchronous subscriptions.
+
+## Explicit range processing
+
+Register processors in construction options, then call `processRange` with an
+exact range, document/revision guard, processor ID/version, serializable
+parameters and fixed output asset/segment IDs. AbortSignal is supplied separately.
+Only one job runs per editor; later content changes or disposal supersede it.
+Late output cannot commit. Undo/redo restores the processed asset instead of
+running the processor again.
+
+A processor declares input handles, raw output length, latency and tail before
+allocation. Input handles clamp to document bounds. Default tail policy is
+`trim`; `extend` explicitly retains the declared tail. Output rate, channels and
+length must match the plan. The default 256 MiB processing budget covers input
+and declared raw output; the returned clip's full retained backing is checked
+again before adoption. Injected processors remain responsible for their own
+internal allocations and cancellation. A borrowed read-only asset reader must
+also implement the store's `registerClip` capability to accept processed output.
+The [Edit API](/audio/api/edit/) supplies bounded normalize/reverse recipes and
+explicit rendering/WAV export.
+
+<details class="component-section">
+<summary>API</summary>
+
+| Member | Contract |
+|---|---|
+| `createAudioClipEditor(input, options?)` / `new AudioClipEditor(input, options?)` | Input is decoded AudioClip or AudioSequence. Options: `assets`, `history: false \| {limit?, assetBytes?}`, `processors`, `processingMaxBytes`, `onListenerError`. |
+| `sequence` | Current immutable AudioSequence; no PCM is exposed. |
+| `getSnapshot()` / `subscribe(listener)` | `AudioDocumentSnapshot`: identity, revision, content identity, sequence, asset reader, ready/disposed status and last change. Subscribe delivers the initial snapshot immediately and returns an idempotent release. |
+| `getState()` / `subscribeState(listener)` | Snapshot plus dirty, history, clipboard summary and processing state. History includes enabled, limit, assetByteLimit, historyOnlyBytes, undoCount, redoCount, trimmedCount, canUndo and canRedo. |
+| `execute(command)` | Version 1 envelope with documentId, expectedRevision, label and ordered operations. Returns committed/noop/failed. |
+| `transaction(label, build, guard?)` | Synchronous builder with `add(operation)`, committing once. Omitted guard intentionally uses the current revision. |
+| `undo(guard?)` / `redo(guard?)` | Restore roots at new revisions; commands return typed failures when history is disabled. |
+| `markSaved()` / `clearHistory()` | Record current content identity / release retained local history. Neither changes content revision. |
+| `createCheckpoint()` / `restoreCheckpoint(checkpoint, guard?)` | Checkpoint is an explicitly released in-memory handle, not a persistence format. |
+| `copy(range)` / `cut(range, guard?)` | Copy a half-open frame range into the editor clipboard; cut also commits a deletion. Copy returns a separate caller-owned `AudioClipboard` lease; cut returns the edit result. |
+| `paste(frame, options?, guard?)` | Insert clipboard references. Options may supply fixed segmentIds and rightId; generated IDs enter the committed operation. Incompatible formats fail. |
+| `clearClipboard()` | Releases the editor clipboard. |
+| `createInteractionSession()` | Session has getSnapshot, subscribe, setSelection, preview, commitDraft, cancelDraft and dispose. Its snapshot contains documentId, selection, draft and disposed. |
+| `processRange(request, {signal}?)` / `cancelProcessing()` | Explicit selected-range job. Result adds cancelled/superseded to ordinary edit outcomes. Cancellation does not roll back already committed content. |
+| `dispose()` | Cancels work, disposes owned sessions and releases current/history/clipboard ownership. External checkpoint/playback leases survive until their holders release them. Repeated disposal is safe. |
+
+`AudioClipEditorOptions.history.limit` defaults to 100 and must be a positive
+safe integer; `assetBytes` defaults to 256 MiB and may be zero. `processors`
+defaults to an empty registry. `processingMaxBytes` defaults to 256 MiB and is
+a nonnegative safe integer; zero rejects every nonempty processing job. The
+editor borrows injected readers/processors and does not dispose them. It owns
+the store created for decoded clip input.
+
+`AudioCheckpoint` contains `documentId`, `contentId`, `content` and the lease's
+`assetIds`, `released` and `release()`. `AudioClipboard` contains `content`,
+`assets` and the same lease members. Keep the snapshot's asset reader if a
+checkpoint must be read after editor disposal. The default interaction selection
+is `{startFrame: 0, endFrame: 0}`; `setSelection` requires an in-bounds half-open
+range. A draft adds `documentRevision`, candidate `content` and captured
+`operations`. `preview` returns preview/failed; `commitDraft` returns an ordinary
+edit result. Session disposal releases its draft assets.
+
+Construction and auxiliary methods throw on invalid input. Semantic edits return
+`AudioEditResult`; a failure contains `AudioEditError` and a stable code.
+Codes include invalid-command, invalid-sequence, invalid-range, unknown-asset,
+incompatible-audio-format, unknown-segment, duplicate-id, revision-conflict,
+document-mismatch, disposed, reentrant-command, history-disabled,
+invalid-checkpoint, transaction-aborted, clipboard-empty, processing-busy,
+processing-failed, resource-limit and unsupported-processor.
+
+Subscribers cannot synchronously commit another edit during publication.
+Observer and cleanup exceptions are reported through `onListenerError` (console by default)
+and do not prevent other observers from receiving the accepted state.
+`AudioClipEditorOptions` belongs to this entry; Core document, command, session,
+processing and asset types are described by [the API](/audio/api/edit/).
+
+</details>
+
+## Related
+
+[Audio document](/audio/element/edit/audio-document/) · [AudioPlayer](/audio/headless/play/audio-player/) · [Waveform editing](/audio/element/view/audio-view/#waveform-editing) · [Edit API](/audio/api/edit/)

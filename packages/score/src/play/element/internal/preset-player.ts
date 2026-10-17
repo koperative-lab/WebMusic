@@ -6,7 +6,7 @@ import {
   type TransportBinding,
   type TransportHandle,
 } from '@webmusic/ui/transport';
-import {type Note, type Score, type TimePosition} from '../../../core';
+import {type Note, type Score, type ScoreDocumentSource, type TimePosition} from '../../../core';
 import type {HeadlessSynth} from '../../headless/audio-contracts';
 import type {PlayerController} from '../../headless/controller';
 import type {Effect} from '../../headless/effects';
@@ -26,6 +26,8 @@ export type TimeControl = 'off' | 'simple' | 'full';
 export type VolumeControl = 'off' | 'fader' | 'knob';
 
 export interface PresetPlayerOptions {
+  /** Borrow a document before exposing this native player's transport. */
+  documentSource?: ScoreDocumentSource;
   className?: string;
   playLabel?: string;
   pauseLabel?: string;
@@ -77,6 +79,8 @@ export interface PresetPlayerHandle {
    * only their visibility moves. A part the mount did not create is ignored.
    */
   setChrome(chrome: {time?: TimeControl; volume?: VolumeControl}): void;
+  /** Disable a retained native transport while its declaration has a source error. */
+  setUnavailable?(error?: unknown): void;
   /** The underlying engine (score path only; undefined for a rack-driven handle). */
   player?: ScorePlayer;
   /** Optional for compatibility with existing custom mount handles. */
@@ -309,12 +313,14 @@ export function mountPresetPlayer(
     effect: options.effect,
     destination: options.destination,
   });
+  if (options.documentSource) player.setDocumentSource(options.documentSource);
   const subscribers = new Set<() => void>();
   const playerUnsubscribes: Array<() => void> = [];
   let starting = false;
   let startingErrors: Set<unknown> | undefined;
   let playGeneration = 0;
   let destroyed = false;
+  let unavailableError: unknown;
   let displayProgress: number | undefined;
   let resetTimer: ReturnType<typeof setTimeout> | undefined;
   // The engine has no volume read-back, so the chrome's slider position is
@@ -369,8 +375,19 @@ export function mountPresetPlayer(
       }
     }),
   );
+  if (player.playback) playerUnsubscribes.push(player.playback.subscribe(() => {
+    if (destroyed) return;
+    if (player.documentSource && player.documentBinding.status !== 'ready') {
+      playGeneration += 1;
+      starting = false;
+      clearReset();
+    }
+    displayProgress = undefined;
+    notify();
+  }));
 
   const play = async () => {
+    if (unavailableError !== undefined) throw unavailableError;
     if (destroyed || starting || player.isPlaying()) return;
     clearReset();
     displayProgress = undefined;
@@ -419,6 +436,7 @@ export function mountPresetPlayer(
     notify();
   };
   const seekFraction = async (fraction: number): Promise<void> => {
+    if (unavailableError !== undefined) throw unavailableError;
     if (destroyed) return;
     clearReset();
     displayProgress = undefined;
@@ -435,6 +453,7 @@ export function mountPresetPlayer(
     await pending;
   };
   const seek = (seconds: number) => {
+    if (unavailableError !== undefined) return Promise.reject(unavailableError);
     if (destroyed) return;
     clearReset();
     displayProgress = undefined;
@@ -444,6 +463,7 @@ export function mountPresetPlayer(
   const binding: TransportBinding = {
     snapshot: () => ({
       playing: starting || player.isPlaying(),
+      disabled: unavailableError !== undefined || Boolean(player.documentSource && player.documentBinding.status !== 'ready'),
       progress: displayProgress ?? player.progress,
       seconds: player.seconds,
       duration: player.durationSeconds,
@@ -505,6 +525,11 @@ export function mountPresetPlayer(
     progress: transport.progress,
     progressFill: transport.progressFill,
     setChrome: (chrome) => transport.setChrome(chrome),
+    setUnavailable: (error) => {
+      unavailableError = error;
+      if (error !== undefined) pause();
+      notify();
+    },
     player,
     get currentTime() { return player.seconds; },
     get duration() { return player.durationSeconds; },

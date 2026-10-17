@@ -1,0 +1,77 @@
+
+> @webmusic/audio@0.2.0 test
+> vitest run test/view/waveform-editing.test.ts
+
+
+ RUN  v5.0.2 /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/audio
+
+ ❯ test/view/waveform-editing.test.ts (64 tests | 8 failed) 253ms
+   ❯ waveform editing renderer (45)
+     × abandons Trim to selection when cancellation changes its selected frame target 6ms
+     × abandons Delete selection when cancellation changes its selected frame target 3ms
+     × abandons Split at start when cancellation changes its selected frame target 3ms
+     × abandons Insert silence when cancellation changes its selected frame target 3ms
+     × abandons keyboard delete when cancellation changes its selected frame target 3ms
+     × abandons Apply segment gain when a shared draft cancellation changes its segment target 3ms
+     × abandons Fade in segment when a shared draft cancellation changes its segment target 4ms
+     × abandons Fade out segment when a shared draft cancellation changes its segment target 3ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/view/waveform-editing.test.ts > waveform editing renderer > abandons Trim to selection when cancellation changes its selected frame target
+ FAIL  test/view/waveform-editing.test.ts > waveform editing renderer > abandons Delete selection when cancellation changes its selected frame target
+ FAIL  test/view/waveform-editing.test.ts > waveform editing renderer > abandons Split at start when cancellation changes its selected frame target
+ FAIL  test/view/waveform-editing.test.ts > waveform editing renderer > abandons Insert silence when cancellation changes its selected frame target
+ FAIL  test/view/waveform-editing.test.ts > waveform editing renderer > abandons keyboard delete when cancellation changes its selected frame target
+AssertionError: expected 1 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ test/view/waveform-editing.test.ts:241:52
+    239|       armed = true;
+    240|       if (command === 'keyboard delete') key(handle.surface, 'Delete')…
+    241|       expect(model.getSnapshot().documentRevision).toBe(0);
+       |                                                    ^
+    242|       expect(model.sequence.length).toBe(1000);
+    243|       expect(editing.state.interaction.selection).toEqual({startFrame:…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/8]⎯
+
+ FAIL  test/view/waveform-editing.test.ts > waveform editing renderer > abandons Apply segment gain when a shared draft cancellation changes its segment target
+ FAIL  test/view/waveform-editing.test.ts > waveform editing renderer > abandons Fade in segment when a shared draft cancellation changes its segment target
+ FAIL  test/view/waveform-editing.test.ts > waveform editing renderer > abandons Fade out segment when a shared draft cancellation changes its segment target
+AssertionError: expected 2 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 2
+
+ ❯ test/view/waveform-editing.test.ts:266:52
+    264|     try {
+    265|       button(host, command).click();
+    266|       expect(model.getSnapshot().documentRevision).toBe(1);
+       |                                                    ^
+    267|       expect(model.sequence.segments).toMatchObject([{id: 'left', gain…
+    268|       expect(segment.value).toBe('right');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/8]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  8 failed | 56 passed (64)
+   Start at  15:19:23
+   Duration  1.43s (environment 58%, transform 20%, tests 19%, import 3%)
+
+npm error Lifecycle script `test` failed with error:
+npm error code 1
+npm error path /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/audio
+npm error workspace @webmusic/audio@0.2.0
+npm error location /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/audio
+npm error command failed
+npm error command sh -c vitest run test/view/waveform-editing.test.ts

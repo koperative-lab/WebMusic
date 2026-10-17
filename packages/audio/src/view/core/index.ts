@@ -24,6 +24,7 @@ export {
 } from './windowing';
 
 export type {
+  AudioWaveformSource,
   AudioViewportSnapshot,
   AudioViewportUpdate,
   AudioViewportSubscriber,

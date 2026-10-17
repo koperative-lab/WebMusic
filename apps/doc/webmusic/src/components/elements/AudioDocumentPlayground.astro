@@ -1,0 +1,67 @@
+---
+import ElementPlayground from '../ElementPlayground.astro';
+const source = `${import.meta.env.BASE_URL}wav/Editing.wav`;
+---
+<ElementPlayground tag="audio-document">
+  <section data-audio-document-demo aria-label="Audio document state">
+    <audio-document src={source}></audio-document>
+    <p data-summary role="status">Loading the generated audio example.</p>
+    <p data-result aria-live="polite">The declaration is silent; these controls belong to the demo.</p>
+  </section>
+  <div slot="controls" class="document-actions">
+    <button class="wui-btn" data-action="silence" type="button">Append ½ second silence</button>
+    <button class="wui-btn" data-action="undo" type="button">Undo</button>
+    <button class="wui-btn" data-action="redo" type="button">Redo</button>
+    <button class="wui-btn" data-action="reload" type="button">Reload</button>
+  </div>
+</ElementPlayground>
+<script>
+  import {defineAudioDocumentElement, type AudioDocumentElement} from '@webmusic/audio/edit/element';
+  import {mountDemos} from '../demo-lifecycle';
+  import {PLAYGROUND_RESET_EVENT} from '../playground-client';
+  defineAudioDocumentElement();
+  mountDemos('[data-audio-document-demo]', (root, scope) => {
+    const owner = root.querySelector<AudioDocumentElement>('audio-document')!;
+    const panel = root.closest<HTMLElement>('[data-wm-pg]')!;
+    const summary = root.querySelector<HTMLElement>('[data-summary]')!;
+    const result = root.querySelector<HTMLElement>('[data-result]')!;
+    let release: (() => void) | undefined;
+    let serial = 0, generation = 0;
+    const paint = () => {
+      if (!scope.active) return;
+      const state = owner.editor?.getState();
+      summary.textContent = state ? `${owner.status} · ${state.document.content.length} frames · revision ${state.document.documentRevision} · ${state.history.undoCount} undo / ${state.history.redoCount} redo · ${state.dirty ? 'unsaved' : 'saved'}` : `Document ${owner.status}`;
+    };
+    const attach = () => {release?.(); release = owner.editor?.subscribeState(paint); paint();};
+    scope.listen(owner, 'webmusic:sourcechange', attach);
+    scope.listen(owner, 'webaudio:documentstatechange', paint);
+    scope.listen(owner, 'webaudio:error', (event) => {result.textContent = String((event as CustomEvent<{error: unknown}>).detail.error);});
+    const reload = async () => {
+      const ticket = ++generation;
+      result.textContent = 'Reloading the configured source.';
+      const outcome = await owner.reload();
+      if (scope.active && ticket === generation) result.textContent = outcome.status === 'failed'
+        ? String(outcome.error) : `Reload: ${outcome.status}`;
+    };
+    scope.listen(panel, 'click', async (event) => {
+      const action = (event.target as Element | null)?.closest('[data-action]')?.getAttribute('data-action');
+      if (!action) return;
+      if (action === 'reload') {
+        await reload(); return;
+      }
+      generation++;
+      const editor = owner.editor; if (!editor) return;
+      const content = editor.getSnapshot().content;
+      const outcome = action === 'undo' ? editor.undo() : action === 'redo' ? editor.redo() :
+        editor.transaction('Append silence', (tx) => tx.add({type: 'insert-silence', frame: content.length,
+          length: Math.round(content.sampleRate / 2), id: `demo-silence-${++serial}`}));
+      result.textContent = outcome.status === 'failed' ? outcome.error.message : outcome.status;
+    });
+    scope.listen(panel, PLAYGROUND_RESET_EVENT, () => {generation++; queueMicrotask(() => {if (scope.active) scope.run(reload());});});
+    scope.add(() => {generation++; release?.();}); attach();
+  });
+</script>
+<style>
+  .document-actions {display:flex; flex-wrap:wrap; gap:.5rem; grid-column:1/-1}
+  [data-audio-document-demo] {min-width:0; overflow-wrap:anywhere}
+</style>

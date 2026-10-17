@@ -2,7 +2,8 @@
 
 > Current design, accepted in DEC-015 and refined for staff notation in DEC-024.
 > DEC-045 owns the domain-prefixed tags. Source and public leaf pages own exact
-> members; STATUS owns delivery and verification gaps.
+> members; STATUS owns delivery and verification gaps. DEC-047 adds the accepted
+> document-bound editing below; DEC-048 keeps staff entry in the same family.
 
 ## Purpose and boundaries
 
@@ -89,10 +90,59 @@ imperative renderer keeps its separate neutral defaults. One full-height divider
 scrolling notes are clipped at that boundary instead of covering signatures.
 These visual connections and clipping add no controls.
 
+## Document-bound editing
+
+[Editing contracts](EDIT-COMPONENTS.md) and
+[DEC-047](../DECISIONS.md#dec-047--document-owned-editing-and-borrowed-playback)
+own the accepted editing behavior. [STATUS](../STATUS.md), EDIT-01, tracks
+implementation and verification. `.editor`, the `editor` selector and `editable`
+are documented in the owning public ScoreView reference.
+
+An editor-bound View borrows committed content and commands from `ScoreEditor`
+through Core structural ports. The editor remains the content and history owner;
+View owns rendering, viewport, focus and local gesture previews. It reuses View
+renderers without importing the concrete Edit implementation. Content history
+does not restore selection; each selection session remaps or prunes its current
+IDs. Viewport and focus remain local and outside content history.
+
+The editable types are `score-view type="piano-roll"` and `type="staff"`.
+Binding an editor without `editable` displays committed content without mutation
+gestures. Staff uses a separate local input controller over the same editor and
+scrolling renderer, with armed A–G entry, written durations and voice/rest
+completion inside authored measures. Its bounded semantic contract and failure
+rules belong to [Editing contracts](EDIT-COMPONENTS.md#staff-notation-entry).
+Sheet engraving and other types gain no editing capability from the attribute.
+`editable` without a ready editor
+reports unavailable instead of creating a private editor. Independent `.score`
+or `src` alongside an editor is a configuration conflict, reported before
+replacing a working binding. Without an editor, existing data precedence and
+player following remain unchanged.
+
+Editing geometry uses rational quarter positions and stable authored note IDs.
+Each gesture has one owner, previews locally and commits one semantic transaction;
+cancel, mode/source replacement or a conflicting content revision discards the
+preview. Item editing must not also seek or scrub. Keyboard commands remain
+local to the focused surface and honor application shortcut overrides.
+
+The player supplies time and sounding occurrences, not document authority.
+Newly committed content can be visible before playback applies it; incompatible
+active-note overlays and seeks are withheld until revisions and coordinate
+projections agree. Repeat-expanded playback without an authored-to-occurrence
+mapping resets to origin on revision application and provides no document seek
+or occurrence overlay. Disconnect releases the View's subscriptions and drafts,
+not the borrowed editor, player or AudioContext.
+
+Acceptance must cover two Views sharing one editor, one undo per gesture,
+overlapping-note selection, keyboard/pointer cancellation, source conflicts and
+pending/failed playback application. Existing passive-renderer checks do not
+establish these editing outcomes.
+
 ## Interaction and presentation
 
-Each instance mounts only its selected surface. The Element has no type switch,
-settings toolbar, extra keyboard or embedded player. Parameters belongs to the
+Each instance mounts only its selected surface. Passive Elements have no type
+switch, settings toolbar, extra keyboard or embedded player. Editable surfaces
+provide local musical input and accessible numeric alternatives; custom UI may
+use the same Headless controllers without the supplied controls. Parameters belongs to the
 documentation/application and shows the options relevant to the selected type.
 Changing type preserves other attribute values, so returning to it restores its
 configuration. Copy includes the player connection; Reset restores the initial

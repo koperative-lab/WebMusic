@@ -1,0 +1,37 @@
+Drag a range or its edges. Choose Trim to preview and keep a range on release. Arrows move the cursor; Shift extends. Delete removes, Ctrl/Cmd+C/X/V copies/cuts/pastes, Ctrl/Cmd+Z undoes. Escape cancels.
+
+Change segment gain. Frames 0–8000 of 8000; revision 4
+Frame values and editing commands
+Start frame
+End frame
+Silence frames
+Segment gain
+Pointer tool 
+Select range
+Trim to range
+Segment
+1: asset, 8000 frames
+Select frames
+Split at start
+Trim to selection
+Delete selection
+Insert silence
+Apply segment gain
+Fade in segment
+Fade out segment
+Copy
+Cut
+Paste at start
+Undo
+Redo
+
+Document ready · 8000 frames · revision 4 · playback ready (revision 4) · saved
+
+Import WAV
+Normalize selection
+Reverse selection
+Cancel processing
+Export WAV
+Reload configured source
+
+WAV export requested for revision 4.

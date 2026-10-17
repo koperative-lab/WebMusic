@@ -1,0 +1,29 @@
+// @vitest-environment jsdom
+import {afterEach, expect, it} from 'vitest';
+import {Duration, NoteId, Pitch, Rational, ScoreBuilder} from '../../src/core';
+import {createScoreEditor, type ScoreEditor} from '../../src/edit/headless';
+import {ScorePlayerElement} from '../../src/play/element/score-player';
+import {ScoreViewElement} from '../../src/view/element/score-view';
+customElements.define('review-lifecycle-score-player', ScorePlayerElement);
+customElements.define('review-lifecycle-score-view', ScoreViewElement);
+const editors: ScoreEditor[] = [];
+function editor() {const b=new ScoreBuilder();const p=b.addPart({id:b.newPartId(),name:'Piano'});b.addNote(p,{id:NoteId('n'),pitch:Pitch.fromMidi(60),onsetQuarters:Rational.ZERO,duration:new Duration({base:[4,1]}),voice:b.newVoiceId()});const e=createScoreEditor(b.build());editors.push(e);return e;}
+afterEach(()=>{document.body.replaceChildren();for(const e of editors.splice(0))e.dispose();});
+it('retains paused player position after assigning a same-document interaction session',async()=>{
+ const model=editor();
+ const player=document.createElement('review-lifecycle-score-player') as ScorePlayerElement;player.id='player';player.editor=model;
+ const view=document.createElement('review-lifecycle-score-view') as ScoreViewElement;view.editor=model;view.editable=true;view.setAttribute('player','#player');document.body.append(player,view);
+ await player.waitForDocumentRevision(model.getSnapshot());await player.seekNominal(1);
+ expect(view.currentTime).toBe(1);expect(view.querySelector('[data-playhead]')).not.toBeNull();
+ const shared=model.createInteractionSession();view.interactionSession=shared;
+ await new Promise(resolve=>setTimeout(resolve,0));
+ expect({viewTime:view.currentTime,playerTime:player.playback.snapshot().nominalSeconds,playhead:!!view.querySelector('[data-playhead]'),renderedPlayback:view.querySelector('[part="editor"]')?.getAttribute('data-playback-state')}).toEqual({viewTime:1,playerTime:1,playhead:true,renderedPlayback:'ready'});
+});
+it('disabling a shared view follows the documented session-draft cancellation contract',()=>{
+ const model=editor(),shared=model.createInteractionSession();
+ const a=document.createElement('review-lifecycle-score-view') as ScoreViewElement; a.editor=model;a.interactionSession=shared;a.editable=true;
+ const b=document.createElement('review-lifecycle-score-view') as ScoreViewElement; b.editor=model;b.interactionSession=shared;b.editable=true;document.body.append(a,b);
+ shared.preview([{type:'transpose-notes',noteIds:[NoteId('n')],semitones:2}]);
+ expect(shared.getSnapshot().draft).toBeDefined(); b.editable=false;
+ expect(shared.getSnapshot().draft).toBeUndefined();
+});

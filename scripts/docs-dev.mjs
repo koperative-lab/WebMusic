@@ -9,7 +9,8 @@ import {fileURLToPath} from 'node:url';
 const repositoryRoot = fileURLToPath(new URL('../', import.meta.url));
 const documentationRoot = path.join(repositoryRoot, 'apps/doc/webmusic');
 
-export function startCommand(command, args, {cwd, quiet = false, processGroup = false} = {}) {
+export function startCommand(command, args, {cwd, quiet = false, processGroup = false, cleanupTimeoutMs = 5000} = {}) {
+  if (!Number.isFinite(cleanupTimeoutMs) || cleanupTimeoutMs < 0) throw new RangeError('cleanupTimeoutMs must be finite and nonnegative.');
   const grouped = processGroup && process.platform !== 'win32';
   const child = spawn(command, args, {cwd, detached: grouped, stdio: quiet ? ['ignore', 'pipe', 'pipe'] : 'inherit'});
   let output = '';
@@ -26,41 +27,60 @@ export function startCommand(command, args, {cwd, quiet = false, processGroup = 
     process.on(signal, handler);
     return [signal, handler];
   });
-  const finished = new Promise((resolve, reject) => {
+  const commandFinished = new Promise((resolve, reject) => {
     child.once('error', reject);
     child.once('exit', (code, signal) => {
       signal = interruptedSignal ?? signal;
       if (code === 0 && !signal) resolve();
       else reject(Object.assign(new Error(`${path.basename(command)} exited with ${signal ?? code}.${output ? `\n${output.trim()}` : ''}`), {exitCode: signal === 'SIGINT' ? 130 : signal === 'SIGTERM' ? 143 : code ?? 1}));
     });
-  }).finally(async () => {
+  });
+  const finished = (async () => {
+    let commandError;
+    try { await commandFinished; } catch (error) { commandError = error; }
     try {
-      if (grouped && child.pid) await drainProcessGroup(child.pid);
+      if (grouped && child.pid) await drainProcessGroup(child.pid, cleanupTimeoutMs);
+    } catch (error) {
+      // Cleanup must not silently replace the original command outcome, nor
+      // report an ordinary interruption while descendants may still be alive.
+      error.commandError = commandError;
+      throw error;
     } finally {
       for (const [signal, handler] of handlers) process.off(signal, handler);
     }
-  });
+    if (commandError) throw commandError;
+  })();
   // A foreground server may fail while its readiness receipt is being polled.
   void finished.catch(() => {});
   return {child, finished, terminate};
 }
 
-async function drainProcessGroup(pid) {
-  const exists = () => {
-    try { process.kill(-pid, 0); return true; } catch (error) {
-      if (error.code === 'ESRCH') return false;
-      throw error;
+async function drainProcessGroup(pid, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  const send = (signal) => {
+    try { process.kill(-pid, signal); return 'sent'; } catch (error) {
+      if (error.code === 'ESRCH') return 'gone';
+      if (error.code === 'EPERM' && signal !== 'SIGKILL') return 'unverified';
+      throw Object.assign(new Error(`Could not verify cleanup of documentation build process group ${pid}: ${signal === 0 ? 'probe' : signal} failed (${error.code ?? error.message}).`, {cause: error}), {
+        code: 'ERR_DEV_PROCESS_GROUP_CLEANUP', processGroupId: pid, exitCode: 1,
+      });
     }
   };
-  if (!exists()) return;
-  try { process.kill(-pid, 'SIGTERM'); } catch (error) { if (error.code !== 'ESRCH') throw error; }
-  const deadline = Date.now() + 5000;
-  while (exists()) {
+  let termSent = false;
+  for (;;) {
+    // On macOS a group containing only unreaped zombies can report EPERM.
+    // That is not proof it is gone: retain the startup lock and retry boundedly.
+    if (send(0) === 'gone') return;
     if (Date.now() >= deadline) {
-      try { process.kill(-pid, 'SIGKILL'); } catch (error) { if (error.code !== 'ESRCH') throw error; }
+      send('SIGKILL');
       // SIGKILL prevents surviving builders from touching package output. A
       // reparented zombie can briefly remain visible until the OS reaps it.
       return;
+    }
+    if (!termSent) {
+      const result = send('SIGTERM');
+      if (result === 'gone') return;
+      termSent = result === 'sent';
     }
     await delay(20);
   }
@@ -81,6 +101,7 @@ export async function withStartupLock(siteRoot, action, {timeout = 300_000, poll
   await mkdir(directory, {recursive: true});
   await mkdir(candidate);
   let acquired = false;
+  let cleanupFailed = false;
   try {
     await writeFile(path.join(candidate, owner), '');
     while (!acquired) {
@@ -93,6 +114,9 @@ export async function withStartupLock(siteRoot, action, {timeout = 300_000, poll
         try { owners = await readdir(lock); } catch (error) {
           if (error.code === 'ENOENT') continue;
           throw error;
+        }
+        if (owners.includes('cleanup-failed.json')) {
+          throw new Error(`Documentation startup is blocked by unverified process cleanup in ${lock}/cleanup-failed.json. Confirm the recorded build process group has stopped before removing this lock.`, {cause: error});
         }
         if (owners.length === 0) {
           await removeEmptyDirectory(lock);
@@ -112,9 +136,27 @@ export async function withStartupLock(siteRoot, action, {timeout = 300_000, poll
         await delay(poll);
       }
     }
-    return await action();
+    try { return await action(); } catch (error) {
+      if (error?.code === 'ERR_DEV_PROCESS_GROUP_CLEANUP') {
+        cleanupFailed = true;
+        const marker = path.join(lock, 'cleanup-failed.json');
+        try {
+          // Publish the blocker before writing diagnostics. Even an empty
+          // marker must prevent stale-owner recovery after a failed write.
+          await rename(path.join(lock, owner), marker);
+          await writeFile(marker, JSON.stringify({
+            processGroupId: error.processGroupId, message: error.message,
+            commandError: error.commandError?.message,
+          }, null, 2));
+        } catch (lockError) {
+          error.lockError = lockError;
+          error.message += ` Failed to record cleanup diagnostics: ${lockError.message}`;
+        }
+      }
+      throw error;
+    }
   } finally {
-    await removeOwner(acquired ? lock : candidate, owner);
+    if (!cleanupFailed) await removeOwner(acquired ? lock : candidate, owner);
     if (!acquired) await removeEmptyDirectory(candidate);
   }
 }

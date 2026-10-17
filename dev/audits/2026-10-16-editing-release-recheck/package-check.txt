@@ -1,0 +1,66 @@
+
+> check:packages
+> node --test scripts/package-artifacts.test.mjs && node scripts/check-package-exports.mjs && node scripts/package-artifacts.mjs --all && node --test scripts/bundle-notices.test.mjs && node scripts/bundle-notices.mjs --check && node scripts/bundle-notices.mjs --package-dir packages/audio --check
+
+✔ packing rejects missing, stale, or altered build output (4.085625ms)
+✔ source receipts include shared source, lockfile, and browser build mappings (31.510125ms)
+▶ packing rejects added, edited, or removed tsup configurations at every repository ancestor
+  ✔ tsup.config.ts (19.086542ms)
+  ✔ tsup.config.cts (19.088542ms)
+  ✔ tsup.config.mts (22.297209ms)
+  ✔ tsup.config.js (18.333958ms)
+  ✔ tsup.config.cjs (18.675292ms)
+  ✔ tsup.config.mjs (17.6785ms)
+  ✔ tsup.config.json (19.507583ms)
+  ✔ packages/tsup.config.ts (18.079875ms)
+  ✔ packages/tsup.config.cts (17.876375ms)
+  ✔ packages/tsup.config.mts (17.946625ms)
+  ✔ packages/tsup.config.js (19.849042ms)
+  ✔ packages/tsup.config.cjs (17.516208ms)
+  ✔ packages/tsup.config.mjs (18.030958ms)
+  ✔ packages/tsup.config.json (17.23825ms)
+  ✔ packages/ui/tsup.config.ts (19.081666ms)
+  ✔ packages/ui/tsup.config.cts (18.542834ms)
+  ✔ packages/ui/tsup.config.mts (19.916875ms)
+  ✔ packages/ui/tsup.config.js (19.20175ms)
+  ✔ packages/ui/tsup.config.cjs (19.810625ms)
+  ✔ packages/ui/tsup.config.mjs (18.659708ms)
+  ✔ packages/ui/tsup.config.json (19.2625ms)
+  ✔ platform/tsup.config.ts (19.056625ms)
+  ✔ platform/tsup.config.cts (20.561083ms)
+  ✔ platform/tsup.config.mts (19.374334ms)
+  ✔ platform/tsup.config.js (18.529084ms)
+  ✔ platform/tsup.config.cjs (18.643875ms)
+  ✔ platform/tsup.config.mjs (20.183833ms)
+  ✔ platform/tsup.config.json (18.6915ms)
+✔ packing rejects added, edited, or removed tsup configurations at every repository ancestor (532.975125ms)
+✔ ancestor package.json tsup configuration and TypeScript mappings invalidate receipts (45.547542ms)
+✔ ambient tsup configuration outside the repository is rejected unless shadowed (17.537333ms)
+✔ build configuration cannot depend on a symbolic link (8.85975ms)
+✔ prepack rejects the actual tsup output change caused by packages/ui/tsup.config.js (496.74125ms)
+✔ prepack rejects the actual tsup output change caused by tsup.config.mjs (426.588125ms)
+ℹ tests 36
+ℹ suites 0
+ℹ pass 36
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1629.577875
+Package export check passed for 101 public entries.
+Package artifact check passed for 5 package(s).
+✔ discovers bundled transitive licenses, preserves mappings and rejects stripped notices (14.2315ms)
+✔ fft.js@4.0.4 snapshot requires its reviewed version, license and repository (4.716584ms)
+✔ @nodable/entities@3.0.0 snapshot requires its reviewed version, license and repository (3.591583ms)
+✔ @nodable/entities@3.1.0 snapshot requires its reviewed version, license and repository (3.285292ms)
+✔ CLI selects a package relative to the working directory and checks its notices (181.897042ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 263.721333
+Bundled notices verified: 26 packages in 7 bundles.
+Bundled notices verified: 4 packages in 3 bundles.

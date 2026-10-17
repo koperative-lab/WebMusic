@@ -1,0 +1,16 @@
+
+> @webmusic/audio@0.2.0 test
+> vitest run test/view
+
+
+ RUN  v5.0.2 /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/audio
+
+
+ Test Files  24 passed (24)
+      Tests  346 passed (346)
+   Start at  15:23:02
+   Duration  2.31s (environment 61%, tests 19%, transform 15%, import 4%, worker 1%)
+
+    Isolate  24 workers spawned · ~609ms startup each (spawn + environment, per file)
+             at least ~719ms faster with isolate: false — reuses workers across files instead of one per file
+

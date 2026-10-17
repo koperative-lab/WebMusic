@@ -5,7 +5,13 @@ import {
   bindViewPlayer, seekViewPlayer, readViewPlayerScore, readViewPlayerSnapshot, resolveViewPlayer,
   type ViewPlayerNote, type ViewPlayerSnapshot,
 } from './internal/player-binding';
-import {Rational, type Score, type ScorePlaybackSource} from '../../core';
+import {NoteId, Rational, isScoreEditorPort, type Score, type ScoreEditorPort, type ScoreInteractionSession,
+  type ScorePlaybackSnapshot, type ScorePlaybackSource} from '../../core';
+import {observeElementSource} from '@webmusic/kernel/element';
+import {createScoreViewEditing, scoreDocumentPlaybackCompatible, type ScoreViewEditing} from '../headless/score-editing';
+import {mountPianoRollEditor, type PianoRollEditingHandle, type PianoRollEditingOptions} from '../render/piano-roll-editor';
+import {createStaffViewEditing, type StaffViewEditing} from '../headless/staff-editing';
+import {mountStaffEditor, type StaffEditingHandle} from '../render/staff-editor';
 import type {ScoreMap} from '../core/map';
 import {createScoreMapView, type ScoreMapView} from '../headless/score-map';
 import {createPianoRollLayout} from '../core/layout';
@@ -46,7 +52,8 @@ export interface ScoreViewSeekDetail {
  * views' option bags. Keys that a view does not understand are ignored by its
  * renderer, so one bag can safely describe all three `type`s.
  */
-export type ScoreViewRenderOptions = VisualizerRenderOptions & WaterfallRenderOptions & StaffRenderOptions;
+export type ScoreViewRenderOptions = VisualizerRenderOptions & WaterfallRenderOptions & StaffRenderOptions &
+  Pick<PianoRollEditingOptions, 'pixelsPerQuarter' | 'editingGrid'>;
 
 /** Numeric layout attributes forwarded to the renderer (kebab → camel). */
 const NUMERIC_OPTION_ATTRS: ReadonlyArray<readonly [attr: string, key: keyof ScoreViewRenderOptions]> = [
@@ -149,6 +156,8 @@ export class ScoreViewElement extends HTMLElementBase {
       'src',
       'format',
       'player',
+      'editor',
+      'editable',
       'type',
       'for-part',
       'cells',
@@ -164,6 +173,16 @@ export class ScoreViewElement extends HTMLElementBase {
   }
 
   private explicitScore?: Score;
+  private explicitEditor?: ScoreEditorPort;
+  private explicitInteractionSession?: ScoreInteractionSession;
+  private editing?: ScoreViewEditing;
+  private editorBindingCleanup?: () => void;
+  private editorStateCleanup?: () => void;
+  private editorGeneration = 0;
+  private editorResolutionRevision = 0;
+  private editorSurface?: PianoRollEditingHandle | StaffEditingHandle;
+  private staffEditing?: StaffViewEditing;
+  private documentPlayback?: ScorePlaybackSnapshot;
   /** The score currently rendered, whether assigned or loaded from `src`. */
   private resolvedScore?: Score;
   private explicitOptions?: ScoreViewRenderOptions;
@@ -192,13 +211,16 @@ export class ScoreViewElement extends HTMLElementBase {
   private ownedSizes = new Map<string, string>();
 
   connectedCallback(): void {
-    upgradeProperties(this, ['score', 'options', 'type']);
+    upgradeProperties(this, ['score', 'options', 'type', 'editor', 'editable', 'interactionSession']);
+    this.bindEditor();
     this.bindPlayer();
     void this.refresh();
   }
 
   disconnectedCallback(): void {
     this.cancelLoad();
+    const generation = this.unbindEditor();
+    if (generation !== this.editorGeneration) return;
     this.unbindPlayer();
     this.disposePresentation();
     this.resolvedScore = undefined;
@@ -206,16 +228,19 @@ export class ScoreViewElement extends HTMLElementBase {
   }
 
   attributeChangedCallback(name: string): void {
-    if (!this.isConnected) return;
+    if (!this.isConnected || !ScoreViewElement.observedAttributes.includes(name)) return;
     if (name === 'player') this.bindPlayer();
-    else if (name === 'src' || name === 'format') void this.refresh();
+    else if (name === 'editor') { this.bindEditor(); this.bindPlayer(); }
+    else if (name === 'editable') { this.updateEditable(); this.renderCurrent(); }
+    else if (name === 'src' || name === 'format') { if (this.hasEditorIntent()) this.bindEditor(); else void this.refresh(); }
     else if (name === 'width' || name === 'height') this.applyHostSize();
     else if (name === 'for-part' || name === 'cells') this.remap();
-    else this.renderCurrent();
+    else { if (name === 'type') this.updateEditable(); this.renderCurrent(); }
   }
 
   /** Assign a pre-loaded score programmatically (overrides `src`). */
   set score(score: Score | undefined) {
+    if (score !== undefined && this.hasEditorIntent()) throw new Error('source-conflict: An editor cannot be combined with an independent score');
     this.explicitScore = score;
     if (this.isConnected) void this.refresh();
   }
@@ -224,6 +249,30 @@ export class ScoreViewElement extends HTMLElementBase {
     return this.explicitScore ?? this.resolvedScore;
   }
 
+  /** Borrow a document owner. Undefined restores same-root selector resolution. */
+  set editor(value: ScoreEditorPort | undefined) {
+    if (value !== undefined && !isScoreEditorPort(value)) throw new TypeError('editor must implement ScoreEditorPort');
+    if (value !== undefined && (this.explicitScore !== undefined || this.getAttribute('src') !== null)) throw new Error('source-conflict: An editor cannot be combined with score or src');
+    if (value && this.explicitInteractionSession && this.explicitInteractionSession.getSnapshot().documentId !== value.getSnapshot().documentId) throw new Error('The interaction session belongs to another document');
+    this.explicitEditor = value;
+    if (this.isConnected) { this.bindEditor(); this.bindPlayer(); }
+  }
+  get editor(): ScoreEditorPort | undefined { return this.explicitEditor ?? this.editing?.editor; }
+  set editable(value: boolean) { if (value) this.setAttribute('editable', ''); else this.removeAttribute('editable'); }
+  get editable(): boolean { return boolAttr(this, 'editable', false); }
+  set interactionSession(value: ScoreInteractionSession | undefined) {
+    if (value && this.editor && value.getSnapshot().documentId !== this.editor.getSnapshot().documentId) throw new Error('The interaction session belongs to another document');
+    this.explicitInteractionSession = value;
+    if (this.isConnected) {
+      const generation = this.editorGeneration + 1;
+      this.bindEditor();
+      // A paused player will not publish again. Restore its current snapshot
+      // unless session cleanup superseded this attachment or disconnected us.
+      if (this.isConnected && generation === this.editorGeneration) this.bindPlayer();
+    }
+  }
+  get interactionSession(): ScoreInteractionSession | undefined { return this.explicitInteractionSession ?? this.editing?.session; }
+
   /** Current position on the nominal score timeline, in seconds. */
   get currentTime(): number {
     return this.view?.state.currentTime ?? this.playheadSeconds;
@@ -231,6 +280,13 @@ export class ScoreViewElement extends HTMLElementBase {
 
   /** MIDI pitches intersecting the current score position, ascending. */
   get active(): number[] {
+    if (this.type === 'map' || this.type === 'thumbnail') return [];
+    if (this.editing && scoreDocumentPlaybackCompatible(this.editing.state.document, this.documentPlayback)) {
+      return [...new Set(this.documentPlayback!.activeNotes.flatMap((note) => {
+        const pitch = this.editing!.state.document.content.getNote(NoteId(note.noteId))?.pitch;
+        return pitch ? [pitch.midi] : [];
+      }))].sort((a, b) => a - b);
+    }
     return [...new Set(this.view?.state.activeNotes.map((note) => note.pitch) ?? [])].sort((a, b) => a - b);
   }
 
@@ -281,6 +337,7 @@ export class ScoreViewElement extends HTMLElementBase {
   }
 
   private async refresh(): Promise<void> {
+    if (this.hasEditorIntent()) return;
     const src = this.getAttribute('src');
     const input = this.explicitScore ?? (src || readViewPlayerScore(this.boundPlayer));
     const format = typeof input === 'string' ? this.getAttribute('format') ?? undefined : undefined;
@@ -310,31 +367,44 @@ export class ScoreViewElement extends HTMLElementBase {
     this.renderCurrent(false);
   }
 
-  private disposePresentation(): void {
-    this.presentationRevision += 1;
-    this.annotationsCleanup?.();
+  private disposePresentation(): number {
+    const revision = ++this.presentationRevision;
+    const surface = this.editorSurface, staff = this.staffEditing;
+    const annotations = this.annotationsCleanup, binding = this.renderedUnbind;
+    const rendered = this.rendered, view = this.view, stage = this.stage, status = this.status;
+    const timeline = this.timeline, mapView = this.mapView;
+    this.editorSurface = undefined;
+    this.staffEditing = undefined;
     this.annotationsCleanup = undefined;
-    this.style?.removeProperty('--_webscore-preview-annotations');
-    this.rebindRendered(undefined);
-    this.rendered?.dispose?.();
+    this.renderedUnbind = undefined;
+    this.visualizerHandlers = undefined;
     this.rendered = undefined;
-    this.view?.dispose();
     this.view = undefined;
-    this.stage?.destroy();
     this.stage = undefined;
-    this.status?.destroy();
     this.status = undefined;
-    this.timeline?.destroy();
     this.timeline = undefined;
-    this.mapView?.dispose();
     this.mapView = undefined;
     this.map = undefined;
+    this.style?.removeProperty('--_webscore-preview-annotations');
+    // A draft cancellation can synchronously mount a newer presentation. Clear
+    // only this lifetime's DOM before invoking its captured cleanup callbacks.
     this.replaceChildren();
+    const failures: unknown[] = [];
+    for (const cleanup of [() => binding?.(), () => annotations?.(), () => surface?.dispose(),
+      () => staff?.dispose(), () => rendered?.dispose?.(), () => view?.dispose(),
+      () => stage?.destroy(), () => status?.destroy(), () => timeline?.destroy(), () => mapView?.dispose()]) {
+      try { cleanup(); } catch (error) { failures.push(error); }
+    }
+    for (const error of failures.slice(1)) console.error('[WebScore] Score View presentation cleanup failed', error);
+    if (failures.length) throw failures[0];
+    return revision;
   }
 
   private renderCurrent(preservePosition = true): void {
     if (preservePosition) this.playheadSeconds = this.currentTime;
-    this.disposePresentation();
+    const generation = this.editorGeneration;
+    const revision = this.disposePresentation();
+    if (revision !== this.presentationRevision || generation !== this.editorGeneration) return;
     this.applyHostSize();
     const score = this.resolvedScore;
     const type = this.type;
@@ -352,6 +422,36 @@ export class ScoreViewElement extends HTMLElementBase {
         this.loadError === undefined ? 'Waiting for a score' : this.errorMessage(this.loadError));
       return;
     }
+    if (this.editing && type === 'piano-roll' && owner) {
+      try {
+        this.editorSurface = mountPianoRollEditor(this, this.editing, {...this.renderOptions(),
+          onPreview: (result) => this.dispatchEvent(new CustomEvent('editpreview', {detail: result, bubbles: true, composed: true})),
+          onCommit: (result) => this.dispatchEvent(new CustomEvent('editcommit', {detail: result, bubbles: true, composed: true})),
+          onError: (error) => this.dispatchEvent(new CustomEvent('editerror', {detail: {error}, bubbles: true, composed: true})),
+        });
+        this.editorSurface.updatePlayback(this.documentPlayback);
+      } catch (error) {
+        this.setAttribute('data-editable-state', 'unavailable');
+        this.showStatus('error', this.errorMessage(error));
+      }
+      return;
+    }
+    if (this.editing && type === 'staff' && this.editable && owner) {
+      try {
+        this.staffEditing = createStaffViewEditing(this.editing);
+        this.editorSurface = mountStaffEditor(this, this.staffEditing, {...this.renderOptions(),
+          onCommit: (result) => this.dispatchEvent(new CustomEvent('editcommit', {detail: result, bubbles: true, composed: true})),
+          onError: (error) => this.dispatchEvent(new CustomEvent('editerror', {detail: {error}, bubbles: true, composed: true})),
+        });
+        this.editorSurface.updatePlayback(this.documentPlayback);
+      } catch (error) {
+        this.staffEditing?.dispose(); this.staffEditing = undefined;
+        this.setAttribute('data-editable-state', 'unavailable');
+        this.showStatus('error', this.errorMessage(error));
+      }
+      return;
+    }
+    if (this.hasEditorIntent() && !this.editing && owner) this.showStatus('error', `Editor unavailable: ${this.getAttribute('data-editor-state') ?? 'missing'}`);
     if (type === 'map') {
       this.remap();
       if (!owner) return;
@@ -638,6 +738,7 @@ export class ScoreViewElement extends HTMLElementBase {
     const score = this.resolvedScore;
     const mapView = this.mapView;
     if (!score || !mapView || this.type !== 'map' || !Number.isFinite(position)) return;
+    if (this.hasEditorIntent() && (!this.editing || !scoreDocumentPlaybackCompatible(this.editing.state.document, this.documentPlayback))) return;
     const quarters = Math.max(0, Math.min(this.map?.durationQuarters ?? 0, position));
     const seconds = score.timeMap.quartersToSeconds(Rational.from(quarters));
     const target = this.boundPlayer as (Element & {
@@ -667,13 +768,14 @@ export class ScoreViewElement extends HTMLElementBase {
   private bindPlayer(): void {
     this.unbindPlayer();
     this.playerUnbind = bindViewPlayer(this, {
-      score: () => this.explicitScore ?? (this.getAttribute('src') ? this.resolvedScore : undefined),
+      score: () => this.hasEditorIntent() ? this.resolvedScore : this.explicitScore ?? (this.getAttribute('src') ? this.resolvedScore : undefined),
+      ...(this.hasEditorIntent() ? {playbackSnapshot: (snapshot: ScorePlaybackSnapshot) => this.followDocumentPlayback(snapshot)} : {}),
       targetChanged: (target) => {
         this.boundPlayer = target;
         this.mapView?.setScore(this.resolvedScore);
       },
       scoreChanged: () => {
-        if (!this.explicitScore && !this.getAttribute('src')) void this.refresh();
+        if (!this.hasEditorIntent() && !this.explicitScore && !this.getAttribute('src')) void this.refresh();
       },
       snapshot: (snapshot) => this.followSnapshot(snapshot),
       noteOn: (note) => this.followNote(note, true),
@@ -681,6 +783,8 @@ export class ScoreViewElement extends HTMLElementBase {
       reset: () => {
         this.snapshotRevision += 1;
         this.lastSnapshot = undefined;
+        this.documentPlayback = undefined;
+        this.editorSurface?.updatePlayback(undefined);
         this.playheadSeconds = 0;
         this.mapView?.setPosition(0);
         this.view?.reset();
@@ -704,6 +808,9 @@ export class ScoreViewElement extends HTMLElementBase {
     this.playerUnbind = undefined;
     this.boundPlayer = undefined;
     this.lastSnapshot = undefined;
+    this.documentPlayback = undefined;
+    this.editorSurface?.updatePlayback(undefined);
+    if (this.hasEditorIntent()) this.setAttribute('data-playback-state', 'unbound');
     this.snapshotRevision += 1;
     this.playheadSeconds = 0;
     this.mapView?.setScore(this.resolvedScore);
@@ -713,6 +820,7 @@ export class ScoreViewElement extends HTMLElementBase {
   }
 
   private followNote(note: ViewPlayerNote, on: boolean): void {
+    if (this.hasEditorIntent()) return;
     const snapshot = readViewPlayerSnapshot(this.boundPlayer);
     if (snapshot) {
       this.followSnapshot(snapshot);
@@ -724,6 +832,7 @@ export class ScoreViewElement extends HTMLElementBase {
   }
 
   private followSnapshot(snapshot: ViewPlayerSnapshot): void {
+    if (this.hasEditorIntent() && (!this.editing || !scoreDocumentPlaybackCompatible(this.editing.state.document, this.documentPlayback))) return;
     this.snapshotRevision += 1;
     this.lastSnapshot = snapshot;
     this.playheadSeconds = this.resolvedScore ? snapshot.nominalSeconds : 0;
@@ -755,8 +864,112 @@ export class ScoreViewElement extends HTMLElementBase {
       this.visualizerHandlers = handlers;
       return () => { this.visualizerHandlers = undefined; };
     }, this.view);
-    if (this.lastSnapshot) this.followSnapshot(this.lastSnapshot);
+    if (this.hasEditorIntent() && (!this.editing || !scoreDocumentPlaybackCompatible(this.editing.state.document, this.documentPlayback))) {
+      this.view?.reset(); rendered.clearActiveNotes();
+    } else if (this.lastSnapshot) this.followSnapshot(this.lastSnapshot);
     else this.paintPosition(this.playheadSeconds);
+  }
+
+  private hasEditorIntent(): boolean { return this.explicitEditor !== undefined || this.getAttribute('editor') !== null; }
+
+  private updateEditable(): void {
+    const supported = this.type === 'piano-roll' || this.type === 'staff';
+    if (this.editing?.state.available) this.editing.setEditable(this.editable && supported);
+    this.setAttribute('data-editable-state', !this.editable ? 'readonly' : !supported ? 'unsupported-type' : this.editing?.state.available ? 'ready' : 'unavailable');
+  }
+
+  /** Detach the old attachment before releasing anything that can publish. */
+  private detachEditor(): () => void {
+    const surface = this.editorSurface;
+    const staff = this.staffEditing;
+    const unsubscribe = this.editorStateCleanup;
+    const editing = this.editing;
+    this.editorSurface = undefined;
+    this.staffEditing = undefined;
+    this.editorStateCleanup = undefined;
+    this.editing = undefined;
+    this.documentPlayback = undefined;
+    return () => {
+      try { unsubscribe?.(); } finally {
+        try { surface?.dispose(); } finally {
+          try { staff?.dispose(); } finally { editing?.dispose(); }
+        }
+      }
+    };
+  }
+
+  private unbindEditor(): number {
+    const generation = ++this.editorGeneration;
+    const discovery = this.editorBindingCleanup;
+    this.editorBindingCleanup = undefined;
+    const release = this.detachEditor();
+    try { discovery?.(); } finally { release(); }
+    return generation;
+  }
+
+  private bindEditor(): void {
+    const generation = this.unbindEditor();
+    const current = () => generation === this.editorGeneration && this.isConnected;
+    if (!current()) return;
+    if (!this.hasEditorIntent()) { this.removeAttribute?.('data-editor-state'); this.updateEditable(); this.sourceInitialized = false; if (current()) void this.refresh(); return; }
+    this.cancelLoad();
+    if (!current()) return;
+    if (this.explicitScore !== undefined || this.getAttribute('src') !== null) {
+      this.setAttribute('data-editor-state', 'source-conflict'); this.updateEditable(); if (current()) this.renderCurrent(); return;
+    }
+    const cleanup = observeElementSource<ScoreEditorPort>(this, {source: this.explicitEditor,
+      selector: this.getAttribute('editor') ?? undefined, property: 'editor', accepts: isScoreEditorPort}, (resolution) => {
+      if (!current()) return;
+      // Reentrant sourcechange can replace this resolution without replacing
+      // the discovery subscription, so it needs its own attachment revision.
+      const revision = ++this.editorResolutionRevision;
+      const attached = () => current() && revision === this.editorResolutionRevision;
+      this.detachEditor()();
+      if (!attached()) return;
+      this.setAttribute('data-editor-state', resolution.state);
+      this.lastSnapshot = undefined; this.playheadSeconds = 0;
+      if (resolution.source && resolution.state === 'ready') {
+        try {
+          const editing = createScoreViewEditing(resolution.source, {
+            editable: this.editable && (this.type === 'piano-roll' || this.type === 'staff'), interactionSession: this.explicitInteractionSession,
+          });
+          if (!attached()) { editing.dispose(); return; }
+          this.editing = editing;
+          const unsubscribe = editing.subscribe((state) => {
+            if (!attached() || editing !== this.editing) return;
+            const visibleScore = state.interaction.draft?.content ?? state.document.content;
+            const changed = this.resolvedScore !== visibleScore;
+            this.resolvedScore = visibleScore;
+            this.setAttribute('data-editor-state', state.available ? 'ready' : 'unavailable');
+            this.setAttribute('data-editable-state', !this.editable ? 'readonly' : this.type !== 'piano-roll' && this.type !== 'staff' ? 'unsupported-type' : state.available ? 'ready' : 'unavailable');
+            if (this.documentPlayback) this.followDocumentPlayback(this.documentPlayback);
+            if (attached() && editing === this.editing && !this.editorSurface && (changed || !this.rendered)) this.renderCurrent(false);
+          });
+          if (attached() && editing === this.editing) this.editorStateCleanup = unsubscribe;
+          else { unsubscribe(); editing.dispose(); return; }
+        } catch (error) {
+          if (!attached()) return;
+          this.setAttribute('data-editor-state', 'invalid'); this.loadError = error;
+        }
+      }
+      if (!attached()) return;
+      this.updateEditable();
+      if (attached() && !this.editorSurface) this.renderCurrent(false);
+    });
+    if (current()) this.editorBindingCleanup = cleanup; else cleanup();
+  }
+
+  private followDocumentPlayback(snapshot: ScorePlaybackSnapshot): void {
+    this.documentPlayback = snapshot;
+    const compatible = this.editing && scoreDocumentPlaybackCompatible(this.editing.state.document, snapshot);
+    this.setAttribute('data-playback-state', compatible ? 'ready' : 'pending');
+    this.editorSurface?.updatePlayback(snapshot);
+    if (!compatible) {
+      this.lastSnapshot = undefined; this.playheadSeconds = 0;
+      this.view?.reset(); this.rendered?.clearActiveNotes(); this.mapView?.setPosition(0); this.timeline?.update(); return;
+    }
+    this.followSnapshot({nominalSeconds: snapshot.nominalSeconds ?? 0, transportSeconds: snapshot.transportSeconds ?? 0,
+      transportDurationSeconds: snapshot.transportDurationSeconds ?? 0, rate: snapshot.rate ?? 1, playing: snapshot.state === 'playing'});
   }
 }
 

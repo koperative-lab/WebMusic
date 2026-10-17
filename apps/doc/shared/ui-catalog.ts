@@ -2,7 +2,7 @@ export type UiCompositionStatus = 'composed' | 'partial' | 'extract' | 'behavior
 
 export interface UiCompositionEntry {
   family: 'Score' | 'Audio';
-  capability: 'Play' | 'Analyze' | 'View';
+  capability: 'Play' | 'Analyze' | 'View' | 'Edit';
   tag: string;
   headless: string;
   ui: string;
@@ -18,6 +18,7 @@ export interface UiCompositionEntry {
  * ledger while production elements move toward Headless + UI Kit composition.
  */
 export const UI_COMPOSITION_CATALOG: readonly UiCompositionEntry[] = [
+  {family: 'Score', capability: 'Edit', tag: 'score-document', headless: 'ScoreEditor', ui: 'Nonvisual document declaration; owns an editor while connected', status: 'behavior', href: '/score/element/edit/score-document/'},
   {family: 'Score', capability: 'Play', tag: 'score-player', headless: 'ScorePlayer / RackTransportController', ui: '@webmusic/ui transport · seek · preset/rack shell', status: 'composed', publishedUi: true, href: '/score/element/play/score-player/'},
   {family: 'Score', capability: 'Play', tag: 'score-rack-control', headless: 'Rack', ui: '@webmusic/ui mixer · master/member faders · labels', status: 'composed', publishedUi: true, href: '/score/element/play/score-rack-control/'},
   {family: 'Score', capability: 'Play', tag: 'score-rack-part', headless: 'Rack member (score + Sound)', ui: 'Declaration only; renders nothing — documented on the desk it belongs to', status: 'behavior', href: '/score/element/play/score-rack-control/'},
@@ -25,13 +26,14 @@ export const UI_COMPOSITION_CATALOG: readonly UiCompositionEntry[] = [
   {family: 'Score', capability: 'Play', tag: 'score-note-input', headless: 'note-input-model · piano/grid/chord/QWERTY pitch mapping', ui: '@webmusic/ui note surface · presenter-owned pointer/chord/QWERTY interaction', status: 'composed', publishedUi: true, href: '/score/element/play/score-note-input/'},
   {family: 'Score', capability: 'Play', tag: 'score-synth-panel', headless: 'LfoController + EqController + SynthPanelAudioGraph + parameter descriptors', ui: '@webmusic/ui section panel · parameter rack · macro rack · envelope · EQ · LFO', status: 'composed', publishedUi: true, href: '/score/element/play/score-synth-panel/'},
 
-  {family: 'Score', capability: 'View', tag: 'score-view', headless: 'createScoreView + createScoreMap + createPianoRollLayout + player binding', ui: '@webmusic/ui stage · timeline · five score surfaces', status: 'composed', publishedUi: true, href: '/score/element/view/score-view/'},
+  {family: 'Score', capability: 'View', tag: 'score-view', headless: 'createScoreView + createScoreViewEditing + createStaffViewEditing + createScoreMap + createPianoRollLayout + player binding', ui: '@webmusic/ui stage · timeline · five score surfaces', status: 'composed', publishedUi: true, href: '/score/element/view/score-view/'},
   {family: 'Score', capability: 'View', tag: 'score-pitch-view', headless: 'ActiveNoteTracker + pitch projections + player binding', ui: '@webmusic/ui pitch · keyboard/staff/fretboard', status: 'composed', publishedUi: true, href: '/score/element/view/score-pitch-view/'},
   {family: 'Score', capability: 'View', tag: 'score-sheet-view', headless: 'OSMD renderer binding + MusicXML serializer', ui: '@webmusic/ui stage · status; optional OSMD engraving surface', status: 'composed', publishedUi: true, href: '/score/element/view/score-sheet-view/'},
 
   {family: 'Score', capability: 'Analyze', tag: 'score-live-chord-analysis', headless: 'LiveChordTracker + sounding chord spelling', ui: '@webmusic/ui harmony · current-chord interpretation', status: 'composed', publishedUi: true, href: '/score/element/analyze/score-live-chord-analysis/'},
   {family: 'Score', capability: 'Analyze', tag: 'score-chord-analysis', headless: 'AnalysisSession + chord segmentation + key-relative probe', ui: '@webmusic/ui harmony · selectable harmonic lane', status: 'composed', publishedUi: true, href: '/score/element/analyze/score-chord-analysis/'},
 
+  {family: 'Audio', capability: 'Edit', tag: 'audio-document', headless: 'AudioClipEditor', ui: 'Nonvisual document declaration; owns an editor while connected', status: 'behavior', href: '/audio/element/edit/audio-document/'},
   {family: 'Audio', capability: 'Play', tag: 'audio-player', headless: 'AudioPlayer + selected clip/queue/mix backend', ui: '@webmusic/ui transport · seek · time · status', status: 'composed', publishedUi: true, href: '/audio/element/play/audio-player/'},
   {family: 'Audio', capability: 'Play', tag: 'audio-playlist', headless: 'AudioPlaylist', ui: '@webmusic/ui playlist · queue selection · per-entry state', status: 'composed', publishedUi: true, href: '/audio/element/play/audio-playlist/'},
   {family: 'Audio', capability: 'Play', tag: 'audio-mixer', headless: 'AudioMixer', ui: '@webmusic/ui mixer · master/member strips · mute/solo', status: 'composed', publishedUi: true, href: '/audio/element/play/audio-mixer/'},

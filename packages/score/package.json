@@ -7,6 +7,7 @@
     "./src/io/worker.ts",
     "./src/analyze/worker.ts",
     "./src/play/element/auto.ts",
+    "./src/edit/element/auto.ts",
     "./dist/worker.js",
     "./dist/io/worker.js",
     "./dist/io/worker.cjs",
@@ -88,6 +89,46 @@
       "require": {
         "types": "./dist/io/worker.d.cts",
         "default": "./dist/io/worker.cjs"
+      }
+    },
+    "./edit": {
+      "import": {
+        "types": "./dist/edit/index.d.ts",
+        "default": "./dist/edit/index.js"
+      },
+      "require": {
+        "types": "./dist/edit/index.d.cts",
+        "default": "./dist/edit/index.cjs"
+      }
+    },
+    "./edit/headless": {
+      "import": {
+        "types": "./dist/edit/headless/index.d.ts",
+        "default": "./dist/edit/headless/index.js"
+      },
+      "require": {
+        "types": "./dist/edit/headless/index.d.cts",
+        "default": "./dist/edit/headless/index.cjs"
+      }
+    },
+    "./edit/element": {
+      "import": {
+        "types": "./dist/edit/element/index.d.ts",
+        "default": "./dist/edit/element/index.js"
+      },
+      "require": {
+        "types": "./dist/edit/element/index.d.cts",
+        "default": "./dist/edit/element/index.cjs"
+      }
+    },
+    "./edit/auto": {
+      "import": {
+        "types": "./dist/edit/element/auto.d.ts",
+        "default": "./dist/edit/element/auto.js"
+      },
+      "require": {
+        "types": "./dist/edit/element/auto.d.cts",
+        "default": "./dist/edit/element/auto.cjs"
       }
     },
     "./view": {

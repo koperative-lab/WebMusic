@@ -1,0 +1,26 @@
+import {it, expect} from 'vitest';
+import {createAudioClip, createMemoryAudioAssetStore, createAudioSequence, type AudioEditResult} from '../../src/core';
+import {createAudioClipEditor} from '../../src/edit/headless';
+
+it('clearHistory does not allow a lease cleanup callback to edit and recreate history', () => {
+  const store = createMemoryAudioAssetStore();
+  const initial = store.registerClip(createAudioClip({sampleRate:8000, channelData:[new Float32Array(8)]}), {id:'a'});
+  let onRelease: (()=>void) | undefined;
+  const assets = {...store, retain(ids:readonly string[]) {
+    const lease = store.retain(ids);
+    return {assetIds:lease.assetIds, get released() {return lease.released;}, release() {
+      lease.release(); const callback = onRelease; onRelease = undefined; callback?.();
+    }};
+  }};
+  const content = createAudioSequence({sampleRate:8000, channelLayout:['mono'], segments:[{kind:'asset', id:'s', assetId:'a',sourceStart:0,sourceEnd:8}]}, assets);
+  const editor = createAudioClipEditor(content, {assets}); initial.release();
+  const execute = (gain:number) => editor.execute({version:1, ...{documentId:editor.getSnapshot().documentId,expectedRevision:editor.getSnapshot().documentRevision}, label:'gain', operations:[{type:'set-gain',segmentIds:['s'],gain}]});
+  expect(execute(.5).status).toBe('committed');
+  let nested: AudioEditResult | undefined;
+  onRelease = () => {nested = execute(.25);};
+  const before = editor.getSnapshot();
+  editor.clearHistory();
+  const after = editor.getSnapshot(); const history = editor.getState().history;
+  editor.dispose(); expect(store.getStats().leases).toBe(0);
+  expect({nested, revision:after.documentRevision, gain:after.content.segments[0],history}).toMatchObject({nested:{status:'failed',error:{code:'reentrant-command'}},revision:before.documentRevision,history:{undoCount:0,redoCount:0}});
+});

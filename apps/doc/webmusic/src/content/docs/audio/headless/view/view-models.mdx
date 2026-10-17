@@ -10,10 +10,10 @@ a renderer paints — and only the columns in view. They share a page because a
 reader picks between them by asking what they want to see, not by learning two
 different objects.
 
-WaveformViewModel retains an AudioPeaks value; SpectrogramViewModel retains
+WaveformViewModel retains an AudioPeaks value or a borrowed AudioWaveformSource; SpectrogramViewModel retains
 structured SpectrogramData. Each owns an AudioTimeline and calculates arrays on
 query. They do not read an AudioClip directly, own audio resources, schedule frames
-or publish events. No disposal method is needed.
+or publish events. The models need no disposal method; dispose a borrowed sequence waveform source separately when its owner is done.
 
 ## Import
 
@@ -43,6 +43,15 @@ than the samples.
 timeline at all. A caller-owned compact preview can use that fit-to-box
 geometry and recompute it on resize.
 
+For an editable reference sequence, supply
+[`createAudioSequenceWaveform(sequence, assets)`](/audio/api/view/#sequence-waveform-ranges)
+instead of a peaks pyramid. `columns()` requests only the visible output-frame
+ranges, including silence, gain and envelopes. The source owns its bounded
+extrema cache and current asset lease; the model borrows it. After
+`source.setSequence(next)`, update `model.timeline.setDuration(next.length /
+next.sampleRate)` before querying if the extent changed. A zero-width viewport
+performs no range reads.
+
 ## SpectrogramViewModel
 
 Reads precomputed STFT frames and windows them to the visible range, with frequency-bin values retained for the renderer to map. The data contract is explicit: it
@@ -59,7 +68,7 @@ its labels and bins consistently rather than infer a mel scale from these values
 
 These models project existing data; they never advance a clock. A separate
 player binding updates their timeline and the caller chooses when to query and
-paint. Input changes require new models; view-model results are not an analysis
+paint. Pyramid/spectrogram input changes require new models; a sequence source may replace its own root and the caller updates the timeline duration; view-model results are not an analysis
 cache or a sample-editing API.
 
 The public barrel and `packages/audio/src/view/headless/waveform.ts and spectrogram.ts` define the value, option, state and event
@@ -73,7 +82,7 @@ fields into public API.
 
 | Member | Kind | Description |
 | --- | --- | --- |
-| `new WaveformViewModel(peaks, options?)` | constructor | Retains AudioPeaks; default duration is peaksDuration(peaks), which may include final block padding. |
+| `new WaveformViewModel(peaks, options?)` | constructor | Retains AudioPeaks or AudioWaveformSource; default duration is peaksDuration(peaks) or frameCount/sampleRate. A pyramid may include final block padding. |
 | `createWaveformViewModel(peaks, options?)` | factory | Returns WaveformViewModel. |
 | `new SpectrogramViewModel(data, options?)` | constructor | Retains SpectrogramData from /view API; default duration is inferred from the last time and final interval. |
 | `createSpectrogramViewModel(data, options?)` | factory | Returns SpectrogramViewModel. |
