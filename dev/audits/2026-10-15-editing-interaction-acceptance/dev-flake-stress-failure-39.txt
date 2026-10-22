@@ -1,0 +1,50 @@
+
+> check:dev-server
+> node --test scripts/docs-dev.test.mjs
+
+✔ repeat dev reuses a running server before a package build or takeover (0.697833ms)
+✔ first root start builds before launch and preserves Astro flags and foreground default (1.817375ms)
+✔ explicit restart stops before rebuilding; docs restart skips build (0.351625ms)
+✔ status, logs and stop never trigger package builds (0.232792ms)
+✔ build and child failures are preserved, including termination code 143 (54.8255ms)
+✔ unsafe bypass flags are rejected before stopping or building (0.257125ms)
+✔ concurrent starts build and start only once; second caller observes ready server (68.361417ms)
+✔ racing stale-owner recovery does not remove a newly acquired lock (149.141625ms)
+✔ a failing action releases the startup lock for the next attempt (9.951875ms)
+✔ foreground readiness releases startup coordination while the child remains running (62.632083ms)
+✖ interrupting a build stops its process tree before another start (350.360334ms)
+✔ all npm entry points route through the same startup coordinator without predev stop (1.362208ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 11
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 789.421333
+
+✖ failing tests:
+
+test at scripts/docs-dev.test.mjs:136:1
+✖ interrupting a build stops its process tree before another start (350.360334ms)
+  AssertionError [ERR_ASSERTION]: Interrupted build exited with 1 (no signal):
+  Error: kill EPERM
+      at process.kill (node:internal/process/per_thread:277:13)
+      at exists (file:///Users/mamingchen/.codex/worktrees/cd78/WebMusic/scripts/docs-dev.mjs:50:19)
+      at drainProcessGroup (file:///Users/mamingchen/.codex/worktrees/cd78/WebMusic/scripts/docs-dev.mjs:58:10)
+      at async file:///Users/mamingchen/.codex/worktrees/cd78/WebMusic/scripts/docs-dev.mjs:38:33 {"code":"EPERM","syscall":"kill"}
+  
+  
+  1 !== 143
+  
+      at TestContext.<anonymous> (file:///Users/mamingchen/.codex/worktrees/cd78/WebMusic/scripts/docs-dev.test.mjs:156:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 143,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

@@ -25,7 +25,7 @@ Evidence is retained without rewriting the failed run:
 
 - [Per-run results](2026-10-15-editing-interaction-acceptance/dev-flake-stress-results.json):
   39 invocations, exit codes and elapsed milliseconds.
-- [Run 39 failure](2026-10-15-editing-interaction-acceptance/dev-flake-stress-failure-39.log):
+- [Run 39 failure](2026-10-15-editing-interaction-acceptance/dev-flake-stress-failure-39.txt):
   complete test output, assertion and the `kill EPERM` stack.
 
 Retained JSON evidence has a final newline added where the temporary writer
@@ -80,13 +80,13 @@ that command passed: 50 exit codes `0`, no failures, and approximately 53.8
 seconds total recorded execution time. This is a bounded local stress result,
 not a guarantee against every future operating-system or process failure.
 
-- [Final 16-test output](2026-10-15-editing-interaction-acceptance/dev-flake-final-tests.log).
-- [Final stress summary](2026-10-15-editing-interaction-acceptance/dev-flake-final-stress.log).
+- [Final 16-test output](2026-10-15-editing-interaction-acceptance/dev-flake-final-tests.txt).
+- [Final stress summary](2026-10-15-editing-interaction-acceptance/dev-flake-final-stress.txt).
 - [All 50 invocation results](2026-10-15-editing-interaction-acceptance/dev-flake-final-stress-results.json).
 - [Stress runner](2026-10-15-editing-interaction-acceptance/dev-flake-final-stress.mjs),
   retained with the original checkout path and temporary output destinations.
 
-An [intervening test failure](2026-10-15-editing-interaction-acceptance/dev-flake-after-stress-failure-2.log)
+An [intervening test failure](2026-10-15-editing-interaction-acceptance/dev-flake-after-stress-failure-2.txt)
 is retained separately: its assertion expected a numeric startup-owner marker.
 The final implementation atomically renames that marker to
 `cleanup-failed.json`, and the final regression checks the replacement marker

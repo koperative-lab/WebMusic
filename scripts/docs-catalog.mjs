@@ -268,7 +268,23 @@ function markdownFileTargets(source) {
   return targets;
 }
 
-function fileLinkProblems(files, {readFile = read, targetExists = exists} = {}) {
+let publishable;
+function publishableTarget(file) {
+  // A file only an ignored local copy provides passes existsSync but is absent
+  // from every clean checkout and CI run, so links must reach published files,
+  // or directories containing at least one.
+  if (!publishable) {
+    const files = execFileSync('git', ['ls-files', '-co', '--exclude-standard', '-z'], {cwd: ROOT, encoding: 'utf8'})
+      .split('\0').filter(Boolean);
+    const directories = new Set(['.']);
+    for (const name of files) for (let index = name.indexOf('/'); index > 0; index = name.indexOf('/', index + 1)) directories.add(name.slice(0, index));
+    publishable = {files: new Set(files), directories};
+  }
+  const target = file.replace(/\/+$/, '') || '.';
+  return (publishable.files.has(target) || publishable.directories.has(target)) && existsSync(path.join(ROOT, target));
+}
+
+function fileLinkProblems(files, {readFile = read, targetExists = publishableTarget} = {}) {
   const failures = [];
   for (const file of files) {
     const source = currentLinkSource(file, readFile(file));
@@ -444,7 +460,13 @@ function runFileLinkProbes() {
     });
     assert.deepEqual(result, probe.expected, probe.name);
   }
-  return probes.length;
+  // `.git` exists in every checkout and is never published, so it proves the
+  // default check rejects present-but-unpublished targets.
+  assert(existsSync(path.join(ROOT, '.git')) && !publishableTarget('.git'), 'a present unpublished path is not a publishable link target');
+  assert(publishableTarget('AGENTS.md') && publishableTarget('dev/audits/'), 'published files and their directories are link targets');
+  assert.deepEqual(fileLinkProblems(['AGENTS.md'], {readFile: () => '[Local](.git)'}), ['AGENTS.md: missing local target .git'],
+    'the documentation check applies the publishable-target rule by default');
+  return probes.length + 3;
 }
 
 const probeCount = runFileLinkProbes();

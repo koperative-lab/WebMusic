@@ -1,0 +1,44 @@
+
+> check:dev-server
+> node --test scripts/docs-dev.test.mjs
+
+✔ repeat dev reuses a running server before a package build or takeover (1.147459ms)
+✔ first root start builds before launch and preserves Astro flags and foreground default (0.376209ms)
+✔ explicit restart stops before rebuilding; docs restart skips build (0.113208ms)
+✔ status, logs and stop never trigger package builds (0.100958ms)
+✔ build and child failures are preserved, including termination code 143 (46.284208ms)
+✔ unsafe bypass flags are rejected before stopping or building (0.246542ms)
+✔ concurrent starts build and start only once; second caller observes ready server (44.26225ms)
+✔ racing stale-owner recovery does not remove a newly acquired lock (111.751041ms)
+✔ a failing action releases the startup lock for the next attempt (2.488166ms)
+✔ foreground readiness releases startup coordination while the child remains running (56.713167ms)
+✔ interrupting a build stops its process tree before another start (290.637417ms)
+✔ a transient post-exit process-group probe denial preserves the interrupted command result (55.091208ms)
+✔ a transient post-exit SIGTERM denial waits for the process group to disappear (59.672875ms)
+✖ persistent process-group denial fails cleanup and blocks another build even after its owner exits (82.391125ms)
+✔ successful deadline SIGKILL preserves the command result and releases startup coordination (87.118167ms)
+✔ all npm entry points route through the same startup coordinator without predev stop (0.508958ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 15
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 895.196125
+
+✖ failing tests:
+
+test at scripts/docs-dev.test.mjs:219:1
+✖ persistent process-group denial fails cleanup and blocks another build even after its owner exits (82.391125ms)
+  AssertionError [ERR_ASSERTION]: Cleanup failure must retain the startup owner
+      at TestContext.<anonymous> (file:///Users/mamingchen/.codex/worktrees/cd78/WebMusic/scripts/docs-dev.test.mjs:245:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
