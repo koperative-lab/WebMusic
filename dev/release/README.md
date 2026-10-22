@@ -7,7 +7,7 @@ They do not establish registry availability, remote tag state or deployment.
 | --- | --- |
 | [Publishing](PUBLISHING.md) | Verify release identity, validate the checkout, publish in dependency order and verify delivery. |
 | [Releasing](RELEASING.md) | Shared version policy, local quality gates and the active CI boundary. |
-| [Editing migration](EDITING-MIGRATION.md) | Upgrade from published 0.2.0 to the next editing release: Score JSON, Audio source details and new Edit entry points. |
+| [Editing migration](EDITING-MIGRATION.md) | Upgrade from published 0.2.0 to the next editing release: Score JSON, Audio source details, existing members with changed behavior and new Edit entry points. |
 | [0.2.0 release preparation and migration](0.2.0.md) | Five-package upgrade notes, reviewed npm baseline and the manual publication checklist. |
 | [Archived pipeline design](../../scripts/release-pipeline/DESIGN.md) | Historical candidate, staging, promotion and deployment design; not an active runbook. |
 

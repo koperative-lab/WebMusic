@@ -48,13 +48,13 @@ without playback. This is the accepted composition direction in
 supports the target syntax; delivery gaps belong to [STATUS](STATUS.md).
 
 Editing adds a document owner shared by these same integration choices. Under
-DEC-047, the accepted target is a persistent domain editor that commits content
+DEC-047, editing uses a persistent domain editor that commits content
 and can provide bounded history for one document. Play borrows its current
 content and reports the revision actually applied for playback; View borrows
 content and edit commands. Existing piano-roll and waveform Views gain optional
 editing interaction, while nonvisual document Elements provide declarative HTML
 ownership. Custom applications use the same contracts without those Elements.
-The [editing design](design/EDIT-COMPONENTS.md) specifies this target;
+The [editing design](design/EDIT-COMPONENTS.md) specifies this contract;
 [STATUS](STATUS.md), EDIT-01, records delivery. Score editing, native document-bound playback, HTML declarations and piano-roll
 interaction are documented in [Score Edit](../apps/doc/webmusic/src/content/docs/score/api/edit.mdx)
 and [Score View](../apps/doc/webmusic/src/content/docs/score/element/view/score-view.mdx).

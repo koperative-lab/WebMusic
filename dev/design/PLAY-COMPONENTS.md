@@ -1,6 +1,6 @@
 # Score Play component responsibilities
 
-Status: existing Play surfaces implemented, including responsive presenter changes; browser and real-device acceptance pending. Document-bound playback below is an accepted target, with runtime implementation pending.
+Status: existing Play surfaces implemented, including responsive presenter changes; browser and real-device acceptance pending. Document-bound playback below is implemented under DEC-047; STATUS EDIT-01 tracks its remaining verification.
 Layer and public entry: Score Play Headless, Elements and UI bindings.
 Related decisions: DEC-016, DEC-045 and DEC-047.
 Source and public types: [Play source](../../packages/score/src/play/).
@@ -47,18 +47,19 @@ Analyze/View borrow the native player's resolved Score and state through the
 has no complete single-score snapshot in this checkout. Transport support is
 not a claim of uniform companion data support.
 
-## Document-bound playback: accepted target
+## Document-bound playback
 
 [Editing contracts](EDIT-COMPONENTS.md) and
 [DEC-047](../DECISIONS.md#dec-047--document-owned-editing-and-borrowed-playback)
-define the accepted editing integration. [STATUS](../STATUS.md), EDIT-01,
-tracks its pending runtime delivery; the following is not an existing API.
+define the editing integration. It is implemented; [STATUS](../STATUS.md),
+EDIT-01, tracks remaining verification. The owning public references list the
+shipped members.
 
 `ScoreEditor` owns committed document content. The native single-Score
 `ScorePlayer` borrows its Core read-only source and reports the document revision
 actually applied to playback, separately from the existing playback `revision`
 and `sourceRevision`. Play does not import the concrete Edit implementation.
-The future `.editor` / `editor` selector binding rejects controller or Rack
+The `.editor` / `editor` selector binding rejects controller or Rack
 configuration before changing a working owner; those modes and other Headless
 engines are outside this first integration.
 

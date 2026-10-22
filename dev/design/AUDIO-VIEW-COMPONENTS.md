@@ -22,7 +22,7 @@ when those interactions are useful. Core/Headless project numeric data without
 DOM; Render owns canvas/browser work; Elements compose these capabilities with
 neutral UIKit presenters. DEC-044 retires the three narrower Audio View tags.
 
-## Accepted editing target (DEC-047)
+## Editing (DEC-047)
 
 [Editing capabilities](EDIT-COMPONENTS.md) and
 [DEC-047](../DECISIONS.md#dec-047--document-owned-editing-and-borrowed-playback)
@@ -58,7 +58,7 @@ contract, not a PCM edit or an implicit document commit. Document annotations
 change only through explicit editor commands. Mode changes cancel active drafts.
 
 The player consumes a read-only sequence source and reports its applied document
-revision under the [Audio Play target](AUDIO-PLAY-COMPONENTS.md#accepted-document-playback-target-dec-047).
+revision under [Audio document playback](AUDIO-PLAY-COMPONENTS.md#document-playback-dec-047).
 View can display newer committed content during preparation, but withholds
 incompatible seek commands and playback overlays until document identities and
 revisions match and the coordinate mapping is valid. The editor owns content; Play owns time and

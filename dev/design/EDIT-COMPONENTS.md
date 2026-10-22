@@ -13,7 +13,7 @@ P0–P8 baseline. The current five-phase roadmap is below. This document specifi
 the complete target; public references describe only implemented members.
 
 Layer and entry: domain Core contracts, `/edit` API, `/edit/headless` behavior,
-and `/edit/element` declarations (implemented for Score). Rendering stays in View.
+and `/edit/element` declarations (implemented for Score and Audio). Rendering stays in View.
 Source reuse starts with [ScoreEditSession](../../packages/score/src/core/model/ScoreEditSession.ts),
 [ClipEditSession](../../packages/audio/src/core/model/ClipEditSession.ts),
 [Score playback](../../packages/score/src/core/playback.ts), and the existing
@@ -171,6 +171,18 @@ an explicit positive rational grid and origin; nearest-grid ties round forward.
 The default editing grid is a sixteenth note (one quarter of a quarter note).
 The first pitch display/edit mode is written pitch. Concert-pitch mode must
 explicitly apply and reverse Part transposition once before it is enabled.
+
+Edits keep written notation readable. Transposing by whole octaves keeps step and
+accidental; other intervals keep a flat spelling for flat notes and otherwise use
+sharps, without double accidentals. Resize, quantize and insert store a length
+that one whole-through-64th value with up to two dots can write as that base and
+dots, so staff entry can address it; other lengths keep a dotless exact base.
+Written pitch edits must also sound inside MIDI 0–127 after Part transposition.
+Velocity overrides apply only to sounding chain heads: a numeric override on a
+rest or a tie continuation rejects, while clearing remains allowed. Deleting one
+endpoint of an authored slur, or part of a well-formed beam group, rejects rather
+than leaving a dangling partner. Results name only notes whose content changed,
+and an entry that would only regenerate identities is a no-op.
 
 Add optional `NoteData.velocityOverride` (integer 1–127), retaining the existing
 numeric `Note.velocity` getter. Effective velocity resolves as
@@ -332,7 +344,7 @@ Static PCM analysis uses an explicit render adapter.
 
 ## Web Components and source selection
 
-Accepted target composition (registration and these members are not shipped):
+Implemented composition (the owning public references list each shipped member):
 
 ```html
 <score-document id="score-doc" src="/music.mid"></score-document>

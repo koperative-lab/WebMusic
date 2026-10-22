@@ -403,10 +403,10 @@ of import-time side effects.
 
 Packages use composite TypeScript projects, with root solution references matching
 workspace dependencies. tsup builds the artifacts; family `moduleEntries` map
-source to output, with split ESM and unsplit CJS passes. CJS worker clients use the
-defined fallback without `import.meta.url`. Kernel explicitly splits both formats
-so its root and capability entries share runtime class identity within each
-module format. Build entries and exports must match
+source to output. Kernel, Score and Audio split both their ESM and CJS passes so
+root and capability entries share one Core implementation, and therefore runtime
+class identity and error codes, within each module format. CJS worker clients use
+the defined fallback without `import.meta.url`. Build entries and exports must match
 in both directions. Relative source imports stay inside their package; cross-package
 imports use public subpaths.
 

@@ -26,7 +26,7 @@ For editing, the document editor owns committed content while Play owns the
 applied playback revision and transport. View borrows content/commands and keeps
 gesture drafts separate; a draft or retained playback snapshot is not another
 content authority. [Editing contracts](design/EDIT-COMPONENTS.md), accepted in
-DEC-047 and pending implementation, own local history and revision reconciliation.
+DEC-047 and implemented, own local history and revision reconciliation.
 
 ## 3. Time is a cross-component protocol
 

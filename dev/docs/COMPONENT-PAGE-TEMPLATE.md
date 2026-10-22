@@ -2,7 +2,7 @@
 
 This is the authoring contract for pages under
 `apps/doc/webmusic/src/content/docs/{score,audio}/element/<capability>/`,
-including Score's nonvisual Edit declaration.
+including the nonvisual Score and Audio Edit declarations.
 It does not replace product component design: establish a new component's
 purpose, layer boundaries, and composition through
 [COMPONENT-DESIGN.md](../design/COMPONENT-DESIGN.md) and

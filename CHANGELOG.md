@@ -5,6 +5,21 @@ work and does not establish npm publication, a release tag or a deployment.
 
 ## Unreleased
 
+- Add document-owned editing for Score and Audio: `/edit`, `/edit/headless`,
+  `/edit/element` and `/edit/auto` entries; revisioned editors with atomic
+  commands and bounded undo/redo; `<score-document>` and `<audio-document>`
+  declarations; playback that pauses and reports the applied document revision;
+  piano-roll, bounded staff and waveform editing on the existing Views; local
+  Audio processing and WAV export. The
+  [editing migration guide](dev/release/EDITING-MIGRATION.md) covers upgrades
+  from 0.2.0; no editing release is published.
+- Write Score JSON schema v0.2 with `NoteData.velocityOverride`; v0.1 and
+  unmarked input remain readable. Audio source-change details are now a
+  `kind`-discriminated union that can describe an edited sequence.
+- Reject non-finite `ScorePlayer` and `AudioPlayer` seeks with `RangeError`;
+  resolve `<audio-view player>` to exactly one observed target like the other
+  player companions; pad odd-sized WAV `data` chunks; share one Core per format
+  across Audio CommonJS entries.
 - Integrate Audio and the Score–Audio Bridge into the main source tree, with
   documentation and package checks for all five library packages. This source
   merge does not publish the two additional npm packages.

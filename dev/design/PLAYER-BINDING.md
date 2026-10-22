@@ -148,8 +148,9 @@ Element and programmatic usage paths.
 ## Document-bound editing extension
 
 [DEC-047](../DECISIONS.md#dec-047--document-owned-editing-and-borrowed-playback)
-accepts an additional source path, implemented for native Score playback and
-Score View. Audio delivery remains tracked in [STATUS](../STATUS.md), EDIT-01. [Editing contracts](EDIT-COMPONENTS.md) own its
+accepts an additional source path, implemented for native Score playback, Score
+View, Audio sequence playback and Audio View. Remaining verification is tracked in
+[STATUS](../STATUS.md), EDIT-01. [Editing contracts](EDIT-COMPONENTS.md) own its
 full command, position-map and resource protocol. This extends the direction of
 data borrowing without changing the passive source precedence above.
 

@@ -1,7 +1,7 @@
 # Editing migration from 0.2.0
 
 This guide covers consumer changes between the published `0.2.0` packages and
-the next release containing the `editing-capabilities` work. It does not choose
+the next release containing the document editing work. It does not choose
 that release's npm version or assert that the editing artifacts are published.
 Use [Releasing](RELEASING.md) and [Publishing](PUBLISHING.md) to prepare and
 verify a new shared package version; [STATUS](../STATUS.md) owns remaining work.
@@ -108,6 +108,24 @@ Because these exported types are now unions, an application interface cannot
 application metadata, such as
 `type NamedSource = AudioPlayerSourceDetail & {label: string}`, or select one
 branch with `Extract<AudioPlayerSourceDetail, {kind: 'clip'}>`.
+
+## Existing members with changed behavior
+
+These members exist in published `0.2.0`. Applications that do not use editing
+can still observe the changes below.
+
+| Member | Published 0.2.0 | Editing release |
+| --- | --- | --- |
+| `ScorePlayer.seek`, `seekNominal`, `seekFraction` | Non-finite input was not validated | `NaN` or `±Infinity` returns a promise rejected with `RangeError`; the position is unchanged |
+| `AudioPlayer.seek`, `scrub`, `seekFraction` and the `<audio-player>` `.seek`, `.scrub`, `.seekFraction` methods | Non-finite input was not validated | A `NaN` or `±Infinity` seek or scrub throws `RangeError`; `seekFraction` throws only for `NaN` and still clamps `±Infinity` to 0–1 |
+| `<audio-view player="…">` | One `querySelector` lookup bound the first match, once | Kernel target observation: exactly one match in the host root binds, a later insertion binds, several matches bind nothing, and invalid selector syntax dispatches `webaudio:error`, as `<score-view player>` and the Analyze Elements already behaved |
+| CommonJS entries of `@webmusic/audio` | Each entry carried its own copy of shared Core modules | Entries share one Core implementation per format, so `instanceof` checks and Core classes such as `AudioEditError` agree across `require('@webmusic/audio')` and its subpaths |
+| `serializeWav`, `clipToWav`, `clipToBlob` and the WAV exports built on them | An odd-sized `data` chunk (for example 24-bit mono with an odd frame count) had no RIFF pad byte | One zero pad byte follows the chunk and is counted in the RIFF size; the `data` chunk size and decoded PCM are unchanged, and the byte length grows by one |
+
+`AudioPlayer.setLoop` still rejects every borrowed queue or mix, and a configured
+clip loop is not applied to them, exactly as in `0.2.0`. Owned clips loop as
+before; among borrowed transport paths, only the player's own document sequence
+accepts loop commands.
 
 ## Adopt the new Edit entries
 

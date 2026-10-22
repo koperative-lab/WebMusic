@@ -87,7 +87,7 @@ retain presentation subscriptions, not duplicate volume/mute/solo maps. Multiple
 presenters and custom UI observe the same Headless object. A source's direct
 out-of-band gain changes are not a second mixer-state authority.
 
-## Accepted document playback target (DEC-047)
+## Document playback (DEC-047)
 
 [Editing capabilities](EDIT-COMPONENTS.md) and
 [DEC-047](../DECISIONS.md#dec-047--document-owned-editing-and-borrowed-playback)

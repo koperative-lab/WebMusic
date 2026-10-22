@@ -286,7 +286,7 @@ demos, external Parameters, reset behavior and redirects.
 **2026-10-13 extension:** [DEC-047](#dec-047--document-owned-editing-and-borrowed-playback)
 adds optional document-bound editing and focused keyboard interaction to existing
 View surfaces. The original passive usage below remains valid; runtime editing
-is pending under STATUS EDIT-01.
+is implemented, and STATUS EDIT-01 tracks its remaining verification.
 
 **Problem:** separate tags for keyboard, current-note staff and fretboard repeat
 one held-note input contract. Separate map and thumbnail tags repeat Score input
@@ -1614,7 +1614,7 @@ of these checks establishes npm publication or live device/audio behavior.
 
 **Date / status:** 2026-10-13; accepted design in P0 following the maintainer's
 request to start the first planned step. Runtime implementation was pending
-at acceptance. P1 and P2 delivery and verification are now tracked by
+at acceptance. P1–P4 are now implemented; their verification is tracked by
 [STATUS EDIT-01](STATUS.md) and the [editing contracts](design/EDIT-COMPONENTS.md).
 
 **Problem:** existing immutable Score/Audio edits and View interactions do not

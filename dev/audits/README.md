@@ -8,6 +8,7 @@ another checkout. [STATUS](../STATUS.md) owns current gaps;
 
 | Date | Records | Evidence and reading boundary |
 |---|---|---|
+| 2026-10-21 | [Editing branch review and repairs](2026-10-21-editing-review-fixes.md) | Repairs the CI-blocking ignored evidence links and the reproduced and static findings of a full branch review; lists deliberately unchanged decisions and current check results. |
 | 2026-10-17 | [Editing target/session repairs](2026-10-17-editing-target-session-fixes.md) | Fixes stale waveform command targets, cancellation-time disposal reentry and paused Score session replacement; regression evidence and finite release exit criteria. |
 | 2026-10-16 | [Editing post-fix release review](2026-10-16-editing-post-fix-review.md) | Two new P2 waveform-target and paused Score-session defects, with failing probes, current package checks and separately tracked publication prerequisites. |
 | 2026-10-16 | [Editing recheck repairs](2026-10-16-editing-recheck-fixes.md) | Follow-up repairs and regression evidence for View rebinding, document abort callbacks, piano-roll commands, Audio history cleanup and segment labels. |
