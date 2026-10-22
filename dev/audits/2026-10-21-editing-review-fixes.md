@@ -125,6 +125,20 @@ has a regression that fails before its fix:
   fraction validation, pending editor states, error codes, grid stepping and
   read-only accessibility wording).
 
+## Branch integration
+
+The repaired editing branch was then merged with the parallel analysis and
+component-feedback branch (`705d48e`, which also prepares shared `0.2.1`
+metadata). That branch had assigned DEC-047–052 on 2026-10-03–08, so the editing
+decisions drafted as DEC-047/048 are registered as DEC-053/054, with their former
+anchors retained; current references were renumbered and dated records keep
+their original wording. Two semantic conflicts were repaired with regressions:
+the other branch's player-readiness rendering rebuilt editor-bound
+`<score-view>` surfaces on every applied revision, discarding staff input and
+drafts, and its load-state refresh rebuilt the editor-bound waveform. Both
+editor-bound Views now ignore player readiness and load state for content.
+A lockfile-only `npm audit fix` clears the `vite` advisory below.
+
 ## Not changed
 
 - A processed output asset ID that was already retired (not one currently stored)
@@ -150,9 +164,13 @@ has a regression that fails before its fix:
 - `npm run pages:build` and `npm run check:external-install` pass
   ([excerpts](2026-10-21-editing-review-fixes/site-and-install-excerpt.txt)).
   Machine paths in the excerpts are replaced by placeholders.
-- `npm run audit:dependencies` reports one high advisory in the development
-  dependency `vite` 8.3.0–8.3.2, published after the baseline lockfile; the
-  lockfile is unchanged by this repair and the same report applies to `main`.
+- `npm run audit:dependencies` first reported a high advisory in the development
+  dependency `vite` 8.3.0–8.3.2, published after the baseline lockfile; after the
+  lockfile-only update during integration it reports no vulnerabilities.
+- After branch integration, `npm run check` passes with 5,053 tests (Kernel 163,
+  UI 704, Score 2,507, Audio 1,231, Bridge 182, site 266), and `pages:build`,
+  `check:external-install` and `audit:dependencies` pass
+  ([integration excerpt](2026-10-21-editing-review-fixes/integration-check-excerpt.txt)).
 
 Browser, pointer, screen-reader and audible verification were not repeated for
 these repairs; STATUS EDIT-01 retains those acceptance gaps.

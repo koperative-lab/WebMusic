@@ -1,0 +1,56 @@
+# Integrated branch: npm run check (excerpt)
+> check
+> check:source
+> check:format
+Format check passed.
+> check:lockfile
+Lockfile check passed: every declared optional dependency is present across 901 locked packages.
+> check:dev-server
+> lint
+> check:architecture
+Architecture check passed for 5 packages and 447 source modules.
+> check:docs
+check-docs: clean — 76 live-demo pages · 91 instances, 117 pages · 26 elements · 117 routes
+> check:dev-docs
+Development documentation check passed: 279 documents; generated inventories, local file links and dev/.agent reading routes are consistent.
+> check:site-notices
+> build:packages
+> check:doc-snippets
+Doc snippet check passed: 273 examples (fences, inline scripts, and literal MDX code exports) compile against built declarations.
+> typecheck
+> typecheck
+> typecheck:tests
+> test
+ Test Files  14 passed (14)
+      Tests  163 passed (163)
+ Test Files  38 passed (38)
+      Tests  704 passed (704)
+ Test Files  203 passed (203)
+      Tests  2507 passed (2507)
+ Test Files  90 passed (90)
+      Tests  1231 passed (1231)
+ Test Files  7 passed (7)
+      Tests  182 passed (182)
+> test
+ Test Files  33 passed (33)
+      Tests  266 passed (266)
+> check:licenses
+License gate passed: no copyleft package in hard dependencies; all restricted peers are optional.
+> check:packages
+Package export check passed for 101 public entries.
+Package artifact check passed for 5 package(s).
+> check:release-manifests
+Release manifests are consistent at 0.2.1.
+
+# npm run pages:build (excerpt)
+21:45:52 [build] 119 page(s) built in 10.37s
+21:45:52 [build] Complete!
+Prefixed 221 root-absolute links across 28 HTML files with /WebMusic; validated 371 emitted HTML/JS/CSS files.
+Site licenses verified: 74 records, 371 files.
+
+# npm run check:external-install (excerpt)
+
+External install check passed: 184 runtime entries imported, Score model composition passed in both formats, 96 ESM/browser and 92 CommonJS declarations checked without skipLibCheck.
+
+# npm run audit:dependencies
+found 0 vulnerabilities
