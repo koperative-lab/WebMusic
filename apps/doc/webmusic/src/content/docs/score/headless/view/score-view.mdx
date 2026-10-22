@@ -150,7 +150,9 @@ the same selection and draft to each consumer. Selection and preview do not
 change content revision or history, and document changes invalidate drafts.
 Piano-roll and staff modes can both expose editor commands. Switching to
 waterfall disables editing and cancels its draft; switching back restores the
-prior editing flag. Staff cursor, voice and written-note entry are supplied by
+prior editing flag. `view.editing.setEditable(value)` records the requested
+flag and applies it only in piano-roll or staff mode, so waterfall stays
+read-only until the type changes. Staff cursor, voice and written-note entry are supplied by
 the separately composed [createStaffViewEditing](/score/headless/view/staff-editing/)
 controller; selecting staff alone does not create a cursor or musical commands.
 
@@ -160,7 +162,9 @@ matching applied document ID/revision and valid authored coordinates. The helper
 During mismatch/preparation/error or unmapped repeat playback, active notes clear
 and the local playback projection resets to zero. Read `playbackAvailable` before
 drawing a playhead; zero is not a substitute for a compatible clock. `seek()`
-remains a local projection and never sends a transport command.
+remains a local projection and never sends a transport command. Without a bound
+playback snapshot, selection, drafts and commits keep the local `seek()` or
+`noteOn()` position; replaced content re-derives the notes sounding at that time.
 
 <details class="component-section">
 <summary>API</summary>
@@ -172,7 +176,7 @@ remains a local projection and never sends a transport command.
 | `type` | option | `'piano-roll'` | `'piano-roll'`, `'staff'` or `'waterfall'`; picks how a renderer should read the sequence. |
 | `viewport` | option | whole piece | `{startTime, endTime}` in seconds. |
 | `playback` | option | none | Borrow a `ScorePlaybackSource`; synchronously apply the initial snapshot and follow updates without DOM. |
-| `editable` | option | false | Editor input only: enable interaction commands for piano-roll/staff modes. Waterfall disables the effective flag. |
+| `editable` | option | false | Editor input only: enable interaction commands for piano-roll/staff modes. Waterfall disables the effective flag, including later `editing.setEditable(true)` requests. |
 | `interactionSession` | option | owned session | Editor input only: borrow a same-document `ScoreInteractionSession` to share selection/drafts. |
 
 **Commands**
@@ -194,11 +198,11 @@ remains a local projection and never sends a transport command.
 
 | Member | Kind | Description |
 | --- | --- | --- |
-| `score` | state | The borrowed `Score`. |
+| `score` | state | The borrowed `Score`; for an editor input, the committed content plus the local draft. |
 | `editing` | state | `ScoreViewEditing` for an editor input; absent for a plain Score input. |
 | `state.editing` | state | Editor interaction state; absent for plain Score input. |
 | `state.playbackAvailable` | state | Editor-bound playback compatibility; absent for plain Score input. |
-| `sequence` | state | The flattened sounding-note `ScoreNoteSequence`, computed once; full written notation remains on `score`. |
+| `sequence` | state | The flattened sounding-note `ScoreNoteSequence`, computed once for a plain Score and recomputed as editor content or drafts change; full written notation remains on `score`. |
 | `state` | state | The current immutable `ScoreViewState`. |
 | `state.type` · `state.sequence` | state | Selected drawing mode and the model's flattened sequence. |
 | `state.currentTime` | state | Playhead in seconds. |
@@ -252,11 +256,11 @@ editor-bound view. Construction requires a ready document.
 | `select(noteIds)` | command | Validate and replace session selection without editing content. Throws for unknown notes or unavailable sessions. |
 | `preview(operations)` | command | Return a `ScoreDraftResult`; successful candidates remain outside committed history. |
 | `commit(label?)` | command | Submit the session draft as one `ScoreEditResult`; default label `Edit notes`. |
-| `cancel()` | command | Clear the session draft and local error; inert after disposal/unavailability. |
+| `cancel()` | command | Clear the session draft and local error, publishing only when either existed; inert after disposal/unavailability. |
 | `execute(label, operations)` | command | Submit one guarded atomic edit against the current document revision; returns `ScoreEditResult`. |
 | `undo()` / `redo()` | commands | Delegate to the document's history; return `ScoreEditResult`. |
 | `subscribe(listener)` | subscription | Immediate current editing state, then changes; returns idempotent unsubscribe. Listener errors are reported to the console and isolated from commits. |
-| `dispose()` | lifecycle | Idempotently detach observation, dispose only an owned session and clear listeners. Last state remains readable with `available: false`. Never disposes the editor or a supplied session. |
+| `dispose()` | lifecycle | Idempotently detach observation, dispose only an owned session, deliver one final `available: false` state to current subscribers and clear listeners. That last state remains readable. Never disposes the editor or a supplied session. |
 
 Mutation commands return typed `failed` results while editing is disabled or
 the document is unavailable. They preserve the underlying editor's validation,

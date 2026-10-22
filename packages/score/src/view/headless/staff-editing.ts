@@ -3,6 +3,7 @@ import {
   type Alter, type PartId, type ScoreDocumentSnapshot, type ScoreEditResult,
   type ScoreNotationEntry, type ScoreQuarterValue, type Step,
 } from '../../core';
+import {spellNotationDuration} from '../../core/editing';
 import type {ScoreViewEditing} from './score-editing';
 
 export interface StaffViewEditingOptions {
@@ -60,14 +61,15 @@ function pair(value: ScoreQuarterValue): Rational {
   if (result.num !== value[0] || result.den !== value[1]) invalid('Rational quarters must be reduced');
   return result;
 }
+const BASES = [4, 2, 1, 1 / 2, 1 / 4, 1 / 8, 1 / 16].map((value) => Rational.from(value));
 function inputDuration(base: ScoreQuarterValue, dots = 0): Duration {
   const rational = pair(base);
-  if (![4, 2, 1, 1 / 2, 1 / 4, 1 / 8, 1 / 16].some((value) => rational.eq(Rational.from(value))) ||
-      !Number.isSafeInteger(dots) || dots < 0 || dots > 2) {
+  if (!BASES.some((value) => rational.eq(value)) || !Number.isSafeInteger(dots) || dots < 0 || dots > 2) {
     invalid('Staff entry supports whole through 64th bases and zero to two dots');
   }
   return new Duration({base: rational, dots});
 }
+/** One whole-through-64th value with up to two dots spelling exactly these quarters, if any. */
 function validOctave(value: number): void {
   if (!Number.isSafeInteger(value) || value < -1 || value > 9) invalid('Octave must be an integer from -1 to 9');
 }
@@ -154,7 +156,7 @@ export function createStaffViewEditing(editing: ScoreViewEditing, options: Staff
       if (document.change?.origin === 'restore') onsetQuarters = Rational.ZERO;
       const end = document.content.durationQuarters;
       if (onsetQuarters.gt(end)) onsetQuarters = end;
-      if (partId && !document.content.getPart(partId)) partId = document.content.parts[0]?.id;
+      if (!partId || !document.content.getPart(partId)) partId = document.content.parts[0]?.id;
       error = undefined;
     }
     publish();
@@ -163,10 +165,14 @@ export function createStaffViewEditing(editing: ScoreViewEditing, options: Staff
     editing,
     get state() { return state; },
     setCursor(value) { local(() => { const next = pair(value); if (next.lt(Rational.ZERO)) invalid('Cursor must be nonnegative'); onsetQuarters = next; }); },
-    setPart(value) { local(() => {
-      if (!editing.state.document.content.getPart(value)) throw new ScoreEditError('unknown-part', `Unknown part: ${value}`);
-      partId = value; staff = 1;
-    }); },
+    setPart(value) {
+      // Re-choosing the current part keeps its staff; only a new part starts at staff 1.
+      if (value === partId) { assertAvailable(); return; }
+      local(() => {
+        if (!editing.state.document.content.getPart(value)) throw new ScoreEditError('unknown-part', `Unknown part: ${value}`);
+        partId = value; staff = 1;
+      });
+    },
     setVoice(value) { local(() => { if (typeof value !== 'string' || !value.trim()) invalid('Voice must be a nonempty string'); voice = value; }); },
     setStaff(value) { local(() => { if (!Number.isSafeInteger(value) || value < 1) invalid('Staff must be a positive integer'); staff = value; }); },
     setDuration(base, dots) { local(() => { duration = inputDuration(base, dots); }); },
@@ -179,7 +185,8 @@ export function createStaffViewEditing(editing: ScoreViewEditing, options: Staff
       if (!part || !note) throw new ScoreEditError('unknown-note', `Unknown note: ${noteId}`);
       partId = part.id; voice = note.voice;
       staff = note.staff ?? ((part.staves ?? 1) > 1 && !note.rest && note.pitch.midi < 60 ? 2 : 1);
-      onsetQuarters = note.onsetQuarters; duration = note.duration;
+      // A duration without one notation value (e.g. a resized or recorded note) keeps the input setting.
+      onsetQuarters = note.onsetQuarters; duration = spellNotationDuration(note.duration.quarters) ?? duration;
       if (!note.rest) { octave = note.pitch.octave; alter = note.pitch.alter; }
       editing.select([noteId]);
     }); },
@@ -193,11 +200,15 @@ export function createStaffViewEditing(editing: ScoreViewEditing, options: Staff
         const part = base.content.parts.find((candidate) => candidate.notes.some((note) => note.id === selected[0]));
         const note = base.content.getNote(selected[0]);
         if (!part || !note) throw new ScoreEditError('unknown-note', `Unknown note: ${selected[0]}`);
+        const spelled = spellNotationDuration(note.duration.quarters);
+        if (!spelled) {
+          throw new ScoreEditError('unsupported-structure', `Staff deletion requires a duration of one whole through 64th value with up to two dots; ${note.id} lasts ${note.duration.quarters} quarters`);
+        }
         const entry: ScoreNotationEntry = {
           id: NoteId(makeId('notation')), partId: part.id, voice: note.voice,
           staff: note.staff ?? ((part.staves ?? 1) > 1 && !note.rest && note.pitch.midi < 60 ? 2 : 1),
           onsetQuarters: note.onsetQuarters.toJSON(),
-          duration: {base: note.duration.base.toJSON(), dots: note.duration.dots}, pitch: null,
+          duration: {base: spelled.base.toJSON(), dots: spelled.dots}, pitch: null,
         };
         // Selection publishes synchronously. Keep the deletion target immutable
         // while observers may change local input settings or the document.

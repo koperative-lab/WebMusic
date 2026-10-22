@@ -1,5 +1,6 @@
 import {existsSync} from 'node:fs';
 import {createRequire} from 'node:module';
+import {fileURLToPath} from 'node:url';
 import {describe, expect, it} from 'vitest';
 
 // Regression guard for the bundled output: these tests exercise the BUILT
@@ -31,7 +32,7 @@ describe.skipIf(!hasDist)('@webmusic/score built dist', () => {
   });
 
   it.each(['js', 'cjs'])('edit entries share Core values and execute a document transaction (%s)', async (extension) => {
-    const load = (name: string) => extension === 'js' ? entry(`${name}.js`) : requireBuilt(new URL(`../dist/${name}.cjs`, import.meta.url).pathname);
+    const load = (name: string) => extension === 'js' ? entry(`${name}.js`) : requireBuilt(fileURLToPath(new URL(`../dist/${name}.cjs`, import.meta.url)));
     const root = await load('index');
     const edit = await load('edit/index');
     const headless = await load('edit/headless/index');
@@ -60,7 +61,7 @@ describe.skipIf(!hasDist)('@webmusic/score built dist', () => {
   });
 
   it.each(['js', 'cjs'])('staff input composes built Core, Edit and View values (%s)', async (extension) => {
-    const load = (name: string) => extension === 'js' ? entry(`${name}.js`) : requireBuilt(new URL(`../dist/${name}.cjs`, import.meta.url).pathname);
+    const load = (name: string) => extension === 'js' ? entry(`${name}.js`) : requireBuilt(fileURLToPath(new URL(`../dist/${name}.cjs`, import.meta.url)));
     const root = await load('index');
     const edit = await load('edit/headless/index');
     const view = await load('view/headless/index');

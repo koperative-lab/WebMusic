@@ -188,7 +188,7 @@ export const SCORE_VIEW_PARAMS: ElementParamCatalog = {
       {name: 'interactionSession', note: 'Borrow a same-document session to share selection/drafts; otherwise the View creates and disposes its own.'},
       {name: 'currentTime', note: 'Read-only nominal score position in seconds.'},
       {name: 'active', note: 'Read-only MIDI pitches at the current score position; empty for map and thumbnail.'},
-      {name: 'configure(configuration)', note: 'Atomically select piano-roll, staff or waterfall with compatible options. Map and thumbnail use type/options/attributes.'},
+      {name: 'configure(configuration)', note: 'Atomically select piano-roll, staff or waterfall with compatible options; piano-roll includes editor pixelsPerQuarter and editingGrid. Map and thumbnail use type/options/attributes.'},
       {name: 'options', note: 'ScoreViewRenderOptions merged over attributes; includes editor pixelsPerQuarter (64) and editingGrid ([1, 4]), plus passive renderer options.'},
       {name: 'type', note: 'Reflects the five-value Element type; the setter writes the attribute.'},
       {name: 'forPart', note: 'Read-only map part filter, or undefined.'},

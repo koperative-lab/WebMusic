@@ -31,7 +31,10 @@ There is no `/edit/render`, `/edit/global`, `/edit/api` or Edit React wrapper.
 ## Atomic note operations
 
 `applyScoreOperations(score, operations)` returns a candidate `score`, a
-defensive immutable snapshot of `operations`, and `affectedNoteIds`. Operations
+defensive immutable snapshot of `operations`, and `affectedNoteIds`: the notes
+the batch inserted, removed or changed relative to the input, in first-touched
+order. A note inserted and deleted, or changed and restored, within the batch
+is not listed; a net-zero batch returns the input Score and no IDs. Operations
 run in order; invalid input throws `ScoreEditError` without modifying the source.
 The helper has no document identity, revision, history or subscriptions. Use
 `ScoreEditor.execute` when the operation must also commit to an owned document.
@@ -42,11 +45,11 @@ not repeat-expanded playback occurrences. Insertions supply their own stable IDs
 | `type` | Fields | Meaning |
 |---|---|---|
 | `insert-notes` | `notes: ScoreNoteInput[]` | Add notes to existing parts. Each input has `id`, `partId`, written `pitch: {step, alter, octave}`, `onsetQuarters`, `durationQuarters`, `voice`, and optional `velocity`. |
-| `delete-notes` | `noteIds` | Remove the named notes. |
+| `delete-notes` | `noteIds` | Remove the named notes. Tied, tuplet and grace notes reject as `unsupported-structure` even when the whole chain or group is named; deleting only part of an authored slur pair or beam group also rejects. |
 | `move-notes` | `noteIds`, `deltaQuarters` | Shift written onset by exact rational quarters, retaining Duration notation. |
 | `resize-notes` | `noteIds`, `durationQuarters` | Set a positive exact quarter duration for simple notes. |
-| `transpose-notes` | `noteIds`, `semitones` | Transpose written pitch by an integer number of semitones. |
-| `set-velocity` | `noteIds`, `velocity` | Set integer velocity 1–127; `null` clears the authored override. |
+| `transpose-notes` | `noteIds`, `semitones` | Transpose written pitch by an integer number of semitones, respelled as described below. |
+| `set-velocity` | `noteIds`, `velocity` | Set integer velocity 1–127; rests and tie continuations reject. `null` clears the authored override. |
 | `quantize-notes` | `noteIds`, optional `grid`, `origin`, `target` | Snap onset, duration, or both to a rational grid. Defaults: grid `[1,4]`, origin `[0,1]`, target `'onset'`; ties round forward. |
 | `enter-notation` | `entry: ScoreNotationEntry` | Enter a spelled note or rest in one existing measure and one voice/staff, replacing fully covered events and filling remaining gaps with written rests. |
 
@@ -57,9 +60,37 @@ unsupported operation fields or structures reject the whole batch. Commands do
 not repair partial ties, tuplets or grace notation. Only `enter-notation` fills
 the selected measure/voice/staff with written rests; ordinary piano-roll
 operations retain their event-editing behavior.
-Insertion and transposition are limited to MIDI pitches 0–127. Transposition
-rejects tied, rest and unpitched notes. Quantization origin affects onset only;
-duration quantization uses origin zero, and a duration rounded to zero rejects.
+Insertion, transposition and notation entry require a written MIDI pitch of
+0–127 and, after adding the Part transposition (`chromatic + 12 × octaveChange`),
+the sounding pitch 0–127 that playback and MIDI export use. Transposition
+rejects tied, rest and unpitched notes. A numeric `set-velocity` rejects rests
+and tie continuations, the later notes of a tie chain. Playback and MIDI export
+sound each tie chain once with its first note's velocity, so set that note
+instead. `null` may clear any stored override. Quantization origin affects
+onset only; duration quantization uses origin zero, and a duration rounded to
+zero rejects.
+
+Transposition by a multiple of 12 semitones keeps the written step and
+accidental and changes only the octave: `Bb4` becomes `Bb5`, and `E#4` becomes
+`E#5`. Other intervals spell the resulting pitch by the original accidental
+direction. A note spelled with a flat keeps flats (`Bb4` + 3 is `Db5`); a
+natural or sharp note uses sharps (`D4` + 1 is `D#4`); white keys are naturals
+(`Eb4` + 1 is `E4`). These results never contain double accidentals and do not
+consult the key signature.
+
+Resize, duration quantization and insertion store a written Duration for the
+exact quarter length. A length spelled by a whole through sixty-fourth base
+with zero to two dots uses that spelling: `[3,4]` is a dotted eighth and `[7,8]`
+a double-dotted eighth. Any other length, such as `[5,4]` or `[1,3]`, becomes
+its own base with no dots and has no single-note staff spelling. A move keeps
+the existing Duration.
+
+Deletion keeps authored slurs and beams matched. A slur's `start` and `stop`
+endpoints pair by voice and slur number; a level-one beam group runs from
+`begin` through `end` in one voice and staff, with chord members sharing their
+onset. Delete such a pair or group entirely, or not at all; a partial deletion
+fails with `unsupported-structure`. Unmarked notes inside a slur can be deleted
+individually, and already unmatched marks are not protected.
 
 An effective move, resize or quantize makes written time authoritative for each
 changed note: it removes absolute `performed` timing and retains the prior
@@ -68,6 +99,13 @@ quarter endpoints through the TimeMap, including interior tempo changes.
 Pitch-only, velocity-only and no-op timing operations preserve performed timing;
 untouched notes retain imported microtiming. Effective velocity is
 `velocityOverride ?? performed?.velocity ?? 80`.
+
+Quantization compares written time only. A note whose written onset and
+duration already lie on the grid is unchanged and keeps its `performed` timing.
+For example, [Score Recorder](/score/element/play/score-recorder/) output
+with a nonzero `quantize` already has grid-aligned written time. Quantizing it
+to that grid is a no-op, and playback and MIDI export continue to use its exact
+performed timing.
 
 This standalone example creates an explicit input and computes a candidate:
 
@@ -117,11 +155,17 @@ several entries shares one item, and the pure helper creates no history.
 
 Ties, tuplets, grace notes, chords, authored beams, slurs, hidden or unpitched
 notation, events crossing a measure boundary and unrepresentable rest gaps
-are outside this entry subset. Replacing events with expressive annotations
-also rejects rather than discarding them. These structures fail explicitly instead of
-silently losing notation. The [staff input controller](/score/headless/view/staff-editing/)
-supplies cursor, duration and voice state for a custom interface over this
-same operation; it does not create another Score or history.
+are outside this entry subset. Replacing events with articulations, ornaments,
+dynamics, lyrics or tags also rejects rather than discarding them. These
+structures fail explicitly instead of silently losing notation. Stem
+directions, rest positions and tie placement are display hints; a replacement
+does not keep them. An entry whose result matches the replaced events apart
+from generated IDs, such as re-entering an existing rest with its duration, is
+a no-op. It keeps the existing notes, their IDs and any selection.
+
+The [staff input controller](/score/headless/view/staff-editing/) supplies
+cursor, duration and voice state for a custom interface over this same
+operation; it does not create another Score or history.
 
 ## Document ports and commands
 

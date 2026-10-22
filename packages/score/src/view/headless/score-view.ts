@@ -252,7 +252,13 @@ function createDocumentScoreView(editor: ScoreEditorPort, options: ScoreViewOpti
   if (options.viewport) validateViewport(options.viewport);
   let type = options.type ?? 'piano-roll';
   let editingRequested = options.editable ?? false;
-  const editing = createScoreViewEditing(editor, {...options, editable: editingRequested && (type === 'piano-roll' || type === 'staff')});
+  const supports = (value: ScoreViewType) => value === 'piano-roll' || value === 'staff';
+  const controller = createScoreViewEditing(editor, {...options, editable: editingRequested && supports(type)});
+  // The exposed controller records the requested flag; the effective flag also follows the type.
+  const editing: ScoreViewEditing = {...controller,
+    get state() { return controller.state; },
+    setEditable(value) { controller.setEditable(value && supports(type)); editingRequested = value; },
+  };
   let current = createScoreView(editor.getSnapshot().content, {type: options.type, viewport: options.viewport});
   let disposed = false;
   let playback: ScorePlaybackSnapshot | undefined;
@@ -274,13 +280,15 @@ function createDocumentScoreView(editor: ScoreEditorPort, options: ScoreViewOpti
     if (disposed) return;
     const score = value.interaction.draft?.content ?? value.document.content;
     if (current.score !== score) {
-      const viewport = current.state.viewport;
+      const {viewport, currentTime, activeNotes} = current.state;
       current.dispose();
       current = createScoreView(score, {type, viewport});
+      // Without a player, re-project the caller's local seek()/noteOn() position onto new content.
+      if (!playback && (currentTime > 0 || activeNotes.length)) current.seek(currentTime);
     }
     available = scoreDocumentPlaybackCompatible(value.document, playback);
     if (available && playback) current.updatePlayback({...playback, score});
-    else current.reset();
+    else if (playback) current.reset();
     publish();
   });
   const updatePlayback = (value: ScorePlaybackSnapshot): ScoreViewState => {
@@ -305,9 +313,8 @@ function createDocumentScoreView(editor: ScoreEditorPort, options: ScoreViewOpti
     get state() { return state; },
     setType(value) {
       validateType(value);
-      if (type === 'piano-roll' || type === 'staff') editingRequested = editing.state.editable;
       type = value; current.setType(value);
-      if (editing.state.available) editing.setEditable(editingRequested && (value === 'piano-roll' || value === 'staff'));
+      if (controller.state.available) controller.setEditable(editingRequested && supports(value));
       return publish();
     },
     setViewport(start, end) { current.setViewport(start, end); return publish(); },

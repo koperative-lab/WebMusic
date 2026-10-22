@@ -176,6 +176,11 @@ export class ScorePlayerScheduler {
     this.transport.seekTo(Math.min(duration, nominalSeconds), now);
   }
 
+  /** Publish the current position once, e.g. after an adoption moved it without a transport command. */
+  publishCursor(): void {
+    this.emitCursor();
+  }
+
   /**
    * Coalesce simultaneous play() calls while an AudioContext is resuming. A
    * single start generation also lets pause()/stop() cancel an in-flight start.
@@ -377,6 +382,9 @@ export class ScorePlayerScheduler {
     // non-running, non-closed live state as resumable, matching Rack and
     // InteractivePlayer rather than rejecting a recoverable user gesture.
     if (context.state !== 'running') await context.resume();
+    // A pause, stop or document revision during the resume supersedes this
+    // start; never report the newer transport state as this start's failure.
+    if (generation !== this.startGeneration || this.playing) return;
     assertLiveAudioContext(context);
     if (context.state !== 'running') {
       throw new Error(`AudioContext is ${context.state} and cannot start live playback.`);

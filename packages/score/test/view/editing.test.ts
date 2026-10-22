@@ -24,8 +24,10 @@ function playback(editor: ReturnType<typeof createScoreEditor>, overrides: Parti
     documentBinding: {status: 'ready', attempt: 1, requested: document, applied: document, documentCoordinates: true, positionPolicy: 'preserve-quarter'}, ...overrides};
 }
 function pointer(target: Element, type: string, x: number, y: number, extra: Record<string, unknown> = {}) {
-  const event = new MouseEvent(type, {bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0, ...extra});
-  Object.defineProperty(event, 'pointerId', {value: 1}); target.dispatchEvent(event);
+  // A held primary button reports buttons = 1 until pointerup.
+  const {pointerId = 1, ...init} = extra;
+  const event = new MouseEvent(type, {bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0, buttons: type === 'pointerup' ? 0 : 1, ...init});
+  Object.defineProperty(event, 'pointerId', {value: pointerId}); target.dispatchEvent(event); return event;
 }
 function mounted() {
   const editor = createScoreEditor(fixture());
@@ -85,6 +87,37 @@ describe('document-bound Score views', () => {
     expect(view.state.playbackAvailable).toBe(false); expect(view.state.activeNotes).toEqual([]);
     view.updatePlayback(playback(editor)); expect(view.state.playbackAvailable).toBe(true);
     view.dispose(); editor.dispose(); foreign.dispose();
+  });
+
+  it('publishes cancellation only when it discards a draft or error, and tells borrowers about disposal', () => {
+    const editor = createScoreEditor(fixture()); const editing = createScoreViewEditing(editor, {editable: true});
+    const states: boolean[] = []; editing.subscribe((state) => states.push(state.available)); states.length = 0;
+    editing.cancel(); expect(states).toEqual([]);
+    editing.preview([move]); states.length = 0;
+    editing.cancel(); expect(states.length).toBeGreaterThan(0); expect(editing.state.interaction.draft).toBeUndefined();
+    states.length = 0; editing.dispose();
+    expect(states).toEqual([false]); expect(editing.state.available).toBe(false); editor.dispose();
+  });
+
+  it('keeps the local seek position across editing publications when no playback is bound', () => {
+    const editor = createScoreEditor(fixture()); const view = createScoreView(editor, {editable: true});
+    view.seek(1); view.editing!.select([a]);
+    expect(view.state.currentTime).toBe(1);
+    view.editing!.preview([move]); expect(view.score).not.toBe(editor.score);
+    expect(view.state.currentTime).toBe(1);
+    view.editing!.cancel(); expect(view.state.currentTime).toBe(1);
+    view.updatePlayback(playback(editor, {documentRevision: 99}));
+    expect(view.state.currentTime).toBe(0); expect(view.state.playbackAvailable).toBe(false);
+    view.dispose(); editor.dispose();
+  });
+
+  it('keeps waterfall editing disabled when its exposed controller requests editing', () => {
+    const editor = createScoreEditor(fixture()); const view = createScoreView(editor, {type: 'waterfall'});
+    view.editing!.setEditable(true);
+    expect(view.editing!.state.editable).toBe(false); expect(view.editing!.execute('Move', [move]).status).toBe('failed');
+    view.setType('piano-roll'); expect(view.editing!.state.editable).toBe(true);
+    view.editing!.setEditable(false); view.setType('staff'); expect(view.editing!.state.editable).toBe(false);
+    view.dispose(); editor.dispose();
   });
 
   it('disposes its owned session if borrowed playback observation fails during construction', () => {
@@ -173,7 +206,7 @@ describe('piano-roll gestures', () => {
     const begin = () => { pointer(host.querySelector('[data-note-id="a"]')!, 'pointerdown', 70, 490); pointer(renderer.surface, 'pointermove', 86, 490); };
     begin(); renderer.surface.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true}));
     pointer(renderer.surface, 'pointerup', 86, 490); expect(editor.getSnapshot().documentRevision).toBe(0);
-    begin(); renderer.surface.dispatchEvent(new Event('lostpointercapture'));
+    begin(); pointer(renderer.surface, 'lostpointercapture', 86, 490);
     pointer(renderer.surface, 'pointerup', 86, 490); expect(editor.getSnapshot().documentRevision).toBe(0);
     begin(); editor.transaction('External', (tx) => tx.add({type: 'set-velocity', noteIds: [b], velocity: 95}));
     pointer(renderer.surface, 'pointerup', 86, 490);
@@ -198,6 +231,117 @@ describe('piano-roll gestures', () => {
     renderer.dispose(); editing.dispose(); editor.dispose();
   });
 
+  it('does not insert over a note when click redraws detach the pressed node before dblclick', () => {
+    const {editor, renderer, host, commits} = mounted();
+    const rectangle = host.querySelector('[data-note-id="a"]')!;
+    pointer(rectangle, 'pointerdown', 70, 490); pointer(renderer.surface, 'pointerup', 70, 490);
+    expect(rectangle.isConnected).toBe(false); // Selection redrew the grid; the browser now targets the SVG.
+    pointer(renderer.surface, 'pointerdown', 70, 490); pointer(renderer.surface, 'pointerup', 70, 490);
+    renderer.surface.dispatchEvent(new MouseEvent('dblclick', {clientX: 70, clientY: 490, bubbles: true}));
+    expect(editor.score.parts[0].notes).toHaveLength(2); expect(editor.getSnapshot().documentRevision).toBe(0);
+    expect(commits).not.toHaveBeenCalled();
+    renderer.dispose();
+  });
+
+  it('inserts into the grid cell under the pointer, so repeating the gesture selects instead of duplicating', () => {
+    const {editor, editing, renderer} = mounted();
+    for (let count = 0; count < 2; count++) {
+      pointer(renderer.surface, 'pointerdown', 318, 410, {altKey: true}); pointer(renderer.surface, 'pointerup', 318, 410);
+    }
+    const drawn = editor.score.parts[0].notes.filter((note) => note.id !== a && note.id !== b);
+    expect(drawn.map((note) => note.onsetQuarters.toString())).toEqual(['19/4']);
+    expect(editing.state.interaction.selectedNoteIds).toEqual([drawn[0].id]);
+    for (let count = 0; count < 2; count++) renderer.surface.dispatchEvent(new MouseEvent('dblclick', {clientX: 446, clientY: 410, bubbles: true}));
+    const inserted = editor.score.parts[0].notes.filter((note) => note.onsetQuarters.eq(new Rational(27, 4)));
+    expect(inserted).toHaveLength(1); expect(inserted[0].duration.quarters.toString()).toBe('1');
+    expect(editor.getState().history.undoCount).toBe(2);
+    renderer.dispose();
+  });
+
+  it('ignores another pointer’s capture loss but cancels a drag whose pointerup was lost', () => {
+    const {editor, editing, renderer, host, commits} = mounted();
+    pointer(host.querySelector('[data-note-id="a"]')!, 'pointerdown', 70, 490); pointer(renderer.surface, 'pointermove', 86, 490);
+    pointer(renderer.surface, 'lostpointercapture', 86, 490, {pointerId: 2}); pointer(renderer.surface, 'pointercancel', 86, 490, {pointerId: 2});
+    expect(editing.state.interaction.draft).toBeDefined();
+    pointer(renderer.surface, 'pointermove', 102, 490, {buttons: 0});
+    expect(editing.state.interaction.draft).toBeUndefined();
+    pointer(renderer.surface, 'pointerup', 102, 490);
+    expect(editor.getSnapshot().documentRevision).toBe(0); expect(commits).not.toHaveBeenCalled();
+    renderer.dispose();
+  });
+
+  it('leaves an Escape that cancels nothing to enclosing handlers', () => {
+    const {editing, renderer} = mounted();
+    const escape = () => { const event = new KeyboardEvent('keydown', {key: 'Escape', bubbles: true, cancelable: true}); renderer.surface.dispatchEvent(event); return event; };
+    expect(escape().defaultPrevented).toBe(false);
+    editing.preview([move]); expect(escape().defaultPrevented).toBe(true);
+    expect(editing.state.interaction.draft).toBeUndefined();
+    renderer.dispose();
+  });
+
+  it('distinguishes selection, drafts, resize handles and sounding notes beyond colour', () => {
+    const {editor, editing, renderer, host} = mounted(); editing.select([a]);
+    const note = (id: string) => host.querySelector(`[data-note-id="${id}"]`)!;
+    expect(host.querySelector('[data-selection-outline]')).toBeTruthy();
+    expect(note('a').getAttribute('stroke')).not.toBe(note('b').getAttribute('stroke'));
+    expect(host.querySelector('[data-resize-handle]')!.getAttribute('stroke')).not.toBe('currentColor');
+    expect(note('a').getAttribute('role')).toBe('img'); expect(host.querySelector('[role="option"]')).toBeNull();
+    renderer.updatePlayback(playback(editor, {activeNotes: [{occurrenceId: 'b', noteId: b, partId: p, midi: 64, nominalStartSeconds: 1.5, nominalEndSeconds: 2}]}));
+    expect(Number(note('b').getAttribute('height'))).toBeGreaterThan(Number(note('a').getAttribute('height')));
+    expect(note('b').getAttribute('data-active')).toBe('true');
+    editing.preview([move]);
+    expect(note('a').getAttribute('stroke-dasharray')).toBe('4 2'); expect(Number(note('a').getAttribute('fill-opacity'))).toBeLessThan(1);
+    renderer.dispose();
+  });
+
+  it('presents a read-only grid as a labelled graphic instead of an instructed tab stop', () => {
+    const {editing, renderer} = mounted();
+    expect(renderer.surface.getAttribute('tabindex')).toBe('0'); expect(renderer.surface.getAttribute('role')).toBe('application');
+    editing.setEditable(false);
+    expect(renderer.surface.hasAttribute('tabindex')).toBe(false); expect(renderer.surface.getAttribute('role')).toBe('img');
+    expect(renderer.surface.hasAttribute('aria-describedby')).toBe(false);
+    editing.setEditable(true); expect(renderer.surface.getAttribute('aria-describedby')).toBeTruthy();
+    renderer.dispose();
+  });
+
+  it('repaints only playback overlays for playback-only updates and leaves an unchanged status alone', () => {
+    const {editor, renderer, host} = mounted();
+    const rebuild = vi.spyOn(renderer.surface, 'replaceChildren');
+    const status = host.querySelector('[part="editing-status"]')!;
+    const writes = new MutationObserver(() => {}); writes.observe(status, {childList: true, characterData: true, subtree: true});
+    renderer.updatePlayback(playback(editor)); writes.takeRecords();
+    const playhead = host.querySelector('[data-playhead]')!;
+    renderer.updatePlayback(playback(editor, {nominalSeconds: 1}));
+    renderer.updatePlayback(playback(editor, {nominalSeconds: 1.5}));
+    expect(host.querySelector('[data-playhead]')).toBe(playhead);
+    expect(playhead.getAttribute('x1')).toBe(String(editor.score.timeMap.secondsToQuarters(1.5).toFloat() * 64));
+    expect(rebuild).not.toHaveBeenCalled(); expect(writes.takeRecords()).toEqual([]);
+    editor.transaction('Move', (tx) => tx.add(move));
+    expect(host.querySelector('[data-playhead]')).toBeNull(); expect(rebuild).toHaveBeenCalled();
+    writes.disconnect(); renderer.dispose();
+  });
+
+  it('accepts a one-sided explicit pitch bound outside the default range', () => {
+    const builder = new ScoreBuilder(); builder.addPart({id: p, name: 'Piano'});
+    const editor = createScoreEditor(builder.build()); const editing = createScoreViewEditing(editor, {editable: true});
+    const host = document.createElement('div'); document.body.append(host);
+    for (const [bounds, lanes] of [[{maxPitch: 40}, 1], [{minPitch: 90}, 1], [{maxPitch: 60}, 13]] as const) {
+      const renderer = mountPianoRollEditor(host, editing, bounds);
+      expect(renderer.surface.getAttribute('height')).toBe(String(lanes * 20)); renderer.dispose();
+    }
+    editing.dispose(); editor.dispose();
+  });
+
+  it('attaches nothing when mounted on an unavailable controller', () => {
+    const editor = createScoreEditor(fixture()); const editing = createScoreViewEditing(editor, {editable: true});
+    editing.dispose();
+    const added = vi.spyOn(window, 'addEventListener');
+    const host = document.createElement('div'); document.body.append(host);
+    expect(() => mountPianoRollEditor(host, editing)).toThrow(/unavailable/);
+    expect(host.childElementCount).toBe(0); expect(added).not.toHaveBeenCalled();
+    editor.dispose();
+  });
+
   it('offers exact numeric edits without intercepting text-field keys', () => {
     const {editor, editing, renderer, host} = mounted(); editing.select([a]);
     const field = host.querySelector<HTMLInputElement>('[aria-label="Onset (quarters)"]')!;
@@ -207,6 +351,37 @@ describe('piano-roll gestures', () => {
     expect(editor.score.getNote(a)!.onsetQuarters.toJSON()).toEqual([1, 3]);
     expect(editor.getState().history.undoCount).toBe(1);
     renderer.dispose(); editing.dispose(); editor.dispose();
+  });
+
+  it('rejects empty numeric pitch and velocity instead of committing zero', () => {
+    const {editor, editing, renderer, host, commits} = mounted(); editing.select([a]);
+    const field = (label: string) => host.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)!;
+    const button = (label: string) => [...host.querySelectorAll('button')].find((node) => node.textContent === label)!;
+    const status = () => host.querySelector('[part="editing-status"]')!.textContent;
+    field('Written MIDI pitch').value = ''; button('Apply to selected note').click();
+    expect(status()).toMatch(/Written MIDI pitch must be an integer from 0 to 127/);
+    button('Insert note').click();
+    expect(editor.score.parts[0].notes).toHaveLength(2); expect(editor.score.getNote(a)!.pitch.midi).toBe(60);
+    field('Written MIDI pitch').value = '60'; field('Velocity').value = ''; button('Apply to selected note').click();
+    expect(status()).toMatch(/Velocity must be an integer from 1 to 127/);
+    expect(editor.getSnapshot().documentRevision).toBe(0); expect(commits).not.toHaveBeenCalled();
+    renderer.dispose();
+  });
+
+  it('submits only changed note values and treats an unchanged Apply as no change', () => {
+    const {editor, editing, renderer, host, commits} = mounted();
+    const field = (label: string) => host.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)!;
+    const apply = () => [...host.querySelectorAll('button')].find((node) => node.textContent === 'Apply to selected note')!.click();
+    editing.execute('Nudge', [{type: 'transpose-notes', noteIds: [b], semitones: 1}]); editing.undo();
+    editing.select([a]); const revision = editor.getSnapshot().documentRevision;
+    apply();
+    expect(editor.getSnapshot().documentRevision).toBe(revision); expect(editor.getState().history.canRedo).toBe(true);
+    expect(host.querySelector('[part="editing-status"]')!.textContent).toBe('No change'); expect(commits).not.toHaveBeenCalled();
+    field('Velocity').value = '70'; apply();
+    expect(commits).toHaveBeenCalledOnce();
+    expect(commits.mock.calls[0][0].change.operations.map((operation: ScoreEditOperation) => operation.type)).toEqual(['set-velocity']);
+    expect(editor.score.getNote(a)!.performed).toEqual({onsetSec: .45, durationSec: .48, velocity: 90});
+    renderer.dispose();
   });
 
   it('selects a non-first note through the native keyboard alternative and edits, deletes and undoes it', () => {
@@ -590,5 +765,49 @@ describe('score-view editor composition', () => {
     view.removeAttribute('player'); expect(view.querySelector('[data-playhead]')).toBeNull();
     expect(view.querySelector('[part="editor"]')!.getAttribute('data-playback-state')).toBe('unbound');
     view.remove(); editor.dispose();
+  });
+
+  it('compares a bound player with committed content, not the view’s local draft', () => {
+    const editor = createScoreEditor(fixture()); const source = playback(editor);
+    let publish = (_: ScorePlaybackSnapshot) => {};
+    const player = document.createElement('div') as HTMLDivElement & {playback: {snapshot(): ScorePlaybackSnapshot; subscribe(listener: (snapshot: ScorePlaybackSnapshot) => void): () => void}};
+    player.id = 'draft-player'; player.playback = {snapshot: () => source, subscribe: (listener) => { publish = listener; listener(source); return () => {}; }};
+    const view = document.createElement('editing-score-view') as ScoreViewElement;
+    view.editor = editor; view.editable = true; view.setAttribute('player', '#draft-player'); document.body.append(player, view);
+    view.interactionSession!.preview([move]); publish(source);
+    expect(view.getAttribute('data-player-state')).toBe('ready'); expect(view.getAttribute('data-playback-state')).toBe('ready');
+    view.remove(); editor.dispose();
+  });
+
+  it('reflects editable state only for editor-bound or editable views and accepts editor geometry through configure()', () => {
+    const passive = document.createElement('editing-score-view') as ScoreViewElement;
+    passive.score = fixture(); document.body.append(passive);
+    expect(passive.hasAttribute('data-editable-state')).toBe(false);
+    passive.editable = true; expect(passive.getAttribute('data-editable-state')).toBe('unavailable');
+    passive.editable = false; expect(passive.hasAttribute('data-editable-state')).toBe(false);
+    const editor = createScoreEditor(fixture()); const view = document.createElement('editing-score-view') as ScoreViewElement;
+    view.editor = editor; document.body.append(view); expect(view.getAttribute('data-editable-state')).toBe('readonly');
+    view.configure({type: 'piano-roll', options: {pixelsPerQuarter: 32, editingGrid: [1, 8]}});
+    expect(view.querySelector('[data-note-id="a"]')!.getAttribute('x')).toBe('32');
+    view.remove(); passive.remove(); editor.dispose();
+  });
+
+  it('keeps its editing session across format changes and shows a pending editor without stale content or an alert', () => {
+    const editor = createScoreEditor(fixture());
+    const declaration = document.createElement('div') as HTMLDivElement & {editor?: typeof editor};
+    declaration.id = 'pending-declaration'; declaration.editor = editor; document.body.append(declaration);
+    const view = document.createElement('editing-score-view') as ScoreViewElement;
+    view.setAttribute('type', 'piano-roll'); view.setAttribute('editor', '#pending-declaration'); view.editable = true;
+    document.body.append(view);
+    const session = view.interactionSession!; session.setSelection([a]);
+    view.setAttribute('format', 'midi');
+    expect(view.interactionSession).toBe(session); expect(session.getSnapshot().selectedNoteIds).toEqual([a]);
+    declaration.editor = undefined; declaration.dispatchEvent(new Event('webmusic:sourcechange', {bubbles: true}));
+    expect(view.getAttribute('data-editor-state')).toBe('unavailable');
+    // The previous editor's notes are gone and a polite waiting status replaces them.
+    expect(view.textContent).toContain('Waiting for a score');
+    expect(view.querySelector('[data-note-id]')).toBeNull();
+    expect(view.querySelector('[role="alert"]')).toBeNull();
+    view.remove(); declaration.remove(); editor.dispose();
   });
 });

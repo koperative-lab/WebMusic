@@ -101,6 +101,8 @@ export function createScoreViewEditing(editor: ScoreEditorPort, options: ScoreVi
     commit(label) { return result(() => session.commitDraft(label)); },
     cancel() {
       if (disposed || !state.available) return;
+      // Nothing to discard: publishing would redraw every surface for no change.
+      if (!session.getSnapshot().draft && !error) return;
       session.cancelDraft();
       error = undefined;
       publish();
@@ -124,7 +126,13 @@ export function createScoreViewEditing(editor: ScoreEditorPort, options: ScoreVi
       disposed = true;
       try { offDocument(); } finally {
         try { offSession(); } finally {
-          try { if (ownsSession) session.dispose(); } finally { state = snapshot(); listeners.clear(); }
+          try { if (ownsSession) session.dispose(); } finally {
+            // One terminal state lets borrowers observe unavailability.
+            const final = state = snapshot(); const borrowers = [...listeners]; listeners.clear();
+            for (const listener of borrowers) {
+              try { listener(final); } catch (error) { console.error('ScoreView editing subscriber failed', error); }
+            }
+          }
         }
       }
     },

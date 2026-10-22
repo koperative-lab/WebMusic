@@ -124,7 +124,7 @@ editor.dispose();
 | --- | --- | --- |
 | `pixelsPerQuarter` | 64 | Finite positive pixel scale for written quarter positions. |
 | `noteHeight` | 20 | Finite positive pitch-lane height in pixels. |
-| `minPitch`, `maxPitch` | MIDI 48–84, expanded around notes | Safe integer bounds within 0–127, minimum no greater than maximum. |
+| `minPitch`, `maxPitch` | MIDI 48–84, expanded around notes | Safe integer bounds within 0–127, minimum no greater than maximum. A single explicit bound limits the computed opposite bound. |
 | `editingGrid` | `[1, 4]` | Positive exact rational quarter grid for pointer and keyboard timing. |
 | `noteColor`, `activeNoteColor` | Score View CSS tokens | CSS note fills; take precedence over the corresponding RGB channels. |
 | `noteRGB`, `activeNoteRGB` | token fallback | Optional `"r, g, b"` fills when the corresponding CSS color is absent. |
@@ -132,10 +132,14 @@ editor.dispose();
 | `onCommit(result)` | none | Committed `ScoreEditResult`; no call for cancellation, failure or no-op. |
 | `onError(error)` | none | Command or numeric-input failure. |
 
+Mounting requires an available `editing` controller; otherwise it throws
+`ScoreEditError` (`disposed`) before adding DOM or listeners.
 `PianoRollEditingHandle` exposes `element` (the mounted section), `surface`
-(the focusable SVG), `updatePlayback(snapshot?)`, `cancel()` and `dispose()`.
+(the SVG, focusable while editable), `updatePlayback(snapshot?)`, `cancel()` and `dispose()`.
 Playback updates draw time and active-note overlays only for ready, exactly
 matching applied document identity/revision with `documentCoordinates: true`.
+A playback-only update repaints the playhead and sounding notes on the existing
+drawing.
 Passing `undefined` removes playback overlays. `cancel()` discards the session
 draft. Idempotent `dispose()` cancels this surface's active gesture, detaches its
 listeners and resize observer and removes its DOM; it leaves the borrowed controller/editor alive.
@@ -206,13 +210,16 @@ keep their [staff-renderer defaults](#render-staff-notation).
 
 | Additional option | Default | Contract |
 | --- | --- | --- |
+| `inputEnabled` | false | Initial armed note-input mode. It applies only while the controller is editable; `<score-view>` uses it to keep input armed across presentation re-renders. |
 | `onCommit(result)` | none | Called for a committed `ScoreEditResult`; not for no-op or failure. |
 | `onError(error)` | none | Reports command or input-field failures. |
 
 `StaffEditingHandle` exposes `element` (the mounted section), `surface`
 (the focusable input container), `updatePlayback(snapshot?)`, `cancel()` and
-`dispose()`. Playback overlays require exactly matching ready document identity
-and revision, with authored coordinates. Passing `undefined` clears playback
+`dispose()`. If the controller cannot be subscribed, mounting removes its DOM and
+rethrows. Playback overlays require exactly matching ready document identity
+and revision, with authored coordinates; playback-only updates do not repaint
+controls, selection or the live status. Passing `undefined` clears playback
 overlays. `cancel()` exits note-input mode; every entry is already atomic and
 there is no pending staff draft. Idempotent `dispose()` releases listeners,
 the engraving surface and its DOM, leaving the borrowed controller/editor
@@ -768,7 +775,8 @@ Score + MusicXML + OSMD constructor -> RenderedScoreVisualizer<OSMDLike>
 
 `ScoreViewConfiguration` is a discriminated union of `{type, options?}` for
 `piano-roll`, `staff` and `waterfall`. `ScoreViewOptionsByType` maps each mode to
-its renderer options. These types prevent options for one mode from silently
+its renderer options; `piano-roll` also accepts the editor-bound grid's
+`pixelsPerQuarter` and `editingGrid`, which passive renderers ignore. These types prevent options for one mode from silently
 configuring another.
 
 `validateScoreViewConfiguration(configuration): void` validates the mode and

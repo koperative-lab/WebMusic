@@ -71,6 +71,8 @@ export interface ScorePlayerTimeUpdateEventDetail {
   duration: number;
 }
 
+const EMPTY_DOCUMENT_BINDING: ScoreDocumentPlaybackBinding = Object.freeze({status: 'empty', attempt: 0, documentCoordinates: false});
+
 /** Snapshot of the native single-score engine; borrowed Rack/controller modes omit it. */
 export interface ScorePlayerPlaybackSnapshot extends ScorePlayerTimeUpdateEventDetail {
   rate: number;
@@ -133,6 +135,8 @@ export class ScorePlayerElement extends WebMusicElement {
   private editorGeneration = 0;
   private mountedDocument = false;
   private documentBlocked?: Error;
+  /** A blocked declaration is an error (conflict, invalid, ambiguous) rather than a pending editor. */
+  private documentFault = false;
   private documentStateKey = '';
   private renderPending: Promise<void> = Promise.resolve();
   private mountedScore?: Score;
@@ -177,7 +181,8 @@ export class ScorePlayerElement extends WebMusicElement {
     const native = this.handle?.player?.playback?.snapshot();
     return {
       sourceRevision: this.sourceRevision,
-      readiness: this.documentBlocked ? 'error' : this.mountedDocument ? native?.readiness ?? this.playbackReadiness : this.playbackReadiness,
+      readiness: this.documentBlocked ? (this.documentFault ? 'error' : 'unavailable')
+        : this.mountedDocument ? native?.readiness ?? this.playbackReadiness : this.playbackReadiness,
       state: native?.state ?? 'stopped',
       score: native?.score,
       nominalSeconds: native?.nominalSeconds ?? null,
@@ -186,7 +191,7 @@ export class ScorePlayerElement extends WebMusicElement {
       transportDurationSeconds: native?.transportDurationSeconds ?? null,
       rate: native?.rate ?? null,
       activeNotes: this.documentBlocked ? Object.freeze([]) : native?.activeNotes ?? Object.freeze([]),
-      error: this.documentBlocked ?? native?.error ?? this.playbackError,
+      error: this.documentBlocked ? this.documentError : native?.error ?? this.playbackError,
       documentId: native?.documentId,
       documentRevision: native?.documentRevision,
       documentBinding: this.documentBinding,
@@ -221,11 +226,8 @@ export class ScorePlayerElement extends WebMusicElement {
       this.rackObserver.observe(this, {childList: true, subtree: true});
       this.own(() => { this.rackObserver?.disconnect(); this.rackObserver = undefined; });
     }
+    this.upgradeSourceProperties();
     upgradeProperties(this, [
-      'score',
-      'editor',
-      'rack',
-      'controller',
       'sound',
       'effect',
       'audioContext',
@@ -287,12 +289,17 @@ export class ScorePlayerElement extends WebMusicElement {
   }
   get editor(): ScoreDocumentSource | undefined { return this.explicitEditor ?? this.selectedEditor; }
 
-  /** Requested and applied revisions; independent sources omit this state. */
+  /**
+   * Requested and applied revisions; independent sources omit this state. In
+   * editor mode it is `empty` until a native player mounts, and `error` for a
+   * conflicting/invalid/ambiguous declaration or a failed mount.
+   */
   get documentBinding(): ScoreDocumentPlaybackBinding | undefined {
+    if (!this.hasEditorSource() && !this.mountedDocument) return undefined;
     const binding = this.handle?.player?.documentBinding;
-    if (this.documentBlocked) return Object.freeze({...binding, status: 'error',
-      attempt: binding?.attempt ?? 0, documentCoordinates: false, error: this.documentBlocked});
-    return this.hasEditorSource() || this.mountedDocument ? binding : undefined;
+    const error = this.documentBlocked ? this.documentError : !binding && this.playbackReadiness === 'error' ? this.playbackError : undefined;
+    if (error !== undefined) return Object.freeze({...binding, status: 'error', attempt: binding?.attempt ?? 0, documentCoordinates: false, error});
+    return binding ?? EMPTY_DOCUMENT_BINDING;
   }
 
   async waitForDocumentRevision(target: ScoreDocumentRevision): Promise<ScoreDocumentApplicationResult> {
@@ -655,6 +662,31 @@ export class ScorePlayerElement extends WebMusicElement {
     if (request === this.renderRequest) this.renderPending = pending;
   }
 
+  private get documentError(): Error | undefined {
+    return this.documentFault ? this.documentBlocked : undefined;
+  }
+
+  /**
+   * Re-run pre-upgrade source writes. A write that conflicts with markup can no
+   * longer be rejected atomically, so it keeps its value and exposes the same
+   * observable conflict as a conflicting attribute instead of aborting the mount.
+   */
+  private upgradeSourceProperties(): void {
+    const own = this as unknown as Record<string, unknown>;
+    for (const property of ['score', 'editor', 'rack', 'controller'] as const) {
+      if (!Object.prototype.hasOwnProperty.call(this, property)) continue;
+      const value = own[property];
+      delete own[property];
+      try { own[property] = value; } catch (error) {
+        if (!(error instanceof ScoreDocumentApplicationError) || error.code !== 'source-conflict') throw error;
+        if (property === 'score') this.explicitScore = value as Score;
+        else if (property === 'editor') this.explicitEditor = value as ScoreDocumentSource;
+        else if (property === 'rack') this.explicitRack = value as Rack;
+        else this.externalController = value as PlayerController;
+      }
+    }
+  }
+
   private hasEditorSource(): boolean {
     return this.explicitEditor !== undefined || this.getAttribute('editor') !== null;
   }
@@ -668,31 +700,45 @@ export class ScorePlayerElement extends WebMusicElement {
     return new ScoreDocumentApplicationError('source-conflict', 'An editor cannot be combined with score, src, Rack or controller sources.');
   }
 
-  private bindEditorSource(): void {
+  /** `render: false` resumes discovery after a failed mount without retrying the current resolution. */
+  private bindEditorSource(render = true): void {
     const generation = ++this.editorGeneration;
     this.stopEditorDiscovery?.();
     this.stopEditorDiscovery = undefined;
     this.selectedEditor = undefined;
     this.editorResolution = undefined;
     if (!this.isConnected) return;
-    if (!this.hasEditorSource()) { this.requestRender(); return; }
+    if (!this.hasEditorSource()) {
+      this.documentStateKey = '';
+      this.removeAttribute('data-editor-state');
+      if (render) this.requestRender();
+      return;
+    }
+    let initial = !render;
     const cleanup = observeElementSource(this, {source: this.explicitEditor,
       selector: this.getAttribute('editor') ?? undefined, property: 'editor', accepts: isScoreDocumentSource}, (resolution) => {
       if (generation !== this.editorGeneration || !this.isConnected) return;
       this.editorResolution = resolution;
       this.selectedEditor = resolution.source;
-      this.requestRender(true);
+      if (!initial) this.requestRender(true);
     });
+    initial = false;
     if (generation === this.editorGeneration && this.isConnected) this.stopEditorDiscovery = cleanup;
     else cleanup();
   }
 
-  private blockDocument(error: Error, state: string): void {
+  /**
+   * Disable playback for the current declaration. A `fault` (conflict, invalid
+   * or ambiguous selection) is an error; otherwise the editor is pending and
+   * joins when it becomes ready, without an error report.
+   */
+  private blockDocument(error: Error, state: string, fault: boolean): void {
     const request = this.renderRequest;
     const handle = this.handle;
     const current = () => request === this.renderRequest && handle === this.handle && this.isConnected;
     if (!handle) this.cancelLoad();
     this.documentBlocked = error;
+    this.documentFault = fault;
     handle?.setUnavailable?.(error);
     if (!current()) return;
     handle?.pause();
@@ -705,7 +751,7 @@ export class ScorePlayerElement extends WebMusicElement {
     this.reflectDocumentState();
     if (!current()) return;
     this.playbackPublisher.notify();
-    if (current()) this.reportPlaybackError(error);
+    if (fault && current()) this.reportPlaybackError(error);
   }
 
   /** Roll back the active partial mount, then report every contained failure. */
@@ -718,6 +764,12 @@ export class ScorePlayerElement extends WebMusicElement {
     }
     this.playbackReadiness = 'error';
     this.playbackError = error;
+    // Teardown released the partial mount and its editor discovery. Keep
+    // observing the declaration so a later editor or target change recovers.
+    if (this.isConnected && this.hasEditorSource()) {
+      this.setAttribute('data-editor-state', 'error');
+      this.bindEditorSource(false);
+    }
     this.playbackPublisher.notify();
 
     for (const failure of failures) {
@@ -768,10 +820,13 @@ export class ScorePlayerElement extends WebMusicElement {
     this.adoptComposedRack();
     const editor = this.hasEditorSource() ? this.selectedEditor : undefined;
     if (this.hasEditorSource()) {
-      if (this.hasIndependentSource()) { this.blockDocument(this.sourceConflict(), 'source-conflict'); return; }
+      if (this.hasIndependentSource()) { this.blockDocument(this.sourceConflict(), 'source-conflict', true); return; }
       if (!editor || editor.getSnapshot().status !== 'ready') {
-        const state = this.editorResolution?.state ?? 'unavailable';
-        this.blockDocument(new ScoreDocumentApplicationError('not-ready', `Score editor is ${state === 'ready' ? 'disposed' : state}.`), state === 'ready' ? 'disposed' : state);
+        // A declaration still loading, a target not inserted yet and a disposed
+        // editor are pending; only an unusable selection is an error.
+        const resolved = this.editorResolution?.state ?? 'unavailable';
+        const state = resolved === 'ready' ? 'disposed' : resolved === 'missing' && !this.explicitEditor && !this.getAttribute('editor') ? 'invalid' : resolved;
+        this.blockDocument(new ScoreDocumentApplicationError('not-ready', `Score editor is ${state}.`), state, state === 'invalid' || state === 'ambiguous');
         return;
       }
       if (reuseDocument && this.mountedDocument && this.handle?.player) {
@@ -979,11 +1034,20 @@ export class ScorePlayerElement extends WebMusicElement {
     const source = this.handle?.player?.playback;
     const revision = this.sourceRevision;
     let nativeRevision: number | undefined;
+    let loopAttempt: number | undefined;
     const unsubscribe = source?.subscribe((snapshot) => {
       const current = () => source === this.handle?.player?.playback && this.isConnected && source.snapshot().revision === snapshot.revision;
       if (!current()) return;
       if (nativeRevision !== undefined && nativeRevision !== snapshot.sourceRevision) this.sourceRevision += 1;
       nativeRevision = snapshot.sourceRevision;
+      const binding = snapshot.documentBinding;
+      if (this.mountedDocument && binding?.status === 'ready' && binding.attempt !== loopAttempt) {
+        loopAttempt = binding.attempt;
+        // Adoption maps or clears a loop by position; the whole-piece loop
+        // instead follows each applied revision's extent.
+        if (this.loopOn) this.applyLoop();
+        if (!current()) return;
+      }
       if (this.mountedDocument) {
         this.playbackReadiness = snapshot.readiness;
         this.playbackError = snapshot.error;
@@ -1128,6 +1192,7 @@ export class ScorePlayerElement extends WebMusicElement {
     this.editorResolution = undefined;
     this.documentBlocked = undefined;
     this.documentStateKey = '';
+    this.removeAttribute('data-editor-state');
     this.composedRack = undefined;
     this.unbindPlayback?.();
     this.unbindPlayback = undefined;

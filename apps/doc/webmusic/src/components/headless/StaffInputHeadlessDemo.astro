@@ -128,11 +128,13 @@ const input = createStaffViewEditing(editing);
     changeField(selection, () => {if (selection.value) input?.select(NoteId(selection.value)); else editing?.select([]);});
     changeField(part, () => input?.setPart(PartId(part.value)));
     changeField(voice, () => input?.setVoice(VoiceId(voice.value)));
-    changeField(staff, () => input?.setStaff(Number(staff.value)));
+    // An empty number field is not zero; the controller rejects NaN with its range message.
+    const integer = (field: {value: string}): number => field.value.trim() === '' ? Number.NaN : Number(field.value);
+    changeField(staff, () => input?.setStaff(integer(staff)));
     changeField(cursor, () => input?.setCursor(quarters(cursor.value)));
     changeField(duration, () => input?.setDuration(quarters(duration.value), Number(dots.value)));
     changeField(dots, () => input?.setDuration(quarters(duration.value), Number(dots.value)));
-    changeField(octave, () => input?.setOctave(Number(octave.value)));
+    changeField(octave, () => input?.setOctave(integer(octave)));
     changeField(alter, () => input?.setAlter(Number(alter.value) as Alter));
     changeField(editable, () => editing?.setEditable(editable.checked));
     const applyPending = (): void => {

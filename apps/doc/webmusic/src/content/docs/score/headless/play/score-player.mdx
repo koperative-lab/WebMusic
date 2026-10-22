@@ -87,9 +87,12 @@ editor.dispose();
 ```
 
 Each requested revision pauses playback, cancels scheduled voices and prepares
-its timeline. Successful adoption stays paused. `play()` rejects while the
-binding is preparing or failed; updating a document alone neither creates nor
-resumes an AudioContext. An already prepared synth may preload the candidate's
+its timeline. Successful adoption never resumes: playing becomes `paused`, while
+a stopped or ended transport keeps that state. After publishing the ready
+snapshot, adoption emits one `cursor` and `timeupdate` for the adopted position.
+A start superseded by a revision while its context resumes resolves without
+playing. `play()` rejects while the binding is preparing or failed; updating a
+document alone neither creates nor resumes an AudioContext. An already prepared synth may preload the candidate's
 pitches. Its backend has no abort contract: obsolete preload work may finish in
 the borrowed cache, but its result cannot adopt an obsolete timeline.
 
@@ -169,7 +172,7 @@ backends receive notes just in time. The full backend contract is on
 | `preload()` | `Promise<void>` | Builds the timeline/graph and awaits sample readiness for sounding pitches, including part transposition; use `play()` to start and resume audio. |
 | `play(when?)` | `Promise<void>` | Prepares audio and starts or arms playback at absolute AudioContext seconds. |
 | `pause()` · `stop()` | `void` | Pause preserves the point; stop resets to the beginning. |
-| `seek(seconds, when?)` · `seekFraction(fraction, when?)` · `seekNominal(seconds, when?)` | `Promise<void>` | Seek in transport seconds, fraction, or nominal score seconds. While playing, optional `when` schedules the restart; paused seeks ignore it. |
+| `seek(seconds, when?)` · `seekFraction(fraction, when?)` · `seekNominal(seconds, when?)` | `Promise<void>` | Seek in transport seconds, fraction, or nominal score seconds, clamped to the timeline. While playing, optional `when` schedules the restart; paused seeks ignore it. A `NaN` or infinite position or fraction rejects with a `RangeError` and leaves the transport unchanged. |
 | `scrub(deltaSeconds)` | `Promise<void>` | Relative transport seek. |
 | `setTempo(bpm)` · `setRate(rate)` | `void` | Change playback speed; retain the nominal musical point. |
 | `setVolume(value)` · `setPan(value)` | `void` | Master linear gain (minimum zero) and stereo pan (clamped to −1…1). |
@@ -192,7 +195,7 @@ backends receive notes just in time. The full backend contract is on
 
 | Event | Payload |
 | --- | --- |
-| `cursor` | `TimePosition`. |
+| `cursor` | `TimePosition`; also once after each applied document revision. |
 | `noteOn` · `noteOff` | The score `Note`. |
 | `end` | The completed `Score`. |
 | `timeupdate` | `PlayerTimeUpdate`: `nominalSeconds`, `transportSeconds`, `transportDurationSeconds`, `progress`; deprecated `seconds` and `duration` alias the transport fields. |

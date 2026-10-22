@@ -313,7 +313,18 @@ export function mountPresetPlayer(
     effect: options.effect,
     destination: options.destination,
   });
-  if (options.documentSource) player.setDocumentSource(options.documentSource);
+  if (options.documentSource) {
+    try {
+      player.setDocumentSource(options.documentSource);
+    } catch (error) {
+      try {
+        player.dispose();
+      } catch (cleanupError) {
+        reportPlaybackOperationFailure('PresetPlayer', 'failed mount player.dispose', cleanupError);
+      }
+      throw error;
+    }
+  }
   const subscribers = new Set<() => void>();
   const playerUnsubscribes: Array<() => void> = [];
   let starting = false;
@@ -375,8 +386,15 @@ export function mountPresetPlayer(
       }
     }),
   );
-  if (player.playback) playerUnsubscribes.push(player.playback.subscribe(() => {
+  // Native publications include every note boundary; timeupdate already
+  // refreshes the position. Only readiness, adoption and settings repaint here.
+  let publishedState: string | undefined;
+  if (player.playback) playerUnsubscribes.push(player.playback.subscribe((snapshot) => {
     if (destroyed) return;
+    const binding = snapshot.documentBinding;
+    const state = `${snapshot.readiness}|${snapshot.state}|${snapshot.sourceRevision}|${snapshot.rate}|${binding?.status}|${binding?.attempt}`;
+    if (state === publishedState) return;
+    publishedState = state;
     if (player.documentSource && player.documentBinding.status !== 'ready') {
       playGeneration += 1;
       starting = false;

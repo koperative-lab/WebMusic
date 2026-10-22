@@ -5,9 +5,18 @@ import type {Score} from '../../core/model/Score';
 import {Duration} from '../../core/primitives/Duration';
 import {Pitch} from '../../core/primitives/Pitch';
 import {Rational} from '../../core/primitives/Rational';
+import {transpositionSemitones} from '../../core/query/transposition';
 import {NoteId} from '../../core/types/ids';
 
 function unsupported(message: string): never { throw new ScoreEditError('unsupported-structure', message); }
+
+/** MIDI export and playback add the Part transposition; reject a written pitch that would sound outside 0–127. */
+export function assertSoundingPitch(part: Part, pitch: Pitch): void {
+  const midi = pitch.midi + transpositionSemitones(part);
+  if (!Number.isSafeInteger(midi) || midi < 0 || midi > 127) {
+    throw new ScoreEditError('invalid-command', `Sounding pitch in part ${part.id} must be in MIDI range 0 to 127`);
+  }
+}
 
 function staffOf(note: Note, part: Part): number {
   return note.staff ?? ((part.staves ?? 1) > 1 && !note.rest && note.pitch.midi < 60 ? 2 : 1);
@@ -21,11 +30,17 @@ function assertSimple(note: Note): void {
   }
 }
 
+// Stem, rest-position and tie-side hints are display defaults; a replacement simply does not keep them.
 function assertReplaceable(note: Note): void {
-  if (note.articulations?.length || note.ornaments?.length || note.dynamic || note.lyric ||
-      note.tags?.length || note.stem || note.restDisplay || note.tiePlacement) {
+  if (note.articulations?.length || note.ornaments?.length || note.dynamic || note.lyric || note.tags?.length) {
     unsupported(`Replacing ${note.id} would discard authored notation; use a dedicated notation command`);
   }
+}
+
+/** Musical content written by an entry; IDs and display hints are excluded. */
+function entryContent(notes: readonly Note[]): string {
+  return notes.map((note) => JSON.stringify([note.rest ? null : note.pitch.toJSON(), note.onsetQuarters.toJSON(),
+    note.duration.toJSON(), note.velocityOverride, note.performed])).sort().join('\n');
 }
 
 const REST_DURATIONS = [4, 2, 1, 1 / 2, 1 / 4, 1 / 8, 1 / 16, 1 / 32, 1 / 64]
@@ -76,6 +91,7 @@ export function applyNotationEntry(score: Score, entry: ScoreNotationEntry, affe
   const entered = new Note({id: entry.id, voice: entry.voice, staff, onsetQuarters: onset, duration,
     ...(entry.pitch === null ? {rest: true} : {pitch: Pitch.fromJSON(entry.pitch),
       ...(entry.velocity === undefined ? {} : {velocityOverride: entry.velocity})})});
+  if (!entered.rest) assertSoundingPitch(part, entered.pitch);
   const retained = notes.filter((note) => !removed.includes(note));
   const occupied = [...retained, entered].sort((a, b) => a.onsetQuarters.cmp(b.onsetQuarters));
   const added: Note[] = [entered];
@@ -99,6 +115,8 @@ export function applyNotationEntry(score: Score, entry: ScoreNotationEntry, affe
   };
   for (const note of occupied) { fill(note.onsetQuarters); cursor = note.offsetQuarters; }
   fill(measure.offsetQuarters);
+  // Re-entering identical content (such as an existing rest) keeps the existing notes, IDs and selection.
+  if (entryContent(removed) === entryContent(added)) return score;
   return score.edit((transaction) => {
     for (const note of removed) { transaction.removeNote(note.id); affected.add(note.id); }
     for (const note of added) { transaction.addNote(part.id, note); affected.add(note.id); }

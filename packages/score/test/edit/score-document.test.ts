@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-import {ScoreBuilder, PartId, NoteId, Pitch, Duration, Rational, VoiceId, type Score} from '../../src/core';
+import {Score, ScoreBuilder, PartId, NoteId, Pitch, Duration, Rational, VoiceId} from '../../src/core';
 import {ScoreDocumentElement, defineScoreDocumentElement, defineAllElements} from '../../src/edit/element';
 import {ScoreEditor} from '../../src/edit/headless';
 import {loadScoreFromUrl} from '../../src/io/load';
@@ -45,6 +45,17 @@ describe('ScoreDocumentElement', () => {
     expect(element.editor!.getSnapshot().documentId).not.toBe(first.getSnapshot().documentId);
   });
 
+  it('keeps the editor when ignored history settings change while history is disabled', async () => {
+    const element = document.createElement('score-document') as ScoreDocumentElement;
+    element.setAttribute('history', 'false'); element.score = score(); document.body.append(element);
+    const editor = element.editor!;
+    expect(editor.transaction('Transpose', (tx) => tx.add({type: 'transpose-notes', noteIds: [NoteId('note')], semitones: 2})).status).toBe('committed');
+    element.setAttribute('history-limit', '5'); element.setAttribute('history', 'off'); await flush();
+    expect(element.editor).toBe(editor); expect(editor.score.getNote(NoteId('note'))!.pitch.midi).toBe(62);
+    element.setAttribute('history', 'true'); await flush();
+    expect(element.editor).not.toBe(editor); expect(element.editor!.getState().history.limit).toBe(5);
+  });
+
   it('notifies borrowers before disposing superseded owners, including reentrant replacement', () => {
     const element = document.createElement('score-document') as ScoreDocumentElement;
     element.score = score(); document.body.append(element);
@@ -70,6 +81,28 @@ describe('ScoreDocumentElement', () => {
     expect(() => { element.score = {} as Score; }).toThrow('Score');
     expect(element.score).toBe(input);
     expect(element.editor).toBe(editor);
+    expect(element.status).toBe('ready');
+  });
+
+  it('validates a Score assigned while disconnected when loading begins', async () => {
+    const duplicate = () => {
+      const base = score();
+      return new Score({id: base.id, metadata: base.metadata, parts: [base.parts[0], base.parts[0]],
+        timeMap: base.timeMap, measures: base.measures});
+    };
+    const element = document.createElement('score-document') as ScoreDocumentElement;
+    const invalid = duplicate();
+    element.score = invalid;
+    expect(element.score).toBe(invalid);
+    const errors: unknown[] = [];
+    element.addEventListener('webscore:error', (event) => errors.push((event as CustomEvent).detail));
+    document.body.append(element);
+    await flush();
+    expect(element.status).toBe('error');
+    expect(element.editor).toBeUndefined();
+    expect(errors).toMatchObject([{operation: 'document-load'}]);
+    element.score = score();
+    expect(() => { element.score = duplicate(); }).toThrow();
     expect(element.status).toBe('ready');
   });
 

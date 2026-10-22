@@ -181,7 +181,9 @@ export class ScoreViewElement extends HTMLElementBase {
   private editorGeneration = 0;
   private editorResolutionRevision = 0;
   private editorSurface?: PianoRollEditingHandle | StaffEditingHandle;
+  /** Lives for one editor attachment; `detachEditor` releases it. */
   private staffEditing?: StaffViewEditing;
+  private staffInputArmed = false;
   private documentPlayback?: ScorePlaybackSnapshot;
   /** The score currently rendered, whether assigned or loaded from `src`. */
   private resolvedScore?: Score;
@@ -232,7 +234,8 @@ export class ScoreViewElement extends HTMLElementBase {
     if (name === 'player') this.bindPlayer();
     else if (name === 'editor') { this.bindEditor(); this.bindPlayer(); }
     else if (name === 'editable') { this.updateEditable(); this.renderCurrent(); }
-    else if (name === 'src' || name === 'format') { if (this.hasEditorIntent()) this.bindEditor(); else void this.refresh(); }
+    // In editor mode only an added or removed src (a conflict) matters; format alone keeps the session.
+    else if (name === 'src' || name === 'format') { if (this.hasEditorIntent()) { if (name === 'src') this.bindEditor(); } else void this.refresh(); }
     else if (name === 'width' || name === 'height') this.applyHostSize();
     else if (name === 'for-part' || name === 'cells') this.remap();
     else { if (name === 'type') this.updateEditable(); this.renderCurrent(); }
@@ -369,12 +372,13 @@ export class ScoreViewElement extends HTMLElementBase {
 
   private disposePresentation(): number {
     const revision = ++this.presentationRevision;
-    const surface = this.editorSurface, staff = this.staffEditing;
+    // Staff input settings belong to the editor attachment and survive presentation re-renders.
+    const surface = this.editorSurface;
     const annotations = this.annotationsCleanup, binding = this.renderedUnbind;
     const rendered = this.rendered, view = this.view, stage = this.stage, status = this.status;
     const timeline = this.timeline, mapView = this.mapView;
+    this.staffInputArmed = surface !== undefined && surface.surface.dataset.inputEnabled === 'true';
     this.editorSurface = undefined;
-    this.staffEditing = undefined;
     this.annotationsCleanup = undefined;
     this.renderedUnbind = undefined;
     this.visualizerHandlers = undefined;
@@ -391,7 +395,7 @@ export class ScoreViewElement extends HTMLElementBase {
     this.replaceChildren();
     const failures: unknown[] = [];
     for (const cleanup of [() => binding?.(), () => annotations?.(), () => surface?.dispose(),
-      () => staff?.dispose(), () => rendered?.dispose?.(), () => view?.dispose(),
+      () => rendered?.dispose?.(), () => view?.dispose(),
       () => stage?.destroy(), () => status?.destroy(), () => timeline?.destroy(), () => mapView?.dispose()]) {
       try { cleanup(); } catch (error) { failures.push(error); }
     }
@@ -418,8 +422,10 @@ export class ScoreViewElement extends HTMLElementBase {
       this.append(style);
     }
     if (!score) {
-      if (owner) this.showStatus(this.loadError === undefined ? 'empty' : 'error',
-        this.loadError === undefined ? 'Waiting for a score' : this.errorMessage(this.loadError));
+      // A missing, loading or disposed editor is pending; only an unusable selection is an error.
+      const blocked = this.hasEditorIntent() ? this.blockedEditorState() : undefined;
+      if (owner) this.showStatus(this.loadError === undefined && !blocked ? 'empty' : 'error',
+        this.loadError !== undefined ? this.errorMessage(this.loadError) : blocked ? `Editor unavailable: ${blocked}` : 'Waiting for a score');
       return;
     }
     if (this.editing && type === 'piano-roll' && owner) {
@@ -438,20 +444,21 @@ export class ScoreViewElement extends HTMLElementBase {
     }
     if (this.editing && type === 'staff' && this.editable && owner) {
       try {
-        this.staffEditing = createStaffViewEditing(this.editing);
-        this.editorSurface = mountStaffEditor(this, this.staffEditing, {...this.renderOptions(),
+        // Reuse the attachment's controller so cursor, voice, staff, duration and spelling persist.
+        this.staffEditing ??= createStaffViewEditing(this.editing);
+        this.editorSurface = mountStaffEditor(this, this.staffEditing, {...this.renderOptions(), inputEnabled: this.staffInputArmed,
           onCommit: (result) => this.dispatchEvent(new CustomEvent('editcommit', {detail: result, bubbles: true, composed: true})),
           onError: (error) => this.dispatchEvent(new CustomEvent('editerror', {detail: {error}, bubbles: true, composed: true})),
         });
         this.editorSurface.updatePlayback(this.documentPlayback);
       } catch (error) {
-        this.staffEditing?.dispose(); this.staffEditing = undefined;
         this.setAttribute('data-editable-state', 'unavailable');
         this.showStatus('error', this.errorMessage(error));
       }
       return;
     }
-    if (this.hasEditorIntent() && !this.editing && owner) this.showStatus('error', `Editor unavailable: ${this.getAttribute('data-editor-state') ?? 'missing'}`);
+    const blocked = this.hasEditorIntent() && !this.editing ? this.blockedEditorState() : undefined;
+    if (blocked && owner) this.showStatus('error', `Editor unavailable: ${blocked}`);
     if (type === 'map') {
       this.remap();
       if (!owner) return;
@@ -571,6 +578,12 @@ export class ScoreViewElement extends HTMLElementBase {
       fitToWidth: true,
       showOnlyOctavesUsed: options.showOnlyOctavesUsed ?? true,
     });
+  }
+
+  /** An editor selection that is unusable rather than pending, if any. */
+  private blockedEditorState(): string | undefined {
+    const state = this.getAttribute('data-editor-state');
+    return state === 'invalid' || state === 'ambiguous' || state === 'source-conflict' ? state : undefined;
   }
 
   private showStatus(kind: 'empty' | 'error', message: string): void {
@@ -768,7 +781,8 @@ export class ScoreViewElement extends HTMLElementBase {
   private bindPlayer(): void {
     this.unbindPlayer();
     this.playerUnbind = bindViewPlayer(this, {
-      score: () => this.hasEditorIntent() ? this.resolvedScore : this.explicitScore ?? (this.getAttribute('src') ? this.resolvedScore : undefined),
+      // A local draft is not playback data: compare the player with committed document content.
+      score: () => this.hasEditorIntent() ? this.editing?.state.document.content : this.explicitScore ?? (this.getAttribute('src') ? this.resolvedScore : undefined),
       ...(this.hasEditorIntent() ? {playbackSnapshot: (snapshot: ScorePlaybackSnapshot) => this.followDocumentPlayback(snapshot)} : {}),
       targetChanged: (target) => {
         this.boundPlayer = target;
@@ -875,6 +889,8 @@ export class ScoreViewElement extends HTMLElementBase {
   private updateEditable(): void {
     const supported = this.type === 'piano-roll' || this.type === 'staff';
     if (this.editing?.state.available) this.editing.setEditable(this.editable && supported);
+    // A passive view has no editable state; `editable` without an editor reports unavailable.
+    if (!this.hasEditorIntent() && !this.editable) { this.removeAttribute?.('data-editable-state'); return; }
     this.setAttribute('data-editable-state', !this.editable ? 'readonly' : !supported ? 'unsupported-type' : this.editing?.state.available ? 'ready' : 'unavailable');
   }
 
@@ -911,7 +927,7 @@ export class ScoreViewElement extends HTMLElementBase {
     const generation = this.unbindEditor();
     const current = () => generation === this.editorGeneration && this.isConnected;
     if (!current()) return;
-    if (!this.hasEditorIntent()) { this.removeAttribute?.('data-editor-state'); this.updateEditable(); this.sourceInitialized = false; if (current()) void this.refresh(); return; }
+    if (!this.hasEditorIntent()) { this.removeAttribute?.('data-editor-state'); this.removeAttribute?.('data-playback-state'); this.updateEditable(); this.sourceInitialized = false; if (current()) void this.refresh(); return; }
     this.cancelLoad();
     if (!current()) return;
     if (this.explicitScore !== undefined || this.getAttribute('src') !== null) {
@@ -928,6 +944,8 @@ export class ScoreViewElement extends HTMLElementBase {
       if (!attached()) return;
       this.setAttribute('data-editor-state', resolution.state);
       this.lastSnapshot = undefined; this.playheadSeconds = 0;
+      // Without a ready editor there is no content to show; never keep a previous editor's score.
+      if (!resolution.source || resolution.state !== 'ready') this.resolvedScore = undefined;
       if (resolution.source && resolution.state === 'ready') {
         try {
           const editing = createScoreViewEditing(resolution.source, {
@@ -937,7 +955,7 @@ export class ScoreViewElement extends HTMLElementBase {
           this.editing = editing;
           const unsubscribe = editing.subscribe((state) => {
             if (!attached() || editing !== this.editing) return;
-            const visibleScore = state.interaction.draft?.content ?? state.document.content;
+            const visibleScore = state.available ? state.interaction.draft?.content ?? state.document.content : undefined;
             const changed = this.resolvedScore !== visibleScore;
             this.resolvedScore = visibleScore;
             this.setAttribute('data-editor-state', state.available ? 'ready' : 'unavailable');
@@ -962,7 +980,8 @@ export class ScoreViewElement extends HTMLElementBase {
   private followDocumentPlayback(snapshot: ScorePlaybackSnapshot): void {
     this.documentPlayback = snapshot;
     const compatible = this.editing && scoreDocumentPlaybackCompatible(this.editing.state.document, snapshot);
-    this.setAttribute('data-playback-state', compatible ? 'ready' : 'pending');
+    const playbackState = compatible ? 'ready' : 'pending';
+    if (this.getAttribute('data-playback-state') !== playbackState) this.setAttribute('data-playback-state', playbackState);
     this.editorSurface?.updatePlayback(snapshot);
     if (!compatible) {
       this.lastSnapshot = undefined; this.playheadSeconds = 0;

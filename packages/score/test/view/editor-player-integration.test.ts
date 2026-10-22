@@ -54,6 +54,20 @@ describe('editor, native Player and piano-roll integration', () => {
     expect(view.currentTime).toBe(0.75);
   });
 
+  it('removes document playback state when the view leaves editor mode', async () => {
+    const editor = createScoreEditor(music()); editors.push(editor);
+    const player = document.createElement('integration-score-player') as ScorePlayerElement;
+    player.id = 'leave-audition'; player.editor = editor;
+    const view = document.createElement('integration-score-view') as ScoreViewElement;
+    view.editor = editor; view.setAttribute('player', '#leave-audition');
+    document.body.append(player, view);
+    expect((await player.waitForDocumentRevision(editor.getSnapshot())).status).toBe('applied');
+    expect(view.getAttribute('data-playback-state')).toBe('ready');
+    view.editor = undefined;
+    expect(view.hasAttribute('data-playback-state')).toBe(false);
+    expect(view.hasAttribute('data-editor-state')).toBe(false);
+  });
+
   it.each(['assign', 'replace', 'clear'] as const)('keeps a player-free view usable when interactionSession is %s', change => {
     const editor = createScoreEditor(music()); editors.push(editor);
     const view = document.createElement('integration-score-view') as ScoreViewElement;

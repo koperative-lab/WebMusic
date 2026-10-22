@@ -1,7 +1,7 @@
 import {NoteId, PartId, Pitch, Rational, ScoreEditError, VoiceId, makeId,
   type Note, type Score, type ScoreDraftResult, type ScoreEditOperation, type ScoreEditResult,
   type ScorePlaybackSnapshot, type ScoreQuarterValue} from '../../core';
-import {scoreDocumentPlaybackCompatible, type ScoreViewEditing} from '../headless/score-editing';
+import {scoreDocumentPlaybackCompatible, type ScoreViewEditing, type ScoreViewEditingState} from '../headless/score-editing';
 
 export interface PianoRollEditingOptions {
   pixelsPerQuarter?: number;
@@ -58,10 +58,7 @@ export function mountPianoRollEditor(host: HTMLElement, editing: ScoreViewEditin
   viewport.style.cssText = 'overflow:auto;max-height:32rem;min-width:0;border:1px solid var(--wm-border,#888);background:var(--wm-score-view-background,var(--wm-surface,Canvas))';
   const svg = owner.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('part', 'editing-surface');
-  svg.setAttribute('tabindex', '0');
-  svg.setAttribute('role', 'application');
   svg.setAttribute('aria-label', 'Piano roll, written pitch and quarter notes');
-  svg.setAttribute('aria-describedby', instructions.id);
   svg.style.cssText = 'display:block;touch-action:none;outline-offset:-3px';
   viewport.append(svg);
   const feedback = owner.createElement('div');
@@ -127,6 +124,14 @@ export function mountPianoRollEditor(host: HTMLElement, editing: ScoreViewEditin
   let existingContent: Score | undefined;
   let existingSummary = '';
   let numericBinding = '';
+  // The last full drawing; playback-only updates repaint overlays on it instead of rebuilding.
+  let drawn: {state: ScoreViewEditingState; left: number; viewportWidth: number} | undefined;
+  const drawnNotes = new Map<NoteId, {rectangle: SVGElement; top: number; active: boolean}>();
+  let playhead: SVGElement | undefined;
+  const idleFill = options.noteColor ?? (options.noteRGB ? `rgb(${options.noteRGB})` : 'var(--wm-score-view-note,var(--wm-accent,#4869d8))');
+  const activeFill = options.activeNoteColor ?? (options.activeNoteRGB ? `rgb(${options.activeNoteRGB})` : 'var(--wm-score-view-active-note,var(--wm-accent,#e25477))');
+  // Selection rings and handles contrast with any note fill by reusing the surface background.
+  const contrast = 'var(--wm-score-view-background,var(--wm-surface,Canvas))';
   function selectedIds(): readonly NoteId[] { return editing.state.interaction.selectedNoteIds; }
   function commandContext(selection = selectedIds()): string {
     const document = editing.state.document;
@@ -175,6 +180,12 @@ export function mountPianoRollEditor(host: HTMLElement, editing: ScoreViewEditin
     }
     throw new RangeError('Enter quarter values as integers, decimals, or fractions such as 1/3');
   }
+  function integer(field: HTMLInputElement, label: string, low: number, high: number): number {
+    // An empty number field is not zero.
+    const value = field.value.trim() === '' ? Number.NaN : Number(field.value);
+    if (!Number.isSafeInteger(value) || value < low || value > high) throw new RangeError(`${label} must be an integer from ${low} to ${high}`);
+    return value;
+  }
   function newNote(at: Rational, length: Rational, midi: number, value: number): Extract<ScoreEditOperation, {type: 'insert-notes'}> {
     const content = editing.state.document.content;
     const selectedPart = content.getPart(PartId(part.value)) ?? content.parts[0];
@@ -193,7 +204,7 @@ export function mountPianoRollEditor(host: HTMLElement, editing: ScoreViewEditin
         return;
       }
       const at = parseQuarter(onset); const length = parseQuarter(duration);
-      const midi = Number(pitch.value); const value = Number(velocity.value);
+      const midi = integer(pitch, 'Written MIDI pitch', 0, 127); const value = integer(velocity, 'Velocity', 1, 127);
       if (inserting) {
         const operation = newNote(at, length, midi, value);
         run('Insert note', [operation], context);
@@ -202,19 +213,22 @@ export function mountPianoRollEditor(host: HTMLElement, editing: ScoreViewEditin
         if (selectedIds().length !== 1) return;
         const note = editing.state.document.content.getNote(selectedIds()[0]);
         if (!note || note.rest || note.unpitched) return;
-        run('Change note values', [
-          {type: 'move-notes', noteIds: [note.id], deltaQuarters: at.sub(note.onsetQuarters).toJSON()},
-          {type: 'resize-notes', noteIds: [note.id], durationQuarters: length.toJSON()},
-          {type: 'transpose-notes', noteIds: [note.id], semitones: midi - note.pitch.midi},
-          {type: 'set-velocity', noteIds: [note.id], velocity: value},
-        ], context);
+        // Fields equal to the committed baseline submit nothing: no history item, dirty state or lost redo.
+        const operations: ScoreEditOperation[] = [];
+        if (!at.eq(note.onsetQuarters)) operations.push({type: 'move-notes', noteIds: [note.id], deltaQuarters: at.sub(note.onsetQuarters).toJSON()});
+        if (!length.eq(note.duration.quarters)) operations.push({type: 'resize-notes', noteIds: [note.id], durationQuarters: length.toJSON()});
+        if (midi !== note.pitch.midi) operations.push({type: 'transpose-notes', noteIds: [note.id], semitones: midi - note.pitch.midi});
+        if (value !== note.velocity) operations.push({type: 'set-velocity', noteIds: [note.id], velocity: value});
+        if (operations.length) run('Change note values', operations, context);
+        else if (cancelForCommand(context)) { message = 'No change'; draw(); }
       }
     } catch (error) { report(error); }
   }
   function geometry(): void {
     const notes = editing.state.document.content.parts.flatMap((part) => part.notes.filter((note) => !note.rest && !note.unpitched));
-    min = options.minPitch ?? Math.max(0, notes.reduce((value, note) => Math.min(value, note.pitch.midi - 2), 48));
-    max = options.maxPitch ?? Math.min(127, notes.reduce((value, note) => Math.max(value, note.pitch.midi + 2), 84));
+    // A one-sided explicit bound limits the computed side instead of being crossed by it.
+    min = options.minPitch ?? Math.min(options.maxPitch ?? 127, Math.max(0, notes.reduce((value, note) => Math.min(value, note.pitch.midi - 2), 48)));
+    max = options.maxPitch ?? Math.max(options.minPitch ?? 0, Math.min(127, notes.reduce((value, note) => Math.max(value, note.pitch.midi + 2), 84)));
     if (!Number.isSafeInteger(min) || !Number.isSafeInteger(max) || min < 0 || max > 127 || min > max) throw new RangeError('Invalid editing pitch range');
     width = Math.max(16, Math.ceil(editing.state.document.content.durationQuarters.toFloat() + 4)) * scale;
     height = (max - min + 1) * lane;
@@ -227,12 +241,18 @@ export function mountPianoRollEditor(host: HTMLElement, editing: ScoreViewEditin
     if (text !== undefined) node.textContent = text;
     svg.append(node); return node;
   }
+  function box(note: Note): {x: number; width: number; top: number} {
+    return {x: note.onsetQuarters.toFloat() * scale, width: Math.max(4, note.duration.quarters.toFloat() * scale), top: (max - note.pitch.midi) * lane};
+  }
+  function band(top: number, active: boolean): {y: number; height: number} {
+    // Sounding notes fill their lane: a size cue in addition to the active colour.
+    return active ? {y: top + .5, height: Math.max(2, lane - 1)} : {y: top + 2, height: Math.max(2, lane - 4)};
+  }
   function draw(): void {
     if (disposed) return;
     geometry();
-    svg.replaceChildren();
+    svg.replaceChildren(); drawnNotes.clear(); playhead = undefined;
     const state = editing.state;
-    const compatible = scoreDocumentPlaybackCompatible(state.document, playback);
     const left = viewport.scrollLeft;
     const right = Math.min(width, left + (viewport.clientWidth || 900));
     for (let midi = min; midi <= max; midi++) {
@@ -250,35 +270,34 @@ export function mountPianoRollEditor(host: HTMLElement, editing: ScoreViewEditin
     }
     const selected = new Set(selectedIds());
     const content = state.interaction.draft?.content ?? state.document.content;
-    const active = new Set(compatible ? playback?.activeNotes.map((note) => note.noteId) : []);
     for (const item of content.parts) for (const note of item.notes) {
       if (note.rest || note.unpitched || note.pitch.midi < min || note.pitch.midi > max) continue;
-      const x = note.onsetQuarters.toFloat() * scale;
-      const noteWidth = Math.max(4, note.duration.quarters.toFloat() * scale);
+      const {x, width: noteWidth, top} = box(note);
       if (x + noteWidth < left || x > right) continue;
       const isSelected = selected.has(note.id);
-      const drafted = state.interaction.draft && state.document.content.getNote(note.id) !== note;
-      const rectangle = shape('rect', {x, y: (max - note.pitch.midi) * lane + 2, width: noteWidth - 1, height: Math.max(2, lane - 4), rx: 2,
-        fill: active.has(note.id)
-          ? options.activeNoteColor ?? (options.activeNoteRGB ? `rgb(${options.activeNoteRGB})` : 'var(--wm-score-view-active-note,var(--wm-accent,#e25477))')
-          : options.noteColor ?? (options.noteRGB ? `rgb(${options.noteRGB})` : 'var(--wm-score-view-note,var(--wm-accent,#4869d8))'),
-        stroke: 'currentColor', 'stroke-width': isSelected ? 2.5 : .5,
+      const drafted = Boolean(state.interaction.draft && state.document.content.getNote(note.id) !== note);
+      // Selection, draft and playing states each have a non-colour cue: double ring, dashes, lane height.
+      const rectangle = shape('rect', {x, ...band(top, false), width: noteWidth - 1, rx: 2, fill: idleFill, 'fill-opacity': drafted ? .55 : 1,
+        stroke: isSelected && !drafted ? contrast : 'currentColor', 'stroke-width': isSelected || drafted ? 1.5 : .5,
         'stroke-dasharray': drafted ? '4 2' : 'none', 'data-note-id': note.id,
-        'data-selected': String(isSelected), 'data-draft': String(Boolean(drafted)),
-        'aria-label': `${note.pitch.toString()}, quarter ${note.onsetQuarters}, duration ${note.duration.quarters}${isSelected ? ', selected' : ''}`,
-        'aria-selected': String(isSelected), role: 'option'});
+        'data-selected': String(isSelected), 'data-draft': String(drafted), 'data-active': 'false',
+        'aria-label': `${note.pitch.toString()}, quarter ${note.onsetQuarters}, duration ${note.duration.quarters}${isSelected ? ', selected' : ''}`, role: 'img'});
       const title = owner.createElementNS('http://www.w3.org/2000/svg', 'title'); title.textContent = rectangle.getAttribute('aria-label'); rectangle.append(title);
-      if (isSelected) shape('line', {x1: x + noteWidth - 5, x2: x + noteWidth - 5, y1: (max - note.pitch.midi) * lane + 5,
-        y2: (max - note.pitch.midi + 1) * lane - 5, stroke: 'currentColor', 'stroke-width': 2, 'pointer-events': 'none'});
+      drawnNotes.set(note.id, {rectangle, top, active: false});
+      if (isSelected) {
+        shape('rect', {x: x - 2, y: top + .75, width: noteWidth + 3, height: Math.max(2, lane - 1.5), rx: 3, fill: 'none',
+          stroke: 'currentColor', 'stroke-width': 1.5, 'data-selection-outline': '', 'pointer-events': 'none'});
+        shape('line', {x1: x + noteWidth - 5, x2: x + noteWidth - 5, y1: top + 5, y2: top + lane - 5,
+          stroke: contrast, 'stroke-width': 2, 'stroke-linecap': 'round', 'data-resize-handle': '', 'pointer-events': 'none'});
+      }
     }
-    if (compatible && playback?.nominalSeconds !== null && playback?.nominalSeconds !== undefined) {
-      const x = state.document.content.timeMap.secondsToQuarters(playback.nominalSeconds).toFloat() * scale;
-      shape('line', {x1: x, x2: x, y1: 0, y2: height, stroke: 'currentColor', 'stroke-width': 2, 'data-playhead': '', 'pointer-events': 'none'});
-    }
+    drawn = {state, left, viewportWidth: viewport.clientWidth};
     const enabled = editable();
-    svg.setAttribute('aria-disabled', String(!enabled));
+    // A read-only grid is a labelled graphic, not a tab stop with hidden instructions.
+    svg.setAttribute('role', enabled ? 'application' : 'img');
+    if (enabled) { svg.setAttribute('tabindex', '0'); svg.setAttribute('aria-describedby', instructions.id); }
+    else { svg.removeAttribute('tabindex'); svg.removeAttribute('aria-describedby'); }
     element.dataset.editState = !state.available ? 'unavailable' : state.interaction.draft ? 'draft' : enabled ? 'ready' : 'readonly';
-    element.dataset.playbackState = !playback ? 'unbound' : compatible ? 'ready' : 'pending';
     instructions.hidden = !state.editable;
     details.hidden = !state.editable;
     const key = state.document.content.parts.map((value) => `${value.id}:${value.name}`).join('|');
@@ -322,17 +341,57 @@ export function mountPianoRollEditor(host: HTMLElement, editing: ScoreViewEditin
     for (const field of [existing, onset, duration, pitch, velocity, part, insert]) field.disabled = !enabled;
     apply.disabled = !enabled || !listedSelection; remove.disabled = !enabled || !selectedIds().length;
     undo.disabled = !enabled || !state.history.canUndo; redo.disabled = !enabled || !state.history.canRedo;
-    feedback.textContent = message || state.error?.message || `${state.interaction.draft ? 'Draft · ' : ''}${selectedIds().length} selected${!state.available ? ' · Document unavailable' : !enabled ? ' · Read only' : ''}${playback && !compatible ? ' · Playback pending or unavailable' : ''}`;
+    paintPlayback();
+  }
+  /** Playhead, sounding notes and status over the current drawing; writes only what changed. */
+  function paintPlayback(): void {
+    const state = editing.state;
+    const compatible = scoreDocumentPlaybackCompatible(state.document, playback);
+    const active = new Set<string>(compatible ? playback!.activeNotes.map((note) => note.noteId) : []);
+    for (const [id, item] of drawnNotes) {
+      const on = active.has(id);
+      if (on === item.active) continue;
+      item.active = on;
+      const {y, height: bandHeight} = band(item.top, on);
+      item.rectangle.setAttribute('y', String(y)); item.rectangle.setAttribute('height', String(bandHeight));
+      item.rectangle.setAttribute('fill', on ? activeFill : idleFill); item.rectangle.setAttribute('data-active', String(on));
+    }
+    const seconds = compatible ? playback!.nominalSeconds : null;
+    if (seconds === null || seconds === undefined) { playhead?.remove(); playhead = undefined; }
+    else {
+      const x = String(state.document.content.timeMap.secondsToQuarters(seconds).toFloat() * scale);
+      if (!playhead) playhead = shape('line', {y1: 0, y2: height, stroke: 'currentColor', 'stroke-width': 2, 'data-playhead': '', 'pointer-events': 'none'});
+      playhead.setAttribute('x1', x); playhead.setAttribute('x2', x);
+    }
+    const playbackState = !playback ? 'unbound' : compatible ? 'ready' : 'pending';
+    if (element.dataset.playbackState !== playbackState) element.dataset.playbackState = playbackState;
+    const enabled = editable();
+    const text = message || state.error?.message || `${state.interaction.draft ? 'Draft · ' : ''}${selectedIds().length} selected${!state.available ? ' · Document unavailable' : !enabled ? ' · Read only' : ''}${playback && !compatible ? ' · Playback pending or unavailable' : ''}`;
+    // Rewriting identical text on every playback frame would re-announce or churn the live region.
+    if (feedback.textContent !== text) feedback.textContent = text;
   }
   function point(event: MouseEvent): {x: number; y: number} {
     const rect = svg.getBoundingClientRect();
     return {x: (event.clientX - rect.left) * (rect.width ? width / rect.width : 1), y: (event.clientY - rect.top) * (rect.height ? height / rect.height : 1)};
   }
   function snap(value: number): Rational { return grid.mul(new Rational(Math.round(value / grid.toFloat()))); }
+  /** Insertion uses the grid cell under the pointer, so the new note covers the point that created it. */
+  function cell(x: number): Rational { return grid.mul(new Rational(Math.floor(Math.max(0, x / scale) / grid.toFloat() + 1e-9))); }
+  function lanePitch(y: number): number { return Math.max(min, Math.min(max, max - Math.floor(y / lane))); }
+  /**
+   * Hit-test the displayed geometry, not event.target: selection and cancellation redraw the
+   * grid, detaching the pressed node, so later click/dblclick events target the SVG itself.
+   */
   function hit(event: MouseEvent): Note | undefined {
-    const target = event.target as Element | null;
-    const id = target?.closest?.('[data-note-id]')?.getAttribute('data-note-id');
-    return id ? editing.state.document.content.getNote(NoteId(id)) : undefined;
+    const position = point(event);
+    const state = editing.state;
+    let found: NoteId | undefined;
+    for (const item of (state.interaction.draft?.content ?? state.document.content).parts) for (const note of item.notes) {
+      if (note.rest || note.unpitched || note.pitch.midi < min || note.pitch.midi > max) continue;
+      const {x, width: noteWidth, top} = box(note);
+      if (position.x >= x && position.x < x + noteWidth && position.y >= top && position.y < top + lane) found = note.id;
+    }
+    return found ? state.document.content.getNote(found) : undefined;
   }
   function preview(operations: readonly ScoreEditOperation[]): void {
     const pending = gesture;
@@ -362,7 +421,7 @@ export function mountPianoRollEditor(host: HTMLElement, editing: ScoreViewEditin
         if (!event.shiftKey) editing.select([]);
         if (!currentContext(insertContext)) return;
         const position = point(event);
-        const operation = newNote(snap(Math.max(0, position.x / scale)), grid, Math.max(min, Math.min(max, max - Math.floor(position.y / lane))), 80);
+        const operation = newNote(cell(position.x), grid, lanePitch(position.y), 80);
         gesture = {pointerId: event.pointerId, revision: editing.state.document.documentRevision, context: insertContext, ...position,
           kind: 'insert', notes: [], insert: operation, valid: true, changed: false};
         svg.setPointerCapture?.(event.pointerId);
@@ -390,6 +449,8 @@ export function mountPianoRollEditor(host: HTMLElement, editing: ScoreViewEditin
   function move(event: PointerEvent): void {
     const pending = gesture;
     if (!pending || event.pointerId !== pending.pointerId || !editable()) return;
+    // No pressed primary button means its pointerup was lost; never keep previewing that gesture.
+    if ((event.buttons & 1) === 0) { cancel(); return; }
     if (!currentContext(pending.context)) { cancel(); return; }
     const position = point(event); const delta = snap((position.x - pending.x) / scale);
     const semitones = Math.round((pending.y - position.y) / lane);
@@ -420,7 +481,7 @@ export function mountPianoRollEditor(host: HTMLElement, editing: ScoreViewEditin
     if (!editable() || hit(event)) return;
     const position = point(event);
     try {
-      const operation = newNote(snap(Math.max(0, position.x / scale)), Rational.ONE, Math.max(min, Math.min(max, max - Math.floor(position.y / lane))), 80);
+      const operation = newNote(cell(position.x), Rational.ONE, lanePitch(position.y), 80);
       run('Insert note', [operation]);
       if (!disposed && editing.state.available && editing.state.document.content.getNote(operation.notes[0].id)) editing.select([operation.notes[0].id]);
     } catch (error) { report(error); }
@@ -429,7 +490,8 @@ export function mountPianoRollEditor(host: HTMLElement, editing: ScoreViewEditin
     if (!editable()) return;
     const command = event.ctrlKey || event.metaKey;
     const ids = selectedIds();
-    if (event.key === 'Escape') { event.preventDefault(); cancel(); return; }
+    // Leave an Escape that cancels nothing to enclosing handlers such as a dialog.
+    if (event.key === 'Escape') { if (gesture || editing.state.interaction.draft) { event.preventDefault(); cancel(); } return; }
     if (command && event.key.toLowerCase() === 'a') {
       event.preventDefault(); editing.select(editing.state.document.content.parts.flatMap((part) => part.notes.filter((note) => !note.rest && !note.unpitched).map((note) => note.id))); return;
     }
@@ -447,20 +509,26 @@ export function mountPianoRollEditor(host: HTMLElement, editing: ScoreViewEditin
   }
   const onScroll = () => draw();
   const onCancel = () => { if (gesture) cancel(); };
+  const onPointerCancel = (event: PointerEvent) => { if (gesture && event.pointerId === gesture.pointerId) cancel(); };
+  // Attach nothing for an unavailable controller; a failed subscription rolls back the mounted DOM.
+  if (!editing.state.available) throw new ScoreEditError('disposed', 'The editing view is unavailable');
   draw();
   host.append(element);
+  let unsubscribe = (): void => {};
+  try {
+    unsubscribe = editing.subscribe((state) => {
+      if (gesture && (gesture.revision !== state.document.documentRevision || !state.available || !state.editable)) {
+        const previous = gesture; gesture = undefined;
+        if (svg.hasPointerCapture?.(previous.pointerId)) svg.releasePointerCapture(previous.pointerId);
+      }
+      draw();
+    });
+  } catch (error) { disposed = true; element.remove(); throw error; }
   svg.addEventListener('pointerdown', down); svg.addEventListener('pointermove', move); svg.addEventListener('pointerup', up);
-  svg.addEventListener('pointercancel', onCancel); svg.addEventListener('lostpointercapture', onCancel);
+  svg.addEventListener('pointercancel', onPointerCancel); svg.addEventListener('lostpointercapture', onPointerCancel);
   svg.addEventListener('blur', onCancel); svg.addEventListener('keydown', key); svg.addEventListener('dblclick', doubleClick);
   owner.defaultView?.addEventListener('blur', onCancel);
   viewport.addEventListener('scroll', onScroll, {passive: true});
-  const unsubscribe = editing.subscribe((state) => {
-    if (gesture && (gesture.revision !== state.document.documentRevision || !state.available || !state.editable)) {
-      const previous = gesture; gesture = undefined;
-      if (svg.hasPointerCapture?.(previous.pointerId)) svg.releasePointerCapture(previous.pointerId);
-    }
-    draw();
-  });
   let viewportWidth = viewport.clientWidth;
   let viewportHeight = viewport.clientHeight;
   const ViewResizeObserver = owner.defaultView?.ResizeObserver;
@@ -477,7 +545,13 @@ export function mountPianoRollEditor(host: HTMLElement, editing: ScoreViewEditin
   }) : undefined;
   resizeObserver?.observe(viewport);
   return {element, surface: svg,
-    updatePlayback(value) { playback = value; draw(); }, cancel,
+    updatePlayback(value) {
+      playback = value;
+      if (disposed) return;
+      // Playback-only frames reuse the drawing; content, interaction or viewport changes redraw it.
+      if (drawn && drawn.state === editing.state && drawn.left === viewport.scrollLeft && drawn.viewportWidth === viewport.clientWidth) paintPlayback();
+      else draw();
+    }, cancel,
     dispose() {
       if (disposed) return;
       disposed = true;
@@ -485,7 +559,7 @@ export function mountPianoRollEditor(host: HTMLElement, editing: ScoreViewEditin
       finally {
         unsubscribe(); resizeObserver?.disconnect();
         svg.removeEventListener('pointerdown', down); svg.removeEventListener('pointermove', move); svg.removeEventListener('pointerup', up);
-        svg.removeEventListener('pointercancel', onCancel); svg.removeEventListener('lostpointercapture', onCancel);
+        svg.removeEventListener('pointercancel', onPointerCancel); svg.removeEventListener('lostpointercapture', onPointerCancel);
         svg.removeEventListener('blur', onCancel); svg.removeEventListener('keydown', key); svg.removeEventListener('dblclick', doubleClick);
         owner.defaultView?.removeEventListener('blur', onCancel);
         viewport.removeEventListener('scroll', onScroll); element.remove();

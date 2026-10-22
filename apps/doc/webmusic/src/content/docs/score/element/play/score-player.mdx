@@ -106,21 +106,36 @@ selector discovery. Selectors resolve in the same Document or ShadowRoot,
 follow late upgrades, replacement and `webmusic:sourcechange`, and release their
 subscriptions on disconnect. The player never disposes the borrowed editor.
 
-An empty, invalid, missing or ambiguous selector disables playback with an
-observable error; it does not fall back to `src`. `.editor` conflicts with
-`.score`, `src` (even empty), `.rack`, a nested Rack or `.controller`. Conflicting
-property writes throw before changing configuration. A conflicting attribute
-retains the mounted engine but rejects play and seek commands until corrected.
+Until its editor is ready, the player never falls back to `src`. A target that
+is not inserted yet (`missing`), a declaration still loading or empty
+(`unavailable`) and a disposed editor are pending: `.playback` reports
+`unavailable` readiness and the player joins when the editor becomes ready.
+Pending state dispatches no `webscore:error`; `play()` and `seekNominal()` reject
+as `not-ready`, and void seeks report that rejection as a `seek` error. An empty,
+invalid or ambiguous selector is an error: readiness is `error` and
+`webscore:error` reports it. The host reflects the resolution, `source-conflict`
+or the binding status as `data-editor-state`, and removes it outside editor mode.
+
+`.editor` conflicts with `.score`, `src` (even empty), `.rack`, a nested Rack or
+`.controller`. Conflicting property writes throw before changing configuration.
+A conflicting attribute retains the mounted engine but rejects play and seek
+commands until corrected. A conflicting source property assigned before the tag
+was registered cannot be rejected; it keeps its value and shows the same
+conflict. A failed mount reports `error` and keeps observing the selected
+declaration, so its next editor or target change mounts again.
 
 An edit pauses and prepares the new revision in the same native engine. It
-stays paused after successful application; press Play again to audition it.
-`.documentBinding` and `webscore:documentstatechange` expose `preparing`, `ready`
-and `error`, with separate requested/applied identities. `.playback` contains
+stays paused after successful application; press Play again to audition it. A
+stopped or ended transport keeps that state. Each applied revision publishes one
+`webscore:timeupdate` for its mapped, clamped or reset position, and a
+whole-piece `loop` is re-applied to the edited extent.
+`.documentBinding` and `webscore:documentstatechange` expose `empty`, `preparing`,
+`ready` and `error`, with separate requested/applied identities. `.playback` contains
 only applied document identity and rejects playing an outdated revision.
 `waitForDocumentRevision(target)` and `retryDocumentApplication()` return the
 native [application outcomes](/score/headless/play/score-player/#apply-document-revisions).
 They await an in-progress Element mount; disconnect or source replacement
-supersedes that wait. An unmounted/static Element may have no document binding.
+supersedes that wait. Without an editor input, `.documentBinding` is `undefined`.
 
 The [editable View demo](/score/element/view/score-view/#piano-roll-editing)
 combines import, editing, undo, audition and MIDI export. Audio resource property
@@ -175,7 +190,7 @@ The source attributes are read only while a source is being resolved; assigning 
 | Member | Kind | Default | Description |
 | --- | --- | --- | --- |
 | `editor` / `.editor` | selector attribute / Core source property | — | Exclusive document source; explicit object wins, `undefined` restores selector discovery. |
-| `.documentBinding` | read-only property | `undefined` before a mount | Requested/applied revisions and attempt state; no source ownership. |
+| `.documentBinding` | read-only property | `undefined` without an editor input | Requested/applied revisions and attempt state; no source ownership. In editor mode, `empty` until a native player mounts and `error` for a conflict, an invalid/ambiguous selector or a failed mount. |
 | `waitForDocumentRevision(target)` / `retryDocumentApplication()` | methods | tagged outcome Promise | Wait for a known revision or explicitly retry preparation. |
 | `src` | attribute | — | URL of a MIDI / MusicXML / MXL / ABC file. Optional when a source property is assigned. |
 | `format` | attribute | extension, else byte sniff | Force `midi` / `mxl` / `musicxml` / `abc`. Passed through unvalidated; an unsupported value fails the load. |
@@ -197,7 +212,7 @@ The source attributes are read only while a source is being resolved; assigning 
 | `rate` / `.rate` | attribute + property | `1` | Native playback speed, applied live; non-finite or non-positive values fall back to `1`. Explicit `.rate` writes also reach a borrowed controller. Inert for Rack members. |
 | `volume` / `.volume` | attribute + property | `1` | Native linear volume, applied live and clamped to `>= 0`. Rack mixing belongs to `<score-rack-control>`; inert in Rack/controller mode. |
 | `pan` / `.pan` | attribute + property | `0` | Native stereo pan, applied live and clamped to `[-1, 1]`. Inert in Rack/controller mode. |
-| `loop` / `.loop` | attribute + property | `false` | Native whole-piece looping. A bare `loop` is on; `loop="false"` (also `0` / `no` / `off`) is off. Inert in Rack/controller mode. |
+| `loop` / `.loop` | attribute + property | `false` | Native whole-piece looping. A bare `loop` is on; `loop="false"` (also `0` / `no` / `off`) is off. In editor mode it is re-applied to each applied revision's full extent. Inert in Rack/controller mode. |
 | `time-control` | attribute | `off` | Add the clock to the chrome: `simple` is the elapsed time (`0:12`), `full` adds the total (`0:12 / 3:40`). Works in every mode. |
 | `volume-control` | attribute | `off` | Add a volume control to the chrome, as a horizontal `fader` or a rotary `knob`. Either moves the same knob `volume` sets, and needs the element's own engine, so both are inert in `.rack` and `.controller` mode. |
 | `.currentTime` | property (read-only) | `0` | Live transport seconds from the native player, borrowed controller or longest built Rack member. |
@@ -234,13 +249,13 @@ native note/state/navigation events are non-composed.
 | `webscore:documentstatechange` | `ScoreDocumentPlaybackBinding` | Document preparation, failure or application state changes; bubbles and is composed. |
 | `webscore:noteon` | `{ midi, startTime }` | A note starts. `startTime` is its onset in nominal score seconds, which is what a bound view matches on. |
 | `webscore:noteoff` | `{ midi, startTime }` | The same note releases. |
-| `webscore:timeupdate` | `{ nominalSeconds, transportSeconds, transportDurationSeconds, progress, rate, playing }` | Every cursor tick, and once per seek. `seconds` and `duration` are deprecated aliases of `nominalSeconds` and `transportDurationSeconds` — two different domains, so never pair them. |
+| `webscore:timeupdate` | `{ nominalSeconds, transportSeconds, transportDurationSeconds, progress, rate, playing }` | Every cursor tick, once per seek, and once per applied document revision. `seconds` and `duration` are deprecated aliases of `nominalSeconds` and `transportDurationSeconds` — two different domains, so never pair them. |
 | `webscore:scorechange` | `{score: Score \| undefined}` | The mounted native score is cleared or replaced. |
 | `webscore:statechange` | `ScorePlayerPlaybackSnapshot` | A native engine mounts, changes playback state/settings, or receives explicit navigation. |
 | `webscore:seek` | none | A non-controller `seek`, `seekNominal` or `seekFraction` command is issued, or the native seek bar commits pointer/keyboard navigation; read the current snapshot for units and position. |
 | `webscore:stop` | none | A non-controller stop command is issued. |
 | `webscore:end` | — | The piece finished playing. |
-| `webscore:error` | `{operation: 'seek' \| 'playback', error}` | `seek` reports asynchronous native failures and declaration source errors from void seek commands; `playback` reports mounted playback/controller errors, including Rack transport failures. |
+| `webscore:error` | `{operation: 'seek' \| 'playback', error}` | `seek` reports asynchronous native failures and declaration source errors from void seek commands; `playback` reports mounted playback/controller errors, including Rack transport failures, and editor conflicts or invalid/ambiguous selectors. A pending editor is not an error. |
 
 **Subclassing.** `ScorePlayerElement` is exported from `/element` without registering a tag, and exposes protected seams for the two things a custom player usually needs to change: which UI is mounted (`mountScore()`, `mountRack()`, `mountController()`, and `replaceHandle()` to swap one safely) and where the music comes from (`resolveScore()`, `buildSynth()`). `render()` and `teardown()` bracket the whole lifecycle if you need to wrap it.
 

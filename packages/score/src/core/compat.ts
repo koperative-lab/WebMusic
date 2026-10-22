@@ -80,8 +80,9 @@ export function noteEndSeconds(note: Note, score: Score): number {
     : score.timeMap.quartersToSeconds(note.offsetQuarters);
 }
 
+/** Resolve fields rather than the Note getter, so plain note data (toJSON output, clones) also resolves. */
 export function noteVelocity(note: Note): number {
-  return note.velocity;
+  return note.velocityOverride ?? note.performed?.velocity ?? 80;
 }
 
 export function noteVoiceString(note: Note): string {

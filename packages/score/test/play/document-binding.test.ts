@@ -99,7 +99,7 @@ describe('native document revision application', () => {
     expect(createGain).not.toHaveBeenCalled();
     expect(context.resume).not.toHaveBeenCalled();
     expect(preload).not.toHaveBeenCalled();
-    expect(playback.snapshot()).toMatchObject({documentId: 'document', documentRevision: 0, readiness: 'ready', state: 'paused'});
+    expect(playback.snapshot()).toMatchObject({documentId: 'document', documentRevision: 0, readiness: 'ready', state: 'stopped'});
     expect(player.documentBinding.documentCoordinates).toBe(true);
     const sourceRevision = playback.snapshot().sourceRevision;
     await player.seekNominal(0.123456);
@@ -128,6 +128,60 @@ describe('native document revision application', () => {
     expect(synth.connect).toHaveBeenCalledOnce();
     expect(tick.dispose).not.toHaveBeenCalled();
     expect(player.playback.snapshot().activeNotes).toEqual([]);
+    expect(player.playback.snapshot().state).toBe('paused');
+  });
+
+  it('keeps stopped and ended transport states across attachment and applied edits', async () => {
+    const {player} = engine();
+    const document = new Document(music());
+    await bind(player, document);
+    expect(player.playback.snapshot().state).toBe('stopped');
+    document.replace(music(8, 120, 'D4'));
+    await player.waitForDocumentRevision(document.getSnapshot());
+    expect(player.playback.snapshot().state).toBe('stopped');
+    await player.seekNominal(4);
+    await player.play();
+    expect(player.playback.snapshot().state).toBe('ended');
+    document.replace(music(8, 120, 'E4'));
+    await player.waitForDocumentRevision(document.getSnapshot());
+    expect(player.playback.snapshot()).toMatchObject({state: 'ended', documentRevision: 2});
+  });
+
+  it('publishes one cursor and timeupdate after a clamped or reset adoption is ready', async () => {
+    const {player} = engine();
+    const document = new Document(music());
+    await bind(player, document);
+    await player.seekNominal(3);
+    const updates: Array<[number, number | undefined]> = [];
+    let cursors = 0;
+    player.on('cursor', () => { cursors += 1; });
+    player.on('timeupdate', ({nominalSeconds}) => updates.push([nominalSeconds, player.playback.snapshot().documentRevision]));
+    document.replace(music(2));
+    await player.waitForDocumentRevision(document.getSnapshot());
+    expect(updates).toEqual([[1, 1]]);
+    document.replace(music(8), {map: false});
+    await player.waitForDocumentRevision(document.getSnapshot());
+    expect(updates).toEqual([[1, 1], [0, 2]]);
+    expect(cursors).toBe(2);
+  });
+
+  it('settles a start superseded by a revision during context resume instead of rejecting as not ready', async () => {
+    const {player, context, preload} = engine();
+    const document = new Document(music());
+    await bind(player, document);
+    const resumed = deferred(); const prepared = deferred();
+    context.state = 'suspended';
+    context.resume.mockImplementationOnce(async () => { await resumed.promise; context.state = 'running'; });
+    preload.mockImplementationOnce(() => prepared.promise);
+    const start = player.play();
+    await flush();
+    document.replace(music(8, 120, 'D4'));
+    expect(player.documentBinding.status).toBe('preparing');
+    resumed.resolve();
+    await expect(start).resolves.toBeUndefined();
+    expect(player.isPlaying()).toBe(false);
+    prepared.resolve();
+    expect((await player.waitForDocumentRevision(document.getSnapshot())).status).toBe('applied');
     expect(player.playback.snapshot().state).toBe('paused');
   });
 

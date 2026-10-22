@@ -7,6 +7,8 @@ import {renderStaffVisualizer} from './renderers/factory';
 import type {StaffSVGVisualizer} from './renderers/staff';
 
 export interface StaffEditingOptions extends StaffRenderOptions {
+  /** Initial armed note-input mode; default false. Applies only while input is editable. */
+  inputEnabled?: boolean;
   onCommit?(result: Extract<ScoreEditResult, {status: 'committed'}>): void;
   onError?(error: unknown): void;
 }
@@ -86,7 +88,7 @@ export function mountStaffEditor(host: HTMLElement, editing: StaffViewEditing, o
   details.append(form); element.append(instructions, toggle, surface, feedback, details);
   host.append(element);
   let disposed = false;
-  let inputEnabled = false;
+  let inputEnabled = options.inputEnabled === true;
   let message = '';
   let content: Score | undefined;
   let partKey = '';
@@ -97,6 +99,7 @@ export function mountStaffEditor(host: HTMLElement, editing: StaffViewEditing, o
   const invalidFields = new Map<HTMLElement, unknown>();
   const fieldActions = new Map<HTMLElement, () => void>();
   const pendingFields = new Set<HTMLElement>();
+  const syncedValues = new Map<HTMLElement, string>();
   const drawing = owner.createElement('div');
   drawing.setAttribute('part', 'drawing');
   drawing.style.cssText = 'min-width:0;max-width:100%;overflow:hidden;background:var(--wm-score-view-background,var(--wm-surface,Canvas))';
@@ -132,11 +135,15 @@ export function mountStaffEditor(host: HTMLElement, editing: StaffViewEditing, o
     if (!match) throw new RangeError('Enter quarter values as nonnegative integers or fractions such as 1/2');
     return new Rational(Number(match[1]), Number(match[2] ?? 1));
   }
+  // An empty number field is not zero; the controller rejects NaN with its range message.
+  function integer(field: HTMLInputElement): number { return field.value.trim() === '' ? Number.NaN : Number(field.value); }
   function withFields(action: () => ScoreEditResult): void {
     if (!available()) return;
     const active = owner.activeElement as HTMLElement | null;
     for (const [field, apply] of fieldActions) {
-      if (!pendingFields.has(field) && field !== active) continue;
+      // A focused field may hold an edit without input/change events; an unchanged one must not re-apply.
+      const edited = field === active && (field as HTMLInputElement).value !== syncedValues.get(field);
+      if (!pendingFields.has(field) && !edited) continue;
       try { apply(); pendingFields.delete(field); invalidFields.delete(field); }
       catch (error) { pendingFields.add(field); invalidFields.set(field, error); report(error); return; }
     }
@@ -164,21 +171,18 @@ export function mountStaffEditor(host: HTMLElement, editing: StaffViewEditing, o
     surface.setAttribute('aria-disabled', String(!enabled));
     surface.dataset.inputEnabled = String(inputEnabled);
     element.dataset.editState = !state.available ? 'unavailable' : draft ? 'draft' : state.editable ? 'ready' : 'readonly';
-    const compatible = !draft && scoreDocumentPlaybackCompatible(state.document, playback);
-    element.dataset.playbackState = !playback ? 'unbound' : compatible ? 'ready' : 'pending';
     visualizer?.setSelectedNotes(editing.editing.state.interaction.selectedNoteIds);
     const nextCursorKey = `${state.partId}:${state.staff}:${state.onsetQuarters}`;
     visualizer?.setEditingCursor(state.partId && state.editable ? {quarters: state.onsetQuarters.toFloat(), partId: state.partId, staff: state.staff} : undefined, nextCursorKey !== cursorKey);
     cursorKey = nextCursorKey;
-    if (compatible && playback?.nominalSeconds !== null && playback?.nominalSeconds !== undefined) visualizer?.redrawAtTime(playback.nominalSeconds, false);
-    else visualizer?.clearActiveNotes();
+    paintPlayback();
     const key = state.document.content.parts.map((value) => `${value.id}:${value.name}`).join('|');
     if (key !== partKey) {
       partKey = key; part.replaceChildren();
       for (const value of state.document.content.parts) { const option = owner.createElement('option'); option.value = value.id; option.textContent = value.name; part.append(option); }
     }
     const sync = (field: HTMLInputElement | HTMLSelectElement, value: string): void => {
-      if (!pendingFields.has(field)) { field.value = value; invalidFields.delete(field); }
+      if (!pendingFields.has(field)) { field.value = value; syncedValues.set(field, field.value); invalidFields.delete(field); }
     };
     sync(part, state.partId ?? ''); sync(voice, state.voice); sync(staff, String(state.staff));
     sync(onset, state.onsetQuarters.toString()); sync(duration, state.duration.base.toString()); sync(dots, String(state.duration.dots));
@@ -189,10 +193,20 @@ export function mountStaffEditor(host: HTMLElement, editing: StaffViewEditing, o
     redo.disabled = !enabled || !editing.editing.state.history.canRedo;
     toggle.hidden = !state.editable; details.hidden = !state.editable; instructions.hidden = !state.editable;
     const selected = editing.editing.state.interaction.selectedNoteIds.map((id) => visibleContent().getNote(id)).filter((note) => !!note);
-    feedback.textContent = [message, !state.available ? 'Editor unavailable.' :
+    const text = [message, !state.available ? 'Editor unavailable.' :
       `${inputEnabled ? 'Note input enabled' : 'Note input off'}. Cursor ${state.onsetQuarters} quarters; voice ${state.voice}; staff ${state.staff}; duration ${state.duration.quarters} quarters; octave ${state.octave}.`,
     selected.length ? `Selected ${selected.length}: ${selected.map((note) => note.rest ? 'rest' : note.pitch.toString()).join(', ')}.` : 'No note selected.',
     draft ? 'Shared edit preview; playback overlay is suspended.' : ''].filter(Boolean).join(' ');
+    // Identical text would otherwise churn the live region on unrelated redraws.
+    if (feedback.textContent !== text) feedback.textContent = text;
+  }
+  /** Playback state and sounding-note overlay only; frames do not repaint controls or selection. */
+  function paintPlayback(): void {
+    const compatible = !editing.editing.state.interaction.draft && scoreDocumentPlaybackCompatible(editing.state.document, playback);
+    const playbackState = !playback ? 'unbound' : compatible ? 'ready' : 'pending';
+    if (element.dataset.playbackState !== playbackState) element.dataset.playbackState = playbackState;
+    if (compatible && playback?.nominalSeconds !== null && playback?.nominalSeconds !== undefined) visualizer?.redrawAtTime(playback.nominalSeconds, false);
+    else visualizer?.clearActiveNotes();
   }
   function keydown(event: KeyboardEvent): void {
     if (event.target !== surface || !available() || event.isComposing || event.altKey) return;
@@ -202,6 +216,8 @@ export function mountStaffEditor(host: HTMLElement, editing: StaffViewEditing, o
       event.preventDefault(); completed(key === 'y' || event.shiftKey ? editing.redo() : editing.undo()); return;
     }
     if (modifier) return;
+    // Escape belongs to an enclosing dialog unless it actually leaves note input.
+    if (key === 'escape' && !inputEnabled) return;
     if (key === 'n' || key === 'escape') {
       event.preventDefault(); if (event.repeat) return;
       inputEnabled = key === 'n' ? !inputEnabled : false; message = ''; draw(); return;
@@ -245,18 +261,24 @@ export function mountStaffEditor(host: HTMLElement, editing: StaffViewEditing, o
   };
   updateField(part, () => editing.setPart(PartId(part.value)));
   updateField(voice, () => editing.setVoice(VoiceId(voice.value)));
-  updateField(staff, () => editing.setStaff(Number(staff.value)));
+  updateField(staff, () => editing.setStaff(integer(staff)));
   updateField(onset, () => editing.setCursor(quarter(onset.value).toJSON()));
   updateField(duration, () => editing.setDuration(quarter(duration.value).toJSON(), Number(dots.value)));
   updateField(dots, () => editing.setDuration(quarter(duration.value).toJSON(), Number(dots.value)));
-  updateField(octave, () => editing.setOctave(Number(octave.value)));
+  updateField(octave, () => editing.setOctave(integer(octave)));
   updateField(accidental, () => editing.setAlter(Number(accidental.value) as Alter));
   toggle.addEventListener('click', toggleInput);
   surface.addEventListener('keydown', keydown); surface.addEventListener('click', click);
-  const off = editing.subscribe(draw);
+  let off: () => void;
+  try { off = editing.subscribe(draw); } catch (error) { disposed = true; rendered?.dispose?.(); element.remove(); throw error; }
   return {
     element, surface,
-    updatePlayback(value) { if (!disposed) { playback = value; draw(); } },
+    updatePlayback(value) {
+      if (disposed) return;
+      playback = value;
+      // A playback frame over unchanged content repaints only its overlay.
+      if (content === visibleContent()) paintPlayback(); else draw();
+    },
     cancel() { if (!disposed) { inputEnabled = false; message = ''; draw(); } },
     dispose() {
       if (disposed) return;

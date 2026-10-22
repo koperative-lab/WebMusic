@@ -62,7 +62,9 @@ An editor starts ready at revision `0` and `dirty: false`. Effective commands,
 undo, redo and checkpoint restoration increment the revision. Undo restores an
 earlier content identity at a new revision. `markSaved` tracks content identity,
 so undoing back to the saved root clears dirty state. A net-zero batch is a no-op:
-it does not add history, increment revision or discard redo.
+it does not add history, increment revision or discard redo. This includes a
+notation entry that would only regenerate note IDs, such as re-entering an
+existing rest; the existing note IDs and session selections remain.
 
 `execute` requires a document/revision guard. The convenience transaction,
 undo, redo and restore methods accept an optional guard; omit it only when the

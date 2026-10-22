@@ -267,7 +267,7 @@ checkpoints and separate interaction drafts. It allocates no player, clock or DO
 import {createScoreEditor} from '@webmusic/score/edit/headless';
 
 const editor = createScoreEditor(score);
-const note = editor.score.notes.find((candidate) => candidate.pitch !== null);
+const note = editor.score.notes.find((candidate) => !candidate.rest);
 if (note) {
   const result = editor.transaction('Move note', (tx) => {
     tx.add({type: 'move-notes', noteIds: [note.id], deltaQuarters: [1, 4]});

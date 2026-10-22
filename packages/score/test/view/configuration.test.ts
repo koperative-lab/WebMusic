@@ -5,6 +5,7 @@ describe('mode-specific view configuration', () => {
   it('accepts each renderer with its own options', () => {
     for (const configuration of [
       {type: 'piano-roll', options: {pixelsPerSecond: 80, showAnnotations: false}},
+      {type: 'piano-roll', options: {pixelsPerQuarter: 32, editingGrid: [1, 3], noteHeight: 16}},
       {type: 'staff', options: {defaultKey: 2, instruments: [0], splitStaves: false, noteColor: 'var(--ink)', activeNoteColor: '#f00', showAnnotations: true}},
       {type: 'waterfall', options: {whiteNoteWidth: 18, virtualization: true, showAnnotations: false}},
     ] satisfies ScoreViewConfiguration[]) {
@@ -15,6 +16,8 @@ describe('mode-specific view configuration', () => {
   it('rejects options for another mode and misspelled options from JavaScript', () => {
     for (const configuration of [
       {type: 'piano-roll', options: {whiteNoteWidth: 18}},
+      {type: 'staff', options: {pixelsPerQuarter: 32}},
+      {type: 'waterfall', options: {editingGrid: [1, 4]}},
       {type: 'waterfall', options: {defaultKey: 2}},
       {type: 'waterfall', options: {whiteNoteHeight: 70}},
       {type: 'waterfall', options: {blackNoteHeight: 40}},
@@ -33,5 +36,8 @@ describe('mode-specific view configuration', () => {
     // @ts-expect-error Waterfall-only options cannot configure staff, even via a variable.
     const invalid: ScoreViewConfiguration = {type: 'staff', options: waterfallOptions};
     expect(() => validateScoreViewConfiguration(invalid)).toThrow(/whiteNoteWidth/);
+    // @ts-expect-error Editor piano-roll geometry does not configure staff notation.
+    const editorGeometry: ScoreViewConfiguration = {type: 'staff', options: {editingGrid: [1, 4]}};
+    expect(() => validateScoreViewConfiguration(editorGeometry)).toThrow(/editingGrid/);
   });
 });

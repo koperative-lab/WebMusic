@@ -131,4 +131,18 @@ describe('independent note velocity', () => {
     expect(noteOnsetSeconds(performed, slower)).toBe(0.52);
     expect(noteDurationSeconds(performed, slower)).toBe(1.4);
   });
+
+  it('resolves velocity for plain note data such as toJSON output and structured clones', () => {
+    const builder = new ScoreBuilder();
+    const partId = builder.addPart({id: builder.newPartId(), name: 'Piano'});
+    const id = builder.newNoteId();
+    builder.addNote(partId, {id, pitch: Pitch.parse('C4'), onsetQuarters: Rational.ZERO, duration: Duration.quarter(),
+      voice: builder.newVoiceId(), performed: {onsetSec: 0, durationSec: 0.5, velocity: 70}});
+    const note = builder.build().getNote(id)!;
+    const plain = (value: unknown) => value as Parameters<typeof noteVelocity>[0];
+    expect(noteVelocity(plain(note.toJSON()))).toBe(70);
+    expect(noteVelocity(plain(structuredClone(note.toJSON())))).toBe(70);
+    expect(noteVelocity(plain({...note.toJSON(), velocityOverride: 101}))).toBe(101);
+    expect(noteVelocity(plain({...note.toJSON(), performed: undefined}))).toBe(80);
+  });
 });

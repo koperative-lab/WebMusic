@@ -216,7 +216,8 @@ export class ScorePlayer {
     this.documents = new ScoreDocumentBinding({
       expanded: options.expandRepeats === true,
       pause: () => {
-        this.playbackState = 'paused';
+        // A stopped or ended transport keeps that state: only a playing one pauses.
+        if (this.scheduler.isPlaying || this.playbackState === 'playing' || this.playbackState === 'starting') this.playbackState = 'paused';
         this.scheduler.pause();
         this.activeNotes.clear();
       },
@@ -228,9 +229,9 @@ export class ScorePlayer {
         this.preloadPromise = candidate.preload;
         this.sourceRevision++;
         this.activeNotes.clear();
-        this.playbackState = 'paused';
       },
       notify: () => this.playbackPublisher.notify(),
+      publishPosition: () => this.scheduler.publishCursor(),
       onDetach: () => { this.sourceRevision++; },
       report: (error) => this.reportOperationError('document subscription cleanup', error),
     });

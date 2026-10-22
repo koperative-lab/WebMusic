@@ -64,9 +64,11 @@ length does not change its duration or playback rate.
 
 An editor-bound piano roll instead uses written quarter-note coordinates, with
 `.options.pixelsPerQuarter` (default `64`) and `.options.editingGrid` (default
-`[1, 4]`). Its pitch lanes default to `20px`; explicit `note-height`, `min-pitch`
-and `max-pitch` still apply. Its default range includes MIDI 48–84 and expands
-to include the notes. `pixels-per-second` and `note-spacing` belong to the
+`[1, 4]`); `configure()` accepts both for `piano-roll`. Its pitch lanes default
+to `20px`; explicit `note-height`, `min-pitch` and `max-pitch` still apply. Its
+default range includes MIDI 48–84 and expands to include the notes; a single
+explicit bound limits the computed opposite bound instead of being crossed by it.
+`pixels-per-second` and `note-spacing` belong to the
 passive renderers below. The editing grid currently draws notes and a quarter
 ruler; expressive annotation strips remain on the passive views.
 
@@ -309,10 +311,16 @@ different source relationship while retaining the passive main demo above.
 
 Click selects; Shift-click adds/removes a note. Drag a note to move it in time
 and pitch; drag its right edge to resize. Double-click empty space inserts a
-quarter note. Alt-drag inserts a note with a previewed duration. Timing snaps to
-the rational editing grid. The focused grid handles arrows, Shift+Left/Right
-for duration, Delete/Backspace, Ctrl/Cmd+A, Ctrl/Cmd+Z, Shift+Ctrl/Cmd+Z and
-Ctrl/Cmd+Y. Keyboard input in the numeric form or elsewhere is not intercepted.
+quarter note. Alt-drag inserts a note with a previewed duration. Both insertions
+start at the editing-grid cell under the pointer, so the new note covers that
+point; pointer hits use the displayed note geometry, and double-clicking or
+Alt-clicking an existing note selects it instead of inserting another. Moves and
+resizes travel in exact editing-grid steps, so an off-grid note keeps its offset;
+only insertion uses the absolute grid cell. The focused grid handles arrows,
+Shift+Left/Right for duration, Delete/Backspace, Ctrl/Cmd+A, Ctrl/Cmd+Z,
+Shift+Ctrl/Cmd+Z and Ctrl/Cmd+Y. Keyboard input in the numeric form or elsewhere
+is not intercepted. Escape is consumed only when it cancels a gesture or draft,
+so an enclosing dialog still receives it otherwise.
 
 The **Note values and keyboard alternatives** disclosure includes a native
 **Select existing note** menu. Open the disclosure with the keyboard, tab to
@@ -332,20 +340,29 @@ the grid but do not replace this committed numeric baseline. With no single
 selected note, Apply is disabled and the fields remain usable as insertion values.
 
 The labeled onset/duration fields accept integers, decimals or fractions;
-other controls provide written MIDI pitch, velocity, insertion part and
-edit/history buttons. Apply changes one
-selected note; insertion uses the chosen part's first voice, or voice `1` for
+other controls provide written MIDI pitch (integer 0–127), velocity (integer
+1–127), insertion part and edit/history buttons. An empty or non-integer pitch
+or velocity is reported as an error, never treated as zero. Apply changes one
+selected note and submits only the fields that differ from its committed
+values; an unchanged Apply reports **No change** and adds no history item,
+dirty state or redo loss. Insertion uses the chosen part's first voice, or voice `1` for
 an empty part. A document needs a part before notes can be inserted. Unsupported
 tie/tuplet/grace repairs fail visibly through the same semantic commands.
 
 A drag publishes revision-bound `editpreview` drafts and adds one history item
-on successful completion. Escape, pointer cancellation, lost capture, focus/window
-blur, viewport size changes, mode/options changes, detach and a changed document revision cancel the
-gesture. A failed latest preview cannot commit an earlier valid preview.
-The grid redraws newly visible notes when its containing viewport changes size.
-Selection has a heavier outline, drafts have dashed outlines, and a live status
-reports selection, drafts and failures. The empty editor still exposes the grid
-and numeric insertion controls.
+on successful completion. Escape, cancellation or lost capture of the dragging
+pointer, a move after its primary button was released, focus/window blur,
+viewport size changes, mode/options changes, detach and a changed document
+revision cancel the gesture. A failed latest preview cannot commit an earlier valid preview.
+The grid redraws newly visible notes when its containing viewport changes size;
+playback updates move the playhead and sounding notes without rebuilding it.
+States do not rely on color alone: a selected note has an outer ring, an inner
+contrast ring and a visible right-edge resize handle; a draft has a dashed
+outline and lighter fill; a sounding note fills its whole pitch lane. A live
+status reports selection, drafts and failures and changes only when its text
+changes. The empty editor still exposes the grid and numeric insertion controls.
+Without `editable`, the grid is a labeled graphic outside the tab order, with no
+instructions, selection gestures or form controls.
 
 Each View owns an interaction session by default. Assign the same
 `.interactionSession` from the bound editor to share selection and drafts across
@@ -394,17 +411,28 @@ the MIDI example above independent.
 Focus **Staff note input** and press **N** to enable note input, then **A–G**
 to enter a spelled pitch. **1–7** choose whole through sixty-fourth note
 values; **0** enters a rest. Left/Right moves the cursor by the
-current duration, Up/Down changes the octave, and Escape exits note input.
-Ctrl/Cmd+Z, Shift+Ctrl/Cmd+Z and Ctrl/Cmd+Y operate the shared document history.
+current duration, Up/Down changes the octave, and Escape exits note input;
+when input is already off, Escape is left to enclosing handlers. Delete or
+Backspace replaces the selected event with a rest, with or without note input
+enabled. Ctrl/Cmd+Z, Shift+Ctrl/Cmd+Z and Ctrl/Cmd+Y operate the shared document history.
 The shortcuts apply only to the focused notation surface, never to text fields.
 
 The labeled fields and buttons supply the same commands without shortcuts:
 choose **Insert into part**, **Voice**, **Staff**, **Cursor (quarters)**,
 **Duration (quarters)**, **Dots**, **Octave**, **Accidental** and **Pitch letter**,
-then **Insert note** or **Insert rest**. Selecting an existing event sets the
-input position; **Delete selected** replaces its span with a rest. A committed
-entry advances the cursor. Input changes publish `editcommit` or `editerror`;
-staff entry is atomic and has no drag preview.
+then **Insert note** or **Insert rest**. Empty **Staff** or **Octave** values
+are reported as errors, not read as zero. A command applies only fields whose
+values were edited, so an unchanged focused field cannot reset the staff.
+Selecting an existing event sets the input position and copies its duration
+when it is one whole through sixty-fourth value with up to two dots; durations
+such as a piano-roll resize to 5/4 quarters keep the current duration setting.
+**Delete selected** replaces the event's span with a rest spelled the same way
+and reports an unsupported structure for other durations. A committed entry
+advances the cursor. Input changes publish `editcommit` or `editerror`;
+staff entry is atomic and has no drag preview. Cursor, part, voice, staff,
+duration, octave, accidental and enabled note input persist when attributes,
+`.options` or `configure()` re-render the View; a new editor attachment or type
+change starts note input disabled.
 
 An entry must fit completely inside one existing authored measure. Entering
 within a rest splits it as necessary and fills the selected voice/staff's gaps
@@ -457,16 +485,16 @@ does not confirm that the browser finished writing a file.
 | `default-key` | attribute | Staff fallback major-key index, 0…11 by chromatic pitch class (0 = C, 1 = D♭, 2 = D); default 0. This is not a fifths count. |
 | `note-color` / `active-note-color` | attributes | Score-renderer idle/active colors; the Element’s active default is red `rgb(240, 84, 119)`. `note-color` also styles thumbnail. Map uses timeline tokens. |
 | `.score` | writable property | Assign a loaded Score; overrides `src` and player data, cancelling obsolete loads. |
-| `.options.pixelsPerQuarter` / `.options.editingGrid` | properties | Editor piano-roll scale (positive pixels/quarter, default 64) and positive rational snap grid (default `[1, 4]`). |
-| `data-editor-state` | reflected state | `ready`, `missing`, `invalid`, `ambiguous`, `unavailable` or `source-conflict`. |
-| `data-editable-state` | reflected state | `readonly`, `ready`, `unsupported-type` or `unavailable`. |
-| `data-playback-state` | reflected state | Editor playback compatibility: `unbound`, `ready` or `pending`. |
+| `.options.pixelsPerQuarter` / `.options.editingGrid` | properties | Editor piano-roll scale (positive pixels/quarter, default 64) and positive rational snap grid (default `[1, 4]`). `configure()` accepts them for `piano-roll`. |
+| `data-editor-state` | reflected state | `ready`, `missing`, `invalid`, `ambiguous`, `unavailable` or `source-conflict`. `missing` and `unavailable` (a target not inserted yet, or a declaration still loading, cleared or disposed) are pending: the view shows no stale content and a polite waiting status. `invalid`, `ambiguous` and `source-conflict` show an error status. A `format` change does not rebind an editor-bound view. |
+| `data-editable-state` | reflected state | `readonly`, `ready`, `unsupported-type` or `unavailable` for an editor-bound or `editable` View; `editable` without a ready editor is `unavailable`. Absent on a passive View without `editable`. |
+| `data-playback-state` | reflected state | Editor playback compatibility: `unbound`, `ready` or `pending`. A local draft does not make the player binding `mismatched`; the player is compared with committed document content. |
 | `configure(configuration)` | method | Atomically select `piano-roll`, `staff` or `waterfall` and replace optional mode-specific `.options`. Invalid modes, malformed options and unsupported keys throw `TypeError` before changing the view. Map/thumbnail use `.type`, `.options` and their attributes. |
 | `.options` | writable property | `ScoreViewRenderOptions` override note-renderer attributes; map/thumbnail also honor `showAnnotations`, `noteRGB` and `noteColor`; see the [renderer API](/score/api/view/). |
 | `.currentTime` | read-only property | Current nominal score position in seconds. |
 | `.active` | read-only property | MIDI pitches at the current score position; empty for map and thumbnail. |
 
-Type-specific attributes stay on the element when another type is selected and do not affect that other surface. Missing or invalid numeric values use their corresponding defaults.
+Type-specific attributes stay on the element when another type is selected and do not affect that other surface. Missing or invalid numeric values use their corresponding defaults, except on an editor-bound piano roll: there a finite but unusable `note-height`, `min-pitch` or `max-pitch` (nonpositive, outside 0–127 or crossing), or an invalid `.options.pixelsPerQuarter` / `editingGrid`, makes the editing surface unavailable with an error status and `data-editable-state="unavailable"` until corrected.
 
 `ScoreViewElement`, `ScoreViewElementType`, `ScoreViewSeekDetail`, `ScoreViewRenderOptions`, `ScoreViewType`, `parseColorAttr` and `defineScoreViewElement(tag?)` are exported from `@webmusic/score/view/element`. `ScoreViewElementType` includes all five Element types; the lower-level `ScoreViewType` remains `piano-roll | staff | waterfall`. Registration is idempotent and SSR-safe.
 
@@ -491,7 +519,7 @@ or a no-op. All four events bubble and are composed. Staff input emits commits
 and errors, with no preview event; waterfall, map and thumbnail have no mutation
 gestures.
 
-**Accessibility.** The map uses the shared [timeline interaction](/uikit/transport-time/timeline/). The editor grid and staff-input surface are focusable with a named application role, instructions and a live status; labeled controls supply alternatives to surface shortcuts. Staff note input has an explicit on/off button. Passive types provide labeled graphics and current-position highlighting where applicable; thumbnail adds no interactive controls.
+**Accessibility.** The map uses the shared [timeline interaction](/uikit/transport-time/timeline/). The editable grid and staff-input surface are focusable with a named application role, instructions and a live status; labeled controls supply alternatives to surface shortcuts. A read-only grid is one labeled image outside the tab order; its notes are not exposed as separate options. Staff note input has an explicit on/off button. Passive types provide labeled graphics and current-position highlighting where applicable; thumbnail adds no interactive controls.
 
 </details>
 
@@ -522,8 +550,10 @@ The editor exposes light-DOM parts `editor`, `editing-instructions`,
 `editing-viewport`, `editing-surface`, `editing-status` and `note-properties`.
 Its viewport uses `--wm-score-view-background` then `--wm-surface`, and the border
 uses `--wm-border`. Note paint follows the existing note/active-note tokens and
-explicit color options. Preserve visible focus and the selected/draft outlines
-when styling the grid.
+explicit color options. Selection's inner ring and the resize handle use the
+viewport background (`--wm-score-view-background`, then `--wm-surface`), so they
+contrast with any note fill; outer rings, draft dashes and the playhead use the
+current text color. Preserve visible focus and these non-color cues when styling the grid.
 
 The staff editor also exposes `staff-input-surface` and `staff-input-controls`
 parts around its focusable notation and labeled command disclosure. It reuses

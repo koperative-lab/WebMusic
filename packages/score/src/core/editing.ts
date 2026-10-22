@@ -1,10 +1,25 @@
 import {Score} from './model/Score';
+import {Duration} from './primitives/Duration';
 import {Rational} from './primitives/Rational';
 import type {NoteId, PartId, VoiceId} from './types/ids';
 import type {Alter, Step} from './types/pitch';
 
 /** Exact, reduced quarters. No float or legacy tick conversion at the edit boundary. */
 export type ScoreQuarterValue = readonly [number, number];
+
+// Each length has at most one spelling here: base * (1, 3/2 or 7/4) keeps odd factors 1, 3 and 7 distinct.
+const NOTATION_DURATIONS = [4, 2, 1, 1 / 2, 1 / 4, 1 / 8, 1 / 16]
+  .flatMap((base) => [0, 1, 2].map((dots) => new Duration({base, dots})));
+
+/**
+ * The staff-entry spelling (whole through 64th base, zero to two dots, no
+ * tuplet) of an exact quarter length, or undefined when none exists. Shared
+ * by Edit operations and the staff input controller.
+ * @internal
+ */
+export function spellNotationDuration(quarters: Rational): Duration | undefined {
+  return NOTATION_DURATIONS.find((duration) => duration.quarters.eq(quarters));
+}
 
 export interface ScoreNoteInput {
   readonly id: NoteId;

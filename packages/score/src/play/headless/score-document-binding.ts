@@ -18,6 +18,8 @@ interface BindingHost {
   transport(): {score: Score; nominalSeconds: number; loop?: readonly [number, number]};
   adopt(candidate: PreparedScoreDocument, nominalSeconds: number, loop?: readonly [number, number]): void;
   notify(): void;
+  /** Report the adopted position once; adoption moves it without a transport command. */
+  publishPosition(): void;
   onDetach(): void;
   report(error: unknown): void;
 }
@@ -219,6 +221,8 @@ export class ScoreDocumentBinding {
       this.state = Object.freeze({status: 'ready', attempt: attempt.id, requested: attempt.target, applied: this.applied,
         positionPolicy, documentCoordinates: !this.host.expanded});
       this.host.notify();
+      if (!this.current(attempt, generation)) return;
+      this.host.publishPosition();
       if (this.current(attempt, generation)) this.finish(attempt, Object.freeze({status: 'applied', target: attempt.target, attempt: attempt.id, positionPolicy}));
     }).catch((error: unknown) => {
       if (!this.current(attempt, generation)) return;

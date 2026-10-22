@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {MeasureId, NoteId, PartId, Rational, ScoreBuilder, ScoreEditError, VoiceId, type ScoreEditResult} from '../../src/core';
+import {Duration, MeasureId, NoteId, PartId, Pitch, Rational, ScoreBuilder, ScoreEditError, VoiceId, type ScoreEditResult} from '../../src/core';
 import {createScoreEditor} from '../../src/edit/headless';
 import {createScoreView, createScoreViewEditing, createStaffViewEditing} from '../../src/view/headless';
 
@@ -178,6 +178,46 @@ describe('staff input controller', () => {
     expect(staff.state.onsetQuarters.toJSON()).toEqual([0, 1]);
     editor.dispose(); expect(staff.state.available).toBe(false);
     expect(staff.insertPitch('D').status).toBe('failed');
+    dispose();
+  });
+
+  it('spells resized or recorded durations as notation values and reports an unspellable deletion', () => {
+    const builder = new ScoreBuilder(); const part = PartId('p');
+    builder.addPart({id: part, name: 'Piano'});
+    builder.addMeasure({id: MeasureId('m'), number: 1, onsetQuarters: Rational.ZERO,
+      durationQuarters: new Rational(4), timeSignature: {numerator: 4, denominator: 4}});
+    // Piano-roll resizing and recording store exact quarters as an undotted base.
+    for (const [id, onset, base] of [['resized', 0, [3, 4]], ['long', 1, [5, 4]]] as const) {
+      builder.addNote(part, {id: NoteId(id), pitch: Pitch.parse('C4'), onsetQuarters: new Rational(onset),
+        duration: new Duration({base}), voice: VoiceId('1')});
+    }
+    const editor = createScoreEditor(builder.build()); const editing = createScoreViewEditing(editor, {editable: true});
+    const staff = createStaffViewEditing(editing);
+    staff.select(NoteId('resized'));
+    expect([staff.state.duration.base.toString(), staff.state.duration.dots]).toEqual(['1/2', 1]);
+    staff.select(NoteId('long')); expect(staff.state.duration.quarters.toString()).toBe('3/4');
+    const failed = staff.deleteSelected();
+    expect(failed.status).toBe('failed');
+    if (failed.status === 'failed') { expect(failed.error.code).toBe('unsupported-structure'); expect(failed.error.message).toMatch(/long lasts 5\/4 quarters/); }
+    staff.setCursor([3, 1]); expect(staff.insertPitch('G').status).toBe('committed');
+    staff.select(NoteId('resized')); expect(staff.deleteSelected().status).toBe('committed');
+    const rest = editor.score.parts[0].notes.find((note) => note.rest && note.onsetQuarters.isZero())!;
+    expect([rest.duration.base.toString(), rest.duration.dots]).toEqual(['1/2', 1]);
+    staff.dispose(); editing.dispose(); editor.dispose();
+  });
+
+  it('keeps the staff when the current part is chosen again', () => {
+    const {staff, dispose} = setup();
+    staff.setStaff(2); staff.setPart(PartId('p')); expect(staff.state.staff).toBe(2);
+    dispose();
+  });
+
+  it('becomes unavailable when its borrowed editing controller is disposed', () => {
+    const {editing, staff, dispose} = setup();
+    const states: boolean[] = []; staff.subscribe((state) => states.push(state.available));
+    editing.dispose();
+    expect(staff.state.available).toBe(false); expect(states.at(-1)).toBe(false);
+    expect(staff.insertRest().status).toBe('failed');
     dispose();
   });
 

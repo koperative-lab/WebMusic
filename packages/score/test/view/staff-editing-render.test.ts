@@ -203,6 +203,78 @@ describe('staff notation editing surface', () => {
     renderer.dispose(); staff.dispose(); editing.dispose(); editor.dispose();
   });
 
+  it('rejects an empty octave field instead of entering octave 0', () => {
+    const item = mounted();
+    field(item.host, 'Octave', '');
+    expect(item.staff.state.octave).toBe(4); expect(item.errors).toHaveBeenCalledOnce();
+    expect(item.host.querySelector('[part="editing-status"]')?.textContent).toMatch(/Octave must be an integer/);
+    item.dispose();
+  });
+
+  it('does not re-apply an unchanged focused field, so entry stays on the selected staff', () => {
+    const builder = new ScoreBuilder(); builder.addPart({id: partId, name: 'Piano', staves: 2});
+    builder.addMeasure({id: builder.newMeasureId(), number: 1, onsetQuarters: Rational.ZERO, durationQuarters: new Rational(4), timeSignature: {numerator: 4, denominator: 4}});
+    for (const staff of [1, 2]) builder.addNote(partId, {id: NoteId(`rest-${staff}`), pitch: Pitch.parse('C4'), rest: true,
+      onsetQuarters: Rational.ZERO, duration: Duration.whole(), voice: VoiceId(String(staff)), staff});
+    const editor = createScoreEditor(builder.build()); const editing = createScoreViewEditing(editor, {editable: true});
+    const staff = createStaffViewEditing(editing); const host = document.createElement('div'); document.body.append(host);
+    const renderer = mountStaffEditor(host, staff);
+    staff.select(NoteId('rest-2'));
+    // Safari keeps focus on the last field when a button is clicked.
+    host.querySelector<HTMLSelectElement>('[aria-label="Insert into part"]')!.focus(); button(host, 'Insert note').click();
+    const entered = editor.score.parts[0].notes.find((note) => !note.rest)!;
+    expect(entered.staff).toBe(2); expect(staff.state.staff).toBe(2);
+    renderer.dispose(); staff.dispose(); editing.dispose(); editor.dispose();
+  });
+
+  it('leaves Escape to enclosing handlers unless it exits note input', () => {
+    const item = mounted();
+    expect(key(item.renderer.surface, 'Escape').defaultPrevented).toBe(false);
+    key(item.renderer.surface, 'n');
+    expect(key(item.renderer.surface, 'Escape').defaultPrevented).toBe(true);
+    expect(item.renderer.surface.dataset.inputEnabled).toBe('false'); item.dispose();
+  });
+
+  it('rolls back its DOM when mounted on an unavailable controller', () => {
+    const editor = createScoreEditor(score()); const editing = createScoreViewEditing(editor, {editable: true});
+    const staff = createStaffViewEditing(editing); staff.dispose();
+    const host = document.createElement('div'); document.body.append(host);
+    expect(() => mountStaffEditor(host, staff)).toThrow(/unavailable/);
+    expect(host.childElementCount).toBe(0); editing.dispose(); editor.dispose();
+  });
+
+  it('repaints only the playback overlay for playback frames and leaves an unchanged status alone', () => {
+    const item = mounted(); const {editor, renderer, host} = item;
+    const document = editor.getSnapshot();
+    const frame = (nominalSeconds: number): ScorePlaybackSnapshot => ({revision: 1, sourceRevision: 1, readiness: 'ready', state: 'playing', score: document.content,
+      nominalSeconds, nominalDurationSeconds: 4, transportSeconds: nominalSeconds, transportDurationSeconds: 4, rate: 1, activeNotes: [],
+      documentId: document.documentId, documentRevision: document.documentRevision,
+      documentBinding: {status: 'ready', attempt: 1, requested: document, applied: document, documentCoordinates: true, positionPolicy: 'preserve-quarter'}});
+    const status = host.querySelector('[part="editing-status"]')!;
+    const writes = new MutationObserver(() => {}); writes.observe(status, {childList: true, characterData: true, subtree: true});
+    renderer.updatePlayback(frame(0)); renderer.updatePlayback(frame(.5)); renderer.updatePlayback(frame(1));
+    expect(writes.takeRecords()).toEqual([]);
+    expect(host.querySelector('[data-webscore-staff-playhead]')?.getAttribute('data-time')).toBe('1');
+    expect(host.querySelector('[part="editor"]')?.getAttribute('data-playback-state')).toBe('ready');
+    writes.disconnect(); item.dispose();
+  });
+
+  it('keeps Element staff input settings and armed mode across presentation re-renders', () => {
+    const editor = createScoreEditor(score());
+    const view = document.createElement('staff-editing-score-view') as ScoreViewElement;
+    view.type = 'staff'; view.editor = editor; view.editable = true; document.body.append(view);
+    const surface = view.querySelector<HTMLElement>('[part="staff-input-surface"]')!;
+    key(surface, 'n'); key(surface, '4'); key(surface, 'ArrowRight'); key(surface, 'ArrowUp');
+    view.setAttribute('note-color', '#336699');
+    const next = view.querySelector<HTMLElement>('[part="staff-input-surface"]')!;
+    expect(next).not.toBe(surface); expect(next.dataset.inputEnabled).toBe('true');
+    expect(view.querySelector<HTMLInputElement>('[aria-label="Cursor (quarters)"]')!.value).toBe('1/2');
+    key(next, 'c');
+    const note = editor.score.parts[0].notes.find((value) => !value.rest)!;
+    expect([note.pitch.toString(), note.onsetQuarters.toString(), note.duration.quarters.toString()]).toEqual(['C5', '1/2', '1/2']);
+    view.remove(); editor.dispose();
+  });
+
   it('keeps Element input state and focus when another view changes the shared document', () => {
     const editor = createScoreEditor(score());
     const view = document.createElement('staff-editing-score-view') as ScoreViewElement;

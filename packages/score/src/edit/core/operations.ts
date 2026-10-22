@@ -1,13 +1,15 @@
-import {ScoreEditError, type ScoreEditOperation, type ScoreNoteInput} from '../../core/editing';
-import {Note, type NoteData} from '../../core/model/Note';
-import {Part} from '../../core/model/Part';
+import {ScoreEditError, spellNotationDuration, type ScoreEditOperation, type ScoreNoteInput} from '../../core/editing';
+import {Note, type NoteData, type SlurMark} from '../../core/model/Note';
+import {Part, getPartNoteLookup} from '../../core/model/Part';
 import {Score} from '../../core/model/Score';
 import {Duration} from '../../core/primitives/Duration';
 import {Pitch} from '../../core/primitives/Pitch';
 import {Rational} from '../../core/primitives/Rational';
+import {tieChains} from '../../core/query/ties';
 import type {NoteId} from '../../core/types/ids';
+import type {Alter, Step} from '../../core/types/pitch';
 import {validateScore} from '../../core/validate';
-import {applyNotationEntry} from './notation';
+import {applyNotationEntry, assertSoundingPitch} from './notation';
 
 function invalid(message: string): never {
   throw new ScoreEditError('invalid-command', message);
@@ -254,6 +256,77 @@ function quantize(value: Rational, grid: Rational, origin: Rational): Rational {
   return new Rational(Number(num), Number(den));
 }
 
+/** Representable lengths keep a staff-entry base/dot spelling; other exact lengths use their quarters as base. */
+function writtenDuration(quarters: Rational): Duration {
+  return spellNotationDuration(quarters) ?? new Duration({base: quarters});
+}
+
+const FLATS: ReadonlyArray<readonly [Step, Alter]> = [['C', 0], ['D', -1], ['D', 0], ['E', -1], ['E', 0], ['F', 0],
+  ['G', -1], ['G', 0], ['A', -1], ['A', 0], ['B', -1], ['B', 0]];
+
+/** Octaves keep the written spelling; other shifts keep flat or sharp direction, with naturals on white keys. */
+function transposeWritten(pitch: Pitch, semitones: number): Pitch {
+  if (semitones % 12 === 0) return new Pitch(pitch.step, pitch.alter, pitch.octave + semitones / 12);
+  if (pitch.alter >= 0) return pitch.transpose(semitones); // naturals and sharps: the default sharp spelling
+  const midi = pitch.midi + semitones;
+  const [step, alter] = FLATS[((midi % 12) + 12) % 12];
+  return new Pitch(step, alter, Math.floor(midi / 12) - 1);
+}
+
+function partOf(score: Score, noteId: NoteId): Part {
+  return score.parts.find((part) => getPartNoteLookup(part).lookup(noteId))!;
+}
+
+function slurMarks(note: Note): readonly SlurMark[] {
+  return typeof note.slur === 'string' ? [{type: note.slur}] : Array.isArray(note.slur) ? note.slur : note.slur ? [note.slur as SlurMark] : [];
+}
+
+/**
+ * Deletion removes a whole authored slur pair or level-one beam group, or none
+ * of it, so no remaining note keeps an unmatched mark. Slurs pair by voice and
+ * number; beam groups run from begin to end per voice and staff, and chord
+ * members share their onset's event. Malformed groups are not protected.
+ */
+function assertWholeGroups(score: Score, deleted: ReadonlySet<NoteId>): void {
+  const reject = (id: NoteId, kind: string): never => {
+    throw new ScoreEditError('unsupported-structure', `Deleting ${id} would leave an unmatched ${kind}; delete the whole ${kind} or none of it`);
+  };
+  for (const part of score.parts) {
+    if (!part.notes.some((note) => deleted.has(note.id))) continue;
+    const slurs = new Map<string, Note[]>();
+    const beams = new Map<string, Note[][]>();
+    const mode = (note: Note) => note.beams?.find((beam) => beam.number === 1)?.type;
+    const close = (lane: string) => {
+      const events = beams.get(lane);
+      beams.delete(lane);
+      if (!events || mode(events[0][0]) !== 'begin' || mode(events[events.length - 1][0]) !== 'end') return;
+      const kept = events.map((event) => event.some((note) => !deleted.has(note.id)));
+      if (kept.includes(true) && kept.includes(false)) reject(events[kept.indexOf(false)][0].id, 'beam group');
+    };
+    for (const note of part.notes) {
+      // A close followed by a new start on the same note denotes two slurs.
+      for (const mark of [...slurMarks(note)].sort((a, b) => Number(a.type === 'start') - Number(b.type === 'start'))) {
+        const key = JSON.stringify([note.voice, mark.number ?? 1]);
+        if (mark.type === 'start') slurs.set(key, [...slurs.get(key) ?? [], note]);
+        else if (mark.type === 'stop') {
+          const start = slurs.get(key)?.shift();
+          if (start && deleted.has(start.id) !== deleted.has(note.id)) reject(deleted.has(note.id) ? note.id : start.id, 'slur');
+        }
+      }
+      const type = mode(note);
+      if (type !== 'begin' && type !== 'continue' && type !== 'end') continue;
+      // Grace beams are their own groups; sharing an onset is not a chord.
+      const lane = JSON.stringify([note.voice, note.staff ?? 1, Boolean(note.grace)]);
+      const events = beams.get(lane);
+      const last = events?.[events.length - 1];
+      if (last?.[0].onsetQuarters.eq(note.onsetQuarters)) { last.push(note); continue; }
+      if (type === 'begin' || !last || mode(last[0]) === 'end') close(lane);
+      beams.set(lane, [...beams.get(lane) ?? [], [note]]);
+    }
+    for (const lane of [...beams.keys()]) close(lane);
+  }
+}
+
 function requireSimpleRhythm(note: Note): void {
   if (note.tie || note.tupletId !== undefined || note.tupletMarks?.length || note.grace ||
       note.duration.tuplet[0] !== note.duration.tuplet[1]) {
@@ -278,8 +351,10 @@ function applyOperation(score: Score, operation: ScoreEditOperation, affected: S
     }
     return score.edit((transaction) => {
       for (const input of operation.notes) {
-        transaction.addNote(input.partId, new Note({id: input.id, pitch: Pitch.fromJSON(input.pitch),
-          onsetQuarters: Rational.from(input.onsetQuarters), duration: new Duration({base: input.durationQuarters}),
+        const pitch = Pitch.fromJSON(input.pitch);
+        assertSoundingPitch(score.getPart(input.partId)!, pitch);
+        transaction.addNote(input.partId, new Note({id: input.id, pitch,
+          onsetQuarters: Rational.from(input.onsetQuarters), duration: writtenDuration(Rational.from(input.durationQuarters)),
           voice: input.voice, ...(input.velocity === undefined ? {} : {velocityOverride: input.velocity})}));
         affected.add(input.id);
       }
@@ -290,6 +365,8 @@ function applyOperation(score: Score, operation: ScoreEditOperation, affected: S
     if (!note) throw new ScoreEditError('unknown-note', `Unknown note: ${noteId}`);
     return note;
   });
+  if (operation.type === 'delete-notes') assertWholeGroups(score, new Set(operation.noteIds));
+  let tieHeads: Set<Note> | undefined;
   return score.edit((transaction) => {
     for (const note of notes) {
       let patch: Partial<NoteData> | undefined;
@@ -304,7 +381,7 @@ function applyOperation(score: Score, operation: ScoreEditOperation, affected: S
           break;
         case 'resize-notes': {
           const duration = Rational.from(operation.durationQuarters);
-          if (!duration.eq(note.duration.quarters)) patch = timingPatch(note, note.onsetQuarters, new Duration({base: duration}));
+          if (!duration.eq(note.duration.quarters)) patch = timingPatch(note, note.onsetQuarters, writtenDuration(duration));
           break;
         }
         case 'transpose-notes': {
@@ -312,11 +389,18 @@ function applyOperation(score: Score, operation: ScoreEditOperation, affected: S
           if (note.tie || note.rest || note.unpitched) throw new ScoreEditError('unsupported-structure', `Note ${note.id} cannot be transposed independently`);
           const midi = note.pitch.midi + operation.semitones;
           if (!Number.isSafeInteger(midi) || midi < 0 || midi > 127) invalid('Transposed pitch must be in MIDI range 0 to 127');
-          patch = {pitch: note.pitch.transpose(operation.semitones)};
+          patch = {pitch: transposeWritten(note.pitch, operation.semitones)};
+          assertSoundingPitch(partOf(score, note.id), patch.pitch!);
           break;
         }
         case 'set-velocity': {
           const value = operation.velocity ?? undefined;
+          // Playback and MIDI export sound a tie chain once, with its first note's velocity; clearing stays allowed.
+          if (value !== undefined && note.rest) throw new ScoreEditError('unsupported-structure', `Rest ${note.id} cannot have a velocity`);
+          if (value !== undefined && (note.tie === 'continue' || note.tie === 'stop') &&
+              !(tieHeads ??= new Set(score.parts.flatMap((part) => tieChains(part).map((chain) => chain[0])))).has(note)) {
+            throw new ScoreEditError('unsupported-structure', `Note ${note.id} continues a tie; set the velocity of its first tied note`);
+          }
           if (note.velocityOverride !== value) patch = {velocityOverride: value};
           break;
         }
@@ -326,7 +410,7 @@ function applyOperation(score: Score, operation: ScoreEditOperation, affected: S
           const target = operation.target ?? 'onset';
           const onset = target === 'duration' ? note.onsetQuarters : quantize(note.onsetQuarters, grid, origin);
           const duration = target === 'onset' ? note.duration.quarters : quantize(note.duration.quarters, grid, Rational.ZERO);
-          patch = timingPatch(note, onset, duration.eq(note.duration.quarters) ? note.duration : new Duration({base: duration}));
+          patch = timingPatch(note, onset, duration.eq(note.duration.quarters) ? note.duration : writtenDuration(duration));
           break;
         }
       }
@@ -388,7 +472,9 @@ export function applyScoreOperations(score: Score, operations: readonly ScoreEdi
     for (const operation of snapshot) candidate = applyOperation(candidate, operation, affected);
     validateEditableScore(candidate);
     if (sameScoreContent(score, candidate)) return {score, operations: snapshot, affectedNoteIds: Object.freeze([])};
-    return {score: candidate, operations: snapshot, affectedNoteIds: Object.freeze([...affected])};
+    // Report only inserted, deleted or changed notes; transient and restored notes are not affected.
+    const changed = [...affected].filter((noteId) => !equalValue(score.getNote(noteId), candidate.getNote(noteId)));
+    return {score: candidate, operations: snapshot, affectedNoteIds: Object.freeze(changed)};
   } catch (error) {
     if (error instanceof ScoreEditError) throw error;
     invalid(error instanceof Error ? error.message : 'Score operation failed');

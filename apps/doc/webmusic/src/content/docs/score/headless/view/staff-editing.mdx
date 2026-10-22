@@ -46,10 +46,15 @@ editor.dispose();
 Input state uses written rational quarters. A successful pitch/rest entry
 advances the cursor by the selected dotted duration unless a synchronous
 observer has already supplied newer input settings. Selection moves the
-cursor to an existing event and copies its part, voice, staff, duration and
-pitched octave/accidental. `deleteSelected` replaces exactly one selected
-event with a rest using the captured event's part, voice, staff, position and
-duration. It leaves the cursor at that event unless a synchronous observer
+cursor to an existing event and copies its part, voice, staff and pitched
+octave/accidental. It copies the event's length as a duration only when one
+whole through sixty-fourth value with zero to two dots spells it exactly (an
+undotted 3/4-quarter base becomes a dotted eighth); otherwise, such as a
+5/4-quarter piano-roll resize, the current duration setting is kept.
+`deleteSelected` replaces exactly one selected event with a rest using the
+captured event's part, voice, staff, position and length spelled the same way;
+a length with no such spelling fails with `unsupported-structure` and changes
+nothing. It leaves the cursor at that event unless a synchronous observer
 supplies newer input settings; those settings cannot redirect the deletion. These are semantic
 commands; keyboard shortcuts and pointer hit testing belong to the renderer.
 
@@ -76,6 +81,8 @@ staff controllers can retain separate cursors while sharing one editing
 session's selected event and one document's history.
 
 Construction and local setters throw `ScoreEditError` for invalid input.
+Disposing the borrowed `editing` controller publishes a final unavailable
+state; later commands fail.
 `insertPitch`, `insertRest`, `deleteSelected`, `undo` and `redo` return
 `ScoreEditResult` (`committed`, `noop` or `failed`) and expose their latest
 failure on `state.error`. Disabled editing retains input state but rejects
@@ -106,16 +113,16 @@ The `editing` argument must be an available `ScoreViewEditing`.
 | `editing` | getter | The borrowed `ScoreViewEditing`; never disposed by this controller. |
 | `state` | getter | Frozen `StaffViewEditingState`, described below. |
 | `setCursor(onsetQuarters)` | command | Set nonnegative reduced rational quarters; entry validates measure containment. |
-| `setPart(partId)` | command | Choose an existing part and reset staff to 1. |
+| `setPart(partId)` | command | Choose an existing part. A different part resets staff to 1; the current part changes nothing. |
 | `setVoice(voice)` | command | Choose a nonempty `VoiceId` without changing Score content. |
 | `setStaff(staff)` | command | Choose a positive staff number; entry validates its range. |
 | `setDuration(baseQuarters, dots = 0)` | command | Set a supported written base and dot count. |
 | `setOctave(octave)` | command | Set the octave for subsequent pitch input. |
 | `setAlter(alter)` | command | Set explicit accidental spelling for subsequent pitch input. |
-| `select(noteId)` | command | Select an existing event in the shared session and copy its input position/settings. |
+| `select(noteId)` | command | Select an existing event in the shared session and copy its input position/settings; an unspellable length keeps the current duration. |
 | `insertPitch(step)` | command | Enter `Step` A–G with the current octave/alteration; return `ScoreEditResult`. |
 | `insertRest()` | command | Enter a rest with the current duration; return `ScoreEditResult`. |
-| `deleteSelected()` | command | Replace exactly one selected event with rest notation; return `ScoreEditResult`. |
+| `deleteSelected()` | command | Replace exactly one selected event with rest notation of the same spelled length; return `ScoreEditResult`. |
 | `undo()` / `redo()` | commands | Delegate to the document's history; return `ScoreEditResult`. |
 | `subscribe(listener)` | subscription | Deliver current state synchronously, then local/document updates; return idempotent unsubscribe. Listener errors are reported to the console and isolated. |
 | `dispose()` | lifecycle | Idempotently release the subscription/listeners and mark local state unavailable; retain borrowed objects. No terminal notification. |

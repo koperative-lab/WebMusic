@@ -77,6 +77,9 @@ export class ScoreDocumentElement extends WebMusicElement {
 
   attributeChangedCallback(name: string, oldValue: string | null, newValue: string | null): void {
     if (this.explicitScore && (name === 'src' || name === 'format')) return;
+    // The limit is ignored while history is disabled, so it must not discard edits by recreating the editor.
+    if (name === 'history-limit' && !boolAttr(this, 'history', true)) return;
+    if (name === 'history' && historyEnabled(oldValue) === historyEnabled(newValue)) return;
     if (oldValue !== newValue && this.isConnected && !this.mounting) void this.reload();
   }
 
@@ -178,3 +181,5 @@ export class ScoreDocumentElement extends WebMusicElement {
 }
 
 export function defineScoreDocumentElement(tag = 'score-document'): void { defineOnce(tag, ScoreDocumentElement); }
+
+function historyEnabled(value: string | null): boolean { return value === null || !/^(false|0|no|off)$/i.test(value.trim()); }

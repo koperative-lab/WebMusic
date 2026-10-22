@@ -80,7 +80,7 @@ const source = `${import.meta.env.BASE_URL}midi/Arabesque%20No.1.mid`;
       }
       const editor = owner.editor;
       if (!editor) return;
-      const note = editor.score.notes.find((candidate) => candidate.pitch !== null && !candidate.tie);
+      const note = editor.score.notes.find((candidate) => !candidate.rest && !candidate.tie);
       const outcome = action === 'undo' ? editor.undo() : note
         ? editor.transaction('Move first note', (tx) => tx.add({type: 'move-notes', noteIds: [note.id], deltaQuarters: [1, 4]}))
         : undefined;

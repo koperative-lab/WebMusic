@@ -3,6 +3,8 @@ import {Duration, Note, NoteId, Part, PartId, Pitch, Rational, Score, ScoreBuild
 import {ScoreEditError, type ScoreEditOperation, type ScoreNoteInput} from '../../src/core/editing';
 import {applyScoreOperations, sameScoreContent, snapshotScoreOperations, validateEditableScore} from '../../src/edit/core/operations';
 import {createScoreEditor} from '../../src/edit/headless/score-editor';
+import {parseMIDI, serializeMIDI} from '../../src/io/formats/midi';
+import {serializeMusicXML} from '../../src/io/formats/musicxml';
 
 const noteId = NoteId('a');
 const partId = PartId('p');
@@ -69,6 +71,14 @@ describe('Score semantic operations', () => {
     expect(result.performed).toBeUndefined();
     expect(result.velocityOverride).toBe(103);
     expect(original.performed?.onsetSec).toBe(0.45);
+  });
+
+  it('stores the performed velocity as an override when a timing edit removes performed timing', () => {
+    const original = note({performed: {onsetSec: 0.45, durationSec: 0.48, velocity: 97}});
+    const moved = applyScoreOperations(score([original]), [{type: 'move-notes', noteIds: [noteId], deltaQuarters: [1, 4]}]).score.getNote(noteId)!;
+    expect(moved.performed).toBeUndefined();
+    expect(moved.velocityOverride).toBe(97);
+    expect(moved.velocity).toBe(97);
   });
 
   it('preserves performed timing under pitch/velocity changes and no-op timing changes', () => {
@@ -238,5 +248,107 @@ describe('Score semantic operations', () => {
     expect(sameScoreContent(before, changed)).toBe(false);
     expect(sameScoreContent(before, restored)).toBe(true);
     expect(sameScoreContent(before, before.withMetadata({title: 'Changed'}))).toBe(false);
+  });
+});
+
+describe('Score operation spelling, velocity and structure rules', () => {
+  it.each([
+    ['Bb4', 12, 'Bb5'], ['Cb4', 12, 'Cb5'], ['E#4', 12, 'E#5'], ['F##4', -24, 'F##2'],
+    ['Bb4', 2, 'C5'], ['Eb4', 1, 'E4'], ['Bb4', 3, 'Db5'], ['Ebb4', 1, 'Eb4'], ['Cb4', -1, 'Bb3'],
+    ['F#4', 2, 'G#4'], ['B#3', 1, 'C#4'], ['D4', 1, 'D#4'], ['D4', -1, 'C#4'],
+  ])('transposes written %s by %i semitones to %s', (from, semitones, to) => {
+    const before = score([note({pitch: Pitch.parse(from)})]);
+    const changed = applyScoreOperations(before, [{type: 'transpose-notes', noteIds: [noteId], semitones}]).score.getNote(noteId)!;
+    expect(changed.pitch.toString()).toBe(to);
+    expect(changed.pitch.midi).toBe(before.getNote(noteId)!.pitch.midi + semitones);
+  });
+
+  it('spells representable resized, quantized and inserted lengths with a base and dots', () => {
+    const spelled = (quarters: readonly [number, number]) => applyScoreOperations(score(),
+      [{type: 'resize-notes', noteIds: [noteId], durationQuarters: quarters}]).score.getNote(noteId)!.duration.toJSON();
+    expect(spelled([3, 4])).toEqual({base: [1, 2], dots: 1, tuplet: [1, 1]});
+    expect(spelled([7, 8])).toEqual({base: [1, 2], dots: 2, tuplet: [1, 1]});
+    expect(spelled([3, 2])).toEqual({base: [1, 1], dots: 1, tuplet: [1, 1]});
+    expect(spelled([7, 64])).toEqual({base: [1, 16], dots: 2, tuplet: [1, 1]});
+    expect(spelled([5, 4])).toEqual({base: [5, 4], dots: 0, tuplet: [1, 1]});
+    expect(spelled([1, 3])).toEqual({base: [1, 3], dots: 0, tuplet: [1, 1]});
+    const quantized = applyScoreOperations(score([note({duration: new Duration({base: [5, 7]})})]),
+      [{type: 'quantize-notes', noteIds: [noteId], target: 'duration'}]).score.getNote(noteId)!;
+    expect(quantized.duration.toJSON()).toEqual({base: [1, 2], dots: 1, tuplet: [1, 1]});
+    const inserted = applyScoreOperations(score(), [{type: 'insert-notes', notes: [{...input(), durationQuarters: [3, 2]}]}]).score;
+    expect(inserted.getNote(NoteId('new'))!.duration.toJSON()).toEqual({base: [1, 1], dots: 1, tuplet: [1, 1]});
+    // The staff controller re-enters a selected note with its stored spelling.
+    const resized = applyScoreOperations(score(), [{type: 'resize-notes', noteIds: [noteId], durationQuarters: [3, 4]}]).score;
+    const duration = resized.getNote(noteId)!.duration;
+    expect(() => snapshotScoreOperations([{type: 'enter-notation', entry: {id: NoteId('rest'), partId, voice: VoiceId('v'),
+      onsetQuarters: [1, 1], duration: {base: duration.base.toJSON(), dots: duration.dots}, pitch: null}}])).not.toThrow();
+    expect(serializeMusicXML(resized)).toContain('<dot');
+    expect(parseMIDI(serializeMIDI(resized).buffer as ArrayBuffer).notes[0].performed?.durationSec).toBeCloseTo(0.375, 5);
+  });
+
+  it('rejects velocity on rests and tie continuations while allowing chain heads and clearing', () => {
+    const rest = score([note({rest: true, pitch: undefined})]);
+    expectCode(() => applyScoreOperations(rest, [{type: 'set-velocity', noteIds: [noteId], velocity: 90}]), 'unsupported-structure');
+    expect(applyScoreOperations(rest, [{type: 'set-velocity', noteIds: [noteId], velocity: null}]).score).toBe(rest);
+    const tied = score([note({tie: 'start'}), note({id: NoteId('b'), onsetQuarters: new Rational(2), tie: 'stop'}),
+      note({id: NoteId('lone'), onsetQuarters: new Rational(4), pitch: Pitch.parse('E4'), tie: 'stop'})]);
+    expectCode(() => applyScoreOperations(tied, [{type: 'set-velocity', noteIds: [NoteId('b')], velocity: 90}]), 'unsupported-structure');
+    const changed = applyScoreOperations(tied, [{type: 'set-velocity', noteIds: [noteId, NoteId('lone')], velocity: 90}]).score;
+    expect(changed.getNote(noteId)?.velocity).toBe(90);
+    // A stop without an open chain sounds as its own event.
+    expect(changed.getNote(NoteId('lone'))?.velocity).toBe(90);
+    const stale = score([note({tie: 'start'}), note({id: NoteId('b'), onsetQuarters: new Rational(2), tie: 'stop', velocityOverride: 50})]);
+    expect(applyScoreOperations(stale, [{type: 'set-velocity', noteIds: [NoteId('b')], velocity: null}])
+      .score.getNote(NoteId('b'))?.velocityOverride).toBeUndefined();
+  });
+
+  it('reports only notes whose content differs between the input and the result', () => {
+    const before = score([note(), note({id: NoteId('b')})]);
+    const result = applyScoreOperations(before, [
+      {type: 'insert-notes', notes: [input('x')]},
+      {type: 'delete-notes', noteIds: [NoteId('x')]},
+      {type: 'move-notes', noteIds: [NoteId('b')], deltaQuarters: [1, 1]},
+      {type: 'move-notes', noteIds: [NoteId('b')], deltaQuarters: [-1, 1]},
+      {type: 'set-velocity', noteIds: [noteId], velocity: 70},
+    ]);
+    expect(result.affectedNoteIds).toEqual([noteId]);
+  });
+
+  it('validates sounding pitch through the Part transposition', () => {
+    const builder = new ScoreBuilder();
+    builder.addPart({id: partId, name: 'Piccolo', transpose: {chromatic: 0, octaveChange: 1}});
+    builder.addNote(partId, note());
+    const before = builder.build();
+    expectCode(() => applyScoreOperations(before, [{type: 'transpose-notes', noteIds: [noteId], semitones: 60}]), 'invalid-command');
+    expectCode(() => applyScoreOperations(before, [{type: 'insert-notes', notes: [{...input(), pitch: {step: 'C', alter: 0, octave: 9}}]}]), 'invalid-command');
+    const valid = applyScoreOperations(before, [{type: 'transpose-notes', noteIds: [noteId], semitones: 55}]).score;
+    expect(parseMIDI(serializeMIDI(valid).buffer as ArrayBuffer).notes[0].pitch.midi).toBe(127);
+  });
+
+  it('deletes authored slur pairs and beam groups whole or not at all', () => {
+    const eighth = Duration.eighth();
+    const slurred = score([note({slur: 'start'}), note({id: NoteId('middle'), onsetQuarters: new Rational(2)}),
+      note({id: NoteId('end'), onsetQuarters: new Rational(3), slur: [{type: 'stop', number: 1}]})]);
+    expectCode(() => applyScoreOperations(slurred, [{type: 'delete-notes', noteIds: [noteId]}]), 'unsupported-structure');
+    expectCode(() => applyScoreOperations(slurred, [{type: 'delete-notes', noteIds: [NoteId('end')]}]), 'unsupported-structure');
+    expect(applyScoreOperations(slurred, [{type: 'delete-notes', noteIds: [NoteId('middle')]}]).score.parts[0].notes).toHaveLength(2);
+    expect(applyScoreOperations(slurred, [{type: 'delete-notes', noteIds: [noteId, NoteId('end')]}]).score.parts[0].notes).toHaveLength(1);
+    const beamed = (id: string, onset: number, type: 'begin' | 'continue' | 'end', extra: Partial<NoteData> = {}) =>
+      note({id: NoteId(id), onsetQuarters: new Rational(onset, 2), duration: eighth, beams: [{number: 1, type}], ...extra});
+    const group = score([beamed('b1', 2, 'begin'), beamed('chord', 2, 'begin', {pitch: Pitch.parse('E4'), chord: true}),
+      beamed('b2', 3, 'continue'), beamed('b3', 4, 'end'), beamed('orphan', 6, 'continue')]);
+    for (const ids of [['b2'], ['b1', 'chord'], ['b3']]) {
+      expectCode(() => applyScoreOperations(group, [{type: 'delete-notes', noteIds: ids.map(NoteId)}]), 'unsupported-structure');
+    }
+    expect(applyScoreOperations(group, [{type: 'delete-notes', noteIds: [NoteId('chord')]}]).score.parts[0].notes).toHaveLength(4);
+    expect(applyScoreOperations(group, [{type: 'delete-notes', noteIds: ['b1', 'chord', 'b2', 'b3'].map(NoteId)}])
+      .score.parts[0].notes.map((item) => item.id)).toEqual([NoteId('orphan')]);
+    expect(applyScoreOperations(group, [{type: 'delete-notes', noteIds: [NoteId('orphan')]}]).score.parts[0].notes).toHaveLength(4);
+    // A beamed grace group at the main group's onset does not absorb its first note.
+    const graced = score([beamed('g1', 2, 'begin', {grace: true}), beamed('g2', 2, 'end', {grace: true, pitch: Pitch.parse('D4')}),
+      beamed('n1', 2, 'begin'), beamed('n2', 3, 'continue'), beamed('n3', 4, 'end')]);
+    expectCode(() => applyScoreOperations(graced, [{type: 'delete-notes', noteIds: [NoteId('n1')]}]), 'unsupported-structure');
+    expect(applyScoreOperations(graced, [{type: 'delete-notes', noteIds: ['n1', 'n2', 'n3'].map(NoteId)}])
+      .score.parts[0].notes.map((item) => item.id)).toEqual([NoteId('g1'), NoteId('g2')]);
   });
 });

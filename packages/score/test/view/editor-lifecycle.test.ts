@@ -49,7 +49,7 @@ describe('Score View editor attachment cleanup', () => {
     });
     const surface = element.querySelector('[part="editing-surface"]')!;
     const pointer = (target: Element, type: string, x: number): void => {
-      const event = new MouseEvent(type, {bubbles: true, button: 0, clientX: x, clientY: 490});
+      const event = new MouseEvent(type, {bubbles: true, button: 0, buttons: 1, clientX: x, clientY: 490});
       Object.defineProperty(event, 'pointerId', {value: 1}); target.dispatchEvent(event);
     };
     pointer(element.querySelector('[data-note-id="note"]')!, 'pointerdown', 10);
