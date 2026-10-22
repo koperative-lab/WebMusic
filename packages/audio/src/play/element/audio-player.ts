@@ -100,6 +100,12 @@ export class AudioPlayerElement extends WebMusicElement {
   private releaseEditorDiscovery?: () => void;
   private editorGeneration = 0;
   private documentError?: Error;
+  /** False while a declaration is pending (missing target, still loading): playback stays blocked without an error report. */
+  private documentFault = false;
+  /** The owned player rejected the resolved editor (pitch preservation); its setting change retries. */
+  private attachFailed = false;
+  /** `preload` waits for a new attachment's first applied revision. */
+  private documentPreloadPending = false;
   private announcedNativeRevision = -1;
   private _clip?: AudioClip;
   private _player?: AudioPlayer;
@@ -161,7 +167,11 @@ export class AudioPlayerElement extends WebMusicElement {
     // Nothing is lost while disconnected: applySource() and applyAttributes()
     // reconcile every attribute on the next mount.
     if (!this.isConnected) return;
-    if (name === 'editor' || (name === 'src' && this.hasEditorSource())) { this.bindEditor(); return; }
+    if (name === 'editor' || (name === 'src' && this.hasEditorSource())) {
+      // A removed src no longer conflicts once its loaded clip is released.
+      if (name === 'src' && !value && this.clipOrigin === 'src') this.clearLoadedClip();
+      this.bindEditor(); return;
+    }
     if (name === 'src') {
       if (value) {
         void this.loadFromSrc(value);
@@ -190,6 +200,7 @@ export class AudioPlayerElement extends WebMusicElement {
       return;
     }
     this.applyPlayerAttribute(name);
+    if (name === 'preserves-pitch' && this.attachFailed) this.bindEditor();
   }
 
   // --- public properties ---
@@ -200,9 +211,10 @@ export class AudioPlayerElement extends WebMusicElement {
     this._clip = clip;
     this.clipOrigin = clip ? 'property' : null;
     this.loadedSrc = undefined;
-    if (this._player) { if (!this.hasEditorSource()) this._player.setClip(clip); this.applyPreload(); }
+    if (this._player) { if (!this.boundToDocument()) this._player.setClip(clip); this.applyPreload(); }
     else if (this.isConnected) this.rebuildPlayer();
     this.announceSource();
+    this.recoverEditor();
   }
   get clip(): AudioClip | undefined {
     return this._player ? this._player.clip : this._clip;
@@ -218,8 +230,10 @@ export class AudioPlayerElement extends WebMusicElement {
     this._clip = undefined;
     this.clipOrigin = null;
     this.loadedSrc = undefined;
-    this._player?.setTransport(transport);
+    // The document's own sequence transport follows `editor`; only a borrowed backend is detached here.
+    if (!this.boundToDocument()) this._player?.setTransport(transport);
     this.announceSource();
+    this.recoverEditor();
   }
   get transport(): AudioPlayerTransport | undefined { return this._player?.transport; }
 
@@ -242,6 +256,8 @@ export class AudioPlayerElement extends WebMusicElement {
     this.notifyUI();
     this.announceSource();
     this.dispatch('playerchange', {player: this._player});
+    // Clearing the player keeps a configured editor bound through a fresh owned player.
+    if (!player && this.isConnected && this.hasEditorSource()) this.bindEditor();
   }
   get player(): AudioPlayer | undefined {
     return this._player;
@@ -265,10 +281,14 @@ export class AudioPlayerElement extends WebMusicElement {
   get editor(): AudioDocumentSource | undefined { return this.explicitEditor ?? this.selectedEditor; }
   get documentBinding(): AudioDocumentPlaybackBinding {
     const state = this._player?.documentBinding ?? {status: 'empty' as const, attempt: 0, documentCoordinates: false};
-    return this.documentError ? {...state, status: 'error', documentCoordinates: false, error: this.documentError} : state;
+    if (!this.documentError) return state;
+    return this.documentFault ? {...state, status: 'error', documentCoordinates: false, error: this.documentError}
+      : {status: 'empty', attempt: state.attempt, documentCoordinates: false};
   }
   get source(): AudioPlaybackSourceSnapshot {
-    return this._player ? {...this._player.source, revision: this.sourceRevision} : {kind: 'empty', clip: undefined, revision: this.sourceRevision};
+    if (this._player) return {...this._player.source, revision: this.sourceRevision};
+    // Without a player (disconnected, or before mount) the retained `.clip` is still the selected data.
+    return this._clip ? {kind: 'clip', clip: this._clip, revision: this.sourceRevision} : {kind: 'empty', clip: undefined, revision: this.sourceRevision};
   }
   waitForDocumentRevision(target: AudioDocumentRevision): Promise<AudioDocumentApplicationResult> {
     if (this.documentError || !this._player) return Promise.resolve({status: 'failed', target, attempt: this.documentBinding.attempt,
@@ -288,13 +308,35 @@ export class AudioPlayerElement extends WebMusicElement {
   private sourceConflict(): AudioDocumentApplicationError {
     return new AudioDocumentApplicationError('source-conflict', 'An editor cannot be combined with src, clip, player or transport');
   }
+  /** Source-clearing calls must not detach this element's own document binding. */
+  private boundToDocument(): boolean { return this.hasEditorSource() && this.ownsPlayer && this._player?.documentSource !== undefined; }
+  /** Re-resolve the editor once the independent source that caused a conflict is gone. */
+  private recoverEditor(): void {
+    const error = this.documentError;
+    if (this.isConnected && this.hasEditorSource() && error instanceof AudioDocumentApplicationError &&
+        error.code === 'source-conflict' && !this.hasIndependentSource()) this.bindEditor();
+  }
+  /** Attach the resolved editor to the owned player; a rejection stays unavailable until reconfigured. */
+  private attachDocument(source: AudioDocumentSource): void {
+    const player = this._player;
+    if (!player || !this.ownsPlayer) return;
+    if (player.documentSource !== source) this.documentPreloadPending = true;
+    try { player.setDocumentSource(source); }
+    catch (error) {
+      if (this._player !== player) return;
+      this.documentError = error instanceof Error ? error : new Error(String(error)); this.documentFault = true; this.attachFailed = true;
+      this.setAttribute('data-editor-state', 'error');
+      this.dispatch('documentstatechange', this.documentBinding);
+      this.onPlayerError(error); this.notifyUI();
+    }
+  }
   private bindEditor(): void {
     const generation = ++this.editorGeneration;
     this.releaseEditorDiscovery?.(); this.releaseEditorDiscovery = undefined;
-    this.selectedEditor = undefined;
+    this.selectedEditor = undefined; this.attachFailed = false;
     if (!this.hasEditorSource()) {
-      this.documentError = undefined;
-      this._player?.setDocumentSource(undefined);
+      this.documentError = undefined; this.documentFault = false;
+      if (this.ownsPlayer) this._player?.setDocumentSource(undefined);
       this.removeAttribute('data-editor-state');
       this.applySource(); this.notifyUI(); return;
     }
@@ -303,25 +345,30 @@ export class AudioPlayerElement extends WebMusicElement {
       property: 'editor', accepts: isAudioDocumentSource}, (resolution) => {
       if (!this.isConnected || generation !== this.editorGeneration) return;
       this.selectedEditor = resolution.source;
-      const error = this.hasIndependentSource() ? this.sourceConflict() :
-        resolution.state !== 'ready' ? new AudioDocumentApplicationError('not-ready', `Audio editor is ${resolution.state}`) : undefined;
+      // A target not inserted yet and a declaration still loading are pending;
+      // only a conflict or an unusable (empty, invalid, ambiguous) selection is an error.
+      const conflict = this.hasIndependentSource();
+      const state = resolution.state === 'missing' && !this.explicitEditor && !this.getAttribute('editor') ? 'invalid' : resolution.state;
+      const error = conflict ? this.sourceConflict() :
+        state !== 'ready' ? new AudioDocumentApplicationError('not-ready', `Audio editor is ${state}`) : undefined;
       this.documentError = error;
+      this.documentFault = conflict || state === 'invalid' || state === 'ambiguous';
       if (error) {
-        this._player?.pause();
-        this._player?.setDocumentSource(undefined);
+        // A caller-owned player keeps its own source and playback state.
+        if (this.ownsPlayer) { this._player?.pause(); this._player?.setDocumentSource(undefined); }
         if (generation !== this.editorGeneration) return;
-        this.setAttribute('data-editor-state', error.code === 'source-conflict' ? 'source-conflict' : resolution.state);
+        this.setAttribute('data-editor-state', conflict ? 'source-conflict' : state);
         this.dispatch('documentstatechange', this.documentBinding);
-        this.onPlayerError(error); this.notifyUI(); return;
+        if (this.documentFault) this.onPlayerError(error);
+        this.notifyUI(); return;
       }
+      // A rebuilt player attaches the selected editor itself.
       if (!this._player) this.rebuildPlayer();
-      try {
-        this._player?.setDocumentSource(resolution.source);
-        if (generation !== this.editorGeneration) return;
-        this.setAttribute('data-editor-state', this.documentBinding.status);
-        this.dispatch('documentstatechange', this.documentBinding);
-        this.notifyUI(); this.announceSource();
-      } catch (error) { this.documentError = error instanceof Error ? error : new Error(String(error)); this.onPlayerError(error); this.notifyUI(); }
+      else if (resolution.source) this.attachDocument(resolution.source);
+      if (generation !== this.editorGeneration || this.documentError) return;
+      this.setAttribute('data-editor-state', this.documentBinding.status);
+      this.dispatch('documentstatechange', this.documentBinding);
+      this.notifyUI(); this.announceSource();
     });
     if (generation === this.editorGeneration && this.isConnected) this.releaseEditorDiscovery = cleanup;
     else cleanup();
@@ -497,7 +544,7 @@ export class AudioPlayerElement extends WebMusicElement {
   protected teardown(): void {
     this.editorGeneration++;
     this.releaseEditorDiscovery?.(); this.releaseEditorDiscovery = undefined;
-    this.selectedEditor = undefined; this.documentError = undefined;
+    this.selectedEditor = undefined; this.documentError = undefined; this.documentFault = false; this.attachFailed = false; this.documentPreloadPending = false;
     this.cancelLoad();
     this.cancelScheduledRender();
     this.releasePlayer();
@@ -556,7 +603,7 @@ export class AudioPlayerElement extends WebMusicElement {
     this._clip = undefined;
     this.clipOrigin = null;
     this.loadedSrc = undefined;
-    this._player?.setClip(undefined);
+    if (!this.boundToDocument()) this._player?.setClip(undefined);
     this.announceSource();
   }
 
@@ -678,7 +725,7 @@ export class AudioPlayerElement extends WebMusicElement {
     this.playerEngine = engine;
     this.ownsPlayer = true;
     this.attachPlayer();
-    if (this.selectedEditor && !this.documentError) this._player.setDocumentSource(this.selectedEditor);
+    if (this.selectedEditor && !this.documentError) this.attachDocument(this.selectedEditor);
     this.announceSource();
     this.dispatch('playerchange', {player: this._player});
   }
@@ -694,6 +741,8 @@ export class AudioPlayerElement extends WebMusicElement {
       if (this._player !== player) return;
       if (!this.documentError) this.setAttribute('data-editor-state', detail.status);
       this.dispatch('documentstatechange', this.documentBinding); this.notifyUI();
+      // Sequence preload needs applied content, so it waits for the attachment's first ready revision.
+      if (this._player === player && detail.status === 'ready' && this.documentPreloadPending) { this.documentPreloadPending = false; this.applyPreload(); }
     }));
     this.offFns.push(player.on('sourcechange', () => {
       if (this._player !== player) return;
@@ -839,6 +888,8 @@ export class AudioPlayerElement extends WebMusicElement {
     const raw = this.getAttribute('preload');
     if (raw === null || raw.trim().toLowerCase() === 'none') return;
     if (!boolAttr(this, 'preload')) return;
+    // A blocked editor binding preloads after its first applied revision instead.
+    if (this.documentError) return;
     void this.preload().catch((error: unknown) => this.onPlayerError(error));
   }
 

@@ -1,10 +1,10 @@
 import {describe, expect, it, vi} from 'vitest';
 import {AudioClip, createAudioClip} from '../../src/core/model/AudioClip';
 import {createAudioSequence, createMemoryAudioAssetStore, readAudioSequenceRange, type AudioAssetSegment} from '../../src/core/sequence';
-import {mapAudioPosition} from '../../src/core/audio-position-map';
+import {composeAudioPositionMaps, mapAudioPosition} from '../../src/core/audio-position-map';
 import {type AudioEditOperation, type AudioRangeProcessor, type AudioProcessingRequest, type AudioEditTransaction} from '../../src/core/editing';
 import {createAudioClipEditor, type AudioClipEditorOptions} from '../../src/edit/headless/audio-clip-editor';
-import {applyAudioOperations} from '../../src/edit/core';
+import {applyAudioOperations, inverseAudioSteps} from '../../src/edit/core';
 
 const clip = (length = 8) => createAudioClip({sampleRate: 8000, channelData: [Float32Array.from({length}, (_, i) => i / 8)]});
 function setup(options?: AudioClipEditorOptions) {return createAudioClipEditor(clip(), options);}
@@ -87,6 +87,45 @@ describe('AudioClipEditor commands and immutable roots', () => {
       {type: 'splice', startFrame: 8, deleteCount: 0, segments: [{...segment, id: 'different', sourceEnd: 999}]},
     ]) expect(command(editor, [op as AudioEditOperation])).toMatchObject({status: 'failed'});
     expect(editor.getSnapshot().documentRevision).toBe(0); editor.dispose();
+  });
+  it('reports duplicate segment and annotation identities with duplicate-id', () => {
+    const editor = setup(), id = editor.sequence.segments[0].id;
+    for (const operation of [
+      {type: 'split', segmentId: id, frame: 4, leftId: 'same', rightId: 'same'},
+      {type: 'insert-silence', frame: 8, length: 2, id},
+      {type: 'insert-silence', frame: 4, length: 2, id: 'gap', rightId: id},
+      {type: 'splice', startFrame: 8, deleteCount: 0, segments: [], annotations: [
+        {id: 'cue', startFrame: 0, anchoring: 'content'}, {id: 'cue', startFrame: 0, anchoring: 'fixed'}]},
+    ] as AudioEditOperation[]) expect(command(editor, [operation])).toMatchObject({status: 'failed', error: {code: 'duplicate-id'}});
+    editor.copy({startFrame: 0, endFrame: 2}).release();
+    expect(editor.paste(8, {segmentIds: [id]})).toMatchObject({status: 'failed', error: {code: 'duplicate-id'}});
+    expect(editor.getSnapshot().documentRevision).toBe(0); editor.dispose();
+  });
+  it('maps a replacement splice and the inverse of a two-step trim', () => {
+    const editor = setup();
+    command(editor, [{type: 'splice', startFrame: 2, deleteCount: 3, segments: [{kind: 'silence', id: 'gap', length: 5}], rightId: 'right'}]);
+    const replace = editor.getSnapshot().change!.positionMap;
+    expect(replace.steps).toEqual([{type: 'splice', startFrame: 2, deleteCount: 3, insertCount: 5, length: 10}]);
+    expect(mapAudioPosition(replace, 3)).toMatchObject({frame: 2, deleted: true});
+    expect(mapAudioPosition(replace, 5)).toMatchObject({frame: 7, deleted: false}); expect(mapAudioPosition(replace, 8).frame).toBe(10);
+    editor.undo();
+    command(editor, [{type: 'trim', startFrame: 2, endFrame: 6}]);
+    const trim = editor.getSnapshot().change!.positionMap;
+    expect(trim.steps).toEqual([{type: 'splice', startFrame: 6, deleteCount: 2, insertCount: 0, length: 6},
+      {type: 'splice', startFrame: 0, deleteCount: 2, insertCount: 0, length: 4}]);
+    expect(mapAudioPosition(trim, 3)).toMatchObject({frame: 1, deleted: false}); expect(mapAudioPosition(trim, 7)).toMatchObject({frame: 4, deleted: true});
+    editor.undo();
+    const undo = editor.getSnapshot().change!.positionMap;
+    expect(undo.steps).toEqual(inverseAudioSteps(trim.steps));
+    expect(undo.steps).toEqual([{type: 'splice', startFrame: 0, deleteCount: 0, insertCount: 2, length: 6},
+      {type: 'splice', startFrame: 6, deleteCount: 0, insertCount: 2, length: 8}]);
+    expect(mapAudioPosition(undo, 1).frame).toBe(3);
+    expect(mapAudioPosition(undo, 0, 'left').frame).toBe(0); expect(mapAudioPosition(undo, 0).frame).toBe(2);
+    expect(mapAudioPosition(undo, 4, 'left').frame).toBe(6); expect(mapAudioPosition(undo, 4).frame).toBe(8);
+    const roundTrip = composeAudioPositionMaps(trim, undo);
+    expect(mapAudioPosition(roundTrip, 3)).toMatchObject({frame: 3, deleted: false});
+    // Undo cannot recover a position collapsed by the trimmed tail.
+    expect(mapAudioPosition(roundTrip, 7)).toMatchObject({frame: 6, deleted: true}); editor.dispose();
   });
   it('keeps dirty identity independent of revision and prunes bounded history', () => {
     const editor = setup({history: {limit: 2}}), id = editor.sequence.segments[0].id;
@@ -195,6 +234,21 @@ describe('explicit bounded range processing', () => {
     expect(await editor.processRange(request)).toMatchObject({status: 'committed'});
     expect(process.mock.calls[0][0].channels[0].length).toBe(2); expect(pcm(editor)).toEqual([0, .125, -.25, -.375, .5, .625, .75, .875]);
     editor.undo(); expect(pcm(editor)).toEqual(original); editor.redo(); expect(process).toHaveBeenCalledTimes(1); editor.dispose();
+  });
+  it('validates the replacement splice before DSP so a rejected request does not retire its output asset ID', async () => {
+    const dsp = processor(), process = vi.fn(dsp.process), editor = setup({processors: [{...dsp, process}]});
+    const {rightId, ...interior} = processRequest(editor) as AudioProcessingRequest & {readonly rightId: string};
+    const existing = editor.sequence.segments[0].id;
+    expect(await editor.processRange(interior)).toMatchObject({status: 'failed', error: {code: 'invalid-command'}});
+    expect(await editor.processRange({...interior, rightId: existing})).toMatchObject({status: 'failed', error: {code: 'duplicate-id'}});
+    expect(await editor.processRange({...interior, rightId, segmentId: rightId})).toMatchObject({status: 'failed', error: {code: 'duplicate-id'}});
+    const live = (editor.sequence.segments[0] as {assetId: string}).assetId;
+    expect(await editor.processRange({...interior, rightId, assetId: live})).toMatchObject({status: 'failed', error: {code: 'duplicate-id'}});
+    expect(process).not.toHaveBeenCalled(); expect(editor.getSnapshot().documentRevision).toBe(0);
+    expect(editor.getState().processing).toBe(false);
+    expect(await editor.processRange({...interior, rightId})).toMatchObject({status: 'committed'});
+    expect(editor.sequence.segments.map((segment) => segment.id)).toEqual([existing, 'processed-segment', rightId]);
+    expect(process).toHaveBeenCalledTimes(1); editor.dispose();
   });
   it('rejects unsafe allocation before invoking a processor', async () => {
     const dsp = processor(), process = vi.fn(dsp.process), editor = setup({processingMaxBytes: 4, processors: [{...dsp, process}]});

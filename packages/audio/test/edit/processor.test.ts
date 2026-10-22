@@ -36,6 +36,15 @@ describe('built-in selected-range processors', () => {
       .toEqual(new Float32Array([.1, .3, .2, .4]));
     editor.dispose();
   });
+  it.each([NaN, Infinity, -Infinity])('fails normalize on a non-finite selected sample (%s) instead of committing a no-op or silence', async (value) => {
+    const editor = createAudioClipEditor(createAudioClip({sampleRate: 8000, channelData: [new Float32Array([.25, value, .5, .125])]}),
+      {processors: [createAudioRangeProcessor('normalize')]});
+    const outcome = await editor.processRange({documentId: editor.getSnapshot().documentId, expectedRevision: 0,
+      startFrame: 0, endFrame: 3, processorId: 'normalize', processorVersion: 1, parameters: {}, assetId: 'normalized', segmentId: 'processed', rightId: 'tail'});
+    expect(outcome).toMatchObject({status: 'failed', error: {code: 'processing-failed'}});
+    expect(editor.getSnapshot().documentRevision).toBe(0); expect(editor.getSnapshot().assets.getDescriptor('normalized')).toBeUndefined();
+    editor.dispose();
+  });
   it('yields long processing so cancellation cannot commit partial output', async () => {
     const editor = createAudioClipEditor(createAudioClip({sampleRate: 8000, channelData: [new Float32Array(131_072).fill(.5)]}),
       {processors: [createAudioRangeProcessor('normalize')]});

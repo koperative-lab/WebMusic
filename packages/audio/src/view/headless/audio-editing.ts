@@ -114,7 +114,9 @@ export function createAudioViewEditing(editor: AudioClipEditorPort, options: Aud
     commit(label) { return result(() => session.commitDraft(label)); },
     cancel() {
       if (disposed || !state.available) return;
-      session.cancelDraft();
+      // A revision change already discarded the draft; do not nest a session
+      // command when a subscriber cancels during that publication.
+      if (session.getSnapshot().draft) session.cancelDraft();
       error = undefined;
       publish();
     },

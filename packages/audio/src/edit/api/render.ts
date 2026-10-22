@@ -42,12 +42,14 @@ export async function exportAudioSequenceWav(sequence: AudioSequence, assets: Au
   }
   const channels = input.sequence.channelLayout.length;
   const blockAlign = channels * depth / 8;
-  const dataBytes = input.length * blockAlign;
+  // An odd data chunk carries one RIFF pad byte.
+  const dataBytes = input.length * blockAlign, paddedBytes = dataBytes + dataBytes % 2;
   if (!Number.isSafeInteger(input.sequence.sampleRate) || channels > 65535 || blockAlign > 65535 || input.sequence.sampleRate > 0xffffffff
-      || input.sequence.sampleRate * blockAlign > 0xffffffff || dataBytes + 36 > 0xffffffff) {
-    throw new AudioEditError('resource-limit', 'Sequence exceeds RIFF/WAV dimensions');
+      || input.sequence.sampleRate * blockAlign > 0xffffffff) {
+    throw new AudioEditError('incompatible-audio-format', 'WAV requires an integer sample rate and format fields within RIFF limits');
   }
-  checkBytes(input.pcmBytes + dataBytes + 44, input.maxBytes);
+  if (paddedBytes + 36 > 0xffffffff) throw new AudioEditError('resource-limit', 'Sequence exceeds the RIFF/WAV 4 GiB size limit');
+  checkBytes(input.pcmBytes + paddedBytes + 44, input.maxBytes);
   const result = await render(input.sequence, assets, input, options.signal);
   aborted(options.signal);
   return serializeWav([...result.channelData], result.sampleRate, depth, {float: options.float});

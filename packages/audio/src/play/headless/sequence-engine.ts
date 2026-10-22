@@ -74,7 +74,7 @@ export class AudioSequenceEngine {
     const bytes = Math.min(content.length, this.chunkFrames) * content.channelLayout.length * 4;
     if (!Number.isSafeInteger(bytes) || bytes > this.preparedBytesLimit) throw new RangeError('Sequence playback chunk exceeds preparedBytesLimit');
     loop = this.normalizeLoop(loop, content);
-    this.checkLoopDensity(loop, content.length / content.sampleRate, this.transport.rate);
+    this.checkLoopDensity(loop, content, this.transport.rate);
     const before = this.generation;
     const lease = retainAudioSequence(content, assets);
     if (this.disposed || before !== this.generation) { lease.release(); return false; }
@@ -134,12 +134,16 @@ export class AudioSequenceEngine {
     const frameRate = this.content?.sampleRate ?? 1;
     const target = Math.round(Math.max(0, Math.min(this.duration, this.wrap(seconds))) * frameRate) / frameRate;
     this.transport.seekTo(target, this.now());
-    if (wasPlaying) void this.play(when).catch((error) => { for (const notify of this.errors) notify(asError(error)); });
+    // Like a clip, a seek to the unlooped end settles there; only a later play() rewinds.
+    const ended = wasPlaying && !this.loop && target >= this.duration;
+    const generation = this.generation;
+    if (wasPlaying && !ended) void this.play(when).catch((error) => { for (const notify of this.errors) notify(asError(error)); });
     this.notify();
+    if (ended && !this.disposed && generation === this.generation) for (const notify of [...this.ends]) notify();
   }
   setRate(rate: number): void {
     if (!Number.isFinite(rate) || rate <= 0) throw new RangeError('Rate must be positive and finite');
-    this.checkLoopDensity(this.loop, this.duration, rate);
+    this.checkLoopDensity(this.loop, this.content, rate);
     const playing = this.playing;
     const when = this.transport.holding ? Math.max(this.now(), this.transport.state.originTime) : this.now();
     this.pause(); this.transport.setRate(rate, this.now());
@@ -150,7 +154,7 @@ export class AudioSequenceEngine {
   setPreservesPitch(value: boolean): void { if (value) throw new Error('Sequence playback does not support pitch preservation'); }
   setLoop(loop: Loop): void {
     const accepted = this.normalizeLoop(loop, this.content);
-    this.checkLoopDensity(accepted, this.duration, this.transport.rate);
+    this.checkLoopDensity(accepted, this.content, this.transport.rate);
     const playing = this.playing;
     const when = this.transport.holding ? Math.max(this.now(), this.transport.state.originTime) : this.now();
     this.pause(); this.loop = accepted;
@@ -285,11 +289,16 @@ export class AudioSequenceEngine {
     try { voice.source.disconnect(); } catch { /* already disconnected */ }
     voice.chunk.pins--;
   }
-  private checkLoopDensity(loop: Loop, duration: number, rate: number): void {
-    if (!loop || !duration) return;
-    const span = loop === true ? duration : Math.min(duration, loop.end) - loop.start;
-    if (span > 0 && Math.ceil(0.2 * rate / span) + 2 > 512) {
-      throw new RangeError('Sequence loop exceeds 512 scheduled voices per lookahead window');
+  /** Bounds the voices schedule() creates per lookahead: one per chunk piece of every loop pass, plus both window edges. */
+  private checkLoopDensity(loop: Loop, content: AudioSequence | undefined, rate: number): void {
+    if (!loop || !content?.length) return;
+    const size = this.chunkFrames, frames = 0.2 * rate * content.sampleRate;
+    const start = loop === true ? 0 : Math.round(loop.start * content.sampleRate);
+    const end = loop === true ? content.length : Math.min(content.length, Math.round(loop.end * content.sampleRate));
+    if (end <= start) return;
+    const passes = Math.ceil(frames / (end - start)), pieces = Math.floor((end - 1) / size) - Math.floor(start / size) + 1;
+    if (Math.min(passes * pieces, Math.ceil(frames / size) + 2 * passes + 2) + 2 > 512) {
+      throw Object.assign(new RangeError('Sequence loop exceeds 512 scheduled voices per lookahead window'), {code: 'loop-density'});
     }
   }
   private normalizeLoop(loop: Loop, content?: AudioSequence): Loop {

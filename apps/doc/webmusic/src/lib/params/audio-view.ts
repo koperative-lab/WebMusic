@@ -67,7 +67,7 @@ export const AUDIO_VIEW_PARAMS: ElementParamCatalog = {
         kind: 'text',
         placeholder: '#my-player',
         fallback: 'no playhead, and no analyser for type="meter"',
-        note: 'Selector of a player: live position/activity supports display-frame following; event-only targets keep their timeupdate cadence. The meter borrows .analyser.',
+        note: 'Same-root selector of exactly one player, observed for late insertion, upgrade and replacement; multiple matches bind nothing and invalid syntax emits webaudio:error. Live position/activity supports display-frame following; event-only targets keep their timeupdate cadence. The meter borrows .analyser.',
       },
       {
         name: 'editor', kind: 'text', placeholder: '#audio-document', fallback: 'no editable document',
@@ -75,7 +75,7 @@ export const AUDIO_VIEW_PARAMS: ElementParamCatalog = {
       },
       {
         name: 'editable', kind: 'bool', fallback: 'off',
-        note: 'Enable frame selection and waveform editing with a ready editor. No editor is created implicitly; annotate suspends content gestures.',
+        note: 'Enable frame selection and waveform editing with a ready editor. No editor is created implicitly; annotate suspends content gestures, and scrub centering waits until editing is off.',
       },
       {
         name: 'interactive',
@@ -88,7 +88,7 @@ export const AUDIO_VIEW_PARAMS: ElementParamCatalog = {
         kind: 'enum',
         options: ['seek', 'scrub', 'pan', 'none'],
         fallback: 'seek — absolute pointer position',
-        note: 'seek follows the pointer; scrub centers the playhead, scratches supported decoded audio and coasts on release (left = forward, right = reverse); pan browses; none keeps clicks. annotate overrides.',
+        note: 'seek follows the pointer; scrub centers the playhead, scratches supported decoded audio and coasts on release (left = forward, right = reverse); pan browses; none keeps clicks. annotate and active content editing override.',
         when: {attribute: 'type', values: ['waveform', 'spectrogram'], fallback: 'waveform'},
       },
       {
@@ -295,11 +295,11 @@ export const AUDIO_VIEW_PARAMS: ElementParamCatalog = {
     events: [
       {name: 'webaudio:editpreview', note: 'AudioDraftResult with status preview: a revision-bound trim preview; committed content is unchanged.'},
       {name: 'webaudio:editcommit', note: 'AudioEditResult with status committed: one successful semantic transaction, separate from playback application.'},
-      {name: 'webaudio:editerror', note: '{error} from a rejected edit or invalid frame input.'},
+      {name: 'webaudio:editerror', note: '{error} from a rejected edit, or an empty or invalid frame or gain field; nothing changes.'},
       {name: 'webaudio:seek', note: '{seconds, region?}: keys, ordinary clicks and seek drags announce requests before the command. Scratch-session clicks and scrub drags report accepted seconds afterward; fallback scrub clicks keep request order. pan never seeks.'},
       {name: 'webaudio:regionchange', note: "{regions} after an annotate drag — the element's whole list, not just the new one."},
       {name: 'webaudio:viewportchange', note: '{startSeconds, endSeconds} whenever the window moves, by user pan/zoom or by panTo()/setZoom().'},
-      {name: 'webaudio:error', note: '{error} from a failed src / peaks-src load or a failed render.'},
+      {name: 'webaudio:error', note: '{error} from a failed src / peaks-src load, a failed render or an invalid player selector.'},
     ],
   },
 

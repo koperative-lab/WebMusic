@@ -111,7 +111,12 @@ exact range, document/revision guard, processor ID/version, serializable
 parameters and fixed output asset/segment IDs. AbortSignal is supplied separately.
 Only one job runs per editor; later content changes or disposal supersede it.
 Late output cannot commit. Undo/redo restores the processed asset instead of
-running the processor again.
+running the processor again. The replacement splice is validated with a
+placeholder before input allocation, so an invalid range, a missing `rightId`
+or a repeated segment ID fails without running the processor, as does an
+`assetId` that identifies an asset currently in the store. Registering the output
+retires `assetId` in the store; a failure after registration, or reuse of an ID
+retired by an earlier registration, needs a new ID.
 
 A processor declares input handles, raw output length, latency and tail before
 allocation. Input handles clamp to document bounds. Default tail policy is
@@ -167,7 +172,9 @@ Codes include invalid-command, invalid-sequence, invalid-range, unknown-asset,
 incompatible-audio-format, unknown-segment, duplicate-id, revision-conflict,
 document-mismatch, disposed, reentrant-command, history-disabled,
 invalid-checkpoint, transaction-aborted, clipboard-empty, processing-busy,
-processing-failed, resource-limit and unsupported-processor.
+processing-failed, resource-limit and unsupported-processor. `duplicate-id`
+reports a repeated segment or annotation ID, including equal split IDs, a
+`rightId` or pasted segment ID that already exists, and asset ID reuse.
 
 Subscribers cannot synchronously commit another edit during publication.
 Observer and cleanup exceptions are reported through `onListenerError` (console by default)

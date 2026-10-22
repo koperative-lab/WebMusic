@@ -1,6 +1,7 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {createAudioClip} from '../../src/core';
 import {AudioPlayer, type AudioPlayerTransport} from '../../src/play/headless/audio-player';
+import {AudioPlaylist} from '../../src/play/headless/playlist';
 
 const clip = (seconds = 2) => createAudioClip({sampleRate: 1000, channelData: [new Float32Array(seconds * 1000)]});
 const node = () => ({connect: vi.fn(), disconnect: vi.fn()});
@@ -225,6 +226,15 @@ describe('AudioPlayer borrowed transport authority', () => {
     expect(player.pan).toBe(0);
     expect(() => player.setLoop(true)).toThrow(/setLoop/);
     player.dispose();
+  });
+
+  it('never turns a configured clip loop into a borrowed queue list loop', () => {
+    const queue = new AudioPlaylist({entries: [{id: 'entry', clip: clip()}], loop: false}); const setLoop = vi.spyOn(queue, 'setLoop');
+    const player = new AudioPlayer(undefined, {loop: {start: 0, end: 0.5}});
+    player.setTransport(queue); expect(setLoop).not.toHaveBeenCalled();
+    expect(() => player.setLoop(true)).toThrow(/does not support setLoop/); expect(setLoop).not.toHaveBeenCalled();
+    player.setTransport(undefined); player.setLoop(true); expect(setLoop).not.toHaveBeenCalled();
+    player.dispose(); queue.dispose();
   });
 
   it('rejects nested central owners before changing the selected source', () => {

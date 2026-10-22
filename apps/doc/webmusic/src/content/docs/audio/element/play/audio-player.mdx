@@ -77,16 +77,37 @@ Cross-root composition uses object properties. No editor is created implicitly.
 An editor conflicts with `src` (including an empty attribute), `.clip`, an injected
 `.player` or an independent transport. Object assignments reject atomically;
 invalid attribute combinations disable playback and report `source-conflict` until
-fixed. Missing, ambiguous and invalid targets remain unavailable without falling
-back to an older clip. The host exposes `data-editor-state` and emits
-`webaudio:documentstatechange` and `webaudio:error` for unavailable bindings.
+fixed. Fixing means clearing whichever source came first: removing `src` (which
+also releases a clip loaded from it), `.clip = undefined`, `.setTransport(undefined)`
+or `.player = undefined` re-resolves the editor. A conflict pauses and detaches
+only a player this element owns; an injected `.player` keeps its own source and
+playback state. No binding falls back to an older clip. A target that is not
+inserted yet, and a matched element that has not published an editor (a
+declaration still loading, or one whose load failed and reports its own
+`webaudio:error`), are pending: `data-editor-state` is `missing` or
+`unavailable`, `.documentBinding.status` is `empty`, and no `webaudio:error` is
+dispatched by the player. While pending or failed, `play()` and `preload()`
+reject and `seek`, `seekFraction`, `scrub` and `beginScratch` throw the
+`not-ready` binding error; `waitForDocumentRevision` and
+`retryDocumentApplication` resolve `failed`. The player joins when the
+declaration publishes its editor. An empty, invalid or ambiguous selector, a
+conflict and a rejected attachment are errors: `.documentBinding.status` is
+`error` and `webaudio:error` is dispatched. `data-editor-state` reports
+`missing`, `unavailable`, `invalid`, `ambiguous`, `source-conflict` or `error`
+while blocked, then the binding's `empty`, `preparing` or `ready` status. The
+host emits `webaudio:documentstatechange` for every binding change.
 
 Each edit pauses and applies a new revision without creating an AudioContext.
 Playback resumes only after an explicit play command. `.source` names the applied
 sequence while `.documentBinding` distinguishes requested and applied revisions.
 The waveform uses that distinction to hide stale playback overlays. `engine`
 controls standalone clips; a document always uses bounded sequence playback.
-`preserves-pitch="true"` is unsupported for sequences and reports an error.
+`preserves-pitch="true"` is unsupported for sequences: binding reports an error
+and `data-editor-state="error"`, and removing the attribute (or setting it false)
+binds again. `preload` warms the sequence after each attachment's first applied
+revision. While bound, `.setTransport(undefined)` and `.clip = undefined` keep the
+document transport; remove the editor to detach it. Assigning `.player = undefined`
+binds the editor to a fresh owned player.
 Disconnecting a player releases its owned sequence engine and subscriptions,
 never the borrowed editor. Disconnecting the document declaration removes its
 owned editor; reconnecting creates a new identity. See the
@@ -132,7 +153,7 @@ await el.player?.play();                     // stable AudioPlayer facade
 | `volume` | attribute | Master volume (linear, `0`–`4`, default `1`); applies live. |
 | `rate` | attribute | Playback rate (`0.25`–`4`, default `1`); applies live. |
 | `pan` | attribute | Stereo position, `-1`–`1`; applies live. |
-| `preload` | attribute | Warm the context, graph and decoded buffer on mount so the first play does not hitch. `preload="none"` opts out. |
+| `preload` | attribute | Warm the context, graph and decoded buffer on mount so the first play does not hitch; with an editor, after its first applied revision. `preload="none"` opts out. |
 | `.editor` | property | Borrow an `AudioDocumentSource`; undefined restores selector lookup. Never disposed by the player. |
 | `.source` | readonly property | Discriminated applied `empty`, `clip` or `sequence` snapshot; sequence includes `sequence`, `assets`, `documentId`, `documentRevision`, and publication `revision`. |
 | `.documentBinding` | readonly property | Requested/applied identities, `empty`/`preparing`/`ready`/`error` status, attempt, mapping policy, coordinate availability and error. |
@@ -156,7 +177,7 @@ await el.player?.play();                     // stable AudioPlayer facade
 | `.analyser` | property (get) | The player's `AnalyserNode` (sequence: available after explicit play/preload), e.g. to feed a live [Analyze tool](/audio/element/#analyze) through its `.analyser` property. |
 | `webaudio:seek` | event | `detail = { seconds, region?, progress }` when the user drags the transport. Same shape [`<audio-view>`](/audio/element/view/audio-view/) established; `progress` is an additive extension. Programmatic `seek()` stays silent, so a bound view cannot echo its own event back. |
 | `webaudio:timeupdate` | event | `detail = { seconds, duration, progress }`, on the cursor cadence (~50 ms). |
-| `webaudio:sourcechange` | event | `AudioPlayerElementSourceDetail` is the discriminated `.source` snapshot after data, applied sequence revision or player identity changes, including clearing. Revision increases per Element. Read `.source` for initial attachment; this event does not require building the audio graph. |
+| `webaudio:sourcechange` | event | `AudioPlayerElementSourceDetail` is the discriminated `.source` snapshot after data, applied sequence revision or player identity changes, including clearing. Without a player (before mounting or after disconnecting), a retained `.clip` reports `kind: 'clip'`. Revision increases per Element. Read `.source` for initial attachment; this event does not require building the audio graph. |
 | `webaudio:documentstatechange` | event | Current `.documentBinding`, including preparation, acknowledgement, failure and recovery. Bubbles and crosses shadow roots. |
 | `webaudio:playerchange` | event | `{player}` after central player identity changes; companions rebind to the new owner. |
 | `webaudio:statechange` | event | `{playing}` from the selected backend. |
@@ -164,7 +185,7 @@ await el.player?.play();                     // stable AudioPlayer facade
 | `webaudio:end` | event | `detail` is the finished `AudioClip`, or undefined for a group with no single clip. |
 | `webaudio:regionenter` / `webaudio:regionleave` | event | `detail` is the `Region` the playhead crossed. |
 | `webaudio:beat` | event | `detail = { index, seconds }` on each beat-grid crossing (when the clip carries a beat grid). |
-| `webaudio:error` | event | `detail` is the `Error` from a failed load, playback engine or presenter. |
+| `webaudio:error` | event | `detail` is the `Error` from a failed load, an unusable or conflicting editor binding, the playback engine or a presenter. |
 
 Compressed sources use native `decodeAudioData` when the supplied or lazily
 created context supports their format; optional decoders provide other paths.
@@ -179,8 +200,10 @@ without creating another player; explicit View data remains an override.
 
 Clip loop, pan and pitch-preservation controls are unavailable on borrowed group
 backends unless their explicit contract supports them; queue list-loop policy
-belongs to the playlist. Selecting a new nonempty source pauses the previous
-backend before switching, so its audio cannot continue invisibly.
+belongs to the playlist. A `loop` attribute is never forwarded to a linked queue
+or mix: changing it while one is selected reports `webaudio:error`. Selecting a
+new nonempty source pauses the previous backend before switching, so its audio
+cannot continue invisibly.
 
 A live attribute update that the player rejects emits `webaudio:error`; a rejected
 loop range preserves the previously accepted range. Disconnecting an owned player

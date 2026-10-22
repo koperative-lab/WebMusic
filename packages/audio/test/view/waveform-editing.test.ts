@@ -66,6 +66,38 @@ describe('waveform editing renderer', () => {
     expect(model.getSnapshot().content.length).toBe(300); expect(model.getState().history.undoCount).toBe(1); expect(onCommit).toHaveBeenCalledOnce();
   });
 
+  it('keeps the clipboard when copy or cut shortcuts run with only a cursor', () => {
+    const {model, handle, editing} = mount();
+    pointer(handle.surface, 'pointerdown', 100); pointer(handle.surface, 'pointermove', 300); pointer(handle.surface, 'pointerup', 300);
+    key(handle.surface, 'c', {ctrlKey: true});
+    expect(model.getState().clipboard).toMatchObject({hasContent: true, length: 200});
+    pointer(handle.surface, 'pointerdown', 500); pointer(handle.surface, 'pointerup', 500);
+    expect(editing.state.interaction.selection).toEqual({startFrame: 500, endFrame: 500});
+    key(handle.surface, 'c', {ctrlKey: true}); key(handle.surface, 'x', {ctrlKey: true});
+    expect(model.getState().clipboard).toMatchObject({hasContent: true, length: 200});
+    expect(model.getSnapshot().documentRevision).toBe(0);
+  });
+
+  it('leaves an Escape that cancels nothing to enclosing handlers', () => {
+    const {handle, editing} = mount();
+    const escape = () => { const event = new KeyboardEvent('keydown', {key: 'Escape', bubbles: true, cancelable: true}); handle.surface.dispatchEvent(event); return event; };
+    expect(escape().defaultPrevented).toBe(false);
+    expect(editing.preview([{type: 'trim', startFrame: 100, endFrame: 300}]).status).toBe('preview');
+    expect(escape().defaultPrevented).toBe(true);
+    expect(editing.state.interaction.draft).toBeUndefined();
+  });
+
+  it('places the cursor on a click near a selected edge and adjusts that edge only by dragging', () => {
+    const {handle, editing} = mount();
+    pointer(handle.surface, 'pointerdown', 100); pointer(handle.surface, 'pointermove', 300); pointer(handle.surface, 'pointerup', 300);
+    expect(editing.state.interaction.selection).toEqual({startFrame: 100, endFrame: 300});
+    pointer(handle.surface, 'pointerdown', 302); pointer(handle.surface, 'pointerup', 302);
+    expect(editing.state.interaction.selection).toEqual({startFrame: 302, endFrame: 302});
+    pointer(handle.surface, 'pointerdown', 100); pointer(handle.surface, 'pointermove', 300); pointer(handle.surface, 'pointerup', 300);
+    pointer(handle.surface, 'pointerdown', 298); pointer(handle.surface, 'pointermove', 400); pointer(handle.surface, 'pointerup', 400);
+    expect(editing.state.interaction.selection).toEqual({startFrame: 100, endFrame: 400});
+  });
+
   it.each(['pointercancel', 'lostpointercapture', 'blur'])('cancels a trim on %s without a content commit', (event) => {
     const {model, handle, host, editing, onCommit} = mount();
     const tool = host.querySelector<HTMLSelectElement>('[aria-label="Pointer tool"]')!; tool.value = 'trim';
@@ -458,6 +490,188 @@ describe('waveform editing renderer', () => {
     expect(host.querySelector('[data-playback-state]')?.getAttribute('data-playback-state')).toBe('pending');
     expect(spies.render.mock.results.at(-1)?.value.setPlayheadVisible).toHaveBeenLastCalledWith(false);
   });
+
+  it.each([[400, 400, 400], [400, 402, 401], [400, 600, 400]])('treats a Trim press at %i moved to %i and released at %i as a click without a commit', (down, move, up) => {
+    const {model, editing, host, handle, onCommit} = mount();
+    host.querySelector<HTMLSelectElement>('[aria-label="Pointer tool"]')!.value = 'trim';
+    pointer(handle.surface, 'pointerdown', down); pointer(handle.surface, 'pointermove', move); pointer(handle.surface, 'pointerup', up);
+    expect(model.sequence.length).toBe(1000); expect(model.getSnapshot().documentRevision).toBe(0);
+    expect(editing.state.interaction.draft).toBeUndefined(); expect(onCommit).not.toHaveBeenCalled();
+    expect(editing.state.interaction.selection).toEqual({startFrame: down, endFrame: down});
+  });
+
+  it.each(['', '-1'])('rejects segment gain %j through the error path without committing', (value) => {
+    const {model, host, onError, onCommit} = mount();
+    field(host, 'Segment gain', value); button(host, 'Apply segment gain').click();
+    expect(onError).toHaveBeenCalledOnce(); expect(onCommit).not.toHaveBeenCalled();
+    expect(model.getSnapshot().documentRevision).toBe(0); expect(model.sequence.segments[0]).toMatchObject({gain: 1});
+  });
+
+  it('applies typed frames before form range commands and rejects invalid frames without changing anything', () => {
+    const {model, editing, host, handle, onError} = mount();
+    editing.select({startFrame: 0, endFrame: 0});
+    field(host, 'Start frame', '100'); field(host, 'End frame', '300').dispatchEvent(new Event('input', {bubbles: true}));
+    expect(button(host, 'Trim to selection').disabled).toBe(false);
+    button(host, 'Delete selection').click();
+    expect(model.sequence.length).toBe(800); expect(model.getState().history.undoCount).toBe(1);
+    editing.select({startFrame: 500, endFrame: 700}); field(host, 'Start frame', '');
+    button(host, 'Trim to selection').click();
+    expect(onError).toHaveBeenCalledOnce(); expect(model.getSnapshot().documentRevision).toBe(1);
+    expect(editing.state.interaction.selection).toEqual({startFrame: 500, endFrame: 700});
+    field(host, 'Start frame', '10'); field(host, 'End frame', '20'); key(handle.surface, 'Delete');
+    expect(model.sequence.length).toBe(600);
+    field(host, 'Start frame', '10'); field(host, 'End frame', '20'); field(host, 'Silence frames', '');
+    button(host, 'Insert silence').click();
+    expect(onError).toHaveBeenCalledTimes(2); expect(model.sequence.length).toBe(600);
+    expect(editing.state.interaction.selection).toEqual({startFrame: 500, endFrame: 500});
+    field(host, 'Silence frames', '5'); button(host, 'Insert silence').click();
+    expect(model.sequence.length).toBe(605); expect(model.sequence.segments[1]).toMatchObject({kind: 'silence', length: 5});
+  });
+
+  it('reapplies later regions and the requested playhead mode when content rebuilds the drawing', () => {
+    const model = editor(), editing = createAudioViewEditing(model);
+    const host = document.createElement('div'); document.body.append(host);
+    const handle = mountWaveformEditor(host, editing, {pixelsPerSecond: 100});
+    cleanups.push(() => { handle.dispose(); editing.dispose(); });
+    const regions = [createRegion({startSeconds: 1, endSeconds: 2, label: 'Cue'})];
+    handle.setRegions(regions); handle.setPlayheadMode('center');
+    model.execute({version: 1, label: 'Trim', documentId: model.getSnapshot().documentId, expectedRevision: 0, operations: [{type: 'trim', startFrame: 0, endFrame: 500}]});
+    expect(spies.render).toHaveBeenCalledTimes(2);
+    expect(spies.render.mock.calls[1][2]).toMatchObject({regions, playheadMode: 'center'});
+    editing.setEditable(true);
+    expect(spies.render.mock.results[1].value.setPlayheadMode).toHaveBeenLastCalledWith('position');
+    editing.select({startFrame: 0, endFrame: 100}); button(host, 'Delete selection').click();
+    expect(spies.render.mock.calls[2][2]).toMatchObject({regions, playheadMode: 'position'});
+    editing.setEditable(false);
+    expect(spies.render.mock.results[2].value.setPlayheadMode).toHaveBeenLastCalledWith('center');
+  });
+
+  it.each(['external commit', 'undo shortcut'])('drops a stale drag after an %s without nesting a session command', (change) => {
+    const {model, editing, host, handle} = mount();
+    const failed = vi.spyOn(console, 'error').mockImplementation(() => {});
+    model.transaction('Setup', tx => tx.add({type: 'insert-silence', frame: 0, length: 100, id: 'setup'}));
+    host.querySelector<HTMLSelectElement>('[aria-label="Pointer tool"]')!.value = 'trim';
+    pointer(handle.surface, 'pointerdown', 100); pointer(handle.surface, 'pointermove', 300);
+    expect(editing.state.interaction.draft).toBeDefined();
+    if (change === 'undo shortcut') key(handle.surface, 'z', {ctrlKey: true});
+    else model.transaction('External gain', tx => tx.add({type: 'set-gain', segmentIds: [model.sequence.segments[1].id], gain: .5}));
+    expect(failed).not.toHaveBeenCalled();
+    expect(editing.state.interaction.draft).toBeUndefined();
+    expect(host.querySelector('[part="editing-status"]')?.textContent).toContain('revision 2');
+    expect(host.querySelector('[part="editor"]')?.getAttribute('data-edit-state')).toBe('ready');
+    pointer(handle.surface, 'pointerup', 300);
+    expect(model.getSnapshot().documentRevision).toBe(2); expect(model.sequence.length).toBe(change === 'undo shortcut' ? 1000 : 1100);
+  });
+
+  it.each(['pointercancel', 'lostpointercapture'])('ignores %s from another pointer during an active trim', (type) => {
+    const {model, editing, host, handle, onCommit} = mount();
+    host.querySelector<HTMLSelectElement>('[aria-label="Pointer tool"]')!.value = 'trim';
+    pointer(handle.surface, 'pointerdown', 100); pointer(handle.surface, 'pointermove', 300);
+    pointer(handle.surface, type, 0, 2);
+    expect(editing.state.interaction.draft).toBeDefined();
+    pointer(handle.surface, 'pointerup', 300);
+    expect(model.sequence.length).toBe(200); expect(onCommit).toHaveBeenCalledOnce();
+  });
+
+  it('ignores invalid zoom values without changing geometry or the active gesture', () => {
+    const {editing, host, handle} = mount();
+    const rendered = spies.render.mock.results.at(-1)!.value, setZoom = vi.spyOn(rendered, 'setZoom');
+    host.querySelector<HTMLSelectElement>('[aria-label="Pointer tool"]')!.value = 'trim';
+    pointer(handle.surface, 'pointerdown', 100);
+    for (const value of [Number.NaN, 0, -2, Number.POSITIVE_INFINITY]) handle.setZoom(value);
+    pointer(handle.surface, 'pointermove', 300);
+    expect(setZoom).not.toHaveBeenCalled(); expect(editing.state.interaction.draft).toBeDefined();
+    expect(editing.state.interaction.selection).toEqual({startFrame: 100, endFrame: 300});
+    const range = host.querySelector<HTMLElement>('[part="selection"] div')!;
+    expect([range.style.left, range.style.width]).toEqual(['100px', '200px']);
+  });
+
+  it('measures pointer frames and places the selection overlay in the drawing box rather than the styled surface', () => {
+    const {editing, host, handle} = mount();
+    const drawing = host.querySelector('[data-wave]')!.parentElement!;
+    const rect = (left: number) => ({left, top: 0, right: left + 400, bottom: 128, width: 400, height: 128, x: left, y: 0, toJSON() {}}) as DOMRect;
+    handle.surface.getBoundingClientRect = () => rect(0); drawing.getBoundingClientRect = () => rect(20);
+    pointer(handle.surface, 'pointerdown', 120); pointer(handle.surface, 'pointermove', 320); pointer(handle.surface, 'pointerup', 320);
+    expect(editing.state.interaction.selection).toEqual({startFrame: 100, endFrame: 300});
+    const overlay = host.querySelector<HTMLElement>('[part="selection"]')!;
+    expect(drawing.contains(overlay)).toBe(true); expect(overlay.querySelector('div')!.style.left).toBe('100px');
+    editing.select({startFrame: 0, endFrame: 100}); button(host, 'Delete selection').click();
+    expect(drawing.lastElementChild).toBe(overlay);
+  });
+
+  it('publishes the clamped window when a rebuilt drawing cannot keep the previous offset', () => {
+    const base = spies.render.getMockImplementation()!;
+    spies.render.mockImplementation((host: HTMLElement, source: AudioWaveformSource, options: WaveformRenderOptions) => {
+      const rendered = base(host, source, options), setOffset = rendered.setOffset;
+      rendered.setOffset = (value: number) => setOffset(Math.max(0, Math.min(value, options.durationSeconds! - 4)));
+      return rendered;
+    });
+    const {host, handle, editing} = mount();
+    const views: AudioViewport[] = []; handle.onViewportChange((view) => views.push(view));
+    handle.setOffset(5); expect(views.at(-1)).toEqual({startSeconds: 5, endSeconds: 9});
+    editing.select({startFrame: 0, endFrame: 800}); button(host, 'Delete selection').click();
+    expect(views.at(-1)).toEqual({startSeconds: 0, endSeconds: 4}); expect(handle.viewport().startSeconds).toBe(0);
+  });
+
+  it('rejects an unavailable controller before acquiring DOM, listeners or the asset lease', () => {
+    const model = editor(), snapshot = model.getSnapshot(), segment = snapshot.content.segments[0];
+    const assetId = segment.kind === 'asset' ? segment.assetId : '', references = snapshot.assets.getReferenceCount(assetId);
+    const editing = createAudioViewEditing(model, {editable: true}); editing.dispose();
+    const host = document.createElement('div'); document.body.append(host);
+    const added = vi.spyOn(window, 'addEventListener');
+    expect(() => mountWaveformEditor(host, editing)).toThrow(/unavailable/);
+    expect(host.childElementCount).toBe(0); expect(spies.render).not.toHaveBeenCalled();
+    expect(added.mock.calls.some(([type]) => type === 'blur')).toBe(false);
+    expect(snapshot.assets.getReferenceCount(assetId)).toBe(references);
+  });
+
+  it('rolls back DOM, listeners and the asset lease when the first drawing fails', () => {
+    const model = editor(), snapshot = model.getSnapshot(), segment = snapshot.content.segments[0];
+    const assetId = segment.kind === 'asset' ? segment.assetId : '', references = snapshot.assets.getReferenceCount(assetId);
+    const editing = createAudioViewEditing(model, {editable: true}); cleanups.push(() => editing.dispose());
+    const host = document.createElement('div'); document.body.append(host);
+    const added = vi.spyOn(window, 'addEventListener'), removed = vi.spyOn(window, 'removeEventListener');
+    spies.render.mockImplementationOnce(() => { throw new Error('paint failed'); });
+    expect(() => mountWaveformEditor(host, editing)).toThrow('paint failed');
+    expect(host.childElementCount).toBe(0); expect(snapshot.assets.getReferenceCount(assetId)).toBe(references);
+    const blur = added.mock.calls.filter(([type]) => type === 'blur').map(([, listener]) => listener);
+    expect(blur.every((listener) => removed.mock.calls.some(([type, value]) => type === 'blur' && value === listener))).toBe(true);
+  });
+
+  it('exposes the focusable application surface only while editing is operable', () => {
+    const model = editor(), editing = createAudioViewEditing(model);
+    const host = document.createElement('div'); document.body.append(host);
+    const handle = mountWaveformEditor(host, editing);
+    cleanups.push(() => { handle.dispose(); editing.dispose(); });
+    for (const name of ['tabindex', 'role', 'aria-label', 'aria-describedby']) expect(handle.surface.hasAttribute(name)).toBe(false);
+    editing.setEditable(true);
+    expect(handle.surface.getAttribute('tabindex')).toBe('0'); expect(handle.surface.getAttribute('role')).toBe('application');
+    expect(handle.surface.getAttribute('aria-describedby')).toBe(host.querySelector('[part="editing-instructions"]')!.id);
+    editing.setEditable(false); expect(handle.surface.hasAttribute('role')).toBe(false);
+  });
+
+  it('rewrites the live status only when its text changes and holds announcements during a pointer drag', () => {
+    const {host, handle} = mount();
+    const status = host.querySelector('[part="editing-status"]')!;
+    const observer = new MutationObserver(() => {}); observer.observe(status, {childList: true, characterData: true, subtree: true});
+    handle.updatePlayback(undefined, .25); handle.updatePlayback(undefined, .5);
+    expect(observer.takeRecords()).toHaveLength(0);
+    pointer(handle.surface, 'pointerdown', 100); expect(status.getAttribute('aria-busy')).toBe('true');
+    pointer(handle.surface, 'pointermove', 300); pointer(handle.surface, 'pointerup', 300);
+    expect(status.hasAttribute('aria-busy')).toBe(false); expect(status.textContent).toContain('Frames 100–300');
+    observer.disconnect();
+  });
+
+  it('moves and extends by one second with PageUp and PageDown', () => {
+    const {editing, handle} = mount();
+    editing.select({startFrame: 250, endFrame: 250});
+    key(handle.surface, 'PageDown'); expect(editing.state.interaction.selection).toEqual({startFrame: 350, endFrame: 350});
+    key(handle.surface, 'PageDown', {shiftKey: true}); key(handle.surface, 'ArrowRight', {shiftKey: true});
+    expect(editing.state.interaction.selection).toEqual({startFrame: 350, endFrame: 451});
+    key(handle.surface, 'PageUp'); expect(editing.state.interaction.selection).toEqual({startFrame: 250, endFrame: 250});
+    for (let i = 0; i < 4; i++) key(handle.surface, 'PageUp');
+    expect(editing.state.interaction.selection).toEqual({startFrame: 0, endFrame: 0});
+  });
 });
 
 describe('Audio View document borrowing', () => {
@@ -599,6 +813,52 @@ describe('Audio View document borrowing', () => {
     expect(element.getAttribute('data-playback-state')).toBe('unbound');
     duplicate.remove(); await tick(); expect(element.getAttribute('data-playback-state')).toBe('ready');
     player.remove(); await tick(); expect(element.getAttribute('data-playback-state')).toBe('unbound');
+  });
+
+  it.each(Object.keys(independentSources) as Array<keyof typeof independentSources>)('keeps the document session when an empty .%s is cleared again', (name) => {
+    const model = editor(), element = view(); element.editor = model; element.editable = true; document.body.append(element);
+    const session = element.interactionSession!, surface = element.querySelector('[part="editing-surface"]');
+    session.setSelection({startFrame: 10, endFrame: 20});
+    assignSource(element, name, undefined);
+    expect(element.interactionSession).toBe(session);
+    expect(session.getSnapshot()).toMatchObject({disposed: false, selection: {startFrame: 10, endFrame: 20}});
+    expect(element.querySelector('[part="editing-surface"]')).toBe(surface);
+  });
+
+  it('removes document playback state with the editor binding', () => {
+    const model = editor(), element = view(); element.editor = model; document.body.append(element);
+    expect(element.getAttribute('data-playback-state')).toBe('unbound');
+    element.editor = undefined;
+    expect(element.hasAttribute('data-playback-state')).toBe(false); expect(element.hasAttribute('data-editor-state')).toBe(false);
+  });
+
+  it('keeps an editable scrub view in position geometry and pannable, and centers it again when read-only', () => {
+    const model = editor(), element = view();
+    element.editor = model; element.editable = true; element.interactive = true; element.dragMode = 'scrub'; document.body.append(element);
+    expect(spies.render.mock.calls.at(-1)![2]).toMatchObject({playheadMode: 'position'});
+    element.panTo(2); expect(element.visibleRange()?.startSeconds).toBe(2);
+    element.editable = false;
+    expect(spies.render.mock.calls.at(-1)![2]).toMatchObject({playheadMode: 'center'});
+    expect(element.getAttribute('role')).toBe('slider');
+    expect(element.querySelector('[part="editing-surface"]')!.hasAttribute('role')).toBe(false);
+  });
+
+  it('does not repaint paused playback for selection-only publications', () => {
+    const model = editor(), snapshot = model.getSnapshot();
+    const player = document.createElement('div') as unknown as HTMLElement & {seconds: number; duration: number; playing: boolean; documentBinding: AudioDocumentPlaybackBinding};
+    player.id = 'paused-player'; player.seconds = 2; player.duration = 10; player.playing = false;
+    player.documentBinding = {status: 'ready', attempt: 1, documentCoordinates: true, applied: {documentId: snapshot.documentId, documentRevision: 0}};
+    const element = view(); element.editor = model; element.editable = true; element.setAttribute('player', '#paused-player');
+    document.body.append(player, element);
+    expect(element.getAttribute('data-playback-state')).toBe('ready');
+    const rendered = spies.render.mock.results.at(-1)!.value; rendered.redraw.mockClear(); rendered.redrawFrame.mockClear();
+    const surface = element.querySelector<HTMLElement>('[part="editing-surface"]')!;
+    pointer(surface, 'pointerdown', 100); for (const x of [150, 200, 250]) pointer(surface, 'pointermove', x); pointer(surface, 'pointerup', 250);
+    key(surface, 'ArrowRight', {shiftKey: true});
+    expect(element.interactionSession!.getSnapshot().selection).toEqual({startFrame: 100, endFrame: 251});
+    expect(rendered.redraw).not.toHaveBeenCalled(); expect(rendered.redrawFrame).not.toHaveBeenCalled();
+    player.seconds = 3; player.dispatchEvent(new CustomEvent('webaudio:documentstatechange'));
+    expect(rendered.redraw).toHaveBeenCalledWith(3, false);
   });
 });
 async function tick() { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); }

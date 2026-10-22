@@ -1,7 +1,7 @@
 import {describe, expect, it, vi} from 'vitest';
 import {createAudioClip} from '../../src/core/model/AudioClip';
 import {audioChannelLayout, audioEnvelopeGain, audioSequenceAssetIds, createAudioSequence, createMemoryAudioAssetStore,
-  readAudioSequenceRange, retainAudioSequence, type AudioAssetSegment} from '../../src/core/sequence';
+  readAudioSequenceRange, retainAudioSequence, type AudioAssetSegment, type AudioSequence} from '../../src/core/sequence';
 import {createAudioPositionMap, composeAudioPositionMaps, mapAudioPosition} from '../../src/core/audio-position-map';
 
 function fixture() {
@@ -73,6 +73,50 @@ describe('immutable Audio sequence and assets', () => {
     expect([...out]).toEqual([.375, 1, 1.875, 0, 0, 0]); expect(audioSequenceAssetIds(sequence)).toEqual(['original']);
     expect(audioEnvelopeGain(segment.envelope, 2)).toBe(1); lease.release();
   });
+  it('reports duplicate segment, annotation and asset identities as duplicate-id', () => {
+    const {store, lease, segment} = fixture();
+    for (const init of [{segments: [segment, {...segment, sourceEnd: 2}]}, {annotations: [
+      {id: 'cue', startFrame: 0, anchoring: 'content' as const}, {id: 'cue', startFrame: 1, anchoring: 'fixed' as const}]}]) {
+      expect(() => createAudioSequence({sampleRate: 8000, channelLayout: ['mono'], segments: [segment], ...init}, store))
+        .toThrowError(expect.objectContaining({name: 'AudioSequenceError', code: 'duplicate-id'}));
+    }
+    const other = () => createAudioClip({sampleRate: 8000, channelData: [new Float32Array(8)]});
+    expect(() => store.registerClip(other(), {id: 'original'})).toThrowError(expect.objectContaining({code: 'duplicate-id'}));
+    lease.release();
+    expect(() => store.registerClip(other(), {id: 'original'})).toThrowError(expect.objectContaining({code: 'duplicate-id'}));
+  });
+  it('rejects null, non-object and missing annotation or envelope entries with typed errors', () => {
+    const {store, lease, segment} = fixture();
+    const hole: unknown[] = []; hole.length = 1;
+    for (const init of [{annotations: [null]}, {annotations: [5]}, {annotations: hole},
+      {segments: [{...segment, envelope: [null]}]}, {segments: [{...segment, envelope: ['point']}]}, {segments: [{...segment, envelope: hole}]}]) {
+      expect(() => createAudioSequence({sampleRate: 8000, channelLayout: ['mono'], ...init} as never, store))
+        .toThrowError(expect.objectContaining({name: 'AudioSequenceError', code: 'invalid-sequence'}));
+    }
+    lease.release();
+  });
+  it('evaluates long envelopes with one cursor per contiguous read and matches per-frame interpolation', () => {
+    const frames = 4096, store = createMemoryAudioAssetStore();
+    const lease = store.registerClip(createAudioClip({sampleRate: 8000, channelData: [new Float32Array(frames).fill(1)]}), {id: 'flat'});
+    const sequence = createAudioSequence({sampleRate: 8000, channelLayout: ['mono'], segments: [{kind: 'asset', id: 'a', assetId: 'flat',
+      sourceStart: 0, sourceEnd: frames, gain: .5, envelope: Array.from({length: 1024}, (_, index) => ({frame: 10 + index * 3, gain: index % 3 / 2}))}]}, store);
+    const segment = sequence.segments[0] as AudioAssetSegment;
+    let reads = 0;
+    const envelope = segment.envelope.map((point) => new Proxy(point, {get(target, key, receiver) {
+      if (key === 'frame') reads++; return Reflect.get(target, key, receiver);
+    }}));
+    const probe: AudioSequence = {...sequence, segments: [{...segment, envelope}]};
+    const out = new Float32Array(frames - 5); readAudioSequenceRange(probe, store, 5, [out]);
+    // Per-frame point scans need millions of reads here; a cursor needs a few per frame and point.
+    expect(reads).toBeLessThan(8 * (out.length + envelope.length));
+    const expected = Float32Array.from({length: frames}, (_, frame) => .5 * audioEnvelopeGain(segment.envelope, frame));
+    expect(out).toEqual(expected.subarray(5));
+    const chunked = new Float32Array(frames);
+    for (let start = 0, size = 1; start < frames; start += size, size = size * 3 % 97 + 1) {
+      readAudioSequenceRange(sequence, store, start, [chunked.subarray(start, Math.min(frames, start + size))]);
+    }
+    expect(chunked).toEqual(expected); lease.release();
+  });
   it('checks read bounds and destination format atomically', () => {
     const {store, lease} = fixture(); const out = new Float32Array([99, 99]);
     expect(() => store.read('original', 7, [out])).toThrow(/bounds/); expect([...out]).toEqual([99, 99]);
@@ -96,6 +140,25 @@ describe('Audio frame position maps', () => {
     expect(() => composeAudioPositionMaps(deletion, deletion)).toThrow(/continuous/);
     const reset = createAudioPositionMap('doc', 1, 2, [{type: 'reset', length: 10}]);
     expect(mapAudioPosition(composeAudioPositionMaps(deletion, reset), 8)).toMatchObject({frame: 0, positionPolicy: 'reset-origin'});
+  });
+  it('keeps a reset at the requested origin when later steps insert at frame 0', () => {
+    const reset = createAudioPositionMap('doc', 0, 1, [{type: 'reset', length: 4}]);
+    const insert = createAudioPositionMap('doc', 1, 2, [{type: 'splice', startFrame: 0, deleteCount: 0, insertCount: 3, length: 7}]);
+    const composed = composeAudioPositionMaps(reset, insert), origin = {frame: 0, deleted: false, positionPolicy: 'reset-origin'};
+    expect(composed.steps).toEqual([{type: 'reset', length: 7}]);
+    expect(mapAudioPosition(composed, 2)).toEqual(origin); expect(mapAudioPosition(composed, 0, 'right')).toEqual(origin);
+    expect(mapAudioPosition(createAudioPositionMap('doc', 0, 2, [...reset.steps, ...insert.steps]), 2)).toEqual(origin);
+  });
+  it('maps a replacement splice as a deletion followed by an insertion', () => {
+    const replace = createAudioPositionMap('doc', 0, 1, [{type: 'splice', startFrame: 2, deleteCount: 3, insertCount: 5, length: 12}]);
+    expect(mapAudioPosition(replace, 1)).toEqual({frame: 1, deleted: false, positionPolicy: 'preserve-frame'});
+    expect(mapAudioPosition(replace, 4)).toMatchObject({frame: 2, deleted: true});
+    expect(mapAudioPosition(replace, 5)).toMatchObject({frame: 7, deleted: false});
+    expect(mapAudioPosition(replace, 10)).toMatchObject({frame: 12, deleted: false});
+    // A collapsed anchor keeps left affinity at a later insertion boundary.
+    const insert = createAudioPositionMap('doc', 1, 2, [{type: 'splice', startFrame: 2, deleteCount: 0, insertCount: 1, length: 13}]);
+    expect(mapAudioPosition(composeAudioPositionMaps(replace, insert), 3)).toMatchObject({frame: 2, deleted: true});
+    expect(mapAudioPosition(composeAudioPositionMaps(replace, insert), 5)).toMatchObject({frame: 8, deleted: false});
   });
 });
 

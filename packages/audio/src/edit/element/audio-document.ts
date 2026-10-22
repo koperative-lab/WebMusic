@@ -33,6 +33,8 @@ export class AudioDocumentElement extends WebMusicElement {
   private generation = 0;
   private abort?: AbortController;
   private mounting = false;
+  /** An upgrade reports existing attributes before onMount; only a mounted lifetime reloads. */
+  private mounted = false;
 
   get src(): string { return this.getAttribute('src') ?? ''; }
   set src(value: string) { this.setAttribute('src', value); }
@@ -43,9 +45,9 @@ export class AudioDocumentElement extends WebMusicElement {
     if (value !== undefined && (!value || typeof value.hasSamples !== 'boolean' || typeof value.sampleRate !== 'number' || typeof value.channelData !== 'function')) throw new TypeError('clip must be an AudioClip or undefined');
     if (value === this.explicitClip) return;
     // Validate the candidate before changing configuration or the valid source.
-    const candidate = value && this.isConnected && !this.mounting ? createAudioClipEditor(value, this.options()) : undefined;
+    const candidate = value && this.mounted && !this.mounting ? createAudioClipEditor(value, this.options()) : undefined;
     this.explicitClip = value;
-    if (!this.isConnected || this.mounting) return;
+    if (!this.mounted || this.mounting) return;
     if (candidate) {
       const generation = this.cancelLoad();
       if (generation !== this.generation || !this.isConnected || this.explicitClip !== value) {
@@ -61,22 +63,22 @@ export class AudioDocumentElement extends WebMusicElement {
     if (value !== undefined && typeof value !== 'function') throw new TypeError('loader must be a function or undefined');
     if (value === this.explicitLoader) return;
     this.explicitLoader = value;
-    if (this.isConnected && !this.mounting && !this.explicitClip) void this.reload();
+    if (this.mounted && !this.mounting && !this.explicitClip) void this.reload();
   }
 
   get loadOptions(): AudioDocumentLoadOptions { return {...this.currentLoadOptions}; }
   set loadOptions(value: AudioDocumentLoadOptions) {
     this.currentLoadOptions = {...value};
-    if (this.isConnected && !this.mounting && !this.explicitClip) void this.reload();
+    if (this.mounted && !this.mounting && !this.explicitClip) void this.reload();
   }
 
   get editor(): AudioClipEditor | undefined { return this.currentEditor; }
-  /** Injected recipes are borrowed; replacing them reloads the configured input. */
+  /** Injected recipes are borrowed; a pending URL load adopts them, otherwise replacing them reloads. */
   get processors(): readonly AudioRangeProcessor[] { return this.currentProcessors; }
   set processors(value: readonly AudioRangeProcessor[]) {
     if (!Array.isArray(value)) throw new TypeError('processors must be an array');
     this.currentProcessors = Object.freeze([...value]);
-    if (this.isConnected && !this.mounting) void this.reload();
+    if (this.mounted && !this.mounting && !this.abort) void this.reload();
   }
   get status(): AudioDocumentStatus { return this.currentStatus; }
   get error(): unknown { return this.currentError; }
@@ -84,6 +86,7 @@ export class AudioDocumentElement extends WebMusicElement {
 
   protected override onMount(): void {
     this.style.setProperty('display', 'none');
+    this.mounted = true;
     this.mounting = true;
     try { upgradeProperties(this, ['clip', 'src', 'loader', 'loadOptions', 'processors']); }
     finally { this.mounting = false; }
@@ -91,6 +94,7 @@ export class AudioDocumentElement extends WebMusicElement {
   }
 
   protected override onUnmount(): void {
+    this.mounted = false;
     const controller = this.abort;
     this.abort = undefined;
     this.generation += 1;
@@ -102,7 +106,10 @@ export class AudioDocumentElement extends WebMusicElement {
 
   attributeChangedCallback(name: string, oldValue: string | null, newValue: string | null): void {
     if (this.explicitClip && (name === 'src' || name === 'format')) return;
-    if (oldValue !== newValue && this.isConnected && !this.mounting) void this.reload();
+    // The limit is ignored while history is disabled, so it must not discard edits by recreating the editor.
+    if (name === 'history-limit' && !boolAttr(this, 'history', true)) return;
+    if (name === 'history' && historyEnabled(oldValue) === historyEnabled(newValue)) return;
+    if (oldValue !== newValue && this.mounted && !this.mounting) void this.reload();
   }
 
   /** Retry the configured input. Stale async loads settle without publication. */
@@ -130,7 +137,8 @@ export class AudioDocumentElement extends WebMusicElement {
         clip = await (this.explicitLoader ?? loadAudioDocument)(src, {...this.currentLoadOptions, signal: controller.signal, format: format as AudioFormat | undefined});
         if (!current()) return {status: 'superseded'};
       }
-      const editor = createAudioClipEditor(clip, options);
+      // Processors replaced while the URL was loading apply to this editor without restarting the load.
+      const editor = createAudioClipEditor(clip, {...options, processors: this.currentProcessors});
       if (!current()) { editor.dispose(); return {status: 'superseded'}; }
       this.abort = undefined;
       this.adopt(editor, direct ? undefined : src);
@@ -203,3 +211,5 @@ export class AudioDocumentElement extends WebMusicElement {
 }
 
 export function defineAudioDocumentElement(tag = 'audio-document'): void { defineOnce(tag, AudioDocumentElement); }
+
+function historyEnabled(value: string | null): boolean { return value === null || !/^(false|0|no|off)$/i.test(value.trim()); }

@@ -30,6 +30,8 @@ export function createAudioRangeProcessor(kind: 'normalize' | 'reverse'): AudioR
           check();
           const end = Math.min(length, offset + 65_536);
           for (const channel of channels) for (let index = offset; index < end; index++) peak = Math.max(peak, Math.abs(channel[index]));
+          // NaN and Infinity propagate through Math.max and leave no meaningful scale.
+          if (!Number.isFinite(peak)) throw new AudioEditError('processing-failed', 'Normalize requires finite input samples');
           if (end < length) await new Promise<void>(resolve => setTimeout(resolve, 0));
         }
       }

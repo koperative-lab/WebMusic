@@ -8,7 +8,7 @@ import {AudioEditError, type AudioCheckpoint, type AudioClipboard, type AudioCli
 import {createAudioPositionMap, mapAudioPosition} from '../../core/audio-position-map';
 import {AudioSequenceError, audioSequenceAssetIds, createAudioSequence, createMemoryAudioAssetStore,
   frameInteger, frameRange, readAudioSequenceRange, retainAudioSequence, sameAudioFormat,
-  type AudioAssetLease, type AudioAssetReader, type AudioAssetStore, type AudioSequence} from '../../core/sequence';
+  type AudioAssetLease, type AudioAssetReader, type AudioAssetStore, type AudioSequence, type AudioSequenceSegmentInput} from '../../core/sequence';
 import {applyAudioOperations, inverseAudioSteps, sameAudioSequence, sliceAudioSegments, snapshotAudioJson, snapshotAudioOperations} from '../core';
 
 export interface AudioClipEditorOptions {
@@ -264,6 +264,12 @@ export class AudioClipEditor implements AudioClipEditorPort {
       const end = Math.min(base.content.length, captured.endFrame + plan.inputAfter);
       const outputLength = rangeLength + (captured.tailPolicy === 'extend' ? plan.tailFrames : 0);
       if (plan.outputLength !== plan.latencyFrames + rangeLength + plan.tailFrames) invalid('Processor output must declare latency, selected length and tail');
+      const splice = (segment: AudioSequenceSegmentInput): AudioEditOperation => ({type: 'splice', startFrame: captured.startFrame,
+        deleteCount: rangeLength, segments: [segment], ...(captured.rightId ? {rightId: captured.rightId} : {})});
+      // Registering output retires its asset ID; reject range/ID/rightId failures with a placeholder before DSP.
+      applyAudioOperations(base.content, this.assets, [splice({kind: 'silence', id: captured.segmentId, length: outputLength})]);
+      if (store.getDescriptor(captured.assetId)) throw new AudioEditError('duplicate-id', `Asset ID already identifies stored PCM: ${captured.assetId}`);
+      this.assertAlive(); this.checkGuard(captured);
       const bytes = (end - start + plan.outputLength) * base.content.channelLayout.length * 4;
       if (!Number.isSafeInteger(bytes) || bytes > this.processingMaxBytes) throw new AudioEditError('resource-limit', 'Processing exceeds its allocation budget');
       if (job.superseded || job.cancelled) return Object.freeze({status: job.superseded ? 'superseded' : 'cancelled'});
@@ -292,10 +298,8 @@ export class AudioClipEditor implements AudioClipEditorPort {
       // The command history stores the materialized result, never processor callbacks.
       this.job = undefined;
       return this.execute({version: 1, documentId: captured.documentId, expectedRevision: captured.expectedRevision,
-        label: captured.label ?? `Process ${captured.processorId}`, operations: [{type: 'splice', startFrame: captured.startFrame,
-          deleteCount: rangeLength, segments: [{kind: 'asset', id: captured.segmentId, assetId: captured.assetId,
-            sourceStart: plan.latencyFrames, sourceEnd: plan.latencyFrames + outputLength, gain: 1, envelope: []}],
-          ...(captured.rightId ? {rightId: captured.rightId} : {})}]});
+        label: captured.label ?? `Process ${captured.processorId}`, operations: [splice({kind: 'asset', id: captured.segmentId,
+          assetId: captured.assetId, sourceStart: plan.latencyFrames, sourceEnd: plan.latencyFrames + outputLength, gain: 1, envelope: []})]});
     } catch (error) {
       if (job?.superseded) return Object.freeze({status: 'superseded'});
       if (job?.cancelled || options.signal?.aborted) return Object.freeze({status: 'cancelled'});

@@ -26,19 +26,18 @@ export function composeAudioPositionMaps(...maps: readonly AudioPositionMap[]): 
     }
   }
   const steps = maps.flatMap((map) => map.steps);
-  let lastReset = -1;
-  for (let index = 0; index < steps.length; index++) if (steps[index].type === 'reset') lastReset = index;
+  // Any reset makes the chain unmappable: the composed map resets to the requested revision's origin.
   return createAudioPositionMap(maps[0].documentId, maps[0].fromRevision, maps[maps.length - 1].toRevision,
-    lastReset < 0 ? steps : steps.slice(lastReset));
+    steps.some((step) => step.type === 'reset') ? [{type: 'reset', length: steps[steps.length - 1].length}] : steps);
 }
 export function mapAudioPosition(map: AudioPositionMap, position: number, affinity: 'left' | 'right' = 'right'): AudioMappedPosition {
   createAudioPositionMap(map.documentId, map.fromRevision, map.toRevision, map.steps);
   frameInteger(position);
   if (affinity !== 'left' && affinity !== 'right') throw new AudioEditError('invalid-command', 'Invalid position affinity');
   let frame = position, deleted = false;
-  let positionPolicy: AudioMappedPosition['positionPolicy'] = 'preserve-frame';
   for (const step of map.steps) {
-    if (step.type === 'reset') {frame = 0; deleted = false; positionPolicy = 'reset-origin'; continue;}
+    // Reset is terminal: later steps cannot move a position that no longer has a mapped origin.
+    if (step.type === 'reset') return Object.freeze({frame: 0, deleted: false, positionPolicy: 'reset-origin'});
     const end = step.startFrame + step.deleteCount;
     if (step.deleteCount && frame >= step.startFrame && frame < end) {
       frame = step.startFrame; deleted = true; affinity = 'left';
@@ -48,5 +47,5 @@ export function mapAudioPosition(map: AudioPositionMap, position: number, affini
     }
     frame = Math.min(frame, step.length);
   }
-  return Object.freeze({frame, deleted, positionPolicy});
+  return Object.freeze({frame, deleted, positionPolicy: 'preserve-frame'});
 }

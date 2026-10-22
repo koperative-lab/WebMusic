@@ -26,6 +26,20 @@ describe('reference-based waveform projection', () => {
     source.dispose(); editor.dispose();
   });
 
+  it('bounds peaks by interior envelope points without spreading every point per range', () => {
+    const store = createMemoryAudioAssetStore();
+    const lease = store.registerClip(createAudioClip({sampleRate: 1000, channelData: [new Float32Array(300_000).fill(1)]}));
+    // A zoomed-out range holds more interior points than one call can spread
+    // as arguments; the single dip at frame 150,000 bounds every range containing it.
+    const envelope = Array.from({length: 150_001}, (_, index) => ({frame: index * 2, gain: index === 75_000 ? .25 : 1}));
+    const sequence = createAudioSequence({sampleRate: 1000, channelLayout: ['mono'], segments: [{kind: 'asset', id: 'a', assetId: lease.assetIds[0], sourceStart: 0, sourceEnd: 300_000, gain: 1, envelope}]}, store);
+    const source = createAudioSequenceWaveform(sequence, store);
+    expect(source.readPeaks(0, 300_000)).toEqual([{min: .25, max: 1}]);
+    expect(source.readPeaks(149_000, 151_000)).toEqual([{min: .25, max: 1}]);
+    expect(source.readPeaks(0, 1000)).toEqual([{min: 1, max: 1}]);
+    source.dispose(); lease.release(); store.dispose();
+  });
+
   it('projects reordered references, silence and boundary envelopes without mutating assets', () => {
     const store = createMemoryAudioAssetStore();
     const lease = store.registerClip(createAudioClip({sampleRate: 10, channelData: [new Float32Array([1, -.5, .25, -.25])]}));
@@ -73,6 +87,43 @@ describe('reference-based waveform projection', () => {
     expect(model.columns()).toHaveLength(20);
     expect(readPeaks.mock.calls[0]).toEqual([100, 101]);
     expect(readPeaks.mock.calls.at(-1)).toEqual([119, 120]);
+    source.dispose(); editor.dispose();
+  });
+
+  it('serves repeated paints of one viewport from a bounded range cache after asset bins overflow', () => {
+    const editor = createAudioClipEditor(clip(8192)); const snapshot = editor.getSnapshot();
+    const read = vi.fn(snapshot.assets.read.bind(snapshot.assets));
+    // Four asset bins cannot hold one painted viewport of 16 zoomed-out columns.
+    const source = createAudioSequenceWaveform(snapshot.content, {...snapshot.assets, read}, {cacheEntries: 4});
+    const paint = () => Array.from({length: 16}, (_, x) => source.readPeaks(x * 512, (x + 1) * 512));
+    const first = paint(), reads = read.mock.calls.length;
+    expect(reads).toBeGreaterThan(0);
+    expect(paint()).toEqual(first); expect(read).toHaveBeenCalledTimes(reads);
+    expect(Object.isFrozen(first[0]) && Object.isFrozen(first[0][0])).toBe(true);
+    source.setSequence(createAudioSequence({...snapshot.content, segments: snapshot.content.segments.map((segment) => segment.kind === 'asset' ? {...segment, gain: .5} : segment)}, snapshot.assets));
+    expect(source.readPeaks(0, 512)).toEqual([{min: -.125, max: .25}]);
+    source.dispose(); editor.dispose();
+  });
+
+  it('bounds the range cache and validates its size', () => {
+    const editor = createAudioClipEditor(clip(1024)); const snapshot = editor.getSnapshot();
+    const read = vi.fn(snapshot.assets.read.bind(snapshot.assets));
+    const source = createAudioSequenceWaveform(snapshot.content, {...snapshot.assets, read}, {cacheEntries: 1, rangeCacheEntries: 2});
+    source.readPeaks(0, 300); source.readPeaks(300, 600); const reads = read.mock.calls.length;
+    source.readPeaks(0, 300); expect(read).toHaveBeenCalledTimes(reads);
+    source.readPeaks(600, 900); source.readPeaks(300, 600); const later = read.mock.calls.length;
+    source.readPeaks(0, 300); expect(read.mock.calls.length).toBeGreaterThan(later);
+    for (const rangeCacheEntries of [0, 1.5]) expect(() => createAudioSequenceWaveform(snapshot.content, snapshot.assets, {rangeCacheEntries})).toThrow('rangeCacheEntries');
+    source.dispose(); editor.dispose();
+  });
+
+  it('skips Headless columns beyond a shorter sequence source instead of requesting invalid ranges', () => {
+    const editor = createAudioClipEditor(clip(100)); const snapshot = editor.getSnapshot();
+    const source = createAudioSequenceWaveform(snapshot.content, snapshot.assets);
+    const model = createWaveformViewModel(source, {pixelsPerSecond: 100, viewportWidth: 300, durationSeconds: 3});
+    const columns = model.columns();
+    expect(columns).toHaveLength(100); expect(columns.at(-1)!.x).toBe(99);
+    model.timeline.setZoom(40); expect(model.columns().at(-1)!.x).toBe(39);
     source.dispose(); editor.dispose();
   });
 });
@@ -124,6 +175,21 @@ describe('Audio View editing sessions', () => {
     expect(editor.getSnapshot().content.length).toBe(1024); expect(view.redo().status).toBe('committed');
     view.preview([{type: 'trim', startFrame: 0, endFrame: 10}]); editor.undo(); expect(view.state.interaction.draft).toBeUndefined();
     expect(editor.getSnapshot().documentRevision).toBe(4); view.dispose(); editor.dispose();
+  });
+
+  it('cancels from a subscriber after a revision already discarded the draft without a reentrant command', () => {
+    const editor = createAudioClipEditor(clip()); const view = createAudioViewEditing(editor, {editable: true});
+    const failed = vi.spyOn(console, 'error').mockImplementation(() => {});
+    view.preview([{type: 'trim', startFrame: 0, endFrame: 10}]);
+    let armed = true, cancelled = false;
+    const off = view.subscribe((state) => {
+      if (!armed || state.interaction.draft) return;
+      armed = false; view.cancel(); cancelled = true;
+    });
+    editor.execute({version: 1, documentId: editor.getSnapshot().documentId, expectedRevision: 0, label: 'External', operations: [{type: 'insert-silence', frame: 0, length: 5, id: 'external'}]});
+    expect(cancelled).toBe(true); expect(failed).not.toHaveBeenCalled();
+    expect(view.state.interaction.draft).toBeUndefined(); expect(view.state.document.documentRevision).toBe(1);
+    off(); failed.mockRestore(); view.dispose(); editor.dispose();
   });
 
   it('copy releases its returned lease while editor clipboard survives for paste/cut', () => {

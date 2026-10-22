@@ -84,6 +84,67 @@ describe('document playback application', () => {
     expect((player.transport as AudioSequenceEngine).loopOption).toEqual({start: 0.1, end: 0.5});
     player.dispose(); doc.initialLease.release(); doc.assets.dispose();
   });
+  it('keeps the configured loop across document replacement, detach and a later clip', async () => {
+    const first = document(), second = document(400); const {ctx, sources} = context();
+    const player = new AudioPlayer(undefined, {loop: true, audioContext: ctx}); const engine = () => player.transport as AudioSequenceEngine;
+    player.setDocumentSource(first.source); await wait(player, first.source); expect(engine().loopOption).toBe(true);
+    player.setDocumentSource(second.source); await wait(player, second.source); expect(engine().loopOption).toBe(true);
+    player.setLoop({start: 0.1, end: 0.3});
+    second.publish(createAudioSequence({...second.content, segments: [{kind: 'silence', id: 'short', length: 200}]}),
+      [{type: 'splice', startFrame: 0, deleteCount: 200, insertCount: 0, length: 200}]);
+    await wait(player, second.source); expect(engine().loopOption).toEqual({start: 0, end: 0.1});
+    player.setDocumentSource(first.source); await wait(player, first.source);
+    expect(engine().loopOption).toEqual({start: 0.1, end: 0.3});
+    player.setDocumentSource(undefined); player.setClip(createAudioClip({sampleRate: 1000, channelData: [new Float32Array(1000)]}));
+    await player.play(); expect(sources.at(-1)).toMatchObject({loop: true, loopStart: 0.1, loopEnd: 0.3});
+    player.dispose(); first.initialLease.release(); first.assets.dispose(); second.initialLease.release(); second.assets.dispose();
+  });
+  it('clamps a configured loop to the first applied revision and disables one left empty', async () => {
+    const doc = document(); const clamped = new AudioPlayer(undefined, {loop: {start: 0.5, end: 3}});
+    clamped.setDocumentSource(doc.source); expect((await wait(clamped, doc.source)).status).toBe('applied');
+    expect((clamped.transport as AudioSequenceEngine).loopOption).toEqual({start: 0.5, end: 1});
+    const outside = new AudioPlayer(undefined, {loop: {start: 2, end: 3}}); outside.setDocumentSource(doc.source);
+    expect((await wait(outside, doc.source)).status).toBe('applied');
+    expect(outside.documentBinding.status).toBe('ready'); expect((outside.transport as AudioSequenceEngine).loopOption).toBe(false);
+    clamped.dispose(); outside.dispose(); doc.initialLease.release(); doc.assets.dispose();
+  });
+  it('honors a reentrant detach issued while the sequence transport is being selected', async () => {
+    const doc = document(); const player = new AudioPlayer(); let detached = false;
+    player.on('sourcechange', () => { if (!detached) { detached = true; player.setDocumentSource(undefined); } });
+    player.setDocumentSource(doc.source);
+    expect(player.documentSource).toBeUndefined(); expect(player.transport).toBeUndefined();
+    expect(player.documentBinding.status).toBe('empty'); expect(doc.listeners.size).toBe(0);
+    player.setDocumentSource(doc.source); expect((await wait(player, doc.source)).status).toBe('applied');
+    expect(player.source).toMatchObject({kind: 'sequence', documentRevision: 0});
+    player.dispose(); doc.initialLease.release(); doc.assets.dispose(); expect(doc.assets.getStats().leases).toBe(0);
+  });
+  it('disables a mapped loop that an edit leaves too short to schedule instead of failing the revision', async () => {
+    const doc = document(); const player = new AudioPlayer(undefined, {rate: 4});
+    player.setDocumentSource(doc.source); await wait(player, doc.source);
+    player.setLoop({start: 0.1, end: 0.5});
+    const segment = doc.content.segments[0] as AudioAssetSegment;
+    doc.publish(createAudioSequence({...doc.content, segments: [{...segment, sourceEnd: 101}, {...segment, id: 'tail', sourceStart: 500}]}, doc.assets),
+      [{type: 'splice', startFrame: 101, deleteCount: 399, insertCount: 0, length: 601}]);
+    expect((await wait(player, doc.source)).status).toBe('applied');
+    expect((player.transport as AudioSequenceEngine).loopOption).toBe(false);
+    expect(() => player.setLoop({start: 0.1, end: 0.101})).toThrow(/scheduled voices/);
+    player.dispose(); doc.initialLease.release(); doc.assets.dispose();
+  });
+  it('rejects invalid sequence limits on every attachment attempt instead of ignoring a retry', () => {
+    const doc = document(); const player = new AudioPlayer(undefined, {chunkFrames: 0});
+    expect(() => player.setDocumentSource(doc.source)).toThrow(RangeError);
+    expect(() => player.setDocumentSource(doc.source)).toThrow(RangeError);
+    expect(player.documentSource).toBeUndefined();
+    player.dispose(); doc.initialLease.release(); doc.assets.dispose();
+  });
+  it('keeps the configured loop when an edit supersedes the first request before adoption', async () => {
+    const doc = document(); const player = new AudioPlayer(undefined, {loop: true});
+    player.setDocumentSource(doc.source);
+    doc.publish(createAudioSequence({...doc.content, segments: [{...(doc.content.segments[0] as AudioAssetSegment), gain: 0.5}]}));
+    expect((await wait(player, doc.source)).status).toBe('applied');
+    expect((player.transport as AudioSequenceEngine).loopOption).toBe(true);
+    player.dispose(); doc.initialLease.release(); doc.assets.dispose();
+  });
   it('does not reinstall a request superseded inside a borrowed asset retain callback', async () => {
     const first = document(); const second = document();
     // Distinct document identity makes accidental old-root publication visible.
@@ -233,6 +294,27 @@ describe('bounded sequence scheduling', () => {
     for (let index = 1; index < 15; index++) {advance(index * 0.1); vi.advanceTimersByTime(25);}
     expect(engine.preparedBytes).toBeLessThanOrEqual(1600); expect(buffers.every((buffer) => buffer.length <= 100)).toBe(true);
     expect(reader.read.mock.calls.every((call) => call[2][0].length <= 100)).toBe(true); engine.dispose(); expect(leases).toBe(0);
+  });
+  it('settles a seek to the unlooped end and emits end until an explicit play rewinds', async () => {
+    const doc = document(); const {ctx, sources} = context(); const player = new AudioPlayer(undefined, {audioContext: ctx});
+    player.setDocumentSource(doc.source); await wait(player, doc.source); await player.play();
+    const ended = vi.fn(); player.on('end', ended); const started = sources.length;
+    player.seek(player.duration);
+    expect(player.playing).toBe(false); expect(player.seconds).toBe(1); expect(ended).toHaveBeenCalledOnce();
+    expect(sources).toHaveLength(started); expect(sources[0].stop).toHaveBeenCalled();
+    await player.play(); expect(player.playing).toBe(true); expect(sources.at(-1)!.starts[0]).toEqual([0, 0, 1]);
+    player.dispose(); doc.initialLease.release(); doc.assets.dispose();
+  });
+  it('counts chunk pieces of a loop straddling a boundary before scheduling voices', async () => {
+    const doc = document(); const {ctx, sources} = context();
+    const engine = new AudioSequenceEngine(() => ctx, {chunkFrames: 100, rate: 4});
+    engine.adopt(doc.content, doc.assets, 0, false);
+    // Two frames crossing frame 100 need two voices per pass: 800 voices in one 200 ms lookahead at rate 4.
+    expect(() => engine.setLoop({start: 0.099, end: 0.101})).toThrow(/per lookahead window/);
+    expect(engine.loopOption).toBe(false);
+    engine.setLoop({start: 0.098, end: 0.1}); await engine.play();
+    expect(engine.playing).toBe(true); expect(sources.length).toBeGreaterThan(300); expect(sources.length).toBeLessThanOrEqual(512);
+    engine.dispose(); doc.initialLease.release(); doc.assets.dispose();
   });
   it('rejects pathological loop voice counts and unsupported pitch preservation', () => {
     const doc = document(); const {ctx} = context(); const engine = new AudioSequenceEngine(() => ctx);

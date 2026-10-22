@@ -104,7 +104,9 @@ applied snapshot and the edited document; retry explicitly. Same-source assignme
 is a no-op. Detachment clears the sequence instead of restoring an earlier clip.
 If releasing an obsolete attempt synchronously attaches another document, the
 old disposal notification cannot clear the new request. Revision waits and
-explicit retries continue to target the new attachment.
+explicit retries continue to target the new attachment. Likewise, a detach,
+replacement or clip/transport selection made by a `sourcechange` listener while
+an attachment is being selected wins over that attachment.
 
 Position maps compose across skipped revisions, failure and undo. Positions inside
 deleted content collapse to the deletion boundary with left affinity; undo does
@@ -114,7 +116,17 @@ position intent. Missing map chains reset to zero and clear loops, reported as
 inverted mapped loop ranges are disabled. Rate, gain, pan and valid loops survive
 adoption. Sequence seeks and loop bounds round to the nearest output frame;
 loop ends also clamp to the sequence length. Scheduling and reported positions
-use these same accepted bounds. A loop that collapses after rounding is rejected.
+use these same accepted bounds. An explicit `setLoop` that collapses after
+rounding is rejected. A seek to the end of an unlooped sequence during playback
+stops there and emits `end`; a later `play()` starts again from zero.
+
+The configured loop (the `loop` option or the last accepted `setLoop`) is kept
+separately from the mapped loop of the current document. Each new attachment,
+and a clip selected after detachment, starts from the configured loop. Its range
+is clamped to the first applied revision; a range that lies beyond that content
+is disabled instead of failing the revision. A mapped or clamped loop that an edit
+leaves too short to schedule within the 512-voice budget is likewise disabled,
+while an explicit `setLoop` with such a range still throws.
 
 Playback reads bounded chunks with segment gain, linear envelopes and silence
 through the same Core range reader as explicit WAV rendering. The default chunk
@@ -123,9 +135,11 @@ PCM chunks. Inactive chunks are evicted in least-recently-used order before allo
 active chunks remain pinned. A chunk larger than the budget fails document
 application. A running allocation that cannot fit fails playback and stops voices.
 No revision stores a full rendered sequence. Scheduling uses a 200 ms lookahead,
-25 ms timer and at most 512 scheduled voices; excessively short loops are rejected
-before starting, and density is rechecked on rate changes. Browser timer throttling
-can still interrupt live audio; this is not a seamless background-rendering engine.
+25 ms timer and at most 512 scheduled voices. Every chunk a loop crosses needs its
+own voice per pass, so a short loop that straddles a chunk boundary counts twice;
+loops exceeding the budget are rejected before starting, and density is rechecked
+on rate changes. Browser timer throttling can still interrupt live audio; this is
+not a seamless background-rendering engine.
 Sequence rate changes transpose; `setPreservesPitch(true)` is unsupported and
 throws. Sequence scratch sessions are unavailable.
 
@@ -137,11 +151,11 @@ throws. Sequence scratch sessions are unavailable.
 | Member | Contract |
 | --- | --- |
 | `new AudioPlayer(clip?, options?)` / `createAudioPlayer(clip?, options?)` | Empty by default. `AudioPlayerOptions` uses the [clip engine options](/audio/headless/play/audio-clip-player/): context/destination, engine, media adapter, rate, volume, pan, loop, pitch preservation and effects. Adds positive safe-integer `chunkFrames` (16,384) and `preparedBytesLimit` (67,108,864 bytes) for document sequences. |
-| `setClip(clip \| undefined)` | Replace the selected source; undefined clears it. Source replacement invalidates the old owned playback and scratch work. |
-| `setTransport(transport \| undefined)` | Borrow an `AudioPlayerTransport`; undefined detaches the selected borrowed backend. Direct and indirect facade borrowing cycles are rejected. |
+| `setClip(clip \| undefined)` | Replace the selected source; undefined clears it. Source replacement invalidates the old owned playback and scratch work. While a document source is attached, a clip rejects with `source-conflict` and undefined detaches the document. |
+| `setTransport(transport \| undefined)` | Borrow an `AudioPlayerTransport`; undefined detaches the selected borrowed backend. Direct and indirect facade borrowing cycles are rejected. While a document source is attached, a transport rejects with `source-conflict` and undefined detaches the document. |
 | `clip` / `transport` | Readonly selected clip or selected transport; sequences and mixes return no clip. Document playback owns its transport even though this property exposes the borrowed facade path. |
 | `source` | `AudioPlaybackSourceSnapshot`: `{kind: 'empty', clip: undefined, revision}`, `{kind: 'clip', clip, revision}`, or `{kind: 'sequence', clip: undefined, sequence, assets, documentId, documentRevision, revision}`. `revision` counts source publications, independently of the document revision. |
-| `setDocumentSource(source \| undefined)` / `documentSource` | Borrow a Core `AudioDocumentSource`. Independent clip/transport conflicts reject before replacement. Undefined detaches and releases the owned sequence engine. |
+| `setDocumentSource(source \| undefined)` / `documentSource` | Borrow a Core `AudioDocumentSource`. Independent clip/transport conflicts reject before replacement. Undefined detaches and releases the owned sequence engine. Invalid `chunkFrames` or `preparedBytesLimit` options throw `RangeError` here, and a configured `preservesPitch: true` rejects the attachment because sequences do not support it; a later attempt with the same source retries. |
 | `documentBinding` | `{status, attempt, requested?, applied?, positionPolicy?, documentCoordinates, error?}`. Status is `empty`, `preparing`, `ready` or `error`; requested/applied values are `{documentId, documentRevision}`. Coordinates are usable only when ready. |
 | `waitForDocumentRevision(target)` | Observe the current requested revision; resolves `applied`, `superseded` or `failed`, with target and attempt. Unknown future revisions fail with `unknown-revision`; obsolete targets and detach/dispose resolve superseded. Applied confirms the exact target is active at settlement. |
 | `retryDocumentApplication()` | New attempt for the current requested revision. Earlier failed results stay terminal; new waiters observe the retry. |
@@ -152,10 +166,10 @@ throws. Sequence scratch sessions are unavailable.
 | --- | --- |
 | `play(when?)` | Promise resolves after start/preparation, not at natural completion. `when` is absolute AudioContext seconds, supported according to the selected backend. Empty/disposed instances do nothing. |
 | `pause()` / `stop()` | Delegate to the current backend. Pause retains position; stop resets according to that backend. |
-| `seek(seconds)` / `seekFraction(fraction)` / `scrub(deltaSeconds)` | Delegate seeks on the selected content axis. Fraction clamps to 0–1; scrub is a relative seek, not scratch audio. |
+| `seek(seconds)` / `seekFraction(fraction)` / `scrub(deltaSeconds)` | Delegate seeks on the selected content axis. Nonfinite `seconds` throw `RangeError` before any backend command or document position intent. A `NaN` fraction throws; other fractions, including `±Infinity`, clamp to 0–1. Scrub is a relative seek, not scratch audio. |
 | `preload()` | Prepare the selected backend without starting sound, when supported. |
 | `setVolume(value)` / `setRate(value)` / `setPan(value)` | Set clip controls; rate clamps to 0.25–4, pan to −1–1, volume is nonnegative. Nonfinite input throws. A selected borrowed backend must expose the requested setter or the command throws without committing a new retained setting. |
-| `setLoop(loop)` / `setPreservesPitch(value)` | Clip/sequence configuration; sequence loop is explicit transport capability. Queue loop belongs to the queue's list policy; do not infer group loop/pan/pitch support. |
+| `setLoop(loop)` / `setPreservesPitch(value)` | Clip/sequence configuration. `setLoop` applies to the owned clip engine or document sequence and is never forwarded to a borrowed queue or mix: with one selected it throws without changing the configured loop, and attaching one does not replay it. Queue loop belongs to the queue's list policy; do not infer group loop/pan/pitch support. |
 | `beginScratch()` / `scratching` | Borrow the selected backend's optional scratch session. See [scratch sessions](/audio/headless/play/audio-clip-player/#scratch-sessions). |
 | `seconds` / `currentTime` / `duration` / `progress` | Live position, duration and fraction; zero for empty input. |
 | `playing` | Selected backend's playback state. |
@@ -184,9 +198,10 @@ to failed. Terminal cleanup continues through a throwing asset release, then
 reports the first cleanup error to the caller.
 
 `AudioPlayerTransport` requires seconds/duration/playing, play/pause/stop/seek.
-Optional clip/currentClip, analyser, clock, configuration, preload/scratch and
-subscribe/onLoad/onEnd/onError ports expose backend capabilities without DOM. An
-`AudioPlaylist` implements this contract; use `AudioMixer.transport` for a mix.
+Optional clip/currentClip, analyser, clock, rate/volume/pan/pitch configuration,
+preload/scratch and subscribe/onLoad/onEnd/onError ports expose backend
+capabilities without DOM; clip loops are not part of it. An `AudioPlaylist`
+implements this contract; use `AudioMixer.transport` for a mix.
 
 </details>
 

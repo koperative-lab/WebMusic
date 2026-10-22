@@ -64,7 +64,7 @@ export interface AudioSequenceInit extends AudioSequenceFormat {
 }
 
 export class AudioSequenceError extends Error {
-  constructor(readonly code: 'invalid-sequence' | 'unknown-asset' | 'incompatible-audio-format' | 'invalid-range' | 'disposed', message: string) {
+  constructor(readonly code: 'invalid-sequence' | 'duplicate-id' | 'unknown-asset' | 'incompatible-audio-format' | 'invalid-range' | 'disposed', message: string) {
     super(message); this.name = 'AudioSequenceError';
   }
 }
@@ -78,16 +78,19 @@ export function audioSegmentLength(segment: AudioSequenceSegment): number {
   return segment.kind === 'silence' ? segment.length : segment.sourceEnd - segment.sourceStart;
 }
 export function audioEnvelopeGain(points: readonly AudioEnvelopePoint[], frame: number): number {
-  if (!points.length) return 1;
-  if (frame <= points[0].frame) return points[0].gain;
-  for (let index = 1; index < points.length; index++) {
-    const end = points[index];
-    if (frame <= end.frame) {
-      const start = points[index - 1];
-      return start.gain + (end.gain - start.gain) * (frame - start.frame) / (end.frame - start.frame);
-    }
-  }
-  return points[points.length - 1].gain;
+  return points.length ? envelopeValue(points, envelopeIndex(points, frame), frame) : 1;
+}
+/** Binary search for the first point at or after `frame`; points strictly increase. */
+function envelopeIndex(points: readonly AudioEnvelopePoint[], frame: number): number {
+  let low = 0, high = points.length;
+  while (low < high) {const middle = (low + high) >>> 1; if (points[middle].frame < frame) low = middle + 1; else high = middle;}
+  return low;
+}
+function envelopeValue(points: readonly AudioEnvelopePoint[], index: number, frame: number): number {
+  if (!index) return points[0].gain;
+  if (index === points.length) return points[index - 1].gain;
+  const start = points[index - 1], end = points[index];
+  return start.gain + (end.gain - start.gain) * (frame - start.frame) / (end.frame - start.frame);
 }
 export function createAudioSequence(init: AudioSequenceInit, assets?: AudioAssetReader): AudioSequence {
   validateFormat(init);
@@ -97,7 +100,7 @@ export function createAudioSequence(init: AudioSequenceInit, assets?: AudioAsset
   let length = 0;
   const segments = (init.segments ?? []).flatMap((segment): AudioSequenceSegment[] => {
     if (!segment || (segment.kind !== 'asset' && segment.kind !== 'silence')) invalid('Unknown segment kind');
-    validId(segment.id); if (ids.has(segment.id)) invalid('Duplicate segment ID'); ids.add(segment.id);
+    validId(segment.id); if (ids.has(segment.id)) duplicate(`Duplicate segment ID: ${segment.id}`); ids.add(segment.id);
     let result: AudioSequenceSegment;
     if (segment.kind === 'silence') {
       frameInteger(segment.length, 'silence length');
@@ -111,7 +114,8 @@ export function createAudioSequence(init: AudioSequenceInit, assets?: AudioAsset
       if (!Array.isArray(points)) invalid('Envelope must be an array');
       const extent = segment.sourceEnd - segment.sourceStart;
       let previous = -1;
-      const envelope = Object.freeze(points.map((point: AudioEnvelopePoint) => {
+      const envelope = Object.freeze(Array.from(points, (point: AudioEnvelopePoint) => {
+        if (!point || typeof point !== 'object') invalid('Envelope points must be objects');
         frameInteger(point.frame, 'envelope frame'); gainValue(point.gain);
         if (point.frame <= previous || point.frame > extent) invalid('Envelope points must be ordered inside the segment');
         previous = point.frame;
@@ -131,9 +135,10 @@ export function createAudioSequence(init: AudioSequenceInit, assets?: AudioAsset
     return size ? [result] : [];
   });
   const annotationIds = new Set<string>();
-  const annotations = Object.freeze((init.annotations ?? []).map((annotation) => {
+  const annotations = Object.freeze(Array.from(init.annotations ?? [], (annotation) => {
+    if (!annotation || typeof annotation !== 'object') invalid('Annotations must be objects');
     validId(annotation.id); frameInteger(annotation.startFrame, 'annotation start');
-    if (annotationIds.has(annotation.id)) invalid('Duplicate annotation ID'); annotationIds.add(annotation.id);
+    if (annotationIds.has(annotation.id)) duplicate(`Duplicate annotation ID: ${annotation.id}`); annotationIds.add(annotation.id);
     if (!['content', 'fixed'].includes(annotation.anchoring) || annotation.startFrame > length ||
         (annotation.label !== undefined && typeof annotation.label !== 'string')) invalid('Invalid annotation');
     if (annotation.endFrame !== undefined) {
@@ -181,8 +186,13 @@ export function readAudioSequenceRange(sequence: AudioSequence, assets: AudioAss
     if (end > start && segment.kind === 'asset') {
       const views = destinations.map((channel) => channel.subarray(start - startFrame, end - startFrame));
       assets.read(segment.assetId, segment.sourceStart + start - offset, views);
-      for (let index = 0; index < end - start; index++) {
-        const gain = segment.gain * audioEnvelopeGain(segment.envelope, start - offset + index);
+      const points = segment.envelope, local = start - offset;
+      // One cursor per contiguous read keeps envelope evaluation O(frames + points).
+      let next = points.length ? envelopeIndex(points, local) : 0;
+      if (points.length || segment.gain !== 1) for (let index = 0; index < end - start; index++) {
+        const frame = local + index;
+        while (next < points.length && points[next].frame < frame) next++;
+        const gain = segment.gain * (points.length ? envelopeValue(points, next, frame) : 1);
         for (const channel of views) channel[index] *= gain;
       }
     }
@@ -230,10 +240,10 @@ export function createMemoryAudioAssetStore(): AudioAssetStore {
       const id = options.id ?? clipIds.get(clip) ?? makeId('asset'); validId(id);
       const existing = entries.get(id);
       if (existing) {
-        if (existing.clip !== clip || !sameAudioFormat(existing.descriptor, {sampleRate: clip.sampleRate, channelLayout: layout})) invalid('Asset IDs cannot be replaced');
+        if (existing.clip !== clip || !sameAudioFormat(existing.descriptor, {sampleRate: clip.sampleRate, channelLayout: layout})) duplicate('Asset IDs cannot be replaced');
       } else {
         const byteLength = retainedClipPcmBytes(clip); frameInteger(byteLength, 'asset byte length');
-        if (retiredIds.has(id) && clipIds.get(clip) !== id) invalid('Asset IDs cannot be reused for different PCM');
+        if (retiredIds.has(id) && clipIds.get(clip) !== id) duplicate('Asset IDs cannot be reused for different PCM');
         retiredIds.add(id);
         entries.set(id, {descriptor: Object.freeze({id, sampleRate: clip.sampleRate, channelLayout: Object.freeze([...layout]),
           length: clip.length, byteLength}), clip, references: 0});
@@ -269,3 +279,4 @@ function validateDestinations(destinations: readonly Float32Array[], channels: n
 function validId(value: string): void { if (typeof value !== 'string' || !value) invalid('IDs must be nonempty strings'); }
 function gainValue(value: number): void { if (!Number.isFinite(value) || value < 0) invalid('Gain must be finite and nonnegative'); }
 function invalid(message: string): never { throw new AudioSequenceError('invalid-sequence', message); }
+function duplicate(message: string): never { throw new AudioSequenceError('duplicate-id', message); }

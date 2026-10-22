@@ -57,8 +57,12 @@ export class WaveformViewModel {
       const firstSample = x * samplesPerPixel;
       const lastSample = (x + 1) * samplesPerPixel;
       if (source) {
-        const channelPeaks = source.readPeaks(Math.max(0, Math.floor(firstSample)), Math.min(source.frameCount, Math.ceil(lastSample)));
-        const peaks = this.#mergeChannels ? [mergePeaks(channelPeaks)] : channelPeaks;
+        // A timeline longer than the source has no frames to read, like a pyramid's missing peaks.
+        const startFrame = Math.max(0, Math.floor(firstSample));
+        if (startFrame >= source.frameCount) continue;
+        const channelPeaks = source.readPeaks(startFrame, Math.min(source.frameCount, Math.ceil(lastSample)));
+        // Columns own their peaks; a source may share frozen cached results.
+        const peaks = this.#mergeChannels ? [mergePeaks(channelPeaks)] : channelPeaks.map(({min, max}) => ({min, max}));
         const region = this.timeline.hitTest(x - state.offsetPixels).region;
         result.push(region ? {x, seconds, peaks, region} : {x, seconds, peaks});
         continue;

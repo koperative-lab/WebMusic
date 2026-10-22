@@ -40,6 +40,12 @@ export type {Effect, EffectNodes} from '../core/effect';
 // ---- Headless component configuration/result contracts (type-only) ----
 // Runtime constructors and factories remain exclusive to `/headless`.
 export type {
+  AudioPlayerOptions,
+  AudioPlayerEvents,
+  AudioPlayerSourceDetail,
+  AudioPlayerTransport,
+} from '../headless/audio-player';
+export type {
   AudioClipPlayerOptions,
   AudioScratchSession,
   AudioClipPlayerEvents,

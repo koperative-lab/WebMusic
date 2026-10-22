@@ -159,28 +159,43 @@ sequence to PCM: bind its editor for waveform display or supply an explicitly
 rendered clip/analysis result.
 
 Drag to select a half-open range in output frames; drag near either selected
-edge to adjust it. The **Trim to range** pointer tool previews the selected
-range and commits once on release. Escape, pointer cancellation, lost capture,
-blur, mode/zoom changes, replacement, revision changes and disconnect cancel
-the surface's active gesture. A passive surface does not cancel another view's
+edge to adjust it. A press that moves less than 3 CSS pixels is a click: it
+places the cursor and never creates a range or trim draft. The **Trim to range**
+pointer tool previews the selected range and commits once on release; a click,
+or a drag released back at its anchor, commits nothing. Escape, cancellation or
+lost capture of the gesture's own pointer, blur, mode/zoom changes, replacement,
+revision changes and disconnect cancel the surface's active gesture; another
+pointer's cancellation does not. A passive surface does not cancel another view's
 draft in a shared session. **Frame values and editing commands** provides exact start/end
 frames, split at the start, trim, delete, silence insertion, copy/cut/paste,
-segment gain, full-segment linear fade-in/out and undo/redo. Gain and fade target
+segment gain, full-segment linear fade-in/out and undo/redo. Its frame commands
+(split, trim, delete, silence insertion, copy, cut and paste) use the Start/End
+fields: valid typed frames that differ from the selection are selected first.
+Empty or invalid frame, silence or gain fields report `webaudio:editerror` and
+change nothing. Gain and fade target
 the explicitly selected segment; silence is not a gain target. Copy uses the
 editor's internal clipboard, not the operating-system clipboard.
 
-The focusable waveform uses Left/Right to move one output frame, Shift+arrows to
+The focusable waveform uses Left/Right to move one output frame, PageUp/PageDown
+to move one second earlier/later, Shift with either to
 extend selection from a fixed anchor in either direction, Home/End to jump, Ctrl/Cmd+A to select all, Delete/Backspace to
-remove, Ctrl/Cmd+C/X/V for clipboard operations, and Ctrl/Cmd+Z or Shift+Z for
-undo/redo. These keys are scoped to the waveform and leave numeric inputs alone.
+remove, Ctrl/Cmd+C/X/V for clipboard operations (copy and cut need a range, so a
+cursor never replaces the clipboard), Ctrl/Cmd+Z to undo, and
+Ctrl/Cmd+Shift+Z or Ctrl/Cmd+Y to redo. Escape cancels a gesture or draft and is
+otherwise left to enclosing handlers. These keys act on the drawn selection,
+are scoped to the waveform and leave numeric inputs alone.
 The range has visible boundaries, trim drafts use dashed edges, and a live status
-reports frames, revision, failures and pending playback.
+reports frames, revision, failures and pending playback. The status is rewritten
+only when its text changes and is marked `aria-busy` during a pointer drag, so it
+announces the released range. Without operable editing the inner surface has no
+focus stop or `application` role; the host keeps its image or slider semantics.
 
 `annotate` suspends content-edit gestures and retains the existing Region event
 contract. It does not change document annotations or PCM. Disable annotation to
 return to editing. While content editing is active, the waveform owns the
-pointer and keyboard; seek using the player's controls, or turn off `editable`
-and use the existing `interactive`/`drag-mode` controls.
+pointer and keyboard and keeps position geometry, so `drag-mode="scrub"` does
+not center it and `panTo()` remains available. Seek using the player's controls,
+or turn off `editable` and use the existing `interactive`/`drag-mode` controls.
 
 Playback paint and seek commands require a ready player whose applied document
 ID and revision exactly match the editor, with valid document coordinates.
@@ -195,7 +210,8 @@ removal and replacement. Missing, ambiguous and invalid targets remain unavailab
 An editor conflicts with independent `.clip`, `.peaks`, `.spectrogram`,
 `.frequencyData`, `src` or `peaks-src`, including empty source attributes.
 Programmatic source setters reject conflicts before changing data or releasing
-the valid binding. Conflicting attributes instead expose `source-conflict`
+the valid binding; assigning `undefined` to an already empty source keeps the
+binding, session, selection and draft. Conflicting attributes instead expose `source-conflict`
 until corrected.
 There is no fallback from an explicit failed editor binding to old clip data.
 
@@ -207,8 +223,10 @@ remain alive. If a cleanup callback synchronously requests another editor or
 reconnects the View, the newer attachment remains active; old cleanup cannot
 replace it or release its session and waveform.
 Asset extrema are computed lazily for visible ranges through
-bounded copies and reused across compatible reference/gain edits. No complete
-PCM render or full output peaks pyramid is created per edit.
+bounded copies and reused across compatible reference/gain edits. Repeated
+paints of the same content and viewport reuse bounded per-column results, and a
+paused selection change repaints only the selection overlay, not the waveform.
+No complete PCM render or full output peaks pyramid is created per edit.
 
 See [Audio Edit](/audio/api/edit/) for history, processing and WAV export, and
 [View editing APIs](/audio/api/view/#document-editing) for custom interfaces.
@@ -384,7 +402,7 @@ view.type = 'spectrogram';                                   // switch the drawi
 
 | Member | Kind | Default | Description |
 | --- | --- | --- | --- |
-| `player` | attribute | — | CSS selector of an [`<audio-player>`](/audio/element/play/audio-player/) to follow (`webaudio:timeupdate`, `webaudio:loaded`). Borrows live position/activity for visible display-frame updates when available; legacy targets remain event-driven. Binding pulls in no play-package code. **Required for `meter`**, which reads `.analyser` from the target (or from its `.player`). |
+| `player` | attribute | — | CSS selector of an [`<audio-player>`](/audio/element/play/audio-player/) to follow (`webaudio:timeupdate`, `webaudio:loaded`). It resolves exactly one element in the view's Document or ShadowRoot and observes late insertion, upgrade, removal and replacement. Multiple matches are ambiguous and bind nothing until one remains; invalid selector syntax binds nothing and dispatches `webaudio:error`. Borrows live position/activity for visible display-frame updates when available; legacy targets remain event-driven. Binding pulls in no play-package code. **Required for `meter`**, which reads `.analyser` from the target (or from its `.player`). |
 | `interactive` | attribute / property | `false` | Enable seeking in `seek`, `scrub` and `none` modes (waveform · spectrogram), and the **default** for `follow`. The property setter writes `"true"` / `"false"`. Never wired on a meter. |
 | `drag-mode` / `.dragMode` | attribute / property | `seek` | `seek` follows the pointer; `scrub` centers the playhead and uses an optional audible scratch session with release inertia; `pan` changes only the viewport with pointer and keyboard input; `none` keeps click/keyboard seeking. See [Dragging and seeking](#dragging-and-seeking) for prerequisites, annotation priority and follow behavior. Unknown values fall back to `seek`. |
 | `annotate` | attribute / property | `false` | Drag to create a region (waveform · spectrogram), overriding every `drag-mode`. Has no effect on a meter. |
@@ -434,8 +452,8 @@ view.type = 'spectrogram';                                   // switch the drawi
 | `webaudio:viewportchange` | `{ startSeconds, endSeconds }` | The visible window moved — user pan or zoom, and programmatic `panTo()` / `setZoom()` alike. Once per distinct window; the first paint is not a pan. |
 | `webaudio:editpreview` | `AudioDraftResult` with `status: "preview"` | Revision-bound trim draft; no commit or playback acknowledgement. |
 | `webaudio:editcommit` | `AudioEditResult` with `status: "committed"` | Successful transaction with snapshot and change; one pointer gesture creates one item. |
-| `webaudio:editerror` | `{ error }` | Rejected semantic edit or invalid frame value. |
-| `webaudio:error` | `{ error }` | A `src` or `peaks-src` load, or a render, failed. |
+| `webaudio:editerror` | `{ error }` | Rejected semantic edit, or an empty or invalid frame, silence or gain field. Nothing changes. |
+| `webaudio:error` | `{ error }` | A `src` or `peaks-src` load or a render failed, or the `player` selector has invalid syntax. |
 
 **The meter is the exception.** It reads no precomputed data — it samples the analyser every animation frame, borrows that node and never disposes it. The time-axis members do nothing there, and do nothing quietly: `visibleRange()` returns `undefined`, `panTo()` moves nothing and announces no `webaudio:viewportchange`, click-to-seek is never wired, and the drag binding is not created at all — so `annotate` and `drag-mode` have no effect and `webaudio:regionchange` cannot fire. `webaudio:error` is the one event left.
 
@@ -524,14 +542,15 @@ The spectrogram image is rasterized through a 256-entry colormap lookup table an
 
 The placeholder shown when there is no data is the kit's `role="status"` presenter. In this embedded state it is deliberately transparent and unframed because the surrounding stage owns the component surface; its text still follows `--wm-status-foreground` and `--wm-font-family`. A standalone status presenter keeps its own full surface.
 
-</details>
-
 Editing exposes the named parts `editor`, `editing-instructions`,
 `editing-surface`, `selection`, `editing-status` and `editing-controls`. Selection
 uses `--wm-accent`; text uses `--wm-foreground`. The drawing keeps the waveform
 paint controls above. `data-editor-state` reports resolution or `source-conflict`;
 `data-editable-state` reports `readonly`, `ready`, `unavailable`, `annotation` or
-`unsupported-type`. `data-playback-state` reports `unbound`, `ready` or `pending`.
+`unsupported-type`. `data-playback-state` reports `unbound`, `ready` or `pending`
+and is removed with the editor binding.
+
+</details>
 
 ## Dressing the same peaks
 

@@ -403,7 +403,8 @@ export class AudioViewElement extends WebMusicElement {
 
   set clip(clip: AudioClip | undefined) {
     this.assertIndependentSource(clip);
-    if (clip && clip === this.explicitClip) return;
+    // Clearing an empty source must not rebind a document view and discard its session.
+    if (clip === this.explicitClip && (clip || this.hasEditorIntent())) return;
     if (clip) {
       this.cancelClipLoad();
       this.sourceClip = undefined;
@@ -422,6 +423,7 @@ export class AudioViewElement extends WebMusicElement {
 
   set peaks(peaks: AudioPeaks | undefined) {
     this.assertIndependentSource(peaks);
+    if (peaks === this.explicitPeaks && this.hasEditorIntent()) return;
     this.explicitPeaks = peaks;
     if (this.isConnected) { if (this.hasEditorIntent()) this.bindEditor(); else this.refresh(); }
   }
@@ -431,6 +433,7 @@ export class AudioViewElement extends WebMusicElement {
 
   set spectrogram(spectrogram: SpectrogramData | undefined) {
     this.assertIndependentSource(spectrogram);
+    if (spectrogram === this.explicitSpectrogram && this.hasEditorIntent()) return;
     this.explicitSpectrogram = spectrogram;
     if (this.isConnected) { if (this.hasEditorIntent()) this.bindEditor(); else this.refresh(); }
   }
@@ -446,6 +449,7 @@ export class AudioViewElement extends WebMusicElement {
    */
   set frequencyData(data: SpectrogramData | readonly SpectrogramData[] | undefined) {
     this.assertIndependentSource(data);
+    if (data === this.explicitFrequencyData && this.hasEditorIntent()) return;
     this.explicitFrequencyData = data;
     if (this.isConnected) { if (this.hasEditorIntent()) this.bindEditor(); else this.refresh(); }
   }
@@ -1220,7 +1224,8 @@ export class AudioViewElement extends WebMusicElement {
   }
 
   private centeredPlayhead(): boolean {
-    return this.dragMode === 'scrub' && !this.annotate && this.type !== 'meter';
+    // Content editing owns the pointer; its frame overlay needs position geometry.
+    return this.dragMode === 'scrub' && !this.annotate && this.type !== 'meter' && !this.editing?.state.editable;
   }
 
   private shouldFollow(): boolean {
@@ -1688,7 +1693,7 @@ export class AudioViewElement extends WebMusicElement {
     const current = () => generation === this.editorGeneration && this.isConnected;
     if (!current()) return;
     if (!this.hasEditorIntent()) {
-      this.removeAttribute('data-editor-state'); this.updateEditable();
+      this.removeAttribute('data-editor-state'); this.removeAttribute('data-playback-state'); this.updateEditable();
       if (!current()) return;
       if (this.hasAttribute('src') && !this.explicitClip) void this.loadSource();
       if (!current()) return;
@@ -1745,7 +1750,8 @@ export class AudioViewElement extends WebMusicElement {
   }
 
   private updateDocumentPlayback(): void {
-    if (!this.hasEditorIntent()) return;
+    // The playback gate describes a document binding only.
+    if (!this.hasEditorIntent()) { this.removeAttribute('data-playback-state'); return; }
     const compatible = this.documentPlaybackCompatible();
     this.setAttribute('data-playback-state', !this.boundPlayer ? 'unbound' : compatible ? 'ready' : 'pending');
     this.rendered?.setPlayheadVisible?.(compatible);

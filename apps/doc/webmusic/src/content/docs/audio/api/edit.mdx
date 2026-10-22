@@ -49,26 +49,26 @@ All positions are **integer frames at the sequence's sample rate**. Ranges are h
 | `AudioSilenceSegment` | `kind: 'silence'`, stable `id`, `length`. |
 | `AudioEnvelopePoint` | Segment-local integer `frame` and nonnegative `gain`; points strictly increase through the segment end. Linear interpolation; outside the listed points the boundary gain is held. |
 | `AudioSequenceAnnotation` | `id`, `startFrame`, optional nonempty `endFrame`, explicit `anchoring: 'content' \| 'fixed'`, optional `label`. Existing `Region` objects keep their meaning. |
-| `createAudioSequence(init, assets?)` | Validate and freeze metadata; when a reader is supplied, validate asset existence, bounds and exact format. |
+| `createAudioSequence(init, assets?)` | Validate and freeze metadata; when a reader is supplied, validate asset existence, bounds and exact format. Repeated segment or annotation IDs throw `duplicate-id`; negative, non-integer or overflowing frames and lengths throw `invalid-range`; with a reader, an unknown asset throws `unknown-asset` and a format mismatch `incompatible-audio-format`; other malformed input, including null or non-object annotation and envelope entries, throws `invalid-sequence`. |
 | `createMemoryAudioAssetStore()` | Own a registry of immutable decoded clips. Registration retains clip backing storage without copying complete PCM. Streaming clips are rejected. |
 | `AudioAssetDescriptor` | `id`, format, `length`, `byteLength` of whole retained backing buffers, including the unsliced backing of a zero-copy clip slice. |
 | `AudioAssetReader` | `getDescriptor(id)`, `getReferenceCount(id)`, `read(id, startFrame, destinations)`, `retain(ids)`. Reads copy into equal-length caller-owned channels; backing samples are never exposed. |
-| `AudioAssetStore` | Reader plus `registerClip(clip, {id?, channelLayout?}?)`, `getStats()`, `dispose()`. Registration returns an initial caller-owned lease. Stats report assets, backing bytes summed per asset and the sum of per-asset lease references. Distinct assets sharing buffers are conservatively charged separately. |
+| `AudioAssetStore` | Reader plus `registerClip(clip, {id?, channelLayout?}?)`, `getStats()`, `dispose()`. Registration returns an initial caller-owned lease and permanently retires its ID: registering different PCM under a live or released ID fails with `duplicate-id`. Stats report assets, backing bytes summed per asset and the sum of per-asset lease references. Distinct assets sharing buffers are conservatively charged separately. |
 | `AudioAssetLease` | `assetIds`, `released`, idempotent `release()`. A retained asset survives owner/store disposal. Store disposal prevents new registrations; retained reads remain valid. |
 | `retainAudioSequence(sequence, assets)` | Retain each referenced asset once; caller releases the returned lease. |
-| `readAudioSequenceRange(sequence, assets, startFrame, destinations)` | Copy a bounded range, applying gain/envelopes and filling silence. Does not retain implicitly; the caller must keep a live lease. |
+| `readAudioSequenceRange(sequence, assets, startFrame, destinations)` | Copy a bounded range, applying gain/envelopes and filling silence. Envelope cost is linear in the frames read plus the segment's points. Does not retain implicitly; the caller must keep a live lease. |
 | `audioSequenceAssetIds(sequence)` | Distinct referenced asset IDs. |
 | `audioChannelLayout(channels)` | `['mono']`, `['left', 'right']`, or ordered `channel-N` names for larger channel counts. |
 | `audioSegmentLength(segment)`, `audioEnvelopeGain(points, frame)`, `sameAudioFormat(a, b)` | Segment extent, interpolated gain and exact format comparison. |
 | `audioClipRegionsToFrameAnnotations(clip, anchoring)` | Explicit nearest-frame conversion from clip regions; requires the caller to select anchoring and rejects out-of-bounds regions. |
 | `frameInteger(value, name?)`, `frameRange(start, length, extent)` | Validate nonnegative safe integer frames and a start/length range within an extent. |
-| `AudioSequenceError` | Typed sequence/format/asset/range/disposal error. |
+| `AudioSequenceError` | Typed sequence/format/asset/range/disposal error. `code` is `invalid-sequence`, `duplicate-id`, `unknown-asset`, `incompatible-audio-format`, `invalid-range` or `disposed`; the editor reports the same code in its failures. |
 
 Backing-byte accounting uses a private cross-bundle Core capability; incompatible legacy clips without this capability fail explicitly rather than silently undercounting memory. The store counts each asset retained by a lease, including current content, history, clipboard, checkpoints, drafts, playback and rendering jobs. [Editor history limits](/audio/headless/edit/audio-clip-editor/#revisions-history-and-ownership) count assets held **solely by history**, so shared references are not charged repeatedly. Keep a lease while consuming a snapshot asynchronously; a snapshot alone does not retain PCM.
 
 ## Atomic commands and position maps
 
-`AudioEditCommand` is a JSON-safe version-1 envelope containing `documentId`, `expectedRevision`, `label` and `operations`. Invalid commands fail atomically. Stable segment IDs and split IDs are explicit so replay does not generate a different sequence.
+`AudioEditCommand` is a JSON-safe version-1 envelope containing `documentId`, `expectedRevision`, `label` and `operations`. Invalid commands fail atomically. Stable segment IDs and split IDs are explicit so replay does not generate a different sequence. A result that repeats a segment or annotation ID, for example equal split IDs or a `rightId` naming an existing segment, fails with `duplicate-id`.
 
 | `AudioEditOperation.type` | Fields and behavior |
 | --- | --- |
@@ -89,7 +89,7 @@ Splits and trims crop/rebase envelopes and preserve boundary values. Content-anc
 | `AudioPositionMap` | `documentId`, `fromRevision`, `toRevision`, ordered `steps`. |
 | `createAudioPositionMap(documentId, fromRevision, toRevision, steps)` | Validate/freeze a map for one document. |
 | `composeAudioPositionMaps(...maps)` | Compose contiguous revisions of the same document; rejects gaps or identity mismatch. |
-| `mapAudioPosition(map, frame, affinity?)` | Returns `AudioMappedPosition`: `{frame, deleted, positionPolicy}`. Default affinity is `'right'`; `'left'` keeps an insertion boundary before inserted content. Reset maps report `'reset-origin'`. |
+| `mapAudioPosition(map, frame, affinity?)` | Returns `AudioMappedPosition`: `{frame, deleted, positionPolicy}`. Default affinity is `'right'`; `'left'` keeps an insertion boundary before inserted content. A reset step is terminal: the position becomes frame 0 of the target revision with `'reset-origin'`, and composing any reset yields one reset step with the final length. |
 | `AudioDocumentChange` | Edit/undo/redo/restore origin, label, revisions, operations, affected frame ranges and position map. |
 | `AudioDocumentSnapshot`, `AudioDocumentSource` | Immutable content identity/revision plus borrowed assets; `getSnapshot()` and immediate `subscribe()`, returning unsubscribe. Ready empty content differs from disposed ownership. |
 | `AudioClipEditorPort`, `isAudioClipEditorPort`, `isAudioDocumentSource` | Structural composition contracts and runtime guards; no `instanceof` dependency between bundles. |
@@ -102,9 +102,9 @@ Playback-source types are owned by the [Audio Play API](/audio/api/play/#editabl
 
 ## Selected-range processing
 
-`createAudioRangeProcessor('normalize' | 'reverse')` returns a version-1 `AudioRangeProcessor` for explicit registration with an editor. Normalize accepts `{targetPeak?: number}` (default `0.95`, range 0–1), using one peak/factor across all selected channels. Reverse accepts `{}` and reverses each selected channel. Both preserve length, declare zero handles/latency/tail, yield between bounded work blocks, and support cancellation. They do not allocate a Web Audio context.
+`createAudioRangeProcessor('normalize' | 'reverse')` returns a version-1 `AudioRangeProcessor` for explicit registration with an editor. Normalize accepts `{targetPeak?: number}` (default `0.95`, range 0–1), using one peak/factor across all selected channels. Reverse accepts `{}` and reverses each selected channel. Both preserve length, declare zero handles/latency/tail, yield between bounded work blocks, and support cancellation. Normalize fails with `processing-failed` when the selection contains NaN or infinite samples. They do not allocate a Web Audio context.
 
-Custom `AudioRangeProcessor` implementations provide `id`, positive integer `version`, `plan(request)` and asynchronous `process(input)`. The plan declares input handles, raw output length, latency and tail **before allocation**. The editor checks the total input/output byte budget, passes copied input and an abort signal, then validates output format/length. `AudioProcessingRequest` includes document/revision guard, selected range, processor ID/version, JSON parameters and output asset/segment IDs. Default `tailPolicy: 'trim'` keeps selected duration; `'extend'` includes a declared tail. Only one job runs per editor. `AudioProcessingResult` adds cancelled/superseded outcomes to ordinary edit results. See [processing lifecycle](/audio/headless/edit/audio-clip-editor/#explicit-range-processing).
+Custom `AudioRangeProcessor` implementations provide `id`, positive integer `version`, `plan(request)` and asynchronous `process(input)`. The plan declares input handles, raw output length, latency and tail **before allocation**. The editor then validates the replacement splice's range, segment ID and `rightId` against a placeholder, and rejects an `assetId` of an asset currently in the store, so those failures never run the processor. It checks the total input/output byte budget, passes copied input and an abort signal, then validates output format/length. Output registration retires `assetId`; a failure after registration needs a new ID. `AudioProcessingRequest` includes document/revision guard, selected range, processor ID/version, JSON parameters and output asset/segment IDs. Default `tailPolicy: 'trim'` keeps selected duration; `'extend'` includes a declared tail. Only one job runs per editor. `AudioProcessingResult` adds cancelled/superseded outcomes to ordinary edit results. See [processing lifecycle](/audio/headless/edit/audio-clip-editor/#explicit-range-processing).
 
 | Processing contract | Fields and units |
 | --- | --- |
@@ -122,12 +122,12 @@ The editor removes the declared latency from the returned asset segment. It trim
 | API / type | Contract |
 | --- | --- |
 | `renderAudioSequence(sequence, assets, options?)` | Promise of `RenderedAudioSequence`: sample rate, channel layout and caller-owned mutable channel arrays. Applies sequence gain, envelope and silence. |
-| `exportAudioSequenceWav(sequence, assets, options?)` | Promise of an `ArrayBuffer`; renders the selected range and encodes WAV. Default 16-bit integer PCM; 24/32-bit integer and 32-bit float supported. Empty output is a valid header-only WAV. |
+| `exportAudioSequenceWav(sequence, assets, options?)` | Promise of an `ArrayBuffer`; renders the selected range and encodes WAV. Default 16-bit integer PCM; 24/32-bit integer and 32-bit float supported. An odd-sized 24-bit data chunk is followed by one zero RIFF pad byte. Empty output is a valid header-only WAV. |
 | `AudioSequenceRenderOptions` | Optional `startFrame` (0), `endFrame` (sequence length), `maxBytes` (256 MiB), `chunkFrames` (65,536), `signal`. |
-| `AudioSequenceWavOptions` | Render options plus `bitDepth: 16 \| 24 \| 32` (16), `float` (false; requires 32). Budget counts both float PCM and WAV output allocations. |
+| `AudioSequenceWavOptions` | Render options plus `bitDepth: 16 \| 24 \| 32` (16; a bare 32 is integer PCM), `float` (false; requires 32). Budget counts both float PCM and WAV output allocations, including a pad byte. |
 | `RenderedAudioSequence` | `{sampleRate, channelLayout, channelData}`; sample arrays are newly owned by the caller and do not expose retained source PCM. |
 
-Rendering retains source assets until completion/failure, performs bounded reads, yields between chunks and releases its lease on cancellation. Invalid ranges/options and excessive allocation fail before sample reads. Export rejects unsupported RIFF dimensions instead of overflowing header fields. No browser download is implicit. Saving an exported revision is an application choice: call `markSaved()` only if that content is still current.
+Rendering retains source assets until completion/failure, performs bounded reads, yields between chunks and releases its lease on cancellation. Invalid ranges/options and excessive allocation fail before sample reads. Export rejects unsupported RIFF dimensions instead of overflowing header fields: a non-integer sample rate or format fields beyond their RIFF widths fail with `incompatible-audio-format`, and data beyond the 4 GiB RIFF size fails with `resource-limit`. No browser download is implicit. Saving an exported revision is an application choice: call `markSaved()` only if that content is still current.
 
 ## Related
 

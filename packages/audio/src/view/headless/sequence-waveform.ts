@@ -5,6 +5,8 @@ import type {AudioWaveformSource} from '../core/types';
 export interface AudioSequenceWaveformOptions {
   /** Bounded extrema cache, shared across revisions. Default 16384 entries. */
   cacheEntries?: number;
+  /** Bounded `readPeaks` results for the current root; one entry per painted column. Default 8192 entries. */
+  rangeCacheEntries?: number;
 }
 export interface AudioSequenceWaveform extends AudioWaveformSource {
   readonly sequence: AudioSequence;
@@ -19,13 +21,17 @@ type Span = {start: number; end: number; segment: AudioSequenceSegment};
  * Lazy dyadic extrema over immutable assets. Reads at most 256 source frames per
  * allocation; coarse bins reuse fine bins and retained coarse results. Editing
  * rebuilds only segment coordinates, not PCM or a full output peaks pyramid.
- * Envelopes conservatively bound extrema within each visible column.
+ * Envelopes conservatively bound extrema within each visible column. A zoomed-out
+ * viewport can need more asset bins than the extrema cache holds, so repeated
+ * paints of one root reuse frozen per-range results instead of rereading PCM.
  */
 export function createAudioSequenceWaveform(initial: AudioSequence, assets: AudioAssetReader,
   options: AudioSequenceWaveformOptions = {}): AudioSequenceWaveform {
-  const limit = options.cacheEntries ?? 16384;
+  const limit = options.cacheEntries ?? 16384, rangeLimit = options.rangeCacheEntries ?? 8192;
   if (!Number.isSafeInteger(limit) || limit < 1) throw new RangeError('cacheEntries must be a positive safe integer');
+  if (!Number.isSafeInteger(rangeLimit) || rangeLimit < 1) throw new RangeError('rangeCacheEntries must be a positive safe integer');
   const cache = new Map<string, {asset: string; values: readonly Peak[]}>();
+  const ranges = new Map<string, readonly Peak[]>();
   let sequence = initial;
   let lease: AudioAssetLease = retainAudioSequence(initial, assets);
   let spans = index(initial);
@@ -78,7 +84,7 @@ export function createAudioSequenceWaveform(initial: AudioSequence, assets: Audi
       if (!sameAudioFormat(next, sequence)) throw new RangeError('Waveform format cannot change');
       const nextLease = retainAudioSequence(next, assets);
       const previous = lease;
-      sequence = next; spans = index(next); lease = nextLease;
+      sequence = next; spans = index(next); lease = nextLease; ranges.clear();
       // A store may permit the same ID to be registered after all leases expire.
       // Never carry a cache entry beyond this source's lease for that asset.
       const retained = new Set(audioSequenceAssetIds(next));
@@ -89,6 +95,8 @@ export function createAudioSequenceWaveform(initial: AudioSequence, assets: Audi
       if (disposed) throw new Error('Waveform source is disposed');
       if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start < 0 || end < start || end > sequence.length) throw new RangeError('Invalid waveform frame range');
       if (start === end) return zeros();
+      const key = `${start}:${end}`, known = ranges.get(key);
+      if (known) { ranges.delete(key); ranges.set(key, known); return known; }
       const result = blank();
       let lo = 0, hi = spans.length;
       while (lo < hi) { const middle = Math.floor((lo + hi) / 2); if (spans[middle].end <= start) lo = middle + 1; else hi = middle; }
@@ -97,14 +105,22 @@ export function createAudioSequenceWaveform(initial: AudioSequence, assets: Audi
         if (segment.kind === 'silence') { merge(result, zeros()); continue; }
         const a = Math.max(start, span.start) - span.start, b = Math.min(end, span.end) - span.start;
         const values = range(segment.assetId, segment.sourceStart + a, segment.sourceStart + b);
-        const gains = [audioEnvelopeGain(segment.envelope, a), audioEnvelopeGain(segment.envelope, b - 1),
-          ...segment.envelope.filter((point) => point.frame > a && point.frame < b).map((point) => point.gain)];
-        const minGain = Math.min(...gains) * segment.gain, maxGain = Math.max(...gains) * segment.gain;
+        // Linear envelope gain is bounded by its endpoints and interior points;
+        // find the interior run by binary search instead of scanning all points.
+        const points = segment.envelope, first = audioEnvelopeGain(points, a), last = audioEnvelopeGain(points, b - 1);
+        let low = Math.min(first, last), high = Math.max(first, last), p = 0, q = points.length;
+        while (p < q) { const middle = (p + q) >>> 1; if (points[middle].frame <= a) p = middle + 1; else q = middle; }
+        for (; p < points.length && points[p].frame < b; p++) { low = Math.min(low, points[p].gain); high = Math.max(high, points[p].gain); }
+        const minGain = low * segment.gain, maxGain = high * segment.gain;
         merge(result, values.map((value) => ({min: Math.min(value.min * minGain, value.min * maxGain), max: Math.max(value.max * minGain, value.max * maxGain)})));
       }
-      return result;
+      // Cached results are shared with every caller, so they are frozen.
+      const frozen = Object.freeze(result.map((peak) => Object.freeze(peak)));
+      ranges.set(key, frozen);
+      while (ranges.size > rangeLimit) ranges.delete(ranges.keys().next().value!);
+      return frozen;
     },
-    dispose() { if (disposed) return; disposed = true; lease.release(); cache.clear(); spans = []; },
+    dispose() { if (disposed) return; disposed = true; lease.release(); cache.clear(); ranges.clear(); spans = []; },
   };
 }
 function index(sequence: AudioSequence): Span[] {

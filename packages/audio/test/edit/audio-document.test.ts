@@ -4,6 +4,7 @@ import {createAudioClip, type AudioClip} from '../../src/core';
 import {AudioDocumentElement, defineAudioDocumentElement, defineAllAudioElements} from '../../src/edit/element';
 import {AudioClipEditor} from '../../src/edit/headless';
 import {loadAudioDocument} from '../../src/edit/element/internal/audio-document-loader';
+import {createAudioRangeProcessor} from '../../src/edit/api/processor';
 
 vi.mock('../../src/edit/element/internal/audio-document-loader', () => ({loadAudioDocument: vi.fn()}));
 const load = vi.mocked(loadAudioDocument);
@@ -278,6 +279,41 @@ describe('AudioDocumentElement', () => {
     expect(element.editor).toBeUndefined();
     expect(element.status).toBe('empty');
     expect(await element.reload()).toEqual({status: 'empty'});
+  });
+
+  it('starts one URL load when a parsed declaration upgrades', async () => {
+    load.mockResolvedValue(clip());
+    const host = document.createElement('div');
+    host.innerHTML = '<audio-document-upgrade src="/parsed.wav"></audio-document-upgrade>'; document.body.append(host);
+    customElements.define('audio-document-upgrade', class extends AudioDocumentElement {});
+    const element = host.firstElementChild as AudioDocumentElement;
+    expect(load).toHaveBeenCalledTimes(1); expect(load.mock.calls[0][1]!.signal!.aborted).toBe(false);
+    await flush(); expect(element.status).toBe('ready'); expect(element.loadedSrc).toBe('/parsed.wav');
+  });
+
+  it('gives processors replaced during a pending URL load to its editor without restarting it', async () => {
+    const pending = deferred<AudioClip>(); load.mockReturnValueOnce(pending.promise);
+    const element = document.createElement('audio-document') as AudioDocumentElement;
+    element.src = '/pending.wav'; document.body.append(element);
+    element.processors = [createAudioRangeProcessor('reverse')];
+    expect(load).toHaveBeenCalledTimes(1); expect(load.mock.calls[0][1]!.signal!.aborted).toBe(false);
+    pending.resolve(clip(4)); await flush();
+    const editor = element.editor!, snapshot = editor.getSnapshot();
+    expect((await editor.processRange({documentId: snapshot.documentId, expectedRevision: 0, startFrame: 1, endFrame: 3, processorId: 'reverse',
+      processorVersion: 1, parameters: {}, assetId: 'reversed', segmentId: 'processed', rightId: 'tail'})).status).toBe('committed');
+    load.mockResolvedValueOnce(clip(4)); element.processors = [];
+    expect(load).toHaveBeenCalledTimes(2); await flush(); expect(element.editor).not.toBe(editor);
+  });
+
+  it('keeps the editor when ignored history settings change while history is disabled', () => {
+    const element = document.createElement('audio-document') as AudioDocumentElement;
+    element.setAttribute('history', 'false'); element.clip = clip(); document.body.append(element);
+    const editor = element.editor!;
+    editor.transaction('Silence', (tx) => tx.add({type: 'insert-silence', frame: 0, length: 10, id: 'silence'}));
+    element.setAttribute('history-limit', '5'); element.setAttribute('history', 'off');
+    expect(element.editor).toBe(editor); expect(editor.getSnapshot().documentRevision).toBe(1);
+    element.setAttribute('history', 'true');
+    expect(element.editor).not.toBe(editor); expect(element.editor!.getState().history.limit).toBe(5);
   });
 
   it('reports invalid history or format without silently loading another input', async () => {

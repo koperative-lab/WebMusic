@@ -50,7 +50,8 @@ ranges, including silence, gain and envelopes. The source owns its bounded
 extrema cache and current asset lease; the model borrows it. After
 `source.setSequence(next)`, update `model.timeline.setDuration(next.length /
 next.sampleRate)` before querying if the extent changed. A zero-width viewport
-performs no range reads.
+performs no range reads, and columns past a shorter source's last frame are
+omitted, as with missing pyramid peaks. Each column owns its peak objects.
 
 ## SpectrogramViewModel
 

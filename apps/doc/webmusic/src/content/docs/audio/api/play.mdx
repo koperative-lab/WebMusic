@@ -72,7 +72,7 @@ const { sampleRate, channelData } = await decodeAudio(bytes, { context: ctx });
 
 ## WAV — the pure-JS byte core
 
-`parseWav` / `serializeWav` are a dependency-free RIFF/WAVE codec that runs in Node, workers, and the main thread alike — which is why WAV is the byte-level fast path for `decodeAudio` (native `decodeAudioData` is only reachable on a thread with an `AudioContext`). Reads 8/16/24/32-bit integer PCM and 32-bit IEEE float, any channel count; walks chunks by their RIFF size fields so `LIST` / `bext` metadata is skipped rather than misread.
+`parseWav` / `serializeWav` are a dependency-free RIFF/WAVE codec that runs in Node, workers, and the main thread alike — which is why WAV is the byte-level fast path for `decodeAudio` (native `decodeAudioData` is only reachable on a thread with an `AudioContext`). Reads 8/16/24/32-bit integer PCM and 32-bit IEEE float, any channel count; walks chunks by their RIFF size fields so `LIST` / `bext` metadata is skipped rather than misread. An odd-sized `data` chunk (for example 24-bit mono with an odd frame count) is followed by one zero RIFF pad byte, counted in the RIFF size but not in the `data` size; `clipToWav` and `clipToBlob` share this writer.
 
 ```ts
 import { parseWav, serializeWav, type DecodedWav } from '@webmusic/audio/play';

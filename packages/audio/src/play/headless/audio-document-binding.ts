@@ -174,6 +174,9 @@ export class AudioDocumentBinding {
       if (this.state.status === 'ready' || this.state.status === 'empty') this.positionIntent = undefined;
       this.map = map;
       this.requested = snapshot;
+      // A configured loop belongs to the first content this attachment adopts,
+      // even when an edit supersedes the first request before adoption.
+      if (!this.applied && this.initialLoop) this.initialLoop = {target: freezeTarget(snapshot), value: this.initialLoop.value};
       this.start(snapshot);
     } catch (error) { this.sourceError(error); }
   }
@@ -233,8 +236,19 @@ export class AudioDocumentBinding {
       }
       if (positionPolicy === 'reset-origin') loop = false;
       if (this.initialLoop?.target.documentId === snapshot.documentId &&
-          this.initialLoop.target.documentRevision === snapshot.documentRevision) loop = this.initialLoop.value;
-      this.host.adopt(candidate, position, loop);
+          this.initialLoop.target.documentRevision === snapshot.documentRevision) {
+        // Configured before this content existed: clamp to it, and disable a range left empty.
+        const value = this.initialLoop.value, rate = snapshot.content.sampleRate, length = snapshot.content.length;
+        const start = typeof value === 'object' ? Math.min(length, Math.round(Math.max(0, value.start) * rate)) : 0;
+        const end = typeof value === 'object' ? Math.min(length, Math.round(value.end * rate)) : 0;
+        loop = typeof value === 'object' ? end > start && {start: start / rate, end: end / rate} : value;
+      }
+      try { this.host.adopt(candidate, position, loop); } catch (error) {
+        // A mapped or clamped loop too short to schedule is disabled like an empty one;
+        // an explicit setLoop command still rejects it.
+        if (!loop || (error as {code?: unknown})?.code !== 'loop-density' || !this.current(attempt, generation)) throw error;
+        this.host.adopt(candidate, position, false);
+      }
       if (!this.current(attempt, generation)) return;
       this.applied = attempt.target;
       this.map = undefined;
@@ -292,4 +306,3 @@ function validTarget(target: AudioDocumentRevision): boolean {
 function freezeTarget(target: AudioDocumentRevision): AudioDocumentRevision {
   return Object.freeze({documentId: target.documentId, documentRevision: target.documentRevision});
 }
-

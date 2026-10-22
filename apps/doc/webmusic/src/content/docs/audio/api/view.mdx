@@ -119,7 +119,7 @@ owns one. A disposed document or foreign/disposed session is rejected.
 | `setEditable(boolean)` | Enable mutation; disabling cancels an active draft. |
 | `select({startFrame, endFrame})` | Set a half-open output-frame selection. Frames must be nonnegative safe integers within the document. No content revision is created. |
 | `preview(operations)` | Return `AudioDraftResult`; draft changes remain outside committed content. |
-| `commit(label?)`, `cancel()` | Commit the current draft as one transaction, or discard it. |
+| `commit(label?)`, `cancel()` | Commit the current draft as one transaction, or discard it. Without a draft, `cancel()` only clears `state.error`, so a subscriber may call it after a revision change discarded the draft. |
 | `execute(label, operations)` | Submit an atomic command against the current document ID/revision. |
 | `undo()`, `redo()`, `cut()`, `paste()` | Return `AudioEditResult`; cut uses selection and paste inserts at its start. Requires editable state. |
 | `copy()` | Copy selection to the editor-owned clipboard; returns `{status: 'copied', length}` or a typed failure. Releases its independent returned asset lease immediately. |
@@ -169,8 +169,13 @@ channel layout must stay identical. Disposal releases the lease and cache.
 The waveform reads only requested source ranges, in copies of at most 256
 frames per channel. A lazy hierarchy reuses immutable extrema across revisions;
 `cacheEntries` defaults to 16384 and must be a positive safe integer. Eviction
-may require rereading a later viewport. Silence requires no PCM access; gains
-and envelopes transform cached ranges. Varying envelopes conservatively bound
+may require rereading a later viewport. A zoomed-out viewport can need more
+asset bins than that limit, so `readPeaks` also keeps up to `rangeCacheEntries`
+(default 8192, a positive safe integer) results for the current root: repeated
+paints of an unchanged viewport, including playback and selection repaints,
+read no PCM. Those results are frozen and shared; `setSequence` and `dispose`
+clear them. The two entry limits bound cache memory. Silence requires no PCM
+access; gains and envelopes transform cached ranges. Varying envelopes conservatively bound
 extrema inside each column, rather than claiming exact sample extrema at every
 zoom. Source creation, structural replacement and empty/hidden views do not
 materialize complete PCM or build a full output peaks pyramid. A viewport
@@ -186,11 +191,29 @@ listeners and a sequence waveform source. `WaveformEditingOptions` extends
 `WaveformRenderOptions` with `editingStepFrames` (positive safe integer, default
 1) and `onPreview`, `onCommit`, `onError` callbacks. Its
 `WaveformEditingHandle` extends `ViewportAudioVisualizer` with `element`,
-`surface`, `updatePlayback(binding?, seconds?)` and `cancel()`.
+`surface`, `updatePlayback(binding?, seconds?)` and `cancel()`. An unavailable
+controller throws `AudioEditError` with code `disposed` before any DOM, listener
+or asset lease is acquired; a failed first drawing releases them before rethrowing.
+
+The inner waveform is rebuilt for each committed revision. Rebuilds keep the
+latest `setZoom`, `setRegions` and `setPlayheadMode` values, and publish the
+restored offset through `onViewportChange` after clamping it to shorter content.
+`setZoom` ignores values that are not finite and positive, like the renderer.
+While the controller is editable the drawing uses `position` mode; a requested
+`center` mode applies only while it is read-only, because the selection overlay
+and pointer frames share position geometry. Both are measured against the inner
+drawing, so padding or borders on the `editing-surface` part do not offset them.
+A press must move 3 CSS pixels before it becomes a range drag; a trim commits
+only after that movement and for a non-empty range. Pointer cancellation and lost
+capture end a gesture only for its own `pointerId`. The surface carries
+`tabindex`, `role="application"`, its label and instructions only while editing
+is operable. The status region changes only when its text does and is
+`aria-busy` during a pointer drag.
 
 `updatePlayback` applies the exact-revision compatibility gate; callers supply
-observed time, never an inferred clock. Playback updates preserve pending numeric
-range and gain inputs while focus moves between fields and command buttons.
+observed time, never an inferred clock. It repaints the playhead only when the
+compatible time changes, so selection-only updates leave the canvas untouched.
+Playback updates preserve pending numeric range and gain inputs while focus moves between fields and command buttons.
 A new shared selection refreshes both range endpoints; a committed revision
 refreshes range and gain, and choosing another segment refreshes its gain.
 Segment labels follow committed type and frame length, including trim and
@@ -204,11 +227,15 @@ and Gain/Fade require the same selected segment. Changes to unrelated controls
 do not discard the command, and playback updates still preserve pending inputs.
 Disposal disables commands before cancelling the surface's gesture, so
 cancellation subscribers cannot commit through the retiring renderer.
+Form frame commands select valid typed Start/End frames that differ from the
+selection before running; empty or invalid frame, silence or gain fields call
+`onError` and change nothing. Keyboard commands act on the session selection.
 Pointer trim produces one transaction on
 release. Explicit `cancel()` discards the session draft. Lifecycle cancellation
 (blur, zoom or disposal) cancels only this surface's active gesture, preserving
 another consumer's draft when this surface is passive. Revision replacement
-invalidates the session draft. `dispose()`
+invalidates the session draft; the surface then drops its stale gesture without
+issuing a nested session command. `dispose()`
 removes the surface, subscriptions and cache/asset lease, and leaves the borrowed
 controller/editor alive. Dispose the controller separately when owned by the
 application. See the [Element workflow](/audio/element/view/audio-view/#waveform-editing)

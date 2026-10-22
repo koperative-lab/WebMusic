@@ -19,7 +19,6 @@ export interface AudioPlayerTransport {
   pause(): void;
   stop(): void;
   seek(seconds: number): void;
-  setLoop?(loop: boolean | {start: number; end: number}): void;
   setRate?(rate: number): void;
   setVolume?(volume: number): void;
   setPan?(pan: number): void;
@@ -67,6 +66,8 @@ export class AudioPlayer {
   private readonly emitter = new EventEmitter<AudioPlayerEvents>();
   private readonly documentAttachment: AudioDocumentBinding;
   private sequenceEngine?: AudioSequenceEngine;
+  /** Latest requested document, set before the binding exists so reentrant requests compare with it. */
+  private documentTarget?: AudioDocumentSource;
   private appliedDocument?: AudioDocumentSnapshot;
   private announcedDocument?: AudioDocumentSnapshot;
   private selectedClip?: AudioClip;
@@ -88,6 +89,7 @@ export class AudioPlayer {
   private storedVolume: number;
   private storedPan: number;
   private storedRate: number;
+  /** Configured loop intent; the sequence engine separately holds the mapped loop it accepted. */
   private storedLoop: boolean | {start: number; end: number};
   private storedPreservesPitch: boolean;
 
@@ -112,7 +114,6 @@ export class AudioPlayer {
         if (!this.sequenceEngine.adopt(snapshot.content, snapshot.assets, seconds, loop)) {
           throw new AudioDocumentApplicationError('not-ready', 'Sequence adoption was superseded');
         }
-        this.storedLoop = this.sequenceEngine.loopOption;
         this.appliedDocument = snapshot;
       },
       notify: () => {
@@ -122,7 +123,7 @@ export class AudioPlayer {
         this.emitter.emit('documentstatechange', state);
         if (this.documentBinding === state) this.publishState();
       },
-      onDetach: () => { this.releaseSource(); this.appliedDocument = undefined; this.storedLoop = false; this.publishSource(); },
+      onDetach: () => { this.releaseSource(); this.appliedDocument = undefined; this.publishSource(); },
       report: (error) => this.emitter.emit('error', error instanceof Error ? error : new Error(String(error))),
     });
   }
@@ -140,20 +141,37 @@ export class AudioPlayer {
   }
   setDocumentSource(source: AudioDocumentSource | undefined): void {
     if (this.disposed) throw new AudioDocumentApplicationError('disposed', 'AudioPlayer has been disposed');
-    if (source === this.documentSource) return;
+    if (source === this.documentTarget) return;
     if (source !== undefined && !isAudioDocumentSource(source)) throw new AudioDocumentApplicationError('invalid-source', 'Expected an AudioDocumentSource');
     if (source && (this.selectedClip || (this.borrowed && this.borrowed !== this.sequenceEngine))) {
       throw new AudioDocumentApplicationError('source-conflict', 'Document source conflicts with the selected clip or transport');
     }
     const generation = ++this.documentGeneration;
+    this.documentTarget = source;
     if (this.documentSource) this.documentAttachment.setSource(undefined);
+    // A source callback can supersede an attachment whose engine is selected but not yet bound.
+    else if (this.sequenceEngine && this.borrowed === this.sequenceEngine) { this.releaseSource(); this.publishSource(); }
     if (generation !== this.documentGeneration || this.disposed) return;
+    // A detach listener's newer clip/transport selection wins over this request.
+    if (source && (this.selectedClip || this.borrowed)) { this.documentTarget = undefined; return; }
     if (source) {
-      const engine = new AudioSequenceEngine(() => this.audioContext, {...this.options,
-        volume: this.storedVolume, pan: this.storedPan, rate: this.storedRate, loop: this.storedLoop});
+      let engine: AudioSequenceEngine;
+      try {
+        engine = new AudioSequenceEngine(() => this.audioContext, {...this.options,
+          volume: this.storedVolume, pan: this.storedPan, rate: this.storedRate, loop: this.storedLoop});
+      } catch (error) {
+        // Invalid sequence limits reject this request; the same source can be retried.
+        if (generation === this.documentGeneration) this.documentTarget = this.documentSource;
+        throw error;
+      }
       this.sequenceEngine = engine;
-      this.applyTransport(engine);
-      if (generation !== this.documentGeneration || this.borrowed !== engine || this.disposed) { engine.dispose(); return; }
+      const abandon = () => {
+        if (generation === this.documentGeneration) this.documentTarget = this.documentSource;
+        if (this.sequenceEngine === engine && this.borrowed !== engine) this.sequenceEngine = undefined;
+        if (this.borrowed !== engine) engine.dispose();
+      };
+      try { this.applyTransport(engine); } catch (error) { abandon(); throw error; }
+      if (generation !== this.documentGeneration || this.borrowed !== engine || this.disposed) { abandon(); return; }
     }
     this.documentAttachment.setSource(source);
     if (source && generation === this.documentGeneration && this.documentSource === source && this.configured.has('loop')) {
@@ -228,7 +246,6 @@ export class AudioPlayer {
         else release();
       };
       try {
-        if (this.configured.has('loop') && transport.setLoop) transport.setLoop(this.storedLoop);
         if (this.configured.has('volume')) transport.setVolume?.(this.storedVolume);
         if (current() && this.configured.has('rate')) transport.setRate?.(this.storedRate);
         if (current() && this.configured.has('pan')) transport.setPan?.(this.storedPan);
@@ -324,11 +341,12 @@ export class AudioPlayer {
   setLoop(loop: boolean | {start: number; end: number}): void {
     if (this.disposed) return;
     const accepted = normalizeLoopOption(loop);
-    this.requireCapability('setLoop');
-    (this.borrowed ?? this.engine)?.setLoop?.(accepted);
-    this.storedLoop = this.sequenceEngine?.loopOption ?? accepted;
+    // Only the owned document transport accepts clip loops; a queue's list loop is a different policy.
+    if (this.borrowed && this.borrowed !== this.sequenceEngine) throw new Error('The selected audio transport does not support setLoop; configure its queue or mix directly');
+    (this.borrowed ? this.sequenceEngine : this.engine)?.setLoop(accepted);
+    this.storedLoop = accepted;
     this.configured.add('loop');
-    this.documentAttachment.recordLoopIntent(this.storedLoop);
+    this.documentAttachment.recordLoopIntent(accepted);
   }
   setPreservesPitch(preservesPitch: boolean): void {
     if (this.disposed) return;
@@ -351,6 +369,7 @@ export class AudioPlayer {
     this.disposed = true;
     this.generation++;
     let failure: unknown;
+    this.documentTarget = undefined;
     try { this.documentAttachment.dispose(); } catch (error) { failure = error; }
     try { this.releaseSource(); } catch (error) { failure = error; }
     try { this.output?.disconnect(); } catch (error) { failure ??= error; }

@@ -13,7 +13,7 @@ export interface DecodedWav {
   channelData: Float32Array[];
 }
 
-/** Bit depths `serializeWav` can emit. 32 alone means float; pass `'float'`/`'int'` to disambiguate. */
+/** Bit depths `serializeWav` can emit. A bare 32 writes 32-bit integer PCM; pass `{float: true}` for IEEE float. */
 export type WavBitDepth = 16 | 24 | 32;
 
 const FMT_PCM = 0x0001;
@@ -90,7 +90,9 @@ export function parseWav(buffer: ArrayBuffer): DecodedWav {
 /**
  * Encode deinterleaved float channels into a WAV/RIFF buffer. `bitDepth` is
  * 16/24/32 (32 = int by default); pass `float: true` to emit 32-bit IEEE float
- * instead. Samples are clamped to [-1, 1] for the integer paths.
+ * instead. Samples are clamped to [-1, 1] for the integer paths. An odd-sized
+ * `data` chunk (24-bit with an odd sample count) is followed by one zero pad
+ * byte; the chunk size stays odd and the RIFF size includes the pad.
  */
 export function serializeWav(
   channels: Float32Array[],
@@ -115,13 +117,15 @@ export function serializeWav(
   const bytesPerSample = bitDepth >> 3;
   const blockAlign = bytesPerSample * numChannels;
   const dataSize = frames * blockAlign;
-  const buffer = new ArrayBuffer(44 + dataSize);
+  // RIFF chunks are word-aligned; the zero-initialized pad byte is not part of the data chunk.
+  const pad = dataSize % 2;
+  const buffer = new ArrayBuffer(44 + dataSize + pad);
   const view = new DataView(buffer);
 
   const formatCode = floatMode ? FMT_FLOAT : FMT_PCM;
 
   writeTag(view, 0, 'RIFF');
-  view.setUint32(4, 36 + dataSize, true);
+  view.setUint32(4, 36 + dataSize + pad, true);
   writeTag(view, 8, 'WAVE');
   writeTag(view, 12, 'fmt ');
   view.setUint32(16, 16, true); // PCM/float fmt chunk size
