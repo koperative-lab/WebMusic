@@ -1,6 +1,8 @@
 import {describe, expect, it, vi} from 'vitest';
 import {AudioOutputPort} from '../src/module/audio-port';
-import type {ConnectionLease} from '../src/module/lease';
+import {createConnectionLease, type ConnectionLease} from '../src/module/lease';
+import {ModuleAudioEnvironment, ModuleContext, moduleScopeChange, routeModuleOutput, sameModuleScope} from '../src/module/context';
+import {ModuleRegistry} from '../src/module/registry';
 
 class TestAudioNode {
   readonly connections = new Set<TestAudioNode>();
@@ -248,5 +250,49 @@ describe('AudioOutputPort managed route leases', () => {
     expect(tap.active).toBe(false);
     expect(source.connections).toEqual(new Set([external]));
     expect(onCleanupError).not.toHaveBeenCalled();
+  });
+});
+
+describe('module scope routing helpers', () => {
+  it('routes through admission or the scope default and retracts only its own default', () => {
+    const {context, source, normal, replacement} = graph();
+    const speakers = new TestAudioNode(context);
+    Object.assign(context, {destination: audioNode(speakers)});
+    const scope = new ModuleContext({id: 'scope', audio: new ModuleAudioEnvironment({context})});
+    const module = {id: 'voice'};
+    const port = new AudioOutputPort(audioNode(source));
+    const speakerRoute = routeModuleOutput(scope, module, port);
+    expect(port.defaultDestination).toBe(audioNode(speakers));
+    speakerRoute.release();
+    expect(port.defaultDestination).toBeUndefined();
+    const routed = routeModuleOutput(scope.derive({id: 'routed', destination: () => audioNode(normal)}), module, port);
+    expect(port.defaultDestination).toBe(audioNode(normal));
+    // A later owner of the default keeps it when this route retires.
+    port.setDefault(audioNode(replacement));
+    routed.release();
+    expect(port.defaultDestination).toBe(audioNode(replacement));
+    const admitted = createConnectionLease(() => {});
+    const admit = vi.fn(() => admitted);
+    expect(routeModuleOutput(scope.derive({id: 'rack', admit}), module, port)).toBe(admitted);
+    expect(admit).toHaveBeenCalledWith(module, port);
+  });
+
+  it('keeps a scope for a republished target but not for a new destination resolver', () => {
+    const scope = new ModuleContext({id: 'scope', audio: new ModuleAudioEnvironment({context: graph().context}), destination: () => undefined});
+    expect(sameModuleScope(scope, scope.derive({id: 'retargeted', target: {id: 'panel-target'}}))).toBe(true);
+    expect(sameModuleScope(scope, scope.derive({id: 'rerouted', destination: () => undefined}))).toBe(false);
+    expect(sameModuleScope(scope, scope.derive({id: 'admitted', admit: () => createConnectionLease(() => {})}))).toBe(false);
+    expect(sameModuleScope(scope, undefined)).toBe(false);
+    expect(sameModuleScope(undefined, undefined)).toBe(false);
+  });
+
+  it('distinguishes an in-place destination change from a new scope', () => {
+    const scope = new ModuleContext({id: 'scope', audio: new ModuleAudioEnvironment({context: graph().context})});
+    expect(moduleScopeChange(scope, scope.derive({id: 'retargeted', target: {id: 'panel-target'}}))).toBe('none');
+    expect(moduleScopeChange(scope, scope.derive({id: 'rerouted', destination: () => undefined}))).toBe('destination');
+    expect(moduleScopeChange(scope, scope.derive({id: 'registry', registry: new ModuleRegistry()}))).toBe('scope');
+    expect(moduleScopeChange(scope, scope.derive({id: 'admitted', admit: () => createConnectionLease(() => {})}))).toBe('scope');
+    expect(moduleScopeChange(scope, new ModuleContext({id: 'other', audio: new ModuleAudioEnvironment()}))).toBe('scope');
+    expect(moduleScopeChange(undefined, scope)).toBe('scope');
   });
 });

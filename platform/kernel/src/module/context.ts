@@ -2,7 +2,7 @@ import {getAudioContextConstructor} from '../audio-context';
 import type {SessionTransport} from '../session';
 import type {AudioOutputPort} from './audio-port';
 import {ModuleCapabilities} from './capability';
-import type {ConnectionLease} from './lease';
+import {createConnectionLease, type ConnectionLease} from './lease';
 import {assertModuleId, ModuleRegistry, type ModuleHandle} from './registry';
 
 export interface ModuleAudioEnvironmentOptions {
@@ -123,4 +123,36 @@ export class ModuleContext {
       capabilities: options.capabilities ?? this.capabilities,
     });
   }
+}
+
+/**
+ * How a republished context relates to the previous one. `none`: same audio
+ * environment, Session, registry, admission and destination resolver (a new
+ * target alone keeps the scope). `destination`: only the default destination
+ * resolver changed, so existing members can re-route in place. `scope`: any
+ * other change, or a missing side, requires rebinding.
+ */
+export function moduleScopeChange(previous: ModuleContext | undefined, next: ModuleContext | undefined): 'none' | 'destination' | 'scope' {
+  if (!previous || !next || previous.audio !== next.audio || previous.session !== next.session ||
+    previous.registry !== next.registry || previous.admit !== next.admit) return 'scope';
+  return previous.destination === next.destination ? 'none' : 'destination';
+}
+
+/** Whether two contexts grant the same resource relationships; see {@link moduleScopeChange}. */
+export function sameModuleScope(left: ModuleContext | undefined, right: ModuleContext | undefined): boolean {
+  return moduleScopeChange(left, right) === 'none';
+}
+
+/**
+ * Establish a module output's normal route in a scope: the scope's admission
+ * when present, otherwise its default destination (or the audio environment's
+ * speakers). Releasing the lease retracts only the default this call installed.
+ */
+export function routeModuleOutput(context: ModuleContext, module: ModuleHandle, port: AudioOutputPort): ConnectionLease {
+  if (context.admit) return context.admit(module, port);
+  const destination = context.destination?.() ?? context.audio.prepare().destination;
+  port.setDefault(destination);
+  return createConnectionLease(() => {
+    if (!port.disposed && port.defaultDestination === destination) port.setDefault(undefined);
+  });
 }

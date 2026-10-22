@@ -212,6 +212,9 @@ This entry exposes explicit nonvisual relationships. DOM lookup lives in
 | `ModuleRegistry` | `register(module)` returns a `ConnectionLease`; `get(id)`, `snapshot()`, `revision` and `subscribe` describe one scope. Duplicate ids reject. `dispose()` unregisters without disposing modules. |
 | `ModuleAudioEnvironment` | Optional borrowed `context` or lazy `create` factory. `peek()` observes; `prepare()` explicitly allocates; `dispose()` closes only an owned context. |
 | `ModuleContext` | Explicit `id`, audio environment, registry, optional Session, destination callback, admission, target and capabilities. `derive(options)` defines inheritance without DOM search. |
+| `moduleScopeChange(previous, next)` | `'none'` when both contexts share audio environment, Session, registry, admission and destination resolver (a republished target alone keeps the scope); `'destination'` when only the destination resolver changed, so members can re-route in place; `'scope'` for any other change or a missing side. |
+| `sameModuleScope(left, right)` | Shorthand for `moduleScopeChange(left, right) === 'none'`. |
+| `routeModuleOutput(context, module, port)` | Normal route for one output: `context.admit(module, port)` when present, otherwise `port.setDefault()` to the context destination or the environment's speakers. The returned lease retracts only the default it installed. |
 | `createConnectionLease(cleanup)` | Revocable, idempotent relationship with `active` and `release()`. Endpoints stay borrowed. |
 | `AudioOutputPort` | Stable named output with one default route, at most one replacement claimant and independent taps/sends. |
 | `ParamHandle` | Numeric base-value authority with native CV bindings, scheduled automation and subscriptions. |
