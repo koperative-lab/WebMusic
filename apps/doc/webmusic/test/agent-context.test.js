@@ -295,6 +295,8 @@ describe('agent context release and output contracts', () => {
     expect(patterns).not.toContain('| `.resolvedScore`');
     expect(files.get('llms.txt')).toContain('## Load, parse and export music');
     expect(files.get('llms.txt')).toContain('## Edit audio documents and manage history');
+    const scoreEdit = files.get('llms.txt').split('## Edit score documents and manage history')[1]?.split('\n## ')[0] ?? '';
+    for (const page of ['score/element/edit/score-document.md', 'score/headless/edit/score-editor.md', 'score/api/edit.md']) expect(scoreEdit).toContain(`agent-context/${page}`);
     expect(patterns).toContain('## Waveform editing');
     for (const page of manifest.pages) {
       expect(files.get('llms.txt').split(`](${page.url})`).length - 1).toBe(1);

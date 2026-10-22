@@ -98,6 +98,7 @@ export const patternSelection = [
 export function functionalIndexGroup(page) {
   const route = page.route;
   if (route.startsWith('/agent-toolkit/')) return 'Set up an AI coding agent';
+  if (/^\/score\/(?:element|headless|api)\/edit\//.test(route)) return 'Edit score documents and manage history';
   if (/^\/score\/(?:element|headless)\/play\/|^\/score\/api\/play\/|^\/uikit\/(?:transport-time|mixing-capture)\//.test(route)) return 'Play music, control time and capture input';
   if (/^\/score\/(?:element|headless)\/view\/|^\/score\/api\/view\/|^\/uikit\/(?:notes|layout-feedback)\//.test(route)) return 'Display scores, pitches and application state';
   if (/^\/score\/(?:element|headless)\/analyze\/|^\/score\/api\/analyze\/|^\/uikit\/views-analysis\//.test(route)) return 'Analyze harmony and follow playback';
