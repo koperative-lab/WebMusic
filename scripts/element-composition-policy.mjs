@@ -54,11 +54,13 @@ export function sourceWithoutOwnedFocusWrite(tag, source, text) {
   if (tag === 'score-view' && source === 'packages/score/src/view/render/staff-editor.ts') {
     return text.replace("surface.setAttribute('tabindex', '0');", '');
   }
+  // Editing surfaces leave the tab order while read-only; each removal is the
+  // same owner withdrawing its own focus entry, never a second ARIA owner.
   if (tag === 'audio-view' && source === 'packages/audio/src/view/render/waveform-editor.ts') {
-    return text.replace("surface.setAttribute('tabindex', '0');", '');
+    return text.replace("surface.setAttribute('tabindex', '0');", '').replace("surface.removeAttribute('tabindex');", '');
   }
   if (tag !== 'score-view' || source !== 'packages/score/src/view/render/piano-roll-editor.ts') return text;
-  return text.replace("svg.setAttribute('tabindex', '0');", '');
+  return text.replace("svg.setAttribute('tabindex', '0');", '').replace("svg.removeAttribute('tabindex');", '');
 }
 
 function entry(family, capability, tag, source, ui, behaviorOnly = false) {

@@ -16,6 +16,21 @@ test('permits only the reviewed musical SVG focus write', () => {
   assert.equal(sourceWithoutOwnedFocusWrite('score-view', owner, focus + focus), focus);
 });
 
+test('permits each editing owner to withdraw only its own read-only tab stop once', () => {
+  const owners = [['score-view', owner, 'svg'], ['audio-view', 'packages/audio/src/view/render/waveform-editor.ts', 'surface']];
+  for (const [tag, source, node] of owners) {
+    const removal = `${node}.removeAttribute('tabindex');`;
+    assert.equal(sourceWithoutOwnedFocusWrite(tag, source, removal), '');
+    assert.equal(sourceWithoutOwnedFocusWrite(tag, source, removal + removal), removal);
+    assert.equal(sourceWithoutOwnedFocusWrite(tag === 'score-view' ? 'audio-view' : 'score-view', source, removal), removal);
+    for (const other of [`${node}.removeAttribute('aria-valuenow');`, `${node}.removeAttribute('role');`]) {
+      assert.equal(sourceWithoutOwnedFocusWrite(tag, source, other), other);
+    }
+  }
+  const staff = "surface.removeAttribute('tabindex');";
+  assert.equal(sourceWithoutOwnedFocusWrite('score-view', 'packages/score/src/view/render/staff-editor.ts', staff), staff);
+});
+
 test('permits only the waveform editor application focus write', () => {
   const owner = 'packages/audio/src/view/render/waveform-editor.ts';
   const focus = "surface.setAttribute('tabindex', '0');";
