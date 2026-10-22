@@ -95,6 +95,44 @@ export function hasModuleContextBoundary(host: Element): boolean { return resolv
 export function notifyModuleContext(host: Element): void { dispatch(host, contextEvent); }
 export function notifyModuleChange(host: Element): void { dispatch(host, moduleEvent); }
 
+type MutationListener = (records: readonly MutationRecord[]) => void;
+const rootObservers = new WeakMap<Node, {observer: MutationObserver; listeners: Set<MutationListener>}>();
+
+/**
+ * One shared observer per Document/ShadowRoot fans out to every discovering
+ * element. Each consumer filters records by its own ancestry, so unrelated
+ * DOM churn costs an ancestor walk instead of a context request per element.
+ */
+function observeRootMutations(Observer: typeof MutationObserver, root: Node, listener: MutationListener): () => void {
+  let entry = rootObservers.get(root);
+  if (!entry) {
+    const listeners = new Set<MutationListener>();
+    const observer = new Observer((records) => {
+      for (const callback of [...listeners]) {
+        if (!listeners.has(callback)) continue;
+        // One consumer's failure must not starve the others of this batch.
+        try { callback(records); } catch (error) { queueMicrotask(() => { throw error; }); }
+      }
+    });
+    observer.observe(root, {childList: true, subtree: true, attributes: true, attributeFilter: ['composition', 'slot', 'name']});
+    entry = {observer, listeners};
+    rootObservers.set(root, entry);
+  }
+  const owned = entry;
+  owned.listeners.add(listener);
+  return () => {
+    if (!owned.listeners.delete(listener) || owned.listeners.size > 0) return;
+    owned.observer.disconnect();
+    if (rootObservers.get(root) === owned) rootObservers.delete(root);
+  };
+}
+
+function ancestorsOf(host: Element): Element[] {
+  const chain: Element[] = [];
+  for (let element = parentElement(host); element; element = parentElement(element)) chain.push(element);
+  return chain;
+}
+
 /** Discovery is synchronous; observations re-evaluate after provider changes, upgrades and layout moves. */
 export function observeModuleContext(
   host: Element,
@@ -104,34 +142,48 @@ export function observeModuleContext(
   let initialized = false;
   let previous: ModuleContext | undefined;
   let previousState: ModuleContextState | undefined;
+  let ancestry: readonly Element[] = [];
   const waiting = new Map<string, {ready?: () => void}>();
   const registry = host.ownerDocument.defaultView?.customElements;
-  const roots = new Set<EventTarget>();
+  const roots = new Map<EventTarget, (() => void) | undefined>();
   const Observer = host.ownerDocument.defaultView?.MutationObserver;
-  const observer = Observer ? new Observer(() => resolve()) : undefined;
-  const refreshRoots = (): void => {
+  // Context depends only on this host's composed ancestry, the composition/
+  // slot attributes along it, upgrades and provider notifications. Mutations
+  // elsewhere in the document cannot change it.
+  const onMutation = (records: readonly MutationRecord[]): void => {
+    if (!active) return;
+    const chain = ancestorsOf(host);
+    const moved = chain.length !== ancestry.length || chain.some((element, index) => element !== ancestry[index]);
+    if (moved || records.some((record) => record.type === 'attributes' &&
+      (record.target === host || ancestry.includes(record.target as Element)))) resolve();
+  };
+  const unobserveRoot = (root: EventTarget, unobserve: (() => void) | undefined): void => {
+    root.removeEventListener(contextEvent, resolve);
+    root.removeEventListener('slotchange', resolve);
+    unobserve?.();
+  };
+  const refreshRoots = (chain: readonly Element[]): void => {
     const next = new Set<EventTarget>([host.ownerDocument, host.getRootNode()]);
-    for (let element = parentElement(host); element; element = parentElement(element)) next.add(element.getRootNode());
+    for (const element of chain) next.add(element.getRootNode());
     if (next.size === roots.size && [...next].every(root => roots.has(root))) return;
-    observer?.disconnect();
-    for (const root of roots) {
-      root.removeEventListener(contextEvent, resolve);
-      root.removeEventListener('slotchange', resolve);
+    for (const [root, unobserve] of [...roots]) {
+      if (next.has(root)) continue;
+      roots.delete(root);
+      unobserveRoot(root, unobserve);
     }
-    roots.clear();
     for (const root of next) {
-      roots.add(root);
+      if (roots.has(root)) continue;
       root.addEventListener(contextEvent, resolve);
       root.addEventListener('slotchange', resolve);
-      if ('nodeType' in root) observer?.observe(root as Node, {
-        childList: true, subtree: true, attributes: true, attributeFilter: ['composition', 'slot', 'name'],
-      });
+      roots.set(root, Observer && 'nodeType' in root ? observeRootMutations(Observer, root as Node, onMutation) : undefined);
     }
   };
   const resolve = (): void => {
     if (!active) return;
-    refreshRoots();
-    for (let element = parentElement(host); element; element = parentElement(element)) {
+    const chain = ancestorsOf(host);
+    ancestry = chain;
+    refreshRoots(chain);
+    for (const element of chain) {
       if (unknownCustomElement(element) && registry && !waiting.has(element.localName)) {
         const name = element.localName;
         const entry = {ready: resolve as (() => void) | undefined};
@@ -154,11 +206,7 @@ export function observeModuleContext(
   const dispose = (): void => {
     if (!active) return;
     active = false;
-    observer?.disconnect();
-    for (const root of roots) {
-      root.removeEventListener(contextEvent, resolve);
-      root.removeEventListener('slotchange', resolve);
-    }
+    for (const [root, unobserve] of roots) unobserveRoot(root, unobserve);
     roots.clear();
     for (const entry of waiting.values()) entry.ready = undefined;
     waiting.clear();

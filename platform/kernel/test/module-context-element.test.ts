@@ -183,6 +183,65 @@ describe('module context discovery', () => {
     notifyModuleContext(secondProvider);
     expect(callback).toHaveBeenCalledTimes(count);
   });
+
+  it('ignores unrelated DOM churn but follows its own ancestry and boundary attributes', async () => {
+    const unrelated = document.createElement('div');
+    const wrapper = document.createElement('div');
+    const provider = document.createElement('section');
+    const child = document.createElement('span');
+    wrapper.append(child);
+    document.body.append(unrelated, wrapper, provider);
+    const providedContext = context('provider');
+    cleanups.push(provideModuleContext(provider, () => providedContext));
+    let requests = 0;
+    const count = () => { requests += 1; };
+    document.addEventListener('webmusic-context-request', count);
+    cleanups.push(() => document.removeEventListener('webmusic-context-request', count));
+    const callback = vi.fn();
+    cleanups.push(observeModuleContext(child, callback));
+    expect(callback).toHaveBeenLastCalledWith(undefined, 'missing');
+    const baseline = requests;
+    for (let index = 0; index < 20; index += 1) unrelated.append(document.createElement('p'));
+    unrelated.textContent = 'live readout';
+    unrelated.setAttribute('composition', 'modules');
+    await flush();
+    expect(requests).toBe(baseline);
+    wrapper.setAttribute('composition', 'modules');
+    await flush();
+    expect(callback).toHaveBeenLastCalledWith(undefined, 'pending');
+    provider.append(child);
+    await flush();
+    expect(callback).toHaveBeenLastCalledWith(providedContext, 'ready');
+  });
+
+  it('shares one mutation observer per root between discovering elements', () => {
+    const Original = window.MutationObserver;
+    let created = 0;
+    window.MutationObserver = class extends Original {
+      constructor(callback: MutationCallback) { super(callback); created += 1; }
+    };
+    try {
+      // A fresh shadow root always needs its own observer; the document's may
+      // already exist. Compare relative counts so other observations cannot
+      // change the result.
+      const shell = document.createElement('div');
+      document.body.append(shell);
+      const shadow = shell.attachShadow({mode: 'open'});
+      const hosts = Array.from({length: 5}, () => document.createElement('span'));
+      shadow.append(...hosts);
+      const stops = [observeModuleContext(hosts[0]!, () => {})];
+      const firstObservation = created;
+      expect(firstObservation).toBeGreaterThanOrEqual(1);
+      stops.push(...hosts.slice(1).map((host) => observeModuleContext(host, () => {})));
+      expect(created).toBe(firstObservation);
+      for (const stop of stops) stop();
+      const released = created;
+      cleanups.push(observeModuleContext(hosts[0]!, () => {}));
+      expect(created - released).toBe(firstObservation);
+    } finally {
+      window.MutationObserver = Original;
+    }
+  });
 });
 
 describe('explicit module target observations', () => {
