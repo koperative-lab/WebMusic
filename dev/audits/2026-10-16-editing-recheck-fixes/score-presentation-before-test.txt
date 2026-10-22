@@ -3,7 +3,7 @@
 > vitest run test/view/editor-lifecycle.test.ts
 
 
- RUN  v5.0.2 /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/score
+ RUN  v5.0.2 <checkout>/packages/score
 
  ❯ test/view/editor-lifecycle.test.ts (8 tests | 1 failed) 161ms
    ❯ Score View editor attachment cleanup (8)
@@ -38,8 +38,8 @@ AssertionError: expected false to be true // Object.is equality
 
 npm error Lifecycle script `test` failed with error:
 npm error code 1
-npm error path /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/score
+npm error path <checkout>/packages/score
 npm error workspace @webmusic/score@0.2.0
-npm error location /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/score
+npm error location <checkout>/packages/score
 npm error command failed
 npm error command sh -c vitest run test/view/editor-lifecycle.test.ts

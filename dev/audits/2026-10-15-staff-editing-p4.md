@@ -93,7 +93,7 @@ content saved; performance-only MIDI export leaves notation dirty.
 
 ## Browser evidence and limitations
 
-The production preview was exercised in the Codex in-app browser at
+The production preview was exercised in the embedded Chromium browser at
 `http://127.0.0.1:4335/score/element/view/score-view/#staff-input`:
 
 - Focused `N`, `D`, `Escape` replaced the opening C4 with D4, advanced the

@@ -30,14 +30,14 @@ test at scripts/docs-dev.test.mjs:136:1
   AssertionError [ERR_ASSERTION]: Interrupted build exited with 1 (no signal):
   Error: kill EPERM
       at process.kill (node:internal/process/per_thread:277:13)
-      at exists (file:///Users/mamingchen/.codex/worktrees/cd78/WebMusic/scripts/docs-dev.mjs:50:19)
-      at drainProcessGroup (file:///Users/mamingchen/.codex/worktrees/cd78/WebMusic/scripts/docs-dev.mjs:58:10)
-      at async file:///Users/mamingchen/.codex/worktrees/cd78/WebMusic/scripts/docs-dev.mjs:38:33 {"code":"EPERM","syscall":"kill"}
+      at exists (file://<checkout>/scripts/docs-dev.mjs:50:19)
+      at drainProcessGroup (file://<checkout>/scripts/docs-dev.mjs:58:10)
+      at async file://<checkout>/scripts/docs-dev.mjs:38:33 {"code":"EPERM","syscall":"kill"}
   
   
   1 !== 143
   
-      at TestContext.<anonymous> (file:///Users/mamingchen/.codex/worktrees/cd78/WebMusic/scripts/docs-dev.test.mjs:156:10)
+      at TestContext.<anonymous> (file://<checkout>/scripts/docs-dev.test.mjs:156:10)
       at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
       at async Test.run (node:internal/test_runner/test:1409:7)
       at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {

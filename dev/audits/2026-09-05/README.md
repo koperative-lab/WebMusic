@@ -36,8 +36,8 @@ P1 denotes a severe availability defect to prioritize. P2 denotes incorrect beha
 | `check:licenses` | Passed the project's listed restricted-dependency rules |
 | `check:release-manifests` | Passed: the five package versions and workspace ranges agreed at `0.1.0` |
 | Production documentation build | Passed: 120 pages generated and 119 indexed for search |
-| Original `npm run lint` | **Failed: 8 errors originated in copies under `.claude/worktrees`** |
-| ESLint explicitly excluding `.claude/**` | Passed; used to identify the failure source, without changing configuration |
+| Original `npm run lint` | **Failed: 8 errors originated in hidden local worktree copies** |
+| ESLint explicitly excluding the hidden worktree directory | Passed; used to identify the failure source, without changing configuration |
 | Common secret-pattern scan | Scanned 879 working-tree text files; no matches for the tested private-key/GitHub/AWS/npm/OpenAI token patterns |
 | Online npm vulnerability scan | Incomplete: the ordinary request failed DNS resolution and the elevated network request was rejected by automatic approval review |
 
@@ -205,9 +205,9 @@ After the parent disables stylesheet injection, child mounts still use the defau
 
 Locations: [eslint.config.mjs:9](https://github.com/mrsteamedbun/WebMusic/blob/6506225b772f6777cc1ae5aa5561ab79342d52df/eslint.config.mjs#L9), [eslint.config.mjs:47](https://github.com/mrsteamedbun/WebMusic/blob/6506225b772f6777cc1ae5aa5561ab79342d52df/eslint.config.mjs#L47).
 
-The root script runs `eslint .`, but its ignore list omits `.claude/`, which .gitignore already excludes. React files in hidden worktrees match generic rules without matching the root React-hooks plugin path configuration. Existing disable comments therefore report an unknown rule.
+The root script runs `eslint .`, but its ignore list omits the hidden local worktree directory, which .gitignore already excludes. React files in hidden worktrees match generic rules without matching the root React-hooks plugin path configuration. Existing disable comments therefore report an unknown rule.
 
-**Observed result:** standard lint failed with 8 undefined `react-hooks/exhaustive-deps` errors across 4 hidden worktrees. `eslint . --ignore-pattern '.claude/**'` passed.
+**Observed result:** standard lint failed with 8 undefined `react-hooks/exhaustive-deps` errors across 4 hidden worktrees. Ignoring that directory with `--ignore-pattern` passed.
 
 **Impact:** local `npm run check` stopped at lint. A clean CI checkout may not contain these directories, so this does not establish the same remote CI failure.
 

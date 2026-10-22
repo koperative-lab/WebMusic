@@ -7,13 +7,13 @@
 ## Scope and preservation
 
 The four maintained branch names are `main`, `dev`,
-`claude/analysis-view-chord-design-693b7b` and
-`claude/mvmnt-features-review-41f87a`. Local dev and published dev had distinct
+`analysis-view-chord-design-693b7b` and
+`mvmnt-features-review-41f87a`. Local dev and published dev had distinct
 runtime histories; each received a documentation-only descendant of its own
 existing tip. Neither history was reset or replaced to synchronize guidance.
 
 Every branch receives the same AGENTS.md and shared product, design, decision,
-player-binding and authoring guides. CLAUDE.md is a Git symlink with the relative
+player-binding and authoring guides. A tool-specific instruction file is a Git symlink with the relative
 target `AGENTS.md`. STATUS and generated inventories describe each checkout's
 actual implementation, catalogs, exports and available checks.
 

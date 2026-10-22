@@ -108,7 +108,7 @@ matching ready playback, while the Segment selector incorrectly displayed
 48,000 frames. The [before screenshot](2026-10-16-editing-recheck-fixes/waveform-before.png)
 preserves that mismatch.
 
-After rebuilding, the Codex in-app browser reloaded the actual documentation
+After rebuilding, the embedded Chromium browser reloaded the actual documentation
 route at `http://127.0.0.1:4335/audio/element/view/audio-view/#waveform-editing`,
 using its configured `Editing.wav` URL. Light theme, 1280 × 720 CSS-pixel
 viewport, 537.8125 px demo container; browser version was not recorded. Native

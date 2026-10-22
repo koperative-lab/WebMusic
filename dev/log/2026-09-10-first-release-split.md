@@ -9,7 +9,7 @@ presenters. [DEC-021](../DECISIONS.md#dec-021--first-release-contains-kernel-ui-
 and [release policy](../release/RELEASING.md) own the maintained boundary.
 
 Main started at `f074cd8b5f7cdf8f288c77d988384a359c873cfb`. The local safety ref
-`codex/before-audio-bridge-split-20260910` preserves that complete tree. Initial
+`before-audio-bridge-split-20260910` preserves that complete tree. Initial
 local dev `9d69d02` and fetched origin/dev `40a445f` had distinct histories;
 they were merged before importing the pre-split main baseline. Dev retains its
 additional Audio viewport/timeline capabilities and extended UI work as well

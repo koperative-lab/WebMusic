@@ -31,7 +31,7 @@ not this earlier test or browser snapshot.
 The docs distinguish full Chordio/MVMNT experiences from reusable capabilities;
 this pass does not implement those complete experiences. Existing demos now omit
 duplicate companion sources when borrowing a player's resolved Score. The agent
-guide maps the accepted contracts, and `CLAUDE.md` remains a relative symlink to
+guide maps the accepted contracts, and the tool-specific instruction file remains a relative symlink to
 `AGENTS.md`.
 
 ## Verification

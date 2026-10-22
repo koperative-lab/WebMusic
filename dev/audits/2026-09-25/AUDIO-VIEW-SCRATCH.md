@@ -36,7 +36,7 @@ this is not a claim that the specification prohibits negative rates.
 ## Verification record
 
 The coordinated checks below completed on 2026-09-25 in the same dirty `dev`
-working tree. Browser checks used the Codex in-app browser on macOS
+working tree. Browser checks used the embedded Chromium browser on macOS
 (`Chrome/154.0.0.0`) against the local documentation server.
 
 ### Automated gates

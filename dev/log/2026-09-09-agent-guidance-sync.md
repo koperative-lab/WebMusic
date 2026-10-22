@@ -13,7 +13,7 @@ The [agent toolkit](../../.agent/README.md) contains project skills and workflow
 for component/algorithm/architecture review, frontend review, and documentation
 maintenance, plus rule ownership and tool recommendations. These are reusable
 source files referenced by [AGENTS.md](../../AGENTS.md); client-specific automatic
-skill discovery still requires its documented setup. `CLAUDE.md` remains a
+skill discovery still requires its documented setup. The tool-specific instruction file remains a
 relative symlink to `AGENTS.md`.
 
 The [development entry point](../README.md) routes current guidance through
@@ -33,9 +33,9 @@ reconcile their runtime histories.
 | Destination | Implementation baseline before this synchronization | Full local gate |
 |---|---|---|
 | `main` | `763abed74c951941cc8f411976f27c718fab6f23` | `npm run check` passed for the shared source |
-| `claude/analysis-view-chord-design-693b7b` | `7b8b0ee8057d4d77051a8b3fcd0dea616ac45519` | `npm run check` passed |
-| `claude/mvmnt-features-review-41f87a` | `9693b4ed31569e0ab25dfc0d11d2cce000ae708f` | `npm run check` passed |
-| `codex/main-drafts-20260909` | `734040824b1ebed88fa0520f13a5429843b6c228` | `npm run check` passed |
+| `analysis-view-chord-design-693b7b` | `7b8b0ee8057d4d77051a8b3fcd0dea616ac45519` | `npm run check` passed |
+| `mvmnt-features-review-41f87a` | `9693b4ed31569e0ab25dfc0d11d2cce000ae708f` | `npm run check` passed |
+| `main-drafts-20260909` | `734040824b1ebed88fa0520f13a5429843b6c228` | `npm run check` passed |
 | Remote `dev` | `d4f7047672e552e93b8d5a265e301e8c090c595d` | Stopped at the same 18 existing architecture diagnostics |
 | Local `dev` | `cc31c7b4ed98871a3d62bcf738328b05a5fbe0db` | Stopped at the same 49 existing architecture diagnostics |
 

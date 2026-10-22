@@ -3,7 +3,7 @@
 > vitest run test/edit/score-document.test.ts
 
 
- RUN  v5.0.2 /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/score
+ RUN  v5.0.2 <checkout>/packages/score
 
  ❯ test/edit/score-document.test.ts (13 tests | 4 failed) 33ms
    ❯ ScoreDocumentElement (13)
@@ -1457,8 +1457,8 @@ undefined
 
 npm error Lifecycle script `test` failed with error:
 npm error code 1
-npm error path /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/score
+npm error path <checkout>/packages/score
 npm error workspace @webmusic/score@0.2.0
-npm error location /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/score
+npm error location <checkout>/packages/score
 npm error command failed
 npm error command sh -c vitest run test/edit/score-document.test.ts

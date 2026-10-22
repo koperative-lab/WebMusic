@@ -3,7 +3,7 @@
 > vitest run test/edit/release-audit-probe.test.ts
 
 
- RUN  v5.0.2 /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/audio
+ RUN  v5.0.2 <checkout>/packages/audio
 
  ❯ test/edit/release-audit-probe.test.ts (1 test | 1 failed) 8ms
    × clearHistory does not allow a lease cleanup callback to edit and recreate history 7ms
@@ -47,8 +47,8 @@ AssertionError: expected { nested: { …(3) }, revision: 2, …(2) } to match ob
 
 npm error Lifecycle script `test` failed with error:
 npm error code 1
-npm error path /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/audio
+npm error path <checkout>/packages/audio
 npm error workspace @webmusic/audio@0.2.0
-npm error location /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/audio
+npm error location <checkout>/packages/audio
 npm error command failed
 npm error command sh -c vitest run test/edit/release-audit-probe.test.ts

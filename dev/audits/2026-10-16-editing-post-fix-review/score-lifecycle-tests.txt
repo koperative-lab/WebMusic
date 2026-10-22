@@ -3,7 +3,7 @@
 > vitest run test/view/editor-lifecycle.test.ts test/view/editor-player-integration.test.ts test/view/staff-editor-integration.test.ts test/view/staff-editing-render.test.ts
 
 
- RUN  v5.0.2 /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/score
+ RUN  v5.0.2 <checkout>/packages/score
 
 
  Test Files  4 passed (4)

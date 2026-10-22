@@ -506,19 +506,19 @@ CLI Using tsconfig: tsconfig.build.json
 CLI Building entry: {"play/auto":"src/play/element/auto.ts"}
 CLI Using tsconfig: ../../scripts/tsconfig.browser-iife.json
 CLI tsup v8.5.1
-CLI Using tsup config: /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/score/tsup.config.mjs
+CLI Using tsup config: <checkout>/packages/score/tsup.config.mjs
 CLI tsup v8.5.1
-CLI Using tsup config: /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/score/tsup.config.mjs
+CLI Using tsup config: <checkout>/packages/score/tsup.config.mjs
 CLI Target: es2020
 IIFE Build start
 CLI Building entry: src/index.ts, src/analyze/index.ts, src/analyze/worker-client.ts, src/analyze/worker-protocol.ts, src/analyze/worker-url.ts, src/analyze/worker.ts, src/edit/index.ts, src/io/index.ts, src/io/load.ts, src/io/worker-client.ts, src/io/worker-protocol.ts, src/io/worker.ts, src/play/drivers.ts, src/play/index.ts, src/view/index.ts, src/react/index.tsx, src/analyze/element/index.ts, src/analyze/headless/index.ts, src/edit/element/auto.ts, src/edit/element/index.ts, src/edit/headless/index.ts, src/io/formats/index.ts, src/play/demos/index.ts, src/play/element/auto.ts, src/play/element/global.ts, src/play/element/index.ts, src/play/headless/index.ts, src/view/element/index.ts, src/view/headless/index.ts, src/view/render/index.ts
 CLI Using tsconfig: tsconfig.build.json
 CLI tsup v8.5.1
-CLI Using tsup config: /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/score/tsup.config.mjs
+CLI Using tsup config: <checkout>/packages/score/tsup.config.mjs
 CLI Building entry: src/index.ts, src/analyze/index.ts, src/analyze/worker-client.ts, src/analyze/worker-protocol.ts, src/analyze/worker-url.ts, src/analyze/worker.ts, src/edit/index.ts, src/io/index.ts, src/io/load.ts, src/io/worker-client.ts, src/io/worker-protocol.ts, src/io/worker.ts, src/play/drivers.ts, src/play/index.ts, src/react/index.tsx, src/view/index.ts, src/analyze/element/index.ts, src/analyze/headless/index.ts, src/edit/element/auto.ts, src/edit/element/index.ts, src/edit/headless/index.ts, src/io/formats/index.ts, src/play/demos/index.ts, src/play/element/auto.ts, src/play/element/global.ts, src/play/element/index.ts, src/play/headless/index.ts, src/view/element/index.ts, src/view/headless/index.ts, src/view/render/index.ts
 CLI Using tsconfig: tsconfig.build.json
 CLI tsup v8.5.1
-CLI Using tsup config: /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/score/tsup.config.mjs
+CLI Using tsup config: <checkout>/packages/score/tsup.config.mjs
 CLI Target: es2020
 ESM Build start
 CLI Target: es2020
@@ -1194,11 +1194,11 @@ CLI Using tsconfig: ../../scripts/tsconfig.browser-iife.json
 CLI Building entry: {"analyze/auto":"src/analyze/element/auto.ts"}
 CLI Using tsconfig: ../../scripts/tsconfig.browser-iife.json
 CLI tsup v8.5.1
-CLI Using tsup config: /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/audio/tsup.config.mjs
+CLI Using tsup config: <checkout>/packages/audio/tsup.config.mjs
 CLI tsup v8.5.1
-CLI Using tsup config: /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/audio/tsup.config.mjs
+CLI Using tsup config: <checkout>/packages/audio/tsup.config.mjs
 CLI tsup v8.5.1
-CLI Using tsup config: /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/audio/tsup.config.mjs
+CLI Using tsup config: <checkout>/packages/audio/tsup.config.mjs
 CLI Target: es2020
 IIFE Build start
 CLI Target: es2020
@@ -1208,11 +1208,11 @@ IIFE Build start
 CLI Building entry: src/index.ts, src/analyze/index.ts, src/analyze/transcribe.ts, src/analyze/worker-client.ts, src/analyze/worker-protocol.ts, src/analyze/worker.ts, src/edit/index.ts, src/play/index.ts, src/play/worker-client.ts, src/play/worker-protocol.ts, src/play/worker.ts, src/react/index.tsx, src/view/index.ts, src/analyze/element/auto.ts, src/analyze/element/global.ts, src/analyze/element/index.ts, src/analyze/headless/index.ts, src/edit/headless/index.ts, src/edit/element/auto.ts, src/edit/element/index.ts, src/play/element/auto.ts, src/play/element/global.ts, src/play/element/index.ts, src/play/headless/index.ts, src/view/element/auto.ts, src/view/element/global.ts, src/view/element/index.ts, src/view/headless/index.ts, src/view/render/index.ts
 CLI Using tsconfig: tsconfig.build.json
 CLI tsup v8.5.1
-CLI Using tsup config: /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/audio/tsup.config.mjs
+CLI Using tsup config: <checkout>/packages/audio/tsup.config.mjs
 CLI Building entry: src/index.ts, src/analyze/index.ts, src/analyze/transcribe.ts, src/analyze/worker-client.ts, src/analyze/worker-protocol.ts, src/analyze/worker.ts, src/edit/index.ts, src/play/index.ts, src/play/worker-client.ts, src/play/worker-protocol.ts, src/play/worker.ts, src/react/index.tsx, src/view/index.ts, src/analyze/element/auto.ts, src/analyze/element/global.ts, src/analyze/element/index.ts, src/analyze/headless/index.ts, src/edit/element/auto.ts, src/edit/element/index.ts, src/edit/headless/index.ts, src/play/element/auto.ts, src/play/element/global.ts, src/play/element/index.ts, src/play/headless/index.ts, src/view/element/auto.ts, src/view/element/global.ts, src/view/element/index.ts, src/view/headless/index.ts, src/view/render/index.ts
 CLI Using tsconfig: tsconfig.build.json
 CLI tsup v8.5.1
-CLI Using tsup config: /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/audio/tsup.config.mjs
+CLI Using tsup config: <checkout>/packages/audio/tsup.config.mjs
 CLI Target: es2020
 CJS Build start
 CLI Target: es2020
@@ -1613,7 +1613,7 @@ Doc snippet check passed: 268 examples (fences, inline scripts, and literal MDX 
 00:03:32 [content] Syncing content
 00:03:32 [content] Synced content
 00:03:32 [types] Generated 384ms
-00:03:32 [check] Getting diagnostics for Astro files in /Users/mamingchen/.codex/worktrees/cd78/WebMusic/apps/doc/webmusic...
+00:03:32 [check] Getting diagnostics for Astro files in <checkout>/apps/doc/webmusic...
 [96msrc/starlight/search-client.ts[0m:[93m154[0m:[93m36[0m - [93mwarning[0m[90m ts(6385): [0m'keyCode' is deprecated.
 
 [7m154[0m     if (event.isComposing || event.keyCode === 229) return;
@@ -1645,7 +1645,7 @@ Result (176 files):
 > vitest run
 
 
- RUN  v5.0.2 /Users/mamingchen/.codex/worktrees/cd78/WebMusic/platform/kernel
+ RUN  v5.0.2 <checkout>/platform/kernel
 
 
  Test Files  14 passed (14)
@@ -1658,7 +1658,7 @@ Result (176 files):
 > vitest run
 
 
- RUN  v5.0.2 /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/ui
+ RUN  v5.0.2 <checkout>/packages/ui
 
 
  Test Files  36 passed (36)
@@ -1674,7 +1674,7 @@ Result (176 files):
 > vitest run
 
 
- RUN  v5.0.2 /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/score
+ RUN  v5.0.2 <checkout>/packages/score
 
 Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
 
@@ -1691,7 +1691,7 @@ Not implemented: HTMLCanvasElement's getContext() method: without installing the
 > vitest run
 
 
- RUN  v5.0.2 /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/audio
+ RUN  v5.0.2 <checkout>/packages/audio
 
 
  Test Files  82 passed (82)
@@ -1707,7 +1707,7 @@ Not implemented: HTMLCanvasElement's getContext() method: without installing the
 > vitest run
 
 
- RUN  v5.0.2 /Users/mamingchen/.codex/worktrees/cd78/WebMusic/bridges/score-audio
+ RUN  v5.0.2 <checkout>/bridges/score-audio
 
 
  Test Files  7 passed (7)
@@ -1720,7 +1720,7 @@ Not implemented: HTMLCanvasElement's getContext() method: without installing the
 > vitest run
 
 
- RUN  v5.0.2 /Users/mamingchen/.codex/worktrees/cd78/WebMusic/apps/doc/webmusic
+ RUN  v5.0.2 <checkout>/apps/doc/webmusic
 
 
  Test Files  32 passed (32)

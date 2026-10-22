@@ -111,13 +111,13 @@ history, persistence and collaboration retain the application boundary above.
 
 **Organization update (2026-09-09):** repository-wide guidance lives under
 `dev/`, with component design, documentation authoring and release operations in
-their own directories. AGENTS and its CLAUDE symlink route through maintained
+their own directories. AGENTS and its tool-specific symlink route through maintained
 directory indexes. Package/platform contracts remain beside source; archived
 release machinery remains beside its historical scripts. Generated inventories
 provide discovery without substituting for these reading routes.
 
 **Organization update (2026-09-25):** `AGENTS.md` is the sole maintained agent
-instruction entry point. The earlier `CLAUDE.md` symlink is retired; current
+instruction entry point. The earlier tool-specific instruction symlink is retired; current
 guidance and generated inventories no longer require it.
 
 **Owner:** [Documentation entry point](README.md), [Conventions](docs/DOCS-CONVENTIONS.md).
@@ -1452,7 +1452,7 @@ unfinished interaction choices as settled product surfaces.
 Analyze Web Components in `dev`. Remove the two recurrence tags, their
 registration, demos, parameter catalogs and Element pages from the current
 checkout. Retain their implementation snapshot on the local
-`codex/score-pattern-analysis-research` branch for later exploration. Keep
+`score-pattern-analysis-research` branch for later exploration. Keep
 `findMotifs`, `findRhythmPatternOccurrences`, `rhythmPatterns` and applicable
 Headless projections in the API/Headless layers; callers may analyze those
 results without a bundled recurrence UI. Old Element URLs redirect to the

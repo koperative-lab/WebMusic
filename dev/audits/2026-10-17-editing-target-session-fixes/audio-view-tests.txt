@@ -3,7 +3,7 @@
 > vitest run test/view
 
 
- RUN  v5.0.2 /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/audio
+ RUN  v5.0.2 <checkout>/packages/audio
 
 
  Test Files  24 passed (24)

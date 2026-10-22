@@ -3,7 +3,7 @@
 > vitest run test/view/waveform-editing.test.ts test/view/sequence-editing.test.ts test/view/editor-lifecycle.test.ts test/view/waveform-render.test.ts
 
 
- RUN  v5.0.2 /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/audio
+ RUN  v5.0.2 <checkout>/packages/audio
 
  ❯ test/view/editor-lifecycle.test.ts (8 tests | 1 failed) 77ms
    ❯ Audio View editor attachment cleanup (8)
@@ -39,8 +39,8 @@ AssertionError: expected …(2) to have a length of 1 but got 2
 
 npm error Lifecycle script `test` failed with error:
 npm error code 1
-npm error path /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/audio
+npm error path <checkout>/packages/audio
 npm error workspace @webmusic/audio@0.2.0
-npm error location /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/audio
+npm error location <checkout>/packages/audio
 npm error command failed
 npm error command sh -c vitest run test/view/waveform-editing.test.ts test/view/sequence-editing.test.ts test/view/editor-lifecycle.test.ts test/view/waveform-render.test.ts

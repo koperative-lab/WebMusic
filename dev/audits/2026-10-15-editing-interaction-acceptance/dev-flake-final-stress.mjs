@@ -7,7 +7,7 @@ for (let index = 0; index < limit; index++) {
   let output = '';
   const result = await new Promise((resolve, reject) => {
     const child = spawn('npm', ['run', 'check:dev-server'], {
-      cwd: '/Users/mamingchen/.codex/worktrees/cd78/WebMusic',
+      cwd: '<checkout>',
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     child.stdout.on('data', chunk => { output += chunk; });

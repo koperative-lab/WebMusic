@@ -1,6 +1,6 @@
 {
   "date": "2026-09-25",
-  "environment": "Codex IAB Chrome/154.0.0.0 macOS",
+  "environment": "Embedded Chromium 154.0.0.0 macOS",
   "sampleRate": 48000,
   "method": "Native OfflineAudioContext renders a two-channel opposite-polarity ramp through final ScratchEngine source; forward/reverse slopes and stereo alignment are measured, with silence after 70ms. This is output-sample evidence, not physical-device listening.",
   "rows": [

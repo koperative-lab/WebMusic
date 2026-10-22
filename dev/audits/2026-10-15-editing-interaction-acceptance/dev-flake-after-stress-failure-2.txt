@@ -32,7 +32,7 @@
 test at scripts/docs-dev.test.mjs:219:1
 ✖ persistent process-group denial fails cleanup and blocks another build even after its owner exits (82.391125ms)
   AssertionError [ERR_ASSERTION]: Cleanup failure must retain the startup owner
-      at TestContext.<anonymous> (file:///Users/mamingchen/.codex/worktrees/cd78/WebMusic/scripts/docs-dev.test.mjs:245:12)
+      at TestContext.<anonymous> (file://<checkout>/scripts/docs-dev.test.mjs:245:12)
       at async Test.run (node:internal/test_runner/test:1409:7)
       at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
     generatedMessage: false,

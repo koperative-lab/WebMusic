@@ -3,7 +3,7 @@
 > vitest run test/view
 
 
- RUN  v5.0.2 /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/score
+ RUN  v5.0.2 <checkout>/packages/score
 
 Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
 

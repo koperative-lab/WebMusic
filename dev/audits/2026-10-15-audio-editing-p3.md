@@ -2,7 +2,7 @@
 
 Date: 2026-10-15. Working tree: `editing-capabilities`, based on
 `ef8664dbb68ece9dc8c1d328141989a0ae86f888`, with the existing uncommitted P0–P2
-work preserved. Environment: macOS, Node 26.8.1, npm 11.19.0, Codex in-app
+work preserved. Environment: macOS, Node 26.8.1, npm 11.19.0, embedded Chromium
 browser. These results describe this working tree, not a published release.
 [STATUS](../STATUS.md), EDIT-01, owns remaining work; the
 [editing contract](../design/EDIT-COMPONENTS.md) owns the P0–P4 roadmap.

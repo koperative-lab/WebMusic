@@ -19,9 +19,9 @@ When a rule changes, update its owner and applicable check. Skills link to that
 rule instead of copying it. Use current user instructions to determine the
 requested scope; a workflow example does not authorize unrelated mutations.
 
-The word "rules" here means engineering guidance. Codex command-execution rules
-use a separate `.rules` format and control whether commands may execute outside
-the sandbox; Markdown in this directory does not configure that mechanism.
-[Official Codex rules documentation](https://learn.chatgpt.com/docs/agent-configuration/rules).
+The word "rules" here means engineering guidance. Agent clients that support
+command-execution rules use their own configuration formats to control whether
+commands may run outside a sandbox; Markdown in this directory does not
+configure any such mechanism.
 
 Return to the [toolkit](../README.md).

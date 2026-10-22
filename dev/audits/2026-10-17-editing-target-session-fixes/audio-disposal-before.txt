@@ -3,7 +3,7 @@
 > vitest run test/view/waveform-editing.test.ts
 
 
- RUN  v5.0.2 /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/audio
+ RUN  v5.0.2 <checkout>/packages/audio
 
  ❯ test/view/waveform-editing.test.ts (68 tests | 1 failed) 218ms
    ❯ waveform editing renderer (49)
@@ -38,8 +38,8 @@ AssertionError: expected 1 to be +0 // Object.is equality
 
 npm error Lifecycle script `test` failed with error:
 npm error code 1
-npm error path /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/audio
+npm error path <checkout>/packages/audio
 npm error workspace @webmusic/audio@0.2.0
-npm error location /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/audio
+npm error location <checkout>/packages/audio
 npm error command failed
 npm error command sh -c vitest run test/view/waveform-editing.test.ts

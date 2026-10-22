@@ -1,7 +1,7 @@
 # Score Play frontend source audit — 2026-09-09
 
 Scope: responsive layout, UIKit reuse, interaction and demo composition on
-`claude/analysis-view-chord-design-693b7b`. This is source and DOM-test evidence,
+`analysis-view-chord-design-693b7b`. This is source and DOM-test evidence,
 not a completed screenshot audit. [Play design](../../design/PLAY-COMPONENTS.md) owns
 the presentation contract; [STATUS](../../STATUS.md) owns remaining acceptance.
 

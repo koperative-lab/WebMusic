@@ -133,7 +133,7 @@ records.
 
 ### Score editing
 
-The production documentation build was exercised in the Codex in-app browser
+The production documentation build was exercised in the embedded Chromium browser
 at `http://127.0.0.1:4335/`, using real mouse input and captured screenshots.
 The shared staff/piano-roll composition used its authored two-measure fixture.
 The sequence below records committed document revisions; note positions and

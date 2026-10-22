@@ -3,7 +3,7 @@
 > vitest run test/edit/score-document.test.ts test/play/editor-element.test.ts
 
 
- RUN  v5.0.2 /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/score
+ RUN  v5.0.2 <checkout>/packages/score
 
 
  Test Files  2 passed (2)

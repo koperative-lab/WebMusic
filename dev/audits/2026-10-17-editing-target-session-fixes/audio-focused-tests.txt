@@ -3,7 +3,7 @@
 > vitest run test/view/waveform-editing.test.ts test/view/sequence-editing.test.ts test/view/editor-lifecycle.test.ts test/view/waveform-render.test.ts
 
 
- RUN  v5.0.2 /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/audio
+ RUN  v5.0.2 <checkout>/packages/audio
 
 
  Test Files  4 passed (4)

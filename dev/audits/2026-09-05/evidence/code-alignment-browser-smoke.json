@@ -1,6 +1,6 @@
 {
   "date": "2026-09-05",
-  "environment": "Codex in-app browser; locally served static documentation on 127.0.0.1:4321",
+  "environment": "embedded Chromium browser; locally served static documentation on 127.0.0.1:4321",
   "method": "UI actions and accessibility/DOM observations through CUA; console inspection through the tab developer log API",
   "observations": [
     {

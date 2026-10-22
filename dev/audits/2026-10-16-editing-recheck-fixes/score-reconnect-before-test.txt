@@ -3,7 +3,7 @@
 > vitest run test/edit/reconnect-owner-review-probe.test.ts
 
 
- RUN  v5.0.2 /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/score
+ RUN  v5.0.2 <checkout>/packages/score
 
 stdout | test/edit/reconnect-owner-review-probe.test.ts > releases the disconnected lifetime owner when abort only reconnects into a failing URL load
 {"connected":true,"status":"error","previousStatus":"ready","retainsPrevious":true,"calls":2}
@@ -37,8 +37,8 @@ Received: "ready"
 
 npm error Lifecycle script `test` failed with error:
 npm error code 1
-npm error path /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/score
+npm error path <checkout>/packages/score
 npm error workspace @webmusic/score@0.2.0
-npm error location /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/score
+npm error location <checkout>/packages/score
 npm error command failed
 npm error command sh -c vitest run test/edit/reconnect-owner-review-probe.test.ts

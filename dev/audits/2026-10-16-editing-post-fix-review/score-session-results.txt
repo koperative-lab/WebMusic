@@ -3,7 +3,7 @@
 > vitest run test/view/release-lifecycle-review.test.ts
 
 
- RUN  v5.0.2 /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/score
+ RUN  v5.0.2 <checkout>/packages/score
 
  ❯ test/view/release-lifecycle-review.test.ts (2 tests | 1 failed) 100ms
    × retains paused player position after assigning a same-document interaction session 70ms
@@ -39,8 +39,8 @@ AssertionError: expected { viewTime: +0, playerTime: 1, …(2) } to deeply equal
 
 npm error Lifecycle script `test` failed with error:
 npm error code 1
-npm error path /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/score
+npm error path <checkout>/packages/score
 npm error workspace @webmusic/score@0.2.0
-npm error location /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/score
+npm error location <checkout>/packages/score
 npm error command failed
 npm error command sh -c vitest run test/view/release-lifecycle-review.test.ts

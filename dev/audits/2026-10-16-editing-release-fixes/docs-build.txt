@@ -389,19 +389,19 @@ CLI Using tsconfig: tsconfig.build.json
 CLI Building entry: {"play/auto":"src/play/element/auto.ts"}
 CLI Using tsconfig: ../../scripts/tsconfig.browser-iife.json
 CLI tsup v8.5.1
-CLI Using tsup config: /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/score/tsup.config.mjs
+CLI Using tsup config: <checkout>/packages/score/tsup.config.mjs
 CLI tsup v8.5.1
-CLI Using tsup config: /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/score/tsup.config.mjs
+CLI Using tsup config: <checkout>/packages/score/tsup.config.mjs
 CLI Target: es2020
 IIFE Build start
 CLI Building entry: src/index.ts, src/analyze/index.ts, src/analyze/worker-client.ts, src/analyze/worker-protocol.ts, src/analyze/worker-url.ts, src/analyze/worker.ts, src/edit/index.ts, src/io/index.ts, src/io/load.ts, src/io/worker-client.ts, src/io/worker-protocol.ts, src/io/worker.ts, src/play/drivers.ts, src/play/index.ts, src/react/index.tsx, src/view/index.ts, src/analyze/element/index.ts, src/analyze/headless/index.ts, src/edit/headless/index.ts, src/edit/element/auto.ts, src/edit/element/index.ts, src/io/formats/index.ts, src/play/demos/index.ts, src/play/element/auto.ts, src/play/element/global.ts, src/play/element/index.ts, src/play/headless/index.ts, src/view/element/index.ts, src/view/headless/index.ts, src/view/render/index.ts
 CLI Using tsconfig: tsconfig.build.json
 CLI tsup v8.5.1
-CLI Using tsup config: /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/score/tsup.config.mjs
+CLI Using tsup config: <checkout>/packages/score/tsup.config.mjs
 CLI Building entry: src/index.ts, src/analyze/index.ts, src/analyze/worker-client.ts, src/analyze/worker-protocol.ts, src/analyze/worker-url.ts, src/analyze/worker.ts, src/edit/index.ts, src/play/drivers.ts, src/play/index.ts, src/io/index.ts, src/io/load.ts, src/io/worker-client.ts, src/io/worker-protocol.ts, src/io/worker.ts, src/react/index.tsx, src/view/index.ts, src/analyze/element/index.ts, src/analyze/headless/index.ts, src/edit/element/auto.ts, src/edit/element/index.ts, src/edit/headless/index.ts, src/play/demos/index.ts, src/play/element/auto.ts, src/play/element/global.ts, src/play/element/index.ts, src/play/headless/index.ts, src/io/formats/index.ts, src/view/element/index.ts, src/view/headless/index.ts, src/view/render/index.ts
 CLI Using tsconfig: tsconfig.build.json
 CLI tsup v8.5.1
-CLI Using tsup config: /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/score/tsup.config.mjs
+CLI Using tsup config: <checkout>/packages/score/tsup.config.mjs
 CLI Target: es2020
 ESM Build start
 CLI Target: es2020
@@ -1077,11 +1077,11 @@ CLI Using tsconfig: ../../scripts/tsconfig.browser-iife.json
 CLI Building entry: {"analyze/auto":"src/analyze/element/auto.ts"}
 CLI Using tsconfig: ../../scripts/tsconfig.browser-iife.json
 CLI tsup v8.5.1
-CLI Using tsup config: /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/audio/tsup.config.mjs
+CLI Using tsup config: <checkout>/packages/audio/tsup.config.mjs
 CLI tsup v8.5.1
-CLI Using tsup config: /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/audio/tsup.config.mjs
+CLI Using tsup config: <checkout>/packages/audio/tsup.config.mjs
 CLI tsup v8.5.1
-CLI Using tsup config: /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/audio/tsup.config.mjs
+CLI Using tsup config: <checkout>/packages/audio/tsup.config.mjs
 CLI Target: es2020
 IIFE Build start
 CLI Target: es2020
@@ -1091,11 +1091,11 @@ IIFE Build start
 CLI Building entry: src/index.ts, src/analyze/index.ts, src/analyze/transcribe.ts, src/analyze/worker-client.ts, src/analyze/worker-protocol.ts, src/analyze/worker.ts, src/edit/index.ts, src/play/index.ts, src/play/worker-client.ts, src/play/worker-protocol.ts, src/play/worker.ts, src/react/index.tsx, src/view/index.ts, src/analyze/element/auto.ts, src/analyze/element/global.ts, src/analyze/element/index.ts, src/analyze/headless/index.ts, src/edit/element/auto.ts, src/edit/element/index.ts, src/edit/headless/index.ts, src/play/element/auto.ts, src/play/element/global.ts, src/play/element/index.ts, src/play/headless/index.ts, src/view/headless/index.ts, src/view/element/auto.ts, src/view/element/global.ts, src/view/element/index.ts, src/view/render/index.ts
 CLI Using tsconfig: tsconfig.build.json
 CLI tsup v8.5.1
-CLI Using tsup config: /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/audio/tsup.config.mjs
+CLI Using tsup config: <checkout>/packages/audio/tsup.config.mjs
 CLI Building entry: src/index.ts, src/analyze/index.ts, src/analyze/transcribe.ts, src/analyze/worker-client.ts, src/analyze/worker-protocol.ts, src/analyze/worker.ts, src/edit/index.ts, src/play/index.ts, src/play/worker-client.ts, src/play/worker-protocol.ts, src/play/worker.ts, src/react/index.tsx, src/view/index.ts, src/analyze/headless/index.ts, src/analyze/element/auto.ts, src/analyze/element/global.ts, src/analyze/element/index.ts, src/edit/element/auto.ts, src/edit/element/index.ts, src/edit/headless/index.ts, src/play/element/auto.ts, src/play/element/global.ts, src/play/element/index.ts, src/play/headless/index.ts, src/view/element/auto.ts, src/view/element/global.ts, src/view/element/index.ts, src/view/headless/index.ts, src/view/render/index.ts
 CLI Using tsconfig: tsconfig.build.json
 CLI tsup v8.5.1
-CLI Using tsup config: /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/audio/tsup.config.mjs
+CLI Using tsup config: <checkout>/packages/audio/tsup.config.mjs
 CLI Target: es2020
 ESM Build start
 CLI Target: es2020
@@ -1452,7 +1452,7 @@ Package artifact receipts written for 5 package(s).
 00:48:11 [types] Generated 392ms
 00:48:11 [build] output: "static"
 00:48:11 [build] mode: "static"
-00:48:11 [build] directory: /Users/mamingchen/.codex/worktrees/cd78/WebMusic/apps/doc/webmusic/dist/
+00:48:11 [build] directory: <checkout>/apps/doc/webmusic/dist/
 00:48:11 [build] Collecting build info...
 00:48:11 [build] ✓ Completed in 493ms.
 00:48:11 [build] Building static entrypoints...

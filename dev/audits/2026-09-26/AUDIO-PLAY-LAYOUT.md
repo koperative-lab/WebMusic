@@ -2,7 +2,7 @@
 
 Baseline: local dev worktree at `ae0742a` with the existing migration and Audio
 Player changes. Main `1e0fb7b` remains the Score and Agent Toolkit reference.
-Environment: Node 24.21.0, Codex in-app browser, default light theme.
+Environment: Node 24.21.0, embedded Chromium browser, default light theme.
 
 ## Scope and changes
 

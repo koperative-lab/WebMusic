@@ -1,5 +1,5 @@
 
- RUN  v5.0.2 /Users/mamingchen/.codex/worktrees/cd78/WebMusic/packages/audio
+ RUN  v5.0.2 <checkout>/packages/audio
 
  ❯ test/view/root-release-waveform-probe.test.ts (2 tests | 2 failed) 36ms
    ❯ release readiness numeric playback probe (2)

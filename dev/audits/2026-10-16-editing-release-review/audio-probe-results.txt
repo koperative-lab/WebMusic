@@ -1,5 +1,5 @@
 
- RUN  v5.0.2 /Users/mamingchen/.codex/worktrees/cd78/WebMusic
+ RUN  v5.0.2 <checkout>
 
  ❯ packages/audio/test/edit/review-audio-release-readiness.test.ts (2 tests | 2 failed) 8ms
    ❯ release readiness probes (2)

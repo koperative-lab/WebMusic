@@ -1,5 +1,5 @@
 
- RUN  v5.0.2 /Users/mamingchen/.codex/worktrees/cd78/WebMusic
+ RUN  v5.0.2 <checkout>
 
 
  Test Files  7 passed (7)

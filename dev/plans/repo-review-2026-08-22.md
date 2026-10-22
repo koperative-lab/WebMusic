@@ -25,7 +25,7 @@ npm or CI observations are not extrapolated to the present.
 A dated compliance snapshot: every document under `dev/` (the handbook, the
 site plan, the conventions, the four page templates, the six plans) read in
 full, then the whole repository checked against them. Reviewed at `main`
-`9b2112b` (== `claude/dev-standards-project-review-3lv09e`) and `origin/dev`
+`9b2112b` (== `dev-standards-project-review-3lv09e`) and `origin/dev`
 `019f46d`. Method: the complete local gate (`npm run check`) was run; the CI
 history was pulled from GitHub Actions; three independent audit passes covered
 the docs site, the package/architecture claims, and the six plans, each
