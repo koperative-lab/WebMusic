@@ -4,8 +4,8 @@ import {AudioClip} from '@webmusic/audio';
 import {AudioClipPlayer} from '@webmusic/audio/play/headless';
 import {InsertChain} from '@webmusic/kernel/effect';
 import {
-  AudioOutputPort, ParamHandle, ParamSurface, createConnectionLease,
-  type ConnectionLease, type ModuleContext, type ModuleHandle, type ProjectFactoryRequest,
+  AudioOutputPort, ParamHandle, ParamSurface, routeModuleOutput,
+  type ConnectionLease, type ModuleHandle, type ProjectFactoryRequest,
   type ProjectJsonObject, type ProjectModuleInstance, type ProjectPluginFactory,
 } from '@webmusic/kernel/module';
 import {SessionLFO} from '@webmusic/kernel/session';
@@ -65,7 +65,7 @@ async function createAudio(request: ProjectFactoryRequest): Promise<ProjectModul
       await player.preload();
       if (disposed) throw new Error('Project audio player preparation was cancelled.');
       if (!route) {
-        const candidate = normalRoute(context, module, player.outputPort);
+        const candidate = routeModuleOutput(context, module, player.outputPort);
         if (disposed || !candidate.active) { candidate.release(); throw new Error('Project audio player admission was cancelled.'); }
         route = candidate;
       }
@@ -170,7 +170,7 @@ function createInsert({context, record}: ProjectFactoryRequest, recipe: Effect):
         candidate = new InsertChain(context.audio.prepare());
         candidate.setSlot({id: 'effect', recipe});
         candidatePort = new AudioOutputPort(candidate.output, {id: `${record.id}:output`});
-        candidateRoute = normalRoute(context, module, candidatePort);
+        candidateRoute = routeModuleOutput(context, module, candidatePort);
         if (disposed || !candidateRoute.active) throw new Error('Project insert admission was cancelled.');
         chain = candidate; port = candidatePort; route = candidateRoute;
       } catch (error) {
@@ -228,15 +228,6 @@ function createLfo({context, record}: ProjectFactoryRequest): ProjectModuleInsta
     exportConfig: () => ({...record.config, waveform: lfo?.waveform ?? waveform(record.config.waveform)}),
     dispose: () => { if (disposed) return; disposed = true; clean([() => registration.release(), () => lfo?.dispose()]); },
   };
-}
-
-function normalRoute(context: ModuleContext, module: ModuleHandle, port: AudioOutputPort): ConnectionLease {
-  if (context.admit) return context.admit(module, port);
-  const destination = context.destination?.() ?? context.audio.prepare().destination;
-  port.setDefault(destination);
-  return createConnectionLease(() => {
-    if (!port.disposed && port.defaultDestination === destination) port.setDefault(undefined);
-  });
 }
 
 function effectRecipe(config: ProjectJsonObject): Effect {

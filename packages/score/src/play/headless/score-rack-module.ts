@@ -2,6 +2,7 @@ import {
   AudioOutputPort,
   ModuleRegistry,
   createConnectionLease,
+  routeModuleOutput,
   type ConnectionLease,
   type ModuleContext,
   type ModuleHandle,
@@ -117,15 +118,7 @@ export class ScoreRackModule implements ModuleHandle {
       chain.setCompatibility(this.recipe);
       master.connect(chain.input);
       port = new AudioOutputPort(chain.output);
-      if (this.upstream.admit) route = this.upstream.admit(this, port);
-      else {
-        const destination = this.upstream.destination?.() ?? audio.destination;
-        port.setDefault(destination);
-        const routed = port;
-        route = createConnectionLease(() => {
-          if (!routed.disposed && routed.defaultDestination === destination) routed.setDefault(undefined);
-        });
-      }
+      route = routeModuleOutput(this.upstream, this, port);
       this.assertActive();
       if (!route.active) throw new Error('Score Rack admission was cancelled.');
       this.master = master;

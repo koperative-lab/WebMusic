@@ -25,12 +25,11 @@ import type {Effect} from '../headless/effects';
 import {boolAttr, numAttr, WebMusicElement, upgradeProperties} from './internal/base';
 import {RACK_DESK_TAG, RACK_SHARE_EVENT} from './internal/rack-part';
 import {isModularComposition, observeModuleContext, provideModuleContext, notifyModuleContext, notifyModuleChange} from '@webmusic/kernel/element';
-import {ModuleAudioEnvironment, ModuleContext, type ModuleHandle} from '@webmusic/kernel/module';
+import {ModuleAudioEnvironment, ModuleContext, sameModuleScope, type ModuleHandle} from '@webmusic/kernel/module';
 import {SessionTransport} from '@webmusic/kernel/session';
 import {ScorePlayerModule} from '../headless/score-module';
 import {mountModuleTransport, setModuleTransportVisibility} from './internal/module-transport';
 import {createModuleSoundfont} from './internal/lazy-module-soundfont';
-import {sameModuleScope} from './internal/module-scope';
 
 let nextElementModuleId = 0;
 

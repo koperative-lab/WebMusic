@@ -1,6 +1,6 @@
 import {
-  createConnectionLease,
   ModuleCapabilities,
+  routeModuleOutput,
   type ConnectionLease,
   type ModuleContext,
   type ModuleHandle,
@@ -135,15 +135,7 @@ export class ScorePlayerModule implements ModuleHandle {
     if (this.disposed) throw new Error('Score module preparation was cancelled.');
     const port = this.player.audioOutput!;
     if (!this.route) {
-      let route: ConnectionLease;
-      if (this.context.admit) route = this.context.admit(this, port);
-      else {
-        const destination = this.context.destination?.() ?? audio.destination;
-        port.setDefault(destination);
-        route = createConnectionLease(() => {
-          if (!port.disposed && port.defaultDestination === destination) port.setDefault(undefined);
-        });
-      }
+      const route = routeModuleOutput(this.context, this, port);
       if (this.disposed || !route.active) {
         route.release();
         throw new Error('Score module admission was cancelled.');

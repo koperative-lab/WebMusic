@@ -11,10 +11,9 @@ import {
 } from "./internal/rack-part";
 import {boolAttr, WebMusicElement, upgradeProperties} from "./internal/base";
 import {isModularComposition, observeModuleContext, provideModuleContext, notifyModuleContext, notifyModuleChange} from '@webmusic/kernel/element';
-import {ModuleAudioEnvironment, ModuleContext, type ModuleHandle} from '@webmusic/kernel/module';
+import {ModuleAudioEnvironment, ModuleContext, sameModuleScope, type ModuleHandle} from '@webmusic/kernel/module';
 import {ScoreRackModule} from '../headless/score-rack-module';
 import {ScorePlayerModule} from '../headless/score-module';
-import {sameModuleScope} from './internal/module-scope';
 
 const STYLE = `
 :host { display:block; box-sizing:border-box; inline-size:100%; min-inline-size:0; max-inline-size:100%; }
