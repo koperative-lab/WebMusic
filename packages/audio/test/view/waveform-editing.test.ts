@@ -686,6 +686,16 @@ describe('Audio View document borrowing', () => {
     element.removeAttribute('peaks-src'); expect(element.getAttribute('data-editor-state')).toBe('ready');
   });
 
+  it('keeps its editing surface when the bound player reports a load-state change', () => {
+    const player = document.createElement('div'); player.id = 'load-state-player'; document.body.append(player);
+    const element = view(); element.editor = editor(); element.editable = true; element.setAttribute('player', '#load-state-player');
+    document.body.append(element);
+    const surface = element.querySelector('[part="editing-surface"]');
+    expect(surface).not.toBeNull();
+    player.dispatchEvent(new Event('webaudio:loadstatechange'));
+    expect(element.querySelector('[part="editing-surface"]')).toBe(surface);
+  });
+
   const independentSources = {
     clip: () => createAudioClip({sampleRate: 100, channelData: [new Float32Array(10)]}),
     peaks: () => ({sampleRate: 100, channels: 1, baseSamplesPerPeak: 1, levels: []}),

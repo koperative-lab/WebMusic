@@ -5,7 +5,7 @@ with [Product](../PRODUCT.md), [Design principles](../DESIGN-PRINCIPLES.md) and
 [Architecture](../ARCHITECTURE.md). [Decisions](../DECISIONS.md) records accepted
 choices; [STATUS](../STATUS.md) distinguishes delivery from target design.
 
-DEC-047 accepts the document/editor, playback and editable-View contracts below.
+DEC-053 accepts the document/editor, playback and editable-View contracts below.
 The [current five-phase roadmap](EDIT-COMPONENTS.md#implementation-and-reference-delivery)
 groups delivery as P0 design, P1 Score foundation, P2 Score editing workflow,
 P3 Audio single-file workflow and P4 staff editing. STATUS EDIT-01 tracks actual

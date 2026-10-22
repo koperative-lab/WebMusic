@@ -9,7 +9,7 @@ afterEach(() => {
 });
 
 describe('mountStatus', () => {
-  it('paints loading, error and ready states with accessible semantics', () => {
+  it('paints loading, waiting, empty, error and ready states with accessible semantics', () => {
     const host = document.createElement('div');
     let state: StatusState = {kind: 'loading'};
     let notify: (() => void) | undefined;
@@ -25,8 +25,8 @@ describe('mountStatus', () => {
         },
       },
       {
-        classNames: {root: 'legacy-status', message: 'legacy-message'},
-        parts: {root: 'status-shell', message: 'status-copy'},
+        classNames: {root: 'legacy-status', indicator: 'legacy-indicator', message: 'legacy-message'},
+        parts: {root: 'status-shell', indicator: 'status-animation', message: 'status-copy'},
       },
     );
 
@@ -36,15 +36,36 @@ describe('mountStatus', () => {
     expect(handle.element.getAttribute('aria-live')).toBe('polite');
     expect(handle.element.getAttribute('aria-busy')).toBe('true');
     expect(handle.message.textContent).toBe('Loading…');
+    expect(handle.indicator.hidden).toBe(false);
+    expect(handle.indicator.getAttribute('aria-hidden')).toBe('true');
+    expect(handle.indicator.childElementCount).toBe(4);
     expect(handle.element.classList.contains('legacy-status')).toBe(true);
+    expect(handle.indicator.classList.contains('legacy-indicator')).toBe(true);
     expect(handle.element.getAttribute('part')).toContain('status-shell');
+    expect(handle.indicator.getAttribute('part')).toContain('status-animation');
     expect(handle.message.getAttribute('part')).toContain('status-copy');
+
+    state = {kind: 'waiting'};
+    notify?.();
+    expect(handle.element.dataset.kind).toBe('waiting');
+    expect(handle.element.getAttribute('role')).toBe('status');
+    expect(handle.element.getAttribute('aria-live')).toBe('polite');
+    expect(handle.element.hasAttribute('aria-busy')).toBe(false);
+    expect(handle.indicator.hidden).toBe(false);
+    expect(handle.message.textContent).toBe('Waiting for a source…');
+
+    state = {kind: 'empty'};
+    notify?.();
+    expect(handle.element.getAttribute('role')).toBe('status');
+    expect(handle.indicator.hidden).toBe(true);
+    expect(handle.message.textContent).toBe('Nothing to show.');
 
     state = {kind: 'error', message: 'Could not decode'};
     notify?.();
     expect(handle.element.getAttribute('role')).toBe('alert');
     expect(handle.element.getAttribute('aria-live')).toBe('assertive');
     expect(handle.element.hasAttribute('aria-busy')).toBe(false);
+    expect(handle.indicator.hidden).toBe(true);
     expect(handle.message.textContent).toBe('Could not decode');
 
     state = {kind: 'ready'};
@@ -56,6 +77,75 @@ describe('mountStatus', () => {
     handle.destroy();
     expect(notify).toBeUndefined();
     expect(host.childElementCount).toBe(0);
+  });
+
+  it('keeps active feedback text available to assistive technology without visible copy', () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    let state: StatusState = {kind: 'waiting', message: 'Connect a player'};
+    const handle = mountStatus(host, {snapshot: () => state});
+
+    for (const kind of ['waiting', 'loading'] as const) {
+      state = {kind, message: 'Connect a player'};
+      handle.update();
+      expect(handle.message.textContent).toBe('Connect a player');
+      expect(handle.message.hidden).toBe(false);
+      expect(handle.message.hasAttribute('aria-hidden')).toBe(false);
+      expect(getComputedStyle(handle.message).position).toBe('absolute');
+      expect(getComputedStyle(handle.message).clipPath).toBe('inset(50%)');
+    }
+
+    state = {kind: 'error', message: 'Source failed'};
+    handle.update();
+    expect(getComputedStyle(handle.message).position).not.toBe('absolute');
+    expect(handle.message.textContent).toBe('Source failed');
+    handle.destroy();
+  });
+
+  it('does not restart animation or repeat live-region mutations on unchanged notifications', () => {
+    const host = document.createElement('div');
+    let state: StatusState = {kind: 'loading', message: 'Preparing'};
+    const handle = mountStatus(host, {snapshot: () => state});
+    const indicator = handle.indicator;
+    const cells = Array.from(indicator.children);
+    const observer = new MutationObserver(() => {});
+    observer.observe(handle.element, {attributes: true, childList: true, characterData: true, subtree: true});
+
+    for (let update = 0; update < 100; update++) handle.update();
+
+    expect(observer.takeRecords()).toEqual([]);
+    state = {kind: 'waiting', message: 'Connect a source'};
+    handle.update();
+    expect(handle.indicator).toBe(indicator);
+    cells.forEach((cell, index) => expect(handle.indicator.children[index]).toBe(cell));
+    expect(handle.message.textContent).toBe('Connect a source');
+
+    observer.disconnect();
+    handle.destroy();
+    handle.destroy();
+    handle.update();
+    expect(host.childElementCount).toBe(0);
+  });
+
+  it('keeps indicators static when the surrounding workbench disables continuous motion', () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    let state: StatusState = {kind: 'loading'};
+    const handle = mountStatus(host, {snapshot: () => state});
+
+    for (const motion of ['none', 'stepped']) {
+      host.dataset.motion = motion;
+      state = {kind: 'loading'};
+      handle.update();
+      for (const cell of handle.indicator.children) {
+        expect(getComputedStyle(cell).animation).toBe('none');
+      }
+      state = {kind: 'waiting'};
+      handle.update();
+      expect(getComputedStyle(handle.indicator).animation).toBe('none');
+    }
+
+    handle.destroy();
   });
 
   it('preserves caller DOM, replaces a previous mount and routes failures', () => {

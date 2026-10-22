@@ -10,6 +10,9 @@ import {ScorePlayer} from '../../src/play/headless/score-player';
 import {Rack} from '../../src/play/headless/rack';
 import type {HeadlessSynth} from '../../src/play/headless/audio-contracts';
 
+const source = vi.hoisted(() => ({load: vi.fn()}));
+vi.mock('../../src/io/load', () => ({loadScoreFromUrl: source.load}));
+
 customElements.define('score-player-lifecycle', ScorePlayerElement);
 customElements.define('score-rack-control', RackControlElement);
 customElements.define('score-rack-part', RackPartElement);
@@ -47,9 +50,77 @@ function element(): ScorePlayerElement {
   return document.createElement('score-player-lifecycle') as ScorePlayerElement;
 }
 
-afterEach(() => document.body.replaceChildren());
+afterEach(() => {
+  document.body.replaceChildren();
+  source.load.mockReset();
+  vi.restoreAllMocks();
+});
 
 describe('score-player lifecycle with real transport owners', () => {
+  it('preserves authored children while waiting and keeps only the latest pending source status', async () => {
+    let finishFirst!: (value: ReturnType<typeof score>) => void;
+    let finishSecond!: (value: ReturnType<typeof score>) => void;
+    source.load.mockImplementationOnce(() => new Promise((resolve) => { finishFirst = resolve; }))
+      .mockImplementationOnce(() => new Promise((resolve) => { finishSecond = resolve; }));
+    const host = element();
+    const authored = document.createElement('span');
+    host.append(authored);
+    document.body.append(host);
+    await flush();
+    expect(host.querySelector('[data-kind="waiting"]')).not.toBeNull();
+    expect(authored.parentElement).toBe(host);
+    host.setAttribute('src', 'first.mid');
+    expect(host.querySelector('[data-kind="loading"]')?.getAttribute('aria-busy')).toBe('true');
+    await vi.waitFor(() => expect(source.load).toHaveBeenCalledOnce());
+    const firstSignal = source.load.mock.calls[0]![1].signal as AbortSignal;
+    host.setAttribute('src', 'second.mid');
+    await vi.waitFor(() => expect(source.load).toHaveBeenCalledTimes(2));
+    expect(firstSignal.aborted).toBe(true);
+    finishFirst(score());
+    await flush();
+    expect(host.querySelector('[data-kind="loading"]')).not.toBeNull();
+    finishSecond(score());
+    await vi.waitFor(() => expect(host.playback.snapshot().readiness).toBe('ready'));
+    expect(host.querySelector('[role="status"]')).toBeNull();
+    expect(host.querySelector('[part~="play"]')).not.toBeNull();
+    expect(authored.parentElement).toBe(host);
+    host.remove();
+    expect(host.querySelector('[data-rack-transport]')).toBeNull();
+    expect(authored.parentElement).toBe(host);
+  });
+
+  it('shows source failure details and recovers from the error on a fresh score', async () => {
+    const reported = vi.spyOn(console, 'error').mockImplementation(() => {});
+    source.load.mockRejectedValue(new Error('Player source unavailable'));
+    const host = element();
+    host.setAttribute('src', 'failed.mid');
+    document.body.append(host);
+    await vi.waitFor(() => expect(host.querySelector('[role="alert"]')?.textContent).toBe('Player source unavailable'));
+    expect(host.playback.snapshot().readiness).toBe('error');
+    expect(reported).toHaveBeenCalled();
+    host.score = score();
+    await flush();
+    expect(host.querySelector('[role="alert"], [role="status"]')).toBeNull();
+    expect(host.playback.snapshot().readiness).toBe('ready');
+  });
+
+  it('removes the loading indicator on disconnect and rejects late completion', async () => {
+    let finish!: (value: ReturnType<typeof score>) => void;
+    source.load.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+    const host = element();
+    host.setAttribute('src', 'pending.mid');
+    document.body.append(host);
+    await vi.waitFor(() => expect(source.load).toHaveBeenCalledOnce());
+    const signal = source.load.mock.calls[0]![1].signal as AbortSignal;
+    host.remove();
+    expect(signal.aborted).toBe(true);
+    expect(host.querySelector('[role="status"]')).toBeNull();
+    finish(score());
+    await flush();
+    expect(host.playback.snapshot().readiness).toBe('disposed');
+    expect(host.querySelector('[part~="play"]')).toBeNull();
+  });
+
   it('keeps a borrowed controller rate across connection, reconnection and attribute initialization', async () => {
     const music = score();
     const player = new ScorePlayer(music);
@@ -61,6 +132,7 @@ describe('score-player lifecycle with real transport owners', () => {
     host.setAttribute('rate', '0.75');
     document.body.append(host);
     await flush();
+    expect(host.querySelector('[role="status"]')).toBeNull();
     expect(controller.rate).toBe(1.5);
     expect(setRate).not.toHaveBeenCalled();
     host.remove();

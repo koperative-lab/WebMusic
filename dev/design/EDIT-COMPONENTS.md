@@ -4,9 +4,9 @@ Status: accepted design (P0, 2026-10-13); P1 Score Core/API/Headless delivered
 and verified on 2026-10-15. P2 Score bindings and piano-roll editing are
 implemented. P3 Audio sequence/history, playback, declaration, waveform editing,
 range processing and WAV export are implemented; current verification belongs to
-STATUS. P4 staff input extends the existing staff View under DEC-048; its
+STATUS. P4 staff input extends the existing staff View under DEC-054; its
 implementation and verification are tracked in STATUS.
-Related decision: [DEC-047](../DECISIONS.md#dec-047--document-owned-editing-and-borrowed-playback).
+Related decision: [DEC-053](../DECISIONS.md#dec-053--document-owned-editing-and-borrowed-playback).
 [STATUS](../STATUS.md), EDIT-01, owns delivery; the
 [dated proposal](../plans/2026-10-13-editing-capabilities.md) retains the original
 P0–P8 baseline. The current five-phase roadmap is below. This document specifies
@@ -38,7 +38,7 @@ undoes/redoes, auditions and exports WAV.
 
 Existing piano-roll and waveform renderers gain optional editing interaction.
 Staff input retains `score-view type="staff"` with a separate local input
-controller and shared renderer under [DEC-048](../DECISIONS.md#dec-048--staff-input-inside-the-existing-score-view). Complete engraving,
+controller and shared renderer under [DEC-054](../DECISIONS.md#dec-054--staff-input-inside-the-existing-score-view). Complete engraving,
 performance-only note editing, seamless live replacement, spectral repair,
 multi-track arrangement, cross-document history, persistence and collaboration
 are separate work. An editable surface does not imply those capabilities.

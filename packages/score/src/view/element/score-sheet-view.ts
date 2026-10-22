@@ -4,7 +4,7 @@ import {renderOSMDStaffVisualizer} from '../render/osmd-staff';
 import type {RenderedScoreVisualizer} from '../core/types';
 import {HTMLElementBase, boolAttr, cssSizeAttr, defineOnce, upgradeProperty} from './base';
 import {mountStage, type StageHandle} from '@webmusic/ui/stage';
-import {mountStatus, type StatusHandle} from '@webmusic/ui/status';
+import {mountStatus, type StatusHandle, type StatusKind} from '@webmusic/ui/status';
 
 // OSMD stores its default ink as hex while loading. Map that reserved paint to
 // CSS at the SVG boundary so later ancestor/theme changes need no score reload.
@@ -64,6 +64,10 @@ export class SheetViewElement extends HTMLElementBase {
 
   disconnectedCallback(): void {
     this.cancelLoad();
+    this.disposePresentation();
+  }
+
+  private disposePresentation(): void {
     this.unbindPlayer?.();
     this.unbindPlayer = undefined;
     this.rendered?.dispose?.();
@@ -73,6 +77,7 @@ export class SheetViewElement extends HTMLElementBase {
     this.status?.destroy();
     this.status = undefined;
     this.surface = undefined;
+    this.replaceChildren();
   }
 
   attributeChangedCallback(name?: string): void {
@@ -105,25 +110,35 @@ export class SheetViewElement extends HTMLElementBase {
     const token = this.loadToken;
     const controller = new AbortController();
     this.loadController = controller;
-
-    const score = await this.resolveScore(controller.signal);
-    if (token !== this.loadToken || !this.isConnected) return;
-
-    this.unbindPlayer?.();
-    this.unbindPlayer = undefined;
-    this.rendered?.dispose?.();
-    this.rendered = undefined;
-    this.stage?.destroy();
-    this.stage = undefined;
-    this.status?.destroy();
-    this.status = undefined;
-    this.surface = undefined;
-    this.replaceChildren();
+    this.disposePresentation();
     this.applyHostLayout();
-    if (!score) return;
+    if (!this.explicitScore && !this.getAttribute('src')) {
+      this.loadController = undefined;
+      this.showStatus('waiting', 'Waiting for a score');
+      return;
+    }
+    this.showStatus('loading', 'Loading sheet music');
+
+    let score: Score | undefined;
+    try {
+      score = await this.resolveScore(controller.signal);
+    } catch (error) {
+      if (controller.signal.aborted || token !== this.loadToken || !this.isConnected) return;
+      this.loadController = undefined;
+      this.renderError(error);
+      return;
+    }
+    if (token !== this.loadToken || !this.isConnected) return;
+    if (!score) {
+      this.loadController = undefined;
+      this.showStatus('waiting', 'Waiting for a score');
+      return;
+    }
 
     const document = (this as {ownerDocument?: Document}).ownerDocument;
     if (!document) return;
+    this.status?.destroy();
+    this.status = undefined;
     this.stage = mountStage(this, {render: () => undefined}, {
       label: 'Sheet music',
       fill: true,
@@ -133,6 +148,14 @@ export class SheetViewElement extends HTMLElementBase {
     });
     const surface = this.stage.surface;
     this.surface = surface;
+    // Preserve layout measurements for the async engraving without exposing a
+    // partially drawn page. The passive status occupies the same stage.
+    surface.style.visibility = 'hidden';
+    this.stage.element.style.minHeight = 'var(--wm-status-height, 3rem)';
+    this.status = mountStatus(this.stage.element, {
+      snapshot: () => ({kind: 'loading', message: 'Loading sheet music'}),
+    });
+    Object.assign(this.status.element.style, {position: 'absolute', inset: '0', border: '0', background: 'transparent'});
     if (!this.osmd) {
       const palette = String(++nextSheetPalette);
       surface.dataset.webscoreSheetPalette = palette;
@@ -168,6 +191,10 @@ export class SheetViewElement extends HTMLElementBase {
         return;
       }
       this.rendered = rendered;
+      this.status?.destroy();
+      this.status = undefined;
+      surface.style.removeProperty('visibility');
+      this.stage?.element.style.removeProperty('min-height');
       this.applyFollowCursor();
       this.bindPlayer();
     } catch (error) {
@@ -176,18 +203,19 @@ export class SheetViewElement extends HTMLElementBase {
     }
   }
 
+  private showStatus(kind: StatusKind, message: string): void {
+    if (!(this as {ownerDocument?: Document}).ownerDocument) return;
+    this.status?.destroy();
+    this.status = mountStatus(this, {snapshot: () => ({kind, message})});
+  }
+
   /** Show the engine's own message — it names the missing peer precisely. */
   private renderError(error: unknown): void {
     if (!(this as {ownerDocument?: Document}).ownerDocument) return;
-    this.stage?.destroy();
-    this.stage = undefined;
-    this.status?.destroy();
-    this.status = undefined;
-    this.surface = undefined;
-    this.replaceChildren();
+    this.disposePresentation();
     this.applyHostLayout();
     const message = error instanceof Error ? error.message : String(error);
-    this.status = mountStatus(this, {snapshot: () => ({kind: 'error', message})});
+    this.showStatus('error', message);
   }
 
   private applyHostLayout(): void {
@@ -266,17 +294,11 @@ export class SheetViewElement extends HTMLElementBase {
     const src = this.getAttribute('src');
     if (!src) return undefined;
     const format = this.getAttribute('format') ?? undefined;
-    try {
-      const io = await import('../../io/load');
-      return await io.loadScoreFromUrl(src, {
-        ...(format ? {format: format as never} : {}),
-        signal,
-      });
-    } catch (error) {
-      if (signal.aborted) return undefined;
-      console.error('[WebScore] <score-sheet-view> failed to load', src, error);
-      return undefined;
-    }
+    const io = await import('../../io/load');
+    return io.loadScoreFromUrl(src, {
+      ...(format ? {format: format as never} : {}),
+      signal,
+    });
   }
 }
 

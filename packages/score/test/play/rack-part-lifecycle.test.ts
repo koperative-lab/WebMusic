@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import type {Score} from '../../src/core';
-const loads = vi.hoisted(() => [] as Array<{signal: AbortSignal; resolve(score: Score): void}>);
+const loads = vi.hoisted(() => [] as Array<{signal: AbortSignal; resolve(score: Score): void; reject(error: unknown): void}>);
 vi.mock('../../src/io/load', () => ({loadScoreFromUrl: vi.fn((_src: string, {signal}: {signal: AbortSignal}) =>
-  new Promise<Score>((resolve) => { loads.push({signal, resolve}); }))}));
+  new Promise<Score>((resolve, reject) => { loads.push({signal, resolve, reject}); }))}));
 import {loadScoreFromUrl} from '../../src/io/load';
 import {defineRackPartElement, type RackPartElement} from '../../src/play/element/score-rack-part';
 defineRackPartElement();
@@ -19,6 +19,37 @@ function mount() {
 }
 
 describe('Rack part declaration lifetime', () => {
+  it('publishes loading readiness to its desk and ignores a superseded completion', async () => {
+    const {part} = mount();
+    expect(part.rackPartStatus().kind).toBe('loading');
+    await flush();
+    const direct = {} as Score;
+    part.score = direct;
+    expect(loads[0]!.signal.aborted).toBe(true);
+    expect(part.rackPartStatus().kind).toBe('ready');
+    loads[0]!.resolve({} as Score);
+    await flush();
+    expect(part.rackPartDeclaration()?.score).toBe(direct);
+    expect(part.rackPartStatus().kind).toBe('ready');
+    part.removeAttribute('src');
+    part.score = undefined;
+    expect(part.rackPartStatus().kind).toBe('waiting');
+    expect(part.style.display).toBe('none');
+  });
+
+  it('clears loading and publishes a failed request to the desk', async () => {
+    const {desk, part} = mount();
+    const states: string[] = [];
+    desk.addEventListener('webscore:rack-part', () => states.push(part.rackPartStatus().kind));
+    await flush();
+    loads[0]!.reject(new Error('Part unavailable'));
+    await flush();
+    expect(part.rackPartStatus()).toEqual({kind: 'error', message: 'Part unavailable'});
+    expect(states.at(-1)).toBe('error');
+    part.removeAttribute('src');
+    expect(part.rackPartStatus().kind).toBe('waiting');
+  });
+
   it('announces an id change without refetching its score or changing its sound', async () => {
     const {desk, part} = mount();
     await flush();

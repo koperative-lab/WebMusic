@@ -2,8 +2,8 @@
 
 > Current design, accepted in DEC-015 and refined for staff notation in DEC-024.
 > DEC-045 owns the domain-prefixed tags. Source and public leaf pages own exact
-> members; STATUS owns delivery and verification gaps. DEC-047 adds the accepted
-> document-bound editing below; DEC-048 keeps staff entry in the same family.
+> members; STATUS owns delivery and verification gaps. DEC-053 adds the accepted
+> document-bound editing below; DEC-054 keeps staff entry in the same family.
 
 ## Purpose and boundaries
 
@@ -93,7 +93,7 @@ These visual connections and clipping add no controls.
 ## Document-bound editing
 
 [Editing contracts](EDIT-COMPONENTS.md) and
-[DEC-047](../DECISIONS.md#dec-047--document-owned-editing-and-borrowed-playback)
+[DEC-053](../DECISIONS.md#dec-053--document-owned-editing-and-borrowed-playback)
 own the accepted editing behavior. [STATUS](../STATUS.md), EDIT-01, tracks
 implementation and verification. `.editor`, the `editor` selector and `editable`
 are documented in the owning public ScoreView reference.
@@ -155,11 +155,14 @@ permit application CSS overrides. Wide musical content scrolls within its own
 surface; it must not enlarge the page or cover controls and labels.
 
 Fitting the host must not shrink text or pitch marks below a readable size.
-UIKit pitch viewports keep minimum key and fret geometry, expose keyboard
-panning only while they overflow, and extend staff lines or fret spacing into
-available width. PitchView's keyboard reveals newly sounding notes; ordinary
-repaints and releases preserve a user's manual pan. Display labels remain
-bounded by their keys, with complete text available to assistive technology.
+UIKit pitch viewports retain their minimum-geometry defaults and expose keyboard
+panning only while they overflow. DEC-050 makes the PitchView Element's keyboard
+fit MIDI 48–71 to the container by default, without horizontal scrolling.
+Explicit `scroll="true"` restores minimum/fixed key widths and optional
+new-note following; ordinary repaints and releases preserve a user's manual
+pan. Staff and fretboard sizing is unchanged: staff lines or fret spacing extend
+into the available width. Display labels remain bounded by their keys, with
+complete text available to assistive technology.
 
 UIKit Stage provides a minimum drawing-surface width independently of its
 shrinkable host. SheetView uses that capability for readable engraving and

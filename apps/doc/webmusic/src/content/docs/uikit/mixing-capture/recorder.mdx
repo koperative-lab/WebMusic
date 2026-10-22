@@ -66,10 +66,15 @@ even when `canPlay` becomes false. The presenter borrows all recorder state and 
 | `level?` | `number` | Normalized input level written to `--wui-recorder-level`. Omission hides the meter. |
 | `recordedCount?` | `number` | Count printed by the generated `● recording… <count>` status; defaults there to `0`. |
 | `takeCount?` | `number` | Count printed by generated captured/playback status. When explicit availability is absent, any defined value enables play and export, including `0`. |
-| `status?` | `string` | Overrides every generated status string. |
+| `status?` | `string` | Overrides the generated status or supplies the accessible loading/waiting description. |
+| `statusKind?` | `'loading' \| 'waiting' \| 'error'` | Selects shared passive feedback. When omitted, `busy` uses loading; other states show their normal status text. |
 | `canPlay?` | `boolean` | Explicit playback availability. When absent, falls back to whether `takeCount` is defined. |
 | `canExport?` | `boolean` | Explicit availability for every export button. When absent, falls back to whether `takeCount` is defined. |
 | `disabled?` | `boolean` | Strict `true` blocks all commands and applies root `aria-disabled`. |
+
+Loading and waiting use the shared square animations, with visually hidden live descriptions.
+Errors remain visible. Feedback does not itself block commands; `busy` and `disabled` retain
+that responsibility. The animations follow reduced-motion preferences.
 
 Without `status`, the fallback order is recording count, playing-take text, captured-take text
 when `takeCount` is defined, then `Ready`. Finite counts become nonnegative integers; invalid
@@ -114,7 +119,8 @@ pressed state follows capture/playback. Recording has a dynamic accessible name;
 uses `playLabel` unless an explicit `stopPlaybackLabel` supplies its playing name. Export buttons
 are named `Download <label>`.
 The optional input level uses `role="progressbar"`, bounds 0–1 and a percentage value text;
-its decorative fill is hidden from accessibility. Status is a named, atomic, polite live region.
+its decorative fill is hidden from accessibility. Normal status is a named, atomic, polite
+live region; passive loading/waiting descriptions are polite, and errors use an alert.
 Busy/disabled state blocks every native command; keyboard focus remains visible.
 
 </details>

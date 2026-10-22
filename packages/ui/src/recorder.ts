@@ -1,3 +1,4 @@
+import {mountStatus, statusStyle, type StatusState} from './status';
 import {installStyle} from './internal/style';
 import {componentSurfaceCss, controlBorderFallback} from './internal/surface';
 import {controlHeight, controlRadius} from './internal/control';
@@ -16,6 +17,8 @@ export interface RecorderState {
   recordedCount?: number;
   takeCount?: number;
   status?: string;
+  /** Passive feedback; busy defaults to loading. Ready/recording text remains visible. */
+  statusKind?: 'loading' | 'waiting' | 'error';
   canPlay?: boolean;
   canExport?: boolean;
   disabled?: boolean;
@@ -91,6 +94,7 @@ interface NormalizedRecorderState {
   recordedCount?: number;
   takeCount?: number;
   status?: string;
+  statusKind?: 'loading' | 'waiting' | 'error';
   canPlay: boolean;
   canExport: boolean;
   disabled: boolean;
@@ -102,7 +106,7 @@ interface RecorderMountClaim {
 
 const mountedRecorders = new WeakMap<RecorderHost, RecorderMountClaim>();
 
-export const recorderStyle = `
+export const recorderStyle = statusStyle + `
 .wui-recorder,
 .wui-recorder * { box-sizing: border-box; }
 .wui-recorder{
@@ -117,6 +121,7 @@ min-width:0;max-width:100%;display:flex;align-items:center;gap:.6rem;flex-wrap:w
 .wui-recorder__exports{display:flex;flex-wrap:wrap;gap:.4rem;min-width:0;max-width:100%}.wui-recorder__exports:empty{display:none}
 .wui-recorder__meter{width:var(--wm-recorder-meter-width,90px);max-width:100%;height:${controlHeight('recorder')};background:var(--wui-recorder-track,var(--wm-recorder-track,var(--wm-surface-muted,#ddd)));overflow:hidden;border-radius:${controlRadius('recorder')}}.wui-recorder__level{height:100%;background:var(--wui-recorder-accent,var(--wm-recorder-accent,var(--wm-accent,#c0392b)));transform-origin:left;transform:scaleX(var(--wui-recorder-level,0))}
 .wui-recorder__status{flex-basis:100%;min-width:0;overflow-wrap:anywhere;font:var(--wm-recorder-status-font,.76rem var(--wm-font-mono,ui-monospace,monospace));color:var(--wui-recorder-muted,var(--wm-recorder-muted,var(--wm-foreground-muted,var(--wm-foreground,#666))))}
+.wui-recorder__status .wui-status { min-height:1.25rem; }
 .wui-recorder__button { font:inherit; }
 .wui-recorder__button:focus-visible {
   outline: 2px solid var(--wm-focus, var(--wm-focus-ring, currentColor));
@@ -177,6 +182,7 @@ function normalizeSnapshot(snapshot: RecorderState): NormalizedRecorderState {
     ...(snapshot?.status === undefined || snapshot?.status === null
       ? {}
       : { status: text(snapshot.status) }),
+    ...(snapshot?.statusKind ? {statusKind: snapshot.statusKind} : {}),
     canPlay:
       snapshot?.canPlay === undefined || snapshot?.canPlay === null
         ? hasTake
@@ -306,6 +312,13 @@ export function mountRecorder(
   addClassNames(status, options.classNames?.status);
   setParts(status, "status", options.parts?.status);
 
+  const statusText = document.createElement('span');
+  status.append(statusText);
+  let feedbackState: StatusState = {kind: 'ready'};
+  const feedback = mountStatus(status, {snapshot: () => feedbackState}, {
+    stylesheet: false, classNames: {root: 'wui-status--embedded'},
+  });
+
   root.append(
     record,
     ...(hasPlayback ? [play] : []),
@@ -392,7 +405,18 @@ export function mountRecorder(
     meter.hidden = state.level === undefined;
     meter.setAttribute("aria-valuenow", String(amount));
     meter.setAttribute("aria-valuetext", `${Math.round(amount * 100)}%`);
-    status.textContent = state.status ?? defaultStatus(state);
+    const statusKind = state.statusKind ?? (state.busy ? 'loading' : 'ready');
+    feedbackState = {kind: statusKind, message: statusKind === 'ready' ? '' : state.status};
+    feedback.update();
+    statusText.hidden = statusKind !== 'ready';
+    statusText.textContent = statusKind === 'ready' ? (state.status ?? defaultStatus(state)) : '';
+    if (statusKind === 'ready') {
+      status.setAttribute('role', 'status');
+      status.setAttribute('aria-live', 'polite');
+    } else {
+      status.removeAttribute('role');
+      status.removeAttribute('aria-live');
+    }
     current = state;
   };
 
@@ -499,6 +523,7 @@ export function mountRecorder(
       // Preserve the mount failure after best-effort rollback.
     }
     unsubscribe = undefined;
+    feedback.destroy();
     try {
       root.remove();
     } catch {
@@ -538,6 +563,7 @@ export function mountRecorder(
         cleanupFailed = true;
       }
       unsubscribe = undefined;
+      feedback.destroy();
       try {
         root.remove();
       } catch (error) {

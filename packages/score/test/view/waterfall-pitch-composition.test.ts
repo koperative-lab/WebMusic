@@ -30,7 +30,7 @@ async function pair(low: number, high: number, white = 32, black = 20) {
   })) score.setAttribute(key, String(value));
   for (const [key, value] of Object.entries({
     type: 'keyboard', low, high, 'white-key-width': white, 'black-key-width': black,
-    'white-key-height': 80, 'black-key-height': 48, follow: 'none',
+    'white-key-height': 80, 'black-key-height': 48, scroll: 'true', follow: 'none',
   })) pitch.setAttribute(key, String(value));
   score.score = music(low, high);
   document.body.append(score, pitch);

@@ -1,8 +1,8 @@
 # Score Play component responsibilities
 
-Status: existing Play surfaces implemented, including responsive presenter changes; browser and real-device acceptance pending. Document-bound playback below is implemented under DEC-047; STATUS EDIT-01 tracks its remaining verification.
+Status: existing Play surfaces implemented, including responsive presenter changes; browser and real-device acceptance pending. Document-bound playback below is implemented under DEC-053; STATUS EDIT-01 tracks its remaining verification.
 Layer and public entry: Score Play Headless, Elements and UI bindings.
-Related decisions: DEC-016, DEC-045 and DEC-047.
+Related decisions: DEC-016, DEC-045 and DEC-053.
 Source and public types: [Play source](../../packages/score/src/play/).
 Owning reference and demos: [Play Elements](../../apps/doc/webmusic/src/content/docs/score/element/index.mdx#play).
 
@@ -50,7 +50,7 @@ not a claim of uniform companion data support.
 ## Document-bound playback
 
 [Editing contracts](EDIT-COMPONENTS.md) and
-[DEC-047](../DECISIONS.md#dec-047--document-owned-editing-and-borrowed-playback)
+[DEC-053](../DECISIONS.md#dec-053--document-owned-editing-and-borrowed-playback)
 define the editing integration. It is implemented; [STATUS](../STATUS.md),
 EDIT-01, tracks remaining verification. The owning public references list the
 shipped members.

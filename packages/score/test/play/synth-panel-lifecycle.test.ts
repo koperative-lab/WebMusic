@@ -41,6 +41,23 @@ afterEach(() => {
 });
 
 describe('synth-panel audio and parameter lifecycle', () => {
+  it('waits for missing section configuration and keeps ready editors interactive', () => {
+    const element = panel();
+    element.sections = ['sound', 'effects', 'eq', 'macros', 'envelope', 'lfo'];
+    document.body.append(element);
+    const states = () => element.shadowRoot!.querySelectorAll('[part~="synth-status"][data-kind="waiting"]');
+    expect(states()).toHaveLength(4);
+    expect(element.shadowRoot!.querySelector('[part~="synth-envelope-slot"] [data-kind="waiting"]')).toBeNull();
+    expect(element.shadowRoot!.querySelector('[part~="synth-lfo-slot"] [data-kind="waiting"]')).toBeNull();
+    element.sound = [{name: 'gain', value: 0.2, min: 0, max: 1, apply: () => {}}];
+    expect(states()).toHaveLength(3);
+    expect(binding().snapshot().parameters).toHaveLength(1);
+    element.remove();
+    expect(states()).toHaveLength(0);
+    document.body.append(element);
+    expect(states()).toHaveLength(3);
+  });
+
   it('does not rebuild audio when non-audio sections are reordered, added or hidden', () => {
     const element = panel();
     const voice = effect();

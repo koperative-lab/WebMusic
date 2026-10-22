@@ -41,6 +41,12 @@ const state = vi.hoisted(() => ({
   setChrome: vi.fn(),
 }));
 
+// This structural host tests transport/event ownership; browser status
+// presentation is covered by score-player-lifecycle.test.ts.
+vi.mock('@webmusic/ui/status', () => ({
+  mountStatus: vi.fn(() => ({destroy: vi.fn()})),
+}));
+
 vi.mock('../../src/io/load', async (importOriginal) => {
   const original = await importOriginal<typeof import('../../src/io/load')>();
   return {

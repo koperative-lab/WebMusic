@@ -1,21 +1,14 @@
 // @vitest-environment jsdom
 import {afterEach, describe, expect, it, vi} from 'vitest';
-import {existsSync, readFileSync} from 'node:fs';
 import {Duration, Pitch, Rational, ScoreBuilder, VoiceId, type Score} from '../../src/core';
-import {loadScore} from '../../src/io';
 import {ChordAnalysisElement} from '../../src/analyze/element/score-chord-analysis';
-import {projectChordCells} from '../../src/analyze/element/internal/chord-cells';
+import {projectBasicInspection} from '../../src/analyze/headless';
 
 vi.mock('@webmusic/ui/harmony', () => import('../../../ui/src/harmony'));
 vi.mock('@webmusic/ui/workbench', () => import('../../../ui/src/workbench'));
 
 let serial = 0;
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
-
-function arabesqueBytes(format: 'midi' | 'mxl'): Uint8Array {
-  const asset = `apps/doc/webmusic/public/${format === 'midi' ? 'midi/Arabesque No.1.mid' : 'mxl/Arabesque No.1.mxl'}`;
-  return readFileSync(existsSync(asset) ? asset : `../../${asset}`);
-}
 
 function score(): Score {
   const builder = new ScoreBuilder();
@@ -89,53 +82,64 @@ describe('score inspection Elements', () => {
     expect(element.score).toBeDefined();
   });
 
-  it('keeps dense Arabesque harmony readable and cell inspection aligned with the lane', async () => {
-    const music = await loadScore(arabesqueBytes('mxl'), {format: 'mxl'});
+  it('uses simultaneous note boundaries rather than combining consecutive chords', async () => {
+    const music = score();
     const element = await mount(ChordAnalysisElement, music);
+    element.grouping = 'simultaneous';
     const bands = [...element.querySelectorAll<HTMLElement>('.wui-harmony-flow__band')];
-    expect(bands).toHaveLength(music.measures.length * 2);
-    expect(bands.length).toBeLessThan(300);
-    expect(element.selection).toMatchObject({startQuarters: 0, endQuarters: 2});
-    expect(element.analysis?.headline).toBe(bands[0]?.querySelector('.wui-harmony-flow__label')?.textContent);
-    expect(element.analysis?.evidence.length).toBeGreaterThan(3);
-    expect(element.querySelector<HTMLElement>('.wui-harmony-flow__pinned')?.style.minHeight).toBe('1.1em');
-
+    expect(element.selection).toMatchObject({startQuarters: 0, endQuarters: 1});
+    expect(element.analysis?.headline).toBe('C');
+    expect(element.analysis?.evidence).toHaveLength(3);
     bands[1]!.dispatchEvent(new MouseEvent('click', {bubbles: true}));
-    expect(element.selection).toMatchObject({startQuarters: 2, endQuarters: 4});
-    expect(element.analysis?.headline).toBe(bands[1]?.querySelector('.wui-harmony-flow__label')?.textContent);
+    expect(element.selection).toMatchObject({startQuarters: 1, endQuarters: 2});
+    expect(element.analysis?.headline).toBe('D');
+    expect(element.analysis?.evidence.every((note) => !note.startsWith('C4'))).toBe(true);
+    element.selectRegion(0, 2);
+    expect(element.analysis?.evidence.some((item) => item.includes('C'))).toBe(true);
+    expect(element.analysis?.detail).toContain('separate');
   });
 
-  it('uses the MIDI demo meter grid when the imported score has no measure objects', async () => {
-    const music = await loadScore(arabesqueBytes('midi'), {format: 'midi'});
-    expect(music.measures).toHaveLength(0);
-    const lane = projectChordCells(music, {bands: [], now: 0}, {spelling: 'auto'});
-    expect(lane.bands.length).toBeGreaterThan(200);
-    expect(lane.bands.length).toBeLessThan(220);
-    expect(lane.bands[0]).toMatchObject({stampStart: 0, stampEnd: 2});
-    expect(lane.bands[1]).toMatchObject({stampStart: 2, stampEnd: 4});
-    expect(lane.bands[lane.bands.length - 1]?.stampEnd).toBeCloseTo(music.durationQuarters.toFloat());
-  });
-
-  it('splits odd and changed meters at beat boundaries and keeps tiny scores to one cell', () => {
+  it('defaults to beat collection and can switch to simultaneous evidence and recover from invalid grouping', async () => {
     const builder = new ScoreBuilder();
-    builder.addMeasure({id: builder.newMeasureId(), number: 1,
+    const part = builder.newPartId();
+    builder.addPart({id: part, name: 'Arpeggio'});
+    ['C#4', 'E4', 'A4'].forEach((pitch, index) => builder.addNote(part, {
+      id: builder.newNoteId(), pitch: Pitch.parse(pitch), onsetQuarters: new Rational(index, 3),
+      duration: Duration.triplet(Duration.eighth()), voice: VoiceId('lead'),
+    }));
+    const element = await mount(ChordAnalysisElement, builder.build());
+    expect(element.grouping).toBe('beat');
+    expect(element.analysis?.headline).toBe('A/C#');
+    expect(element.querySelector('.wui-harmony-flow__pinned-name')?.textContent).toBe('A/C#');
+    expect(element.querySelector('.wui-harmony-flow__pinned-note')?.textContent).toBe('C#4 E4 A4');
+    element.grouping = 'simultaneous';
+    expect(element.getAttribute('grouping')).toBe('simultaneous');
+    expect(element.analysis?.headline).toBe('C#4');
+    expect(element.querySelector('.wui-harmony-flow__pinned-name')?.textContent).toBe('');
+    expect(element.querySelector('.wui-harmony-flow__pinned-note')?.textContent).toBe('C#4');
+    expect(element.querySelector('[part~="index"]')?.textContent).toContain('C#4');
+    expect(element.textContent).not.toContain('Unclassified note set');
+    element.setAttribute('grouping', 'unknown');
+    expect(element.analysis).toBeUndefined();
+    expect(element.querySelector('.wui-workbench')?.getAttribute('data-phase')).toBe('error');
+    element.grouping = 'beat';
+    expect(element.analysis?.headline).toBe('A/C#');
+  });
+
+  it('does not invent chords from meter alone and preserves short-note boundaries', () => {
+    const empty = new ScoreBuilder();
+    empty.addMeasure({id: empty.newMeasureId(), number: 1,
       onsetQuarters: Rational.ZERO, durationQuarters: new Rational(5, 2),
       timeSignature: {numerator: 5, denominator: 8}});
-    builder.addMeasure({id: builder.newMeasureId(), number: 2,
-      onsetQuarters: new Rational(5, 2), durationQuarters: new Rational(3),
-      timeSignature: {numerator: 3, denominator: 4}});
-    const mixed = projectChordCells(builder.build(), {bands: [], now: 0}, {spelling: 'auto'});
-    expect(mixed.bands.map((band) => [band.stampStart, band.stampEnd])).toEqual([
-      [0, 1], [1, 2.5], [2.5, 3.5], [3.5, 5.5],
-    ]);
-
+    expect(projectBasicInspection(empty.build(), 'chord').lane.bands).toEqual([]);
     const tiny = new ScoreBuilder();
     const part = tiny.newPartId();
     tiny.addPart({id: part, name: 'Tiny'});
     tiny.addNote(part, {id: tiny.newNoteId(), pitch: Pitch.parse('C4'),
       onsetQuarters: Rational.ZERO, duration: Duration.eighth(), voice: VoiceId('lead')});
-    const shortLane = projectChordCells(tiny.build(), {bands: [], now: 0}, {spelling: 'auto'});
+    const shortLane = projectBasicInspection(tiny.build(), 'chord').lane;
     expect(shortLane.bands.map((band) => [band.stampStart, band.stampEnd])).toEqual([[0, 0.5]]);
+    expect(shortLane.bands[0]).toMatchObject({primary: '', secondary: 'C4'});
   });
 
   it('keeps publicly returned inspection data separate from local selection state', async () => {
@@ -158,7 +162,7 @@ describe('score inspection Elements', () => {
     const music = chromaticScore();
     const chord = await mount(ChordAnalysisElement, music);
     chord.selectRegion(0, 1);
-    expect(chord.analysis?.detail).toContain('No reliable key context');
+    expect(chord.analysis?.detail).toContain('No key context');
     chord.key = 'C major';
     expect(chord.analysis?.detail).toContain('in C major (chosen)');
   });

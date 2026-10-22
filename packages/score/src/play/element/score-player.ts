@@ -28,6 +28,7 @@ import type {Rack} from '../headless/rack';
 import type {Effect} from '../headless/effects';
 import {boolAttr, numAttr, WebMusicElement, upgradeProperties} from './internal/base';
 import {RACK_DESK_TAG, RACK_SHARE_EVENT} from './internal/rack-part';
+import {mountStatus, type StatusHandle, type StatusKind} from '@webmusic/ui/status';
 
 /**
  * Detail payload for the DOM events a `<score-player>` dispatches. View
@@ -127,6 +128,7 @@ export class ScorePlayerElement extends WebMusicElement {
   }
 
   private handle?: PresetPlayerHandle;
+  private status?: StatusHandle;
   private explicitScore?: Score;
   private explicitEditor?: ScoreDocumentSource;
   private selectedEditor?: ScoreDocumentSource;
@@ -764,6 +766,7 @@ export class ScorePlayerElement extends WebMusicElement {
     }
     this.playbackReadiness = 'error';
     this.playbackError = error;
+    this.showStatus('error', error instanceof Error ? error.message : String(error));
     // Teardown released the partial mount and its editor discovery. Keep
     // observing the declaration so a later editor or target change recovers.
     if (this.isConnected && this.hasEditorSource()) {
@@ -814,6 +817,16 @@ export class ScorePlayerElement extends WebMusicElement {
     return this.rackHost;
   }
 
+  private clearStatus(): void {
+    this.status?.destroy();
+    this.status = undefined;
+  }
+
+  private showStatus(kind: StatusKind, message: string): void {
+    this.clearStatus();
+    this.status = mountStatus(this.ensureTransportHost(), {snapshot: () => ({kind, message})});
+  }
+
   protected async render(reuseDocument = false): Promise<void> {
     // A caller can remove the desk and assign a score before the observer's
     // microtask. Never mount the removed desk's now-disposed Rack in that gap.
@@ -846,6 +859,7 @@ export class ScorePlayerElement extends WebMusicElement {
     const token = this.loadToken;
     this.replaceHandle(undefined);
     if (token !== this.loadToken || !this.isConnected) return;
+    this.clearStatus();
     this.playbackError = undefined;
     this.playbackReadiness = 'loading';
     this.playbackPublisher.notify();
@@ -874,6 +888,7 @@ export class ScorePlayerElement extends WebMusicElement {
 
     const controller = new AbortController();
     this.loadController = controller;
+    this.showStatus('loading', 'Loading score');
     let score: Score | undefined;
     try {
       score = editor ? editor.getSnapshot().content : await this.resolveScore(controller.signal);
@@ -883,11 +898,10 @@ export class ScorePlayerElement extends WebMusicElement {
     if (token !== this.loadToken || !this.isConnected) return; // superseded or detached
 
     if (!score) {
-      // Only what this element mounted: light-DOM children may be a desk and
-      // its parts, which nothing here put there and nothing here may remove.
-      this.rackHost?.remove();
-      this.rackHost = undefined;
       this.playbackReadiness = 'empty';
+      // Status uses the owned transport host too, preserving authored desks
+      // and parts while this player waits for its next source.
+      this.showStatus('waiting', 'Waiting for a score');
       this.playbackPublisher.notify();
       return;
     }
@@ -1008,6 +1022,7 @@ export class ScorePlayerElement extends WebMusicElement {
       candidate?.destroy();
       return false;
     }
+    this.clearStatus();
     this.handle = candidate;
     return true;
   }
@@ -1193,6 +1208,7 @@ export class ScorePlayerElement extends WebMusicElement {
     this.documentBlocked = undefined;
     this.documentStateKey = '';
     this.removeAttribute('data-editor-state');
+    this.clearStatus();
     this.composedRack = undefined;
     this.unbindPlayback?.();
     this.unbindPlayback = undefined;

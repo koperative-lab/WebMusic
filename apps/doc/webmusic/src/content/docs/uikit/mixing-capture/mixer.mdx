@@ -66,6 +66,7 @@ channel's action row.
 |---|---|---|
 | `master` | `number` | Required normalized master value painted by the first fader. The master inherits `state.disabled`. |
 | `channels` | `readonly MixerChannel[]` | Required ordered channel records. Updates reuse surviving strips by id, preserving drag and focus state. |
+| `status?` | `StatusState` | Optional `{kind, message?}` readiness from [Status](/uikit/layout-feedback/status/); defaults to ready. Loading/waiting animate with accessible descriptions. Empty unavailable boards hide; existing channels remain available. |
 | `disabled?` | `boolean` | Strict `true` disables all faders, channel actions, and optional transport buttons. |
 
 Each `MixerChannel` has this shape:
@@ -97,7 +98,7 @@ Each `MixerChannel` has this shape:
 
 | Member | Kind | Default | Description |
 |---|---|---|---|
-| `classNames` | `MixerClassNames` | `{}` | Adds compatibility classes for `root`, `transport`, `board`, `channels`, `strip`, `master`, `fader`, `input`, `label`, `actions`, `button`, `mute`, `solo`, `play`, `pause`, and `stop`. `fader` and `input` both reach the one fader node. |
+| `classNames` | `MixerClassNames` | `{}` | Adds compatibility classes for `root`, `transport`, `board`, `channels`, `strip`, `master`, `fader`, `input`, `label`, `actions`, `button`, `mute`, `solo`, `play`, `pause`, `stop`, and `status`. `fader` and `input` both reach the one fader node. |
 | `parts` | `MixerParts` | `{}` | Adds tokens with the same keys beside the presenter's canonical part tokens. |
 | `onError` | `(error: unknown) => void` | — | Receives snapshot and command errors. Subscription registration/disposal and DOM cleanup errors escape to the caller. An exception thrown by this callback is not caught. |
 | `stylesheet` | `boolean` | `true` | Installs the presenter's stylesheet unless explicitly `false`, for a light-DOM host that cannot inject CSS into its page. |
@@ -189,6 +190,11 @@ it never replaces either.
 | Any button | `.wui-mixer__button` | M, S, Play, Pause, or Stop | `button` |
 | M / S button | `.mute` / `.solo` | Matching command exists | `mute` / `solo` |
 | Transport button | `.t-play` / `.t-pause` / `.t-stop` | Matching command exists | `play` / `pause` / `stop` |
+| Passive feedback host | `.wui-mixer__status` | Visible while nonready | `status` |
+
+The `status` class/part hook reaches the passive feedback host. Loading and waiting use
+[Status tokens](/uikit/layout-feedback/status/) and reduced-motion behavior; only loading
+marks the root busy. `disabled` continues to own control availability.
 
 **Parts**
 
@@ -208,6 +214,7 @@ it never replaces either.
 | Action row | `actions` | Either channel action exists | `actions` |
 | M / S button | `button mute` / `button solo` | Matching command exists | `button`, `mute` / `solo` |
 | Transport button | `button play` / `button pause` / `button stop` | Matching command exists | `button`, matching action |
+| Passive feedback host | `status` | Visible while nonready | `status` |
 
 </details>
 

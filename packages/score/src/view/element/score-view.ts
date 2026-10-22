@@ -30,7 +30,7 @@ import type {
 import {HTMLElementBase, boolAttr, cssSizeAttr, defineOnce, numAttr, upgradeProperties} from './base';
 import {mountStage, type StageHandle} from '@webmusic/ui/stage';
 import {mountTimeline, type TimelineHandle, type TimelineRegion, type TimelineTick} from '@webmusic/ui/timeline';
-import {mountStatus, type StatusHandle} from '@webmusic/ui/status';
+import {mountStatus, type StatusHandle, type StatusKind} from '@webmusic/ui/status';
 
 const ELEMENT_NOTE_RGB = '51, 51, 51';
 const ELEMENT_ACTIVE_NOTE_RGB = '240, 84, 119';
@@ -199,6 +199,7 @@ export class ScoreViewElement extends HTMLElementBase {
   private view?: ScoreView;
   private stage?: StageHandle;
   private status?: StatusHandle;
+  private loading = false;
   private loadError?: unknown;
   private map?: ScoreMap;
   private mapView?: ScoreMapView;
@@ -353,6 +354,8 @@ export class ScoreViewElement extends HTMLElementBase {
     const token = this.loadToken;
     const controller = new AbortController();
     this.loadController = controller;
+    this.loading = typeof input === 'string';
+    if (this.loading) this.renderCurrent(false);
     let score: Score | undefined;
     try {
       score = await this.resolveScore(input, format, controller.signal);
@@ -360,6 +363,7 @@ export class ScoreViewElement extends HTMLElementBase {
       if (this.loadController === controller) this.loadController = undefined;
     }
     if (token !== this.loadToken || !this.isConnected) return; // superseded or detached
+    this.loading = false;
     this.resolvedScore = score;
     const native = (this.boundPlayer as (Element & {playback?: ScorePlaybackSource}) | undefined)?.playback?.snapshot();
     if (native && native.readiness !== 'unavailable' && native.score && score !== native.score) {
@@ -421,10 +425,23 @@ export class ScoreViewElement extends HTMLElementBase {
 :where(${selector}[type="thumbnail"]) { height: calc(3rem + var(--_webscore-preview-annotations, 0px)); }`;
       this.append(style);
     }
+    // An editor-bound view renders document content; its player contributes time only.
+    const native = !this.hasEditorIntent() && !this.explicitScore && !this.getAttribute('src')
+      ? (this.boundPlayer as (Element & {playback?: ScorePlaybackSource}) | undefined)?.playback?.snapshot()
+      : undefined;
+    if (this.loading || native?.readiness === 'loading') {
+      if (owner) this.showStatus('loading', 'Loading score');
+      return;
+    }
+    const sourceError = this.loadError ?? (native?.readiness === 'error' ? native.error ?? new Error('Could not load playback source.') : undefined);
+    if (sourceError !== undefined) {
+      if (owner) this.showStatus('error', this.errorMessage(sourceError));
+      return;
+    }
     if (!score) {
       // A missing, loading or disposed editor is pending; only an unusable selection is an error.
       const blocked = this.hasEditorIntent() ? this.blockedEditorState() : undefined;
-      if (owner) this.showStatus(this.loadError === undefined && !blocked ? 'empty' : 'error',
+      if (owner) this.showStatus(this.loadError === undefined && !blocked ? 'waiting' : 'error',
         this.loadError !== undefined ? this.errorMessage(this.loadError) : blocked ? `Editor unavailable: ${blocked}` : 'Waiting for a score');
       return;
     }
@@ -534,6 +551,7 @@ export class ScoreViewElement extends HTMLElementBase {
 
   private cancelLoad(): void {
     this.loadToken += 1;
+    this.loading = false;
     // An old command must not repaint the retained map while a new input loads.
     this.mapView?.dispose();
     this.mapView = undefined;
@@ -586,7 +604,7 @@ export class ScoreViewElement extends HTMLElementBase {
     return state === 'invalid' || state === 'ambiguous' || state === 'source-conflict' ? state : undefined;
   }
 
-  private showStatus(kind: 'empty' | 'error', message: string): void {
+  private showStatus(kind: StatusKind, message: string): void {
     this.status?.destroy();
     this.status = mountStatus(this, {snapshot: () => ({kind, message})});
   }
@@ -790,6 +808,9 @@ export class ScoreViewElement extends HTMLElementBase {
       },
       scoreChanged: () => {
         if (!this.hasEditorIntent() && !this.explicitScore && !this.getAttribute('src')) void this.refresh();
+      },
+      readinessChanged: () => {
+        if (!this.hasEditorIntent() && !this.explicitScore && !this.getAttribute('src')) this.renderCurrent(false);
       },
       snapshot: (snapshot) => this.followSnapshot(snapshot),
       noteOn: (note) => this.followNote(note, true),

@@ -76,6 +76,7 @@ export class ScoreRecorderElement extends HTMLElementBase {
   private playbackOff?: () => void;
   private playbackGeneration = 0;
   private playing = false;
+  private playbackPending = false;
   private selfListening = false;
 
   private readonly onNoteEvent = (event: Event): void => {
@@ -285,8 +286,13 @@ export class ScoreRecorderElement extends HTMLElementBase {
       }
     });
     this.playing = true;
+    this.playbackPending = true;
     this.refresh();
-    void playback.play().catch((error: unknown) => {
+    void playback.play().then(() => {
+      if (this.playback !== playback || generation !== this.playbackGeneration) return;
+      this.playbackPending = false;
+      this.refresh();
+    }).catch((error: unknown) => {
       if (this.playback !== playback || generation !== this.playbackGeneration) return;
       this.stopPlayback();
       this.dispatchEvent(new CustomEvent<ScoreRecorderErrorDetail>('webscore:error', {
@@ -304,6 +310,7 @@ export class ScoreRecorderElement extends HTMLElementBase {
     this.playback?.dispose();
     this.playback = undefined;
     this.playing = false;
+    this.playbackPending = false;
     this.refresh();
   }
 
@@ -314,6 +321,8 @@ export class ScoreRecorderElement extends HTMLElementBase {
       snapshot: () => ({
         recording: this.session.active,
         playing: this.playing,
+        busy: this.playbackPending,
+        ...(this.playbackPending ? {status: 'Preparing take playback…'} : {}),
         recordedCount: this.session.noteCount,
         takeCount: this.takeScore
           ? this.takeScore.parts.reduce((sum, part) => sum + part.notes.length, 0)

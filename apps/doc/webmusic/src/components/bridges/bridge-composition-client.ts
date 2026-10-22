@@ -1,13 +1,4 @@
-import {
-  Duration,
-  MeasureId,
-  PartId,
-  Pitch,
-  Rational,
-  ScoreBuilder,
-  VoiceId,
-  type ScorePlaybackSource,
-} from "@webmusic/score";
+import type { ScorePlaybackSource } from "@webmusic/score";
 import { defineScoreViewElement } from "@webmusic/score/view/element";
 import { defineChordAnalysisElement } from "@webmusic/score/analyze/element";
 import { computePeaks } from "@webmusic/audio/analyze";
@@ -19,59 +10,15 @@ import {
 } from "@webmusic/bridge";
 import { mountTransport } from "@webmusic/ui/transport";
 import type { DemoScope } from "../demo-lifecycle";
+import {
+  arabesqueExcerpt,
+  loadArabesqueScore,
+} from "../headless/arabesque-score";
 
 let nextOwner = 0;
 type Pair = ReturnType<typeof createSyncedPlayback>;
 type Waveform = ReturnType<typeof renderWaveformVisualizer>;
 type PlaybackHost = HTMLElement & { playback?: ScorePlaybackSource };
-
-/** Two small sources with identical duration and different musical content. */
-function sampleScore(descending: boolean) {
-  const builder = new ScoreBuilder();
-  const partId = PartId("demo-piano");
-  const voice = VoiceId("demo-voice");
-  const meter = { numerator: 4, denominator: 4 };
-  builder
-    .setMetadata({
-      title: descending ? "Descending phrase" : "Ascending phrase",
-    })
-    .addTempo({ atQuarters: Rational.ZERO, bpm: 120 })
-    .addMeter({
-      atQuarters: Rational.ZERO,
-      measureNumber: 1,
-      timeSignature: meter,
-    });
-  builder.addPart({ id: partId, name: "Piano", staves: 1 });
-  const pitches = Array.from({ length: 4 }, () => [
-    "C4",
-    "E4",
-    "G4",
-    "B4",
-    "C5",
-    "G4",
-    "E4",
-    "C4",
-  ]).flat();
-  if (descending) pitches.reverse();
-  pitches.forEach((pitch, index) => {
-    if (index % 8 === 0)
-      builder.addMeasure({
-        id: MeasureId(`demo-measure-${index / 8}`),
-        number: index / 8 + 1,
-        onsetQuarters: new Rational(index, 2),
-        durationQuarters: new Rational(4),
-        timeSignature: meter,
-      });
-    builder.addNote(partId, {
-      id: builder.newNoteId(),
-      pitch: Pitch.parse(pitch),
-      onsetQuarters: new Rational(index, 2),
-      duration: Duration.eighth(),
-      voice,
-    });
-  });
-  return builder.build();
-}
 
 /** Application composition only: public package entries, explicit resources and commands. */
 export function mountBridgeComposition(
@@ -102,7 +49,7 @@ export function mountBridgeComposition(
   let offSync: (() => void) | undefined;
   let loading = false;
   let attached = false;
-  let descending = false;
+  let extended = false;
   let duration = 0;
   let frame = 0;
   let lastPaint = 0;
@@ -244,7 +191,7 @@ export function mountBridgeComposition(
     { label: "Coordinated playback", showTime: "full", onError: report },
   );
 
-  const loadSource = async (nextDescending: boolean) => {
+  const loadSource = async (nextExtended: boolean) => {
     const expected = ++generation;
     loading = true;
     refresh();
@@ -255,7 +202,10 @@ export function mountBridgeComposition(
       await context.resume(); // invoked in the Load / Replace gesture
       if (!scope.active || expected !== generation) return;
       if (pair) await pair.sync.dispatch({ type: "pause" });
-      const score = sampleScore(nextDescending);
+      if (!scope.active || expected !== generation) return;
+      const source = await loadArabesqueScore("midi");
+      if (!scope.active || expected !== generation) return;
+      const score = arabesqueExcerpt(source, nextExtended ? 24 : 16);
       const clip = await renderScoreToClip(score, { tailSeconds: 0 });
       if (!scope.active || expected !== generation) return;
       const channels = clip.channels();
@@ -312,7 +262,7 @@ export function mountBridgeComposition(
             );
         },
       };
-      descending = nextDescending;
+      extended = nextExtended;
       rate.value = "1";
       loop.checked = false;
       offSync = pair.sync.subscribe((event) => {
@@ -328,7 +278,7 @@ export function mountBridgeComposition(
       mountViews();
       wave.redraw(pair.clipPlayer.seconds);
       message(
-        `${descending ? "Descending" : "Ascending"} phrase ready. Click Play, then attach views.`,
+        `Arabesque No. 1 opening (${extended ? 24 : 16} quarter-note beats) ready. Click Play, then attach views.`,
       );
     } catch (error) {
       candidate?.sync.dispose();
@@ -355,7 +305,7 @@ export function mountBridgeComposition(
   };
 
   scope.listen(load, "click", () => loadSource(false));
-  scope.listen(replace, "click", () => loadSource(!descending));
+  scope.listen(replace, "click", () => loadSource(!extended));
   scope.listen(disposeButton, "click", disposeSession);
   scope.listen(rate, "change", () =>
     command({ type: "rate", rate: Number(rate.value) }).catch(report),

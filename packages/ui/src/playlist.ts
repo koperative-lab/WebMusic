@@ -1,3 +1,4 @@
+import {mountStatus, statusStyle, type StatusHandle, type StatusState} from './status';
 import {installStyle} from './internal/style';
 import {componentSurfaceCss, controlBorderFallback} from './internal/surface';
 import {controlHeight, controlRadius, controlThumbRadius} from './internal/control';
@@ -26,6 +27,8 @@ export interface PlaylistState {
   progress: number;
   disabled?: boolean;
   items: readonly PlaylistItem[];
+  /** Optional owner readiness. An empty list otherwise waits for entries. */
+  status?: StatusState;
 }
 
 /** Structural presenter port. It owns no DOM or UI resource. */
@@ -54,6 +57,8 @@ export interface PlaylistClassNames {
   number?: string;
   label?: string;
   duration?: string;
+  status?: string;
+  itemStatus?: string;
 }
 
 export interface PlaylistParts {
@@ -70,6 +75,8 @@ export interface PlaylistParts {
   number?: string;
   label?: string;
   duration?: string;
+  status?: string;
+  itemStatus?: string;
 }
 
 export interface PlaylistOptions {
@@ -129,11 +136,12 @@ interface NormalizedState {
   progress: number;
   disabled: boolean;
   items: NormalizedItem[];
+  status: StatusState;
 }
 
 const mounted = new WeakMap<Host, PlaylistHandle>();
 
-export const playlistStyle = String.raw`
+export const playlistStyle = statusStyle + String.raw`
 .wui-playlist,
 .wui-playlist * { box-sizing: border-box; }
 
@@ -147,6 +155,10 @@ ${componentSurfaceCss('playlist', {
   font: .85rem var(--wm-font-family, var(--wm-font, system-ui, sans-serif));
 }
 
+.wui-playlist__status .wui-status { min-height:3rem; height:auto; }
+.wui-playlist__item-status { flex:0 0 auto; }
+.wui-playlist__item-status .wui-status { --wm-status-indicator-size:.875rem; }
+.wui-playlist__status[hidden], .wui-playlist__item-status[hidden], .wui-playlist__duration[hidden], .wui-playlist__bar[hidden], .wui-playlist__items[hidden] { display:none; }
 .wui-playlist__bar {
   display: flex;
   align-items: center;
@@ -342,6 +354,7 @@ function normalizeSnapshot(snapshot: PlaylistState): NormalizedState {
     playing: snapshot?.playing === true,
     progress: clamp01(snapshot?.progress),
     disabled: snapshot?.disabled === true,
+    status: snapshot?.status ?? {kind: items.length ? 'ready' : 'waiting', message: 'Waiting for playlist entries.'},
     items,
   };
 }
@@ -414,6 +427,15 @@ export function mountPlaylist(
 
   if (options.transport !== false) root.append(bar);
   root.append(list);
+  const statusHost = document.createElement('div');
+  statusHost.className = 'wui-playlist__status';
+  addClassNames(statusHost, options.classNames?.status);
+  setParts(statusHost, ['status'], options.parts?.status);
+  root.append(statusHost);
+  let statusState: StatusState = {kind: 'ready'};
+  const status = mountStatus(statusHost, {snapshot: () => statusState}, {
+    stylesheet: false, classNames: {root: 'wui-status--embedded'},
+  });
 
   let destroyed = false;
   let unsubscribe: (() => void) | undefined;
@@ -423,6 +445,11 @@ export function mountPlaylist(
   let commandRevision = 0;
   let listSignature = '';
   const rows = new Map<string, HTMLLIElement>();
+  const rowStatuses = new Map<string, {host: HTMLElement; handle: StatusHandle; state: StatusState}>();
+  const clearRowStatuses = (): void => {
+    for (const item of rowStatuses.values()) item.handle.destroy();
+    rowStatuses.clear();
+  };
   const cleanups: Array<() => void> = [];
 
   const isCurrent = (): boolean => !destroyed && mounted.get(host) === handle;
@@ -479,7 +506,17 @@ export function mountPlaylist(
     addClassNames(duration, options.classNames?.duration);
     setParts(duration, ['duration'], options.parts?.duration);
 
-    row.append(ordinal, label, duration);
+    const itemStatus = document.createElement('span');
+    itemStatus.className = 'wui-playlist__item-status';
+    addClassNames(itemStatus, options.classNames?.itemStatus);
+    setParts(itemStatus, ['item-status'], options.parts?.itemStatus);
+    const entry = {host: itemStatus, state: {kind: 'ready'} as StatusState, handle: undefined as StatusHandle | undefined};
+    const handle = mountStatus(itemStatus, {snapshot: () => entry.state}, {
+      stylesheet: false, classNames: {root: 'wui-status--embedded'},
+    });
+    // The binding closes over the same mutable entry stored for repainting.
+    rowStatuses.set(item.id, Object.assign(entry, {handle}));
+    row.append(ordinal, label, duration, itemStatus);
     return row;
   };
 
@@ -490,10 +527,25 @@ export function mountPlaylist(
     if (item.status) row.dataset.status = item.status;
     else delete row.dataset.status;
     const duration = row.querySelector<HTMLElement>('.wui-playlist__duration');
-    if (duration) duration.textContent = item.duration;
+    if (duration) {
+      duration.textContent = item.duration;
+      duration.hidden = item.status === 'loading' || item.status === 'error';
+    }
+    const feedback = rowStatuses.get(item.id);
+    if (feedback) {
+      feedback.state = {kind: item.status ?? 'ready', message: item.status === 'error' ? 'Unable to load' : item.status === 'loading' ? `Loading ${item.label}` : ''};
+      feedback.handle.update();
+      feedback.host.hidden = !item.status;
+    }
   };
 
   const paint = (state: NormalizedState): void => {
+    statusState = state.status;
+    status.update();
+    statusHost.hidden = statusState.kind === 'ready';
+    list.hidden = state.items.length === 0;
+    bar.hidden = list.hidden && statusState.kind !== 'ready';
+    root.setAttribute('aria-busy', String(statusState.kind === 'loading' || state.items.some((item) => item.active && item.status === 'loading')));
     toggle.textContent = state.playing ? '⏸' : '▶';
     toggle.setAttribute(
       'aria-label',
@@ -517,6 +569,7 @@ export function mountPlaylist(
     if (signature !== listSignature) {
       const refocus = focusedRowId();
       rows.clear();
+      clearRowStatuses();
       const nodes = state.items.map((item, index) => {
         const row = renderRow(item, index);
         rows.set(item.id, row);
@@ -632,6 +685,8 @@ export function mountPlaylist(
     const off = unsubscribe;
     unsubscribe = undefined;
     if (off) attempt(off);
+    attempt(clearRowStatuses);
+    attempt(() => status.destroy());
     attempt(() => root.remove());
     attempt(() => style?.remove());
     current = undefined;

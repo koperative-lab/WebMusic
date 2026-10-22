@@ -3,6 +3,9 @@
 // one shared algorithm implementation.
 export * from './chord-spelling';
 export * from './chords';
+export * from './chord-inspection';
+export * from './scale-inspection';
+export type {TheoryNoteEvidence} from './inspection-notes';
 export * from './distributions';
 export * from './fretboard-voicing';
 export * from './interval';

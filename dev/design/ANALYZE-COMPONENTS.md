@@ -1,227 +1,239 @@
-# Atomic musical analysis and view composition
+# Elementary Score analysis and view composition
 
-Status: DEC-043 narrows the Element inventory to two chord surfaces; DEC-040
-through DEC-042 record the earlier four-tool design. Browser pointer, audio and
-accessibility acceptance remain open.
-Layer and public entries: Score Elements, `@webmusic/score/analyze/element` and `@webmusic/score/view/element`.
-Related decisions: DEC-002, DEC-004, DEC-007, DEC-009, DEC-011, DEC-012, DEC-013, DEC-014, DEC-015, DEC-017, DEC-038 through DEC-043, and DEC-045.
-Source and types: [Analyze barrel](../../packages/score/src/analyze/element/index.ts), [View barrel](../../packages/score/src/view/element/index.ts), [analysis composition](../../packages/score/src/analyze/element/internal/analysis-component.ts).
-Owning references and demos: [Analyze](../../apps/doc/webmusic/src/content/docs/score/element/index.mdx#analyze) and [View](../../apps/doc/webmusic/src/content/docs/score/element/index.mdx#view).
+Status: DEC-047 accepts four elementary tools; DEC-048 defines metrical chord
+grouping and the readable lane presentation. [STATUS](../STATUS.md) owns
+current delivery, verification and remaining acceptance work. DEC-038 through
+DEC-043 retain the earlier design history.
+Layer and public entry: Score Elements, `@webmusic/score/analyze/element`.
+Related decisions: DEC-002, DEC-004, DEC-007, DEC-009, DEC-011 through DEC-015,
+DEC-017, DEC-034, DEC-038 through DEC-043, DEC-045, DEC-047 and DEC-048.
+Source and types: [Analyze barrel](../../packages/score/src/analyze/element/index.ts),
+[shared composition](../../packages/score/src/analyze/element/internal/analysis-component.ts),
+[Headless projection](../../packages/score/src/analyze/headless/basic-inspection.ts).
+Owning references and demos: [Analyze inventory](../../apps/doc/webmusic/src/content/docs/score/element/index.mdx#analyze).
 
 ## User task and boundary
 
-The application chooses each musical inspection surface and places it
-explicitly. An analyzer must not construct a keyboard, staff, fretboard,
-configuration bar or second workbench. Those are separate reusable components.
-Musical gestures stay with the surface that interprets them; display
-configuration belongs to attributes and application-owned controls.
+Four components answer four elementary musical questions. Each owns one useful
+surface, with display configuration outside it. A component must not create a
+keyboard, staff, fretboard, second player, or settings workbench. Supporting
+views are ordinary siblings selected by the application.
 
-| Component | One surface | Musical operation |
+| Component | Musical task | Meaningful result |
 |---|---|---|
-| `score-live-chord-analysis` | Current sounding chord nameplate | Read the primary chord and any secondary interpretations without editing the notes |
-| `score-chord-analysis` | Harmonic progression lane | Select a passage, inspect its chord evidence and key-relative degree, and seek |
-| `score-pitch-view type="keyboard"` | Current piano keys | Passive held-note display |
-| `score-pitch-view type="staff"` | Current staff pitches | Passive held-note display |
-| `score-pitch-view type="fretboard"` | Exact-MIDI fret positions | Passive held-note display |
+| `score-chord-analysis` | What chord structure is present? | Score/live modes; complete spelled triad/seventh, bass, inversion and optional explicit-key degree |
+| `score-interval-analysis` | What is the relationship between notes? | Written/sounding interval number, quality, direction, semitones and note provenance |
+| `score-scale-analysis` | How do notes relate to a chosen scale? | Spelled degree and alteration against an explicit tonic and scale form |
+| `score-rhythm-analysis` | Where does a written attack fall in meter? | Duration, measure, grouped beat and fractional subbeat |
 
-Analyze Elements are performance surfaces: their meaningful state follows
-playback position, sounding notes or accumulated performance evidence. Adding a
-playhead or active-row highlight to a whole-score report does not make the report
-a performance surface.
+The chord `mode` switches the data presentation of one musical task. Default
+`score` mode collects source notes by metrical pulse (`grouping="beat"`);
+`grouping="simultaneous"` reads exact note-boundary spans. `live` uses held MIDI
+activity and is unaffected by score grouping. This replaces the former separate
+live-chord tag. Metrical grouping follows the authored meter rather than
+DEC-042's retired fixed half-bar projection. No other generic type-switching
+Analyze component is introduced.
 
-Whole-score summaries, distributions and rhythmic vocabulary belong to the
-Headless/API workflow. The former `score-analysis`, `analysis-histogram` and
-`rhythm-patterns` tags and registration helpers are removed. Their algorithms
-remain available through `createScoreReport`, `distributions` and
-`rhythmPatterns`; application-owned UI may render that data.
+None of these tools guesses a key, harmonic function, cadence, voice-leading
+intent or performance quality. Missing context is visible. Scale alterations
+are descriptions, not musical errors. MIDI pitch spelling is inferred; a
+written MusicXML note can preserve an enharmonic distinction that MIDI cannot.
+Evidence `spellingInferred` identifies inference needed by analysis-time
+transposition only; it does not identify an earlier importer's spelling choices.
 
-DEC-043 parks the two recurrence Elements from DEC-040 for further research.
-Their code and demos remain on the research branch, not in this checkout's
-public Element inventory. `detectKey`, `analyzeIntervals`,
-`inspectScoreRhythm`, `findMotifs`, `findRhythmPatternOccurrences` and
-`rhythmPatterns` remain API/Headless capabilities for application-owned
-analysis. Roman-numeral and voice-leading algorithms likewise remain
-available for specialist compositions.
-Selected evidence remains available through `.analysis` and a nonvisual
-status rather than an under-lane text panel. Tonal wheels and heard-chord
-histories remain application-owned compositions. The generic
-`analysis-view` alias and `analysis-timeline` remain retired. The removed
-history wrapper's bounded trail was Element-owned; an application needing
-history retains tracker updates and timestamps itself.
+Recurrence research remains parked under DEC-043. Motif and rhythmic-occurrence
+algorithms, key estimation, whole-score reports, specialist Roman analysis and
+voice-leading remain API/Headless capabilities. Historical research source and
+dated evidence are not restored by this decision.
 
 ## Composition
 
-A player produces data and state. Each Element connects its own API/Headless
-projection to one UI surface. The explicit markup is player + selected Analyze
-surface + optional View/Analyze siblings. Source-level implementation reuse may
-share lifecycle and presenter infrastructure; it must not cause hidden companion
-views or their computation to run inside each core component.
+A player produces Score data, note activity, state and authoritative time.
+API/Headless performs inspection and produces plain evidence and lane models.
+The Element maps attributes, observation and gestures to those operations and
+to existing neutral Harmony/Workbench presenters. Custom UI uses the same
+`projectBasicInspection` data rather than requiring a custom element.
 
-The selected player owns score, sound, engine and timeline. Components borrow
-according to [Player binding](PLAYER-BINDING.md). Score-based input precedence is
-explicit `.score` → `src` → the player's shared `ScorePlaybackSource` snapshot.
-Native observation owns readiness, source identity and occurrence-aware activity.
-Targets without native observation, or explicitly reporting `unavailable`, retain
-the legacy resolved-data/event path (`.resolvedScore`, or structural `.score`
-only when that capability is absent). Note-only views and live surfaces borrow
-held notes without loading a score. A local Score that differs from the native
-owner suppresses incompatible activity and cannot navigate that owner.
+Score input precedence is explicit `.score`, then `src`, then the selected
+player's shared `ScorePlaybackSource` snapshot. Native observation owns readiness,
+source identity and occurrence-aware activity. Targets without a source, or
+reporting `unavailable`, retain the legacy resolved-data/event path. The live
+chord mode borrows held notes without loading a Score. A local Score different
+from the native player's Score suppresses incompatible activity and cannot seek
+that owner. See [Player binding](PLAYER-BINDING.md) for discovery and commands.
 
 ## Inputs, outputs, and units
 
 | Item | Type/unit | Default/empty | Owner |
 |---|---|---|---|
-| Score | `Score`, or URL/format | Borrow player data or await input | Caller/player; Element owns explicit URL request |
+| Score | Immutable `Score` or URL/format | Borrow player data or await input | Caller/player; Element owns explicit request |
 | Player | Unique selector in current Document or ShadowRoot | Unbound for missing/invalid/ambiguous matches | Application selects; Element subscribes |
-| Score position | Nominal seconds and quarters | Snapshot or initial position | Player is authoritative |
-| Held notes | Counted occurrences of MIDI pitches | Empty note state | Player/source owns activity |
-| Inspection selection | Quarter-note passage | Local current passage; empty until selected | Element or explicit caller input |
-| Inspection result | Plain evidence and possible readings | Empty/uncertain result, not a fabricated answer | Score Analyze API/Headless |
-| Configuration | Surface-specific attributes | Owning page defines defaults | Application and each element |
-| Visibility | Native HTML `hidden` on an explicit sibling | Visible unless hidden | Application/external controls |
+| Position | Quarter notes and nominal seconds | Initial snapshot or local initial position | Player is authoritative when bound |
+| Pitch basis | `written` / `sounding` | Written; live MIDI is already sounding | Explicit analysis choice |
+| Selection | Quarter-note region; exact note IDs for interval/scale | First available band; no invented evidence | Local Element/application state |
+| Chord key | Explicit tonic plus major/minor | No degree without context | Application |
+| Chord grouping | `beat` / `simultaneous` | Element: beat; API/Headless: simultaneous | Explicit inspection choice |
+| Scale | Explicit tonic and major/minor form | Missing tonic asks for input | Application |
+| Meter grouping | Positive denominator-unit groups | Conventional simple/compound; irregular requires input | Authored meter plus explicit choice |
+| Result | Plain evidence, interpretation and source identities | Empty/uncertain/invalid stay distinct | Analyze API/Headless |
 
-Every tag exposes only applicable attributes. Pitch ranges, clefs and fret
-tuning belong to View components. The chord `window` is a visible
-duration in seconds rather than an analysis horizon.
-Roman degrees in the chord probe are relative to an explicit or estimated key;
-they are not a contextual harmonic-function verdict. No Analyze tag has
-`show`, `shell`, `range` or `tuning` attributes.
+Scale forms are major, natural minor, harmonic minor, ascending melodic minor
+and descending melodic minor. The two melodic directions are explicit reference
+choices. Interval inspection respects diatonic spelling and part transposition;
+ambiguous polyphonic attacks interrupt a melodic line until exact note selection
+resolves it. Tied continuations are not new melodic or rhythmic attacks.
+
+Chord score inspection matches complete spelled triads and seventh chords;
+doublings are allowed, omitted/rootless tones and respellings are not inferred.
+Beat grouping includes every selected source note overlapping each half-open
+metrical pulse, including notes sustained from a prior pulse. It retains passing
+tones and other pitches even when they prevent a chord match. The lowest
+collected source pitch determines the displayed bass/inversion; it does not
+establish the passage's structural harmonic bass. Simultaneous grouping instead
+uses only pitches overlapping each exact note-boundary span. An explicit key
+provides a relative degree and figure, not a harmonic-function verdict. Live
+MIDI uses chosen/inferred spelling and exposes that limitation.
+
+`inspectScoreChords()` keeps `grouping: 'simultaneous'` as its default;
+`projectBasicInspection()` likewise requires `chordGrouping: 'beat'` to opt in.
+The Element passes its beat default explicitly. Result and span metadata name
+the grouping, and source evidence preserves original note onsets and offsets.
+Grouping is independent of the visible `window` in seconds.
+
+Rhythm uses one denominator unit for simple 2/3/4 meters and groups of three
+for 6/9/12 compound meters. Beat-grouped chords use the same pulse definition.
+Other numerators require explicit grouping such as
+`2+3` in 5/8. One grouping must be valid for every inspected meter. Pickups begin
+at the authored boundary without inventing missing leading beats. Subdivision
+is relative to the grouped pulse; durations remain quarter-note units.
+
+The method is deliberately bounded: arpeggios can express chords, but harmonic
+rhythm need not change once per pulse, and non-chord-tone classification requires
+melodic context. The pulse union is therefore an inspectable collection, not an
+automatic harmonic reduction. See *Music Theory for the 21st-Century Classroom*:
+[Arpeggiated Accompaniments §14.3.1](https://musictheory.pugetsound.edu/mt21c/ArpeggiatedAccompaniments.html),
+[Harmonic Rhythm §9.2](https://musictheory.pugetsound.edu/mt21c/HarmonicRhythm.html)
+and [Introduction to Non-Chord Tones §10.1](https://musictheory.pugetsound.edu/mt21c/NonChordTonesIntroduction.html).
 
 ## State and commands
 
-The chord lane supports standalone local inspection and bound seek commands. A
-selected band or passage exposes its detailed evidence through `.analysis` and
-nonvisual selection status, while the lane marks the visual selection. Changing a
-inspection scope is local selection state and does not change the Score or
-sibling components. Chord candidate readings remain available in
-`.analysis` for application-owned inspectors, without candidate controls in the
-Element. The nameplate reacts to held-note input, clears on playback resets,
-and displays alternate readings as secondary text rather than choices; it has
-no score loader or history lane. None constructs another player, synth,
-AudioContext or playback scheduler.
+Clicking a score band selects its evidence and seeks. Keyboard navigation and
+pointer drag retain the lane's established semantics. `selectRegion()` chooses
+local inspection without commanding playback; interval/scale `selectNotes()`
+chooses source IDs without seeking. Neither changes the Score or siblings.
+The lane retains a full current readout even when a short band cannot fit its
+label. `.analysis` retains detailed provenance and candidates, accompanied by a
+nonvisual selection status; a separate report panel is not appended below it.
 
-Initial native snapshots hydrate position and held notes. Late/replaced targets,
-source changes, pause/seek/stop/end and overlapping equal pitches follow the
-binding contract. Explicit data keeps precedence. Superseded loads cannot restore
-old input; errors/empty data are displayed by the affected surface. Cleanup
-releases owned work and leaves borrowed playback with its owner.
+Changing chord mode remounts the owned presentation and relevant observation
+without changing playback state. Live mode updates its nameplate immediately,
+keeps fixed reading rows through empty states, and emits a named chord only
+after the configured stability delay. Reset, changed notes, mode/source change
+or disconnect cancels a pending notification. Unclassified notes remain literal
+pitches rather than a fabricated chord.
 
-## Session time
+Initial native snapshots hydrate data, position and held-note occurrences. Late
+and replaced targets, source replacement, pause/seek/stop/end, overlapping equal
+pitches and reconnect follow the binding contract. Failed explicit loading does
+not fall back to borrowed data. Superseded work cannot restore old input.
 
-The chord lane converts quarters through the score map and emits nominal-seconds seek
-requests. They use `seekNominal` when available, or divide by current rate for a
-transport-seconds `seek`. Failed commands restore local position unless newer
-state has arrived. Native snapshots remain authoritative after discontinuities.
+## Session time and ownership
 
-The current-chord nameplate follows note activity without a moving lane or
-animation clock. Presentation does not complete shared Score/Audio
-transport-clock injection.
-
-## Interaction and visuals
-
-Each surface retains its own meaningful gesture and accessible representation:
-chord-lane keyboard/pointer navigation and passage selection. A selection
-is not merely a moving playhead: its current readout and selected band remain
-visible, and its details remain available through `.analysis` and a nonvisual
-status. The chord lane does not append a visible prose/evidence section
-beneath the lane. The chord lane has no candidate-button row. The live nameplate
-places alternate readings as plain text below the primary chord, without a
-redundant temporal caption or a selection affordance. Nonvisual selection
-feedback must not repeat on every passive playback tick. Reusable pitch views remain passive labeled siblings.
-The chord lane groups written pitches into at most two beat-aligned cells per
-measure; notes in one cell may sound successively rather than simultaneously.
-Its default two-bar viewport keeps those readings legible, and its pinned
-readout reserves height across empty and active states. Selecting a cell exposes
-the same aggregate through `.analysis`, while a custom region keeps midpoint
-sampling and raw API/Headless chord segments remain unchanged.
-Recurrence search results and detailed occurrence evidence remain available
-through Headless/API for application-owned visualizations.
-Current staff and fretboard are MIDI readouts, not score engraving or inferred
-guitar voicing. Whole-score notes use a sibling `score-view`; the core chord
-lane disables its optional embedded roll.
-
-All demo configuration controls are in external Parameters. Each Score Analyze
-tag-owned live demo and basic import example contain one `score-player`
-and the current component. The family Element inventory's Analyze section owns
-the optional composition example; tag pages link to it and related components. Copy reflects
-the displayed pair, and Reset restores its initial attributes and connection.
-
-Composition demos that include optional siblings can provide named Parameters
-groups and a Visible checkbox using native `hidden`. Copied markup and Reset
-preserve each target’s attributes and visibility. Hiding one sibling does not
-create or dispose the player. Responsive layout and public tokens apply per host.
-
-Responsive geometry belongs to UIKit's `mountFlowLane`: the chord Element supplies a
-`visibleSpan` in seconds instead of assuming a pixel width. Resizing preserves
-that duration and recomputes pointer coordinates without replacing the player,
-clock or presenter host. Track labels, the ruler and the current readout occupy
-separate space. Weight changes affect a band's visual fill rather than reducing
-its readable text height. Each Score Analyze Element owns one neutral component
-surface: background, border, radius and equal padding, using the same defaults
-as Score Play. The outer `surface` part exposes the public component/workbench
-surface tokens. Inner lanes and nameplates remain unframed, and bare workbench
-chrome omits configuration controls. It must not remove the Element's outer
-frame or spacing. Full-width sibling composition and its `0.5rem` gap belong to
-the demo layout; component padding belongs to the reusable Element (DEC-034).
-
-## Resources and failure
+The lanes convert quarters through the Score's time map and emit nominal-seconds
+seek requests. Commands use `seekNominal` when available or divide nominal time
+by the current rate for transport `seek`. Failed commands restore local position
+unless newer state has arrived. Native snapshots remain authoritative after
+seek, rate or source discontinuities. Live chord mode has no moving lane or
+score seek. None creates an audio clock or completes cross-domain clock injection.
 
 | Resource | Ownership | Release |
 |---|---|---|
-| Player, sound and audio context | Borrowed; never allocated by a follower | Player owner decides |
-| Explicit URL request | Owned by score-based Element | Abort/invalidate on input change/disconnect |
-| Analysis session/tracker | Element-owned derived state | Reset/drop with its declared lifetime |
-| Player subscription and target observer | Element-owned | Release on rebind/disconnect |
-| Presenter/DOM/frame subscription | Element-owned | Destroy on remount/disconnect |
+| Player, synth and AudioContext | Borrowed; never allocated by Analyze | Player owner decides |
+| Explicit URL request | Element-owned | Abort/invalidate on replacement or disconnect |
+| Derived inspection/projection | Element-owned or caller-owned plain data | Replace with input/configuration |
+| Target discovery/subscriptions | Element-owned | Rebind/disconnect |
+| Presenter/DOM/frame subscription | Element-owned | Remount/disconnect |
 
-Missing input remains distinguishable from load failure. Optional playback/device
-requirements belong to Play, and merely mounting a follower does not request them.
+## Interaction and visuals
 
-## Composition, extension, and compatibility
+Each score lane is a named slider with keyboard/pointer interaction and a semantic
+ordered list. A prominent current reading and quieter configuration context make
+the musical result legible without depending on a tiny band's text. Named chords
+show their symbol above source pitch names with octaves; unmatched sets leave
+the symbol row empty and retain pitch names in the note row below. This applies
+to the score readout, timeline and live nameplate. Grouping belongs in settings and inspection details,
+not a repeated collection caption. Chord timeline labels wrap and their row
+height grows to fit instead of truncating with ellipses. Melodic interval pairs
+use an arrow; harmonic pairs use `+`. Rhythm labels
+use compact duration and beat notation, with exact units retained in evidence.
+Interval, scale and rhythm place their secondary facts in three fixed,
+equal-width readout slots: Notes/Motion/Semitones, Note/Reference/Relation and
+Bar/Beat/Duration (qn), respectively. Rest and tie-continuation rhythm readings
+retain the same slots; unavailable values are empty. Full-band data determines
+the space needed by the primary heading and each wrapped field on content or
+geometry changes. Playback updates values without measuring or resizing the
+readout; gaps retain field labels and slot heights while clearing values.
+These structured fields replace the visual secondary sentence for those three
+tools. The chord symbol/note hierarchy stays unchanged.
+Passive playback does not repeatedly announce a local selection. Selection
+details remain in `.analysis`; no hidden sibling analysis or pitch view runs
+inside the core tool.
 
-Fixed tags identify the musical task; there is no generic type-switching
-Analyze Element. Existing callers select the corresponding retained tag and
-compose supporting views explicitly. The retired Roman and voice-leading
-Element pages redirect to the code-only analysis workflows; their algorithms
-and projections remain. Other retired diagnostic and specialist pages continue
-to redirect to Headless/API references. Public registration includes exactly
-the two Analyze tags in the table, with no compatibility aliases. Former
-key, interval, rhythm, motif and rhythm-pattern Element bookmarks redirect
-to their retained API algorithms.
+Responsive geometry belongs to UIKit's `mountFlowLane`: the Element supplies a
+visible duration in seconds, and resize preserves that duration while updating
+pointer coordinates. Track labels, ruler and reserved current readout have
+separate space. Score lanes hide tracks whose material is outside the viewport,
+retaining one empty row through gaps instead of reserving rows for overlap
+elsewhere in the score; this changes only layout, never identities or evidence.
+The live chord nameplate starts with the prominent chord name and quieter
+source notes below. It omits explanatory captions from the performance surface;
+MIDI spelling provenance remains in the owning reference. Reserved reading
+rows stay stable through silence, unnamed sets and named chords. Long readings
+remain available by horizontal scrolling without ellipses. Alternate readings
+are secondary text with no candidate buttons or redundant time caption.
 
-Headless `projectNameplate` supports the current name without computing pitch
-views. `projectProgression(..., {roll: false})` produces only chord bands; its
-existing API default still includes the roll. UI's workbench presenter remains
-available for application-owned compositions; its full chrome is not a primitive
-Analyze element's product interface.
+Each component retains one neutral frame using public surface, padding, border
+and radius tokens (DEC-034). Inner presenters remain unframed. Light-DOM public
+parts and named handles remain the styling seams; private presenter selectors
+are not public API. External demo Parameters own configuration. The demo's
+full-width sibling composition and `0.5rem` gap do not alter component geometry.
+
+## Compatibility and documentation
+
+Register exactly the four tags above. Migrate old live callers to
+`score-chord-analysis mode="live"`; its old reference URL redirects to the
+merged page without registering an alias. Interval and rhythm bookmarks route
+to their new domain-prefixed pages. Retired recurrence and specialist bookmarks
+continue to their API owners. API/Headless key and report algorithms remain
+available, but their estimates do not silently fill these components' context.
+
+Each tag has one [template-complete page](../docs/COMPONENT-PAGE-TEMPLATE.md),
+parameter catalog and real one-player demo. All four load the existing
+`public/mxl/Arabesque No.1.mxl` asset and inspect its actual written notes and
+meter; no substitute teaching score or generated notes are used in the demos.
+Scale starts with an explicit E-major reference, not a key estimate. Exact
+synthetic theory cases remain test fixtures rather than replacements for the
+demo piece. All four demos start with a one-second viewport to leave room for
+written notes and full chord labels. These viewport choices
+do not change analysis grouping. Copy includes the actual source and Reset restores initial
+attributes. Optional supporting views belong to the family composition example.
 
 ## Acceptance
 
-Automated contracts cover exact tags/exports/attributes, one active core
-surface, absence of internal pitch views, selection and nonvisual candidate data,
-initial/replaced bindings, source precedence, cancellation,
-equal-pitch occurrences, rate-correct seeking, standalone interaction, live
-note resets and cleanup. An omitted voice or unsupported analysis must never
-produce a misleading clean verdict. External Parameters need distinct-target
-checks: changing/hiding staff cannot mutate the main analysis or keyboard, and
-Reset restores player links and visible states.
+Verify exact tags/exports/catalog attributes; complete/ambiguous chord sets,
+strict API defaults, metrical arpeggio collection, sustained overlaps, passing
+tones, irregular meter validation and grouped bass provenance;
+inversions with explicit major/minor key; interval spelling/transposition;
+explicit scale degrees and all minor forms; ties, simple/compound/additive meter,
+invalid/missing context, exact note selection and standalone region inspection.
+Then exercise source precedence, initial/replaced bindings, cancellation,
+overlapping equal pitches, rate-correct seek, mode changes and repeated cleanup.
 
-Browser acceptance checks actual controls, copied composition, layout and
-multiple followers of one player. Audible timing and devices require separate
-evidence. Uniform Rack/controller snapshots and shared cross-domain clock
-injection remain outside this implementation.
-
-For the chord lane, visual acceptance also checks that no explanation
-section appears below the lane, no chord candidate controls appear above it,
-and selected details remain screen-reader accessible without a visible report
-panel (DEC-039 and DEC-041). For the live nameplate, alternate readings are static
-secondary text below the primary symbol and no temporal caption is shown.
-
-## Documentation delivery
-
-Tag-owned pages follow the [component template](../docs/COMPONENT-PAGE-TEMPLATE.md).
-Observed-attribute catalogs match source order; effective properties/events and
-units belong to the owning page. Each Analyze live demo isolates the current tag
-with one player, external Parameters and truthful Copy/Reset behavior. Reusable
-compositions belong to the overview and related references. Catalogs and generated
-inventories describe this branch; historical workbench plans remain unchanged.
+Browser acceptance covers all four controls, copied markup, Reset, normal/narrow
+layout, keyboard/pointer navigation and multiple followers of one player.
+For interval/scale/rhythm, compare field positions and readout height across
+short/long values, rests, ties and gaps; geometry changes may recompute the
+reserved space, ordinary playback must not. Record
+actual evidence in dated audits, and leave audible timing, real MIDI devices and
+screen-reader acceptance open until measured. Historical passing checks do not
+establish this tree's behavior.

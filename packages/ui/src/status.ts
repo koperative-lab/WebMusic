@@ -2,9 +2,9 @@ import {installStyle} from './internal/style';
 import {claimHost, createErrorSink} from './internal/lifecycle';
 import {addClassNames, setParts} from './internal/dom';
 import {componentSurfaceCss} from './internal/surface';
-export type StatusKind = 'ready' | 'loading' | 'empty' | 'error';
+export type StatusKind = 'ready' | 'loading' | 'waiting' | 'empty' | 'error';
 
-/** Domain-neutral state for a passive loading, empty, or failure message. */
+/** Domain-neutral state for passive loading, waiting, empty, or failure feedback. */
 export interface StatusState {
   kind: StatusKind;
   message?: string;
@@ -17,11 +17,13 @@ export interface StatusBinding {
 
 export interface StatusClassNames {
   root?: string;
+  indicator?: string;
   message?: string;
 }
 
 export interface StatusParts {
   root?: string;
+  indicator?: string;
   message?: string;
 }
 
@@ -35,6 +37,7 @@ export interface StatusOptions {
 
 export interface StatusHandle {
   element: HTMLElement;
+  indicator: HTMLSpanElement;
   message: HTMLSpanElement;
   update(): void;
   destroy(): void;
@@ -64,6 +67,68 @@ ${componentSurfaceCss('status', {
 }
 .wui-status__message { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
 .wui-status[hidden] { display: none; }
+.wui-status__indicator {
+  box-sizing: border-box;
+  display: grid;
+  flex: 0 0 auto;
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: 20%;
+  width: var(--wm-status-indicator-size, 1.25rem);
+  height: var(--wm-status-indicator-size, 1.25rem);
+  color: inherit;
+}
+.wui-status__indicator[hidden] { display: none; }
+.wui-status__indicator > span { background: currentColor; }
+.wui-status[data-kind="loading"] .wui-status__indicator > span {
+  animation: wui-status-loading var(--wm-status-loading-duration, 1.2s) ease-in-out infinite;
+}
+.wui-status[data-kind="loading"] .wui-status__indicator > span:nth-child(2) {
+  animation-delay: calc(var(--wm-status-loading-duration, 1.2s) * -.75);
+}
+.wui-status[data-kind="loading"] .wui-status__indicator > span:nth-child(3) {
+  animation-delay: calc(var(--wm-status-loading-duration, 1.2s) * -.25);
+}
+.wui-status[data-kind="loading"] .wui-status__indicator > span:nth-child(4) {
+  animation-delay: calc(var(--wm-status-loading-duration, 1.2s) * -.5);
+}
+.wui-status[data-kind="waiting"] .wui-status__indicator {
+  border: 1px solid currentColor;
+  animation: wui-status-waiting var(--wm-status-waiting-duration, 2.4s) ease-in-out infinite;
+}
+.wui-status[data-kind="waiting"] .wui-status__indicator > span { visibility: hidden; }
+.wui-status[data-kind="loading"] .wui-status__message,
+.wui-status[data-kind="waiting"] .wui-status__message {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+@keyframes wui-status-loading {
+  0%, 60%, 100% { opacity: .22; }
+  30% { opacity: .9; }
+}
+@keyframes wui-status-waiting {
+  0%, 100% { opacity: .3; }
+  50% { opacity: .75; }
+}
+:is([data-motion="none"], [data-motion="stepped"]) .wui-status[data-kind="loading"] .wui-status__indicator > span,
+:is([data-motion="none"], [data-motion="stepped"]) .wui-status[data-kind="waiting"] .wui-status__indicator {
+  animation: none;
+  opacity: .65;
+}
+@media (prefers-reduced-motion: reduce) {
+  .wui-status[data-kind="loading"] .wui-status__indicator > span,
+  .wui-status[data-kind="waiting"] .wui-status__indicator {
+    animation: none;
+    opacity: .65;
+  }
+}
 .wui-status[data-kind="error"] {
   border-style: solid;
   color: var(--wm-status-error, var(--wm-danger, #b42318));
@@ -80,6 +145,7 @@ ${componentSurfaceCss('status', {
 
 function defaultMessage(kind: StatusKind): string {
   if (kind === 'loading') return 'Loading…';
+  if (kind === 'waiting') return 'Waiting for a source…';
   if (kind === 'empty') return 'Nothing to show.';
   if (kind === 'error') return 'Something went wrong.';
   return '';
@@ -99,13 +165,24 @@ export function mountStatus(
   addClassNames(root, options.classNames?.root);
   setParts(root, 'root', options.parts?.root);
 
+  const indicator = document.createElement('span');
+  indicator.className = 'wui-status__indicator';
+  indicator.hidden = true;
+  indicator.setAttribute('aria-hidden', 'true');
+  addClassNames(indicator, options.classNames?.indicator);
+  setParts(indicator, 'indicator', options.parts?.indicator);
+  for (let index = 0; index < 4; index++) {
+    indicator.append(document.createElement('span'));
+  }
+
   const message = document.createElement('span');
   message.className = 'wui-status__message';
   addClassNames(message, options.classNames?.message);
   setParts(message, 'message', options.parts?.message);
-  root.append(message);
+  root.append(indicator, message);
 
   let destroyed = false;
+  let currentKind: StatusKind | undefined;
   let unsubscribe: (() => void) | undefined;
 
   const report = createErrorSink(options.onError);
@@ -115,23 +192,26 @@ export function mountStatus(
     try {
       const state = binding.snapshot();
       const kind: StatusKind =
-        state.kind === 'loading' || state.kind === 'empty' || state.kind === 'error'
+        state.kind === 'loading' || state.kind === 'waiting' || state.kind === 'empty' || state.kind === 'error'
           ? state.kind
           : 'ready';
-      root.dataset.kind = kind;
-      root.hidden = kind === 'ready';
-      root.removeAttribute('role');
-      root.removeAttribute('aria-live');
-      root.removeAttribute('aria-busy');
-      if (kind === 'error') {
-        root.setAttribute('role', 'alert');
-        root.setAttribute('aria-live', 'assertive');
-      } else if (kind !== 'ready') {
-        root.setAttribute('role', 'status');
-        root.setAttribute('aria-live', 'polite');
+      if (kind !== currentKind) {
+        currentKind = kind;
+        root.dataset.kind = kind;
+        root.hidden = kind === 'ready';
+        indicator.hidden = kind !== 'loading' && kind !== 'waiting';
+        if (kind === 'ready') {
+          root.removeAttribute('role');
+          root.removeAttribute('aria-live');
+        } else {
+          root.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+          root.setAttribute('aria-live', kind === 'error' ? 'assertive' : 'polite');
+        }
+        if (kind === 'loading') root.setAttribute('aria-busy', 'true');
+        else root.removeAttribute('aria-busy');
       }
-      if (kind === 'loading') root.setAttribute('aria-busy', 'true');
-      message.textContent = state.message ?? defaultMessage(kind);
+      const text = state.message ?? defaultMessage(kind);
+      if (message.textContent !== text) message.textContent = text;
     } catch (error) {
       report(error);
     }
@@ -139,6 +219,7 @@ export function mountStatus(
 
   const handle: StatusHandle = {
     element: root,
+    indicator,
     message,
     update,
     destroy(): void {

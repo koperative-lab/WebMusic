@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import {afterEach, describe, expect, it, vi} from 'vitest';
+vi.mock('@webmusic/ui/pitch', () => import('../../../ui/src/pitch'));
 import type {ScorePlaybackNote, ScorePlaybackSnapshot, ScorePlaybackSource} from '../../src/core';
 import {definePitchViewElement, type PitchViewElement, type PitchViewType} from '../../src/view/element/score-pitch-view';
 
@@ -49,6 +50,55 @@ function mount(type: PitchViewType = 'keyboard') {
 }
 
 describe('pitch-view shared native follower', () => {
+  it('preserves occurrence counts and its borrowed subscription across scroll and type changes', () => {
+    const owner = player(snapshot({activeNotes: [note('left'), note('right')]}));
+    const view = mount();
+    view.setAttribute('scroll', 'true');
+    view.querySelector<HTMLElement>('[role="img"]')!.scrollLeft = 100;
+    view.setAttribute('scroll', 'false');
+    expect(view.querySelector<HTMLElement>('[role="img"]')!.scrollLeft).toBe(0);
+    view.type = 'staff'; view.setAttribute('scroll', 'true'); view.type = 'keyboard';
+    view.removeAttribute('scroll');
+    expect(view.active).toEqual([60]);
+    expect(view.querySelector('[data-midi="60"]')!.getAttribute('data-active')).toBe('true');
+    expect(owner.playback.subscribe).toHaveBeenCalledOnce();
+    expect(owner.cleanup).not.toHaveBeenCalled();
+    owner.emit(snapshot({revision: 1, activeNotes: [note('right')]}));
+    expect(view.active).toEqual([60]);
+    owner.emit(snapshot({revision: 2, activeNotes: []}));
+    expect(view.active).toEqual([]);
+    view.remove();
+    expect(owner.cleanup).toHaveBeenCalledOnce();
+    expect(owner.subscriptions.size).toBe(0);
+    owner.emit(snapshot({revision: 3, activeNotes: [note('late')]}));
+    expect(view.active).toEqual([]);
+    expect(owner.element.stop).not.toHaveBeenCalled();
+    expect(owner.element.dispose).not.toHaveBeenCalled();
+    expect(owner.playback.seekNominal).not.toHaveBeenCalled();
+  });
+
+  it('uses waiting and loading only while the borrowed source is unavailable, preserving ready silence', async () => {
+    const view = mount('staff');
+    const status = () => view.querySelector<HTMLElement>('[part~="pitch-status"]')!;
+    expect(status().dataset.kind).toBe('waiting');
+    const owner = player(snapshot({readiness: 'loading'}));
+    await flush();
+    expect(status().dataset.kind).toBe('loading');
+    expect(status().getAttribute('aria-busy')).toBe('true');
+    owner.emit(snapshot({revision: 1, readiness: 'ready', activeNotes: []}));
+    expect(status().hidden).toBe(true);
+    expect(view.querySelector<HTMLElement>('[role="img"]')!.hidden).toBe(false);
+    expect(view.textContent).toContain('No sounding notes');
+    owner.emit(snapshot({revision: 2, readiness: 'error', error: new Error('Source failed')}));
+    expect(status().dataset.kind).toBe('error');
+    expect(status().textContent).toContain('Source failed');
+    owner.element.remove();
+    await flush();
+    expect(status().dataset.kind).toBe('waiting');
+    view.remove();
+    expect(view.querySelector('[part~="pitch-status"]')).toBeNull();
+  });
+
   it.each(['keyboard', 'staff', 'fretboard'] as const)('%s reuses occurrence-aware snapshots and clears reused IDs at stop', (type) => {
     const owner = player(snapshot({activeNotes: [note('left'), note('right')]}));
     const view = mount(type);

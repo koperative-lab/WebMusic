@@ -18,7 +18,7 @@ const headlessSources = {
   'play/engines': ['engines/buffer-engine', 'engines/media-engine'],
   'analyze/audio-analysis-session': ['session'],
   'analyze/realtime-analyzer': ['realtime'],
-  'view/audio-meter': ['meter'],
+  'view/audio-meter': ['meter', 'meter-display'],
   'view/audio-timeline': ['timeline', 'binding'],
   'view/live-projection': ['live'],
   'view/peaks': ['peaks'],
@@ -73,6 +73,8 @@ export const audioBridgeContext = Object.freeze({
   rawInputs: [
     'apps/doc/webmusic/src/components/bridges/bridge-composition-client.ts',
     'apps/doc/webmusic/src/components/bridges/independent-loops-client.ts',
+    'apps/doc/webmusic/src/components/headless/arabesque-score.ts',
+    'apps/doc/webmusic/src/components/headless/arabesque-audio.ts',
   ],
   htmlElements: ['kbd'],
   demoComponents: [

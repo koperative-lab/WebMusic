@@ -57,6 +57,9 @@
   "overrides": {
     "tsup": {
       "esbuild": "^0.28.2"
+    },
+    "@expressive-code/core": {
+      "postcss-nested": "^7.0.2"
     }
   }
 }

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {ScoreRecorderElement} from '../../src/play/element/score-recorder';
+import {ScorePlayer} from '../../src/play/headless/score-player';
 import {NoteInputElement} from '../../src/play/element/score-note-input';
 
 customElements.define('lifecycle-score-recorder', ScoreRecorderElement);
@@ -18,6 +19,35 @@ afterEach(() => {
 });
 
 describe('recorder input ownership', () => {
+  it('marks pending take playback busy and clears it on completion and superseding recording', async () => {
+    const recorder = document.createElement('lifecycle-score-recorder') as ScoreRecorderElement;
+    document.body.append(recorder);
+    const recordTake = () => {
+      recorder.record();
+      noteEvent(recorder, true);
+      noteEvent(recorder, false);
+      recorder.stop();
+    };
+    recordTake();
+    let resolve!: () => void;
+    vi.spyOn(ScorePlayer.prototype, 'play').mockImplementation(() => new Promise<void>((done) => { resolve = done; }));
+    const root = () => recorder.shadowRoot!.querySelector<HTMLElement>('[part~="root"]')!;
+    const play = () => recorder.shadowRoot!.querySelector<HTMLButtonElement>('[part~="play"]')!.click();
+    play();
+    expect(root().getAttribute('aria-busy')).toBe('true');
+    resolve();
+    await Promise.resolve();
+    expect(root().getAttribute('aria-busy')).toBe('false');
+    recordTake();
+    play();
+    expect(root().getAttribute('aria-busy')).toBe('true');
+    recorder.record();
+    resolve();
+    await Promise.resolve();
+    expect(root().getAttribute('aria-busy')).toBe('false');
+    expect(recorder.recordingActive).toBe(true);
+  });
+
   it('discards old-source pending presses while retaining completed notes and the recording time origin', () => {
     let milliseconds = 0;
     vi.spyOn(performance, 'now').mockImplementation(() => milliseconds);

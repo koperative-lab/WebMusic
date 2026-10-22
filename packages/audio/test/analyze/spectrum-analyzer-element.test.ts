@@ -127,7 +127,7 @@ describe('<audio-spectrum-analyzer>', () => {
     owner.dispatchEvent(new CustomEvent('webaudio:statechange', {detail: {playing: false}}));
     expect(realtime.runners[1]!.stop).toHaveBeenCalledOnce();
     expect(spectrum.frame).toBeUndefined();
-    expect(spectrum.textContent).toContain('Playback paused');
+    expect(spectrum.querySelector<HTMLElement>('[part="status"]')?.hidden).toBe(true);
   });
 
   it('invalidates replaced sources and stale callbacks, and supports an explicit analyser', () => {

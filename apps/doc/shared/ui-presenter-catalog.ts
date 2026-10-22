@@ -143,6 +143,8 @@ handle.update(state);`,
     consumerTags: ['audio-level-analyzer'],
     hint: 'Inspect the moving dBFS history, change the threshold, then freeze or reset peak hold. The demo signal is generated locally.',
     state: [
+      {name: 'loading', kind: 'boolean', initial: false, fallback: 'off', note: 'Shows the shared four-square loading animation while the demo source is pending.'},
+      {name: 'waiting', kind: 'boolean', initial: false, fallback: 'off', note: 'Shows the outlined-square waiting animation without a source; loading takes precedence.'},
       {name: 'rmsDbfs', kind: 'number', required: true, initial: -24, min: -60, max: 0, step: 1, note: 'Base RMS of the generated demo signal; the live history adds a small movement around it.'},
       {name: 'peakDbfs', kind: 'number', required: true, initial: -10, min: -60, max: 0, step: 1, note: 'Base sample peak in dBFS. Held peak and recent history derive from incoming samples.'},
       {name: 'thresholdDbfs', kind: 'number', required: true, initial: -6, min: -60, max: 0, step: 1, note: 'Alert threshold for sample peaks; the presenter slider changes this same state.'},
@@ -166,6 +168,7 @@ const handle = mountSpectrumAnalyzer(host, {
     consumerTags: ['audio-spectrum-analyzer'],
     hint: 'Probe the plot with pointer or arrow keys, hold peaks, then freeze a frame. The moving harmonic spectrum is generated locally.',
     state: [
+      {name: 'status', kind: 'enum', required: true, initial: 'live', choices: [{value: 'live', label: 'live'}, {value: 'loading', label: 'loading'}, {value: 'waiting', label: 'waiting'}, {value: 'paused', label: 'paused'}, {value: 'unavailable', label: 'unavailable'}, {value: 'frozen', label: 'frozen'}], note: 'Selects real presenter readiness, including both shared animations; Reset restores the generated live source.'},
       {name: 'fundamentalHz', kind: 'number', required: true, initial: 440, min: 55, max: 2000, step: 1, note: 'Fundamental of the generated harmonic test signal; each frame contains real dB values per FFT bin.'},
       {name: 'frozen', kind: 'boolean', required: true, initial: false, note: 'Keeps the latest frame; the presenter Freeze button changes this same state.'},
       {name: 'peakHold', kind: 'boolean', required: true, initial: false, note: 'Overlays maxima until Reset peaks or source replacement.'},
@@ -197,6 +200,7 @@ const handle = mountOscilloscope(host, {
     consumerTags: ['audio-oscilloscope'],
     hint: 'Adjust the timebase or trigger, then probe and freeze the generated waveform. This demo does not read an audio device.',
     state: [
+      {name: 'status', kind: 'enum', required: true, initial: 'live', choices: [{value: 'live', label: 'live'}, {value: 'loading', label: 'loading'}, {value: 'waiting', label: 'waiting'}, {value: 'paused', label: 'paused'}, {value: 'unavailable', label: 'unavailable'}, {value: 'frozen', label: 'frozen'}], note: 'Selects real presenter readiness, including both shared animations; Reset restores the generated live source.'},
       {name: 'frequencyHz', kind: 'number', required: true, initial: 440, min: 60, max: 1800, step: 1, note: 'Frequency of the caller-generated test waveform, not an audio-device reading.'},
       {name: 'amplitude', kind: 'number', required: true, initial: 0.75, min: 0, max: 1, step: 0.05, note: 'Linear amplitude of the generated samples; a threshold above it has no matching edge.'},
       {name: 'timebaseMs', kind: 'number', required: true, initial: 10, min: 1, max: 85, step: 0.5, note: 'Requested visible window in milliseconds; the presenter Timebase control writes this state.'},
@@ -227,6 +231,8 @@ handle.update(state);`,
     consumerTags: ['audio-transient-analyzer'],
     hint: 'Watch generated attacks cross the threshold, change Sensitivity, then Freeze or Clear. This demo does not analyze a microphone.',
     state: [
+      {name: 'loading', kind: 'boolean', initial: false, fallback: 'off', note: 'Shows the shared four-square loading animation while the demo source is pending.'},
+      {name: 'waiting', kind: 'boolean', initial: false, fallback: 'off', note: 'Shows the outlined-square waiting animation without a source; loading takes precedence.'},
       {name: 'attackStrength', kind: 'number', required: true, initial: 0.32, min: 0, max: 1, step: 0.01, note: 'Base strength of generated attack pulses; sensitivity decides which pulses count as hits.'},
       {name: 'sensitivity', kind: 'number', required: true, initial: 0.55, min: 0, max: 1, step: 0.01, note: 'Higher sensitivity lowers the demo threshold; the presenter slider changes this same state.'},
       {name: 'frozen', kind: 'boolean', required: true, initial: false, note: 'Hold the current synthetic history; the presenter Freeze button changes this same state.'},
@@ -736,6 +742,7 @@ const handle = mountPlaylist(host, {
     consumerTags: ['audio-playlist'],
     hint: 'Use Previous, Play and Next, drag Seek, or choose a row; then expose loading/error items or change Options.',
     state: [
+      {name: 'status', kind: 'enum', required: true, initial: 'ready', choices: [{value: 'ready', label: 'ready', literal: "{kind: 'ready'}"}, {value: 'loading', label: 'loading', literal: "{kind: 'loading'}"}, {value: 'waiting', label: 'waiting', literal: "{kind: 'waiting'}"}, {value: 'error', label: 'error', literal: "{kind: 'error', message: 'Source unavailable.'}"}], note: 'Shows owner readiness through the shared Status presenter; Reset restores ready.'},
       {
         name: 'playing',
         kind: 'boolean',
@@ -766,6 +773,7 @@ const handle = mountPlaylist(host, {
         required: true,
         initial: 'ready',
         choices: [
+          {value: 'empty', label: 'no entries'},
           {value: 'ready', label: 'four ready entries'},
           {value: 'mixed', label: 'loading + error states'},
           {value: 'single', label: 'single entry'},
@@ -796,7 +804,7 @@ const handle = mountPlaylist(host, {
           {
             value: 'demo',
             label: 'demo compatibility hooks',
-            literal: "{root: 'demo-playlist', bar: 'demo-bar', button: 'demo-button', seek: 'demo-seek', list: 'demo-list', item: 'demo-item'}",
+            literal: "{root: 'demo-playlist', status: 'demo-status', itemStatus: 'demo-item-status', bar: 'demo-bar', button: 'demo-button', seek: 'demo-seek', list: 'demo-list', item: 'demo-item'}",
           },
         ],
         note: 'Adds compatibility classes alongside canonical playlist classes.',
@@ -810,7 +818,7 @@ const handle = mountPlaylist(host, {
           {
             value: 'demo',
             label: 'demo part hooks',
-            literal: "{root: 'demo-root', bar: 'demo-bar', button: 'demo-button', seek: 'demo-seek', list: 'demo-list', item: 'demo-item'}",
+            literal: "{root: 'demo-root', status: 'demo-status', itemStatus: 'demo-item-status', bar: 'demo-bar', button: 'demo-button', seek: 'demo-seek', list: 'demo-list', item: 'demo-item'}",
           },
         ],
         note: 'Adds part tokens alongside canonical playlist parts.',
@@ -1132,6 +1140,7 @@ const handle = mountMixer(host, {
     consumerTags: ['score-rack-control', 'audio-mixer'],
     hint: 'Move a fader or press M / S; in this demo Play enables, Pause disables, and Stop clears the levels.',
     state: [
+      {name: 'status', kind: 'enum', required: true, initial: 'ready', choices: [{value: 'ready', label: 'ready', literal: "{kind: 'ready'}"}, {value: 'loading', label: 'loading', literal: "{kind: 'loading'}"}, {value: 'waiting', label: 'waiting', literal: "{kind: 'waiting'}"}, {value: 'error', label: 'error', literal: "{kind: 'error', message: 'Source unavailable.'}"}], note: 'Shows owner readiness through the shared Status presenter; Reset restores ready.'},
       {
         name: 'master',
         kind: 'number',
@@ -1148,6 +1157,7 @@ const handle = mountMixer(host, {
         required: true,
         initial: 'studio',
         choices: [
+          {value: 'empty', label: 'no channels'},
           {value: 'studio', label: 'four studio channels'},
           {value: 'compact', label: 'two compact channels'},
           {value: 'disabled', label: 'disabled and muted channels'},
@@ -1171,7 +1181,7 @@ const handle = mountMixer(host, {
           {
             value: 'demo',
             label: 'demo compatibility hooks',
-            literal: "{root: 'demo-mixer', transport: 'demo-transport', board: 'demo-board', channels: 'demo-channels', strip: 'demo-strip', master: 'demo-master', fader: 'demo-fader', input: 'demo-input', label: 'demo-label', actions: 'demo-actions', button: 'demo-button', mute: 'demo-mute', solo: 'demo-solo', play: 'demo-play', pause: 'demo-pause', stop: 'demo-stop'}",
+            literal: "{root: 'demo-mixer', status: 'demo-status', transport: 'demo-transport', board: 'demo-board', channels: 'demo-channels', strip: 'demo-strip', master: 'demo-master', fader: 'demo-fader', input: 'demo-input', label: 'demo-label', actions: 'demo-actions', button: 'demo-button', mute: 'demo-mute', solo: 'demo-solo', play: 'demo-play', pause: 'demo-pause', stop: 'demo-stop'}",
           },
         ],
         note: 'Adds compatibility classes beside all canonical mixer classes.',
@@ -1185,7 +1195,7 @@ const handle = mountMixer(host, {
           {
             value: 'demo',
             label: 'demo part hooks',
-            literal: "{root: 'demo-root', transport: 'demo-transport', board: 'demo-board', channels: 'demo-channels', strip: 'demo-strip', master: 'demo-master', fader: 'demo-fader', input: 'demo-input', label: 'demo-label', actions: 'demo-actions', button: 'demo-button', mute: 'demo-mute', solo: 'demo-solo', play: 'demo-play', pause: 'demo-pause', stop: 'demo-stop'}",
+            literal: "{root: 'demo-root', status: 'demo-status', transport: 'demo-transport', board: 'demo-board', channels: 'demo-channels', strip: 'demo-strip', master: 'demo-master', fader: 'demo-fader', input: 'demo-input', label: 'demo-label', actions: 'demo-actions', button: 'demo-button', mute: 'demo-mute', solo: 'demo-solo', play: 'demo-play', pause: 'demo-pause', stop: 'demo-stop'}",
           },
         ],
         note: 'Adds part tokens beside the canonical mixer parts.',
@@ -1212,10 +1222,12 @@ const handle = mountMixer(host, {
 const handle = mountMeter(host, {
   readLevel: () => meter.level,
   readSpectrum: (bars) => meter.spectrum(bars),
+  readStatus: () => state.status,
 });`,
-    consumerTags: ['audio-meter', 'audio-view'],
+    consumerTags: ['audio-view'],
     hint: 'Change the pulled level and peak values, switch mode, or turn animation off and use State changes to call redraw().',
     state: [
+      {name: 'status', kind: 'enum', required: true, initial: 'ready', choices: [{value: 'ready', label: 'ready', literal: "{kind: 'ready'}"}, {value: 'loading', label: 'loading', literal: "{kind: 'loading'}"}, {value: 'waiting', label: 'waiting', literal: "{kind: 'waiting'}"}, {value: 'error', label: 'error', literal: "{kind: 'error', message: 'Source unavailable.'}"}], note: 'The demo passes this status to binding.readStatus(); Reset restores a ready signal.'},
       {
         name: 'level',
         kind: 'number',
@@ -1317,7 +1329,7 @@ const handle = mountMeter(host, {
           {
             value: 'demo',
             label: 'demo compatibility hooks',
-            literal: "{root: 'demo-meter', track: 'demo-track', fill: 'demo-fill', peak: 'demo-peak', spectrum: 'demo-spectrum', bar: 'demo-bar'}",
+            literal: "{root: 'demo-meter', status: 'demo-status', track: 'demo-track', fill: 'demo-fill', peak: 'demo-peak', spectrum: 'demo-spectrum', bar: 'demo-bar'}",
           },
         ],
         note: 'Adds compatibility classes beside every meter class.',
@@ -1331,7 +1343,7 @@ const handle = mountMeter(host, {
           {
             value: 'demo',
             label: 'demo part hooks',
-            literal: "{root: 'demo-root', track: 'demo-track', fill: 'demo-fill', peak: 'demo-peak', spectrum: 'demo-spectrum', bar: 'demo-bar'}",
+            literal: "{root: 'demo-root', status: 'demo-status', track: 'demo-track', fill: 'demo-fill', peak: 'demo-peak', spectrum: 'demo-spectrum', bar: 'demo-bar'}",
           },
         ],
         note: 'Adds part tokens beside every canonical meter part.',
@@ -1363,6 +1375,7 @@ const handle = mountRecorder(host, {
     consumerTags: ['score-recorder', 'audio-recorder'],
     hint: 'Press Record to run an asynchronous demo capture; choose exportFormats to add working download callbacks.',
     state: [
+      {name: 'statusKind', kind: 'enum', fallback: 'loading while busy; otherwise text', choices: [{value: 'loading', label: 'loading'}, {value: 'waiting', label: 'waiting'}, {value: 'error', label: 'error'}], note: 'Chooses passive loading, source waiting, or a visible error for the status message; Reset restores ready capture.'},
       {name: 'recording', kind: 'boolean', required: true, initial: false, note: 'Paints and labels the record toggle as Record or Stop.'},
       {name: 'busy', kind: 'boolean', initial: false, fallback: 'off', note: 'Blocks recorder commands and sets root and record-button aria-busy state.'},
       {name: 'playing', kind: 'boolean', initial: false, fallback: 'off', note: 'Paints the playback toggle as Play or Stop.'},
@@ -1504,7 +1517,7 @@ mountCanvasStage(canvasHost, canvasBinding);
 mountSurfaceSlider(surface, sliderBinding);`,
       variant: 'stage-compound',
     },
-    consumerTags: ['score-view', 'score-sheet-view', 'audio-view', 'audio-live-view'],
+    consumerTags: ['score-player', 'audio-player', 'score-view', 'score-sheet-view', 'audio-view', 'audio-live-view', 'audio-meter', 'score-chord-analysis', 'score-interval-analysis', 'score-scale-analysis', 'score-rhythm-analysis', 'audio-level-analyzer', 'audio-spectrum-analyzer', 'audio-oscilloscope', 'audio-transient-analyzer'],
     hint: 'Drag the surface slider or use its Arrow, Home, and End keys; all three real stage mounts share the same caller-owned State.',
     state: [
       {
@@ -1696,12 +1709,12 @@ mountSurfaceSlider(surface, sliderBinding);`,
     presenter: 'status',
     classSlug: 'layout-feedback',
     label: 'Status',
-    summary: 'A shared ready, loading, empty or error surface with appropriate live-region behavior.',
+    summary: 'Shared square loading and waiting animations, empty and error feedback, with live-region semantics.',
     api: `import {mountStatus} from '@webmusic/ui/status';
 
 const handle = mountStatus(host, binding, options);`,
-    consumerTags: ['score-view', 'score-sheet-view', 'audio-view', 'audio-live-view'],
-    hint: 'Choose Ready, Loading, Empty, or Error, then edit the caller-owned message.',
+    consumerTags: ['score-player', 'score-rack-control', 'score-recorder', 'score-synth-panel', 'score-view', 'score-pitch-view', 'score-sheet-view', 'score-chord-analysis', 'score-interval-analysis', 'score-scale-analysis', 'score-rhythm-analysis', 'audio-player', 'audio-playlist', 'audio-mixer', 'audio-recorder', 'audio-view', 'audio-live-view', 'audio-meter', 'audio-level-analyzer', 'audio-oscilloscope', 'audio-spectrum-analyzer', 'audio-transient-analyzer'],
+    hint: 'Choose Loading or Waiting to compare the animations, or Ready, Empty, and Error for settled states.',
     state: [
       {
         name: 'kind',
@@ -1711,10 +1724,11 @@ const handle = mountStatus(host, binding, options);`,
         choices: [
           {value: 'ready', label: 'ready', literal: "'ready'"},
           {value: 'loading', label: 'loading', literal: "'loading'"},
+          {value: 'waiting', label: 'waiting', literal: "'waiting'"},
           {value: 'empty', label: 'empty', literal: "'empty'"},
           {value: 'error', label: 'error', literal: "'error'"},
         ],
-        note: 'Selects the hidden, polite loading / empty, or assertive error surface.',
+        note: 'Selects hidden ready, animated loading / waiting, visible empty, or assertive error feedback.',
       },
       {
         name: 'message',
@@ -1886,8 +1900,8 @@ const playhead = createAnalysisPlayhead(root);`,
       name: 'createAnalysisPlayhead',
       arguments: 'root',
     },
-    consumerTags: ['score-chord-analysis', 'score-live-chord-analysis'],
-    hint: 'Watch the real playhead move across helper-rendered spans; Options remount its controller.',
+    consumerTags: ['score-chord-analysis', 'score-interval-analysis', 'score-scale-analysis', 'score-rhythm-analysis'],
+    hint: 'Inspect source-derived Arabesque data as a visual playhead crosses the opening passage; Options remount its controller. This demo does not play audio.',
     options: [
       {
         name: 'scroll',
@@ -1935,20 +1949,20 @@ const fretboard = mountFretboard(fretboardHost, fretboardBinding);`,
       arguments: 'host, keyboardBinding',
     },
     consumerTags: ['score-pitch-view'],
-    hint: 'The progression advances on its own; picking a chord takes it over, and Reset hands it back.',
+    hint: 'Inspect written pitches from the opening Arabesque passage. Choosing a position holds that frame; Reset resumes the visual progression. This demo does not play audio.',
     state: [
       {
-        name: 'chord',
+        name: 'position',
         kind: 'enum',
         required: true,
-        initial: 'Dm7',
+        initial: 'opening',
         choices: [
-          {value: 'Dm7', label: 'Dm7'},
-          {value: 'G7', label: 'G7'},
-          {value: 'Cmaj7', label: 'Cmaj7'},
-          {value: 'Am7', label: 'Am7'},
+          {value: 'opening', label: 'Opening'},
+          {value: 'quarter', label: 'Quarter of passage'},
+          {value: 'half', label: 'Half of passage'},
+          {value: 'three-quarter', label: 'Three quarters of passage'},
         ],
-        note: 'Which chord’s marks the three surfaces hold. The demo supplies every spelling, role and fret; the kit is told none of them.',
+        note: 'Holds a relative position in the loaded passage. Marks preserve its written pitches; fret locations show playable alternatives, not a prescribed fingering.',
       },
       {
         name: 'labels',
@@ -1985,7 +1999,7 @@ const fretboard = mountFretboard(fretboardHost, fretboardBinding);`,
           {value: 3, label: '3'},
           {value: 5, label: '5'},
         ],
-        note: 'FretboardState.firstFret — a fixed window, or auto, which keeps a window that still holds every mark.',
+        note: 'FretboardState.firstFret — choose a fixed starting fret or an automatic window without changing the source pitches.',
       },
       {
         name: 'orientation',
@@ -2102,15 +2116,15 @@ const wheel = mountWheel(wheelHost, wheelBinding);`,
       name: 'mountFlowLane',
       arguments: 'host, laneBinding',
     },
-    consumerTags: ['score-chord-analysis', 'score-live-chord-analysis'],
-    hint: 'The progression runs itself past the now line. Drag or arrow-key the lane to scrub, click a band to jump to it, and pick an alternate reading to take the nameplate over.',
+    consumerTags: ['score-chord-analysis', 'score-interval-analysis', 'score-scale-analysis', 'score-rhythm-analysis'],
+    hint: 'Inspect Arabesque note spans on a visual clock without audio. Drag or arrow-key the lane to scrub, or select a band to inspect its actual pitches and any complete chord reading.',
     state: [
       {
         name: 'playing',
         kind: 'boolean',
         required: true,
         initial: true,
-        note: 'FlowLaneState.playing, and the demo’s own transport with it. Held, every read-out keeps the frame it was on — nothing here is an accumulation of the frames that went past.',
+        note: 'FlowLaneState.playing controls the demo’s visual inspection clock; pausing holds the current source position and does not start or stop audio.',
       },
       {
         name: 'tracks',
@@ -2121,7 +2135,7 @@ const wheel = mountWheel(wheelHost, wheelBinding);`,
           {value: 1, label: 'one row'},
           {value: 2, label: 'two rows'},
         ],
-        note: 'FlowLaneState.tracks — chords alone, or chords and numerals. Rows are children of one reel, so there is no arrangement of the code in which two of them drift apart.',
+        note: 'FlowLaneState.tracks — note-set/chord labels alone, or labels plus source pitch names; both rows share the same time axis.',
       },
       {
         name: 'future',
@@ -2137,9 +2151,9 @@ const wheel = mountWheel(wheelHost, wheelBinding);`,
         initial: 'none',
         choices: [
           {value: 'none', label: 'none'},
-          {value: 'subdominant', label: 'subdominant'},
+          {value: 'matched', label: 'Matched triads/sevenths'},
         ],
-        note: 'FlowLaneState.focusGroup — every band carrying that group lights with the one under the line. The kit compares two strings; which bands share a group is the caller’s answer.',
+        note: 'FlowLaneState.focusGroup highlights exact spelled triad/seventh matches from the source; the demo does not assign harmonic function.',
       },
       {
         name: 'layout',
@@ -2273,7 +2287,7 @@ if (rail) mountKeyboard(rail, keyboardBinding);`,
       name: 'mountWorkbench',
       arguments: 'host, shellBinding',
     },
-    consumerTags: ['score-chord-analysis', 'score-live-chord-analysis'],
+    consumerTags: ['score-chord-analysis', 'score-interval-analysis', 'score-scale-analysis', 'score-rhythm-analysis'],
     hint: 'Arrow-key the tabs and press Enter: an arrow moves focus and chooses nothing. Fold a dock away with its switch and the presenter inside it is unmounted, because a caller must not be able to mount into a box nobody can see. Park the shell and the frame loop stops with it.',
     state: [
       {
@@ -2283,10 +2297,10 @@ if (rail) mountKeyboard(rail, keyboardBinding);`,
         initial: 'chords',
         choices: [
           {value: 'chords', label: 'Chords'},
-          {value: 'key', label: 'Key'},
+          {value: 'key', label: 'Roots and basses'},
           {value: 'voicing', label: 'Voicing'},
         ],
-        note: 'WorkbenchState.activeViewId. Each view declares the docks it wants, so switching one folds two rail sections away and takes a different tenant into the stage — and the shell never learns what any of the three words mean.',
+        note: 'WorkbenchState.activeViewId chooses a presentation of the loaded Arabesque passage; Roots and basses keeps the internal key ID but performs no key estimation.',
       },
       {
         name: 'phase',
@@ -2297,6 +2311,8 @@ if (rail) mountKeyboard(rail, keyboardBinding);`,
           {value: 'playing', label: 'playing'},
           {value: 'listening', label: 'listening'},
           {value: 'idle', label: 'idle'},
+          {value: 'loading', label: 'loading'},
+          {value: 'waiting', label: 'waiting'},
           {value: 'empty', label: 'empty'},
           {value: 'error', label: 'error'},
         ],

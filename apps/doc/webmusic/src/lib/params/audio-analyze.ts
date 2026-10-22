@@ -12,27 +12,46 @@ const PLAYER = {
   note: 'Unique audio-player selector in the current root. The tool borrows its analyser only while playing.',
 } as const;
 
+const METER_TYPES = ['vu', 'loudness', 'waveform', 'oscilloscope', 'spectrum', 'spectrogram', 'stereometer'] as const;
+
+function meterTypes(...values: Array<(typeof METER_TYPES)[number]>) {
+  return {attribute: 'type', values, fallback: 'vu'} as const;
+}
+
 export const AUDIO_ANALYZE_PARAMS: ElementParamCatalog = {
   'audio-meter': {
     tag: 'audio-meter',
     entry: ENTRY,
     params: [
       {name: 'player', kind: 'text', placeholder: '#session', fallback: 'use .analyser or .context', note: 'Borrow the central player output analyser; late insertion and source replacement are observed.'},
-      {name: 'mode', kind: 'enum', options: ['level', 'spectrum'], fallback: 'level', note: 'Choose normalized level or FFT bars; changing modes remounts the presenter.'},
-      {name: 'bars', kind: 'number', min: 4, step: 1, fallback: '28', note: 'Spectrum bar count, minimum 4; remounts the presenter.'},
-      {name: 'aria-label', kind: 'text', placeholder: 'Output level', fallback: 'Audio level, or Spectrum', note: 'Accessible monitor name.'},
+      {name: 'type', kind: 'enum', options: [...METER_TYPES], fallback: 'vu — needle dial with peak and clip lamps', note: 'Select the display: VU, loudness bars, scrolling waveform, oscilloscope, spectrum, spectrogram or stereometer. The graph stays connected.'},
+      {name: 'theme', kind: 'enum', options: ['mono', 'color'], fallback: 'mono — intensity as a surface-to-ink grey ramp', note: 'mono paints sound with the page greys; color adds hue for frequency and a colormap for intensity.'},
+      {name: 'size', kind: 'enum', options: ['sm', 'md', 'lg'], fallback: 'md — height up to the 144px surface tier', note: 'Preset cap for the adaptive height: the kit surface tiers of 72, 144 or 216px. Width stays fluid.'},
+      {name: 'width', kind: 'text', placeholder: '320 or 20rem', fallback: 'fluid — fills the container', note: 'Explicit host width as a CSS length; a bare number is pixels.'},
+      {name: 'height', kind: 'text', placeholder: '160 or 10rem', fallback: 'adaptive — follows the width up to the size cap', note: 'Explicit frame height as a CSS length; a bare number is pixels. Overrides size.'},
+      {name: 'mode', kind: 'enum', options: ['level', 'spectrum'], fallback: 'ignored when type is set', note: 'Legacy selector: level maps to the VU dial and spectrum to the spectrum until a type attribute is present.'},
+      {name: 'bars', kind: 'number', min: 0, step: 1, fallback: '0 — continuous curve', note: 'Spectrum only: a bar count of at least 4, or 0 for the continuous curve.', when: meterTypes('spectrum')},
+      {name: 'aria-label', kind: 'text', placeholder: 'Output level', fallback: 'the type name, such as VU meter', note: 'Accessible monitor name.'},
+      {name: 'scale', kind: 'enum', options: ['log', 'mel', 'linear'], fallback: 'log', note: 'Frequency axis of the spectrum and spectrogram.', when: meterTypes('spectrum', 'spectrogram')},
+      {name: 'window-seconds', kind: 'number', min: 0.5, step: 0.5, fallback: '4', note: 'History kept by the waveform and spectrogram, in seconds; changing it clears the strip.', when: meterTypes('waveform', 'spectrogram')},
+      {name: 'timebase-ms', kind: 'number', min: 0.1, max: 100, step: 0.1, fallback: '20', note: 'Visible oscilloscope span in milliseconds, capped by the analyser window.', when: meterTypes('oscilloscope')},
+      {name: 'trigger', kind: 'enum', options: ['rising', 'off'], fallback: 'rising', note: 'Align the oscilloscope to the latest rising zero crossing, or free-run.', when: meterTypes('oscilloscope')},
+      {name: 'loudness-mode', kind: 'enum', options: ['momentary', 'short-term', 'rms-fast', 'rms-slow'], fallback: 'momentary — K-weighted 400 ms window', note: 'K-weighted 400 ms or 3 s windows read in LUFS; RMS 300 ms or 1 s windows read in dBFS.', when: meterTypes('loudness')},
+      {name: 'reference-dbfs', kind: 'number', min: -40, max: 0, step: 1, fallback: '-18', note: 'Sine level, in dBFS peak, that reads 0 VU.', when: meterTypes('vu')},
       {name: 'fft-size', kind: 'number', min: 32, max: 32768, step: 32, fallback: '1024', note: 'Power-of-two FFT size for an owned tap only; does not retune a borrowed analyser.'},
       {name: 'smoothing-time-constant', kind: 'number', min: 0, max: 1, step: 0.05, fallback: '0.8', note: 'Owned analyser smoothing; a borrowed analyser keeps its own setting.'},
-      {name: 'level-scale', kind: 'number', min: 0, step: 0.1, fallback: '1.8', note: 'Multiplier for the normalized RMS and peak display.'},
-      {name: 'peak-decay', kind: 'number', min: 0, step: 0.002, fallback: '0.012', note: 'Absolute per-read decrement of the held scaled-RMS marker.'},
+      {name: 'level-scale', kind: 'number', min: 0, step: 0.1, fallback: '1.8', note: 'Display gain of readLevel(), the waveform columns and the stereometer points; the oscilloscope stays 1:1.'},
+      {name: 'peak-decay', kind: 'number', min: 0, step: 0.002, fallback: '0.012', note: 'Per-frame decrement of the VU and loudness hold markers, in normalized scale units.'},
     ],
     properties: [
       {name: 'player', note: 'Borrow an AudioMeterPlayer object instead of a selector.'},
       {name: 'context', note: 'Build an owned transparent input-analyser-output tap in a caller-supplied BaseAudioContext.'},
-      {name: 'analyser', note: 'Borrow an existing AnalyserNode; it is never disconnected by the meter.'},
+      {name: 'analyser', note: 'Borrow an existing AnalyserNode; the meter adds at most one output edge for its stereo branch.'},
       {name: 'input / output', note: 'Read-only ports of an owned transparent tap; absent for a borrowed analyser.'},
+      {name: 'type / theme', note: 'Reflected display type and palette.'},
+      {name: 'snapshot', note: 'Read-only latest painted reduction, typed by display, or undefined without a source.'},
     ],
-    events: [{name: 'webaudio:error', note: 'A read, scheduling or tuning failure; error value is the event detail.'}],
+    events: [{name: 'webaudio:error', note: 'A read, scheduling, stereo-branch or tuning failure; error value is the event detail.'}],
   },
   'audio-level-analyzer': {
     tag: 'audio-level-analyzer',

@@ -21,8 +21,7 @@ The source tree contains Kernel, UI Kit, Score, Audio and Bridge. The earlier
 three-package `main` release remains a historical publication baseline; adding
 Audio and Bridge source does not publish new npm artifacts. Score and Agent
 Toolkit behavior retain their accepted contracts. The reviewed Score Recorder,
-Analyze demo and component-frame choices (DEC-032–034), two-tool Analyze
-inventory (DEC-043), and domain-prefixed Score tags (DEC-045) are part of this
+Analyze demo and component-frame choices (DEC-032–034), four elementary Analyze tools (DEC-047), and domain-prefixed Score tags (DEC-045) are part of this
 combined source tree. Keep Kernel and UI domain-neutral, with explicit contracts
 and tests for compatibility used by both domains.
 
@@ -30,6 +29,23 @@ Preserve unrelated uncommitted work and dated evidence when synchronizing
 branches. Read [STATUS](dev/STATUS.md), manifests and source for the checkout's
 delivery and verification; an older branch's passing checks do not establish
 current results. Generated inventories must describe the actual tracked tree.
+
+## Demo music: reuse Arabesque No. 1
+
+All musical demos must use the existing **Arabesque No. 1** assets in
+`apps/doc/webmusic/public/`. Inspect that directory before choosing an input:
+use MXL when authored pitch spelling, voices, rhythm or notation matters, MIDI
+for MIDI/playback workflows, and WAV or MP3 for audio workflows. Follow the
+[demo asset guidance](dev/docs/DOCS-CONVENTIONS.md#demo-assets) for format
+limitations, URL encoding and the site base path.
+
+Do not generate replacement note sequences, teaching pieces, synthetic demo
+Scores or new media files merely to populate a demo. Reuse the existing piece
+or a passage from it; keep the same source across related demos and their
+copyable examples. Choose another demo piece only when the user explicitly
+requests it. Small deterministic fixtures belong in automated tests, not in
+the user-facing demo repertoire. Live input/recording demos may accept user
+input; their bundled sample material must still use Arabesque No. 1.
 
 ## Start every task
 
@@ -110,7 +126,7 @@ owning leaf page; do not copy a complete member table into another document.
 | Score/Audio coordination and conversion | [bridges/score-audio/src/](bridges/score-audio/src/) | [Bridge contracts](bridges/README.md), [Bridge README](bridges/score-audio/README.md), [generated Bridge API reference](dev/COMPONENTS.md) |
 | Session-clock design or scheduling changes | Kernel, domain engines and Bridge | [Shared-clock design](platform/shared-clock-injection.md), [Architecture](dev/ARCHITECTURE.md) and current STATUS |
 | Player bindings, readouts, analysis followers and views | Domain Play/Analyze/View and neutral UI presenters | [Player binding design](dev/design/PLAYER-BINDING.md), DEC-011, current STATUS and the owning public leaf pages |
-| Document editing, history and playback revisions | Domain Core/Edit, Play bindings and existing View surfaces | [Editing contracts](dev/design/EDIT-COMPONENTS.md), DEC-047 and STATUS EDIT-01; distinguish accepted target contracts from delivered APIs |
+| Document editing, history and playback revisions | Domain Core/Edit, Play bindings and existing View surfaces | [Editing contracts](dev/design/EDIT-COMPONENTS.md), DEC-053 and STATUS EDIT-01; distinguish accepted target contracts from delivered APIs |
 | Audio Analyze performance surfaces and static reports | [Audio Analyze source](packages/audio/src/analyze/) | [Audio Analyze design](dev/design/AUDIO-ANALYZE-COMPONENTS.md), [Audio Analyze API](apps/doc/webmusic/src/content/docs/audio/api/analyze.mdx) and owning Element pages |
 | Documentation site and demos | [apps/doc/webmusic/src/](apps/doc/webmusic/src/), [shared catalogs](apps/doc/shared/) | [apps README](apps/README.md), Site Plan, Conventions and the applicable page template |
 | A systematic Score or Audio review | Owning domain, UI presenters and demos | [Score review workflow and Audio starting brief](dev/log/2026-09-09-score-review-workflow.md); use current design and STATUS to scope algorithm/architecture work before frontend acceptance |

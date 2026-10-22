@@ -13,6 +13,12 @@ For symbolic note performances, use the corresponding
 [`<score-recorder>`](/score/element/play/score-recorder/), which produces a `Score`
 and exports MIDI / MusicXML.
 
+Opening the microphone shows the shared four-square loading animation until permission
+and context startup settle. A missing requested playback owner shows the outlined-square
+waiting animation while idle and without a take; Record remains available because capture
+is independent. Recording, audition and captured-take details remain visible. Standalone idle
+capture stays ready for a user gesture.
+
 <AudioRecorderDemo />
 
 ## Import

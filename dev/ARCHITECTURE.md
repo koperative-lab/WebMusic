@@ -16,8 +16,8 @@ status or a second task list. The complete documentation routing map lives in
 DEC-021 records the original three-package first release. DEC-046 accepts
 Kernel, UI Kit, Score, Audio and Bridge in the integrated `main` source tree.
 The Score and Agent Toolkit baseline incorporates the approved Recorder and
-Analyze demo composition (DEC-032/033), component framing (DEC-034), two-tool
-Analyze inventory (DEC-043), and domain-prefixed tags (DEC-045). Shared
+Analyze demo composition (DEC-032/033), component framing (DEC-034), four elementary
+Analyze tools (DEC-047), and domain-prefixed tags (DEC-045). Shared
 Kernel/UI changes have explicit consumers and regression coverage.
 
 The five-package source tree and site routes describe implementation, not npm
@@ -160,7 +160,7 @@ Score and Audio Edit supply Core/API/Headless behavior through `/edit` and
 Native Score Play, Audio sequence Play and their editable Views borrow the Core
 document ports. Score piano-roll, bounded staff input and Audio waveform editing
 share this ownership. Staff's local input controller and scrolling renderer use
-the existing Score View under DEC-048. The detailed contract belongs to
+the existing Score View under DEC-054. The detailed contract belongs to
 [Editing components](design/EDIT-COMPONENTS.md), and [STATUS](STATUS.md), EDIT-01,
 tracks implementation.
 
@@ -333,7 +333,7 @@ For an edit-enabled composition, the editor owns committed content and Play
 borrows it through the document source. Existing View Elements gain an optional
 editor binding; `editable` enables mutation gestures against that binding.
 `score-document` and `audio-document` are the implemented nonvisual owner tags
-under DEC-047. The View owns neither an implicit editor
+under DEC-053. The View owns neither an implicit editor
 nor the lifetime of a borrowed editor. These bindings preserve passive usage and
 report explicit content-source conflicts instead of silently switching owners.
 

@@ -305,6 +305,141 @@ describe('<audio-view> player integration', () => {
 });
 
 describe('<audio-view> src loading', () => {
+  it('follows bound player loading and errors while preserving independent explicit data', () => {
+    const clip = createAudioClip({sampleRate: 8, channelData: [new Float32Array(8)]});
+    const player = Object.assign(document.createElement('div'), {
+      loading: true, loadError: undefined as Error | undefined, clip,
+    });
+    player.id = 'loading-owner';
+    const view = document.createElement('test-audio-view') as AudioViewElement;
+    view.setAttribute('player', '#loading-owner');
+    document.body.append(player, view);
+    expect(view.querySelector('[data-kind="loading"]')).not.toBeNull();
+    player.loading = false;
+    player.loadError = new Error('Decode unavailable');
+    player.dispatchEvent(new CustomEvent('webaudio:loadstatechange'));
+    expect(view.querySelector('[data-kind="error"]')?.textContent).toBe('Decode unavailable');
+    mocks.waveform.mockReturnValue(visualizerHarness(1));
+    view.clip = clip;
+    expect(view.querySelector('.wui-status')).toBeNull();
+    player.loading = true;
+    player.loadError = undefined;
+    player.dispatchEvent(new CustomEvent('webaudio:loadstatechange'));
+    expect(view.querySelector('.wui-status')).toBeNull();
+  });
+
+  it('distinguishes waiting, active loading and rendered audio', async () => {
+    const view = document.createElement('test-audio-view') as AudioViewElement;
+    document.body.appendChild(view);
+    expect(view.querySelector('.wui-status')?.getAttribute('data-kind')).toBe('waiting');
+    const request = deferred<AudioClip>();
+    mocks.loadClip.mockReturnValue(request.promise);
+    mocks.waveform.mockReturnValue(visualizerHarness(0));
+    view.setAttribute('src', '/slow.wav');
+    expect(view.querySelector('.wui-status')?.getAttribute('data-kind')).toBe('loading');
+    expect(view.getAttribute('aria-busy')).toBe('true');
+    await vi.waitFor(() => expect(mocks.loadClip).toHaveBeenCalledOnce());
+    request.resolve(toneClip(1));
+    await vi.waitFor(() => expect(mocks.waveform).toHaveBeenCalledOnce());
+    expect(view.querySelector('.wui-status')).toBeNull();
+    expect(view.hasAttribute('aria-busy')).toBe(false);
+  });
+
+  it('stops showing loading when its source is removed before a late load settles', async () => {
+    const request = deferred<AudioClip>();
+    mocks.loadClip.mockReturnValue(request.promise);
+    const view = document.createElement('test-audio-view') as AudioViewElement;
+    view.setAttribute('src', '/slow.wav');
+    document.body.appendChild(view);
+    await vi.waitFor(() => expect(mocks.loadClip).toHaveBeenCalledOnce());
+    view.removeAttribute('src');
+    expect(view.hasAttribute('aria-busy')).toBe(false);
+    expect(view.querySelector('.wui-status')?.getAttribute('data-kind')).toBe('waiting');
+    request.resolve(toneClip(1));
+    await vi.waitFor(() => expect(view.hasAttribute('aria-busy')).toBe(false));
+    expect(view.querySelector('.wui-status')?.getAttribute('data-kind')).toBe('waiting');
+    expect(mocks.waveform).not.toHaveBeenCalled();
+  });
+
+  it.each(['src', 'peaks-src'] as const)('shows a failed %s load and recovers through removal and retry', async (attribute) => {
+    const first = deferred<AudioClip & Response>();
+    const second = deferred<AudioClip & Response>();
+    const loader = attribute === 'src'
+      ? mocks.loadClip.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
+      : vi.spyOn(globalThis, 'fetch').mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    mocks.waveform.mockReturnValue(visualizerHarness(0));
+    const view = document.createElement('test-audio-view') as AudioViewElement;
+    const errors: unknown[] = [];
+    view.addEventListener('webaudio:error', (event) => errors.push((event as CustomEvent).detail));
+    document.body.append(view);
+    view.setAttribute(attribute, '/missing');
+    await vi.waitFor(() => expect(loader).toHaveBeenCalledOnce());
+    first.reject(new Error('Source unavailable'));
+    await vi.waitFor(() => expect(view.querySelector('[role="alert"]')?.textContent).toBe('Source unavailable'));
+    expect(errors).toHaveLength(1);
+    expect(view.hasAttribute('aria-busy')).toBe(false);
+    view.removeAttribute(attribute);
+    expect(view.querySelector('.wui-status')?.getAttribute('data-kind')).toBe('waiting');
+    view.setAttribute(attribute, '/retry');
+    expect(view.querySelector('.wui-status')?.getAttribute('data-kind')).toBe('loading');
+    await vi.waitFor(() => expect(loader).toHaveBeenCalledTimes(2));
+    const result = attribute === 'src' ? toneClip(1) : new Response(JSON.stringify({
+      version: 2, channels: 1, sample_rate: 100, samples_per_pixel: 10,
+      bits: 8, length: 2, data: [-10, 10, -20, 20],
+    }));
+    second.resolve(result as AudioClip & Response);
+    await vi.waitFor(() => expect(mocks.waveform).toHaveBeenCalledOnce());
+    expect(view.querySelector('.wui-status')).toBeNull();
+    expect(view.hasAttribute('aria-busy')).toBe(false);
+  });
+
+  it.each(['src', 'peaks-src'] as const)('ignores a stale %s failure while the replacement remains pending', async (attribute) => {
+    const first = deferred<AudioClip & Response>();
+    const second = deferred<AudioClip & Response>();
+    const loader = attribute === 'src'
+      ? mocks.loadClip.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
+      : vi.spyOn(globalThis, 'fetch').mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    const view = document.createElement('test-audio-view') as AudioViewElement;
+    const errors: unknown[] = [];
+    view.addEventListener('webaudio:error', (event) => errors.push((event as CustomEvent).detail));
+    document.body.append(view);
+    view.setAttribute(attribute, '/old');
+    await vi.waitFor(() => expect(loader).toHaveBeenCalledOnce());
+    view.setAttribute(attribute, '/new');
+    await vi.waitFor(() => expect(loader).toHaveBeenCalledTimes(2));
+    first.reject(new Error('Stale failure'));
+    await first.promise.catch(() => {});
+    await Promise.resolve();
+    expect(errors).toHaveLength(0);
+    expect(view.querySelector('.wui-status')?.getAttribute('data-kind')).toBe('loading');
+    second.reject(new Error('Current failure'));
+    await vi.waitFor(() => expect(view.querySelector('[role="alert"]')?.textContent).toBe('Current failure'));
+    expect(errors).toHaveLength(1);
+  });
+
+  it('keeps the other source failure when cancelling a pending alternative, then accepts explicit peaks', async () => {
+    const pendingClip = deferred<AudioClip>();
+    mocks.loadClip.mockReturnValue(pendingClip.promise);
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('Peaks unavailable'));
+    mocks.waveform.mockReturnValue(visualizerHarness(0));
+    const view = document.createElement('test-audio-view') as AudioViewElement;
+    const errors: unknown[] = [];
+    view.addEventListener('webaudio:error', (event) => errors.push((event as CustomEvent).detail));
+    view.setAttribute('src', '/audio');
+    view.setAttribute('peaks-src', '/peaks');
+    document.body.append(view);
+    await vi.waitFor(() => expect(errors).toHaveLength(1));
+    expect(view.querySelector('.wui-status')?.getAttribute('data-kind')).toBe('loading');
+    view.removeAttribute('src');
+    expect(view.querySelector('[role="alert"]')?.textContent).toBe('Peaks unavailable');
+    view.peaks = computeClipPeaks(toneClip(1))!;
+    expect(view.querySelector('.wui-status')).toBeNull();
+    expect(mocks.waveform).toHaveBeenCalledOnce();
+    pendingClip.reject(new Error('Obsolete audio failure'));
+    await pendingClip.promise.catch(() => {});
+    expect(errors).toHaveLength(1);
+  });
+
   it('aborts its current load when disconnected', async () => {
     const request = deferred<AudioClip>();
     mocks.loadClip.mockReturnValue(request.promise);

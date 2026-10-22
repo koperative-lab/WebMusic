@@ -5,24 +5,9 @@ import {
   type SyncMasterTransport,
   type TransportCommand,
 } from "@webmusic/kernel/sync";
-import { createAudioClip } from "@webmusic/audio";
 import { AudioClipPlayer } from "@webmusic/audio/play/headless";
 import type { DemoScope } from "../demo-lifecycle";
-
-/** A short decaying tone followed by silence; each clip's end is its native loop boundary. */
-function pulseClip(seconds: number, frequency: number, sampleRate: number) {
-  const samples = new Float32Array(Math.round(seconds * sampleRate));
-  const length = Math.round(0.12 * sampleRate);
-  for (let i = 0; i < length; i++) {
-    const time = i / sampleRate;
-    samples[i] =
-      0.18 *
-      Math.sin(2 * Math.PI * frequency * time) *
-      Math.min(1, time / 0.004) *
-      Math.exp(-45 * time);
-  }
-  return createAudioClip({ sampleRate, channelData: [samples] });
-}
+import { loadArabesqueAudioExcerpt } from "../headless/arabesque-audio";
 
 /** App-owned continuous master: only TransportGroup delegates mutations to it. */
 function continuousMaster(context: AudioContext): SyncMasterTransport {
@@ -149,14 +134,19 @@ export function mountIndependentLoops(
         if (!scope.active || expected !== generation) return;
         if (!group) {
           const sessionContext = context;
+          status.textContent = "Loading the Arabesque No. 1 opening…";
+          // The shared excerpt is decoded once; a disposed session simply
+          // ignores a load that settles afterwards, and the next one reuses it.
+          const source = await loadArabesqueAudioExcerpt(Math.max(...periods));
+          if (!scope.active || expected !== generation) return;
           group = new TransportGroup(
             continuousMaster(sessionContext),
             () => sessionContext.currentTime,
             { onOperationError: (_operation, error) => report(error) },
           );
-          for (const [index, period] of periods.entries()) {
+          for (const period of periods) {
             const player = new AudioClipPlayer(
-              pulseClip(period, index ? 660 : 330, context.sampleRate),
+              source.slice(0, period),
               {
                 audioContext: context,
                 engine: "buffer",

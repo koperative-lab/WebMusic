@@ -15,7 +15,7 @@ branch's tracked files before making a delivery claim.
 
 **Consequence:** application concerns such as project persistence, undo, collaboration, and arrangement/session editing need explicit application-layer designs. They are not implied by the existence of a player or mixer.
 
-**2026-10-13 refinement:** [DEC-047](#dec-047--document-owned-editing-and-borrowed-playback)
+**2026-10-13 refinement:** [DEC-053](#dec-053--document-owned-editing-and-borrowed-playback)
 assigns optional single-document history to domain editors. Project/global
 history, persistence and collaboration retain the application boundary above.
 
@@ -283,7 +283,7 @@ demos, external Parameters, reset behavior and redirects.
 
 **Date / status:** 2026-09-08; accepted.
 
-**2026-10-13 extension:** [DEC-047](#dec-047--document-owned-editing-and-borrowed-playback)
+**2026-10-13 extension:** [DEC-053](#dec-053--document-owned-editing-and-borrowed-playback)
 adds optional document-bound editing and focused keyboard interaction to existing
 View surfaces. The original passive usage below remains valid; runtime editing
 is implemented, and STATUS EDIT-01 tracks its remaining verification.
@@ -1608,9 +1608,415 @@ five-package manifests, public exports and Agent Toolkit source-snapshot
 claims. Verify CI and deployment on the exact target commit separately; none
 of these checks establishes npm publication or live device/audio behavior.
 
-<a id="dec-047--document-owned-editing-and-borrowed-playback-proposed"></a>
+## DEC-047 — Four elementary Score analysis tools with explicit musical context
 
-## DEC-047 — Document-owned editing and borrowed playback
+**Date / status:** 2026-10-03; accepted by the maintainer's request to develop
+basic music-theory analysis before resuming recurrence research. This supersedes
+DEC-043's two-tag inventory and DEC-042's fixed half-bar aggregate chord
+projection; the research branch and dated evidence remain untouched.
+
+**Problem:** separate score/live chord tags duplicate one musical task, while
+basic interval, scale-degree and metrical questions have no direct component.
+Recurrence lanes and inferred-key reports do not provide those elementary facts.
+
+**Decision:** register exactly four Score Analyze tags: `score-chord-analysis`,
+`score-interval-analysis`, `score-scale-analysis` and `score-rhythm-analysis`.
+Chord `mode="score"` is the default; `mode="live"` selects the held-note nameplate
+on that same tag. Remove the separate live-chord class/registration and redirect
+its documentation bookmark to the merged reference. Every score surface reuses
+API/Headless inspection and neutral UI presenters, can borrow one player's Score
+and timeline, and also accepts standalone explicit input.
+
+Chord score inspection uses simultaneous, spelled complete triads/sevenths,
+including bass and inversion. Key-relative degrees require an explicit major or
+minor reference and do not assert harmonic function. Interval inspection keeps
+spelling, diatonic size, quality, direction, semitones and source identities;
+ambiguous chord attacks do not invent a melodic line. Scale inspection requires
+a chosen tonic and one of major, natural minor, harmonic minor, ascending melodic
+minor or descending melodic minor; alterations are descriptive, not errors.
+Rhythm inspection uses simple/compound pulses and requires explicit grouping
+for irregular meters. Written durations and exact beat placement remain separate
+from performance judgments. Written/sounding pitch basis is explicit where
+applicable; no component estimates a key to fill missing context.
+
+**Alternatives considered:** restore recurrence research first; add an inferred
+key component; retain separate chord tags; or put every report in one component.
+These alternatives do not establish four independent elementary musical tasks
+with clear, reusable inputs.
+
+**Consequences:** migrate `score-live-chord-analysis` to
+`score-chord-analysis mode="live"`. Historical tags remain unregistered. The
+four tag-owned demos use the existing `public/mxl/Arabesque No.1.mxl` asset
+and pair one real player with one tool. They inspect the piece’s actual notes
+and preserve its written spelling; generated substitute scores are not used.
+Scale starts with an explicit E-major reference. Synthetic elementary examples
+belong in regression tests. Controls, Copy and Reset remain outside the
+component. API/Headless retain detailed data and specialist algorithms; the
+research branch is not merged as part of this work.
+
+**Owner:** [Score Analyze design](design/ANALYZE-COMPONENTS.md), owning
+[Element pages](../apps/doc/webmusic/src/content/docs/score/element/index.mdx#analyze)
+and [Analyze API](../apps/doc/webmusic/src/content/docs/score/api/analyze.mdx).
+
+**Verification implications:** assert the exact tag/export/catalog inventory;
+cover C–F♯ versus C–G♭, transposing parts, explicit-key chord inversions, all
+minor forms, tie continuations, simple/compound/additive meters, invalid context,
+source replacement, mode changes, cancellation and repeated cleanup. Verify
+public examples and responsive keyboard/pointer demos on the same tree. Unit
+and static checks do not establish audible timing or accessibility acceptance.
+
+## DEC-048 — Metrical chord collections and readable elementary inspection lanes
+
+**Date / status:** 2026-10-07; accepted after reviewing the four elementary
+Analyze tools against the existing Arabesque No. 1 demos. This supersedes
+DEC-047's simultaneous-only default for the chord Element and refines the lane
+presentation. DEC-047's four tasks, explicit context and strict chord dictionary
+remain in force; its dated record is retained above.
+
+**Problem:** exact simultaneous slices fragment arpeggiated material into
+unhelpful short sets. Dense lanes can leave the primary reading too small to
+read, repeat generic failure text, and reserve blank rows for overlapping notes
+far outside the visible passage. These presentations obscure valid evidence.
+
+**Decision:** score-mode `score-chord-analysis` defaults to `grouping="beat"`.
+Each actual metrical pulse collects all selected source notes that overlap its
+half-open span, retaining sustained and sequential notes and their identities.
+Simple 2/3/4 meters use one denominator unit per pulse; compound 6/9/12 meters
+use groups of three. Other numerators require explicit `beat-groups`, whose
+positive integer values must sum to each inspected numerator. Grouping is
+independent of the visible seconds window. `grouping="simultaneous"` retains
+exact note-boundary inspection. Live mode continues to inspect held MIDI notes.
+
+`inspectScoreChords()` keeps its simultaneous default and adds explicit
+`grouping: 'beat'` and `beatGroups`; `projectBasicInspection()` also keeps its
+simultaneous default and accepts `chordGrouping: 'beat'`. Chord results and spans
+identify their grouping. Only complete, correctly spelled triads and supported
+sevenths receive names. No passing tone is removed, missing tone inferred, key
+estimated or harmonic function asserted. The lowest collected source pitch
+determines the displayed bass/inversion; a grouped reading does not prove the
+passage's structural harmonic bass. Unmatched collections display their pitches.
+
+The musical rationale is bounded by the distinction between texture and
+analysis: arpeggios can express a chord, harmonic duration can vary, and
+non-chord-tone classification depends on surrounding motion. Beat grouping is
+an explicit collection method, not an automatic harmonic reduction. See the
+University of Puget Sound's *Music Theory for the 21st-Century Classroom*:
+[Arpeggiated Accompaniments §14.3.1](https://musictheory.pugetsound.edu/mt21c/ArpeggiatedAccompaniments.html),
+[Harmonic Rhythm §9.2](https://musictheory.pugetsound.edu/mt21c/HarmonicRhythm.html)
+and [Introduction to Non-Chord Tones §10.1](https://musictheory.pugetsound.edu/mt21c/NonChordTonesIntroduction.html).
+
+All four score lanes retain a prominent full current readout and quieter
+configuration context. Visible material determines occupied rows; offscreen
+overlap must not create blank space. Melodic interval pairs use an arrow and
+harmonic pairs use `+`. Rhythm uses compact duration/beat labels while preserving
+exact units and source notation in evidence. Semantic lists, keyboard commands,
+source identities and `.analysis` remain available. No additional report panel,
+player, clock or sibling musical view is created inside a tool.
+
+**Alternatives considered:** retain simultaneous slicing as the only component
+view; restore a fixed half-bar window; or infer an underlying harmony by removing
+non-chord tones. The first under-serves arpeggiated input, the second ignores
+metrical pulse, and the third requires analysis beyond the elementary contract.
+
+**Consequences:** expose grouping in the chord reference and external Parameters;
+Copy/Reset preserve it. Keep API/Headless defaults compatible. The chord Arabesque
+demo starts with a four-second viewport; the other three start with one second.
+Those are demo display settings, not musical grouping rules. Detailed inspection
+evidence remains available independently of presentation.
+
+**Owner:** [Score Analyze design](design/ANALYZE-COMPONENTS.md),
+[Analyze API](../apps/doc/webmusic/src/content/docs/score/api/analyze.mdx), the
+[four Element references](../apps/doc/webmusic/src/content/docs/score/element/index.mdx#analyze)
+and the [Harmony presenter reference](../apps/doc/webmusic/src/content/docs/uikit/views-analysis/harmony.mdx).
+
+**Verification implications:** preserve simultaneous-default regressions and
+test metrical collection of arpeggios, sustained overlaps, passing tones,
+compound/irregular meter, clipped selections, transposition and bass provenance.
+Verify readouts, harmonic separators, visible row compaction, narrow layouts,
+keyboard/pointer seeking and Copy/Reset on the real Arabesque demos. Tests and
+static checks do not replace browser, audible or accessibility evidence.
+
+**DEC-048 display refinement, 2026-10-07:** at the maintainer's request, chord
+labels no longer repeat the grouping caption. Named chords appear above their
+source note names with octaves; unmatched sets show only note names. Grouping
+remains explicit in configuration and inspection evidence. Chord timeline
+labels wrap with content-sized row height instead of ellipses, preserving their
+time coordinates. The chord demo now starts at one second, like the other three,
+to give its labels more room. This refines DEC-048's initial presentation, not
+its musical collection or matching rules.
+
+**DEC-048 note-row clarification, 2026-10-07:** unmatched pitches remain in
+the secondary note/voicing row, with the primary chord-name row empty. This
+applies to the current score readout, timeline and stable live nameplate,
+superseding DEC-042's unnamed-held-set promotion to the main readout. Empty
+name slots retain their row so notes align with those beneath named chords.
+
+**DEC-048 live display refinement, 2026-10-07:** the performance surface omits
+the MIDI-spelling caption and starts directly with the chord name. Its quieter
+note row follows the same hierarchy as score mode; unmatched notes remain below
+an empty chord row. Fixed reading rows and scrollable, unabridged long lines
+retain the live layout's stability. MIDI spelling limitations remain in the
+public reference rather than recurring above every reading.
+
+**DEC-048 structured readout refinement, 2026-10-07:** interval, scale and rhythm
+replace a changing secondary sentence with fixed fields under the primary
+reading. Their three equal-width slots are Notes/Motion/Semitones,
+Note/Reference/Relation and Bar/Beat/Duration (qn), respectively. Rhythm keeps
+the same slots for attacks, rests and tie continuations; unavailable values
+stay empty. Field labels, order and horizontal positions remain stable while
+values change. Gaps clear values but retain labels and reserved space. The
+chord symbol/note presentation is unchanged.
+
+UIKit adds domain-neutral `FlowReadoutField {id, label, value}` and
+`FlowReadout {primary?, secondary?, fields?}` for `FlowBand.readout` and
+`FlowLaneState.pinned`. Score uses the same structural field shape without a
+new named field export. Existing secondary text remains available for consumers
+that do not use the structured fields. The presenter derives stable slots from
+the full band collection and measures the maximum wrapped heading/field space
+on content or geometry changes. Its fixed three-column grid keeps playback to
+value updates without per-frame measurement or readout resizing. More generic
+UI fields continue in additional rows; these Score tools supply exactly three.
+Verify slot identity, long values, gaps, narrow widths and semantic field text;
+do not infer that fixed readout geometry fixes the separate scrolling lane's
+visible row count.
+
+## DEC-049 — Per-numerator beat groups, a wrapped-label minimum width and the interval overlap contract
+
+**Date / status:** 2026-10-07; accepted after the independent review of the
+`dev` consolidation (`92e841a` and `4471a22`). This supersedes DEC-048's rule
+that one `beat-groups` list must sum to every inspected numerator and refines
+DEC-048's wrapped chord labels. It records, rather than changes, the harmonic
+interval contract that DEC-047's implementation introduced.
+
+**Problem:** the chord Element's default beat grouping failed for any score
+with an irregular meter until `beat-groups` was set, and one list could never
+satisfy a score whose irregular numerators differ. Wrapped chord labels had no
+lower width bound: a 30-second `window` on the Arabesque demo produced 10px
+bands with one glyph per line and rows nearly 500px tall. `analyzeIntervals`
+began reporting same-voice overlaps with different onsets without a recorded
+decision. A full-range float selection rounded a triplet-ending last chord
+span, the stable live nameplate exposed an unnamed note set to screen readers
+twice, unobserved attributes could put a tool into an error state, and the
+independent-loops demo decoded the complete recording for every session.
+
+**Decision:**
+
+- `BeatGroups` is one list or an array of lists. Each list applies to the
+  meter numerator equal to its sum; lists with equal sums are rejected.
+  Numerators 2/3/4 and 6/9/12 keep their conventional pulses unless a list
+  sums to them; any other numerator without a matching list throws. The
+  `beat-groups` attribute accepts several groupings separated by spaces or
+  commas, for example `2+3 2+2+3` for 5/8 and 7/8. Chord and rhythm inspection
+  share the rule; API/Headless defaults are unchanged.
+- A wrapped band narrower than 48 measured pixels hides its label stack, is
+  marked `data-label-fit="hidden"`, keeps its title and semantic entry, and
+  does not raise the shared row height. Bands at or above 48px keep complete
+  stacks. The threshold is a presenter constant, not a public token, and the
+  fit is recomputed only with measurements: data changes, resize and zoom.
+- Harmonic intervals include a note sustained in one voice beneath a later
+  attack in that same voice; continuation and stop fragments remain excluded
+  as attacks. The 0.2.0 release excluded such same-voice pairs.
+- A chord selection whose float bounds reach the Score's start or end uses the
+  authored Rational ends; bounds strictly inside the Score remain decimal
+  approximations.
+- The stable nameplate marks its visible note row `aria-hidden` while the live
+  region speaks the same unnamed notes.
+- An Element validates only the attributes it observes.
+- The independent-loops demo decodes the Arabesque recording once per excerpt
+  length through a shared site helper and keeps only the opening excerpt; a
+  failed load is forgotten so the next start can retry.
+
+**Alternatives considered:** keep the strict single-list rule and improve only
+its error message; cap the wrapped row height while still wrapping single
+glyphs; revert the harmonic overlap change. The first leaves the default chord
+tool unusable on mixed meters, the second keeps unreadable labels, and the
+third removes tested, musically defensible evidence.
+
+**Consequences:** the chord and rhythm Element references, the Analyze API
+page, the Parameters catalog and the Harmony presenter reference describe the
+new rules. Single-list callers are unaffected unless they relied on a mismatch
+throwing for a conventional meter. Browser evidence for long chord windows is
+recorded in STATUS when the correction is verified on the site.
+
+**Owner:** [Score Analyze design](design/ANALYZE-COMPONENTS.md),
+[Analyze API](../apps/doc/webmusic/src/content/docs/score/api/analyze.mdx),
+the [chord](../apps/doc/webmusic/src/content/docs/score/element/analyze/score-chord-analysis.mdx)
+and [rhythm](../apps/doc/webmusic/src/content/docs/score/element/analyze/score-rhythm-analysis.mdx)
+Element references and the
+[Harmony presenter reference](../apps/doc/webmusic/src/content/docs/uikit/views-analysis/harmony.mdx).
+
+**Verification implications:** cover mixed 4/4, 5/8 and 7/8 scores with one
+and several lists, equal-sum rejection, a conventional meter replaced by a
+matching list, hidden and restored wrapped stacks across zoom and resize,
+exact triplet ends, nameplate `aria-hidden`, unobserved attributes, and the
+cached excerpt's disposal and retry paths. Unit checks do not establish the
+rendered result; verify the chord demo at long windows in a browser.
+
+## DEC-050 — PitchView keyboard fits two octaves unless scrolling is enabled
+
+**Date / status:** 2026-10-07; accepted by the maintainer's request for an
+optional scroll mode and a responsive MIDI 48–71 keyboard.
+
+**Problem:** the keyboard defaulted to MIDI 36–84 with a minimum key width.
+Ordinary demo containers therefore showed only part of the range and could
+move when new notes arrived. Disabling `follow` alone still allowed manual
+overflow and did not fit the full range.
+
+**Decision:** keyboard mode defaults to `low="48"`, `high="71"` and disabled
+scrolling. The Element reuses UIKit's full-range `fitToWidth` option, so the
+board scales with its container, ignores fixed/minimum widths while fitted,
+and has no scrolling focus stop. `scroll="true"` restores minimum or explicitly
+configured widths; `follow` independently controls new-note following in that
+mode. Turning scrolling off resets the horizontal offset while retaining held
+notes and the borrowed player subscription. Staff, fretboard and Headless
+behavior, key heights and the neutral UIKit defaults are unchanged.
+
+An explicit `scroll` attribute is authoritative. Without it, an explicit
+`fit-to-width` retains its inverse compatibility meaning; without either
+attribute the keyboard fits. The read-only `.scrollable` and `.fitToWidth`
+getters report this effective choice. The inherited `HTMLElement.scroll()`
+method is not replaced. Parameters primarily expose `scroll`; the legacy
+fitting row appears only for existing explicit `fit-to-width` settings.
+
+**Alternatives considered:** change only the demo; disable only automatic
+following; hide overflow without fitting. These leave ordinary consumers
+unchanged or hide part of the requested keyboard range.
+
+**Consequences:** exact-width waterfall/keyboard compositions explicitly opt
+into scrolling to preserve pitch-column alignment. Out-of-range sounding notes
+remain available in `.active`; fitting does not infer or expand the range.
+
+**Owner:** [View families](design/VIEW-COMPONENTS.md) and the
+[PitchView reference](../apps/doc/webmusic/src/content/docs/score/element/view/score-pitch-view.mdx).
+
+**Verification implications:** test default endpoints, scroll and legacy
+precedence, preserved notes/subscriptions, cleanup, focus and offset resets,
+and exact waterfall alignment. Verify fitted and scrolling keyboards in wide
+and narrow containers, including Parameters, Copy and Reset, with Arabesque No. 1.
+
+## DEC-051 — One type-selected live meter with mono and colour themes
+
+**Date / status:** 2026-10-08; accepted by the maintainer's request to give
+`audio-meter` the seven MiniMeters-style displays. This supersedes DEC-037's
+description of the meter as a two-mode normalized RMS/FFT-bar monitor; the
+five-tag Analyze inventory, the API/Headless ownership of static reports and
+the player-borrowing rule remain in force. Browser and device acceptance
+remain in STATUS.
+
+**Problem:** the compact monitor offered one level bar and one bank of bars
+through the neutral meter presenter, while a music workstation expects the
+familiar at-a-glance instruments: VU, loudness, waveform, oscilloscope,
+spectrum, spectrogram and stereometer. Adding seven tags would multiply the
+same binding, tap and lifecycle code; the inspection tools already own
+gestures, so the meter needs displays, not interaction.
+
+**Decision:** `audio-meter` keeps one tag and selects its drawing with
+`type`: `vu` (default), `loudness`, `waveform`, `oscilloscope`, `spectrum`,
+`spectrogram` and `stereometer`. `theme` selects `mono` (default), which
+encodes sound only as a ramp between the page's surface and ink tokens, or
+`color`, which adds hue for frequency position and a perceptual colormap for
+intensity. Every display is a square-cornered canvas with square cells, dots
+and lamps. The reductions (VU ballistics, K-weighted windows, histories,
+trigger alignment, correlation) live in a DOM-free `AudioMeterDisplay` in
+View Headless; the painters live in View render; the Element composes them
+with the UI kit's canvas stage and resolves its colours from public tokens
+through computed style. The retired two-mode DOM presenter is replaced: `mode`
+remains a compatibility alias (`spectrum` maps to the spectrum, anything else
+to the VU dial) that applies only while `type` is absent, `bars` now defaults
+to a continuous spectrum curve, and the presenter's inner `track`, `fill`,
+`peak`, `spectrum` and `bar` parts are retired while `part="wrap"`, the outer
+surface tokens and the legacy `--wameter-*` aliases remain effective.
+
+The box adapts: width fills the container; without an explicit height each
+type keeps its aspect ratio until the `size` preset's cap, which maps `sm`,
+`md` (default) and `lg` onto the UI kit's `--wm-surface-sm/md/lg` tiers so
+the meter follows the same scale as the kit's other drawing surfaces. `width`
+and `height` attributes, or the existing height tokens, fix a custom box.
+
+The stereometer and loudness displays need separate channels, which an
+`AnalyserNode` does not provide. The controller may attach an owned stereo
+branch (`analyser -> two-channel fan-out -> ChannelSplitterNode -> two
+analysers`) to the analyser it reads, including a borrowed one. This is the
+single permitted change to a borrowed node: one added output edge, removed
+with a selective `disconnect(branch)`, never a disconnect of the owner's
+connections or a retune. A mono input is up-mixed to both channels.
+
+**Alternatives considered:** seven new Analyze tags; keeping the DOM
+presenter beside the canvas types; reading stereo from the player's internal
+graph; or shipping colour-only displays. Separate tags duplicate the binding
+and tap contracts; two presenters make one tag two designs; the player's
+graph is private; and a colour-only meter has no page-neutral default.
+
+**Consequences:** the K-weighting biquads move to the Audio core so the
+offline loudness analysis and the live meter share one derivation. Readings
+are meter-grade: windows polled on animation frames overlap or skip, the
+loudness bar is a windowed K-weighted estimate rather than a gapless, gated or
+certified EBU R128 measurement, peaks are sample peaks, spectrum magnitudes
+remain the analyser's own decibel window, and the trigger is not
+sample-accurate. The Element declares the `stage` presenter instead of
+`meter`; `audio-view type="meter"` still composes the neutral meter presenter.
+Documentation demos keep one player and one meter with external Parameters
+for type, theme and the display attributes.
+
+**Owner:** [Audio Analyze design](design/AUDIO-ANALYZE-COMPONENTS.md),
+[Audio View design](design/AUDIO-VIEW-COMPONENTS.md), the
+[meter reference](../apps/doc/webmusic/src/content/docs/audio/element/analyze/audio-meter.mdx)
+and the [metering Headless page](../apps/doc/webmusic/src/content/docs/audio/headless/view/audio-meter.mdx).
+
+**Verification implications:** assert the seven types and two themes, the
+legacy `mode` mapping, type changes that keep the graph and stage, the stereo
+branch attached only for the two displays and removed with a selective
+disconnect on type change, source replacement and removal, the owned-tap and
+borrowed-analyser cleanup, palette resolution fallbacks, every painter in both
+themes, the VU calibration, K-weighting coefficients and window estimates,
+trigger alignment, correlation and spectrum projection; verify the demo's
+type/theme controls, Copy/Reset and narrow layouts in a browser. Static tests
+do not establish calibrated loudness, true peak or acoustic accuracy.
+
+## DEC-052 — Loading and source waiting use shared square animations
+
+**Date / status:** 2026-10-08; accepted at the maintainer's request.
+
+**Problem:** source placeholders such as “No live source” and “Waiting for a score”
+interrupt the otherwise minimal component presentation, and some asynchronous views
+remain blank until their source or renderer finishes loading.
+
+**Decision:** UI Status owns two neutral, square animations: sequential four-cell loading
+for pending work, and a slower outlined-square pulse for source/input waiting. Score
+and Audio Play, View and Analyze compose these states without another player or clock.
+Status adds `waiting`; Workbench adds `loading` and `waiting` phases. Keep descriptions
+in a polite live region, mark only loading busy, and retain visible error and meaningful
+empty-result text. Reduced-motion and stepped/no-motion surfaces use static indicators.
+
+**Alternatives considered:** independent per-component animations or treating every empty
+surface as loading. Both would obscure the distinction between pending work and missing input.
+
+**Consequences:** animations use existing foreground/surface tokens, sharp square geometry
+and CSS only. Pending feedback preserves mounted content and state, and stops being visible
+when data arrives. Existing `empty`, `error` and `ready` meanings remain intact.
+Queue rows, mixer desks, recorder operations, synth configuration sections and pitch
+followers use the same presenter. A valid silent or paused source is not pending work;
+an immediately usable note input has no artificial loading phase. The nonvisual rack-part
+declaration reports readiness to its visible desk. Native Audio Player exposes current
+`loading` and `loadError` plus `webaudio:loadstatechange` so companions can share its
+readiness without initiating another load.
+
+**Owner:** [Design principles](DESIGN-PRINCIPLES.md),
+[Status presenter](../apps/doc/webmusic/src/content/docs/uikit/layout-feedback/status.mdx),
+[Workbench](../apps/doc/webmusic/src/content/docs/uikit/layout-feedback/workbench.mdx),
+and the affected Element references.
+
+**Verification implications:** loading/waiting/ready/error transitions, source replacement,
+cancellation, teardown, unchanged-update stability, light/dark themes, narrow layouts and
+reduced motion. Browser and screen-reader acceptance remain distinct from DOM regressions.
+<a id="dec-047--document-owned-editing-and-borrowed-playback-proposed"></a>
+<a id="dec-047--document-owned-editing-and-borrowed-playback"></a>
+
+## DEC-053 — Document-owned editing and borrowed playback
+
+**Identifier note:** drafted as DEC-047 on the editing branch while DEC-047–052
+were assigned in parallel; registered as DEC-053 when the branches merged. Dated
+editing records before 2026-10-21 that say DEC-047 mean this decision.
 
 **Date / status:** 2026-10-13; accepted design in P0 following the maintainer's
 request to start the first planned step. Runtime implementation was pending
@@ -1679,7 +2085,13 @@ keyboard/pointer behavior and application-owned history through all supported
 integration forms. Accepted target syntax must not enter current public
 references as though it were shipped.
 
-## DEC-048 — Staff input inside the existing Score View
+<a id="dec-048--staff-input-inside-the-existing-score-view"></a>
+
+## DEC-054 — Staff input inside the existing Score View
+
+**Identifier note:** drafted as DEC-048 on the editing branch; registered as
+DEC-054 when the branches merged. Dated editing records before 2026-10-21 that
+say DEC-048 mean this decision.
 
 **Date / status:** 2026-10-15; accepted for P4 implementation. Current
 verification and remaining interaction checks belong to [STATUS](STATUS.md), EDIT-01.
@@ -1712,7 +2124,7 @@ shortcuts; storing auto-rests only in renderer state; and automatically rewritin
 complex or unmeasured music. The chosen boundary shares existing resources while
 keeping notation operations explicit and atomic.
 
-**Consequences:** extends DEC-047's editable View subset to staff without adding
+**Consequences:** extends DEC-053's editable View subset to staff without adding
 an Element or an Edit-to-View dependency. The optional OSMD sheet renderer stays
 separate and passive. Complete engraving, chord/tie/tuplet authoring, measure-grid
 editing and page layout remain outside this bounded P4 delivery.

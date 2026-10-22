@@ -12,6 +12,11 @@ import AudioPlaylistPlayground from '../../../../../components/elements/AudioPla
 the list displays entries and their loading/current state. The queue keeps one
 context across entries and reuses its tested auto-advance/prefetch behavior.
 
+An empty queue or missing requested owner shows the shared outlined-square waiting
+animation. Fetching/decoding an entry replaces its duration with the four-square
+loading animation; loaded rows and keyboard focus remain intact. Failed entries
+keep visible failure feedback, and background prefetch marks only its own row.
+
 <AudioPlaylistPlayground />
 
 ## Import

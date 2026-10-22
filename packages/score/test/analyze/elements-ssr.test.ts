@@ -24,10 +24,10 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {
   ChordAnalysisElement,
-  LiveChordAnalysisElement,
+  IntervalAnalysisElement, ScaleAnalysisElement, RhythmAnalysisElement,
   defineAllAnalysisElements,
   defineChordAnalysisElement,
-  defineLiveChordAnalysisElement,
+  defineIntervalAnalysisElement, defineScaleAnalysisElement, defineRhythmAnalysisElement,
 } from '../../src/analyze/element/index';
 import * as elements from '../../src/analyze/element/index';
 import {ScoreBuilder} from '../../src/core';
@@ -37,8 +37,9 @@ import {createScoreReport} from '../../src/analyze/headless';
 describe('elements module (SSR safety)', () => {
   it('does not export retired Element classes or registration helpers', () => {
     expect(Object.keys(elements).sort()).toEqual([
-      'ChordAnalysisElement', 'LiveChordAnalysisElement', 'defineAllAnalysisElements',
-      'defineChordAnalysisElement', 'defineLiveChordAnalysisElement',
+      'ChordAnalysisElement', 'IntervalAnalysisElement', 'ScaleAnalysisElement', 'RhythmAnalysisElement',
+      'defineAllAnalysisElements', 'defineChordAnalysisElement', 'defineIntervalAnalysisElement',
+      'defineScaleAnalysisElement', 'defineRhythmAnalysisElement',
     ].sort());
   });
 
@@ -51,15 +52,15 @@ describe('elements module (SSR safety)', () => {
 
   it('imports and constructs in Node without document/customElements', () => {
     expect(typeof ChordAnalysisElement).toBe('function');
-    expect(typeof LiveChordAnalysisElement).toBe('function');
+    for (const ctor of [IntervalAnalysisElement, ScaleAnalysisElement, RhythmAnalysisElement]) expect(typeof ctor).toBe('function');
     expect(() => new ChordAnalysisElement()).not.toThrow();
-    expect(() => new LiveChordAnalysisElement()).not.toThrow();
+    for (const ctor of [IntervalAnalysisElement, ScaleAnalysisElement, RhythmAnalysisElement]) expect(() => new ctor()).not.toThrow();
   });
 
   it('define functions are no-ops without customElements', () => {
     expect((globalThis as Record<string, unknown>).customElements).toBeUndefined();
     expect(() => defineChordAnalysisElement()).not.toThrow();
-    expect(() => defineLiveChordAnalysisElement()).not.toThrow();
+    for (const define of [defineIntervalAnalysisElement, defineScaleAnalysisElement, defineRhythmAnalysisElement]) expect(() => define()).not.toThrow();
     expect(() => defineAllAnalysisElements()).not.toThrow();
   });
 });
@@ -85,15 +86,15 @@ describe('define functions', () => {
 
     defineChordAnalysisElement();
     defineChordAnalysisElement();
-    defineLiveChordAnalysisElement();
-    defineLiveChordAnalysisElement();
+    defineChordAnalysisElement();
+    defineChordAnalysisElement();
 
-    expect(define).toHaveBeenCalledTimes(2);
+    expect(define).toHaveBeenCalledTimes(1);
     expect(registry.get('score-chord-analysis')).toBe(ChordAnalysisElement);
-    expect(registry.get('score-live-chord-analysis')).toBe(LiveChordAnalysisElement);
+    expect(registry.has('score-live-chord-analysis')).toBe(false);
   });
 
-  it('registers only the two supported capabilities through defineAllAnalysisElements', () => {
+  it('registers only the four supported capabilities through defineAllAnalysisElements', () => {
     const registry = new Map<string, CustomElementConstructor>();
     const define = vi.fn((tag: string, ctor: CustomElementConstructor) => registry.set(tag, ctor));
     globals.customElements = {
@@ -104,8 +105,8 @@ describe('define functions', () => {
     defineAllAnalysisElements();
     defineAllAnalysisElements();
 
-    expect([...registry.keys()].sort()).toEqual(['score-chord-analysis', 'score-live-chord-analysis']);
-    expect(define).toHaveBeenCalledTimes(2);
+    expect([...registry.keys()].sort()).toEqual(['score-chord-analysis', 'score-interval-analysis', 'score-rhythm-analysis', 'score-scale-analysis']);
+    expect(define).toHaveBeenCalledTimes(4);
     for (const tag of [
       'score-analysis', 'analysis-histogram', 'rhythm-patterns', 'analysis-view', 'analysis-timeline',
       'key-analysis', 'interval-analysis', 'rhythm-analysis', 'motif-analysis', 'rhythm-pattern-analysis',

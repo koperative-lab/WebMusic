@@ -58,7 +58,7 @@ port. Its renderer adapts the existing scrolling staff geometry and owns local
 focus. The `enter-notation` command belongs to Edit and completes a chosen
 voice/staff measure with real rests; it does not depend on renderer projections.
 Staff and piano roll share content/history while keeping cursor and input
-settings local. DEC-048 and the editing design own the supported notation subset.
+settings local. DEC-054 and the editing design own the supported notation subset.
 
 ---
 

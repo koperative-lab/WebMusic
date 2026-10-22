@@ -1,4 +1,4 @@
-/** DEC-047's one browser-adapter exception; never a capability-wide Edit edge. */
+/** DEC-053's one browser-adapter exception; never a capability-wide Edit edge. */
 export function allowsAudioDocumentLoaderImport(name, importer, target, imported) {
   return name === '@webmusic/audio'
     && importer === 'edit/element/internal/audio-document-loader.ts'

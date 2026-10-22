@@ -87,10 +87,10 @@ retain presentation subscriptions, not duplicate volume/mute/solo maps. Multiple
 presenters and custom UI observe the same Headless object. A source's direct
 out-of-band gain changes are not a second mixer-state authority.
 
-## Document playback (DEC-047)
+## Document playback (DEC-053)
 
 [Editing capabilities](EDIT-COMPONENTS.md) and
-[DEC-047](../DECISIONS.md#dec-047--document-owned-editing-and-borrowed-playback)
+[DEC-053](../DECISIONS.md#dec-053--document-owned-editing-and-borrowed-playback)
 define the document-owned audio sequence and borrowed playback implemented in P3.
 Current verification belongs to [STATUS EDIT-01](../STATUS.md). Public members and
 limits are owned by [AudioPlayer](../../apps/doc/webmusic/src/content/docs/audio/headless/play/audio-player.mdx)

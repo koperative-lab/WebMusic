@@ -48,7 +48,7 @@ without playback. This is the accepted composition direction in
 supports the target syntax; delivery gaps belong to [STATUS](STATUS.md).
 
 Editing adds a document owner shared by these same integration choices. Under
-DEC-047, editing uses a persistent domain editor that commits content
+DEC-053, editing uses a persistent domain editor that commits content
 and can provide bounded history for one document. Play borrows its current
 content and reports the revision actually applied for playback; View borrows
 content and edit commands. Existing piano-roll and waveform Views gain optional
@@ -61,7 +61,7 @@ and [Score View](../apps/doc/webmusic/src/content/docs/score/element/view/score-
 Audio sequence editing, local processing and WAV export are documented in
 [Audio Edit](../apps/doc/webmusic/src/content/docs/audio/api/edit.mdx) and
 [Audio View](../apps/doc/webmusic/src/content/docs/audio/element/view/audio-view.mdx).
-Bounded staff input under DEC-048 uses the same Score document and history,
+Bounded staff input under DEC-054 uses the same Score document and history,
 with explicit note-entry focus, written durations and voice/rest completion
 inside authored measures. It does not imply complete MuseScore parity.
 

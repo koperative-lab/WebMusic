@@ -113,6 +113,81 @@ describe('<audio-player>', () => {
     expect(customElements.get('audio-player')).toBe(AudioPlayerElement);
   });
 
+  it.each(['src', 'load'] as const)('shows waiting and %s loading without remounting transport controls', async (kind) => {
+    let resolve!: (value: AudioClip) => void;
+    const pending = new Promise<AudioClip>((done) => { resolve = done; });
+    vi.spyOn(load, 'loadClipFromUrl').mockReturnValue(pending);
+    vi.spyOn(load, 'loadClip').mockReturnValue(pending);
+    const element = mount();
+    const loadStates: boolean[] = [];
+    element.addEventListener('webaudio:loadstatechange', (event) => loadStates.push((event as CustomEvent).detail.loading));
+    const transport = transportOf(element);
+    const button = transport.querySelector('button');
+    const status = element.shadowRoot!.querySelector<HTMLElement>('[part~="status"]')!;
+    expect(status.dataset.kind).toBe('waiting');
+    expect(status.textContent).toBe('Waiting for an audio source');
+    if (kind === 'src') element.setAttribute('src', '/pending.wav');
+    const loading = kind === 'load' ? element.load(new ArrayBuffer(8)) : undefined;
+    expect(element.loading).toBe(true);
+    expect(status.dataset.kind).toBe('loading');
+    expect(status.getAttribute('aria-busy')).toBe('true');
+    resolve(clip(2));
+    await loading;
+    await flush();
+    expect(element.loading).toBe(false);
+    expect(element.loadError).toBeUndefined();
+    expect(status.hidden).toBe(true);
+    expect(status.hasAttribute('aria-busy')).toBe(false);
+    expect(transportOf(element)).toBe(transport);
+    expect(transport.querySelector('button')).toBe(button);
+    expect(element.duration).toBe(2);
+    expect(loadStates).toEqual([true, false]);
+  });
+
+  it('keeps replacement loading visible over the retained source and settles only the current request', async () => {
+    const requests: Array<{resolve(value: AudioClip): void}> = [];
+    vi.spyOn(load, 'loadClipFromUrl').mockImplementation(() => new Promise((resolve) => requests.push({resolve})));
+    const element = mount();
+    element.clip = clip(2);
+    const transport = transportOf(element);
+    element.setAttribute('src', '/old.wav');
+    element.setAttribute('src', '/new.wav');
+    const status = element.shadowRoot!.querySelector<HTMLElement>('[part~="status"]')!;
+    expect(status.dataset.kind).toBe('loading');
+    expect(element.duration).toBe(2);
+    expect(transport.querySelector('button')?.disabled).toBe(false);
+    requests[0]!.resolve(clip(3));
+    await flush();
+    expect(status.dataset.kind).toBe('loading');
+    expect(element.duration).toBe(2);
+    requests[1]!.resolve(clip(4));
+    await flush();
+    expect(status.hidden).toBe(true);
+    expect(element.duration).toBe(4);
+    expect(transportOf(element)).toBe(transport);
+  });
+
+  it('shows current load errors, clears them on source selection, and releases feedback on removal', async () => {
+    vi.spyOn(load, 'loadClip').mockRejectedValue(new Error('Cannot decode audio'));
+    const element = mount();
+    const errors: unknown[] = [];
+    element.addEventListener('webaudio:error', (event) => errors.push((event as CustomEvent).detail));
+    await element.load(new ArrayBuffer(8));
+    const status = element.shadowRoot!.querySelector<HTMLElement>('[part~="status"]')!;
+    expect(status.dataset.kind).toBe('error');
+    expect(status.getAttribute('role')).toBe('alert');
+    expect(status.textContent).toBe('Cannot decode audio');
+    expect(element.loading).toBe(false);
+    expect(element.loadError?.message).toBe('Cannot decode audio');
+    expect(errors).toHaveLength(1);
+    element.clip = clip();
+    expect(status.hidden).toBe(true);
+    element.clip = undefined;
+    expect(status.dataset.kind).toBe('waiting');
+    element.remove();
+    expect(element.shadowRoot!.querySelector('[part~="status"]')).toBeNull();
+  });
+
   it.each([
     ['src', 'clip'], ['src', 'transport'], ['load', 'clip'], ['load', 'transport'],
   ] as const)('keeps a direct owner %s / %s choice ahead of an older browser load', async (loadKind, selection) => {
@@ -133,6 +208,8 @@ describe('<audio-player>', () => {
     else owner.setTransport(group);
     const options = loadKind === 'src' ? loadFromUrl.mock.calls[0]?.[1] : loadInput.mock.calls[0]?.[1];
     expect(options?.signal?.aborted).toBe(true);
+    expect(element.loading).toBe(false);
+    expect(element.loadError).toBeUndefined();
     resolve(clip(9));
     await pending;
     await flush();
@@ -140,6 +217,23 @@ describe('<audio-player>', () => {
     expect(owner.transport).toBe(selection === 'transport' ? group : undefined);
     expect(element.clip).toBe(selection === 'clip' ? take : undefined);
     expect(element.duration).toBe(selection === 'clip' ? 3 : 7);
+  });
+
+  it('does not restore a load cancelled by a source choice inside its readiness event', async () => {
+    let resolve!: (value: AudioClip) => void;
+    vi.spyOn(load, 'loadClip').mockReturnValue(new Promise((done) => { resolve = done; }));
+    const element = mount();
+    const selected = clip(4);
+    element.addEventListener('webaudio:loadstatechange', (event) => {
+      if ((event as CustomEvent).detail.loading) element.clip = selected;
+    });
+    const pending = element.load(new ArrayBuffer(8));
+    expect(element.loading).toBe(false);
+    expect(element.clip).toBe(selected);
+    resolve(clip(9));
+    await pending;
+    expect(element.clip).toBe(selected);
+    expect(element.loadError).toBeUndefined();
   });
 
   it('hands the decoder a context so the native decodeAudioData path can run', async () => {
