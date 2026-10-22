@@ -3,12 +3,13 @@
 Status: accepted contract with opt-in composition, shared sound/modulation,
 Session scheduling and versioned project APIs.
 Current verification and remaining stages belong to [STATUS](../STATUS.md).
-Related decisions: [DEC-047](../DECISIONS.md#dec-047--modular-composition-separates-resources-routing-and-session-authority)
-and [DEC-048](../DECISIONS.md#dec-048--session-scheduling-is-a-borrowed-anchor-projects-store-declarative-identity).
+Related decisions: [DEC-047](../DECISIONS.md#dec-047--modular-composition-separates-resources-routing-and-session-authority),
+[DEC-048](../DECISIONS.md#dec-048--session-scheduling-is-a-borrowed-anchor-projects-store-declarative-identity)
+and [DEC-049](../DECISIONS.md#dec-049--provider-scope-changes-separate-in-place-re-routing-from-rebinding).
 Layers: neutral Kernel contracts, domain Headless runtimes, structural UI bindings,
 and declarative Elements. Shared public entries are Kernel `/module`, `/session`,
 `/effect` and `/element`; domain runtimes remain in their Play Headless entries.
-Delivery owner: [STATUS](../STATUS.md), MOD-02 through MOD-12.
+Delivery owner: [STATUS](../STATUS.md), MOD-02 through MOD-13.
 
 ## User task and boundary
 

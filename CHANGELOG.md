@@ -28,6 +28,20 @@ work and does not establish npm publication, a release tag or a deployment.
 - Replace unresolved public resources with original MIT-licensed study media,
   with reproducibility and license checks in source and site builds. A scoped
   Expressive Code PostCSS override removes the vulnerable selector-parser chain.
+- Keep inherited Audio module leaves from rewriting their provider's Session
+  rate and loop. A provider's new destination re-routes Audio leaves and desk
+  masters in place, preserving engines, Session membership and channel mixes.
+  `<audio-player>.effect` no longer throws while its owned player drives a
+  borrowed mix. Module-mode command failures and every failed preparation or
+  activation attempt reach `webaudio:error`.
+- Expose recovered Session participant readiness after a failed preparation is
+  retried, recreate a disposed shared parameter macro on demand, and share one
+  module-discovery observer per document or shadow root. Kernel adds
+  `moduleScopeChange()`, `sameModuleScope()` and `routeModuleOutput()` for
+  domain adapters.
+- Demo asset checks pin the WAV the reviewed MP3 was encoded from. `--write`
+  refreshes inventories without re-encoding while that WAV is unchanged and
+  never installs unreviewed encoder output.
 
 ### Earlier source preparation
 

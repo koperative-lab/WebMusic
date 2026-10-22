@@ -1754,6 +1754,57 @@ late restores and borrowed contexts. Test keyboard wiring, focus, diagnostics,
 narrow layouts and restoration through the public runnable example. Static
 checks alone establish neither sound precision nor device behavior.
 
+## DEC-049 — Provider scope changes separate in-place re-routing from rebinding
+
+**Date / status:** 2026-10-21; accepted with the modular release-candidate review
+fixes. Audio Elements adopt it; Score adoption is MOD-13 in [STATUS](STATUS.md).
+
+**Problem:** a provider republishes its context when its target, destination,
+admission, Session or audio environment changes. Treating every republication
+alike either ignored a new destination, leaving Audio routes on the old node, or
+rebuilt engines, Session membership and desk mixes for a change that moves one
+default route. Each domain also kept its own scope comparison and route lease,
+and those copies had already drifted.
+
+**Decision:** Kernel classifies a republished context with
+`moduleScopeChange(previous, next)`: `none` when the audio environment, Session,
+registry, admission and destination resolver are identical (a new target alone
+keeps the scope), `destination` when only the destination resolver changed, and
+`scope` for any other change or a missing side. `sameModuleScope()` is the `none`
+shorthand. On `destination`, a consumer keeps its engine, Session participant,
+registrations and desk state; it re-derives its child context and replaces only a
+default route. An admitted route belongs to the provider's desk and is unchanged.
+On `scope`, it releases its route, registration and membership, then rebinds.
+`routeModuleOutput(context, module, port)` is the single normal-route helper:
+admission when present, otherwise the scope's default destination or speakers.
+Its lease retracts only the default it installed.
+
+Only a Session owner maps declarative transport state, such as `rate` and a
+whole-Session `loop`, to Session commands; an inherited leaf never rewrites its
+provider's transport. A participant's `ready` describes its latest preparation
+attempt: a retried preparation replaces a rejected promise, and Elements report
+each failed preparation, activation or attachment where it occurs.
+
+**Alternatives considered:** compare scopes without the destination (stale
+routes); rebuild on every change (lost mixes, cut notes and re-registration);
+keep per-domain comparison and route code (silent drift between domains).
+
+**Consequences:** Kernel `/module` gains three domain-neutral functions and no
+domain types. Re-routing replaces one default edge within a task; it is not a
+crossfade. Score Elements still use `sameModuleScope()` and rebind on a
+destination-only change until MOD-13, so a mixed composition currently keeps
+Audio state but recreates Score engines and Rack channel state.
+
+**Owner:** [Modular composition](design/MODULAR-COMPOSITION.md), the
+[Kernel API](../apps/doc/webmusic/src/content/docs/kernel/api.mdx) and the Audio
+player/mixer Element references; [Status](STATUS.md) owns MOD-13.
+
+**Verification implications:** unit tests cover classification, routing leases,
+nested-leaf rate and loop, in-place re-routing that retains the engine, Session
+membership and desk levels, and per-attempt failure reporting. Audible and
+browser behavior of a destination change during playback remains a manual
+check under VERIFY-01.
+
 ## Recording the next decision
 
 Add an identifier, date, status, problem, chosen contract, considered alternatives, consequences, owning document, and verification implications. A proposed choice does not change a public API. If a choice supersedes this register, retain its old identifier and point to the replacement; do not rewrite historical evidence as though the new choice always existed.
