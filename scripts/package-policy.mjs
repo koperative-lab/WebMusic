@@ -175,8 +175,7 @@ export const domainFamilies = Object.freeze(
 );
 
 /**
- * Established visual feature capabilities have four source responsibilities.
- * Incremental capabilities list only their implemented layers below.
+ * Feature capabilities, including Edit, have four source responsibilities.
  * `core` is deliberately internal: it is the reusable
  * implementation floor, not an additional semver surface. The capability
  * ROOT is the API (`./api` is not published; `src/api/` stays as the
@@ -198,15 +197,7 @@ const featureLayersFor = (capabilities) =>
   );
 
 export const requiredFeatureLayers = Object.freeze({
-  "@webmusic/score": Object.freeze({
-    ...featureLayersFor(["play", "analyze", "view"]),
-    edit: Object.freeze({
-      core: "edit/core/index.ts",
-      api: "edit/api/index.ts",
-      headless: "edit/headless/index.ts",
-      element: "edit/element/index.ts",
-    }),
-  }),
+  "@webmusic/score": featureLayersFor(["play", "analyze", "view", "edit"]),
   "@webmusic/audio": featureLayersFor(["play", "analyze", "view", "edit"]),
 });
 

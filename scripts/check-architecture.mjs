@@ -500,8 +500,8 @@ function checkFeatureLayers(name, pkg) {
       }
     }
 
-    // Require only explicitly implemented public layers. Exact export policy
-    // still rejects additional unreviewed subpaths such as Edit Element.
+    // Require each declared public layer. Exact export policy separately
+    // rejects subpaths outside the reviewed allowlist.
     for (const [layer, subpath] of Object.entries({
       api: `./${capability}`,
       headless: `./${capability}/headless`,
