@@ -37,7 +37,8 @@ export interface SessionParticipantLease {
   readonly token: symbol;
   readonly active: boolean;
   /** Resolves after explicit play/preload preparation and registration (or release).
-   * Merely discovering a member in a paused Session does not prepare resources. */
+   * Merely discovering a member in a paused Session does not prepare resources.
+   * After a rejected attempt, a retried preparation exposes a fresh promise. */
   readonly ready: Promise<void>;
   /** Resolves after release and cancellation of late preparation/play work. */
   readonly settled: Promise<void>;
@@ -255,7 +256,20 @@ export class SessionTransport {
     const settled = new Promise<void>((resolve) => { settle = resolve; });
     let readyResolve!: () => void;
     let readyReject!: (error: unknown) => void;
-    const ready = new Promise<void>((resolve, reject) => { readyResolve = resolve; readyReject = reject; });
+    let readyState: 'pending' | 'resolved' | 'rejected' = 'pending';
+    // Readiness describes the latest attempt. A rejected attempt is replaced
+    // by a fresh promise when preparation is retried, so recovery is observable.
+    const deferReady = (): Promise<void> => {
+      readyState = 'pending';
+      const promise = new Promise<void>((resolve, reject) => {
+        readyResolve = () => { if (readyState === 'pending') { readyState = 'resolved'; resolve(); } };
+        readyReject = (error) => { if (readyState === 'pending') { readyState = 'rejected'; reject(error); } };
+      });
+      // Preparation can fail before any caller awaits readiness.
+      void promise.catch(() => {});
+      return promise;
+    };
+    const ready = deferReady();
     let releasedResolve!: () => void;
     const released = new Promise<void>((resolve) => { releasedResolve = resolve; });
     let preparation: Promise<void> | undefined;
@@ -269,6 +283,7 @@ export class SessionTransport {
         if (member.preparing) return preparation!;
         if (member.attached && !member.options.prepare) return member.ready;
         member.preparing = true;
+        if (readyState === 'rejected') member.ready = deferReady();
         let preparedResolve!: () => void;
         let preparedReject!: (error: unknown) => void;
         const progress = new Promise<void>((resolve, reject) => { preparedResolve = resolve; preparedReject = reject; });
@@ -338,13 +353,12 @@ export class SessionTransport {
     owners.set(identity, member);
     this.#members.add(member);
     ++this.#membershipRevision;
-    void member.ready.catch(() => {});
     if (!member.options.prepare || !this.#clock.paused) void member.prepare().catch(() => {});
     this.#publish({type: 'participants', snapshot: this.snapshot});
     return Object.freeze({
       token: Symbol(options.axis),
       get active() { return member.active; },
-      ready: member.ready,
+      get ready() { return member.ready; },
       settled,
       get cancellationError() { return member.cancellationError; },
       release: () => this.#release(member),

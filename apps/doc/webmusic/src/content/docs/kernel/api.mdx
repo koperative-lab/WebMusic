@@ -608,8 +608,10 @@ releases outstanding reservations. The lease exposes `token`, `active` and `read
 
 A lease exposes `token`, `active`, `ready`, `settled`, `cancellationError` and
 `release()`. `ready` waits for first explicit preparation/attachment or release;
-preparation, activation and scheduling-attachment failures reject it.
-do not await it before the action that starts preparation. `release()` unregisters
+preparation, activation and scheduling-attachment failures reject it. After a
+rejection, a retried preparation replaces the getter's value with a fresh promise,
+so read `ready` again to observe recovery. Do not await it before the action that
+starts preparation. `release()` unregisters
 and cancels only its member. In-flight work retains engine identity until
 `settled`; cancellation failure blocks reuse and can be retried with `release()`.
 Old lease releases cannot cancel a newer owner.

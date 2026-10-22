@@ -357,6 +357,24 @@ describe('source-free SessionTransport', () => {
     } finally { lease.release(); await lease.settled; w.session.dispose(); }
   });
 
+  it('exposes recovered readiness after a failed preparation is retried', async () => {
+    const w = world();
+    const leaf = w.leaf();
+    let attempts = 0;
+    const lease = w.session.register(leaf, {axis: 'clip-seconds', durationSeconds: 10,
+      prepare: () => { if (++attempts === 1) throw new Error('transient decode failure'); }});
+    const first = lease.ready;
+    await expect(w.session.play()).rejects.toThrow('transient decode failure');
+    await expect(first).rejects.toThrow('transient decode failure');
+    expect(await w.session.play()).toMatchObject({status: 'committed'});
+    expect(lease.ready).not.toBe(first);
+    await expect(lease.ready).resolves.toBeUndefined();
+    expect(leaf.play).toHaveBeenCalled();
+    lease.release();
+    await lease.settled;
+    w.session.dispose();
+  });
+
   it('reprepares changed source resources and snapshots the supplied callback', async () => {
     const w = world();
     const prepare = vi.fn();
