@@ -62,14 +62,16 @@ export default defineConfig([
     dts: true,
     sourcemap: true,
   },
-  // CJS: no code splitting (esbuild limitation), so shared modules are
-  // inlined per entry — the same tradeoff the pre-merge per-package builds
-  // made. `import.meta.url` is compiled away so the worker clients fall back
+  // tsup also splits CJS through Rollup. Keep one Core implementation per
+  // format so clips, sequences and error classes created through one entry
+  // remain the same objects and classes in every other entry.
+  // `import.meta.url` is compiled away so the worker clients fall back
   // to configured/explicit workers.
   {
     entry: moduleEntries,
     format: ['cjs'],
     tsconfig: 'tsconfig.build.json',
+    splitting: true,
     dts: true,
     sourcemap: true,
     define: {'import.meta.url': 'undefined'},
