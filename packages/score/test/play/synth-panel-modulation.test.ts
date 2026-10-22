@@ -364,6 +364,22 @@ describe('attached parameter modulation controls', () => {
     gain.dispose();
   });
 
+  it('lets a later definition reclaim a macro id after its shared controller is disposed', () => {
+    const gain = new ParamHandle({id: 'gain', unit: 'ratio', range: {min: 0, max: 1}, defaultValue: 0.5});
+    const params = new ParamSurface([gain]);
+    const config = {id: 'level', targets: [{parameter: 'gain', min: 0, max: 1}]};
+    const first = getParameterMacroController(params, config);
+    expect(getParameterMacroController(params, config)).toBe(first);
+    first.dispose();
+    const second = getParameterMacroController(params, config);
+    expect(second).not.toBe(first);
+    second.setValue(0.25);
+    expect(gain.snapshot.baseValue).toBeCloseTo(0.25);
+    gain.dispose();
+    expect(second.snapshot().disabled).toBe(true);
+    expect(() => getParameterMacroController(params, config)).toThrow('Macro parameter unavailable: gain');
+  });
+
   it('reports unsupported rate and phase without silently invoking callback targets', () => {
     const control = new ParamHandle({id: 'attackSeconds', unit: 's', range: {min: 0, max: 2}, defaultValue: 0.1});
     const element = panel({id: 'callback', params: new ParamSurface([control])});

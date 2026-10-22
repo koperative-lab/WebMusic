@@ -177,6 +177,7 @@ export class ParameterMacroController {
   private disposed = false;
   private releases: Array<() => void> = [];
   private readonly listeners = new Set<() => void>();
+  get isDisposed(): boolean { return this.disposed; }
 
   constructor(surface: ParamSurface, config: ParameterMacroConfig) {
     if (!config.id.trim()) throw new TypeError('A parameter macro requires an id.');
@@ -243,12 +244,13 @@ export class ParameterMacroController {
 }
 
 const macros = new WeakMap<ParamSurface, Map<string, ParameterMacroController>>();
-/** The first definition establishes a macro id. Later panels borrow its state. */
+/** The first live definition establishes a macro id. Later panels borrow its state. */
 export function getParameterMacroController(surface: ParamSurface, config: ParameterMacroConfig): ParameterMacroController {
   let entries = macros.get(surface);
   if (!entries) { entries = new Map(); macros.set(surface, entries); }
   let controller = entries.get(config.id);
-  if (!controller) { controller = new ParameterMacroController(surface, config); entries.set(config.id, controller); }
+  // A disposed controller no longer owns the id; a new definition may claim it.
+  if (!controller || controller.isDisposed) { controller = new ParameterMacroController(surface, config); entries.set(config.id, controller); }
   else if (!controller.matches(config)) throw new Error(`Macro id already has a different mapping: ${config.id}`);
   return controller;
 }
