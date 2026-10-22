@@ -19,7 +19,9 @@ export function startCommand(command, args, {cwd, quiet = false, processGroup = 
   let interruptedSignal;
   const terminate = (signal) => {
     if (grouped && child.pid) {
-      try { process.kill(-child.pid, signal); } catch (error) { if (error.code !== 'ESRCH') throw error; }
+      // macOS reports EPERM for a group holding only zombies; a repeated
+      // interrupt during the drain must not throw from the signal handler.
+      try { process.kill(-child.pid, signal); } catch (error) { if (error.code !== 'ESRCH' && error.code !== 'EPERM') throw error; }
     } else child.kill(signal);
   };
   const handlers = ['SIGINT', 'SIGTERM'].map((signal) => {
@@ -143,7 +145,11 @@ export async function withStartupLock(siteRoot, action, {timeout = 300_000, poll
         try {
           // Publish the blocker before writing diagnostics. Even an empty
           // marker must prevent stale-owner recovery after a failed write.
-          await rename(path.join(lock, owner), marker);
+          try { await rename(path.join(lock, owner), marker); } catch (renameError) {
+            // Without the renamed owner, an exclusively created marker still
+            // blocks recovery once that owner process exits.
+            await writeFile(marker, '', {flag: 'wx'}).catch(() => { throw renameError; });
+          }
           await writeFile(marker, JSON.stringify({
             processGroupId: error.processGroupId, message: error.message,
             commandError: error.commandError?.message,

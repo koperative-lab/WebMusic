@@ -173,6 +173,14 @@ function deniedGroup() {
   return Object.assign(new Error('kill EPERM'), {code: 'EPERM', syscall: 'kill'});
 }
 
+test('a repeated interrupt denied for a zombie-only process group does not throw from the signal path',
+  {skip: process.platform === 'win32', timeout: 3000}, async (t) => {
+    const running = startCommand(process.execPath, ['-e', 'setTimeout(()=>{},100)'], {quiet: true, processGroup: true, cleanupTimeoutMs: 500});
+    mockGroupKill(t, running.child, (signal, native) => { if (signal === 'SIGINT') throw deniedGroup(); return native(); });
+    assert.doesNotThrow(() => running.terminate('SIGINT'));
+    await running.finished;
+  });
+
 test('a transient post-exit process-group probe denial preserves the interrupted command result',
   {skip: process.platform === 'win32', timeout: 3000}, async (t) => {
     const directory = await fixture(t);
@@ -251,6 +259,21 @@ test('persistent process-group denial fails cleanup and blocks another build eve
     assert.equal((await readdir(lock)).includes('cleanup-failed.json'), true);
     assert.deepEqual(await readdir(path.join(directory, '.astro')), ['webmusic-dev-start']);
   });
+
+test('a cleanup failure still publishes its barrier when the owner marker cannot be renamed', async (t) => {
+  const directory = await fixture(t);
+  const lock = path.join(directory, '.astro/webmusic-dev-start');
+  await assert.rejects(withStartupLock(directory, async () => {
+    // Losing the owner file makes the rename fail; an exclusive marker must still block recovery.
+    for (const name of await readdir(lock)) await rm(path.join(lock, name));
+    throw Object.assign(new Error('cleanup unverified'), {code: 'ERR_DEV_PROCESS_GROUP_CLEANUP', processGroupId: 1});
+  }), (error) => error.code === 'ERR_DEV_PROCESS_GROUP_CLEANUP' && !error.lockError);
+  assert.deepEqual(await readdir(lock), ['cleanup-failed.json']);
+  assert.equal(JSON.parse(await readFile(path.join(lock, 'cleanup-failed.json'), 'utf8')).processGroupId, 1);
+  let restarted = false;
+  await assert.rejects(withStartupLock(directory, () => { restarted = true; }, {timeout: 50, poll: 1}), /cleanup/i);
+  assert.equal(restarted, false);
+});
 
 test('successful deadline SIGKILL preserves the command result and releases startup coordination',
   {skip: process.platform === 'win32', timeout: 3000}, async (t) => {
