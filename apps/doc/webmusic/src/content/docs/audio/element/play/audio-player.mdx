@@ -79,11 +79,20 @@ These controls do not register another participant. `.sessionTransport` exposes
 the borrowed/owned authority and `.module` exposes the local capability handle;
 a source-free root has no fabricated audio output.
 
-Module-mode play/pause/stop/seek/rate commands delegate to the Session. Seek is
+Module-mode play/pause/stop/seek/rate commands delegate to the Session; a failed
+delegated command is reported as `webaudio:error`. Seek is
 on **Session seconds**; a module leaf adapter maps its own stable seconds axis.
 Unknown/live duration remains explicit on the Session snapshot instead of being
 reported as a known finite clip. Discovery does not prepare audio. See
 [modular composition](/bridge/modular-composition/) for a running mixed example.
+
+The `rate` and `loop` attributes set Session rate and whole-Session loop only on
+a player that owns its Session: a module root or a `session="local"` boundary. On
+an inherited leaf they leave the borrowed Session unchanged. A provider's new
+default destination re-routes the leaf in place, keeping its engine and Session
+membership. A new admission, Session or audio environment withdraws the old
+route and joins the new scope. Each failed preparation or activation attempt is
+reported as `webaudio:error`.
 
 
 <details class="component-section">
@@ -121,7 +130,7 @@ await el.player?.play();                     // stable AudioPlayer facade
 | `.player` | property | Inject/read the central `AudioPlayer`; an injected instance stays caller-owned. The mounted element creates an empty player when needed, so companions can attach before data is loaded. |
 | `.setClip(clip)` / `.setTransport(transport)` | method | Select a clip or borrowed queue/mix backend through the Element. Nonempty replacement pauses the old backend; detaching a borrowed backend does not dispose it. |
 | `.transport` | readonly property | Currently borrowed AudioPlayerTransport, if any. |
-| `.effect` | property | An `Effect` recipe for the owned clip compatibility insert; reassigning updates that insert and preserves explicit slots. |
+| `.effect` | property | An `Effect` recipe for the owned clip compatibility insert; reassigning updates that insert and preserves explicit slots. A caller-owned `.player` keeps its own effect. While the owned player drives a borrowed queue or mix, the recipe waits for the next owned clip; the group keeps its own effects. |
 | `.load(input)` | method | Load a non-URL `ArrayBuffer` / `Blob` imperatively. |
 | `.play(when?)` | method | Start playback. `when` is an absolute `AudioContext.currentTime`, sample-accurate on the buffer engine — the scheduling primitive a sync bridge needs. |
 | `.pause()` / `.stop()` | method | Transport. |

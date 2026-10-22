@@ -21,7 +21,7 @@ import {AudioMixer, type AudioMixerOptions} from '../headless/mixer';
 import type {PlayerLike} from '../headless/player';
 import type {AudioPlayer} from '../headless/audio-player';
 import {AudioPlayerConnection, type AudioPlayerTarget} from './internal/player-connection';
-import {ModuleAudioEnvironment, ModuleContext, ModuleRegistry, createConnectionLease, type ConnectionLease, type ModuleHandle} from '@webmusic/kernel/module';
+import {ModuleAudioEnvironment, ModuleContext, ModuleRegistry, moduleScopeChange, routeModuleOutput, type ConnectionLease, type ModuleHandle} from '@webmusic/kernel/module';
 import {isModularComposition, provideModuleContext, observeModuleContext, notifyModuleContext, notifyModuleChange} from '@webmusic/kernel/element';
 import {
   WebMusicElement,
@@ -306,10 +306,13 @@ export class AudioMixerElement extends WebMusicElement {
     this.moduleReleases.push(provideModuleContext(this, () => this.moduleContext));
     this.moduleReleases.push(observeModuleContext(this, (parent, state) => {
       if (parent === this.parentModuleContext && this.moduleContext) return;
-      if (parent && this.parentModuleContext && this.moduleContext &&
-        parent.audio === this.parentModuleContext.audio && parent.session === this.parentModuleContext.session &&
-        parent.admit === this.parentModuleContext.admit && parent.registry === this.parentModuleContext.registry) {
+      // A republished target keeps this desk, and a new destination resolver
+      // re-routes only its master. A new admission, Session or environment
+      // revokes its master route and descendant channels.
+      const change = moduleScopeChange(this.parentModuleContext, parent);
+      if (this.moduleContext && parent && change !== 'scope') {
         this.parentModuleContext = parent;
+        if (change === 'destination') this.followProviderDestination();
         return;
       }
       this.moduleRoute?.release(); this.moduleRoute = undefined;
@@ -374,17 +377,27 @@ export class AudioMixerElement extends WebMusicElement {
     const port = mixer.outputPort;
     if (port.context && port.context !== context.audio.prepare()) throw new Error('Audio mixer must share the module AudioContext');
     if (!this.moduleRoute?.active) {
+      // The desk's own admission serves its children. Its master joins the
+      // parent's admission or default destination, then `.destination`.
       const parent = this.parentModuleContext;
-      if (parent?.admit) this.moduleRoute = parent.admit(this.moduleHandle!, port);
-      else {
-        const destination = parent?.destination?.() ?? this.destinationRef ?? context.audio.prepare().destination;
-        port.setDefault(destination);
-        this.moduleRoute = createConnectionLease(() => {
-          if (!port.disposed && port.defaultDestination === destination) port.setDefault(undefined);
-        });
-      }
+      const scope = (parent ?? context).derive({
+        id: context.id, admit: parent?.admit ?? null,
+        destination: () => parent?.destination?.() ?? this.destinationRef,
+      });
+      this.moduleRoute = routeModuleOutput(scope, this.moduleHandle!, port);
     }
     notifyModuleChange(this);
+  }
+
+  /** Re-route only the master's default path; the desk, channels and admissions stay. */
+  private followProviderDestination(): void {
+    const previous = this.moduleRoute;
+    if (this.parentModuleContext?.admit || !previous?.active) return;
+    this.moduleRoute = undefined;
+    try {
+      previous.release();
+      this.prepareModuleMixer();
+    } catch (error) { this.onMixerError(error); }
   }
 
   // --- wiring ---

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import {afterEach, beforeAll, describe, expect, it, vi} from 'vitest';
 import {AudioOutputPort, ModuleAudioEnvironment, ModuleContext, type ModuleHandle} from '@webmusic/kernel/module';
-import {provideModuleContext} from '@webmusic/kernel/element';
+import {notifyModuleContext, provideModuleContext} from '@webmusic/kernel/element';
 import {SessionTransport} from '@webmusic/kernel/session';
 import {createAudioClip, type AudioClip} from '../../src/core';
 import {AudioPlayer} from '../../src/play/headless/audio-player';
@@ -540,5 +540,128 @@ describe('neutral module audio taps', () => {
     await Promise.resolve();
     expect(observed).toHaveBeenCalledWith({module: undefined});
     release();
+  });
+});
+
+describe('modular Audio Session and route ownership', () => {
+  it('keeps an inherited leaf from rewriting its provider Session rate or loop', async () => {
+    const context = new GraphContext();
+    const root = player(); root.setAttribute('composition', 'modules'); root.audioContext = context.audio;
+    root.setAttribute('rate', '1.5');
+    const leaf = player(); leaf.clip = clip();
+    leaf.setAttribute('rate', '0.5'); leaf.setAttribute('loop', '');
+    root.append(leaf); document.body.append(root);
+    const session = root.sessionTransport!;
+    expect(leaf.sessionTransport).toBe(session);
+    await vi.waitFor(() => expect(session.snapshot.rate).toBe(1.5));
+    leaf.setAttribute('rate', '2');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(session.snapshot.rate).toBe(1.5);
+    expect(session.snapshot.loop).toBeNull();
+    root.setAttribute('rate', '0.75');
+    root.setAttribute('loop', '');
+    await vi.waitFor(() => expect(session.snapshot.rate).toBe(0.75));
+    await vi.waitFor(() => expect(session.snapshot.loop).toEqual({startSeconds: 0, endSeconds: 2}));
+  });
+
+  it('re-routes an inherited leaf when its provider publishes a new destination', async () => {
+    const context = new GraphContext();
+    const session = new SessionTransport(() => context.currentTime);
+    const first = context.createGain();
+    const second = context.createGain();
+    const audio = new ModuleAudioEnvironment({context: context.audio});
+    let scope = new ModuleContext({id: 'routed-scope', audio, session, destination: () => first as unknown as AudioNode});
+    const host = document.createElement('section'); host.setAttribute('composition', 'modules');
+    const leaf = player(); leaf.clip = clip(); host.append(leaf);
+    const release = provideModuleContext(host, () => scope);
+    document.body.append(host);
+    await session.play();
+    const engine = leaf.player!;
+    const output = engine.outputPort!;
+    expect(output.defaultDestination).toBe(first);
+    scope = scope.derive({id: 'rerouted-scope', destination: () => second as unknown as AudioNode});
+    notifyModuleContext(host);
+    // Re-routed in place: same engine, port and Session membership, still playing.
+    expect(leaf.player).toBe(engine);
+    expect(output.defaultDestination).toBe(second);
+    expect(paths(output.node as unknown as GraphNode, first)).toBe(0);
+    expect(session.snapshot.participantCount).toBe(1);
+    expect(engine.playing).toBe(true);
+    host.remove(); release(); session.dispose();
+  });
+
+  it('keeps a desk and its channel mix when the provider changes only its destination', async () => {
+    const context = new GraphContext();
+    const session = new SessionTransport(() => context.currentTime);
+    const first = context.createGain();
+    const second = context.createGain();
+    let scope = new ModuleContext({id: 'desk-scope', audio: new ModuleAudioEnvironment({context: context.audio}), session,
+      destination: () => first as unknown as AudioNode});
+    const host = document.createElement('section'); host.setAttribute('composition', 'modules');
+    const desk = mixer(); const leaf = player(); leaf.clip = clip();
+    desk.append(leaf); host.append(desk);
+    const release = provideModuleContext(host, () => scope);
+    document.body.append(host);
+    await session.play();
+    const engine = desk.mixer!;
+    const channel = leaf.module!.id;
+    engine.setVolume(channel, 0.25);
+    expect(engine.outputPort.defaultDestination).toBe(first);
+    scope = scope.derive({id: 'desk-rerouted', destination: () => second as unknown as AudioNode});
+    notifyModuleContext(host);
+    expect(desk.mixer).toBe(engine);
+    expect(engine.outputPort.defaultDestination).toBe(second);
+    expect(paths(engine.outputPort.node as unknown as GraphNode, first)).toBe(0);
+    expect(engine.snapshot().members.find((member) => member.id === channel)?.volume).toBe(0.25);
+    expect(leaf.player!.playing).toBe(true);
+    host.remove(); release(); session.dispose();
+  });
+
+  it('reports every failed activation attempt of an inherited leaf', async () => {
+    const context = new GraphContext();
+    context.state = 'suspended';
+    context.resume = vi.fn(async () => { throw new Error('gesture required'); });
+    const root = player(); root.setAttribute('composition', 'modules'); root.audioContext = context.audio;
+    const leaf = player(); leaf.clip = clip();
+    root.append(leaf); document.body.append(root);
+    const errors: unknown[] = [];
+    leaf.addEventListener('webaudio:error', (event) => errors.push((event as CustomEvent).detail));
+    await expect(root.play()).rejects.toThrow('gesture required');
+    await expect(root.play()).rejects.toThrow('gesture required');
+    expect(errors).toHaveLength(2);
+    expect(errors.every((error) => error instanceof Error && error.message === 'gesture required')).toBe(true);
+  });
+
+  it('keeps an effect assigned while the owned player drives a borrowed mix', async () => {
+    const context = new GraphContext();
+    const element = player(); element.audioContext = context.audio; element.clip = clip();
+    document.body.append(element);
+    const desk = new AudioMixer({audioContext: context.audio});
+    element.setTransport(desk.transport);
+    const recipe = gain({value: 0.5});
+    expect(() => { element.effect = recipe; }).not.toThrow();
+    expect(element.effect).toBe(recipe);
+    element.setTransport(undefined);
+    element.clip = clip();
+    await element.preload();
+    expect(element.player!.insertChain!.instances.map((instance) => instance.recipe)).toEqual([recipe]);
+    desk.dispose();
+  });
+
+  it('reports a failed module-mode command on the error channel instead of throwing', () => {
+    const context = new GraphContext();
+    const session = new SessionTransport(() => context.currentTime);
+    const scope = new ModuleContext({id: 'closing-scope', audio: new ModuleAudioEnvironment({context: context.audio}), session});
+    const host = document.createElement('section'); host.setAttribute('composition', 'modules');
+    const leaf = player(); host.append(leaf);
+    const release = provideModuleContext(host, () => scope);
+    document.body.append(host);
+    const errors: unknown[] = [];
+    leaf.addEventListener('webaudio:error', (event) => errors.push((event as CustomEvent).detail));
+    session.dispose();
+    expect(() => { leaf.pause(); leaf.stop(); leaf.seek(1); }).not.toThrow();
+    expect(errors).toHaveLength(3);
+    expect(errors[0]).toBeInstanceOf(Error);
+    host.remove(); release();
   });
 });

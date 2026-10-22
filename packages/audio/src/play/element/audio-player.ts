@@ -52,7 +52,7 @@ import {parseLoopAttr} from '../core/format';
 import {browserMediaAdapterFactory} from './internal/browser-media-adapter';
 import {getAudioContextConstructor} from '@webmusic/kernel/audio-context';
 import type {TransportClockReader} from '@webmusic/kernel/transport';
-import {ModuleAudioEnvironment, ModuleContext, createConnectionLease, type ConnectionLease, type ModuleHandle} from '@webmusic/kernel/module';
+import {ModuleAudioEnvironment, ModuleContext, moduleScopeChange, routeModuleOutput, type ConnectionLease, type ModuleHandle} from '@webmusic/kernel/module';
 import {SessionTransport, type SessionParticipantLease, type SessionPendingSourceLease} from '@webmusic/kernel/session';
 import {isModularComposition, provideModuleContext, observeModuleContext, notifyModuleContext, notifyModuleChange} from '@webmusic/kernel/element';
 import {
@@ -280,8 +280,14 @@ export class AudioPlayerElement extends WebMusicElement {
     return this._player;
   }
 
+  /**
+   * Source-local recipe for this element's owned clip insert. A borrowed
+   * player keeps its caller's configuration. While the owned facade drives a
+   * borrowed queue or mix, the recipe waits for the next owned clip; the group
+   * keeps its own effects.
+   */
   set effect(effect: Effect | undefined) {
-    if (this._player && (this.ownsPlayer || !this._player.transport)) this._player.setEffect(effect);
+    if (this._player && this.ownsPlayer && !this._player.transport) this._player.setEffect(effect);
     this._effect = effect;
   }
   get effect(): Effect | undefined {
@@ -302,13 +308,13 @@ export class AudioPlayerElement extends WebMusicElement {
   }
 
   pause(): void {
-    if (this.modular) void this.moduleContext?.session?.pause();
+    if (this.modular) this.sessionCommand(this.moduleContext?.session, (session) => session.pause());
     else this._player?.pause();
     this.notifyUI();
   }
 
   stop(): void {
-    if (this.modular) void this.moduleContext?.session?.stop();
+    if (this.modular) this.sessionCommand(this.moduleContext?.session, (session) => session.stop());
     else this._player?.stop();
     this.notifyUI();
   }
@@ -320,7 +326,7 @@ export class AudioPlayerElement extends WebMusicElement {
    * second time would echo the view's own event back at it.
    */
   seek(seconds: number): void {
-    if (this.modular) void this.moduleContext?.session?.seek(seconds);
+    if (this.modular) this.sessionCommand(this.moduleContext?.session, (session) => session.seek(seconds));
     else this._player?.seek(seconds);
     this.notifyUI();
   }
@@ -460,14 +466,34 @@ export class AudioPlayerElement extends WebMusicElement {
     this.dispatch('error', error instanceof Error ? error : new Error(String(error)));
   }
 
+  /**
+   * Fire-and-forget Session command; its failure reaches the element's error
+   * channel. The target Session is explicit: an absent owned Session must not
+   * fall back to a borrowed provider's authority.
+   */
+  private sessionCommand(
+    session: SessionTransport | undefined,
+    command: (session: SessionTransport) => Promise<unknown>,
+  ): void {
+    if (!session) return;
+    try {
+      void command(session).catch((error: unknown) => this.onPlayerError(error));
+    } catch (error) {
+      this.onPlayerError(error);
+    }
+  }
+
   private mountModules(): void {
     this.moduleReleases.push(provideModuleContext(this, () => this.moduleContext));
     this.moduleReleases.push(observeModuleContext(this, (parent, state) => {
       if (!this.isConnected || parent === this.parentModuleContext && this.moduleContext) return;
-      if (parent && this.parentModuleContext && this.moduleContext &&
-        parent.audio === this.parentModuleContext.audio && parent.session === this.parentModuleContext.session &&
-        parent.admit === this.parentModuleContext.admit && parent.registry === this.parentModuleContext.registry) {
+      // A republished target keeps this scope, and a new destination resolver
+      // re-routes it in place. A new admission, Session or environment revokes
+      // the old route and membership.
+      const change = moduleScopeChange(this.parentModuleContext, parent);
+      if (this.moduleContext && parent && change !== 'scope') {
         this.parentModuleContext = parent;
+        if (change === 'destination') this.followProviderDestination(parent);
         return;
       }
       this.detachModuleSource();
@@ -491,7 +517,9 @@ export class AudioPlayerElement extends WebMusicElement {
       }));
       const session = parent?.session && this.getAttribute('session') !== 'local'
         ? parent.session
-        : (this.ownedSession = new SessionTransport(() => audio.peek()?.currentTime ?? 0));
+        : (this.ownedSession = new SessionTransport(() => audio.peek()?.currentTime ?? 0, {
+          onOperationError: (_operation, error) => this.onPlayerError(error),
+        }));
       if (this.pendingLoadRequested) {
         this.pendingLoad = session.holdPendingSource();
         if (this.pendingLoadFailure) this.pendingLoad.reject(this.pendingLoadFailure.error);
@@ -500,6 +528,9 @@ export class AudioPlayerElement extends WebMusicElement {
         ? parent.derive({id: `audio-element-${++audioElementSequence}`, session, target: null})
         : new ModuleContext({id: `audio-element-${++audioElementSequence}`, audio, session});
       this.moduleLoopKey = undefined;
+      // Only an owning boundary maps its declarative rate/loop to Session
+      // commands; an inherited leaf never rewrites its provider's transport.
+      if (this.ownedSession && this.hasAttribute('rate')) this.applyModuleRate();
       this.releaseSessionObservation = session.subscribe(() => {
         if (this.hasAttribute('loop')) this.applyModuleLoop();
         this.notifyUI(); this.scheduleRender();
@@ -543,20 +574,32 @@ export class AudioPlayerElement extends WebMusicElement {
         get position() { return player.seconds; }, get running() { return player.playing; },
         get clock() { return player.clock; },
       };
+      // Report every failed attempt where it happens. A retried preparation
+      // gets a fresh readiness promise, so observing only the first misses
+      // later failures; the same error reached twice is reported once.
+      let reported: unknown;
+      const report = (error: unknown): void => {
+        if (generation !== this.moduleGeneration || error === reported) return;
+        reported = error;
+        this.onPlayerError(error);
+      };
+      const observed = async (operation: () => Promise<void>): Promise<void> => {
+        try { await operation(); } catch (error) { report(error); throw error; }
+      };
       try {
         this.participant = context.session.register(transport, {
           axis: 'clip-seconds', identity: player,
           durationSeconds: () => player.clip ? player.duration : null,
           endPolicy: 'position',
-          prepare: () => this.prepareModuleSource(player, context, generation),
+          prepare: () => observed(() => this.prepareModuleSource(player, context, generation)),
           ...(player.timingCapabilities.sharedSessionClock ? {
-            activate: () => player.activateScheduling(),
-            attachScheduling: (binding) => player.attachScheduling(binding),
+            activate: () => observed(() => player.activateScheduling()),
+            attachScheduling: (binding) => {
+              try { return player.attachScheduling(binding); } catch (error) { report(error); throw error; }
+            },
           } : {}),
         });
-        void this.participant.ready.catch((error: unknown) => {
-          if (generation === this.moduleGeneration) this.onPlayerError(error);
-        });
+        void this.participant.ready.catch(report);
         this.resolvePendingLoad();
       } catch (error) { this.pendingLoad?.reject(error); this.onPlayerError(error); }
     };
@@ -572,17 +615,29 @@ export class AudioPlayerElement extends WebMusicElement {
     const port = player.outputPort;
     if (!port) return;
     if (port.context && port.context !== context.audio.prepare()) throw new Error('A borrowed player must share the module AudioContext');
-    if (!this.moduleRoute?.active) {
-      if (context.admit) this.moduleRoute = context.admit(this.moduleHandle!, port);
-      else {
-        const destination = context.destination?.() ?? context.audio.prepare().destination;
-        port.setDefault(destination);
-        this.moduleRoute = createConnectionLease(() => {
-          if (!port.disposed && port.defaultDestination === destination) port.setDefault(undefined);
-        });
-      }
-    }
+    // Route through the current scope: its destination can change in place.
+    if (!this.moduleRoute?.active) this.moduleRoute = routeModuleOutput(this.moduleContext ?? context, this.moduleHandle!, port);
     notifyModuleChange(this);
+  }
+
+  /**
+   * Adopt a provider's new default destination without rebuilding the engine
+   * or its Session membership. An admitted route belongs to the provider's
+   * desk and is unaffected; a default route is replaced in the same task.
+   */
+  private followProviderDestination(parent: ModuleContext): void {
+    const current = this.moduleContext!;
+    this.moduleContext = parent.derive({id: current.id, session: current.session ?? null, target: current.target ?? null});
+    const previous = this.moduleRoute;
+    const port = this.moduleSourcePlayer?.peekOutputPort();
+    if (!parent.admit && previous?.active && port && this.moduleHandle) {
+      this.moduleRoute = undefined;
+      try {
+        previous.release();
+        this.moduleRoute = routeModuleOutput(this.moduleContext, this.moduleHandle, port);
+      } catch (error) { this.onPlayerError(error); }
+    }
+    notifyModuleContext(this);
   }
 
   private detachModuleSource(): Promise<void> | undefined {
@@ -866,7 +921,13 @@ export class AudioPlayerElement extends WebMusicElement {
         this.clipOrigin = player.clip ? 'property' : null;
         this.loadedSrc = undefined;
       }
+      const ownsSourceAgain = this.ownsPlayer && this.selectedTransport !== undefined && transport === undefined;
       this.selectedTransport = transport;
+      // A recipe assigned while the owned facade drove a borrowed group
+      // belongs to the clip insert it owns again now.
+      if (ownsSourceAgain) {
+        try { player.setEffect(this._effect); } catch (error) { this.onPlayerError(error); }
+      }
       this._clip = player.clip;
       this.announceSource();
       this.syncModuleSource();
@@ -952,18 +1013,17 @@ export class AudioPlayerElement extends WebMusicElement {
   private applyAttributes(): void {
     this.applyControls();
     // A present attribute wins; an absent one leaves a borrowed player's own
-    // value alone.
+    // value alone. Module rate/loop are Session state, applied when the
+    // Session is bound rather than on every player reconciliation.
     for (const name of LIVE_ATTRIBUTES) {
+      if (this.modular && (name === 'rate' || name === 'loop')) continue;
       if (this.hasAttribute(name)) this.applyPlayerAttribute(name);
     }
   }
 
   /** One live knob, applied to whatever player is current — owned or borrowed. */
   private applyPlayerAttribute(name: string): void {
-    if (this.modular && name === 'rate') {
-      void this.moduleContext?.session?.setRate(numAttr(this, 'rate', 1, 0.25, 4)).catch((error: unknown) => this.onPlayerError(error));
-      return;
-    }
+    if (this.modular && name === 'rate') { this.applyModuleRate(); return; }
     if (this.modular && name === 'loop') { this.applyModuleLoop(); return; }
     const player = this._player;
     if (!player) return;
@@ -978,8 +1038,12 @@ export class AudioPlayerElement extends WebMusicElement {
     }
   }
 
+  private applyModuleRate(): void {
+    this.sessionCommand(this.ownedSession, (session) => session.setRate(numAttr(this, 'rate', 1, 0.25, 4)));
+  }
+
   private applyModuleLoop(): void {
-    const session = this.moduleContext?.session;
+    const session = this.ownedSession;
     if (!session) return;
     const loop = parseLoopAttr(this.getAttribute('loop'));
     const duration = session.snapshot.durationSeconds;
@@ -990,7 +1054,7 @@ export class AudioPlayerElement extends WebMusicElement {
     const key = JSON.stringify(region);
     if (this.moduleLoopKey === key) return;
     this.moduleLoopKey = key;
-    void session.setLoop(region).catch((error: unknown) => this.onPlayerError(error));
+    this.sessionCommand(session, (owned) => owned.setLoop(region));
   }
 
   /**

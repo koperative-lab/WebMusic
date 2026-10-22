@@ -37,6 +37,9 @@ an explicit audio bus. `.module` exposes its mixer capability, `master` output
 and insert chain. Child outputs are admitted through routing leases and their
 existing Session passes through unchanged: mixer admission is not transport
 registration. Effects declared directly under this desk own master insert slots.
+When the provider changes only its default destination, the master route moves
+in place and channel levels, mutes and solo are kept. A new admission, Session or
+audio environment rebuilds the desk and re-admits its children.
 
 Use `input="#desk" port="master"` on an Audio analyzer to tap the mixed output.
 Reading `.module` does not prepare an AudioContext. Legacy player/mixer linking
