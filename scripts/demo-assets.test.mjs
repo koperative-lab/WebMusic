@@ -166,3 +166,53 @@ test('changing both inventory hashes cannot approve an arbitrary replacement MP3
   }
   await assert.rejects(processDemoAssets({check: true, repositoryDirectory: directory}), /encoded original MP3 changed/);
 });
+
+test('write mode refreshes inventories without re-encoding a reviewed MP3', async (t) => {
+  const {directory, publicDirectory} = await fixture(t);
+  const mp3 = path.join(publicDirectory, `mp3/${name}.mp3`);
+  const reviewed = await readFile(mp3);
+  await writeFile(path.join(directory, 'apps/doc/webmusic/assets.json'), '{}\n');
+  const searchPath = process.env.PATH;
+  t.after(() => { process.env.PATH = searchPath; });
+  // No encoder is reachable: an unchanged WAV must not need one.
+  process.env.PATH = '';
+  await processDemoAssets({repositoryDirectory: directory});
+  process.env.PATH = searchPath;
+  assert.deepEqual(await readFile(mp3), reviewed);
+  await processDemoAssets({check: true, repositoryDirectory: directory});
+});
+
+test('write mode never installs encoder output that differs from the reviewed MP3', {skip: process.platform === 'win32'}, async (t) => {
+  const {directory, publicDirectory} = await fixture(t);
+  const mp3 = path.join(publicDirectory, `mp3/${name}.mp3`);
+  const stale = Buffer.from(`ID3 stale ${license}`);
+  await writeFile(mp3, stale);
+  const bin = await mkdtemp(path.join(os.tmpdir(), 'webmusic-fake-encoder-'));
+  t.after(() => rm(bin, {recursive: true, force: true}));
+  await writeFile(path.join(bin, 'ffmpeg'), '#!/bin/sh\nfor last; do :; done\nprintf "ID3 different encoder build" > "$last"\n', {mode: 0o755});
+  const searchPath = process.env.PATH;
+  t.after(() => { process.env.PATH = searchPath; });
+  process.env.PATH = bin;
+  await assert.rejects(processDemoAssets({repositoryDirectory: directory}), /encoded original MP3 changed \(WAV sha256 [0-9a-f]{64}, MP3 sha256 [0-9a-f]{64}\)/);
+  process.env.PATH = searchPath;
+  assert.deepEqual(await readFile(mp3), stale);
+});
+
+test('a WAV changed by an earlier failed write cannot keep the reviewed MP3', async (t) => {
+  const {directory} = await fixture(t);
+  const licenseFile = path.join(directory, 'LICENSE');
+  const lines = (await readFile(licenseFile, 'utf8')).trim().split('\n');
+  // A license prefix changes every generated file, including the WAV, while
+  // the reviewed MP3's embedded copyright still contains the shorter text.
+  await writeFile(licenseFile, `${lines.slice(0, -1).join('\n')}\n`);
+  const searchPath = process.env.PATH;
+  t.after(() => { process.env.PATH = searchPath; });
+  process.env.PATH = '';
+  const options = {repositoryDirectory: directory};
+  const explained = /generated WAV changed \(sha256 [0-9a-f]{64}\) and its MP3 must be re-encoded and reviewed; encoding requires ffmpeg/;
+  await assert.rejects(processDemoAssets(options), explained);
+  // The first attempt already rewrote the WAV; a retry must still refuse.
+  await assert.rejects(processDemoAssets(options), explained);
+  process.env.PATH = searchPath;
+  await assert.rejects(processDemoAssets({check: true, repositoryDirectory: directory}), /encoded from a different WAV/);
+});
