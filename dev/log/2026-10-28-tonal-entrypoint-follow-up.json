@@ -1,0 +1,561 @@
+{
+  "checkedOn": "2026-10-28 (America/New_York)",
+  "baseline": "a3a30596798a2233920d1017215e28b27f65c7c3",
+  "publications": [
+    {
+      "name": "@tonaljs/chord",
+      "version": "6.2.1",
+      "integrity": "sha512-7K4J8B6xv8usTkKJ/Fg/r5Ay6Nc0TxWc+jr25ijYPJZstJH8gnWMGxsWjFnqjZViu8lrFxa4F384iJtS+X8w+Q==",
+      "shasum": "acd8fcba47430be5a9df60d05e4fefc95af01521",
+      "main": "dist/index.js",
+      "module": "dist/index.mjs",
+      "types": "dist/index.d.ts",
+      "license": "MIT",
+      "files": [
+        "package/LICENSE",
+        "package/dist/index.js",
+        "package/package.json",
+        "package/dist/index.js.map",
+        "package/dist/index.mjs.map",
+        "package/README.md",
+        "package/dist/index.mjs",
+        "package/dist/index.d.mts",
+        "package/dist/index.d.ts"
+      ],
+      "dependencies": {
+        "@tonaljs/chord-detect": "4.9.3",
+        "@tonaljs/chord-type": "5.2.1",
+        "@tonaljs/collection": "4.9.1",
+        "@tonaljs/interval": "^5.1.1",
+        "@tonaljs/pcset": "4.10.3",
+        "@tonaljs/pitch-distance": "5.0.7",
+        "@tonaljs/pitch-note": "6.1.2",
+        "@tonaljs/scale-type": "4.9.4"
+      }
+    },
+    {
+      "name": "@tonaljs/chord-detect",
+      "version": "4.9.3",
+      "integrity": "sha512-L6qFtpM2hFXM7Nexq1EPM+6vt5tElYzFftmtH2UbtwmpS2f6+Lx9iPC8hBuu3HLUFld5vOd+7o7hyzabDAmsDg==",
+      "shasum": "672f8fe444bf7f3e20d4474ae6c3ce589be0064e",
+      "main": "dist/index.js",
+      "module": "dist/index.mjs",
+      "types": "dist/index.d.ts",
+      "license": "MIT",
+      "files": [
+        "package/LICENSE",
+        "package/dist/index.js",
+        "package/package.json",
+        "package/dist/index.js.map",
+        "package/dist/index.mjs.map",
+        "package/README.md",
+        "package/dist/index.mjs",
+        "package/dist/index.d.mts",
+        "package/dist/index.d.ts"
+      ],
+      "dependencies": {
+        "@tonaljs/chord-type": "5.2.1",
+        "@tonaljs/pitch-note": "6.1.2",
+        "@tonaljs/pcset": "4.10.3"
+      }
+    }
+  ],
+  "lockfileChanges": [
+    {
+      "path": "node_modules/@tonaljs/chord",
+      "before": "6.1.2",
+      "after": "6.2.1"
+    },
+    {
+      "path": "node_modules/@tonaljs/chord-detect",
+      "before": "4.9.1",
+      "after": "4.9.3"
+    },
+    {
+      "path": "node_modules/@tonaljs/chord-detect/node_modules/@tonaljs/pitch",
+      "before": null,
+      "after": "5.0.3"
+    },
+    {
+      "path": "node_modules/@tonaljs/chord-detect/node_modules/@tonaljs/pitch-note",
+      "before": null,
+      "after": "6.1.2"
+    },
+    {
+      "path": "node_modules/@tonaljs/chord-type",
+      "before": "5.1.1",
+      "after": "5.2.1"
+    },
+    {
+      "path": "node_modules/@tonaljs/chord/node_modules/@tonaljs/pitch",
+      "before": null,
+      "after": "5.0.3"
+    },
+    {
+      "path": "node_modules/@tonaljs/chord/node_modules/@tonaljs/pitch-distance",
+      "before": null,
+      "after": "5.0.7"
+    },
+    {
+      "path": "node_modules/@tonaljs/chord/node_modules/@tonaljs/pitch-interval",
+      "before": null,
+      "after": "6.1.2"
+    },
+    {
+      "path": "node_modules/@tonaljs/chord/node_modules/@tonaljs/pitch-note",
+      "before": null,
+      "after": "6.1.2"
+    },
+    {
+      "path": "node_modules/@tonaljs/collection",
+      "before": "4.9.0",
+      "after": "4.9.1"
+    },
+    {
+      "path": "node_modules/@tonaljs/interval",
+      "before": "5.1.0",
+      "after": "5.1.1"
+    },
+    {
+      "path": "node_modules/@tonaljs/interval/node_modules/@tonaljs/pitch",
+      "before": null,
+      "after": "5.0.3"
+    },
+    {
+      "path": "node_modules/@tonaljs/interval/node_modules/@tonaljs/pitch-distance",
+      "before": null,
+      "after": "5.0.7"
+    },
+    {
+      "path": "node_modules/@tonaljs/interval/node_modules/@tonaljs/pitch-interval",
+      "before": null,
+      "after": "6.1.2"
+    },
+    {
+      "path": "node_modules/@tonaljs/interval/node_modules/@tonaljs/pitch-note",
+      "before": null,
+      "after": "6.1.2"
+    },
+    {
+      "path": "node_modules/@tonaljs/pcset",
+      "before": "4.10.1",
+      "after": "4.10.3"
+    },
+    {
+      "path": "node_modules/@tonaljs/pcset/node_modules/@tonaljs/pitch",
+      "before": null,
+      "after": "5.0.3"
+    },
+    {
+      "path": "node_modules/@tonaljs/pcset/node_modules/@tonaljs/pitch-distance",
+      "before": null,
+      "after": "5.0.7"
+    },
+    {
+      "path": "node_modules/@tonaljs/pcset/node_modules/@tonaljs/pitch-interval",
+      "before": null,
+      "after": "6.1.2"
+    },
+    {
+      "path": "node_modules/@tonaljs/pcset/node_modules/@tonaljs/pitch-note",
+      "before": null,
+      "after": "6.1.2"
+    },
+    {
+      "path": "node_modules/@tonaljs/scale-type",
+      "before": "4.9.2",
+      "after": "4.9.4"
+    },
+    {
+      "path": "packages/score",
+      "before": "0.2.0",
+      "after": "0.2.0"
+    }
+  ],
+  "directProbe": "import assert from 'node:assert/strict';\nimport {createRequire} from 'node:module';\nimport {readFileSync, existsSync} from 'node:fs';\nimport {dirname, join} from 'node:path';\nimport {pathToFileURL} from 'node:url';\nimport {get, getChord, degrees} from '@tonaljs/chord';\nimport {detect} from '@tonaljs/chord-detect';\nconst require = createRequire(import.meta.url);\nassert.deepEqual(get('Cmaj7').notes, ['C', 'E', 'G', 'B']);\nassert.deepEqual(getChord('m', 'D').notes, ['D', 'F', 'A']);\nassert.deepEqual(get('C/E').notes, ['E', 'G', 'C']);\nassert.equal(degrees(['C4', 'M'])(4), 'C5');\nassert.ok(detect(['C', 'E', 'G']).includes('CM'));\nconst seen = new Set();\nasync function visit(name, ownerRequire) {\n  const file = ownerRequire.resolve(name + '/package.json');\n  if (seen.has(file)) return;\n  seen.add(file);\n  const pkg = JSON.parse(readFileSync(file, 'utf8'));\n  assert.equal(pkg.license, 'MIT');\n  assert.ok(existsSync(join(dirname(file), 'LICENSE')));\n  for (const key of ['main', 'module', 'types']) {\n    assert.ok(pkg[key], name + ': missing ' + key);\n    assert.ok(existsSync(join(dirname(file), pkg[key])), name + ': invalid ' + key);\n  }\n  const cjs = ownerRequire(name);\n  const esm = await import(pathToFileURL(join(dirname(file), pkg.module)).href);\n  assert.ok(Object.keys(cjs).length && Object.keys(esm).length);\n  console.log(name + '@' + pkg.version + ': declared main/module/types, MIT text, CJS and raw ESM pass');\n  const nestedRequire = createRequire(file);\n  for (const child of Object.keys(pkg.dependencies ?? {})) if (child.startsWith('@tonaljs/')) await visit(child, nestedRequire);\n}\nawait visit('@tonaljs/chord', require);\nawait visit('@tonaljs/chord-detect', require);\nassert.deepEqual(require('@tonaljs/chord').get('Cmaj7').notes, ['C','E','G','B']);\nassert.ok(require('@tonaljs/chord-detect').detect(['C','E','G']).includes('CM'));\nconsole.log('PASS: direct Tonal bare ESM/CJS and raw ESM graph; ' + seen.size + ' package instances; chord, inversion and octave-preserving degree smoke tests.');\n",
+  "typeProbe": "import {get, getChord, degrees} from '@tonaljs/chord';\nimport {detect} from '@tonaljs/chord-detect';\nconst notes: string[] = get('Cmaj7').notes;\nconst triad: string[] = getChord('m', 'D').notes;\nconst name: string = degrees(['C4', 'M'])(4);\nconst matches: string[] = detect(notes);\nvoid [notes, triad, name, matches];\n",
+  "originalPullRequests": [
+    {
+      "number": 34,
+      "url": "https://github.com/koperative-lab/WebMusic/pull/34",
+      "headSha": "e0fc139b8da41d89b154e2fb4f7fa9e99f95755c",
+      "title": "chore(deps-dev): bump @tonaljs/chord from 6.1.2 to 6.2.1",
+      "checks": [
+        {
+          "name": "Deploy GitHub Pages",
+          "status": "completed",
+          "conclusion": "skipped",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/40632371623/job/122633417632"
+        },
+        {
+          "name": "Deploy GitHub Pages",
+          "status": "completed",
+          "conclusion": "skipped",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/40632376427/job/122633279765"
+        },
+        {
+          "name": "Build website",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/40632376427/job/122631493768"
+        },
+        {
+          "name": "Quality (Node 22.22.3)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/40632376427/job/122631493743"
+        },
+        {
+          "name": "Quality (Node 24)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/40632376427/job/122631493125"
+        },
+        {
+          "name": "Build website",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/40632371623/job/122631478247"
+        },
+        {
+          "name": "Quality (Node 22.22.3)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/40632371623/job/122631477928"
+        },
+        {
+          "name": "Quality (Node 24)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/40632371623/job/122631477665"
+        }
+      ]
+    },
+    {
+      "number": 38,
+      "url": "https://github.com/koperative-lab/WebMusic/pull/38",
+      "headSha": "8f256dcc2810736143b423339a6f606bdd1525e0",
+      "title": "chore(deps-dev): bump @tonaljs/chord-detect from 4.9.1 to 4.9.3",
+      "checks": [
+        {
+          "name": "Deploy GitHub Pages",
+          "status": "completed",
+          "conclusion": "skipped",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/40632380466/job/122633831486"
+        },
+        {
+          "name": "Deploy GitHub Pages",
+          "status": "completed",
+          "conclusion": "skipped",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/40632375250/job/122633192695"
+        },
+        {
+          "name": "Build website",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/40632380466/job/122631507346"
+        },
+        {
+          "name": "Quality (Node 22.22.3)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/40632380466/job/122631507029"
+        },
+        {
+          "name": "Quality (Node 24)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/40632380466/job/122631506562"
+        },
+        {
+          "name": "Build website",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/40632375250/job/122631491958"
+        },
+        {
+          "name": "Quality (Node 24)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/40632375250/job/122631491540"
+        },
+        {
+          "name": "Quality (Node 22.22.3)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/40632375250/job/122631491470"
+        }
+      ]
+    }
+  ],
+  "finalLockfileSha256": "9e4d640c27fcb96898a7d19c54f2e10af7510d4364ec06e52ca655a40209f9b2",
+  "satisfiedTonalDependencyEdges": 44,
+  "registryVersions": {
+    "chord": {
+      "latest": "6.2.1",
+      "publishedAt": "2026-10-14T06:25:31.355Z",
+      "dist": {
+        "tarball": "https://registry.npmjs.org/@tonaljs/chord/-/chord-6.2.1.tgz",
+        "integrity": "sha512-7K4J8B6xv8usTkKJ/Fg/r5Ay6Nc0TxWc+jr25ijYPJZstJH8gnWMGxsWjFnqjZViu8lrFxa4F384iJtS+X8w+Q==",
+        "shasum": "acd8fcba47430be5a9df60d05e4fefc95af01521"
+      }
+    },
+    "chord-detect": {
+      "latest": "4.9.3",
+      "publishedAt": "2026-10-14T06:23:48.669Z",
+      "dist": {
+        "tarball": "https://registry.npmjs.org/@tonaljs/chord-detect/-/chord-detect-4.9.3.tgz",
+        "integrity": "sha512-L6qFtpM2hFXM7Nexq1EPM+6vt5tElYzFftmtH2UbtwmpS2f6+Lx9iPC8hBuu3HLUFld5vOd+7o7hyzabDAmsDg==",
+        "shasum": "672f8fe444bf7f3e20d4474ae6c3ce589be0064e"
+      }
+    }
+  },
+  "auditSnapshot": {
+    "auditReportVersion": 2,
+    "vulnerabilities": {
+      "@rollup/plugin-node-resolve": {
+        "name": "@rollup/plugin-node-resolve",
+        "severity": "low",
+        "isDirect": false,
+        "via": [
+          "deepmerge"
+        ],
+        "effects": [
+          "meyda"
+        ],
+        "range": ">=8.0.0",
+        "nodes": [
+          "node_modules/@rollup/plugin-node-resolve"
+        ],
+        "fixAvailable": {
+          "name": "meyda",
+          "version": "5.6.2",
+          "isSemVerMajor": true
+        }
+      },
+      "deepmerge": {
+        "name": "deepmerge",
+        "severity": "low",
+        "isDirect": false,
+        "via": [
+          {
+            "source": 1243505,
+            "name": "deepmerge",
+            "dependency": "deepmerge",
+            "title": "deepmerge mergeObject() allows prototype poisoning of returned objects",
+            "url": "https://github.com/advisories/GHSA-gcqx-w48m-w2h4",
+            "severity": "low",
+            "cwe": [
+              "CWE-1321"
+            ],
+            "cvss": {
+              "score": 5.3,
+              "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N"
+            },
+            "range": ">=4.2.0 <=4.3.1"
+          }
+        ],
+        "effects": [
+          "@rollup/plugin-node-resolve"
+        ],
+        "range": ">=4.2.0",
+        "nodes": [
+          "node_modules/deepmerge"
+        ],
+        "fixAvailable": {
+          "name": "meyda",
+          "version": "5.6.2",
+          "isSemVerMajor": true
+        }
+      },
+      "meyda": {
+        "name": "meyda",
+        "severity": "low",
+        "isDirect": true,
+        "via": [
+          "@rollup/plugin-node-resolve"
+        ],
+        "effects": [],
+        "range": "5.6.3",
+        "nodes": [
+          "node_modules/meyda"
+        ],
+        "fixAvailable": {
+          "name": "meyda",
+          "version": "5.6.2",
+          "isSemVerMajor": true
+        }
+      }
+    },
+    "metadata": {
+      "vulnerabilities": {
+        "info": 0,
+        "low": 3,
+        "moderate": 0,
+        "high": 0,
+        "critical": 0,
+        "total": 3
+      },
+      "dependencies": {
+        "prod": 70,
+        "dev": 818,
+        "optional": 194,
+        "peer": 0,
+        "peerOptional": 0,
+        "total": 914
+      }
+    }
+  },
+  "localValidation": [
+    {
+      "node": "22.22.3",
+      "npm": "11.19.0",
+      "command": "npm ci",
+      "exitCode": 0,
+      "summary": "Clean install, exact committed lockfile",
+      "logFile": "npm-ci-node22.log",
+      "logSha256": "aa7d0e6b223196f6683f1a27d6a0afe34867f12f37a13511de6dc06923314978"
+    },
+    {
+      "node": "22.22.3",
+      "npm": "11.19.0",
+      "command": "npm run check",
+      "exitCode": 0,
+      "summary": "4190 tests in 341 files; all source, type, license, notice, package and release gates pass",
+      "logFile": "check-node22.log",
+      "logSha256": "ef526e03253f15334cad47323b714ace544f46bd8f5ace327f2fb1306a61f973"
+    },
+    {
+      "node": "22.22.3",
+      "npm": "11.19.0",
+      "command": "npm run check:external-install",
+      "exitCode": 0,
+      "summary": "168 runtime imports, 88 ESM/browser and 84 CommonJS declarations pass",
+      "logFile": "external-node22.log",
+      "logSha256": "470ad0cbfe18acd1be99411e056b49f99db1ffe1c7b095663a7c1650504ddd9a"
+    },
+    {
+      "node": "22.22.3",
+      "npm": "11.19.0",
+      "command": "npm run audit:dependencies",
+      "exitCode": 0,
+      "summary": "0 high, 0 moderate, 3 low; original high gate passes",
+      "logFile": "audit-full-node22.log",
+      "logSha256": "f4474a4965cf25b04464c04bcadae782de4519629e9031b078150575f00d26c6"
+    },
+    {
+      "node": "22.22.3",
+      "npm": "11.19.0",
+      "command": "npm run audit:production",
+      "exitCode": 0,
+      "summary": "0 high, 0 moderate, 3 low; original high gate passes",
+      "logFile": "audit-production-node22.log",
+      "logSha256": "0481e83838a9af458eeb1f21b8e811aa0bda2c8cda21e7c15862edfd4a42becf"
+    },
+    {
+      "node": "22.22.3",
+      "npm": "11.19.0",
+      "command": "node probe.mjs",
+      "exitCode": 0,
+      "summary": "11-package direct CJS/raw ESM graph, entrypoint/license paths and runtime assertions pass",
+      "logFile": "direct-tonal-node22.log",
+      "logSha256": "829bfd5971c656c7906091c4a31e972e46c8474a81d68a8bac226b893aec40b4"
+    },
+    {
+      "node": "22.22.3",
+      "npm": "11.19.0",
+      "command": "tsc --noEmit --strict --skipLibCheck false; Node16/NodeNext/Bundler",
+      "exitCode": 0,
+      "summary": "Direct .mts/.cts/.ts public imports pass",
+      "logFile": "direct-types-node22.log",
+      "logSha256": "3821d4e06c5a0bc9f677de2d5afc0fd598c6ee15daca13d7c1b16c3f8d0b8c65"
+    },
+    {
+      "node": "24.21.0",
+      "npm": "11.19.0",
+      "command": "npm ci",
+      "exitCode": 0,
+      "summary": "Clean install, exact committed lockfile",
+      "logFile": "npm-ci-node24.log",
+      "logSha256": "8a94d0642442cfb7d37322a752bb12f0b54679cf6c492d5d96df8857185921d4"
+    },
+    {
+      "node": "24.21.0",
+      "npm": "11.19.0",
+      "command": "npm run check",
+      "exitCode": 0,
+      "summary": "4190 tests in 341 files; all source, type, license, notice, package and release gates pass",
+      "logFile": "check-node24.log",
+      "logSha256": "ffdab3c78c45d5a83ba9d0c33a75a9f3beb88e599719e168e0ba88527f7c9ab7"
+    },
+    {
+      "node": "24.21.0",
+      "npm": "11.19.0",
+      "command": "npm run check:external-install",
+      "exitCode": 0,
+      "summary": "168 runtime imports, 88 ESM/browser and 84 CommonJS declarations pass",
+      "logFile": "external-node24.log",
+      "logSha256": "470ad0cbfe18acd1be99411e056b49f99db1ffe1c7b095663a7c1650504ddd9a"
+    },
+    {
+      "node": "24.21.0",
+      "npm": "11.19.0",
+      "command": "npm run audit:dependencies",
+      "exitCode": 0,
+      "summary": "0 high, 0 moderate, 3 low; original high gate passes",
+      "logFile": "audit-full-node24.log",
+      "logSha256": "f4474a4965cf25b04464c04bcadae782de4519629e9031b078150575f00d26c6"
+    },
+    {
+      "node": "24.21.0",
+      "npm": "11.19.0",
+      "command": "npm run audit:production",
+      "exitCode": 0,
+      "summary": "0 high, 0 moderate, 3 low; original high gate passes",
+      "logFile": "audit-production-node24.log",
+      "logSha256": "0481e83838a9af458eeb1f21b8e811aa0bda2c8cda21e7c15862edfd4a42becf"
+    },
+    {
+      "node": "24.21.0",
+      "npm": "11.19.0",
+      "command": "node probe.mjs",
+      "exitCode": 0,
+      "summary": "11-package direct CJS/raw ESM graph, entrypoint/license paths and runtime assertions pass",
+      "logFile": "direct-tonal-node24.log",
+      "logSha256": "829bfd5971c656c7906091c4a31e972e46c8474a81d68a8bac226b893aec40b4"
+    },
+    {
+      "node": "24.21.0",
+      "npm": "11.19.0",
+      "command": "tsc --noEmit --strict --skipLibCheck false; Node16/NodeNext/Bundler",
+      "exitCode": 0,
+      "summary": "Direct .mts/.cts/.ts public imports pass",
+      "logFile": "direct-types-node24.log",
+      "logSha256": "2d2eaa13dfd3de6b8c57a44266531eb435626c9358adfcbbe961bbbb92d8ff48"
+    },
+    {
+      "node": "24.21.0",
+      "npm": "11.19.0",
+      "command": "npm run docs:build",
+      "exitCode": 0,
+      "summary": "110 pages; 74 license records, 346 emitted files",
+      "logFile": "docs-build-node24.log",
+      "logSha256": "a6c1f14d0c72661f0fe220429b4f79aaccdc80f8cc23378fe127a57b19024b5e"
+    },
+    {
+      "node": "24.21.0",
+      "npm": "11.19.0",
+      "command": "npm run pages:build",
+      "exitCode": 0,
+      "summary": "110 pages; 74 license records, 346 emitted files; /WebMusic/ base path verified",
+      "logFile": "pages-build-node24.log",
+      "logSha256": "64efc23f27e74232626e685045824e4cd5dc83292c8d0cf25d57812dfc79a6eb"
+    }
+  ],
+  "validationEnvironment": {
+    "nodeOptions": "--max-old-space-size=6144",
+    "vitestMaxWorkers": 2,
+    "separateCheckouts": true,
+    "checksWeakened": false
+  }
+}

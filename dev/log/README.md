@@ -13,6 +13,7 @@ than maintaining another member or component inventory.
 
 | Record | Purpose |
 |---|---|
+| [Tonal entrypoint follow-up — 2026-10-28](2026-10-28-tonal-entrypoint-follow-up.md) | Corrected upstream releases, shared lockfile reconciliation, direct package entrypoints and Node 22/24 regression verification. |
 | [Dependabot integration review — 2026-10-27](2026-10-27-dependabot-integration.md) | Three accepted updates, two deferred Tonal publication defects, minimal security patches and Node 22/24 verification. |
 | [Dependabot integration review — 2026-10-07](2026-10-07-dependabot-integration.md) | Five dependency updates, exact license snapshots, preserved security fixes and integration verification. |
 | [First-release branch split — 2026-09-10](2026-09-10-first-release-split.md) | Audio/Bridge preservation on dev, three-package main release scope, original work preservation and independent verification. |
