@@ -110,7 +110,7 @@ async function componentIndex(files) {
     '## Web Components', '',
   ];
   for (const family of ['Score', 'Audio']) {
-    for (const capability of ['Edit', 'Play', 'Analyze', 'View']) {
+    for (const capability of ['Play', 'Analyze', 'View']) {
       if (!UI_COMPOSITION_CATALOG.some((entry) => entry.family === family && entry.capability === capability)) continue;
       lines.push(`### ${family} / ${capability}`, '');
       for (const entry of UI_COMPOSITION_CATALOG.filter((e) => e.family === family && e.capability === capability)) {

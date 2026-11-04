@@ -127,17 +127,15 @@ The capability DAG is enforced by `capabilityDependencies` in
 |---|---|
 | `core` | None |
 | `io` | `core` |
-| `edit` | `core`, `io`; Core/API/Headless behavior and nonvisual Element declarations |
 | `view`, `play`, `analyze` | `core`, `io`; the three siblings do not import one another |
-| `react` | `core`, `io`, `view`, `play`, `analyze`; Edit has no React adapter yet |
+| `react` | `core`, `io`, `view`, `play`, `analyze`; editing has no React adapter yet |
 
 | Audio capability | May depend on |
 |---|---|
 | `core` | None |
-| `edit` | `core`; one exact Element loading adapter exception described below |
 | `play` | `core` |
 | `view`, `analyze` | `core`, `play` |
-| `react` | `core`, `view`, `play`, `analyze`; Edit has no React adapter yet |
+| `react` | `core`, `view`, `play`, `analyze`; editing has no React adapter yet |
 
 Audio Play exposes a stable `AudioPlayer` command facade over its selected clip,
 queue, mix or document sequence backend. Linked playlist/mixer/recorder Elements compose with that
@@ -153,47 +151,43 @@ tag. This is not a blanket Analyze-to-View dependency or permission for other
 Analyze layers to import View. See [Audio Play](design/AUDIO-PLAY-COMPONENTS.md),
 [Audio Analyze](design/AUDIO-ANALYZE-COMPONENTS.md), DEC-029 and DEC-037.
 
-### Editing capabilities
+### Document editing in View
 
-Score and Audio Edit supply Core/API/Headless behavior through `/edit` and
-`/edit/headless`, plus `/edit/element` declarations and `/edit/auto` registration.
-Native Score Play, Audio sequence Play and their editable Views borrow the Core
-document ports. Score piano-roll, bounded staff input and Audio waveform editing
-share this ownership. Staff's local input controller and scrolling renderer use
-the existing Score View under DEC-054. The detailed contract belongs to
+Editing is part of View in both domains (DEC-055); there is no separate Edit
+capability. The View API root exports semantic operations, position maps,
+document contracts and Audio range-processor recipes. `/view/headless` exports
+`ScoreEditor` and `AudioClipEditor`, and `/view/element` exports the nonvisual
+`<score-document>` and `<audio-document>` declarations. Rendering and WAV export
+of an edited Audio sequence belong to the Play export API. Native Score Play,
+Audio sequence Play and the editable Views borrow the Core document ports.
+Score piano-roll, bounded staff input and Audio waveform editing share this
+ownership. Staff's local input controller and scrolling renderer use the
+existing Score View under DEC-054. The detailed contract belongs to
 [Editing components](design/EDIT-COMPONENTS.md), and [STATUS](STATUS.md), EDIT-01,
 tracks implementation.
 
-`ScoreEditor` and `AudioClipEditor` live in their domain's `edit/headless` layer.
+`ScoreEditor` and `AudioClipEditor` live in their domain's `view/headless` layer.
 Each is the only owner that commits its document content, identity and monotonic
 revision. Domain Core owns immutable snapshots, read/command ports and position
-maps. Play and View consume these Core contracts without importing a concrete
-Edit implementation. An editor owns no player, transport or visual surface.
-Retained history roots and a player's last applied snapshot can coexist without
-creating additional commit authorities.
+maps. Play consumes these Core contracts without importing View; View surfaces
+borrow an editor through the same ports. An editor owns no player, transport or
+visual surface. Retained history roots and a player's last applied snapshot can
+coexist without creating additional commit authorities.
 
 | Editing dependency | Boundary |
 |---|---|
-| Score `edit` → `core`, `io` | Persistent editing and semantic commands reuse the domain model and format boundary. |
-| Audio `edit/headless` → `core` | Asset readers and processing/loading services are injected through nonvisual ports. |
-| Play/View → Core document ports | Play prepares content for sound; View supplies interaction and rendering. Neither imports Edit implementation. |
-| Edit Element → its lower Edit layers | Nonvisual declarations create or load an editor and own its connected lifetime. |
+| Score `view` → `core`, `io` | Editors and semantic commands reuse the domain model; `<score-document>` loads through the I/O boundary. |
+| Audio `view/headless` → `core` | Asset readers and processing services are injected through nonvisual ports. |
+| Audio `view/element` → `play` | `<audio-document>` loads a URL with Play's `loadClipFromUrl` over the existing View-to-Play edge. |
+| Play → Core document ports | Play prepares content for sound without importing View or a concrete editor. |
 
-Audio loading belongs to Play. The implemented browser exception is the
-exact adapter edge from
-`packages/audio/src/edit/element/internal/audio-document-loader.ts` to
-`packages/audio/src/play/api/load.ts`, importing `loadClipFromUrl` only. This
-does not add a general Audio Edit-to-Play dependency. No Core, API or Headless
-entry may reach this adapter. The adapter fixes `streaming: false`, forwards
+The `<audio-document>` URL loader fixes `streaming: false`, forwards
 AbortSignal/resource limits and creates no implicit AudioContext. Native decoding
 requires an injected loader closure that borrows the caller's context.
-[scripts/audio-document-import-policy.mjs](../scripts/audio-document-import-policy.mjs)
-checks the exact package, importer, resolved target and sole static runtime import
-symbol; its regression tests reject other symbols, dynamic imports and barrels.
-`forbiddenEntryReachability` in package policy separately prevents the Audio root
-and Edit Core/API/Headless entries from reaching Play or the Element adapter.
-The shared pure WAV codec resides in Audio Core; public Play codec exports remain
-compatible, and Edit rendering does not depend on Play.
+`forbiddenEntryReachability` keeps the View API root and Headless entries from
+reaching the Element layer. The shared pure WAV codec resides in Audio Core;
+public Play codec exports remain compatible, and sequence rendering in Play
+depends only on Core.
 
 Local history is optional and bounded to one document. Applications retain
 project-wide commands, cross-document history and persistence. Audio documents
@@ -377,14 +371,11 @@ are not public aliases. Kernel exports `/events`, `/element`, `/worker`,
 Bridge currently exports its capabilities from its package root. Exact entry sets
 are reconciled between manifests and `expectedPublicEntries`.
 
-Both domains expose `/edit`, `/edit/headless`, `/edit/element` and `/edit/auto`
-with implemented behavior and declarations. Neither Edit capability publishes a
-`/global` IIFE or React adapter. Do not publish empty entries or require an unimplemented Element
-layer for symmetry. Each increment updates manifests, tsup mappings, entry and
-layer policy, composition membership, catalogs and owning references together.
-The four Edit layers (Core/API/Headless/Element) have corresponding build,
-registration side-effect, dependency, reachability and composition checks; Edit
-has no renderer layer because existing View owns editing presentation.
+Editing adds no entries of its own: its API, Headless and Element pieces ship
+through the existing View entries, and Audio sequence export through Play.
+Do not publish empty entries or require an unimplemented Element layer for
+symmetry. Each increment updates manifests, tsup mappings, entry and layer
+policy, composition membership, catalogs and owning references together.
 
 Non-IIFE entries use nested conditions:
 
@@ -418,7 +409,6 @@ without changing `package-policy.mjs`.
 | Contract being changed | Sources to review |
 |---|---|
 | Packages, entries, dependencies, layers, side effects, DOM-free/optional-peer reachability | [scripts/package-policy.mjs](../scripts/package-policy.mjs) |
-| Reviewed cross-capability import exceptions (Audio Edit Element loader) | [scripts/audio-document-import-policy.mjs](../scripts/audio-document-import-policy.mjs), applied by the architecture checker |
 | Element-to-presenter composition and behavior-only exceptions | [scripts/element-composition-policy.mjs](../scripts/element-composition-policy.mjs) |
 | Element/catalog membership, UI information classes and AST rules | Composition policy and [architecture checker](../scripts/check-architecture.mjs); reviewed membership determines the catalog |
 | Installed API and type/runtime paths | Each package's `exports`, dependencies/peers and `sideEffects` in `package.json` |

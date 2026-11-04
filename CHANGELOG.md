@@ -5,10 +5,11 @@ work and does not establish npm publication, a release tag or a deployment.
 
 ## Unreleased
 
-- Add document-owned editing for Score and Audio: `/edit`, `/edit/headless`,
-  `/edit/element` and `/edit/auto` entries; revisioned editors with atomic
-  commands and bounded undo/redo; `<score-document>` and `<audio-document>`
-  declarations; playback that pauses and reports the applied document revision;
+- Add document-owned editing for Score and Audio as part of View: operations
+  and contracts in `/view`, `ScoreEditor`/`AudioClipEditor` in
+  `/view/headless`, `<score-document>`/`<audio-document>` in `/view/element`,
+  and Audio sequence rendering/WAV export in `/play`; revisioned editors with atomic
+  commands and bounded undo/redo; playback that pauses and reports the applied document revision;
   piano-roll, bounded staff and waveform editing on the existing Views; local
   Audio processing and WAV export. The
   [editing migration guide](dev/release/EDITING-MIGRATION.md) covers upgrades

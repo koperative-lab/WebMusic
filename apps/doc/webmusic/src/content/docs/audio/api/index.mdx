@@ -8,7 +8,7 @@ The `@webmusic/audio` root is the **foundation** of Audio: sequence/asset/docume
 It is intentionally thin. Functional APIs live in capability subpaths of the same package:
 
 - **Decode, loading, playback, mixing, recording, effects, and audio export** live in [`@webmusic/audio/play`](/audio/api/play/).
-- **Document editing, history, range processing and sequence WAV export** live in [`@webmusic/audio/edit`](/audio/api/edit/).
+- **Document editing, history and range processing** are part of View ([editable documents](/audio/api/view/#editable-documents)); **sequence rendering and WAV export** are part of [Play](/audio/api/play/#render-an-edited-sequence).
 - **Analysis** (peak computation, tempo/beat detection, …) lives in `@webmusic/audio/analyze`.
 - **Visualization** lives in `@webmusic/audio/view`; its Web Components and those from [`@webmusic/audio/play`](/audio/api/play/) live under each capability's `/element` subpath.
 
@@ -25,11 +25,7 @@ capability pages below document what is inside each entry.
 | Entry | Form | What is there |
 | --- | --- | --- |
 | `@webmusic/audio` | package root | `AudioClip`, `Region`, `BeatGrid`, `ClipEditSession`, `AudioPeaks`, events, JSON — this page. |
-| `@webmusic/audio/edit` | [capability root](/audio/api/edit/) | Immutable sequences/assets, commands, local history, selected-range processing and WAV export. |
-| `@webmusic/audio/edit/headless` | [Headless](/audio/headless/edit/audio-clip-editor/) | `AudioClipEditor`. |
-| `@webmusic/audio/edit/element` | [Web Component](/audio/element/edit/audio-document/) | Nonvisual `<audio-document>` owner. |
-| `@webmusic/audio/edit/auto` | registration | Registers `<audio-document>` on evaluation; no Edit global/IIFE entry. |
-| `@webmusic/audio/play` | [capability root](/audio/api/play/) | Decoding and loading, playback engines, mixing, recording, effects, WAV export. |
+| `@webmusic/audio/play` | [capability root](/audio/api/play/) | Decoding and loading, playback engines, mixing, recording, effects, clip and edited-sequence WAV export. |
 | `@webmusic/audio/play/headless` | [Headless](/audio/headless/#play) | `AudioClipPlayer`, `AudioMixer`, `AudioRecorder`, the playlist controller, `Effect`. |
 | `@webmusic/audio/play/element` | [Web Components](/audio/element/#play) | `<audio-player>`, `<audio-playlist>`, `<audio-mixer>`, `<audio-recorder>`. |
 | `@webmusic/audio/play/auto` | registration | Imports the play elements and registers them on evaluation. |
@@ -42,15 +38,15 @@ capability pages below document what is inside each entry.
 | `@webmusic/audio/analyze/global` | browser IIFE | `<script>`-tag bundle exposing `WebMusicAudioAnalyze`. |
 | `@webmusic/audio/analyze/transcribe` | code-only sub-entry | `transcribe()` — audio → family-neutral note events, behind an optional peer. |
 | `@webmusic/audio/analyze/worker-client` · `@webmusic/audio/analyze/worker-protocol` · `@webmusic/audio/analyze/worker` | worker triple | Off-main-thread analysis: the client, the wire protocol, and the worker runtime. |
-| `@webmusic/audio/view` | [capability root](/audio/api/view/) | Signal projection: waveform and spectrogram surfaces, colormaps, geometry. |
-| `@webmusic/audio/view/headless` | [Headless](/audio/headless/#view) | `AudioTimeline`, the view models, `LiveScrollBuffer`. |
+| `@webmusic/audio/view` | [capability root](/audio/api/view/) | Signal projection: waveform and spectrogram surfaces, colormaps, geometry; editable-document contracts, operations and range processors. |
+| `@webmusic/audio/view/headless` | [Headless](/audio/headless/#view) | `AudioTimeline`, the view models, `LiveScrollBuffer`, `AudioClipEditor`. |
 | `@webmusic/audio/view/render` | code-only sub-entry | Imperative canvas renderers and the player binding. |
-| `@webmusic/audio/view/element` | [Web Components](/audio/element/#view) | `<audio-view>` and `<audio-live-view>`; also retains `<audio-meter>` as a compatibility export. |
-| `@webmusic/audio/view/auto` | registration | Registers the View elements, including the retained meter compatibility tag. |
+| `@webmusic/audio/view/element` | [Web Components](/audio/element/#view) | `<audio-view>`, `<audio-live-view>` and the nonvisual `<audio-document>` owner; also retains `<audio-meter>` as a compatibility export. |
+| `@webmusic/audio/view/auto` | registration | Registers the View elements, including `<audio-document>` and the retained meter compatibility tag. |
 | `@webmusic/audio/view/global` | browser IIFE | `<script>`-tag bundle exposing `WebMusicAudioView`. |
 | `@webmusic/audio/react` | [capability root](/audio/api/react/) | React components and hooks over the three capabilities; React is an optional peer. |
 
-Audio Play, Analyze and View ship `/auto` and `/global`; Edit ships `/auto` only.
+Audio Play, Analyze and View ship `/auto` and `/global`.
 Audio has no `/io` — decoding lives inside `play`.
 
 ## Install
@@ -224,8 +220,10 @@ adapter borrows the immutable grid and creates no running clock.
 
 The root also exports `AudioSequence`, asset readers/stores/leases, document and
 editor ports, command/result types, frame position maps and playback binding
-contracts. Their complete member references belong to [Audio Edit](/audio/api/edit/)
-and [document playback](/audio/api/play/#editable-document-playback). Use
+contracts. Their complete member references belong to
+[View editable documents](/audio/api/view/#editable-documents),
+[document playback](/audio/api/play/#editable-document-playback) and
+[sequence rendering](/audio/api/play/#render-an-edited-sequence). Use
 `AudioClipEditor` for a mutable document owner with structural history; it retains
 PCM references across edits rather than storing a new clip for every revision.
 

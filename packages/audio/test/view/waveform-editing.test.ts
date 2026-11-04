@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import {afterEach, beforeAll, beforeEach, describe, expect, it, vi} from 'vitest';
 import {createAudioClip, createRegion, type AudioDocumentPlaybackBinding, type AudioPeaks} from '../../src/core';
-import {createAudioClipEditor} from '../../src/edit/headless';
+import {createAudioClipEditor} from '../../src/view/headless';
 import {createAudioViewEditing} from '../../src/view/headless/audio-editing';
 import type {AudioViewport, AudioWaveformSource, WaveformRenderOptions} from '../../src/view/core/types';
 

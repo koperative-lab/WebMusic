@@ -2,7 +2,7 @@
 
 This is the authoring contract for pages under
 `apps/doc/webmusic/src/content/docs/{score,audio}/element/<capability>/`,
-including the nonvisual Score and Audio Edit declarations.
+including the nonvisual `score-document` and `audio-document` declarations under View.
 It does not replace product component design: establish a new component's
 purpose, layer boundaries, and composition through
 [COMPONENT-DESIGN.md](../design/COMPONENT-DESIGN.md) and
@@ -243,8 +243,8 @@ example. Do not document variables without an effective reader.
 ## Web Components inventory and acceptance
 
 One Web Components inventory per family, at `/<family>/element/`, covers each
-implemented capability in its own section: Play, Analyze and View, plus Edit
-where its declaration Element is available.
+implemented capability in its own section: Play, Analyze and View. Editing
+declarations belong to View.
 The [Site Plan](DOCS-SITE-PLAN.md) owns its responsibilities: selection,
 composition, registration, and shared theming, with no live demo.
 

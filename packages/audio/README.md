@@ -69,7 +69,7 @@ Current work is tracked in [STATUS.md](../../dev/STATUS.md).
 ## Which entry do I import?
 
 Subpaths follow a two-level grammar. The **first level is a capability** —
-`edit`, `play`, `view`, `analyze`, `react`; the package root is the core model. The
+`play`, `view`, `analyze`, `react`; the package root is the core model. The
 **second level is a form** of that capability: **`headless`** is stateful
 code with no UI DOM (operations still have entry-specific environment and
 resource requirements); **`element`** is Web
@@ -78,33 +78,30 @@ registers all elements as an import side effect; **`global`** is the CDN
 IIFE bundle; and **`worker`** / **`worker-client`** / **`worker-protocol`**
 are the Worker trio — the self-registering Worker runtime, the main-thread
 client, and the pure wire types. Each capability's *root*
-(`@webmusic/audio/edit`, `…/play`, `…/view`, `…/analyze`) is its supported API.
-Data helpers and explicit controller factories remain free of UI DOM. Available
-forms are entry-specific: Edit has no `/global` IIFE.
+(`@webmusic/audio/play`, `…/view`, `…/analyze`) is its supported API.
+Data helpers and explicit controller factories remain free of UI DOM. Document
+editing is part of View, and sequence rendering/WAV export part of Play.
 
 | Entry | What it is |
 |---|---|
 | `@webmusic/audio` | The core model: immutable `AudioClip`, regions, edit sessions, `BeatGrid`, peaks, events, JSON. Zero DOM. |
-| `@webmusic/audio/edit` | Sequence operations, editor factories, explicit range processing and WAV export; no UI DOM. |
-| `@webmusic/audio/edit/headless` | `AudioClipEditor`: one document, transactions/history and interaction sessions. |
-| `@webmusic/audio/edit/element` | Nonvisual `<audio-document>` loading and ownership. |
-| `@webmusic/audio/play` | Stateless loading, decoding (WAV pure-JS; compressed formats prefer a supplied context, then optional WASM fallback), export and worker controls. |
+| `@webmusic/audio/play` | Stateless loading, decoding (WAV pure-JS; compressed formats prefer a supplied context, then optional WASM fallback), export (including `exportAudioSequenceWav` for edited sequences) and worker controls. |
 | `@webmusic/audio/play/headless` | `AudioPlayer`, `AudioClipPlayer`, `AudioPlaylist`, `AudioMixer`, `AudioRecorder`, effects and playback engines — code-only. |
 | `@webmusic/audio/play/element` | `<audio-player>`, `<audio-playlist>`, `<audio-mixer>`, `<audio-recorder>`. |
 | `@webmusic/audio/play/worker-client` | Main-thread client for worker-offloaded decoding (`createDecoderWorker`). |
 | `@webmusic/audio/play/worker-protocol` | The decode-worker wire types, engine-free. |
 | `@webmusic/audio/play/worker` | The self-registering decode Worker runtime. |
-| `@webmusic/audio/view` | Layout and view models for waveform / spectrogram views. |
-| `@webmusic/audio/view/headless` | Stateful code-only views, `AudioMeterController`, the `AudioMeterDisplay` reductions behind the seven meter displays and PCM metering helpers. |
+| `@webmusic/audio/view` | Layout and view models for waveform / spectrogram views, plus sequence operations, document contracts and range-processor recipes for editing. |
+| `@webmusic/audio/view/headless` | Stateful code-only views, `AudioMeterController`, the `AudioMeterDisplay` reductions behind the seven meter displays and PCM metering helpers, and `AudioClipEditor` (one document, transactions/history and interaction sessions). |
 | `@webmusic/audio/view/render` | Imperative browser visualizers and the meter display painters. |
-| `@webmusic/audio/view/element` | `<audio-view>` and `<audio-live-view>`; retains a legacy `<audio-meter>` import/registration alias. |
+| `@webmusic/audio/view/element` | `<audio-view>`, `<audio-live-view>` and the nonvisual `<audio-document>` owner; retains a legacy `<audio-meter>` import/registration alias. |
 | `@webmusic/audio/analyze` | One-shot MIR analysis: key, tempo, pitch, loudness, onsets, spectrogram, summaries. |
 | `@webmusic/audio/analyze/headless` | Stateful analysis sessions and live trackers. |
 | `@webmusic/audio/analyze/element` | Canonical live `<audio-meter>`, `<audio-level-analyzer>`, `<audio-spectrum-analyzer>`, `<audio-oscilloscope>` and `<audio-transient-analyzer>` tools; offline onset, beat and whole-clip reports use Analyze API/Headless entries. |
 | `@webmusic/audio/analyze/transcribe` | Audio→note transcription emitting family-neutral note events (assemble a `Score` with `@webmusic/bridge`). |
 | `@webmusic/audio/analyze/worker-client` / `…/worker-protocol` / `…/worker` | The analysis Worker trio. |
 | `@webmusic/audio/react` | React hooks and components over the other capabilities (optional `react>=18` peer). |
-| `@webmusic/audio/{edit,play,view,analyze}/auto` | Import-side-effect element registration per capability. |
+| `@webmusic/audio/{play,view,analyze}/auto` | Import-side-effect element registration per capability. |
 | `@webmusic/audio/{play,view,analyze}/global` | CDN `<script>` IIFE per capability (`WebMusicAudioPlay` / `…View` / `…Analyze` globals). |
 
 ## Optional engines stay optional
@@ -118,7 +115,7 @@ metadata (`music-metadata`, `mediabunny`), time-stretch
 none of them and WAV decoding, playback, views and the pure-JS analyzers
 still work.
 
-`@webmusic/ui` is also optional. The nonvisual Edit declaration needs no presenter peer. Package roots and `/headless` entries never
+`@webmusic/ui` is also optional. The nonvisual `<audio-document>` declaration needs no presenter peer. Package roots and `/headless` entries never
 reach it; install it only for `/element`, `/auto`, visible analysis elements,
 `view/render`'s meter presenter, or the React entry that imports that renderer.
 
@@ -179,7 +176,7 @@ processing commits a new asset. Asset readers copy bounded ranges and expose
 leases for retained roots, history, clipboard, checkpoints, views and playback.
 
 Play borrows `AudioDocumentSource`; View borrows `AudioClipEditorPort`. They
-never import the Edit implementation. The native `AudioPlayer` prepares bounded
+import only Core contracts; the editor lives in View Headless. The native `AudioPlayer` prepares bounded
 sequence playback, reports requested/applied revisions, maps surviving frame
 positions and stays paused after application. A waveform hides incompatible
 playback paint/seek while displaying the newer edit. Its extrema cache reads
@@ -188,12 +185,12 @@ visible ranges without rendering a complete sequence for every commit.
 The nonvisual `<audio-document>` supplies HTML ownership; `<audio-player
 editor="#document">` and `<audio-view editor="#document" editable>` borrow it.
 Object injection supports an application-owned editor independently of DOM
-lifetime. See [Edit API](../../apps/doc/webmusic/src/content/docs/audio/api/edit.mdx)
+lifetime. See the [View API](../../apps/doc/webmusic/src/content/docs/audio/api/view.mdx)
 and [waveform editing](../../apps/doc/webmusic/src/content/docs/audio/element/view/audio-view.mdx).
 
 ### Four layers, one direction
 
-Each capability directory (`edit`, `play`, `view`, `analyze`) repeats the same
+Each capability directory (`play`, `view`, `analyze`) repeats the same
 internal structure, and imports only ever point one way:
 
 ```
@@ -230,9 +227,9 @@ core ◀── play ◀── view
 ```
 
 `view` and `analyze` may depend on `core` and `play`; `play` never depends on
-either. Edit API/Headless depends only on Core and injected ports. The reviewed
-nonvisual document loader is the sole Edit Element adapter allowed to call the
-Play URL loader; it does not introduce a Play dependency into editing behavior. The existing meter's `view/headless/meter.ts` and
+either. The editing API and `AudioClipEditor` depend only on Core and injected
+ports; `<audio-document>` loads URLs through Play's loader over View's existing
+Play dependency. The existing meter's `view/headless/meter.ts` and
 `view/render/meter.ts` reuse the play-side `AudioMeterController` rather than
 growing a second one. The canonical Analyze Element meter facade has one
 reviewed compatibility adapter to the existing View meter implementation;

@@ -68,7 +68,7 @@ Sharing this facade does not complete shared-clock injection across mix members.
 ## Edited sequence playback
 
 ```ts
-import {createAudioClipEditor} from '@webmusic/audio/edit/headless';
+import {createAudioClipEditor} from '@webmusic/audio/view/headless';
 import {AudioPlayer} from '@webmusic/audio/play/headless';
 import {loadClipFromUrl} from '@webmusic/audio/play';
 
@@ -208,7 +208,7 @@ implements this contract; use `AudioMixer.transport` for a mix.
 ## Related
 
 [`<audio-player>`](/audio/element/play/audio-player/) ·
-[AudioClipEditor](/audio/headless/edit/audio-clip-editor/) ·
+[AudioClipEditor](/audio/headless/view/audio-clip-editor/) ·
 [AudioClipPlayer](/audio/headless/play/audio-clip-player/) ·
 [AudioPlaylist](/audio/headless/play/audio-playlist/) ·
 [AudioMixer](/audio/headless/play/audio-mixer/) ·

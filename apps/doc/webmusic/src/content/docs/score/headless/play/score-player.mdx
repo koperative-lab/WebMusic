@@ -65,12 +65,12 @@ and may resolve with playback paused. All new bindings name their time axis.
 ## Apply document revisions
 
 `setDocumentSource(source)` borrows the Core `ScoreDocumentSource` contract,
-including a [ScoreEditor](/score/headless/edit/score-editor/), without owning
-its history or importing Edit. The native player, scheduler, clock and synth
+including a [ScoreEditor](/score/headless/view/score-editor/), without owning
+its history or importing the editor implementation. The native player, scheduler, clock and synth
 keep their identities across successful revisions.
 
 ```ts
-import {createScoreEditor} from '@webmusic/score/edit/headless';
+import {createScoreEditor} from '@webmusic/score/view/headless';
 import {ScorePlayer} from '@webmusic/score/play/headless';
 
 const editor = createScoreEditor(score);

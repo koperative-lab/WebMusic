@@ -56,20 +56,22 @@ function mountWorkflow() {
   const view = Object.assign(document.querySelector('[data-audio-edit-view]')!, {
     editor: owner.editor, interactionSession: owner.editor.createInteractionSession(),
   });
-  const io = {loadClip: vi.fn<(...args: unknown[]) => Promise<unknown>>()};
-  const edit = {createAudioRangeProcessor: vi.fn(), exportAudioSequenceWav: vi.fn<(...args: unknown[]) => Promise<ArrayBuffer>>()};
+  const io = {
+    loadClip: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
+    exportAudioSequenceWav: vi.fn<(...args: unknown[]) => Promise<ArrayBuffer>>(),
+  };
   runDemo('elements/AudioEditingDemo', {
-    '@webmusic/audio/edit/element': {defineAudioDocumentElement() {}},
     '@webmusic/audio/play/element': {defineAudioPlayerElement() {}},
-    '@webmusic/audio/view/element': {defineAudioViewElement() {}},
-    '@webmusic/audio/play': io, '@webmusic/audio/edit': edit,
+    '@webmusic/audio/view/element': {defineAudioDocumentElement() {}, defineAudioViewElement() {}},
+    '@webmusic/audio/view': {createAudioRangeProcessor: vi.fn()},
+    '@webmusic/audio/play': io,
   });
   const upload = document.querySelector<HTMLInputElement>('[data-audio-edit-import]')!;
   const choose = (file: {name: string}) => {
     Object.defineProperty(upload, 'files', {configurable: true, value: [file]});
     upload.dispatchEvent(new Event('change'));
   };
-  return {owner, view, player, io, edit, choose, result: document.querySelector('[data-audio-edit-result]')!};
+  return {owner, view, player, io, choose, result: document.querySelector('[data-audio-edit-result]')!};
 }
 afterEach(async () => {
   for (const stop of registrations.splice(0)) stop();
@@ -129,8 +131,8 @@ describe('Audio editing workflow demo', () => {
   });
 
   it('exports the retained snapshot without marking a newer root saved', async () => {
-    const {owner, edit, result} = mountWorkflow();
-    const bytes = deferred<ArrayBuffer>(); edit.exportAudioSequenceWav.mockReturnValue(bytes.promise);
+    const {owner, io, result} = mountWorkflow();
+    const bytes = deferred<ArrayBuffer>(); io.exportAudioSequenceWav.mockReturnValue(bytes.promise);
     Object.defineProperty(URL, 'createObjectURL', {configurable: true, value: vi.fn(() => 'blob:download')});
     Object.defineProperty(URL, 'revokeObjectURL', {configurable: true, value: vi.fn()});
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
@@ -146,7 +148,7 @@ describe('Audio document demo controls', () => {
     document.body.innerHTML = `<div data-wm-pg><section data-audio-document-demo><audio-document></audio-document>
       <p data-summary></p><p data-result>committed</p></section><button data-action="reload"></button></div>`;
     const owner = Object.assign(document.querySelector('audio-document')!, {editor: editor(), status: 'ready', reload: vi.fn<() => Promise<unknown>>()});
-    runDemo('elements/AudioDocumentPlayground', {'@webmusic/audio/edit/element': {defineAudioDocumentElement() {}}});
+    runDemo('elements/AudioDocumentPlayground', {'@webmusic/audio/view/element': {defineAudioDocumentElement() {}}});
     const result = document.querySelector('[data-result]')!;
     const reset = deferred<unknown>(); owner.reload.mockReturnValue(reset.promise);
     document.querySelector('[data-wm-pg]')!.dispatchEvent(new Event('webmusic:playground-reset')); await flush();
@@ -165,7 +167,7 @@ describe('Audio document demo controls', () => {
     const create = vi.fn().mockReturnValueOnce(first).mockReturnValueOnce(next);
     runDemo('headless/AudioClipEditorHeadlessDemo', {
       '@webmusic/audio': {createAudioClip: (value: unknown) => value, audioSegmentLength: () => 0},
-      '@webmusic/audio/edit/headless': {createAudioClipEditor: create},
+      '@webmusic/audio/view/headless': {createAudioClipEditor: create},
     });
     document.querySelector<HTMLButtonElement>('[data-action="restore"]')!.click();
     expect(document.querySelector('[data-hl-feedback]')!.textContent).toBe('Keep a checkpoint first.');

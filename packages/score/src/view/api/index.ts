@@ -57,3 +57,16 @@ export type {
 export type {PitchViewOptions, PitchViewState} from '../headless/pitch-view';
 export type {ScoreViewEditing, ScoreViewEditingOptions, ScoreViewEditingState} from '../headless/score-editing';
 export type {StaffViewEditing, StaffViewEditingOptions, StaffViewEditingState} from '../headless/staff-editing';
+
+// Document editing is a View feature: stateless operations and contracts here,
+// the stateful editor in /view/headless and <score-document> in /view/element.
+export {applyScoreOperations} from '../core/edit-operations';
+export {
+  ScoreEditError, createScorePositionMap, composeScorePositionMaps, mapScorePosition,
+  isScoreDocumentSource, isScoreEditorPort,
+  type ScoreEditorPort, type ScoreEditorState, type ScoreDocumentSource, type ScoreDocumentSnapshot,
+  type ScoreDocumentChange, type ScoreEditCommand, type ScoreEditOperation, type ScoreEditResult,
+  type ScoreEditTransaction, type ScoreRevisionGuard, type ScoreCheckpoint, type ScoreInteractionSession,
+  type ScoreInteractionSnapshot, type ScoreDraftResult, type ScoreNoteInput, type ScoreNotationDuration, type ScoreNotationEntry, type ScoreQuarterValue,
+  type ScorePositionMap, type ScoreMappedPosition, type ScoreEditErrorCode, type ScoreEditFailure,
+} from '../../core/editing';

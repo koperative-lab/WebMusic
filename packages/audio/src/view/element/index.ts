@@ -25,10 +25,16 @@ export {
 
 export {AudioMeterElement, defineAudioMeterElement} from './audio-meter';
 export type {AudioMeterPlayer} from './audio-meter';
+export {
+  AudioDocumentElement, defineAudioDocumentElement,
+  type AudioDocumentLoadResult, type AudioDocumentStateDetail, type AudioDocumentStatus,
+} from './audio-document';
+export type {AudioDocumentLoader, AudioDocumentLoadOptions} from './internal/audio-document-loader';
 
 import {defineAudioMeterElement} from './audio-meter';
 import {defineAudioViewElement} from './audio-view';
 import {defineAudioLiveViewElement} from './audio-live-view';
+import {defineAudioDocumentElement} from './audio-document';
 
 /**
  * Register every `@webmusic/audio/view` custom element at its default tag — the
@@ -40,4 +46,5 @@ export function defineAllAudioElements(): void {
   defineAudioMeterElement();
   defineAudioViewElement();
   defineAudioLiveViewElement();
+  defineAudioDocumentElement();
 }

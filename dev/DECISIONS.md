@@ -2072,6 +2072,12 @@ separate scope decisions. Product, Architecture and family/binding owners adopt
 this target in P0. Actual exports, executable policies, references and demos
 change together when each implementation layer exists, not as empty scaffolds.
 
+**2026-11-04 refinement:** [DEC-055](#dec-055--editing-is-a-view-feature-not-a-capability)
+moves the editor, declaration and operations into View and Audio sequence
+export into Play. The ownership and playback contract above is unchanged; the
+separate Edit capability, its `/edit*` entries and the Edit-to-Play loader
+exception no longer exist.
+
 **Owner:** [Editing contracts](design/EDIT-COMPONENTS.md). The
 [dated proposal and implementation sequence](plans/2026-10-13-editing-capabilities.md)
 retains the planning baseline.
@@ -2138,6 +2144,51 @@ shortcuts, exact rests and independent voices, structural rejection, shared undo
 playback revision application and MIDI silence for rests. Verify passive staff
 and separate input instances retain their behavior. Browser keyboard evidence,
 pointer behavior and visual/accessibility acceptance are recorded separately.
+
+## DEC-055 — Editing is a View feature, not a capability
+
+**Date / status:** 2026-11-04; accepted at the maintainer's request before the
+editing work is published. Supersedes the entry and capability layout of
+[DEC-053](#dec-053--document-owned-editing-and-borrowed-playback); its
+document-ownership, history and playback-binding contract is retained.
+
+**Problem:** DEC-053 delivered editing as a fourth capability family beside
+Play, Analyze and View, with `/edit`, `/edit/headless`, `/edit/element` and
+`/edit/auto` entries, separate documentation groups and its own policy rows.
+Every editing surface is an existing View, so the extra family added navigation,
+entries and checks without a different user-facing role.
+
+**Chosen contract:** document editing extends View in both domains. The View
+API root exports semantic operations, position maps, document contracts and
+Audio range-processor recipes. `/view/headless` exports `ScoreEditor` and
+`AudioClipEditor`. `/view/element` exports `<score-document>` and
+`<audio-document>`; `defineAllViewElements()` and Audio's
+`defineAllAudioElements()` register them, and `@webmusic/audio/view/auto`
+registers `<audio-document>`. Score View keeps explicit registration and gains
+no `/auto` entry. Rendering and WAV export of an edited Audio sequence join the
+existing Play export API. The Score–Audio and Core boundaries are unchanged.
+
+**Alternatives considered:** keeping the package entries and only hiding Edit
+in the documentation, which leaves a public family the site does not present;
+and letting each View create a private editor without a declaration, which
+loses one shared document and history across several Views and the player.
+
+**Consequences:** no `/edit*` entry is published; the unpublished editing
+release needs no compatibility aliases. Audio View already depends on Play, so
+the `<audio-document>` URL loader uses the ordinary View-to-Play edge and the
+importer-specific exception is removed. Element composition, catalogs, build
+entries, side-effect lists, reachability rules and documentation routes list
+the editing pieces under View. The View API root still cannot reach its
+Headless, render or Element layers, so editors are imported from
+`/view/headless`.
+
+**Owner:** [Editing contracts](design/EDIT-COMPONENTS.md) and
+[Architecture](ARCHITECTURE.md).
+
+**Verification implications:** package policy, architecture and documentation
+checks must find no Edit capability; built-entry tests must load the editing
+values from the View and Play entries with shared Core identity; demos and
+snippets must import only published View/Play subpaths.
 
 ## Recording the next decision
 

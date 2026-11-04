@@ -26,11 +26,12 @@ const source = `${import.meta.env.BASE_URL}wav/Editing.wav`;
 </ElementPlayground>
 
 <script>
-  import {defineAudioDocumentElement, type AudioDocumentElement} from '@webmusic/audio/edit/element';
   import {defineAudioPlayerElement, type AudioPlayerElement} from '@webmusic/audio/play/element';
-  import {defineAudioViewElement, type AudioViewElement} from '@webmusic/audio/view/element';
-  import {createAudioRangeProcessor, exportAudioSequenceWav} from '@webmusic/audio/edit';
-  import {loadClip} from '@webmusic/audio/play';
+  import {
+    defineAudioDocumentElement, defineAudioViewElement, type AudioDocumentElement, type AudioViewElement,
+  } from '@webmusic/audio/view/element';
+  import {createAudioRangeProcessor} from '@webmusic/audio/view';
+  import {exportAudioSequenceWav, loadClip} from '@webmusic/audio/play';
   import {mountDemos} from '../demo-lifecycle';
   import {PLAYGROUND_RESET_EVENT} from '../playground-client';
   defineAudioDocumentElement(); defineAudioPlayerElement(); defineAudioViewElement();

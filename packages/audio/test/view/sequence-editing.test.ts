@@ -1,6 +1,6 @@
 import {describe, expect, it, vi} from 'vitest';
 import {AudioEditError, createAudioClip, createAudioSequence, createMemoryAudioAssetStore, type AudioDocumentPlaybackBinding} from '../../src/core';
-import {createAudioClipEditor} from '../../src/edit/headless';
+import {createAudioClipEditor} from '../../src/view/headless';
 import {createAudioSequenceWaveform} from '../../src/view/headless/sequence-waveform';
 import {audioDocumentPlaybackCompatible, createAudioViewEditing} from '../../src/view/headless/audio-editing';
 import {createWaveformViewModel} from '../../src/view/headless/waveform';

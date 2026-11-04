@@ -1,6 +1,6 @@
 ---
 import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
-const code = `import {createScoreEditor} from '@webmusic/score/edit/headless';
+const code = `import {createScoreEditor} from '@webmusic/score/view/headless';
 // score is the four-note document shown above.
 const editor = createScoreEditor(score, {history: {limit: 100}});
 const session = editor.createInteractionSession();
@@ -8,7 +8,7 @@ const session = editor.createInteractionSession();
 ---
 
 <HeadlessDemoFrame
-  entry="@webmusic/score/edit/headless"
+  entry="@webmusic/score/view/headless"
   name="ScoreEditor"
   hint="Edit the operations below, then commit or preview. This document demo is silent; the Score view editing demo adds playback. Changing history options creates a fresh document."
   code={code}
@@ -56,7 +56,7 @@ const session = editor.createInteractionSession();
 
 <script>
   import {Duration, NoteId, PartId, Pitch, Rational, ScoreBuilder, VoiceId, type ScoreEditOperation} from '@webmusic/score';
-  import {createScoreEditor, type ScoreEditor, type ScoreCheckpoint, type ScoreInteractionSession} from '@webmusic/score/edit/headless';
+  import {createScoreEditor, type ScoreEditor, type ScoreCheckpoint, type ScoreInteractionSession} from '@webmusic/score/view/headless';
   import {mountDemos} from '../demo-lifecycle';
 
   mountDemos('[data-score-editor-demo]', (root, scope) => {
@@ -122,7 +122,7 @@ const session = editor.createInteractionSession();
       editor = createScoreEditor(builder.build(), {...options, onListenerError: (error) => message(String(error))});
       session = editor.createInteractionSession();
       subscriptions = [editor.subscribeState(paint), session.subscribe(paint)];
-      readout.textContent = `import {createScoreEditor} from '@webmusic/score/edit/headless';\n// score is the four-note document shown above.\nconst editor = createScoreEditor(score, ${JSON.stringify(options)});\nconst session = editor.createInteractionSession();\n// On teardown: session.dispose(); editor.dispose();`;
+      readout.textContent = `import {createScoreEditor} from '@webmusic/score/view/headless';\n// score is the four-note document shown above.\nconst editor = createScoreEditor(score, ${JSON.stringify(options)});\nconst session = editor.createInteractionSession();\n// On teardown: session.dispose(); editor.dispose();`;
       message('Fresh document ready.');
       paint();
     };

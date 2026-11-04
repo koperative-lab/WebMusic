@@ -56,10 +56,11 @@ editing interaction, while nonvisual document Elements provide declarative HTML
 ownership. Custom applications use the same contracts without those Elements.
 The [editing design](design/EDIT-COMPONENTS.md) specifies this contract;
 [STATUS](STATUS.md), EDIT-01, records delivery. Score editing, native document-bound playback, HTML declarations and piano-roll
-interaction are documented in [Score Edit](../apps/doc/webmusic/src/content/docs/score/api/edit.mdx)
+interaction are documented in the [Score View API](../apps/doc/webmusic/src/content/docs/score/api/view.mdx)
 and [Score View](../apps/doc/webmusic/src/content/docs/score/element/view/score-view.mdx).
 Audio sequence editing, local processing and WAV export are documented in
-[Audio Edit](../apps/doc/webmusic/src/content/docs/audio/api/edit.mdx) and
+the [Audio View API](../apps/doc/webmusic/src/content/docs/audio/api/view.mdx),
+[Audio Play export](../apps/doc/webmusic/src/content/docs/audio/api/play.mdx) and
 [Audio View](../apps/doc/webmusic/src/content/docs/audio/element/view/audio-view.mdx).
 Bounded staff input under DEC-054 uses the same Score document and history,
 with explicit note-entry focus, written durations and voice/rest completion

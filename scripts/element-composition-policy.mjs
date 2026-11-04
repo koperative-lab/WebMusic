@@ -10,7 +10,6 @@
  * presenter.
  */
 export const elementCompositionPolicy = Object.freeze([
-  entry('Score', 'Edit', 'score-document', 'packages/score/src/edit/element/score-document.ts', [], true),
   entry('Score', 'Play', 'score-player', 'packages/score/src/play/element/score-player.ts', ['transport', 'status']),
   entry('Score', 'Play', 'score-rack-control', 'packages/score/src/play/element/score-rack-control.ts', ['mixer']),
   // Declaration only: it renders nothing, so it has no presenter to reach.
@@ -27,8 +26,9 @@ export const elementCompositionPolicy = Object.freeze([
   entry('Score', 'View', 'score-view', 'packages/score/src/view/element/score-view.ts', ['stage', 'timeline', 'status']),
   entry('Score', 'View', 'score-sheet-view', 'packages/score/src/view/element/score-sheet-view.ts', ['stage', 'status']),
   entry('Score', 'View', 'score-pitch-view', 'packages/score/src/view/element/score-pitch-view.ts', ['pitch', 'status']),
+  // Declaration only: the nonvisual document owner shared by Views and the player.
+  entry('Score', 'View', 'score-document', 'packages/score/src/view/element/score-document.ts', [], true),
 
-  entry('Audio', 'Edit', 'audio-document', 'packages/audio/src/edit/element/audio-document.ts', [], true),
   entry('Audio', 'Play', 'audio-player', 'packages/audio/src/play/element/audio-player.ts', ['transport', 'status']),
   entry('Audio', 'Play', 'audio-playlist', 'packages/audio/src/play/element/audio-playlist.ts', ['playlist']),
   entry('Audio', 'Play', 'audio-mixer', 'packages/audio/src/play/element/audio-mixer.ts', ['mixer']),
@@ -41,6 +41,8 @@ export const elementCompositionPolicy = Object.freeze([
 
   entry('Audio', 'View', 'audio-view', 'packages/audio/src/view/element/audio-view.ts', ['stage', 'status', 'meter']),
   entry('Audio', 'View', 'audio-live-view', 'packages/audio/src/view/element/audio-live-view.ts', ['stage']),
+  // Declaration only: the nonvisual document owner shared by Views and the player.
+  entry('Audio', 'View', 'audio-document', 'packages/audio/src/view/element/audio-document.ts', [], true),
 ]);
 
 /** Main presenters available without a domain Element consumer. */

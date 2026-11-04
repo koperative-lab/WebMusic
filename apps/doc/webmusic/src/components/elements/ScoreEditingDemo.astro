@@ -35,9 +35,8 @@ const playerId = `${idPrefix}-player`;
 </ElementPlayground>
 
 <script>
-  import {defineScoreDocumentElement, type ScoreDocumentElement} from '@webmusic/score/edit/element';
+  import {defineScoreDocumentElement, defineScoreViewElement, type ScoreDocumentElement} from '@webmusic/score/view/element';
   import {defineScorePlayerElement, type ScorePlayerElement} from '@webmusic/score/play/element';
-  import {defineScoreViewElement} from '@webmusic/score/view/element';
   import {loadScore, serializeMIDI, serializeMusicXML, assertScoreInputByteLength, DEFAULT_LOAD_SCORE_LIMITS} from '@webmusic/score/io';
   import {mountDemos} from '../demo-lifecycle';
   import {PLAYGROUND_RESET_EVENT} from '../playground-client';

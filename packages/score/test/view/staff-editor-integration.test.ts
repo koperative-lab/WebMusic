@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import {afterEach, expect, it} from 'vitest';
 import {MeasureId, PartId, Rational, ScoreBuilder} from '../../src/core';
-import {createScoreEditor, type ScoreEditor} from '../../src/edit/headless';
+import {createScoreEditor, type ScoreEditor} from '../../src/view/headless';
 import {parseMIDI, serializeMIDI} from '../../src/io/formats/midi';
 import {ScorePlayerElement} from '../../src/play/element/score-player';
 import {ScoreTimeline} from '../../src/play/headless/score-timeline';

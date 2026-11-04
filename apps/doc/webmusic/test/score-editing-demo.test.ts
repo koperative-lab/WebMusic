@@ -42,9 +42,8 @@ function mount(notation = false) {
     assertScoreInputByteLength: (size: number, max: number) => {if (size > max) throw new Error('input limit');},
   };
   const modules: Record<string, unknown> = {
-    '@webmusic/score/edit/element': {defineScoreDocumentElement() {}},
     '@webmusic/score/play/element': {defineScorePlayerElement() {}},
-    '@webmusic/score/view/element': {defineScoreViewElement() {}},
+    '@webmusic/score/view/element': {defineScoreDocumentElement() {}, defineScoreViewElement() {}},
     '@webmusic/score/io': io,
     '../playground-client': {PLAYGROUND_RESET_EVENT: 'webmusic:playground-reset'},
     '../demo-lifecycle': {mountDemos: (selector: string, setup: (root: HTMLElement, scope: DemoScope) => void) => registrations.push(mountDemos(selector, setup))},

@@ -105,3 +105,6 @@ export {
 
 // ---- Pure transport helpers (shared with custom UIs) ----
 export {formatTime, parseLoopAttr} from '../core/format';
+
+export {renderAudioSequence, exportAudioSequenceWav, type AudioSequenceRenderOptions,
+  type AudioSequenceWavOptions, type RenderedAudioSequence} from './render-sequence';

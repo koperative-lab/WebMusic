@@ -72,9 +72,9 @@ browser input to a player; **`auto`** registers all elements as an import
 side effect; **`global`** is the CDN IIFE bundle; and **`worker`** /
 **`worker-client`** / **`worker-protocol`** are the Worker trio — the
 self-registering Worker runtime, the main-thread client, and the pure wire
-types. Each capability's *root* is its supported code API. Most provide stateless
-functions; `@webmusic/score/edit` also exposes the deliberate `ScoreEditor`
-convenience facade alongside pure operations. All these API entries are DOM-free.
+types. Each capability's *root* is its supported code API. They provide stateless
+functions; persistent owners such as `ScoreEditor` live in `/headless`. All
+these API entries are DOM-free.
 
 | Entry | What it is |
 |---|---|
@@ -85,14 +85,10 @@ convenience facade alongside pure operations. All these API entries are DOM-free
 | `@webmusic/score/io/worker-client` | Main-thread parser Worker client (`createParserWorker`). |
 | `@webmusic/score/io/worker-protocol` | Pure parser wire types and constants for custom hosts. |
 | `@webmusic/score/io/worker` | Self-registering parser Worker runtime. |
-| `@webmusic/score/edit` | Atomic note operations, document contracts, position maps and the `ScoreEditor` facade. |
-| `@webmusic/score/edit/headless` | Persistent `ScoreEditor`, bounded history, checkpoints and draft/selection sessions. |
-| `@webmusic/score/edit/element` | Nonvisual `<score-document>` loading and ownership, plus registration helpers. |
-| `@webmusic/score/edit/auto` | Import for side effect: registers `<score-document>`. |
-| `@webmusic/score/view` | Stateless view API: layout geometry, note sequences, types. |
-| `@webmusic/score/view/headless` | Score windows, map navigation and held-pitch state with optional borrowed playback; no DOM. |
+| `@webmusic/score/view` | Stateless view API: layout geometry, note sequences, types, plus atomic note operations, document contracts and position maps for editing. |
+| `@webmusic/score/view/headless` | Score windows, map navigation and held-pitch state with optional borrowed playback, and the persistent `ScoreEditor` (bounded history, checkpoints, draft/selection sessions); no DOM. |
 | `@webmusic/score/view/render` | Imperative browser visualizers (SVG / canvas / OSMD). |
-| `@webmusic/score/view/element` | `<score-view>`, `<score-pitch-view>` and `<score-sheet-view>` Web Components. |
+| `@webmusic/score/view/element` | `<score-view>`, `<score-pitch-view>` and `<score-sheet-view>` Web Components, and the nonvisual `<score-document>` owner. |
 | `@webmusic/score/play` | Stateless playback API: SFZ data helpers, offline render types. |
 | `@webmusic/score/play/headless` | Players, synths, `Sound`, `Effect`, `Rack`, `LfoController`, offline rendering. |
 | `@webmusic/score/play/drivers` | Pointer / scroll / orientation / value transport adapters. |
@@ -256,7 +252,7 @@ other structured remote failures reject with `ParserWorkerRemoteError`. Wire
 types live at `@webmusic/score/io/worker-protocol`; the self-registering
 runtime at `@webmusic/score/io/worker`.
 
-## Document editing (`@webmusic/score/edit`)
+## Document editing (part of `@webmusic/score/view`)
 
 `createScoreEditor(score, options?)` owns one committed immutable Score and
 document revision. It supports atomic insert/delete/move/resize/transpose/velocity/
@@ -264,7 +260,7 @@ quantize commands, bounded undo/redo (100 transactions by default), application
 checkpoints and separate interaction drafts. It allocates no player, clock or DOM.
 
 ```ts
-import {createScoreEditor} from '@webmusic/score/edit/headless';
+import {createScoreEditor} from '@webmusic/score/view/headless';
 
 const editor = createScoreEditor(score);
 const note = editor.score.notes.find((candidate) => !candidate.rest);
@@ -289,8 +285,8 @@ simple note/rest entry with voice completion inside authored measures. It reject
 unsupported structures and unmeasured MIDI rather than inferring notation.
 Playback applies revisions while paused and requires
 an explicit later Play action. See the
-[Edit API](https://github.com/koperative-lab/WebMusic/blob/main/apps/doc/webmusic/src/content/docs/score/api/edit.mdx)
-and [ScoreEditor](https://github.com/koperative-lab/WebMusic/blob/main/apps/doc/webmusic/src/content/docs/score/headless/edit/score-editor.mdx)
+[View API](https://github.com/koperative-lab/WebMusic/blob/main/apps/doc/webmusic/src/content/docs/score/api/view.mdx)
+and [ScoreEditor](https://github.com/koperative-lab/WebMusic/blob/main/apps/doc/webmusic/src/content/docs/score/headless/view/score-editor.mdx)
 for complete commands, failures and ownership.
 
 ## Views (`@webmusic/score/view`)

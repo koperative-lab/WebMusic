@@ -45,17 +45,17 @@ in the package manifest.
 That is the single most load-bearing constraint in the package, and §4
 explains what it buys.
 
-Edit is another sibling over Core and I/O. Its `ScoreEditor` is the single
-document commit owner. Shared read/command ports and position maps live in
-`core/editing.ts`; Play/View bindings use those ports without importing Edit
-implementation. The nonvisual `ScoreDocumentElement` loads a Score and owns an
+Document editing is part of View (DEC-055). `ScoreEditor` in `view/headless`
+is the single document commit owner. Shared read/command ports and position maps
+live in `core/editing.ts`; Play binds through those ports without importing View.
+The nonvisual `ScoreDocumentElement` in `view/element` loads a Score and owns an
 editor for its connected lifetime. Kernel's generic `observeElementSource`
 adapts explicit objects and same-root selectors in the browser layer. The
-existing React adapters do not yet wrap Edit.
+existing React adapters do not yet wrap editing.
 
 Staff input uses a separate View Headless controller over the same Core editor
 port. Its renderer adapts the existing scrolling staff geometry and owns local
-focus. The `enter-notation` command belongs to Edit and completes a chosen
+focus. The `enter-notation` command belongs to the editor's operations and completes a chosen
 voice/staff measure with real rests; it does not depend on renderer projections.
 Staff and piano roll share content/history while keeping cursor and input
 settings local. DEC-054 and the editing design own the supported notation subset.
@@ -110,11 +110,11 @@ element → api → headless → core
 
 Consumers can use Web Components, Headless, or API + UI. These reuse the same
 domain resources; the four source directories are not four required usage stages.
-Edit publishes `/edit`, `/edit/headless`, `/edit/element` and `/edit/auto`.
-Its Element is a presenter-free declaration, and its registration entry imports
-no optional UI peer. Editable piano-roll interaction stays in View's browser
-renderer; Edit has no renderer or browser-global IIFE entry.
-Its `edit/index.ts` forwards `./api`, following the existing capability convention.
+Editing adds no entries: operations and contracts ship from `/view`, the
+editor from `/view/headless`, and the presenter-free `<score-document>`
+declaration from `/view/element`, registered by `defineScoreDocumentElement()`
+or `defineAllViewElements()`. Editable piano-roll and staff interaction stay in
+View's browser renderers.
 Prefer existing controllers and presenters before adding another engine or
 per-variant tag. Three consequences matter for implementation:
 
@@ -476,11 +476,12 @@ precision, conversion fidelity or cleanup correctness.
 
 ## 12. Implementation boundaries
 
-Score Edit supplies atomic semantic note commands, document identity/revision,
+Score editing supplies atomic semantic note commands, document identity/revision,
 bounded local history, saved-content identity, same-owner in-memory checkpoints,
 and separate draft/selection sessions. It creates no loader, player or clock.
-The pure operation pipeline lives in `edit/core`, the owner in `edit/headless`,
-and selected exports in `edit/api`. Timing edits remove performed timing only
+The pure operation pipeline lives in `view/core/edit-operations.ts` and
+`edit-notation.ts`, the owner in `view/headless/score-editor.ts`, and selected
+exports in `view/api`. Timing edits remove performed timing only
 for changed notes and preserve effective velocity through `velocityOverride`;
 Score JSON v0.2 carries the field while reading v0.1 and legacy input.
 
@@ -488,7 +489,7 @@ Native playback applies document revisions through Core ports while retaining
 its scheduler and clock. Nonvisual `score-document` owns the editor; existing
 View adds written-quarter piano-roll gestures and exact-value alternatives.
 These implement P2 in the [current editing roadmap](../../dev/design/EDIT-COMPONENTS.md#implementation-and-reference-delivery).
-The [Edit API](../../apps/doc/webmusic/src/content/docs/score/api/edit.mdx) owns
+The [View API](../../apps/doc/webmusic/src/content/docs/score/api/view.mdx) owns
 the implemented public contract; [STATUS](../../dev/STATUS.md), EDIT-01, owns
 current verification.
 

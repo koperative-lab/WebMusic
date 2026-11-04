@@ -31,13 +31,13 @@ describe.skipIf(!hasDist)('@webmusic/score built dist', () => {
     expect(Object.keys(await entry('io/worker-protocol.js')).length).toBeGreaterThan(0);
   });
 
-  it.each(['js', 'cjs'])('edit entries share Core values and execute a document transaction (%s)', async (extension) => {
+  it.each(['js', 'cjs'])('View editing entries share Core values and execute a document transaction (%s)', async (extension) => {
     const load = (name: string) => extension === 'js' ? entry(`${name}.js`) : requireBuilt(fileURLToPath(new URL(`../dist/${name}.cjs`, import.meta.url)));
     const root = await load('index');
-    const edit = await load('edit/index');
-    const headless = await load('edit/headless/index');
-    expect(edit.ScoreEditor).toBe(headless.ScoreEditor);
-    expect(edit.ScoreEditError).toBe(root.ScoreEditError);
+    const view = await load('view/index');
+    const headless = await load('view/headless/index');
+    expect(typeof view.applyScoreOperations).toBe('function');
+    expect(view.ScoreEditError).toBe(root.ScoreEditError);
     const builder = new root.ScoreBuilder();
     builder.addPart({id: root.PartId('p'), name: 'Piano'});
     const score = builder.build();
@@ -60,11 +60,11 @@ describe.skipIf(!hasDist)('@webmusic/score built dist', () => {
     expect(Object.keys(await entry('view/element/index.js')).length).toBeGreaterThan(0);
   });
 
-  it.each(['js', 'cjs'])('staff input composes built Core, Edit and View values (%s)', async (extension) => {
+  it.each(['js', 'cjs'])('staff input composes built Core and View values (%s)', async (extension) => {
     const load = (name: string) => extension === 'js' ? entry(`${name}.js`) : requireBuilt(fileURLToPath(new URL(`../dist/${name}.cjs`, import.meta.url)));
     const root = await load('index');
-    const edit = await load('edit/headless/index');
     const view = await load('view/headless/index');
+    const edit = view;
     const render = await load('view/render/index');
     expect(typeof render.mountStaffEditor).toBe('function');
     const builder = new root.ScoreBuilder();

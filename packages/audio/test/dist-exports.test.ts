@@ -14,13 +14,15 @@ const load = (name: string, extension: string) => extension === 'js'
   : Promise.resolve(requireBuilt(fileURLToPath(new URL(`../dist/${name}.cjs`, import.meta.url))));
 
 describe.skipIf(!hasDist)('@webmusic/audio built dist', () => {
-  it.each(['js', 'cjs'])('edit entries share Core classes and keep failure codes (%s)', async (extension) => {
+  it.each(['js', 'cjs'])('View editing and Play export entries share Core classes and keep failure codes (%s)', async (extension) => {
     const root = await load('index', extension);
-    const edit = await load('edit/index', extension);
-    const headless = await load('edit/headless/index', extension);
-    expect(edit.AudioEditError).toBe(root.AudioEditError);
-    expect(edit.AudioSequenceError).toBe(root.AudioSequenceError);
-    expect(headless.AudioClipEditor).toBe(edit.AudioClipEditor);
+    const view = await load('view/index', extension);
+    const headless = await load('view/headless/index', extension);
+    const play = await load('play/index', extension);
+    expect(view.AudioEditError).toBe(root.AudioEditError);
+    expect(view.AudioSequenceError).toBe(root.AudioSequenceError);
+    expect(typeof view.applyAudioOperations).toBe('function');
+    expect(typeof play.exportAudioSequenceWav).toBe('function');
     const clip = root.createAudioClip({sampleRate: 8000, channelData: [new Float32Array(8)]});
     const editor = headless.createAudioClipEditor(clip);
     const result = editor.execute({version: 1, documentId: editor.getSnapshot().documentId, expectedRevision: 0,

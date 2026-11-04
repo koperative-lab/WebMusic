@@ -103,13 +103,13 @@ whole-output rendering or implicit context creation. It pauses on edits and
 exposes requested/applied identities, retry outcomes and the discriminated
 `AudioPlaybackSourceSnapshot` (`empty | clip | sequence`). A sequence has no fake
 `.clip`; use editor-aware waveform views and explicit
-[Edit rendering/export](/audio/api/edit/) for static PCM analysis or WAV bytes.
+[sequence rendering/export](#render-an-edited-sequence) for static PCM analysis or WAV bytes.
 See [document playback](/audio/headless/play/audio-player/#edited-sequence-playback)
 for the full resource limits, position mapping, loop and lifecycle contract.
 
 ### Document revision observation
 
-The root `@webmusic/audio` (and `/edit`) export the observation and result types
+The root `@webmusic/audio` exports the observation and result types
 that playback reports for a borrowed document. The document's `documentRevision`
 is distinct from the snapshot's playback publication `revision`; compare both
 document identity and revision before using playback frames against current
@@ -175,6 +175,33 @@ const wetBytes = clipToWav(wet);
 | `renderClipWithEffect(clip, effect, opts?)` | Offline-render through an effect → new clip (browser; `tailSeconds` for tails). |
 
 `ClipToWavOptions` is `{ bitDepth?: 16 | 24 | 32; float?: boolean }`.
+
+## Render an edited sequence
+
+`renderAudioSequence` and `exportAudioSequenceWav` turn an editable document's
+sequence and asset reader, such as an `AudioClipEditor` snapshot's `content` and
+`assets`, into PCM or WAV bytes. They create no audio context. The sequence,
+asset and editor contracts are documented under
+[View editable documents](/audio/api/view/#editable-documents).
+
+```ts
+import type {AudioDocumentSnapshot} from '@webmusic/audio';
+import {exportAudioSequenceWav} from '@webmusic/audio/play';
+
+declare const snapshot: AudioDocumentSnapshot; // e.g. editor.getSnapshot()
+const {content, assets} = snapshot;
+const wav = await exportAudioSequenceWav(content, assets, {bitDepth: 24});
+```
+
+| API / type | Contract |
+| --- | --- |
+| `renderAudioSequence(sequence, assets, options?)` | Promise of `RenderedAudioSequence`: sample rate, channel layout and caller-owned mutable channel arrays. Applies sequence gain, envelope and silence. |
+| `exportAudioSequenceWav(sequence, assets, options?)` | Promise of an `ArrayBuffer`; renders the selected range and encodes WAV. Default 16-bit integer PCM; 24/32-bit integer and 32-bit float supported. An odd-sized 24-bit data chunk is followed by one zero RIFF pad byte. Empty output is a valid header-only WAV. The file uses a plain 16-byte PCM or IEEE-float `fmt ` chunk, not `WAVE_FORMAT_EXTENSIBLE`, so channel count is preserved but `channelLayout` labels are not written; readers see the channels in layout order without speaker assignments. |
+| `AudioSequenceRenderOptions` | Optional `startFrame` (0), `endFrame` (sequence length), `maxBytes` (256 MiB), `chunkFrames` (65,536), `signal`. |
+| `AudioSequenceWavOptions` | Render options plus `bitDepth: 16 \| 24 \| 32` (16; a bare 32 is integer PCM), `float` (false; requires 32). Budget counts both float PCM and WAV output allocations, including a pad byte. |
+| `RenderedAudioSequence` | `{sampleRate, channelLayout, channelData}`; sample arrays are newly owned by the caller and do not expose retained source PCM. |
+
+Rendering retains source assets until completion/failure, performs bounded reads, yields between chunks and releases its lease on cancellation. Invalid ranges/options and excessive allocation fail before sample reads. Export rejects unsupported RIFF dimensions instead of overflowing header fields: a non-integer sample rate or format fields beyond their RIFF widths fail with `incompatible-audio-format`, and data beyond the 4 GiB RIFF size fails with `resource-limit`. No browser download is implicit. Saving an exported revision is an application choice: call `markSaved()` only if that content is still current.
 
 ## Decode worker — off the main thread
 
@@ -254,6 +281,7 @@ client and protocol also have dedicated subpaths in the
 | `decodeAudio`, `decodeAudioChunked` | Decode | Bytes → float channels (WAV pure-JS → native → WASM); chunked variant. |
 | `parseWav`, `serializeWav` | WAV | Dependency-free RIFF/WAVE decode / encode (8/16/24/32-bit, float). |
 | `clipToWav`, `clipToBlob`, `renderClipWithEffect` | Export | Clip → WAV bytes / Blob; offline-render through an effect. |
+| `renderAudioSequence`, `exportAudioSequenceWav` | Export | [Edited sequence → caller-owned PCM / WAV bytes](#render-an-edited-sequence). |
 | `createDecoderWorker` | Worker | Decode off the main thread (with in-process fallback). |
 | `handleDecodeRequest`, `transferablesOf`, `createRequestTracker` | Worker | Pure protocol pieces for hosting the handler yourself. |
 | `formatTime`, `parseLoopAttr` | UI helper | Transport-time formatting and `loop` attribute parsing (shared with custom UIs). |
@@ -267,6 +295,7 @@ client and protocol also have dedicated subpaths in the
 | `BufferEngineOptions`, `MediaEngineOptions` | Types | Buffer and media engine options. |
 | `Effect`, `EffectNodes`, `GainOptions`, `FilterOptions`, `DelayOptions`, `CompressorOptions` | Types | Effect contract and built-in option shapes. |
 | `DecodedAudio`, `DecodeOptions`, `DecodedWav`, `WavBitDepth`, `LoadClipOptions`, `LoadClipFromUrlOptions`, `ClipToWavOptions` | Types | Decode / load / WAV / export option shapes. |
+| `AudioSequenceRenderOptions`, `AudioSequenceWavOptions`, `RenderedAudioSequence` | Types | [Sequence render/export options and result](#render-an-edited-sequence). |
 | `DecoderWorker`, `DecodedResult`, `DecoderRequestOptions`, `DecoderWorkerOptions`, `DecodeClipOptions`, `WorkerLike`, `RequestTracker`, `DecodeRequest`, `DecodeResponse`, `DecodeWorkerFormat` | Types | Decode-worker client and protocol shapes. |
 
 The playlist's runtime values and types, the meter controller, both engines,

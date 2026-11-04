@@ -48,8 +48,7 @@ const input = createStaffViewEditing(editing);
 
 <script>
   import {MeasureId, NoteId, PartId, Rational, ScoreBuilder, VoiceId, type Alter, type Step, type ScoreQuarterValue} from '@webmusic/score';
-  import {createScoreEditor, type ScoreEditor} from '@webmusic/score/edit/headless';
-  import {createScoreViewEditing, createStaffViewEditing, type ScoreViewEditing, type StaffViewEditing} from '@webmusic/score/view/headless';
+  import {createScoreEditor, createScoreViewEditing, createStaffViewEditing, type ScoreEditor, type ScoreViewEditing, type StaffViewEditing} from '@webmusic/score/view/headless';
   import {mountDemos} from '../demo-lifecycle';
 
   mountDemos('[data-staff-input-demo]', (root, scope) => {

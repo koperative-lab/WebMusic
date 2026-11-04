@@ -20,7 +20,6 @@ import {elementCompositionPolicy, standaloneUiPresenters, sourceWithoutOwnedFocu
 import {releasePackageNames} from './release-packages.mjs';
 import {manifestBoundaryProblems, unpublishedWorkspacePackage} from './release-surface.mjs';
 import {isIdentifierReference, isRuntimeIdentifierReference} from './architecture-identifiers.mjs';
-import {allowsAudioDocumentLoaderImport} from './audio-document-import-policy.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const errors = [];
@@ -622,7 +621,6 @@ function checkCapabilityBoundaries(name, pkg) {
       if (!resolved) continue;
       const targetRelative = path.relative(pkg.sourceRoot, resolved).replaceAll(path.sep, '/');
       const target = capabilityOf(targetRelative);
-      if (allowsAudioDocumentLoaderImport(name, relative, targetRelative, imported)) continue;
       if (name === '@webmusic/audio' && relative === 'analyze/element/audio-meter.ts' &&
         targetRelative === 'view/element/audio-meter.ts') continue;
       if (target !== capability && target !== 'root' && !allowed.includes(target)) {
@@ -1039,7 +1037,7 @@ async function checkElementComposition() {
   // dependency closure and presenter ownership below remain the public gates.
   for (const entry of elementCompositionPolicy) {
     if (!domainFamilies.includes(entry.family.toLowerCase())
-      || !['Play', 'Analyze', 'View', 'Edit'].includes(entry.capability)) {
+      || !['Play', 'Analyze', 'View'].includes(entry.capability)) {
       errors.push(`Element composition policy has an unknown family/capability for <${entry.tag}>.`);
     } else if (!entry.source.startsWith(
       `packages/${entry.family.toLowerCase()}/src/${entry.capability.toLowerCase()}/element/`,
@@ -1102,7 +1100,7 @@ async function checkElementComposition() {
 
     const reachesDomainBehavior = [...architecturalReachable].some((file) => {
       const relative = relativeToRoot(file);
-      return new RegExp(`^packages/${entry.family.toLowerCase()}/src/(?:core/|(?:play|analyze|view|edit)/(?:core|headless)/)`).test(relative);
+      return new RegExp(`^packages/${entry.family.toLowerCase()}/src/(?:core/|(?:play|analyze|view)/(?:core|headless)/)`).test(relative);
     });
     if (!reachesDomainBehavior) {
       errors.push(`<${entry.tag}> does not reach a reusable domain core/headless module.`);
@@ -1141,7 +1139,7 @@ async function checkElementComposition() {
     const forbiddenTags = new Set(['button', 'input', 'select', 'option', 'canvas', 'svg']);
     for (const file of reachable) {
       const relative = relativeToRoot(file);
-      if (!new RegExp(`^packages/${entry.family.toLowerCase()}/src/(?:play|analyze|view|edit)/element/`).test(relative)) continue;
+      if (!new RegExp(`^packages/${entry.family.toLowerCase()}/src/(?:play|analyze|view)/element/`).test(relative)) continue;
       const inspected = modules.get(file);
       const directTags = new Set([
         ...[...inspected.createdElementTags].filter((tag) => forbiddenTags.has(tag)),

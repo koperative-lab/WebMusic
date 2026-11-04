@@ -2,7 +2,7 @@
 title: 'createStaffViewEditing'
 description: 'A written-note cursor, duration and voice controller over a borrowed Score editing session.'
 sidebar:
-  order: 4
+  order: 3
 ---
 
 import StaffInputHeadlessDemo from '../../../../../components/headless/StaffInputHeadlessDemo.astro';
@@ -10,7 +10,7 @@ import StaffInputHeadlessDemo from '../../../../../components/headless/StaffInpu
 `createStaffViewEditing(editing, options?)` supplies staff-input state for custom
 UI. It borrows a [ScoreViewEditing](/score/headless/view/score-view/#follow-an-editing-document)
 controller and its document. Entering a note or rest submits the same atomic
-[`enter-notation` operation](/score/api/edit/#written-notation-entry) used by
+[`enter-notation` operation](/score/api/view/#written-notation-entry) used by
 the built-in staff surface, so the piano roll and staff share content and undo.
 This object creates no renderer, DOM listeners, player, clock or history stack.
 
@@ -20,8 +20,7 @@ This object creates no renderer, DOM listeners, player, clock or history stack.
 
 ```ts
 import {MeasureId, PartId, Rational, ScoreBuilder} from '@webmusic/score';
-import {createScoreEditor} from '@webmusic/score/edit/headless';
-import {createScoreViewEditing, createStaffViewEditing} from '@webmusic/score/view/headless';
+import {createScoreEditor, createScoreViewEditing, createStaffViewEditing} from '@webmusic/score/view/headless';
 
 const builder = new ScoreBuilder();
 builder.addPart({id: PartId('piano'), name: 'Piano', staves: 1});
@@ -65,7 +64,7 @@ measure grid from MIDI. Fully covered notes are replaced; partial overlap
 with a sounding note fails. Rest splitting and gap filling preserve a complete
 simple monophonic voice/staff inside that measure. Other voices/staves remain
 unchanged. Ties, tuplets, chords, grace notes and other unsupported structures
-fail through the [notation operation's validation](/score/api/edit/#written-notation-entry).
+fail through the [notation operation's validation](/score/api/view/#written-notation-entry).
 
 Setting an accidental chooses explicit spelling; it does not infer the key's
 alteration. Input octaves range from `-1` to `9`, but each entered pitch must
@@ -153,5 +152,5 @@ The three types are also exported from `@webmusic/score/view`.
 [`<score-view type="staff" editable>`](/score/element/view/score-view/#staff-input)
 composes this controller with the staff renderer and browser input.
 [`mountStaffEditor`](/score/api/view/#edit-a-staff) provides that surface for
-imperative composition. [ScoreEditor](/score/headless/edit/score-editor/) owns
+imperative composition. [ScoreEditor](/score/headless/view/score-editor/) owns
 the document, transactions and history.

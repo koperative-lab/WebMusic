@@ -5,7 +5,6 @@ import {fileURLToPath} from 'node:url';
 import ts from 'typescript';
 import {afterEach, describe, expect, it} from 'vitest';
 import * as core from '../../../../packages/score/src/core';
-import * as edit from '../../../../packages/score/src/edit/headless';
 import * as view from '../../../../packages/score/src/view/headless';
 import {mountDemos, type DemoScope} from '../src/components/demo-lifecycle';
 
@@ -28,12 +27,15 @@ function mount() {
     <button data-action="delete">Delete selected</button><button data-action="undo">Undo</button>
     <button data-action="redo">Redo</button><button data-action="dispose">Dispose input</button>
   </section>`;
-  let editor!: edit.ScoreEditor;
+  let editor!: view.ScoreEditor;
   let input!: view.StaffViewEditing;
   const modules: Record<string, unknown> = {
     '@webmusic/score': core,
-    '@webmusic/score/edit/headless': {...edit, createScoreEditor: (...args: Parameters<typeof edit.createScoreEditor>) => editor = edit.createScoreEditor(...args)},
-    '@webmusic/score/view/headless': {...view, createStaffViewEditing: (...args: Parameters<typeof view.createStaffViewEditing>) => input = view.createStaffViewEditing(...args)},
+    '@webmusic/score/view/headless': {
+      ...view,
+      createScoreEditor: (...args: Parameters<typeof view.createScoreEditor>) => editor = view.createScoreEditor(...args),
+      createStaffViewEditing: (...args: Parameters<typeof view.createStaffViewEditing>) => input = view.createStaffViewEditing(...args),
+    },
     '../demo-lifecycle': {mountDemos: (selector: string, setup: (root: HTMLElement, scope: DemoScope) => void) => registrations.push(mountDemos(selector, setup))},
   };
   new Function('require', 'exports', code)((name: string) => {

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {createAudioClip} from '../../src/core';
-import {createAudioClipEditor, type AudioClipEditor} from '../../src/edit/headless';
+import {createAudioClipEditor, type AudioClipEditor} from '../../src/view/headless';
 import {AudioViewElement} from '../../src/view/element/audio-view';
 
 // Rendering is exercised by the waveform suites; this fixture isolates Element

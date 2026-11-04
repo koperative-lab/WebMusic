@@ -295,7 +295,7 @@ function checkTitles(files) {
 function checkCapabilityGroups(files) {
   const groups = {};
   for (const file of files) {
-    const match = /^(score|audio)\/element\/(play|analyze|view|edit)\/([a-z-]+)\.mdx$/.exec(relative(DOCS, file));
+    const match = /^(score|audio)\/element\/(play|analyze|view)\/([a-z-]+)\.mdx$/.exec(relative(DOCS, file));
     if (!match) continue;
     const [, family, capability, name] = match;
     if (name === 'index') {
@@ -739,7 +739,7 @@ const pages = collectPages(files);
 await checkCatalogs(pages, paramsCatalog);
 checkElementPages(files, paramsCatalog);
 for (const message of headlessDocProblems({
-  pages: files.filter((file) => file.startsWith(`${DOCS}/score/headless/`) || file.startsWith(`${DOCS}/audio/headless/edit/`)).map((file) => ({file, source: read(file)})),
+  pages: files.filter((file) => file.startsWith(`${DOCS}/score/headless/`) || file === `${DOCS}/audio/headless/view/audio-clip-editor.mdx`).map((file) => ({file, source: read(file)})),
   readFile: read,
   frameFile: 'apps/doc/webmusic/src/components/HeadlessDemoFrame.astro',
 })) fail('headless-page', message);

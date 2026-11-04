@@ -58,7 +58,7 @@ shipped members.
 `ScoreEditor` owns committed document content. The native single-Score
 `ScorePlayer` borrows its Core read-only source and reports the document revision
 actually applied to playback, separately from the existing playback `revision`
-and `sourceRevision`. Play does not import the concrete Edit implementation.
+and `sourceRevision`. Play does not import the concrete editor, which lives in View.
 The `.editor` / `editor` selector binding rejects controller or Rack
 configuration before changing a working owner; those modes and other Headless
 engines are outside this first integration.

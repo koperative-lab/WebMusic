@@ -1,6 +1,6 @@
 import {describe, expect, it} from 'vitest';
 import {Duration, MeasureId, NoteId, PartId, Pitch, Rational, ScoreBuilder, ScoreEditError, VoiceId, type ScoreEditResult} from '../../src/core';
-import {createScoreEditor} from '../../src/edit/headless';
+import {createScoreEditor} from '../../src/view/headless';
 import {createScoreView, createScoreViewEditing, createStaffViewEditing} from '../../src/view/headless';
 
 function fixture() {

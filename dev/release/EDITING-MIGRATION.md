@@ -32,7 +32,7 @@ absolute performed timing. Effective velocity is
 `velocityOverride ?? performed?.velocity ?? 80`. The
 [Score Core reference](../../apps/doc/webmusic/src/content/docs/score/api/index.mdx)
 owns serialization and field validation; the
-[Edit API](../../apps/doc/webmusic/src/content/docs/score/api/edit.mdx)
+[Score View API](../../apps/doc/webmusic/src/content/docs/score/api/view.mdx)
 explains when timing edits clear performed timing.
 
 Upgrade every reader of shared persisted Score JSON before allowing new
@@ -101,7 +101,7 @@ export function sourceDuration(source: AudioPlayerSourceDetail): number {
 For a real player, forward its `.source` snapshot instead of rebuilding one
 from `.clip`. This preserves sequence identity and its borrowed asset reader.
 The snapshot does not itself retain PCM for asynchronous work; follow the
-[asset lease contract](../../apps/doc/webmusic/src/content/docs/audio/api/edit.mdx).
+[asset lease contract](../../apps/doc/webmusic/src/content/docs/audio/api/view.mdx).
 
 Because these exported types are now unions, an application interface cannot
 `extend AudioPlayerSourceDetail`. Use a type intersection for additional
@@ -127,24 +127,30 @@ clip loop is not applied to them, exactly as in `0.2.0`. Owned clips loop as
 before; among borrowed transport paths, only the player's own document sequence
 accepts loop commands.
 
-## Adopt the new Edit entries
+## Adopt editing through the View entries
 
-The inspected `0.2.0` packages do not export `/edit`, `/edit/headless`,
-`/edit/element` or `/edit/auto`. Those subpaths are additions to the existing
-`@webmusic/score` and `@webmusic/audio` packages; they are not separately
-installed packages. Until an editing release is published, use this checkout's
-built tarballs or workspace entries. Installing an older package successfully
-does not make its missing Edit subpaths available.
+Editing adds members to existing entries; it adds no new subpath. The inspected
+`0.2.0` packages lack these members, so installing an older package does not
+make them available. Until an editing release is published, use this checkout's
+built tarballs or workspace entries.
 
-`/edit` supplies semantic operations and editor factories. `/edit/headless`
-supplies the persistent editor owners. `/edit/element` supplies explicit
-registration for nonvisual `<score-document>` and `<audio-document>` owners;
-`/edit/auto` registers the corresponding default tag on import. There is no
-Edit `/global` or `/render` entry, or dedicated Edit React wrapper. The package
-root remains Core; it does not re-export the editor implementation. Use the
-owning [Score Edit](../../apps/doc/webmusic/src/content/docs/score/api/edit.mdx)
-and [Audio Edit](../../apps/doc/webmusic/src/content/docs/audio/api/edit.mdx)
-references for imports, environments and dependencies.
+| Need | Score | Audio |
+| --- | --- | --- |
+| Semantic operations, position maps and document contracts | `@webmusic/score/view` | `@webmusic/audio/view` (also range-processor recipes) |
+| Persistent editor owner | `ScoreEditor` from `@webmusic/score/view/headless` | `AudioClipEditor` from `@webmusic/audio/view/headless` |
+| Nonvisual HTML document owner | `<score-document>` from `@webmusic/score/view/element` | `<audio-document>` from `@webmusic/audio/view/element` |
+| Default registration | `defineScoreDocumentElement()` or `defineAllViewElements()`; Score View has no `/auto` entry | `@webmusic/audio/view/auto` (and `/view/global`) |
+| Render or export an edited sequence | — | `renderAudioSequence`, `exportAudioSequenceWav` from `@webmusic/audio/play` |
+
+There is no dedicated editing React wrapper. The package root remains Core; it
+does not re-export the editor implementation. Use the owning
+[Score View](../../apps/doc/webmusic/src/content/docs/score/api/view.mdx),
+[Audio View](../../apps/doc/webmusic/src/content/docs/audio/api/view.mdx) and
+[Audio Play](../../apps/doc/webmusic/src/content/docs/audio/api/play.mdx)
+references for imports, environments and dependencies. Pre-release builds of
+this branch briefly published separate `/edit`, `/edit/headless`,
+`/edit/element` and `/edit/auto` subpaths; DEC-055 removed them before any
+release, so no compatibility alias exists.
 
 Existing immutable Score/AudioClip playback and read-only views remain usable
 without an editor. To enable editing, create one editor per document and let

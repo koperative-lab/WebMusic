@@ -7,34 +7,15 @@ The drop-in custom elements of `@webmusic/score` — place a tag on the page, no
 JavaScript wiring required. Each capability ships its elements from its
 `/element` subpath, so the capability root tree-shakes free of DOM code. To load
 and register them — via a CDN script, a bundler, or individual `define*` calls —
-see [Score setup](/score/#drop-in-web-components). Edit and Play publish `/auto`;
-only Play publishes `/global`. Register the analyze and view tags with the `defineAll*` functions
-listed in their sections below.
+see [Score setup](/score/#drop-in-web-components). Only Play publishes `/auto`
+and `/global`. Register the analyze and view tags, including `<score-document>`,
+with the `define*` functions listed in their sections below.
 
 | Capability | Elements |
 | --- | --- |
-| [Edit](#edit) | A nonvisual owner for one editable Score document shared by players and views. |
 | [Play](#play) | Playing a score: the transport, a rack mixer, note input, recording and synth control. |
 | [Analyze](#analyze) | Elementary inspection: chord score/live modes, intervals, explicit scales and grouped rhythm. |
-| [View](#view) | Whole-score representations, held-pitch representations and optional sheet engraving. |
-
-## Edit
-
-[`@webmusic/score/edit/element`](/score/api/edit/) supplies the HTML document
-owner. It uses the same [ScoreEditor](/score/headless/edit/score-editor/) as custom
-applications and renders no interface. Piano-roll interaction belongs to the
-existing [Score view](/score/element/view/score-view/).
-
-| Element | Job | Register |
-|---|---|---|
-| [`<score-document>`](/score/element/edit/score-document/) | Load or accept a Score and own its editor for the connected lifetime. | `defineScoreDocumentElement(tag?)` |
-| — | Register the default document declaration. | `defineAllElements()` from `@webmusic/score/edit/element` |
-
-Import `@webmusic/score/edit/auto` for default registration. Borrow the document
-through `editor="#document-id"` on a player/view, or pass a Core document port
-through its `.editor` property. The document declaration owns disposal; borrowers
-release their subscriptions. The owning leaf explains load failures, replacement
-and reconnect behavior.
+| [View](#view) | Whole-score representations, held-pitch representations, optional sheet engraving and the editable document owner. |
 
 ## Play
 
@@ -135,19 +116,27 @@ subscriptions, discovery and owned analysis work, without stopping the player.
 
 ## View
 
-Three View elements group representations by the data and resources they use.
+Three visual View elements group representations by the data and resources they
+use; a fourth, nonvisual element owns an editable document.
 
 | Element | Representations | Register |
 | --- | --- | --- |
 | [`<score-view>`](/score/element/view/score-view/) | `piano-roll`, `staff`, `waterfall`, `map` and `thumbnail` over a whole Score. | `defineScoreViewElement(tag?)` |
 | [`<score-pitch-view>`](/score/element/view/score-pitch-view/) | `keyboard`, `staff` and `fretboard` for currently held MIDI pitches. | `definePitchViewElement(tag?)` |
 | [`<score-sheet-view>`](/score/element/view/score-sheet-view/) | Engraved sheet music using the optional OpenSheetMusicDisplay peer. | `defineSheetViewElement(tag?)` |
+| [`<score-document>`](/score/element/view/score-document/) | No visual representation: loads or accepts a Score and owns its [ScoreEditor](/score/headless/view/score-editor/) for the connected lifetime. | `defineScoreDocumentElement(tag?)` |
 
-`defineAllViewElements()` from `@webmusic/score/view/element` registers all three.
+`defineAllViewElements()` from `@webmusic/score/view/element` registers all four.
 Each type stays on its owning page, with its controls in external Parameters.
 `score-view` borrows resolved score data and position; `score-pitch-view` borrows held
 notes. `score-sheet-view` requires explicit `.score` or `src` and follows player events;
 it does not borrow the player's loaded score.
+
+Editing is part of View. `<score-document>` renders no interface; borrow its
+document through `editor="#document-id"` on a player or view, or pass a Core
+document port through their `.editor` property. The declaration owns disposal;
+borrowers release their subscriptions. Piano-roll editing and staff input belong
+to [`<score-view>`](/score/element/view/score-view/).
 
 ```html
 <score-player id="p" src="/mxl/Arabesque%20No.1.mxl"></score-player>

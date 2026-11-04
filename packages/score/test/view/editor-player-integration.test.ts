@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {Duration, NoteId, Pitch, Rational, ScoreBuilder} from '../../src/core';
-import {createScoreEditor, type ScoreEditor} from '../../src/edit/headless';
+import {createScoreEditor, type ScoreEditor} from '../../src/view/headless';
 import {ScorePlayerElement} from '../../src/play/element/score-player';
 import {ScoreViewElement} from '../../src/view/element/score-view';
 

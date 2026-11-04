@@ -101,7 +101,8 @@ are documented in the owning public ScoreView reference.
 An editor-bound View borrows committed content and commands from `ScoreEditor`
 through Core structural ports. The editor remains the content and history owner;
 View owns rendering, viewport, focus and local gesture previews. It reuses View
-renderers without importing the concrete Edit implementation. Content history
+renderers; the editors and `<score-document>` / `<audio-document>` declarations
+are View Headless and Element pieces under DEC-055. Content history
 does not restore selection; each selection session remaps or prunes its current
 IDs. Viewport and focus remain local and outside content history.
 

@@ -141,9 +141,8 @@ content and semantic commands; it never creates an editor or audio graph.
 
 ```html
 <script type="module">
-  import '@webmusic/audio/edit/auto';
   import '@webmusic/audio/play/auto';
-  import '@webmusic/audio/view/auto';
+  import '@webmusic/audio/view/auto'; // also registers <audio-document>
 </script>
 <audio-document id="audio-doc" src="/wav/Arabesque%20No.1.wav"></audio-document>
 <audio-player id="audio-play" editor="#audio-doc"></audio-player>
@@ -229,8 +228,10 @@ paints of the same content and viewport reuse bounded per-column results, and a
 paused selection change repaints only the selection overlay, not the waveform.
 No complete PCM render or full output peaks pyramid is created per edit.
 
-See [Audio Edit](/audio/api/edit/) for history, processing and WAV export, and
-[View editing APIs](/audio/api/view/#document-editing) for custom interfaces.
+See [editable documents](/audio/api/view/#editable-documents) for history and
+processing, [sequence rendering](/audio/api/play/#render-an-edited-sequence) for
+WAV export, and [View editing APIs](/audio/api/view/#document-editing) for custom
+interfaces.
 
 ## Dragging and seeking
 

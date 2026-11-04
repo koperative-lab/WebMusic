@@ -10,8 +10,7 @@ It is intentionally thin. Functional APIs live in capability subpaths of the sam
 - **Playback utilities** (SFZ, recorded-note conversion, offline rendering) live in [`@webmusic/score/play`](/score/api/play/). Stateful engines and effects use `@webmusic/score/play/headless`; browser transport adapters use `/play/drivers`.
 - **Analysis** (`summarizeScore`, `chordTimeline`, key/chord/roman/motif/voice-leading) lives in [`@webmusic/score/analyze`](/score/api/analyze/).
 - **File loading** (MIDI, MusicXML, MXL, ABC) lives in [`@webmusic/score/io`](/score/api/io/).
-- **Document editing** lives in [`@webmusic/score/edit`](/score/api/edit/), with persistent state and history in `@webmusic/score/edit/headless`.
-- **Layout and projections** live in [`@webmusic/score/view`](/score/api/view/). Play, Analyze and View supply `/element` entries; [`@webmusic/score/react`](/score/api/react/) supplies their React adapters.
+- **Layout, projections and document editing** live in [`@webmusic/score/view`](/score/api/view/); the persistent `ScoreEditor` with its history lives in `@webmusic/score/view/headless`. Play, Analyze and View supply `/element` entries; [`@webmusic/score/react`](/score/api/react/) supplies their React adapters.
 
 Install `@webmusic/score` once, then import the root model or a capability entry such as `@webmusic/score/play` as needed.
 
@@ -30,10 +29,6 @@ capability pages below document what is inside each entry.
 | `@webmusic/score/io/load` | code-only sub-entry | The loader surface on its own, for consumers that want only `loadScore`. |
 | `@webmusic/score/io/formats` | code-only sub-entry | Per-format parsers and serializers (MIDI, MusicXML, MXL, ABC). |
 | `@webmusic/score/io/worker-client` · `@webmusic/score/io/worker-protocol` · `@webmusic/score/io/worker` | worker triple | Off-main-thread parsing: the client, the wire protocol, and the worker runtime. |
-| `@webmusic/score/edit` | [capability root](/score/api/edit/) | Atomic note operations, document contracts, position maps and the editor facade. |
-| `@webmusic/score/edit/headless` | [Headless](/score/headless/#edit) | `ScoreEditor`, `createScoreEditor`, history, checkpoints and interaction sessions. |
-| `@webmusic/score/edit/element` | [Web Component](/score/element/edit/score-document/) | Nonvisual `<score-document>` loading, ownership and registration helpers. |
-| `@webmusic/score/edit/auto` | registration | Imports and registers the default document declaration on evaluation. |
 | `@webmusic/score/play` | [capability root](/score/api/play/) | Stateless playback: SFZ parsing, offline WAV render, recording → `Score`. |
 | `@webmusic/score/play/headless` | [Headless](/score/headless/#play) | `ScorePlayer`, `InteractivePlayer`, `Rack`, `Sound`, `Effect`, `LfoController`, `PlayerController`. |
 | `@webmusic/score/play/drivers` | code-only sub-entry | Browser transport adapters: scroll, pointer, orientation, arbitrary values. |
@@ -45,15 +40,15 @@ capability pages below document what is inside each entry.
 | `@webmusic/score/analyze/headless` | [Headless](/score/headless/#analyze) | `AnalysisSession`, the live trackers, `createScoreReport`. |
 | `@webmusic/score/analyze/element` | [Web Components](/score/element/#analyze) | Chord score/live modes, spelled intervals, explicit scale degrees and grouped rhythmic placement. |
 | `@webmusic/score/analyze/worker-client` · `@webmusic/score/analyze/worker-protocol` · `@webmusic/score/analyze/worker` | worker triple | Off-main-thread analysis: the client, the wire protocol, and the worker runtime. |
-| `@webmusic/score/view` | [capability root](/score/api/view/) | Layout and projection helpers for notation surfaces. |
-| `@webmusic/score/view/headless` | [Headless](/score/headless/#view) | `createScoreView`, `createActiveNoteTracker`. |
+| `@webmusic/score/view` | [capability root](/score/api/view/) | Layout and projection helpers, pure edit operations, document contracts and position maps. |
+| `@webmusic/score/view/headless` | [Headless](/score/headless/#view) | `createScoreView`, map/pitch/editing models, `createActiveNoteTracker` and `ScoreEditor`. |
 | `@webmusic/score/view/render` | code-only sub-entry | Imperative DOM/canvas/SVG renderers and the player binding. |
-| `@webmusic/score/view/element` | [Web Components](/score/element/#view) | `<score-view>`, `<score-pitch-view>` and `<score-sheet-view>`. |
+| `@webmusic/score/view/element` | [Web Components](/score/element/#view) | `<score-view>`, `<score-pitch-view>`, `<score-sheet-view>` and the nonvisual `<score-document>`. |
 | `@webmusic/score/react` | [capability root](/score/api/react/) | React components and hooks for the existing I/O, Play, Analyze and View composition; React is an optional peer. |
 
 Score has no `/view/auto` or `/view/global`, and no `/analyze/auto`.
-Edit and Play supply automatic registration; only Play supplies a browser IIFE.
-Edit has no React wrapper.
+Only Play supplies automatic registration and a browser IIFE; View tags,
+including `<score-document>`, register explicitly. Document editing has no React wrapper.
 
 ## Install
 
@@ -153,7 +148,7 @@ const values = {
 `NoteData.velocityOverride` is an optional integer from 1 to 127. `Note.velocity`
 and `noteVelocity(note)` resolve `velocityOverride ?? performed?.velocity ?? 80`.
 An override does not create or change performed onset/duration. Clear it with
-`note.with({velocityOverride: undefined})`; the Edit command uses `velocity: null`.
+`note.with({velocityOverride: undefined})`; the `set-velocity` edit operation uses `velocity: null`.
 
 JSON-like metadata extensions are recursively snapshotted, including own keys
 such as `__proto__` and null-prototype records. Nonplain application values such
@@ -211,7 +206,7 @@ TimeMap with missing provenance stays conservatively independent.
 
 ## Batch Edits With `score.edit`
 
-`score.edit(fn)` is a short-lived synchronous batch primitive. The transaction object (`ScoreEditSession`) buffers note and measure operations and applies them in one incremental rebuild at commit: touched parts are reprocessed, and untouched parts can share their indexes. Cost depends on the edits and affected parts. The original score is never modified; `edit` returns a new immutable `Score` (or the same instance if no operations were buffered). Unknown ids throw with a clear error. For persistent document identity, semantic timing edits, undo or interaction drafts, use [ScoreEditor](/score/headless/edit/score-editor/).
+`score.edit(fn)` is a short-lived synchronous batch primitive. The transaction object (`ScoreEditSession`) buffers note and measure operations and applies them in one incremental rebuild at commit: touched parts are reprocessed, and untouched parts can share their indexes. Cost depends on the edits and affected parts. The original score is never modified; `edit` returns a new immutable `Score` (or the same instance if no operations were buffered). Unknown ids throw with a clear error. For persistent document identity, semantic timing edits, undo or interaction drafts, use [ScoreEditor](/score/headless/view/score-editor/).
 
 ```ts
 import { Duration, Pitch, Rational } from '@webmusic/score';
@@ -243,7 +238,7 @@ failure or commit failure; retaining it does not permit later edits. Patches
 change only the named fields: changing notated onset does not rewrite absolute
 `performed.onsetSec`, and moving or removing a measure does not automatically move
 or remove its notes. An application that edits both projections must update both.
-The [Edit operation API](/score/api/edit/#atomic-note-operations) supplies that
+The [View edit operations](/score/api/view/#atomic-note-operations) supply that
 timing policy for supported note commands without changing this low-level primitive.
 
 ## Convert Musical Time
@@ -504,10 +499,10 @@ set and reports both synchronous throws and rejected listener Promises through
 | `Duration` | Primitive | Whole, half, quarter, eighth, dotted, and triplet durations. |
 | `ScoreBuilder` | Builder | Build scores from generators and importers. |
 | `ScoreEditSession` | Transaction | Buffer synchronous edits; normally obtained from `score.edit`. |
-| `ScoreEditError` | Error | Coded command/position-map failures; see [Edit API](/score/api/edit/). |
+| `ScoreEditError` | Error | Coded command/position-map failures; see [Document editing](/score/api/view/#document-editing). |
 | `ScoreDocumentApplicationError` | Error | Coded document playback application failures; see [document revision observation](#document-revision-observation). |
-| `isScoreDocumentSource`, `isScoreEditorPort` | Type guards | Validate shared document read or command ports and their current Score snapshot; see [Edit ports](/score/api/edit/#document-ports-and-commands). |
-| `createScorePositionMap`, `composeScorePositionMaps`, `mapScorePosition` | Position maps | [Create, compose and apply document transitions](/score/api/edit/#position-maps) without importing Edit implementation. |
+| `isScoreDocumentSource`, `isScoreEditorPort` | Type guards | Validate shared document read or command ports and their current Score snapshot; see [document ports](/score/api/view/#document-ports-and-commands). |
+| `createScorePositionMap`, `composeScorePositionMaps`, `mapScorePosition` | Position maps | [Create, compose and apply document transitions](/score/api/view/#position-maps) without importing the editor implementation. |
 | `Score` | Model | Top-level immutable score with metadata, parts, measures, and a time map. |
 | `Part` | Model | Instrument or voice container with notes, MIDI program, and staff count. |
 | `Measure` | Model | Measure number, onset, duration, meter, key, tempo, and repeats. |
@@ -557,12 +552,12 @@ instance types.
 | `EventListenerFailureMode` | Listener error handling in EventEmitter. |
 | `ScorePlaybackSource`, `ScorePlaybackSnapshot`, `ScorePlaybackNote`, `ScorePlaybackReadiness`, `ScorePlaybackState` | Shared playback observation, detailed below. |
 | `ScoreDocumentRevision`, `ScoreDocumentPlaybackBinding`, `ScoreDocumentApplicationResult` | Requested/applied document identity, readiness and application outcomes, [detailed below](#document-revision-observation). |
-| `ScoreQuarterValue`, `ScoreNoteInput`, `ScoreEditOperation`, `ScoreEditCommand`, `ScoreRevisionGuard` | [Exact semantic editing inputs](/score/api/edit/#atomic-note-operations). |
-| `ScoreNotationDuration`, `ScoreNotationEntry` | [Written-note/rest entry and notation duration](/score/api/edit/#written-notation-entry). |
-| `ScoreDocumentSource`, `ScoreDocumentSnapshot`, `ScoreDocumentChange`, `ScoreEditorPort`, `ScoreEditorState` | [Document read/command contracts](/score/api/edit/#document-ports-and-commands); the concrete owner is exported separately from Edit. |
-| `ScoreEditResult`, `ScoreEditFailure`, `ScoreEditErrorCode`, `ScoreEditTransaction`, `ScoreCheckpoint` | [ScoreEditor outcomes, transactions and checkpoints](/score/headless/edit/score-editor/). |
-| `ScoreInteractionSession`, `ScoreInteractionSnapshot`, `ScoreDraftResult` | [Selection and draft session contracts](/score/headless/edit/score-editor/). |
-| `ScorePositionMap`, `ScoreMappedPosition` | [Document revision maps and rational-position results](/score/api/edit/#position-maps). |
+| `ScoreQuarterValue`, `ScoreNoteInput`, `ScoreEditOperation`, `ScoreEditCommand`, `ScoreRevisionGuard` | [Exact semantic editing inputs](/score/api/view/#atomic-note-operations). |
+| `ScoreNotationDuration`, `ScoreNotationEntry` | [Written-note/rest entry and notation duration](/score/api/view/#written-notation-entry). |
+| `ScoreDocumentSource`, `ScoreDocumentSnapshot`, `ScoreDocumentChange`, `ScoreEditorPort`, `ScoreEditorState` | [Document read/command contracts](/score/api/view/#document-ports-and-commands); the concrete owner is exported from `@webmusic/score/view/headless`. |
+| `ScoreEditResult`, `ScoreEditFailure`, `ScoreEditErrorCode`, `ScoreEditTransaction`, `ScoreCheckpoint` | [ScoreEditor outcomes, transactions and checkpoints](/score/headless/view/score-editor/). |
+| `ScoreInteractionSession`, `ScoreInteractionSnapshot`, `ScoreDraftResult` | [Selection and draft session contracts](/score/headless/view/score-editor/). |
+| `ScorePositionMap`, `ScoreMappedPosition` | [Document revision maps and rational-position results](/score/api/view/#position-maps). |
 
 `scoreTempos(score, ppq?)` and the cached `score.tempos` expose quarter notes per
 minute: `TempoEntry.bpm * (TempoEntry.unit ?? 1)`. For example, half note = 60

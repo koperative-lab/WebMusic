@@ -1,14 +1,14 @@
 ---
 import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
 const code = `import {createAudioClip} from '@webmusic/audio';
-import {createAudioClipEditor} from '@webmusic/audio/edit/headless';
+import {createAudioClipEditor} from '@webmusic/audio/view/headless';
 const clip = createAudioClip({sampleRate: 8000, channelData: [new Float32Array(16)]});
 const editor = createAudioClipEditor(clip);
 editor.transaction('Append silence', tx => tx.add({type: 'insert-silence', frame: 16, length: 4, id: 'pause'}));
 editor.undo();
 editor.dispose();`;
 ---
-<HeadlessDemoFrame entry="@webmusic/audio/edit/headless" name="AudioClipEditor" code={code}
+<HeadlessDemoFrame entry="@webmusic/audio/view/headless" name="AudioClipEditor" code={code}
   hint="Edit a tiny generated PCM document. Structural history retains assets; it does not copy PCM. Reset creates a fresh document."
   rootAttrs={{'data-audio-editor-demo': true}}>
   <section aria-label="Audio document and history">
@@ -36,7 +36,7 @@ editor.dispose();`;
 </HeadlessDemoFrame>
 <script>
   import {createAudioClip, audioSegmentLength, type AudioCheckpoint, type AudioEditOperation, type AudioInteractionSession} from '@webmusic/audio';
-  import {createAudioClipEditor, type AudioClipEditor} from '@webmusic/audio/edit/headless';
+  import {createAudioClipEditor, type AudioClipEditor} from '@webmusic/audio/view/headless';
   import {mountDemos} from '../demo-lifecycle';
   mountDemos('[data-audio-editor-demo]', (root, scope) => {
     const summary = root.querySelector<HTMLElement>('[data-summary]')!;

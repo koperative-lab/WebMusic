@@ -74,7 +74,7 @@ retry, reentrant callbacks, source replacement, cleanup, transport intent and
 position-map composition in
 [document-binding tests](../../packages/score/test/play/document-binding.test.ts).
 [Player Element tests](../../packages/score/test/play/editor-element.test.ts),
-[document declaration tests](../../packages/score/test/edit/) and
+[document declaration tests](../../packages/score/test/view/) (then in `test/edit/`, moved under DEC-055) and
 [Kernel discovery tests](../../platform/kernel/test/element-source.test.ts)
 cover binding ownership, conflicts, late targets and lifecycle behavior.
 [Editing tests](../../packages/score/test/view/editing.test.ts) and

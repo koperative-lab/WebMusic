@@ -112,3 +112,5 @@ export {
 export {
   createAudioSequenceWaveform, type AudioSequenceWaveform, type AudioSequenceWaveformOptions,
 } from './sequence-waveform';
+
+export {AudioClipEditor, createAudioClipEditor, type AudioClipEditorOptions} from './audio-clip-editor';

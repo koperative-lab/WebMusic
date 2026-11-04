@@ -1,4 +1,5 @@
-// @webmusic/score/view/element — every observed attribute of the View tags.
+// @webmusic/score/view/element — every observed attribute of the View tags,
+// including the nonvisual <score-document> document owner.
 // Checked against `static get observedAttributes()` in
 // packages/score/src/view/element/*.ts. `<score-view>`'s last ten names are
 // spread from NUMERIC_OPTION_ATTRS / COLOR_OPTION_ATTRS in score-view.ts, and
@@ -286,6 +287,29 @@ export const SCORE_VIEW_PARAMS: ElementParamCatalog = {
       {name: 'follow', note: 'Read-only requested keyboard follow mode, active or none; fitting does not scroll.'},
       {name: 'scrollable', note: 'Read-only effective keyboard scrolling flag, false by default; configure through scroll. The native HTMLElement.scroll() method remains available.'},
       {name: 'fitToWidth', note: 'Read-only effective keyboard fitting flag, equal to !scrollable and true by default.'},
+    ],
+  },
+  'score-document': {
+    tag: 'score-document',
+    entry: ENTRY,
+    params: [
+      {name: 'src', kind: 'text', fallback: 'No URL', note: 'Load a new document; a failed replacement retains the previous editor.'},
+      {name: 'format', kind: 'enum', options: ['midi', 'musicxml', 'mxl', 'abc'], fallback: 'Auto — extension or content', note: 'Override URL format detection; ignored while .score is assigned.'},
+      {name: 'history', kind: 'bool', fallback: 'true — local undo is enabled', note: 'Changing this option creates a fresh document with the configured input.'},
+      {name: 'history-limit', kind: 'number', min: 1, step: 1, fallback: '100', note: 'Maximum retained undo/redo transactions; ignored when history is false.'},
+    ],
+    properties: [
+      {name: 'score', note: 'Explicit Score input; undefined restores src loading.'},
+      {name: 'editor', note: 'Read-only owned ScoreEditor, available after successful loading.'},
+      {name: 'status', note: 'Read-only empty/loading/ready/error/disposed state.'},
+      {name: 'error', note: 'Read-only most recent load/configuration error.'},
+      {name: 'loadedSrc', note: 'Read-only successfully loaded URL, independent of a pending or failed src.'},
+      {name: 'reload()', note: 'Retry the configured input and return ready/empty/superseded/failed.'},
+    ],
+    events: [
+      {name: 'webmusic:sourcechange', note: 'The editor getter changed; subscribers reconnect before the prior editor is disposed.'},
+      {name: 'webscore:documentstatechange', note: 'Loading/result state with editor, loadedSrc and error.'},
+      {name: 'webscore:error', note: 'Failed document-load operation.'},
     ],
   },
 };

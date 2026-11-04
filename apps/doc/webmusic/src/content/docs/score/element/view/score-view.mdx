@@ -291,7 +291,7 @@ Missing source data displays a quiet square waiting animation. Loading a URL or 
 
 ## Piano-roll editing
 
-Bind a [Score document](/score/element/edit/score-document/) and add `editable`
+Bind a [Score document](/score/element/view/score-document/) and add `editable`
 to edit its existing piano-roll surface. The document owns content and history;
 the View borrows its Core editor port. The second composition demonstrates this
 different source relationship while retaining the passive main demo above.
@@ -300,8 +300,7 @@ different source relationship while retaining the passive main demo above.
 
 ```html
 <script type="module">
-  import {defineScoreDocumentElement} from '@webmusic/score/edit/element';
-  import {defineScoreViewElement} from '@webmusic/score/view/element';
+  import {defineScoreDocumentElement, defineScoreViewElement} from '@webmusic/score/view/element';
   defineScoreDocumentElement();
   defineScoreViewElement();
 </script>

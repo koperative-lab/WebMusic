@@ -33,3 +33,12 @@ export {
   type ActiveNoteState,
   type ActiveNoteTracker,
 } from './active-notes';
+
+// Document-owned editing: one editor shared by every View and the player.
+export {ScoreEditor, createScoreEditor, type ScoreEditorOptions} from './score-editor';
+export type {
+  ScoreEditorPort, ScoreEditorState, ScoreDocumentSource, ScoreDocumentSnapshot,
+  ScoreDocumentChange, ScoreEditCommand, ScoreEditOperation, ScoreEditResult,
+  ScoreEditTransaction, ScoreRevisionGuard, ScoreCheckpoint, ScoreInteractionSession,
+  ScoreInteractionSnapshot, ScoreDraftResult,
+} from '../../core/editing';

@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import {afterEach, beforeAll, describe, expect, it, vi} from 'vitest';
 import {Duration, NoteId, Pitch, Rational, ScoreBuilder, type Score, type ScoreDocumentPlaybackBinding, type ScoreDocumentSource} from '../../src/core';
-import {createScoreEditor, type ScoreEditor} from '../../src/edit/headless';
-import {defineScoreDocumentElement, type ScoreDocumentElement} from '../../src/edit/element';
+import {createScoreEditor, type ScoreEditor} from '../../src/view/headless';
+import {defineScoreDocumentElement, type ScoreDocumentElement} from '../../src/view/element';
 import {ScorePlayerElement, type ScorePlayerTimeUpdateEventDetail} from '../../src/play/element/score-player';
 import {mountPresetPlayer, type PresetPlayerHandle, type PresetPlayerOptions} from '../../src/play/element/internal/preset-player';
 import {ScorePlayer} from '../../src/play/headless/score-player';

@@ -6,26 +6,32 @@ implemented. P3 Audio sequence/history, playback, declaration, waveform editing,
 range processing and WAV export are implemented; current verification belongs to
 STATUS. P4 staff input extends the existing staff View under DEC-054; its
 implementation and verification are tracked in STATUS.
-Related decision: [DEC-053](../DECISIONS.md#dec-053--document-owned-editing-and-borrowed-playback).
+Related decisions: [DEC-053](../DECISIONS.md#dec-053--document-owned-editing-and-borrowed-playback)
+and [DEC-055](../DECISIONS.md#dec-055--editing-is-a-view-feature-not-a-capability), which
+places editing inside View rather than a separate capability.
 [STATUS](../STATUS.md), EDIT-01, owns delivery; the
 [dated proposal](../plans/2026-10-13-editing-capabilities.md) retains the original
 P0–P8 baseline. The current five-phase roadmap is below. This document specifies
 the complete target; public references describe only implemented members.
 
-Layer and entry: domain Core contracts, `/edit` API, `/edit/headless` behavior,
-and `/edit/element` declarations (implemented for Score and Audio). Rendering stays in View.
+Layer and entry: domain Core contracts plus View: operations and contracts in the
+`/view` API, editors in `/view/headless`, and the nonvisual declarations in
+`/view/element` (implemented for Score and Audio). Audio sequence rendering and
+WAV export belong to the `/play` export API. There is no Edit capability.
 Source reuse starts with [ScoreEditSession](../../packages/score/src/core/model/ScoreEditSession.ts),
 [ClipEditSession](../../packages/audio/src/core/model/ClipEditSession.ts),
 [Score playback](../../packages/score/src/core/playback.ts), and the existing
 [Score](PLAY-COMPONENTS.md) / [Audio](AUDIO-PLAY-COMPONENTS.md) players.
 Public references and demos ship with the corresponding implementation, using
 the [documentation templates](../docs/README.md).
-The P1 Score surface is documented in the [Edit API](../../apps/doc/webmusic/src/content/docs/score/api/edit.mdx)
-and [ScoreEditor](../../apps/doc/webmusic/src/content/docs/score/headless/edit/score-editor.mdx)
-references. Score bindings are described by the [document Element](../../apps/doc/webmusic/src/content/docs/score/element/edit/score-document.mdx),
+The Score surface is documented in the [View API](../../apps/doc/webmusic/src/content/docs/score/api/view.mdx)
+and [ScoreEditor](../../apps/doc/webmusic/src/content/docs/score/headless/view/score-editor.mdx)
+references. Score bindings are described by the [document Element](../../apps/doc/webmusic/src/content/docs/score/element/view/score-document.mdx),
 [native player](../../apps/doc/webmusic/src/content/docs/score/headless/play/score-player.mdx)
 and [editable View](../../apps/doc/webmusic/src/content/docs/score/element/view/score-view.mdx).
-Audio public contracts are documented in the [Edit API](../../apps/doc/webmusic/src/content/docs/audio/api/edit.mdx).
+Audio public contracts are documented in the [View API](../../apps/doc/webmusic/src/content/docs/audio/api/view.mdx),
+[AudioClipEditor](../../apps/doc/webmusic/src/content/docs/audio/headless/view/audio-clip-editor.mdx)
+and the [Play export API](../../apps/doc/webmusic/src/content/docs/audio/api/play.mdx).
 Staff input uses the bounded notation-entry contract below.
 
 ## User task and boundary
@@ -48,7 +54,7 @@ are separate work. An editable surface does not imply those capabilities.
 | Owner | Responsibility | Borrowed resources |
 |---|---|---|
 | `ScoreEditor` / `AudioClipEditor` | One authoritative current document, transactions, content revisions, optional local history and interaction sessions | Injected loaders/processors; no player or clock |
-| Domain Core | Immutable models, source/command ports, semantic operations, position maps and asset-reader contracts | No DOM or Edit/Play/View implementation |
+| Domain Core | Immutable models, source/command ports, semantic operations, position maps and asset-reader contracts | No DOM or Play/View implementation |
 | Play | Applied snapshot, preparation, scheduler, transport, audible state and revision acknowledgement | Read-only document source; never commits edits |
 | View | Layout, viewport, focus, hit testing, tool interaction and draft overlays | Core editor port and optional player source/time |
 | `score-document` / `audio-document` | Nonvisual HTML loading and ownership of an editor | Domain loading adapter; no visible renderer |
@@ -71,9 +77,10 @@ Headless owners; existing short-lived edit sessions remain batch primitives.
 History roots, drafts and the last applied playback snapshot are retained data,
 not additional authorities that may commit content.
 
-Score Edit may depend on Core and I/O. Audio Edit API/Headless depends only on
-Core and injected ports. Play, View and Analyze never import concrete Edit
-implementations. UI uses neutral structural bindings and imports neither domain
+Score editing in View may depend on Core and I/O. Audio's editing API and
+Headless editor depend only on Core and injected ports. Play and Analyze never
+import the concrete editors; editable View surfaces borrow them through the Core
+ports. UI uses neutral structural bindings and imports neither domain
 nor Kernel types. Do not extract shared Kernel history before both domains
 establish a useful common implementation.
 
@@ -472,14 +479,13 @@ memory. Audio load retains the existing loader limits; total decode, assets,
 playback cache, history, jobs and export are measured separately. Structural
 edits/undo must not read whole PCM; playback adoption must not render full output.
 
-Audio declaration loading uses one reviewed exception:
-`edit/element/internal/audio-document-loader.ts` may import only
-`loadClipFromUrl` from `play/api/load.ts`. It sets `streaming: false`, forwards
-AbortSignal and resource limits, and creates no implicit AudioContext. Native
-decoding, when needed, uses a caller-injected loader closure with its borrowed
-context. Default codec availability remains the existing loader's capability.
-The exception permits no Play barrel/Headless/Element import and no reachable
-path from Edit Core/API/Headless to that browser adapter.
+Audio declaration loading in `view/element/internal/audio-document-loader.ts`
+imports `loadClipFromUrl` from `play/api/load.ts` over the existing View-to-Play
+edge. It sets `streaming: false`, forwards AbortSignal and resource limits, and
+creates no implicit AudioContext. Native decoding, when needed, uses a
+caller-injected loader closure with its borrowed context. Default codec
+availability remains the existing loader's capability. The View API root and
+Headless entries cannot reach that browser adapter.
 
 ## Implementation and reference delivery
 
@@ -491,7 +497,7 @@ claim completion.
 | Phase | Deliverable | Mapping from the dated proposal |
 |---|---|---|
 | P0 | Accepted document, history, timing, playback and component contracts | Original P0 |
-| P1 | Score Core ports/maps, velocity/schema migration, atomic Edit API/Headless commands, history, checkpoints and interaction sessions | Original P1 |
+| P1 | Score Core ports/maps, velocity/schema migration, atomic editing API/Headless commands, history, checkpoints and interaction sessions | Original P1 |
 | P2 | Native Score playback revision application, HTML document declaration/bindings, and piano-roll editing through import, undo, audition and MIDI export | Original P2–P3 |
 | P3 | Audio single-file asset/sequence model, structural history, segment playback, HTML binding, waveform editing, local processing and WAV export | Original P4–P6 |
 | P4 | Staff-input keyboard/voice prototype, tag-boundary decision, and notation editing against the shared Score editor | Original P7 |
@@ -505,11 +511,10 @@ When each layer ships, update manifests, tsup mappings, exports/barrels,
 registration side effects, [package policy](../../scripts/package-policy.mjs),
 [architecture checks](../../scripts/check-architecture.mjs),
 [Element composition](../../scripts/element-composition-policy.mjs), catalogs
-and owning public references together. Require only implemented layers; do not
-apply a helper that requires Element/render layers before they exist. Review
-nonvisual declarations like other behavior-only elements. The Audio exception
-checks exact importer, resolved target, imported symbol and code-only reachability;
-it does not open an Edit-to-Play capability edge. Review format migrations,
+and owning public references together. Editing pieces ship inside the existing
+View layers (and Audio export inside Play), so they add no capability, entry or
+layer of their own. Review nonvisual declarations like other behavior-only
+elements. Review format migrations,
 optional dependencies and all other surfaces in the
 [Architecture policy table](../ARCHITECTURE.md#executable-policy-and-documentation-authority).
 

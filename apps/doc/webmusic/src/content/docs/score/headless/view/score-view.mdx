@@ -121,15 +121,14 @@ after content changes and local drafts.
 
 ## Follow an editing document
 
-Pass an existing [ScoreEditor](/score/headless/edit/score-editor/) or structural
+Pass an existing [ScoreEditor](/score/headless/view/score-editor/) or structural
 `ScoreEditorPort` instead of a Score. The facade remains stable while `.score`,
 `.sequence` and visible notes follow its committed content plus the attached
 session's draft. `editable` defaults to false. The editor remains the sole
 document/history owner; the View creates no implicit editor or playback resources.
 
 ```ts
-import {createScoreEditor} from '@webmusic/score/edit/headless';
-import {createScoreView} from '@webmusic/score/view/headless';
+import {createScoreEditor, createScoreView} from '@webmusic/score/view/headless';
 
 const editor = createScoreEditor(score);
 const view = createScoreView(editor, {editable: true});

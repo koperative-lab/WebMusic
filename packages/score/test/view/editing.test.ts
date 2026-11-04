@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {Duration, NoteId, PartId, Pitch, Rational, ScoreBuilder, ScoreEditError, VoiceId, type ScoreEditOperation, type ScorePlaybackSnapshot} from '../../src/core';
-import {createScoreEditor} from '../../src/edit/headless';
+import {createScoreEditor} from '../../src/view/headless';
 import {createScoreView, createScoreViewEditing, scoreDocumentPlaybackCompatible} from '../../src/view/headless';
 import {mountPianoRollEditor} from '../../src/view/render/piano-roll-editor';
 import {ScoreViewElement} from '../../src/view/element/score-view';

@@ -58,9 +58,8 @@ Headless engine for one clip.
 
 ```html
 <script type="module">
-  import '@webmusic/audio/edit/auto';
   import '@webmusic/audio/play/auto';
-  import '@webmusic/audio/view/auto';
+  import '@webmusic/audio/view/auto'; // also registers <audio-document>
 </script>
 <audio-document id="take" src="/wav/Arabesque%20No.1.wav"></audio-document>
 <audio-player id="audition" editor="#take"></audio-player>

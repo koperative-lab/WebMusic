@@ -2,8 +2,7 @@ import {readFileSync} from 'node:fs';
 import {describe, expect, it} from 'vitest';
 import {VoiceId} from '../../../../packages/score/src/core';
 import {parseMusicXML, serializeMusicXML} from '../../../../packages/score/src/io';
-import {createScoreEditor} from '../../../../packages/score/src/edit/headless';
-import {createScoreViewEditing, createStaffViewEditing} from '../../../../packages/score/src/view/headless';
+import {createScoreEditor, createScoreViewEditing, createStaffViewEditing} from '../../../../packages/score/src/view/headless';
 
 describe('Staff editing documentation fixture', () => {
   it('supports rest entry, a second voice and shared undo on its authored measures', () => {
