@@ -204,7 +204,7 @@ export class ScoreGridViewElement extends ScoreViewElementBase {
 
   private gridOptions(): ScoreGridOptions {
     const options: ScoreGridOptions = {...this.attributeSettings(), features: this.tools,
-      noteColor: 'var(--wm-score-view-note, var(--wm-accent, light-dark(#3b5bdb, #91a7ff)))',
+      noteColor: 'var(--wm-score-view-note, var(--wm-foreground, light-dark(#333, #ddd)))',
       activeNoteColor: 'var(--wm-score-view-active-note, rgb(240, 84, 119))',
       onPreview: (result) => this.dispatchEvent(new CustomEvent('editpreview', {detail: result, bubbles: true, composed: true})),
       onCommit: (result) => this.dispatchEvent(new CustomEvent('editcommit', {detail: result, bubbles: true, composed: true})),

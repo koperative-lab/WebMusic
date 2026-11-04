@@ -361,7 +361,7 @@ describe('score grid editing gestures', () => {
     const field = host.querySelector<HTMLInputElement>('[aria-label="Onset (quarters)"]')!;
     field.value = '1/3'; field.focus(); field.dispatchEvent(new KeyboardEvent('keydown', {key: 'Delete', bubbles: true}));
     expect(editor.score.getNote(a)).toBeDefined();
-    [...host.querySelectorAll('button')].find((button) => button.textContent === 'Apply to selected note')!.click();
+    [...host.querySelectorAll('button')].find((button) => button.getAttribute('aria-label') === 'Apply to selected note')!.click();
     expect(editor.score.getNote(a)!.onsetQuarters.toJSON()).toEqual([1, 3]);
     expect(editor.getState().history.undoCount).toBe(1);
     renderer.dispose(); editing.dispose(); editor.dispose();
@@ -370,7 +370,7 @@ describe('score grid editing gestures', () => {
   it('rejects empty numeric pitch and velocity instead of committing zero', () => {
     const {editor, editing, renderer, host, commits} = mounted(); editing.select([a]);
     const field = (label: string) => host.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)!;
-    const button = (label: string) => [...host.querySelectorAll('button')].find((node) => node.textContent === label)!;
+    const button = (label: string) => [...host.querySelectorAll('button')].find((node) => node.getAttribute('aria-label') === label)!;
     const status = () => host.querySelector('[part="editing-status"]')!.textContent;
     field('Written MIDI pitch').value = ''; button('Apply to selected note').click();
     expect(status()).toMatch(/Written MIDI pitch must be an integer from 0 to 127/);
@@ -385,7 +385,7 @@ describe('score grid editing gestures', () => {
   it('submits only changed note values and treats an unchanged Apply as no change', () => {
     const {editor, editing, renderer, host, commits} = mounted();
     const field = (label: string) => host.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)!;
-    const apply = () => [...host.querySelectorAll('button')].find((node) => node.textContent === 'Apply to selected note')!.click();
+    const apply = () => [...host.querySelectorAll('button')].find((node) => node.getAttribute('aria-label') === 'Apply to selected note')!.click();
     editing.execute('Nudge', [{type: 'transpose-notes', noteIds: [b], semitones: 1}]); editing.undo();
     editing.select([a]); const revision = editor.getSnapshot().documentRevision;
     apply();
@@ -402,7 +402,7 @@ describe('score grid editing gestures', () => {
     const {editor, editing, renderer, host, commits} = mounted();
     const picker = host.querySelector<HTMLSelectElement>('[aria-label="Select existing note"]')!;
     const field = (label: string) => host.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)!;
-    const button = (label: string) => [...host.querySelectorAll('button')].find((node) => node.getAttribute('aria-label') === label || node.textContent === label)!;
+    const button = (label: string) => [...host.querySelectorAll('button')].find((node) => node.getAttribute('aria-label') === label)!;
     host.querySelector<HTMLButtonElement>('[part="values-toggle"]')!.click();
     expect(host.querySelector<HTMLElement>('[part="note-properties"]')!.hidden).toBe(false);
     picker.focus(); picker.value = 'note:b'; picker.dispatchEvent(new Event('change', {bubbles: true}));
@@ -464,7 +464,7 @@ describe('score grid editing gestures', () => {
     const {editor, editing, renderer, host} = mounted();
     const peer = createScoreViewEditing(editor, {interactionSession: editing.session});
     const field = (label: string) => host.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)!;
-    const apply = [...host.querySelectorAll('button')].find((button) => button.textContent === 'Apply to selected note')!;
+    const apply = [...host.querySelectorAll('button')].find((button) => button.getAttribute('aria-label') === 'Apply to selected note')!;
     editing.select([a]); field('Written MIDI pitch').value = '72';
     const active = focused === 'input' ? field('Written MIDI pitch') : apply; active.focus();
     peer.select([b]);
@@ -481,7 +481,7 @@ describe('score grid editing gestures', () => {
   it('refreshes fields on same-note revisions and history changes but preserves pending values within one binding', () => {
     const {editor, editing, renderer, host} = mounted(); editing.select([a]);
     const field = (label: string) => host.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)!;
-    const apply = [...host.querySelectorAll('button')].find((button) => button.textContent === 'Apply to selected note')!;
+    const apply = [...host.querySelectorAll('button')].find((button) => button.getAttribute('aria-label') === 'Apply to selected note')!;
     field('Onset (quarters)').value = '9'; field('Written MIDI pitch').value = '72'; apply.focus();
     editor.transaction('External change', (tx) => {
       tx.add({type: 'move-notes', noteIds: [a], deltaQuarters: [1, 1]});
@@ -506,7 +506,7 @@ describe('score grid editing gestures', () => {
   it('keeps insertion values usable through empty or multiple selection without applying a deleted target', () => {
     const {editor, editing, renderer, host} = mounted(); editing.select([a]);
     const field = (label: string) => host.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)!;
-    const button = (label: string) => [...host.querySelectorAll('button')].find((node) => node.textContent === label)!;
+    const button = (label: string) => [...host.querySelectorAll('button')].find((node) => node.getAttribute('aria-label') === label)!;
     field('Onset (quarters)').focus(); field('Onset (quarters)').value = '5';
     field('Written MIDI pitch').value = '72'; field('Duration (quarters)').value = '1/2'; field('Velocity').value = '65';
     editor.transaction('Delete externally', (tx) => tx.add({type: 'delete-notes', noteIds: [a]}));
@@ -536,7 +536,7 @@ describe('score grid editing gestures', () => {
     renderer.surface.focus(); editing.preview([move]);
     expect(host.querySelector('[data-note-id="a"]')!.getAttribute('x')).toBe(String(X(1.25)));
     expect(host.querySelector<HTMLInputElement>('[aria-label="Onset (quarters)"]')!.value).toBe('1');
-    [...host.querySelectorAll('button')].find((button) => button.textContent === 'Apply to selected note')!.click();
+    [...host.querySelectorAll('button')].find((button) => button.getAttribute('aria-label') === 'Apply to selected note')!.click();
     expect(editing.state.interaction.draft).toBeUndefined();
     expect(editor.score.getNote(a)!.onsetQuarters.toString()).toBe('1');
     expect(editor.score.getNote(a)!.performed).toEqual({onsetSec: .45, durationSec: .48, velocity: 90});
@@ -554,7 +554,7 @@ describe('score grid editing gestures', () => {
         editor.transaction('External transpose', (tx) => tx.add({type: 'transpose-notes', noteIds: [a], semitones: 3}));
       }
     });
-    [...host.querySelectorAll('button')].find((button) => button.textContent === 'Apply to selected note')!.click();
+    [...host.querySelectorAll('button')].find((button) => button.getAttribute('aria-label') === 'Apply to selected note')!.click();
     expect(editor.getSnapshot().documentRevision).toBe(1);
     expect(editor.score.getNote(a)!.onsetQuarters.toString()).toBe('1'); expect(editor.score.getNote(a)!.pitch.midi).toBe(63);
     expect(commits).not.toHaveBeenCalled(); expect(host.querySelector('[part="editing-status"]')!.textContent).toMatch(/changed.*review/i);

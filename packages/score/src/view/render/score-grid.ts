@@ -91,6 +91,119 @@ const SCALE_RANGE = [8, 512] as const;
 const ROW_RANGE = [6, 48] as const;
 const BLACK = new Set([1, 3, 6, 8, 10]);
 
+function snapLabel(value: ScoreGridSnap): string {
+  return value === 'off' ? 'Off' : value.endsWith('t') ? `${value.slice(0, -1)}T` : value;
+}
+
+/** 24px line icons, drawn square to match the kit's square controls. */
+const ICONS: Record<string, string> = {
+  select: '<path d="M6 4v15l4-4 3 6 2-1-3-6h6z"/>',
+  draw: '<path d="M5 19l1-4L16 5l3 3L9 18z"/><path d="M14 7l3 3"/>',
+  snap: '<path d="M6 5h4v7a2 2 0 0 0 4 0V5h4v7a6 6 0 0 1-12 0z"/><path d="M6 9h4M14 9h4"/>',
+  velocity: '<path d="M5 20v-6M10 20V6M15 20v-9M20 20v-4"/><path d="M4 13h2v2H4zM9 5h2v2H9zM14 10h2v2h-2zM19 15h2v2h-2z"/>',
+  'zoom-out': '<path d="M12 5v14"/><path d="M3 12h6M6.5 9.5L9 12l-2.5 2.5M21 12h-6M17.5 9.5L15 12l2.5 2.5"/>',
+  'zoom-in': '<path d="M12 5v14"/><path d="M4 12h5M6.5 9.5L4 12l2.5 2.5M20 12h-5M17.5 9.5L20 12l-2.5 2.5"/>',
+  'rows-shorter': '<path d="M5 12h14"/><path d="M12 3v6M9.5 6.5L12 9l2.5-2.5M12 21v-6M9.5 17.5L12 15l2.5 2.5"/>',
+  'rows-taller': '<path d="M5 12h14"/><path d="M12 4v5M9.5 6.5L12 4l2.5 2.5M12 20v-5M9.5 17.5L12 20l2.5-2.5"/>',
+  delete: '<path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/>',
+  undo: '<path d="M9 14l-5-5 5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-4"/>',
+  redo: '<path d="M15 14l5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h4"/>',
+  values: '<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><path d="M14 5h4v4h-4zM8 15h4v4H8z"/>',
+  close: '<path d="M6 6l12 12M18 6L6 18"/>',
+};
+
+/**
+ * Scoped grid stylesheet. Values resolve through the kit's public tokens to the
+ * shared neutral palette, square radius and 2rem control height. `:where()`
+ * keeps every rule at zero specificity so application CSS wins.
+ */
+const GRID_STYLE = `
+:where([data-score-grid]) {
+  --sg-ink: var(--wm-foreground, light-dark(#111, #eee));
+  --sg-muted: var(--wm-foreground-muted, light-dark(#777, #aaa));
+  --sg-line: var(--wm-control-border, var(--wm-border, light-dark(#d8d8d8, #333)));
+  --sg-surface: var(--wm-score-view-background, var(--wm-surface, light-dark(#fff, #111)));
+  --sg-raised: var(--wm-surface-muted, light-dark(#f3f3f3, #1c1c1c));
+  --sg-on-ink: var(--wm-accent-foreground, light-dark(#fff, #111));
+  --sg-control: var(--wm-control-size, 2rem);
+  --sg-radius: var(--wm-control-radius, 0);
+  --sg-mono: var(--wm-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  position: relative; display: flex; flex-direction: column; min-width: 0; overflow: hidden;
+  color: var(--sg-ink); background: var(--sg-surface);
+  border: var(--wm-component-border, 1px solid var(--sg-line)); border-radius: var(--wm-component-radius, var(--sg-radius));
+}
+:where([data-score-grid] [part~="toolbar"]) {
+  display: flex; flex-wrap: nowrap; align-items: stretch; min-width: 0; height: var(--sg-control);
+  overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; border-bottom: 1px solid var(--sg-line);
+}
+:where([data-score-grid] [part~="viewport"]) {
+  overflow: auto; max-height: var(--wm-score-grid-max-height, 32rem); min-width: 0; flex: 1 1 auto; scrollbar-width: none;
+}
+:where([data-score-grid] [part~="toolbar"], [data-score-grid] [part~="viewport"], [data-score-grid] [part~="card"])::-webkit-scrollbar { display: none; }
+:where([data-score-grid] [data-grid-group]) { display: flex; align-items: stretch; flex: none; }
+:where([data-score-grid] [data-grid-divider]) { flex: none; width: 1px; background: var(--sg-line); }
+:where([data-score-grid] [data-grid-spacer]) { flex: 1 1 auto; min-width: 0; }
+:where([data-score-grid] [data-grid-button]) {
+  appearance: none; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  flex: none; width: var(--sg-control); height: var(--sg-control); margin: 0; padding: 0; border: 0; border-radius: var(--sg-radius);
+  background: transparent; color: var(--sg-muted); font: inherit; cursor: pointer;
+}
+:where([data-score-grid] [data-grid-button][data-wide]) { width: auto; padding: 0 10px 0 8px; }
+:where([data-score-grid] [data-grid-value]) { font: 500 11px/1 var(--sg-mono); letter-spacing: .02em; color: var(--sg-ink); }
+:where([data-score-grid] [data-grid-button]:hover:not(:disabled)) { color: var(--sg-ink); background: var(--sg-raised); }
+:where([data-score-grid] [data-grid-button][aria-pressed="true"], [data-score-grid] [data-grid-button][aria-expanded="true"]) { color: var(--sg-on-ink); background: var(--sg-ink); }
+:where([data-score-grid] [data-grid-button][aria-pressed="true"], [data-score-grid] [data-grid-button][aria-expanded="true"]) [data-grid-value] { color: inherit; }
+:where([data-score-grid] [data-grid-button]:disabled) { opacity: .3; cursor: default; }
+:where([data-score-grid] button:focus-visible, [data-score-grid] select:focus-visible, [data-score-grid] input:focus-visible, [data-score-grid] [part~="surface"]:focus-visible) {
+  outline: 2px solid var(--wm-focus-ring, var(--sg-ink)); outline-offset: -2px;
+}
+:where([data-score-grid] [part~="overlay"]) {
+  position: absolute; inset: 0; z-index: 10; display: flex; align-items: flex-start; justify-content: center;
+  padding: calc(var(--sg-control) + 12px) 12px 12px; box-sizing: border-box;
+  background: var(--wm-score-grid-scrim, color-mix(in srgb, #000 45%, transparent));
+}
+:where([data-score-grid] [part~="card"]) {
+  box-sizing: border-box; width: min(100%, 20rem); max-height: 100%; overflow: auto; scrollbar-width: none;
+  background: var(--sg-surface); color: var(--sg-ink); border: 1px solid var(--sg-line); border-radius: var(--sg-radius);
+  box-shadow: 0 12px 32px rgb(0 0 0 / .22); outline: none;
+}
+:where([data-score-grid] [data-grid-card-header]) {
+  display: flex; align-items: center; justify-content: space-between; height: var(--sg-control); padding-left: 12px; border-bottom: 1px solid var(--sg-line);
+}
+:where([data-score-grid] [data-grid-card-header] h2) { margin: 0; font: 600 10px/1 var(--sg-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--sg-muted); }
+:where([data-score-grid] [part~="snap-options"]) { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; padding: 0; background: var(--sg-line); }
+:where([data-score-grid] [data-grid-option]) {
+  appearance: none; height: var(--sg-control); margin: 0; border: 0; border-radius: 0; background: var(--sg-surface);
+  color: var(--sg-ink); font: 500 12px/1 var(--sg-mono); cursor: pointer;
+}
+:where([data-score-grid] [data-grid-option]:hover) { background: var(--sg-raised); }
+:where([data-score-grid] [data-grid-blank]) { background: var(--sg-surface); }
+:where([data-score-grid] [data-grid-option][aria-pressed="true"]) { background: var(--sg-ink); color: var(--sg-on-ink); }
+:where([data-score-grid] [data-grid-form]) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 12px; margin: 0; }
+:where([data-score-grid] [data-grid-form] label) {
+  display: grid; gap: 4px; min-width: 0; font: 600 9px/1 var(--sg-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--sg-muted);
+}
+:where([data-score-grid] [data-grid-form] label[data-span]) { grid-column: 1 / -1; }
+:where([data-score-grid] [data-grid-form] input, [data-score-grid] [data-grid-form] select) {
+  appearance: none; box-sizing: border-box; width: 100%; min-width: 0; height: var(--sg-control); margin: 0; padding: 0 8px;
+  border: 1px solid var(--sg-line); border-radius: var(--sg-radius); background: var(--sg-surface); color: var(--sg-ink);
+  font: 400 12px/1 var(--sg-mono); letter-spacing: 0; text-transform: none;
+}
+:where([data-score-grid] [data-grid-form] select) {
+  padding-right: 24px; background-repeat: no-repeat;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(-45deg, transparent 50%, currentColor 50%);
+  background-size: 4px 4px, 4px 4px; background-position: right 13px center, right 9px center;
+}
+:where([data-score-grid] [data-grid-actions]) { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+:where([data-score-grid] [data-grid-action]) {
+  appearance: none; height: var(--sg-control); margin: 0; padding: 0 12px; border: 1px solid var(--sg-ink); border-radius: var(--sg-radius);
+  background: transparent; color: var(--sg-ink); font: 600 10px/1 var(--sg-mono); letter-spacing: .1em; text-transform: uppercase; cursor: pointer;
+}
+:where([data-score-grid] [data-grid-action="primary"]) { background: var(--sg-ink); color: var(--sg-on-ink); }
+:where([data-score-grid] [data-grid-action]:disabled) { opacity: .3; cursor: default; }
+:where([data-score-grid] [data-grid-action][hidden]) { display: none; }
+`;
+
 /**
  * DAW-style piano-roll grid. It draws a fixed score or a borrowed editing
  * controller; it creates no document, player or clock. Editing controls and
@@ -107,25 +220,27 @@ export function mountScoreGrid(host: HTMLElement, content: ScoreGridContent, opt
   // A tool that is not offered falls back to selection.
   if (settings.tool === 'draw' && !features.has('draw')) settings = {...settings, tool: 'select'};
 
-  const line = 'var(--wm-border,color-mix(in srgb,currentColor 22%,transparent))';
-  const background = 'var(--wm-score-view-background,var(--wm-surface,Canvas))';
+  // Visual layer: one scoped stylesheet built from the kit's neutral tokens. The
+  // grid inherits the shared square, monochrome control geometry.
+  const line = 'var(--sg-line)';
+  const background = 'var(--sg-surface)';
   // Instructions and status are read by assistive technology, not drawn in the window.
   const offscreen = 'position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0';
   const element = owner.createElement('section');
   element.setAttribute('part', 'grid');
-  element.style.cssText = `position:relative;display:flex;flex-direction:column;min-width:0;color:var(--wm-foreground,inherit);border:1px solid ${line};background:${background}`;
+  element.dataset.scoreGrid = '';
+  const style = owner.createElement('style');
+  style.textContent = GRID_STYLE;
   const toolbar = owner.createElement('div');
   toolbar.setAttribute('part', 'toolbar');
   toolbar.setAttribute('role', 'group');
   toolbar.setAttribute('aria-label', 'Grid editing tools');
-  toolbar.style.cssText = `display:flex;flex-wrap:nowrap;align-items:center;gap:2px;min-width:0;overflow-x:auto;padding:3px 4px;border-bottom:1px solid ${line};background:color-mix(in srgb,currentColor 5%,${background})`;
   const instructions = owner.createElement('p');
   instructions.id = makeId('score-grid-help');
   instructions.setAttribute('part', 'editing-instructions');
   instructions.style.cssText = offscreen;
   const viewport = owner.createElement('div');
   viewport.setAttribute('part', 'viewport');
-  viewport.style.cssText = 'overflow:auto;max-height:var(--wm-score-grid-max-height,32rem);min-width:0;flex:1 1 auto';
   // One scrolled canvas: the note surface underneath, then sticky ruler, keys and
   // velocity lane above it. The browser keeps sticky layers in place while scrolling.
   const canvas = owner.createElement('div');
@@ -134,7 +249,7 @@ export function mountScoreGrid(host: HTMLElement, content: ScoreGridContent, opt
   const svg = owner.createElementNS(SVG, 'svg') as SVGSVGElement;
   svg.setAttribute('part', 'surface');
   svg.setAttribute('aria-label', 'Piano roll grid, written pitch and quarter notes');
-  svg.style.cssText = 'position:absolute;left:0;top:0;display:block;touch-action:none;outline-offset:-3px;user-select:none';
+  svg.style.cssText = 'position:absolute;left:0;top:0;display:block;touch-action:none;outline-offset:-2px;user-select:none';
   const layer = (part: string, css: string): HTMLDivElement => {
     const node = owner.createElement('div');
     node.setAttribute('part', part);
@@ -152,7 +267,7 @@ export function mountScoreGrid(host: HTMLElement, content: ScoreGridContent, opt
     node.setAttribute('aria-hidden', 'true');
     return node;
   };
-  const ruler = layer('ruler', `position:sticky;top:0;z-index:4;display:flex;height:${RULER_HEIGHT}px;background:${background};border-bottom:1px solid ${line};box-sizing:border-box`);
+  const ruler = layer('ruler', `position:sticky;top:0;z-index:4;display:flex;height:${RULER_HEIGHT}px;background:${background};border-bottom:1px solid ${line};box-sizing:border-box;color:var(--sg-muted)`);
   ruler.dataset.ruler = '';
   const rulerSvg = overlaySvg();
   ruler.append(corner(''), rulerSvg);
@@ -162,8 +277,8 @@ export function mountScoreGrid(host: HTMLElement, content: ScoreGridContent, opt
   keys.style.cssText = `position:sticky;left:0;z-index:3;display:block;pointer-events:none;border-right:1px solid ${line};background:${background}`;
   const lane = layer('velocity-lane', `position:sticky;bottom:0;z-index:4;display:flex;height:${LANE_HEIGHT}px;background:${background};border-top:1px solid ${line};box-sizing:border-box`);
   lane.dataset.velocityLane = '';
-  const laneLabel = corner('display:flex;align-items:flex-start;padding:3px 4px;font-size:10px;line-height:1.2');
-  laneLabel.textContent = 'Velocity';
+  const laneLabel = corner('display:flex;align-items:flex-start;padding:5px 6px;font:600 9px/1 var(--sg-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--sg-muted)');
+  laneLabel.textContent = 'Vel';
   const laneSvg = overlaySvg();
   lane.append(laneLabel, laneSvg);
   canvas.append(svg, ruler, keys, lane);
@@ -174,76 +289,49 @@ export function mountScoreGrid(host: HTMLElement, content: ScoreGridContent, opt
   feedback.setAttribute('aria-live', 'polite');
   feedback.style.cssText = offscreen;
 
-  // ---- Toolbar: one row of icon buttons; names live in aria-label and title ----
-  const ICONS: Record<string, string> = {
-    select: '<path d="M5 3l14 7.5-6 1.5-2.5 6z"/>',
-    draw: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>',
-    snap: '<path d="M5 4h4v8a3 3 0 0 0 6 0V4h4v8a7 7 0 0 1-14 0z"/><path d="M5 8h4M15 8h4"/>',
-    velocity: '<path d="M5 20v-7M10 20V6M15 20v-9M20 20V9"/><circle cx="5" cy="12" r="1.5"/><circle cx="10" cy="5" r="1.5"/><circle cx="15" cy="10" r="1.5"/><circle cx="20" cy="8" r="1.5"/>',
-    'zoom-out': '<circle cx="11" cy="11" r="6.5"/><path d="M20.5 20.5L16 16M8 11h6"/>',
-    'zoom-in': '<circle cx="11" cy="11" r="6.5"/><path d="M20.5 20.5L16 16M8 11h6M11 8v6"/>',
-    'rows-shorter': '<path d="M12 3v6M9 6l3 3 3-3M12 21v-6M9 18l3-3 3 3M4 12h16"/>',
-    'rows-taller': '<path d="M12 3v18M8.5 6.5L12 3l3.5 3.5M8.5 17.5L12 21l3.5-3.5M4 12h3M17 12h3"/>',
-    delete: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/>',
-    undo: '<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>',
-    redo: '<path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/>',
-    values: '<path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>',
-  };
+  // ---- Toolbar: one row of square icon buttons; names live in aria-label and title ----
   const icon = (name: string): SVGSVGElement => {
     const node = owner.createElementNS(SVG, 'svg') as SVGSVGElement;
     node.setAttribute('viewBox', '0 0 24 24'); node.setAttribute('width', '16'); node.setAttribute('height', '16');
-    node.setAttribute('fill', 'none'); node.setAttribute('stroke', 'currentColor'); node.setAttribute('stroke-width', '1.75');
-    node.setAttribute('stroke-linecap', 'round'); node.setAttribute('stroke-linejoin', 'round'); node.setAttribute('aria-hidden', 'true');
+    node.setAttribute('fill', 'none'); node.setAttribute('stroke', 'currentColor'); node.setAttribute('stroke-width', '1.5');
+    node.setAttribute('stroke-linecap', 'square'); node.setAttribute('stroke-linejoin', 'miter'); node.setAttribute('aria-hidden', 'true');
     node.innerHTML = ICONS[name];
     return node;
   };
   const group = (label: string): HTMLElement => {
     const node = owner.createElement('span');
     node.setAttribute('role', 'group'); node.setAttribute('aria-label', label);
-    node.style.cssText = 'display:inline-flex;align-items:center;gap:2px;flex:none';
+    node.dataset.gridGroup = '';
     toolbar.append(node); return node;
   };
   const divider = (): HTMLElement => {
     const node = owner.createElement('span');
     node.setAttribute('aria-hidden', 'true');
-    node.style.cssText = `flex:none;width:1px;height:18px;margin:0 4px;background:${line}`;
+    node.dataset.gridDivider = '';
     toolbar.append(node); return node;
   };
   const toolButton = (parent: HTMLElement, name: string, label: string, part: string, action: () => void): HTMLButtonElement => {
     const button = owner.createElement('button');
     button.type = 'button'; button.title = label;
     button.setAttribute('aria-label', label); button.setAttribute('part', part); button.dataset.icon = name;
-    button.style.cssText = 'display:inline-grid;place-items:center;flex:none;width:28px;height:28px;padding:0;border:1px solid transparent;border-radius:4px;background:transparent;color:inherit;cursor:pointer';
+    button.dataset.gridButton = '';
     button.append(icon(name));
     button.addEventListener('click', action);
     parent.append(button); return button;
   };
-  /** Pressed tools get a tinted fill and a visible ring, not colour alone. */
-  const press = (button: HTMLButtonElement, pressed: boolean): void => {
-    button.setAttribute('aria-pressed', String(pressed));
-    button.style.background = pressed ? 'color-mix(in srgb,currentColor 16%,transparent)' : 'transparent';
-    button.style.borderColor = pressed ? 'color-mix(in srgb,currentColor 45%,transparent)' : 'transparent';
-  };
+  /** A pressed tool inverts to an ink fill, as the kit's other toggles do. */
+  const press = (button: HTMLButtonElement, pressed: boolean): void => { button.setAttribute('aria-pressed', String(pressed)); };
   const tools = group('Tool');
   const selectTool = toolButton(tools, 'select', 'Select tool', 'tool-button', () => change({tool: 'select'}, 'tool'));
   const drawTool = toolButton(tools, 'draw', 'Draw tool (B)', 'tool-button', () => change({tool: 'draw'}, 'tool'));
   const toolsDivider = divider();
   const snapGroup = group('Snap');
-  const snapIcon = icon('snap');
-  snapIcon.style.flex = 'none';
-  const snapSelect = owner.createElement('select');
-  snapSelect.setAttribute('part', 'snap');
-  snapSelect.setAttribute('aria-label', 'Snap grid');
-  snapSelect.title = 'Snap grid';
-  snapSelect.style.cssText = `font:inherit;font-size:12px;height:24px;padding:0 2px;border:1px solid ${line};border-radius:4px;background:${background};color:inherit`;
-  for (const value of SCORE_GRID_SNAPS) {
-    const option = owner.createElement('option'); option.value = value;
-    option.textContent = value === 'off' ? 'Off' : value.endsWith('t') ? `${value.slice(0, -1)}T` : value;
-    snapSelect.append(option);
-  }
-  snapSelect.addEventListener('change', () => change({snap: snapSelect.value as ScoreGridSnap}, 'snap'));
-  snapGroup.style.gap = '4px'; snapGroup.style.padding = '0 2px';
-  snapGroup.append(snapIcon, snapSelect);
+  const snapButton = toolButton(snapGroup, 'snap', 'Snap grid', 'snap', () => togglePanel('snap', snapButton));
+  snapButton.dataset.wide = '';
+  snapButton.setAttribute('aria-haspopup', 'dialog');
+  const snapValue = owner.createElement('span');
+  snapValue.dataset.gridValue = '';
+  snapButton.append(snapValue);
   const laneGroup = group('Lanes');
   const laneToggle = toolButton(laneGroup, 'velocity', 'Show velocity lane', 'lane-toggle', () => change({velocityLane: !settings.velocityLane}, 'velocityLane'));
   const zoomDivider = divider();
@@ -258,12 +346,44 @@ export function mountScoreGrid(host: HTMLElement, content: ScoreGridContent, opt
   const historyGroup = group('History');
   const undoButton = toolButton(historyGroup, 'undo', 'Undo', 'history-button', () => travelHistory('undo'));
   const redoButton = toolButton(historyGroup, 'redo', 'Redo', 'history-button', () => travelHistory('redo'));
-  const spacer = owner.createElement('span'); spacer.style.cssText = 'flex:1 1 auto'; toolbar.append(spacer);
+  const spacer = owner.createElement('span'); spacer.dataset.gridSpacer = ''; toolbar.append(spacer);
   const valuesGroup = group('Note values');
-  const valuesToggle = toolButton(valuesGroup, 'values', 'Note values and keyboard alternatives', 'values-toggle', () => {
-    valuesOpen = !valuesOpen; paintControls();
-    if (valuesOpen) existing.focus();
+  const valuesToggle = toolButton(valuesGroup, 'values', 'Note values and keyboard alternatives', 'values-toggle', () => togglePanel('values', valuesToggle));
+  valuesToggle.setAttribute('aria-haspopup', 'dialog');
+
+  // ---- Adjustment card: opens inside the grid window over a dimmed scrim ----
+  const overlay = owner.createElement('div');
+  overlay.setAttribute('part', 'overlay');
+  overlay.hidden = true;
+  const card = owner.createElement('div');
+  card.setAttribute('part', 'card');
+  card.setAttribute('role', 'dialog');
+  card.setAttribute('aria-modal', 'true');
+  const cardHeader = owner.createElement('div');
+  cardHeader.dataset.gridCardHeader = '';
+  const cardTitle = owner.createElement('h2');
+  cardTitle.id = makeId('score-grid-card');
+  card.setAttribute('aria-labelledby', cardTitle.id);
+  toolButton(cardHeader, 'close', 'Close', 'card-close', () => closePanel());
+  cardHeader.prepend(cardTitle);
+  const snapOptions = owner.createElement('div');
+  snapOptions.setAttribute('part', 'snap-options');
+  snapOptions.setAttribute('role', 'group');
+  snapOptions.setAttribute('aria-label', 'Snap grid');
+  const snapChoices = SCORE_GRID_SNAPS.map((value) => {
+    const option = owner.createElement('button');
+    option.type = 'button'; option.dataset.value = value; option.dataset.gridOption = '';
+    option.setAttribute('part', 'snap-option');
+    option.textContent = snapLabel(value);
+    option.setAttribute('aria-label', value === 'off' ? 'Snap off' : `Snap to ${value.endsWith('t') ? `${value.slice(0, -1)} triplet` : value}`);
+    option.addEventListener('click', () => { change({snap: value}, 'snap'); closePanel(); });
+    snapOptions.append(option);
+    return option;
   });
+  // Blank cells complete the last row so the hairline grid stays rectangular.
+  for (let index = SCORE_GRID_SNAPS.length; index % 4; index++) {
+    const blank = owner.createElement('span'); blank.dataset.gridBlank = ''; blank.setAttribute('aria-hidden', 'true'); snapOptions.append(blank);
+  }
 
   // ---- Numeric note values: the non-pointer path for every pointer edit ----
   const details = owner.createElement('div');
@@ -271,15 +391,15 @@ export function mountScoreGrid(host: HTMLElement, content: ScoreGridContent, opt
   details.setAttribute('part', 'note-properties');
   details.setAttribute('role', 'group');
   details.setAttribute('aria-label', 'Note values');
-  details.style.cssText = `min-width:0;max-width:100%;font-size:.8125rem;padding:0 6px;border-bottom:1px solid ${line}`;
   valuesToggle.setAttribute('aria-controls', details.id);
-  let valuesOpen = false;
+  let panel: 'snap' | 'values' | undefined;
+  let panelReturn: HTMLElement | undefined;
   const form = owner.createElement('form');
-  form.style.cssText = 'display:flex;flex-wrap:wrap;align-items:end;gap:.5rem;padding:.5rem 0';
-  const existingLabel = owner.createElement('label'); existingLabel.textContent = 'Select existing note ';
-  existingLabel.style.cssText = 'display:grid;grid-template-columns:minmax(0,1fr);min-width:0;max-width:100%';
+  form.dataset.gridForm = '';
+  const existingLabel = owner.createElement('label'); existingLabel.textContent = 'Note';
+  existingLabel.dataset.span = '';
   const existing = owner.createElement('select'); existing.setAttribute('aria-label', 'Select existing note');
-  existing.style.cssText = 'width:26em;min-width:0;max-width:100%'; existingLabel.append(existing); form.append(existingLabel);
+  existingLabel.append(existing); form.append(existingLabel);
   existing.addEventListener('change', () => {
     if (!editable() || !editing) return;
     try {
@@ -289,30 +409,58 @@ export function mountScoreGrid(host: HTMLElement, content: ScoreGridContent, opt
     } catch (error) { report(error); }
   });
   const fields: HTMLLabelElement[] = [];
-  const input = (label: string, type: string, value: string): HTMLInputElement => {
+  const input = (label: string, caption: string, type: string, value: string): HTMLInputElement => {
     const wrapper = owner.createElement('label');
-    wrapper.textContent = `${label} `;
+    wrapper.textContent = caption;
     const field = owner.createElement('input');
     field.type = type; field.value = value; field.setAttribute('aria-label', label);
-    field.style.width = '7em';
     wrapper.append(field); form.append(wrapper); fields.push(wrapper);
     return field;
   };
-  const onset = input('Onset (quarters)', 'text', '0');
-  const duration = input('Duration (quarters)', 'text', '1');
-  const pitch = input('Written MIDI pitch', 'number', '60'); pitch.min = '0'; pitch.max = '127'; pitch.step = '1';
-  const velocity = input('Velocity', 'number', '80'); velocity.min = '1'; velocity.max = '127'; velocity.step = '1';
-  const partLabel = owner.createElement('label'); partLabel.textContent = 'Insert into part ';
+  const onset = input('Onset (quarters)', 'Onset', 'text', '0');
+  const duration = input('Duration (quarters)', 'Length', 'text', '1');
+  const pitch = input('Written MIDI pitch', 'Pitch', 'number', '60'); pitch.min = '0'; pitch.max = '127'; pitch.step = '1';
+  const velocity = input('Velocity', 'Velocity', 'number', '80'); velocity.min = '1'; velocity.max = '127'; velocity.step = '1';
+  const partLabel = owner.createElement('label'); partLabel.textContent = 'Part'; partLabel.dataset.span = '';
   const part = owner.createElement('select'); part.setAttribute('aria-label', 'Insert into part'); partLabel.append(part); form.append(partLabel);
-  const formButton = (label: string, action: () => void): HTMLButtonElement => {
-    const result = owner.createElement('button'); result.type = 'button'; result.textContent = label;
-    result.addEventListener('click', action); form.append(result); return result;
+  const actions = owner.createElement('div'); actions.dataset.gridActions = ''; form.append(actions);
+  const formButton = (label: string, caption: string, primary: boolean, action: () => void): HTMLButtonElement => {
+    const result = owner.createElement('button'); result.type = 'button'; result.textContent = caption;
+    result.setAttribute('aria-label', label); result.dataset.gridAction = primary ? 'primary' : '';
+    result.addEventListener('click', action); actions.append(result); return result;
   };
-  const apply = formButton('Apply to selected note', () => numeric(false));
-  const insert = formButton('Insert note', () => numeric(true));
+  const insert = formButton('Insert note', 'Insert', false, () => numeric(true));
+  const apply = formButton('Apply to selected note', 'Apply', true, () => numeric(false));
   form.addEventListener('submit', (event) => { event.preventDefault(); numeric(false); });
   details.append(form);
-  element.append(toolbar, details, viewport, instructions, feedback);
+  card.append(cardHeader, snapOptions, details);
+  overlay.append(card);
+  element.append(style, toolbar, viewport, overlay, instructions, feedback);
+
+  function togglePanel(kind: 'snap' | 'values', trigger: HTMLElement): void {
+    if (panel === kind) { closePanel(); return; }
+    panel = kind; panelReturn = trigger;
+    paintControls();
+    (kind === 'snap' ? snapChoices.find((option) => option.dataset.value === settings.snap) ?? snapChoices[0] : existing).focus();
+  }
+  function closePanel(restoreFocus = true): void {
+    if (!panel) return;
+    const trigger = panelReturn;
+    panel = undefined; panelReturn = undefined;
+    paintControls();
+    if (restoreFocus && trigger && !trigger.hidden) trigger.focus();
+  }
+  // The scrim closes the card; Escape closes it; Tab stays inside it.
+  overlay.addEventListener('pointerdown', (event) => { if (event.target === overlay) closePanel(); });
+  overlay.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); closePanel(); return; }
+    if (event.key !== 'Tab') return;
+    const focusable = [...card.querySelectorAll<HTMLElement>('button, select, input')].filter((node) => !(node as HTMLButtonElement).disabled && node.offsetParent !== null);
+    if (!focusable.length) return;
+    const first = focusable[0]; const last = focusable[focusable.length - 1];
+    if (event.shiftKey && owner.activeElement === first) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && owner.activeElement === last) { event.preventDefault(); first.focus(); }
+  });
 
   let disposed = false;
   let gesture: Gesture | undefined;
@@ -332,10 +480,10 @@ export function mountScoreGrid(host: HTMLElement, content: ScoreGridContent, opt
   let drawn: {key: unknown; revision: number; from: number; to: number; viewportWidth: number; viewportHeight: number} | undefined;
   const drawnNotes = new Map<string, {rectangle: SVGElement; top: number; active: boolean}>();
   let playhead: SVGElement | undefined;
-  const idleFill = options.noteColor ?? (options.noteRGB ? `rgb(${options.noteRGB})` : 'var(--wm-score-view-note,var(--wm-accent,#4869d8))');
+  const idleFill = options.noteColor ?? (options.noteRGB ? `rgb(${options.noteRGB})` : 'var(--wm-score-view-note,var(--sg-ink))');
   const activeFill = options.activeNoteColor ?? (options.activeNoteRGB ? `rgb(${options.activeNoteRGB})` : 'var(--wm-score-view-active-note,var(--wm-accent,#e25477))');
   // Selection rings and handles contrast with any note fill by reusing the surface background.
-  const contrast = 'var(--wm-score-view-background,var(--wm-surface,Canvas))';
+  const contrast = 'var(--sg-surface)';
 
   function committed(): Score { return editing ? editing.state.document.content : staticScore!; }
   function visible(): Score { return editing ? editing.state.interaction.draft?.content ?? editing.state.document.content : staticScore!; }
@@ -628,8 +776,10 @@ export function mountScoreGrid(host: HTMLElement, content: ScoreGridContent, opt
       const x = quarterX(note.onsetQuarters.toFloat());
       const y = velocityY(note.velocity, 0);
       const isSelected = selected.has(note.id);
-      shape('line', {x1: x + 1, x2: x + 1, y1: LANE_HEIGHT - 6, y2: y, stroke: isSelected ? activeFill : idleFill, 'stroke-width': 2}, undefined, laneSvg);
-      shape('circle', {cx: x + 1, cy: y, r: isSelected ? 4 : 3, fill: isSelected ? activeFill : contrast, stroke: isSelected ? activeFill : idleFill, 'stroke-width': 1.5,
+      // Selected stems are solid ink with a larger square head; idle stems are muted.
+      shape('line', {x1: x + 1, x2: x + 1, y1: LANE_HEIGHT - 6, y2: y, stroke: isSelected ? 'var(--sg-ink)' : 'var(--sg-muted)', 'stroke-width': isSelected ? 2 : 1}, undefined, laneSvg);
+      const head = isSelected ? 7 : 5;
+      shape('rect', {x: x + 1 - head / 2, y: y - head / 2, width: head, height: head, fill: isSelected ? 'var(--sg-ink)' : contrast, stroke: isSelected ? 'var(--sg-ink)' : 'var(--sg-muted)', 'stroke-width': 1,
         'data-velocity-note-id': note.id}, undefined, laneSvg);
     }
   }
@@ -640,10 +790,10 @@ export function mountScoreGrid(host: HTMLElement, content: ScoreGridContent, opt
     shape('rect', {x, y, width: Math.abs((bounds.currentX ?? bounds.x) - bounds.x), height: Math.abs((bounds.currentY ?? bounds.y) - bounds.y),
       fill: 'color-mix(in srgb, currentColor 8%, transparent)', stroke: 'currentColor', 'stroke-dasharray': '3 2', 'data-marquee': '', 'pointer-events': 'none'});
   }
-  /** `hidden` alone loses to an inline `display`, so flex containers toggle both. */
-  function show(node: HTMLElement, shown: boolean, display = ''): void {
+  /** `hidden` alone loses to an author `display`, so hiding also writes an inline `none`. */
+  function show(node: HTMLElement, shown: boolean): void {
     node.hidden = !shown;
-    node.style.display = shown ? display : 'none';
+    node.style.display = shown ? '' : 'none';
   }
   function paintControls(): void {
     const enabled = editable();
@@ -656,26 +806,31 @@ export function mountScoreGrid(host: HTMLElement, content: ScoreGridContent, opt
     element.dataset.editState = !editing ? 'static' : !state!.available ? 'unavailable' : state!.interaction.draft ? 'draft' : enabled ? 'ready' : 'readonly';
     element.dataset.tool = settings.tool;
     const shown = Boolean(editing && state!.available && state!.editable);
-    show(toolbar, shown, 'flex'); instructions.hidden = !shown;
-    show(details, shown && valuesOpen, 'block');
+    show(toolbar, shown); instructions.hidden = !shown;
+    // A card for a feature that is no longer offered, or a closed editor, closes.
+    if (!shown || (panel === 'snap' && !has('snap'))) { panel = undefined; panelReturn = undefined; }
+    show(overlay, panel !== undefined);
+    show(snapOptions, panel === 'snap'); show(details, panel === 'values');
+    cardTitle.textContent = panel === 'snap' ? 'Snap' : 'Note values';
     if (!shown || !editing || !state) return;
     instructions.textContent = helpText();
-    show(tools, has('draw'), 'inline-flex');
-    show(toolsDivider, has('draw'), 'block');
+    show(tools, has('draw'));
+    show(toolsDivider, has('draw'));
     press(selectTool, settings.tool === 'select'); press(drawTool, settings.tool === 'draw');
-    show(snapGroup, has('snap'), 'inline-flex'); snapSelect.value = settings.snap;
-    show(laneGroup, has('velocity'), 'inline-flex');
+    show(snapGroup, has('snap'));
+    snapValue.textContent = snapLabel(settings.snap);
+    snapButton.setAttribute('aria-expanded', String(panel === 'snap'));
+    for (const option of snapChoices) option.setAttribute('aria-pressed', String(option.dataset.value === settings.snap));
+    show(laneGroup, has('velocity'));
     press(laneToggle, settings.velocityLane);
-    show(zoomDivider, has('zoom'), 'block');
-    show(zoomGroup, has('zoom'), 'inline-flex');
-    show(editDivider, has('delete') || has('history'), 'block');
-    show(editGroup, has('delete'), 'inline-flex');
-    show(historyGroup, has('history'), 'inline-flex');
-    valuesToggle.setAttribute('aria-expanded', String(valuesOpen)); press(valuesToggle, valuesOpen);
-    valuesToggle.removeAttribute('aria-pressed');
+    show(zoomDivider, has('zoom'));
+    show(zoomGroup, has('zoom'));
+    show(editDivider, has('delete') || has('history'));
+    show(editGroup, has('delete'));
+    show(historyGroup, has('history'));
+    valuesToggle.setAttribute('aria-expanded', String(panel === 'values'));
     deleteButton.disabled = !enabled || !selectedIds().length;
     undoButton.disabled = !enabled || !state.history.canUndo; redoButton.disabled = !enabled || !state.history.canRedo;
-    for (const button of [deleteButton, undoButton, redoButton]) { button.style.opacity = button.disabled ? '.35' : ''; button.style.cursor = button.disabled ? 'default' : 'pointer'; }
     const content = state.document.content;
     const key = content.parts.map((value) => `${value.id}:${value.name}`).join('|');
     if (key !== partsKey) {

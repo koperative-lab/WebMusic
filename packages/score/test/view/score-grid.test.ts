@@ -296,18 +296,34 @@ describe('score grid editing', () => {
 });
 
 describe('score grid settings', () => {
-  it('reflects the snap select to the attribute and announces only user changes', () => {
+  it('reflects snap in the toolbar and sets it from the in-card snap options', () => {
     const {view, part} = grid((value) => { value.snap = '1/8t'; });
     const events: ScoreGridSettingsChangeDetail[] = [];
     view.addEventListener('gridsettingschange', (event) => events.push((event as CustomEvent<ScoreGridSettingsChangeDetail>).detail));
-    const select = part('snap') as HTMLSelectElement;
-    expect(select.value).toBe('1/8t');
-    view.setAttribute('snap', '1/32'); expect(select.value).toBe('1/32');
-    view.setAttribute('snap', 'bogus'); expect(view.snap).toBe('1/16'); expect(select.value).toBe('1/16');
+    const trigger = part('snap') as HTMLButtonElement;
+    const value = () => trigger.querySelector('[data-grid-value]')!.textContent;
+    const pressed = () => [...view.querySelectorAll<HTMLButtonElement>('[part="snap-option"][aria-pressed="true"]')].map((option) => option.dataset.value);
+    expect(value()).toBe('1/8T'); expect(pressed()).toEqual(['1/8t']);
+    view.setAttribute('snap', '1/32'); expect(value()).toBe('1/32');
+    view.setAttribute('snap', 'bogus'); expect(view.snap).toBe('1/16'); expect(value()).toBe('1/16');
     expect(events).toEqual([]);
-    select.value = '1/4'; select.dispatchEvent(new Event('change', {bubbles: true}));
-    expect(view.getAttribute('snap')).toBe('1/4');
+    // The trigger opens an adjustment card over a scrim inside the grid window.
+    const overlay = part('overlay');
+    expect(overlay.hidden).toBe(true);
+    trigger.click();
+    expect(overlay.hidden).toBe(false); expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    expect(part('card').getAttribute('role')).toBe('dialog'); expect(part('snap-options').hidden).toBe(false);
+    expect(part('note-properties').hidden).toBe(true);
+    expect(document.activeElement).toBe(view.querySelector('[part="snap-option"][data-value="1/16"]'));
+    view.querySelector<HTMLButtonElement>('[part="snap-option"][data-value="1/4"]')!.click();
+    expect(view.getAttribute('snap')).toBe('1/4'); expect(overlay.hidden).toBe(true);
+    expect(document.activeElement).toBe(trigger);
     expect(events).toHaveLength(1); expect(events[0].changed).toBe('snap'); expect(events[0].settings.snap).toBe('1/4');
+    // Escape and the scrim close the card without changing anything.
+    trigger.click(); part('card').dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true}));
+    expect(overlay.hidden).toBe(true);
+    trigger.click(); overlay.dispatchEvent(new MouseEvent('pointerdown', {bubbles: true}));
+    expect(overlay.hidden).toBe(true); expect(events).toHaveLength(1);
   });
 
   it('zooms with the toolbar and modified wheel within bounds, reflecting attributes', () => {

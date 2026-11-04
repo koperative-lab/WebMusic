@@ -100,7 +100,7 @@ always available while editing.
 | `draw` | **Select tool** / **Draw tool** buttons | Draw tool; B toggles it; double-click or Alt-drag in Select. | Insert into part, Insert note |
 | `delete` | **Delete selected notes** | Delete or Backspace; a click with the Draw tool. | — |
 | `velocity` | **Show velocity lane** toggle | Drag a stem in the velocity lane. | Velocity, Apply |
-| `snap` | **Snap grid** menu | — | — |
+| `snap` | **Snap grid** button and card | — | — |
 | `zoom` | Four zoom buttons | Ctrl/Cmd+wheel and Alt+wheel. | — |
 | `history` | **Undo** / **Redo** | Ctrl/Cmd+Z, Shift+Ctrl/Cmd+Z, Ctrl/Cmd+Y. | — |
 
@@ -120,8 +120,13 @@ cancels an active gesture but keeps the selection.
 
 ## Gestures and keyboard
 
-Toolbar buttons show icons; the names above are their accessible names and
-tooltips. The piano keys, ruler and velocity lane stay in place while the grid
+Toolbar buttons show square line icons; the names above are their accessible
+names and tooltips. A pressed tool inverts to an ink fill. **Snap grid** and
+**Note values and keyboard alternatives** open an adjustment card inside the
+grid window over a dimmed backdrop; Escape, the close button or a click on the
+backdrop closes it and returns focus to its button, and Tab stays inside the
+card while it is open. The viewport and toolbar scroll without visible
+scrollbars. The piano keys, ruler and velocity lane stay in place while the grid
 scrolls. The pointer works on the note rows and the velocity lane; the piano
 keys and ruler are labels only.
 
@@ -166,7 +171,7 @@ or feature change, a changed document revision, and becoming read-only or
 detached. A failed latest preview cannot commit an earlier valid one.
 
 The **Note values and keyboard alternatives** toolbar button, at the right end
-of the toolbar, opens a panel that offers every edit without a pointer. **Select existing note** lists pitched notes by part, onset
+of the toolbar, opens a card that offers every edit without a pointer. **Select existing note** lists pitched notes by part, onset
 and pitch. **Onset** and **Duration** accept quarter values as integers,
 decimals or fractions such as `1/3`. **Written MIDI pitch** accepts 0–127 and
 **Velocity** 1–127; empty values are errors, not zero. **Apply to selected
@@ -276,9 +281,12 @@ block filling its container; `width` and `height` size it.
 
 | Part | Element |
 | --- | --- |
-| `grid` | The bordered window holding the toolbar, note-values panel and viewport. |
+| `grid` | The bordered window holding the toolbar, viewport and card overlay. |
 | `toolbar` | The one-row icon toolbar along the top; contains `tool-button`, `snap`, `lane-toggle`, `zoom-button`, `delete-button`, `history-button` and `values-toggle`. |
-| `note-properties` | The note-values panel opened by `values-toggle`. |
+| `overlay` | The dimmed backdrop covering the window while a card is open. |
+| `card` | The adjustment card (a modal `dialog`); its header holds `card-close`. |
+| `snap-options` | The snap choices in the card; each is a `snap-option`. |
+| `note-properties` | The note-values form in the card. |
 | `viewport` | The scrolling frame around the drawing. |
 | `canvas` | The scrolled content holding the surface and the sticky layers. |
 | `surface` | The SVG note rows, grid lines, notes and playhead. |
@@ -294,11 +302,20 @@ The `grid` part reflects `data-edit-state` (`static`, `readonly`, `ready`,
 | Property | Effect |
 | --- | --- |
 | `--wm-score-grid-max-height` | Maximum viewport height before it scrolls; default `32rem`. |
-| `--wm-score-view-note` | Idle note fill, then `--wm-accent`, then `#3b5bdb` / `#91a7ff` for light / dark schemes. |
-| `--wm-score-view-active-note` | Sounding note fill and selected velocity stems; default `rgb(240, 84, 119)`. |
-| `--wm-score-view-background` | Viewport, keys and ruler background, then `--wm-surface`. Selection rings and the resize handle reuse it to contrast with note fills. |
-| `--wm-border` | Viewport and toolbar button borders. |
-| `--wm-foreground` | Text, grid lines and outlines, through `currentColor`. |
+| `--wm-score-grid-scrim` | Backdrop behind an open card; default 45% black. |
+| `--wm-score-view-note` | Idle note fill, then `--wm-foreground`, then `#333` / `#ddd` for light / dark schemes. |
+| `--wm-score-view-active-note` | Sounding note fill; default `rgb(240, 84, 119)`. |
+| `--wm-score-view-background` | Window, keys, ruler and card background, then `--wm-surface`. Selection rings and the resize handle reuse it to contrast with note fills. |
+| `--wm-foreground` | Icons, text, pressed-tool fill, selected velocity stems, grid lines and outlines; default `#111` / `#eee`. |
+| `--wm-foreground-muted` | Idle icons, ruler and key labels, idle velocity stems; default `#777` / `#aaa`. |
+| `--wm-accent-foreground` | Icon color on a pressed tool and the primary card action; default `#fff` / `#111`. |
+| `--wm-surface-muted` | Hover fill for toolbar buttons and snap options. |
+| `--wm-control-border`, `--wm-border` | Window, toolbar, divider, card and field lines; default `#d8d8d8` / `#333`. |
+| `--wm-control-size` | Toolbar height, square button size and card field height; default `2rem`. |
+| `--wm-control-radius` | Button, field and card corners; default `0`. |
+| `--wm-component-border`, `--wm-component-radius` | The window's outer border and corners. |
+| `--wm-font-mono` | Snap values, labels and numeric fields. |
+| `--wm-focus-ring` | Focus outline on buttons, fields and the grid. |
 
 Note opacity follows velocity. `note-color` and `active-note-color` replace
 the note tokens for one element. The loading, waiting and error states use the
