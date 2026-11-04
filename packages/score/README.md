@@ -279,11 +279,11 @@ Effective timing edits make written time authoritative for changed notes while
 preserving their effective velocity. Unchanged notes keep their performed timing.
 Native ScorePlayer borrows the editor through `setDocumentSource(editor)`.
 `loadScoreEditor(url)` loads a file into a new editor. Assign it to
-`score-player` and `score-view` through `.editor`; the application owns and
-disposes it. Piano-roll and staff Views enable
-editing with `editable`. Staff entry uses an explicit input mode and supports
-simple note/rest entry with voice completion inside authored measures. It rejects
-unsupported structures and unmeasured MIDI rather than inferring notation.
+`score-player`, `score-grid-view` and `score-view` through `.editor`; the
+application owns and disposes it. `<score-grid-view editable>` is a DAW-style
+piano-roll grid with a toolbar: select, drag, resize, draw and delete notes,
+edit velocity in a lane, snap and zoom. Its `tools` attribute chooses which of
+those features exist. `<score-view>` is read-only and draws the editor's content.
 Playback applies revisions while paused and requires
 an explicit later Play action. See the
 [View API](https://github.com/koperative-lab/WebMusic/blob/main/apps/doc/webmusic/src/content/docs/score/api/view.mdx)

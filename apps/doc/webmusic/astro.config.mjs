@@ -202,6 +202,8 @@ export default defineConfig({
     '/score/headless/analyze/transport-clock': withDocsBase('/score/headless/analyze/analysis-follower/#presentation-clock'),
     '/score/headless/view/active-note-tracker': withDocsBase('/score/headless/view/pitch-view/#active-note-tracker'),
     '/score/headless/analyze/score-report': withDocsBase('/score/api/analyze/#reports'),
+    // Staff input was removed; ScoreEditor still owns the document and its commands.
+    '/score/headless/view/staff-editing': withDocsBase('/score/headless/view/score-editor/'),
     // The aggregated headless pages became one page per object. The capability
     // URL itself is now a redirect to the family inventory (above), so these
     // deep anchors are repointed at the object page that absorbed them.

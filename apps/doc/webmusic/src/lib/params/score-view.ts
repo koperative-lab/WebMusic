@@ -1,7 +1,10 @@
 // @webmusic/score/view/element — every observed attribute of the View tags.
 // Checked against `static get observedAttributes()` in
-// packages/score/src/view/element/*.ts. `<score-view>`'s last ten names are
-// spread from NUMERIC_OPTION_ATTRS / COLOR_OPTION_ATTRS in score-view.ts, and
+// packages/score/src/view/element/*.ts. `<score-view>` and `<score-grid-view>`
+// begin with SCORE_VIEW_BASE_ATTRIBUTES (internal/score-view-base.ts);
+// `<score-view>`'s last ten names are spread from NUMERIC_OPTION_ATTRS /
+// COLOR_OPTION_ATTRS in score-view.ts, `<score-grid-view>`'s from
+// GRID_ATTRIBUTES in score-grid-view.ts, and
 // the fallbacks below include the Element's responsive and theme defaults;
 // the standalone renderer retains its own fixed-size defaults.
 
@@ -42,15 +45,6 @@ export const SCORE_VIEW_PARAMS: ElementParamCatalog = {
         fallback: 'standalone score input',
         note: 'Borrow the selected player’s score and current position; initialize and follow paused, playing, seek and source changes.',
       },
-      {name: 'editable', kind: 'bool', fallback: 'off',
-        note: 'Enable editing for an editor-bound piano roll or staff. Staff input needs authored measures; other types remain read-only.'},
-      {
-        name: 'type',
-        kind: 'enum',
-        options: ['piano-roll', 'staff', 'waterfall'],
-        fallback: 'piano-roll',
-        note: 'Which drawing is rendered; changing it disposes the old visualizer and re-renders. An unknown value (including the removed map and thumbnail) falls back to piano-roll.',
-      },
       {
         name: 'width',
         kind: 'text',
@@ -64,6 +58,13 @@ export const SCORE_VIEW_PARAMS: ElementParamCatalog = {
         placeholder: '240',
         fallback: 'natural height',
         note: 'Host height, same rule as width; a fixed height also sets overflow-y: auto, so a taller drawing scrolls inside the box.',
+      },
+      {
+        name: 'type',
+        kind: 'enum',
+        options: ['piano-roll', 'staff', 'waterfall'],
+        fallback: 'piano-roll',
+        note: 'Which drawing is rendered; changing it disposes the old visualizer and re-renders. An unknown value (including the removed map and thumbnail) falls back to piano-roll.',
       },
       {
         name: 'show-annotations',
@@ -100,15 +101,15 @@ export const SCORE_VIEW_PARAMS: ElementParamCatalog = {
         kind: 'number',
         placeholder: '30',
         fallback: '30 (staff: shared readable scale, or compact for one layer)',
-        note: 'Passive piano-roll/waterfall pixels per second; editor piano rolls use .options.pixelsPerQuarter. Staff converts the value through initial tempo.',
+        note: 'Piano-roll/waterfall pixels per nominal second. Staff converts the value through initial tempo.',
       },
       {
         name: 'note-height',
         when: scoreTypes('piano-roll', 'staff'),
         kind: 'number',
         placeholder: '6',
-        fallback: '6; editor piano roll: 20',
-        note: 'Piano-roll lane height or staff notation scale in px; editor grid values must be positive.',
+        fallback: '6',
+        note: 'Piano-roll lane height or staff notation scale in px.',
       },
       {
         name: 'note-spacing',
@@ -180,19 +181,74 @@ export const SCORE_VIEW_PARAMS: ElementParamCatalog = {
     ],
     properties: [
       {name: 'score', note: 'Assign a loaded Score; overrides src and cancels any in-flight load.'},
-      {name: 'editor', note: 'Assign an editor from loadScoreEditor/createScoreEditor; borrowed, never disposed. Undefined detaches it. Rejects source conflicts with score/src before replacing a valid binding.'},
-      {name: 'editable', note: 'Reflected boolean editing flag; false by default.'},
-      {name: 'interactionSession', note: 'Borrow a same-document session to share selection/drafts; otherwise the View creates and disposes its own.'},
+      {name: 'editor', note: 'Follow an editor from loadScoreEditor/createScoreEditor read-only, including shared drafts; borrowed, never disposed. Undefined detaches it. Rejects source conflicts with score/src.'},
+      {name: 'interactionSession', note: 'Borrow a same-document session to draw another surface’s draft; otherwise the View creates and disposes its own.'},
       {name: 'currentTime', note: 'Read-only nominal score position in seconds.'},
       {name: 'active', note: 'Read-only MIDI pitches at the current score position.'},
-      {name: 'configure(configuration)', note: 'Atomically select piano-roll, staff or waterfall with compatible options; piano-roll includes editor pixelsPerQuarter and editingGrid; showAnnotations is staff-only.'},
-      {name: 'options', note: 'ScoreViewRenderOptions merged over attributes; includes editor pixelsPerQuarter (64) and editingGrid ([1, 4]), plus passive renderer options.'},
+      {name: 'configure(configuration)', note: 'Atomically select piano-roll, staff or waterfall with compatible options; showAnnotations is staff-only.'},
+      {name: 'options', note: 'ScoreViewRenderOptions merged over attributes; the property wins.'},
       {name: 'type', note: 'Reflects the three-value type; the setter writes the attribute.'},
     ],
+  },
+
+  'score-grid-view': {
+    tag: 'score-grid-view',
+    entry: ENTRY,
+    params: [
+      {...SRC, fallback: 'borrow player data, else await .score or .editor'},
+      FORMAT,
+      {
+        name: 'player',
+        kind: 'text',
+        placeholder: '#my-player',
+        fallback: 'no playhead',
+        note: 'Follow one selected player’s position and sounding notes; without an editor the grid also borrows its score.',
+      },
+      {name: 'width', kind: 'text', placeholder: '640', fallback: 'stretches to the container', note: 'Host width — a bare number is px, any other CSS length passes through.'},
+      {name: 'height', kind: 'text', placeholder: '360', fallback: 'natural height', note: 'Host height, same rule as width; a fixed height scrolls a taller grid inside the box.'},
+      {name: 'editable', kind: 'bool', fallback: 'off — read-only grid',
+        note: 'Show the editing toolbar and accept gestures when a ready .editor is assigned; never creates an editor.'},
+      {
+        name: 'tools',
+        kind: 'text',
+        placeholder: 'move resize draw delete velocity snap zoom history',
+        fallback: 'every feature',
+        note: 'Space- or comma-separated features to offer; empty leaves selection only. Unknown tokens are ignored.',
+      },
+      {name: 'tool', kind: 'enum', options: ['select', 'draw'], fallback: 'select',
+        note: 'Pointer tool; draw needs the draw feature and otherwise falls back to select. The toolbar and B key reflect it here.'},
+      {name: 'snap', kind: 'enum', options: ['off', '1/4', '1/8', '1/8t', '1/16', '1/16t', '1/32'], fallback: '1/16',
+        note: 'Snap and subdivision-line resolution as a note value; t marks triplets. Applies without the snap feature, which only adds the toolbar menu.'},
+      {name: 'velocity-lane', kind: 'bool', fallback: 'off',
+        note: 'Show the velocity lane below the rows; needs the velocity feature.'},
+      {name: 'pixels-per-quarter', kind: 'number', min: 8, max: 512, placeholder: '64', fallback: '64',
+        note: 'Horizontal zoom in px per written quarter, clamped to 8–512.'},
+      {name: 'note-height', kind: 'number', min: 6, max: 48, placeholder: '16', fallback: '16',
+        note: 'Row height in px per semitone, clamped to 6–48.'},
+      {name: 'min-pitch', kind: 'number', step: 1, min: 0, max: 127, placeholder: '48', fallback: 'MIDI 48, or two below the lowest note',
+        note: 'Lowest written MIDI row; an integer 0–127.'},
+      {name: 'max-pitch', kind: 'number', step: 1, min: 0, max: 127, placeholder: '84', fallback: 'MIDI 84, or two above the highest note',
+        note: 'Highest written MIDI row; a crossing range shows an error status.'},
+      {name: 'note-color', kind: 'text', placeholder: '#2563eb', fallback: '--wm-score-view-note, else --wm-accent',
+        note: 'Idle note fill: #rgb, #rrggbb, rgb() or an r, g, b triple.'},
+      {name: 'active-note-color', kind: 'text', placeholder: '#f59e0b', fallback: '--wm-score-view-active-note, else red rgb(240, 84, 119)',
+        note: 'Fill of sounding notes and selected velocity stems; same syntax as note-color.'},
+    ],
+    properties: [
+      {name: 'score', note: 'Assign a loaded Score; overrides src and player data. Rejected while an editor is assigned.'},
+      {name: 'editor', note: 'Borrow an editor from loadScoreEditor/createScoreEditor; required for editing. Never disposed; undefined detaches it.'},
+      {name: 'interactionSession', note: 'Borrow a same-document session to share selection and drafts with other surfaces.'},
+      {name: 'editable', note: 'Reflects the editable attribute.'},
+      {name: 'tools', note: 'Offered features in canonical order; the setter writes the attribute and rejects unknown names.'},
+      {name: 'tool / snap / velocityLane', note: 'Reflect their attributes with the same fallbacks.'},
+      {name: 'pixelsPerQuarter / noteHeight', note: 'Current zoom, including toolbar and wheel changes; the setters write the attributes.'},
+      {name: 'currentTime', note: 'Read-only nominal score position in seconds.'},
+    ],
     events: [
-      {name: 'editpreview', note: 'Successful draft result: {status: "preview", snapshot}; bubbling and composed.'},
-      {name: 'editcommit', note: 'Successful document commit: {status: "committed", snapshot, change}; playback acknowledgement is separate; bubbling and composed.'},
-      {name: 'editerror', note: 'Editing failure detail {error}; bubbling and composed.'},
+      {name: 'editpreview', note: 'A gesture’s successful draft: {status: "preview", snapshot}; bubbling and composed.'},
+      {name: 'editcommit', note: 'A committed edit: {status: "committed", snapshot, change}; bubbling and composed.'},
+      {name: 'editerror', note: 'An editing failure, detail {error}; bubbling and composed.'},
+      {name: 'gridsettingschange', note: 'A toolbar, wheel or keyboard change to tool, snap, lane or zoom: {settings, changed}; bubbling and composed.'},
     ],
   },
 

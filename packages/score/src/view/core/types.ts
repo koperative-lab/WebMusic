@@ -1,4 +1,4 @@
-import type {Note, ScoreQuarterValue} from '../../core';
+import type {Note} from '../../core';
 
 export interface ViewLayoutOptions {
   /** Finite positive pixels per nominal second; default 30. */
@@ -69,7 +69,7 @@ export interface StaffRenderOptions extends VisualizerRenderOptions {
 /** Renderer options selected by a concrete view mode. */
 export interface ScoreViewOptionsByType {
   /** Editor-bound piano rolls also read written-quarter geometry; passive renderers ignore it. */
-  'piano-roll': VisualizerRenderOptions & {pixelsPerQuarter?: number; editingGrid?: ScoreQuarterValue};
+  'piano-roll': VisualizerRenderOptions;
   staff: StaffRenderOptions;
   waterfall: WaterfallRenderOptions;
 }

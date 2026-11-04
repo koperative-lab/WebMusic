@@ -97,16 +97,16 @@ and any views. No application revision-copying code is required:
 
 ```html
 <score-player id="audition"></score-player>
-<score-view player="#audition" editable></score-view>
+<score-grid-view player="#audition" editable></score-grid-view>
 <script type="module">
   import {defineScorePlayerElement} from '@webmusic/score/play/element';
-  import {defineScoreViewElement} from '@webmusic/score/view/element';
+  import {defineScoreGridViewElement} from '@webmusic/score/view/element';
   import {loadScoreEditor} from '@webmusic/score/view/headless';
   defineScorePlayerElement();
-  defineScoreViewElement();
+  defineScoreGridViewElement();
   const editor = await loadScoreEditor('/midi/Editing.mid');
   const player = /** @type {import('@webmusic/score/play/element').ScorePlayerElement | null} */ (document.querySelector('score-player'));
-  const view = /** @type {import('@webmusic/score/view/element').ScoreViewElement | null} */ (document.querySelector('score-view'));
+  const view = /** @type {import('@webmusic/score/view/element').ScoreGridViewElement | null} */ (document.querySelector('score-grid-view'));
   if (player) player.editor = editor;
   if (view) view.editor = editor;
 </script>
@@ -146,8 +146,8 @@ native [application outcomes](/score/headless/play/score-player/#apply-document-
 They await an in-progress Element mount; disconnect or source replacement
 supersedes that wait. Without an editor input, `.documentBinding` is `undefined`.
 
-The [editable View demo](/score/element/view/score-view/#piano-roll-editing)
-combines import, editing, undo, audition and MIDI export. Audio resource property
+The [shared editing demo](/score/element/view/score-view/#follow-an-editor)
+combines import, grid editing, undo, audition and MIDI export. Audio resource property
 changes still rebuild the engine; ordinary document commits preserve it.
 
 ## Share data and state with companions

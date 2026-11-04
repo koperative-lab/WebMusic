@@ -152,9 +152,10 @@ Piano-roll and staff modes can both expose editor commands. Switching to
 waterfall disables editing and cancels its draft; switching back restores the
 prior editing flag. `view.editing.setEditable(value)` records the requested
 flag and applies it only in piano-roll or staff mode, so waterfall stays
-read-only until the type changes. Staff cursor, voice and written-note entry are supplied by
-the separately composed [createStaffViewEditing](/score/headless/view/staff-editing/)
-controller; selecting staff alone does not create a cursor or musical commands.
+read-only until the type changes. This model supplies commands and drafts but
+no gestures: [`mountScoreGrid`](/score/api/view/#mount-a-score-grid) draws an
+editing grid over a `ScoreViewEditing` controller, and selecting staff does not
+create a notation cursor or written-note entry.
 
 With `playback`, `state.playbackAvailable` is true only for a ready binding with
 matching applied document ID/revision and valid authored coordinates. The helper
@@ -282,6 +283,8 @@ are described by the [View API](/score/api/view/).
 **Composed by.** [`<score-view>`](/score/element/view/score-view/) — Score /
 View, which pairs it with the `/render` adapters and a
 [`@webmusic/ui/stage`](/uikit/layout-feedback/stage/) surface.
+[`<score-grid-view>`](/score/element/view/score-grid-view/) composes
+`createScoreViewEditing` with `mountScoreGrid`.
 
 [createActiveNoteTracker](/score/headless/view/pitch-view/#active-note-tracker) handles
 live pitches that have no score onset.

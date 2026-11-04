@@ -18,9 +18,10 @@ Use this owner when several custom surfaces edit one document. Use the pure
 your application owns the entire state/history model. Existing `score.edit`
 remains a short-lived batch primitive. [ScorePlayer](/score/headless/play/score-player/)
 can borrow this owner through `setDocumentSource(editor)`, and
-[`<score-player>`](/score/element/play/score-player/) and
-[editable Score views](/score/element/view/score-view/) borrow it through their
-`.editor` property.
+[`<score-player>`](/score/element/play/score-player/),
+[`<score-grid-view>`](/score/element/view/score-grid-view/) and
+[`<score-view>`](/score/element/view/score-view/#follow-an-editor) borrow it
+through their `.editor` property.
 
 <ScoreEditorHeadlessDemo />
 
@@ -69,17 +70,17 @@ editor's `history` and `onListenerError` options are applied to the result.
 ```ts
 import {loadScoreEditor} from '@webmusic/score/view/headless';
 import {defineScorePlayerElement, type ScorePlayerElement} from '@webmusic/score/play/element';
-import {defineScoreViewElement, type ScoreViewElement} from '@webmusic/score/view/element';
+import {defineScoreGridViewElement, type ScoreGridViewElement} from '@webmusic/score/view/element';
 
 defineScorePlayerElement();
-defineScoreViewElement();
+defineScoreGridViewElement();
 
 const controller = new AbortController();
 const editor = await loadScoreEditor('/midi/Editing.mid', {
   signal: controller.signal, history: {limit: 100},
 });
 const player = document.querySelector<ScorePlayerElement>('score-player')!;
-const view = document.querySelector<ScoreViewElement>('score-view')!;
+const view = document.querySelector<ScoreGridViewElement>('score-grid-view')!;
 player.editor = editor;
 view.editor = editor;
 
@@ -251,8 +252,9 @@ re-exported by `@webmusic/score/view`, with their runtime checks documented in
 
 [Score I/O](/score/api/io/) loads Scores, owns the load options and exports an
 explicit committed snapshot. [Score Core](/score/api/#batch-edits-with-scoreedit) supplies
-the lower-level batch primitive. [Score views](/score/element/view/score-view/)
-borrow this editor for piano-roll and staff input, and
+the lower-level batch primitive. [`<score-grid-view>`](/score/element/view/score-grid-view/)
+borrows this editor to edit notes, [`<score-view>`](/score/element/view/score-view/#follow-an-editor)
+follows it read-only, and
 [`<score-player>`](/score/element/play/score-player/) and
 [ScorePlayer](/score/headless/play/score-player/) apply committed revisions
 through their document binding.

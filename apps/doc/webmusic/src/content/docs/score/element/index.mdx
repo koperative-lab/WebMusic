@@ -116,18 +116,19 @@ subscriptions, discovery and owned analysis work, without stopping the player.
 
 ## View
 
-Three View elements group representations by the data and resources they
+Four View elements group representations by the data and resources they
 use.
 
 | Element | Representations | Register |
 | --- | --- | --- |
-| [`<score-view>`](/score/element/view/score-view/) | `piano-roll`, `staff` and `waterfall` over a whole Score. | `defineScoreViewElement(tag?)` |
+| [`<score-view>`](/score/element/view/score-view/) | Read-only `piano-roll`, `staff` and `waterfall` over a whole Score. | `defineScoreViewElement(tag?)` |
+| [`<score-grid-view>`](/score/element/view/score-grid-view/) | DAW-style piano-roll grid; edits a borrowed editor with a switchable toolbar. | `defineScoreGridViewElement(tag?)` |
 | [`<score-pitch-view>`](/score/element/view/score-pitch-view/) | `keyboard`, `staff` and `fretboard` for currently held MIDI pitches. | `definePitchViewElement(tag?)` |
 | [`<score-sheet-view>`](/score/element/view/score-sheet-view/) | Engraved sheet music using the optional OpenSheetMusicDisplay peer. | `defineSheetViewElement(tag?)` |
 
-`defineAllViewElements()` from `@webmusic/score/view/element` registers all three.
+`defineAllViewElements()` from `@webmusic/score/view/element` registers all four.
 Each type stays on its owning page, with its controls in external Parameters.
-`score-view` borrows resolved score data and position; `score-pitch-view` borrows held
+`score-view` and `score-grid-view` borrow resolved score data and position; `score-pitch-view` borrows held
 notes. `score-sheet-view` requires explicit `.score` or `src` and follows player events;
 it does not borrow the player's loaded score.
 
@@ -135,8 +136,10 @@ Editing is part of View. Load an editor with
 [`loadScoreEditor`](/score/headless/view/score-editor/#load-from-a-url) (or create
 one with `createScoreEditor`) and assign it to the `.editor` property of a player
 or view; there is no `editor` attribute. Your application owns and disposes the
-editor; borrowers release their subscriptions. Piano-roll editing and staff input
-belong to [`<score-view>`](/score/element/view/score-view/).
+editor; borrowers release their subscriptions. Note editing belongs to
+[`<score-grid-view>`](/score/element/view/score-grid-view/);
+[`<score-view>`](/score/element/view/score-view/#follow-an-editor) follows an
+editor read-only.
 
 ```html
 <score-player id="p" src="/mxl/Arabesque%20No.1.mxl"></score-player>
@@ -196,6 +199,7 @@ of the component background.
 | Channel mixer | [Rack control](/score/element/play/score-rack-control/) |
 | Parameters, envelope, EQ, LFO and macros | [Synth panel](/score/element/play/score-synth-panel/) |
 | Score drawings and active notes | [Score view](/score/element/view/score-view/) |
+| Piano-roll grid and editing toolbar | [Score grid view](/score/element/view/score-grid-view/) |
 | Keyboard, staff and fretboard readouts | [Pitch view](/score/element/view/score-pitch-view/) |
 | Engraved paper and ink | [Sheet view](/score/element/view/score-sheet-view/) |
 | Live analysis | Each [Analyze component](#analyze) and its UIKit Harmony/Workbench tokens |

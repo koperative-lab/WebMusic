@@ -4,13 +4,16 @@ Status: accepted design (P0, 2026-10-13); P1 Score Core/API/Headless delivered
 and verified on 2026-10-15. P2 Score bindings and piano-roll editing are
 implemented. P3 Audio sequence/history, playback, loading, waveform editing,
 range processing and WAV export are implemented; current verification belongs to
-STATUS. P4 staff input extends the existing staff View under DEC-054; its
-implementation and verification are tracked in STATUS.
+STATUS. P4 staff input was implemented under DEC-054 and then removed by
+[DEC-058](../DECISIONS.md#dec-058--score-editing-moves-to-a-dedicated-grid-view),
+which moves Score note editing to `<score-grid-view>` and makes `<score-view>`
+read-only.
 Related decisions: [DEC-053](../DECISIONS.md#dec-053--document-owned-editing-and-borrowed-playback),
 [DEC-055](../DECISIONS.md#dec-055--editing-is-a-view-feature-not-a-capability), which
 places editing inside View rather than a separate capability, and
 [DEC-057](../DECISIONS.md#dec-057--editable-documents-are-an-api-not-a-web-component),
-which replaces the document Web Components with loading APIs.
+which replaces the document Web Components with loading APIs, and
+[DEC-058](../DECISIONS.md#dec-058--score-editing-moves-to-a-dedicated-grid-view).
 [STATUS](../STATUS.md), EDIT-01, owns delivery; the
 [dated proposal](../plans/2026-10-13-editing-capabilities.md) retains the original
 P0–P8 baseline. The current five-phase roadmap is below. This document specifies
@@ -30,12 +33,10 @@ The Score surface is documented in the [View API](../../apps/doc/webmusic/src/co
 and [ScoreEditor](../../apps/doc/webmusic/src/content/docs/score/headless/view/score-editor.mdx)
 references. Score bindings are described by the
 [native player](../../apps/doc/webmusic/src/content/docs/score/headless/play/score-player.mdx)
-and [editable View](../../apps/doc/webmusic/src/content/docs/score/element/view/score-view.mdx).
+and the [grid View](../../apps/doc/webmusic/src/content/docs/score/element/view/score-grid-view.mdx).
 Audio public contracts are documented in the [View API](../../apps/doc/webmusic/src/content/docs/audio/api/view.mdx),
 [AudioClipEditor](../../apps/doc/webmusic/src/content/docs/audio/headless/view/audio-clip-editor.mdx)
 and the [Play export API](../../apps/doc/webmusic/src/content/docs/audio/api/play.mdx).
-Staff input uses the bounded notation-entry contract below.
-
 ## User task and boundary
 
 The first Score workflow imports MIDI, edits authored notes in a piano roll,
@@ -44,9 +45,10 @@ revision and exports MIDI. The first Audio workflow loads a single file, edits
 a contiguous sequence, applies gain/fades or explicit local processing,
 undoes/redoes, auditions and exports WAV.
 
-Existing piano-roll and waveform renderers gain optional editing interaction.
-Staff input retains `score-view type="staff"` with a separate local input
-controller and shared renderer under [DEC-054](../DECISIONS.md#dec-054--staff-input-inside-the-existing-score-view). Complete engraving,
+Score notes are edited on the dedicated `<score-grid-view>` piano-roll grid;
+the existing waveform renderer gains optional editing interaction for Audio.
+`<score-view>` is read-only and can follow an editor's content. Staff and
+notation editing are outside the current contract (DEC-058). Complete engraving,
 performance-only note editing, seamless live replacement, spectral repair,
 multi-track arrangement, cross-document history, persistence and collaboration
 are separate work. An editable surface does not imply those capabilities.
@@ -361,8 +363,8 @@ the editor through the Headless API, then lends it to Elements through the
 import {loadScoreEditor} from '@webmusic/score/view/headless';
 const editor = await loadScoreEditor('/music.mid');
 scorePlayer.editor = editor;
-pianoRoll.editor = editor;   // <score-view type="piano-roll" editable>
-staff.editor = editor;       // <score-view type="staff">
+grid.editor = editor;        // <score-grid-view editable>
+staff.editor = editor;       // <score-view type="staff">, read-only follow
 // …later, after detaching borrowers:
 editor.dispose();
 ```
@@ -375,9 +377,11 @@ an injectable decode loader with the editor's history, processing and listener
 options. A failed or aborted load rejects and creates no editor.
 
 A View never creates an editor implicitly. `.editor` supplies content and
-commands; boolean `editable` (default false) only enables mutation gestures.
-Without a ready editor, or for a type that does not support editing, editable
-state is explicitly unavailable; no pretend-success gestures occur. Read-only
+commands; boolean `editable` (default false) only enables mutation gestures on
+the Views that edit: `<score-grid-view>` and `<audio-view>`. `<score-view>` has
+no `editable`; with `.editor` it draws the editor's visible content read-only.
+Without a ready editor, or for an Audio type that does not support editing,
+editable state is explicitly unavailable; no pretend-success gestures occur. Read-only
 editor-bound views are supported without playback. Assigning `undefined`
 detaches the editor; there is no `editor` selector attribute, so cross-root and
 late composition are the application's own object wiring.
@@ -413,40 +417,43 @@ Keyboard commands are scoped to the focused editing surface and do not intercept
 text fields elsewhere. Arrow/nudge, selection, delete and undo/redo operate through
 the same domain commands as pointer input. Provide labels, visible focus and
 numeric alternatives to dragging; selection/draft/playing/error states must be
-distinguishable beyond color. Staff's A–G entry, durations, voices and automatic
-rests use their own controller, not the piano-roll keyboard interpretation.
+distinguishable beyond color.
 
-### Staff notation entry
+### Score grid editing
 
-The staff View borrows the same editor as other views. Its local controller owns
-part, staff, voice, exact quarter cursor, octave, accidental and duration.
-None of these settings creates a second Score or history. The browser adapter
-owns focused, armed input and reuses the scrolling staff renderer; the native player remains
-an optional applied-revision follower. The optional OSMD sheet has no entry mode.
+`<score-grid-view>` (renderer `mountScoreGrid`) draws written-pitch rows with
+piano keys, bar, beat and snap lines from the score's time signatures (4/4
+before the first), a bar ruler and an optional velocity lane. Without an editor
+it draws `.score`, `src` or a player's score; editing needs a ready `.editor`
+and `editable`, which shows a toolbar above the grid.
 
-Notation entry is one semantic transaction: insert a spelled note or rest into
-one existing measure and fill the target voice/staff's uncovered time with real
-rest Notes. Rest IDs are deterministic derivatives of the submitted entry ID,
-with collision rejection. Replay and undo retain those identities. Unchanged
-notes keep their original attributes and performed timing. New notes use written
-time; other voices/staves are untouched. Rests do not become sounding MIDI notes.
+The application chooses which features exist with the `tools` token list —
+`move`, `resize`, `draw`, `delete`, `velocity`, `snap`, `zoom`, `history`;
+absent means all. A missing feature hides its toolbar control and makes its
+gestures, keys and numeric fields inert; selection is always available while
+editing. The user chooses, within those features, the pointer tool (`select`
+or `draw`), snap (`off`, `1/4`, `1/8`, `1/8t`, `1/16`, `1/16t`, `1/32`; a
+note value, default `1/16`), the velocity lane and horizontal/row zoom. These
+settings are also `tool`, `snap`, `velocity-lane`, `pixels-per-quarter` and
+`note-height` attributes; a user change is reflected and announced with
+`gridsettingschange`, and an attribute change applies without remounting.
 
-The first operation accepts simple monophonic notation in an authored positive
-measure. It rejects cross-boundary entry, partial replacement of sounding notes,
-ambiguous overlaps and unsupported grouped notation instead of repairing it
-implicitly. Duration spelling and rest fragmentation are bounded. The public
-command reference owns exact supported bases, dots and limits. A display grid
-inferred from MIDI is not an authored measure grid and cannot authorize entry.
-Applications may supply measures through Core construction; this version adds
-no implicit transcription or measure-editing command.
+| Gesture | Feature | Command |
+|---|---|---|
+| Click / Shift-click / drag empty space (Select) | always | Selection only |
+| Drag a note body | `move` | One `move-notes` + `transpose-notes` draft, clamped at quarter 0 and MIDI 0–127 |
+| Drag a note's right edge | `resize` | `resize-notes`, never shorter than one snap step |
+| Draw tool click/drag empty; Select double-click or Alt-drag | `draw` | `insert-notes`, one snap step or the dragged length |
+| Draw tool click on a note | `delete` | `delete-notes` |
+| Drag a velocity-lane stem | `velocity` | One `set-velocity` per selected note, committed together |
+| Arrow keys / Shift+Left/Right | `move` / `resize` | One snap step or semitone |
+| Delete, Ctrl/Cmd+Z/Y, B | `delete`, `history`, `draw` | Delete, undo/redo, toggle the draw tool |
+| Ctrl/Cmd+wheel, Alt+wheel, toolbar zoom | `zoom` | View setting only |
 
-Focus and note-input mode are separate from `editable`. The focused surface uses
-N to toggle entry and Escape to leave it; A–G and rest entry mutate only when
-armed. Duration, cursor, voice and numeric controls have named alternatives.
-Undo/redo target the borrowed editor's shared history. External document changes
-invalidate local entry assumptions; detach releases renderer/controller
-subscriptions without disposing the borrowed editor or player. Error feedback
-must identify unsupported structure without partially changing the score.
+With snap off, positions resolve to 1/96 quarter. Each completed gesture is one
+atomic, revision-guarded editor command; a shared interaction session lets a
+read-only `<score-view>` show the grid's draft. The collapsible note-values form
+offers every enabled edit without a pointer.
 
 UI work covers a neutral two-dimensional item grid, draggable range handles and
 envelope-lane presentation. Bindings supply hit IDs, numeric axes and legal
@@ -494,7 +501,7 @@ claim completion.
 | P1 | Score Core ports/maps, velocity/schema migration, atomic editing API/Headless commands, history, checkpoints and interaction sessions | Original P1 |
 | P2 | Native Score playback revision application, Element `.editor` bindings, and piano-roll editing through import, undo, audition and MIDI export | Original P2–P3 |
 | P3 | Audio single-file asset/sequence model, structural history, segment playback, HTML binding, waveform editing, local processing and WAV export | Original P4–P6 |
-| P4 | Staff-input keyboard/voice prototype, tag-boundary decision, and notation editing against the shared Score editor | Original P7 |
+| P4 | Staff-input keyboard/voice prototype, tag-boundary decision, and notation editing against the shared Score editor; removed by DEC-058, which adds the Score grid View | Original P7 |
 
 Original P8 remains future work beyond these five phases: seamless replacement,
 multi-track/project workflows, richer MIDI control editing, spectral repair and
@@ -525,7 +532,8 @@ the owning tests; the table alone does not establish verification.
 | E5 / P2–P3 | Pointer and keyboard produce one equivalent commit per gesture; cancellation and external replacement discard drafts; local/shared selection, focus and accessible numeric alternatives work in browser |
 | E6 / P3 | Sequence splice/undo shares PCM; allocation instrumentation covers long input, history pruning and leases; exact format rejection, range bounds, silence, envelopes, deletion anchors and lossy undo mapping |
 | E7 / P3 | Same-transport sequence source revisions publish; no fake clip or full render per commit; play/loop and WAV export match edited output; stale DSP, latency/tails, cancellation and asset release |
-| E8 / P4 | Prototype proves note-entry focus, pitch/duration shortcuts, voice/rest completion, structural validation and shared undo before finalizing the staff Element boundary |
+| E8 / P4 | Retired by DEC-058 with staff input; the Core notation-entry operation keeps its own tests |
+| E10 / DEC-058 | `<score-grid-view>` draws without an editor; each `tools` feature gates its toolbar control, gestures, keys and numeric fields; draw, marquee, snap/unsnapped move, resize, velocity lane and zoom; settings reflection without remount; read-only `<score-view>` follows an editor and a shared draft |
 | E9 / each shipped layer | Exports, dependency/layer checks, public members, demos, snippets and three integration forms match implementation; regression coverage proves old passive use remains valid |
 
 Automated gates establish code/document consistency. Audible playback/export

@@ -161,9 +161,8 @@ and `loadAudioClipEditor`. There is no document Element (DEC-057): applications
 own the editor and lend it through each Element's `.editor` property. Rendering and WAV export
 of an edited Audio sequence belong to the Play export API. Native Score Play,
 Audio sequence Play and the editable Views borrow the Core document ports.
-Score piano-roll, bounded staff input and Audio waveform editing share this
-ownership. Staff's local input controller and scrolling renderer use the
-existing Score View under DEC-054. The detailed contract belongs to
+Score grid editing (`<score-grid-view>`, DEC-058) and Audio waveform editing
+share this ownership; `<score-view>` borrows an editor only to display it. The detailed contract belongs to
 [Editing components](design/EDIT-COMPONENTS.md), and [STATUS](STATUS.md), EDIT-01,
 tracks implementation.
 
@@ -325,8 +324,9 @@ Play retains playback mutation and resource ownership. Data-only analysis and
 static views remain usable without a player.
 
 For an edit-enabled composition, the editor owns committed content and Play
-borrows it through the document source. Existing View Elements gain an optional
-editor binding; `editable` enables mutation gestures against that binding.
+borrows it through the document source. View Elements gain an optional editor
+binding; on the editing Views (`<score-grid-view>`, `<audio-view>`) `editable`
+enables mutation gestures against it, and `<score-view>` displays it read-only.
 The application creates and owns the editor (DEC-057); Elements borrow it only
 through `.editor`, with no selector attribute. The View owns neither an implicit editor
 nor the lifetime of a borrowed editor. These bindings preserve passive usage and

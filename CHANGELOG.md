@@ -11,8 +11,8 @@ work and does not establish npm publication, a release tag or a deployment.
   to players and views through `.editor`, and Audio sequence rendering/WAV
   export in `/play`; revisioned editors with atomic
   commands and bounded undo/redo; playback that pauses and reports the applied document revision;
-  piano-roll, bounded staff and waveform editing on the existing Views; local
-  Audio processing and WAV export. The
+  note editing on the new `<score-grid-view>` piano-roll grid and waveform
+  editing on `<audio-view>`; local Audio processing and WAV export. The
   [editing migration guide](dev/release/EDITING-MIGRATION.md) covers upgrades
   from 0.2.0; no editing release is published.
 - Write Score JSON schema v0.2 with `NoteData.velocityOverride`; v0.1 and
@@ -21,7 +21,14 @@ work and does not establish npm publication, a release tag or a deployment.
 - Add browser-only Kernel `observeElementSource`, which resolves a borrowed
   source from an explicit object or a selected element's public property with a
   consumer-supplied type guard; `<score-player>`, `<score-view>`,
-  `<audio-player>` and `<audio-view>` use it to find their editor.
+  `<score-grid-view>`, `<audio-player>` and `<audio-view>` use it to find their editor.
+- Add `<score-grid-view>`, a DAW-style piano-roll grid with piano keys, a bar
+  ruler, snap lines and an optional velocity lane. With a borrowed `.editor`
+  and `editable`, a toolbar offers select/draw tools, snap, the velocity lane,
+  zoom, delete and undo/redo; `tools` chooses which features exist. Its
+  renderer is `mountScoreGrid` in `/view/render`. `<score-view>` is read-only:
+  it draws a borrowed editor's content but has no `editable`. Score staff
+  editing (`createStaffViewEditing`, `mountStaffEditor`) is removed.
 - Limit `<score-view>` to `piano-roll`, `staff` and `waterfall`, removing the
   `map` and `thumbnail` types with `for-part`, `cells`, `webscore:seek` and
   `ScoreViewSeekDetail`; draw score annotations only on the staff, so

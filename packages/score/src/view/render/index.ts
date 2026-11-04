@@ -18,5 +18,17 @@ export {
   renderScoreVisualizer,
   type ScoreVisualizerRenderOptions,
 } from './score-visualizer';
-export {mountPianoRollEditor, type PianoRollEditingOptions, type PianoRollEditingHandle} from './piano-roll-editor';
-export {mountStaffEditor, type StaffEditingOptions, type StaffEditingHandle} from './staff-editor';
+export {
+  SCORE_GRID_FEATURES,
+  SCORE_GRID_SNAPS,
+  mountScoreGrid,
+  parseScoreGridFeatures,
+  type ScoreGridContent,
+  type ScoreGridFeature,
+  type ScoreGridHandle,
+  type ScoreGridOptions,
+  type ScoreGridPlayback,
+  type ScoreGridSettings,
+  type ScoreGridSnap,
+  type ScoreGridTool,
+} from './score-grid';

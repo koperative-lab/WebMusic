@@ -2088,6 +2088,10 @@ replaces the nonvisual `score-document` / `audio-document` declarations and the
 `editor="#id"` selector with application-owned editors created through
 `loadScoreEditor` / `loadAudioClipEditor` and lent through `.editor`.
 
+**2026-11-04 refinement:** [DEC-058](#dec-058--score-editing-moves-to-a-dedicated-grid-view)
+moves Score note editing from `<score-view>` to `<score-grid-view>`; `<score-view>`
+is read-only and Score staff editing is removed.
+
 **Owner:** [Editing contracts](design/EDIT-COMPONENTS.md). The
 [dated proposal and implementation sequence](plans/2026-10-13-editing-capabilities.md)
 retains the planning baseline.
@@ -2111,6 +2115,9 @@ say DEC-048 mean this decision.
 
 **Date / status:** 2026-10-15; accepted for P4 implementation. Current
 verification and remaining interaction checks belong to [STATUS](STATUS.md), EDIT-01.
+**Superseded 2026-11-04** by [DEC-058](#dec-058--score-editing-moves-to-a-dedicated-grid-view):
+staff input, its Headless controller and its browser adapter are removed. The
+entry below is the record of the bounded P4 contract that shipped on the branch.
 
 **Problem:** notation entry needs an explicit input mode, written spelling,
 duration, staff and voice, plus measure completion. Piano-roll gestures do not
@@ -2286,6 +2293,69 @@ published packages because neither Element was released. Kernel's
 abort, option forwarding and no editor on failure; Element binding through
 `.editor` only, with `editor` no longer an observed attribute; existing conflict,
 lifecycle and playback-application tests rewritten to assign editors directly.
+
+## DEC-058 — Score editing moves to a dedicated grid View
+
+**Date / status:** 2026-11-04; accepted at the maintainer's request before the
+editing work is published. Supersedes [DEC-054](#dec-054--staff-input-inside-the-existing-score-view)
+and refines [DEC-053](#dec-053--document-owned-editing-and-borrowed-playback)
+and [DEC-055](#dec-055--editing-is-a-view-feature-not-a-capability).
+
+**Problem:** `<score-view>` mixed three read-only renderers with two editing
+surfaces: a piano-roll editor that replaced the canvas piano roll whenever an
+editor was bound, and bounded staff input. Its `editable` attribute meant
+something different per `type`, the piano-roll editing surface had no grid,
+ruler, keys, snap choice, velocity editing or zoom, and features could not be
+withheld by the application. The maintainer asked for `<score-view>` to stay a
+display and for note editing to look and behave like a DAW piano roll.
+
+**Chosen contract:** `<score-view>` is read-only. It keeps `.editor` and
+`.interactionSession` as a read-only follow: it draws the editor's visible
+content, including a shared draft, with its normal renderers and follows a bound
+player only through document-compatible snapshots. It no longer has `editable`,
+`data-editable-state` or edit events, and its piano-roll options no longer
+include `pixelsPerQuarter` / `editingGrid`.
+
+A new `<score-grid-view>` draws a piano-roll grid: written-pitch rows with piano
+keys, bar/beat/snap lines from the score's time signatures, a bar ruler and an
+optional velocity lane. It reads `.score`, `src`, a player's score or a borrowed
+`.editor`, and follows `player` like the other score Views. Editing requires a
+ready `.editor` and `editable`; a toolbar then appears. `tools` lists the
+offered features — `move`, `resize`, `draw`, `delete`, `velocity`, `snap`,
+`zoom`, `history` (absent means all). Selection is always available while
+editing. The toolbar picks the pointer tool (`select` / `draw`), snap, velocity
+lane and zoom; those are also `tool`, `snap`, `velocity-lane`,
+`pixels-per-quarter` and `note-height` attributes, which toolbar, wheel and
+keyboard changes reflect and announce with `gridsettingschange`. Each gesture is
+one atomic editor command, so history, playback revision application and shared
+sessions are unchanged. A collapsible numeric form keeps a non-pointer path to
+every edit. The renderer is `mountScoreGrid` in `/view/render`; the two Elements
+share one data/player/editor binding base. Score staff editing — Headless
+`createStaffViewEditing`, render `mountStaffEditor`, and staff input — is
+removed; the notation-entry Core operation remains.
+
+**Alternatives considered:** a `type="grid"` on `<score-view>`, which keeps an
+editing-only attribute set on a multi-type Element; per-feature boolean
+attributes, which multiply attributes without a natural default; keeping staff
+editing as a Headless API with no Element; and a separate editing toolbar
+Element, which would need its own binding to the grid's interaction state.
+
+**Consequences:** applications that edited through `<score-view editable>` use
+`<score-grid-view editable>`. Neither was published, so no package migration is
+needed. Audio editing on `<audio-view>` is unchanged. Staff/notation editing is
+out of scope until a new decision; the passive staff and sheet Views are
+unaffected.
+
+**Owner:** [Editing contracts](design/EDIT-COMPONENTS.md) and the
+[Score View family](design/VIEW-COMPONENTS.md).
+
+**Verification implications:** read-only `<score-view>` with a bound editor and
+shared draft; grid display without an editor; every feature gated by `tools` in
+both toolbar and gestures/keys; draw, marquee, move with and without snap,
+resize, velocity-lane commit, zoom bounds and settings reflection; editor
+attachment cleanup and playback application retargeted from the old piano-roll
+surface. Browser pointer, keyboard, focus and visual acceptance are recorded
+separately.
 
 ## Recording the next decision
 

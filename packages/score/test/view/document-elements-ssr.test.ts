@@ -7,5 +7,8 @@ describe('Score View Element entry outside a browser', () => {
     expect(() => elements.defineAllViewElements()).not.toThrow();
     expect(() => elements.defineAllViewElements()).not.toThrow();
     expect(Object.keys(elements).filter((name) => /ScoreDocument/.test(name))).toEqual([]);
+    expect(typeof elements.ScoreGridViewElement).toBe('function');
+    expect(() => elements.defineScoreGridViewElement()).not.toThrow();
+    expect(Object.keys(elements).filter((name) => /Staff.*Edit/.test(name))).toEqual([]);
   });
 });

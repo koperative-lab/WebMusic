@@ -3,10 +3,12 @@ import {afterEach, describe, expect, it, vi} from 'vitest';
 import {Duration, NoteId, PartId, Pitch, Rational, ScoreBuilder, ScoreEditError, VoiceId, type ScoreEditOperation, type ScorePlaybackSnapshot} from '../../src/core';
 import {createScoreEditor} from '../../src/view/headless';
 import {createScoreView, createScoreViewEditing, scoreDocumentPlaybackCompatible} from '../../src/view/headless';
-import {mountPianoRollEditor} from '../../src/view/render/piano-roll-editor';
+import {mountScoreGrid} from '../../src/view/render/score-grid';
 import {ScoreViewElement} from '../../src/view/element/score-view';
+import {ScoreGridViewElement} from '../../src/view/element/score-grid-view';
 
 customElements.define('editing-score-view', ScoreViewElement);
+customElements.define('editing-score-grid-view', ScoreGridViewElement);
 const a = NoteId('a'); const b = NoteId('b'); const p = PartId('p');
 function fixture() {
   const builder = new ScoreBuilder(); builder.addPart({id: p, name: 'Piano'});
@@ -16,6 +18,10 @@ function fixture() {
   return builder.build();
 }
 const move: ScoreEditOperation = {type: 'move-notes', noteIds: [a], deltaQuarters: [1, 4]};
+// Grid geometry at the defaults: a 48px key column, a 22px ruler, 64px per quarter and
+// 16px rows from MIDI 84 (the fixture's computed upper bound) downward.
+const X = (quarters: number) => 48 + quarters * 64;
+const Y = (midi: number) => 22 + (84 - midi) * 16 + 8;
 function playback(editor: ReturnType<typeof createScoreEditor>, overrides: Partial<ScorePlaybackSnapshot> = {}): ScorePlaybackSnapshot {
   const document = editor.getSnapshot();
   return {revision: 1, sourceRevision: 1, readiness: 'ready', state: 'paused', score: document.content,
@@ -34,7 +40,7 @@ function mounted() {
   const editing = createScoreViewEditing(editor, {editable: true});
   const host = document.createElement('div'); document.body.append(host);
   const commits = vi.fn(); const previews = vi.fn();
-  const renderer = mountPianoRollEditor(host, editing, {onCommit: commits, onPreview: previews});
+  const renderer = mountScoreGrid(host, {editing}, {onCommit: commits, onPreview: previews});
   return {editor, editing, host, renderer, commits, previews};
 }
 afterEach(() => { document.body.replaceChildren(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
@@ -129,7 +135,7 @@ describe('document-bound Score views', () => {
   });
 });
 
-describe('piano-roll gestures', () => {
+describe('score grid editing gestures', () => {
   it('repaints newly visible notes when its viewport widens and releases its resize observer', () => {
     let resize = () => {};
     let observed: Element | undefined;
@@ -144,8 +150,8 @@ describe('piano-roll gestures', () => {
       onsetQuarters: new Rational(at), duration: Duration.quarter(), voice: VoiceId('v')});
     const editor = createScoreEditor(builder.build()); const editing = createScoreViewEditing(editor, {editable: true});
     const host = document.createElement('div'); document.body.append(host);
-    const renderer = mountPianoRollEditor(host, editing);
-    const viewport = host.querySelector<HTMLElement>('[part="editing-viewport"]')!;
+    const renderer = mountScoreGrid(host, {editing});
+    const viewport = host.querySelector<HTMLElement>('[part="viewport"]')!;
     let width = 232;
     Object.defineProperty(viewport, 'clientWidth', {get: () => width});
     expect(observed).toBe(viewport); resize();
@@ -170,15 +176,15 @@ describe('piano-roll gestures', () => {
       disconnect() {}
     });
     const {editor, editing, renderer, host, commits} = mounted();
-    const viewport = host.querySelector<HTMLElement>('[part="editing-viewport"]')!;
+    const viewport = host.querySelector<HTMLElement>('[part="viewport"]')!;
     let width = 232;
     Object.defineProperty(viewport, 'clientWidth', {get: () => width}); resize();
-    pointer(host.querySelector('[data-note-id="a"]')!, 'pointerdown', 70, 490);
-    pointer(renderer.surface, 'pointermove', 86, 490);
+    pointer(host.querySelector('[data-note-id="a"]')!, 'pointerdown', X(1) + 6, Y(60));
+    pointer(renderer.surface, 'pointermove', X(1) + 22, Y(60));
     expect(editing.state.interaction.draft).toBeDefined();
     width = 553; resize();
     expect(editing.state.interaction.draft).toBeUndefined();
-    pointer(renderer.surface, 'pointerup', 86, 490);
+    pointer(renderer.surface, 'pointerup', X(1) + 22, Y(60));
     expect(editor.getSnapshot().documentRevision).toBe(0); expect(commits).not.toHaveBeenCalled();
     editing.session.preview([move]);
     width = 232; resize();
@@ -190,11 +196,11 @@ describe('piano-roll gestures', () => {
   it('uses written quarters, previews a drag and commits exactly one history item', () => {
     const {editor, editing, renderer, host, commits, previews} = mounted();
     const rectangle = host.querySelector('[data-note-id="a"]')!;
-    expect(rectangle.getAttribute('x')).toBe('64'); // performed .45s must not become its editing coordinate
-    pointer(rectangle, 'pointerdown', 70, 490);
-    pointer(renderer.surface, 'pointermove', 86, 490); pointer(renderer.surface, 'pointermove', 102, 490);
+    expect(rectangle.getAttribute('x')).toBe(String(X(1))); // performed .45s must not become its editing coordinate
+    pointer(rectangle, 'pointerdown', X(1) + 6, Y(60));
+    pointer(renderer.surface, 'pointermove', X(1) + 22, Y(60)); pointer(renderer.surface, 'pointermove', X(1) + 38, Y(60));
     expect(editor.getSnapshot().documentRevision).toBe(0); expect(previews).toHaveBeenCalledTimes(2);
-    pointer(renderer.surface, 'pointerup', 102, 490);
+    pointer(renderer.surface, 'pointerup', X(1) + 38, Y(60));
     expect(editor.score.getNote(a)!.onsetQuarters.toJSON()).toEqual([3, 2]);
     expect(editor.score.getNote(a)!.performed).toBeUndefined();
     expect(editor.getState().history.undoCount).toBe(1); expect(commits).toHaveBeenCalledOnce();
@@ -203,21 +209,21 @@ describe('piano-roll gestures', () => {
 
   it('cancels escape/capture loss and an externally superseded gesture', () => {
     const {editor, editing, renderer, host, commits} = mounted();
-    const begin = () => { pointer(host.querySelector('[data-note-id="a"]')!, 'pointerdown', 70, 490); pointer(renderer.surface, 'pointermove', 86, 490); };
+    const begin = () => { pointer(host.querySelector('[data-note-id="a"]')!, 'pointerdown', X(1) + 6, Y(60)); pointer(renderer.surface, 'pointermove', X(1) + 22, Y(60)); };
     begin(); renderer.surface.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true}));
-    pointer(renderer.surface, 'pointerup', 86, 490); expect(editor.getSnapshot().documentRevision).toBe(0);
-    begin(); pointer(renderer.surface, 'lostpointercapture', 86, 490);
-    pointer(renderer.surface, 'pointerup', 86, 490); expect(editor.getSnapshot().documentRevision).toBe(0);
+    pointer(renderer.surface, 'pointerup', X(1) + 22, Y(60)); expect(editor.getSnapshot().documentRevision).toBe(0);
+    begin(); pointer(renderer.surface, 'lostpointercapture', X(1) + 22, Y(60));
+    pointer(renderer.surface, 'pointerup', X(1) + 22, Y(60)); expect(editor.getSnapshot().documentRevision).toBe(0);
     begin(); editor.transaction('External', (tx) => tx.add({type: 'set-velocity', noteIds: [b], velocity: 95}));
-    pointer(renderer.surface, 'pointerup', 86, 490);
+    pointer(renderer.surface, 'pointerup', X(1) + 22, Y(60));
     expect(editor.score.getNote(a)!.onsetQuarters.toJSON()).toEqual([1, 1]); expect(commits).not.toHaveBeenCalled();
     renderer.dispose(); editing.dispose(); editor.dispose();
   });
 
   it('resizes, inserts, nudges and deletes with undo through the same semantic owner', () => {
     const {editor, editing, renderer, host} = mounted();
-    pointer(host.querySelector('[data-note-id="a"]')!, 'pointerdown', 126, 490);
-    pointer(renderer.surface, 'pointermove', 142, 490); pointer(renderer.surface, 'pointerup', 142, 490);
+    pointer(host.querySelector('[data-note-id="a"]')!, 'pointerdown', X(2) - 2, Y(60));
+    pointer(renderer.surface, 'pointermove', X(2) + 14, Y(60)); pointer(renderer.surface, 'pointerup', X(2) + 14, Y(60));
     expect(editor.score.getNote(a)!.duration.quarters.toJSON()).toEqual([5, 4]);
     renderer.surface.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowRight', bubbles: true}));
     expect(editor.score.getNote(a)!.onsetQuarters.toJSON()).toEqual([5, 4]);
@@ -225,7 +231,7 @@ describe('piano-roll gestures', () => {
     expect(editor.score.getNote(a)).toBeUndefined();
     renderer.surface.dispatchEvent(new KeyboardEvent('keydown', {key: 'z', ctrlKey: true, bubbles: true}));
     expect(editor.score.getNote(a)).toBeDefined();
-    renderer.surface.dispatchEvent(new MouseEvent('dblclick', {clientX: 320, clientY: 410, bubbles: true}));
+    renderer.surface.dispatchEvent(new MouseEvent('dblclick', {clientX: X(5), clientY: Y(64), bubbles: true}));
     expect(editor.score.parts[0].notes).toHaveLength(3);
     expect(editor.score.parts[0].notes.find((note) => note.onsetQuarters.eq(new Rational(5)))!.pitch.midi).toBe(64);
     renderer.dispose(); editing.dispose(); editor.dispose();
@@ -234,10 +240,10 @@ describe('piano-roll gestures', () => {
   it('does not insert over a note when click redraws detach the pressed node before dblclick', () => {
     const {editor, renderer, host, commits} = mounted();
     const rectangle = host.querySelector('[data-note-id="a"]')!;
-    pointer(rectangle, 'pointerdown', 70, 490); pointer(renderer.surface, 'pointerup', 70, 490);
+    pointer(rectangle, 'pointerdown', X(1) + 6, Y(60)); pointer(renderer.surface, 'pointerup', X(1) + 6, Y(60));
     expect(rectangle.isConnected).toBe(false); // Selection redrew the grid; the browser now targets the SVG.
-    pointer(renderer.surface, 'pointerdown', 70, 490); pointer(renderer.surface, 'pointerup', 70, 490);
-    renderer.surface.dispatchEvent(new MouseEvent('dblclick', {clientX: 70, clientY: 490, bubbles: true}));
+    pointer(renderer.surface, 'pointerdown', X(1) + 6, Y(60)); pointer(renderer.surface, 'pointerup', X(1) + 6, Y(60));
+    renderer.surface.dispatchEvent(new MouseEvent('dblclick', {clientX: X(1) + 6, clientY: Y(60), bubbles: true}));
     expect(editor.score.parts[0].notes).toHaveLength(2); expect(editor.getSnapshot().documentRevision).toBe(0);
     expect(commits).not.toHaveBeenCalled();
     renderer.dispose();
@@ -246,26 +252,27 @@ describe('piano-roll gestures', () => {
   it('inserts into the grid cell under the pointer, so repeating the gesture selects instead of duplicating', () => {
     const {editor, editing, renderer} = mounted();
     for (let count = 0; count < 2; count++) {
-      pointer(renderer.surface, 'pointerdown', 318, 410, {altKey: true}); pointer(renderer.surface, 'pointerup', 318, 410);
+      pointer(renderer.surface, 'pointerdown', X(4.97), Y(64), {altKey: true}); pointer(renderer.surface, 'pointerup', X(4.97), Y(64));
     }
     const drawn = editor.score.parts[0].notes.filter((note) => note.id !== a && note.id !== b);
     expect(drawn.map((note) => note.onsetQuarters.toString())).toEqual(['19/4']);
     expect(editing.state.interaction.selectedNoteIds).toEqual([drawn[0].id]);
-    for (let count = 0; count < 2; count++) renderer.surface.dispatchEvent(new MouseEvent('dblclick', {clientX: 446, clientY: 410, bubbles: true}));
+    for (let count = 0; count < 2; count++) renderer.surface.dispatchEvent(new MouseEvent('dblclick', {clientX: X(6.97), clientY: Y(64), bubbles: true}));
     const inserted = editor.score.parts[0].notes.filter((note) => note.onsetQuarters.eq(new Rational(27, 4)));
-    expect(inserted).toHaveLength(1); expect(inserted[0].duration.quarters.toString()).toBe('1');
+    // A drawn note is one snap step long: a sixteenth at the default 1/16 grid.
+    expect(inserted).toHaveLength(1); expect(inserted[0].duration.quarters.toString()).toBe('1/4');
     expect(editor.getState().history.undoCount).toBe(2);
     renderer.dispose();
   });
 
   it('ignores another pointer’s capture loss but cancels a drag whose pointerup was lost', () => {
     const {editor, editing, renderer, host, commits} = mounted();
-    pointer(host.querySelector('[data-note-id="a"]')!, 'pointerdown', 70, 490); pointer(renderer.surface, 'pointermove', 86, 490);
-    pointer(renderer.surface, 'lostpointercapture', 86, 490, {pointerId: 2}); pointer(renderer.surface, 'pointercancel', 86, 490, {pointerId: 2});
+    pointer(host.querySelector('[data-note-id="a"]')!, 'pointerdown', X(1) + 6, Y(60)); pointer(renderer.surface, 'pointermove', X(1) + 22, Y(60));
+    pointer(renderer.surface, 'lostpointercapture', X(1) + 22, Y(60), {pointerId: 2}); pointer(renderer.surface, 'pointercancel', X(1) + 22, Y(60), {pointerId: 2});
     expect(editing.state.interaction.draft).toBeDefined();
-    pointer(renderer.surface, 'pointermove', 102, 490, {buttons: 0});
+    pointer(renderer.surface, 'pointermove', X(1) + 38, Y(60), {buttons: 0});
     expect(editing.state.interaction.draft).toBeUndefined();
-    pointer(renderer.surface, 'pointerup', 102, 490);
+    pointer(renderer.surface, 'pointerup', X(1) + 38, Y(60));
     expect(editor.getSnapshot().documentRevision).toBe(0); expect(commits).not.toHaveBeenCalled();
     renderer.dispose();
   });
@@ -280,13 +287,13 @@ describe('piano-roll gestures', () => {
   });
 
   it('distinguishes selection, drafts, resize handles and sounding notes beyond colour', () => {
-    const {editor, editing, renderer, host} = mounted(); editing.select([a]);
+    const {editing, renderer, host} = mounted(); editing.select([a]);
     const note = (id: string) => host.querySelector(`[data-note-id="${id}"]`)!;
     expect(host.querySelector('[data-selection-outline]')).toBeTruthy();
     expect(note('a').getAttribute('stroke')).not.toBe(note('b').getAttribute('stroke'));
     expect(host.querySelector('[data-resize-handle]')!.getAttribute('stroke')).not.toBe('currentColor');
     expect(note('a').getAttribute('role')).toBe('img'); expect(host.querySelector('[role="option"]')).toBeNull();
-    renderer.updatePlayback(playback(editor, {activeNotes: [{occurrenceId: 'b', noteId: b, partId: p, midi: 64, nominalStartSeconds: 1.5, nominalEndSeconds: 2}]}));
+    renderer.updatePlayback({seconds: 1.5, activeNoteIds: new Set([b])});
     expect(Number(note('b').getAttribute('height'))).toBeGreaterThan(Number(note('a').getAttribute('height')));
     expect(note('b').getAttribute('data-active')).toBe('true');
     editing.preview([move]);
@@ -295,12 +302,15 @@ describe('piano-roll gestures', () => {
   });
 
   it('presents a read-only grid as a labelled graphic instead of an instructed tab stop', () => {
-    const {editing, renderer} = mounted();
+    const {editing, renderer, host} = mounted();
     expect(renderer.surface.getAttribute('tabindex')).toBe('0'); expect(renderer.surface.getAttribute('role')).toBe('application');
     editing.setEditable(false);
     expect(renderer.surface.hasAttribute('tabindex')).toBe(false); expect(renderer.surface.getAttribute('role')).toBe('img');
     expect(renderer.surface.hasAttribute('aria-describedby')).toBe(false);
+    expect(host.querySelector<HTMLElement>('[part="toolbar"]')!.hidden).toBe(true);
+    expect(renderer.element.dataset.editState).toBe('readonly');
     editing.setEditable(true); expect(renderer.surface.getAttribute('aria-describedby')).toBeTruthy();
+    expect(host.querySelector<HTMLElement>('[part="toolbar"]')!.hidden).toBe(false);
     renderer.dispose();
   });
 
@@ -309,15 +319,18 @@ describe('piano-roll gestures', () => {
     const rebuild = vi.spyOn(renderer.surface, 'replaceChildren');
     const status = host.querySelector('[part="editing-status"]')!;
     const writes = new MutationObserver(() => {}); writes.observe(status, {childList: true, characterData: true, subtree: true});
-    renderer.updatePlayback(playback(editor)); writes.takeRecords();
+    renderer.updatePlayback({seconds: .5}); writes.takeRecords(); rebuild.mockClear();
     const playhead = host.querySelector('[data-playhead]')!;
-    renderer.updatePlayback(playback(editor, {nominalSeconds: 1}));
-    renderer.updatePlayback(playback(editor, {nominalSeconds: 1.5}));
+    renderer.updatePlayback({seconds: 1});
+    renderer.updatePlayback({seconds: 1.5});
     expect(host.querySelector('[data-playhead]')).toBe(playhead);
-    expect(playhead.getAttribute('x1')).toBe(String(editor.score.timeMap.secondsToQuarters(1.5).toFloat() * 64));
+    expect(playhead.getAttribute('x1')).toBe(String(X(editor.score.timeMap.secondsToQuarters(1.5).toFloat())));
     expect(rebuild).not.toHaveBeenCalled(); expect(writes.takeRecords()).toEqual([]);
     editor.transaction('Move', (tx) => tx.add(move));
-    expect(host.querySelector('[data-playhead]')).toBeNull(); expect(rebuild).toHaveBeenCalled();
+    expect(rebuild).toHaveBeenCalled(); expect(host.querySelector('[data-playhead]')).not.toBe(playhead);
+    renderer.updatePlayback({seconds: null});
+    expect(host.querySelector('[data-playhead]')).toBeNull();
+    expect(renderer.element.dataset.playbackState).toBe('pending');
     writes.disconnect(); renderer.dispose();
   });
 
@@ -326,8 +339,8 @@ describe('piano-roll gestures', () => {
     const editor = createScoreEditor(builder.build()); const editing = createScoreViewEditing(editor, {editable: true});
     const host = document.createElement('div'); document.body.append(host);
     for (const [bounds, lanes] of [[{maxPitch: 40}, 1], [{minPitch: 90}, 1], [{maxPitch: 60}, 13]] as const) {
-      const renderer = mountPianoRollEditor(host, editing, bounds);
-      expect(renderer.surface.getAttribute('height')).toBe(String(lanes * 20)); renderer.dispose();
+      const renderer = mountScoreGrid(host, {editing}, bounds);
+      expect(renderer.surface.getAttribute('height')).toBe(String(22 + lanes * 16)); renderer.dispose();
     }
     editing.dispose(); editor.dispose();
   });
@@ -337,7 +350,7 @@ describe('piano-roll gestures', () => {
     editing.dispose();
     const added = vi.spyOn(window, 'addEventListener');
     const host = document.createElement('div'); document.body.append(host);
-    expect(() => mountPianoRollEditor(host, editing)).toThrow(/unavailable/);
+    expect(() => mountScoreGrid(host, {editing})).toThrow(/unavailable/);
     expect(host.childElementCount).toBe(0); expect(added).not.toHaveBeenCalled();
     editor.dispose();
   });
@@ -388,7 +401,7 @@ describe('piano-roll gestures', () => {
     const {editor, editing, renderer, host, commits} = mounted();
     const picker = host.querySelector<HTMLSelectElement>('[aria-label="Select existing note"]')!;
     const field = (label: string) => host.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)!;
-    const button = (label: string) => [...host.querySelectorAll('button')].find((node) => node.textContent === label)!;
+    const button = (label: string) => [...host.querySelectorAll('button')].find((node) => node.getAttribute('aria-label') === label || node.textContent === label)!;
     host.querySelector<HTMLDetailsElement>('details')!.open = true;
     picker.focus(); picker.value = 'note:b'; picker.dispatchEvent(new Event('change', {bubbles: true}));
     expect(editing.state.interaction.selectedNoteIds).toEqual([b]); expect(document.activeElement).toBe(picker);
@@ -397,12 +410,12 @@ describe('piano-roll gestures', () => {
     for (const key of ['ArrowLeft', 'Home', 'End', 'Delete']) picker.dispatchEvent(new KeyboardEvent('keydown', {key, bubbles: true}));
     expect(editor.getSnapshot().documentRevision).toBe(0); expect(editor.score.getNote(b)).toBeDefined();
     field('Onset (quarters)').focus(); field('Onset (quarters)').value = '7/2';
-    button('Apply to selected note').focus(); renderer.updatePlayback(playback(editor));
+    button('Apply to selected note').focus(); renderer.updatePlayback({seconds: .5});
     expect(field('Onset (quarters)').value).toBe('7/2');
     button('Apply to selected note').click();
     expect(editor.score.getNote(b)!.onsetQuarters.toJSON()).toEqual([7, 2]); expect(editor.score.getNote(b)!.pitch.midi).toBe(64);
     expect(editor.score.getNote(a)!.onsetQuarters.toJSON()).toEqual([1, 1]); expect(commits).toHaveBeenCalledOnce();
-    button('Delete selected').focus(); button('Delete selected').click();
+    button('Delete selected notes').focus(); button('Delete selected notes').click();
     expect(editor.score.getNote(b)).toBeUndefined(); expect(picker.value).toBe(''); expect(picker.querySelector('[value="note:b"]')).toBeNull();
     button('Undo').focus(); button('Undo').click();
     expect(editor.score.getNote(b)!.onsetQuarters.toJSON()).toEqual([7, 2]); expect(picker.querySelector('[value="note:b"]')).not.toBeNull();
@@ -419,14 +432,14 @@ describe('piano-roll gestures', () => {
       builder.addNote(partId, {id: NoteId(id), pitch: Pitch.fromMidi(60), onsetQuarters: new Rational(onset), duration: Duration.quarter(), voice: VoiceId('1')});
     }
     const editor = createScoreEditor(builder.build()), editing = createScoreViewEditing(editor, {editable: true});
-    const host = document.createElement('div'); document.body.append(host); const renderer = mountPianoRollEditor(host, editing);
+    const host = document.createElement('div'); document.body.append(host); const renderer = mountScoreGrid(host, {editing});
     const picker = host.querySelector<HTMLSelectElement>('[aria-label="Select existing note"]')!;
     expect([...picker.options].map((option) => option.value)).toEqual(['', 'note:early', 'note:late', 'note:same-pitch']);
     expect(picker.options[1].textContent).toBe('Piano (part 1) · C4 · quarter 0 · voice 1 · note 1');
     expect(picker.options[3].textContent).toBe('Piano (part 2) · C4 · quarter 0 · voice 1 · note 1');
     picker.focus(); const changes = vi.fn(); picker.addEventListener('change', changes);
     editing.select([NoteId('late')]); expect(picker.value).toBe('note:late');
-    const retained = picker.querySelector('[value="note:late"]'); renderer.updatePlayback(playback(editor));
+    const retained = picker.querySelector('[value="note:late"]'); renderer.updatePlayback({seconds: .5});
     expect(picker.querySelector('[value="note:late"]')).toBe(retained);
     editor.transaction('External edit', tx => tx.add({type: 'transpose-notes', noteIds: [NoteId('late')], semitones: 2}));
     expect(picker.value).toBe('note:late'); expect(picker.selectedOptions[0].textContent).toContain('D4');
@@ -439,7 +452,8 @@ describe('piano-roll gestures', () => {
     host.querySelector('form')!.dispatchEvent(new Event('submit', {bubbles: true, cancelable: true}));
     expect(editor.getSnapshot().documentRevision).toBe(revision);
     picker.value = ''; picker.dispatchEvent(new Event('change', {bubbles: true})); expect(editing.state.interaction.selectedNoteIds).toEqual([]);
-    editing.setEditable(false); expect(picker.disabled).toBe(true);
+    // A read-only grid hides its numeric alternative; its handlers stay inert.
+    editing.setEditable(false); expect(host.querySelector<HTMLDetailsElement>('[part="note-properties"]')!.hidden).toBe(true);
     picker.value = 'note:late'; picker.dispatchEvent(new Event('change', {bubbles: true})); expect(editing.state.interaction.selectedNoteIds).toEqual([]);
     renderer.dispose(); editing.dispose(); editor.dispose();
   });
@@ -479,9 +493,9 @@ describe('piano-roll gestures', () => {
     editor.undo(); expect(field('Onset (quarters)').value).toBe('1'); expect(field('Written MIDI pitch').value).toBe('60');
     editor.redo(); expect(field('Onset (quarters)').value).toBe('2'); expect(field('Written MIDI pitch').value).toBe('62');
     field('Onset (quarters)').value = '5/2';
-    editing.select([a]); editor.markSaved(); renderer.updatePlayback(playback(editor));
+    editing.select([a]); editor.markSaved(); renderer.updatePlayback({seconds: .5});
     expect(field('Onset (quarters)').value).toBe('5/2');
-    renderer.surface.focus(); renderer.updatePlayback(playback(editor));
+    renderer.surface.focus(); renderer.updatePlayback({seconds: .5});
     expect(field('Onset (quarters)').value).toBe('5/2');
     apply.click(); expect(editor.score.getNote(a)!.onsetQuarters.toJSON()).toEqual([5, 2]);
     renderer.dispose(); editing.dispose(); editor.dispose();
@@ -498,7 +512,7 @@ describe('piano-roll gestures', () => {
     host.querySelector('form')!.dispatchEvent(new Event('submit', {bubbles: true, cancelable: true}));
     expect(editor.getSnapshot().documentRevision).toBe(1);
     editor.undo(); expect(editing.state.interaction.selectedNoteIds).toEqual([]);
-    editing.select([a, b]); renderer.updatePlayback(playback(editor));
+    editing.select([a, b]); renderer.updatePlayback({seconds: .5});
     expect(field('Onset (quarters)').value).toBe('5'); expect(field('Written MIDI pitch').value).toBe('72');
     host.querySelector('form')!.dispatchEvent(new Event('submit', {bubbles: true, cancelable: true}));
     expect(editor.getSnapshot().documentRevision).toBe(2);
@@ -518,7 +532,7 @@ describe('piano-roll gestures', () => {
   it('keeps the numeric baseline on committed content while rendering a shared preview', () => {
     const {editor, editing, renderer, host} = mounted(); editing.select([a]);
     renderer.surface.focus(); editing.preview([move]);
-    expect(host.querySelector('[data-note-id="a"]')!.getAttribute('x')).toBe('80');
+    expect(host.querySelector('[data-note-id="a"]')!.getAttribute('x')).toBe(String(X(1.25)));
     expect(host.querySelector<HTMLInputElement>('[aria-label="Onset (quarters)"]')!.value).toBe('1');
     [...host.querySelectorAll('button')].find((button) => button.textContent === 'Apply to selected note')!.click();
     expect(editing.state.interaction.draft).toBeUndefined();
@@ -555,8 +569,8 @@ describe('piano-roll gestures', () => {
           editor.transaction('External resize', (tx) => tx.add({type: 'resize-notes', noteIds: [a], durationQuarters: [4, 1]}));
         }
       });
-      if (command === 'delete-button') [...host.querySelectorAll('button')].find((button) => button.textContent === 'Delete selected')!.click();
-      else if (command === 'double-click') renderer.surface.dispatchEvent(new MouseEvent('dblclick', {clientX: 400, clientY: 410, bubbles: true}));
+      if (command === 'delete-button') host.querySelector<HTMLButtonElement>('[part="delete-button"]')!.click();
+      else if (command === 'double-click') renderer.surface.dispatchEvent(new MouseEvent('dblclick', {clientX: X(6.25), clientY: Y(64), bubbles: true}));
       else renderer.surface.dispatchEvent(new KeyboardEvent('keydown', {
         key: command === 'delete-key' ? 'Delete' : command === 'transpose' ? 'ArrowUp' : 'ArrowRight',
         shiftKey: command === 'resize', bubbles: true,
@@ -636,8 +650,9 @@ describe('piano-roll gestures', () => {
       }
     });
     const inserting = kind === 'insert';
-    pointer(inserting ? renderer.surface : host.querySelector('[data-note-id="a"]')!, 'pointerdown', inserting ? 320 : 126, 490, {altKey: inserting});
-    pointer(renderer.surface, 'pointermove', 352, 490); pointer(renderer.surface, 'pointerup', 352, 490);
+    // The draft shows `a` a sixteenth later, so its right edge is at quarter 2.25.
+    pointer(inserting ? renderer.surface : host.querySelector('[data-note-id="a"]')!, 'pointerdown', inserting ? X(5) : X(2.25) - 2, Y(60), {altKey: inserting});
+    pointer(renderer.surface, 'pointermove', X(5.5), Y(60)); pointer(renderer.surface, 'pointerup', X(5.5), Y(60));
     expect(editor.getSnapshot().documentRevision).toBe(1); expect(editor.score.getNote(a)!.duration.quarters.toString()).toBe('4');
     expect(editor.score.parts[0].notes).toHaveLength(2); expect(editing.state.interaction.draft).toBeUndefined();
     expect(commits).not.toHaveBeenCalled(); expect(previews).not.toHaveBeenCalled();
@@ -653,8 +668,8 @@ describe('piano-roll gestures', () => {
         editor.transaction('External resize', (tx) => tx.add({type: 'resize-notes', noteIds: [a], durationQuarters: [4, 1]}));
       }
     });
-    pointer(host.querySelector('[data-note-id="a"]')!, 'pointerdown', 126, 490);
-    pointer(renderer.surface, 'pointermove', 352, 490); pointer(renderer.surface, 'pointerup', 352, 490);
+    pointer(host.querySelector('[data-note-id="a"]')!, 'pointerdown', X(2) - 2, Y(60));
+    pointer(renderer.surface, 'pointermove', X(5.5), Y(60)); pointer(renderer.surface, 'pointerup', X(5.5), Y(60));
     expect(editor.getSnapshot().documentRevision).toBe(1); expect(editor.score.getNote(a)!.duration.quarters.toString()).toBe('4');
     expect(commits).not.toHaveBeenCalled(); expect(previews).not.toHaveBeenCalled();
     off(); renderer.dispose(); editing.dispose(); editor.dispose();
@@ -662,14 +677,14 @@ describe('piano-roll gestures', () => {
 
   it('rejects a gesture commit when cancellation redirects its selection', () => {
     const {editor, editing, renderer, host, commits} = mounted();
-    pointer(host.querySelector('[data-note-id="a"]')!, 'pointerdown', 70, 490);
-    pointer(renderer.surface, 'pointermove', 86, 490);
+    pointer(host.querySelector('[data-note-id="a"]')!, 'pointerdown', X(1) + 6, Y(60));
+    pointer(renderer.surface, 'pointermove', X(1) + 22, Y(60));
     expect(editing.state.interaction.draft).toBeDefined();
     let cancelledPublications = 0;
     const off = editing.subscribe((state) => {
       if (!state.interaction.draft && ++cancelledPublications === 2) editing.select([b]);
     });
-    pointer(renderer.surface, 'pointerup', 86, 490);
+    pointer(renderer.surface, 'pointerup', X(1) + 22, Y(60));
     expect(editing.state.interaction.selectedNoteIds).toEqual([b]);
     expect(editor.getSnapshot().documentRevision).toBe(0); expect(editor.score.getNote(a)!.onsetQuarters.toString()).toBe('1');
     expect(commits).not.toHaveBeenCalled();
@@ -678,8 +693,8 @@ describe('piano-roll gestures', () => {
 
   it('stays disposed when its gesture cancellation callback dispatches another command', () => {
     const {editor, editing, renderer, host, commits} = mounted();
-    pointer(host.querySelector('[data-note-id="a"]')!, 'pointerdown', 70, 490);
-    pointer(renderer.surface, 'pointermove', 86, 490);
+    pointer(host.querySelector('[data-note-id="a"]')!, 'pointerdown', X(1) + 6, Y(60));
+    pointer(renderer.surface, 'pointermove', X(1) + 22, Y(60));
     let pending = true;
     const off = editing.session.subscribe((snapshot) => {
       if (pending && !snapshot.draft) {
@@ -693,22 +708,32 @@ describe('piano-roll gestures', () => {
     off(); editing.dispose(); editor.dispose();
   });
 
-  it('draws an inserted-note draft with Alt-drag and discards the last valid draft after an invalid move', () => {
+  it('draws an inserted-note draft with Alt-drag, clamps a drag at the score start and discards the last valid draft after a failed preview', () => {
     const {editor, editing, renderer, host, commits} = mounted();
-    pointer(renderer.surface, 'pointerdown', 320, 410, {altKey: true});
-    pointer(renderer.surface, 'pointermove', 352, 410);
+    pointer(renderer.surface, 'pointerdown', X(5), Y(64), {altKey: true});
+    pointer(renderer.surface, 'pointermove', X(5.5), Y(64));
     expect(editor.score.parts[0].notes).toHaveLength(2);
     expect(host.querySelector('[data-draft="true"]')).toBeTruthy();
-    pointer(renderer.surface, 'pointerup', 352, 410);
+    pointer(renderer.surface, 'pointerup', X(5.5), Y(64));
     expect(editor.score.parts[0].notes).toHaveLength(3);
     expect(editor.score.parts[0].notes.find((note) => note.onsetQuarters.eq(new Rational(5)))!.duration.quarters.toJSON()).toEqual([1, 2]);
     expect(commits).toHaveBeenCalledOnce();
-    pointer(host.querySelector('[data-note-id="a"]')!, 'pointerdown', 70, 490);
-    pointer(renderer.surface, 'pointermove', 86, 490);
-    pointer(renderer.surface, 'pointermove', -100, 490);
-    pointer(renderer.surface, 'pointerup', -100, 490);
-    expect(editor.score.getNote(a)!.onsetQuarters.toJSON()).toEqual([1, 1]);
-    expect(editor.getState().history.undoCount).toBe(1);
+    // Dragging before the score start clamps at quarter 0 instead of failing the drag.
+    pointer(host.querySelector('[data-note-id="a"]')!, 'pointerdown', X(1) + 6, Y(60));
+    pointer(renderer.surface, 'pointermove', -100, Y(60)); pointer(renderer.surface, 'pointerup', -100, Y(60));
+    expect(editor.score.getNote(a)!.onsetQuarters.toJSON()).toEqual([0, 1]);
+    expect(editor.getState().history.undoCount).toBe(2);
+    // A later failed preview discards the last valid draft; release commits nothing.
+    pointer(host.querySelector('[data-note-id="a"]')!, 'pointerdown', X(0) + 6, Y(60));
+    pointer(renderer.surface, 'pointermove', X(0) + 22, Y(60));
+    expect(editing.state.interaction.draft).toBeDefined();
+    vi.spyOn(editing, 'preview').mockReturnValueOnce({status: 'failed', error: new ScoreEditError('invalid-command', 'Rejected preview')});
+    pointer(renderer.surface, 'pointermove', X(0) + 38, Y(60));
+    expect(editing.state.interaction.draft).toBeUndefined();
+    expect(host.querySelector('[part="editing-status"]')!.textContent).toBe('Rejected preview');
+    pointer(renderer.surface, 'pointerup', X(0) + 38, Y(60));
+    expect(editor.score.getNote(a)!.onsetQuarters.toJSON()).toEqual([0, 1]);
+    expect(editor.getState().history.undoCount).toBe(2); expect(commits).toHaveBeenCalledTimes(2);
     renderer.dispose(); editing.dispose(); editor.dispose();
   });
 
@@ -716,17 +741,21 @@ describe('piano-roll gestures', () => {
     const editor = createScoreEditor(fixture()); const shared = editor.createInteractionSession();
     const editing = createScoreViewEditing(editor, {interactionSession: shared, editable: true});
     const host = document.createElement('div'); document.body.append(host);
-    const renderer = mountPianoRollEditor(host, editing);
+    const renderer = mountScoreGrid(host, {editing});
     shared.preview([move]); renderer.dispose(); editing.dispose();
     expect(shared.getSnapshot().draft).toBeDefined(); expect(shared.getSnapshot().disposed).toBe(false); editor.dispose();
   });
 });
 
-describe('score-view editor composition', () => {
+type PlaybackHost = HTMLDivElement & {playback: {snapshot(): ScorePlaybackSnapshot; subscribe(listener: (snapshot: ScorePlaybackSnapshot) => void): () => void}};
+function gridView(): ScoreGridViewElement { return document.createElement('editing-score-grid-view') as ScoreGridViewElement; }
+const editingSurface = (view: Element) => view.querySelector('[part="grid"][data-edit-state="ready"] [part="surface"]');
+
+describe('score-grid-view editor composition', () => {
   it('renders object-bound editing, commits events, rejects conflicts and releases only owned sessions', () => {
-    const editor = createScoreEditor(fixture()); const view = document.createElement('editing-score-view') as ScoreViewElement;
+    const editor = createScoreEditor(fixture()); const view = gridView();
     view.editor = editor; view.editable = true; document.body.append(view);
-    expect(view.getAttribute('data-editor-state')).toBe('ready'); expect(view.querySelector('[part="editing-surface"]')).toBeTruthy();
+    expect(view.getAttribute('data-editor-state')).toBe('ready'); expect(editingSurface(view)).toBeTruthy();
     const session = view.interactionSession!; const commit = vi.fn(); view.addEventListener('editcommit', commit);
     session.setSelection([a]); view.querySelector('svg')!.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowRight', bubbles: true}));
     expect(commit).toHaveBeenCalledOnce();
@@ -739,7 +768,7 @@ describe('score-view editor composition', () => {
 
   it('replaces and detaches assigned editors without disposing them', () => {
     const first = createScoreEditor(fixture()); const second = createScoreEditor(fixture());
-    const view = document.createElement('editing-score-view') as ScoreViewElement; view.editor = first; view.editable = true;
+    const view = gridView(); view.editor = first; view.editable = true;
     document.body.append(view); expect(view.editor).toBe(first);
     const old = view.interactionSession!;
     view.editor = second; expect(view.editor).toBe(second);
@@ -747,19 +776,20 @@ describe('score-view editor composition', () => {
     expect(view.interactionSession!.getSnapshot().documentId).toBe(second.getSnapshot().documentId);
     view.editor = undefined; expect(view.editor).toBeUndefined();
     expect(view.hasAttribute('data-editor-state')).toBe(false);
-    expect(view.querySelector('[part="editing-surface"]')).toBeNull();
+    expect(view.querySelector('[part="grid"]')).toBeNull();
     expect(first.getSnapshot().status).toBe('ready'); expect(second.getSnapshot().status).toBe('ready');
     view.remove(); first.dispose(); second.dispose();
   });
 
   it('removes the editing surface when an assigned editor is disposed by its owner', () => {
     const editor = createScoreEditor(fixture());
-    const view = document.createElement('editing-score-view') as ScoreViewElement; view.editor = editor; view.editable = true;
+    const view = gridView(); view.editor = editor; view.editable = true;
     document.body.append(view);
-    expect(view.querySelector('[part="editor"]')).not.toBeNull();
+    expect(view.querySelector('[part="grid"]')).not.toBeNull();
+    expect(editingSurface(view)).not.toBeNull();
     editor.dispose();
     expect(view.getAttribute('data-editor-state')).toBe('unavailable');
-    expect(view.querySelector('[part="editor"]')).toBeNull();
+    expect(view.querySelector('[part="grid"]')).toBeNull();
     expect(view.textContent).toContain('Waiting for a score');
     expect(view.editor).toBe(editor);
     view.remove();
@@ -768,48 +798,48 @@ describe('score-view editor composition', () => {
   it('suppresses old playback and clears overlays when the player is detached', () => {
     const editor = createScoreEditor(fixture());
     const source = playback(editor, {activeNotes: [{occurrenceId: 'a', noteId: a, partId: p, midi: 60, nominalStartSeconds: .45, nominalEndSeconds: .93}]});
-    const player = document.createElement('div') as HTMLDivElement & {playback: {snapshot(): ScorePlaybackSnapshot; subscribe(listener: (snapshot: ScorePlaybackSnapshot) => void): () => void}};
+    const player = document.createElement('div') as PlaybackHost;
     player.id = 'player'; player.playback = {snapshot: () => source, subscribe: (listener) => { listener(source); return () => {}; }};
-    const view = document.createElement('editing-score-view') as ScoreViewElement;
+    const view = gridView();
     view.editor = editor; view.setAttribute('player', '#player'); document.body.append(player, view);
     expect(view.querySelector('[data-playhead]')).toBeTruthy();
-    expect(view.active).toEqual([60]);
-    view.type = 'waterfall'; view.type = 'piano-roll'; expect(view.active).toEqual([60]);
+    expect(view.querySelector('[data-note-id="a"]')!.getAttribute('data-active')).toBe('true');
     editor.transaction('Move', (tx) => tx.add(move)); expect(view.querySelector('[data-playhead]')).toBeNull();
+    expect(view.querySelector('[data-note-id="a"]')!.getAttribute('data-active')).toBe('false');
+    expect(view.querySelector('[part="grid"]')!.getAttribute('data-playback-state')).toBe('pending');
     view.removeAttribute('player'); expect(view.querySelector('[data-playhead]')).toBeNull();
-    expect(view.querySelector('[part="editor"]')!.getAttribute('data-playback-state')).toBe('unbound');
+    expect(view.querySelector('[part="grid"]')!.getAttribute('data-playback-state')).toBe('unbound');
     view.remove(); editor.dispose();
   });
 
   it('compares a bound player with committed content, not the view’s local draft', () => {
     const editor = createScoreEditor(fixture()); const source = playback(editor);
     let publish = (_: ScorePlaybackSnapshot) => {};
-    const player = document.createElement('div') as HTMLDivElement & {playback: {snapshot(): ScorePlaybackSnapshot; subscribe(listener: (snapshot: ScorePlaybackSnapshot) => void): () => void}};
+    const player = document.createElement('div') as PlaybackHost;
     player.id = 'draft-player'; player.playback = {snapshot: () => source, subscribe: (listener) => { publish = listener; listener(source); return () => {}; }};
-    const view = document.createElement('editing-score-view') as ScoreViewElement;
+    const view = gridView();
     view.editor = editor; view.editable = true; view.setAttribute('player', '#draft-player'); document.body.append(player, view);
     view.interactionSession!.preview([move]); publish(source);
     expect(view.getAttribute('data-player-state')).toBe('ready'); expect(view.getAttribute('data-playback-state')).toBe('ready');
     view.remove(); editor.dispose();
   });
 
-  it('reflects editable state only for editor-bound or editable views and accepts editor geometry through configure()', () => {
-    const passive = document.createElement('editing-score-view') as ScoreViewElement;
+  it('reflects editable state only for editor-bound or editable views and accepts grid geometry through attributes', () => {
+    const passive = gridView();
     passive.score = fixture(); document.body.append(passive);
     expect(passive.hasAttribute('data-editable-state')).toBe(false);
     passive.editable = true; expect(passive.getAttribute('data-editable-state')).toBe('unavailable');
     passive.editable = false; expect(passive.hasAttribute('data-editable-state')).toBe(false);
-    const editor = createScoreEditor(fixture()); const view = document.createElement('editing-score-view') as ScoreViewElement;
+    const editor = createScoreEditor(fixture()); const view = gridView();
     view.editor = editor; document.body.append(view); expect(view.getAttribute('data-editable-state')).toBe('readonly');
-    view.configure({type: 'piano-roll', options: {pixelsPerQuarter: 32, editingGrid: [1, 8]}});
-    expect(view.querySelector('[data-note-id="a"]')!.getAttribute('x')).toBe('32');
+    view.setAttribute('pixels-per-quarter', '32'); view.setAttribute('snap', '1/8');
+    expect(view.querySelector('[data-note-id="a"]')!.getAttribute('x')).toBe('80');
     view.remove(); passive.remove(); editor.dispose();
   });
 
   it('keeps its editing session across format changes and clears stale content without an alert on detach', () => {
     const editor = createScoreEditor(fixture());
-    const view = document.createElement('editing-score-view') as ScoreViewElement;
-    view.setAttribute('type', 'piano-roll'); view.editor = editor; view.editable = true;
+    const view = gridView(); view.editor = editor; view.editable = true;
     document.body.append(view);
     const session = view.interactionSession!; session.setSelection([a]);
     view.setAttribute('format', 'midi');
@@ -818,9 +848,67 @@ describe('score-view editor composition', () => {
     expect(session.getSnapshot().disposed).toBe(true);
     // The previous editor's notes and editing surface are gone; detaching is not an error.
     expect(view.querySelector('[data-note-id]')).toBeNull();
-    expect(view.querySelector('[part="editing-surface"]')).toBeNull();
+    expect(view.querySelector('[part="grid"]')).toBeNull();
     expect(view.hasAttribute('data-editor-state')).toBe(false);
     expect(view.querySelector('[role="alert"]')).toBeNull();
     view.remove(); editor.dispose();
+  });
+});
+
+describe('read-only score-view with an editor', () => {
+  const pitches = (view: Element) => [...view.querySelectorAll<SVGElement>('rect.note')].map((note) => Number(note.dataset.pitch));
+
+  it('draws the editor’s content and redraws after commits and shared drafts without offering editing', () => {
+    expect(ScoreViewElement.observedAttributes).not.toContain('editable');
+    const editor = createScoreEditor(fixture()); const view = document.createElement('editing-score-view') as ScoreViewElement;
+    const edits = vi.fn();
+    for (const type of ['editpreview', 'editcommit', 'editerror']) view.addEventListener(type, edits);
+    view.setAttribute('editable', ''); view.editor = editor; document.body.append(view);
+    expect(view.getAttribute('data-editor-state')).toBe('ready');
+    expect(view.hasAttribute('data-editable-state')).toBe(false);
+    expect('editable' in view).toBe(false);
+    expect(view.querySelector('[part="grid"], [part="toolbar"], [tabindex="0"]')).toBeNull();
+    expect(pitches(view).sort()).toEqual([60, 64]);
+    // The view's own editing controller stays read-only even though `editable` is present.
+    expect(view.interactionSession).toBeDefined();
+    editor.transaction('Transpose', (tx) => tx.add({type: 'transpose-notes', noteIds: [a], semitones: 7}));
+    expect(view.score).toBe(editor.score);
+    expect(pitches(view).sort()).toEqual([64, 67]);
+    // A same-session draft from another surface is visible here, read-only.
+    view.interactionSession!.preview([{type: 'transpose-notes', noteIds: [b], semitones: 1}]);
+    expect(pitches(view).sort()).toEqual([65, 67]);
+    view.interactionSession!.cancelDraft();
+    expect(pitches(view).sort()).toEqual([64, 67]);
+    view.querySelector('svg')?.dispatchEvent(new KeyboardEvent('keydown', {key: 'Delete', bubbles: true}));
+    expect(editor.getSnapshot().documentRevision).toBe(1); expect(edits).not.toHaveBeenCalled();
+    view.remove(); editor.dispose();
+  });
+
+  it('follows document playback only while the player snapshot addresses the committed revision', () => {
+    const editor = createScoreEditor(fixture());
+    const source = playback(editor, {activeNotes: [{occurrenceId: 'a', noteId: a, partId: p, midi: 60, nominalStartSeconds: .45, nominalEndSeconds: .93}]});
+    const player = document.createElement('div') as PlaybackHost;
+    player.id = 'read-only-player'; player.playback = {snapshot: () => source, subscribe: (listener) => { listener(source); return () => {}; }};
+    const view = document.createElement('editing-score-view') as ScoreViewElement;
+    view.editor = editor; view.setAttribute('player', '#read-only-player'); document.body.append(player, view);
+    expect(view.active).toEqual([60]); expect(view.getAttribute('data-playback-state')).toBe('ready');
+    view.type = 'waterfall'; view.type = 'piano-roll'; expect(view.active).toEqual([60]);
+    editor.transaction('Move', (tx) => tx.add(move));
+    expect(view.active).toEqual([]); expect(view.getAttribute('data-playback-state')).toBe('pending');
+    view.removeAttribute('player'); expect(view.active).toEqual([]);
+    expect(view.getAttribute('data-playback-state')).toBe('unbound');
+    view.remove(); editor.dispose();
+  });
+
+  it('removes its content when an assigned editor is disposed by its owner', () => {
+    const editor = createScoreEditor(fixture());
+    const view = document.createElement('editing-score-view') as ScoreViewElement; view.editor = editor;
+    document.body.append(view);
+    expect(pitches(view)).toHaveLength(2);
+    editor.dispose();
+    expect(view.getAttribute('data-editor-state')).toBe('unavailable');
+    expect(pitches(view)).toHaveLength(0);
+    expect(view.textContent).toContain('Waiting for a score');
+    view.remove();
   });
 });

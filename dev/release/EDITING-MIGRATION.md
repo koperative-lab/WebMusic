@@ -146,7 +146,8 @@ draws annotations only on the staff (DEC-056).
 
 ## Adopt editing through the View entries
 
-Editing adds members to existing entries; it adds no new subpath. The inspected
+Editing adds members to existing entries and one Element, `<score-grid-view>`,
+registered by `defineAllViewElements()`; it adds no new subpath. The inspected
 `0.2.0` packages lack these members, so installing an older package does not
 make them available. Until an editing release is published, use this checkout's
 built tarballs or workspace entries.
@@ -156,7 +157,7 @@ built tarballs or workspace entries.
 | Semantic operations, position maps and document contracts | `@webmusic/score/view` | `@webmusic/audio/view` (also range-processor recipes) |
 | Persistent editor owner | `ScoreEditor` from `@webmusic/score/view/headless` | `AudioClipEditor` from `@webmusic/audio/view/headless` |
 | Load a file into a new editor | `loadScoreEditor(url, options)` from `@webmusic/score/view/headless` | `loadAudioClipEditor(url, options)` from `@webmusic/audio/view/headless` |
-| Bind an editor to Elements | Assign `.editor` on `<score-view>` / `<score-player>`; the application disposes the editor | Assign `.editor` on `<audio-view>` / `<audio-player>`; the application disposes the editor |
+| Bind an editor to Elements | Assign `.editor` on `<score-grid-view editable>` (editing), `<score-view>` (read-only display) and `<score-player>`; the application disposes the editor | Assign `.editor` on `<audio-view>` / `<audio-player>`; the application disposes the editor |
 | Render or export an edited sequence | — | `renderAudioSequence`, `exportAudioSequenceWav` from `@webmusic/audio/play` |
 
 There is no dedicated editing React wrapper. The package root remains Core; it
@@ -187,10 +188,11 @@ not a multitrack project. Create or decode clips with the matching Audio
 release before handing them to its editor: older clip objects lack the retained
 backing-byte accounting capability required by the new asset store.
 
-Piano-roll and waveform editing are opt-in interactions on existing Views.
-Staff entry requires authored measures and supports the documented simple
-notation subset; MIDI time signatures alone do not create editable measures.
-These entries do not imply complete notation authoring, spectral repair or
+Score note editing is the new `<score-grid-view>` piano-roll grid, whose
+`tools` attribute chooses the offered features; `<score-view>` stays read-only
+and gains only the `.editor` display binding (DEC-058). Waveform editing is an
+opt-in interaction on the existing `<audio-view>`. There is no staff or notation
+editing. These entries do not imply notation authoring, spectral repair or
 multitrack editing. The [editing contract](../design/EDIT-COMPONENTS.md) records
 the accepted boundaries.
 

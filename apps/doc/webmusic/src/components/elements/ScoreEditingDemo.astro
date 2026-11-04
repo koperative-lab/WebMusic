@@ -4,54 +4,49 @@ import './editing-import.css';
 interface Props {
   sourcePath?: string;
   idPrefix?: string;
-  staffEditable?: boolean;
 }
-const {sourcePath = 'midi/Editing.mid', idPrefix = 'editing', staffEditable = false} = Astro.props;
+const {sourcePath = 'midi/Editing.mid', idPrefix = 'editing'} = Astro.props;
 const source = `${import.meta.env.BASE_URL}${sourcePath}`;
 const playerId = `${idPrefix}-player`;
 ---
 
-<ElementPlayground tag="score-view" target={staffEditable ? '[data-editing-staff]' : '[data-editing-roll]'} markup="[data-editing-composition]"
-  companions={[{tag: 'score-player', target: '[data-editing-player]'}]}>
-  <section data-editing-demo data-editing-src={source} data-editing-notation={staffEditable || undefined} aria-label={staffEditable ? 'Shared staff and piano-roll editing workflow' : 'MIDI editing workflow'}>
+<ElementPlayground tag="score-view" target="[data-editing-staff]" markup="[data-editing-composition]"
+  companions={[{tag: 'score-grid-view', target: '[data-editing-grid]'}, {tag: 'score-player', target: '[data-editing-player]'}]}>
+  <section data-editing-demo data-editing-src={source} aria-label="Shared MIDI editing workflow">
     <div data-editing-composition data-pg-fragment>
       <score-player data-editing-player id={playerId} time-control="full"></score-player>
-      <score-view data-editing-roll player={`#${playerId}`} type="piano-roll" editable note-height="18" min-pitch="58" max-pitch="74"></score-view>
-      <score-view data-editing-staff player={`#${playerId}`} type="staff" editable={staffEditable}></score-view>
+      <score-grid-view data-editing-grid player={`#${playerId}`} editable note-height="14" min-pitch="58" max-pitch="74"></score-grid-view>
+      <score-view data-editing-staff player={`#${playerId}`} type="staff"></score-view>
     </div>
-    <p data-editing-status role="status">{staffEditable ? 'Loading the two-measure notation example.' : 'Loading the eight-note MIDI example.'}</p>
+    <p data-editing-status role="status">Loading the eight-note MIDI example.</p>
     <div class="editing-actions">
       <label class="editing-import">Import MIDI <input data-editing-import type="file" accept=".mid,.midi,audio/midi" aria-label="Import MIDI" /></label>
       <button class="wui-btn" data-editing-export type="button">Export MIDI</button>
-      {staffEditable && <button class="wui-btn" data-editing-export-notation type="button">Export MusicXML</button>}
       <button class="wui-btn" data-editing-restore type="button">Reload configured source</button>
     </div>
-    <p data-editing-result aria-live="polite">{staffEditable
-      ? 'Enter notes or rests in either measure, then press Play. Both surfaces share the document and undo history. Importing MIDI retains piano-roll editing; staff entry needs authored measures.'
-      : 'Edit the roll, then press Play to hear the committed version. The staff follows the same document.'}</p>
+    <p data-editing-result aria-live="polite">Edit notes in the grid, then press Play to hear the committed version. The read-only staff follows the same document.</p>
   </section>
 </ElementPlayground>
 
 <script>
-  import {defineScoreViewElement, type ScoreViewElement} from '@webmusic/score/view/element';
+  import {defineScoreGridViewElement, defineScoreViewElement, type ScoreGridViewElement, type ScoreViewElement} from '@webmusic/score/view/element';
   import {createScoreEditor, loadScoreEditor, type ScoreEditor} from '@webmusic/score/view/headless';
   import {defineScorePlayerElement, type ScorePlayerElement} from '@webmusic/score/play/element';
-  import {loadScore, serializeMIDI, serializeMusicXML, assertScoreInputByteLength, DEFAULT_LOAD_SCORE_LIMITS} from '@webmusic/score/io';
+  import {loadScore, serializeMIDI, assertScoreInputByteLength, DEFAULT_LOAD_SCORE_LIMITS} from '@webmusic/score/io';
   import {mountDemos} from '../demo-lifecycle';
   import {PLAYGROUND_RESET_EVENT} from '../playground-client';
-  defineScorePlayerElement(); defineScoreViewElement();
+  defineScorePlayerElement(); defineScoreGridViewElement(); defineScoreViewElement();
   mountDemos('[data-editing-demo]', (root, scope) => {
-    // The demo owns one editor at a time. The player and both views borrow it
-    // through `.editor`; replacing or tearing down disposes the previous one.
+    // The demo owns one editor at a time. The player, the editable grid and the
+    // read-only staff borrow it through `.editor`; replacing or tearing down
+    // disposes the previous one.
     const source = root.dataset.editingSrc!;
     const player = root.querySelector<ScorePlayerElement>('[data-editing-player]')!;
-    const views = [...root.querySelectorAll<ScoreViewElement>('score-view')];
+    const views = [...root.querySelectorAll<ScoreGridViewElement | ScoreViewElement>('score-grid-view, score-view')];
     const status = root.querySelector<HTMLElement>('[data-editing-status]')!;
     const result = root.querySelector<HTMLElement>('[data-editing-result]')!;
     const upload = root.querySelector<HTMLInputElement>('[data-editing-import]')!;
     const exportButton = root.querySelector<HTMLButtonElement>('[data-editing-export]')!;
-    const notationExportButton = root.querySelector<HTMLButtonElement>('[data-editing-export-notation]');
-    const notationDocument = root.hasAttribute('data-editing-notation');
     let editor: ScoreEditor | undefined;
     let documentStatus = 'loading';
     let stop: (() => void) | undefined;
@@ -74,7 +69,6 @@ const playerId = `${idPrefix}-player`;
         ? `Document ${documentStatus} · ${state.document.content.notes.length} notes · revision ${state.document.documentRevision} · playback ${binding?.status ?? 'empty'}${binding?.applied ? ` (revision ${binding.applied.documentRevision})` : ''} · ${state.dirty ? 'unsaved' : 'saved'}`
         : `Document ${documentStatus}.`;
       exportButton.disabled = !state || state.document.status !== 'ready';
-      if (notationExportButton) notationExportButton.disabled = exportButton.disabled;
       if (transientBindingError && state?.document.status === 'ready' && binding?.status === 'ready'
         && binding.applied?.documentId === state.document.documentId
         && binding.applied?.documentRevision === state.document.documentRevision) {
@@ -151,25 +145,21 @@ const playerId = `${idPrefix}-player`;
         if (valid()) upload.value = '';
       }
     });
-    const exportScore = (format: 'midi' | 'musicxml'): void => {
+    scope.listen(exportButton, 'click', () => {
       const exported = editor; if (!exported) return;
       try {
         const snapshot = exported.getSnapshot();
-        const payload = format === 'musicxml' ? serializeMusicXML(snapshot.content, {ppq: 960}) : new Uint8Array(serializeMIDI(snapshot.content));
+        const payload = new Uint8Array(serializeMIDI(snapshot.content));
         if (downloadUrl) URL.revokeObjectURL(downloadUrl);
-        downloadUrl = URL.createObjectURL(new Blob([payload], {type: format === 'musicxml' ? 'application/vnd.recordare.musicxml+xml' : 'audio/midi'}));
-        const link = document.createElement('a'); link.href = downloadUrl; link.download = format === 'musicxml' ? 'edited-score.musicxml' : 'edited-score.mid';
+        downloadUrl = URL.createObjectURL(new Blob([payload], {type: 'audio/midi'}));
+        const link = document.createElement('a'); link.href = downloadUrl; link.download = 'edited-score.mid';
         link.click();
-        if ((!notationDocument || format === 'musicxml') && editor === exported && exported.getSnapshot().status === 'ready' && exported.getSnapshot().contentId === snapshot.contentId) exported.markSaved();
-        if (scope.active) showResult(format === 'musicxml'
-          ? `MusicXML export requested for revision ${snapshot.documentRevision}. The file retains supported staff-entry notation, voices and rests on the demo's binary quarter grid.`
-          : `Export requested for revision ${snapshot.documentRevision}. MIDI exports playback data; it does not preserve every notation detail.${notationDocument ? ' This performance export leaves the notation document unsaved; use Export MusicXML to save notation.' : ''}`);
+        if (editor === exported && exported.getSnapshot().status === 'ready' && exported.getSnapshot().contentId === snapshot.contentId) exported.markSaved();
+        if (scope.active) showResult(`Export requested for revision ${snapshot.documentRevision}. MIDI exports playback data; it does not preserve every notation detail.`);
       } catch (error) {
         if (scope.active) showResult(message(error));
       }
-    };
-    scope.listen(exportButton, 'click', () => exportScore('midi'));
-    if (notationExportButton) scope.listen(notationExportButton, 'click', () => exportScore('musicxml'));
+    });
     const restore = async (): Promise<void> => {
       upload.value = '';
       const pending = loadConfigured();

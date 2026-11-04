@@ -77,6 +77,16 @@ function resolveList(source, name) {
   return [...body.matchAll(/'([a-z0-9-]+)'/g)].map((m) => m[1]);
 }
 
+/** A list constant imported by name from a relative module, such as a shared base class. */
+function resolveImportedList(source, file, name) {
+  for (const match of source.matchAll(/import\s*\{([^}]*)\}\s*from\s*['"](\.[^'"]+)['"]/g)) {
+    if (!match[1].split(',').some((part) => part.trim() === name)) continue;
+    const target = join(dirname(file), `${match[2]}.ts`);
+    return existsSync(abs(target)) ? resolveList(read(target), name) : null;
+  }
+  return null;
+}
+
 /**
  * The element's observed attributes, with every `...spread` resolved. An
  * element with no getter observes nothing — `<score-rack-control>` is driven only by
@@ -105,7 +115,7 @@ function observedAttributes(source, file, seen = new Set()) {
     }
     const spread = /\.\.\.([A-Z_][A-Z0-9_]*)/.exec(line);
     if (!spread) continue;
-    const resolved = resolveList(source, spread[1]);
+    const resolved = resolveList(source, spread[1]) ?? resolveImportedList(source, file, spread[1]);
     if (!resolved) {
       fail('params', `${file}: cannot resolve spread \`...${spread[1]}\` in observedAttributes`);
       continue;

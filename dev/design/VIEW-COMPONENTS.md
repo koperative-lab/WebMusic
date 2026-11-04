@@ -3,7 +3,8 @@
 > Current design, accepted in DEC-015 and refined for staff notation in DEC-024.
 > DEC-045 owns the domain-prefixed tags. Source and public leaf pages own exact
 > members; STATUS owns delivery and verification gaps. DEC-053 adds the accepted
-> document-bound editing below; DEC-054 keeps staff entry in the same family.
+> document-bound editing below; DEC-058 moves Score note editing to the
+> dedicated `<score-grid-view>` and makes `<score-view>` read-only.
 
 ## Purpose and boundaries
 
@@ -14,7 +15,8 @@ they need simultaneous representations.
 
 | Component | Input and task | Types |
 |---|---|---|
-| `score-view` | A complete Score, optionally with a borrowed playback position | `piano-roll`, `staff`, `waterfall` |
+| `score-view` | A complete Score, optionally with a borrowed playback position; read-only | `piano-roll`, `staff`, `waterfall` |
+| `score-grid-view` | A complete Score on a DAW-style piano-roll grid; with a borrowed editor and `editable`, note editing | One grid; `tools` selects editing features |
 | `score-pitch-view` | Currently held MIDI pitches from one selected note source | `keyboard`, `staff`, `fretboard` |
 | `score-sheet-view` | Page engraving using an optional OSMD renderer | Separate engraving lifecycle; no type selector |
 
@@ -91,8 +93,8 @@ These visual connections and clipping add no controls.
 [Editing contracts](EDIT-COMPONENTS.md) and
 [DEC-053](../DECISIONS.md#dec-053--document-owned-editing-and-borrowed-playback)
 own the accepted editing behavior. [STATUS](../STATUS.md), EDIT-01, tracks
-implementation and verification. `.editor`, the `editor` selector and `editable`
-are documented in the owning public ScoreView reference.
+implementation and verification. `.editor` and `editable` are documented in the
+owning public `<score-view>` and `<score-grid-view>` references.
 
 An editor-bound View borrows committed content and commands from `ScoreEditor`
 through Core structural ports. The editor remains the content and history owner;
@@ -102,15 +104,15 @@ DEC-055 and DEC-057, lent to Elements through `.editor`. Content history
 does not restore selection; each selection session remaps or prunes its current
 IDs. Viewport and focus remain local and outside content history.
 
-The editable types are `score-view type="piano-roll"` and `type="staff"`.
-Binding an editor without `editable` displays committed content without mutation
-gestures. Staff uses a separate local input controller over the same editor and
-scrolling renderer, with armed A–G entry, written durations and voice/rest
-completion inside authored measures. Its bounded semantic contract and failure
-rules belong to [Editing contracts](EDIT-COMPONENTS.md#staff-notation-entry).
-Sheet engraving and other types gain no editing capability from the attribute.
-`editable` without a ready editor
-reports unavailable instead of creating a private editor. Independent `.score`
+Under [DEC-058](../DECISIONS.md#dec-058--score-editing-moves-to-a-dedicated-grid-view)
+`<score-view>` is read-only: with `.editor` it draws the editor's visible content,
+including a shared session's draft, through its normal piano-roll, staff or
+waterfall renderer. Note editing belongs to `<score-grid-view>`, a separate
+Element because it adds a toolbar, piano keys, a ruler, a velocity lane and
+editing settings that none of the read-only types share. Its feature gating and
+gesture contract belong to [Editing contracts](EDIT-COMPONENTS.md#score-grid-editing).
+Staff, sheet and waterfall have no editing capability. On the grid, `editable`
+without a ready editor reports unavailable instead of creating a private editor. Independent `.score`
 or `src` alongside an editor is a configuration conflict, reported before
 replacing a working binding. Without an editor, existing data precedence and
 player following remain unchanged.
@@ -137,8 +139,9 @@ establish these editing outcomes.
 ## Interaction and presentation
 
 Each instance mounts only its selected surface. Passive Elements have no type
-switch, settings toolbar, extra keyboard or embedded player. Editable surfaces
-provide local musical input and accessible numeric alternatives; custom UI may
+switch, settings toolbar, extra keyboard or embedded player. The editable grid's
+toolbar appears only while editing and offers only the features its `tools`
+attribute lists; it provides local musical input and accessible numeric alternatives; custom UI may
 use the same Headless controllers without the supplied controls. Parameters belongs to the
 documentation/application and shows the options relevant to the selected type.
 Changing type preserves other attribute values, so returning to it restores its

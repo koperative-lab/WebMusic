@@ -1713,7 +1713,7 @@ mountSurfaceSlider(surface, sliderBinding);`,
     api: `import {mountStatus} from '@webmusic/ui/status';
 
 const handle = mountStatus(host, binding, options);`,
-    consumerTags: ['score-player', 'score-rack-control', 'score-recorder', 'score-synth-panel', 'score-view', 'score-pitch-view', 'score-sheet-view', 'score-chord-analysis', 'score-interval-analysis', 'score-scale-analysis', 'score-rhythm-analysis', 'audio-player', 'audio-playlist', 'audio-mixer', 'audio-recorder', 'audio-view', 'audio-live-view', 'audio-meter', 'audio-level-analyzer', 'audio-oscilloscope', 'audio-spectrum-analyzer', 'audio-transient-analyzer'],
+    consumerTags: ['score-player', 'score-rack-control', 'score-recorder', 'score-synth-panel', 'score-view', 'score-grid-view', 'score-pitch-view', 'score-sheet-view', 'score-chord-analysis', 'score-interval-analysis', 'score-scale-analysis', 'score-rhythm-analysis', 'audio-player', 'audio-playlist', 'audio-mixer', 'audio-recorder', 'audio-view', 'audio-live-view', 'audio-meter', 'audio-level-analyzer', 'audio-oscilloscope', 'audio-spectrum-analyzer', 'audio-transient-analyzer'],
     hint: 'Choose Loading or Waiting to compare the animations, or Ready, Empty, and Error for settled states.',
     state: [
       {

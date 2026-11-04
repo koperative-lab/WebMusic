@@ -17,7 +17,6 @@ files already deployed by earlier workflow runs.
 | `audio-analysis-demo.wav` | PCM audio; no creator, generating source, or license record is retained. It is currently unreferenced by the documentation source. | Unverified. |
 | `midi/Arabesque No.1.mid` | MIDI file; no creator, export source, or license record is retained. | Unverified. |
 | `midi/Editing.mid` | Original programmatically generated WebMusic editing fixture, added 2026-10-15; reproducible contents and hash below. | Project-owned fixture under the repository [MIT license](../../../LICENSE). |
-| `musicxml/StaffEditing.musicxml` | Original WebMusic two-measure staff-input fixture, added 2026-10-15; source contents and hash below. | Project-owned fixture under the repository [MIT license](../../../LICENSE). |
 | `mxl/Arabesque No.1.mxl` | Its embedded MusicXML names Claude Achille Debussy as composer, MuseScore 3.5.2 as encoding software, an encoding date of 2020-11-07, and `https://musescore.com/user/19710/scores/55396` as source. These fields identify a possible source, not the arranger's identity or a redistribution license. | Unverified. |
 | `wav/Editing.wav` | Original programmatically generated WebMusic editing fixture, added 2026-10-15; reproducible contents and hash below. | Project-owned fixture under the repository [MIT license](../../../LICENSE). |
 | `wav/Arabesque No.1.wav` | PCM recording; no performer, recording owner, source, or license record is retained. | Unverified. |
@@ -52,18 +51,6 @@ musical content without any sampled sound or external source material.
 
 SHA-256 of the 141-byte file:
 `cc7a03e4087d3fae92b413b27f4ed4a3243eb5b4c4c9444786a53d21e80cce93`.
-
-## Staff editing fixture
-
-`musicxml/StaffEditing.musicxml` is an original notation test fixture with two
-explicit four-quarter measures, one piano part, voice 1, staff 1, a treble clef,
-C major and 120 quarters per minute. The first measure contains C4, E4, G4 and
-C5 quarter notes; the second contains a whole-measure rest. Its uncompressed
-MusicXML source is the complete authored fixture. It contains no imported
-composition, engraving or performance.
-
-SHA-256 of the 1,744-byte file:
-`8d38e7a49dc8024449e923071c082cba24e5437b2bd414788204d9cec8b70183`.
 
 ## Audio editing fixture
 

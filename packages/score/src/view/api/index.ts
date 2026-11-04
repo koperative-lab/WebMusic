@@ -56,7 +56,6 @@ export type {
 } from '../headless/score-view';
 export type {PitchViewOptions, PitchViewState} from '../headless/pitch-view';
 export type {ScoreViewEditing, ScoreViewEditingOptions, ScoreViewEditingState} from '../headless/score-editing';
-export type {StaffViewEditing, StaffViewEditingOptions, StaffViewEditingState} from '../headless/staff-editing';
 
 // Document editing is a View feature: stateless operations and contracts here,
 // the stateful editor and its URL loader in /view/headless.

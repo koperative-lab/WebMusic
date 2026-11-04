@@ -60,27 +60,21 @@ describe.skipIf(!hasDist)('@webmusic/score built dist', () => {
     expect(Object.keys(await entry('view/element/index.js')).length).toBeGreaterThan(0);
   });
 
-  it.each(['js', 'cjs'])('staff input composes built Core and View values (%s)', async (extension) => {
+  it.each(['js', 'cjs'])('score grid entries are built and staff editing is gone (%s)', async (extension) => {
     const load = (name: string) => extension === 'js' ? entry(`${name}.js`) : requireBuilt(fileURLToPath(new URL(`../dist/${name}.cjs`, import.meta.url)));
-    const root = await load('index');
-    const view = await load('view/headless/index');
-    const edit = view;
+    const headless = await load('view/headless/index');
     const render = await load('view/render/index');
-    expect(typeof render.mountStaffEditor).toBe('function');
-    const builder = new root.ScoreBuilder();
-    builder.addPart({id: root.PartId('staff-part'), name: 'Piano'});
-    builder.addMeasure({id: root.MeasureId('bar'), number: 1, onsetQuarters: root.Rational.ZERO,
-      durationQuarters: new root.Rational(4)});
-    const editor = edit.createScoreEditor(builder.build());
-    const editing = view.createScoreViewEditing(editor, {editable: true});
-    const staff = view.createStaffViewEditing(editing);
-    staff.setDuration([1, 1], 1);
-    expect(staff.insertPitch('D').status).toBe('committed');
-    expect(editor.score.notes[0].duration.quarters.toJSON()).toEqual([3, 2]);
-    expect(editor.score.parts[0].notes.some((note: {rest: boolean}) => note.rest)).toBe(true);
-    expect(staff.undo().status).toBe('committed');
-    expect(editor.score.parts[0].notes).toHaveLength(0);
-    staff.dispose(); editing.dispose(); editor.dispose();
+    const element = await load('view/element/index');
+    expect(typeof render.mountScoreGrid).toBe('function');
+    expect(render.SCORE_GRID_FEATURES).toEqual(['move', 'resize', 'draw', 'delete', 'velocity', 'snap', 'zoom', 'history']);
+    expect(render.SCORE_GRID_SNAPS).toContain('1/16t');
+    expect(render.parseScoreGridFeatures('history move')).toEqual(['move', 'history']);
+    expect(() => render.parseScoreGridFeatures('erase')).toThrow(RangeError);
+    expect(typeof element.ScoreGridViewElement).toBe('function');
+    expect(typeof element.defineScoreGridViewElement).toBe('function');
+    expect(typeof headless.createScoreViewEditing).toBe('function');
+    for (const removed of ['mountStaffEditor', 'mountPianoRollEditor']) expect(render[removed]).toBeUndefined();
+    expect(headless.createStaffViewEditing).toBeUndefined();
   });
 
   it('play entries are populated', async () => {

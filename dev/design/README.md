@@ -8,7 +8,8 @@ choices; [STATUS](../STATUS.md) distinguishes delivery from target design.
 DEC-053 accepts the document/editor, playback and editable-View contracts below.
 The [current five-phase roadmap](EDIT-COMPONENTS.md#implementation-and-reference-delivery)
 groups delivery as P0 design, P1 Score foundation, P2 Score editing workflow,
-P3 Audio single-file workflow and P4 staff editing. STATUS EDIT-01 tracks actual
+P3 Audio single-file workflow and P4 staff editing; DEC-058 later replaced
+P4's staff editing with the Score grid View. STATUS EDIT-01 tracks actual
 delivery. The [dated proposal](../plans/2026-10-13-editing-capabilities.md) retains
 its original phase sequence and alternatives.
 

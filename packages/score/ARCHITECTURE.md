@@ -111,8 +111,9 @@ element → api → headless → core
 Consumers can use Web Components, Headless, or API + UI. These reuse the same
 domain resources; the four source directories are not four required usage stages.
 Editing adds no entries: operations and contracts ship from `/view`, the
-editor and `loadScoreEditor` from `/view/headless`. Editable piano-roll and staff interaction stay in
-View's browser renderers.
+editor and `loadScoreEditor` from `/view/headless`. Note editing is the
+`mountScoreGrid` browser renderer behind `<score-grid-view>`; `<score-view>`
+and `<score-grid-view>` share one data, player and editor binding base.
 Prefer existing controllers and presenters before adding another engine or
 per-variant tag. Three consequences matter for implementation:
 

@@ -29,28 +29,27 @@ function editor() {
   };
 }
 type Editor = ReturnType<typeof editor>;
-async function mount(notation = false, initial: 'ready' | 'pending' = 'ready') {
-  document.body.innerHTML = `<div data-wm-pg><section data-editing-demo data-editing-src="example.mid" ${notation ? 'data-editing-notation' : ''}>
-    <score-player data-editing-player></score-player><score-view data-editing-roll></score-view><score-view data-editing-staff></score-view>
+async function mount(initial: 'ready' | 'pending' = 'ready') {
+  document.body.innerHTML = `<div data-wm-pg><section data-editing-demo data-editing-src="example.mid">
+    <score-player data-editing-player></score-player><score-grid-view data-editing-grid editable></score-grid-view><score-view data-editing-staff type="staff"></score-view>
     <p data-editing-status></p><p data-editing-result>Ready to edit.</p>
     <input data-editing-import type="file"><button data-editing-export></button><button data-editing-restore></button>
-    ${notation ? '<button data-editing-export-notation></button>' : ''}
   </section></div>`;
   const player = Object.assign(document.querySelector('[data-editing-player]')!, {documentBinding: undefined as unknown, editor: undefined as unknown});
-  const views = [...document.querySelectorAll('score-view')].map((view) => Object.assign(view, {editor: undefined as unknown}));
+  const views = [...document.querySelectorAll('score-grid-view, score-view')].map((view) => Object.assign(view, {editor: undefined as unknown}));
   const first = editor();
   const configured = deferred<Editor>();
   const headless = {
     loadScoreEditor: vi.fn<(...args: unknown[]) => Promise<Editor>>(() => configured.promise),
     createScoreEditor: vi.fn<(...args: unknown[]) => Editor>(() => editor()),
   };
-  const io = {loadScore: vi.fn<(...args: unknown[]) => Promise<unknown>>(), serializeMIDI: vi.fn(() => new Uint8Array([1])), serializeMusicXML: vi.fn(() => '<score-partwise />'),
+  const io = {loadScore: vi.fn<(...args: unknown[]) => Promise<unknown>>(), serializeMIDI: vi.fn(() => new Uint8Array([1])),
     DEFAULT_LOAD_SCORE_LIMITS: {maxInputBytes: 32},
     assertScoreInputByteLength: (size: number, max: number) => {if (size > max) throw new Error('input limit');},
   };
   const modules: Record<string, unknown> = {
     '@webmusic/score/play/element': {defineScorePlayerElement() {}},
-    '@webmusic/score/view/element': {defineScoreViewElement() {}},
+    '@webmusic/score/view/element': {defineScoreGridViewElement() {}, defineScoreViewElement() {}},
     '@webmusic/score/view/headless': headless,
     '@webmusic/score/io': io,
     '../playground-client': {PLAYGROUND_RESET_EVENT: 'webmusic:playground-reset'},
@@ -78,8 +77,9 @@ afterEach(async () => {
 });
 
 describe('Score editing workflow demo', () => {
-  it('loads the configured URL and lends one editor to the player and both views', async () => {
+  it('loads the configured URL and lends one editor to the player, the editable grid and the read-only staff', async () => {
     const {first, headless, player, views} = await mount();
+    expect(views.map((view) => view.localName)).toEqual(['score-grid-view', 'score-view']);
     expect(headless.loadScoreEditor).toHaveBeenCalledWith('example.mid', {signal: expect.any(AbortSignal)});
     expect(player.editor).toBe(first);
     for (const view of views) expect(view.editor).toBe(first);
@@ -128,7 +128,7 @@ describe('Score editing workflow demo', () => {
   });
 
   it('keeps a selected import when the configured URL finishes loading during file reading', async () => {
-    const {first, configured, headless, player, io, choose, result} = await mount(false, 'pending');
+    const {first, configured, headless, player, io, choose, result} = await mount('pending');
     const bytes = deferred<ArrayBuffer>(); io.loadScore.mockResolvedValue({notes: ['new']});
     const options = headless.loadScoreEditor.mock.calls[0][1] as {signal: AbortSignal};
     choose({size: 4, name: 'selected.mid', arrayBuffer: () => bytes.promise});
@@ -190,31 +190,17 @@ describe('Score editing workflow demo', () => {
     expect(result.textContent).toContain('revision 0');
   });
 
-  it('keeps a notation document dirty on MIDI export and saves the same revision on MusicXML export', async () => {
-    const {first, io, result} = await mount(true);
+  it('marks the exported revision saved after a MIDI export', async () => {
+    const {first, io, result} = await mount();
     Object.defineProperty(URL, 'createObjectURL', {configurable: true, value: vi.fn(() => 'blob:download')});
     Object.defineProperty(URL, 'revokeObjectURL', {configurable: true, value: vi.fn()});
     const downloads: string[] = [];
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {downloads.push(this.download);});
     document.querySelector<HTMLButtonElement>('[data-editing-export]')!.click();
     expect(io.serializeMIDI).toHaveBeenCalledWith(first.getSnapshot().content);
-    expect(first.markSaved).not.toHaveBeenCalled();
-    expect(result.textContent).toContain('leaves the notation document unsaved');
-    document.querySelector<HTMLButtonElement>('[data-editing-export-notation]')!.click();
-    expect(io.serializeMusicXML).toHaveBeenCalledWith(first.getSnapshot().content, {ppq: 960});
     expect(first.markSaved).toHaveBeenCalledOnce();
-    expect(downloads).toEqual(['edited-score.mid', 'edited-score.musicxml']);
-    expect(result.textContent).toContain('MusicXML export requested for revision 0');
-  });
-
-  it('does not mark a replacement root saved by an earlier MusicXML export', async () => {
-    const {first, result} = await mount(true);
-    Object.defineProperty(URL, 'createObjectURL', {configurable: true, value: vi.fn(() => 'blob:download')});
-    Object.defineProperty(URL, 'revokeObjectURL', {configurable: true, value: vi.fn()});
-    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => first.replace());
-    document.querySelector<HTMLButtonElement>('[data-editing-export-notation]')!.click();
-    expect(first.markSaved).not.toHaveBeenCalled();
-    expect(result.textContent).toContain('MusicXML export requested for revision 0');
+    expect(downloads).toEqual(['edited-score.mid']);
+    expect(result.textContent).toContain('Export requested for revision 0');
   });
 
   it('detaches every element and disposes the owned editor at teardown', async () => {
