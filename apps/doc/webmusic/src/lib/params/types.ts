@@ -18,13 +18,19 @@ export type ParamKind =
   /** Numeric attribute → `<input type="number">`. */
   | 'number'
   /** Free text (URL, selector, label, CSS length, colour, …). */
-  | 'text';
+  | 'text'
+  /**
+   * Space-separated token list → one checkbox per `options` value. Every box
+   * checked while the attribute is absent shows the all-tokens fallback; any
+   * change writes the checked tokens (an empty list when none are checked).
+   */
+  | 'tokens';
 
 export interface ParamSpec {
   /** Attribute name exactly as it appears in `observedAttributes`. */
   readonly name: string;
   readonly kind: ParamKind;
-  /** `enum` only — the accepted values, in source order. */
+  /** `enum` / `tokens` — the accepted values, in source order. */
   readonly options?: readonly string[];
   /** `number` only. */
   readonly min?: number;

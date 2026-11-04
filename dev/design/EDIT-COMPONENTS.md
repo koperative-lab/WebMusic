@@ -425,7 +425,11 @@ distinguishable beyond color.
 piano keys, bar, beat and snap lines from the score's time signatures (4/4
 before the first), a bar ruler and an optional velocity lane. Without an editor
 it draws `.score`, `src` or a player's score; editing needs a ready `.editor`
-and `editable`, which shows a toolbar above the grid.
+and `editable`, which shows a one-row icon toolbar along the top of the grid
+window. The piano keys, ruler and velocity lane are sticky layers over the
+scrolled notes, so they stay in place while the grid scrolls; the gesture
+instructions and live status are available to assistive technology but not
+drawn, and the numeric note-values panel opens from a toolbar button.
 
 The application chooses which features exist with the `tools` token list —
 `move`, `resize`, `draw`, `delete`, `velocity`, `snap`, `zoom`, `history`;

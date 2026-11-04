@@ -107,83 +107,173 @@ export function mountScoreGrid(host: HTMLElement, content: ScoreGridContent, opt
   // A tool that is not offered falls back to selection.
   if (settings.tool === 'draw' && !features.has('draw')) settings = {...settings, tool: 'select'};
 
+  const line = 'var(--wm-border,color-mix(in srgb,currentColor 22%,transparent))';
+  const background = 'var(--wm-score-view-background,var(--wm-surface,Canvas))';
+  // Instructions and status are read by assistive technology, not drawn in the window.
+  const offscreen = 'position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0';
   const element = owner.createElement('section');
   element.setAttribute('part', 'grid');
-  element.style.cssText = 'display:grid;gap:.375rem;min-width:0;color:var(--wm-foreground,inherit)';
+  element.style.cssText = `position:relative;display:flex;flex-direction:column;min-width:0;color:var(--wm-foreground,inherit);border:1px solid ${line};background:${background}`;
   const toolbar = owner.createElement('div');
   toolbar.setAttribute('part', 'toolbar');
   toolbar.setAttribute('role', 'group');
   toolbar.setAttribute('aria-label', 'Grid editing tools');
-  toolbar.style.cssText = 'display:flex;flex-wrap:wrap;align-items:center;gap:.25rem .75rem;min-width:0;font-size:.8125rem';
+  toolbar.style.cssText = `display:flex;flex-wrap:nowrap;align-items:center;gap:2px;min-width:0;overflow-x:auto;padding:3px 4px;border-bottom:1px solid ${line};background:color-mix(in srgb,currentColor 5%,${background})`;
   const instructions = owner.createElement('p');
   instructions.id = makeId('score-grid-help');
   instructions.setAttribute('part', 'editing-instructions');
-  instructions.style.cssText = 'margin:0;font:inherit;font-size:.75em;opacity:.8';
+  instructions.style.cssText = offscreen;
   const viewport = owner.createElement('div');
   viewport.setAttribute('part', 'viewport');
-  viewport.style.cssText = 'overflow:auto;max-height:var(--wm-score-grid-max-height,32rem);min-width:0;border:1px solid var(--wm-border,#888);background:var(--wm-score-view-background,var(--wm-surface,Canvas))';
+  viewport.style.cssText = 'overflow:auto;max-height:var(--wm-score-grid-max-height,32rem);min-width:0;flex:1 1 auto';
+  // One scrolled canvas: the note surface underneath, then sticky ruler, keys and
+  // velocity lane above it. The browser keeps sticky layers in place while scrolling.
+  const canvas = owner.createElement('div');
+  canvas.setAttribute('part', 'canvas');
+  canvas.style.cssText = 'position:relative';
   const svg = owner.createElementNS(SVG, 'svg') as SVGSVGElement;
   svg.setAttribute('part', 'surface');
   svg.setAttribute('aria-label', 'Piano roll grid, written pitch and quarter notes');
-  svg.style.cssText = 'display:block;touch-action:none;outline-offset:-3px;user-select:none';
-  viewport.append(svg);
+  svg.style.cssText = 'position:absolute;left:0;top:0;display:block;touch-action:none;outline-offset:-3px;user-select:none';
+  const layer = (part: string, css: string): HTMLDivElement => {
+    const node = owner.createElement('div');
+    node.setAttribute('part', part);
+    node.style.cssText = `pointer-events:none;${css}`;
+    return node;
+  };
+  const corner = (css: string): HTMLDivElement => {
+    const node = owner.createElement('div');
+    node.style.cssText = `position:sticky;left:0;z-index:1;flex:none;box-sizing:border-box;width:${KEY_WIDTH}px;background:${background};border-right:1px solid ${line};${css}`;
+    return node;
+  };
+  const overlaySvg = (): SVGSVGElement => {
+    const node = owner.createElementNS(SVG, 'svg') as SVGSVGElement;
+    node.style.cssText = 'display:block;flex:none;overflow:hidden';
+    node.setAttribute('aria-hidden', 'true');
+    return node;
+  };
+  const ruler = layer('ruler', `position:sticky;top:0;z-index:4;display:flex;height:${RULER_HEIGHT}px;background:${background};border-bottom:1px solid ${line};box-sizing:border-box`);
+  ruler.dataset.ruler = '';
+  const rulerSvg = overlaySvg();
+  ruler.append(corner(''), rulerSvg);
+  const keys = owner.createElementNS(SVG, 'svg') as SVGSVGElement;
+  keys.setAttribute('part', 'keys');
+  keys.setAttribute('aria-hidden', 'true');
+  keys.style.cssText = `position:sticky;left:0;z-index:3;display:block;pointer-events:none;border-right:1px solid ${line};background:${background}`;
+  const lane = layer('velocity-lane', `position:sticky;bottom:0;z-index:4;display:flex;height:${LANE_HEIGHT}px;background:${background};border-top:1px solid ${line};box-sizing:border-box`);
+  lane.dataset.velocityLane = '';
+  const laneLabel = corner('display:flex;align-items:flex-start;padding:3px 4px;font-size:10px;line-height:1.2');
+  laneLabel.textContent = 'Velocity';
+  const laneSvg = overlaySvg();
+  lane.append(laneLabel, laneSvg);
+  canvas.append(svg, ruler, keys, lane);
+  viewport.append(canvas);
   const feedback = owner.createElement('div');
   feedback.setAttribute('part', 'editing-status');
   feedback.setAttribute('role', 'status');
   feedback.setAttribute('aria-live', 'polite');
-  feedback.style.cssText = 'font-size:.75em;min-height:1.2em';
+  feedback.style.cssText = offscreen;
 
-  // ---- Toolbar ----
+  // ---- Toolbar: one row of icon buttons; names live in aria-label and title ----
+  const ICONS: Record<string, string> = {
+    select: '<path d="M5 3l14 7.5-6 1.5-2.5 6z"/>',
+    draw: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>',
+    snap: '<path d="M5 4h4v8a3 3 0 0 0 6 0V4h4v8a7 7 0 0 1-14 0z"/><path d="M5 8h4M15 8h4"/>',
+    velocity: '<path d="M5 20v-7M10 20V6M15 20v-9M20 20V9"/><circle cx="5" cy="12" r="1.5"/><circle cx="10" cy="5" r="1.5"/><circle cx="15" cy="10" r="1.5"/><circle cx="20" cy="8" r="1.5"/>',
+    'zoom-out': '<circle cx="11" cy="11" r="6.5"/><path d="M20.5 20.5L16 16M8 11h6"/>',
+    'zoom-in': '<circle cx="11" cy="11" r="6.5"/><path d="M20.5 20.5L16 16M8 11h6M11 8v6"/>',
+    'rows-shorter': '<path d="M12 3v6M9 6l3 3 3-3M12 21v-6M9 18l3-3 3 3M4 12h16"/>',
+    'rows-taller': '<path d="M12 3v18M8.5 6.5L12 3l3.5 3.5M8.5 17.5L12 21l3.5-3.5M4 12h3M17 12h3"/>',
+    delete: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/>',
+    undo: '<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>',
+    redo: '<path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/>',
+    values: '<path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>',
+  };
+  const icon = (name: string): SVGSVGElement => {
+    const node = owner.createElementNS(SVG, 'svg') as SVGSVGElement;
+    node.setAttribute('viewBox', '0 0 24 24'); node.setAttribute('width', '16'); node.setAttribute('height', '16');
+    node.setAttribute('fill', 'none'); node.setAttribute('stroke', 'currentColor'); node.setAttribute('stroke-width', '1.75');
+    node.setAttribute('stroke-linecap', 'round'); node.setAttribute('stroke-linejoin', 'round'); node.setAttribute('aria-hidden', 'true');
+    node.innerHTML = ICONS[name];
+    return node;
+  };
   const group = (label: string): HTMLElement => {
     const node = owner.createElement('span');
     node.setAttribute('role', 'group'); node.setAttribute('aria-label', label);
-    node.style.cssText = 'display:inline-flex;align-items:center;gap:.25rem';
+    node.style.cssText = 'display:inline-flex;align-items:center;gap:2px;flex:none';
     toolbar.append(node); return node;
   };
-  const toolButton = (parent: HTMLElement, text: string, label: string, part: string, action: () => void): HTMLButtonElement => {
+  const divider = (): HTMLElement => {
+    const node = owner.createElement('span');
+    node.setAttribute('aria-hidden', 'true');
+    node.style.cssText = `flex:none;width:1px;height:18px;margin:0 4px;background:${line}`;
+    toolbar.append(node); return node;
+  };
+  const toolButton = (parent: HTMLElement, name: string, label: string, part: string, action: () => void): HTMLButtonElement => {
     const button = owner.createElement('button');
-    button.type = 'button'; button.textContent = text; button.title = label;
-    button.setAttribute('aria-label', label); button.setAttribute('part', part);
-    button.style.cssText = 'font:inherit;min-width:2em;padding:.125rem .5rem;border:1px solid var(--wm-border,#888);border-radius:4px;background:var(--wm-surface,Canvas);color:inherit;cursor:pointer';
+    button.type = 'button'; button.title = label;
+    button.setAttribute('aria-label', label); button.setAttribute('part', part); button.dataset.icon = name;
+    button.style.cssText = 'display:inline-grid;place-items:center;flex:none;width:28px;height:28px;padding:0;border:1px solid transparent;border-radius:4px;background:transparent;color:inherit;cursor:pointer';
+    button.append(icon(name));
     button.addEventListener('click', action);
     parent.append(button); return button;
   };
+  /** Pressed tools get a tinted fill and a visible ring, not colour alone. */
+  const press = (button: HTMLButtonElement, pressed: boolean): void => {
+    button.setAttribute('aria-pressed', String(pressed));
+    button.style.background = pressed ? 'color-mix(in srgb,currentColor 16%,transparent)' : 'transparent';
+    button.style.borderColor = pressed ? 'color-mix(in srgb,currentColor 45%,transparent)' : 'transparent';
+  };
   const tools = group('Tool');
-  const selectTool = toolButton(tools, 'Select', 'Select tool', 'tool-button', () => change({tool: 'select'}, 'tool'));
-  const drawTool = toolButton(tools, 'Draw', 'Draw tool (B)', 'tool-button', () => change({tool: 'draw'}, 'tool'));
+  const selectTool = toolButton(tools, 'select', 'Select tool', 'tool-button', () => change({tool: 'select'}, 'tool'));
+  const drawTool = toolButton(tools, 'draw', 'Draw tool (B)', 'tool-button', () => change({tool: 'draw'}, 'tool'));
+  const toolsDivider = divider();
   const snapGroup = group('Snap');
-  const snapLabel = owner.createElement('label');
-  snapLabel.textContent = 'Snap ';
+  const snapIcon = icon('snap');
+  snapIcon.style.flex = 'none';
   const snapSelect = owner.createElement('select');
   snapSelect.setAttribute('part', 'snap');
   snapSelect.setAttribute('aria-label', 'Snap grid');
+  snapSelect.title = 'Snap grid';
+  snapSelect.style.cssText = `font:inherit;font-size:12px;height:24px;padding:0 2px;border:1px solid ${line};border-radius:4px;background:${background};color:inherit`;
   for (const value of SCORE_GRID_SNAPS) {
     const option = owner.createElement('option'); option.value = value;
-    option.textContent = value === 'off' ? 'Off' : value.endsWith('t') ? `${value.slice(0, -1)} triplet` : value;
+    option.textContent = value === 'off' ? 'Off' : value.endsWith('t') ? `${value.slice(0, -1)}T` : value;
     snapSelect.append(option);
   }
   snapSelect.addEventListener('change', () => change({snap: snapSelect.value as ScoreGridSnap}, 'snap'));
-  snapLabel.append(snapSelect); snapGroup.append(snapLabel);
+  snapGroup.style.gap = '4px'; snapGroup.style.padding = '0 2px';
+  snapGroup.append(snapIcon, snapSelect);
   const laneGroup = group('Lanes');
-  const laneToggle = toolButton(laneGroup, 'Velocity', 'Show velocity lane', 'lane-toggle', () => change({velocityLane: !settings.velocityLane}, 'velocityLane'));
+  const laneToggle = toolButton(laneGroup, 'velocity', 'Show velocity lane', 'lane-toggle', () => change({velocityLane: !settings.velocityLane}, 'velocityLane'));
+  const zoomDivider = divider();
   const zoomGroup = group('Zoom');
-  toolButton(zoomGroup, '−', 'Zoom out horizontally', 'zoom-button', () => zoom('pixelsPerQuarter', 1 / ZOOM_STEP));
-  toolButton(zoomGroup, '+', 'Zoom in horizontally', 'zoom-button', () => zoom('pixelsPerQuarter', ZOOM_STEP));
-  toolButton(zoomGroup, '↕−', 'Shorter rows', 'zoom-button', () => zoom('noteHeight', 1 / ZOOM_STEP));
-  toolButton(zoomGroup, '↕+', 'Taller rows', 'zoom-button', () => zoom('noteHeight', ZOOM_STEP));
+  toolButton(zoomGroup, 'zoom-out', 'Zoom out horizontally', 'zoom-button', () => zoom('pixelsPerQuarter', 1 / ZOOM_STEP));
+  toolButton(zoomGroup, 'zoom-in', 'Zoom in horizontally', 'zoom-button', () => zoom('pixelsPerQuarter', ZOOM_STEP));
+  toolButton(zoomGroup, 'rows-shorter', 'Shorter rows', 'zoom-button', () => zoom('noteHeight', 1 / ZOOM_STEP));
+  toolButton(zoomGroup, 'rows-taller', 'Taller rows', 'zoom-button', () => zoom('noteHeight', ZOOM_STEP));
+  const editDivider = divider();
   const editGroup = group('Edit');
-  const deleteButton = toolButton(editGroup, 'Delete', 'Delete selected notes', 'delete-button', () => run('Delete notes', [{type: 'delete-notes', noteIds: selectedIds()}]));
+  const deleteButton = toolButton(editGroup, 'delete', 'Delete selected notes', 'delete-button', () => run('Delete notes', [{type: 'delete-notes', noteIds: selectedIds()}]));
   const historyGroup = group('History');
-  const undoButton = toolButton(historyGroup, 'Undo', 'Undo', 'history-button', () => travelHistory('undo'));
-  const redoButton = toolButton(historyGroup, 'Redo', 'Redo', 'history-button', () => travelHistory('redo'));
+  const undoButton = toolButton(historyGroup, 'undo', 'Undo', 'history-button', () => travelHistory('undo'));
+  const redoButton = toolButton(historyGroup, 'redo', 'Redo', 'history-button', () => travelHistory('redo'));
+  const spacer = owner.createElement('span'); spacer.style.cssText = 'flex:1 1 auto'; toolbar.append(spacer);
+  const valuesGroup = group('Note values');
+  const valuesToggle = toolButton(valuesGroup, 'values', 'Note values and keyboard alternatives', 'values-toggle', () => {
+    valuesOpen = !valuesOpen; paintControls();
+    if (valuesOpen) existing.focus();
+  });
 
   // ---- Numeric note values: the non-pointer path for every pointer edit ----
-  const details = owner.createElement('details');
+  const details = owner.createElement('div');
+  details.id = makeId('score-grid-values');
   details.setAttribute('part', 'note-properties');
-  details.style.cssText = 'min-width:0;max-width:100%;font-size:.8125rem';
-  const summary = owner.createElement('summary');
-  summary.textContent = 'Note values and keyboard alternatives';
-  details.append(summary);
+  details.setAttribute('role', 'group');
+  details.setAttribute('aria-label', 'Note values');
+  details.style.cssText = `min-width:0;max-width:100%;font-size:.8125rem;padding:0 6px;border-bottom:1px solid ${line}`;
+  valuesToggle.setAttribute('aria-controls', details.id);
+  let valuesOpen = false;
   const form = owner.createElement('form');
   form.style.cssText = 'display:flex;flex-wrap:wrap;align-items:end;gap:.5rem;padding:.5rem 0';
   const existingLabel = owner.createElement('label'); existingLabel.textContent = 'Select existing note ';
@@ -222,7 +312,7 @@ export function mountScoreGrid(host: HTMLElement, content: ScoreGridContent, opt
   const insert = formButton('Insert note', () => numeric(true));
   form.addEventListener('submit', (event) => { event.preventDefault(); numeric(false); });
   details.append(form);
-  element.append(toolbar, instructions, viewport, feedback, details);
+  element.append(toolbar, details, viewport, instructions, feedback);
 
   let disposed = false;
   let gesture: Gesture | undefined;
@@ -237,12 +327,11 @@ export function mountScoreGrid(host: HTMLElement, content: ScoreGridContent, opt
   let existingSummary = '';
   let numericBinding = '';
   let staticRevision = 0;
-  // The last full drawing; playback-only updates repaint overlays on it instead of rebuilding.
-  let drawn: {key: unknown; revision: number; left: number; top: number; viewportWidth: number; viewportHeight: number} | undefined;
+  // The last full drawing covers [from, to] horizontally. Playback-only updates
+  // and scrolling inside that range repaint nothing but the playback overlay.
+  let drawn: {key: unknown; revision: number; from: number; to: number; viewportWidth: number; viewportHeight: number} | undefined;
   const drawnNotes = new Map<string, {rectangle: SVGElement; top: number; active: boolean}>();
-  let overlays: SVGElement | undefined;
   let playhead: SVGElement | undefined;
-  let marquee: SVGElement | undefined;
   const idleFill = options.noteColor ?? (options.noteRGB ? `rgb(${options.noteRGB})` : 'var(--wm-score-view-note,var(--wm-accent,#4869d8))');
   const activeFill = options.activeNoteColor ?? (options.activeNoteRGB ? `rgb(${options.activeNoteRGB})` : 'var(--wm-score-view-active-note,var(--wm-accent,#e25477))');
   // Selection rings and handles contrast with any note fill by reusing the surface background.
@@ -393,6 +482,19 @@ export function mountScoreGrid(host: HTMLElement, content: ScoreGridContent, opt
     height = RULER_HEIGHT + (max - min + 1) * settings.noteHeight + (laneVisible() ? LANE_HEIGHT : 0);
     svg.setAttribute('width', String(width)); svg.setAttribute('height', String(height));
     svg.style.width = `${width}px`; svg.style.height = `${height}px`; svg.style.maxWidth = 'none';
+    const rows = (max - min + 1) * settings.noteHeight;
+    canvas.style.width = `${width}px`; canvas.style.height = `${height}px`;
+    ruler.style.width = `${width}px`;
+    for (const [node, h] of [[rulerSvg, RULER_HEIGHT], [laneSvg, LANE_HEIGHT]] as const) {
+      node.setAttribute('width', String(width - KEY_WIDTH)); node.setAttribute('height', String(h));
+      // Overlays draw in canvas x coordinates; the view box skips the key column.
+      node.setAttribute('viewBox', `${KEY_WIDTH} 0 ${width - KEY_WIDTH} ${h}`);
+    }
+    keys.setAttribute('width', String(KEY_WIDTH)); keys.setAttribute('height', String(rows));
+    keys.setAttribute('viewBox', `0 ${RULER_HEIGHT} ${KEY_WIDTH} ${rows}`);
+    keys.style.width = `${KEY_WIDTH}px`; keys.style.height = `${rows}px`; keys.style.boxSizing = 'border-box';
+    lane.style.width = `${width}px`;
+    lane.style.display = laneVisible() ? 'flex' : 'none';
   }
   function frame(): {left: number; right: number; top: number; bottom: number; laneTop: number} {
     const left = viewport.scrollLeft;
@@ -421,21 +523,24 @@ export function mountScoreGrid(host: HTMLElement, content: ScoreGridContent, opt
   function draw(): void {
     if (disposed) return;
     geometry();
-    svg.replaceChildren(); drawnNotes.clear(); playhead = undefined; marquee = undefined;
-    const {left, right, top, laneTop} = frame();
+    svg.replaceChildren(); drawnNotes.clear(); playhead = undefined;
+    const {left, right} = frame();
+    // Overscan one viewport each side so ordinary scrolling needs no redraw.
+    const span = Math.max(1, right - left);
+    const from = Math.max(0, left - span);
+    const to = Math.min(width, right + span);
     const lane = settings.noteHeight;
     const gridBottom = RULER_HEIGHT + (max - min + 1) * lane;
     const score = visible();
     for (let midi = min; midi <= max; midi++) {
-      shape('rect', {x: Math.max(KEY_WIDTH, left), y: noteLaneTop(midi), width: Math.max(0, right - Math.max(KEY_WIDTH, left)), height: lane,
+      shape('rect', {x: Math.max(KEY_WIDTH, from), y: noteLaneTop(midi), width: Math.max(0, to - Math.max(KEY_WIDTH, from)), height: lane,
         fill: BLACK.has(midi % 12) ? 'color-mix(in srgb, currentColor 7%, transparent)' : 'transparent',
         stroke: 'color-mix(in srgb, currentColor 8%, transparent)', 'stroke-width': midi % 12 === 0 ? 1 : .5, 'pointer-events': 'none'});
     }
-    const bars = barLines(score, (right - KEY_WIDTH) / settings.pixelsPerQuarter + 1);
+    const bars = barLines(score, (to - KEY_WIDTH) / settings.pixelsPerQuarter + 1).filter((bar) => quarterX(bar.quarter + bar.length) >= from && quarterX(bar.quarter) <= to);
     const subdivision = grid();
     for (const bar of bars) {
       const barEnd = bar.quarter + bar.length;
-      if (quarterX(barEnd) < left || quarterX(bar.quarter) > right) continue;
       // Subdivisions follow the snap grid; lines closer than 6px are omitted, not merged.
       const sub = subdivision && subdivision.toFloat() * settings.pixelsPerQuarter >= 6 ? subdivision.toFloat() : undefined;
       if (sub) {
@@ -452,12 +557,12 @@ export function mountScoreGrid(host: HTMLElement, content: ScoreGridContent, opt
     const selected = new Set<string>(selectedIds());
     const draft = editing?.state.interaction.draft;
     const base = committed();
-    const visibleNotes: Note[] = [];
+    const drawnRange: Note[] = [];
     for (const note of pitchedNotes(score)) {
       if (note.pitch.midi < min || note.pitch.midi > max) continue;
       const {x, width: noteWidth, top: noteTop} = box(note);
-      if (x + noteWidth < left || x > right) continue;
-      visibleNotes.push(note);
+      if (x + noteWidth < from || x > to) continue;
+      drawnRange.push(note);
       const isSelected = selected.has(note.id);
       const drafted = Boolean(draft && base.getNote(note.id) !== note);
       // Selection, draft and playing states each have a non-colour cue: double ring, dashes, lane height.
@@ -478,59 +583,62 @@ export function mountScoreGrid(host: HTMLElement, content: ScoreGridContent, opt
         }
       }
     }
-    // Sticky overlays follow the scroll position; notes pass beneath them.
-    overlays = shape('g', {'data-overlays': '', 'pointer-events': 'none'});
-    if (laneVisible()) {
-      shape('rect', {x: left, y: laneTop, width: right - left, height: LANE_HEIGHT, fill: contrast, stroke: 'currentColor', 'stroke-opacity': '.3', 'data-velocity-lane': ''}, undefined, overlays);
-      for (const value of [32, 64, 96, 127]) {
-        shape('line', {x1: Math.max(KEY_WIDTH, left), x2: right, y1: velocityY(value, laneTop), y2: velocityY(value, laneTop), stroke: 'currentColor', 'stroke-opacity': '.08'}, undefined, overlays);
-      }
-      for (const note of visibleNotes) {
-        const x = quarterX(note.onsetQuarters.toFloat());
-        const y = velocityY(note.velocity, laneTop);
-        const isSelected = selected.has(note.id);
-        shape('line', {x1: x + 1, x2: x + 1, y1: laneTop + LANE_HEIGHT - 6, y2: y, stroke: isSelected ? activeFill : idleFill, 'stroke-width': 2}, undefined, overlays);
-        shape('circle', {cx: x + 1, cy: y, r: isSelected ? 4 : 3, fill: isSelected ? activeFill : contrast, stroke: isSelected ? activeFill : idleFill, 'stroke-width': 1.5,
-          'data-velocity-note-id': note.id}, undefined, overlays);
-      }
-      shape('rect', {x: left, y: laneTop, width: KEY_WIDTH, height: LANE_HEIGHT, fill: contrast, stroke: 'currentColor', 'stroke-opacity': '.3'}, undefined, overlays);
-      shape('text', {x: left + 4, y: laneTop + 14, fill: 'currentColor', 'font-size': 10, 'aria-hidden': 'true'}, 'Velocity', overlays);
-    }
-    // Piano keys: white or black rows, with octave names on C.
-    for (let midi = min; midi <= max; midi++) {
-      const y = noteLaneTop(midi);
-      if (y + lane < top + RULER_HEIGHT && y < top) continue;
-      const black = BLACK.has(midi % 12);
-      shape('rect', {x: left, y, width: KEY_WIDTH, height: lane, fill: black ? 'color-mix(in srgb, currentColor 70%, transparent)' : contrast,
-        stroke: 'color-mix(in srgb, currentColor 30%, transparent)', 'stroke-width': .5, 'data-key': midi}, undefined, overlays);
-      if (midi % 12 === 0) shape('text', {x: left + 4, y: y + lane - Math.max(2, (lane - 10) / 2), fill: 'currentColor', 'font-size': Math.min(11, Math.max(7, lane - 3)), 'aria-hidden': 'true'}, Pitch.fromMidi(midi).toString(), overlays);
-    }
-    // Ruler: bar numbers, and bar.beat labels once beats have room.
-    shape('rect', {x: left, y: top, width: right - left, height: RULER_HEIGHT, fill: contrast, stroke: 'currentColor', 'stroke-opacity': '.3', 'data-ruler': ''}, undefined, overlays);
+    paintMarquee();
+    drawRuler(bars);
+    drawKeys();
+    drawLane(drawnRange, selected, from, to);
+    drawn = {key: editing ? editing.state : staticScore, revision: staticRevision, from, to, viewportWidth: viewport.clientWidth, viewportHeight: viewport.clientHeight};
+    paintControls();
+    paintPlayback();
+  }
+  /** Bar numbers, and bar.beat labels once beats have room, in canvas x coordinates. */
+  function drawRuler(bars: readonly BarLine[]): void {
+    rulerSvg.replaceChildren();
     for (const bar of bars) {
-      if (quarterX(bar.quarter + bar.length) < left || quarterX(bar.quarter) > right) continue;
       const labelBeats = bar.beat * settings.pixelsPerQuarter >= 40;
       for (let beat = 0, at = bar.quarter; at < bar.quarter + bar.length - 1e-9; beat++, at += bar.beat) {
         if (beat > 0 && !labelBeats) break;
         const x = quarterX(at);
-        shape('line', {x1: x, x2: x, y1: top + (beat ? RULER_HEIGHT - 6 : 2), y2: top + RULER_HEIGHT, stroke: 'currentColor', 'stroke-opacity': beat ? '.4' : '.8'}, undefined, overlays);
-        shape('text', {x: x + 3, y: top + 14, fill: 'currentColor', 'font-size': 10, 'fill-opacity': beat ? '.7' : '1', 'aria-hidden': 'true'},
-          beat ? `${bar.number}.${beat + 1}` : String(bar.number), overlays);
+        shape('line', {x1: x, x2: x, y1: beat ? RULER_HEIGHT - 6 : 2, y2: RULER_HEIGHT, stroke: 'currentColor', 'stroke-opacity': beat ? '.4' : '.8'}, undefined, rulerSvg);
+        shape('text', {x: x + 3, y: 14, fill: 'currentColor', 'font-size': 10, 'fill-opacity': beat ? '.7' : '1'},
+          beat ? `${bar.number}.${beat + 1}` : String(bar.number), rulerSvg);
       }
     }
-    shape('rect', {x: left, y: top, width: KEY_WIDTH, height: RULER_HEIGHT, fill: contrast, stroke: 'currentColor', 'stroke-opacity': '.3'}, undefined, overlays);
-    paintMarquee();
-    drawn = {key: editing ? editing.state : staticScore, revision: staticRevision, left, top, viewportWidth: viewport.clientWidth, viewportHeight: viewport.clientHeight};
-    paintControls();
-    paintPlayback();
+  }
+  /** Piano keys: white or black rows, with octave names on C, in canvas y coordinates. */
+  function drawKeys(): void {
+    keys.replaceChildren();
+    const lane = settings.noteHeight;
+    for (let midi = min; midi <= max; midi++) {
+      const y = noteLaneTop(midi);
+      const black = BLACK.has(midi % 12);
+      shape('rect', {x: 0, y, width: black ? KEY_WIDTH * .62 : KEY_WIDTH, height: lane, fill: black ? 'color-mix(in srgb, currentColor 78%, transparent)' : contrast,
+        stroke: 'color-mix(in srgb, currentColor 30%, transparent)', 'stroke-width': .5, 'data-key': midi}, undefined, keys);
+      if (midi % 12 === 0) shape('text', {x: KEY_WIDTH - 4, y: y + lane - Math.max(2, (lane - 10) / 2), 'text-anchor': 'end', fill: 'currentColor', 'font-size': Math.min(11, Math.max(7, lane - 3))}, Pitch.fromMidi(midi).toString(), keys);
+    }
+  }
+  /** One stem per drawn note, in canvas x and lane-local y coordinates. */
+  function drawLane(notes: readonly Note[], selected: ReadonlySet<string>, from: number, to: number): void {
+    laneSvg.replaceChildren();
+    if (!laneVisible()) return;
+    for (const value of [32, 64, 96, 127]) {
+      shape('line', {x1: Math.max(KEY_WIDTH, from), x2: to, y1: velocityY(value, 0), y2: velocityY(value, 0), stroke: 'currentColor', 'stroke-opacity': '.08'}, undefined, laneSvg);
+    }
+    for (const note of notes) {
+      const x = quarterX(note.onsetQuarters.toFloat());
+      const y = velocityY(note.velocity, 0);
+      const isSelected = selected.has(note.id);
+      shape('line', {x1: x + 1, x2: x + 1, y1: LANE_HEIGHT - 6, y2: y, stroke: isSelected ? activeFill : idleFill, 'stroke-width': 2}, undefined, laneSvg);
+      shape('circle', {cx: x + 1, cy: y, r: isSelected ? 4 : 3, fill: isSelected ? activeFill : contrast, stroke: isSelected ? activeFill : idleFill, 'stroke-width': 1.5,
+        'data-velocity-note-id': note.id}, undefined, laneSvg);
+    }
   }
   function paintMarquee(): void {
-    if (!gesture || gesture.kind !== 'marquee' || !gesture.changed || !overlays) return;
+    if (!gesture || gesture.kind !== 'marquee' || !gesture.changed) return;
     const bounds = gesture as Gesture & {currentX?: number; currentY?: number};
     const x = Math.min(bounds.x, bounds.currentX ?? bounds.x); const y = Math.min(bounds.y, bounds.currentY ?? bounds.y);
-    marquee = shape('rect', {x, y, width: Math.abs((bounds.currentX ?? bounds.x) - bounds.x), height: Math.abs((bounds.currentY ?? bounds.y) - bounds.y),
+    shape('rect', {x, y, width: Math.abs((bounds.currentX ?? bounds.x) - bounds.x), height: Math.abs((bounds.currentY ?? bounds.y) - bounds.y),
       fill: 'color-mix(in srgb, currentColor 8%, transparent)', stroke: 'currentColor', 'stroke-dasharray': '3 2', 'data-marquee': '', 'pointer-events': 'none'});
-    svg.insertBefore(marquee, overlays);
   }
   /** `hidden` alone loses to an inline `display`, so flex containers toggle both. */
   function show(node: HTMLElement, shown: boolean, display = ''): void {
@@ -548,26 +656,26 @@ export function mountScoreGrid(host: HTMLElement, content: ScoreGridContent, opt
     element.dataset.editState = !editing ? 'static' : !state!.available ? 'unavailable' : state!.interaction.draft ? 'draft' : enabled ? 'ready' : 'readonly';
     element.dataset.tool = settings.tool;
     const shown = Boolean(editing && state!.available && state!.editable);
-    show(toolbar, shown, 'flex'); instructions.hidden = !shown; details.hidden = !shown;
+    show(toolbar, shown, 'flex'); instructions.hidden = !shown;
+    show(details, shown && valuesOpen, 'block');
     if (!shown || !editing || !state) return;
     instructions.textContent = helpText();
     show(tools, has('draw'), 'inline-flex');
-    for (const [button, tool] of [[selectTool, 'select'], [drawTool, 'draw']] as const) {
-      const pressed = settings.tool === tool;
-      button.setAttribute('aria-pressed', String(pressed));
-      button.style.background = pressed ? 'color-mix(in srgb, currentColor 18%, var(--wm-surface,Canvas))' : 'var(--wm-surface,Canvas)';
-      button.style.fontWeight = pressed ? '600' : '400';
-    }
+    show(toolsDivider, has('draw'), 'block');
+    press(selectTool, settings.tool === 'select'); press(drawTool, settings.tool === 'draw');
     show(snapGroup, has('snap'), 'inline-flex'); snapSelect.value = settings.snap;
     show(laneGroup, has('velocity'), 'inline-flex');
-    laneToggle.setAttribute('aria-pressed', String(settings.velocityLane));
-    laneToggle.style.background = settings.velocityLane ? 'color-mix(in srgb, currentColor 18%, var(--wm-surface,Canvas))' : 'var(--wm-surface,Canvas)';
-    laneToggle.style.fontWeight = settings.velocityLane ? '600' : '400';
+    press(laneToggle, settings.velocityLane);
+    show(zoomDivider, has('zoom'), 'block');
     show(zoomGroup, has('zoom'), 'inline-flex');
+    show(editDivider, has('delete') || has('history'), 'block');
     show(editGroup, has('delete'), 'inline-flex');
     show(historyGroup, has('history'), 'inline-flex');
+    valuesToggle.setAttribute('aria-expanded', String(valuesOpen)); press(valuesToggle, valuesOpen);
+    valuesToggle.removeAttribute('aria-pressed');
     deleteButton.disabled = !enabled || !selectedIds().length;
     undoButton.disabled = !enabled || !state.history.canUndo; redoButton.disabled = !enabled || !state.history.canRedo;
+    for (const button of [deleteButton, undoButton, redoButton]) { button.style.opacity = button.disabled ? '.35' : ''; button.style.cursor = button.disabled ? 'default' : 'pointer'; }
     const content = state.document.content;
     const key = content.parts.map((value) => `${value.id}:${value.name}`).join('|');
     if (key !== partsKey) {
@@ -651,7 +759,6 @@ export function mountScoreGrid(host: HTMLElement, content: ScoreGridContent, opt
       const x = String(quarterX(committed().timeMap.secondsToQuarters(seconds).toFloat()));
       if (!playhead) {
         playhead = shape('line', {y1: RULER_HEIGHT, y2: RULER_HEIGHT + (max - min + 1) * settings.noteHeight, stroke: 'currentColor', 'stroke-width': 2, 'data-playhead': '', 'pointer-events': 'none'});
-        if (overlays) svg.insertBefore(playhead, overlays);
       }
       playhead.setAttribute('x1', x); playhead.setAttribute('x2', x);
     }
@@ -913,7 +1020,11 @@ export function mountScoreGrid(host: HTMLElement, content: ScoreGridContent, opt
     const factor = event.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP;
     zoom(event.altKey && !(event.ctrlKey || event.metaKey) ? 'noteHeight' : 'pixelsPerQuarter', factor, event);
   }
-  const onScroll = () => draw();
+  // Sticky layers follow scrolling natively; notes redraw only past the overscan.
+  const onScroll = () => {
+    const {left, right} = frame();
+    if (!drawn || left < drawn.from || right > drawn.to) draw();
+  };
   const onCancel = () => { if (gesture) cancel(); };
   const onPointerCancel = (event: PointerEvent) => { if (gesture && event.pointerId === gesture.pointerId) cancel(); };
   draw();
@@ -971,8 +1082,9 @@ export function mountScoreGrid(host: HTMLElement, content: ScoreGridContent, opt
       playback = value;
       if (disposed) return;
       // Playback-only frames reuse the drawing; content, interaction or viewport changes redraw it.
+      const {left, right} = frame();
       if (drawn && drawn.key === (editing ? editing.state : staticScore) && drawn.revision === staticRevision &&
-        drawn.left === viewport.scrollLeft && drawn.top === viewport.scrollTop &&
+        left >= drawn.from && right <= drawn.to &&
         drawn.viewportWidth === viewport.clientWidth && drawn.viewportHeight === viewport.clientHeight) paintPlayback();
       else draw();
     }, cancel,

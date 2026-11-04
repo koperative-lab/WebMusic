@@ -43,7 +43,29 @@ const choicesFor = (p: ParamSpec) =>
 const reasonFor = (p: ParamSpec) => inert[p.name] ?? p.inert;
 ---
 
-{params.map((p) => (
+{params.map((p) => p.kind === 'tokens' ? (
+  <div
+    class="wm-pg__param"
+    role="group"
+    aria-label={p.name}
+    data-pg-scope={scope}
+    data-pg-when={p.when ? JSON.stringify({...p.when, options: spec.params.find((entry) => entry.name === p.when?.attribute)?.options}) : undefined}
+  >
+    <span class="wm-pg__name">
+      {p.name}
+      {reasonFor(p) ? <em data-inert title={reasonFor(p)}>no visible change here</em> : null}
+    </span>
+    <span class="wm-pg__tokens">
+      {(p.options ?? []).map((token) => (
+        <label class="wm-pg__token">
+          <input type="checkbox" data-pg-attr={p.name} data-pg-kind="token" value={token} checked />
+          {token}
+        </label>
+      ))}
+    </span>
+    <span class="wm-pg__note">{p.note}</span>
+  </div>
+) : (
   <label
     class="wm-pg__param"
     data-pg-scope={scope}

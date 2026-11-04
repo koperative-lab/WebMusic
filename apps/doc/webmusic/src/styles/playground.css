@@ -115,6 +115,23 @@
   display: none;
 }
 
+/* A token-list attribute: one checkbox per accepted token. */
+.wm-pg__tokens {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.6rem;
+  min-width: 0;
+}
+
+.wm-pg__token {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--wui-ink);
+  font-family: var(--wui-font-mono);
+  font-size: var(--wui-size-label);
+}
+
 .wm-pg__name {
   display: flex;
   flex-wrap: wrap;

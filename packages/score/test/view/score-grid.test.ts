@@ -167,9 +167,12 @@ describe('score grid feature gating', () => {
   it('without velocity, the lane toggle is hidden and the lane never draws', () => {
     const {view, groupOf} = grid((value) => { without('velocity')(value); value.velocityLane = true; });
     expect(groupOf(view.querySelector('[part="lane-toggle"]')!).hidden).toBe(true);
-    expect(view.querySelector('[data-velocity-lane]')).toBeNull();
+    const lane = () => view.querySelector<HTMLElement>('[data-velocity-lane]')!;
+    expect(lane().style.display).toBe('none');
+    expect(view.querySelector('[data-velocity-note-id]')).toBeNull();
     view.tools = [...SCORE_GRID_FEATURES];
-    expect(view.querySelector('[data-velocity-lane]')).toBeTruthy();
+    expect(lane().style.display).toBe('flex');
+    expect(view.querySelector('[data-velocity-note-id]')).toBeTruthy();
   });
 
   it('without snap or zoom, those groups are hidden and Ctrl+wheel is inert', () => {
@@ -194,7 +197,9 @@ describe('score grid feature gating', () => {
   it('with no features, selection still works and nothing edits', () => {
     const {editor, view, surface, part} = grid((value) => value.setAttribute('tools', ''));
     expect(view.tools).toEqual([]);
-    expect([...part('toolbar').querySelectorAll<HTMLElement>(':scope > [role="group"]')].every((group) => group.hidden)).toBe(true);
+    // Only the note-values toggle remains: selection by list needs no feature.
+    expect([...part('toolbar').querySelectorAll<HTMLElement>(':scope > [role="group"]')].filter((group) => !group.hidden)
+      .map((group) => group.getAttribute('aria-label'))).toEqual(['Note values']);
     drag(surface(), [X(1) + 6, Y(60)], [X(2), Y(62)]);
     expect(view.interactionSession!.getSnapshot().selectedNoteIds).toEqual([a]);
     for (const name of ['Delete', 'ArrowLeft']) key(surface(), {key: name});
@@ -273,7 +278,8 @@ describe('score grid editing', () => {
     expect(lane).toBeTruthy();
     view.interactionSession!.setSelection([a, b]);
     const stem = view.querySelector('[data-velocity-note-id="a"]')!;
-    const cy = Number(stem.getAttribute('cy'));
+    // Stems are drawn lane-local; the lane sits at the bottom of the visible frame.
+    const cy = Number(stem.getAttribute('cy')) + Number(surface().getAttribute('height')) - 72;
     drag(surface(), [X(1) + 1, cy], [X(1) + 1, cy - 29]);
     expect(editor.score.getNote(a)!.velocity).toBe(124);
     expect(editor.score.getNote(b)!.velocity).toBe(127);
@@ -283,7 +289,9 @@ describe('score grid editing', () => {
     expect(change.operations.map((operation: ScoreEditOperation) => operation.type)).toEqual(['set-velocity', 'set-velocity']);
     expect(editor.getState().history.undoCount).toBe(1);
     view.querySelector<HTMLButtonElement>('[part="lane-toggle"]')!.click();
-    expect(view.hasAttribute('velocity-lane')).toBe(false); expect(view.querySelector('[data-velocity-lane]')).toBeNull();
+    expect(view.hasAttribute('velocity-lane')).toBe(false);
+    expect(view.querySelector<HTMLElement>('[data-velocity-lane]')!.style.display).toBe('none');
+    expect(view.querySelector('[data-velocity-note-id]')).toBeNull();
   });
 });
 

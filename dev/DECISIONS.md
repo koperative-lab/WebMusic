@@ -2320,7 +2320,10 @@ A new `<score-grid-view>` draws a piano-roll grid: written-pitch rows with piano
 keys, bar/beat/snap lines from the score's time signatures, a bar ruler and an
 optional velocity lane. It reads `.score`, `src`, a player's score or a borrowed
 `.editor`, and follows `player` like the other score Views. Editing requires a
-ready `.editor` and `editable`; a toolbar then appears. `tools` lists the
+ready `.editor` and `editable`; a one-row icon toolbar then appears along the
+top of the grid window, with names in accessible labels and tooltips. The piano
+keys, ruler and velocity lane are sticky layers that stay in place while the
+notes scroll. `tools` lists the
 offered features — `move`, `resize`, `draw`, `delete`, `velocity`, `snap`,
 `zoom`, `history` (absent means all). Selection is always available while
 editing. The toolbar picks the pointer tool (`select` / `draw`), snap, velocity

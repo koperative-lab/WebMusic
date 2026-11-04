@@ -210,10 +210,10 @@ export const SCORE_VIEW_PARAMS: ElementParamCatalog = {
         note: 'Show the editing toolbar and accept gestures when a ready .editor is assigned; never creates an editor.'},
       {
         name: 'tools',
-        kind: 'text',
-        placeholder: 'move resize draw delete velocity snap zoom history',
+        kind: 'tokens',
+        options: ['move', 'resize', 'draw', 'delete', 'velocity', 'snap', 'zoom', 'history'],
         fallback: 'every feature',
-        note: 'Space- or comma-separated features to offer; empty leaves selection only. Unknown tokens are ignored.',
+        note: 'Features to offer; an unchecked feature leaves the toolbar and stops its gestures and keys. None checked leaves selection only.',
       },
       {name: 'tool', kind: 'enum', options: ['select', 'draw'], fallback: 'select',
         note: 'Pointer tool; draw needs the draw feature and otherwise falls back to select. The toolbar and B key reflect it here.'},

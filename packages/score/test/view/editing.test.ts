@@ -146,7 +146,8 @@ describe('score grid editing gestures', () => {
       disconnect = disconnect;
     });
     const builder = new ScoreBuilder(); builder.addPart({id: p, name: 'Piano'});
-    for (const [id, at] of [[a, 1], [b, 6]] as const) builder.addNote(p, {id, pitch: Pitch.fromMidi(60),
+    // b sits past the drawn range: one viewport of overscan either side of a 232px view.
+    for (const [id, at] of [[a, 1], [b, 20]] as const) builder.addNote(p, {id, pitch: Pitch.fromMidi(60),
       onsetQuarters: new Rational(at), duration: Duration.quarter(), voice: VoiceId('v')});
     const editor = createScoreEditor(builder.build()); const editing = createScoreViewEditing(editor, {editable: true});
     const host = document.createElement('div'); document.body.append(host);
@@ -158,7 +159,7 @@ describe('score grid editing gestures', () => {
     expect(host.querySelector('[data-note-id="a"]')).toBeTruthy();
     expect(host.querySelector('[data-note-id="b"]')).toBeNull();
     renderer.surface.focus(); const snapshot = editor.getSnapshot();
-    width = 553; resize();
+    width = 900; resize();
     expect(host.querySelector('[data-note-id="b"]')).toBeTruthy();
     expect(editor.getSnapshot()).toBe(snapshot); expect(snapshot.documentRevision).toBe(0);
     expect(document.activeElement).toBe(renderer.surface);
@@ -402,7 +403,8 @@ describe('score grid editing gestures', () => {
     const picker = host.querySelector<HTMLSelectElement>('[aria-label="Select existing note"]')!;
     const field = (label: string) => host.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)!;
     const button = (label: string) => [...host.querySelectorAll('button')].find((node) => node.getAttribute('aria-label') === label || node.textContent === label)!;
-    host.querySelector<HTMLDetailsElement>('details')!.open = true;
+    host.querySelector<HTMLButtonElement>('[part="values-toggle"]')!.click();
+    expect(host.querySelector<HTMLElement>('[part="note-properties"]')!.hidden).toBe(false);
     picker.focus(); picker.value = 'note:b'; picker.dispatchEvent(new Event('change', {bubbles: true}));
     expect(editing.state.interaction.selectedNoteIds).toEqual([b]); expect(document.activeElement).toBe(picker);
     expect(field('Onset (quarters)').value).toBe('3'); expect(field('Written MIDI pitch').value).toBe('64');
@@ -597,7 +599,7 @@ describe('score grid editing gestures', () => {
           editor.transaction('External resize', (tx) => tx.add({type: 'resize-notes', noteIds: [a], durationQuarters: [4, 1]}));
         }
       });
-      if (command.endsWith('button')) [...host.querySelectorAll('button')].find((button) => button.textContent === (command.startsWith('redo') ? 'Redo' : 'Undo'))!.click();
+      if (command.endsWith('button')) host.querySelector<HTMLButtonElement>(`[part="history-button"][aria-label="${command.startsWith('redo') ? 'Redo' : 'Undo'}"]`)!.click();
       else renderer.surface.dispatchEvent(new KeyboardEvent('keydown', {key: 'z', ctrlKey: true, shiftKey: command.startsWith('redo'), bubbles: true}));
       expect(editor.getSnapshot().documentRevision).toBe(revision + 1);
       expect(editor.score.getNote(a)!.duration.quarters.toString()).toBe('4');
@@ -757,7 +759,7 @@ describe('score-grid-view editor composition', () => {
     view.editor = editor; view.editable = true; document.body.append(view);
     expect(view.getAttribute('data-editor-state')).toBe('ready'); expect(editingSurface(view)).toBeTruthy();
     const session = view.interactionSession!; const commit = vi.fn(); view.addEventListener('editcommit', commit);
-    session.setSelection([a]); view.querySelector('svg')!.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowRight', bubbles: true}));
+    session.setSelection([a]); view.querySelector('[part="surface"]')!.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowRight', bubbles: true}));
     expect(commit).toHaveBeenCalledOnce();
     expect(() => { view.score = fixture(); }).toThrow(/source-conflict/);
     view.setAttribute('src', 'conflict.mid'); expect(view.getAttribute('data-editor-state')).toBe('source-conflict');

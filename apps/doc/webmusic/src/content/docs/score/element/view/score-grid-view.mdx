@@ -14,7 +14,8 @@ notes. Positions are written quarters, so the grid stays aligned with the bar
 lines when the tempo changes.
 
 Assign a [ScoreEditor](/score/headless/view/score-editor/) to `.editor` and add
-`editable` to edit it. An editing toolbar then appears above the grid. Click
+`editable` to edit it. A one-row toolbar of icon buttons then appears along the
+top of the grid window. Click
 notes to select them and drag them as in a DAW piano roll. Draw, resize, delete,
 velocity, snap, zoom and undo/redo can each be switched on or off with `tools`.
 Use [`<score-view>`](/score/element/view/score-view/) for read-only staff,
@@ -24,13 +25,11 @@ waterfall or seconds-based piano-roll drawings; it can follow the same editor.
 
 The demo loads the original eight-note `public/midi/Editing.mid` fixture into
 one editor. The page owns that editor and lends it to the player and the grid.
-Clear a box under **Offered tools** to remove that feature's toolbar group,
-gestures, keys and note-value fields; the checkboxes rewrite the `tools`
-attribute, which the markup and the **tools** control both show. Toolbar, wheel
-and keyboard changes update **tool**, **snap**, **velocity-lane**,
-**pixels-per-quarter** and **note-height**. The status line reports the last
-grid event. Reset restores the attributes and reloads the fixture, discarding
-edits.
+Every switch and setting is in **Parameters**: clear a box in the **tools** row
+to remove that feature's toolbar button, gestures, keys and note-value fields.
+Toolbar, wheel and keyboard changes update **tool**, **snap**,
+**velocity-lane**, **pixels-per-quarter** and **note-height** there. Reset
+restores the attributes and reloads the fixture, discarding edits.
 
 ## Import
 
@@ -98,10 +97,10 @@ always available while editing.
 | --- | --- | --- | --- |
 | `move` | — | Drag a note in time and pitch; arrows nudge. | Onset and written pitch, Apply |
 | `resize` | — | Drag a note's right edge; Shift+Left/Right. | Duration, Apply |
-| `draw` | **Select** / **Draw** tool buttons | Draw tool; B toggles it; double-click or Alt-drag in Select. | Insert into part, Insert note |
-| `delete` | **Delete** | Delete or Backspace; a click with the Draw tool. | — |
-| `velocity` | **Velocity** lane toggle | Drag a stem in the velocity lane. | Velocity, Apply |
-| `snap` | **Snap** menu | — | — |
+| `draw` | **Select tool** / **Draw tool** buttons | Draw tool; B toggles it; double-click or Alt-drag in Select. | Insert into part, Insert note |
+| `delete` | **Delete selected notes** | Delete or Backspace; a click with the Draw tool. | — |
+| `velocity` | **Show velocity lane** toggle | Drag a stem in the velocity lane. | Velocity, Apply |
+| `snap` | **Snap grid** menu | — | — |
 | `zoom` | Four zoom buttons | Ctrl/Cmd+wheel and Alt+wheel. | — |
 | `history` | **Undo** / **Redo** | Ctrl/Cmd+Z, Shift+Ctrl/Cmd+Z, Ctrl/Cmd+Y. | — |
 
@@ -121,8 +120,10 @@ cancels an active gesture but keeps the selection.
 
 ## Gestures and keyboard
 
-The pointer works on the note rows and the velocity lane; the piano keys and
-ruler are labels only.
+Toolbar buttons show icons; the names above are their accessible names and
+tooltips. The piano keys, ruler and velocity lane stay in place while the grid
+scrolls. The pointer works on the note rows and the velocity lane; the piano
+keys and ruler are labels only.
 
 - **Select.** Click a note to select it; Shift-click adds or removes it. Drag
   empty space to select an area; Shift-drag adds the area to the selection.
@@ -164,8 +165,8 @@ primary button was released, focus or window blur, a viewport resize, a setting
 or feature change, a changed document revision, and becoming read-only or
 detached. A failed latest preview cannot commit an earlier valid one.
 
-The **Note values and keyboard alternatives** disclosure offers every edit
-without a pointer. **Select existing note** lists pitched notes by part, onset
+The **Note values and keyboard alternatives** toolbar button, at the right end
+of the toolbar, opens a panel that offers every edit without a pointer. **Select existing note** lists pitched notes by part, onset
 and pitch. **Onset** and **Duration** accept quarter values as integers,
 decimals or fractions such as `1/3`. **Written MIDI pitch** accepts 0–127 and
 **Velocity** 1–127; empty values are errors, not zero. **Apply to selected
@@ -255,10 +256,11 @@ session. The borrowed editor, a supplied session and the player stay alive.
 Reconnecting binds them again.
 
 **Accessibility.** An editable grid is a focusable SVG with the `application`
-role, described by visible instructions that list the offered gestures and
-keys. Toolbar buttons are named, the tool buttons and lane toggle report their
-pressed state, and a polite live status reports selection, drafts, edits and
-errors. The note-value form offers every
+role, described by instructions that list the offered gestures and keys. The
+instructions and a polite live status that reports selection, drafts, edits and
+errors are available to assistive technology but not drawn. Icon buttons carry
+accessible names and tooltips; the tool buttons and lane toggle report their
+pressed state, and the note-values button reports whether its panel is open. The note-value form offers every
 edit with native controls. Selected notes have a double outline, drafts a
 dashed outline and sounding notes fill their row, so no state relies on color
 alone. A read-only grid is one labeled image outside the tab order.
@@ -274,13 +276,17 @@ block filling its container; `width` and `height` size it.
 
 | Part | Element |
 | --- | --- |
-| `grid` | The section holding the toolbar, viewport and status. |
-| `toolbar` | The editing toolbar; contains `tool-button`, `snap`, `lane-toggle`, `zoom-button`, `delete-button` and `history-button`. |
-| `editing-instructions` | The gesture and key summary. |
+| `grid` | The bordered window holding the toolbar, note-values panel and viewport. |
+| `toolbar` | The one-row icon toolbar along the top; contains `tool-button`, `snap`, `lane-toggle`, `zoom-button`, `delete-button`, `history-button` and `values-toggle`. |
+| `note-properties` | The note-values panel opened by `values-toggle`. |
 | `viewport` | The scrolling frame around the drawing. |
-| `surface` | The SVG drawing. |
-| `editing-status` | The live status line. |
-| `note-properties` | The **Note values and keyboard alternatives** disclosure. |
+| `canvas` | The scrolled content holding the surface and the sticky layers. |
+| `surface` | The SVG note rows, grid lines, notes and playhead. |
+| `ruler` | The bar ruler, sticky at the top. |
+| `keys` | The piano keys, sticky at the left. |
+| `velocity-lane` | The velocity lane, sticky at the bottom. |
+| `editing-instructions` | The gesture and key summary, read by assistive technology only. |
+| `editing-status` | The live status, read by assistive technology only. |
 
 The `grid` part reflects `data-edit-state` (`static`, `readonly`, `ready`,
 `draft` or `unavailable`), `data-tool` and `data-playback-state`.
