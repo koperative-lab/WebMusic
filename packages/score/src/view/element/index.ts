@@ -8,7 +8,6 @@ export {
   type ScoreViewType,
   type ScoreViewElementType,
   type ScoreViewRenderOptions,
-  type ScoreViewSeekDetail,
   type ScoreViewConfiguration,
   type ScoreViewOptionsByType,
 } from './score-view';

@@ -2,12 +2,9 @@
 import {afterEach, describe, expect, it} from 'vitest';
 import {Duration, Pitch, Rational, ScoreBuilder, VoiceId, type ScorePlaybackSource} from '../../src/core';
 import {ScorePlayer} from '../../src/play/headless/score-player';
-import {ScoreViewElement as PreviewScoreViewElement} from '../../src/view/element/score-view';
-class ScorePreviewElement extends PreviewScoreViewElement {
-  override connectedCallback(): void { this.type = 'map'; super.connectedCallback(); }
-}
+import {ScoreViewElement} from '../../src/view/element/score-view';
 
-customElements.define('settlement-score-map', ScorePreviewElement);
+customElements.define('local-music-score-view', ScoreViewElement);
 
 const players: ScorePlayer[] = [];
 const flush = async () => {
@@ -36,8 +33,8 @@ function owner(player: ScorePlayer): void {
   document.body.append(element);
 }
 
-function map(): ScorePreviewElement {
-  const element = document.createElement('settlement-score-map') as ScorePreviewElement;
+function view(): ScoreViewElement {
+  const element = document.createElement('local-music-score-view') as ScoreViewElement;
   element.setAttribute('player', '#settlement-owner');
   return element;
 }
@@ -47,34 +44,12 @@ afterEach(() => {
   for (const player of players.splice(0)) player.dispose();
 });
 
-describe('ScoreMap native playback settlement', () => {
-  it('retains the actual wrapped nominal position after an awaited seek at rate 2', async () => {
-    const player = new ScorePlayer(music());
-    // Set the nominal loop before changing rate: the scheduler preserves its
-    // musical region, while the map's input remains measured in quarters.
-    player.setLoop(0, 1);
-    player.setRate(2);
-    owner(player);
-    const element = map();
-    document.body.append(element);
-    await flush();
-
-    const seek = element.querySelector<HTMLInputElement>('[part~="seek"]');
-    expect(seek).not.toBeNull();
-    seek!.value = '3'; // 1.5 nominal seconds; the native loop lands at 0.5.
-    seek!.dispatchEvent(new Event('input', {bubbles: true}));
-    await flush();
-
-    expect(player.nominalSeconds).toBeCloseTo(0.5);
-    expect(player.seconds).toBeCloseTo(0.25);
-    expect(element.currentTime).toBeCloseTo(player.nominalSeconds);
-  });
-
+describe('score-view with local music and a native player', () => {
   it('keeps explicit local music static when the selected player has another score', async () => {
     const player = new ScorePlayer(music('G4'));
     owner(player);
     const local = music('C4');
-    const element = map();
+    const element = view();
     element.score = local;
     document.body.append(element);
     await flush();

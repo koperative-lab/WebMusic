@@ -57,8 +57,9 @@ use that Score data; the flattened sequence alone cannot reproduce the source's
 notation. Glyph layout and VexFlow remain on `/render`, with no DOM or engraving
 dependency in this Headless object.
 
-The renderer's [`showAnnotations` option](/score/api/view/#render-annotations)
-controls expressive directions without changing this view model's state or
+The staff renderer's [`showAnnotations` option](/score/api/view/#render-annotations)
+controls expressive directions; piano-roll and waterfall renderers draw none.
+The option works without changing this view model's state or
 playback position. It is not a `createScoreView` construction option.
 
 ## Viewport and virtualization

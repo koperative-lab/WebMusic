@@ -22,30 +22,6 @@ function score() {
 afterEach(() => { document.body.replaceChildren(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('View drawing colors', () => {
-  it.each(['thumbnail', 'map'] as const)('%s gives explicit CSS colors priority over RGB/attributes and keeps inherited tokens live', async (type) => {
-    const view = document.createElement('styling-score-view') as ScoreViewElement;
-    view.type = type;
-    view.score = score();
-    view.setAttribute('note-color', '#123456');
-    view.options = {noteRGB: '4, 5, 6', noteColor: 'rebeccapurple'};
-    document.body.append(view);
-    const paint = () => type === 'thumbnail'
-      ? view.querySelector('rect')?.getAttribute('fill')
-      : (view.querySelector('button') as HTMLElement)?.style.getPropertyValue('--wui-timeline-region-color');
-    await vi.waitFor(() => expect(paint()).toContain('rebeccapurple'));
-    view.options = {noteRGB: '4, 5, 6'};
-    expect(paint()).toContain('rgb(4, 5, 6)');
-    view.options = {};
-    expect(paint()).toContain('rgb(18, 52, 86)');
-    view.removeAttribute('note-color');
-    expect(paint()).toContain(type === 'thumbnail' ? '--wm-score-view-note' : '--wm-score-view-map');
-    const drawing = view.querySelector(type === 'thumbnail' ? '[part="drawing"]' : 'input');
-    view.style.setProperty('--wm-score-view-note', 'orange');
-    view.style.setProperty('--wm-score-view-map', 'orange');
-    expect(view.querySelector(type === 'thumbnail' ? '[part="drawing"]' : 'input')).toBe(drawing);
-    expect(view.currentTime).toBe(0);
-  });
-
   it('resolves inherited canvas colors at paint time, preserving velocity alpha and the paused sample', () => {
     const contexts: Array<{fillStyle: string; globalAlpha: number; paints: Array<[string, number]>}> = [];
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(function(this: HTMLCanvasElement) {

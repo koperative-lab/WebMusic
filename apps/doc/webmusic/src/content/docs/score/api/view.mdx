@@ -6,7 +6,7 @@ description: Score visualization and document editing — stateless layout and e
 
 `@webmusic/score/view` turns `Score` objects into layout data and visual renderings, and owns [document editing](#document-editing). Its three visual Web Components are `<score-view>` for score-position views, `<score-pitch-view>` for sounding pitches, and `<score-sheet-view>` for optional full engraving; the nonvisual `<score-document>` owns an editable document.
 
-Playback lives in [`@webmusic/score/play`](/score/api/play/). Views borrow player data or events according to their owning contracts; the thumbnail is a passive whole-score preview. Imperative renderers expose `redraw` for application-driven highlighting.
+Playback lives in [`@webmusic/score/play`](/score/api/play/). Views borrow player data or events according to their owning contracts; the static thumbnail renderer is a passive whole-score preview. Imperative renderers expose `redraw` for application-driven highlighting.
 
 ## Install
 
@@ -380,8 +380,8 @@ The grid works with ready empty content when a Part exists. It uses written
 pitch and written quarters, even when imported notes have performed microtiming.
 The [Element editing section](/score/element/view/score-view/#piano-roll-editing)
 documents gestures, exact-value inputs, cancellation and supported semantic
-limits. Notes, selection and drafts are rendered here; expressive annotation
-strips remain on passive renderers.
+limits. Notes, selection and drafts are rendered here; score annotations are
+drawn only by the staff renderers.
 
 ### Edit a staff
 
@@ -458,26 +458,26 @@ rendered.redrawAtTime?.(1.25, false);
 
 ## Render annotations
 
-`VisualizerRenderOptions.showAnnotations` defaults to `true` for the SVG
-piano-roll, scrolling staff and waterfall factories. They read the original
-Score's supported `Part.directions`: words such as `rit.`, rehearsal labels,
-dynamics, metronome marks, pedal signs/lines and crescendo/diminuendo hairpins.
-These are visual directions, with no tempo, volume or sustain automation.
+`StaffRenderOptions.showAnnotations` defaults to `true` for the scrolling
+staff renderer. It reads the original Score's supported `Part.directions`:
+words such as `rit.`, rehearsal labels, dynamics, metronome marks, pedal
+signs/lines and crescendo/diminuendo hairpins, and keeps their authored
+above/below placement around the notation. These are visual directions, with
+no tempo, volume or sustain automation.
 
-The piano roll uses a compact strip above its notes; waterfall uses a side rail
-on its vertical time axis. Staff retains authored above/below placement around
-the notation. The other types use compact timeline labels and span lines,
-without reproducing staff engraving positions. At dense onsets labels can be
-abbreviated or reduced to markers; each mark's SVG title retains the full text.
-Set `showAnnotations: false` to remove the marks and their layout
-space. Staff and piano-roll natural heights shrink; waterfall reclaims width
-while retaining its requested viewport height. Explicit application sizing
-still defines the outer viewport.
+Annotations are staff-only. The piano-roll and waterfall renderers never draw
+them and reserve no space for them; `VisualizerRenderOptions` and
+`WaterfallRenderOptions` have no `showAnnotations` member, and
+`validateScoreViewConfiguration` rejects it for `piano-roll` and `waterfall`.
+Set `showAnnotations: false` on the staff to remove the marks and their layout
+space; the natural staff height shrinks. Explicit application sizing still
+defines the outer viewport.
 
 The Element's [`show-annotations` attribute](/score/element/view/score-view/#annotations-and-compact-layout)
-also covers its lightweight map and thumbnail types. This is a rendering
-option; Headless `createScoreView` continues to expose sounding-note state and
-does not allocate an annotation surface.
+applies only to `type="staff"`. This is a rendering option; Headless
+`createScoreView` continues to expose sounding-note state and does not allocate
+an annotation surface. The [static thumbnail](#static-thumbnail) has its own
+`showAnnotations` option for overview labels.
 
 ### Static thumbnail
 
@@ -501,9 +501,9 @@ source text and musical ranges. Text retains its size while the note plot fits
 the remaining height, with a `1rem` minimum note area when annotations are
 visible. Without annotations, the SVG fits the supplied surface.
 This one-shot function creates no resize observer or player binding;
-remove its returned SVG at teardown or before drawing again. The
-[`thumbnail` Element type](/score/element/view/score-view/#thumbnail) owns its
-responsive updates and cleanup.
+remove its returned SVG at teardown or before drawing again. Applications that
+need responsive updates redraw it from their own resize handling; no
+`<score-view>` type wraps this renderer.
 
 ```ts
 import {createPianoRollLayout} from '@webmusic/score/view';
@@ -620,8 +620,7 @@ scale, bounded to 80–200px. An explicit measurable container height uses the f
 available height. Resizing reflows note columns while preserving the visible
 score position and active notes; hidden containers retain their last useful
 layout until a size is available. `dispose()` releases the resize observer (or
-window-resize fallback) and owned DOM. Annotations follow the same vertical
-time axis in a separate rail.
+window-resize fallback) and owned DOM. The waterfall draws no score annotations.
 
 ```ts
 import { renderWaterfallVisualizer } from '@webmusic/score/view/render';
@@ -930,17 +929,16 @@ Score + MusicXML + OSMD constructor -> RenderedScoreVisualizer<OSMDLike>
 
 | API | Kind | Use it for |
 | --- | --- | --- |
-| `defineScoreViewElement(tag?)` | Web Component | Register `<score-view>` with piano-roll, staff, waterfall, map and thumbnail types. |
+| `defineScoreViewElement(tag?)` | Web Component | Register `<score-view>` with piano-roll, staff and waterfall types. |
 | `definePitchViewElement(tag?)` | Web Component | Register `<score-pitch-view>` with keyboard, current staff and fretboard types. |
 | `defineSheetViewElement(tag?)` | Web Component | Register `<score-sheet-view>` with its optional OSMD renderer. |
 | `defineScoreDocumentElement(tag?)` | Web Component | Register the nonvisual [`<score-document>`](/score/element/view/score-document/). |
 | `defineAllViewElements()` | Web Component | Register the three default View tags and `<score-document>`. |
 | `ScoreViewElement`, `PitchViewElement`, `SheetViewElement`, `ScoreDocumentElement` | Web Component | Classes from `@webmusic/score/view/element`; owning [Element references](/score/element/#view) describe properties, attributes and lifecycle. |
-| `ScoreViewElementType` | Type | Five-value Element type: `piano-roll`, `staff`, `waterfall`, `map`, `thumbnail`. |
+| `ScoreViewElementType` | Type | Alias of `ScoreViewType`: `piano-roll`, `staff` or `waterfall`. |
 | `PitchViewType` | Type | `keyboard`, `staff` or `fretboard`. |
 | `ScoreDocumentLoadResult`, `ScoreDocumentStateDetail`, `ScoreDocumentStatus` | Type | [`<score-document>`](/score/element/view/score-document/) load result, state event detail and status, from `/element`. |
-| `ScoreViewSeekDetail` | Type | Map navigation event detail: `{quarters, seconds}`, with nominal seconds. |
-| `ScoreViewType`, `ScoreViewRenderOptions`, `parseColorAttr` | Element exports | The three note-renderer types, their option union and attribute-color parser; map/thumbnail do not extend the lower-level three-type model. |
+| `ScoreViewType`, `ScoreViewRenderOptions`, `parseColorAttr` | Element exports | The three note-renderer types, their option union and attribute-color parser. |
 | `createScoreView(scoreOrEditor, options?)` | Headless model | [Score window and document state](/score/headless/view/score-view/), from `@webmusic/score/view/headless`. |
 | `ScoreEditor`, `createScoreEditor(score, options?)` | Headless model | [Own one editing document](/score/headless/view/score-editor/) with revisions, history, checkpoints and interaction sessions, from `/headless`. |
 | `ScoreEditorOptions` | Type | [History limit and listener error handling](/score/headless/view/score-editor/), from `/headless`. |
@@ -966,7 +964,7 @@ Score + MusicXML + OSMD constructor -> RenderedScoreVisualizer<OSMDLike>
 | `readoutPitch`, `currentStaffMarks`, `currentFretMarks`, `STANDARD_VIEW_TUNING` | Projection/helpers | [Current-pitch data](#current-pitch-projections), exported by this root. |
 | `PitchViewOptions`, `PitchViewState` | Type | [PitchView construction and state](/score/headless/view/pitch-view/), type-only exports from this root. |
 | `PitchReadoutSpelling`, `CurrentStaffMark`, `CurrentFretMark` | Type | [Current-pitch projection inputs/results](#current-pitch-projections). |
-| `createScoreMap(score, options?)` | Layout | Project a whole score onto one strip: note density per bar, bar and rehearsal landmarks (backs `<score-view type="map">`). |
+| `createScoreMap(score, options?)` | Layout | Project a whole score onto one strip: note density per bar, bar and rehearsal landmarks; compose it with your own UI. |
 | `scoreToNoteSequence(score)` | View model | Convert `Score` into the visualizer note-sequence format. |
 | `findSequenceNote(sequence, pitch, startTime)` | View model | Find the sequence note matching a pitch and start time (for highlighting). |
 | `secondsToQuarters(tempos, seconds)` | Time conversion | Integrate nominal seconds through quarter-notes-per-minute markers; use the Score TimeMap for inverse conversion. |
@@ -978,7 +976,7 @@ Score + MusicXML + OSMD constructor -> RenderedScoreVisualizer<OSMDLike>
 | `RenderedScoreVisualizer` | Type | The [renderer handle](#renderer-handle), including optional `redrawAtTime` for exact nominal-time activity. |
 | `PianoRollNote`, `WaterfallNote`, `StaffGlyph` | Type | Layout result shapes — geometry plus `startSeconds` / `durationSeconds`. |
 | `ScoreMap`, `ScoreMapCell`, `ScoreMapMark`, `ScoreMapOptions` | Type | Result and option shapes for `createScoreMap`. |
-| `ViewLayoutOptions`, `VisualizerRenderOptions`, `StaffRenderOptions`, `WaterfallRenderOptions` | Type | Layout options and renderer geometry/paint options; render options share `showAnnotations` (default true). |
+| `ViewLayoutOptions`, `VisualizerRenderOptions`, `StaffRenderOptions`, `WaterfallRenderOptions` | Type | Layout options and renderer geometry/paint options; `showAnnotations` (default true) is a `StaffRenderOptions` member only. |
 | `applyScoreOperations(score, operations)` | Edit operation | [Compute an atomic candidate](#atomic-note-operations) without a document owner. |
 | `ScoreEditError` | Error | Coded edit failure; `.code` is a `ScoreEditErrorCode`. |
 | `isScoreDocumentSource`, `isScoreEditorPort` | Type guards | [Validate a document read port or the complete command/session port](#document-ports-and-commands). |
@@ -1004,6 +1002,5 @@ option keys without creating UI. It throws `TypeError` for an unknown mode,
 malformed options or an unsupported key. It does not replace each renderer's
 value/default semantics. The Element's
 [`configure()`](/score/element/view/score-view/) uses this check before changing
-its mode or options; legacy permissive option bags remain supported. The
-Element-only `map` and `thumbnail` types are outside this three-renderer union;
-configure them with `.type`, `.options` and their documented attributes.
+its mode or options; legacy permissive option bags remain supported.
+`showAnnotations` is accepted only for `staff`.

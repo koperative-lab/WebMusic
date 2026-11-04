@@ -25,7 +25,7 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 describe('shared playback with asynchronously loaded local music', () => {
-  it.each(['map', 'piano-roll', 'chord'])('keeps %s at its own origin after a different local src resolves', async (mode) => {
+  it.each(['waterfall', 'piano-roll', 'chord'])('keeps %s at its own origin after a different local src resolves', async (mode) => {
     const player = new ScorePlayer(music('G4'));
     players.push(player);
     await player.playback.seekNominal!(1);
@@ -35,7 +35,7 @@ describe('shared playback with asynchronously loaded local music', () => {
     let finish!: (score: Score) => void;
     io.load.mockImplementationOnce(() => new Promise<Score>((resolve) => { finish = resolve; }));
     const follower = document.createElement(mode === 'chord' ? 'local-data-chord-analysis' : 'local-data-score-view') as ScoreViewElement | ChordAnalysisElement;
-    if (follower instanceof ScoreViewElement) follower.type = mode as 'map' | 'piano-roll';
+    if (follower instanceof ScoreViewElement) follower.type = mode as 'waterfall' | 'piano-roll';
     follower.setAttribute('player', '#local-data-owner');
     follower.setAttribute('src', '/local.mid');
     document.body.append(follower);

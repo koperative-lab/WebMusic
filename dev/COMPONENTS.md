@@ -130,13 +130,13 @@ Inspect score attacks against simple, compound or explicitly grouped meter.
 
 #### `<score-view>`
 
-One score, five views: piano roll, staff, waterfall, navigation map or static thumbnail.
+One score, three views: piano roll, staff or waterfall.
 
-- Behavior/data collaboration: createScoreView + createScoreViewEditing + createStaffViewEditing + createScoreMap + createPianoRollLayout + player binding.
-- Reviewed UI composition: `@webmusic/ui/stage`, `@webmusic/ui/timeline`, `@webmusic/ui/status`.
-- Attribute controls: `src`, `format`, `player`, `editor`, `editable`, `type`, `for-part`, `cells`, `width`, `height`, `show-annotations`, `show-only-octaves-used`, `scroll-type`, `split-staves`, `pixels-per-second`, `note-height`, `note-spacing`, `min-pitch`, `max-pitch`, `white-note-width`, `black-note-width`, `default-key`, `note-color`, `active-note-color`
-- Properties and methods: `score`, `editor`, `editable`, `interactionSession`, `currentTime`, `active`, `configure(configuration)`, `options`, `type`, `forPart`, `cells`
-- Events: `webscore:seek`, `editpreview`, `editcommit`, `editerror`
+- Behavior/data collaboration: createScoreView + createScoreViewEditing + createStaffViewEditing + createPianoRollLayout + player binding.
+- Reviewed UI composition: `@webmusic/ui/stage`, `@webmusic/ui/status`.
+- Attribute controls: `src`, `format`, `player`, `editor`, `editable`, `type`, `width`, `height`, `show-annotations`, `show-only-octaves-used`, `scroll-type`, `split-staves`, `pixels-per-second`, `note-height`, `note-spacing`, `min-pitch`, `max-pitch`, `white-note-width`, `black-note-width`, `default-key`, `note-color`, `active-note-color`
+- Properties and methods: `score`, `editor`, `editable`, `interactionSession`, `currentTime`, `active`, `configure(configuration)`, `options`, `type`
+- Events: `editpreview`, `editcommit`, `editerror`
 - [Owning workflow and contract](<../apps/doc/webmusic/src/content/docs/score/element/view/score-view.mdx>) · [Element source](<../packages/score/src/view/element/score-view.ts>) · [Parameter catalog](<../apps/doc/webmusic/src/lib/params/score-view.ts>)
 
 #### `<score-pitch-view>`

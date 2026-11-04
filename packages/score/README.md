@@ -339,11 +339,12 @@ defineAllViewElements();
 <score-pitch-view type="keyboard" player="#p" low="48" high="84"></score-pitch-view>
 ```
 
-- **`<score-view>`** selects `piano-roll` (default), `staff`, `waterfall`,
-  `map` or `thumbnail`. It resolves explicit `.score`, then `src`, then the
-  selected player's score. Type changes reuse that data. Map provides density
-  cells and rate-aware seeking; thumbnail is a static preview without active
-  highlighting or interaction, even when borrowing a player's loaded score.
+- **`<score-view>`** selects `piano-roll` (default), `staff` or `waterfall`.
+  It resolves explicit `.score`, then `src`, then the selected player's score.
+  Type changes reuse that data. Only `staff` draws score annotations
+  (`show-annotations`, default true). For a navigation map or a static
+  preview, compose Headless `createScoreMapView` with `@webmusic/ui/timeline`,
+  or the `/view/render` thumbnail renderer.
 - **`<score-pitch-view>`** selects `keyboard` (default), current-pitch `staff` or
   `fretboard`. It borrows held notes through `player` (or legacy `source`), owns
   no Score, and sends no note or transport commands. Type changes retain activity.

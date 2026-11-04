@@ -330,12 +330,13 @@ ScoreProvider
 
 ## Annotation visibility
 
-`PianoRollView`, `StaffView` and `WaterfallView`, and their `Simple*` presets,
-accept `showAnnotations` (default `true`) for the packaged SVG renderers. Set it
-to `false` to hide words, dynamics, tempo, rehearsal, pedal and hairpin marks
-and remove their reserved space. Notes and notation essentials remain visible.
-`StaffView` and `WaterfallView` retain their explicit/default viewport heights;
-use `height="auto"` on `StaffView` to follow its compact natural drawing height.
+Only `StaffView` (and its `SimpleStaff` preset) accepts `showAnnotations`
+(default `true`) for the lightweight staff renderer. Set it to `false` to hide
+words, dynamics, tempo, rehearsal, pedal and hairpin marks and remove their
+reserved space. Notes and notation essentials remain visible. `PianoRollView`
+and `WaterfallView` never draw annotations and have no `showAnnotations` prop.
+`StaffView` retains its explicit/default viewport height; use `height="auto"`
+to follow its compact natural drawing height.
 OSMD engraving remains configured through its own `osmdOptions`.
 
 ## OSMD Staff Mode

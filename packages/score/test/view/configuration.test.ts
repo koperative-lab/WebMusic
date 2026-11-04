@@ -4,10 +4,10 @@ import {validateScoreViewConfiguration, type ScoreViewConfiguration} from '../..
 describe('mode-specific view configuration', () => {
   it('accepts each renderer with its own options', () => {
     for (const configuration of [
-      {type: 'piano-roll', options: {pixelsPerSecond: 80, showAnnotations: false}},
+      {type: 'piano-roll', options: {pixelsPerSecond: 80}},
       {type: 'piano-roll', options: {pixelsPerQuarter: 32, editingGrid: [1, 3], noteHeight: 16}},
       {type: 'staff', options: {defaultKey: 2, instruments: [0], splitStaves: false, noteColor: 'var(--ink)', activeNoteColor: '#f00', showAnnotations: true}},
-      {type: 'waterfall', options: {whiteNoteWidth: 18, virtualization: true, showAnnotations: false}},
+      {type: 'waterfall', options: {whiteNoteWidth: 18, virtualization: true}},
     ] satisfies ScoreViewConfiguration[]) {
       expect(() => validateScoreViewConfiguration(configuration)).not.toThrow();
     }
@@ -16,6 +16,8 @@ describe('mode-specific view configuration', () => {
   it('rejects options for another mode and misspelled options from JavaScript', () => {
     for (const configuration of [
       {type: 'piano-roll', options: {whiteNoteWidth: 18}},
+      {type: 'piano-roll', options: {showAnnotations: false}},
+      {type: 'waterfall', options: {showAnnotations: true}},
       {type: 'staff', options: {pixelsPerQuarter: 32}},
       {type: 'waterfall', options: {editingGrid: [1, 4]}},
       {type: 'waterfall', options: {defaultKey: 2}},

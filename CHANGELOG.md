@@ -21,6 +21,11 @@ work and does not establish npm publication, a release tag or a deployment.
   source from an explicit object or a selected element's public property with a
   consumer-supplied type guard; `<score-player>`, `<score-view>`,
   `<audio-player>` and `<audio-view>` use it to find their editor.
+- Limit `<score-view>` to `piano-roll`, `staff` and `waterfall`, removing the
+  `map` and `thumbnail` types with `for-part`, `cells`, `webscore:seek` and
+  `ScoreViewSeekDetail`; draw score annotations only on the staff, so
+  `showAnnotations` is now a staff-only option. Headless `createScoreMapView`,
+  the UI timeline and the thumbnail renderer remain available.
 - Reject non-finite `ScorePlayer` and `AudioPlayer` seeks with `RangeError`;
   resolve `<audio-view player>` to exactly one observed target like the other
   player companions; pad odd-sized WAV `data` chunks; share one Core per format

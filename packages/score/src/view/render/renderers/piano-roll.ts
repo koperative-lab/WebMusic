@@ -1,8 +1,5 @@
 // SVG/canvas implementation for the explicit /render surface.
-import {Rational, type Score} from '../../../core';
-import {projectScoreAnnotations} from '../../core/annotations';
 import type {ScoreNoteSequence, ScoreSequenceNote} from '../../core/types';
-import {drawHorizontalScoreAnnotations} from '../annotations';
 import {clampCanvasBackingSize, visibleNoteRange, type IndexRange} from '../../core/windowing';
 import {
   BaseVisualizer,
@@ -269,7 +266,7 @@ export class PianoRollCanvasVisualizer extends BaseVisualizer {
 
 /** SVG piano-roll renderer. */
 export class PianoRollSVGVisualizer extends BaseSVGVisualizer {
-  constructor(sequence: ScoreNoteSequence, svg: SVGSVGElement, config: VisualizerConfig = {}, score?: Score) {
+  constructor(sequence: ScoreNoteSequence, svg: SVGSVGElement, config: VisualizerConfig = {}) {
     super(sequence, config);
     if (!(svg instanceof SVGSVGElement)) {
       throw new Error('This visualizer requires an <svg> element to display the visualization');
@@ -279,13 +276,6 @@ export class PianoRollSVGVisualizer extends BaseSVGVisualizer {
     this.width = size.width;
     this.height = size.height;
     this.clear();
-    if (score && config.showAnnotations !== false) {
-      const annotations = projectScoreAnnotations(score);
-      if (annotations.length) this.height += drawHorizontalScoreAnnotations(svg, annotations, {
-        xAtQuarter: (quarter) => score.timeMap.quartersToSeconds(Rational.from(quarter)) * this.config.pixelsPerSecond,
-        width: this.width, color: config.noteColor ?? `rgb(${this.config.noteRGB})`,
-      }).height;
-    }
     const viewportHeight = Math.max(getRenderedHeight(this.svg, this.height), this.height);
     this.parentElement = this.adoptScrollViewport(
       ensureScrollViewport(this.svg, 'webscore-piano-roll-viewport', viewportHeight),

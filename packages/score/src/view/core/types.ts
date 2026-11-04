@@ -13,8 +13,6 @@ export interface ViewLayoutOptions {
 export type ScoreViewType = 'piano-roll' | 'staff' | 'waterfall';
 
 export interface VisualizerRenderOptions {
-  /** Show supported score expression directions; default true. False removes their layout space. */
-  showAnnotations?: boolean;
   /** Piano-roll pitch-lane height or staff glyph scale, in pixels; default 6. */
   noteHeight?: number;
   /** Gap subtracted from duration rectangles, in pixels; default 1. Zero joins adjacent notes. */
@@ -59,6 +57,8 @@ export interface WaterfallRenderOptions extends VisualizerRenderOptions {
 }
 
 export interface StaffRenderOptions extends VisualizerRenderOptions {
+  /** Show supported score expression directions; default true. False removes their layout space. Only the staff draws annotations. */
+  showAnnotations?: boolean;
   defaultKey?: number;
   instruments?: number[];
   scrollType?: number;

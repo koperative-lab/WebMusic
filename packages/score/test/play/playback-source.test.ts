@@ -8,7 +8,7 @@ import {ChordAnalysisElement} from '../../src/analyze/element/score-chord-analys
 class AnalysisLaneElement extends ChordAnalysisElement {}
 import {ScoreViewElement as PreviewScoreViewElement} from '../../src/view/element/score-view';
 class ScorePreviewElement extends PreviewScoreViewElement {
-  override connectedCallback(): void { this.type = 'map'; super.connectedCallback(); }
+  override connectedCallback(): void { this.type = 'waterfall'; super.connectedCallback(); }
 }
 import {bindAnalysisPlayer} from '../../src/analyze/element/internal/player-binding';
 import {PlaybackPublisher} from '../../src/play/headless/playback-source';
@@ -252,7 +252,7 @@ describe('shared native playback source', () => {
     expect(cleanup).toHaveBeenCalledOnce();
   });
 
-  it.each(['binding-chord-analysis', 'binding-score-preview'])('seeks %s in nominal seconds at rate 2 using a real player', async (tag) => {
+  it.each(['binding-chord-analysis'])('seeks %s in nominal seconds at rate 2 using a real player', async (tag) => {
     const {player} = engine();
     player.setRate(2);
     owner(player.playback);

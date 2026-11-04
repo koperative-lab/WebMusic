@@ -14,14 +14,15 @@ they need simultaneous representations.
 
 | Component | Input and task | Types |
 |---|---|---|
-| `score-view` | A complete Score, optionally with a borrowed playback position | `piano-roll`, `staff`, `waterfall`, `map`, `thumbnail` |
+| `score-view` | A complete Score, optionally with a borrowed playback position | `piano-roll`, `staff`, `waterfall` |
 | `score-pitch-view` | Currently held MIDI pitches from one selected note source | `keyboard`, `staff`, `fretboard` |
 | `score-sheet-view` | Page engraving using an optional OSMD renderer | Separate engraving lifecycle; no type selector |
 
 Score staff includes musical time. Pitch staff depicts only sounding notes.
-Map is a whole-score navigation surface. Thumbnail is a static, fitted preview;
-it does not acquire the full visualizer or expose seeking just because another
-type supports it. Page engraving remains independent because its optional
+Under DEC-056 `score-view` has no map or thumbnail type; applications compose
+the Headless `createScoreMapView` with the UI timeline, or the `/view/render`
+thumbnail renderer, when they need navigation or a static preview. Only the
+staff type draws score annotations. Page engraving remains independent because its optional
 engine, injection points and asynchronous layout differ from the scrolling
 staff renderer.
 
@@ -32,16 +33,11 @@ types changes presentation of the resolved score without fetching it again or
 restarting its player. The shared core `ScorePlaybackSource` initializes data,
 readiness, nominal position and active occurrences; legacy event targets remain
 available when native observation is absent or reports `unavailable`.
-Map converts its quarter-note axis through the score TimeMap; seeks use the
-source's nominal command or the legacy owner's declared command/rate mapping.
-The committed cursor comes from the owner's resulting position, including loop
-wrapping. Stale failures cannot overwrite a newer cursor or replacement owner,
-and a view with a different explicit Score cannot seek the native owner.
+A view with a different explicit Score never follows or seeks the native owner.
 
-`configure(ScoreViewConfiguration)` validates the three full-renderer modes and
-their compatible option keys before replacing them atomically. The lightweight
-map/thumbnail modes retain their Element type/attribute/property interface;
-they do not expand the render entry's mode union. SheetView retains its separate
+`configure(ScoreViewConfiguration)` validates the three modes and their
+compatible option keys before replacing them atomically; `showAnnotations` is
+a staff-only key. SheetView retains its separate
 explicit-data and event-following contract.
 
 PitchView keeps one ActiveNoteTracker and one binding while switching types.
@@ -192,10 +188,9 @@ OSMD loading, injection and failure contract.
 
 The five superseded tags and their registration helpers are removed. Migrate
 `keyboard-view`, `staff-view` and `fretboard-view` to the corresponding PitchView
-type; migrate `score-map` and `score-thumbnail` to ScoreView types. Low-level
-Headless/API/render helpers remain available. The three visualizer types stay
-unchanged in the lower-level `ScoreViewType`; the Element's additional modes use
-`ScoreViewElementType`.
+type. The `score-view` `map` and `thumbnail` types published in 0.2.0 were removed by
+DEC-056; their Headless/API/render helpers remain available.
+`ScoreViewElementType` equals the lower-level `ScoreViewType`.
 
 ## Acceptance
 
@@ -204,8 +199,7 @@ unchanged in the lower-level `ScoreViewType`; the Element's additional modes use
   note counts and the player's cursor without duplicate subscriptions or loads.
 - Retain standalone Score use, native player-data borrowing, invalid/late/
   replaced target handling and cleanup.
-- Keep map seek units correct at non-unit rate and recover from rejected seeks.
-- Keep thumbnail passive and avoid full-score playback-view computation.
+- Accept only the three types; draw annotations only on staff.
 - Verify all types at narrow and wide widths, two simultaneous instances,
   keyboard interaction, type-specific Parameters, Copy and Reset.
 

@@ -758,9 +758,7 @@ describe('score-view editor composition', () => {
     view.editor = editor; view.setAttribute('player', '#player'); document.body.append(player, view);
     expect(view.querySelector('[data-playhead]')).toBeTruthy();
     expect(view.active).toEqual([60]);
-    view.type = 'map'; expect(view.active).toEqual([]);
-    view.type = 'thumbnail'; expect(view.active).toEqual([]);
-    view.type = 'piano-roll'; expect(view.active).toEqual([60]);
+    view.type = 'waterfall'; view.type = 'piano-roll'; expect(view.active).toEqual([60]);
     editor.transaction('Move', (tx) => tx.add(move)); expect(view.querySelector('[data-playhead]')).toBeNull();
     view.removeAttribute('player'); expect(view.querySelector('[data-playhead]')).toBeNull();
     expect(view.querySelector('[part="editor"]')!.getAttribute('data-playback-state')).toBe('unbound');

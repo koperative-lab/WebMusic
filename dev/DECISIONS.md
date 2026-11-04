@@ -288,6 +288,11 @@ adds optional document-bound editing and focused keyboard interaction to existin
 View surfaces. The original passive usage below remains valid; runtime editing
 is implemented, and STATUS EDIT-01 tracks its remaining verification.
 
+**2026-11-04 refinement:** [DEC-056](#dec-056--score-view-draws-three-types-annotations-only-on-staff)
+removes the `map` and `thumbnail` types below and limits score annotations to
+`staff`. The three-family structure and the remaining type-switch guarantees
+are unchanged.
+
 **Problem:** separate tags for keyboard, current-note staff and fretboard repeat
 one held-note input contract. Separate map and thumbnail tags repeat Score input
 and loading, making the View catalog and composition examples harder to choose.
@@ -2189,6 +2194,52 @@ Headless, render or Element layers, so editors are imported from
 checks must find no Edit capability; built-entry tests must load the editing
 values from the View and Play entries with shared Core identity; demos and
 snippets must import only published View/Play subpaths.
+
+## DEC-056 — Score View draws three types; annotations only on staff
+
+**Date / status:** 2026-11-04; accepted at the maintainer's request. Refines
+[DEC-015](#dec-015--type-selected-score-view-families).
+
+**Problem:** `<score-view>` mixed three full renderers with a navigation strip
+(`map`) and a static preview (`thumbnail`), each with its own attributes, event
+and styling token. Score expression annotations were also drawn three different
+ways: in a strip above the piano roll, in a rail beside the waterfall and on the
+staff. Only staff notation places expressions where musicians read them.
+
+**Chosen contract:** `<score-view type>` accepts exactly `piano-roll` (default),
+`staff` and `waterfall`; any other value falls back to `piano-roll`.
+`ScoreViewElementType` equals `ScoreViewType`. The element no longer has
+`for-part`, `cells`, `webscore:seek`, `ScoreViewSeekDetail` or
+`--wm-score-view-map`, and no longer composes the UI timeline. Only the staff
+draws annotations: `showAnnotations` belongs to `StaffRenderOptions` and the
+React `StaffView`, `show-annotations` affects only `type="staff"`, and
+`validateScoreViewConfiguration` rejects it for the other types. Piano roll and
+waterfall reserve no annotation space.
+
+The underlying pieces stay public: Headless `createScoreMapView`, the
+`createScoreMap` layout, the `@webmusic/ui/timeline` presenter (now a
+standalone presenter) and the `/view/render` thumbnail renderer with its own
+overview annotations. Applications that need a map or preview compose them
+directly.
+
+**Alternatives considered:** separate `score-map` / `score-thumbnail` tags,
+which DEC-015 already rejected for duplicating input and binding; and keeping
+annotations off by default on piano roll and waterfall, which would not make
+them staff-only.
+
+**Consequences:** this changes behavior published in `0.2.0`; the
+[editing migration guide](release/EDITING-MIGRATION.md) records the upgrade.
+Element composition lists `score-view` with `stage` and `status` only. The
+internal horizontal and vertical annotation drawers and the map annotation
+layer are removed with their tests.
+
+**Owner:** [View component families](design/VIEW-COMPONENTS.md).
+
+**Verification implications:** type parsing and fallback; type switches
+without reload across the three types; staff-only forwarding of
+`show-annotations`; configuration rejection for other types; piano roll and
+waterfall render no annotation marks; the retained map, timeline and thumbnail
+APIs keep their own tests.
 
 ## Recording the next decision
 

@@ -35,8 +35,6 @@ function bindPlayer(rendered: RenderedScoreVisualizer, player: Player, score: Sc
 }
 
 export interface ViewProps extends ViewLayoutOptions {
-  /** Show score expression directions in the scrolling renderers; default true. OSMD uses its own options. */
-  showAnnotations?: boolean;
   /** CSS width or numeric pixel width. Defaults to the containing block. */
   width?: number | string;
   /** CSS height or numeric pixel height. */
@@ -48,6 +46,8 @@ export interface ViewProps extends ViewLayoutOptions {
 }
 
 export interface StaffViewProps extends ViewProps {
+  /** Show score expression directions on the scrolling staff; default true. OSMD uses its own options. Only the staff draws annotations. */
+  showAnnotations?: boolean;
   /**
    * Render page notation with OpenSheetMusicDisplay instead of the scrolling staff renderer.
    * Pass `toMusicXML` (e.g. `serializeMusicXML` from `@webmusic/score/io`) and,
@@ -73,7 +73,6 @@ export function PianoRollView({
     const rendered = renderPianoRollVisualizer(score, svgRef.current, {
       noteHeight: layoutOptions.laneHeight,
       pixelsPerSecond: layoutOptions.pixelsPerSecond,
-      showAnnotations: layoutOptions.showAnnotations,
     });
     const unbind = bindPlayer(rendered, player, score);
     return () => {
@@ -83,7 +82,7 @@ export function PianoRollView({
       // original parent and removes the wrapper + drawn notes.
       rendered.dispose?.();
     };
-  }, [score, player, layoutOptions.laneHeight, layoutOptions.pixelsPerSecond, layoutOptions.showAnnotations]);
+  }, [score, player, layoutOptions.laneHeight, layoutOptions.pixelsPerSecond]);
 
   // The renderer reparents the SVG into its horizontal scroll viewport. Keep
   // the public surface on this stable wrapper so the frame stays fixed around
@@ -229,7 +228,6 @@ export function WaterfallView({
     const rendered = renderWaterfallVisualizer(score, container, {
       noteHeight: layoutOptions.laneHeight,
       pixelsPerSecond: layoutOptions.pixelsPerSecond,
-      showAnnotations: layoutOptions.showAnnotations,
     });
     const unbind = bindPlayer(rendered, player, score);
     return () => {
@@ -237,7 +235,7 @@ export function WaterfallView({
       rendered.dispose?.();
       container.replaceChildren();
     };
-  }, [score, player, layoutOptions.laneHeight, layoutOptions.pixelsPerSecond, layoutOptions.showAnnotations]);
+  }, [score, player, layoutOptions.laneHeight, layoutOptions.pixelsPerSecond]);
 
   return (
     <div

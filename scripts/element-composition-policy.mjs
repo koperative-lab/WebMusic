@@ -23,7 +23,7 @@ export const elementCompositionPolicy = Object.freeze([
   entry('Score', 'Analyze', 'score-scale-analysis', 'packages/score/src/analyze/element/score-scale-analysis.ts', ['analysis', 'harmony', 'workbench']),
   entry('Score', 'Analyze', 'score-rhythm-analysis', 'packages/score/src/analyze/element/score-rhythm-analysis.ts', ['analysis', 'harmony', 'workbench']),
 
-  entry('Score', 'View', 'score-view', 'packages/score/src/view/element/score-view.ts', ['stage', 'timeline', 'status']),
+  entry('Score', 'View', 'score-view', 'packages/score/src/view/element/score-view.ts', ['stage', 'status']),
   entry('Score', 'View', 'score-sheet-view', 'packages/score/src/view/element/score-sheet-view.ts', ['stage', 'status']),
   entry('Score', 'View', 'score-pitch-view', 'packages/score/src/view/element/score-pitch-view.ts', ['pitch', 'status']),
   // Declaration only: the nonvisual document owner shared by Views and the player.
@@ -46,7 +46,7 @@ export const elementCompositionPolicy = Object.freeze([
 ]);
 
 /** Main presenters available without a domain Element consumer. */
-export const standaloneUiPresenters = Object.freeze(['minimap', 'playlist', 'meter', 'track-list']);
+export const standaloneUiPresenters = Object.freeze(['minimap', 'playlist', 'meter', 'track-list', 'timeline']);
 
 /**
  * Musical editing surfaces own their focus entry and keyboard interpretation.

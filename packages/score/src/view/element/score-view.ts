@@ -2,21 +2,16 @@ import {bindPlayerToVisualizer, type PlayerBindingHandlers} from '../render/bind
 import {validateScoreViewConfiguration} from '../core/configuration';
 import {findSequenceNote} from '../core/note-sequence';
 import {
-  bindViewPlayer, seekViewPlayer, readViewPlayerScore, readViewPlayerSnapshot, resolveViewPlayer,
+  bindViewPlayer, readViewPlayerScore, readViewPlayerSnapshot,
   type ViewPlayerNote, type ViewPlayerSnapshot,
 } from './internal/player-binding';
-import {NoteId, Rational, isScoreEditorPort, type Score, type ScoreEditorPort, type ScoreInteractionSession,
+import {NoteId, isScoreEditorPort, type Score, type ScoreEditorPort, type ScoreInteractionSession,
   type ScorePlaybackSnapshot, type ScorePlaybackSource} from '../../core';
 import {observeElementSource} from '@webmusic/kernel/element';
 import {createScoreViewEditing, scoreDocumentPlaybackCompatible, type ScoreViewEditing} from '../headless/score-editing';
 import {mountPianoRollEditor, type PianoRollEditingHandle, type PianoRollEditingOptions} from '../render/piano-roll-editor';
 import {createStaffViewEditing, type StaffViewEditing} from '../headless/staff-editing';
 import {mountStaffEditor, type StaffEditingHandle} from '../render/staff-editor';
-import type {ScoreMap} from '../core/map';
-import {createScoreMapView, type ScoreMapView} from '../headless/score-map';
-import {createPianoRollLayout} from '../core/layout';
-import {mountScoreThumbnail} from '../render/thumbnail';
-import {mountScoreMapAnnotations} from '../render/map-annotations';
 import {createScoreView, type ScoreView} from '../headless/score-view';
 import {renderScoreVisualizer} from '../render/score-visualizer';
 import type {
@@ -29,7 +24,6 @@ import type {
 } from '../core/types';
 import {HTMLElementBase, boolAttr, cssSizeAttr, defineOnce, numAttr, upgradeProperties} from './base';
 import {mountStage, type StageHandle} from '@webmusic/ui/stage';
-import {mountTimeline, type TimelineHandle, type TimelineRegion, type TimelineTick} from '@webmusic/ui/timeline';
 import {mountStatus, type StatusHandle, type StatusKind} from '@webmusic/ui/status';
 
 const ELEMENT_NOTE_RGB = '51, 51, 51';
@@ -38,14 +32,8 @@ const ELEMENT_ACTIVE_NOTE_RGB = '240, 84, 119';
 export type {ScoreViewType} from '../core/types';
 export type {ScoreViewConfiguration, ScoreViewOptionsByType} from '../core/types';
 
-/** Element modes include lightweight previews without expanding renderer types. */
-export type ScoreViewElementType = ScoreViewType | 'map' | 'thumbnail';
-
-/** Map navigation intent; seconds are on the nominal score timeline. */
-export interface ScoreViewSeekDetail {
-  quarters: number;
-  seconds: number;
-}
+/** `<score-view>` draws exactly the three renderer types. */
+export type ScoreViewElementType = ScoreViewType;
 
 /**
  * Every render option `<score-view>` can forward — the union of the three
@@ -107,9 +95,9 @@ export function parseColorAttr(raw: string | null): string | undefined {
 
 /**
  * `<score-view>` — the single WebScore visualization element. The `type`
- * attribute picks the drawing (`piano-roll` by default, `staff`, `waterfall`,
- * `map` or `thumbnail`). Switching it disposes the old presentation and reuses
- * the resolved score. Map and thumbnail never create a full visualizer.
+ * attribute picks the drawing (`piano-roll` by default, `staff` or
+ * `waterfall`). Switching it disposes the old presentation and reuses the
+ * resolved score.
  *
  * ```html
  * <score-view type="waterfall" src="song.mid"
@@ -136,8 +124,9 @@ export function parseColorAttr(raw: string | null): string | undefined {
  *   `black-note-width`. Compose a separate `<score-pitch-view>` for a keyboard.
  * - **Colours** — `note-color` / `active-note-color` (hex, `rgb()`, or a raw
  *   `r, g, b` triple).
- * - **Expressions** — `show-annotations` (default true) shows supported score
- *   directions. False removes their space without changing musical data.
+ * - **Expressions** (staff only) — `show-annotations` (default true) shows
+ *   supported score directions. False removes their space without changing
+ *   musical data. Piano roll and waterfall never draw annotations.
  * - **Staff** — `default-key` (chromatic key index), `scroll-type`
  *   (`page` · `note` · `bar`), and `split-staves` (default true; false combines
  *   source staves within each part).
@@ -159,8 +148,6 @@ export class ScoreViewElement extends HTMLElementBase {
       'editor',
       'editable',
       'type',
-      'for-part',
-      'cells',
       'width',
       'height',
       'show-annotations',
@@ -201,10 +188,6 @@ export class ScoreViewElement extends HTMLElementBase {
   private status?: StatusHandle;
   private loading = false;
   private loadError?: unknown;
-  private map?: ScoreMap;
-  private mapView?: ScoreMapView;
-  private timeline?: TimelineHandle;
-  private annotationsCleanup?: () => void;
   private playheadSeconds = 0;
   private presentationRevision = 0;
   private snapshotRevision = 0;
@@ -238,7 +221,6 @@ export class ScoreViewElement extends HTMLElementBase {
     // In editor mode only an added or removed src (a conflict) matters; format alone keeps the session.
     else if (name === 'src' || name === 'format') { if (this.hasEditorIntent()) { if (name === 'src') this.bindEditor(); } else void this.refresh(); }
     else if (name === 'width' || name === 'height') this.applyHostSize();
-    else if (name === 'for-part' || name === 'cells') this.remap();
     else { if (name === 'type') this.updateEditable(); this.renderCurrent(); }
   }
 
@@ -284,7 +266,6 @@ export class ScoreViewElement extends HTMLElementBase {
 
   /** MIDI pitches intersecting the current score position, ascending. */
   get active(): number[] {
-    if (this.type === 'map' || this.type === 'thumbnail') return [];
     if (this.editing && scoreDocumentPlaybackCompatible(this.editing.state.document, this.documentPlayback)) {
       return [...new Set(this.documentPlayback!.activeNotes.flatMap((note) => {
         const pitch = this.editing!.state.document.content.getNote(NoteId(note.noteId))?.pitch;
@@ -323,21 +304,11 @@ export class ScoreViewElement extends HTMLElementBase {
   /** Reflects the `type` attribute; unknown values fall back to `piano-roll`. */
   get type(): ScoreViewElementType {
     const raw = this.getAttribute('type');
-    return raw === 'staff' || raw === 'waterfall' || raw === 'map' || raw === 'thumbnail' ? raw : 'piano-roll';
+    return raw === 'staff' || raw === 'waterfall' ? raw : 'piano-roll';
   }
 
   set type(type: ScoreViewElementType) {
     this.setAttribute('type', type);
-  }
-
-  /** Map density part, selected by id or name; absent means every part. */
-  get forPart(): string | undefined {
-    return this.getAttribute('for-part') ?? undefined;
-  }
-
-  /** Map cell budget; measures are grouped evenly to fit it. */
-  get cells(): number {
-    return Math.max(1, Math.round(numAttr(this, 'cells', 64)));
   }
 
   private async refresh(): Promise<void> {
@@ -378,29 +349,23 @@ export class ScoreViewElement extends HTMLElementBase {
     const revision = ++this.presentationRevision;
     // Staff input settings belong to the editor attachment and survive presentation re-renders.
     const surface = this.editorSurface;
-    const annotations = this.annotationsCleanup, binding = this.renderedUnbind;
+    const binding = this.renderedUnbind;
     const rendered = this.rendered, view = this.view, stage = this.stage, status = this.status;
-    const timeline = this.timeline, mapView = this.mapView;
     this.staffInputArmed = surface !== undefined && surface.surface.dataset.inputEnabled === 'true';
     this.editorSurface = undefined;
-    this.annotationsCleanup = undefined;
     this.renderedUnbind = undefined;
     this.visualizerHandlers = undefined;
     this.rendered = undefined;
     this.view = undefined;
     this.stage = undefined;
     this.status = undefined;
-    this.timeline = undefined;
-    this.mapView = undefined;
-    this.map = undefined;
-    this.style?.removeProperty('--_webscore-preview-annotations');
     // A draft cancellation can synchronously mount a newer presentation. Clear
     // only this lifetime's DOM before invoking its captured cleanup callbacks.
     this.replaceChildren();
     const failures: unknown[] = [];
-    for (const cleanup of [() => binding?.(), () => annotations?.(), () => surface?.dispose(),
+    for (const cleanup of [() => binding?.(), () => surface?.dispose(),
       () => rendered?.dispose?.(), () => view?.dispose(),
-      () => stage?.destroy(), () => status?.destroy(), () => timeline?.destroy(), () => mapView?.dispose()]) {
+      () => stage?.destroy(), () => status?.destroy()]) {
       try { cleanup(); } catch (error) { failures.push(error); }
     }
     for (const error of failures.slice(1)) console.error('[WebScore] Score View presentation cleanup failed', error);
@@ -421,8 +386,7 @@ export class ScoreViewElement extends HTMLElementBase {
       const style = owner.createElement('style');
       const selector = this.localName.replace(/[^a-z0-9-]/gi, (char) => `\\${char.codePointAt(0)!.toString(16)} `);
       style.textContent = `:where(${selector}) { box-sizing: border-box; width: 100%; min-width: 0; max-width: 100%; }
-:where(${selector}:not([hidden])) { display: block; }
-:where(${selector}[type="thumbnail"]) { height: calc(3rem + var(--_webscore-preview-annotations, 0px)); }`;
+:where(${selector}:not([hidden])) { display: block; }`;
       this.append(style);
     }
     // An editor-bound view renders document content; its player contributes time only.
@@ -476,41 +440,6 @@ export class ScoreViewElement extends HTMLElementBase {
     }
     const blocked = this.hasEditorIntent() && !this.editing ? this.blockedEditorState() : undefined;
     if (blocked && owner) this.showStatus('error', `Editor unavailable: ${blocked}`);
-    if (type === 'map') {
-      this.remap();
-      if (!owner) return;
-      this.timeline = mountTimeline(this, {
-        snapshot: () => this.mapSnapshot(),
-        seek: (quarters) => this.seekMap(quarters),
-        selectRegion: (id) => {
-          const cell = this.map?.cells[Number(id.slice('cell-'.length))];
-          if (cell) this.seekMap(cell.startQuarters);
-        },
-      }, {
-        label: 'Score map',
-        formatPosition: (quarters) => score.measures.length
-          ? `m. ${score.timeMap.quartersToMBS(Rational.from(quarters)).measure}`
-          : quarters.toFixed(1),
-      });
-      this.renderMapAnnotations();
-      return;
-    }
-    if (type === 'thumbnail') {
-      const notes = createPianoRollLayout(score);
-      if (!owner || !notes.length) return;
-      const color = this.summaryColor('var(--wm-score-view-note, currentColor)');
-      this.stage = mountStage(this,
-        {render: (surface) => mountScoreThumbnail(surface, notes, {
-          color, score, showAnnotations: this.renderOptions().showAnnotations,
-        }, (height) => {
-          // Derived per-instance sizing, not a public styling control. Explicit
-          // host height attributes or author CSS still override the default.
-          this.style.setProperty('--_webscore-preview-annotations', `${height}px`);
-        })},
-        {label: 'Score preview', fill: true, overflow: 'auto'},
-      );
-      return;
-    }
     this.view = createScoreView(score, {type});
     if (owner && !this.view.sequence.notes.length) {
       this.view.dispose();
@@ -552,9 +481,6 @@ export class ScoreViewElement extends HTMLElementBase {
   private cancelLoad(): void {
     this.loadToken += 1;
     this.loading = false;
-    // An old command must not repaint the retained map while a new input loads.
-    this.mapView?.dispose();
-    this.mapView = undefined;
     const controller = this.loadController;
     this.loadController = undefined;
     controller?.abort();
@@ -590,6 +516,8 @@ export class ScoreViewElement extends HTMLElementBase {
 
   private renderScore(score: Score, surface: HTMLElement, type: ScoreViewType): RenderedScoreVisualizer {
     const options = this.renderOptions();
+    // Only the staff draws score annotations; the other renderers never receive the switch.
+    if (type !== 'staff') delete options.showAnnotations;
     if (type !== 'waterfall') return renderScoreVisualizer(score, surface, type, options);
     return renderScoreVisualizer(score, surface, type, {
       ...options,
@@ -673,127 +601,6 @@ export class ScoreViewElement extends HTMLElementBase {
     }
   }
 
-  private remap(): void {
-    if (this.type !== 'map' || !this.resolvedScore) return;
-    const options = {part: this.forPart, maxCells: this.cells};
-    if (!this.mapView) {
-      this.mapView = createScoreMapView({score: this.resolvedScore, ...options,
-        seekNominal: (seconds) => {
-          const target = this.boundPlayer as (Element & {rate?: number; playback?: ScorePlaybackSource}) | undefined;
-          const playback = target?.playback;
-          const model = this.mapView;
-          const candidateRate = readViewPlayerSnapshot(target)?.rate ?? target?.rate ?? this.lastSnapshot?.rate;
-          const rate = typeof candidateRate === 'number' && Number.isFinite(candidateRate) && candidateRate > 0
-            ? candidateRate : 1;
-          const result = seekViewPlayer(target, seconds, this.resolvedScore, rate);
-          const reconcile = (): void => {
-            if (model !== this.mapView || target !== this.boundPlayer || playback !== target?.playback) return;
-            // Native snapshots settle even a no-op command. Legacy owners report
-            // new positions through events; their getter may still be stale.
-            const actual = playback?.snapshot();
-            if (actual && actual.readiness !== 'unavailable' && actual.readiness !== 'disposed') {
-              model?.setPosition(actual.nominalSeconds ?? 0);
-            }
-          };
-          if (result) return Promise.resolve(result).then(reconcile);
-          reconcile();
-        },
-      });
-      this.mapView.setPosition(this.playheadSeconds);
-      this.mapView.subscribe((state) => {
-        this.playheadSeconds = state.nominalSeconds;
-        if (this.lastSnapshot) this.lastSnapshot = {...this.lastSnapshot, nominalSeconds: state.nominalSeconds};
-        this.timeline?.update();
-      });
-    } else this.mapView.configure(options);
-    const projected = this.mapView.state.map!;
-    this.map = {durationQuarters: projected.durationQuarters, cells: [...projected.cells], marks: [...projected.marks]};
-    // Expressions have their own strip; the navigation ruler keeps bar labels
-    // so it neither repeats a rehearsal nor resurrects a hidden source mark.
-    const measures = new Map(this.resolvedScore.measures.map((measure) => [measure.onsetQuarters.toFloat(), measure]));
-    this.map.marks = this.map.marks.map((mark) => {
-      const measure = measures.get(mark.startQuarters);
-      return measure?.rehearsal
-        ? {...mark, label: `m. ${measure.number}`, level: measure.timeSignature || measure.tempo ? 'major' : 'minor'}
-        : mark;
-    });
-    this.timeline?.update();
-    this.renderMapAnnotations();
-  }
-
-  /** A compact expression ruler shares the map's quarter axis and part filter. */
-  private renderMapAnnotations(): void {
-    this.annotationsCleanup?.();
-    this.annotationsCleanup = undefined;
-    const score = this.resolvedScore;
-    const timeline = this.timeline;
-    if (!score || !timeline || this.renderOptions().showAnnotations === false) return;
-    this.annotationsCleanup = mountScoreMapAnnotations(timeline, score, {
-      part: this.forPart,
-      color: this.summaryColor('var(--wm-score-view-note, currentColor)'),
-    });
-  }
-
-  /** Lightweight drawings share the same explicit color precedence as notes. */
-  private summaryColor(fallback: string): string {
-    if (this.explicitOptions?.noteColor !== undefined) return this.explicitOptions.noteColor;
-    if (this.explicitOptions?.noteRGB !== undefined) return `rgb(${this.explicitOptions.noteRGB})`;
-    const raw = this.getAttribute('note-color');
-    const channels = parseColorAttr(raw);
-    return channels ? `rgb(${channels})` : raw || fallback;
-  }
-
-  private mapSnapshot() {
-    const score = this.resolvedScore;
-    const map = this.map;
-    const playhead = score?.timeMap.secondsToQuarters(this.playheadSeconds).toFloat() ?? 0;
-    return {
-      duration: map?.durationQuarters ?? 0,
-      playhead,
-      ticks: map?.marks.map<TimelineTick>((mark, index) => ({
-        id: `mark-${index}`, position: mark.startQuarters, label: mark.label, level: mark.level,
-      })),
-      regions: (map?.cells ?? []).map<TimelineRegion>((cell, index) => ({
-        id: `cell-${index}`, start: cell.startQuarters, end: cell.endQuarters,
-        label: cell.firstMeasure === undefined ? ''
-          : cell.lastMeasure !== undefined && cell.lastMeasure !== cell.firstMeasure
-            ? `m. ${cell.firstMeasure}–${cell.lastMeasure}` : `m. ${cell.firstMeasure}`,
-        color: `color-mix(in srgb, ${this.summaryColor('var(--wm-score-view-map, var(--wm-accent, #4869d8))')} ${Math.round(12 + cell.density * 88)}%, transparent)`,
-        selected: playhead >= cell.startQuarters && playhead < cell.endQuarters,
-      })),
-    };
-  }
-
-  /** Map commands borrow the player's time axis, without owning its transport. */
-  private seekMap(position: number): void {
-    const score = this.resolvedScore;
-    const mapView = this.mapView;
-    if (!score || !mapView || this.type !== 'map' || !Number.isFinite(position)) return;
-    if (this.hasEditorIntent() && (!this.editing || !scoreDocumentPlaybackCompatible(this.editing.state.document, this.documentPlayback))) return;
-    const quarters = Math.max(0, Math.min(this.map?.durationQuarters ?? 0, position));
-    const seconds = score.timeMap.quartersToSeconds(Rational.from(quarters));
-    const target = this.boundPlayer as (Element & {
-      rate?: number;
-      seekNominal?: (seconds: number) => void | Promise<void>;
-      seek?: (seconds: number) => void | Promise<void>;
-    }) | undefined;
-    const sourceRevision = this.loadToken;
-    const presentationRevision = this.presentationRevision;
-    const beforeState = mapView.state;
-    const beforeSnapshot = this.snapshotRevision;
-    const current = () => this.isConnected && mapView === this.mapView
-      && sourceRevision === this.loadToken && presentationRevision === this.presentationRevision
-      && target === this.boundPlayer && target === resolveViewPlayer(this);
-    this.dispatchEvent(new CustomEvent<ScoreViewSeekDetail>('webscore:seek', {
-      detail: {quarters, seconds}, bubbles: true, composed: true,
-    }));
-    // A consumer can synchronously replace the source, owner or type on intent.
-    if (!current() || beforeSnapshot !== this.snapshotRevision || beforeState !== mapView.state) return;
-    void mapView.seekQuarters(quarters).then((outcome) => {
-      if (current() && outcome.status === 'failed') console.error('[WebScore] <score-view> seek failed', outcome.error);
-    });
-  }
-
   // ---- Playback sync (player="#id") ----
 
   private bindPlayer(): void {
@@ -804,7 +611,6 @@ export class ScoreViewElement extends HTMLElementBase {
       ...(this.hasEditorIntent() ? {playbackSnapshot: (snapshot: ScorePlaybackSnapshot) => this.followDocumentPlayback(snapshot)} : {}),
       targetChanged: (target) => {
         this.boundPlayer = target;
-        this.mapView?.setScore(this.resolvedScore);
       },
       scoreChanged: () => {
         if (!this.hasEditorIntent() && !this.explicitScore && !this.getAttribute('src')) void this.refresh();
@@ -821,10 +627,8 @@ export class ScoreViewElement extends HTMLElementBase {
         this.documentPlayback = undefined;
         this.editorSurface?.updatePlayback(undefined);
         this.playheadSeconds = 0;
-        this.mapView?.setPosition(0);
         this.view?.reset();
         this.rendered?.clearActiveNotes();
-        this.timeline?.update();
       },
       end: () => {
         if (this.lastSnapshot) this.view?.seek(this.lastSnapshot.nominalSeconds);
@@ -832,7 +636,6 @@ export class ScoreViewElement extends HTMLElementBase {
         this.view?.clearActiveNotes();
         this.rendered?.clearActiveNotes();
         if (!readViewPlayerSnapshot(this.boundPlayer)) this.playheadSeconds = 0;
-        this.timeline?.update();
       },
     });
     if (!this.playerUnbind && !this.explicitScore && !this.getAttribute('src')) void this.refresh();
@@ -848,10 +651,8 @@ export class ScoreViewElement extends HTMLElementBase {
     if (this.hasEditorIntent()) this.setAttribute('data-playback-state', 'unbound');
     this.snapshotRevision += 1;
     this.playheadSeconds = 0;
-    this.mapView?.setScore(this.resolvedScore);
     this.view?.reset();
     this.rendered?.clearActiveNotes();
-    this.timeline?.update();
   }
 
   private followNote(note: ViewPlayerNote, on: boolean): void {
@@ -871,8 +672,6 @@ export class ScoreViewElement extends HTMLElementBase {
     this.snapshotRevision += 1;
     this.lastSnapshot = snapshot;
     this.playheadSeconds = this.resolvedScore ? snapshot.nominalSeconds : 0;
-    this.mapView?.setPosition(this.playheadSeconds);
-    this.timeline?.update();
     this.paintPosition(snapshot.nominalSeconds);
   }
 
@@ -1006,7 +805,7 @@ export class ScoreViewElement extends HTMLElementBase {
     this.editorSurface?.updatePlayback(snapshot);
     if (!compatible) {
       this.lastSnapshot = undefined; this.playheadSeconds = 0;
-      this.view?.reset(); this.rendered?.clearActiveNotes(); this.mapView?.setPosition(0); this.timeline?.update(); return;
+      this.view?.reset(); this.rendered?.clearActiveNotes(); return;
     }
     this.followSnapshot({nominalSeconds: snapshot.nominalSeconds ?? 0, transportSeconds: snapshot.transportSeconds ?? 0,
       transportDurationSeconds: snapshot.transportDurationSeconds ?? 0, rate: snapshot.rate ?? 1, playing: snapshot.state === 'playing'});

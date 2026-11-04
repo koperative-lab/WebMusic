@@ -127,6 +127,23 @@ clip loop is not applied to them, exactly as in `0.2.0`. Owned clips loop as
 before; among borrowed transport paths, only the player's own document sequence
 accepts loop commands.
 
+## Score View types and annotations
+
+`0.2.0`'s `<score-view>` also accepted `type="map"` and `type="thumbnail"`, and
+drew score annotations on every type. The next release keeps three types and
+draws annotations only on the staff (DEC-056).
+
+| Published 0.2.0 | Next release | Upgrade |
+| --- | --- | --- |
+| `type="map"`, with `for-part`, `cells`, `.forPart`, `.cells`, the `webscore:seek` event and `ScoreViewSeekDetail` | Removed; the value falls back to `piano-roll` | Compose `createScoreMapView` from `@webmusic/score/view/headless` with the `@webmusic/ui/timeline` presenter, and seek your player from its commands |
+| `type="thumbnail"` | Removed; the value falls back to `piano-roll` | Use `mountScoreThumbnail` / `renderScoreThumbnail` from `@webmusic/score/view/render` |
+| `--wm-score-view-map` styling token | Removed | Style the timeline presenter you compose |
+| Piano-roll expression strip and waterfall expression rail | Not drawn; no space reserved | Show annotations with `type="staff"` |
+| `showAnnotations` on `VisualizerRenderOptions` and React `ViewProps` | Only on `StaffRenderOptions` and `StaffViewProps` | Remove it from piano-roll and waterfall options; `validateScoreViewConfiguration` rejects it there |
+| `show-annotations` on any `<score-view>` | Affects only `type="staff"` | No change needed for staff views |
+
+`ScoreViewElementType` remains exported and now equals `ScoreViewType`.
+
 ## Adopt editing through the View entries
 
 Editing adds members to existing entries; it adds no new subpath. The inspected
