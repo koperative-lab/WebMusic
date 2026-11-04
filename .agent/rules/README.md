@@ -11,7 +11,7 @@ rule file. Start from [AGENTS.md](../../AGENTS.md), the sole instruction entry.
 | Domains, source layers and public entries | [Architecture](../../dev/ARCHITECTURE.md) | `check:architecture`, package policy and export checks |
 | Component responsibility and composition | [Component design](../../dev/design/COMPONENT-DESIGN.md), [family designs](../../dev/design/README.md) | Owning types, tests, composition catalogs and reviewed use cases |
 | Time, data and resource ownership | [Player binding](../../dev/design/PLAYER-BINDING.md), [shared-clock design](../../platform/shared-clock-injection.md) | Scheduler/attachment/lifecycle regressions; real-time acceptance remains separate |
-| UI behavior and styling | [Design principles](../../dev/DESIGN-PRINCIPLES.md), [UI contracts](../../packages/ui/README.md) | Presenter tests plus actual browser, keyboard and device evidence |
+| UI behavior and styling | [Visual design](../../dev/design/VISUAL-DESIGN.md) (required for all UI), [Design principles](../../dev/DESIGN-PRINCIPLES.md), [UI contracts](../../packages/ui/README.md) | Presenter tests plus actual browser, keyboard and device evidence |
 | Reference and demo accuracy | [Conventions](../../dev/docs/DOCS-CONVENTIONS.md), [page templates](../../dev/docs/README.md) | Existing documentation gates, snippets and manual semantics review |
 | Versions and publication | [Release guides](../../dev/release/README.md) | Manifest/export checks and the release procedure's external verification |
 

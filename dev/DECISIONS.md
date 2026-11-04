@@ -2360,6 +2360,43 @@ attachment cleanup and playback application retargeted from the old piano-roll
 surface. Browser pointer, keyboard, focus and visual acceptance are recorded
 separately.
 
+## DEC-059 — One required visual language for all UI
+
+**Date / status:** 2026-11-04; accepted at the maintainer's request. Makes
+Design principles §7 concrete; does not change any public API.
+
+**Problem:** the neutral-palette and square-geometry principle lived only as
+prose in Design principles, and the frontend skill and workflow were framed as
+review steps. New UI could therefore be built without consulting them: the
+first `<score-grid-view>` toolbar used rounded text buttons, a blue note
+default, native menus, visible scrollbars and instructions inside the canvas,
+and had to be redone.
+
+**Chosen contract:** [Visual design](design/VISUAL-DESIGN.md) is the required
+visual language for every visible UI — presenters, Element surfaces, renderer
+controls and the component area of demos. It fixes the neutral token palette,
+square one-height controls, mono captions, square line icons, single-row icon
+toolbars, in-component adjustment cards over a scrim with modal focus, hidden
+scrollbars with sticky labels, no explanatory text inside components, and demo
+configuration in Parameters, with an acceptance checklist. AGENTS, the
+frontend skill and workflow, and the rule map route every UI change to it
+before coding.
+
+**Alternatives considered:** leaving the principle as prose and fixing drift
+in review, which repeats the rework; and a UIKit theme package, which would
+not cover renderer-owned surfaces such as the grid.
+
+**Consequences:** existing components that predate it remain until touched;
+a component change brings the touched surface into line. Adjustment cards are
+currently implemented by the grid renderer; a shared UIKit card presenter is
+the reuse target when a second component needs one.
+
+**Owner:** [Visual design](design/VISUAL-DESIGN.md).
+
+**Verification implications:** the visual checklist and browser comparison
+beside an existing component are part of UI acceptance; automated checks do
+not establish visual conformance.
+
 ## Recording the next decision
 
 Add an identifier, date, status, problem, chosen contract, considered alternatives, consequences, owning document, and verification implications. A proposed choice does not change a public API. If a choice supersedes this register, retain its old identifier and point to the replacement; do not rewrite historical evidence as though the new choice always existed.

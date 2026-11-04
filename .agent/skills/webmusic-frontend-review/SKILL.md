@@ -1,10 +1,12 @@
 ---
 name: webmusic-frontend-review
-description: Review or repair WebMusic component rendering, responsive container sizing, UIKit reuse, focus, clipping, and live-demo Parameters when frontend acceptance is requested.
+description: Build, review or repair any visible WebMusic UI — presenters, Element surfaces, toolbars, popups, live-demo Parameters — to the required visual design, with responsive sizing, UIKit reuse, focus and clipping checks. Use whenever UI is added or changed, not only when a review is requested.
 ---
 
 # WebMusic frontend review
 
+Read [Visual design](../../../dev/design/VISUAL-DESIGN.md) before writing or
+changing UI code and build to it; its acceptance checklist is part of done.
 Follow the [frontend workflow](../../../.agent/workflows/frontend-review.md)
 for the actual component, modes and route. Begin with screenshots and behavior
 from an available browser, then inspect the owning presenter and renderer.

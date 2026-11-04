@@ -61,7 +61,10 @@ input; their bundled sample material must still use Arabesque No. 1.
    user's requested scope determines the task; STATUS is context, not an
    instruction to start unrelated backlog items.
 4. Read [ARCHITECTURE.md](dev/ARCHITECTURE.md) and
-   [DEVELOPMENT.md](dev/DEVELOPMENT.md) before implementation. Follow the
+   [DEVELOPMENT.md](dev/DEVELOPMENT.md) before implementation. If the task adds
+   or changes anything visible — a presenter, an Element surface, a toolbar, a
+   popup, a demo — read [VISUAL-DESIGN.md](dev/design/VISUAL-DESIGN.md) first
+   and build to it; this is required for every UI change, not only reviews. Follow the
    task-specific references below to the owning source, public types, and tests.
 5. Use [COMPONENTS.md](dev/COMPONENTS.md) to locate existing capabilities and
    [DOCUMENTATION-MAP.md](dev/DOCUMENTATION-MAP.md) to find **every indexed
@@ -90,6 +93,7 @@ input; their bundled sample material must still use Arabesque No. 1.
 | Agent tools and repeatable procedures | [.agent/README.md](.agent/README.md) | Project skills, workflow entry points and prioritized tool recommendations |
 | Product scope | [PRODUCT.md](dev/PRODUCT.md) | Users, scenarios, integration choices, resource reuse, long-term goals |
 | Logic, interaction, and visual philosophy | [DESIGN-PRINCIPLES.md](dev/DESIGN-PRINCIPLES.md) | State/time authority, feedback, accessibility, styling and resource principles |
+| Visual language (required for all UI) | [VISUAL-DESIGN.md](dev/design/VISUAL-DESIGN.md) | Monochrome square palette and geometry, icon toolbars, in-component adjustment cards, hidden scrollbars, no in-canvas prose, demo Parameters, acceptance checklist |
 | Accepted choices | [DECISIONS.md](dev/DECISIONS.md) | Decisions, reasons, consequences and the next-decision format |
 | Technical architecture | [ARCHITECTURE.md](dev/ARCHITECTURE.md) | Package/capability boundaries, layers, timing, ownership and executable policy |
 | Component design | [COMPONENT-DESIGN.md](dev/design/COMPONENT-DESIGN.md) | Design questions, copyable design template and acceptance scenarios |
@@ -128,6 +132,7 @@ owning leaf page; do not copy a complete member table into another document.
 | Player bindings, readouts, analysis followers and views | Domain Play/Analyze/View and neutral UI presenters | [Player binding design](dev/design/PLAYER-BINDING.md), DEC-011, current STATUS and the owning public leaf pages |
 | Document editing, history and playback revisions | Domain Core, View editors and surfaces, and Play bindings | [Editing contracts](dev/design/EDIT-COMPONENTS.md), DEC-053, DEC-055 and STATUS EDIT-01; distinguish accepted target contracts from delivered APIs |
 | Audio Analyze performance surfaces and static reports | [Audio Analyze source](packages/audio/src/analyze/) | [Audio Analyze design](dev/design/AUDIO-ANALYZE-COMPONENTS.md), [Audio Analyze API](apps/doc/webmusic/src/content/docs/audio/api/analyze.mdx) and owning Element pages |
+| Any new or changed visible UI | The owning presenter, renderer or Element | [Visual design](dev/design/VISUAL-DESIGN.md) before coding, then the [frontend workflow](.agent/workflows/frontend-review.md) for rendered acceptance |
 | Documentation site and demos | [apps/doc/webmusic/src/](apps/doc/webmusic/src/), [shared catalogs](apps/doc/shared/) | [apps README](apps/README.md), Site Plan, Conventions and the applicable page template |
 | A systematic Score or Audio review | Owning domain, UI presenters and demos | [Score review workflow and Audio starting brief](dev/log/2026-09-09-score-review-workflow.md); use current design and STATUS to scope algorithm/architecture work before frontend acceptance |
 
@@ -167,10 +172,16 @@ alternative specification:
 - Use public styling tokens, parts and named handles. Keep private presenter
   selectors private. Preserve keyboard, focus and state feedback when replacing
   visuals; documentation demo chrome is not required application UI.
+- Every visible UI follows [Visual design](dev/design/VISUAL-DESIGN.md):
+  neutral monochrome tokens, square one-height controls, icon-only toolbars,
+  adjustment cards inside the component over a scrim, no visible scrollbars,
+  no explanatory text in the component, and demo settings in Parameters.
 
 ## Implement a change
 
-1. Locate an existing capability before adding a new one. For a new component
+1. Locate an existing capability before adding a new one. For visible UI,
+   start from [Visual design](dev/design/VISUAL-DESIGN.md) and reuse an existing
+   presenter or pattern before styling anything new. For a new component
    or substantial contract change, use the component design template and record
    shared decisions in DECISIONS. Small fixes should stay scoped to their actual
    behavior and owning reference.

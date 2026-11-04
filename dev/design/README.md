@@ -15,6 +15,7 @@ its original phase sequence and alternatives.
 
 | Contract | Use |
 |---|---|
+| [VISUAL-DESIGN.md](VISUAL-DESIGN.md) | Required visual language for every UI: monochrome square controls, icon toolbars, in-component adjustment cards, hidden scrollbars and the acceptance checklist |
 | [COMPONENT-DESIGN.md](COMPONENT-DESIGN.md) | Design questions, a copyable contract template and acceptance scenarios for any component |
 | [EDIT-COMPONENTS.md](EDIT-COMPONENTS.md) | Document ownership, commands/history, editable Views, playback revision application and asset-backed audio editing |
 | [PLAYER-BINDING.md](PLAYER-BINDING.md) | Borrowing Play data, state and time, including ownership, standalone use and open binding choices |

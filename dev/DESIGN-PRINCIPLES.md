@@ -79,6 +79,11 @@ Presenters supply default structure and styling needed for their interaction. Ap
 
 Disabling stylesheet installation does not disable state machines, bindings, keyboard logic, or cleanup. A compound presenter propagates its styling choice to children it owns. Compatibility token precedence and entry-specific options are documented in the [UI package](../packages/ui/README.md), [style source](../packages/ui/src/styles.ts), and individual presenter pages.
 
+[Visual design](design/VISUAL-DESIGN.md) is the required, concrete form of this
+principle for every UI change: palette, geometry, type, controls, icons,
+toolbars, adjustment cards, scrolling surfaces and demos, with an acceptance
+checklist (DEC-059).
+
 Score and Audio share the same neutral default palette, control geometry and component-surface tokens. A musical domain does not introduce its own brand skin. Color may encode musical data or semantic states such as recording and clipping, and explicit caller styling remains authoritative. Canonical demos show these defaults; a separately identified customization example may supply its own palette.
 
 Pending component feedback uses the shared UI status presenter: four grayscale square cells

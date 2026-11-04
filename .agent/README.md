@@ -13,7 +13,7 @@ and verification policy.
 | [Tool recommendations](TOOLS.md) | Choose existing tools first; identify useful additions and what they would prove |
 | [Rule ownership](rules/README.md) | Find the authoritative rule and its existing mechanical check |
 | [Component review skill](skills/webmusic-component-review/SKILL.md) | Review musical algorithms, lifecycle and component boundaries |
-| [Frontend review skill](skills/webmusic-frontend-review/SKILL.md) | Inspect actual rendering, responsive composition and UIKit reuse |
+| [Frontend skill](skills/webmusic-frontend-review/SKILL.md) | Build or review any visible UI to the required [visual design](../dev/design/VISUAL-DESIGN.md); inspect rendering, responsive composition and UIKit reuse |
 | [Documentation maintenance skill](skills/webmusic-docs-maintenance/SKILL.md) | Align public contracts, examples, navigation and generated indexes |
 | [Component review workflow](workflows/component-review.md) | Run an architecture/algorithm phase, including Audio-specific evidence |
 | [Frontend review workflow](workflows/frontend-review.md) | Run the rendered UI acceptance phase |
