@@ -2,7 +2,7 @@
 
 > Promotion note, 2026-10-13: P0 produced the accepted
 > [editing contract](../design/EDIT-COMPONENTS.md) and
-> [DEC-047](../DECISIONS.md#dec-047--document-owned-editing-and-borrowed-playback).
+> [DEC-053](../DECISIONS.md#dec-053--document-owned-editing-and-borrowed-playback) (drafted as DEC-047).
 > The original proposal below is retained as dated evidence, including its then-open
 > choices. STATUS owns current progress; runtime implementation is still pending.
 
@@ -14,7 +14,7 @@
 
 Date: 2026-10-13. Status: proposed; implementation has not started.
 Source baseline: `ef8664d`, on the `editing-capabilities` planning branch.
-Related decision: [DEC-047, proposed](../DECISIONS.md#dec-047--document-owned-editing-and-borrowed-playback-proposed).
+Related decision: [DEC-047, proposed](../DECISIONS.md#dec-053--document-owned-editing-and-borrowed-playback) (accepted as DEC-053).
 Current delivery tracking belongs to [STATUS](../STATUS.md), EDIT-01.
 
 This records the merged Score/Audio editing discussion and its source review.

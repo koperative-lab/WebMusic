@@ -107,6 +107,47 @@ exposes requested/applied identities, retry outcomes and the discriminated
 See [document playback](/audio/headless/play/audio-player/#edited-sequence-playback)
 for the full resource limits, position mapping, loop and lifecycle contract.
 
+### Document revision observation
+
+The root `@webmusic/audio` (and `/edit`) export the observation and result types
+that playback reports for a borrowed document. The document's `documentRevision`
+is distinct from the snapshot's playback publication `revision`; compare both
+document identity and revision before using playback frames against current
+document content.
+
+`AudioDocumentRevision` is `{documentId: string, documentRevision: number}`.
+`AudioDocumentPlaybackBinding` contains:
+
+| Member | Meaning |
+|---|---|
+| `status` | `empty`, `preparing`, `ready` or `error`. |
+| `attempt` | Application-attempt generation; retrying a revision creates another attempt. |
+| `requested` | Optional latest requested document identity/revision. |
+| `applied` | Optional last document identity/revision adopted by playback. |
+| `positionPolicy` | Optional `preserve-frame` or `reset-origin` policy used for application. |
+| `documentCoordinates` | True only for ready/current playback whose position maps back to the authored document; matching IDs alone do not establish this. |
+| `error` | Optional application failure. Edited content and the last applied playback snapshot remain distinct. |
+
+`AudioDocumentApplicationResult` reports `applied` with `target`, `attempt` and
+`positionPolicy`; `superseded` with optional `target` and `attempt`; or `failed`
+with optional `target`, `attempt` and `error`. These outcomes belong to the
+[player's wait/retry methods](/audio/headless/play/audio-player/#edited-sequence-playback).
+
+`AudioDocumentApplicationError` carries a readable message and `.code`:
+
+| Code | Raised when |
+|---|---|
+| `unknown-revision` | A wait target is malformed or names a document revision newer than the binding has observed. |
+| `not-ready` | Playback or a retry is requested before a revision is ready to apply, the document source is unavailable, or no sequence transport is available. |
+| `disposed` | The player or its binding has been disposed. |
+| `invalid-source` | `setDocumentSource()` or `.editor` receives a value that is not an `AudioDocumentSource`, or its `subscribe()` does not return an unsubscribe function. |
+| `invalid-snapshot` | A published snapshot is malformed, changes content without a new revision, or its sequence length disagrees with its segments. |
+| `source-conflict` | A document source is combined with an independent clip, transport, `src` or player. |
+
+The union also declares `document-disposed`; the current implementation does not
+raise it. A disposed editor returns the binding to `empty` without an error, and
+the Element reports `not-ready`.
+
 ## Export — render to WAV (and offline effects)
 
 `clipToWav` turns a decoded clip back into WAV bytes via the same pure-JS serializer (Node / worker safe); `clipToBlob` wraps that as an `audio/wav` `Blob` for download or object-URL playback. `renderClipWithEffect` runs a clip through an effect chain **offline** via an `OfflineAudioContext` (browser-only, guarded) and returns a fresh, effected clip — the bounce/print step.

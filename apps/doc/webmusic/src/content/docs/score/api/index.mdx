@@ -653,6 +653,9 @@ with optional `target`, `attempt` and `error`. These outcomes belong to the
 
 `ScoreDocumentApplicationError` carries a readable message and `.code`:
 `unknown-revision`, `not-ready`, `disposed`, `invalid-source`,
-`invalid-snapshot`, `document-disposed` or `source-conflict`. Core defines the
+`invalid-snapshot`, `document-disposed` or `source-conflict`. The current
+implementation does not raise `document-disposed`: a disposed editor returns the
+binding to `empty` without an error, and `<score-player>` reports `not-ready`.
+Core defines the
 observation/result types; playback preparation, pausing and command gating belong
 to Play, and the editor retains ownership of committed musical content.

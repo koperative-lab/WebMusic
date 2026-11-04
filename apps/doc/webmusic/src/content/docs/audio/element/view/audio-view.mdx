@@ -209,8 +209,9 @@ same Document or ShadowRoot and observes late insertion, upgrade, source changes
 removal and replacement. Missing, ambiguous and invalid targets remain unavailable.
 An editor conflicts with independent `.clip`, `.peaks`, `.spectrogram`,
 `.frequencyData`, `src` or `peaks-src`, including empty source attributes.
-Programmatic source setters reject conflicts before changing data or releasing
-the valid binding; assigning `undefined` to an already empty source keeps the
+Programmatic source setters reject conflicts by throwing a plain `Error` whose
+message starts with `source-conflict:` (not a typed application error) before
+changing data or releasing the valid binding; assigning `undefined` to an already empty source keeps the
 binding, session, selection and draft. Conflicting attributes instead expose `source-conflict`
 until corrected.
 There is no fallback from an explicit failed editor binding to old clip data.

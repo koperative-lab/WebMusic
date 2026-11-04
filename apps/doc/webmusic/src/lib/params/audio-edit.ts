@@ -14,7 +14,7 @@ export const AUDIO_EDIT_PARAMS: ElementParamCatalog = {
       {name: 'clip', note: 'Explicit decoded AudioClip input; undefined restores src loading.'},
       {name: 'loader', note: 'Optional caller-owned decoding closure; receives URL, limits and AbortSignal.'},
       {name: 'loadOptions', note: 'Configured input/decode resource limits forwarded to the loader; an injected loader enforces its own limits.'},
-      {name: 'processors', note: 'Borrowed range processor recipes. A pending URL load adopts a replacement; otherwise replacing the array reloads the configured document.'},
+      {name: 'processors', note: 'Borrowed range processor recipes. A pending URL load adopts a replacement; otherwise replacing the array reloads the configured document and discards unexported edits and history.'},
       {name: 'editor', note: 'Read-only owned AudioClipEditor, available after successful loading.'},
       {name: 'status', note: 'Read-only empty/loading/ready/error/disposed state.'},
       {name: 'error', note: 'Read-only most recent load/configuration error.'},

@@ -131,8 +131,8 @@ the redo branch. Undo/redo restores immutable roots at a new revision and emits
 the corresponding map. History trimming is observable in history state.
 `markSaved` records the current content identity without changing revision.
 
-For application history, an immutable checkpoint/restore path bypasses the local
-stack but still validates, increments revision, emits a change and supplies a
+For application history, an immutable checkpoint/restore path does not record a
+local undo entry; restoring clears both local undo and redo stacks, and still validates, increments revision, emits a change and supplies a
 map or explicit reset policy. A restore event identifies its origin so an
 application need not record its own undo as another action. Checkpoints carrying
 Audio assets hold explicit leases until released. This is in-memory integration,

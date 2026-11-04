@@ -16,6 +16,10 @@ work and does not establish npm publication, a release tag or a deployment.
 - Write Score JSON schema v0.2 with `NoteData.velocityOverride`; v0.1 and
   unmarked input remain readable. Audio source-change details are now a
   `kind`-discriminated union that can describe an edited sequence.
+- Add browser-only Kernel `observeElementSource`, which resolves a borrowed
+  source from an explicit object or a selected element's public property with a
+  consumer-supplied type guard; `<score-player>`, `<score-view>`,
+  `<audio-player>` and `<audio-view>` use it to find their editor.
 - Reject non-finite `ScorePlayer` and `AudioPlayer` seeks with `RangeError`;
   resolve `<audio-view player>` to exactly one observed target like the other
   player companions; pad odd-sized WAV `data` chunks; share one Core per format

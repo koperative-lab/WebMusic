@@ -90,7 +90,7 @@ Splits and trims crop/rebase envelopes and preserve boundary values. Content-anc
 | `createAudioPositionMap(documentId, fromRevision, toRevision, steps)` | Validate/freeze a map for one document. |
 | `composeAudioPositionMaps(...maps)` | Compose contiguous revisions of the same document; rejects gaps or identity mismatch. |
 | `mapAudioPosition(map, frame, affinity?)` | Returns `AudioMappedPosition`: `{frame, deleted, positionPolicy}`. Default affinity is `'right'`; `'left'` keeps an insertion boundary before inserted content. A reset step is terminal: the position becomes frame 0 of the target revision with `'reset-origin'`, and composing any reset yields one reset step with the final length. |
-| `AudioDocumentChange` | Edit/undo/redo/restore origin, label, revisions, operations, affected frame ranges and position map. |
+| `AudioDocumentChange` | Edit/undo/redo/restore origin, label, revisions, operations, affected frame ranges and position map. `AudioClipEditor` currently reports one conservative range, `[0, max(previous length, new length))`, for every change; use the operations and position map for precise extents. |
 | `AudioDocumentSnapshot`, `AudioDocumentSource` | Immutable content identity/revision plus borrowed assets; `getSnapshot()` and immediate `subscribe()`, returning unsubscribe. Ready empty content differs from disposed ownership. |
 | `AudioClipEditorPort`, `isAudioClipEditorPort`, `isAudioDocumentSource` | Structural composition contracts and runtime guards; no `instanceof` dependency between bundles. |
 | `AudioRevisionGuard`, `AudioEditTransaction`, `AudioEditResult`, `AudioEditFailure`, `AudioEditError`, `AudioEditErrorCode` | Guarded atomic editing, transaction builder, committed/noop/failed results and typed errors. |
@@ -122,7 +122,7 @@ The editor removes the declared latency from the returned asset segment. It trim
 | API / type | Contract |
 | --- | --- |
 | `renderAudioSequence(sequence, assets, options?)` | Promise of `RenderedAudioSequence`: sample rate, channel layout and caller-owned mutable channel arrays. Applies sequence gain, envelope and silence. |
-| `exportAudioSequenceWav(sequence, assets, options?)` | Promise of an `ArrayBuffer`; renders the selected range and encodes WAV. Default 16-bit integer PCM; 24/32-bit integer and 32-bit float supported. An odd-sized 24-bit data chunk is followed by one zero RIFF pad byte. Empty output is a valid header-only WAV. |
+| `exportAudioSequenceWav(sequence, assets, options?)` | Promise of an `ArrayBuffer`; renders the selected range and encodes WAV. Default 16-bit integer PCM; 24/32-bit integer and 32-bit float supported. An odd-sized 24-bit data chunk is followed by one zero RIFF pad byte. Empty output is a valid header-only WAV. The file uses a plain 16-byte PCM or IEEE-float `fmt ` chunk, not `WAVE_FORMAT_EXTENSIBLE`, so channel count is preserved but `channelLayout` labels are not written; readers see the channels in layout order without speaker assignments. |
 | `AudioSequenceRenderOptions` | Optional `startFrame` (0), `endFrame` (sequence length), `maxBytes` (256 MiB), `chunkFrames` (65,536), `signal`. |
 | `AudioSequenceWavOptions` | Render options plus `bitDepth: 16 \| 24 \| 32` (16; a bare 32 is integer PCM), `float` (false; requires 32). Budget counts both float PCM and WAV output allocations, including a pad byte. |
 | `RenderedAudioSequence` | `{sampleRate, channelLayout, channelData}`; sample arrays are newly owned by the caller and do not expose retained source PCM. |

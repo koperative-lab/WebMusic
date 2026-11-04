@@ -418,6 +418,7 @@ without changing `package-policy.mjs`.
 | Contract being changed | Sources to review |
 |---|---|
 | Packages, entries, dependencies, layers, side effects, DOM-free/optional-peer reachability | [scripts/package-policy.mjs](../scripts/package-policy.mjs) |
+| Reviewed cross-capability import exceptions (Audio Edit Element loader) | [scripts/audio-document-import-policy.mjs](../scripts/audio-document-import-policy.mjs), applied by the architecture checker |
 | Element-to-presenter composition and behavior-only exceptions | [scripts/element-composition-policy.mjs](../scripts/element-composition-policy.mjs) |
 | Element/catalog membership, UI information classes and AST rules | Composition policy and [architecture checker](../scripts/check-architecture.mjs); reviewed membership determines the catalog |
 | Installed API and type/runtime paths | Each package's `exports`, dependencies/peers and `sideEffects` in `package.json` |

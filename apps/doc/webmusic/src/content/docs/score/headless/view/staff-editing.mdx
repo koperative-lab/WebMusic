@@ -73,6 +73,12 @@ still fit MIDI `0–127`. Readiness means the local controller and borrowed
 document are available; an individual command can still reject an unsupported
 measure. Changing cursor or input settings does not create undo history.
 
+When the borrowed document changes, the cursor is clamped to the new content
+duration and the part falls back to the first part if the selected part no
+longer exists. A checkpoint restore (`change.origin === 'restore'`) instead
+returns the cursor to `0`, because positions in the replaced document no longer
+correspond to the restored content. Undo and redo keep the clamped cursor.
+
 ## Ownership and failures
 
 The caller creates and releases `editing` and its editor. This controller owns

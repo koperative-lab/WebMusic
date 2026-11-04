@@ -143,7 +143,7 @@ explicit rendering/WAV export.
 | `undo(guard?)` / `redo(guard?)` | Restore roots at new revisions; commands return typed failures when history is disabled. |
 | `markSaved()` / `clearHistory()` | Record current content identity / release retained local history. Neither changes content revision. |
 | `createCheckpoint()` / `restoreCheckpoint(checkpoint, guard?)` | Checkpoint is an explicitly released in-memory handle, not a persistence format. |
-| `copy(range)` / `cut(range, guard?)` | Copy a half-open frame range into the editor clipboard; cut also commits a deletion. Copy returns a separate caller-owned `AudioClipboard` lease; cut returns the edit result. |
+| `copy(range)` / `cut(range, guard?)` | Copy a half-open frame range into the editor clipboard; cut also commits a deletion. Copy returns a separate caller-owned `AudioClipboard` lease; cut returns the edit result. An empty range is accepted: it replaces the editor clipboard with empty content and releases the previous one, and an empty cut then returns `noop`. Guard empty selections before calling either. |
 | `paste(frame, options?, guard?)` | Insert clipboard references. Options may supply fixed segmentIds and rightId; generated IDs enter the committed operation. Incompatible formats fail. |
 | `clearClipboard()` | Releases the editor clipboard. |
 | `createInteractionSession()` | Session has getSnapshot, subscribe, setSelection, preview, commitDraft, cancelDraft and dispose. Its snapshot contains documentId, selection, draft and disposed. |

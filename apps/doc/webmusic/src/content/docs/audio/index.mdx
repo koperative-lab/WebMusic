@@ -60,7 +60,7 @@ npm install @webmusic/audio @webmusic/kernel @webmusic/ui
 
 ## Drop-in Web Components
 
-The fastest way to get audio on a page — no build step. `@webmusic/audio/play` ships ready-to-use custom elements (central player, playlist, mixer and recorder); drop a tag in and it works. `@webmusic/audio/view` adds `<audio-view>` and `<audio-live-view>`. `@webmusic/audio/analyze` adds five live tools, including `<audio-meter>`. `@webmusic/audio/edit` adds the nonvisual `<audio-document>` owner for player/view editing compositions. Every tag and its owning page is on the [Web Components page](/audio/element/).
+The fastest way to get audio on a page — no build step. Each capability's `/auto` entry registers its ready-to-use custom elements, and `/element` exports the classes with explicit registration; the capability roots (`@webmusic/audio/play`, `/view`, `/analyze`, `/edit`) are programming APIs and register nothing. Play provides the central player, playlist, mixer and recorder; View adds `<audio-view>` and `<audio-live-view>`; Analyze adds five live tools, including `<audio-meter>`; Edit adds the nonvisual `<audio-document>` owner for player/view editing compositions. Every tag and its owning page is on the [Web Components page](/audio/element/).
 
 ### From a CDN
 

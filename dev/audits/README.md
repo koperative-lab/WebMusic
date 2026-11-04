@@ -6,6 +6,10 @@ another checkout. [STATUS](../STATUS.md) owns current gaps;
 [the development map](../README.md) routes to accepted contracts and the
 [workflow logs](../log/README.md) explain completed review sequences.
 
+Retained text evidence was normalized on 2026-10-22: local absolute paths and
+client-specific tool names became neutral placeholders such as `<local-worktree>`.
+Findings, commands, counts and results were not otherwise changed.
+
 | Date | Records | Evidence and reading boundary |
 |---|---|---|
 | 2026-10-21 | [Editing branch review and repairs](2026-10-21-editing-review-fixes.md) | Repairs the CI-blocking ignored evidence links and the reproduced and static findings of a full branch review; lists deliberately unchanged decisions and current check results. |
