@@ -2083,6 +2083,11 @@ export into Play. The ownership and playback contract above is unchanged; the
 separate Edit capability, its `/edit*` entries and the Edit-to-Play loader
 exception no longer exist.
 
+**2026-11-04 refinement:** [DEC-057](#dec-057--editable-documents-are-an-api-not-a-web-component)
+replaces the nonvisual `score-document` / `audio-document` declarations and the
+`editor="#id"` selector with application-owned editors created through
+`loadScoreEditor` / `loadAudioClipEditor` and lent through `.editor`.
+
 **Owner:** [Editing contracts](design/EDIT-COMPONENTS.md). The
 [dated proposal and implementation sequence](plans/2026-10-13-editing-capabilities.md)
 retains the planning baseline.
@@ -2240,6 +2245,47 @@ without reload across the three types; staff-only forwarding of
 `show-annotations`; configuration rejection for other types; piano roll and
 waterfall render no annotation marks; the retained map, timeline and thumbnail
 APIs keep their own tests.
+
+## DEC-057 — Editable documents are an API, not a Web Component
+
+**Date / status:** 2026-11-04; accepted at the maintainer's request before the
+editing work is published. Refines [DEC-053](#dec-053--document-owned-editing-and-borrowed-playback)
+and [DEC-055](#dec-055--editing-is-a-view-feature-not-a-capability).
+
+**Problem:** `<score-document>` and `<audio-document>` were nonvisual Elements
+that loaded a file, owned an editor for their connected lifetime and were found
+by players and views through `editor="#id"`. A document is application data, not
+something rendered. Tying its lifetime to DOM connection and selector discovery
+added loading state, reload races, selector-resolution states and source-change
+events that an application owning the editor does not need.
+
+**Chosen contract:** remove both Elements and the `editor` selector attribute
+from `score-player`, `score-view`, `audio-player` and `audio-view`. Add
+`loadScoreEditor(url, options)` and `loadAudioClipEditor(url, options)` to the
+domain's `/view/headless`, next to `createScoreEditor` / `createAudioClipEditor`.
+They combine the existing loader options (format, AbortSignal, limits and, for
+Audio, an injectable decode loader with the default fixed to non-streaming and no
+implicit AudioContext) with the editor options, and reject without creating an
+editor when loading fails. The application owns the editor, assigns it through
+each Element's `.editor` property and disposes it; Elements borrow it and never
+dispose it. Source-conflict, playback-application and editable rules are
+unchanged.
+
+**Alternatives considered:** keeping the Elements beside the API, which leaves two
+ownership models to document and test; and keeping `editor="#id"` pointing at
+any element exposing `.editor`, which has no built-in owner to point at.
+
+**Consequences:** the Elements, their exports, catalogs, pages and playground
+demos are removed; demos create editors in script. No migration is needed for
+published packages because neither Element was released. Kernel's
+`observeElementSource` remains as the Elements' explicit-object adapter.
+
+**Owner:** [Editing contracts](design/EDIT-COMPONENTS.md).
+
+**Verification implications:** loader success and failure, format validation,
+abort, option forwarding and no editor on failure; Element binding through
+`.editor` only, with `editor` no longer an observed attribute; existing conflict,
+lifecycle and playback-application tests rewritten to assign editors directly.
 
 ## Recording the next decision
 

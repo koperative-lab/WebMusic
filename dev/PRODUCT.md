@@ -52,10 +52,10 @@ DEC-053, editing uses a persistent domain editor that commits content
 and can provide bounded history for one document. Play borrows its current
 content and reports the revision actually applied for playback; View borrows
 content and edit commands. Existing piano-roll and waveform Views gain optional
-editing interaction, while nonvisual document Elements provide declarative HTML
-ownership. Custom applications use the same contracts without those Elements.
+editing interaction. Applications load or create the editor through the
+Headless API and lend it to those Elements; there is no document Element.
 The [editing design](design/EDIT-COMPONENTS.md) specifies this contract;
-[STATUS](STATUS.md), EDIT-01, records delivery. Score editing, native document-bound playback, HTML declarations and piano-roll
+[STATUS](STATUS.md), EDIT-01, records delivery. Score editing, native document-bound playback, editor loading and piano-roll
 interaction are documented in the [Score View API](../apps/doc/webmusic/src/content/docs/score/api/view.mdx)
 and [Score View](../apps/doc/webmusic/src/content/docs/score/element/view/score-view.mdx).
 Audio sequence editing, local processing and WAV export are documented in

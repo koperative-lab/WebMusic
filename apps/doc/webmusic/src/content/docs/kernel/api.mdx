@@ -339,10 +339,11 @@ runtime readiness still comes from that domain's snapshots.
 import {observeElementSource} from '@webmusic/kernel/element';
 import {isScoreDocumentSource} from '@webmusic/score';
 
-const host = document.querySelector('score-player');
+// A custom application element that discovers a sibling exposing `.editor`.
+const host = document.querySelector('my-score-panel');
 if (host) {
   const stop = observeElementSource(host, {
-    selector: '#document', property: 'editor', accepts: isScoreDocumentSource,
+    selector: '#editor-host', property: 'editor', accepts: isScoreDocumentSource,
   }, ({state, source}) => {
     console.log(state, source?.getSnapshot().documentRevision);
   });

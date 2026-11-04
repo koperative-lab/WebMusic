@@ -33,8 +33,8 @@ verification. Actual commands, numeric controls and limits belong to the
 and [Headless reference](../../apps/doc/webmusic/src/content/docs/audio/headless/view/view-models.mdx).
 Existing behavior remains the default without an editor. This decision adds no standalone visual audio-editor Element.
 
-The nonvisual `audio-document` declaration owns and loads an `AudioClipEditor`;
-object injection supports an application-owned editor. A View borrows Core
+The application owns an `AudioClipEditor`, created with `loadAudioClipEditor` or
+`createAudioClipEditor`, and assigns it through `.editor` (DEC-057). A View borrows Core
 document state/commands and an optional player, retaining only its viewport,
 focus, gestures and draft presentation. Editor binding without `editable` displays
 committed content without content-mutation gestures. `editable` without a ready

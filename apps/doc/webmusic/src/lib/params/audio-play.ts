@@ -21,8 +21,6 @@ export const AUDIO_PLAY_PARAMS: ElementParamCatalog = {
         fallback: 'no clip until you assign .clip / .player or call .load()',
         note: 'URL of an audio file. Loading it replaces the selected clip; removing it clears a clip that came from src.',
       },
-      {name: 'editor', kind: 'text', placeholder: '#audio-document', fallback: 'unbound',
-        note: 'Borrow one same-root provider exposing .editor. Late targets/replacements are observed; independent sources conflict.'},
       {
         name: 'format',
         kind: 'enum',
@@ -91,7 +89,7 @@ export const AUDIO_PLAY_PARAMS: ElementParamCatalog = {
       },
     ],
     properties: [
-      {name: 'editor', note: 'Borrow a Core AudioDocumentSource; undefined restores the editor selector. Conflicts with independent sources.'},
+      {name: 'editor', note: 'Assign an editor from loadAudioClipEditor/createAudioClipEditor (any Core AudioDocumentSource); borrowed, never disposed. Undefined detaches it. Conflicts with independent sources.'},
       {name: 'source', note: 'Applied empty/clip/sequence snapshot. Sequence includes document identity/revision, assets and content; clip stays undefined.'},
       {name: 'documentBinding', note: 'Requested/applied revision, readiness, attempt, coordinate availability and mapping/error details.'},
       {name: 'waitForDocumentRevision()', note: 'Observe the current requested target; settles applied, superseded or failed.'},

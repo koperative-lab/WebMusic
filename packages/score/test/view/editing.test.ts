@@ -737,16 +737,32 @@ describe('score-view editor composition', () => {
     expect(editor.getSnapshot().status).toBe('ready'); editor.dispose();
   });
 
-  it('resolves and replaces same-root declaration sources while respecting object precedence', async () => {
+  it('replaces and detaches assigned editors without disposing them', () => {
     const first = createScoreEditor(fixture()); const second = createScoreEditor(fixture());
-    const declaration = document.createElement('div') as HTMLDivElement & {editor: typeof first}; declaration.id = 'doc'; declaration.editor = first;
-    const view = document.createElement('editing-score-view') as ScoreViewElement; view.setAttribute('editor', '#doc'); view.editable = true;
-    document.body.append(declaration, view); expect(view.editor).toBe(first);
-    declaration.editor = second; declaration.dispatchEvent(new CustomEvent('webmusic:sourcechange', {bubbles: true})); expect(view.editor).toBe(second);
-    view.editor = first; declaration.editor = second; declaration.dispatchEvent(new CustomEvent('webmusic:sourcechange', {bubbles: true})); expect(view.editor).toBe(first);
-    view.editor = undefined; expect(view.editor).toBe(second);
-    declaration.remove(); await new Promise((resolve) => setTimeout(resolve, 0)); expect(view.getAttribute('data-editor-state')).toBe('missing');
+    const view = document.createElement('editing-score-view') as ScoreViewElement; view.editor = first; view.editable = true;
+    document.body.append(view); expect(view.editor).toBe(first);
+    const old = view.interactionSession!;
+    view.editor = second; expect(view.editor).toBe(second);
+    expect(old.getSnapshot().disposed).toBe(true);
+    expect(view.interactionSession!.getSnapshot().documentId).toBe(second.getSnapshot().documentId);
+    view.editor = undefined; expect(view.editor).toBeUndefined();
+    expect(view.hasAttribute('data-editor-state')).toBe(false);
+    expect(view.querySelector('[part="editing-surface"]')).toBeNull();
+    expect(first.getSnapshot().status).toBe('ready'); expect(second.getSnapshot().status).toBe('ready');
     view.remove(); first.dispose(); second.dispose();
+  });
+
+  it('removes the editing surface when an assigned editor is disposed by its owner', () => {
+    const editor = createScoreEditor(fixture());
+    const view = document.createElement('editing-score-view') as ScoreViewElement; view.editor = editor; view.editable = true;
+    document.body.append(view);
+    expect(view.querySelector('[part="editor"]')).not.toBeNull();
+    editor.dispose();
+    expect(view.getAttribute('data-editor-state')).toBe('unavailable');
+    expect(view.querySelector('[part="editor"]')).toBeNull();
+    expect(view.textContent).toContain('Waiting for a score');
+    expect(view.editor).toBe(editor);
+    view.remove();
   });
 
   it('suppresses old playback and clears overlays when the player is detached', () => {
@@ -790,22 +806,21 @@ describe('score-view editor composition', () => {
     view.remove(); passive.remove(); editor.dispose();
   });
 
-  it('keeps its editing session across format changes and shows a pending editor without stale content or an alert', () => {
+  it('keeps its editing session across format changes and clears stale content without an alert on detach', () => {
     const editor = createScoreEditor(fixture());
-    const declaration = document.createElement('div') as HTMLDivElement & {editor?: typeof editor};
-    declaration.id = 'pending-declaration'; declaration.editor = editor; document.body.append(declaration);
     const view = document.createElement('editing-score-view') as ScoreViewElement;
-    view.setAttribute('type', 'piano-roll'); view.setAttribute('editor', '#pending-declaration'); view.editable = true;
+    view.setAttribute('type', 'piano-roll'); view.editor = editor; view.editable = true;
     document.body.append(view);
     const session = view.interactionSession!; session.setSelection([a]);
     view.setAttribute('format', 'midi');
     expect(view.interactionSession).toBe(session); expect(session.getSnapshot().selectedNoteIds).toEqual([a]);
-    declaration.editor = undefined; declaration.dispatchEvent(new Event('webmusic:sourcechange', {bubbles: true}));
-    expect(view.getAttribute('data-editor-state')).toBe('unavailable');
-    // The previous editor's notes are gone and a polite waiting status replaces them.
-    expect(view.textContent).toContain('Waiting for a score');
+    view.editor = undefined;
+    expect(session.getSnapshot().disposed).toBe(true);
+    // The previous editor's notes and editing surface are gone; detaching is not an error.
     expect(view.querySelector('[data-note-id]')).toBeNull();
+    expect(view.querySelector('[part="editing-surface"]')).toBeNull();
+    expect(view.hasAttribute('data-editor-state')).toBe(false);
     expect(view.querySelector('[role="alert"]')).toBeNull();
-    view.remove(); declaration.remove(); editor.dispose();
+    view.remove(); editor.dispose();
   });
 });

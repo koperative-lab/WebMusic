@@ -94,7 +94,7 @@ editing is part of View, and sequence rendering/WAV export part of Play.
 | `@webmusic/audio/view` | Layout and view models for waveform / spectrogram views, plus sequence operations, document contracts and range-processor recipes for editing. |
 | `@webmusic/audio/view/headless` | Stateful code-only views, `AudioMeterController`, the `AudioMeterDisplay` reductions behind the seven meter displays and PCM metering helpers, and `AudioClipEditor` (one document, transactions/history and interaction sessions). |
 | `@webmusic/audio/view/render` | Imperative browser visualizers and the meter display painters. |
-| `@webmusic/audio/view/element` | `<audio-view>`, `<audio-live-view>` and the nonvisual `<audio-document>` owner; retains a legacy `<audio-meter>` import/registration alias. |
+| `@webmusic/audio/view/element` | `<audio-view>` and `<audio-live-view>`; retains a legacy `<audio-meter>` import/registration alias. |
 | `@webmusic/audio/analyze` | One-shot MIR analysis: key, tempo, pitch, loudness, onsets, spectrogram, summaries. |
 | `@webmusic/audio/analyze/headless` | Stateful analysis sessions and live trackers. |
 | `@webmusic/audio/analyze/element` | Canonical live `<audio-meter>`, `<audio-level-analyzer>`, `<audio-spectrum-analyzer>`, `<audio-oscilloscope>` and `<audio-transient-analyzer>` tools; offline onset, beat and whole-clip reports use Analyze API/Headless entries. |
@@ -115,7 +115,7 @@ metadata (`music-metadata`, `mediabunny`), time-stretch
 none of them and WAV decoding, playback, views and the pure-JS analyzers
 still work.
 
-`@webmusic/ui` is also optional. The nonvisual `<audio-document>` declaration needs no presenter peer. Package roots and `/headless` entries never
+`@webmusic/ui` is also optional. Package roots and `/headless` entries never
 reach it; install it only for `/element`, `/auto`, visible analysis elements,
 `view/render`'s meter presenter, or the React entry that imports that renderer.
 
@@ -182,10 +182,9 @@ positions and stays paused after application. A waveform hides incompatible
 playback paint/seek while displaying the newer edit. Its extrema cache reads
 visible ranges without rendering a complete sequence for every commit.
 
-The nonvisual `<audio-document>` supplies HTML ownership; `<audio-player
-editor="#document">` and `<audio-view editor="#document" editable>` borrow it.
-Object injection supports an application-owned editor independently of DOM
-lifetime. See the [View API](../../apps/doc/webmusic/src/content/docs/audio/api/view.mdx)
+`loadAudioClipEditor(url)` loads a file into a new editor that the application
+owns; assign it to `<audio-player>` and `<audio-view editable>` through
+`.editor` and dispose it when done. See the [View API](../../apps/doc/webmusic/src/content/docs/audio/api/view.mdx)
 and [waveform editing](../../apps/doc/webmusic/src/content/docs/audio/element/view/audio-view.mdx).
 
 ### Four layers, one direction
@@ -228,8 +227,8 @@ core ◀── play ◀── view
 
 `view` and `analyze` may depend on `core` and `play`; `play` never depends on
 either. The editing API and `AudioClipEditor` depend only on Core and injected
-ports; `<audio-document>` loads URLs through Play's loader over View's existing
-Play dependency. The existing meter's `view/headless/meter.ts` and
+ports; `loadAudioClipEditor` loads URLs through Play's loader over View's
+existing Play dependency. The existing meter's `view/headless/meter.ts` and
 `view/render/meter.ts` reuse the play-side `AudioMeterController` rather than
 growing a second one. The canonical Analyze Element meter facade has one
 reviewed compatibility adapter to the existing View meter implementation;

@@ -100,8 +100,7 @@ describe('agent context MDX extraction', () => {
 
   it.each([
     ['headless/view/audio-clip-editor', 'AudioClipEditorHeadlessDemo', 'createAudioClipEditor'],
-    ['element/view/audio-document', 'AudioDocumentPlayground', 'defineAudioDocumentElement'],
-    ['element/view/audio-view', 'AudioEditingDemo', 'editor="#audio-doc"'],
+    ['element/view/audio-view', 'AudioEditingDemo', 'loadAudioClipEditor'],
   ])('links the Audio %s demo while retaining its API reference', async (page, demo, api) => {
     const filename = `apps/doc/webmusic/src/content/docs/audio/${page}.mdx`;
     const source = await readFile(path.join(root, filename), 'utf8');
@@ -298,7 +297,7 @@ describe('agent context release and output contracts', () => {
     expect(files.get('llms.txt')).toContain('## Load, parse and export music');
     expect(files.get('llms.txt')).toContain('## Display and edit audio waveforms and spectral data');
     const scoreEdit = files.get('llms.txt').split('## Display and edit scores, pitches and application state')[1]?.split('\n## ')[0] ?? '';
-    for (const page of ['score/element/view/score-document.md', 'score/headless/view/score-editor.md', 'score/api/view.md']) expect(scoreEdit).toContain(`agent-context/${page}`);
+    for (const page of ['score/element/view/score-view.md', 'score/headless/view/score-editor.md', 'score/api/view.md']) expect(scoreEdit).toContain(`agent-context/${page}`);
     expect(patterns).toContain('## Waveform editing');
     for (const page of manifest.pages) {
       expect(files.get('llms.txt').split(`](${page.url})`).length - 1).toBe(1);
@@ -327,10 +326,7 @@ describe('agent context release and output contracts', () => {
       docs: ['agent-context/audio/headless/view/audio-clip-editor.md'],
       source: ['agent-context/source/packages/audio/src/view/headless/audio-clip-editor.ts.txt'], styles: [],
     });
-    expect(catalog.components.find(({id}) => id === 'element/audio-document')).toMatchObject({
-      docs: ['agent-context/audio/element/view/audio-document.md'],
-      source: ['agent-context/source/packages/audio/src/view/element/audio-document.ts.txt'], styles: [],
-    });
+    expect(catalog.components.some(({id}) => id === 'element/audio-document' || id === 'element/score-document')).toBe(false);
     expect(catalog.components.find(({id}) => id === 'headless/bridge/score-audio-sync').docs).toEqual(['agent-context/bridge/headless/score-audio-sync.md']);
     expect(catalog.components.some(({id}) => id === 'headless/envelope-controller')).toBe(false);
     expect(catalog.components.find(({id}) => id === 'element/audio-view').docs).toEqual(['agent-context/audio/element/view/audio-view.md']);

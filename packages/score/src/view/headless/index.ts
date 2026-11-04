@@ -36,6 +36,7 @@ export {
 
 // Document-owned editing: one editor shared by every View and the player.
 export {ScoreEditor, createScoreEditor, type ScoreEditorOptions} from './score-editor';
+export {loadScoreEditor, type LoadScoreEditorOptions} from './load-score-editor';
 export type {
   ScoreEditorPort, ScoreEditorState, ScoreDocumentSource, ScoreDocumentSnapshot,
   ScoreDocumentChange, ScoreEditCommand, ScoreEditOperation, ScoreEditResult,

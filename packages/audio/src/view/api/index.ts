@@ -100,8 +100,8 @@ export type {
 } from '../headless/sequence-waveform';
 
 // Document editing is a View feature: stateless operations, range-processor
-// recipes and Core contracts here; AudioClipEditor in /view/headless and
-// <audio-document> in /view/element. Rendering and WAV export live in Play.
+// recipes and Core contracts here; AudioClipEditor and loadAudioClipEditor in
+// /view/headless. Rendering and WAV export live in Play.
 export {applyAudioOperations} from '../core/edit-operations';
 export {createAudioRangeProcessor} from './processor';
 export * from '../../core/editing';

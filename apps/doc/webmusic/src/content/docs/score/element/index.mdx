@@ -8,14 +8,14 @@ JavaScript wiring required. Each capability ships its elements from its
 `/element` subpath, so the capability root tree-shakes free of DOM code. To load
 and register them — via a CDN script, a bundler, or individual `define*` calls —
 see [Score setup](/score/#drop-in-web-components). Only Play publishes `/auto`
-and `/global`. Register the analyze and view tags, including `<score-document>`,
+and `/global`. Register the analyze and view tags
 with the `define*` functions listed in their sections below.
 
 | Capability | Elements |
 | --- | --- |
 | [Play](#play) | Playing a score: the transport, a rack mixer, note input, recording and synth control. |
 | [Analyze](#analyze) | Elementary inspection: chord score/live modes, intervals, explicit scales and grouped rhythm. |
-| [View](#view) | Whole-score representations, held-pitch representations, optional sheet engraving and the editable document owner. |
+| [View](#view) | Whole-score representations with optional editing, held-pitch representations and optional sheet engraving. |
 
 ## Play
 
@@ -116,27 +116,27 @@ subscriptions, discovery and owned analysis work, without stopping the player.
 
 ## View
 
-Three visual View elements group representations by the data and resources they
-use; a fourth, nonvisual element owns an editable document.
+Three View elements group representations by the data and resources they
+use.
 
 | Element | Representations | Register |
 | --- | --- | --- |
 | [`<score-view>`](/score/element/view/score-view/) | `piano-roll`, `staff` and `waterfall` over a whole Score. | `defineScoreViewElement(tag?)` |
 | [`<score-pitch-view>`](/score/element/view/score-pitch-view/) | `keyboard`, `staff` and `fretboard` for currently held MIDI pitches. | `definePitchViewElement(tag?)` |
 | [`<score-sheet-view>`](/score/element/view/score-sheet-view/) | Engraved sheet music using the optional OpenSheetMusicDisplay peer. | `defineSheetViewElement(tag?)` |
-| [`<score-document>`](/score/element/view/score-document/) | No visual representation: loads or accepts a Score and owns its [ScoreEditor](/score/headless/view/score-editor/) for the connected lifetime. | `defineScoreDocumentElement(tag?)` |
 
-`defineAllViewElements()` from `@webmusic/score/view/element` registers all four.
+`defineAllViewElements()` from `@webmusic/score/view/element` registers all three.
 Each type stays on its owning page, with its controls in external Parameters.
 `score-view` borrows resolved score data and position; `score-pitch-view` borrows held
 notes. `score-sheet-view` requires explicit `.score` or `src` and follows player events;
 it does not borrow the player's loaded score.
 
-Editing is part of View. `<score-document>` renders no interface; borrow its
-document through `editor="#document-id"` on a player or view, or pass a Core
-document port through their `.editor` property. The declaration owns disposal;
-borrowers release their subscriptions. Piano-roll editing and staff input belong
-to [`<score-view>`](/score/element/view/score-view/).
+Editing is part of View. Load an editor with
+[`loadScoreEditor`](/score/headless/view/score-editor/#load-from-a-url) (or create
+one with `createScoreEditor`) and assign it to the `.editor` property of a player
+or view; there is no `editor` attribute. Your application owns and disposes the
+editor; borrowers release their subscriptions. Piano-roll editing and staff input
+belong to [`<score-view>`](/score/element/view/score-view/).
 
 ```html
 <score-player id="p" src="/mxl/Arabesque%20No.1.mxl"></score-player>
@@ -210,5 +210,5 @@ Use `::part(...)` for the documented parts of Shadow DOM components such as
 DOM: target their public `[part~="..."]` hooks instead. Do not select private
 UIKit child classes. UIKit can also be mounted directly with the same variables,
 parts and named handle nodes; see [UIKit styling](/uikit/).
-`score-document` and `score-rack-part` are nonvisual declarations. Demo wrapper elements inherit their
+`score-rack-part` is a nonvisual declaration. Demo wrapper elements inherit their
 theme into the components they compose.

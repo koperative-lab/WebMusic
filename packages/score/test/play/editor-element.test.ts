@@ -2,7 +2,6 @@
 import {afterEach, beforeAll, describe, expect, it, vi} from 'vitest';
 import {Duration, NoteId, Pitch, Rational, ScoreBuilder, type Score, type ScoreDocumentPlaybackBinding, type ScoreDocumentSource} from '../../src/core';
 import {createScoreEditor, type ScoreEditor} from '../../src/view/headless';
-import {defineScoreDocumentElement, type ScoreDocumentElement} from '../../src/view/element';
 import {ScorePlayerElement, type ScorePlayerTimeUpdateEventDetail} from '../../src/play/element/score-player';
 import {mountPresetPlayer, type PresetPlayerHandle, type PresetPlayerOptions} from '../../src/play/element/internal/preset-player';
 import {ScorePlayer} from '../../src/play/headless/score-player';
@@ -48,7 +47,6 @@ const loopOf = (engine: ScorePlayer) => (engine as unknown as {scheduler: ScoreP
 beforeAll(() => {
   customElements.define('test-editor-player', InspectablePlayer);
   customElements.define('test-flaky-editor-player', FlakyPlayer);
-  defineScoreDocumentElement();
 });
 afterEach(() => {
   document.body.replaceChildren();
@@ -104,31 +102,41 @@ describe('Score Player Element editor binding', () => {
     expect(element.playback.snapshot().nominalSeconds).toBe(0.25);
   });
 
-  it('handles late declarations, owned editor replacement, removal and reconnect', async () => {
-    const element = document.createElement('test-editor-player') as InspectablePlayer;
-    element.setAttribute('editor', '#declaration');
-    document.body.append(element);
-    expect(element.getAttribute('data-editor-state')).toBe('missing');
-    const declaration = document.createElement('score-document') as ScoreDocumentElement;
-    declaration.id = 'declaration'; declaration.score = music();
-    document.body.append(declaration);
-    await flush();
-    const first = declaration.editor!;
+  it('replaces, detaches and reconnects an assigned editor on the same native player', async () => {
+    const first = editor();
+    const element = player(first);
     expect((await element.waitForDocumentRevision(first.getSnapshot())).status).toBe('applied');
     const engine = element.engines[0];
-    declaration.score = music('D4');
-    const second = declaration.editor!;
+    const second = editor('D4');
+    element.editor = second;
     expect((await element.waitForDocumentRevision(second.getSnapshot())).status).toBe('applied');
     expect(element.engines).toEqual([engine]);
     expect(element.editor).toBe(second);
-    expect(first.getSnapshot().status).toBe('disposed');
-    declaration.remove();
-    await flush();
-    await expect(element.play()).rejects.toThrow('editor');
+    expect(element.resolvedScore).toBe(second.score);
+    // The caller owns both editors; replacing or detaching does not dispose them.
+    expect(first.getSnapshot().status).toBe('ready');
+    element.remove();
     expect(engine.documentSource).toBeUndefined();
-    document.body.append(declaration);
+    expect(second.getSnapshot().status).toBe('ready');
+    document.body.append(element);
+    expect((await element.waitForDocumentRevision(second.getSnapshot())).status).toBe('applied');
+    element.editor = undefined;
+    expect(element.editor).toBeUndefined();
+    expect(element.documentBinding).toBeUndefined();
+    expect(second.getSnapshot().status).toBe('ready');
+  });
+
+  it('blocks playback when its assigned editor is disposed and recovers with a new editor', async () => {
+    const first = editor();
+    const element = player(first);
+    expect((await element.waitForDocumentRevision(first.getSnapshot())).status).toBe('applied');
+    const engine = element.engines[0];
+    first.dispose();
     await flush();
-    expect((await element.waitForDocumentRevision(declaration.editor!.getSnapshot())).status).toBe('applied');
+    await expect(element.play()).rejects.toMatchObject({code: 'not-ready'});
+    const second = editor('D4');
+    element.editor = second;
+    expect((await element.waitForDocumentRevision(second.getSnapshot())).status).toBe('applied');
     expect(element.engines).toEqual([engine]);
   });
 
@@ -176,24 +184,27 @@ describe('Score Player Element editor binding', () => {
     expect(errors).toEqual([]);
   });
 
-  it('restores selector resolution after clearing an object source and never falls back from invalid selectors', async () => {
+  it('rejects an invalid editor object atomically and ignores the removed editor attribute', async () => {
+    expect(ScorePlayerElement.observedAttributes).not.toContain('editor');
     const source = editor();
     const declared = editor('E4');
     const target = document.createElement('div'); target.id = 'port';
     Object.assign(target, {editor: declared}); document.body.append(target);
     const element = player(source);
-    element.setAttribute('editor', '#port');
     await element.waitForDocumentRevision(source.getSnapshot());
-    expect(element.editor).toBe(source);
-    element.editor = undefined;
-    expect((await element.waitForDocumentRevision(declared.getSnapshot())).status).toBe('applied');
-    expect(element.editor).toBe(declared);
     expect(() => { element.editor = {} as ScoreEditor; }).toThrow('Expected a Score');
-    expect(element.editor).toBe(declared);
+    expect(element.editor).toBe(source);
+    element.setAttribute('editor', '#port');
     element.setAttribute('editor', '[');
-    expect(element.getAttribute('data-editor-state')).toBe('invalid');
-    expect(element.resolvedScore).toBeUndefined();
-    await expect(element.play()).rejects.toThrow('editor');
+    await flush();
+    expect(element.editor).toBe(source);
+    expect(element.resolvedScore).toBe(source.score);
+    expect(element.getAttribute('data-editor-state')).toBe('ready');
+    element.editor = undefined;
+    await flush();
+    expect(element.editor).toBeUndefined();
+    expect(element.resolvedScore).not.toBe(declared.score);
+    expect(element.hasAttribute('data-editor-state')).toBe(false);
   });
 
   it('keeps the whole-piece loop through applied revisions and follows a lengthened piece', async () => {
@@ -213,37 +224,6 @@ describe('Score Player Element editor binding', () => {
     source.undo();
     await element.waitForDocumentRevision(source.getSnapshot());
     expect(loopOf(engine)).toBeUndefined();
-  });
-
-  it('reports a pending declaration as unavailable without an error, then joins when its editor is ready', async () => {
-    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => {})));
-    const errors: unknown[] = [];
-    const element = document.createElement('test-editor-player') as InspectablePlayer;
-    element.setAttribute('editor', '#pending');
-    element.addEventListener('webscore:error', (event) => errors.push((event as CustomEvent).detail));
-    document.body.append(element);
-    expect(element.getAttribute('data-editor-state')).toBe('missing');
-    expect(element.playback.snapshot().readiness).toBe('unavailable');
-    const declaration = document.createElement('score-document') as ScoreDocumentElement;
-    declaration.id = 'pending'; declaration.setAttribute('src', '/pending.mid');
-    document.body.append(declaration);
-    await flush();
-    expect(declaration.status).toBe('loading');
-    expect(element.getAttribute('data-editor-state')).toBe('unavailable');
-    expect(element.playback.snapshot()).toMatchObject({readiness: 'unavailable', error: undefined});
-    expect(element.documentBinding).toMatchObject({status: 'empty', documentCoordinates: false});
-    await expect(element.play()).rejects.toMatchObject({code: 'not-ready'});
-    declaration.score = music();
-    expect((await element.waitForDocumentRevision(declaration.editor!.getSnapshot())).status).toBe('applied');
-    expect(element.playback.snapshot().readiness).toBe('ready');
-    expect(errors).toEqual([]);
-    element.setAttribute('editor', '[');
-    expect(element.playback.snapshot().readiness).toBe('error');
-    expect(element.documentBinding).toMatchObject({status: 'error'});
-    expect(errors).toMatchObject([{operation: 'playback', error: {code: 'not-ready'}}]);
-    element.setAttribute('editor', '');
-    expect(element.getAttribute('data-editor-state')).toBe('invalid');
-    expect(errors).toHaveLength(2);
   });
 
   it('dispatches one timeupdate when an applied revision clamps the position', async () => {
@@ -268,8 +248,8 @@ describe('Score Player Element editor binding', () => {
     element.editor = undefined;
     expect(element.hasAttribute('data-editor-state')).toBe(false);
     expect(element.documentBinding).toBeUndefined();
-    element.setAttribute('editor', '#absent');
-    expect(element.getAttribute('data-editor-state')).toBe('missing');
+    element.editor = source;
+    expect(element.hasAttribute('data-editor-state')).toBe(true);
     element.remove();
     expect(element.hasAttribute('data-editor-state')).toBe(false);
   });
@@ -282,37 +262,33 @@ describe('Score Player Element editor binding', () => {
     Object.assign(borrowing, {editor: source});
     borrowing.setAttribute('src', '/conflict.mid');
     Object.assign(scored, {score});
+    // The removed editor attribute is inert: it neither conflicts with nor replaces the Score.
     scored.setAttribute('editor', '#absent');
     document.body.append(borrowing, scored);
     customElements.define('test-late-editor-player', class extends InspectablePlayer {});
-    for (const element of [borrowing, scored]) {
-      expect(element.getAttribute('data-editor-state')).toBe('source-conflict');
-      expect(element.playback.snapshot().readiness).toBe('error');
-    }
+    expect(borrowing.getAttribute('data-editor-state')).toBe('source-conflict');
+    expect(borrowing.playback.snapshot().readiness).toBe('error');
     expect(borrowing.editor).toBe(source);
     expect(scored.score).toBe(score);
+    await flush();
+    expect(scored.hasAttribute('data-editor-state')).toBe(false);
+    expect(scored.resolvedScore).toBe(score);
     borrowing.removeAttribute('src');
     expect((await borrowing.waitForDocumentRevision(source.getSnapshot())).status).toBe('applied');
-    scored.removeAttribute('editor');
-    await flush();
-    expect(scored.resolvedScore).toBe(score);
-    expect(scored.hasAttribute('data-editor-state')).toBe(false);
   });
 
-  it('keeps observing its declaration after a failed mount and recovers with the next editor', async () => {
-    const declaration = document.createElement('score-document') as ScoreDocumentElement;
-    declaration.id = 'flaky'; declaration.score = music();
-    document.body.append(declaration);
+  it('reports a failed mount and recovers with the next assigned editor', async () => {
     const element = document.createElement('test-flaky-editor-player') as FlakyPlayer;
-    element.setAttribute('editor', '#flaky');
+    element.editor = editor();
     document.body.append(element);
     await flush();
     expect(element.lifecycleErrors).toMatchObject([{message: 'mount failed'}]);
     expect(element.getAttribute('data-editor-state')).toBe('error');
     expect(element.playback.snapshot().readiness).toBe('error');
     expect(element.documentBinding).toMatchObject({status: 'error', error: {message: 'mount failed'}});
-    declaration.score = music('D4');
-    expect((await element.waitForDocumentRevision(declaration.editor!.getSnapshot())).status).toBe('applied');
+    const next = editor('D4');
+    element.editor = next;
+    expect((await element.waitForDocumentRevision(next.getSnapshot())).status).toBe('applied');
     expect(element.getAttribute('data-editor-state')).toBe('ready');
     expect(element.engines).toHaveLength(1);
   });

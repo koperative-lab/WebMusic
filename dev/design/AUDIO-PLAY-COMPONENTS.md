@@ -98,8 +98,8 @@ and [its Element](../../apps/doc/webmusic/src/content/docs/audio/element/play/au
 clip/queue/mix use remains supported.
 
 `AudioClipEditor` owns immutable asset/segment content, transactions and optional
-local history. The nonvisual `audio-document` declaration creates and loads that
-owner; applications may instead supply a Headless owner. Play borrows its Core
+local history. Applications create it with `loadAudioClipEditor` or
+`createAudioClipEditor` and own it (DEC-057). Play borrows its Core
 read-only source contract, never the concrete editor implementation or editing
 commands. Play retains sound, graph and transport authority. Detaching a borrower
 releases its subscriptions and snapshot/asset leases without disposing the editor.

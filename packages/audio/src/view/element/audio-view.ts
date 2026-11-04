@@ -238,7 +238,6 @@ export class AudioViewElement extends WebMusicElement {
       'format',
       'type',
       'player',
-      'editor',
       'editable',
       'interactive',
       'drag-mode',
@@ -330,7 +329,6 @@ export class AudioViewElement extends WebMusicElement {
     // A write that changes nothing — a framework re-applying its props, or
     // `setAttribute(name, getAttribute(name))` — must not cost a rebuild.
     if (!this.isConnected || previous === next) return;
-    if (name === 'editor') { this.bindEditor(); return; }
     if (name === 'editable') { this.updateEditable(); this.refresh(); return; }
     if (name === 'player') {
       this.bindPlayer();
@@ -382,7 +380,7 @@ export class AudioViewElement extends WebMusicElement {
 
   // ---- Public properties ----
 
-  /** Borrowed document owner. Undefined restores the editor selector. */
+  /** Borrowed document owner; the caller keeps it. Undefined detaches it. */
   set editor(value: AudioClipEditorPort | undefined) {
     if (value !== undefined && !isAudioClipEditorPort(value)) throw new TypeError('editor must implement AudioClipEditorPort');
     if (value !== undefined && this.hasIndependentSource()) throw new Error('source-conflict: An editor cannot be combined with independent audio sources');
@@ -1679,7 +1677,7 @@ export class AudioViewElement extends WebMusicElement {
     }
   }
 
-  private hasEditorIntent(): boolean { return this.explicitEditor !== undefined || this.hasAttribute('editor'); }
+  private hasEditorIntent(): boolean { return this.explicitEditor !== undefined; }
 
   private hasIndependentSource(): boolean {
     return this.explicitClip !== undefined || this.explicitPeaks !== undefined || this.explicitSpectrogram !== undefined ||
@@ -1741,8 +1739,9 @@ export class AudioViewElement extends WebMusicElement {
     if (this.hasIndependentSource()) {
       this.setAttribute('data-editor-state', 'source-conflict'); this.updateEditable(); if (current()) this.refresh(); return;
     }
+    // Editors are assigned through `.editor` only; there is no selector attribute.
     const cleanup = observeElementSource<AudioClipEditorPort>(this, {source: this.explicitEditor,
-      selector: this.getAttribute('editor') ?? undefined, property: 'editor', accepts: isAudioClipEditorPort}, (resolution) => {
+      property: 'editor', accepts: isAudioClipEditorPort}, (resolution) => {
       if (!current()) return;
       // A nested sourcechange can supersede this attachment while the same
       // discovery subscription remains active.

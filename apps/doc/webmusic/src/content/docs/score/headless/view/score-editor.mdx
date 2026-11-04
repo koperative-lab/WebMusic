@@ -1,6 +1,6 @@
 ---
 title: 'ScoreEditor'
-description: 'One immutable Score document with atomic commands, bounded undo, checkpoints and independent selection/draft sessions.'
+description: 'One immutable Score document with URL loading, atomic commands, bounded undo, checkpoints and independent selection/draft sessions.'
 sidebar:
   order: 2
 ---
@@ -9,16 +9,18 @@ import ScoreEditorHeadlessDemo from '../../../../../components/headless/ScoreEdi
 
 `ScoreEditor` owns the current immutable Score, document identity, monotonic
 revision and optional local history. `createScoreEditor(score, options?)` returns
-the same class. Construction takes an already loaded Score; neither form loads
-files, creates audio resources nor mounts UI.
+the same class from an already loaded Score. `loadScoreEditor(url, options?)`
+fetches and parses a file first, then returns a new editor. None of them creates
+audio resources or mounts UI.
 
 Use this owner when several custom surfaces edit one document. Use the pure
 [`applyScoreOperations`](/score/api/view/#atomic-note-operations) helper when
 your application owns the entire state/history model. Existing `score.edit`
 remains a short-lived batch primitive. [ScorePlayer](/score/headless/play/score-player/)
-can borrow this owner through `setDocumentSource(editor)`; the
-[document Element](/score/element/view/score-document/) supplies HTML ownership
-for players and [editable Score views](/score/element/view/score-view/).
+can borrow this owner through `setDocumentSource(editor)`, and
+[`<score-player>`](/score/element/play/score-player/) and
+[editable Score views](/score/element/view/score-view/) borrow it through their
+`.editor` property.
 
 <ScoreEditorHeadlessDemo />
 
@@ -55,6 +57,47 @@ editor.dispose();
 In an application, keep the editor for the document lifetime and dispose it
 during teardown. Immutable Score values retained by the caller remain readable.
 Importing a replacement creates a new editor with a new document identity.
+
+## Load from a URL
+
+`loadScoreEditor(url, options?)` fetches one MIDI, MusicXML, MXL or ABC file,
+parses it and returns `Promise<ScoreEditor>`. The I/O stack loads on demand, so
+an application that only imports this entry pays for parsing when it first loads
+a file. Load options are the [`loadScoreFromUrl`](/score/api/io/) options; the
+editor's `history` and `onListenerError` options are applied to the result.
+
+```ts
+import {loadScoreEditor} from '@webmusic/score/view/headless';
+import {defineScorePlayerElement, type ScorePlayerElement} from '@webmusic/score/play/element';
+import {defineScoreViewElement, type ScoreViewElement} from '@webmusic/score/view/element';
+
+defineScorePlayerElement();
+defineScoreViewElement();
+
+const controller = new AbortController();
+const editor = await loadScoreEditor('/midi/Editing.mid', {
+  signal: controller.signal, history: {limit: 100},
+});
+const player = document.querySelector<ScorePlayerElement>('score-player')!;
+const view = document.querySelector<ScoreViewElement>('score-view')!;
+player.editor = editor;
+view.editor = editor;
+
+// Teardown: detach the borrowers, then release the document.
+player.editor = undefined;
+view.editor = undefined;
+editor.dispose();
+```
+
+The caller owns the returned editor. Elements and players borrow it and never
+dispose it; when you replace the document, assign the new editor, then dispose
+the previous one. A load that has not settled is cancelled through `signal`.
+
+The promise rejects, and no editor is created, when the request fails, the
+response exceeds `maxInputBytes` (32 MiB by default), parsing fails, `timeoutMs`
+elapses or `signal` aborts (an `AbortError`). A `format` other than `midi`,
+`musicxml`, `mxl` or `abc` rejects with `TypeError` before anything is fetched.
+Without `format`, the URL extension and then the content select the parser.
 
 ## Revisions, history and drafts
 
@@ -124,14 +167,28 @@ never disposes a borrowed player or caller-owned Score.
 <details class="component-section">
 <summary>API</summary>
 
-**Construction** — `new ScoreEditor(score, options?)` or
-`createScoreEditor(score, options?): ScoreEditor`.
+**Construction** — `new ScoreEditor(score, options?)`,
+`createScoreEditor(score, options?): ScoreEditor`, or
+`loadScoreEditor(url, options?): Promise<ScoreEditor>`.
 
 | Member | Kind | Default | Description |
 |---|---|---|---|
 | `score` | input | required | Valid immutable Score retained as the initial root. |
 | `history` | option | `{limit: 100}` | `false` disables local history; otherwise `limit` is a positive safe integer. |
 | `onListenerError` | option | `console.error` | `(error: unknown) => void`; observes subscriber exceptions. An error in this handler is itself reported to the console. |
+
+**`loadScoreEditor(url, options?)`** — `LoadScoreEditorOptions` extends
+`LoadScoreOptions` from `@webmusic/score/io` and `ScoreEditorOptions`.
+
+| Member | Kind | Default | Description |
+|---|---|---|---|
+| `url` | input | required | URL fetched with `fetch`; the caller handles credentials and CORS. |
+| `format` | option | extension, then content | `'midi'`, `'musicxml'`, `'mxl'` or `'abc'`; any other value rejects with `TypeError`. |
+| `signal` | option | — | Cancels download and parsing; the promise rejects and no editor is created. |
+| `timeoutMs` | option | none | Maximum milliseconds for download, bounded reading and parsing. |
+| `maxInputBytes` | option | `33554432` (32 MiB) | Maximum response size before parsing. |
+| `abc`, `midi`, `musicxml`, `mxl` | option | parser defaults | Per-format resource/structure limit overrides, used only for that format. |
+| `history`, `onListenerError` | option | as above | Applied to the returned editor. |
 
 **Commands and checkpoints**
 
@@ -178,8 +235,8 @@ never disposes a borrowed player or caller-owned Score.
 `ScoreEditTransaction`, `ScoreDocumentSource`, `ScoreDocumentSnapshot`,
 `ScoreDocumentChange`, `ScoreEditorPort`, `ScoreCheckpoint`,
 `ScoreInteractionSession`, `ScoreInteractionSnapshot` and `ScoreDraftResult`
-are re-exported from this Headless entry with `ScoreEditorOptions` and
-`ScoreEditorState`. Operation fields, source fields and position-map helpers
+are re-exported from this Headless entry with `ScoreEditorOptions`,
+`LoadScoreEditorOptions` and `ScoreEditorState`. Operation fields, source fields and position-map helpers
 are detailed under [document editing](/score/api/view/#document-editing) in the
 View API. `ScoreEditError` and the pure helpers are exported from
 `@webmusic/score/view` or the Core root as documented there, rather than from
@@ -192,10 +249,10 @@ re-exported by `@webmusic/score/view`, with their runtime checks documented in
 
 ## Related
 
-[Score I/O](/score/api/io/) loads the initial Score and exports an explicit
-committed snapshot. [Score Core](/score/api/#batch-edits-with-scoreedit) supplies
+[Score I/O](/score/api/io/) loads Scores, owns the load options and exports an
+explicit committed snapshot. [Score Core](/score/api/#batch-edits-with-scoreedit) supplies
 the lower-level batch primitive. [Score views](/score/element/view/score-view/)
-borrow this editor for piano-roll and staff input.
-[ScoreDocument](/score/element/view/score-document/) supplies an HTML owner,
-and [ScorePlayer](/score/headless/play/score-player/) applies committed revisions
-through its document binding.
+borrow this editor for piano-roll and staff input, and
+[`<score-player>`](/score/element/play/score-player/) and
+[ScorePlayer](/score/headless/play/score-player/) apply committed revisions
+through their document binding.

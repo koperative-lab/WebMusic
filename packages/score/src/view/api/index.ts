@@ -59,7 +59,7 @@ export type {ScoreViewEditing, ScoreViewEditingOptions, ScoreViewEditingState} f
 export type {StaffViewEditing, StaffViewEditingOptions, StaffViewEditingState} from '../headless/staff-editing';
 
 // Document editing is a View feature: stateless operations and contracts here,
-// the stateful editor in /view/headless and <score-document> in /view/element.
+// the stateful editor and its URL loader in /view/headless.
 export {applyScoreOperations} from '../core/edit-operations';
 export {
   ScoreEditError, createScorePositionMap, composeScorePositionMaps, mapScorePosition,

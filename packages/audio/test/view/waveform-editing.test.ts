@@ -8,7 +8,7 @@ import type {AudioViewport, AudioWaveformSource, WaveformRenderOptions} from '..
 const spies = vi.hoisted(() => ({render: vi.fn()}));
 vi.mock('../../src/view/render/waveform', () => ({renderWaveformVisualizer: spies.render}));
 import {mountWaveformEditor} from '../../src/view/render/waveform-editor';
-import {defineAudioViewElement, type AudioViewElement} from '../../src/view/element/audio-view';
+import {AudioViewElement, defineAudioViewElement} from '../../src/view/element/audio-view';
 
 const cleanups: (() => void)[] = [];
 beforeAll(() => defineAudioViewElement('editing-audio-view'));
@@ -746,18 +746,18 @@ describe('Audio View document borrowing', () => {
     expect(element.querySelector('[part="editing-surface"]')).toBe(surface); expect(shared.getSnapshot().disposed).toBe(false);
   });
 
-  it('discovers late HTML owners, replacements, missing and ambiguous selectors and explicit precedence', async () => {
-    const element = view(); element.setAttribute('editor', '#document'); document.body.append(element);
-    expect(element.getAttribute('data-editor-state')).toBe('missing');
+  it('takes editors only through the property and ignores an editor attribute', () => {
+    expect(AudioViewElement.observedAttributes).not.toContain('editor');
     const first = editor(), second = editor(); const owner = document.createElement('div') as unknown as HTMLElement & {editor: typeof first};
-    owner.id = 'document'; owner.editor = first; document.body.append(owner); await tick(); expect(element.editor).toBe(first);
-    owner.editor = second; owner.dispatchEvent(new CustomEvent('webmusic:sourcechange', {bubbles: true})); expect(element.editor).toBe(second);
-    element.editor = first; owner.remove(); await tick(); expect(element.editor).toBe(first);
-    element.editor = undefined; expect(element.getAttribute('data-editor-state')).toBe('missing');
-    document.body.append(owner); const duplicate = owner.cloneNode() as typeof owner; duplicate.editor = first; document.body.append(duplicate); await tick();
-    expect(element.getAttribute('data-editor-state')).toBe('ambiguous');
-    duplicate.remove(); await tick(); expect(element.editor).toBe(second);
-    element.remove(); expect(second.getSnapshot().status).toBe('ready');
+    owner.id = 'document'; owner.editor = second; document.body.append(owner);
+    const element = view(); element.setAttribute('editor', '#document'); document.body.append(element);
+    expect(element.editor).toBeUndefined(); expect(element.hasAttribute('data-editor-state')).toBe(false);
+    element.editor = first; expect(element.editor).toBe(first); expect(element.getAttribute('data-editor-state')).toBe('ready');
+    owner.dispatchEvent(new CustomEvent('webmusic:sourcechange', {bubbles: true})); expect(element.editor).toBe(first);
+    element.editor = second; expect(element.editor).toBe(second);
+    element.editor = undefined; expect(element.editor).toBeUndefined(); expect(element.hasAttribute('data-editor-state')).toBe(false);
+    element.editor = first; element.remove();
+    expect(first.getSnapshot().status).toBe('ready'); expect(second.getSnapshot().status).toBe('ready');
   });
 
   it('borrows shared selection and leaves it and the editor alive after disconnect', () => {

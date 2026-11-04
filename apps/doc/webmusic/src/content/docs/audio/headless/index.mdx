@@ -13,7 +13,7 @@ editors, engines, sessions and projection models imported from
 | --- | --- |
 | [Play](#play) | `AudioPlayer`, clip/queue/mix backends, `AudioRecorder` and engines. |
 | [Analyze](#analyze) | Cached analysis sessions, a main-thread realtime sampler and a streaming transient detector; worker clients use their own entry. |
-| [View](#view) | Timeline/view models, pure projection helpers and the `AudioClipEditor` document owner; renderers use the separate /render entry. |
+| [View](#view) | Timeline/view models, pure projection helpers and the `AudioClipEditor` document owner with its URL loader; renderers use the separate /render entry. |
 
 ## Roles and ownership
 
@@ -139,7 +139,9 @@ subscriptions and returns unsubscribe(). None draws or creates a playback clock.
 `AudioClipEditor` owns one editable document without a clock or visual surface.
 A decoded clip becomes retained immutable assets plus a contiguous sequence;
 ordinary edits and history share those assets. A player and waveform view
-borrow the Core read/command ports. Local processing and WAV export are explicit
+borrow the Core read/command ports. `loadAudioClipEditor` fetches and decodes a
+URL into a new caller-owned editor without streaming or an implicit AudioContext.
+Local processing and WAV export are explicit
 operations, never an implicit step in structural editing. Core
 sequence/asset/operation/session contracts are described under
 [View editable documents](/audio/api/view/#editable-documents); borrowed asset
@@ -157,6 +159,7 @@ responsibilities.
 | `WaveformViewModel` · `createWaveformViewModel` · `fitWaveformColumns` | class · factory · helper | [View models](/audio/headless/view/view-models/) |
 | `SpectrogramViewModel` · `createSpectrogramViewModel` | class · factory | [View models](/audio/headless/view/view-models/) |
 | `AudioClipEditor` · `createAudioClipEditor` | class · factory | [AudioClipEditor](/audio/headless/view/audio-clip-editor/) |
+| `loadAudioClipEditor` | URL loader | [Load from a URL](/audio/headless/view/audio-clip-editor/#load-from-a-url) |
 | `createAudioViewEditing` · `audioDocumentPlaybackCompatible` | interaction controller · compatibility gate | [Document editing](/audio/api/view/#document-editing) |
 | `createAudioSequenceWaveform` | range source | [Sequence waveform ranges](/audio/api/view/#sequence-waveform-ranges) |
 | `computeClipPeaks` · `peaksDuration` | functions | [Peaks](/audio/headless/view/peaks/) |
@@ -171,7 +174,7 @@ responsibilities.
 | `AudioMeterDisplayOptions`, `AudioMeterDisplaySource`, `AudioMeterDisplaySnapshot`, `AudioMeterDisplayType`, `AudioMeterFrequencyScale`, `AudioMeterLoudnessMode`, `AudioMeterTrigger`, `AudioMeterVuSnapshot`, `AudioMeterLoudnessSnapshot`, `AudioMeterWaveformSnapshot`, `AudioMeterOscilloscopeSnapshot`, `AudioMeterSpectrumSnapshot`, `AudioMeterSpectrumPeak`, `AudioMeterSpectrogramSnapshot`, `AudioMeterStereometerSnapshot` | [Metering](/audio/headless/view/audio-meter/) |
 | `AudioTimelineOptions`, `AudioTimelineSnapshot`, `AudioTimelineHit`, `AudioTimelineGeometryUpdate`, `AudioTimelineSubscriber`, `AudioTimelineBinding`, `BindAudioTimelineOptions`, `PlayheadTarget` | [AudioTimeline](/audio/headless/view/audio-timeline/) |
 | `WaveformViewModelOptions`, `WaveformColumn`, `WaveformChannelPeak`, `SpectrogramViewModelOptions`, `SpectrogramFrameView` | [View models](/audio/headless/view/view-models/) |
-| `AudioClipEditorOptions` | [AudioClipEditor](/audio/headless/view/audio-clip-editor/) |
+| `AudioClipEditorOptions`, `LoadAudioClipEditorOptions`, `AudioClipEditorLoadLimits`, `AudioClipEditorLoader` | [AudioClipEditor](/audio/headless/view/audio-clip-editor/) |
 | `AudioViewEditing`, `AudioViewEditingOptions`, `AudioViewEditingState` | [Document editing](/audio/api/view/#document-editing) |
 | `AudioSequenceWaveform`, `AudioSequenceWaveformOptions` | [Sequence waveform ranges](/audio/api/view/#sequence-waveform-ranges) |
 | `LiveColumn`, `LiveProjectionType`, `LiveScrollOptions`, `LiveViewControllerOptions` | [Live projection](/audio/headless/view/live-projection/) |

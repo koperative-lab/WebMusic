@@ -1,6 +1,6 @@
 ---
 title: AudioClipEditor
-description: One immutable Audio sequence with structural history, explicit asset leases, range processing and interaction sessions.
+description: One immutable Audio sequence with URL loading, structural history, explicit asset leases, range processing and interaction sessions.
 sidebar:
   order: 1
 ---
@@ -8,7 +8,8 @@ sidebar:
 import AudioClipEditorHeadlessDemo from '../../../../../components/headless/AudioClipEditorHeadlessDemo.astro';
 
 `AudioClipEditor` owns one editable contiguous sequence. `createAudioClipEditor`
-returns the same class. Edits and history retain immutable asset references;
+returns the same class from decoded input, and `loadAudioClipEditor` fetches and
+decodes one file first. Edits and history retain immutable asset references;
 they do not save a complete PCM copy per edit. Construction creates no player,
 AudioContext, worker or UI. Existing `ClipEditSession` remains a separate,
 materializing clip-transform API.
@@ -39,6 +40,54 @@ Supplying `assets` together with a decoded clip is rejected; construct a sequenc
 when you need to share an existing store.
 Streaming clips cannot become editable assets. Empty sequences require an
 explicit format and remain valid ready documents.
+
+## Load from a URL
+
+`loadAudioClipEditor(url, options?)` fetches one audio file, decodes it in full
+and returns `Promise<AudioClipEditor>`. The default loader never streams and
+never creates an AudioContext: WAV uses the built-in parser and other formats use
+the optional WASM decoders. To decode natively, inject `loader` and pass your
+own context to [`loadClipFromUrl`](/audio/api/play/#load--decode):
+
+```ts
+import {loadClipFromUrl} from '@webmusic/audio/play';
+import {defineAudioPlayerElement, type AudioPlayerElement} from '@webmusic/audio/play/element';
+import {createAudioRangeProcessor} from '@webmusic/audio/view';
+import {defineAudioViewElement, type AudioViewElement} from '@webmusic/audio/view/element';
+import {loadAudioClipEditor} from '@webmusic/audio/view/headless';
+
+defineAudioPlayerElement();
+defineAudioViewElement();
+const context = new AudioContext(); // owned by this application
+const controller = new AbortController();
+const editor = await loadAudioClipEditor('/wav/Editing.wav', {
+  signal: controller.signal,
+  processors: [createAudioRangeProcessor('normalize')],
+  loader: (url, options) => loadClipFromUrl(url, {...options, context, streaming: false}),
+});
+const player = document.querySelector<AudioPlayerElement>('audio-player')!;
+const view = document.querySelector<AudioViewElement>('audio-view')!;
+player.editor = editor;
+view.editor = editor;
+
+// Teardown: detach the borrowers, then release the document.
+player.editor = undefined;
+view.editor = undefined;
+editor.dispose();
+await context.close();
+```
+
+The caller owns the returned editor. Players and views borrow it and never
+dispose it; when you replace the document, assign the new editor, then dispose
+the previous one. A custom loader receives the URL, the defined limits, `format`
+and `signal`; it must return a decoded, nonstreaming `AudioClip`, and it enforces
+its own limits. The editor owns the memory store created for that clip.
+
+The promise rejects, and no editor is created, when the request or decoding
+fails, a limit is exceeded (`RangeError`), the request times out or `signal`
+aborts (an `AbortError`). A `format` outside `wav`, `aiff`, `mp3`, `flac`, `ogg`,
+`opus`, `m4a`, `aac` and `webm` rejects with `TypeError` before the loader runs.
+Without `format`, the URL extension and then the bytes select the decoder.
 
 ## Revisions, history and ownership
 
@@ -135,6 +184,9 @@ supplies explicit rendering/WAV export.
 | Member | Contract |
 |---|---|
 | `createAudioClipEditor(input, options?)` / `new AudioClipEditor(input, options?)` | Input is decoded AudioClip or AudioSequence. Options: `assets`, `history: false \| {limit?, assetBytes?}`, `processors`, `processingMaxBytes`, `onListenerError`. |
+| `loadAudioClipEditor(url, options?)` | Returns `Promise<AudioClipEditor>`. `LoadAudioClipEditorOptions` takes the editor options except `assets`, plus `AudioClipEditorLoadLimits`, `format`, `signal` and `loader`. Rejects without creating an editor; see [Load from a URL](#load-from-a-url). |
+| `AudioClipEditorLoadLimits` | `maxInputBytes` (default 128 MiB), `maxDecodedFrames` (30,000,000 per channel), `maxDecodedBytes` (256 MiB of PCM), `maxChannels` (32) and `timeoutMs` (30,000 ms; 0 disables). Defaults are the default loader's; only defined values are forwarded. |
+| `AudioClipEditorLoader` | `(url, options) => Promise<AudioClip>`, where options are the defined limits plus `signal?` and `format?`. Replaces the default nonstreaming, context-free decoder. |
 | `sequence` | Current immutable AudioSequence; no PCM is exposed. |
 | `getSnapshot()` / `subscribe(listener)` | `AudioDocumentSnapshot`: identity, revision, content identity, sequence, asset reader, ready/disposed status and last change. Subscribe delivers the initial snapshot immediately and returns an idempotent release. |
 | `getState()` / `subscribeState(listener)` | Snapshot plus dirty, history, clipboard summary and processing state. History includes enabled, limit, assetByteLimit, historyOnlyBytes, undoCount, redoCount, trimmedCount, canUndo and canRedo. |
@@ -179,7 +231,8 @@ reports a repeated segment or annotation ID, including equal split IDs, a
 Subscribers cannot synchronously commit another edit during publication.
 Observer and cleanup exceptions are reported through `onListenerError` (console by default)
 and do not prevent other observers from receiving the accepted state.
-`AudioClipEditorOptions` belongs to this entry; Core document, command, session,
+`AudioClipEditorOptions`, `LoadAudioClipEditorOptions`,
+`AudioClipEditorLoadLimits` and `AudioClipEditorLoader` belong to this entry; Core document, command, session,
 processing and asset types are described by the
 [View API](/audio/api/view/#editable-documents).
 
@@ -187,4 +240,4 @@ processing and asset types are described by the
 
 ## Related
 
-[Audio document](/audio/element/view/audio-document/) · [AudioPlayer](/audio/headless/play/audio-player/) · [Waveform editing](/audio/element/view/audio-view/#waveform-editing) · [Editable documents API](/audio/api/view/#editable-documents)
+[`<audio-player>`](/audio/element/play/audio-player/) · [AudioPlayer](/audio/headless/play/audio-player/) · [Waveform editing](/audio/element/view/audio-view/#waveform-editing) · [Editable documents API](/audio/api/view/#editable-documents)

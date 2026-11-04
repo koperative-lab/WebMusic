@@ -13,20 +13,14 @@ export {
 } from './score-view';
 export {PitchViewElement, definePitchViewElement, type PitchViewType} from './score-pitch-view';
 export {SheetViewElement, defineSheetViewElement} from './score-sheet-view';
-export {
-  ScoreDocumentElement, defineScoreDocumentElement,
-  type ScoreDocumentLoadResult, type ScoreDocumentStateDetail, type ScoreDocumentStatus,
-} from './score-document';
 
 import {defineScoreViewElement} from './score-view';
 import {definePitchViewElement} from './score-pitch-view';
 import {defineSheetViewElement} from './score-sheet-view';
-import {defineScoreDocumentElement} from './score-document';
 
-/** Register the three view families and the nonvisual `<score-document>`. Idempotent and SSR-safe. */
+/** Register the three view families. Idempotent and SSR-safe. */
 export function defineAllViewElements(): void {
   defineScoreViewElement();
   definePitchViewElement();
   defineSheetViewElement();
-  defineScoreDocumentElement();
 }

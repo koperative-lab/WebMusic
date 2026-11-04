@@ -156,20 +156,23 @@ describe('editor, native Player and piano-roll integration', () => {
     expect(player.resolvedScore).toBe(editor.score);
   });
 
-  it('keeps an empty editor selector in document mode without falling back to the player', async () => {
+  it('treats the removed editor attribute as inert beside a Score and a player', async () => {
+    expect(ScoreViewElement.observedAttributes).not.toContain('editor');
     const editor = createScoreEditor(music()); editors.push(editor);
     const player = document.createElement('integration-score-player') as ScorePlayerElement;
     player.id = 'audition'; player.editor = editor; document.body.append(player);
     await player.waitForDocumentRevision(editor.getSnapshot());
     const view = document.createElement('integration-score-view') as ScoreViewElement;
     view.setAttribute('editor', ''); view.setAttribute('player', '#audition'); view.editable = true;
-    expect(() => { view.score = music(); }).toThrow('source-conflict');
+    const score = music();
+    expect(() => { view.score = score; }).not.toThrow();
     document.body.append(view);
+    view.setAttribute('editor', '#audition');
     for (let index = 0; index < 10; index++) await Promise.resolve();
-    expect(view.getAttribute('data-editor-state')).toBe('missing');
-    expect(view.getAttribute('data-editable-state')).toBe('unavailable');
-    expect(view.score).toBeUndefined();
-    expect(view.querySelector('[part="editing-surface"]')).toBeNull();
+    expect(view.score).toBe(score);
+    expect(view.editor).toBeUndefined();
+    expect(view.hasAttribute('data-editor-state')).toBe(false);
+    expect(view.interactionSession).toBeUndefined();
   });
 
   it('rejects an empty src attribute alongside a document, with attribute conflict recovery', () => {

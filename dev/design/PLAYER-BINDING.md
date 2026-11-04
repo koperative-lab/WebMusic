@@ -176,9 +176,9 @@ document editing usable and reports playback unavailable. The first Score
 integration supports the native single-Score engine, not controller/Rack sources.
 Audio sequence sources do not pretend to be a single AudioClip.
 
-Object injection and the `editor` selector reach the same Core contract. Nonvisual
-document declarations own their editors; Views and Players borrow them. Existing
-selector root, late-upgrade, replacement, ambiguity and cleanup rules apply. A
+Object injection through `.editor` reaches the Core contract; there is no
+`editor` selector (DEC-057). The application owns its editors; Views and Players
+borrow them and release only their own bindings. A
 View still owns no player/clock and a Player never gains edit authority merely by
 observing a document. Source conflicts and lifecycle details use the editing
 contract, not implicit precedence between new and old source kinds.

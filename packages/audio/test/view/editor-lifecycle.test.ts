@@ -22,13 +22,6 @@ function view(): AudioViewElement {
   const value = document.createElement('lifecycle-audio-view') as AudioViewElement;
   value.editable = true; return value;
 }
-function declaration(value: AudioClipEditor): HTMLDivElement & {editor: AudioClipEditor} {
-  const owner = Object.assign(document.createElement('div'), {editor: value});
-  owner.id = 'document'; document.body.append(owner); return owner;
-}
-function publish(owner: HTMLDivElement & {editor: AudioClipEditor}, value: AudioClipEditor): void {
-  owner.editor = value; owner.dispatchEvent(new CustomEvent('webmusic:sourcechange', {bubbles: true}));
-}
 function expectBound(element: AudioViewElement, target: AudioClipEditor): void {
   expect(element.editor).toBe(target);
   expect(element.interactionSession!.getSnapshot().documentId).toBe(target.getSnapshot().documentId);
@@ -44,8 +37,8 @@ afterEach(() => {
 describe('Audio View editor attachment cleanup', () => {
   it.each(['source', 'presentation'])('preserves a newer binding during active draft cancellation from %s cleanup', trigger => {
     const added = vi.spyOn(window, 'addEventListener'), removed = vi.spyOn(window, 'removeEventListener');
-    const a = editor(60), b = editor(64), c = editor(67), owner = declaration(a), element = view();
-    element.setAttribute('editor', '#document'); document.body.append(element);
+    const a = editor(60), b = editor(64), c = editor(67), element = view();
+    element.editor = a; document.body.append(element);
     const surface = element.querySelector('[part="editing-surface"]')!;
     const tool = element.querySelector<HTMLSelectElement>('[aria-label="Pointer tool"]')!; tool.value = 'trim';
     const pointer = (type: string, x: number): void => {
@@ -56,7 +49,7 @@ describe('Audio View editor attachment cleanup', () => {
     const session = element.interactionSession!; expect(session.getSnapshot().draft).toBeDefined();
     let armed = true;
     session.subscribe(state => { if (armed && !state.draft) { armed = false; element.editor = c; } });
-    if (trigger === 'source') publish(owner, b); else element.setAttribute('wave-color', 'red');
+    if (trigger === 'source') element.editor = b; else element.setAttribute('wave-color', 'red');
     expectBound(element, c); element.remove();
     const snapshot = c.getSnapshot(), asset = snapshot.content.segments[0];
     expect(asset.kind).toBe('asset');
@@ -66,24 +59,15 @@ describe('Audio View editor attachment cleanup', () => {
   });
 
   it('keeps a newer explicit binding requested by the old session disposal callback', () => {
-    const a = editor(60), b = editor(64), c = editor(67), owner = declaration(a), element = view();
-    element.setAttribute('editor', '#document'); document.body.append(element);
+    const a = editor(60), b = editor(64), c = editor(67), element = view();
+    element.editor = a; document.body.append(element);
     element.interactionSession!.subscribe(state => { if (state.disposed) element.editor = c; });
-    publish(owner, b);
+    element.editor = b;
     expectBound(element, c);
     element.interactionSession!.setSelection({startFrame: 0, endFrame: 1});
     element.querySelector('[part="editing-surface"]')!.dispatchEvent(new KeyboardEvent('keydown', {key: 'Delete', bubbles: true}));
     expect(c.getSnapshot().content.length).toBe(66);
     expect(b.getSnapshot().content.length).toBe(64);
-  });
-
-  it('keeps a nested selector-source replacement and continues observing later replacements', () => {
-    const a = editor(60), b = editor(64), c = editor(67), d = editor(69), owner = declaration(a), element = view();
-    element.setAttribute('editor', '#document'); document.body.append(element);
-    element.interactionSession!.subscribe(state => { if (state.disposed) publish(owner, c); });
-    publish(owner, b); expectBound(element, c);
-    const session = element.interactionSession!;
-    publish(owner, d); expectBound(element, d); expect(session.getSnapshot().disposed).toBe(true);
   });
 
   it('releases every intermediate owned session after reentrant direct property replacement', () => {
@@ -101,11 +85,11 @@ describe('Audio View editor attachment cleanup', () => {
   });
 
   it('does not adopt a source if old-session cleanup disconnects the view', () => {
-    const a = editor(60), b = editor(64), owner = declaration(a), element = view();
-    element.setAttribute('editor', '#document'); document.body.append(element);
+    const a = editor(60), b = editor(64), element = view();
+    element.editor = a; document.body.append(element);
     element.interactionSession!.subscribe(state => { if (state.disposed) element.remove(); });
     const create = vi.spyOn(b, 'createInteractionSession');
-    publish(owner, b);
+    element.editor = b;
     expect(element.isConnected).toBe(false); expect(element.interactionSession).toBeUndefined();
     expect(create).not.toHaveBeenCalled(); expect(b.getSnapshot().status).toBe('ready');
   });

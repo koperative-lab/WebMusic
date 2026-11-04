@@ -27,7 +27,7 @@ const demoComponents = new Set([
   'AnalysisFeaturePlayground', 'AudioAnalyzeFeaturePlayground', 'NoteInputDemo', 'ScoreRecorderDemo', 'SheetViewPlayground', 'RackControlDemo',
   'SynthPanelDemo', 'LiveTrackersPlayground', 'AnalysisSessionPlayground',
   'PitchViewPlayground', 'ReactPresetShowcase', 'ScoreViewDemo', 'WaterfallKeyboardDemo',
-  'UiPresenterLiveDemo', 'ScoreReportPlayground', 'ProgrammaticTransportDriverDemo', 'ScoreEditorHeadlessDemo', 'ScoreDocumentPlayground', 'ScoreEditingDemo',
+  'UiPresenterLiveDemo', 'ScoreReportPlayground', 'ProgrammaticTransportDriverDemo', 'ScoreEditorHeadlessDemo', 'ScoreEditingDemo',
   'StaffEditingDemo', 'StaffInputHeadlessDemo',
 ]);
 const htmlElements = new Set(['details', 'summary', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'a', 'br', 'p', 'div', 'span', 'strong', 'em', 'code', 'sup', 'sub']);

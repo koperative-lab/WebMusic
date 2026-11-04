@@ -4,7 +4,7 @@ description: Score visualization and document editing — stateless layout and e
 ---
 
 
-`@webmusic/score/view` turns `Score` objects into layout data and visual renderings, and owns [document editing](#document-editing). Its three visual Web Components are `<score-view>` for score-position views, `<score-pitch-view>` for sounding pitches, and `<score-sheet-view>` for optional full engraving; the nonvisual `<score-document>` owns an editable document.
+`@webmusic/score/view` turns `Score` objects into layout data and visual renderings, and owns [document editing](#document-editing). Its three visual Web Components are `<score-view>` for score-position views, `<score-pitch-view>` for sounding pitches, and `<score-sheet-view>` for optional full engraving. An editable document is a [`ScoreEditor`](/score/headless/view/score-editor/) that your application owns and lends to views and players.
 
 Playback lives in [`@webmusic/score/play`](/score/api/play/). Views borrow player data or events according to their owning contracts; the static thumbnail renderer is a passive whole-score preview. Imperative renderers expose `redraw` for application-driven highlighting.
 
@@ -31,7 +31,7 @@ The browser renderer implementation is also separated by responsibility: shared 
 
 ## Web Components
 
-`<score-view>`, `<score-pitch-view>`, `<score-sheet-view>` and the nonvisual `<score-document>` live on `@webmusic/score/view/element`. Their owning pages under [Web Components › View](/score/element/#view) document each tag’s types, attributes, events, player binding and styling. This page owns the code-facing APIs they compose.
+`<score-view>`, `<score-pitch-view>` and `<score-sheet-view>` live on `@webmusic/score/view/element`. Their owning pages under [Web Components › View](/score/element/#view) document each tag’s types, attributes, events, player binding and styling. This page owns the code-facing APIs they compose.
 
 The code-only APIs below let you maintain view state or build your own renderer; the explicit `/render` adapters draw into browser elements. The examples assume a `score` built with `@webmusic/score`.
 
@@ -80,10 +80,10 @@ Editing is a View feature. This root exports the stateless parts: the
 contracts and `ScoreEditError`. The stateful
 [`ScoreEditor`](/score/headless/view/score-editor/) on
 `@webmusic/score/view/headless` adds one document owner, revision guards, local
-history and interaction drafts; the nonvisual
-[`<score-document>`](/score/element/view/score-document/) on
-`@webmusic/score/view/element` owns HTML loading. None of them creates a player,
-clock or visual surface. [Score player](/score/headless/play/score-player/) and
+history and interaction drafts, and `loadScoreEditor(url, options?)` there loads
+a file into a new caller-owned editor. Elements borrow an editor only through
+their `.editor` property. None of them creates a player, clock or visual
+surface. [Score player](/score/headless/play/score-player/) and
 the editable views borrow the same Core ports, which the
 [`@webmusic/score` root](/score/api/) also exports.
 
@@ -932,16 +932,16 @@ Score + MusicXML + OSMD constructor -> RenderedScoreVisualizer<OSMDLike>
 | `defineScoreViewElement(tag?)` | Web Component | Register `<score-view>` with piano-roll, staff and waterfall types. |
 | `definePitchViewElement(tag?)` | Web Component | Register `<score-pitch-view>` with keyboard, current staff and fretboard types. |
 | `defineSheetViewElement(tag?)` | Web Component | Register `<score-sheet-view>` with its optional OSMD renderer. |
-| `defineScoreDocumentElement(tag?)` | Web Component | Register the nonvisual [`<score-document>`](/score/element/view/score-document/). |
-| `defineAllViewElements()` | Web Component | Register the three default View tags and `<score-document>`. |
-| `ScoreViewElement`, `PitchViewElement`, `SheetViewElement`, `ScoreDocumentElement` | Web Component | Classes from `@webmusic/score/view/element`; owning [Element references](/score/element/#view) describe properties, attributes and lifecycle. |
+| `defineAllViewElements()` | Web Component | Register the three default View tags. |
+| `ScoreViewElement`, `PitchViewElement`, `SheetViewElement` | Web Component | Classes from `@webmusic/score/view/element`; owning [Element references](/score/element/#view) describe properties, attributes and lifecycle. |
 | `ScoreViewElementType` | Type | Alias of `ScoreViewType`: `piano-roll`, `staff` or `waterfall`. |
 | `PitchViewType` | Type | `keyboard`, `staff` or `fretboard`. |
-| `ScoreDocumentLoadResult`, `ScoreDocumentStateDetail`, `ScoreDocumentStatus` | Type | [`<score-document>`](/score/element/view/score-document/) load result, state event detail and status, from `/element`. |
 | `ScoreViewType`, `ScoreViewRenderOptions`, `parseColorAttr` | Element exports | The three note-renderer types, their option union and attribute-color parser. |
 | `createScoreView(scoreOrEditor, options?)` | Headless model | [Score window and document state](/score/headless/view/score-view/), from `@webmusic/score/view/headless`. |
 | `ScoreEditor`, `createScoreEditor(score, options?)` | Headless model | [Own one editing document](/score/headless/view/score-editor/) with revisions, history, checkpoints and interaction sessions, from `/headless`. |
+| `loadScoreEditor(url, options?)` | Headless loader | [Fetch and parse a file into a new caller-owned `ScoreEditor`](/score/headless/view/score-editor/#load-from-a-url); loads the I/O stack on demand, from `/headless`. |
 | `ScoreEditorOptions` | Type | [History limit and listener error handling](/score/headless/view/score-editor/), from `/headless`. |
+| `LoadScoreEditorOptions` | Type | [`LoadScoreOptions` plus `ScoreEditorOptions`](/score/headless/view/score-editor/#load-from-a-url), from `/headless`. |
 | `createScoreViewEditing(editor, options?)` | Headless model | [Selection/draft controller](/score/headless/view/score-view/#follow-an-editing-document), from `/headless`. |
 | `createStaffViewEditing(editing, options?)` | Headless model | [Written-note cursor and voice input](/score/headless/view/staff-editing/), from `/headless`. |
 | `scoreDocumentPlaybackCompatible(document, playback?)` | Headless helper | Exact ready/applied revision and authored-coordinate compatibility, from `/headless`. |

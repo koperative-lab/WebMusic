@@ -57,44 +57,45 @@ Headless engine for one clip.
 ## Document composition
 
 ```html
+<audio-player id="audition"></audio-player>
+<audio-view id="take-view" player="#audition" type="waveform" editable></audio-view>
 <script type="module">
   import '@webmusic/audio/play/auto';
-  import '@webmusic/audio/view/auto'; // also registers <audio-document>
+  import '@webmusic/audio/view/auto';
+  import {loadAudioClipEditor} from '@webmusic/audio/view/headless';
+  const editor = await loadAudioClipEditor('/wav/Arabesque%20No.1.wav');
+  const player = /** @type {import('@webmusic/audio/play/element').AudioPlayerElement | null} */ (document.getElementById('audition'));
+  const view = /** @type {import('@webmusic/audio/view/element').AudioViewElement | null} */ (document.getElementById('take-view'));
+  if (player) player.editor = editor;
+  if (view) view.editor = editor;
 </script>
-<audio-document id="take" src="/wav/Arabesque%20No.1.wav"></audio-document>
-<audio-player id="audition" editor="#take"></audio-player>
-<audio-view editor="#take" player="#audition" type="waveform" editable></audio-view>
 ```
 
 `.editor` accepts the same Core `AudioDocumentSource` as
-[`AudioPlayer.setDocumentSource`](/audio/headless/play/audio-player/#edited-sequence-playback).
-It takes precedence over the `editor` selector; assigning undefined restores
-selector resolution. Selectors resolve exactly one provider in the same
-Document/ShadowRoot and follow late insertion, upgrade, replacement and removal.
-Cross-root composition uses object properties. No editor is created implicitly.
+[`AudioPlayer.setDocumentSource`](/audio/headless/play/audio-player/#edited-sequence-playback),
+such as an editor from
+[`loadAudioClipEditor`](/audio/headless/view/audio-clip-editor/#load-from-a-url)
+or `createAudioClipEditor`. There is no `editor` attribute. The player borrows
+the editor and never disposes it; assigning `undefined` detaches it. When you
+replace the document, assign the new editor, then dispose the previous one.
+No editor is created implicitly.
 
 An editor conflicts with `src` (including an empty attribute), `.clip`, an injected
 `.player` or an independent transport. Object assignments reject atomically;
-invalid attribute combinations disable playback and report `source-conflict` until
+a `src` attribute added later disables playback and reports `source-conflict` until
 fixed. Fixing means clearing whichever source came first: removing `src` (which
 also releases a clip loaded from it), `.clip = undefined`, `.setTransport(undefined)`
 or `.player = undefined` re-resolves the editor. A conflict pauses and detaches
 only a player this element owns; an injected `.player` keeps its own source and
-playback state. No binding falls back to an older clip. A target that is not
-inserted yet, and a matched element that has not published an editor (a
-declaration still loading, or one whose load failed and reports its own
-`webaudio:error`), are pending: `data-editor-state` is `missing` or
-`unavailable`, `.documentBinding.status` is `empty`, and no `webaudio:error` is
-dispatched by the player. While pending or failed, `play()` and `preload()`
-reject and `seek`, `seekFraction`, `scrub` and `beginScratch` throw the
-`not-ready` binding error; `waitForDocumentRevision` and
-`retryDocumentApplication` resolve `failed`. The player joins when the
-declaration publishes its editor. An empty, invalid or ambiguous selector, a
-conflict and a rejected attachment are errors: `.documentBinding.status` is
-`error` and `webaudio:error` is dispatched. `data-editor-state` reports
-`missing`, `unavailable`, `invalid`, `ambiguous`, `source-conflict` or `error`
-while blocked, then the binding's `empty`, `preparing` or `ready` status. The
-host emits `webaudio:documentstatechange` for every binding change.
+playback state. No binding falls back to an older clip. While blocked,
+`play()` and `preload()` reject and `seek`, `seekFraction`, `scrub` and
+`beginScratch` throw the binding error; `waitForDocumentRevision` and
+`retryDocumentApplication` resolve `failed`. A conflict and a rejected
+attachment are errors: `.documentBinding.status` is `error` and
+`webaudio:error` is dispatched. `data-editor-state` reports `source-conflict` or
+`error` while blocked, then the binding's `empty`, `preparing` or `ready`
+status, and is removed when `.editor` is undefined. The host emits
+`webaudio:documentstatechange` for every binding change.
 
 Each edit pauses and applies a new revision without creating an AudioContext.
 Playback resumes only after an explicit play command. `.source` names the applied
@@ -108,8 +109,7 @@ revision. While bound, `.setTransport(undefined)` and `.clip = undefined` keep t
 document transport; remove the editor to detach it. Assigning `.player = undefined`
 binds the editor to a fresh owned player.
 Disconnecting a player releases its owned sequence engine and subscriptions,
-never the borrowed editor. Disconnecting the document declaration removes its
-owned editor; reconnecting creates a new identity. See the
+never the borrowed editor; the application disposes it. See the
 [editing waveform](/audio/element/view/audio-view/) for the complete workflow.
 
 ## Loading and waiting
@@ -157,7 +157,6 @@ await el.player?.play();                     // stable AudioPlayer facade
 | Member | Kind | Description |
 | --- | --- | --- |
 | `src` | attribute | URL of an audio file (format inferred from the extension). Optional if you assign `.clip` / `.player`. |
-| `editor` | attribute | Selector of one provider exposing a Core Audio document source through `.editor`. Explicit `.editor` wins. Conflicts with independent sources. |
 | `format` | attribute | Force the decode format (e.g. `wav` / `mp3`) when the extension is missing or wrong. |
 | `controls` | attribute | Shown by default; `controls="false"` (also `0`/`no`/`off`) hides the transport, leaving a headless element. Toggling it never remounts the transport, so the playhead survives. |
 | `loop` | attribute | `loop` (whole clip) or `loop="a,b"` (an A–B region in seconds). Applied **live** — changing it keeps the playhead instead of rebuilding the player. |
@@ -167,7 +166,7 @@ await el.player?.play();                     // stable AudioPlayer facade
 | `rate` | attribute | Playback rate (`0.25`–`4`, default `1`); applies live. |
 | `pan` | attribute | Stereo position, `-1`–`1`; applies live. |
 | `preload` | attribute | Warm the context, graph and decoded buffer on mount so the first play does not hitch; with an editor, after its first applied revision. `preload="none"` opts out. |
-| `.editor` | property | Borrow an `AudioDocumentSource`; undefined restores selector lookup. Never disposed by the player. |
+| `.editor` | property | Assign an editor from `loadAudioClipEditor`/`createAudioClipEditor` (any `AudioDocumentSource`); borrowed, never disposed. `undefined` detaches it. Conflicts with independent sources. There is no `editor` attribute. |
 | `.source` | readonly property | Discriminated applied `empty`, `clip` or `sequence` snapshot; sequence includes `sequence`, `assets`, `documentId`, `documentRevision`, and publication `revision`. |
 | `.documentBinding` | readonly property | Requested/applied identities, `empty`/`preparing`/`ready`/`error` status, attempt, mapping policy, coordinate availability and error. |
 | `.waitForDocumentRevision(target)` / `.retryDocumentApplication()` | method | Promise of applied/superseded/failed revision outcome; retry creates a fresh attempt. See the Headless reference for failure and mapping rules. |

@@ -155,8 +155,8 @@ built tarballs or workspace entries.
 | --- | --- | --- |
 | Semantic operations, position maps and document contracts | `@webmusic/score/view` | `@webmusic/audio/view` (also range-processor recipes) |
 | Persistent editor owner | `ScoreEditor` from `@webmusic/score/view/headless` | `AudioClipEditor` from `@webmusic/audio/view/headless` |
-| Nonvisual HTML document owner | `<score-document>` from `@webmusic/score/view/element` | `<audio-document>` from `@webmusic/audio/view/element` |
-| Default registration | `defineScoreDocumentElement()` or `defineAllViewElements()`; Score View has no `/auto` entry | `@webmusic/audio/view/auto` (and `/view/global`) |
+| Load a file into a new editor | `loadScoreEditor(url, options)` from `@webmusic/score/view/headless` | `loadAudioClipEditor(url, options)` from `@webmusic/audio/view/headless` |
+| Bind an editor to Elements | Assign `.editor` on `<score-view>` / `<score-player>`; the application disposes the editor | Assign `.editor` on `<audio-view>` / `<audio-player>`; the application disposes the editor |
 | Render or export an edited sequence | — | `renderAudioSequence`, `exportAudioSequenceWav` from `@webmusic/audio/play` |
 
 There is no dedicated editing React wrapper. The package root remains Core; it

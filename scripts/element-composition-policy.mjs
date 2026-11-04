@@ -26,8 +26,6 @@ export const elementCompositionPolicy = Object.freeze([
   entry('Score', 'View', 'score-view', 'packages/score/src/view/element/score-view.ts', ['stage', 'status']),
   entry('Score', 'View', 'score-sheet-view', 'packages/score/src/view/element/score-sheet-view.ts', ['stage', 'status']),
   entry('Score', 'View', 'score-pitch-view', 'packages/score/src/view/element/score-pitch-view.ts', ['pitch', 'status']),
-  // Declaration only: the nonvisual document owner shared by Views and the player.
-  entry('Score', 'View', 'score-document', 'packages/score/src/view/element/score-document.ts', [], true),
 
   entry('Audio', 'Play', 'audio-player', 'packages/audio/src/play/element/audio-player.ts', ['transport', 'status']),
   entry('Audio', 'Play', 'audio-playlist', 'packages/audio/src/play/element/audio-playlist.ts', ['playlist']),
@@ -41,8 +39,6 @@ export const elementCompositionPolicy = Object.freeze([
 
   entry('Audio', 'View', 'audio-view', 'packages/audio/src/view/element/audio-view.ts', ['stage', 'status', 'meter']),
   entry('Audio', 'View', 'audio-live-view', 'packages/audio/src/view/element/audio-live-view.ts', ['stage']),
-  // Declaration only: the nonvisual document owner shared by Views and the player.
-  entry('Audio', 'View', 'audio-document', 'packages/audio/src/view/element/audio-document.ts', [], true),
 ]);
 
 /** Main presenters available without a domain Element consumer. */

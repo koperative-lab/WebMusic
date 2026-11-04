@@ -61,7 +61,7 @@ That is the whole setup. To see what any attribute does to a live element, use t
 ## Four ways to drive it
 
 Without an editor binding, the element uses the following legacy precedence.
-An `editor` input is a separate exclusive mode: combining it with any source
+An assigned `.editor` is a separate exclusive mode: combining it with any source
 below is a source conflict.
 
 | Precedence | Source | What the element owns |
@@ -91,38 +91,47 @@ with one shared clock.
 
 ## Play an editable document
 
-Register the nonvisual owner with `defineScoreDocumentElement()` from
-`@webmusic/score/view/element`, alongside Play and View. No application revision-copying code is required:
+Load an editor with [`loadScoreEditor`](/score/headless/view/score-editor/#load-from-a-url)
+(or create one with `createScoreEditor`) and assign it to `.editor` on the player
+and any views. No application revision-copying code is required:
 
 ```html
-<score-document id="song" src="/midi/Editing.mid"></score-document>
-<score-player id="audition" editor="#song"></score-player>
-<score-view editor="#song" player="#audition" editable></score-view>
+<score-player id="audition"></score-player>
+<score-view player="#audition" editable></score-view>
+<script type="module">
+  import {defineScorePlayerElement} from '@webmusic/score/play/element';
+  import {defineScoreViewElement} from '@webmusic/score/view/element';
+  import {loadScoreEditor} from '@webmusic/score/view/headless';
+  defineScorePlayerElement();
+  defineScoreViewElement();
+  const editor = await loadScoreEditor('/midi/Editing.mid');
+  const player = /** @type {import('@webmusic/score/play/element').ScorePlayerElement | null} */ (document.querySelector('score-player'));
+  const view = /** @type {import('@webmusic/score/view/element').ScoreViewElement | null} */ (document.querySelector('score-view'));
+  if (player) player.editor = editor;
+  if (view) view.editor = editor;
+</script>
 ```
 
-Alternatively assign `player.editor = editor` with a Core `ScoreDocumentSource`.
-The explicit object wins over the selector; assigning `undefined` restores
-selector discovery. Selectors resolve in the same Document or ShadowRoot,
-follow late upgrades, replacement and `webmusic:sourcechange`, and release their
-subscriptions on disconnect. The player never disposes the borrowed editor.
+`.editor` accepts any Core `ScoreDocumentSource`; there is no `editor`
+attribute. The player borrows the editor and never disposes it; assigning
+`undefined` detaches it. When you replace the document, assign the new editor
+and then dispose the previous one; dispose the last one after detaching it.
 
-Until its editor is ready, the player never falls back to `src`. A target that
-is not inserted yet (`missing`), a declaration still loading or empty
-(`unavailable`) and a disposed editor are pending: `.playback` reports
-`unavailable` readiness and the player joins when the editor becomes ready.
-Pending state dispatches no `webscore:error`; `play()` and `seekNominal()` reject
-as `not-ready`, and void seeks report that rejection as a `seek` error. An empty,
-invalid or ambiguous selector is an error: readiness is `error` and
-`webscore:error` reports it. The host reflects the resolution, `source-conflict`
-or the binding status as `data-editor-state`, and removes it outside editor mode.
+Until its editor is ready, the player never falls back to `src`. A disposed or
+otherwise not-ready editor is pending: `.playback` reports `unavailable`
+readiness, `data-editor-state` is `disposed`, and the player joins when an
+assigned editor is ready. Pending state dispatches no `webscore:error`; `play()`
+and `seekNominal()` reject as `not-ready`, and void seeks report that rejection
+as a `seek` error. The host reflects `source-conflict`, `error` (a failed mount)
+or the binding status as `data-editor-state`, and removes it when `.editor` is
+undefined.
 
 `.editor` conflicts with `.score`, `src` (even empty), `.rack`, a nested Rack or
 `.controller`. Conflicting property writes throw before changing configuration.
 A conflicting attribute retains the mounted engine but rejects play and seek
 commands until corrected. A conflicting source property assigned before the tag
 was registered cannot be rejected; it keeps its value and shows the same
-conflict. A failed mount reports `error` and keeps observing the selected
-declaration, so its next editor or target change mounts again.
+conflict. A failed mount reports `error`; assigning the next editor mounts again.
 
 An edit pauses and prepares the new revision in the same native engine. It
 stays paused after successful application; press Play again to audition it. A
@@ -189,8 +198,8 @@ The source attributes are read only while a source is being resolved; assigning 
 
 | Member | Kind | Default | Description |
 | --- | --- | --- | --- |
-| `editor` / `.editor` | selector attribute / Core source property | — | Exclusive document source; explicit object wins, `undefined` restores selector discovery. |
-| `.documentBinding` | read-only property | `undefined` without an editor input | Requested/applied revisions and attempt state; no source ownership. In editor mode, `empty` until a native player mounts and `error` for a conflict, an invalid/ambiguous selector or a failed mount. |
+| `.editor` | Core source property | — | Exclusive document source. Assign an editor from `loadScoreEditor`/`createScoreEditor`; borrowed, never disposed. `undefined` detaches it. There is no `editor` attribute. |
+| `.documentBinding` | read-only property | `undefined` without an editor input | Requested/applied revisions and attempt state; no source ownership. In editor mode, `empty` until a native player mounts and `error` for a source conflict or a failed mount. |
 | `waitForDocumentRevision(target)` / `retryDocumentApplication()` | methods | tagged outcome Promise | Wait for a known revision or explicitly retry preparation. |
 | `src` | attribute | — | URL of a MIDI / MusicXML / MXL / ABC file. Optional when a source property is assigned. |
 | `format` | attribute | extension, else byte sniff | Force `midi` / `mxl` / `musicxml` / `abc`. Passed through unvalidated; an unsupported value fails the load. |
@@ -255,7 +264,7 @@ native note/state/navigation events are non-composed.
 | `webscore:seek` | none | A non-controller `seek`, `seekNominal` or `seekFraction` command is issued, or the native seek bar commits pointer/keyboard navigation; read the current snapshot for units and position. |
 | `webscore:stop` | none | A non-controller stop command is issued. |
 | `webscore:end` | — | The piece finished playing. |
-| `webscore:error` | `{operation: 'seek' \| 'playback', error}` | `seek` reports asynchronous native failures and declaration source errors from void seek commands; `playback` reports mounted playback/controller errors, including Rack transport failures, and editor conflicts or invalid/ambiguous selectors. A pending editor is not an error. |
+| `webscore:error` | `{operation: 'seek' \| 'playback', error}` | `seek` reports asynchronous native failures and declaration source errors from void seek commands; `playback` reports mounted playback/controller errors, including Rack transport failures, and editor source conflicts. A pending editor is not an error. |
 
 **Subclassing.** `ScorePlayerElement` is exported from `/element` without registering a tag, and exposes protected seams for the two things a custom player usually needs to change: which UI is mounted (`mountScore()`, `mountRack()`, `mountController()`, and `replaceHandle()` to swap one safely) and where the music comes from (`resolveScore()`, `buildSynth()`). `render()` and `teardown()` bracket the whole lifecycle if you need to wrap it.
 

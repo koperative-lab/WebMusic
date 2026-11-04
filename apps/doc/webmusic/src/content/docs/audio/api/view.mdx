@@ -3,7 +3,7 @@ title: '@webmusic/audio/view'
 description: Audio visualization — retained visualizers, fitted overview and live-frame helpers, Headless view models/controllers, structural bindings, virtualization and colormaps.
 ---
 
-`@webmusic/audio/view` is the **visualization** capability of the `@webmusic/audio` package. The capability root exports colormaps, viewport math, data contracts and [editable-document](#editable-documents) operations; `/headless` supplies `AudioClipEditor` and document-editing controllers. Its `/render` subpath draws precomputed analysis data onto a Canvas — a min/max **waveform**, an STFT **spectrogram**, and a live **level/spectrum meter**. Drop-in Web Components live under [Web Components → View](/audio/element/#view): `<audio-view>`, `<audio-live-view>` and the nonvisual `<audio-document>` owner. The standalone [`<audio-meter>`](/audio/element/analyze/audio-meter/) is now listed with live Analyze tools; its existing `view/element` and `view/auto` entries remain compatibility paths.
+`@webmusic/audio/view` is the **visualization** capability of the `@webmusic/audio` package. The capability root exports colormaps, viewport math, data contracts and [editable-document](#editable-documents) operations; `/headless` supplies `AudioClipEditor`, its `loadAudioClipEditor` URL loader and document-editing controllers. Its `/render` subpath draws precomputed analysis data onto a Canvas — a min/max **waveform**, an STFT **spectrogram**, and a live **level/spectrum meter**. Drop-in Web Components live under [Web Components → View](/audio/element/#view): `<audio-view>` and `<audio-live-view>`. The standalone [`<audio-meter>`](/audio/element/analyze/audio-meter/) is now listed with live Analyze tools; its existing `view/element` and `view/auto` entries remain compatibility paths.
 
 It is **bring-your-own-data**: the renderers consume the typed-array structures produced by [`@webmusic/audio/analyze`](/audio/api/analyze/) (the `AudioPeaks` pyramid and `SpectrogramData`), but `@webmusic/audio/view` does **not** depend on `@webmusic/audio/analyze` — the spectrogram payload is declared structurally here. Playback lives in [`@webmusic/audio/play`](/audio/api/play/), while the renderer binding talks to a structural `ViewPlayerBinding` interface and does not import the play capability. The optional `<audio-view src="…">` convenience resolves `@webmusic/audio/play` dynamically. All renderer DOM work is confined to call time, so importing the capability root or `/headless` remains safe in non-browser environments.
 
@@ -110,8 +110,8 @@ Document editing is part of View. An editable document is a **sequence of asset 
 | --- | --- |
 | `@webmusic/audio` | Sequence, assets, document snapshots, commands, position maps and playback-source contracts. Core remains DOM-free. |
 | `@webmusic/audio/view` | Re-exports those Core editing, sequence and position-map contracts, plus `applyAudioOperations` and `createAudioRangeProcessor`. |
-| `@webmusic/audio/view/headless` | [`AudioClipEditor`](/audio/headless/view/audio-clip-editor/), `createAudioClipEditor` and `AudioClipEditorOptions`; no renderer or browser registration. |
-| `@webmusic/audio/view/element` | [`AudioDocumentElement`](/audio/element/view/audio-document/), its loader and state types, and explicit registration; `/view/auto` registers `<audio-document>` with the other View tags. |
+| `@webmusic/audio/view/headless` | [`AudioClipEditor`](/audio/headless/view/audio-clip-editor/), `createAudioClipEditor`, `AudioClipEditorOptions`, and [`loadAudioClipEditor`](/audio/headless/view/audio-clip-editor/#load-from-a-url) with `LoadAudioClipEditorOptions`, `AudioClipEditorLoadLimits` and `AudioClipEditorLoader`; no renderer or browser registration. |
+| `@webmusic/audio/view/element` | No editing element. `<audio-player>` and `<audio-view>` borrow a caller-owned editor through their `.editor` property. |
 
 The editing contracts and the editor do not require the UI peer.
 
@@ -134,7 +134,7 @@ console.log(wav.byteLength);
 editor.dispose();
 ```
 
-For URL/file decoding use [Audio Play loading](/audio/api/play/#load--decode). The View root and the Headless editor never import Play or create an audio context. The nonvisual `<audio-document>` browser adapter can load a URL through the existing bounded decoder. The [waveform editing demo](/audio/element/view/audio-view/#waveform-editing) composes one document, player and view.
+For file decoding use [Audio Play loading](/audio/api/play/#load--decode). The View root and `AudioClipEditor` never import Play or create an audio context. `loadAudioClipEditor(url, options?)` fetches and decodes one URL through Play's bounded, nonstreaming decoder without creating an audio context, then returns a new caller-owned editor; inject `loader` to decode with your own context. The [waveform editing demo](/audio/element/view/audio-view/#waveform-editing) composes one editor, player and view.
 
 ### Sequence and asset contracts
 
@@ -195,6 +195,7 @@ Splits and trims crop/rebase envelopes and preserve boundary values. Content-anc
 | `AudioClipEditorPort`, `isAudioClipEditorPort`, `isAudioDocumentSource` | Structural composition contracts and runtime guards; no `instanceof` dependency between bundles. |
 | `AudioRevisionGuard`, `AudioEditTransaction`, `AudioEditResult`, `AudioEditFailure`, `AudioEditError`, `AudioEditErrorCode` | Guarded atomic editing, transaction builder, committed/noop/failed results and typed errors. |
 | `AudioClipEditor`, `createAudioClipEditor`, `AudioClipEditorOptions` | The concrete owner, constructor options and factory. Exported by `/view/headless`, not the root; complete reference on [AudioClipEditor](/audio/headless/view/audio-clip-editor/). |
+| `loadAudioClipEditor`, `LoadAudioClipEditorOptions`, `AudioClipEditorLoadLimits`, `AudioClipEditorLoader` | Fetch and decode one URL into a new caller-owned editor, with bounded limits and an optional injected loader. Exported by `/view/headless`; see [Load from a URL](/audio/headless/view/audio-clip-editor/#load-from-a-url). |
 | `AudioEditorState`, `AudioCheckpoint`, `AudioClipboard`, `AudioFrameRange` | Editor state and explicit retained resource handles, documented on the Headless page. |
 | `AudioInteractionSession`, `AudioInteractionSnapshot`, `AudioDraftResult` | Per-view selection/draft state; preview does not advance the document. |
 
@@ -695,9 +696,7 @@ The `/view/headless` values have one explanation owner in the
 [Headless View inventory](/audio/headless/#view), including `AudioTimeline`,
 `WaveformViewModel`, `SpectrogramViewModel`, live projection helpers and peaks
 readers. The root re-exports their **types** as listed above. The `createAudioViewEditing`,
-`audioDocumentPlaybackCompatible`, `createAudioSequenceWaveform` and
-`createAudioClipEditor` runtime values belong only to `/view/headless`; the first
-three are documented above and the editor on
-[AudioClipEditor](/audio/headless/view/audio-clip-editor/). `/view/element`
-exports `AudioDocumentElement`, `defineAudioDocumentElement` and its
-load/state/loader types; see [`<audio-document>`](/audio/element/view/audio-document/).
+`audioDocumentPlaybackCompatible`, `createAudioSequenceWaveform`,
+`createAudioClipEditor` and `loadAudioClipEditor` runtime values belong only to
+`/view/headless`; the first three are documented above and the editor and its
+loader on [AudioClipEditor](/audio/headless/view/audio-clip-editor/).

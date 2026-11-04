@@ -7,8 +7,9 @@ work and does not establish npm publication, a release tag or a deployment.
 
 - Add document-owned editing for Score and Audio as part of View: operations
   and contracts in `/view`, `ScoreEditor`/`AudioClipEditor` in
-  `/view/headless`, `<score-document>`/`<audio-document>` in `/view/element`,
-  and Audio sequence rendering/WAV export in `/play`; revisioned editors with atomic
+  `/view/headless` with `loadScoreEditor`/`loadAudioClipEditor`, editors lent
+  to players and views through `.editor`, and Audio sequence rendering/WAV
+  export in `/play`; revisioned editors with atomic
   commands and bounded undo/redo; playback that pauses and reports the applied document revision;
   piano-roll, bounded staff and waveform editing on the existing Views; local
   Audio processing and WAV export. The

@@ -2,21 +2,23 @@
 
 Status: accepted design (P0, 2026-10-13); P1 Score Core/API/Headless delivered
 and verified on 2026-10-15. P2 Score bindings and piano-roll editing are
-implemented. P3 Audio sequence/history, playback, declaration, waveform editing,
+implemented. P3 Audio sequence/history, playback, loading, waveform editing,
 range processing and WAV export are implemented; current verification belongs to
 STATUS. P4 staff input extends the existing staff View under DEC-054; its
 implementation and verification are tracked in STATUS.
-Related decisions: [DEC-053](../DECISIONS.md#dec-053--document-owned-editing-and-borrowed-playback)
-and [DEC-055](../DECISIONS.md#dec-055--editing-is-a-view-feature-not-a-capability), which
-places editing inside View rather than a separate capability.
+Related decisions: [DEC-053](../DECISIONS.md#dec-053--document-owned-editing-and-borrowed-playback),
+[DEC-055](../DECISIONS.md#dec-055--editing-is-a-view-feature-not-a-capability), which
+places editing inside View rather than a separate capability, and
+[DEC-057](../DECISIONS.md#dec-057--editable-documents-are-an-api-not-a-web-component),
+which replaces the document Web Components with loading APIs.
 [STATUS](../STATUS.md), EDIT-01, owns delivery; the
 [dated proposal](../plans/2026-10-13-editing-capabilities.md) retains the original
 P0–P8 baseline. The current five-phase roadmap is below. This document specifies
 the complete target; public references describe only implemented members.
 
 Layer and entry: domain Core contracts plus View: operations and contracts in the
-`/view` API, editors in `/view/headless`, and the nonvisual declarations in
-`/view/element` (implemented for Score and Audio). Audio sequence rendering and
+`/view` API, and editors with their URL loaders in `/view/headless` (implemented
+for Score and Audio); Elements only borrow an editor through `.editor`. Audio sequence rendering and
 WAV export belong to the `/play` export API. There is no Edit capability.
 Source reuse starts with [ScoreEditSession](../../packages/score/src/core/model/ScoreEditSession.ts),
 [ClipEditSession](../../packages/audio/src/core/model/ClipEditSession.ts),
@@ -26,7 +28,7 @@ Public references and demos ship with the corresponding implementation, using
 the [documentation templates](../docs/README.md).
 The Score surface is documented in the [View API](../../apps/doc/webmusic/src/content/docs/score/api/view.mdx)
 and [ScoreEditor](../../apps/doc/webmusic/src/content/docs/score/headless/view/score-editor.mdx)
-references. Score bindings are described by the [document Element](../../apps/doc/webmusic/src/content/docs/score/element/view/score-document.mdx),
+references. Score bindings are described by the
 [native player](../../apps/doc/webmusic/src/content/docs/score/headless/play/score-player.mdx)
 and [editable View](../../apps/doc/webmusic/src/content/docs/score/element/view/score-view.mdx).
 Audio public contracts are documented in the [View API](../../apps/doc/webmusic/src/content/docs/audio/api/view.mdx),
@@ -57,7 +59,7 @@ are separate work. An editable surface does not imply those capabilities.
 | Domain Core | Immutable models, source/command ports, semantic operations, position maps and asset-reader contracts | No DOM or Play/View implementation |
 | Play | Applied snapshot, preparation, scheduler, transport, audible state and revision acknowledgement | Read-only document source; never commits edits |
 | View | Layout, viewport, focus, hit testing, tool interaction and draft overlays | Core editor port and optional player source/time |
-| `score-document` / `audio-document` | Nonvisual HTML loading and ownership of an editor | Domain loading adapter; no visible renderer |
+| `loadScoreEditor` / `loadAudioClipEditor` | Load one file and create its editor for the application to own | Domain loading adapter; no Element or renderer |
 | Application | Project workflow, persistence, global history and cross-document transactions | Domain commands/checkpoints |
 | Bridge | Reusable cross-domain conversion and coordination | Domain contracts; no application project/history ownership |
 
@@ -289,8 +291,8 @@ reset-origin policy. Document-coordinate seeking and occurrence overlays remain
 unavailable there; passive followers may still show the actual expanded playback
 snapshot. Do not infer authored IDs by parsing repeat suffixes.
 
-Play Headless exposes `setDocumentSource(source | undefined)`; Element `.editor`
-and `editor="#id"` adapt to that same binding. Binding state contains requested
+Play Headless exposes `setDocumentSource(source | undefined)`; the Element
+`.editor` property adapts to that same binding. Binding state contains requested
 and applied document identity/revision, `empty | preparing | ready | error`, and
 an attempt generation and the failure/position policy where relevant. `waitForDocumentRevision` observes
 the current requested revision and settles `applied | superseded | failed`;
@@ -351,40 +353,34 @@ Static PCM analysis uses an explicit render adapter.
 
 ## Web Components and source selection
 
-Implemented composition (the owning public references list each shipped member):
+There is no document Web Component (DEC-057). An application creates and owns
+the editor through the Headless API, then lends it to Elements through the
+`.editor` property. The owning public references list each shipped member.
 
-```html
-<score-document id="score-doc" src="/music.mid"></score-document>
-<score-player id="score-play" editor="#score-doc"></score-player>
-<score-view type="piano-roll" editor="#score-doc" player="#score-play" editable></score-view>
-<score-view type="staff" editor="#score-doc"></score-view>
-
-<audio-document id="audio-doc" src="/audio.wav"></audio-document>
-<audio-player id="audio-play" editor="#audio-doc"></audio-player>
-<audio-view type="waveform" editor="#audio-doc" player="#audio-play" editable></audio-view>
+```js
+import {loadScoreEditor} from '@webmusic/score/view/headless';
+const editor = await loadScoreEditor('/music.mid');
+scorePlayer.editor = editor;
+pianoRoll.editor = editor;   // <score-view type="piano-roll" editable>
+staff.editor = editor;       // <score-view type="staff">
+// …later, after detaching borrowers:
+editor.dispose();
 ```
 
-Declaration Elements expose get-only `.editor` after successful loading. A View
-never creates an editor implicitly. `.editor` supplies content and commands;
-boolean `editable` (default false) only enables mutation gestures. Without a ready
-editor, or for a type that does not support editing, editable state is explicitly
-unavailable; no pretend-success gestures occur. Read-only editor-bound views are
-supported without playback.
+`loadScoreEditor(url, options)` and `loadAudioClipEditor(url, options)` fetch,
+parse or decode one file and create its editor; `createScoreEditor` and
+`createAudioClipEditor` wrap content the application already holds. Loading
+options combine the existing loader limits, format, AbortSignal and, for Audio,
+an injectable decode loader with the editor's history, processing and listener
+options. A failed or aborted load rejects and creates no editor.
 
-A declaration publishes its new `.editor` getter value before dispatching the
-existing bubbling `webmusic:sourcechange` event on connected availability,
-replacement or clearing. This refreshes same-element bindings after asynchronous
-loading; DOM target discovery alone cannot observe a non-reflected property
-change. Pending loads and event callbacks use generation guards, including
-reentrant replacement. Dispose superseded owned editors after notifying borrowers
-of the new source, without allowing an old callback to dispose the current one.
-
-An explicit `.editor` object takes precedence over its `editor` selector; setting
-it to undefined restores selector resolution. An invalid explicit binding never
-falls back. Selector lookup uses the existing browser resolution rules: one target
-in the host Document/ShadowRoot, observable unresolved/ambiguous/error state, late
-insertion/upgrade, removal and replacement. Cross-root composition uses object
-properties. Selector resolution must check the domain port, not just the tag name.
+A View never creates an editor implicitly. `.editor` supplies content and
+commands; boolean `editable` (default false) only enables mutation gestures.
+Without a ready editor, or for a type that does not support editing, editable
+state is explicitly unavailable; no pretend-success gestures occur. Read-only
+editor-bound views are supported without playback. Assigning `undefined`
+detaches the editor; there is no `editor` selector attribute, so cross-root and
+late composition are the application's own object wiring.
 
 An editor combined with independent `.score`/`.clip`, `src`, controller, Rack or
 transport source is a `source-conflict`, even if values appear equal. Programmatic
@@ -399,13 +395,11 @@ matches and the coordinate mapping is valid. During lag, mismatch or failed
 application, show playback pending/unavailable and suppress misleading playheads,
 active-note overlays and seeking. The same document ID alone is insufficient.
 
-URL replacement prepares a new editor before replacing the declaration's current
-one. Failure preserves the previous editor but reports the replacement failure;
-it must not claim the new URL loaded. A disconnected declaration aborts loads and
-disposes its owned editor; borrowers become unavailable. Reconnection reloads the
-configured source with a new document identity. Applications needing document
-lifetime independent of DOM create and own a Headless editor instead. A View or
-Player disconnect releases its bindings, never a borrowed editor.
+The application decides the document's lifetime. Replacing a document means
+loading or creating the new editor, assigning it to every borrower, then
+disposing the old one; disposing an editor still assigned makes its borrowers
+unavailable. A View or Player disconnect releases its bindings, never a borrowed
+editor.
 
 ## Interaction and presentation
 
@@ -479,13 +473,13 @@ memory. Audio load retains the existing loader limits; total decode, assets,
 playback cache, history, jobs and export are measured separately. Structural
 edits/undo must not read whole PCM; playback adoption must not render full output.
 
-Audio declaration loading in `view/element/internal/audio-document-loader.ts`
-imports `loadClipFromUrl` from `play/api/load.ts` over the existing View-to-Play
-edge. It sets `streaming: false`, forwards AbortSignal and resource limits, and
-creates no implicit AudioContext. Native decoding, when needed, uses a
-caller-injected loader closure with its borrowed context. Default codec
-availability remains the existing loader's capability. The View API root and
-Headless entries cannot reach that browser adapter.
+`loadAudioClipEditor` in `view/headless/load-audio-clip-editor.ts` imports
+`loadClipFromUrl` from `play/api/load.ts` over the existing View-to-Play edge.
+Its default loader sets `streaming: false`, forwards AbortSignal and resource
+limits, and creates no implicit AudioContext. Native decoding, when needed, uses
+a caller-injected loader closure with its borrowed context. Default codec
+availability remains the existing loader's capability. `loadScoreEditor`
+imports the Score I/O loader on demand.
 
 ## Implementation and reference delivery
 
@@ -498,7 +492,7 @@ claim completion.
 |---|---|---|
 | P0 | Accepted document, history, timing, playback and component contracts | Original P0 |
 | P1 | Score Core ports/maps, velocity/schema migration, atomic editing API/Headless commands, history, checkpoints and interaction sessions | Original P1 |
-| P2 | Native Score playback revision application, HTML document declaration/bindings, and piano-roll editing through import, undo, audition and MIDI export | Original P2–P3 |
+| P2 | Native Score playback revision application, Element `.editor` bindings, and piano-roll editing through import, undo, audition and MIDI export | Original P2–P3 |
 | P3 | Audio single-file asset/sequence model, structural history, segment playback, HTML binding, waveform editing, local processing and WAV export | Original P4–P6 |
 | P4 | Staff-input keyboard/voice prototype, tag-boundary decision, and notation editing against the shared Score editor | Original P7 |
 
@@ -513,8 +507,7 @@ registration side effects, [package policy](../../scripts/package-policy.mjs),
 [Element composition](../../scripts/element-composition-policy.mjs), catalogs
 and owning public references together. Editing pieces ship inside the existing
 View layers (and Audio export inside Play), so they add no capability, entry or
-layer of their own. Review nonvisual declarations like other behavior-only
-elements. Review format migrations,
+layer of their own. Review format migrations,
 optional dependencies and all other surfaces in the
 [Architecture policy table](../ARCHITECTURE.md#executable-policy-and-documentation-authority).
 

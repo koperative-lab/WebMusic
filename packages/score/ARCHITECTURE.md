@@ -48,9 +48,9 @@ explains what it buys.
 Document editing is part of View (DEC-055). `ScoreEditor` in `view/headless`
 is the single document commit owner. Shared read/command ports and position maps
 live in `core/editing.ts`; Play binds through those ports without importing View.
-The nonvisual `ScoreDocumentElement` in `view/element` loads a Score and owns an
-editor for its connected lifetime. Kernel's generic `observeElementSource`
-adapts explicit objects and same-root selectors in the browser layer. The
+`loadScoreEditor` loads a file into a new editor that the application owns and
+lends to Elements through `.editor` (DEC-057). Kernel's generic
+`observeElementSource` adapts that explicit object in the browser layer. The
 existing React adapters do not yet wrap editing.
 
 Staff input uses a separate View Headless controller over the same Core editor
@@ -111,9 +111,7 @@ element → api → headless → core
 Consumers can use Web Components, Headless, or API + UI. These reuse the same
 domain resources; the four source directories are not four required usage stages.
 Editing adds no entries: operations and contracts ship from `/view`, the
-editor from `/view/headless`, and the presenter-free `<score-document>`
-declaration from `/view/element`, registered by `defineScoreDocumentElement()`
-or `defineAllViewElements()`. Editable piano-roll and staff interaction stay in
+editor and `loadScoreEditor` from `/view/headless`. Editable piano-roll and staff interaction stay in
 View's browser renderers.
 Prefer existing controllers and presenters before adding another engine or
 per-variant tag. Three consequences matter for implementation:
@@ -486,7 +484,7 @@ for changed notes and preserve effective velocity through `velocityOverride`;
 Score JSON v0.2 carries the field while reading v0.1 and legacy input.
 
 Native playback applies document revisions through Core ports while retaining
-its scheduler and clock. Nonvisual `score-document` owns the editor; existing
+its scheduler and clock. The application owns the editor; existing
 View adds written-quarter piano-roll gestures and exact-value alternatives.
 These implement P2 in the [current editing roadmap](../../dev/design/EDIT-COMPONENTS.md#implementation-and-reference-delivery).
 The [View API](../../apps/doc/webmusic/src/content/docs/score/api/view.mdx) owns

@@ -41,37 +41,43 @@ function editor() {
     replace: () => {snapshot = {...snapshot, contentId: 'changed', documentRevision: 1};},
   };
 }
-function mountWorkflow() {
-  document.body.innerHTML = `<div data-wm-pg><section data-audio-edit-demo>
-    <audio-document data-audio-edit-document src="example.wav"></audio-document>
+type Editor = ReturnType<typeof editor>;
+async function mountWorkflow(initial: 'ready' | 'pending' = 'ready') {
+  document.body.innerHTML = `<div data-wm-pg><section data-audio-edit-demo data-audio-edit-src="example.wav">
     <audio-player data-audio-edit-player></audio-player><audio-view data-audio-edit-view></audio-view>
     <p data-audio-edit-status></p><p data-audio-edit-result>Ready to edit.</p>
     <input data-audio-edit-import type="file"><button data-audio-edit-process="normalize"></button>
     <button data-audio-edit-cancel></button><button data-audio-edit-export></button><button data-audio-edit-restore></button>
   </section></div>`;
-  const owner = Object.assign(document.querySelector('[data-audio-edit-document]')!, {
-    clip: undefined as unknown, editor: editor(), status: 'loading', reload: vi.fn<() => Promise<unknown>>(),
-  });
-  const player = Object.assign(document.querySelector('[data-audio-edit-player]')!, {documentBinding: undefined as unknown});
-  const view = Object.assign(document.querySelector('[data-audio-edit-view]')!, {
-    editor: owner.editor, interactionSession: owner.editor.createInteractionSession(),
-  });
+  const player = Object.assign(document.querySelector('[data-audio-edit-player]')!, {documentBinding: undefined as unknown, editor: undefined as unknown});
+  const view = Object.assign(document.querySelector('[data-audio-edit-view]')!, {editor: undefined as unknown, interactionSession: undefined as unknown as ReturnType<Editor['createInteractionSession']>});
+  const first = editor();
+  const configured = deferred<Editor>();
+  const headless = {
+    loadAudioClipEditor: vi.fn<(...args: unknown[]) => Promise<Editor>>(() => configured.promise),
+    createAudioClipEditor: vi.fn<(...args: unknown[]) => Editor>(() => editor()),
+  };
   const io = {
     loadClip: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
     exportAudioSequenceWav: vi.fn<(...args: unknown[]) => Promise<ArrayBuffer>>(),
   };
   runDemo('elements/AudioEditingDemo', {
     '@webmusic/audio/play/element': {defineAudioPlayerElement() {}},
-    '@webmusic/audio/view/element': {defineAudioDocumentElement() {}, defineAudioViewElement() {}},
-    '@webmusic/audio/view': {createAudioRangeProcessor: vi.fn()},
+    '@webmusic/audio/view/element': {defineAudioViewElement() {}},
+    '@webmusic/audio/view/headless': headless,
+    '@webmusic/audio/view': {createAudioRangeProcessor: vi.fn((kind: string) => ({id: kind}))},
     '@webmusic/audio/play': io,
   });
+  if (initial === 'ready') {
+    configured.resolve(first); await flush();
+    view.interactionSession = first.createInteractionSession();
+  }
   const upload = document.querySelector<HTMLInputElement>('[data-audio-edit-import]')!;
   const choose = (file: {name: string}) => {
     Object.defineProperty(upload, 'files', {configurable: true, value: [file]});
     upload.dispatchEvent(new Event('change'));
   };
-  return {owner, view, player, io, choose, result: document.querySelector('[data-audio-edit-result]')!};
+  return {first, configured, headless, view, player, io, choose, result: document.querySelector('[data-audio-edit-result]')!};
 }
 afterEach(async () => {
   for (const stop of registrations.splice(0)) stop();
@@ -82,24 +88,34 @@ afterEach(async () => {
 });
 
 describe('Audio editing workflow demo', () => {
+  it('loads the configured URL with the demo processors and lends one editor to both elements', async () => {
+    const {first, headless, view, player} = await mountWorkflow();
+    expect(headless.loadAudioClipEditor).toHaveBeenCalledWith('example.wav', expect.objectContaining({
+      processors: [{id: 'normalize'}, {id: 'reverse'}], signal: expect.any(AbortSignal),
+    }));
+    expect(player.editor).toBe(first);
+    expect(view.editor).toBe(first);
+    expect(document.querySelector('[data-audio-edit-status]')!.textContent).toContain('Document ready · 16 frames · revision 0');
+  });
+
   it('rejects processing a selection from another document binding', async () => {
-    const {owner, view, result} = mountWorkflow();
+    const {first, view, result} = await mountWorkflow();
     const button = document.querySelector<HTMLButtonElement>('[data-audio-edit-process]')!;
     view.editor = editor();
     button.click(); await flush();
-    expect(owner.editor.processRange).not.toHaveBeenCalled();
+    expect(first.processRange).not.toHaveBeenCalled();
     expect(result.textContent).toContain('Bind the waveform to this audio document');
-    view.editor = owner.editor;
+    view.editor = first;
     view.interactionSession.getSnapshot = () => ({documentId: 'foreign', selection: {startFrame: 2, endFrame: 8}, disposed: false});
     button.click(); await flush();
-    expect(owner.editor.processRange).not.toHaveBeenCalled();
+    expect(first.processRange).not.toHaveBeenCalled();
     view.interactionSession.getSnapshot = () => ({documentId: 'document', selection: {startFrame: 2, endFrame: 8}, disposed: false});
     button.click(); await flush();
-    expect(owner.editor.processRange).toHaveBeenCalledWith(expect.objectContaining({documentId: 'document', startFrame: 2, endFrame: 8}));
+    expect(first.processRange).toHaveBeenCalledWith(expect.objectContaining({documentId: 'document', startFrame: 2, endFrame: 8}));
   });
 
   it.each(['direct', 'wrapped'])('clears a %s transient error only when the matching revision is ready', async format => {
-    const {owner, player, io, choose, result} = mountWorkflow();
+    const {player, io, choose, result} = await mountWorkflow();
     const error = Object.assign(new Error('Audio editor is unavailable.'), {code: 'not-ready'});
     const detail = format === 'direct' ? error : {error};
     player.dispatchEvent(new CustomEvent('webaudio:error', {bubbles: true, detail}));
@@ -111,54 +127,76 @@ describe('Audio editing workflow demo', () => {
     expect(result.textContent).toBe('Ready to edit.');
     player.dispatchEvent(new CustomEvent('webaudio:error', {bubbles: true, detail}));
     io.loadClip.mockResolvedValue({length: 20}); choose({name: 'selected.wav'}); await flush();
-    owner.status = 'ready'; player.dispatchEvent(new Event('webaudio:documentstatechange'));
+    player.dispatchEvent(new Event('webaudio:documentstatechange'));
     expect(result.textContent).toBe('Imported selected.wav.');
   });
 
-  it('aborts a pending import at Reset and ignores its late result', async () => {
-    const {owner, io, choose, result} = mountWorkflow();
-    const imported = deferred<unknown>(), reload = deferred<unknown>();
-    io.loadClip.mockReturnValue(imported.promise); owner.reload.mockReturnValue(reload.promise);
+  it('replaces the editor on import and disposes the previous one after the elements detach from it', async () => {
+    const {first, headless, view, player, io, choose, result} = await mountWorkflow();
+    const clip = {length: 20}; io.loadClip.mockResolvedValue(clip);
+    first.dispose.mockImplementation(() => {
+      expect(player.editor).not.toBe(first); expect(view.editor).not.toBe(first);
+    });
+    choose({name: 'selected.wav'}); await flush();
+    expect(headless.createAudioClipEditor).toHaveBeenCalledWith(clip, {processors: [{id: 'normalize'}, {id: 'reverse'}]});
+    const imported = headless.createAudioClipEditor.mock.results[0].value as Editor;
+    expect(player.editor).toBe(imported); expect(view.editor).toBe(imported);
+    expect(first.dispose).toHaveBeenCalledOnce();
+    expect(imported.dispose).not.toHaveBeenCalled();
+    expect(result.textContent).toBe('Imported selected.wav.');
+  });
+
+  it('lets an import supersede the pending configured load and disposes its late editor', async () => {
+    const {first, configured, headless, player, io, choose} = await mountWorkflow('pending');
+    const options = headless.loadAudioClipEditor.mock.calls[0][1] as {signal: AbortSignal};
+    io.loadClip.mockResolvedValue({length: 20}); choose({name: 'selected.wav'}); await flush();
+    expect(options.signal.aborted).toBe(true);
+    configured.resolve(first); await flush();
+    expect(first.dispose).toHaveBeenCalledOnce();
+    expect(player.editor).toBe(headless.createAudioClipEditor.mock.results[0].value);
+  });
+
+  it('aborts a pending import at Reset and reports a failed reload while keeping the current editor', async () => {
+    const {first, headless, player, io, choose, result} = await mountWorkflow();
+    const imported = deferred<unknown>();
+    io.loadClip.mockReturnValue(imported.promise);
     choose({name: 'selected.wav'});
     const options = io.loadClip.mock.calls[0][1] as {signal: AbortSignal};
+    let rejectReload!: (error: unknown) => void;
+    headless.loadAudioClipEditor.mockReturnValueOnce(new Promise((_yes, no) => {rejectReload = no;}));
     document.querySelector('[data-wm-pg]')!.dispatchEvent(new Event('webmusic:playground-reset'));
     expect(options.signal.aborted).toBe(true);
     imported.resolve({length: 30}); await flush();
-    expect(owner.clip).toBeUndefined();
+    expect(headless.createAudioClipEditor).not.toHaveBeenCalled();
     expect(result.textContent).toBe('Reloading configured source.');
-    reload.resolve({status: 'failed', error: new Error('decode failed')}); await flush();
+    rejectReload(new Error('decode failed')); await flush();
     expect(result.textContent).toBe('Error: decode failed');
+    expect(player.editor).toBe(first);
+    expect(first.dispose).not.toHaveBeenCalled();
   });
 
   it('exports the retained snapshot without marking a newer root saved', async () => {
-    const {owner, io, result} = mountWorkflow();
+    const {first, io, result} = await mountWorkflow();
     const bytes = deferred<ArrayBuffer>(); io.exportAudioSequenceWav.mockReturnValue(bytes.promise);
     Object.defineProperty(URL, 'createObjectURL', {configurable: true, value: vi.fn(() => 'blob:download')});
     Object.defineProperty(URL, 'revokeObjectURL', {configurable: true, value: vi.fn()});
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
     document.querySelector<HTMLButtonElement>('[data-audio-edit-export]')!.click();
-    owner.editor.replace(); bytes.resolve(new ArrayBuffer(44)); await flush();
-    expect(owner.editor.markSaved).not.toHaveBeenCalled();
+    first.replace(); bytes.resolve(new ArrayBuffer(44)); await flush();
+    expect(first.markSaved).not.toHaveBeenCalled();
     expect(result.textContent).toContain('revision 0');
+  });
+
+  it('detaches both elements and disposes the owned editor at teardown', async () => {
+    const {first, view, player} = await mountWorkflow();
+    for (const stop of registrations.splice(0)) stop();
+    expect(player.editor).toBeUndefined(); expect(view.editor).toBeUndefined();
+    expect(first.cancelProcessing).toHaveBeenCalled();
+    expect(first.dispose).toHaveBeenCalledOnce();
   });
 });
 
-describe('Audio document demo controls', () => {
-  it('replaces stale Reset feedback and preserves a detailed reload failure', async () => {
-    document.body.innerHTML = `<div data-wm-pg><section data-audio-document-demo><audio-document></audio-document>
-      <p data-summary></p><p data-result>committed</p></section><button data-action="reload"></button></div>`;
-    const owner = Object.assign(document.querySelector('audio-document')!, {editor: editor(), status: 'ready', reload: vi.fn<() => Promise<unknown>>()});
-    runDemo('elements/AudioDocumentPlayground', {'@webmusic/audio/view/element': {defineAudioDocumentElement() {}}});
-    const result = document.querySelector('[data-result]')!;
-    const reset = deferred<unknown>(); owner.reload.mockReturnValue(reset.promise);
-    document.querySelector('[data-wm-pg]')!.dispatchEvent(new Event('webmusic:playground-reset')); await flush();
-    expect(result.textContent).toBe('Reloading the configured source.');
-    reset.resolve({status: 'ready'}); await flush(); expect(result.textContent).toBe('Reload: ready');
-    owner.reload.mockResolvedValue({status: 'failed', error: new Error('decoding failed')});
-    document.querySelector<HTMLButtonElement>('[data-action="reload"]')!.click(); await flush();
-    expect(result.textContent).toBe('Error: decoding failed');
-  });
-
+describe('Audio editor Headless demo', () => {
   it('resets Headless input and releases the old editor, session and checkpoint', () => {
     document.body.innerHTML = `<section data-audio-editor-demo><p data-summary></p><ul data-segments></ul><p data-last></p>
       <p data-hl-feedback></p><input data-limit value="100"><textarea data-operations>[]</textarea>

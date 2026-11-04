@@ -18,13 +18,6 @@ function view(): ScoreViewElement {
   const value = document.createElement('lifecycle-score-view') as ScoreViewElement;
   value.editable = true; return value;
 }
-function declaration(value: ScoreEditor): HTMLDivElement & {editor: ScoreEditor} {
-  const owner = Object.assign(document.createElement('div'), {editor: value});
-  owner.id = 'document'; document.body.append(owner); return owner;
-}
-function publish(owner: HTMLDivElement & {editor: ScoreEditor}, value: ScoreEditor): void {
-  owner.editor = value; owner.dispatchEvent(new CustomEvent('webmusic:sourcechange', {bubbles: true}));
-}
 function expectBound(element: ScoreViewElement, target: ScoreEditor): void {
   expect(element.editor).toBe(target);
   expect(element.interactionSession!.getSnapshot().documentId).toBe(target.getSnapshot().documentId);
@@ -40,8 +33,8 @@ afterEach(() => {
 describe('Score View editor attachment cleanup', () => {
   it.each(['source', 'presentation'])('preserves a newer binding during active draft cancellation from %s cleanup', trigger => {
     const added = vi.spyOn(window, 'addEventListener'), removed = vi.spyOn(window, 'removeEventListener');
-    const a = editor(60), b = editor(64), c = editor(67), owner = declaration(a), element = view();
-    element.setAttribute('editor', '#document'); document.body.append(element);
+    const a = editor(60), b = editor(64), c = editor(67), element = view();
+    element.editor = a; document.body.append(element);
     const subscriptions: ReturnType<typeof vi.fn>[] = [];
     const subscribe = c.subscribeState.bind(c);
     vi.spyOn(c, 'subscribeState').mockImplementation(listener => {
@@ -57,7 +50,7 @@ describe('Score View editor attachment cleanup', () => {
     const session = element.interactionSession!; expect(session.getSnapshot().draft).toBeDefined();
     let armed = true;
     session.subscribe(state => { if (armed && !state.draft) { armed = false; element.editor = c; } });
-    if (trigger === 'source') publish(owner, b); else element.setAttribute('note-height', '22');
+    if (trigger === 'source') element.editor = b; else element.setAttribute('note-height', '22');
     expectBound(element, c);
     element.remove(); expect(subscriptions.length).toBeGreaterThan(0);
     expect(subscriptions.every(unsubscribe => unsubscribe.mock.calls.length === 1)).toBe(true);
@@ -66,24 +59,15 @@ describe('Score View editor attachment cleanup', () => {
   });
 
   it('keeps a newer explicit binding requested by the old session disposal callback', () => {
-    const a = editor(60), b = editor(64), c = editor(67), owner = declaration(a), element = view();
-    element.setAttribute('editor', '#document'); document.body.append(element);
+    const a = editor(60), b = editor(64), c = editor(67), element = view();
+    element.editor = a; document.body.append(element);
     element.interactionSession!.subscribe(state => { if (state.disposed) element.editor = c; });
-    publish(owner, b);
+    element.editor = b;
     expectBound(element, c);
     element.interactionSession!.setSelection([noteId]);
     element.querySelector('[part="editing-surface"]')!.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowUp', bubbles: true}));
     expect(c.score.getNote(noteId)!.pitch.midi).toBe(68);
     expect(b.score.getNote(noteId)!.pitch.midi).toBe(64);
-  });
-
-  it('keeps a nested selector-source replacement and continues observing later replacements', () => {
-    const a = editor(60), b = editor(64), c = editor(67), d = editor(69), owner = declaration(a), element = view();
-    element.setAttribute('editor', '#document'); document.body.append(element);
-    element.interactionSession!.subscribe(state => { if (state.disposed) publish(owner, c); });
-    publish(owner, b); expectBound(element, c);
-    const session = element.interactionSession!;
-    publish(owner, d); expectBound(element, d); expect(session.getSnapshot().disposed).toBe(true);
   });
 
   it('releases every intermediate owned session after reentrant direct property replacement', () => {
@@ -101,11 +85,11 @@ describe('Score View editor attachment cleanup', () => {
   });
 
   it('does not adopt a source if old-session cleanup disconnects the view', () => {
-    const a = editor(60), b = editor(64), owner = declaration(a), element = view();
-    element.setAttribute('editor', '#document'); document.body.append(element);
+    const a = editor(60), b = editor(64), element = view();
+    element.editor = a; document.body.append(element);
     element.interactionSession!.subscribe(state => { if (state.disposed) element.remove(); });
     const create = vi.spyOn(b, 'createInteractionSession');
-    publish(owner, b);
+    element.editor = b;
     expect(element.isConnected).toBe(false); expect(element.interactionSession).toBeUndefined();
     expect(create).not.toHaveBeenCalled(); expect(b.getSnapshot().status).toBe('ready');
   });

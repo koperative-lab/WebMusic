@@ -88,7 +88,7 @@ these API entries are DOM-free.
 | `@webmusic/score/view` | Stateless view API: layout geometry, note sequences, types, plus atomic note operations, document contracts and position maps for editing. |
 | `@webmusic/score/view/headless` | Score windows, map navigation and held-pitch state with optional borrowed playback, and the persistent `ScoreEditor` (bounded history, checkpoints, draft/selection sessions); no DOM. |
 | `@webmusic/score/view/render` | Imperative browser visualizers (SVG / canvas / OSMD). |
-| `@webmusic/score/view/element` | `<score-view>`, `<score-pitch-view>` and `<score-sheet-view>` Web Components, and the nonvisual `<score-document>` owner. |
+| `@webmusic/score/view/element` | `<score-view>`, `<score-pitch-view>` and `<score-sheet-view>` Web Components. |
 | `@webmusic/score/play` | Stateless playback API: SFZ data helpers, offline render types. |
 | `@webmusic/score/play/headless` | Players, synths, `Sound`, `Effect`, `Rack`, `LfoController`, offline rendering. |
 | `@webmusic/score/play/drivers` | Pointer / scroll / orientation / value transport adapters. |
@@ -278,8 +278,9 @@ editor.dispose();
 Effective timing edits make written time authoritative for changed notes while
 preserving their effective velocity. Unchanged notes keep their performed timing.
 Native ScorePlayer borrows the editor through `setDocumentSource(editor)`.
-For HTML, `<score-document>` owns loading and editor disposal; `score-player`
-and `score-view` accept `editor="#document-id"`. Piano-roll and staff Views enable
+`loadScoreEditor(url)` loads a file into a new editor. Assign it to
+`score-player` and `score-view` through `.editor`; the application owns and
+disposes it. Piano-roll and staff Views enable
 editing with `editable`. Staff entry uses an explicit input mode and supports
 simple note/rest entry with voice completion inside authored measures. It rejects
 unsupported structures and unmeasured MIDI rather than inferring notation.

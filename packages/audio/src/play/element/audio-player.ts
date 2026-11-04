@@ -82,7 +82,6 @@ export class AudioPlayerElement extends WebMusicElement {
   static get observedAttributes(): string[] {
     return [
       'src',
-      'editor',
       'format',
       'controls',
       'loop',
@@ -173,7 +172,7 @@ export class AudioPlayerElement extends WebMusicElement {
     // Nothing is lost while disconnected: applySource() and applyAttributes()
     // reconcile every attribute on the next mount.
     if (!this.isConnected) return;
-    if (name === 'editor' || (name === 'src' && this.hasEditorSource())) {
+    if (name === 'src' && this.hasEditorSource()) {
       // A removed src no longer conflicts once its loaded clip is released.
       if (name === 'src' && !value && this.clipOrigin === 'src') this.clearLoadedClip();
       this.bindEditor(); return;
@@ -277,7 +276,7 @@ export class AudioPlayerElement extends WebMusicElement {
     return this._effect;
   }
 
-  /** Borrow a read-only document port; undefined restores selector resolution. */
+  /** Borrow a read-only document port; the caller keeps it. Undefined detaches it. */
   set editor(source: AudioDocumentSource | undefined) {
     if (source !== undefined && !isAudioDocumentSource(source)) throw new AudioDocumentApplicationError('invalid-source', 'Expected an AudioDocumentSource');
     if (source && this.hasIndependentSource()) throw this.sourceConflict();
@@ -306,7 +305,7 @@ export class AudioPlayerElement extends WebMusicElement {
       error: this.documentError ?? new AudioDocumentApplicationError('not-ready', 'Player unavailable')});
     return this._player.retryDocumentApplication();
   }
-  private hasEditorSource(): boolean { return this.explicitEditor !== undefined || this.hasAttribute('editor'); }
+  private hasEditorSource(): boolean { return this.explicitEditor !== undefined; }
   private hasIndependentSource(): boolean {
     return this.hasAttribute('src') || this._clip !== undefined || Boolean(this._player && !this.ownsPlayer) ||
       Boolean(this._player?.transport && !this._player.documentSource);
@@ -347,14 +346,15 @@ export class AudioPlayerElement extends WebMusicElement {
       this.applySource(); this.notifyUI(); return;
     }
     this.cancelLoad();
-    const cleanup = observeElementSource(this, {source: this.explicitEditor, selector: this.getAttribute('editor') ?? undefined,
+    // Editors are assigned through `.editor` only; there is no selector attribute.
+    const cleanup = observeElementSource(this, {source: this.explicitEditor,
       property: 'editor', accepts: isAudioDocumentSource}, (resolution) => {
       if (!this.isConnected || generation !== this.editorGeneration) return;
       this.selectedEditor = resolution.source;
       // A target not inserted yet and a declaration still loading are pending;
       // only a conflict or an unusable (empty, invalid, ambiguous) selection is an error.
       const conflict = this.hasIndependentSource();
-      const state = resolution.state === 'missing' && !this.explicitEditor && !this.getAttribute('editor') ? 'invalid' : resolution.state;
+      const state = resolution.state === 'missing' && !this.explicitEditor ? 'invalid' : resolution.state;
       const error = conflict ? this.sourceConflict() :
         state !== 'ready' ? new AudioDocumentApplicationError('not-ready', `Audio editor is ${state}`) : undefined;
       this.documentError = error;

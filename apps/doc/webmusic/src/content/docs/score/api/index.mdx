@@ -41,14 +41,14 @@ capability pages below document what is inside each entry.
 | `@webmusic/score/analyze/element` | [Web Components](/score/element/#analyze) | Chord score/live modes, spelled intervals, explicit scale degrees and grouped rhythmic placement. |
 | `@webmusic/score/analyze/worker-client` · `@webmusic/score/analyze/worker-protocol` · `@webmusic/score/analyze/worker` | worker triple | Off-main-thread analysis: the client, the wire protocol, and the worker runtime. |
 | `@webmusic/score/view` | [capability root](/score/api/view/) | Layout and projection helpers, pure edit operations, document contracts and position maps. |
-| `@webmusic/score/view/headless` | [Headless](/score/headless/#view) | `createScoreView`, map/pitch/editing models, `createActiveNoteTracker` and `ScoreEditor`. |
+| `@webmusic/score/view/headless` | [Headless](/score/headless/#view) | `createScoreView`, map/pitch/editing models, `createActiveNoteTracker`, `ScoreEditor` and `loadScoreEditor`. |
 | `@webmusic/score/view/render` | code-only sub-entry | Imperative DOM/canvas/SVG renderers and the player binding. |
-| `@webmusic/score/view/element` | [Web Components](/score/element/#view) | `<score-view>`, `<score-pitch-view>`, `<score-sheet-view>` and the nonvisual `<score-document>`. |
+| `@webmusic/score/view/element` | [Web Components](/score/element/#view) | `<score-view>`, `<score-pitch-view>` and `<score-sheet-view>`. |
 | `@webmusic/score/react` | [capability root](/score/api/react/) | React components and hooks for the existing I/O, Play, Analyze and View composition; React is an optional peer. |
 
 Score has no `/view/auto` or `/view/global`, and no `/analyze/auto`.
-Only Play supplies automatic registration and a browser IIFE; View tags,
-including `<score-document>`, register explicitly. Document editing has no React wrapper.
+Only Play supplies automatic registration and a browser IIFE; View tags
+register explicitly. Document editing has no React wrapper.
 
 ## Install
 

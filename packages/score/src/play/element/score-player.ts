@@ -115,7 +115,6 @@ export class ScorePlayerElement extends WebMusicElement {
   static get observedAttributes(): string[] {
     return [
       'src',
-      'editor',
       'format',
       'sound-font',
       'volume',
@@ -248,7 +247,6 @@ export class ScorePlayerElement extends WebMusicElement {
   attributeChangedCallback(name?: string): void {
     if (!this.isConnected) return;
     if (name && !ScorePlayerElement.observedAttributes.includes(name)) return;
-    if (name === 'editor') { this.bindEditorSource(); return; }
     // The live knobs apply in place. Re-rendering for them would tear the
     // player down and restart the piece just to change a volume.
     if (name === 'rate' || name === 'volume' || name === 'pan' || name === 'loop') {
@@ -279,7 +277,7 @@ export class ScorePlayerElement extends WebMusicElement {
     return this.explicitScore;
   }
 
-  /** Borrow an editor's read-only document port; undefined restores selector lookup. */
+  /** Borrow an editor's read-only document port; the caller keeps it. Undefined detaches it. */
   set editor(source: ScoreDocumentSource | undefined) {
     if (source !== undefined) {
       if (!isScoreDocumentSource(source)) throw new ScoreDocumentApplicationError('invalid-source', 'Expected a Score document source.');
@@ -690,7 +688,7 @@ export class ScorePlayerElement extends WebMusicElement {
   }
 
   private hasEditorSource(): boolean {
-    return this.explicitEditor !== undefined || this.getAttribute('editor') !== null;
+    return this.explicitEditor !== undefined;
   }
 
   private hasIndependentSource(): boolean {
@@ -717,8 +715,9 @@ export class ScorePlayerElement extends WebMusicElement {
       return;
     }
     let initial = !render;
+    // Editors are assigned through `.editor` only; there is no selector attribute.
     const cleanup = observeElementSource(this, {source: this.explicitEditor,
-      selector: this.getAttribute('editor') ?? undefined, property: 'editor', accepts: isScoreDocumentSource}, (resolution) => {
+      property: 'editor', accepts: isScoreDocumentSource}, (resolution) => {
       if (generation !== this.editorGeneration || !this.isConnected) return;
       this.editorResolution = resolution;
       this.selectedEditor = resolution.source;
@@ -838,7 +837,7 @@ export class ScorePlayerElement extends WebMusicElement {
         // A declaration still loading, a target not inserted yet and a disposed
         // editor are pending; only an unusable selection is an error.
         const resolved = this.editorResolution?.state ?? 'unavailable';
-        const state = resolved === 'ready' ? 'disposed' : resolved === 'missing' && !this.explicitEditor && !this.getAttribute('editor') ? 'invalid' : resolved;
+        const state = resolved === 'ready' ? 'disposed' : resolved === 'missing' && !this.explicitEditor ? 'invalid' : resolved;
         this.blockDocument(new ScoreDocumentApplicationError('not-ready', `Score editor is ${state}.`), state, state === 'invalid' || state === 'ambiguous');
         return;
       }

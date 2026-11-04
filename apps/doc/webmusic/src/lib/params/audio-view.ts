@@ -70,10 +70,6 @@ export const AUDIO_VIEW_PARAMS: ElementParamCatalog = {
         note: 'Same-root selector of exactly one player, observed for late insertion, upgrade and replacement; multiple matches bind nothing and invalid syntax emits webaudio:error. Live position/activity supports display-frame following; event-only targets keep their timeupdate cadence. The meter borrows .analyser.',
       },
       {
-        name: 'editor', kind: 'text', placeholder: '#audio-document', fallback: 'no editable document',
-        note: 'Same-root selector of one owner exposing an AudioClipEditorPort. Conflicts with independent src/peaks/clip data; .editor overrides this selector.',
-      },
-      {
         name: 'editable', kind: 'bool', fallback: 'off',
         note: 'Enable frame selection and waveform editing with a ready editor. No editor is created implicitly; annotate suspends content gestures, and scrub centering waits until editing is off.',
       },
@@ -279,7 +275,7 @@ export const AUDIO_VIEW_PARAMS: ElementParamCatalog = {
       },
     ],
     properties: [
-      {name: 'editor', note: 'Borrow an AudioClipEditorPort. Undefined restores the selector; disconnection never disposes the owner.'},
+      {name: 'editor', note: 'Assign an editor from loadAudioClipEditor/createAudioClipEditor; borrowed, never disposed. Undefined detaches it. Conflicts with independent src/peaks/clip data.'},
       {name: 'interactionSession', note: 'Optional shared AudioInteractionSession for range selection/drafts. Otherwise this View owns a local session.'},
       {name: 'clip', note: 'An AudioClip you already have; cancels any in-flight src load.'},
       {name: 'peaks', note: 'An AudioPeaks pyramid. Wins over src and peaks-src alike.'},
@@ -351,33 +347,5 @@ export const AUDIO_VIEW_PARAMS: ElementParamCatalog = {
       {name: 'windowSeconds', note: 'Getter: the clamped window-seconds attribute.'},
     ],
     events: [{name: 'webaudio:error', note: '{error} when presenter sizing, animation or the draw adapter fails.'}],
-  },
-
-  // Nonvisual document owner borrowed by <audio-player> and <audio-view>.
-  'audio-document': {
-    tag: 'audio-document',
-    entry: ENTRY,
-    params: [
-      {name: 'src', kind: 'text', fallback: 'No URL', note: 'Load a new document; a failed replacement retains the previous editor.'},
-      {name: 'format', kind: 'enum', options: [...AUDIO_FORMATS], fallback: 'Auto — extension or content', note: 'Override URL format detection; ignored while .clip is assigned.'},
-      {name: 'history', kind: 'bool', fallback: 'true — local undo is enabled', note: 'Changing whether history is enabled creates a fresh document with the configured input; an equivalent spelling keeps the editor.'},
-      {name: 'history-limit', kind: 'number', min: 1, step: 1, fallback: '100', note: 'Maximum retained undo/redo transactions; ignored, without recreating the editor, when history is false.'},
-    ],
-    properties: [
-      {name: 'clip', note: 'Explicit decoded AudioClip input; undefined restores src loading.'},
-      {name: 'loader', note: 'Optional caller-owned decoding closure; receives URL, limits and AbortSignal.'},
-      {name: 'loadOptions', note: 'Configured input/decode resource limits forwarded to the loader; an injected loader enforces its own limits.'},
-      {name: 'processors', note: 'Borrowed range processor recipes. A pending URL load adopts a replacement; otherwise replacing the array reloads the configured document and discards unexported edits and history.'},
-      {name: 'editor', note: 'Read-only owned AudioClipEditor, available after successful loading.'},
-      {name: 'status', note: 'Read-only empty/loading/ready/error/disposed state.'},
-      {name: 'error', note: 'Read-only most recent load/configuration error.'},
-      {name: 'loadedSrc', note: 'Read-only successfully loaded URL, independent of a pending or failed src.'},
-      {name: 'reload()', note: 'Retry the configured input and return ready/empty/superseded/failed.'},
-    ],
-    events: [
-      {name: 'webmusic:sourcechange', note: 'The editor getter changed; subscribers reconnect before the prior editor is disposed.'},
-      {name: 'webaudio:documentstatechange', note: 'Loading/result state with editor, loadedSrc and error.'},
-      {name: 'webaudio:error', note: 'Failed document-load operation.'},
-    ],
   },
 };

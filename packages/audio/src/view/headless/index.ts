@@ -114,3 +114,6 @@ export {
 } from './sequence-waveform';
 
 export {AudioClipEditor, createAudioClipEditor, type AudioClipEditorOptions} from './audio-clip-editor';
+export {
+  loadAudioClipEditor, type LoadAudioClipEditorOptions, type AudioClipEditorLoader, type AudioClipEditorLoadLimits,
+} from './load-audio-clip-editor';

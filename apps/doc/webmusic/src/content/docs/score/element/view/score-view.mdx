@@ -247,22 +247,28 @@ Missing source data displays a quiet square waiting animation. Loading a URL or 
 
 ## Piano-roll editing
 
-Bind a [Score document](/score/element/view/score-document/) and add `editable`
-to edit its existing piano-roll surface. The document owns content and history;
-the View borrows its Core editor port. The second composition demonstrates this
-different source relationship while retaining the passive main demo above.
+Assign a [ScoreEditor](/score/headless/view/score-editor/) to `.editor` and add
+`editable` to edit its existing piano-roll surface. The editor owns content and
+history; the View borrows it and never disposes it. The second composition
+demonstrates this different source relationship while retaining the passive main
+demo above.
 
 <ScoreEditingDemo />
 
 ```html
+<score-view id="notes-roll" type="piano-roll" editable></score-view>
+<score-view id="notes-staff" type="staff"></score-view>
 <script type="module">
-  import {defineScoreDocumentElement, defineScoreViewElement} from '@webmusic/score/view/element';
-  defineScoreDocumentElement();
+  import {defineScoreViewElement} from '@webmusic/score/view/element';
+  import {loadScoreEditor} from '@webmusic/score/view/headless';
   defineScoreViewElement();
+  // Your page owns the editor; dispose it after detaching the views.
+  const editor = await loadScoreEditor('/midi/Arabesque%20No.1.mid');
+  for (const id of ['notes-roll', 'notes-staff']) {
+    const view = /** @type {import('@webmusic/score/view/element').ScoreViewElement | null} */ (document.getElementById(id));
+    if (view) view.editor = editor;
+  }
 </script>
-<score-document id="notes" src="/midi/Arabesque%20No.1.mid"></score-document>
-<score-view editor="#notes" type="piano-roll" editable></score-view>
-<score-view editor="#notes" type="staff"></score-view>
 ```
 
 Click selects; Shift-click adds/removes a note. Drag a note to move it in time
@@ -332,12 +338,13 @@ View, the newer attachment remains active; the old cleanup releases only its
 own session, subscriptions and presentation.
 Selection is pruned when notes disappear and is not restored by undo.
 
-`.editor` takes precedence over the `editor` selector; assigning `undefined`
-restores selector lookup. Selectors require one target in the current root and
-track late insertion, removal and `webmusic:sourcechange`. An editor alongside
-independent `.score` or `src` is `source-conflict`: object setters reject it
-before replacement, and conflicting attributes disable editing until corrected.
-No View creates an editor implicitly. Read-only editor binding works for all
+An editor is attached only through the `.editor` property; there is no `editor`
+attribute. Assign one from `loadScoreEditor` or `createScoreEditor`; the View
+borrows it, and assigning `undefined` detaches it without disposing it. When you
+replace a document, assign the new editor before disposing the previous one. An
+editor alongside independent `.score` or `src` is `source-conflict`: object
+setters reject it before replacement, and adding a `src` attribute later disables
+editing until corrected. No View creates an editor implicitly. Read-only editor binding works for all
 types; `editable` is supported for piano roll and staff.
 
 An optional player contributes time only when its applied document ID and
@@ -349,7 +356,7 @@ not playback readiness.
 
 ## Staff input
 
-Use `type="staff" editable` with the same document owner. The notation surface
+Use `type="staff" editable` with the same editor. The notation surface
 retains its own input cursor, duration, octave, accidental, part, voice and
 staff; document content and undo history remain shared with the piano roll.
 The demo uses an original two-measure MusicXML fixture: four quarter notes in
@@ -359,9 +366,18 @@ the MIDI example above independent.
 <StaffEditingDemo />
 
 ```html
-<score-document id="notation" src="/musicxml/StaffEditing.musicxml"></score-document>
-<score-view type="staff" editor="#notation" editable></score-view>
-<score-view type="piano-roll" editor="#notation" editable></score-view>
+<score-view id="notation-staff" type="staff" editable></score-view>
+<score-view id="notation-roll" type="piano-roll" editable></score-view>
+<script type="module">
+  import {defineScoreViewElement} from '@webmusic/score/view/element';
+  import {loadScoreEditor} from '@webmusic/score/view/headless';
+  defineScoreViewElement();
+  const editor = await loadScoreEditor('/musicxml/StaffEditing.musicxml');
+  for (const id of ['notation-staff', 'notation-roll']) {
+    const view = /** @type {import('@webmusic/score/view/element').ScoreViewElement | null} */ (document.getElementById(id));
+    if (view) view.editor = editor;
+  }
+</script>
 ```
 
 Focus **Staff note input** and press **N** to enable note input, then **A–G**
@@ -421,7 +437,7 @@ does not confirm that the browser finished writing a file.
 | --- | --- | --- |
 | `src` / `format` | attributes | Explicit MIDI / MusicXML / MXL / ABC URL and optional parser override. |
 | `player` | attribute | Unique source/position selector; explicit score input retains precedence. |
-| `editor` / `.editor` | selector attribute / writable property | Borrow a `ScoreEditorPort`; object wins, `undefined` restores selector resolution. Cannot coexist with independent `.score` or `src`. |
+| `.editor` | writable property | Assign an editor from `loadScoreEditor`/`createScoreEditor` (any `ScoreEditorPort`); borrowed, never disposed. `undefined` detaches it. Cannot coexist with independent `.score` or `src`. There is no `editor` attribute. |
 | `editable` / `.editable` | boolean attribute / property | Default false. Enable mutation commands for a ready editor-bound piano roll or staff; never creates an editor. |
 | `.interactionSession` | writable property | Optional same-document `ScoreInteractionSession`; getter returns the supplied or View-created session. Supplied sessions are borrowed. |
 | `type` / `.type` | attribute / writable property | `piano-roll`, `staff` or `waterfall`; unknown or removed values (such as `map` or `thumbnail`) use piano-roll. |
@@ -440,7 +456,7 @@ does not confirm that the browser finished writing a file.
 | `note-color` / `active-note-color` | attributes | Score-renderer idle/active colors; the Element’s active default is red `rgb(240, 84, 119)`. |
 | `.score` | writable property | Assign a loaded Score; overrides `src` and player data, cancelling obsolete loads. |
 | `.options.pixelsPerQuarter` / `.options.editingGrid` | properties | Editor piano-roll scale (positive pixels/quarter, default 64) and positive rational snap grid (default `[1, 4]`). `configure()` accepts them for `piano-roll`. |
-| `data-editor-state` | reflected state | `ready`, `missing`, `invalid`, `ambiguous`, `unavailable` or `source-conflict`. `missing` and `unavailable` (a target not inserted yet, or a declaration still loading, cleared or disposed) are pending: the view shows no stale content and a polite waiting status. `invalid`, `ambiguous` and `source-conflict` show an error status. A `format` change does not rebind an editor-bound view. |
+| `data-editor-state` | reflected state | Present while `.editor` is assigned: `ready`, `unavailable`, `invalid` or `source-conflict`. `unavailable` (a disposed or not-ready editor) is pending: the view shows no stale content and a polite waiting status. `invalid` (the editing binding could not be created) and `source-conflict` show an error status. A `format` change does not rebind an editor-bound view. |
 | `data-editable-state` | reflected state | `readonly`, `ready`, `unsupported-type` or `unavailable` for an editor-bound or `editable` View; `editable` without a ready editor is `unavailable`. Absent on a passive View without `editable`. |
 | `data-playback-state` | reflected state | Editor playback compatibility: `unbound`, `ready` or `pending`. A local draft does not make the player binding `mismatched`; the player is compared with committed document content. |
 | `configure(configuration)` | method | Atomically select `piano-roll`, `staff` or `waterfall` and replace optional mode-specific `.options`. Invalid modes, malformed options and unsupported keys (including `showAnnotations` outside `staff`) throw `TypeError` before changing the view. |

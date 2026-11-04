@@ -156,8 +156,9 @@ Analyze layers to import View. See [Audio Play](design/AUDIO-PLAY-COMPONENTS.md)
 Editing is part of View in both domains (DEC-055); there is no separate Edit
 capability. The View API root exports semantic operations, position maps,
 document contracts and Audio range-processor recipes. `/view/headless` exports
-`ScoreEditor` and `AudioClipEditor`, and `/view/element` exports the nonvisual
-`<score-document>` and `<audio-document>` declarations. Rendering and WAV export
+`ScoreEditor` and `AudioClipEditor` with their URL loaders `loadScoreEditor`
+and `loadAudioClipEditor`. There is no document Element (DEC-057): applications
+own the editor and lend it through each Element's `.editor` property. Rendering and WAV export
 of an edited Audio sequence belong to the Play export API. Native Score Play,
 Audio sequence Play and the editable Views borrow the Core document ports.
 Score piano-roll, bounded staff input and Audio waveform editing share this
@@ -176,12 +177,12 @@ coexist without creating additional commit authorities.
 
 | Editing dependency | Boundary |
 |---|---|
-| Score `view` → `core`, `io` | Editors and semantic commands reuse the domain model; `<score-document>` loads through the I/O boundary. |
+| Score `view` → `core`, `io` | Editors and semantic commands reuse the domain model; `loadScoreEditor` imports the I/O loader on demand. |
 | Audio `view/headless` → `core` | Asset readers and processing services are injected through nonvisual ports. |
-| Audio `view/element` → `play` | `<audio-document>` loads a URL with Play's `loadClipFromUrl` over the existing View-to-Play edge. |
+| Audio `view/headless` → `play` | `loadAudioClipEditor` loads a URL with Play's `loadClipFromUrl` over the existing View-to-Play edge. |
 | Play → Core document ports | Play prepares content for sound without importing View or a concrete editor. |
 
-The `<audio-document>` URL loader fixes `streaming: false`, forwards
+The default `loadAudioClipEditor` loader fixes `streaming: false`, forwards
 AbortSignal/resource limits and creates no implicit AudioContext. Native decoding
 requires an injected loader closure that borrows the caller's context.
 `forbiddenEntryReachability` keeps the View API root and Headless entries from
@@ -326,8 +327,8 @@ static views remain usable without a player.
 For an edit-enabled composition, the editor owns committed content and Play
 borrows it through the document source. Existing View Elements gain an optional
 editor binding; `editable` enables mutation gestures against that binding.
-`score-document` and `audio-document` are the implemented nonvisual owner tags
-under DEC-053. The View owns neither an implicit editor
+The application creates and owns the editor (DEC-057); Elements borrow it only
+through `.editor`, with no selector attribute. The View owns neither an implicit editor
 nor the lifetime of a borrowed editor. These bindings preserve passive usage and
 report explicit content-source conflicts instead of silently switching owners.
 

@@ -55,30 +55,6 @@ describe('Audio Player Element document binding', () => {
     source.undo(); await element.waitForDocumentRevision(source.getSnapshot()); expect(element.duration).toBe(1);
     element.remove(); expect(source.getSnapshot().status).toBe('ready'); expect(element.player).toBeUndefined();
   });
-  it('keeps a missing or still-loading declaration pending without an error, then joins when it is ready', async () => {
-    const errors: unknown[] = [];
-    const element = document.createElement('audio-player') as AudioPlayerElement;
-    element.addEventListener('webaudio:error', (event) => errors.push((event as CustomEvent).detail));
-    element.setAttribute('editor', '#later'); document.body.append(element); await flush();
-    expect(element.getAttribute('data-editor-state')).toBe('missing');
-    expect(element.documentBinding.status).toBe('empty');
-    // Rebuilding a preloading player while pending must not report the pending state.
-    element.setAttribute('preload', ''); element.audioContext = context(); await flush();
-    const target = document.createElement('div') as HTMLDivElement & {editor?: AudioClipEditor};
-    target.id = 'later'; document.body.append(target); await flush();
-    expect(element.getAttribute('data-editor-state')).toBe('unavailable');
-    expect(element.documentBinding.status).toBe('empty');
-    await expect(element.play()).rejects.toMatchObject({code: 'not-ready'});
-    expect(errors).toEqual([]);
-    const source = editor(); target.editor = source;
-    target.dispatchEvent(new Event('webmusic:sourcechange', {bubbles: true}));
-    expect((await element.waitForDocumentRevision(source.getSnapshot())).status).toBe('applied');
-    expect(element.getAttribute('data-editor-state')).toBe('ready');
-    expect(errors).toEqual([]);
-    element.setAttribute('editor', ''); await flush();
-    expect(element.getAttribute('data-editor-state')).toBe('invalid');
-    expect(element.documentBinding.status).toBe('error'); expect(errors).toHaveLength(1);
-  });
   it('rejects object conflicts before mutation and makes invalid attributes unavailable until fixed', async () => {
     const source = editor(); const element = player(source); await element.waitForDocumentRevision(source.getSnapshot());
     const native = element.player;
@@ -92,31 +68,30 @@ describe('Audio Player Element document binding', () => {
     expect(element.documentBinding.status).toBe('ready'); expect(element.player).toBe(native);
     expect(element.shadowRoot?.querySelector<HTMLButtonElement>('button')?.disabled).toBe(false);
   });
-  it('resolves late HTML targets, replacement and removal without retaining the removed transport', async () => {
-    const element = document.createElement('audio-player') as AudioPlayerElement;
-    element.setAttribute('editor', '#owner'); document.body.append(element);
-    expect(element.getAttribute('data-editor-state')).toBe('missing');
-    const first = editor(); const owner = declaration('owner', first); await flush();
+  it('replaces and detaches property editors without retaining the removed transport', async () => {
+    const first = editor(); const element = player(first);
     expect((await element.waitForDocumentRevision(first.getSnapshot())).status).toBe('applied');
     const transport = element.transport;
-    const second = editor(); owner.editor = second; owner.dispatchEvent(new CustomEvent('webmusic:sourcechange', {bubbles: true, composed: true}));
-    await flush(); expect((await element.waitForDocumentRevision(second.getSnapshot())).status).toBe('applied');
+    const second = editor(); element.editor = second;
+    expect((await element.waitForDocumentRevision(second.getSnapshot())).status).toBe('applied');
     expect(element.transport).not.toBe(transport); expect(element.editor).toBe(second);
-    owner.remove(); await flush(); expect(element.transport).toBeUndefined(); expect(element.source.kind).toBe('empty');
-    await expect(element.play()).rejects.toMatchObject({code: 'not-ready'});
-    document.body.append(owner); await flush(); expect((await element.waitForDocumentRevision(second.getSnapshot())).status).toBe('applied');
+    element.editor = undefined; await flush(); expect(element.editor).toBeUndefined();
+    expect(element.transport).toBeUndefined(); expect(element.source.kind).toBe('empty');
+    expect(element.documentBinding.status).toBe('empty'); expect(element.hasAttribute('data-editor-state')).toBe(false);
+    expect(first.getSnapshot().status).toBe('ready'); expect(second.getSnapshot().status).toBe('ready');
+    element.editor = second; expect((await element.waitForDocumentRevision(second.getSnapshot())).status).toBe('applied');
   });
-  it('handles ambiguous/empty selectors and explicit precedence without cross-document leakage', async () => {
-    const first = editor(); const second = editor(); declaration('same', first); declaration('same', second);
-    const element = document.createElement('audio-player') as AudioPlayerElement; element.setAttribute('editor', '#same'); document.body.append(element);
-    expect(element.getAttribute('data-editor-state')).toBe('ambiguous');
-    element.editor = first; await element.waitForDocumentRevision(first.getSnapshot()); expect(element.editor).toBe(first);
-    const other = player(second); await other.waitForDocumentRevision(second.getSnapshot());
+  it('keeps separate editors isolated across players and ignores an editor attribute', async () => {
+    expect(AudioPlayerElement.observedAttributes).not.toContain('editor');
+    const first = editor(); const second = editor(); const element = player(first); const other = player(second);
+    await element.waitForDocumentRevision(first.getSnapshot()); await other.waitForDocumentRevision(second.getSnapshot());
     first.transaction('Silence', (tx) => tx.add({type: 'insert-silence', frame: 0, length: 100, id: 's'}));
     await element.waitForDocumentRevision(first.getSnapshot()); expect(other.duration).toBe(1); expect(element.duration).toBe(1.1);
-    element.editor = undefined; expect(element.getAttribute('data-editor-state')).toBe('ambiguous');
-    element.setAttribute('editor', ''); expect(element.getAttribute('data-editor-state')).toBe('invalid');
-    await expect(element.play()).rejects.toMatchObject({code: 'not-ready'});
+    declaration('elsewhere', second); element.setAttribute('editor', '#elsewhere'); await flush();
+    expect(element.editor).toBe(first); expect(element.getAttribute('data-editor-state')).toBe('ready');
+    const plain = document.createElement('audio-player') as AudioPlayerElement; plain.setAttribute('editor', '#elsewhere');
+    document.body.append(plain); await flush();
+    expect(plain.editor).toBeUndefined(); expect(plain.hasAttribute('data-editor-state')).toBe(false);
   });
   it('does not reattach obsolete owners after reentrant sourcechange replacement', async () => {
     const first = editor(); const second = editor(); const element = player(first);
@@ -131,38 +106,32 @@ describe('Audio Player Element document binding', () => {
 });
 
 describe('Audio Player Element source recovery', () => {
-  it('recovers when a clip, transport or player that existed before the editor is cleared', async () => {
-    const source = editor(); declaration('doc', source);
-    const element = player(); element.clip = clip();
-    element.setAttribute('editor', '#doc'); await flush();
-    expect(element.getAttribute('data-editor-state')).toBe('source-conflict');
-    element.clip = undefined; await flush();
+  it('rejects an editor while a clip, transport or player exists and binds once it is cleared', async () => {
+    const source = editor(); const element = player(); element.clip = clip();
+    expect(() => {element.editor = source;}).toThrow(/cannot be combined/); expect(element.editor).toBeUndefined();
+    element.clip = undefined; element.editor = source;
     expect((await element.waitForDocumentRevision(source.getSnapshot())).status).toBe('applied');
     expect(element.source.kind).toBe('sequence'); expect(element.clip).toBeUndefined();
-    element.removeAttribute('editor'); const queue = {seconds: 0, duration: 1, playing: false, play: vi.fn(), pause: vi.fn(), stop: vi.fn(), seek: vi.fn()} satisfies AudioPlayerTransport;
-    element.setTransport(queue); element.setAttribute('editor', '#doc'); await flush();
-    expect(element.getAttribute('data-editor-state')).toBe('source-conflict');
-    element.setTransport(undefined); await flush();
+    element.editor = undefined; const queue = {seconds: 0, duration: 1, playing: false, play: vi.fn(), pause: vi.fn(), stop: vi.fn(), seek: vi.fn()} satisfies AudioPlayerTransport;
+    element.setTransport(queue); expect(() => {element.editor = source;}).toThrow(/cannot be combined/);
+    element.setTransport(undefined); element.editor = source;
     expect((await element.waitForDocumentRevision(source.getSnapshot())).status).toBe('applied');
-    element.removeAttribute('editor'); const external = new AudioPlayer(clip()); element.player = external;
+    element.editor = undefined; const external = new AudioPlayer(clip()); element.player = external;
     const pause = vi.spyOn(external, 'pause'), attach = vi.spyOn(external, 'setDocumentSource');
-    element.setAttribute('editor', '#doc'); await flush();
-    expect(element.getAttribute('data-editor-state')).toBe('source-conflict');
+    expect(() => {element.editor = source;}).toThrow(/cannot be combined/);
     expect(pause).not.toHaveBeenCalled(); expect(attach).not.toHaveBeenCalled();
-    element.removeAttribute('editor'); expect(attach).not.toHaveBeenCalled(); element.setAttribute('editor', '#doc'); await flush();
-    element.player = undefined; await flush();
+    element.player = undefined; element.editor = source;
     expect((await element.waitForDocumentRevision(source.getSnapshot())).status).toBe('applied');
     expect(element.player).not.toBe(external); expect(external.clip).toBeDefined(); expect(external.documentSource).toBeUndefined();
     external.dispose();
   });
-  it('recovers after a src-loaded clip is removed from an editor-bound host', async () => {
-    const source = editor(); declaration('doc', source); loaded.clip = clip();
+  it('rejects an editor while a src attribute is present and binds once it is removed', async () => {
+    const source = editor(); loaded.clip = clip();
     const element = document.createElement('audio-player') as AudioPlayerElement;
     element.audioContext = context(); element.setAttribute('src', '/take.wav'); document.body.append(element); await flush();
     expect(element.clip).toBe(loaded.clip);
-    element.setAttribute('editor', '#doc'); await flush();
-    expect(element.getAttribute('data-editor-state')).toBe('source-conflict');
-    element.removeAttribute('src'); await flush();
+    expect(() => {element.editor = source;}).toThrow(/cannot be combined/);
+    element.removeAttribute('src'); await flush(); element.editor = source;
     expect((await element.waitForDocumentRevision(source.getSnapshot())).status).toBe('applied');
     expect(element.clip).toBeUndefined(); expect(element.getAttribute('data-editor-state')).toBe('ready');
   });

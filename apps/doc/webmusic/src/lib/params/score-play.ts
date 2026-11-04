@@ -18,7 +18,6 @@ export const SCORE_PLAY_PARAMS: ElementParamCatalog = {
         fallback: 'nothing plays until you assign .score, .rack or .controller',
         note: 'URL of a MIDI / MusicXML / MXL / ABC file, loaded through the sibling @webmusic/score/io capability.',
       },
-      {name: 'editor', kind: 'text', placeholder: '#score-document', fallback: 'standalone playback source', note: 'Borrow a Score document from the selected owner. Conflicts with src, .score, Rack and controller inputs; .editor takes precedence over this selector.'},
       {
         name: 'format',
         kind: 'enum',
@@ -84,8 +83,8 @@ export const SCORE_PLAY_PARAMS: ElementParamCatalog = {
     ],
     properties: [
       {name: 'score', note: 'Assign a loaded Score; overrides src.'},
-      {name: 'editor', note: 'Borrow a Core ScoreDocumentSource; an explicit object wins and undefined restores the editor selector. Conflicts with src, .score, Rack and controller inputs.'},
-      {name: 'documentBinding', note: 'Requested/applied document revision, attempt and readiness; undefined without an editor input, empty until a native player mounts, error for a conflict, invalid/ambiguous selector or failed mount.'},
+      {name: 'editor', note: 'Assign an editor from loadScoreEditor/createScoreEditor (any Core ScoreDocumentSource); borrowed, never disposed. Undefined detaches it. Conflicts with src, .score, Rack and controller inputs.'},
+      {name: 'documentBinding', note: 'Requested/applied document revision, attempt and readiness; undefined without an editor input, empty until a native player mounts, error for a source conflict or failed mount.'},
       {name: 'waitForDocumentRevision(target) / retryDocumentApplication()', note: 'Wait for a known document revision, or explicitly retry preparation; both resolve a tagged applied/superseded/failed outcome.'},
       {name: 'playback', note: 'Read-only stable ScorePlaybackSource: resolved data, readiness and revisioned snapshots/subscriptions.'},
       {name: 'resolvedScore', note: 'Read-only current native score, including src; undefined in Rack/controller modes.'},
@@ -115,7 +114,7 @@ export const SCORE_PLAY_PARAMS: ElementParamCatalog = {
       {name: 'webscore:stop', note: 'An explicit non-controller stop was issued; no detail.'},
       {name: 'webscore:end', note: 'Fired once the piece finishes.'},
       {name: 'webscore:documentstatechange', note: 'ScoreDocumentPlaybackBinding as document preparation, failure or application changes; bubbling and composed.'},
-      {name: 'webscore:error', note: '{operation: "seek" | "playback", error}; bubbling and composed. Reports async native void-seek failures, mounted playback/controller errors and editor conflicts or invalid/ambiguous selectors; a pending editor is not an error.'},
+      {name: 'webscore:error', note: '{operation: "seek" | "playback", error}; bubbling and composed. Reports async native void-seek failures, mounted playback/controller errors and editor source conflicts; an editor whose document is not ready is pending, not an error.'},
     ],
   },
 

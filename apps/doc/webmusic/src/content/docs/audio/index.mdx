@@ -59,7 +59,7 @@ npm install @webmusic/audio @webmusic/kernel @webmusic/ui
 
 ## Drop-in Web Components
 
-The fastest way to get audio on a page — no build step. Each capability's `/auto` entry registers its ready-to-use custom elements, and `/element` exports the classes with explicit registration; the capability roots (`@webmusic/audio/play`, `/view`, `/analyze`) are programming APIs and register nothing. Play provides the central player, playlist, mixer and recorder; View adds `<audio-view>`, `<audio-live-view>` and the nonvisual `<audio-document>` owner for player/view editing compositions; Analyze adds five live tools, including `<audio-meter>`. Every tag and its owning page is on the [Web Components page](/audio/element/).
+The fastest way to get audio on a page — no build step. Each capability's `/auto` entry registers its ready-to-use custom elements, and `/element` exports the classes with explicit registration; the capability roots (`@webmusic/audio/play`, `/view`, `/analyze`) are programming APIs and register nothing. Play provides the central player, playlist, mixer and recorder; View adds `<audio-view>`, with optional waveform editing, and `<audio-live-view>`; Analyze adds five live tools, including `<audio-meter>`. Every tag and its owning page is on the [Web Components page](/audio/element/).
 
 ### From a CDN
 
@@ -104,7 +104,7 @@ once and its elements register on load:
 
 ```ts
 import "@webmusic/audio/play/auto"; // <audio-player>, <audio-playlist>, <audio-mixer>, <audio-recorder>
-import "@webmusic/audio/view/auto"; // <audio-view>, <audio-live-view>, <audio-document>
+import "@webmusic/audio/view/auto"; // <audio-view>, <audio-live-view>
 import "@webmusic/audio/analyze/auto"; // <audio-level-analyzer>, <audio-meter>, <audio-oscilloscope>, <audio-spectrum-analyzer>, <audio-transient-analyzer>
 ```
 
@@ -152,9 +152,10 @@ matching optional WASM decoder. To stream an MP3 without decoding it into an
 
 ## Edit a recording
 
-One [`<audio-document>`](/audio/element/view/audio-document/) owns imported
-samples and a contiguous sequence of asset/silence references. Bind a player and
-waveform view to that owner, then add `editable` to opt into selection, trim,
+One [`AudioClipEditor`](/audio/headless/view/audio-clip-editor/), loaded with
+`loadAudioClipEditor(url)`, owns imported samples and a contiguous sequence of
+asset/silence references. Assign it to the `.editor` property of a player and a
+waveform view, then add `editable` to opt into selection, trim,
 split, silence, gain/fades, clipboard and undo/redo. Edits do not duplicate all
 PCM for history; explicit processing and export materialize their requested
 range or snapshot. The player reports its applied document revision and remains

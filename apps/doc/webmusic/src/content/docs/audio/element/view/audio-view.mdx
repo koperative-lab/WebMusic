@@ -136,20 +136,27 @@ over borrowed data.
 
 <AudioEditingDemo />
 
-Bind the same document owner to a player and waveform view. The view borrows
-content and semantic commands; it never creates an editor or audio graph.
+Assign the same [AudioClipEditor](/audio/headless/view/audio-clip-editor/) to a
+player and a waveform view through `.editor`. The view borrows content and
+semantic commands; it never creates an editor or audio graph.
 
 ```html
+<audio-player id="audio-play"></audio-player>
+<audio-view id="audio-edit" player="#audio-play" editable></audio-view>
 <script type="module">
   import '@webmusic/audio/play/auto';
-  import '@webmusic/audio/view/auto'; // also registers <audio-document>
+  import '@webmusic/audio/view/auto';
+  import {loadAudioClipEditor} from '@webmusic/audio/view/headless';
+  // Your page owns the editor; dispose it after detaching both elements.
+  const editor = await loadAudioClipEditor('/wav/Arabesque%20No.1.wav');
+  const player = /** @type {import('@webmusic/audio/play/element').AudioPlayerElement | null} */ (document.getElementById('audio-play'));
+  const view = /** @type {import('@webmusic/audio/view/element').AudioViewElement | null} */ (document.getElementById('audio-edit'));
+  if (player) player.editor = editor;
+  if (view) view.editor = editor;
 </script>
-<audio-document id="audio-doc" src="/wav/Arabesque%20No.1.wav"></audio-document>
-<audio-player id="audio-play" editor="#audio-doc"></audio-player>
-<audio-view editor="#audio-doc" player="#audio-play" editable></audio-view>
 ```
 
-`editor` supplies the document, while `editable` enables waveform gestures.
+`.editor` supplies the document, while `editable` enables waveform gestures.
 Omitting `editable` displays the sequence without content mutation. An editable
 view without a ready editor reports unavailable. Spectrogram and meter types do
 not accept an editing document; a meter can independently borrow the player's
@@ -202,16 +209,16 @@ Preparation or failure leaves the new edit visible while hiding the old
 playhead/progress paint and reporting pending playback. Applying an edit remains
 paused; resume with an explicit player command.
 
-An object assigned to `.editor` takes precedence over `editor="#id"`; setting it
-to `undefined` restores selector lookup. The selector resolves one owner in the
-same Document or ShadowRoot and observes late insertion, upgrade, source changes,
-removal and replacement. Missing, ambiguous and invalid targets remain unavailable.
+An editor is attached only through the `.editor` property; there is no `editor`
+attribute. Assign one from `loadAudioClipEditor` or `createAudioClipEditor`; the
+view borrows it, and setting `undefined` detaches it without disposing it. When
+you replace a document, assign the new editor before disposing the previous one.
 An editor conflicts with independent `.clip`, `.peaks`, `.spectrogram`,
 `.frequencyData`, `src` or `peaks-src`, including empty source attributes.
 Programmatic source setters reject conflicts by throwing a plain `Error` whose
 message starts with `source-conflict:` (not a typed application error) before
 changing data or releasing the valid binding; assigning `undefined` to an already empty source keeps the
-binding, session, selection and draft. Conflicting attributes instead expose `source-conflict`
+binding, session, selection and draft. A source attribute added later instead exposes `source-conflict`
 until corrected.
 There is no fallback from an explicit failed editor binding to old clip data.
 
@@ -400,7 +407,7 @@ view.type = 'spectrogram';                                   // switch the drawi
 | `peaks-src` | attribute | — | **Waveform only.** URL of BBC `audiowaveform` **v2 JSON**, hydrated into the pyramid with **no decode** — no `AudioContext`, no samples, no play import. |
 | `src` | attribute | — | URL of an audio file, decoded through the sibling [`@webmusic/audio/play`](/audio/api/play/) capability (resolved dynamically). |
 | `format` | attribute | — | Force a decoder when the extension is missing or ambiguous; an unsupported value surfaces as `webaudio:error`. |
-| `editor` / `.editor` | attribute / property | — | Borrow one `AudioClipEditorPort`; object property overrides the same-root selector. Conflicts with independent audio sources. |
+| `.editor` | property | — | Assign an editor from `loadAudioClipEditor`/`createAudioClipEditor` (any `AudioClipEditorPort`); borrowed, never disposed. `undefined` detaches it. Conflicts with independent audio sources. There is no `editor` attribute. |
 | `editable` | attribute / property | `false` | Enable waveform editing with a ready editor; `annotate` suspends content gestures. |
 | `.interactionSession` | property | owned local session | Optional borrowed same-document `AudioInteractionSession`; selection/drafts can be shared. |
 | `.clip` | property | — | An `AudioClip` you already have; the element derives peaks from it, and takes its regions and duration. |
@@ -556,7 +563,7 @@ The placeholder shown when there is no data is the kit's `role="status"` present
 Editing exposes the named parts `editor`, `editing-instructions`,
 `editing-surface`, `selection`, `editing-status` and `editing-controls`. Selection
 uses `--wm-accent`; text uses `--wm-foreground`. The drawing keeps the waveform
-paint controls above. `data-editor-state` reports resolution or `source-conflict`;
+paint controls above. `data-editor-state` reports `ready`, `unavailable` (a disposed or not-ready editor), `invalid` (the editing binding could not be created) or `source-conflict` while `.editor` is assigned;
 `data-editable-state` reports `readonly`, `ready`, `unavailable`, `annotation` or
 `unsupported-type`. `data-playback-state` reports `unbound`, `ready` or `pending`
 and is removed with the editor binding.

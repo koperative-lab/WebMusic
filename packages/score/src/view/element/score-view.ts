@@ -145,7 +145,6 @@ export class ScoreViewElement extends HTMLElementBase {
       'src',
       'format',
       'player',
-      'editor',
       'editable',
       'type',
       'width',
@@ -216,7 +215,6 @@ export class ScoreViewElement extends HTMLElementBase {
   attributeChangedCallback(name: string): void {
     if (!this.isConnected || !ScoreViewElement.observedAttributes.includes(name)) return;
     if (name === 'player') this.bindPlayer();
-    else if (name === 'editor') { this.bindEditor(); this.bindPlayer(); }
     else if (name === 'editable') { this.updateEditable(); this.renderCurrent(); }
     // In editor mode only an added or removed src (a conflict) matters; format alone keeps the session.
     else if (name === 'src' || name === 'format') { if (this.hasEditorIntent()) { if (name === 'src') this.bindEditor(); } else void this.refresh(); }
@@ -235,7 +233,7 @@ export class ScoreViewElement extends HTMLElementBase {
     return this.explicitScore ?? this.resolvedScore;
   }
 
-  /** Borrow a document owner. Undefined restores same-root selector resolution. */
+  /** Borrow a document owner; the caller keeps it. Undefined detaches it. */
   set editor(value: ScoreEditorPort | undefined) {
     if (value !== undefined && !isScoreEditorPort(value)) throw new TypeError('editor must implement ScoreEditorPort');
     if (value !== undefined && (this.explicitScore !== undefined || this.getAttribute('src') !== null)) throw new Error('source-conflict: An editor cannot be combined with score or src');
@@ -704,7 +702,7 @@ export class ScoreViewElement extends HTMLElementBase {
     else this.paintPosition(this.playheadSeconds);
   }
 
-  private hasEditorIntent(): boolean { return this.explicitEditor !== undefined || this.getAttribute('editor') !== null; }
+  private hasEditorIntent(): boolean { return this.explicitEditor !== undefined; }
 
   private updateEditable(): void {
     const supported = this.type === 'piano-roll' || this.type === 'staff';
@@ -753,8 +751,9 @@ export class ScoreViewElement extends HTMLElementBase {
     if (this.explicitScore !== undefined || this.getAttribute('src') !== null) {
       this.setAttribute('data-editor-state', 'source-conflict'); this.updateEditable(); if (current()) this.renderCurrent(); return;
     }
+    // Editors are assigned through `.editor` only; there is no selector attribute.
     const cleanup = observeElementSource<ScoreEditorPort>(this, {source: this.explicitEditor,
-      selector: this.getAttribute('editor') ?? undefined, property: 'editor', accepts: isScoreEditorPort}, (resolution) => {
+      property: 'editor', accepts: isScoreEditorPort}, (resolution) => {
       if (!current()) return;
       // Reentrant sourcechange can replace this resolution without replacing
       // the discovery subscription, so it needs its own attachment revision.
@@ -781,7 +780,8 @@ export class ScoreViewElement extends HTMLElementBase {
             this.setAttribute('data-editor-state', state.available ? 'ready' : 'unavailable');
             this.setAttribute('data-editable-state', !this.editable ? 'readonly' : this.type !== 'piano-roll' && this.type !== 'staff' ? 'unsupported-type' : state.available ? 'ready' : 'unavailable');
             if (this.documentPlayback) this.followDocumentPlayback(this.documentPlayback);
-            if (attached() && editing === this.editing && !this.editorSurface && (changed || !this.rendered)) this.renderCurrent(false);
+            // A disposed or otherwise unavailable editor must not leave its editing surface on screen.
+            if (attached() && editing === this.editing && (this.editorSurface ? !state.available : changed || !this.rendered)) this.renderCurrent(false);
           });
           if (attached() && editing === this.editing) this.editorStateCleanup = unsubscribe;
           else { unsubscribe(); editing.dispose(); return; }

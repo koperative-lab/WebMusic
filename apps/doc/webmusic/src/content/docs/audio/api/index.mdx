@@ -39,10 +39,10 @@ capability pages below document what is inside each entry.
 | `@webmusic/audio/analyze/transcribe` | code-only sub-entry | `transcribe()` — audio → family-neutral note events, behind an optional peer. |
 | `@webmusic/audio/analyze/worker-client` · `@webmusic/audio/analyze/worker-protocol` · `@webmusic/audio/analyze/worker` | worker triple | Off-main-thread analysis: the client, the wire protocol, and the worker runtime. |
 | `@webmusic/audio/view` | [capability root](/audio/api/view/) | Signal projection: waveform and spectrogram surfaces, colormaps, geometry; editable-document contracts, operations and range processors. |
-| `@webmusic/audio/view/headless` | [Headless](/audio/headless/#view) | `AudioTimeline`, the view models, `LiveScrollBuffer`, `AudioClipEditor`. |
+| `@webmusic/audio/view/headless` | [Headless](/audio/headless/#view) | `AudioTimeline`, the view models, `LiveScrollBuffer`, `AudioClipEditor` and `loadAudioClipEditor`. |
 | `@webmusic/audio/view/render` | code-only sub-entry | Imperative canvas renderers and the player binding. |
-| `@webmusic/audio/view/element` | [Web Components](/audio/element/#view) | `<audio-view>`, `<audio-live-view>` and the nonvisual `<audio-document>` owner; also retains `<audio-meter>` as a compatibility export. |
-| `@webmusic/audio/view/auto` | registration | Registers the View elements, including `<audio-document>` and the retained meter compatibility tag. |
+| `@webmusic/audio/view/element` | [Web Components](/audio/element/#view) | `<audio-view>` and `<audio-live-view>`; also retains `<audio-meter>` as a compatibility export. |
+| `@webmusic/audio/view/auto` | registration | Registers the View elements, including the retained meter compatibility tag. |
 | `@webmusic/audio/view/global` | browser IIFE | `<script>`-tag bundle exposing `WebMusicAudioView`. |
 | `@webmusic/audio/react` | [capability root](/audio/api/react/) | React components and hooks over the three capabilities; React is an optional peer. |
 

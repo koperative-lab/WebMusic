@@ -8,9 +8,9 @@ pitches, durations and voices, read from MIDI, MusicXML, MXL or ABC. The
 play, analyze, and view capabilities support Web Components, Headless objects,
 and APIs. Combine the APIs with [UI presenters](/uikit/) or your own interface;
 integration entries such as React build on the same contracts.
-View also provides document editing: one document owner through API, Headless
-and a nonvisual HTML declaration that Score player, piano-roll editing and staff
-input can borrow.
+View also provides document editing: one Headless document owner, loaded with
+`loadScoreEditor` or created from a Score, that Score player, piano-roll editing
+and staff input borrow through their `.editor` property.
 
 For a working player with notation and a keyboard, start with
 [Quick Start](/quick-start/). This page covers package selection and setup.
@@ -111,7 +111,7 @@ and shared theming.
 ### With a bundler
 
 Importing `@webmusic/score/play/auto` registers all **Play** elements at their default names.
-It registers no Analyze or View elements, including `<score-document>`. Use their
+It registers no Analyze or View elements. Use their
 `@webmusic/score/analyze/element` and `@webmusic/score/view/element` entries and
 call the registration functions listed in the inventory.
 
