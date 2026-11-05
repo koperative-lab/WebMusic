@@ -435,6 +435,8 @@ describe('score grid editing gestures', () => {
     }
     const editor = createScoreEditor(builder.build()), editing = createScoreViewEditing(editor, {editable: true});
     const host = document.createElement('div'); document.body.append(host); const renderer = mountScoreGrid(host, {editing});
+    // The keyboard alternative lives in the note-values card; a closed card's fields cannot take focus.
+    host.querySelector<HTMLButtonElement>('[part="values-toggle"]')!.click();
     const picker = host.querySelector<HTMLSelectElement>('[aria-label="Select existing note"]')!;
     expect([...picker.options].map((option) => option.value)).toEqual(['', 'note:early', 'note:late', 'note:same-pitch']);
     expect(picker.options[1].textContent).toBe('Piano (part 1) · C4 · quarter 0 · voice 1 · note 1');
@@ -465,6 +467,7 @@ describe('score grid editing gestures', () => {
     const peer = createScoreViewEditing(editor, {interactionSession: editing.session});
     const field = (label: string) => host.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)!;
     const apply = [...host.querySelectorAll('button')].find((button) => button.getAttribute('aria-label') === 'Apply to selected note')!;
+    host.querySelector<HTMLButtonElement>('[part="values-toggle"]')!.click();
     editing.select([a]); field('Written MIDI pitch').value = '72';
     const active = focused === 'input' ? field('Written MIDI pitch') : apply; active.focus();
     peer.select([b]);
@@ -480,6 +483,7 @@ describe('score grid editing gestures', () => {
 
   it('refreshes fields on same-note revisions and history changes but preserves pending values within one binding', () => {
     const {editor, editing, renderer, host} = mounted(); editing.select([a]);
+    host.querySelector<HTMLButtonElement>('[part="values-toggle"]')!.click();
     const field = (label: string) => host.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)!;
     const apply = [...host.querySelectorAll('button')].find((button) => button.getAttribute('aria-label') === 'Apply to selected note')!;
     field('Onset (quarters)').value = '9'; field('Written MIDI pitch').value = '72'; apply.focus();
