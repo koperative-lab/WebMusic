@@ -400,20 +400,23 @@ describe('type-specific Element playground parameters', () => {
   });
   it('follows the effective type, retains hidden values, and leaves shared controls visible', async () => {
     const f = fixture(); mountPlaygrounds();
-    expect(f.row('cells').hidden).toBe(true);
+    expect(f.row('default-key').hidden).toBe(true);
     expect(f.row('note-height').hidden).toBe(false);
-    f.change('type', 'map'); f.change('cells', '42');
-    expect(f.row('cells').hidden).toBe(false);
+    f.change('type', 'staff'); f.change('default-key', '3');
+    expect(f.row('default-key').hidden).toBe(false);
+    expect(f.row('note-height').hidden).toBe(false);
+    f.change('type', 'waterfall');
+    expect(f.row('default-key').hidden).toBe(true);
     expect(f.row('note-height').hidden).toBe(true);
+    expect(f.target.getAttribute('default-key')).toBe('3');
     f.change('type', 'staff');
-    expect(f.row('cells').hidden).toBe(true);
-    expect(f.target.getAttribute('cells')).toBe('42');
-    f.change('type', 'map');
-    expect(f.input('cells').value).toBe('42');
+    expect(f.input('default-key').value).toBe('3');
     for (const name of ['src', 'format', 'player', 'type', 'width', 'height']) expect(f.row(name).hidden).toBe(false);
-    f.target.setAttribute('type', 'not-a-type'); await Promise.resolve();
-    expect(f.row('cells').hidden).toBe(true);
-    expect(f.row('note-height').hidden).toBe(false);
+    for (const removed of ['map', 'thumbnail']) {
+      f.target.setAttribute('type', removed); await Promise.resolve();
+      expect(f.row('default-key').hidden).toBe(true);
+      expect(f.row('note-height').hidden).toBe(false);
+    }
   });
 
   it('copies the complete composition and Reset restores both owners and type visibility', async () => {
@@ -537,25 +540,31 @@ describe('type-specific Element playground parameters', () => {
     expect(f.output.textContent).not.toContain('direction=');
   });
 
-  it('keeps annotation visibility shared across every score type and includes it in Copy/Reset', async () => {
+  it('shows annotation visibility only for the staff type and includes it in Copy/Reset', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, 'clipboard', {configurable: true, value: {writeText}});
     const f = fixture(); mountPlaygrounds();
+    expect(f.row('show-annotations').hidden).toBe(true);
     expect(f.input('show-annotations').value).toBe('unset');
+    f.change('type', 'staff');
+    expect(f.row('show-annotations').hidden).toBe(false);
     expect(f.input('show-annotations').querySelector('option[value="unset"]')!.textContent).toBe('off');
     f.change('show-annotations', 'on');
-    for (const type of ['staff', 'waterfall', 'map', 'thumbnail', 'piano-roll']) {
+    expect(f.target.getAttribute('show-annotations')).toBe('');
+    for (const type of ['waterfall', 'piano-roll']) {
       f.change('type', type);
-      expect(f.row('show-annotations').hidden).toBe(false);
-      expect(f.input('show-annotations').value).toBe('on');
+      expect(f.row('show-annotations').hidden).toBe(true);
       expect(f.target.getAttribute('show-annotations')).toBe('');
     }
+    f.change('type', 'staff');
+    expect(f.row('show-annotations').hidden).toBe(false);
+    expect(f.input('show-annotations').value).toBe('on');
     f.copy.click(); await Promise.resolve();
     expect(writeText).toHaveBeenCalledWith(expect.stringMatching(/<score-view[^>]*\bshow-annotations[\s=>]/));
     f.reset.click();
     expect(f.target.hasAttribute('show-annotations')).toBe(false);
     expect(f.input('show-annotations').value).toBe('unset');
-    expect(f.row('show-annotations').hidden).toBe(false);
+    expect(f.row('show-annotations').hidden).toBe(true);
     expect(f.output.textContent).not.toContain('show-annotations');
   });
 
@@ -566,9 +575,9 @@ describe('type-specific Element playground parameters', () => {
     const scopeRow = (name: string) => f.panel.querySelector<HTMLLabelElement>(`[data-pg-scope="score-pitch-view"]:has([data-pg-attr="${name}"])`)!;
     expect(scopeRow('frets').hidden).toBe(false);
     expect(scopeRow('low').hidden).toBe(true);
-    f.change('type', 'map');
+    f.change('type', 'staff');
     expect(scopeRow('frets').hidden).toBe(false);
-    expect(f.row('cells').hidden).toBe(false);
+    expect(f.row('default-key').hidden).toBe(false);
     companion.setAttribute('fit-to-width', 'false');
     await Promise.resolve();
     expect(scopeRow('fit-to-width').hidden).toBe(true);

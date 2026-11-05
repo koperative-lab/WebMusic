@@ -73,9 +73,16 @@ This entry has no `onError` option. Handle failures inside the caller's action
 callbacks so the application can report them consistently.
 
 Strength, Hits and Last interval retain fixed positions above the history.
-The surface omits a repeated title and hides routine Live, Paused and Frozen
-messages. No-signal, unavailable and other diagnostics remain visible.
-Loading and waiting use square indicators with accessible descriptions. Freeze keeps its label and uses its pressed state to show the hold.
+The surface omits a repeated title and clears routine Live, Paused and Frozen
+messages. Informational messages such as No signal or Listening stay in the
+status region but are visually hidden; unavailable and other diagnostics are
+drawn. Loading and waiting use square indicators with accessible descriptions.
+The plot's axis captions are visually hidden; the plot's text alternative and
+the readouts carry the values. Freeze and Clear are icon buttons named in
+`aria-label` and `title`; Freeze uses its pressed state to show the hold. The
+buttons and the Sensitivity fader share one non-wrapping row, one control height
+tall, separated by hairlines; on a narrow host it scrolls sideways without a
+visible scrollbar.
 
 <details class="component-section">
 <summary>API</summary>
@@ -93,7 +100,7 @@ Loading and waiting use square indicators with accessible descriptions. Freeze k
 | `lastIntervalMs` | `number?` | absent | Most recent gap between accepted cues, in milliseconds. |
 | `loading` | `boolean?` | `false` | Active pending source work; shows the four-cell animation and `aria-busy`, taking precedence over `waiting`. |
 | `waiting` | `boolean?` | `false` | Show the shared square waiting indicator instead of visible status prose; controls and retained readings remain available. |
-| `status` | `string` | required | Diagnostic text; accessible during loading/waiting, visible for meaningful diagnostics, and hidden for routine Live, Paused and Frozen states. |
+| `status` | `string` | required | Diagnostic text; accessible during loading/waiting, visually hidden for informational messages (No signal, Listening, Waiting for …, Loading …), drawn for other diagnostics, and cleared for routine Live, Paused and Frozen states. |
 
 **Actions and handle**
 
@@ -109,8 +116,9 @@ Loading and waiting use square indicators with accessible descriptions. Freeze k
 There are no mount options, subscription, automatic sampling or presenter
 events. The actions do not themselves alter the audio graph.
 
-**Accessibility.** Freeze and Clear are native buttons; Freeze reports its
-state with `aria-pressed` and keeps the same label. Sensitivity is a rectangular
+**Accessibility.** Freeze and Clear are native icon buttons named by
+`aria-label` and `title`; Freeze reports its state with `aria-pressed` and keeps
+the same name. Sensitivity is a rectangular
 horizontal UIKit fader with a numeric output and `role="slider"`. Its bounds
 and ARIA value use `0..100%`; Arrow keys move one percentage point, and
 Home/End select the bounds. Actions still receive `0..1`. The plot has an
@@ -134,15 +142,15 @@ and `destroy()` removes the style node it owns.
 
 | Token | Fallback | Controls |
 |---|---|---|
-| `--wm-transient-analyzer-foreground` | `--wm-foreground`, then dark ink | Root text. |
-| `--wm-transient-analyzer-background` | `--wm-surface`, then white | Root background. |
-| `--wm-transient-analyzer-border` | `--wm-border`, then gray | Root border. |
+| `--wm-transient-analyzer-foreground` | `--wm-foreground`, then `light-dark(#111, #eee)` | Root text. |
+| `--wm-transient-analyzer-background` | `--wm-surface`, then `light-dark(#fff, #111)` | Root background. |
+| `--wm-transient-analyzer-border` | `--wm-border`, then `light-dark(#d8d8d8, #333)` | Root border. In the control row it falls back to `--wm-control-border`, then `--wm-border`, for the hairlines. |
 | `--wm-transient-analyzer-padding` | `.85rem` | Root inset. |
-| `--wm-transient-analyzer-strength` | `#999` | Strength bars. |
-| `--wm-transient-analyzer-hit` | `#333` | Accepted-hit bars. |
-| `--wm-transient-analyzer-threshold` | `#666` | Dashed threshold line. |
-| `--wm-muted`, `--wm-border`, `--wm-surface-muted`, `--wm-surface`, `--wm-accent`, `--wm-control-radius` | stylesheet fallbacks | Secondary text, plot/control surfaces, pressed button and corners. |
-| `--wm-analysis-control-size` | `1.5rem` | Compact button height and horizontal fader thickness. |
+| `--wm-transient-analyzer-strength` | `light-dark(#999, #666)` | Strength bars. |
+| `--wm-transient-analyzer-hit` | `--wm-foreground`, then `light-dark(#111, #eee)` | Accepted-hit bars. |
+| `--wm-transient-analyzer-threshold` | `--wm-foreground-muted`, then `light-dark(#777, #aaa)` | Dashed threshold line. |
+| `--wm-muted`, `--wm-surface-muted`, `--wm-accent-foreground`, `--wm-control-radius`, `--wm-focus-ring` | stylesheet fallbacks | Captions and status, borderless plot surface, pressed icon, corners and inside focus outline. |
+| `--wm-analysis-control-height` | `--wm-control-size`, then `--wui-row-h`, then `2rem` | Icon-button height and horizontal fader thickness. |
 | `--wm-fader-*` | shared fader defaults | Sensitivity track, fill, thumb and corners. |
 
 The default palette is achromatic. Bar height and threshold position come from the supplied state, not CSS

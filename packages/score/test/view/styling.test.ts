@@ -22,30 +22,6 @@ function score() {
 afterEach(() => { document.body.replaceChildren(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('View drawing colors', () => {
-  it.each(['thumbnail', 'map'] as const)('%s gives explicit CSS colors priority over RGB/attributes and keeps inherited tokens live', async (type) => {
-    const view = document.createElement('styling-score-view') as ScoreViewElement;
-    view.type = type;
-    view.score = score();
-    view.setAttribute('note-color', '#123456');
-    view.options = {noteRGB: '4, 5, 6', noteColor: 'rebeccapurple'};
-    document.body.append(view);
-    const paint = () => type === 'thumbnail'
-      ? view.querySelector('rect')?.getAttribute('fill')
-      : (view.querySelector('button') as HTMLElement)?.style.getPropertyValue('--wui-timeline-region-color');
-    await vi.waitFor(() => expect(paint()).toContain('rebeccapurple'));
-    view.options = {noteRGB: '4, 5, 6'};
-    expect(paint()).toContain('rgb(4, 5, 6)');
-    view.options = {};
-    expect(paint()).toContain('rgb(18, 52, 86)');
-    view.removeAttribute('note-color');
-    expect(paint()).toContain(type === 'thumbnail' ? '--wm-score-view-note' : '--wm-score-view-map');
-    const drawing = view.querySelector(type === 'thumbnail' ? '[part="drawing"]' : 'input');
-    view.style.setProperty('--wm-score-view-note', 'orange');
-    view.style.setProperty('--wm-score-view-map', 'orange');
-    expect(view.querySelector(type === 'thumbnail' ? '[part="drawing"]' : 'input')).toBe(drawing);
-    expect(view.currentTime).toBe(0);
-  });
-
   it('resolves inherited canvas colors at paint time, preserving velocity alpha and the paused sample', () => {
     const contexts: Array<{fillStyle: string; globalAlpha: number; paints: Array<[string, number]>}> = [];
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(function(this: HTMLCanvasElement) {
@@ -88,45 +64,63 @@ describe('View drawing colors', () => {
     renderer.dispose();
   });
 
-  it('themes the actual OSMD note, line and title paints without rebuilding on a CSS change', async () => {
-    // The optional peer is installed by the docs workspace. Font metrics and
-    // skyline pixels are stubbed; the real SVG backend/paint attributes run.
-    const context = new Proxy({measureText: (text: string) => ({width: text.length * 8}),
-      getImageData: () => ({data: new Uint8ClampedArray(800 * 600 * 4)}),
-      createLinearGradient: () => ({addColorStop() {}})}, {
-      get(target, property) { return Reflect.get(target, property) ?? (() => {}); },
+  it('resolves canvas colors once per theme, not once per playhead frame', () => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => ({
+      fillStyle: '', globalAlpha: 1, setTransform() {}, clearRect() {}, fillRect() {},
+    }) as unknown as CanvasRenderingContext2D);
+    const host = document.createElement('div');
+    const canvas = document.createElement('canvas');
+    host.append(canvas); document.body.append(host);
+    const sequence: ScoreNoteSequence = {notes: [{pitch: 60, startTime: 0, endTime: 2, velocity: 40}],
+      ticksPerQuarter: 480, totalTime: 2, tempos: [{time: 0, qpm: 120}],
+      keySignatures: [], timeSignatures: [], partInfos: []};
+    const renderer = new PianoRollCanvasVisualizer(sequence, canvas, {noteColor: 'red', activeNoteColor: 'blue'});
+    renderer.redrawAtTime(0, false); // the first frame resolves the active layer
+    const reads = vi.spyOn(window, 'getComputedStyle');
+    for (let frame = 0; frame < 20; frame++) renderer.redrawAtTime(frame / 10, false);
+    expect(reads).not.toHaveBeenCalled();
+    // A theme written on an ancestor is honoured by the very next paint.
+    host.className = 'dark';
+    renderer.redrawAtTime(1, false);
+    expect(reads).toHaveBeenCalledTimes(2);
+    renderer.redrawAtTime(1.1, false);
+    expect(reads).toHaveBeenCalledTimes(2);
+    renderer.dispose();
+  });
+
+  it('hides renderer scrollbars with one zero-specificity rule while keeping them scrollable', () => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => ({
+      fillStyle: '', globalAlpha: 1, setTransform() {}, clearRect() {}, fillRect() {},
+    }) as unknown as CanvasRenderingContext2D);
+    const sequence: ScoreNoteSequence = {notes: [{pitch: 60, startTime: 0, endTime: 2}],
+      ticksPerQuarter: 480, totalTime: 2, tempos: [{time: 0, qpm: 120}],
+      keySignatures: [], timeSignatures: [], partInfos: []};
+    const renderers = [0, 1].map(() => {
+      const host = document.createElement('div');
+      const canvas = document.createElement('canvas');
+      host.append(canvas); document.body.append(host);
+      return new PianoRollCanvasVisualizer(sequence, canvas);
     });
-    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(context as unknown as CanvasRenderingContext2D);
-    vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('');
-    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(800);
-    const {OpenSheetMusicDisplay} = await import('opensheetmusicdisplay');
+    const viewports = [...document.querySelectorAll<HTMLElement>('.webscore-piano-roll-viewport')];
+    expect(viewports).toHaveLength(2);
+    for (const viewport of viewports) {
+      expect(viewport.dataset.webscoreScrollbar).toBe('hidden');
+      expect(viewport.style.getPropertyValue('overflow-x')).toBe('auto');
+    }
+    const rules = document.head.querySelectorAll('style[data-webscore-scrollbar-rule]');
+    expect(rules).toHaveLength(1);
+    expect(rules[0]!.textContent).toContain(':where([data-webscore-scrollbar="hidden"])::-webkit-scrollbar { display: none; }');
+    expect(rules[0]!.textContent).toContain('scrollbar-width: none');
+    for (const renderer of renderers) renderer.dispose();
+  });
+
+  it('draws sheet notation with the sheet ink token', async () => {
     const view = document.createElement('styling-sheet-view') as SheetViewElement;
-    view.setAttribute('follow-cursor', 'false');
-    // Use an independently authored engraving fixture: this regression owns
-    // SVG theming, not the Score-to-MusicXML serialization contract.
-    view.OpenSheetMusicDisplay = class extends OpenSheetMusicDisplay {
-      override load() {
-        return super.load('<?xml version="1.0"?><score-partwise version="4.0"><work><work-title>Theme test</work-title></work><part-list><score-part id="P1"><part-name>Piano</part-name></score-part></part-list><part id="P1"><measure number="1"><attributes><divisions>1</divisions><time><beats>4</beats><beat-type>4</beat-type></time><clef><sign>G</sign><line>2</line></clef></attributes><note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration><type>whole</type></note></measure></part></score-partwise>');
-      }
-    } as never;
     view.score = score();
     document.body.append(view);
-    await vi.waitFor(() => expect(view.querySelector('svg [fill="#010203"]')).not.toBeNull());
-    expect(view.querySelector('svg [stroke="#010203"]')).not.toBeNull();
-    expect(view.querySelector('svg [fill="#fff"], svg [fill="#ffffff"], svg [fill="white"]')).toBeNull();
-    const ink = view.querySelector('svg [fill="#010203"]')!;
-    const rules = [...view.querySelectorAll('style')].flatMap((style) => [...(style.sheet?.cssRules ?? [])]);
-    const paintRule = rules.find((rule): rule is CSSStyleRule => 'selectorText' in rule
-      && ink.matches((rule as CSSStyleRule).selectorText)
-      && (rule as CSSStyleRule).style.getPropertyValue('fill').includes('--wm-sheet-foreground'));
-    expect(paintRule).toBeDefined();
-    // Prove the matching rule paints the vendor path, not just the stage shell.
-    paintRule!.style.setProperty('fill', 'rgb(210, 220, 230)');
-    expect(getComputedStyle(ink).fill).toBe('rgb(210, 220, 230)');
-    const svg = view.querySelector('svg');
-    view.style.setProperty('--wm-sheet-foreground', 'orange');
-    view.classList.add('alternate-theme');
-    await Promise.resolve();
-    expect(view.querySelector('svg')).toBe(svg);
+    await vi.waitFor(() => expect(view.querySelector('[part~="system"]')).not.toBeNull());
+    const system = view.querySelector<HTMLElement>('[part~="system"] [data-webscore-staff-timeline]')!.parentElement!;
+    expect(system.style.getPropertyValue('--webscore-staff-note')).toContain('--wm-score-sheet-note');
+    view.remove();
   });
 });

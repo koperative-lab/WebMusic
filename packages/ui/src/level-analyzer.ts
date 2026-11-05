@@ -1,7 +1,11 @@
 import {mountStatus, statusStyle, type StatusState} from './status';
 import {installStyle} from './internal/style';
 import {claimHost} from './internal/lifecycle';
-import {analysisControlStyle, createAnalysisFader, setAnalysisStatus} from './internal/analysis-controls';
+import {
+  analysisControlStyle, analysisLine, analysisMono, analysisMuted, createAnalysisFader, setAnalysisStatusRegion,
+} from './internal/analysis-controls';
+import {ICON_PATHS, setIconButton} from './internal/icons';
+import {neutralColor} from './internal/palette';
 
 /** A sampled window from a caller-owned signal graph, expressed in dBFS. */
 export interface LevelAnalyzerSample {
@@ -41,33 +45,36 @@ const mounted = new WeakMap<HTMLElement, LevelAnalyzerHandle>();
 
 const levelAnalyzerStyle = `${statusStyle}
 ${analysisControlStyle}
-.wui-level-analyzer { box-sizing: border-box; display: grid; gap: .75rem; width: 100%; min-width: 0;
-  color: var(--wm-level-analyzer-foreground, var(--wm-foreground, #222));
-  background: var(--wm-level-analyzer-background, var(--wm-surface, #fff));
-  border: 1px solid var(--wm-level-analyzer-border, var(--wm-border, #d8d8d8));
+:where(.wui-level-analyzer) { box-sizing: border-box; display: grid; gap: .75rem; width: 100%; min-width: 0;
+  color: var(--wm-level-analyzer-foreground, var(--wm-foreground, ${neutralColor('foreground')}));
+  background: var(--wm-level-analyzer-background, var(--wm-surface, light-dark(#fff, #111)));
+  border: 1px solid var(--wm-level-analyzer-border, var(--wm-border, ${neutralColor('border')}));
   padding: var(--wm-level-analyzer-padding, .85rem); }
-.wui-level-analyzer, .wui-level-analyzer * { box-sizing: border-box; }
-.wui-level-analyzer__controls { display: flex; align-items: center; flex-wrap: wrap; gap: .45rem .65rem; }
-.wui-level-analyzer__status { font-size: .78rem; color: var(--wm-muted, var(--wm-foreground-muted, #777)); }
-.wui-level-analyzer__values { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .6rem; margin: 0; }
-.wui-level-analyzer__readout { min-width: 0; }
-.wui-level-analyzer__readout dt { font-size: .72rem; color: var(--wm-muted, var(--wm-foreground-muted, #777)); }
-.wui-level-analyzer__readout dd { margin: .15rem 0 0; font: 600 1.35rem/1.15 ui-monospace, SFMono-Regular, Consolas, monospace;
+:where(.wui-level-analyzer, .wui-level-analyzer *) { box-sizing: border-box; }
+:where(.wui-level-analyzer__controls) { border-color: var(--wm-level-analyzer-border, ${analysisLine}); }
+:where(.wui-level-analyzer__controls > * + *) { border-left-color: var(--wm-level-analyzer-border, ${analysisLine}); }
+:where(.wui-level-analyzer__status) { font: 400 .6875rem/1.4 ${analysisMono}; color: var(--wm-muted, ${analysisMuted}); }
+:where(.wui-level-analyzer__values) { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .6rem; margin: 0; }
+:where(.wui-level-analyzer__readout) { min-width: 0; }
+:where(.wui-level-analyzer__readout dt) { font: 400 .625rem/1.2 ${analysisMono}; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--wm-muted, ${analysisMuted}); }
+:where(.wui-level-analyzer__readout dd) { margin: .15rem 0 0; font: 600 1.35rem/1.15 ${analysisMono};
   font-variant-numeric: tabular-nums; white-space: nowrap; }
-.wui-level-analyzer__readout small { font: 400 .68rem/1.2 system-ui, sans-serif; }
-.wui-level-analyzer__plot { position: relative; height: 94px; overflow: hidden; display: flex; align-items: end;
-  gap: 1px; border: 1px solid var(--wm-border, #d8d8d8); background: var(--wm-surface-muted, #f3f3f3); }
-.wui-level-analyzer__column { position: relative; flex: 1 1 0; min-width: 0; height: 100%; }
-.wui-level-analyzer__rms, .wui-level-analyzer__peak { position: absolute; bottom: 0; left: 0; right: 0; }
-.wui-level-analyzer__rms { background: var(--wm-level-analyzer-rms, #999); }
-.wui-level-analyzer__peak { height: 2px; background: var(--wm-level-analyzer-peak, #111); }
-.wui-level-analyzer__threshold { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--wm-level-analyzer-threshold, #666); pointer-events: none; }
-.wui-level-analyzer__plot[data-over='true'] { outline: 2px solid var(--wm-danger, #111); outline-offset: -2px; }
-.wui-level-analyzer__scale { display: flex; justify-content: space-between; margin-top: -.5rem;
-  font: .68rem ui-monospace, SFMono-Regular, Consolas, monospace; color: var(--wm-muted, var(--wm-foreground-muted, #777)); }
-@media (max-width: 400px) { .wui-level-analyzer__readout dd { font-size: 1.05rem; } }
-@media (forced-colors: active) { .wui-level-analyzer__rms { background: Highlight; }
-  .wui-level-analyzer__peak, .wui-level-analyzer__threshold { background: CanvasText; } }
+:where(.wui-level-analyzer__readout small) { font: 400 .6875rem/1.2 ${analysisMono}; color: var(--wm-muted, ${analysisMuted}); }
+:where(.wui-level-analyzer__plot) { position: relative; height: 94px; overflow: hidden; display: flex; align-items: end;
+  gap: 1px; border: 0; background: var(--wm-surface-muted, light-dark(#f3f3f3, #1c1c1c)); }
+:where(.wui-level-analyzer__column) { position: relative; flex: 1 1 0; min-width: 0; height: 100%; }
+:where(.wui-level-analyzer__rms, .wui-level-analyzer__peak) { position: absolute; bottom: 0; left: 0; right: 0; }
+:where(.wui-level-analyzer__rms) { background: var(--wm-level-analyzer-rms, light-dark(#999, #666)); }
+:where(.wui-level-analyzer__peak) { height: 2px; background: var(--wm-level-analyzer-peak, var(--wm-foreground, ${neutralColor('foreground')})); }
+:where(.wui-level-analyzer__threshold) { position: absolute; left: 0; right: 0; pointer-events: none;
+  border-top: 1px dashed var(--wm-level-analyzer-threshold, var(--wm-foreground-muted, ${neutralColor('muted')})); }
+:where(.wui-level-analyzer__plot[data-over='true']) { outline: 2px solid var(--wm-danger, var(--wm-foreground, ${neutralColor('foreground')})); outline-offset: -2px; }
+:where(.wui-level-analyzer__scale) { display: flex; justify-content: space-between; margin-top: -.5rem;
+  font: .625rem/1.2 ${analysisMono}; color: var(--wm-muted, ${analysisMuted}); }
+@media (max-width: 400px) { :where(.wui-level-analyzer__readout dd) { font-size: 1.05rem; } }
+@media (forced-colors: active) { :where(.wui-level-analyzer__rms) { background: Highlight; }
+  :where(.wui-level-analyzer__peak, .wui-level-analyzer__threshold) { background: CanvasText; } }
 `;
 
 function heightFor(db: number): number {
@@ -148,24 +155,26 @@ export function mountLevelAnalyzer(host: HTMLElement, actions: LevelAnalyzerActi
   }
 
   const controls = document.createElement('div');
-  controls.className = 'wui-level-analyzer__controls';
+  controls.className = 'wui-level-analyzer__controls wui-analysis-row';
+  const buttons = document.createElement('div');
+  buttons.className = 'wui-analysis-group';
   const freeze = document.createElement('button');
   freeze.type = 'button';
   freeze.className = 'wui-level-analyzer__button wui-analysis-button';
   freeze.setAttribute('part', 'freeze');
-  freeze.textContent = 'Freeze';
+  setIconButton(freeze, ICON_PATHS.freeze, 'Freeze');
   freeze.setAttribute('aria-pressed', 'false');
   const reset = document.createElement('button');
   reset.type = 'button';
   reset.className = 'wui-level-analyzer__button wui-analysis-button';
   reset.setAttribute('part', 'reset');
-  reset.setAttribute('aria-label', 'Reset hold');
-  reset.textContent = 'Reset';
+  setIconButton(reset, ICON_PATHS.reset, 'Reset hold');
   const threshold = createAnalysisFader(document, {
     label: 'Peak threshold', part: 'threshold', min: MIN_DB, max: MAX_DB, step: 1, value: -12,
     formatValue: (value) => `${value} dBFS`, onInput: (value) => actions.onThresholdChange(value),
   });
-  controls.append(freeze, reset, threshold.element);
+  buttons.append(freeze, reset);
+  controls.append(buttons, threshold.element);
   root.append(values, plot, scale, controls, status);
 
   let destroyed = false;
@@ -179,10 +188,9 @@ export function mountLevelAnalyzer(host: HTMLElement, actions: LevelAnalyzerActi
       if (destroyed) return;
       frozen = state.frozen;
       const pending = state.loading || state.waiting;
-      setAnalysisStatus(statusMessage, pending ? '' : state.status);
+      setAnalysisStatusRegion(status, statusMessage, state.status, Boolean(pending));
       feedback = {kind: state.loading ? 'loading' : state.waiting ? 'waiting' : 'ready', message: pending ? state.status : ''};
       waiting.update();
-      status.hidden = !pending && statusMessage.hidden;
       freeze.setAttribute('aria-pressed', String(frozen));
       threshold.paint(state.thresholdDbfs);
       line.style.bottom = `${heightFor(state.thresholdDbfs)}%`;

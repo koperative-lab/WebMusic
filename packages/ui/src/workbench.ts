@@ -22,6 +22,7 @@ import {
 import {claimHost, createErrorSink, createUpdateLoop} from './internal/lifecycle';
 import {installStyle, paint} from './internal/style';
 import {componentSurfaceDeclarations} from './internal/surface';
+import {hiddenScrollbarCss, visuallyHiddenDeclarations} from './internal/icons';
 import type {Declarations} from './styles';
 import {mountStatus, statusStyle, type StatusState} from './status';
 
@@ -633,14 +634,18 @@ const RESPONSIVE = [
         'flex-direction': 'row',
         'overflow-x': 'auto',
         'overscroll-behavior-x': 'contain',
+        // Visual design → Scrolling surfaces: the shelf stays scrollable by
+        // wheel, trackpad and keyboard, without a visible scrollbar.
+        'scrollbar-width': 'none',
       }),
     ),
     // Every dock gets a readable width or the shelf scrolls; found by running
     // it. A column shares its width by height, but a ROW shares it by intrinsic
     // content, so one dock holding a wide drawing starves the two beside it —
     // three surfaces became 515px, 70px and 9px on a 594px shelf. Growing from
-    // an equal floor and refusing to shrink is what makes the scrollbar, and a
-    // scrollbar is the honest answer to "these do not fit".
+    // an equal floor and refusing to shrink is what makes the shelf scroll, and
+    // scrolling is the honest answer to "these do not fit"; the scrollbar itself
+    // stays hidden like every other scrolling surface.
     indent(
       harmonyRule('.wui-workbench__rail .wui-workbench__dock', {
         flex: `1 0 min(100%, ${DOCK_FLOOR})`,
@@ -709,6 +714,12 @@ export const workbenchStyle = [
   harmonyRule('.wui-workbench__detail', workbenchParts.detail),
   harmonyRule('.wui-workbench__index', workbenchParts.index),
   harmonyRule('.wui-workbench__note[data-phase="error"]', {color: severityFill('error')}),
+  // An empty stage carries no visible prose (Visual design → Type): the
+  // sentence stays in the accessibility tree, where a reader still hears it.
+  // An error keeps its one visible line.
+  harmonyRule('.wui-workbench__note[data-phase="empty"]', visuallyHiddenDeclarations),
+  // `scrollbar-width` is in the part records; WebKit needs its pseudo-element.
+  hiddenScrollbarCss('.wui-workbench__tablist, .wui-workbench__rail').trimEnd(),
 
   // `hidden` has to actually hide. The UA sheet's `[hidden] { display: none }`
   // is at USER-AGENT origin and every `display` above it is at author origin,
@@ -1457,6 +1468,13 @@ export function mountWorkbench(
     setText(note, noted);
     setHidden(note, noted === '');
     setData(note, 'phase', noted === '' ? undefined : phase);
+    if (inline) {
+      const quiet = noted !== '' && phase === 'empty';
+      for (const [name, value] of Object.entries(visuallyHiddenDeclarations)) {
+        setStyleValue(note, name, quiet ? value : undefined);
+      }
+      if (!quiet) dress(note, workbenchParts.note);
+    }
     if (chrome === 'bare') {
       setAttr(note, 'role', noted === '' ? undefined : 'status');
       setAttr(note, 'aria-live', noted === '' ? undefined : 'polite');

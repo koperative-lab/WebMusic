@@ -3,6 +3,8 @@ import {claimHost, createUpdateLoop} from "./internal/lifecycle";
 import {addClassNames, clamp, setParts} from './internal/dom';
 import {componentSurfaceCss, controlBorderFallback} from './internal/surface';
 import {controlHeight, controlRadius, controlThumbRadius, surfaceHeight} from './internal/control';
+import {neutralColor} from './internal/palette';
+import {ICON_PATHS, setIconButton} from './internal/icons';
 // ============================================================================
 // Domain-neutral low-frequency oscillator presenter.
 //
@@ -156,7 +158,6 @@ ${componentSurfaceCss('lfo', {
   flex-wrap: wrap;
   min-width: 0;
 }
-.wui-lfo__run,
 .wui-lfo__shape {
   display: inline-flex;
   align-items: center;
@@ -166,13 +167,32 @@ ${componentSurfaceCss('lfo', {
   border-radius: var(--wm-lfo-radius, var(--wm-control-radius, 0));
   cursor: pointer;
 }
-.wui-lfo__run {
+/* Run is an icon button: muted and unfilled while idle, inverted while it runs
+   (aria-pressed). --wm-lfo-button-background/-foreground theme the pressed fill. */
+:where(.wui-lfo__run) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
   width: ${controlHeight('lfo')};
-  border: 1px solid var(--wm-lfo-button-background, var(--wm-accent, var(--wm-foreground, #111)));
-  background: var(--wm-lfo-button-background, var(--wm-accent, var(--wm-foreground, #111)));
-  color: var(--wm-lfo-button-foreground, var(--wm-accent-foreground, #fff));
+  height: ${controlHeight('lfo')};
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--wm-lfo-radius, var(--wm-control-radius, 0));
+  background: transparent;
+  color: var(--wm-foreground-muted, ${neutralColor('muted')});
+  cursor: pointer;
 }
-.wui-lfo__run svg { width: 1.1rem; height: 1.1rem; }
+:where(.wui-lfo__run:hover:not(:disabled)) {
+  color: var(--wm-foreground, ${neutralColor('foreground')});
+  background: var(--wm-surface-muted, light-dark(#f3f3f3, #1c1c1c));
+}
+:where(.wui-lfo__run[aria-pressed='true']) {
+  background: var(--wm-lfo-button-background, var(--wm-foreground, ${neutralColor('foreground')}));
+  color: var(--wm-lfo-button-foreground, var(--wm-accent-foreground, light-dark(#fff, #111)));
+}
+:where(.wui-lfo__run svg) { width: 16px; height: 16px; flex: none; }
 .wui-lfo__shapes { display: flex; flex-wrap: wrap; min-width: 0; max-width: 100%; gap: var(--wm-lfo-shape-gap, .25rem); }
 .wui-lfo__shape {
   width: 1.9rem;
@@ -235,34 +255,37 @@ ${componentSurfaceCss('lfo', {
   max-width: 100%;
   overflow-wrap: anywhere;
   color: var(--wm-lfo-value, currentColor);
+  font-family: var(--wm-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
   font-variant-numeric: tabular-nums;
 }
-.wui-lfo__wave {
+/* The wave shares the component surface below a hairline; a theme inverts it
+   through --wm-lfo-wave-background and --wm-lfo-wave. */
+:where(.wui-lfo__wave) {
   position: relative;
   height: ${surfaceHeight('lfo-wave', 'sm')};
   margin-top: .6rem;
   overflow: hidden;
-  background: var(--wm-lfo-wave-background, var(--wm-surface-inverse, #111));
+  border-top: 1px solid var(--wm-control-border, var(--wm-border, ${neutralColor('border')}));
+  background: var(--wm-lfo-wave-background, var(--wm-surface, light-dark(#fff, #111)));
 }
-.wui-lfo__wave svg { display: block; width: 100%; height: 100%; }
-.wui-lfo__curve {
+:where(.wui-lfo__wave svg) { display: block; width: 100%; height: 100%; }
+:where(.wui-lfo__curve) {
   fill: none;
-  stroke: var(--wm-lfo-wave, var(--wm-foreground-on-inverse, #fff));
+  stroke: var(--wm-lfo-wave, var(--wm-foreground, ${neutralColor('foreground')}));
   stroke-width: 1.5;
   vector-effect: non-scaling-stroke;
 }
-.wui-lfo__head {
-  stroke: var(--wm-lfo-head, var(--wm-accent, #c0392b));
-  stroke-width: 1.5;
+/* The phase head marks position, not meaning: ink, not a hue. */
+:where(.wui-lfo__head) {
+  stroke: var(--wm-lfo-head, var(--wm-foreground, ${neutralColor('foreground')}));
+  stroke-width: 1;
   vector-effect: non-scaling-stroke;
 }
-.wui-lfo.is-disabled { opacity: .55; }
-.wui-lfo.is-disabled button,
-.wui-lfo.is-disabled input { cursor: default; }
-.wui-lfo button:focus-visible,
-.wui-lfo input:focus-visible {
-  outline: 2px solid var(--wm-focus, var(--wm-focus-ring, currentColor));
-  outline-offset: 2px;
+:where(.wui-lfo.is-disabled) { opacity: .3; }
+:where(.wui-lfo.is-disabled button, .wui-lfo.is-disabled input) { cursor: default; }
+:where(.wui-lfo button:focus-visible, .wui-lfo input:focus-visible) {
+  outline: var(--wm-focus-ring, 2px solid var(--wm-foreground, ${neutralColor('foreground')}));
+  outline-offset: -2px;
 }
 @media (forced-colors: active) {
   .wui-lfo { border-color: CanvasText; }
@@ -340,34 +363,6 @@ function createShapeGlyph(document: Document, shape: LfoShape): SVGSVGElement {
   const path = createSvg(document, "path");
   path.setAttribute("d", shapePath(shape));
   svg.append(path);
-  return svg;
-}
-
-function createRunGlyph(document: Document, running: boolean): SVGSVGElement {
-  const svg = createSvg(document, "svg");
-  svg.setAttribute("viewBox", "0 0 24 24");
-  svg.setAttribute("aria-hidden", "true");
-  svg.setAttribute("focusable", "false");
-  if (running) {
-    const first = createSvg(document, "rect");
-    first.setAttribute("x", "7");
-    first.setAttribute("y", "5");
-    first.setAttribute("width", "3.5");
-    first.setAttribute("height", "14");
-    first.setAttribute("fill", "currentColor");
-    const second = createSvg(document, "rect");
-    second.setAttribute("x", "13.5");
-    second.setAttribute("y", "5");
-    second.setAttribute("width", "3.5");
-    second.setAttribute("height", "14");
-    second.setAttribute("fill", "currentColor");
-    svg.append(first, second);
-  } else {
-    const polygon = createSvg(document, "polygon");
-    polygon.setAttribute("points", "8 5 19 12 8 19 8 5");
-    polygon.setAttribute("fill", "currentColor");
-    svg.append(polygon);
-  }
   return svg;
 }
 
@@ -529,6 +524,9 @@ export function mountLfo(
 
   let destroyed = false;
   let current: LfoState | undefined;
+  /** What the DOM last drew, so a phase-only frame moves only the head. */
+  let paintedRun: string | undefined;
+  let paintedWave: string | undefined;
   let currentRateText = "";
   let currentDepthText = "";
   let unsubscribe: (() => void) | undefined;
@@ -573,7 +571,6 @@ export function mountLfo(
   ): void => {
     if (!isCurrent()) return;
     const firstFrame = current === undefined;
-    const points = wavePoints(snapshot.shape, snapshot.depth);
     const headX = (snapshot.phase * 100).toFixed(1);
     current = snapshot;
     currentRateText = rateText;
@@ -581,13 +578,15 @@ export function mountLfo(
 
     root.classList.toggle("is-disabled", snapshot.disabled === true);
     run.disabled = snapshot.disabled === true;
-    run.setAttribute(
-      "aria-label",
-      snapshot.running
-        ? (options.stopLabel ?? "Stop")
-        : (options.runLabel ?? "Run"),
-    );
-    run.replaceChildren(createRunGlyph(document, snapshot.running));
+    const runLabel = snapshot.running
+      ? (options.stopLabel ?? "Stop")
+      : (options.runLabel ?? "Run");
+    const runKey = `${snapshot.running}|${runLabel}`;
+    if (runKey !== paintedRun) {
+      paintedRun = runKey;
+      setIconButton(run, snapshot.running ? ICON_PATHS.pause : ICON_PATHS.play, runLabel);
+      run.setAttribute("aria-pressed", String(snapshot.running));
+    }
     for (const [shape, button] of shapeButtons) {
       const active = shape === snapshot.shape;
       button.disabled = snapshot.disabled === true;
@@ -599,13 +598,17 @@ export function mountLfo(
     rateControl.input.value = String(snapshot.rate);
     if (firstFrame) rateControl.input.defaultValue = String(snapshot.rate);
     rateControl.input.setAttribute("aria-valuetext", rateText);
-    rateControl.value.textContent = rateText;
+    if (rateControl.value.textContent !== rateText) rateControl.value.textContent = rateText;
     depthControl.input.disabled = snapshot.disabled === true;
     depthControl.input.value = String(snapshot.depth);
     if (firstFrame) depthControl.input.defaultValue = String(snapshot.depth);
     depthControl.input.setAttribute("aria-valuetext", depthText);
-    depthControl.value.textContent = depthText;
-    curve.setAttribute("points", points);
+    if (depthControl.value.textContent !== depthText) depthControl.value.textContent = depthText;
+    const waveKey = `${snapshot.shape}:${snapshot.depth}`;
+    if (waveKey !== paintedWave) {
+      paintedWave = waveKey;
+      curve.setAttribute("points", wavePoints(snapshot.shape, snapshot.depth));
+    }
     head.setAttribute("x1", headX);
     head.setAttribute("x2", headX);
   };

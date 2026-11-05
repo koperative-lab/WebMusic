@@ -38,7 +38,9 @@ second, sustain holds across the third, and release extends into the fourth. Eac
 scaled against its positive `*Max` range; sustain is clamped to `0…1`. The combined decay/sustain
 handle edits both axes in one pointer gesture.
 
-Pointer and native-range input paints optimistically, calls `setEnvelope()` with a new complete
+Pointer movement during a drag is applied at most once per animation frame, using only the latest
+position; releasing the pointer applies the final position at once, and a cancelled drag drops a
+pending one. Pointer and native-range input paints optimistically, calls `setEnvelope()` with a new complete
 object, then re-reads the binding after the latest command settles. Earlier command settlements
 cannot overwrite a newer gesture. Subscription and explicit updates use the same 32-pass bounded
 repaint path. See the [shared presenter shape](/uikit/api/#the-shared-presenter-shape) for the
@@ -98,8 +100,8 @@ shown below; curve geometry clamps values to each visible range without mutating
 ranges are labelled Attack, Decay, Sustain and Release and expose formatted `aria-valuetext`;
 their native keys are the keyboard-equivalent editing path. SVG curve, handles and visual readout
 are `aria-hidden`, so they do not duplicate the ranges. Focus on a range highlights its related
-SVG handle. Disabled state reaches every native input, and forced-colors rules retain curve,
-handle and focus contrast.
+SVG handle with a 2px ink ring. Disabled state reaches every native input and drops the root to
+30% opacity; forced-colors rules retain curve, handle and focus contrast.
 
 </details>
 
@@ -112,39 +114,36 @@ Presenter-specific tokens below take precedence within their documented roles.
 
 The presenter installs `envelopeStyle` unless `stylesheet: false`. The SVG fills its container
 width and keeps the height set by `--wm-envelope-height`. The wrapping ADSR readout occupies a
-separate row below the plot and adds to the total height. Drag coordinates use the SVG's current
-bounds, so wrapping text and container resizing do not change the time/level mapping.
+separate row below the plot, divided from it by a hairline, and adds to the total height. Drag
+coordinates use the SVG's bounds measured when the press starts, so wrapping text and container
+resizing do not change the time/level mapping.
 Supply the exported stylesheet or your own CSS from the host when opting out.
 
-The graph is an inverse surface: `--wm-surface-inverse` and
-`--wm-foreground-on-inverse` keep its background and marks paired. Ordinary
-`--wm-surface` and `--wm-foreground` do not recolor that inner graph. Set
-`--wm-envelope-background` and the documented graph-ink tokens together when
-replacing its palette; the readout below uses ordinary foreground tokens.
+The plot shares the component surface: by default its background is `--wm-surface` and its
+curve and handles use `--wm-foreground`, with no inner border. To invert the plot, set
+`--wm-envelope-background` and `--wm-envelope-foreground` (or the curve and handle tokens)
+together; handle outlines follow the plot background so they stay paired. The readout below uses
+ordinary muted foreground tokens.
 
 **Tokens**
 
 | Property | Falls back to | Default | Controls |
 |---|---|---|---|
-| `--wm-envelope-border` | `--wm-control-border` → `--wm-border` | `#d8d8d8` | Inner graph border. |
-| `--wm-control-border` | `--wm-border` | `#d8d8d8` | Shared non-primary control border fallback. |
-| `--wm-border` | literal | `#d8d8d8` | Shared border fallback. |
-| `--wm-envelope-radius` | `--wm-control-radius` | `0` | Inner graph corners. |
+| `--wm-envelope-border` | `--wm-control-border` → `--wm-border` | `light-dark(#d8d8d8, #333)` | Hairline between the plot and the readout. |
+| `--wm-control-border` | `--wm-border` | `light-dark(#d8d8d8, #333)` | Shared line fallback for the divider and grid. |
+| `--wm-envelope-radius` | `--wm-control-radius` | `0` | Plot corners. |
 | `--wm-control-radius` | literal | `0` | Shared radius fallback. |
-| `--wm-envelope-background` | `--wm-surface-inverse` | `#111` | Inner graph surface; the outer root uses the shared `--wm-component-*` surface. |
-| `--wm-surface-inverse` | literal | `#111` | Shared inverse-surface fallback. |
-| `--wm-envelope-foreground` | `--wm-foreground-on-inverse` | `#fff` | Root current color and curve/handle fallback. |
-| `--wm-foreground-on-inverse` | literal | `#fff` | Shared inverse foreground fallback. |
+| `--wm-envelope-background` | `--wm-surface` | `light-dark(#fff, #111)` | Plot background; the outer root uses the shared `--wm-component-*` surface. |
+| `--wm-envelope-foreground` | `--wm-foreground` | `light-dark(#111, #eee)` | Root current color and curve/handle fallback. |
 | `--wm-envelope-height` | `--wm-surface-md` | `144px` | SVG display height, on the shared drawing-surface scale. |
-| `--wm-envelope-grid` | literal | `rgba(255,255,255,.12)` | Vertical guide lines. |
-| `--wm-envelope-fill` | literal | `rgba(255,255,255,.12)` | Area under the curve. |
+| `--wm-envelope-grid` | `--wm-control-border` → `--wm-border` | `light-dark(#d8d8d8, #333)` | Vertical guide lines. |
+| `--wm-envelope-fill` | `--wm-surface-muted` | `light-dark(#f3f3f3, #1c1c1c)` | Area under the curve. |
 | `--wm-envelope-curve` | `currentColor` | Root foreground | ADSR line. |
 | `--wm-envelope-handle` | `currentColor` | Root foreground | Handle fill. |
-| `--wm-envelope-handle-border` | `--wm-control-border` → `--wm-border` | `#d8d8d8` | Handle outline. |
-| `--wm-focus` | `--wm-focus-ring` | `Highlight` | Focused-handle outline. |
-| `--wm-focus-ring` | literal | `Highlight` | Shared focus fallback. |
-| `--wm-font-mono` | literal | `ui-monospace, monospace` | ADSR readout font family. |
-| `--wm-envelope-text` | `--wm-foreground-muted` → `--wm-foreground` | `#666` | Visual ADSR readout. |
+| `--wm-envelope-handle-border` | `--wm-envelope-background` → `--wm-surface` | `light-dark(#fff, #111)` | Handle outline. |
+| `--wm-foreground` | literal | `light-dark(#111, #eee)` | Focused-handle ring. |
+| `--wm-font-mono` | literal | `ui-monospace, SFMono-Regular, Menlo, monospace` | ADSR readout font family. |
+| `--wm-envelope-text` | `--wm-foreground-muted` | `light-dark(#777, #aaa)` | Visual ADSR readout. |
 
 **Classes**
 

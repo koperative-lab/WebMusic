@@ -4,7 +4,7 @@
 
 Reviewed on 2026-10-08 on `component-loading-animations`, starting from
 `ef8664dbb68ece9dc8c1d328141989a0ae86f888` plus this task's working-tree changes.
-Environment: macOS, Node 26.8.1, npm 11.19.0 and the Codex in-app browser.
+Environment: macOS, Node 26.8.1, npm 11.19.0 and the embedded Chromium browser.
 The browser's exact engine version was not exposed by the UI tooling.
 
 This pass covers every tag in the explicit Element composition catalog, following

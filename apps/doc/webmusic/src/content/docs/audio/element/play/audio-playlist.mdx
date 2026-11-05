@@ -120,7 +120,9 @@ The host fills its container width by default, can shrink inside flex/grid
 layouts, and respects `hidden`. Set host width in your application for a narrower
 control; spacing between components belongs to their composition.
 
-The shared playlist presenter supplies the neutral `--wm-component-*` outer surface. The legacy
+The shared playlist presenter supplies the neutral `--wm-component-*` outer surface. Its padding
+falls back to `0` (`--wm-audio-playlist-surface-padding` → `--wm-playlist-surface-padding` →
+`--wm-component-padding` → `0`), so the transport row and the rows run edge to edge. The legacy
 `--wapl-*` aliases remain available for a playlist-specific skin:
 
 ```css
@@ -128,13 +130,16 @@ audio-playlist {
   --wapl-bg: #fff;
   --wapl-fg: #111;
   --wapl-accent: #e23b3b;
-  --wapl-active: rgba(226, 59, 59, .12);
   --wapl-radius: 12px;
 }
 ```
 
 In linked mode, the transport bar is omitted. An independent playlist shows its
-transport, using `--wapl-accent` and `--wm-playlist-button-*`.
+transport: previous, play/pause and next icon buttons (muted when idle, inverted while
+playing) and a seek rail whose filled part uses `--wapl-accent` → `--wm-playlist-accent` →
+`--wm-foreground-muted`. The current row is inverted ink through `--wm-playlist-active` and
+`--wm-playlist-active-foreground`; the legacy active-row alias no longer styles it. Numbers and durations
+use mono type.
 
 Rows carry `aria-current="true"` for the entry playing and `data-status="loading" | "error"` while an entry is being fetched or after it failed, so a stylesheet can mark both. The presenter patches those in place rather than rebuilding the list, so a keyboard user's focus survives playback ticks.
 

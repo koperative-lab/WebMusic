@@ -85,7 +85,7 @@ describe('mountStatus', () => {
     let state: StatusState = {kind: 'waiting', message: 'Connect a player'};
     const handle = mountStatus(host, {snapshot: () => state});
 
-    for (const kind of ['waiting', 'loading'] as const) {
+    for (const kind of ['waiting', 'loading', 'empty'] as const) {
       state = {kind, message: 'Connect a player'};
       handle.update();
       expect(handle.message.textContent).toBe('Connect a player');
@@ -180,6 +180,16 @@ describe('mountStatus', () => {
   it('exports the canonical status style', () => {
     expect(statusStyle).toContain('.wui-status');
     expect(statusStyle).toContain('[data-kind="error"]');
+  });
+
+  it('keeps every rule at zero specificity and pairs the error ink for dark schemes', () => {
+    const selectors = [...statusStyle.matchAll(/(?:^|})\s*([^{}@]+?)\s*\{/g)]
+      .map((match) => match[1]!.trim())
+      .filter((selector) => !/^(?:from|to|\d|\/\*)/.test(selector) && !selector.includes('%'));
+    expect(selectors.length).toBeGreaterThan(10);
+    for (const selector of selectors) expect(selector.replace(/^\/\*[\s\S]*?\*\/\s*/, '')).toMatch(/^:where\(/);
+    expect(statusStyle).toContain('light-dark(#b42318, #f97066)');
+    expect(statusStyle).not.toMatch(/var\(--wm-danger, #b42318\)/);
   });
 });
 

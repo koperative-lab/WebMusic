@@ -48,12 +48,12 @@ type StatusHost = HTMLElement | ShadowRoot;
 const mounted = new WeakMap<StatusHost, StatusHandle>();
 
 export const statusStyle = String.raw`
-.wui-status {
+:where(.wui-status) {
 ${componentSurfaceCss('status', {
   padding: 'var(--wm-status-padding, .6rem)',
-  border: 'var(--wm-status-border, 1px solid var(--wm-border, #d8d8d8))',
+  border: 'var(--wm-status-border, 1px solid var(--wm-border, light-dark(#d8d8d8, #333)))',
   radius: 'var(--wm-status-radius, var(--wm-control-radius, 0))',
-  background: 'var(--wm-status-background, var(--wm-surface, #fff))',
+  background: 'var(--wm-status-background, var(--wm-surface, light-dark(#fff, #111)))',
 })}
   display: flex;
   align-items: center;
@@ -61,13 +61,13 @@ ${componentSurfaceCss('status', {
   width: 100%;
   min-width: 0;
   min-height: var(--wm-status-height, 3rem);
-  color: var(--wm-status-foreground, var(--wm-foreground-muted, var(--wm-foreground, #777)));
+  color: var(--wm-status-foreground, var(--wm-foreground-muted, light-dark(#777, #aaa)));
   font: 500 .8125rem/1.3 var(--wm-font-family, system-ui, sans-serif);
   text-align: center;
 }
-.wui-status__message { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
-.wui-status[hidden] { display: none; }
-.wui-status__indicator {
+:where(.wui-status__message) { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+:where(.wui-status[hidden]) { display: none; }
+:where(.wui-status__indicator) {
   box-sizing: border-box;
   display: grid;
   flex: 0 0 auto;
@@ -78,27 +78,33 @@ ${componentSurfaceCss('status', {
   height: var(--wm-status-indicator-size, 1.25rem);
   color: inherit;
 }
-.wui-status__indicator[hidden] { display: none; }
-.wui-status__indicator > span { background: currentColor; }
-.wui-status[data-kind="loading"] .wui-status__indicator > span {
+:where(.wui-status__indicator[hidden]) { display: none; }
+:where(.wui-status__indicator > span) { background: currentColor; }
+:where(.wui-status[data-kind="loading"] .wui-status__indicator > span) {
   animation: wui-status-loading var(--wm-status-loading-duration, 1.2s) ease-in-out infinite;
 }
-.wui-status[data-kind="loading"] .wui-status__indicator > span:nth-child(2) {
+:where(.wui-status[data-kind="loading"] .wui-status__indicator > span:nth-child(2)) {
   animation-delay: calc(var(--wm-status-loading-duration, 1.2s) * -.75);
 }
-.wui-status[data-kind="loading"] .wui-status__indicator > span:nth-child(3) {
+:where(.wui-status[data-kind="loading"] .wui-status__indicator > span:nth-child(3)) {
   animation-delay: calc(var(--wm-status-loading-duration, 1.2s) * -.25);
 }
-.wui-status[data-kind="loading"] .wui-status__indicator > span:nth-child(4) {
+:where(.wui-status[data-kind="loading"] .wui-status__indicator > span:nth-child(4)) {
   animation-delay: calc(var(--wm-status-loading-duration, 1.2s) * -.5);
 }
-.wui-status[data-kind="waiting"] .wui-status__indicator {
+:where(.wui-status[data-kind="waiting"] .wui-status__indicator) {
   border: 1px solid currentColor;
   animation: wui-status-waiting var(--wm-status-waiting-duration, 2.4s) ease-in-out infinite;
 }
-.wui-status[data-kind="waiting"] .wui-status__indicator > span { visibility: hidden; }
-.wui-status[data-kind="loading"] .wui-status__message,
-.wui-status[data-kind="waiting"] .wui-status__message {
+:where(.wui-status[data-kind="waiting"] .wui-status__indicator > span) { visibility: hidden; }
+/* Loading, waiting and empty carry no visible prose (Visual design → Type): the
+   indicator or the empty surface is the visible state, the sentence is for
+   assistive technology. An error keeps its one visible line. */
+:where(
+  .wui-status[data-kind="loading"] .wui-status__message,
+  .wui-status[data-kind="waiting"] .wui-status__message,
+  .wui-status[data-kind="empty"] .wui-status__message
+) {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -117,23 +123,24 @@ ${componentSurfaceCss('status', {
   0%, 100% { opacity: .3; }
   50% { opacity: .75; }
 }
-:is([data-motion="none"], [data-motion="stepped"]) .wui-status[data-kind="loading"] .wui-status__indicator > span,
-:is([data-motion="none"], [data-motion="stepped"]) .wui-status[data-kind="waiting"] .wui-status__indicator {
+:where(
+  :is([data-motion="none"], [data-motion="stepped"]) .wui-status[data-kind="loading"] .wui-status__indicator > span,
+  :is([data-motion="none"], [data-motion="stepped"]) .wui-status[data-kind="waiting"] .wui-status__indicator
+) {
   animation: none;
   opacity: .65;
 }
 @media (prefers-reduced-motion: reduce) {
-  .wui-status[data-kind="loading"] .wui-status__indicator > span,
-  .wui-status[data-kind="waiting"] .wui-status__indicator {
+  :where(.wui-status[data-kind="loading"] .wui-status__indicator > span, .wui-status[data-kind="waiting"] .wui-status__indicator) {
     animation: none;
     opacity: .65;
   }
 }
-.wui-status[data-kind="error"] {
+:where(.wui-status[data-kind="error"]) {
   border-style: solid;
-  color: var(--wm-status-error, var(--wm-danger, #b42318));
+  color: var(--wm-status-error, var(--wm-danger, light-dark(#b42318, #f97066)));
 }
-.wui-status.wui-status--embedded {
+:where(.wui-status.wui-status--embedded) {
   min-height: 100%;
   height: 100%;
   padding: 0;

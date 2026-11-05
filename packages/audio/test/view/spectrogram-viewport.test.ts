@@ -271,6 +271,20 @@ describe('renderSpectrogramVisualizer viewport', () => {
     rendered.dispose();
   });
 
+  it('paints an anchored zoom start and hides the native scrollbar', () => {
+    measuredWidth = 100;
+    const {rendered, scroller} = renderHarness({durationSeconds: 100, pixelsPerSecond: 10});
+    expect(scroller.hasAttribute('data-wm-hidden-scrollbar')).toBe(true);
+    rendered.setOffset(40);
+    const notify = vi.fn();
+    rendered.onViewportChange(notify);
+    rendered.setZoom(20, 42.5);
+    expect(rendered.viewport()).toEqual({startSeconds: 42.5, endSeconds: 47.5});
+    expect(scroller.scrollLeft).toBe(850);
+    expect(notify).toHaveBeenCalledOnce();
+    rendered.dispose();
+  });
+
   it('keeps the offset inside the content width across zoom changes', () => {
     measuredWidth = 100;
     const {rendered, scroller, canvas} = renderHarness({

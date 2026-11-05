@@ -1,7 +1,7 @@
 # Score Play implementation audit — 2026-09-09
 
 Scope: algorithm, implementation and component responsibility review on
-`claude/analysis-view-chord-design-693b7b`. Frontend visual review was explicitly
+`analysis-view-chord-design-693b7b`. Frontend visual review was explicitly
 deferred. [Play design](../../design/PLAY-COMPONENTS.md) and DEC-016 own current intent;
 [STATUS](../../STATUS.md) owns open work.
 

@@ -1,12 +1,12 @@
 ---
 title: '@webmusic/score/view'
-description: Score visualization — stateless layout APIs, code-only view and navigation models, explicit SVG/OSMD renderers, and three styled Web Components.
+description: Score visualization and document editing — stateless layout and edit operations, code-only view, navigation and editor models, SVG renderers including page engraving, and the View Web Components.
 ---
 
 
-`@webmusic/score/view` turns `Score` objects into layout data and visual renderings. Its three Web Components are `<score-view>` for score-position views, `<score-pitch-view>` for sounding pitches, and `<score-sheet-view>` for optional full engraving.
+`@webmusic/score/view` turns `Score` objects into layout data and visual renderings, and owns [document editing](#document-editing). Its visual Web Components are `<score-view>` for read-only score-position views, `<score-grid-view>` for a piano-roll grid that edits notes, `<score-pitch-view>` for sounding pitches, and `<score-sheet-view>` for optional full engraving. An editable document is a [`ScoreEditor`](/score/headless/view/score-editor/) that your application owns and lends to views and players.
 
-Playback lives in [`@webmusic/score/play`](/score/api/play/). Views borrow player data or events according to their owning contracts; the thumbnail is a passive whole-score preview. Imperative renderers expose `redraw` for application-driven highlighting.
+Playback lives in [`@webmusic/score/play`](/score/api/play/). Views borrow player data or events according to their owning contracts; the static thumbnail renderer is a passive whole-score preview. Imperative renderers expose `redraw` for application-driven highlighting.
 
 ## Install
 
@@ -18,12 +18,11 @@ Optional integration:
 
 ```txt
 @webmusic/score/io     sibling capability used by the Web Component to load a `src` file
-opensheetmusicdisplay  required only for the separate OSMD page-engraving workflow
 ```
 
 The view capability has four entry points — the [package subpath table](/score/api/#package-subpaths) lists them with every other `@webmusic/score` entry:
 
-The `@webmusic/score/view` root is the **stateless API** (serializable layout data and the note-sequence view model). `/headless` provides [score-window, map-navigation and held-pitch models](/score/headless/#view): they own reusable view behavior and optional playback subscriptions without creating UI or choosing visual styles. Imperative SVG/Canvas/OSMD adapters live explicitly on `/render`, while the styled custom element lives on `/element`.
+The `@webmusic/score/view` root is the **stateless API** (serializable layout data, the note-sequence view model and the pure edit operations). `/headless` provides [score-window, map-navigation, held-pitch, editing and editor models](/score/headless/#view): they own reusable view behavior and optional playback subscriptions without creating UI or choosing visual styles. Imperative SVG/Canvas renderers live explicitly on `/render`, while the custom elements live on `/element`.
 
 The browser renderer implementation is also separated by responsibility: shared sizing/lifecycle, SVG virtualization, piano-roll, waterfall, staff, and the public factory each live in their own internal module. These internals are not package subpaths; consumers should use `/render`.
 
@@ -31,7 +30,7 @@ The browser renderer implementation is also separated by responsibility: shared 
 
 ## Web Components
 
-`<score-view>`, `<score-pitch-view>` and `<score-sheet-view>` live on `@webmusic/score/view/element`. Their owning pages under [Web Components › View](/score/element/#view) document each tag’s types, attributes, events, player binding and styling. This page owns the code-facing APIs they compose.
+`<score-view>`, `<score-grid-view>`, `<score-pitch-view>` and `<score-sheet-view>` live on `@webmusic/score/view/element`. Their owning pages under [Web Components › View](/score/element/#view) document each tag’s types, attributes, events, player binding and styling. This page owns the code-facing APIs they compose.
 
 The code-only APIs below let you maintain view state or build your own renderer; the explicit `/render` adapters draw into browser elements. The examples assume a `score` built with `@webmusic/score`.
 
@@ -73,6 +72,271 @@ unsubscribe();
 view.dispose();
 ```
 
+## Document editing
+
+Editing is a View feature. This root exports the stateless parts: the
+`applyScoreOperations` helper, exact position maps, the shared document port
+contracts and `ScoreEditError`. The stateful
+[`ScoreEditor`](/score/headless/view/score-editor/) on
+`@webmusic/score/view/headless` adds one document owner, revision guards, local
+history and interaction drafts, and `loadScoreEditor(url, options?)` there loads
+a file into a new caller-owned editor. Elements borrow an editor only through
+their `.editor` property. None of them creates a player, clock or visual
+surface. [Score player](/score/headless/play/score-player/) and
+the views borrow the same Core ports, which the
+[`@webmusic/score` root](/score/api/) also exports.
+
+### Atomic note operations
+
+`applyScoreOperations(score, operations)` returns a candidate `score`, a
+defensive immutable snapshot of `operations`, and `affectedNoteIds`: the notes
+the batch inserted, removed or changed relative to the input, in first-touched
+order. A note inserted and deleted, or changed and restored, within the batch
+is not listed; a net-zero batch returns the input Score and no IDs. Operations
+run in order; invalid input throws `ScoreEditError` without modifying the source.
+The helper has no document identity, revision, history or subscriptions. Use
+`ScoreEditor.execute` when the operation must also commit to an owned document.
+
+Every operation has the following exact fields. IDs refer to authored notes,
+not repeat-expanded playback occurrences. Insertions supply their own stable IDs.
+
+| `type` | Fields | Meaning |
+|---|---|---|
+| `insert-notes` | `notes: ScoreNoteInput[]` | Add notes to existing parts. Each input has `id`, `partId`, written `pitch: {step, alter, octave}`, `onsetQuarters`, `durationQuarters`, `voice`, and optional `velocity`. |
+| `delete-notes` | `noteIds` | Remove the named notes. Tied, tuplet and grace notes reject as `unsupported-structure` even when the whole chain or group is named; deleting only part of an authored slur pair or beam group also rejects. |
+| `move-notes` | `noteIds`, `deltaQuarters` | Shift written onset by exact rational quarters, retaining Duration notation. |
+| `resize-notes` | `noteIds`, `durationQuarters` | Set a positive exact quarter duration for simple notes. |
+| `transpose-notes` | `noteIds`, `semitones` | Transpose written pitch by an integer number of semitones, respelled as described below. |
+| `set-velocity` | `noteIds`, `velocity` | Set integer velocity 1–127; rests and tie continuations reject. `null` clears the authored override. |
+| `quantize-notes` | `noteIds`, optional `grid`, `origin`, `target` | Snap onset, duration, or both to a rational grid. Defaults: grid `[1,4]`, origin `[0,1]`, target `'onset'`; ties round forward. |
+| `enter-notation` | `entry: ScoreNotationEntry` | Enter a spelled note or rest in one existing measure and one voice/staff, replacing fully covered events and filling remaining gaps with written rests. |
+| `write-notation` | `partId`, `voice`, optional `staff`, `onsetQuarters`, `duration`, `notes: ScoreWrittenNote[]` | [Rewrite one note, chord or rest locally](#sheet-editing-operations) in a measure, replacing what it covers and leaving rests for a partly covered remainder. |
+| `set-pitches` | `changes: ScorePitchChange[]` | [Set spelled written pitches](#sheet-editing-operations); a tied note's whole chain follows. |
+| `notes-to-rests` | `noteIds` | [Delete like a notation editor](#sheet-editing-operations): chord heads go, a lone event becomes a rest of the same value and tuplet. |
+| `tie-notes` | `noteIds`, `tied` | [Add or remove the tie](#sheet-editing-operations) to the next same-pitch note in the voice. |
+
+`ScoreQuarterValue` is a reduced safe-integer `[numerator, denominator]` pair
+with positive denominator. Onsets cannot become negative and ordinary-note
+durations must remain positive. Invalid/unknown IDs, duplicate insertion IDs,
+unsupported operation fields or structures reject the whole batch. Commands do
+not repair partial ties, tuplets or grace notation. Only `enter-notation` fills
+the selected measure/voice/staff with written rests; ordinary piano-roll
+operations retain their event-editing behavior.
+Insertion, transposition and notation entry require a written MIDI pitch of
+0–127 and, after adding the Part transposition (`chromatic + 12 × octaveChange`),
+the sounding pitch 0–127 that playback and MIDI export use. Transposition
+rejects tied, rest and unpitched notes. A numeric `set-velocity` rejects rests
+and tie continuations, the later notes of a tie chain. Playback and MIDI export
+sound each tie chain once with its first note's velocity, so set that note
+instead. `null` may clear any stored override. Quantization origin affects
+onset only; duration quantization uses origin zero, and a duration rounded to
+zero rejects.
+
+Transposition by a multiple of 12 semitones keeps the written step and
+accidental and changes only the octave: `Bb4` becomes `Bb5`, and `E#4` becomes
+`E#5`. Other intervals spell the resulting pitch by the original accidental
+direction. A note spelled with a flat keeps flats (`Bb4` + 3 is `Db5`); a
+natural or sharp note uses sharps (`D4` + 1 is `D#4`); white keys are naturals
+(`Eb4` + 1 is `E4`). These results never contain double accidentals and do not
+consult the key signature.
+
+Resize, duration quantization and insertion store a written Duration for the
+exact quarter length. A length spelled by a whole through sixty-fourth base
+with zero to two dots uses that spelling: `[3,4]` is a dotted eighth and `[7,8]`
+a double-dotted eighth. Any other length, such as `[5,4]` or `[1,3]`, becomes
+its own base with no dots and has no single-note staff spelling. A move keeps
+the existing Duration.
+
+Deletion keeps authored slurs and beams matched. A slur's `start` and `stop`
+endpoints pair by voice and slur number; a level-one beam group runs from
+`begin` through `end` in one voice and staff, with chord members sharing their
+onset. Delete such a pair or group entirely, or not at all; a partial deletion
+fails with `unsupported-structure`. Unmarked notes inside a slur can be deleted
+individually, and already unmatched marks are not protected.
+
+An effective move, resize or quantize makes written time authoritative for each
+changed note: it removes absolute `performed` timing and retains the prior
+effective velocity in `velocityOverride`. Sounding duration follows the new
+quarter endpoints through the TimeMap, including interior tempo changes.
+Pitch-only, velocity-only and no-op timing operations preserve performed timing;
+untouched notes retain imported microtiming. Effective velocity is
+`velocityOverride ?? performed?.velocity ?? 80`.
+
+Quantization compares written time only. A note whose written onset and
+duration already lie on the grid is unchanged and keeps its `performed` timing.
+For example, [Score Recorder](/score/element/play/score-recorder/) output
+with a nonzero `quantize` already has grid-aligned written time. Quantizing it
+to that grid is a no-op, and playback and MIDI export continue to use its exact
+performed timing.
+
+This standalone example creates an explicit input and computes a candidate:
+
+```ts
+import {Duration, NoteId, PartId, Pitch, Rational, ScoreBuilder, VoiceId} from '@webmusic/score';
+import {applyScoreOperations} from '@webmusic/score/view';
+
+const partId = PartId('piano');
+const noteId = NoteId('opening-note');
+const builder = new ScoreBuilder();
+builder.addPart({id: partId, name: 'Piano', midiProgram: 0, staves: 1});
+builder.addNote(partId, {
+  id: noteId, pitch: Pitch.parse('C4'), onsetQuarters: Rational.ZERO,
+  duration: Duration.quarter(), voice: VoiceId('melody'),
+});
+const original = builder.build();
+const result = applyScoreOperations(original, [
+  {type: 'move-notes', noteIds: [noteId], deltaQuarters: [1, 4]},
+  {type: 'set-velocity', noteIds: [noteId], velocity: 96},
+]);
+console.log(original.getNote(noteId)?.onsetQuarters.toString()); // 0
+console.log(result.score.getNote(noteId)?.onsetQuarters.toString()); // 1/4
+```
+
+### Written notation entry
+
+`enter-notation` uses `ScoreNotationEntry`: a new `id`, existing `partId`,
+`voice`, optional one-based `staff`, `onsetQuarters`, `duration`, and `pitch`.
+`pitch` is the same spelled `{step, alter, octave}` as ordinary note insertion;
+`null` enters a rest. Optional `velocity` sets a pitched note's authored
+velocity. `ScoreNotationDuration` has `base: ScoreQuarterValue` and optional
+`dots` (default `0`); supported bases are whole through sixty-fourth notes
+(`[4,1]` through `[1,16]`), with zero, one or two dots. These are notation
+values, so the sounded duration includes their dots.
+
+Entry requires an existing positive authored measure containing the complete
+duration. It does not infer measures from a MIDI time signature or extend the
+piece. The selected measure/voice/staff must be simple and monophonic. Fully
+covered notes are replaced; an overlap that would cut a sounding note is
+rejected. Existing rests may be split, and remaining gaps become actual rests
+with deterministic IDs and written durations. Other voices and staves remain
+unchanged. Automatic completion requires exact gaps on a 1/64-quarter grid and
+generates at most 256 rests per operation. It can use smaller rest values than
+the offered input bases. One entry, including rest repair, is one atomic
+operation. A controller entry commits one history item; a transaction containing
+several entries shares one item, and the pure helper creates no history.
+
+Ties, tuplets, grace notes, chords, authored beams, slurs, hidden or unpitched
+notation, events crossing a measure boundary and unrepresentable rest gaps
+are outside this entry subset. Replacing events with articulations, ornaments,
+dynamics, lyrics or tags also rejects rather than discarding them. These
+structures fail explicitly instead of silently losing notation. Stem
+directions, rest positions and tie placement are display hints; a replacement
+does not keep them. An entry whose result matches the replaced events apart
+from generated IDs, such as re-entering an existing rest with its duration, is
+a no-op. It keeps the existing notes, their IDs and any selection.
+
+No built-in surface issues `enter-notation`; submit it through
+`applyScoreOperations` or `ScoreEditor.execute` from your own interface.
+
+### Sheet editing operations
+
+[`<score-sheet-view>`](/score/element/view/score-sheet-view/) edits through
+four operations that act locally on the notes they name, so they work in real
+scores with beams, slurs, chords, several voices and tuplets elsewhere in the
+measure. Anything they cannot rewrite exactly fails with
+`unsupported-structure` and changes nothing.
+
+`set-pitches` takes `changes: {noteId, pitch}[]`, where `pitch` is a spelled
+`{step, alter, octave}` (`ScorePitchChange`). The whole tie chain of a tied
+note takes the same pitch, so ties keep joining equal pitches; two changes that
+give one chain different pitches reject as `invalid-command`. Rests and
+unpitched notes reject. Tuplet and chord notes are allowed. An authored stem
+direction is cleared so the engraver chooses again.
+
+`notes-to-rests` takes `noteIds`. In a chord only the named heads are removed
+and the next head carries the event. An event that loses every head becomes a
+rest with the first head's ID, onset, written Duration (including its tuplet
+ratio), tuplet marks and beam marks. Rests are left unchanged; grace notes
+reject. Ties and slurs that would lose their partner are removed from the
+remaining note.
+
+`tie-notes` takes `noteIds` and `tied`. With `tied: true`, each note is tied to
+the next note in its voice with the same MIDI pitch that starts exactly where
+it ends, extending an existing chain (`stop` becomes `continue`); without such
+a note it rejects. With `tied: false` the forward tie is removed from the note
+and its partner.
+
+`write-notation` (`ScoreNotationWrite`) writes one event in one voice and staff:
+`notes` holds one `{id, pitch, velocity?}` per chord head (`ScoreWrittenNote`),
+or a single `{id, pitch: null}` for a rest, at `onsetQuarters` lasting
+`duration` (the notation values of `enter-notation`). The measure comes from
+the authored measures or, where a score has none, from bars derived from its
+meter. The event must end by the barline. Events it overlaps are replaced, a
+rest that starts before the onset is split, and the part of a covered event
+after the new end becomes rests. Gaps elsewhere in the measure are untouched.
+An ID may be new or the ID of a note being replaced; a replaced note that keeps
+its ID keeps its articulations, ornaments, slurs, dynamic, lyric and tags. The
+operation rejects a write that starts inside a sounding note, overlaps a tuplet
+or a note crossing the barline, or covers a grace note. It removes authored
+beams from the rest of that voice in the measure, so the engraver regroups it
+by meter, and drops ties and slurs whose partner is gone. Rewriting identical
+content keeps the existing notes and is a no-op.
+
+```ts
+import {applyScoreOperations} from '@webmusic/score/view';
+
+const {score: next} = applyScoreOperations(score, [
+  {type: 'write-notation', partId, voice, staff: 1, onsetQuarters: [4, 1],
+    duration: {base: [1, 1], dots: 1}, notes: [{id: noteId, pitch: {step: 'G', alter: 1, octave: 4}}]},
+  {type: 'tie-notes', noteIds: [noteId], tied: true},
+]);
+```
+
+### Document ports and commands
+
+`ScoreDocumentSource` exposes `getSnapshot()` and synchronous `subscribe`.
+`ScoreEditorPort` adds state, commands, history and interaction-session creation.
+These interfaces live in Core so another capability can read a document without
+depending on the editor implementation. Native ScorePlayer accepts the read-only
+port; editor-bound Score views require the command/session port.
+
+`isScoreDocumentSource(value)` checks the required reader/subscriber methods and
+the current snapshot: nonempty document/content identity, a nonnegative safe
+revision, `ready` or `disposed` status and a Score instance. `isScoreEditorPort`
+also checks every required state, command, history and session method. Both
+return `false` for malformed values or throwing getters. These structural type
+guards do not subscribe, mutate, or establish readiness: a disposed source can
+satisfy the port shape, so consumers still inspect its snapshot status.
+
+A `ScoreEditCommand` carries `version: 1`, `documentId`, `expectedRevision`,
+`label` and `operations`. `execute` validates the complete serializable envelope
+and commits atomically. `ScoreEditResult` is `committed` with a snapshot/change,
+`noop` with the unchanged snapshot, or `failed` with a `ScoreEditError`. Command
+errors are results; the pure helper throws. The [ScoreEditor reference](/score/headless/view/score-editor/)
+owns revision, subscription, checkpoint and disposal details.
+
+`ScoreDocumentSnapshot` contains `documentId`, `documentRevision`, `contentId`,
+`content`, `status: 'ready' | 'disposed'`, and optional last `change`.
+`ScoreDocumentChange` contains `origin`, `label`, from/to revisions, operations,
+affected note IDs and a position map. Undo/redo/restore changes identify their
+origin and do not replay the original edit operations.
+
+### Position maps
+
+Position maps describe content transitions in rational musical quarters. They
+do not seek or reschedule a player.
+
+| Function | Contract |
+|---|---|
+| `createScorePositionMap(documentId, fromRevision, toRevision, extent, policy?)` | Create a frozen map. Revisions are nonnegative safe integers with `toRevision > fromRevision`; `extent` is a nonnegative `Rational`. Policy defaults to `'preserve-quarter'`; `'reset-origin'` explicitly resets. |
+| `composeScorePositionMaps(...maps)` | Require a nonempty, continuous revision chain for one document. Preserve intermediate clamps so an undo cannot reconstruct a lost position. The composed representation is bounded independently of undo history. |
+| `mapScorePosition(map, position)` | Accept a nonnegative `Rational`; return `{quarters, clamped, positionPolicy}`. Preserved positions clamp to extent; reset policy returns the origin. |
+
+Malformed maps or positions throw `ScoreEditError('invalid-command', ...)`.
+A mismatched document or discontinuous composition throws `revision-conflict`.
+The document source publishes maps with changes; consumers retain or compose
+them themselves rather than expecting the editor to retain an unbounded log.
+
+```ts
+import {Rational} from '@webmusic/score';
+import {createScorePositionMap, composeScorePositionMaps, mapScorePosition} from '@webmusic/score/view';
+
+const shorter = createScorePositionMap('example', 0, 1, new Rational(2));
+const restored = createScorePositionMap('example', 1, 2, new Rational(4));
+const result = mapScorePosition(composeScorePositionMaps(shorter, restored), new Rational(3));
+console.log(result.quarters.toString(), result.clamped); // 2, true
+```
+
 ## Render a piano roll
 
 `renderPianoRollVisualizer` draws the built-in SVG piano roll into an `<svg>` and returns the [renderer handle](#renderer-handle) used by `<score-view type="piano-roll">`.
@@ -100,6 +364,140 @@ rendered.redraw(rendered.noteSequence.notes[0], true);
 rendered.clearActiveNotes();
 ```
 
+### Mount a score grid
+
+`mountScoreGrid(host, content, options?)` mounts the DAW-style piano-roll grid
+used by [`<score-grid-view>`](/score/element/view/score-grid-view/): written
+pitch rows over bar, beat and snap lines, piano keys, a bar ruler, an optional
+velocity lane and a playback overlay. `content` is either `{score}`, drawn
+read-only, or `{editing}`, a
+[`ScoreViewEditing`](/score/headless/view/score-view/#follow-an-editing-document)
+controller over a borrowed Core editor port. While that controller is available
+and editable, the grid shows its editing toolbar and accepts the gestures and
+keys described on the [Element page](/score/element/view/score-grid-view/#gestures-and-keyboard).
+It creates no editor, player or clock. Plain seconds-based note drawing remains
+on `renderPianoRollVisualizer`.
+
+```ts
+import {createScoreEditor, createScoreViewEditing} from '@webmusic/score/view/headless';
+import {mountScoreGrid, parseScoreGridFeatures} from '@webmusic/score/view/render';
+
+const editor = createScoreEditor(score);
+const editing = createScoreViewEditing(editor, {editable: true});
+const grid = mountScoreGrid(document.querySelector<HTMLElement>('#notes')!, {editing}, {
+  features: parseScoreGridFeatures('move resize draw delete history'),
+  snap: '1/8',
+  onCommit: (result) => console.log(result.change.label, result.snapshot.documentRevision),
+  onSettingsChange: (settings, changed) => console.log(changed, settings[changed]),
+});
+grid.configure({velocityLane: true, features: [...grid.features, 'velocity']});
+// During teardown:
+grid.dispose();
+editing.dispose();
+editor.dispose();
+```
+
+`ScoreGridOptions` extends `Partial<ScoreGridSettings>`; every setting is also
+an option.
+
+| Option | Default | Contract |
+| --- | --- | --- |
+| `features` | `SCORE_GRID_FEATURES` (all) | Offered editing features: `move`, `resize`, `draw`, `delete`, `velocity`, `snap`, `zoom`, `history`. Selection is always available while editing. Unknown names throw `RangeError`. |
+| `tool` | `'select'` | `'select'` or `'draw'`; `draw` without the `draw` feature falls back to `select` on `configure`. |
+| `snap` | `'1/16'` | One of `SCORE_GRID_SNAPS`: `off`, `1/4`, `1/8`, `1/8t`, `1/16`, `1/16t`, `1/32`. Sets the edit step and subdivision lines. |
+| `velocityLane` | false | Show the velocity lane; drawn only with the `velocity` feature. |
+| `pixelsPerQuarter` | 64 | Finite positive horizontal zoom, clamped to 8–512. |
+| `noteHeight` | 16 | Finite positive row height, clamped to 6–48. |
+| `minPitch`, `maxPitch` | MIDI 48–84, widened to two semitones beyond the notes | Integer bounds within 0–127, minimum no greater than maximum. A single explicit bound limits the computed opposite bound. |
+| `noteColor`, `activeNoteColor` | Score View CSS tokens | CSS note fills; take precedence over the RGB channels. |
+| `noteRGB`, `activeNoteRGB` | token fallback | Optional `"r, g, b"` fills when the corresponding CSS color is absent. |
+| `onPreview(result)` | none | Successful preview `ScoreDraftResult` of a drag. |
+| `onCommit(result)` | none | Committed `ScoreEditResult`, including undo and redo; no call for cancellation, failure or no change. |
+| `onError(error)` | none | Command, preview or note-value input failure. |
+| `onSettingsChange(settings, changed)` | none | A toolbar, wheel or keyboard change to a setting; `configure` calls do not report. |
+
+Mounting a non-available controller throws `ScoreEditError` (`disposed`), and
+an invalid setting, feature or pitch range throws before the grid is added.
+`ScoreGridHandle` exposes `element` (the mounted section), `surface` (the SVG,
+focusable while editable), the current `settings` and `features`,
+`configure(options)`, `updatePlayback(playback?)`, `cancel()` and `dispose()`.
+`configure` applies settings and features in place, validating everything
+before changing anything, and cancels this grid's active gesture.
+
+`updatePlayback({seconds, activeNoteIds?})` draws a playhead at a nominal score
+position; `seconds: null` hides it, and without `activeNoteIds` the sounding
+notes are derived from the score. A playback-only update repaints the playhead
+and sounding notes on the existing drawing. Passing `undefined` removes the
+overlay. The caller decides whether a player's position is compatible with the
+editor's revision; `<score-grid-view>` applies the same document-revision
+check as `<score-view>`.
+
+`cancel()` discards this grid's gesture and the session draft. Idempotent
+`dispose()` cancels an active gesture, detaches its listeners and resize
+observer and removes its DOM; it leaves the borrowed controller and editor
+alive. Where `ResizeObserver` is available, viewport size changes redraw newly
+visible notes and cancel only this grid's active gesture.
+
+`parseScoreGridFeatures(value)` parses a `tools`-style list separated by spaces
+or commas into canonical order and throws `RangeError` for an unknown token;
+an empty string yields no features. `SCORE_GRID_FEATURES` and
+`SCORE_GRID_SNAPS` are the frozen value lists. The grid uses written pitch and
+written quarters, even when imported notes have performed microtiming.
+
+### Mount a score sheet
+
+`mountScoreSheet(host, content, options?)` mounts the engraved sheet used by
+[`<score-sheet-view>`](/score/element/view/score-sheet-view/). It measures each
+measure's natural width with the staff engraver, breaks measures into systems
+at the line width, justifies each system and stacks the systems on A4 pages
+(`layout: 'page'`) or in a continuous column (`'flow'`). `content` is `{score}`,
+drawn read-only, or `{editing}`, a
+[`ScoreViewEditing`](/score/headless/view/score-view/#follow-an-editing-document)
+controller. While that controller is available and editable, the sheet shows
+its toolbar and accepts the keys and gestures described on the
+[Element page](/score/element/view/score-sheet-view/#editing), through the
+[sheet editing operations](#sheet-editing-operations). It creates no editor,
+player or clock.
+
+```ts
+import {createScoreEditor, createScoreViewEditing} from '@webmusic/score/view/headless';
+import {mountScoreSheet, parseScoreSheetFeatures} from '@webmusic/score/view/render';
+
+const editor = createScoreEditor(score);
+const editing = createScoreViewEditing(editor, {editable: true});
+const sheet = mountScoreSheet(document.querySelector<HTMLElement>('#sheet')!, {editing}, {
+  layout: 'page',
+  features: parseScoreSheetFeatures('pitch input duration delete history'),
+  onError: (error) => console.warn(error),
+});
+console.log(sheet.layoutInfo.systems, sheet.layoutInfo.pages);
+// During teardown:
+sheet.dispose();
+editing.dispose();
+editor.dispose();
+```
+
+| Option | Default | Contract |
+| --- | --- | --- |
+| `layout` | `'page'` | `'page'` or `'flow'`; other values throw `RangeError`. |
+| `zoom` | 0 | 0 fits a page to the width (page) or means 1 (flow); otherwise a staff size factor clamped to 0.5–3. Negative or non-finite values throw `RangeError`. |
+| `features` | `SCORE_SHEET_FEATURES` (all) | `pitch`, `input`, `duration`, `tie`, `accidental`, `delete`, `history`, `zoom`; unknown names throw. |
+| `inputMode`, `duration`, `dotted` | false, `'quarter'`, false | Note input state; `duration` is one of `SCORE_SHEET_DURATIONS`. |
+| `followPlayback` | false | Scroll the sounding system into view on `updatePlayback`. |
+| `noteColor`, `activeNoteColor` | engraver defaults | CSS ink for notation and sounding notes. |
+| `onPreview`, `onCommit`, `onError` | none | A drag's draft, a committed edit, and a refused edit or failure. |
+| `onSettingsChange(settings, changed)` | none | A toolbar or keyboard change; `configure` calls do not report. |
+
+`ScoreSheetHandle` exposes `element`, the current `settings`, `features`,
+`layoutInfo` (`systems` and `pages`), `configure(options)` (validated before
+anything changes; a layout or zoom change re-engraves), `updatePlayback(playback?)`,
+`cancel()` and idempotent `dispose()`. `updatePlayback({seconds})` marks
+sounding notes and the position in each system; `seconds: null` clears them.
+A content change from the controller re-engraves and keeps the scroll
+position; a width change re-breaks the systems. `parseScoreSheetFeatures(value)`
+parses a `tools` list and ignores unknown tokens. `SCORE_SHEET_FEATURES`,
+`SCORE_SHEET_LAYOUTS` and `SCORE_SHEET_DURATIONS` are frozen lists.
+
 ### Renderer handle
 
 The render helpers implement `RenderedScoreVisualizer<TVisualizer>`. The built-in
@@ -111,12 +509,12 @@ SVG factories and `renderScoreVisualizer()` return its browser-specific
 | `noteSequence` | Read-only sequence used by this renderer. |
 | `visualizer` | The underlying renderer instance. |
 | `scrollViewport?` | Native waterfall time-axis viewport, available on `ScoreVisualizerHandle`. Undefined for other modes and after waterfall disposal. It is a named mounting surface for optional UI focus/scrollbar presentation. |
-| `redraw(activeNote?, scrollIntoView?)` | Existing note-driven drawing entry. Exact-time-capable renderers use the nominated note’s onset; OSMD moves its engraving cursor. Returns a renderer coordinate or `null`. |
+| `redraw(activeNote?, scrollIntoView?)` | Existing note-driven drawing entry. Exact-time-capable renderers use the nominated note’s onset. Returns a renderer coordinate or `null`. |
 | `redrawAtTime?(nominalSeconds, scrollIntoView?)` | Optional exact-time drawing entry, implemented by the built-in SVG and Canvas piano rolls, waterfall and scrolling staff. Highlights notes where `startTime <= nominalSeconds < endTime`; it does not snap to a selected note’s onset. Returns a renderer coordinate or `null`. |
 | `clearActiveNotes()` | Clear current highlights and the applicable cursor display. |
 | `dispose?()` | Release owned rendering resources and DOM. Supplied by all package renderers and safe to repeat. |
 
-`redrawAtTime` rejects non-finite time with `RangeError`. After disposal it is inert and returns `null`. Use nominal score seconds, without playback-rate scaling. `scrollIntoView: false` updates highlighting without requesting follow scrolling. Coordinate orientation and default following behavior belong to the selected renderer. OSMD retains `redraw` and does not implement `redrawAtTime`.
+`redrawAtTime` rejects non-finite time with `RangeError`. After disposal it is inert and returns `null`. Use nominal score seconds, without playback-rate scaling. `scrollIntoView: false` updates highlighting without requesting follow scrolling. Coordinate orientation and default following behavior belong to the selected renderer.
 
 ```ts
 // On a caller-owned clock or position notification:
@@ -125,28 +523,28 @@ rendered.redrawAtTime?.(1.25, false);
 
 ## Render annotations
 
-`VisualizerRenderOptions.showAnnotations` defaults to `true` for the SVG
-piano-roll, scrolling staff and waterfall factories. They read the original
-Score's supported `Part.directions`: words such as `rit.`, rehearsal labels,
-dynamics, metronome marks, pedal signs/lines and crescendo/diminuendo hairpins.
-These are visual directions, with no tempo, volume or sustain automation.
+`StaffRenderOptions.showAnnotations` defaults to `true` for the scrolling
+staff renderer. It reads the original Score's supported `Part.directions`:
+words such as `rit.`, rehearsal labels, dynamics, metronome marks, pedal
+signs/lines and crescendo/diminuendo hairpins, and keeps their authored
+above/below placement around the notation. These are visual directions, with
+no tempo, volume or sustain automation.
 
-The piano roll uses a compact strip above its notes; waterfall uses a side rail
-on its vertical time axis. Staff retains authored above/below placement around
-the notation. The other types use compact timeline labels and span lines,
-without reproducing staff engraving positions. At dense onsets labels can be
-abbreviated or reduced to markers; each mark's SVG title retains the full text.
-Set `showAnnotations: false` to remove the marks and their layout
-space. Staff and piano-roll natural heights shrink; waterfall reclaims width
-while retaining its requested viewport height. Explicit application sizing
-still defines the outer viewport.
+Annotations are staff-only. The piano-roll and waterfall renderers never draw
+them and reserve no space for them; `VisualizerRenderOptions` and
+`WaterfallRenderOptions` have no `showAnnotations` member, and
+`validateScoreViewConfiguration` rejects it for `piano-roll` and `waterfall`.
+Set `showAnnotations: false` on the staff to remove the marks and their layout
+space; the natural staff height shrinks. Explicit application sizing still
+defines the outer viewport.
 
 The Element's [`show-annotations` attribute](/score/element/view/score-view/#annotations-and-compact-layout)
-defaults to false for all five Element types, including map and thumbnail.
-Enabling it or setting `.options.showAnnotations` overrides that Element
-default; the imperative renderer defaults remain true. This is a rendering
-option; Headless `createScoreView` continues to expose sounding-note state and
-does not allocate an annotation surface.
+applies only to `type="staff"` and defaults to false in the Element. Enabling
+it or setting `.options.showAnnotations` overrides that Element default; the
+imperative staff renderer default remains true. This is a rendering option;
+Headless `createScoreView` continues to expose sounding-note state and does not
+allocate an annotation surface. The [static thumbnail](#static-thumbnail) has
+its own `showAnnotations` option for overview labels.
 
 ### Static thumbnail
 
@@ -170,9 +568,9 @@ source text and musical ranges. Text retains its size while the note plot fits
 the remaining height, with a `1rem` minimum note area when annotations are
 visible. Without annotations, the SVG fits the supplied surface.
 This one-shot function creates no resize observer or player binding;
-remove its returned SVG at teardown or before drawing again. The
-[`thumbnail` Element type](/score/element/view/score-view/#thumbnail) owns its
-responsive updates and cleanup.
+remove its returned SVG at teardown or before drawing again. Applications that
+need responsive updates redraw it from their own resize handling; no
+`<score-view>` type wraps this renderer.
 
 ```ts
 import {createPianoRollLayout} from '@webmusic/score/view';
@@ -248,10 +646,9 @@ nominal sounding times, not the inferred glyph duration. File-to-Score
 conversion limits remain owned by [I/O](/score/api/io/).
 
 This scrolling renderer does not implement cross-staff/cross-measure beams,
-nested tuplet layout, complete grace notation, lyrics or
-page/system justification.
-Retained metadata does not mean every mark is drawn. [OSMD](#render-with-osmd)
-remains a separate optional page-engraving workflow.
+nested tuplet layout, complete grace notation or lyrics. Retained metadata does
+not mean every mark is drawn. [Page and system layout](#mount-a-score-sheet)
+uses the same engraver.
 
 ```ts
 import { renderStaffVisualizer } from '@webmusic/score/view/render';
@@ -293,8 +690,7 @@ score position and active notes; hidden containers retain their last useful
 layout until a size is available. `dispose()` releases the resize observer (or
 window-resize fallback) and owned DOM. Left/right travel uses the available
 container width for time and its height for pitch; set an explicit height for
-fitted vertical pitch layouts. Annotations follow the selected time axis in a
-separate rail.
+fitted vertical pitch layouts. The waterfall draws no score annotations.
 
 ```ts
 import { renderWaterfallVisualizer } from '@webmusic/score/view/render';
@@ -569,87 +965,74 @@ Output:
 }
 ```
 
-## Render with OSMD
-
-`renderOSMDStaffVisualizer` renders full notation engraving through OpenSheetMusicDisplay. The dependency is optional, and `@webmusic/score/view` does not convert scores to MusicXML by itself — pass pre-serialized MusicXML (e.g. `serializeMusicXML` from `@webmusic/score/io`) or a converter function.
-
-Install `opensheetmusicdisplay` to let a browser bundler resolve the lazy peer
-import, or inject `OpenSheetMusicDisplay`/`osmd` as shown below. Native browser
-modules need an import map or constructor injection. Importing the renderer
-does not evaluate the optional engine until rendering is requested.
-
-For an owned OSMD instance, the adapter reflows when its container width changes, using `ResizeObserver` or a window-resize fallback. Height-only changes do not re-engrave the score. Disposal releases the observer and pending resize work; a borrowed instance retains its existing lifecycle.
-
-For this adapter, `redraw(undefined, false)` cancels queued cursor scrolling without moving or clearing the cursor. `clearActiveNotes()` and disposal also invalidate pending scrolling. An explicit `redraw(note, true)` still requests scrolling when the default `followCursor` option is false.
-
-Backward cursor moves reset and replay OSMD’s iterator, reacquiring the replacement iterator created by `reset()` before applying checkpoints. This adapter continues to expose note-driven `redraw`, rather than `redrawAtTime`.
-
-```ts
-import { renderOSMDStaffVisualizer } from '@webmusic/score/view/render';
-import { OpenSheetMusicDisplay } from 'opensheetmusicdisplay';
-
-const rendered = await renderOSMDStaffVisualizer(score, document.querySelector('#osmd'), {
-  musicXML,
-  OpenSheetMusicDisplay,
-  osmdOptions: {
-    drawTitle: false,
-    drawPartNames: false,
-  },
-});
-
-rendered.redraw(rendered.noteSequence.notes[0], true);
-```
-
-Output:
-
-```txt
-Score + MusicXML + OSMD constructor -> RenderedScoreVisualizer<OSMDLike>
-```
-
 ## API Reference
 
 | API | Kind | Use it for |
 | --- | --- | --- |
-| `defineScoreViewElement(tag?)` | Web Component | Register `<score-view>` with piano-roll, staff, waterfall, map and thumbnail types. |
+| `defineScoreViewElement(tag?)` | Web Component | Register `<score-view>` with piano-roll, staff and waterfall types. |
 | `definePitchViewElement(tag?)` | Web Component | Register `<score-pitch-view>` with keyboard, current staff and fretboard types. |
-| `defineSheetViewElement(tag?)` | Web Component | Register `<score-sheet-view>` with its optional OSMD renderer. |
-| `defineAllViewElements()` | Web Component | Register the three default View tags. |
-| `ScoreViewElement`, `PitchViewElement`, `SheetViewElement` | Web Component | Classes from `@webmusic/score/view/element`; owning [Element references](/score/element/#view) describe properties, attributes and lifecycle. |
+| `defineSheetViewElement(tag?)` | Web Component | Register `<score-sheet-view>`, engraved pages with notation editing. |
+| `defineScoreGridViewElement(tag?)` | Web Component | Register `<score-grid-view>`, the piano-roll grid with an editing toolbar. |
+| `defineAllViewElements()` | Web Component | Register the four default View tags. |
+| `ScoreViewElement`, `ScoreGridViewElement`, `PitchViewElement`, `SheetViewElement` | Web Component | Classes from `@webmusic/score/view/element`; owning [Element references](/score/element/#view) describe properties, attributes and lifecycle. |
+| `ScoreGridFeature`, `ScoreGridTool`, `ScoreGridSnap`, `ScoreGridSettings`, `ScoreGridSettingsChangeDetail` | Element types | [Grid features, settings and the `gridsettingschange` detail](/score/element/view/score-grid-view/). |
+| `SHEET_VIEW_FEATURES`, `ScoreSheetFeature`, `ScoreSheetLayout`, `ScoreSheetDuration`, `ScoreSheetSettings`, `ScoreSheetSettingsChangeDetail` | Element exports | [Sheet features, settings and the `sheetsettingschange` detail](/score/element/view/score-sheet-view/). |
 | `ScoreViewDirection` | Type | `up`, `down`, `left` or `right`; exported by the View API and Element entries. Piano-roll uses increasing-time direction; waterfall uses note-travel direction. |
 | `PitchViewDirection` | Type | Keyboard key-front direction, exported by the Element entry; the same four string values. |
-| `ScoreViewElementType` | Type | Five-value Element type: `piano-roll`, `staff`, `waterfall`, `map`, `thumbnail`. |
+| `ScoreViewElementType` | Type | Alias of `ScoreViewType`: `piano-roll`, `staff` or `waterfall`. |
 | `PitchViewType` | Type | `keyboard`, `staff` or `fretboard`. |
-| `ScoreViewSeekDetail` | Type | Map navigation event detail: `{quarters, seconds}`, with nominal seconds. |
-| `ScoreViewType`, `ScoreViewRenderOptions`, `parseColorAttr` | Element exports | The three note-renderer types, their option union and attribute-color parser; map/thumbnail do not extend the lower-level three-type model. |
-| `createScoreView(score, options?)` | Headless model | [Score window state](/score/headless/view/score-view/), from `@webmusic/score/view/headless`. |
+| `ScoreViewType`, `ScoreViewRenderOptions`, `parseColorAttr` | Element exports | The three note-renderer types, their option union and attribute-color parser. |
+| `createScoreView(scoreOrEditor, options?)` | Headless model | [Score window and document state](/score/headless/view/score-view/), from `@webmusic/score/view/headless`. |
+| `ScoreEditor`, `createScoreEditor(score, options?)` | Headless model | [Own one editing document](/score/headless/view/score-editor/) with revisions, history, checkpoints and interaction sessions, from `/headless`. |
+| `loadScoreEditor(url, options?)` | Headless loader | [Fetch and parse a file into a new caller-owned `ScoreEditor`](/score/headless/view/score-editor/#load-from-a-url); loads the I/O stack on demand, from `/headless`. |
+| `ScoreEditorOptions` | Type | [History limit and listener error handling](/score/headless/view/score-editor/), from `/headless`. |
+| `LoadScoreEditorOptions` | Type | [`LoadScoreOptions` plus `ScoreEditorOptions`](/score/headless/view/score-editor/#load-from-a-url), from `/headless`. |
+| `createScoreViewEditing(editor, options?)` | Headless model | [Selection/draft controller](/score/headless/view/score-view/#follow-an-editing-document), from `/headless`. |
+| `scoreDocumentPlaybackCompatible(document, playback?)` | Headless helper | Exact ready/applied revision and authored-coordinate compatibility, from `/headless`. |
 | `createScoreMapView(options?)` | Headless model | [Map navigation and source following](/score/headless/view/score-map-view/), from `/headless`. |
 | `createPitchView(options?)` | Headless model | [Current pitches and source following](/score/headless/view/pitch-view/), from `/headless`. |
 | `renderPianoRollVisualizer(score, svg, config?)` | Visualizer | Render an SVG piano roll and return a visualizer handle (from `@webmusic/score/view/render`). |
+| `mountScoreGrid(host, content, options?)` | Interactive renderer | Mount the [piano-roll grid](#mount-a-score-grid) over a Score or an editing controller, from `/render`. |
+| `parseScoreGridFeatures(value)`, `SCORE_GRID_FEATURES`, `SCORE_GRID_SNAPS` | Render helpers | Parse a `tools` list; the feature and snap value lists, from `/render`. |
+| `ScoreGridOptions`, `ScoreGridHandle`, `ScoreGridContent`, `ScoreGridPlayback`, `ScoreGridSettings`, `ScoreGridFeature`, `ScoreGridTool`, `ScoreGridSnap` | Render types | Grid options, handle, content, playback overlay and settings, from `/render`. |
 | `renderStaffVisualizer(score, container, config?)` | Visualizer | Render scrolling SVG staff notation from written Score data (from `@webmusic/score/view/render`). |
 | `renderWaterfallVisualizer(score, container, config?)` | Visualizer | Render falling notes on piano-style pitch columns, without an embedded keyboard (from `@webmusic/score/view/render`). |
 | `renderScoreThumbnail(surface, notes, options?)` | Renderer | Append a static fitted note preview with optional original Score directions; returns its SVG (from `@webmusic/score/view/render`). |
 | `ScoreThumbnailRenderOptions` | Render type | Thumbnail color, accessible label, original Score and annotation visibility (from `@webmusic/score/view/render`). |
 | `ScoreVisualizerHandle` | Render type | Built-in renderer handle with an optional native `scrollViewport`; DOM details stay in the render entry. |
 | `WaterfallVisualizerConfig` | Render type | Falling-note geometry plus opt-in container fitting. |
-| `renderOSMDStaffVisualizer(score, container, options?)` | Visualizer | Render full staff engraving through OpenSheetMusicDisplay (from `@webmusic/score/view/render`). |
+| `mountScoreSheet(host, content, options?)` | Interactive renderer | Mount [engraved pages](#mount-a-score-sheet) over a Score or an editing controller, from `/render`. |
+| `parseScoreSheetFeatures(value)`, `SCORE_SHEET_FEATURES`, `SCORE_SHEET_LAYOUTS`, `SCORE_SHEET_DURATIONS` | Render helpers | Parse a `tools` list; the feature, layout and note-value lists, from `/render`. |
+| `ScoreSheetOptions`, `ScoreSheetHandle`, `ScoreSheetContent`, `ScoreSheetPlayback`, `ScoreSheetSettings`, `ScoreSheetFeature`, `ScoreSheetLayout`, `ScoreSheetDuration` | Render types | Sheet options, handle, content, playback overlay and settings, from `/render`. |
 | `createPianoRollLayout(score, opts?)` | Layout | Return serializable piano-roll note rectangles. |
 | `createStaffLayout(score, opts?)` | Layout | Return serializable staff glyph positions. |
 | `createWaterfallLayout(score, opts?)` | Layout | Return serializable waterfall note rectangles. |
 | `readoutPitch`, `currentStaffMarks`, `currentFretMarks`, `STANDARD_VIEW_TUNING` | Projection/helpers | [Current-pitch data](#current-pitch-projections), exported by this root. |
 | `PitchViewOptions`, `PitchViewState` | Type | [PitchView construction and state](/score/headless/view/pitch-view/), type-only exports from this root. |
 | `PitchReadoutSpelling`, `CurrentStaffMark`, `CurrentFretMark` | Type | [Current-pitch projection inputs/results](#current-pitch-projections). |
-| `createScoreMap(score, options?)` | Layout | Project a whole score onto one strip: note density per bar, bar and rehearsal landmarks (backs `<score-view type="map">`). |
+| `createScoreMap(score, options?)` | Layout | Project a whole score onto one strip: note density per bar, bar and rehearsal landmarks; compose it with your own UI. |
 | `scoreToNoteSequence(score)` | View model | Convert `Score` into the visualizer note-sequence format. |
 | `findSequenceNote(sequence, pitch, startTime)` | View model | Find the sequence note matching a pitch and start time (for highlighting). |
 | `secondsToQuarters(tempos, seconds)` | Time conversion | Integrate nominal seconds through quarter-notes-per-minute markers; use the Score TimeMap for inverse conversion. |
 | `ScrollType` | Enum | Staff scroll behaviour (`PAGE` / `NOTE` / `BAR`) for `renderStaffVisualizer` (from `@webmusic/score/view/render`). |
 | `ScoreNoteSequence`, `ScoreSequenceNote` | Type | View-model sequence and note shapes. Score-derived sequence notes retain optional `noteId` and `partId` for exact playback identity; external legacy sequences may omit them. |
 | `ScoreViewOptions`, `ScoreViewState`, `ScoreViewTimeRange` | Type | Public configuration and immutable result contracts for `createScoreView` (type-only exports from `@webmusic/score/view`). |
+| `ScoreViewEditing`, `ScoreViewEditingOptions`, `ScoreViewEditingState` | Type | Core-port editing controller contracts, type-only from `/view` and also exported by `/view/headless`. |
 | `RenderedScoreVisualizer` | Type | The [renderer handle](#renderer-handle), including optional `redrawAtTime` for exact nominal-time activity. |
 | `PianoRollNote`, `WaterfallNote`, `StaffGlyph` | Type | Layout result shapes — geometry plus `startSeconds` / `durationSeconds`. |
 | `ScoreMap`, `ScoreMapCell`, `ScoreMapMark`, `ScoreMapOptions` | Type | Result and option shapes for `createScoreMap`. |
-| `ViewLayoutOptions`, `VisualizerRenderOptions`, `StaffRenderOptions`, `WaterfallRenderOptions` | Type | Layout options and renderer geometry/paint options; render options share `showAnnotations` (default true). |
-| `OSMDStaffOptions` | Type | Options for the OSMD staff renderer. |
+| `ViewLayoutOptions`, `VisualizerRenderOptions`, `StaffRenderOptions`, `WaterfallRenderOptions` | Type | Layout options and renderer geometry/paint options; `showAnnotations` (default true) is a `StaffRenderOptions` member only. |
+| `applyScoreOperations(score, operations)` | Edit operation | [Compute an atomic candidate](#atomic-note-operations) without a document owner. |
+| `ScoreEditError` | Error | Coded edit failure; `.code` is a `ScoreEditErrorCode`. |
+| `isScoreDocumentSource`, `isScoreEditorPort` | Type guards | [Validate a document read port or the complete command/session port](#document-ports-and-commands). |
+| `createScorePositionMap`, `composeScorePositionMaps`, `mapScorePosition` | Position maps | [Create, compose and apply a content-position transition](#position-maps). |
+| `ScoreQuarterValue`, `ScoreNoteInput`, `ScoreEditOperation` | Type | [Exact rational coordinates, insertion data and the operation union](#atomic-note-operations). |
+| `ScoreNotationEntry`, `ScoreNotationDuration` | Type | [Spelled note/rest entry and written duration](#written-notation-entry). |
+| `ScoreNotationWrite`, `ScoreWrittenNote`, `ScorePitchChange` | Type | [Sheet editing operation payloads](#sheet-editing-operations). |
+| `ScoreEditCommand`, `ScoreRevisionGuard`, `ScoreEditResult`, `ScoreEditFailure`, `ScoreEditErrorCode` | Type | [Versioned command envelope, revision guard and outcomes](#document-ports-and-commands). |
+| `ScoreDocumentSource`, `ScoreDocumentSnapshot`, `ScoreDocumentChange`, `ScoreEditorPort`, `ScoreEditorState` | Type | [Document read/command contracts](#document-ports-and-commands); `ScoreEditor` implements the command port. |
+| `ScoreEditTransaction`, `ScoreCheckpoint`, `ScoreInteractionSession`, `ScoreInteractionSnapshot`, `ScoreDraftResult` | Type | [Transactions, checkpoints and interaction drafts](/score/headless/view/score-editor/). |
+| `ScorePositionMap`, `ScoreMappedPosition` | Type | [Revision maps and mapped rational positions](#position-maps). |
 
 ## Mode-specific configuration
 
@@ -658,13 +1041,12 @@ Score + MusicXML + OSMD constructor -> RenderedScoreVisualizer<OSMDLike>
 its renderer options. These types prevent options for one mode from silently
 configuring another. `direction` is supported by piano-roll and waterfall;
 strict staff configuration rejects it. A retained Element direction attribute
-is instead ignored while displaying staff, map or thumbnail.
+is instead ignored while displaying staff.
 
 `validateScoreViewConfiguration(configuration): void` validates the mode and
 option keys without creating UI. It throws `TypeError` for an unknown mode,
 malformed options or an unsupported key. It does not replace each renderer's
 value/default semantics. The Element's
 [`configure()`](/score/element/view/score-view/) uses this check before changing
-its mode or options; legacy permissive option bags remain supported. The
-Element-only `map` and `thumbnail` types are outside this three-renderer union;
-configure them with `.type`, `.options` and their documented attributes.
+its mode or options; legacy permissive option bags remain supported.
+`showAnnotations` is accepted only for `staff`.

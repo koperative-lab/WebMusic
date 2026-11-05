@@ -6,51 +6,51 @@ import LiveDemoCanvas from './LiveDemoCanvas.astro';
   <LiveDemoCanvas label="Four-direction notes with independent keyboards">
     <div class="aligned-demo__layout">
       <score-player id="aligned-waterfall-player" time-control="full" aria-label="Arabesque No. 1 opening"></score-player>
-      <p class="doc-status" data-aligned-status role="status">Preparing score…</p>
-      <div class="aligned-demo__controls">
-        <label>Note travel
-          <select class="doc-select" data-aligned-direction>
-            <option value="down" selected>Down</option>
-            <option value="up">Up</option>
-            <option value="left">Left</option>
-            <option value="right">Right</option>
-          </select>
-        </label>
-        <label>Pitch width
-          <select class="doc-select" data-aligned-width>
-            <option value="24/15">24 / 15px</option>
-            <option value="32/20" selected>32 / 20px</option>
-            <option value="40/25">40 / 25px</option>
-          </select>
-        </label>
-        <label>Note length
-          <select class="doc-select" data-aligned-time-scale>
-            <option value="32">32px / second</option>
-            <option value="64" selected>64px / second</option>
-            <option value="96">96px / second</option>
-          </select>
-        </label>
-        <label>Key depth
-          <select class="doc-select" data-aligned-key-height>
-            <option value="64">64px</option>
-            <option value="80" selected>80px</option>
-            <option value="112">112px</option>
-          </select>
-        </label>
-      </div>
+      <p class="doc-status wm-demo-status" data-aligned-status role="status">Preparing score…</p>
       <div class="aligned-demo__pan" tabindex="0" role="region" aria-label="Pan notes and keyboards together">
         <div class="aligned-demo__track" data-aligned-track>
           <score-pitch-view data-aligned-before type="keyboard" direction="down" player="#aligned-waterfall-player" low="48" high="83"
             white-key-width="32" black-key-width="20" white-key-height="80" black-key-height="50" scroll="true" follow="none"></score-pitch-view>
           <score-view type="waterfall" direction="down" player="#aligned-waterfall-player" min-pitch="48" max-pitch="83"
             white-note-width="32" black-note-width="20" pixels-per-second="64" note-spacing="0"
-            show-annotations="false" height="180"></score-view>
+            height="180"></score-view>
           <score-pitch-view data-aligned-after type="keyboard" direction="up" player="#aligned-waterfall-player" low="48" high="83"
             white-key-width="32" black-key-width="20" white-key-height="80" black-key-height="50" scroll="true" follow="none"></score-pitch-view>
         </div>
       </div>
     </div>
   </LiveDemoCanvas>
+  <div class="aligned-demo__controls" aria-label="Layout">
+    <label>Note travel
+      <select class="doc-select" data-aligned-direction>
+        <option value="down" selected>Down</option>
+        <option value="up">Up</option>
+        <option value="left">Left</option>
+        <option value="right">Right</option>
+      </select>
+    </label>
+    <label>Pitch width
+      <select class="doc-select" data-aligned-width>
+        <option value="24/15">24 / 15px</option>
+        <option value="32/20" selected>32 / 20px</option>
+        <option value="40/25">40 / 25px</option>
+      </select>
+    </label>
+    <label>Note length
+      <select class="doc-select" data-aligned-time-scale>
+        <option value="32">32px / second</option>
+        <option value="64" selected>64px / second</option>
+        <option value="96">96px / second</option>
+      </select>
+    </label>
+    <label>Key depth
+      <select class="doc-select" data-aligned-key-height>
+        <option value="64">64px</option>
+        <option value="80" selected>80px</option>
+        <option value="112">112px</option>
+      </select>
+    </label>
+  </div>
 </section>
 
 <script>
@@ -68,9 +68,15 @@ import LiveDemoCanvas from './LiveDemoCanvas.astro';
 <style>
   .aligned-demo { margin-block: 1.5rem; }
   .aligned-demo__layout { display: grid; gap: .75rem; min-width: 0; }
-  .aligned-demo__controls { display: flex; flex-wrap: wrap; gap: .65rem 1rem; }
-  .aligned-demo__controls label { display: grid; gap: .25rem; font-size: .75rem; }
-  .aligned-demo__pan { max-width: 100%; overflow: auto; border: 1px solid var(--wm-border, #d8d8d8); }
+  /* Layout settings sit outside the live canvas, beside it like Parameters. */
+  .aligned-demo__controls { display: flex; flex-wrap: wrap; gap: .65rem 1rem; margin-top: .75rem; }
+  .aligned-demo__controls label {
+    display: grid; gap: .25rem;
+    color: var(--wm-foreground-muted, light-dark(#777, #aaa));
+    font: .625rem/1 var(--wm-font-mono, ui-monospace, monospace); text-transform: uppercase; letter-spacing: .06em;
+  }
+  .aligned-demo__pan { max-width: 100%; overflow: auto; scrollbar-width: none; border: 1px solid var(--wm-border, light-dark(#d8d8d8, #333)); }
+  .aligned-demo__pan::-webkit-scrollbar { display: none; }
   .aligned-demo__track { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; width: 672px; }
   .aligned-demo__track > * {
     width: 100%; min-width: 0; min-height: 0; margin: 0;

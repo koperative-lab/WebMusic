@@ -83,6 +83,34 @@ describe('createKnob', () => {
     knob.destroy();
   });
 
+  it('holds the nearer end through the bottom dead zone instead of flipping across it', () => {
+    const onInput = vi.fn();
+    const knob = createKnob(document, {label: 'Volume', value: 0, onInput});
+    withRect(knob.element, 40);
+
+    // Three o'clock, then round past the end into the dead zone and across six o'clock.
+    knob.element.dispatchEvent(pointerEvent('pointerdown', 40, 20, 1));
+    knob.element.dispatchEvent(pointerEvent('pointermove', 30, 40, 1));
+    expect(onInput).toHaveBeenLastCalledWith(1);
+    knob.element.dispatchEvent(pointerEvent('pointermove', 10, 40, 1));
+    expect(onInput).toHaveBeenLastCalledWith(1);
+    knob.element.dispatchEvent(pointerEvent('pointerup', 10, 40, 1));
+
+    // From the low end the same zone holds zero.
+    knob.paint(0.1);
+    knob.element.dispatchEvent(pointerEvent('pointerdown', 10, 40, 2));
+    expect(onInput).toHaveBeenLastCalledWith(0);
+    knob.destroy();
+  });
+
+  it('sizes from the shared control height and focuses inside the dial', () => {
+    const knob = createKnob(document, {label: 'Volume'});
+    expect(knob.element.style.width).toBe('var(--wm-knob-size, var(--wm-knob-height, var(--wm-control-size, var(--wui-row-h, 2rem))))');
+    expect(knobStyle).toContain('outline-offset: -2px');
+    expect(knobStyle).toContain('var(--wm-focus-ring, 2px solid var(--wm-foreground, light-dark(#111, #eee)))');
+    knob.destroy();
+  });
+
   it('takes the keyboard through the shared slider lifecycle', () => {
     const onInput = vi.fn();
     const knob = createKnob(document, {label: 'Volume', value: 0.5, keyboardStep: 0.1, onInput});

@@ -16,10 +16,11 @@ presenter owns only its DOM and forwards seek and region-selection intent throug
 
 Use [transport](/uikit/transport-time/transport/) for playback controls,
 [minimap](/uikit/transport-time/minimap/) for moving a viewport over a dense overview, or
-[playlist](/uikit/transport-time/playlist/) for ordered entries. The
-[`<score-view type="map">`](/score/element/view/score-view/#map) element
-composes this presenter; mount it directly when the time domain and region model belong to your
-own store.
+[playlist](/uikit/transport-time/playlist/) for ordered entries. For a whole-score
+navigation strip, compose Headless
+[`createScoreMapView`](/score/headless/view/score-map-view/) with this presenter
+yourself; no built-in element does so. Mount it directly when the time domain and
+region model belong to your own store.
 
 <UiPresenterLiveDemo presenter="timeline" />
 

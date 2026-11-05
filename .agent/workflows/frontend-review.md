@@ -1,13 +1,14 @@
 # Frontend review
 
-Use when frontend inspection or repair is in scope. Preserve review-only requests;
+Use when UI is built, changed, inspected or repaired. Preserve review-only requests;
 otherwise carry authorized fixes through verification. This workflow does not
 install browser tooling or authorize commits, pushes or publication by itself.
 
 ## 1. Define the surface and evidence
 
 1. Inspect `git status --short`, the current branch and affected changes.
-2. Read [Design principles](../../dev/DESIGN-PRINCIPLES.md), the applicable
+2. Read [Visual design](../../dev/design/VISUAL-DESIGN.md) — required before
+   any UI code — then [Design principles](../../dev/DESIGN-PRINCIPLES.md), the applicable
    [component contract](../../dev/design/README.md) and [STATUS](../../dev/STATUS.md).
 3. Locate the real component, UIKit presenter, owning page and live demo through
    [COMPONENTS](../../dev/COMPONENTS.md). List the modes and interactions in scope.
@@ -55,6 +56,9 @@ install browser tooling or authorize commits, pushes or publication by itself.
    Confirm the ordinary host works without corrective demo-only display rules.
 4. Run the applicable gates from [Development](../../dev/DEVELOPMENT.md); coordinate
    package builds before consumers read declarations or generated output.
+
+5. Walk the [visual design checklist](../../dev/design/VISUAL-DESIGN.md#acceptance-checklist)
+   beside an existing component on the same page.
 
 ## 5. Report the actual result
 

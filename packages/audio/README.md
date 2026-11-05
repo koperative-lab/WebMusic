@@ -3,7 +3,7 @@
 **Digital audio for the web.** One package: an immutable `AudioClip` model,
 WAV decoding in JavaScript and compressed-audio decoding through a supplied
 context's native decoder with optional WASM fallbacks, playback and mixing,
-waveform / spectrogram views, MIR analysis and
+reference-based document editing and local history, waveform / spectrogram views, MIR analysis and
 transcription, Web Components, and React bindings.
 
 ```bash
@@ -78,20 +78,21 @@ registers all elements as an import side effect; **`global`** is the CDN
 IIFE bundle; and **`worker`** / **`worker-client`** / **`worker-protocol`**
 are the Worker trio — the self-registering Worker runtime, the main-thread
 client, and the pure wire types. Each capability's *root*
-(`@webmusic/audio/play`, `…/view`, `…/analyze`) is its stateless API: data
-in, data out, no DOM, no engine state.
+(`@webmusic/audio/play`, `…/view`, `…/analyze`) is its supported API.
+Data helpers and explicit controller factories remain free of UI DOM. Document
+editing is part of View, and sequence rendering/WAV export part of Play.
 
 | Entry | What it is |
 |---|---|
 | `@webmusic/audio` | The core model: immutable `AudioClip`, regions, edit sessions, `BeatGrid`, peaks, events, JSON. Zero DOM. |
-| `@webmusic/audio/play` | Stateless loading, decoding (WAV pure-JS; compressed formats prefer a supplied context, then optional WASM fallback), export and worker controls. |
+| `@webmusic/audio/play` | Stateless loading, decoding (WAV pure-JS; compressed formats prefer a supplied context, then optional WASM fallback), export (including `exportAudioSequenceWav` for edited sequences) and worker controls. |
 | `@webmusic/audio/play/headless` | `AudioPlayer`, `AudioClipPlayer`, `AudioPlaylist`, `AudioMixer`, `AudioRecorder`, effects and playback engines — code-only. |
 | `@webmusic/audio/play/element` | `<audio-player>`, `<audio-playlist>`, `<audio-mixer>`, `<audio-recorder>`. |
 | `@webmusic/audio/play/worker-client` | Main-thread client for worker-offloaded decoding (`createDecoderWorker`). |
 | `@webmusic/audio/play/worker-protocol` | The decode-worker wire types, engine-free. |
 | `@webmusic/audio/play/worker` | The self-registering decode Worker runtime. |
-| `@webmusic/audio/view` | Layout and view models for waveform / spectrogram views. |
-| `@webmusic/audio/view/headless` | Stateful code-only views, `AudioMeterController`, the `AudioMeterDisplay` reductions behind the seven meter displays and PCM metering helpers. |
+| `@webmusic/audio/view` | Layout and view models for waveform / spectrogram views, plus sequence operations, document contracts and range-processor recipes for editing. |
+| `@webmusic/audio/view/headless` | Stateful code-only views, `AudioMeterController`, the `AudioMeterDisplay` reductions behind the seven meter displays and PCM metering helpers, and `AudioClipEditor` (one document, transactions/history and interaction sessions). |
 | `@webmusic/audio/view/render` | Imperative browser visualizers and the meter display painters. |
 | `@webmusic/audio/view/element` | `<audio-view>` and `<audio-live-view>`; retains a legacy `<audio-meter>` import/registration alias. |
 | `@webmusic/audio/analyze` | One-shot MIR analysis: key, tempo, pitch, loudness, onsets, spectrogram, summaries. |
@@ -137,7 +138,8 @@ linked from the contributor index.
 
 ### The one idea: decode once, share the object
 
-Every capability in this package consumes the same immutable `AudioClip`.
+Static playback and analysis consume immutable `AudioClip` data; editable documents
+retain those samples as assets behind an immutable `AudioSequence`.
 Decoding is the expensive, format-specific step, so it happens once and its
 result becomes plain data that playback, rendering, analysis and Workers all
 read without re-deriving anything:
@@ -163,6 +165,28 @@ A clip may also carry **no samples at all**: a streaming clip holds a
 single flag is what lets a 3-hour podcast and a 2-second drum hit travel
 through the same API — the playback layer picks an engine from it rather than
 the caller picking a code path.
+
+### One editable document, borrowed playback and views
+
+`AudioClipEditor` owns a contiguous sequence of immutable asset references and
+silence segments, monotonic document revisions and optional bounded local
+history. Structural commands, clipboard and undo retain references rather than
+copying complete PCM. Gain/envelopes are segment parameters; explicit range
+processing commits a new asset. Asset readers copy bounded ranges and expose
+leases for retained roots, history, clipboard, checkpoints, views and playback.
+
+Play borrows `AudioDocumentSource`; View borrows `AudioClipEditorPort`. They
+import only Core contracts; the editor lives in View Headless. The native `AudioPlayer` prepares bounded
+sequence playback, reports requested/applied revisions, maps surviving frame
+positions and stays paused after application. A waveform hides incompatible
+playback paint/seek while displaying the newer edit. Its extrema cache reads
+visible ranges without rendering a complete sequence for every commit.
+
+`loadAudioClipEditor(url)` loads a file into a new editor that the application
+owns; assign it to `<audio-player>` and `<audio-clip-view editable>` (and any
+read-only `<audio-view>`) through `.editor` and dispose it when done. See the
+[View API](../../apps/doc/webmusic/src/content/docs/audio/api/view.mdx) and the
+[clip editor](../../apps/doc/webmusic/src/content/docs/audio/element/view/audio-clip-view.mdx).
 
 ### Four layers, one direction
 
@@ -203,7 +227,9 @@ core ◀── play ◀── view
 ```
 
 `view` and `analyze` may depend on `core` and `play`; `play` never depends on
-either. The existing meter's `view/headless/meter.ts` and
+either. The editing API and `AudioClipEditor` depend only on Core and injected
+ports; `loadAudioClipEditor` loads URLs through Play's loader over View's
+existing Play dependency. The existing meter's `view/headless/meter.ts` and
 `view/render/meter.ts` reuse the play-side `AudioMeterController` rather than
 growing a second one. The canonical Analyze Element meter facade has one
 reviewed compatibility adapter to the existing View meter implementation;
@@ -435,7 +461,7 @@ becomes a hard dependency.
   package manifest, build configuration and applicable policies described in
   [ARCHITECTURE.md](../../dev/ARCHITECTURE.md).
 - **`sideEffects` is an explicit list**, not `false` and not absent: exactly
-  the two Worker runtimes and the three `/auto` bundles. Everything else must
+  the two Worker runtimes and four capability `/auto` entries. Everything else must
   be pure, so a bundler can drop what an app does not import.
 - **Every export maps to a build entry and back** — no orphan builds, no
   exported target that does not exist on disk or in the `npm pack` file list.
@@ -452,10 +478,10 @@ The design buys its properties with real costs. The honest list:
   incremental analysis session used to retain exactly such a copy for the
   lifetime of the session and now diffs against the clip it already holds;
   callers doing the same should follow suit.
-- **`AudioClip` immutability makes edits allocate.** `slice` and the `with*`
-  mutators build new instances. `ClipEditSession` exists for edit-heavy flows
-  so a sequence of edits is described rather than materialized one clip at a
-  time.
+- **Explicit sample processing allocates.** `ClipEditSession` remains a
+  materializing clip-transform API. `AudioClipEditor` uses reference sequences
+  for structural edits/history and bounds explicit processing/export buffers.
+  Its history-only asset budget does not cap current content or total browser memory.
 - **`engine: 'auto'` guesses.** Decoded and ≤10 minutes takes the buffer
   engine; anything else streams. The threshold is a heuristic about memory,
   not a statement about your clip — pass `engine` explicitly when you know

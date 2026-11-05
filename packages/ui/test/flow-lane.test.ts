@@ -57,6 +57,26 @@ function lane(
   );
 }
 
+/**
+ * Zoom by `factor` the way a pinch arrives: a burst of Ctrl+wheel events inside
+ * one frame (each within the per-event clamp), then the frame that applies it.
+ */
+function zoomLane(viewport: HTMLElement, factor: number): void {
+  const total = -100 * Math.log(factor);
+  const count = Math.max(1, Math.ceil(Math.abs(total) / 40));
+  const due: FrameRequestCallback[] = [];
+  const original = window.requestAnimationFrame;
+  window.requestAnimationFrame = (callback: FrameRequestCallback): number => due.push(callback);
+  try {
+    for (let index = 0; index < count; index++) {
+      viewport.dispatchEvent(new WheelEvent('wheel', {deltaY: total / count, ctrlKey: true, bubbles: true, cancelable: true}));
+    }
+  } finally {
+    window.requestAnimationFrame = original;
+  }
+  for (const callback of due) callback(0);
+}
+
 /** Every band's box, exactly as serialised — the invariant's own measurement. */
 function boxes(root: HTMLElement): string[] {
   return [...root.querySelectorAll<HTMLElement>('.wui-harmony-flow__band')].map(
@@ -891,14 +911,63 @@ describe('mountFlowLane accessibility and input', () => {
     const handle = lane({}, {}, {scale: 10, fallbackWidth: 300});
     const before = boxes(handle.element);
     expect(handle.reel.style.width).toBe('100px');
-    handle.viewport.dispatchEvent(
-      new WheelEvent('wheel', {deltaY: -300, ctrlKey: true, bubbles: true, cancelable: true}),
-    );
+    zoomLane(handle.viewport, Math.E);
     // The reel is what zoomed. Every band is still a percentage of it, so not
     // one of the three had to be touched.
     expect(Number.parseFloat(handle.reel.style.width)).toBeCloseTo(100 * Math.E, 3);
     expect(boxes(handle.element)).toEqual(before);
     handle.destroy();
+  });
+
+  it('applies a burst of zoom wheels once per frame, proportional to the summed deltas', () => {
+    const due: FrameRequestCallback[] = [];
+    const raf = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => due.push(callback));
+    const handle = lane({ruler: [{at: 0, label: '1'}, {at: 5, label: '2'}]}, {}, {scale: 10, fallbackWidth: 300, animate: false});
+    const wheel = (init: WheelEventInit): WheelEvent => {
+      const event = new WheelEvent('wheel', {ctrlKey: true, cancelable: true, ...init});
+      handle.viewport.dispatchEvent(event);
+      return event;
+    };
+    const frame = (): void => { const run = due.splice(0); for (const callback of run) callback(0); };
+    raf.mockClear();
+    // Three events inside one frame: nothing is written until the frame, one
+    // frame is requested, and the factor is the product of the three.
+    const events = [wheel({deltaY: -10}), wheel({deltaY: -20}), wheel({deltaY: -5})];
+    expect(events.every((event) => event.defaultPrevented)).toBe(true);
+    expect(raf).toHaveBeenCalledTimes(1);
+    expect(handle.reel.style.width).toBe('100px');
+    frame();
+    expect(Number.parseFloat(handle.reel.style.width)).toBeCloseTo(100 * Math.exp(0.35), 3);
+    // One mouse-wheel notch is clamped (about 1.5x), and lines count as 16px.
+    wheel({deltaY: -500});
+    frame();
+    expect(Number.parseFloat(handle.reel.style.width)).toBeCloseTo(100 * Math.exp(0.35) * Math.exp(0.4), 3);
+    wheel({deltaY: 1, deltaMode: 1});
+    frame();
+    expect(Number.parseFloat(handle.reel.style.width)).toBeCloseTo(100 * Math.exp(0.35 + 0.4 - 0.16), 3);
+    // Safari's pinch: gesture events carrying the cumulative scale.
+    const gesture = (type: string, scale?: number): Event => {
+      const event = Object.assign(new Event(type, {cancelable: true}), scale === undefined ? {} : {scale});
+      handle.viewport.dispatchEvent(event);
+      return event;
+    };
+    const before = Number.parseFloat(handle.reel.style.width);
+    expect(gesture('gesturestart').defaultPrevented).toBe(true);
+    gesture('gesturechange', 1.2);
+    gesture('gesturechange', 1.5);
+    frame();
+    expect(Number.parseFloat(handle.reel.style.width)).toBeCloseTo(before * 1.5, 3);
+    // At the end of the range the gesture is the page's again.
+    for (let index = 0; index < 20; index++) { wheel({deltaY: -40}); frame(); }
+    expect(handle.reel.style.width).toBe('400px');
+    expect(wheel({deltaY: -40}).defaultPrevented).toBe(false);
+    expect(wheel({deltaY: 40}).defaultPrevented).toBe(true);
+    // A frame that lands after teardown does nothing.
+    wheel({deltaY: 40});
+    const width = handle.reel.style.width;
+    handle.destroy();
+    frame();
+    expect(handle.reel.style.width).toBe(width);
   });
 
   it('rejoins the loop in one frame after being scrolled out of view', () => {
@@ -1293,8 +1362,11 @@ describe('mountFlowLane responsive layout', () => {
     const lefts = visible().map((node) => Number.parseFloat(node.style.left) / 100 * 480);
     lefts.slice(1).forEach((left, index) => expect(left - lefts[index]!).toBeGreaterThanOrEqual(48));
     expect(ticks()).toEqual(positions);
-    handle.viewport.dispatchEvent(new WheelEvent('wheel', {deltaY: 300 * Math.log(2), ctrlKey: true}));
+    const beforeZoom = labelMeasure.mock.calls.length;
+    zoomLane(handle.viewport, 0.5);
     expect(visible().map((node) => node.textContent)).toEqual(['bar:0', 'bar:2', 'bar:4', 'bar:6', 'bar:8', 'bar:10']);
+    // A zoom refits from the widths measured when the labels were built.
+    expect(labelMeasure).toHaveBeenCalledTimes(beforeZoom);
     expect(ticks()).toEqual(positions);
     handle.destroy();
   });
@@ -1355,7 +1427,7 @@ describe('mountFlowLane responsive layout', () => {
     const band = handle.band('b');
     expect(handle.reel.style.width).toBe('300px');
     expect(handle.reel.style.transform).toBe('translate3d(39px, 0, 0)');
-    handle.viewport.dispatchEvent(new WheelEvent('wheel', {deltaY: -300 * Math.log(2), ctrlKey: true}));
+    zoomLane(handle.viewport, 2);
     expect(handle.reel.style.width).toBe('600px');
     expect(handle.reel.style.transform).toBe('translate3d(-21px, 0, 0)');
     let width = 150;
@@ -1547,7 +1619,7 @@ describe('mountFlowLane wrapped labels', () => {
     handle.update();
     expect(widths).toEqual([50, 50]);
     expect(handle.element.style.getPropertyValue('--wui-harmony-flow-row-height')).toContain('120px');
-    handle.viewport.dispatchEvent(new WheelEvent('wheel', {deltaY: -300 * Math.log(2), ctrlKey: true}));
+    zoomLane(handle.viewport, 2);
     expect(widths).toEqual([50, 50, 100]);
     expect(boxes(handle.element)).toEqual(geometry);
     handle.tick();
@@ -1586,7 +1658,7 @@ describe('mountFlowLane wrapped labels', () => {
     expect(wide.querySelector<HTMLElement>('.wui-harmony-flow__label')!.hidden).toBe(false);
     expect(handle.element.style.getPropertyValue('--wui-harmony-flow-row-height')).toContain('60px');
     const geometry = boxes(handle.element);
-    handle.viewport.dispatchEvent(new WheelEvent('wheel', {deltaY: -300 * Math.log(2), ctrlKey: true}));
+    zoomLane(handle.viewport, 2);
     expect(measured).toEqual([75, 150, 60]);
     expect(narrow.dataset.labelFit).toBeUndefined();
     expect(narrowLabel.hidden).toBe(false);
@@ -1653,7 +1725,7 @@ describe('mountFlowLane contour labels', () => {
     expect(path.getAttribute('vector-effect')).toBe('non-scaling-stroke');
     expect(path.getAttribute('stroke-width')).toBe('1.5');
     const geometry = path.getAttribute('d');
-    handle.viewport.dispatchEvent(new WheelEvent('wheel', {deltaY: -300, ctrlKey: true}));
+    zoomLane(handle.viewport, Math.E);
     expect(path.getAttribute('d')).toBe(geometry);
     expect(path.getAttribute('stroke-width')).toBe('1.5');
     expect(label.textContent).toBe('Voice 1');
@@ -1830,7 +1902,7 @@ describe('mountFlowLane fixed readout fields', () => {
     handle.destroy();
   });
 
-  it('remeasures fixed columns on width, typography and zoom changes without replacing slots or measuring frames', () => {
+  it('remeasures fixed columns on width and typography changes, never on zoom, slots or frames', () => {
     let resize = () => {};
     vi.stubGlobal('ResizeObserver', class {
       constructor(callback: () => void) { resize = callback; }
@@ -1871,9 +1943,11 @@ describe('mountFlowLane fixed readout fields', () => {
     width = 360; resize();
     expect(heading.style.minHeight).toBe('36px');
     expect([...fields.children]).toEqual(slots);
+    // The pinned read-out spans the lane, not the reel: its line boxes do not
+    // depend on the zoom, so a zoom frame reads none of them.
     const beforeZoom = reads.mock.calls.length;
-    handle.viewport.dispatchEvent(new WheelEvent('wheel', {deltaY: -100, ctrlKey: true}));
-    expect(reads.mock.calls.length).toBeGreaterThan(beforeZoom);
+    zoomLane(handle.viewport, Math.exp(1 / 3));
+    expect(reads).toHaveBeenCalledTimes(beforeZoom);
     const measurements = reads.mock.calls.length;
     const widths = widthRead.mock.calls.length;
     handle.tick(); handle.tick();
@@ -1990,7 +2064,7 @@ describe('mountFlowLane expanded readings and visible rows', () => {
     expect(readStart).toHaveBeenCalledTimes(reads);
     expect(readWidth).not.toHaveBeenCalled();
     resize(); expect(handle.viewport.dataset.lanes).toBe('2');
-    handle.viewport.dispatchEvent(new WheelEvent('wheel', {deltaY: -300 * Math.log(4), ctrlKey: true}));
+    zoomLane(handle.viewport, 4);
     expect(handle.viewport.dataset.lanes).toBe('1');
     expect(handle.band('later')!.parentElement!.hidden).toBe(true);
     handle.destroy();

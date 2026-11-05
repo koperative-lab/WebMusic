@@ -91,6 +91,52 @@ afterEach(() => {
 });
 
 describe('mountLfo', () => {
+  it('moves only the head on a phase frame and swaps the run icon only when running changes', () => {
+    const host = document.createElement('div');
+    const binding = new FakeLfo();
+    const handle = mountLfo(host, binding, {runLabel: 'Run LFO', stopLabel: 'Stop LFO'});
+    const {run, curve, head} = handle.controls;
+    expect(run.getAttribute('aria-pressed')).toBe('false');
+    expect(run.title).toBe('Run LFO');
+    expect(run.querySelector('svg[data-icon]')?.getAttribute('aria-hidden')).toBe('true');
+    const idleIcon = run.firstElementChild;
+    const setCurve = vi.spyOn(curve, 'setAttribute');
+
+    binding.state.phase = 0.4;
+    handle.update();
+    binding.state.phase = 0.6;
+    handle.update();
+    expect(head.getAttribute('x1')).toBe('60.0');
+    expect(setCurve).not.toHaveBeenCalled();
+    expect(run.firstElementChild).toBe(idleIcon);
+
+    binding.state.running = true;
+    handle.update();
+    expect(run.getAttribute('aria-pressed')).toBe('true');
+    expect(run.getAttribute('aria-label')).toBe('Stop LFO');
+    expect(run.title).toBe('Stop LFO');
+    const runningIcon = run.firstElementChild;
+    expect(runningIcon).not.toBe(idleIcon);
+    binding.state.phase = 0.7;
+    handle.update();
+    expect(run.firstElementChild).toBe(runningIcon);
+    expect(setCurve).not.toHaveBeenCalled();
+
+    binding.state.depth = 0.2;
+    handle.update();
+    expect(setCurve).toHaveBeenCalledOnce();
+    handle.destroy();
+  });
+
+  it('draws the wave in ink on the component surface and keeps the head colourless', () => {
+    expect(lfoStyle).toContain('var(--wm-lfo-wave-background, var(--wm-surface, light-dark(#fff, #111)))');
+    expect(lfoStyle).toContain('var(--wm-lfo-head, var(--wm-foreground, light-dark(#111, #eee)))');
+    expect(lfoStyle).not.toContain('#c0392b');
+    expect(lfoStyle).not.toContain('--wm-surface-inverse');
+    expect(lfoStyle).toContain(":where(.wui-lfo__run[aria-pressed='true'])");
+    expect(lfoStyle).toContain('outline-offset: -2px');
+  });
+
   it('exposes the named control nodes as the stable route to presenter DOM', () => {
     const host = document.createElement('div');
     const binding = new FakeLfo();

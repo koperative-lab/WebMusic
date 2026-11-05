@@ -16,8 +16,8 @@ about this repo, what blocks a planned commit, the exact file list and gate comm
 corrected commit order, and the risks.
 
 Every fact below was re-verified against the worktree at
-`/Users/mamingchen/GitHub/WebMusic/.claude/worktrees/debug-branch-db7bf5`
-(branch `claude/analysis-view-chord-design-693b7b`, HEAD `086905c`). Where the seven recon reports
+`<local-worktree>/debug-branch-db7bf5`
+(branch `analysis-view-chord-design-693b7b`, HEAD `086905c`). Where the seven recon reports
 disagreed with each other, the line numbers here are the ones I read out of the scripts myself; the
 losing citation is named so nobody re-litigates it.
 
@@ -33,8 +33,8 @@ is out of eslint's path. `npm run lint` is **red right now** — see §0.
 
 ## 0.1 The consolidation: what landed, and which of two implementations it is
 
-C.3, C.4, C.5 and C.6 were each written twice — once on `claude/analysis-view-chord-design-693b7b`
-and once on `claude/kind-swartz-c081f5` — from the same commit, with different code. Seven
+C.3, C.4, C.5 and C.6 were each written twice — once on `analysis-view-chord-design-693b7b`
+and once on `kind-swartz-c081f5` — from the same commit, with different code. Seven
 module-by-module comparisons decided each one on evidence, and this tree is the result. **Nothing
 below is a preference; each row names the property that decided it.**
 
@@ -194,7 +194,7 @@ that hole.
 
 ## 0.6 The salvage port: C.7 and C.7b, carried off a worktree that was deleted
 
-C.7 and C.7b were written on `claude/kind-swartz-c081f5` and never committed there. They were
+C.7 and C.7b were written on `kind-swartz-c081f5` and never committed there. They were
 ported onto this tree as a working-tree change, not applied as a patch: their delta was a delta
 against **their** consolidated base, and four files here had already diverged.
 
@@ -1969,7 +1969,7 @@ Binding repo rules, quoted:
 `ARCHITECTURE.md:368-369` — "Changing architecture means changing a policy table in the same commit —
 there is no other knob." · `dev/DEVELOPMENT.md:238-240` — "Add or remove an entry in the policy table,
 the manifest, and the build in the same commit — the gate enforces it." · `dev/DEVELOPMENT.md:110` —
-`npm run check` before any push. There is **no `CLAUDE.md`** in this repo.
+`npm run check` before any push. There is **no tool-specific instruction file** in this repo.
 
 ---
 

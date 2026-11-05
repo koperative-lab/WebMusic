@@ -104,3 +104,16 @@ export {
   type BindAudioTimelineOptions,
   type PlayheadTarget,
 } from './binding';
+
+export {
+  createAudioViewEditing, audioDocumentPlaybackCompatible,
+  type AudioViewEditing, type AudioViewEditingOptions, type AudioViewEditingState,
+} from './audio-editing';
+export {
+  createAudioSequenceWaveform, type AudioSequenceWaveform, type AudioSequenceWaveformOptions,
+} from './sequence-waveform';
+
+export {AudioClipEditor, createAudioClipEditor, type AudioClipEditorOptions} from './audio-clip-editor';
+export {
+  loadAudioClipEditor, type LoadAudioClipEditorOptions, type AudioClipEditorLoader, type AudioClipEditorLoadLimits,
+} from './load-audio-clip-editor';

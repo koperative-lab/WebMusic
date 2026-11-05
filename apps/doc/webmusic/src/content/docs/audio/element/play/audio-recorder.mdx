@@ -97,7 +97,14 @@ Wire `webaudio:recorded` to do something else with the take — feed it to an [`
 
 The host fills its container width by default, can shrink inside flex/grid
 layouts, and respects `hidden`. Set host width in your application for a narrower
-control; spacing between components belongs to their composition.
+control; spacing between components belongs to their composition. The
+[UIKit Recorder](/uikit/mixing-capture/recorder/) draws one edge-to-edge row of icon buttons —
+record (a stop icon with an elapsed-time mono readout while recording), play take, the level bar
+and a download button with the `WAV` readout — and the frame's padding falls back to `0`
+(`--wm-audio-recorder-surface-padding` → `--wm-recorder-surface-padding` →
+`--wm-component-padding` → `0`). Status text is announced but visually hidden; only an error line
+is drawn. The recording colour resolves `--war-accent` → `--wm-recorder-accent` → `--wm-recording`
+→ `light-dark(#c62828, #ef5350)`.
 
 The default surface uses the same neutral UI tokens as Score. These optional legacy aliases
 demonstrate an explicit dark customization; they do not define the default palette.
@@ -106,12 +113,12 @@ demonstrate an explicit dark customization; they do not define the default palet
 audio-recorder {
   --war-bg: #15171c;      /* surface background */
   --war-fg: #eef;         /* text */
-  --war-accent: #e0445b;  /* record button + level fill */
+  --war-accent: #e0445b;  /* pressed record button + level fill while recording */
   --war-track: #2a2e37;   /* level-bar track */
 }
 ```
 
-`--war-button-border` controls the idle action-button line and, when omitted, follows
-`--wm-control-border` → `--wm-border` → `#d8d8d8`.
+The idle icon buttons have no border or fill, so `--war-button-border` and `--war-muted` no
+longer change the presenter's appearance.
 
 </details>

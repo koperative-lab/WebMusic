@@ -1,4 +1,4 @@
-import {Duration, Pitch, Rational, ScoreBuilder, VoiceId, scoreNotes} from '../../src/core';
+import {Duration, Pitch, Rational, ScoreBuilder, VoiceId, expandRepeats, scoreNotes} from '../../src/core';
 import * as TonejsMidi from '@tonejs/midi';
 import {describe, expect, it} from 'vitest';
 import {
@@ -52,6 +52,41 @@ describe('detectFormat', () => {
 });
 
 describe('MIDI serialization', () => {
+  it('exports velocity overrides through repeats while retaining written and performed timing', () => {
+    const builder = new ScoreBuilder();
+    builder.addMeasure({
+      id: builder.newMeasureId(), number: 1, onsetQuarters: Rational.ZERO,
+      durationQuarters: new Rational(4), tempo: {bpm: 120}, repeat: {start: true},
+    });
+    builder.addMeasure({
+      id: builder.newMeasureId(), number: 2, onsetQuarters: new Rational(4),
+      durationQuarters: new Rational(4), tempo: {bpm: 60}, repeat: {end: true},
+    });
+    const part = builder.addPart({id: builder.newPartId(), name: 'Piano'});
+    const voice = builder.newVoiceId();
+    builder.addNote(part, {
+      id: builder.newNoteId(), pitch: Pitch.parse('C4'), voice,
+      onsetQuarters: Rational.ONE, duration: Duration.quarter(),
+      performed: {onsetSec: 0.6, durationSec: 0.2, velocity: 90}, velocityOverride: 45,
+    });
+    builder.addNote(part, {
+      id: builder.newNoteId(), pitch: Pitch.parse('D4'), voice,
+      onsetQuarters: new Rational(3), duration: Duration.half(), velocityOverride: 99,
+    });
+    const expanded = expandRepeats(builder.build());
+    const notes = expanded.notes;
+    expect(notes.map((note) => note.velocityOverride)).toEqual([45, 99, 45, 99]);
+    expect(notes[1].performed).toBeUndefined();
+    expect(notes[3].performed).toBeUndefined();
+
+    const restored = parseMIDI(serializeMIDI(expanded).buffer as ArrayBuffer);
+    expect(restored.notes.map((note) => note.velocity)).toEqual([45, 99, 45, 99]);
+    for (const [index, onset] of [0.6, 1.5, 6.6, 7.5].entries()) {
+      expect(restored.notes[index].performed?.onsetSec).toBeCloseTo(onset, 3);
+      expect(restored.notes[index].performed?.durationSec).toBeCloseTo(index % 2 === 0 ? 0.2 : 1.5, 3);
+    }
+  });
+
   it('preserves performed timing instead of silently snapping it to notation', () => {
     const base = sampleScore();
     const source = base.edit((tx) => {

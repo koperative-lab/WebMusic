@@ -1,16 +1,19 @@
 ---
 title: '<score-view>'
-description: 'One score, five views: piano roll, staff, waterfall, navigation map or static thumbnail.'
+description: 'One score, three views: piano roll, staff or waterfall.'
 sidebar:
   order: 1
 ---
 
 import ScoreViewDemo from '../../../../../components/ScoreViewDemo.astro';
 import WaterfallKeyboardDemo from '../../../../../components/WaterfallKeyboardDemo.astro';
+import ScoreEditingDemo from '../../../../../components/elements/ScoreEditingDemo.astro';
 
 <ScoreViewDemo />
 
-`<score-view>` displays a loaded score as `piano-roll` (default), `staff`, `waterfall`, `map` or `thumbnail`. Each instance renders one surface. Select `type` in the demo’s external Parameters; only relevant drawing controls appear, and switching back restores their retained values.
+`<score-view>` displays a loaded score as `piano-roll` (default), `staff` or `waterfall`. Each instance renders one surface. Select `type` in the demo’s external Parameters; only relevant drawing controls appear, and switching back restores their retained values.
+
+The view is read-only. It can [follow an editor](#follow-an-editor) and draw its current content, but it never edits notes; use [`<score-grid-view>`](/score/element/view/score-grid-view/) to edit them.
 
 ## Import
 
@@ -28,23 +31,23 @@ import WaterfallKeyboardDemo from '../../../../../components/WaterfallKeyboardDe
 
 The demo starts in staff mode with `public/mxl/Arabesque No.1.mxl`, a notation source for Debussy's *Arabesque No. 1* with one piano part and two staves. The player loads the MXL once and the view borrows the parsed score.
 
-The demo contains one player and one score view. Expand the player’s Parameters group to configure playback. Copy includes both tags; Reset restores their initial attributes. The thumbnail type can borrow the player’s loaded score while remaining a static preview.
+The demo contains one player and one score view. Expand the player’s Parameters group to configure playback. Copy includes both tags; Reset restores their initial attributes.
 
 ## Annotations and compact layout
 
-Advanced score annotations are hidden by default in all five types. Enable
-`show-annotations="true"` to display supported directions retained in the Score: words such as
-`rit.`, rehearsal labels, dynamics, metronome marks, pedal signs/lines and
-crescendo/diminuendo hairpins. The staff places them around notation; the other
-types place them along their time axis with compact labels and span lines.
-Dense labels may be abbreviated or reduced to markers; SVG titles retain their
-full text. The other types do not reproduce staff engraving placement. These
+Only the staff type draws supported directions retained in the Score, and only
+when `show-annotations="true"` enables them: words such as `rit.`, rehearsal
+labels, dynamics, metronome marks, pedal signs/lines and crescendo/diminuendo
+hairpins, placed around the notation. Piano roll and waterfall never draw
+annotations and reserve no space for them. These
 directions are visual and do not change playback tempo, volume or sustain.
 
-Set `show-annotations="false"` or omit it to keep these directions hidden. The demo’s
-**show-annotations** control applies to every type and is included by Copy and
-Reset. `.options.showAnnotations` overrides the attribute. Changing this option
-retains the loaded score and playback position.
+`show-annotations` affects only `type="staff"` and defaults to false. Set
+`show-annotations="false"` or omit it to keep the staff's directions hidden. The
+demo shows the **show-annotations** control only for the staff type; Copy and
+Reset include it. `.options.showAnnotations` overrides the attribute. Changing
+this option retains the loaded score and playback position. On the other types
+the attribute is retained but has no effect.
 
 ```html
 <score-view player="#piece" type="staff" show-annotations="true"></score-view>
@@ -63,7 +66,7 @@ roll it is the direction of increasing score time (default `right`). For
 waterfall it is note travel toward the current-time landing edge (default
 `down`). Low pitches remain at the left for vertical time axes and at the
 bottom for horizontal time axes. Labels keep their normal reading direction.
-Staff, map and thumbnail ignore this attribute and retain their usual layout.
+The staff ignores this attribute and retains its usual layout.
 
 Changing direction preserves the score, nominal position and borrowed player.
 `.options.direction` takes precedence over the attribute. Give a vertical
@@ -75,6 +78,9 @@ travel directions between two independent keyboards sharing one player.
 
 Time, pitch and instrument dimensions are separate. Changing a note's displayed
 length does not change its duration or playback rate.
+
+The piano roll's horizontal axis is nominal seconds. For a written-quarter grid
+with bar and beat lines, use [`<score-grid-view>`](/score/element/view/score-grid-view/).
 
 | Surface / dimension | Attribute | Effect |
 | --- | --- | --- |
@@ -96,7 +102,7 @@ when exact natural/accidental key alignment matters.
 
 ### Piano roll
 
-`type="piano-roll"` draws equal semitone lanes and score time along the selected direction; the default is time to the right and low pitches at the bottom. It follows the score position and highlights active notes. `pixels-per-second` and the pitch range control the drawing’s geometry. When enabled, annotations occupy a compact strip beside the pitch lanes, aligned to nominal seconds. Hiding them removes the strip and reduces the natural pitch-axis size.
+`type="piano-roll"` draws equal semitone lanes and score time along the selected direction; the default is time to the right and low pitches at the bottom. It follows the score position and highlights active notes. `pixels-per-second` and the pitch range control the drawing’s geometry. It draws notes only; score directions appear on the staff type.
 
 ### Staff
 
@@ -155,11 +161,10 @@ endpoint and collision rules, including authored slurs between staves of one par
 These visual directions do not introduce playback automation.
 
 Cross-staff and cross-measure beams, nested tuplet layout, complete grace-note
-engraving, lyrics and page/system justification remain outside
-this scrolling renderer's supported subset.
-[`<score-sheet-view>`](/score/element/view/score-sheet-view/) retains the optional OSMD
-page-engraving workflow. The staff type needs no separate engine option or
-additional installation.
+engraving and lyrics remain outside this scrolling renderer's supported subset.
+[`<score-sheet-view>`](/score/element/view/score-sheet-view/) lays the same
+engraving out in justified systems on pages and edits it like a notation
+program. Neither needs a separate engine or additional installation.
 
 ### Waterfall
 
@@ -215,7 +220,7 @@ Use the same structure with a score file in your application:
       scroll="true" follow="none"></score-pitch-view>
     <score-view type="waterfall" direction="down" player="#falling-piece"
       min-pitch="48" max-pitch="83" white-note-width="32" black-note-width="20"
-      pixels-per-second="64" note-spacing="0" show-annotations="false" height="180"></score-view>
+      pixels-per-second="64" note-spacing="0" height="180"></score-view>
     <score-pitch-view type="keyboard" direction="up" player="#falling-piece" low="48" high="83"
       white-key-width="32" black-key-width="20" white-key-height="80" black-key-height="50"
       scroll="true" follow="none"></score-pitch-view>
@@ -241,8 +246,8 @@ Explicit `min-pitch` / `max-pitch` preserve that exact waterfall range. The
 matching `low` / `high` select the same keyboard keys. `scroll="true"` preserves
 the keyboard's explicit key widths instead of fitting them to its container.
 Zero presenter insets align their left edges; `follow="none"` prevents the keyboard from panning
-independently. Disabling annotations removes the waterfall's side rail from
-this shared pitch grid. If you resize the columns in application code, update
+independently. The waterfall draws no annotation rail, so its note columns
+span the shared pitch grid exactly. If you resize the columns in application code, update
 both views and the track width together.
 
 For a horizontal composition, set the view's `direction="right"`, give it a
@@ -255,64 +260,80 @@ landing edge for `left`; a keyboard above a rising waterfall faces `down`.
 The topic demo applies these settings to both edge keyboards without reloading
 the score or creating another transport.
 
-When enabled, annotations follow the selected time axis in a separate rail. Nearby words and
-directions share wrapped labels with leaders to their musical positions;
-separate span tracks retain pedal and hairpin durations. Hiding annotations
-returns the rail's width to the note columns without changing a requested
-viewport height.
-
-### Map
-
-`type="map"` gives a whole-piece navigation strip using note-density cells, bar numbers and score landmarks. `for-part` filters the density by part id or name; `cells` bounds the cell count. Long scores group bars rather than creating per-note graphics. Scores without bar structure use an even division and have no bar ruler marks.
-
-When enabled, directions occupy a compact strip above the density cells at their quarter
-positions. `show-annotations="false"` removes that strip and expression labels;
-the bar ruler remains available for navigation.
-
-Click a cell or seek through the lane with its pointer/keyboard controls. The view emits `webscore:seek` with `{quarters, seconds}` in nominal score time and seeks the bound player. It prefers `seekNominal(seconds)`; structural targets with only `seek(seconds)` receive rate-scaled time. A failed player seek is reported and the local position rolls back when no newer state superseded the request. Without a player, navigation updates local inspection and still emits the event.
-
-The projection remains available as [`createScoreMap(score, options)`](/score/api/view/), with no DOM or transport ownership.
-
-### Thumbnail
-
-`type="thumbnail"` makes one static piano-roll layout and scales it into the box.
-Its natural height is `3rem` plus one compact annotation strip when annotations are enabled and directions
-exist; normal stage padding stays inside that height. Hiding annotations returns
-the component to `3rem`. Nearby directions form overview groups with a readable
-representative label and count; SVG titles and accessible descriptions retain
-the complete text and musical ranges. Labels keep their readable size when an
-explicit height fits the notes into the remaining space.
-Very short explicit heights scroll inside the stage so the annotation strip
-cannot collapse the note preview to zero height.
-
-Note color defaults to `var(--wm-score-view-note, currentColor)`. `note-color`
-accepts CSS colors or an RGB triple; `.options.noteRGB` overrides the attribute,
-and `.options.noteColor` overrides both. There is no active-note highlighting,
-seeking or playback animation inside the preview. `.active` is empty.
-Playback time can still be read through `.currentTime` when a player is attached,
-but time changes do not redraw the thumbnail.
-
-```html
-<a href="/songs/1">
-  <score-view type="thumbnail" src="/midi/Arabesque%20No.1.mid" width="180" height="48"></score-view>
-</a>
-```
-
 ## Data and playback
 
-Source precedence is explicit `.score`, then `src`, then the selected player’s resolved score. Explicit URLs load through [`@webmusic/score/io`](/score/api/io/). A player-only view borrows data without another fetch. Changing `type` reuses the resolved score and player snapshot while replacing the old presentation.
+Without an editor, source precedence is explicit `.score`, then `src`, then the selected player’s resolved score. Explicit URLs load through [`@webmusic/score/io`](/score/api/io/). A player-only view borrows data without another fetch. Changing `type` reuses the resolved score and player snapshot while replacing the old presentation.
 
-The `player` selector must resolve uniquely in the current Document or ShadowRoot. Native snapshots initialize position, including paused state, then data/state/time updates keep it current. Late or replaced targets rebind; invalid or ambiguous selectors remain unbound. Disconnect cancels pending work and releases owned subscriptions and renderers without stopping playback. No type creates a player or audio resource. Only `map` sends seek commands.
+The `player` selector must resolve uniquely in the current Document or ShadowRoot. Native snapshots initialize position, including paused state, then data/state/time updates keep it current. Late or replaced targets rebind; invalid or ambiguous selectors remain unbound. Disconnect cancels pending work and releases owned subscriptions and renderers without stopping playback. No type creates a player or audio resource or sends seek commands.
 
 Native binding prefers the target's `.playback` [shared source](/score/api/#shared-playback-observation).
 An available source suppresses duplicate legacy events. A target without a source,
 or one reporting `unavailable`, retains the compatibility snapshot/event path.
 `data-player-state` exposes resolution and readiness. An explicit Score with a
-different identity from native playback suppresses incompatible highlighting and
-map navigation; use the same Score instance to share data intentionally. A custom
+different identity from native playback suppresses incompatible highlighting;
+use the same Score instance to share data intentionally. A custom
 target replacing its `.playback` property dispatches `webmusic:sourcechange`.
 
 Missing source data displays a quiet square waiting animation. Loading a URL or borrowing a native player whose source is loading displays the shared square loading animation, including while a replacement source is pending. Native source failures remain visible; independent explicit view data takes precedence. Both retain a screen-reader status message and respect reduced-motion preferences. The three note views show an empty status for a score without notes, and load or drawing failures show an accessible error message. Replacing the source or drawing options retries the applicable work. Disconnect also releases the waterfall resize observer.
+
+## Follow an editor
+
+Assign a [ScoreEditor](/score/headless/view/score-editor/) to `.editor` to draw
+an editable document read-only. The view shows the editor's committed content,
+or the draft of its interaction session while another surface previews an edit,
+and redraws after every commit, undo or redo. It offers no editing gestures,
+toolbar or keyboard commands. The editor owns content and history; the view
+borrows it and never disposes it.
+
+In this composition, a [`<score-grid-view editable>`](/score/element/view/score-grid-view/)
+edits Arabesque No. 1 (`public/midi/Arabesque No.1.mid`) and the staff follows
+the same editor. The player auditions committed revisions. The main Parameters
+group configures the staff; the grid and player have their own groups.
+
+<ScoreEditingDemo />
+
+```html
+<score-player id="notes-player"></score-player>
+<score-grid-view id="notes-grid" player="#notes-player" editable></score-grid-view>
+<score-view id="notes-staff" player="#notes-player" type="staff"></score-view>
+<script type="module">
+  import {defineScorePlayerElement} from '@webmusic/score/play/element';
+  import {defineScoreGridViewElement, defineScoreViewElement} from '@webmusic/score/view/element';
+  import {loadScoreEditor} from '@webmusic/score/view/headless';
+  defineScorePlayerElement();
+  defineScoreGridViewElement();
+  defineScoreViewElement();
+  // Your page owns the editor; dispose it after detaching every borrower.
+  const editor = await loadScoreEditor('/midi/Arabesque%20No.1.mid');
+  const player = /** @type {import('@webmusic/score/play/element').ScorePlayerElement | null} */ (document.getElementById('notes-player'));
+  const grid = /** @type {import('@webmusic/score/view/element').ScoreGridViewElement | null} */ (document.getElementById('notes-grid'));
+  const staff = /** @type {import('@webmusic/score/view/element').ScoreViewElement | null} */ (document.getElementById('notes-staff'));
+  if (player) player.editor = editor;
+  if (grid) grid.editor = editor;
+  if (staff) staff.editor = editor;
+</script>
+```
+
+Each view owns an interaction session by default, so it draws committed
+content only. To show another surface's drafts while they are previewed, assign the same session from `editor.createInteractionSession()`
+to `.interactionSession` on both. Foreign-document sessions are rejected.
+Disconnect disposes only a view-created session; a supplied session and editor
+remain caller-owned. Replacing or clearing this property restores the
+compatible player's current position immediately, including while paused.
+
+An editor is attached only through the `.editor` property; there is no `editor`
+attribute. Assigning `undefined` detaches it without disposing it. When you
+replace a document, assign the new editor before disposing the previous one. An
+editor alongside independent `.score` or `src` is `source-conflict`: object
+setters reject it before replacement, and adding a `src` attribute later shows
+an error until corrected. No view creates an editor implicitly. All three types
+can follow an editor.
+
+An optional player contributes time only when its applied document ID and
+revision exactly match, its binding is ready, and `documentCoordinates` is true.
+Pending, failed, foreign or repeat-expanded unmapped playback suppresses
+playheads and active notes. The editor's newly committed content stays visible
+while playback catches up.
 
 <details class="component-section">
 <summary>API</summary>
@@ -321,12 +342,12 @@ Missing source data displays a quiet square waiting animation. Loading a URL or 
 | --- | --- | --- |
 | `src` / `format` | attributes | Explicit MIDI / MusicXML / MXL / ABC URL and optional parser override. |
 | `player` | attribute | Unique source/position selector; explicit score input retains precedence. |
-| `type` / `.type` | attribute / writable property | `piano-roll`, `staff`, `waterfall`, `map` or `thumbnail`; unknown values use piano-roll. |
-| `width` / `height` | attributes | Bare numbers are px; CSS lengths pass through. Width defaults to 100%; height follows the drawing. Thumbnail uses 3rem plus any annotation strip. A fixed height makes a taller surface scroll within its box. |
-| `direction` / `.direction` | attribute / reflected property | `up`, `down`, `left` or `right`. Piano roll: increasing time, default `right`; waterfall: note travel, default `down`. Invalid values use the mode default. Ignored by staff, map and thumbnail. `.options.direction` wins. |
-| `show-annotations` | attribute | All types; default false. Absent or `false` hides advanced score directions and their reserved space. Empty or `true` shows them. `.options.showAnnotations` takes precedence. |
-| `for-part` / `.forPart` | attribute / read-only property | Map density filter by part id/name; absent includes every part. |
-| `cells` / `.cells` | attribute / read-only property | Map cell limit; default 64, rounded with minimum 1. |
+| `.editor` | writable property | Follow an editor from `loadScoreEditor`/`createScoreEditor` (any `ScoreEditorPort`) read-only; borrowed, never disposed. `undefined` detaches it. Cannot coexist with independent `.score` or `src`. There is no `editor` attribute. |
+| `.interactionSession` | writable property | Optional same-document `ScoreInteractionSession` whose draft the view draws; getter returns the supplied or View-created session. Supplied sessions are borrowed. |
+| `type` / `.type` | attribute / writable property | `piano-roll`, `staff` or `waterfall`; unknown or removed values (such as `map` or `thumbnail`) use piano-roll. |
+| `width` / `height` | attributes | Bare numbers are px; CSS lengths pass through. Width defaults to 100%; height follows the drawing. A fixed height makes a taller surface scroll within its box. |
+| `direction` / `.direction` | attribute / reflected property | `up`, `down`, `left` or `right`. Piano roll: increasing time, default `right`; waterfall: note travel, default `down`. Invalid values use the mode default. Ignored by the staff. `.options.direction` wins. |
+| `show-annotations` | attribute | Staff only; default false. Absent or `false` hides score directions and their reserved space. Empty or `true` shows them. `.options.showAnnotations` takes precedence. Piano roll and waterfall never show annotations. |
 | `show-only-octaves-used` | attribute | Waterfall only; default true. Show occupied octaves; `false` selects the standard A0–C8 piano pitch range. |
 | `scroll-type` | attribute | Staff only: `page` (default), `note` or `bar`. |
 | `split-staves` | attribute | Staff only; default true. Preserve source staff assignments within each part. `false` combines that part’s staves; absent, empty or `true` preserves them. `.options.splitStaves` takes precedence. |
@@ -337,22 +358,24 @@ Missing source data displays a quiet square waiting animation. Loading a URL or 
 | `white-note-width` | attribute | Waterfall natural-note pitch-column width; fits the available pitch axis by default. A positive explicit natural or accidental width fixes pitch scale. |
 | `black-note-width` | attribute | Waterfall accidental pitch-column width; defaults to 0.62 × natural-note width and cannot exceed it. Alone, derives natural-note width as `value / 0.62`. A positive explicit width disables fitting. |
 | `default-key` | attribute | Staff fallback major-key index, 0…11 by chromatic pitch class (0 = C, 1 = D♭, 2 = D); default 0. This is not a fifths count. |
-| `note-color` / `active-note-color` | attributes | Score-renderer idle/active colors; the Element’s active default is red `rgb(240, 84, 119)`. `note-color` also styles thumbnail. Map uses timeline tokens. |
+| `note-color` / `active-note-color` | attributes | Score-renderer idle/active colors; the Element’s active default is red `rgb(240, 84, 119)`. |
 | `.score` | writable property | Assign a loaded Score; overrides `src` and player data, cancelling obsolete loads. |
-| `configure(configuration)` | method | Atomically select `piano-roll`, `staff` or `waterfall` and replace optional mode-specific `.options`. Invalid modes, malformed options and unsupported keys throw `TypeError` before changing the view. Map/thumbnail use `.type`, `.options` and their attributes. |
-| `.options` | writable property | `ScoreViewRenderOptions` override note-renderer attributes; map/thumbnail also honor `showAnnotations`, `noteRGB` and `noteColor`; see the [renderer API](/score/api/view/). |
+| `data-editor-state` | reflected state | Present while `.editor` is assigned: `ready`, `unavailable`, `invalid` or `source-conflict`. `unavailable` (a disposed or not-ready editor) is pending: the view shows no stale content and a polite waiting status. `invalid` (the editing binding could not be created) and `source-conflict` show an error status. A `format` change does not rebind an editor-bound view. |
+| `data-playback-state` | reflected state | Editor playback compatibility: `unbound`, `ready` or `pending`. A draft does not make the player binding `mismatched`; the player is compared with committed document content. |
+| `configure(configuration)` | method | Atomically select `piano-roll`, `staff` or `waterfall` and replace optional mode-specific `.options`. Invalid modes, malformed options and unsupported keys (including `showAnnotations` outside `staff`) throw `TypeError` before changing the view. |
+| `.options` | writable property | `ScoreViewRenderOptions` override renderer attributes; `showAnnotations` applies only to the staff; see the [renderer API](/score/api/view/). |
 | `.currentTime` | read-only property | Current nominal score position in seconds. |
-| `.active` | read-only property | MIDI pitches at the current score position; empty for map and thumbnail. |
+| `.active` | read-only property | MIDI pitches at the current score position. |
 
 Type-specific attributes stay on the element when another type is selected and do not affect that other surface. Missing or invalid numeric values use their corresponding defaults.
 
-`ScoreViewElement`, `ScoreViewElementType`, `ScoreViewDirection`, `ScoreViewSeekDetail`, `ScoreViewRenderOptions`, `ScoreViewType`, `parseColorAttr` and `defineScoreViewElement(tag?)` are exported from `@webmusic/score/view/element`. `ScoreViewElementType` includes all five Element types; the lower-level `ScoreViewType` remains `piano-roll | staff | waterfall`. Registration is idempotent and SSR-safe.
+`ScoreViewElement`, `ScoreViewElementType`, `ScoreViewDirection`, `ScoreViewRenderOptions`, `ScoreViewType`, `parseColorAttr` and `defineScoreViewElement(tag?)` are exported from `@webmusic/score/view/element`. `ScoreViewElementType` is an alias of `ScoreViewType`: `piano-roll | staff | waterfall`. Registration is idempotent and SSR-safe.
 
 `ScoreViewConfiguration` and `ScoreViewOptionsByType` describe the three full
 renderer modes and are exported from both `@webmusic/score/view` and
 `@webmusic/score/view/element`. `configure()` validates mode/option keys before
 committing; it preserves the current source and playback position. Legacy
-`.type` and `.options` assignments remain supported for all five Element types.
+`.type` and `.options` assignments remain supported for all three types.
 
 ```ts
 import {ScoreViewElement} from '@webmusic/score/view/element';
@@ -360,9 +383,12 @@ const configuredView = new ScoreViewElement();
 configuredView.configure({type: 'staff', options: {splitStaves: true, showAnnotations: false}});
 ```
 
-**Events.** Only map emits `webscore:seek`: `{quarters, seconds}`, bubbling and composed, with nominal seconds. Other types are passive displays.
+**Events.** `<score-view>` dispatches no editing events; the editing surface
+that changes the document, such as [`<score-grid-view>`](/score/element/view/score-grid-view/),
+dispatches them.
 
-**Accessibility.** The map uses the shared [timeline interaction](/uikit/transport-time/timeline/). Other types provide labeled graphics and current-position highlighting where applicable; thumbnail adds no interactive controls. Native external Parameters configure the selected drawing.
+**Accessibility.** Each type is a labeled graphic with current-position
+highlighting. Following an editor adds no focusable controls.
 
 </details>
 
@@ -372,22 +398,20 @@ configuredView.configure({type: 'staff', options: {splitStaves: true, showAnnota
 Staff layers within one part sit closer together when their notation allows it.
 The renderer checks the whole score, including offscreen notes, and retains space
 for stems, ties and ledger lines without shrinking the notation. Only visible
-annotations contribute to clearance; `show-annotations="false"` removes their
-space as well as their marks.
+annotations contribute to clearance; `show-annotations="false"` on the staff
+removes their space as well as their marks.
 
-The component fits its containing block. Size the host with `width` / `height` or application CSS. Fixed-height note views use a scrollable [UIKit stage](/uikit/layout-feedback/stage/) so a drawing taller than the box remains accessible. Piano-roll/staff/waterfall use their drawing attributes and `.options`; thumbnail stretches its SVG to the requested box.
+The component fits its containing block. Size the host with `width` / `height` or application CSS. Fixed-height note views use a scrollable [UIKit stage](/uikit/layout-feedback/stage/) so a drawing taller than the box remains accessible. Each type uses its drawing attributes and `.options`. The renderers' scroll containers carry `data-webscore-scrollbar="hidden"`: one scoped zero-specificity rule per document or shadow root hides their scrollbars while wheel, trackpad and keyboard scrolling keep working. Because the rule (`scrollbar-width: none` plus the WebKit `::-webkit-scrollbar` equivalent) has zero specificity, application CSS can restore a bar.
 
 Idle notes inherit `--wm-foreground` through `--wm-score-view-note`, with neutral `#333` / `#ddd` defaults for light / dark schemes. Active notes use `--wm-score-view-active-note`, then the shared `--wm-accent`, then the existing red default `rgb(240, 84, 119)`. Explicit `note-color` / `active-note-color` attributes or `.options.noteRGB` / `.options.activeNoteRGB` override those defaults; `.options.noteColor` / `.options.activeNoteColor` accept full CSS colors, including variables. The [imperative renderers](/score/api/view/) retain their separate neutral RGB defaults.
 
-Map uses [timeline](/uikit/transport-time/timeline/) tokens such as `--wm-timeline-lane-height`, `--wm-timeline-background`, `--wm-accent` and `--wm-playhead`. [Status](/uikit/layout-feedback/status/) owns the loading, waiting, empty and error appearance. A separately composed PitchView uses its own [pitch tokens](/score/element/view/score-pitch-view/).
+[Status](/uikit/layout-feedback/status/) owns the loading, waiting, empty and error appearance. A separately composed PitchView uses its own [pitch tokens](/score/element/view/score-pitch-view/).
 
-The stage/timeline frame accepts `--wm-component-background`, `--wm-component-border` (a complete border shorthand) and `--wm-component-radius`; the presenter's `--wm-stage-surface-*` or `--wm-timeline-surface-*` tokens take precedence. Set `--wm-surface: transparent` as well when clearing nested drawing surfaces. Staff, piano-roll and thumbnail SVGs have transparent drawing backgrounds.
+The stage frame accepts `--wm-component-background`, `--wm-component-border` (a complete border shorthand) and `--wm-component-radius`; the presenter's `--wm-stage-surface-*` tokens take precedence. Set `--wm-surface: transparent` as well when clearing nested drawing surfaces. Staff and piano-roll SVGs have transparent drawing backgrounds.
 
 For staff, piano-roll and waterfall, `--wm-score-view-background` overrides the stage viewport background. Otherwise it follows `--wm-stage-background`, `--wm-stage-surface-background`, `--wm-component-background`, then `--wm-surface`, with neutral `#fff` / `#111` defaults for light / dark schemes.
 
-Map density cells use `--wm-score-view-map`, falling back to `--wm-accent`. Their opacity still represents density. Explicit `.options.noteColor`, `.options.noteRGB` and `note-color` override that default, in that order. Thumbnail follows the same explicit precedence with its separate default above.
-
-All five types use live CSS paint expressions: changing a class, ancestor token or inline custom property updates the existing drawing without reloading the score or moving its cursor. These are light-DOM nodes: target `[part~="root"]` / `[part~="surface"]` on the presenter, and `[part~="drawing"]` on full note views and thumbnail, using ordinary selectors rather than shadow-DOM `::part()`.
+All three types use live CSS paint expressions: changing a class, ancestor token or inline custom property updates the existing drawing without reloading the score or moving its cursor. These are light-DOM nodes: target `[part~="root"]` / `[part~="surface"]` on the presenter, and `[part~="drawing"]` on the note views, using ordinary selectors rather than shadow-DOM `::part()`.
 
 ```css
 score-view {
@@ -404,4 +428,4 @@ score-view {
 
 ## Related
 
-[Current sounding pitches](/score/element/view/score-pitch-view/) · [Engraved sheet music](/score/element/view/score-sheet-view/) · [View API and renderers](/score/api/view/) · [Headless ScoreView](/score/headless/view/score-view/) · [Headless map navigation](/score/headless/view/score-map-view/)
+[Edit notes in a grid](/score/element/view/score-grid-view/) · [Current sounding pitches](/score/element/view/score-pitch-view/) · [Engraved sheet music](/score/element/view/score-sheet-view/) · [View API and renderers](/score/api/view/) · [Headless ScoreView](/score/headless/view/score-view/)

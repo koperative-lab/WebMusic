@@ -24,7 +24,7 @@ export function renderPianoRollVisualizer(
   config: VisualizerRenderOptions = {},
 ): ScoreVisualizerHandle {
   const noteSequence = scoreToNoteSequence(score);
-  return wrapVisualizer(noteSequence, new PianoRollSVGVisualizer(noteSequence, svg, config, score));
+  return wrapVisualizer(noteSequence, new PianoRollSVGVisualizer(noteSequence, svg, config));
 }
 
 export function renderWaterfallVisualizer(
@@ -33,7 +33,7 @@ export function renderWaterfallVisualizer(
   config: WaterfallVisualizerConfig = {},
 ): ScoreVisualizerHandle {
   const noteSequence = scoreToNoteSequence(score);
-  return wrapVisualizer(noteSequence, new WaterfallSVGVisualizer(noteSequence, container, config, score));
+  return wrapVisualizer(noteSequence, new WaterfallSVGVisualizer(noteSequence, container, config));
 }
 
 export function renderStaffVisualizer(

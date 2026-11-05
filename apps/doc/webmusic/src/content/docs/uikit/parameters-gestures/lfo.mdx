@@ -60,7 +60,7 @@ the [shared presenter shape](/uikit/api/#the-shared-presenter-shape) for the com
 | `rate` | `number` | Frequency in hertz, clamped to the native input's `0.05…12` range. |
 | `depth` | `number` | Normalized modulation depth clamped to `0…1`; scales waveform amplitude. |
 | `phase` | `number` | Normalized external cycle position clamped to `0…1`; sets the phase-head x coordinate. |
-| `running` | `boolean` | Strict `true` selects the stop glyph and accessible action. |
+| `running` | `boolean` | Strict `true` selects the pause icon, the stop accessible action and `aria-pressed="true"`. |
 | `disabled?` | `boolean` | Strict `true` disables every button and range input and dims the root. |
 
 **Binding**
@@ -105,11 +105,12 @@ the [shared presenter shape](/uikit/api/#the-shared-presenter-shape) for the com
 | `update()` | `() => void` | Re-reads and repaints through the bounded update loop. |
 | `destroy()` | `() => void` | Idempotently invalidates pending commands and removes listeners, subscription, root and stylesheet. |
 
-**Accessibility.** The root and shape set are named groups. Run is a native button with a dynamic
-accessible name; every shape is a labelled toggle button with `aria-pressed`. Rate and depth are
+**Accessibility.** The root and shape set are named groups. Run is a native icon button whose
+dynamic name is in `aria-label` and `title` and whose `aria-pressed` follows `running`; every shape is a labelled toggle button with `aria-pressed`. Rate and depth are
 native labelled ranges whose custom formatted values are mirrored in `aria-valuetext`; visible
 readouts and all SVG glyphs are hidden from assistive technology. Disabled state reaches every
-interactive node, and `:focus-visible` outlines buttons and inputs.
+interactive node and drops the root to 30% opacity, and `:focus-visible` draws a 2px outline
+inside buttons and inputs.
 
 </details>
 
@@ -123,17 +124,19 @@ Presenter-specific tokens below take precedence within their documented roles.
 The presenter installs `lfoStyle` unless `stylesheet: false`. Controls and waveform buttons
 wrap according to their container width. Range inputs can shrink below their preferred width;
 long formatted values wrap onto additional lines while the waveform keeps its configured height.
+Run is a muted, unfilled icon button that inverts to ink while running. Formatted values use mono
+type.
 Supply the exported stylesheet or your own CSS from the host when opting out.
 
-The waveform pairs `--wm-surface-inverse` with `--wm-foreground-on-inverse`.
-Ordinary surface and foreground tokens leave that inverse plot unchanged; set
-both inverse tokens or the LFO-specific background/curve tokens to replace it.
+The waveform shares the component surface below a hairline: by default its background is
+`--wm-surface` and its curve and phase head use `--wm-foreground`. Set `--wm-lfo-wave-background`
+with `--wm-lfo-wave` (and `--wm-lfo-head`) to invert it.
 
 **Tokens**
 
 | Property | Falls back to | Default | Controls |
 |---|---|---|---|
-| `--wm-lfo-height` | `--wm-control-size` → `--wui-row-h` | `2rem` | Height of the run toggle, the shape chips, and both range rails. |
+| `--wm-lfo-height` | `--wm-control-size` → `--wui-row-h` | `2rem` | Height (and run-button width) of the run toggle, the shape chips, and both range rails. |
 | `--wm-lfo-handle-size` | literal | `.7rem` | Range thumb width. Its height follows the control size. |
 | `--wm-lfo-thumb-radius` | `--wm-control-radius` | `0` | Range thumb corners. |
 | `--wm-lfo-padding` | literal | `.6rem` | Root-inset compatibility fallback. |
@@ -149,8 +152,8 @@ both inverse tokens or the LFO-specific background/curve tokens to replace it.
 | `--wm-lfo-font` | `.8rem var(--wm-font-family)` | `.8rem system-ui, sans-serif` | Root font shorthand. |
 | `--wm-font-family` | literal | `system-ui, sans-serif` | Font-family fallback. |
 | `--wm-lfo-gap` | literal | `.5rem` | Control-row gap. |
-| `--wm-lfo-button-background` | `--wm-accent` → `--wm-foreground` | `#111` | Run background and border. |
-| `--wm-lfo-button-foreground` | `--wm-accent-foreground` | `#fff` | Run glyph. |
+| `--wm-lfo-button-background` | `--wm-foreground` | `light-dark(#111, #eee)` | Run fill while running (`aria-pressed="true"`). Idle, the run button is unfilled with a `--wm-foreground-muted` icon and a `--wm-surface-muted` hover fill. |
+| `--wm-lfo-button-foreground` | `--wm-accent-foreground` | `light-dark(#fff, #111)` | Run icon while running. |
 | `--wm-lfo-shape-gap` | literal | `.25rem` | Gap between waveform buttons. |
 | `--wm-lfo-chip-border` | `--wm-control-border` → `--wm-border` | `#d8d8d8` | Inactive shape-button border. |
 | `--wm-lfo-chip-background` | `--wm-surface` | `#fff` | Inactive shape background. |
@@ -164,16 +167,12 @@ both inverse tokens or the LFO-specific background/curve tokens to replace it.
 | `--wm-control-track` | literal | `#f3f3f3` | Shared range-track fallback. |
 | `--wm-lfo-thumb` | `--wm-control-thumb` | `#111` | Range thumbs. |
 | `--wm-control-thumb` | literal | `#111` | Shared range-thumb fallback. |
-| `--wm-lfo-value` | `currentColor` | Label current color | Formatted readouts. |
+| `--wm-lfo-value` | `currentColor` | Label current color | Formatted readouts, in `--wm-font-mono`. |
 | `--wm-lfo-wave-height` | `--wm-surface-sm` | `72px` | Waveform viewport height, on the shared drawing-surface scale. |
-| `--wm-lfo-wave-background` | `--wm-surface-inverse` | `#111` | Waveform viewport. |
-| `--wm-surface-inverse` | literal | `#111` | Shared inverse-surface fallback. |
-| `--wm-lfo-wave` | `--wm-foreground-on-inverse` | `#fff` | Waveform curve. |
-| `--wm-foreground-on-inverse` | literal | `#fff` | Shared inverse-foreground fallback. |
-| `--wm-lfo-head` | `--wm-accent` | `#c0392b` | Phase head. |
-| `--wm-accent` | literal | `#c0392b` | Shared phase-accent fallback. |
-| `--wm-focus` | `--wm-focus-ring` | `currentColor` | Button/range focus outline. |
-| `--wm-focus-ring` | literal | `currentColor` | Shared focus fallback. |
+| `--wm-lfo-wave-background` | `--wm-surface` | `light-dark(#fff, #111)` | Waveform viewport; a `--wm-control-border` → `--wm-border` hairline sits above it. |
+| `--wm-lfo-wave` | `--wm-foreground` | `light-dark(#111, #eee)` | Waveform curve. |
+| `--wm-lfo-head` | `--wm-foreground` | `light-dark(#111, #eee)` | Phase head. |
+| `--wm-focus-ring` | literal | `2px solid var(--wm-foreground)` | Button/range focus outline, drawn inside. |
 
 **Classes**
 

@@ -45,7 +45,15 @@ import {
   type AudioFormat,
   type AudioPeaks,
   type WaveformDataJSON,
+  isAudioClipEditorPort,
+  type AudioClipEditorPort,
+  type AudioInteractionSession,
+  type AudioDocumentPlaybackBinding,
+  type AudioPlaybackSourceSnapshot,
 } from '../../core';
+import {observeElementSource, observeElementTarget} from '@webmusic/kernel/element';
+import {createAudioViewEditing, audioDocumentPlaybackCompatible, type AudioViewEditing} from '../headless/audio-editing';
+import {createAudioSequenceWaveform, type AudioSequenceWaveform} from '../headless/sequence-waveform';
 import {renderWaveformVisualizer} from '../render/waveform';
 import {renderSpectrogramVisualizer} from '../render/spectrogram-view';
 import {renderLoudnessMeter} from '../render/meter';
@@ -76,7 +84,6 @@ import {
   type SurfaceSliderHandle,
 } from '@webmusic/ui/stage';
 import {mountStatus, type StatusHandle, type StatusState} from '@webmusic/ui/status';
-import {observeElementTarget} from '@webmusic/kernel/element';
 
 /** The union of option bags `<audio-view>` accepts across its three types. */
 export type AudioViewOptions = WaveformRenderOptions & SpectrogramRenderOptions & MeterRenderOptions;
@@ -110,9 +117,17 @@ interface BoundPlayerFacade {
   readonly duration?: number;
   readonly playing?: boolean;
   readonly scratching?: boolean;
+  readonly documentBinding?: AudioDocumentPlaybackBinding;
+  readonly source?: AudioPlaybackSourceSnapshot;
   seek?(seconds: number): void;
   beginScratch?(): BoundScratchSession | undefined;
 }
+
+/**
+ * The renderers' zoom accepts the window start the element anchored, so the
+ * one paint at the new scale already shows the anchored window. Visualizers
+ * typed without the second parameter simply ignore it.
+ */
 
 /** Scale the renderers draw at when nothing asks for another one. */
 const DEFAULT_PIXELS_PER_SECOND = 100;
@@ -133,6 +148,8 @@ const PROPS = [
   'annotate',
   'follow',
   'scrollable',
+  'editor',
+  'interactionSession',
 ] as const;
 
 // Numeric attributes mirrored onto the renderer options bag (all NaN-safe).
@@ -196,6 +213,12 @@ const SEEK_LABEL = 'Audio position';
 
 const NO_REGIONS: readonly Region[] = Object.freeze([]);
 
+/** Announced but not drawn: instructions and explanations (Visual design → Type). */
+const VISUALLY_HIDDEN: Readonly<Partial<CSSStyleDeclaration>> = Object.freeze({
+  position: 'absolute', width: '1px', height: '1px', margin: '-1px', padding: '0', border: '0',
+  overflow: 'hidden', clipPath: 'inset(50%)', whiteSpace: 'nowrap',
+});
+
 const AUDIO_FORMATS = new Set<AudioFormat>([
   'wav',
   'aiff',
@@ -248,6 +271,16 @@ export class AudioViewElement extends WebMusicElement {
   private explicitFrequencyData?: SpectrogramData | readonly SpectrogramData[];
   private explicitRegions?: readonly Region[];
   private explicitOptions?: AudioViewOptions;
+  private explicitEditor?: AudioClipEditorPort;
+  private explicitInteractionSession?: AudioInteractionSession;
+  private editing?: AudioViewEditing;
+  /** The waveform source drawing a borrowed editor's visible content. */
+  private editorWaveform?: AudioSequenceWaveform;
+  private editorDrawnContent?: unknown;
+  private editorCleanup?: () => void;
+  private editorStateCleanup?: () => void;
+  private editorGeneration = 0;
+  private editorResolutionRevision = 0;
 
   private rendered?: RenderedAudioVisualizer;
   private renderedClip?: AudioClip;
@@ -264,16 +297,25 @@ export class AudioViewElement extends WebMusicElement {
   };
   /** A released gesture remains borrowed until playback-owned inertia settles. */
   private releasedScratch?: {session: BoundScratchSession; cleanup(): void};
+  /**
+   * An absolute (`drag-mode="seek"`) pointer drag: the press seeks at once,
+   * moves are coalesced to one seek per animation frame and release flushes
+   * the exact final position.
+   */
+  private seekDrag?: {pressed: boolean; pending?: {seconds: number; region?: Region}; last?: number};
   private dragFrame = 0;
+  /** True while a drag frame callback runs: renderers then paint synchronously. */
+  private inFrame = false;
   private seekRevision = 0;
   private viewportUnsubscribe?: () => void;
   private boundPlayer?: EventTarget;
   private playerUnbind?: () => void;
-  private stopPlayerObservation?: () => void;
-  private playerObservationRevision = 0;
+  private playerTargetCleanup?: () => void;
+  private playerTargetGeneration = 0;
   private playerSelectionError?: Error;
   private vizBinding?: {unsubscribe(): void};
   private bindingRevision = 0;
+  private presentationRevision = 0;
   private derivedClip?: AudioClip;
   private derivedPeaks?: AudioPeaks;
   private sourceToken = 0;
@@ -300,6 +342,7 @@ export class AudioViewElement extends WebMusicElement {
     this.syncBusyState();
     this.applyWidth();
     this.bindPlayer();
+    if (this.hasEditorIntent()) { this.bindEditor(); return; }
     if (this.hasAttribute('peaks-src') && !this.explicitPeaks) void this.loadPeaksSource();
     if (this.hasAttribute('src') && !this.explicitClip) void this.loadSource();
     else this.refresh();
@@ -320,10 +363,12 @@ export class AudioViewElement extends WebMusicElement {
       return;
     }
     if (name === 'src' || name === 'format') {
+      if (this.hasEditorIntent()) { this.bindEditor(); return; }
       void this.loadSource();
       return;
     }
     if (name === 'peaks-src') {
+      if (this.hasEditorIntent()) { this.bindEditor(); return; }
       void this.loadPeaksSource();
       return;
     }
@@ -369,8 +414,28 @@ export class AudioViewElement extends WebMusicElement {
     this.setAttribute('loading', loading ? 'true' : 'false');
   }
 
+  /** Borrowed document owner; the caller keeps it. Undefined detaches it. */
+  set editor(value: AudioClipEditorPort | undefined) {
+    if (value !== undefined && !isAudioClipEditorPort(value)) throw new TypeError('editor must implement AudioClipEditorPort');
+    if (value !== undefined && this.hasIndependentSource()) throw new Error('source-conflict: An editor cannot be combined with independent audio sources');
+    if (value && this.explicitInteractionSession && this.explicitInteractionSession.getSnapshot().documentId !== value.getSnapshot().documentId) throw new Error('The interaction session belongs to another document');
+    if (this.explicitEditor === value) return;
+    this.explicitEditor = value;
+    if (this.isConnected) this.bindEditor();
+  }
+  get editor(): AudioClipEditorPort | undefined { return this.editing?.editor ?? this.explicitEditor; }
+  set interactionSession(value: AudioInteractionSession | undefined) {
+    if (value && this.editor && value.getSnapshot().documentId !== this.editor.getSnapshot().documentId) throw new Error('The interaction session belongs to another document');
+    if (value === this.explicitInteractionSession) return;
+    this.explicitInteractionSession = value;
+    if (this.isConnected) this.bindEditor();
+  }
+  get interactionSession(): AudioInteractionSession | undefined { return this.editing?.session ?? this.explicitInteractionSession; }
+
   set clip(clip: AudioClip | undefined) {
-    if (clip && clip === this.explicitClip) return;
+    this.assertIndependentSource(clip);
+    // Clearing an empty source must not rebind a document view and discard its session.
+    if (clip === this.explicitClip && (clip || this.hasEditorIntent())) return;
     if (clip) {
       this.cancelClipLoad();
       this.sourceClip = undefined;
@@ -378,6 +443,7 @@ export class AudioViewElement extends WebMusicElement {
     this.explicitClip = clip;
     this.invalidateDerivedPeaks();
     if (this.isConnected) {
+      if (this.hasEditorIntent()) { this.bindEditor(); return; }
       if (!clip && this.hasAttribute('src')) void this.loadSource();
       else this.refresh();
     }
@@ -387,14 +453,16 @@ export class AudioViewElement extends WebMusicElement {
   }
 
   set peaks(peaks: AudioPeaks | undefined) {
-    if (peaks && peaks === this.explicitPeaks) return;
+    this.assertIndependentSource(peaks);
+    if (peaks === this.explicitPeaks && (peaks || this.hasEditorIntent())) return;
     if (peaks) {
       this.cancelPeaksLoad();
       this.sourcePeaks = undefined;
     }
     this.explicitPeaks = peaks;
     if (this.isConnected) {
-      if (!peaks && this.hasAttribute('peaks-src')) void this.loadPeaksSource();
+      if (this.hasEditorIntent()) this.bindEditor();
+      else if (!peaks && this.hasAttribute('peaks-src')) void this.loadPeaksSource();
       else this.refresh();
     }
   }
@@ -403,8 +471,10 @@ export class AudioViewElement extends WebMusicElement {
   }
 
   set spectrogram(spectrogram: SpectrogramData | undefined) {
+    this.assertIndependentSource(spectrogram);
+    if (spectrogram === this.explicitSpectrogram && this.hasEditorIntent()) return;
     this.explicitSpectrogram = spectrogram;
-    if (this.isConnected) this.refresh();
+    if (this.isConnected) { if (this.hasEditorIntent()) this.bindEditor(); else this.refresh(); }
   }
   get spectrogram(): SpectrogramData | undefined {
     return this.explicitSpectrogram;
@@ -417,8 +487,10 @@ export class AudioViewElement extends WebMusicElement {
    * same payload seen from the other type's point of view.
    */
   set frequencyData(data: SpectrogramData | readonly SpectrogramData[] | undefined) {
+    this.assertIndependentSource(data);
+    if (data === this.explicitFrequencyData && this.hasEditorIntent()) return;
     this.explicitFrequencyData = data;
-    if (this.isConnected) this.refresh();
+    if (this.isConnected) { if (this.hasEditorIntent()) this.bindEditor(); else this.refresh(); }
   }
   get frequencyData(): SpectrogramData | readonly SpectrogramData[] | undefined {
     return this.explicitFrequencyData;
@@ -593,13 +665,28 @@ export class AudioViewElement extends WebMusicElement {
     if (this.dragMode === 'pan') this.surfaceSlider?.update();
   }
 
-  /** Live re-scale: the renderer keeps its DOM, the timeline keeps the window. */
+  /**
+   * Live re-scale: the renderer keeps its DOM, the timeline keeps the window.
+   * The timeline anchors the zoom (the playhead while it is in view, else the
+   * window centre) and the renderer paints that anchored window directly, so
+   * its report back cannot replace the anchor with the old pixel offset.
+   */
   private applyZoom(pixelsPerSecond: number): void {
     this.surfaceSlider?.cancelGesture();
     // Final-release callbacks can reenter after UIKit released its pointer.
     this.cancelTrackGesture();
-    this.timeline.setZoom(pixelsPerSecond);
-    this.rendered?.setZoom(pixelsPerSecond);
+    const rendered = this.rendered;
+    const range = rendered && this.type !== 'meter' ? this.visibleRange() : undefined;
+    const {playheadSeconds} = this.timeline.snapshot;
+    const anchor = !range || (playheadSeconds >= range.startSeconds && playheadSeconds <= range.endSeconds)
+      ? playheadSeconds
+      : (range.startSeconds + range.endSeconds) / 2;
+    this.timeline.setZoom(pixelsPerSecond, anchor);
+    if (rendered) {
+      // A centered playhead anchors itself; the renderer ignores a start there.
+      const startSeconds = range && !this.centeredPlayhead() ? this.timeline.visibleRange().startSeconds : undefined;
+      rendered.setZoom(pixelsPerSecond, startSeconds);
+    }
     this.announceViewport();
   }
 
@@ -663,31 +750,43 @@ export class AudioViewElement extends WebMusicElement {
   private teardown(): void {
     this.cancelClipLoad();
     this.cancelPeaksLoad();
-    this.playerObservationRevision++;
-    this.stopPlayerObservation?.();
-    this.stopPlayerObservation = undefined;
+    this.playerTargetGeneration++; this.playerTargetCleanup?.(); this.playerTargetCleanup = undefined;
     this.unbindPlayer();
-    this.teardownRendered();
+    const generation = this.unbindEditor();
+    if (generation !== this.editorGeneration) return;
+    const revision = this.teardownRendered();
+    if (generation !== this.editorGeneration || revision !== this.presentationRevision) return;
     this.stage?.destroy();
     this.stage = undefined;
   }
 
-  private teardownRendered(): void {
+  private teardownRendered(): number {
+    const revision = ++this.presentationRevision;
     this.bindingRevision++;
-    this.surfaceSlider?.destroy();
+    const slider = this.surfaceSlider, viewport = this.viewportUnsubscribe;
+    const binding = this.vizBinding, rendered = this.rendered, status = this.status;
     this.surfaceSlider = undefined;
-    this.viewportUnsubscribe?.();
     this.viewportUnsubscribe = undefined;
-    this.vizBinding?.unsubscribe();
     this.vizBinding = undefined;
-    this.rendered?.dispose();
     this.rendered = undefined;
+    const editorWaveform = this.editorWaveform;
+    this.editorWaveform = undefined;
+    this.editorDrawnContent = undefined;
     this.renderedClip = undefined;
     this.renderedDuration = 0;
-    this.status?.destroy();
     this.status = undefined;
     this.host = undefined;
-    this.configureAccessibility();
+    // Cancellation can synchronously attach a newer editor or presentation.
+    // Release only the captured lifetime, never fields installed by callbacks.
+    const failures: unknown[] = [];
+    for (const cleanup of [() => slider?.destroy(), () => viewport?.(), () => binding?.unsubscribe(),
+      () => rendered?.dispose(), () => editorWaveform?.dispose(), () => status?.destroy()]) {
+      try { cleanup(); } catch (error) { failures.push(error); }
+    }
+    if (revision === this.presentationRevision) this.configureAccessibility();
+    for (const error of failures.slice(1)) console.error('[WebAudio] Audio View presentation cleanup failed', error);
+    if (failures.length) throw failures[0];
+    return revision;
   }
 
   private invalidateDerivedPeaks(): void {
@@ -696,6 +795,7 @@ export class AudioViewElement extends WebMusicElement {
   }
 
   private resolveClip(): AudioClip | undefined {
+    if (this.hasEditorIntent()) return undefined;
     if (this.explicitClip) return this.explicitClip;
     if (this.sourceClip) return this.sourceClip;
     // A wrapped player's resolved data takes precedence over a wrapper's old
@@ -817,14 +917,34 @@ export class AudioViewElement extends WebMusicElement {
    * visualization while keeping the element's stage, binding and accessibility.
    */
   protected renderStage(host: HTMLElement): void {
-    this.teardownRendered();
+    const generation = this.editorGeneration;
+    const revision = this.teardownRendered();
+    if (generation !== this.editorGeneration || revision !== this.presentationRevision) return;
     host.style.width = '100%';
     this.host = host;
 
+    if (this.hasEditorIntent()) {
+      if (!this.editing?.state.available) return this.renderUnavailable(host, this.getAttribute('data-editor-state') === 'source-conflict' ? 'Editor conflicts with an independent audio source' : 'Audio editor unavailable');
+      if (this.type !== 'waveform') return this.renderUnavailable(host, 'Waveform only', 'Sequence documents support waveform views. Render explicit audio before using a clip-only view.');
+      // A read-only follow: draw the editor's visible content (including a shared draft).
+      const state = this.editing.state;
+      const content = state.interaction.draft?.content ?? state.document.content;
+      this.editorWaveform = createAudioSequenceWaveform(content, state.document.assets);
+      this.editorDrawnContent = content;
+      this.rendered = renderWaveformVisualizer(host, this.editorWaveform, {...this.renderOptions(),
+        durationSeconds: content.length / content.sampleRate});
+      this.renderedDuration = this.resolveDuration();
+      this.syncTimeline(); this.configureAccessibility(); this.updateDocumentPlayback(); this.bindVisualizer();
+      return;
+    }
     const owner = this.boundPlayer as {loading?: boolean; loadError?: Error} | undefined;
     if (this.loading || (!this.hasIndependentData() && (owner?.loading || owner?.loadError || this.playerSelectionError))) {
       return this.renderEmpty(host);
     }
+    if (this.playerFacade()?.source?.kind === 'sequence' && !this.explicitClip && !this.sourceClip && !this.explicitPeaks && !this.sourcePeaks && this.type !== 'meter') {
+      return this.renderUnavailable(host, 'No rendered audio', 'This player contains a sequence. Bind the same editor for its waveform, or supply explicitly rendered audio.');
+    }
+
     const options = this.renderOptions();
     this.renderedClip = this.resolveClip();
     this.renderedDuration = this.resolveDuration();
@@ -893,6 +1013,23 @@ export class AudioViewElement extends WebMusicElement {
   }
 
   /**
+   * A view that cannot draw this source. The surface shows one short line;
+   * the explanation is announced with it but visually hidden (Visual design:
+   * a component surface carries no explanatory prose).
+   */
+  private renderUnavailable(host: HTMLElement, message: string, explanation?: string): void {
+    const status = this.status = mountStatus(host, {snapshot: () => ({kind: 'empty', message})}, {classNames: {root: 'wui-status--embedded'}});
+    if (explanation) {
+      const detail = host.ownerDocument.createElement('span');
+      detail.dataset.statusDetail = '';
+      Object.assign(detail.style, VISUALLY_HIDDEN);
+      detail.textContent = ` ${explanation}`;
+      status.element.append(detail);
+    }
+    this.configureAccessibility();
+  }
+
+  /**
    * Re-draw with new options without disturbing the stage.
    *
    * The renderers bake colour, height and gain into the canvas they build, so
@@ -923,7 +1060,9 @@ export class AudioViewElement extends WebMusicElement {
           const range = this.visibleRange();
           const {playheadSeconds} = this.timeline.snapshot;
           const announced = this.announcedRange;
+          const generation = this.editorGeneration, revision = this.presentationRevision + 1;
           this.renderStage(host);
+          if (generation !== this.editorGeneration || revision !== this.presentationRevision || this.host !== host) return;
           // Only the paint changed, so restore what was already announced:
           // putting the window back must not look like an external pan.
           this.announcedRange = announced;
@@ -962,78 +1101,90 @@ export class AudioViewElement extends WebMusicElement {
   // ---- Player binding (player="#id"), structural live observation + events ----
 
   private bindPlayer(): void {
-    const revision = ++this.playerObservationRevision;
-    this.stopPlayerObservation?.();
-    this.stopPlayerObservation = undefined;
-    this.unbindPlayer();
+    const generation = ++this.playerTargetGeneration;
+    this.playerTargetCleanup?.(); this.playerTargetCleanup = undefined;
     this.playerSelectionError = undefined;
     const selector = this.getAttribute('player');
+    if (!selector) { this.connectPlayer(undefined); this.updateDocumentPlayback(); return; }
     const current = (): boolean => this.isConnected &&
-      revision === this.playerObservationRevision && this.getAttribute('player') === selector;
-    if (!selector || !current()) return;
+      generation === this.playerTargetGeneration && this.getAttribute('player') === selector;
     let initial = true;
-    const stop = observeElementTarget(this, selector, (target, state) => {
+    const cleanup = observeElementTarget(this, selector, (target, state) => {
       if (!current()) return;
-      this.unbindPlayer();
-      this.boundPlayer = target;
+      const changed = target !== this.boundPlayer;
+      const previousError = this.playerSelectionError?.message;
       this.playerSelectionError = state === 'invalid' ? new Error('Invalid player selector')
         : state === 'ambiguous' ? new Error('Player selector matches multiple elements') : undefined;
-      if (target) {
-        const active = (event: Event): boolean => {
-          if (!current() || this.boundPlayer !== target || event.target !== target) return false;
-          // Owners can announce disposal before mutation delivery. Release the
-          // removed owner now instead of rebuilding from its retained clip.
-          if (target.getRootNode() !== this.getRootNode()) {
-            this.bindPlayer();
-            this.refresh();
-            return false;
-          }
-          return true;
-        };
-        const onSourceChange = (event: Event): void => {
-          // Immutable clip identity invalidates the derived cache in resolvePeaks.
-          if (active(event)) this.refresh();
-        };
-        const onLoaded = (event: Event): void => {
-          if (!active(event)) return;
-          if (!this.rendered || this.type === 'meter' ||
-              this.resolveClip() !== this.renderedClip ||
-              this.resolveDuration() !== this.renderedDuration) {
-            this.refresh();
-          } else {
-            // Graph readiness does not replace immutable data or painted focus.
-            this.bindVisualizer();
-            const seconds = this.currentSeconds();
-            this.timeline.setPlayhead(seconds);
-            this.rendered?.redraw(seconds, false);
-            this.surfaceSlider?.update();
-          }
-        };
-        const onLoadStateChange = (event: Event): void => {
-          if (active(event) && !this.hasIndependentData()) this.refresh();
-        };
-        const listeners: Array<[string, EventListener]> = [
-          ['webaudio:loadstatechange', onLoadStateChange],
-          ['webaudio:loaded', onLoaded],
-          ['webaudio:sourcechange', onSourceChange],
-          ['webaudio:playerchange', onSourceChange],
-        ];
-        // Register rollback before a custom target's subscription can throw.
-        this.playerUnbind = () => {
-          for (const [name, listener] of listeners) target.removeEventListener(name, listener);
-        };
-        for (const [name, listener] of listeners) {
-          if (!current() || this.boundPlayer !== target) break;
-          target.addEventListener(name, listener);
-        }
-      }
-      if (!current()) return;
-      if (initial) this.bindVisualizer();
-      else this.refresh();
+      this.connectPlayer(state === 'ready' ? target : undefined);
+      this.updateDocumentPlayback();
+      if (state === 'invalid') this.onViewError(this.playerSelectionError!);
+      if (!initial && (changed || previousError !== this.playerSelectionError?.message) && !this.hasEditorIntent()) this.refresh();
     });
     initial = false;
-    if (current()) this.stopPlayerObservation = stop;
-    else stop();
+    if (generation === this.playerTargetGeneration) this.playerTargetCleanup = cleanup; else cleanup();
+  }
+
+  private connectPlayer(target: Element | undefined): void {
+    if (target === this.boundPlayer) return;
+    this.unbindPlayer();
+    this.boundPlayer = target;
+    if (target) {
+      const active = (event: Event): boolean => {
+        if (!this.isConnected || this.boundPlayer !== target || event.target !== target) return false;
+        // Owners can announce disposal before mutation delivery. Release the
+        // removed owner now instead of rebuilding from its retained clip.
+        if (target.getRootNode() !== this.getRootNode()) {
+          this.bindPlayer();
+          this.refresh();
+          return false;
+        }
+        return true;
+      };
+      const onSourceChange = (event: Event): void => {
+        if (!active(event)) return;
+        if (this.hasEditorIntent()) { this.updateDocumentPlayback(); this.bindVisualizer(); return; }
+        // Immutable clip identity invalidates the derived cache in resolvePeaks.
+        // A new player using the same clip must not copy/rescan all PCM again.
+        this.refresh();
+      };
+      const onLoaded = (event: Event): void => {
+        if (!active(event)) return;
+        if (this.hasEditorIntent()) { this.updateDocumentPlayback(); this.bindVisualizer(); return; }
+        if (!this.rendered || this.type === 'meter' ||
+            this.resolveClip() !== this.renderedClip ||
+            this.resolveDuration() !== this.renderedDuration) {
+          this.refresh();
+        } else {
+          // Graph readiness changes the available transport, not immutable data.
+          // Keep the painted window/focus and bind the current player in place.
+          this.bindVisualizer();
+          const seconds = this.currentSeconds();
+          this.timeline.setPlayhead(seconds);
+          this.rendered?.redraw(seconds, false);
+          this.surfaceSlider?.update();
+        }
+      };
+      const onLoadStateChange = (event: Event): void => {
+        // An editor-bound view draws document content; player loading never rebuilds its editor.
+        if (active(event) && !this.hasEditorIntent() && !this.hasIndependentData()) this.refresh();
+      };
+      const listeners: Array<[string, EventListener]> = [
+        ['webaudio:loadstatechange', onLoadStateChange],
+        ['webaudio:loaded', onLoaded],
+        ['webaudio:sourcechange', onSourceChange],
+        ['webaudio:playerchange', onSourceChange],
+        ['webaudio:documentstatechange', onSourceChange],
+      ];
+      // Register rollback before a custom target's subscription can throw.
+      this.playerUnbind = () => {
+        for (const [name, listener] of listeners) target.removeEventListener(name, listener);
+      };
+      for (const [name, listener] of listeners) {
+        if (this.boundPlayer !== target) break;
+        target.addEventListener(name, listener);
+      }
+    }
+    this.bindVisualizer();
   }
 
   private unbindPlayer(): void {
@@ -1057,11 +1208,16 @@ export class AudioViewElement extends WebMusicElement {
     this.vizBinding = undefined;
     const rendered = this.rendered;
     if (!rendered || this.type === 'meter') return;
+    if (this.hasEditorIntent() && !this.documentPlaybackCompatible() && !this.annotate) {
+      this.updateDocumentPlayback();
+      return;
+    }
     const annotate = this.annotate;
     if (!this.boundPlayer && !annotate) return;
 
     const redraw = (seconds: number | undefined, follow: boolean | undefined, currentFrame: boolean): void => {
       if (this.rendered !== rendered || revision !== this.bindingRevision) return;
+      if (this.hasEditorIntent() && !this.documentPlaybackCompatible()) return;
       if (seconds !== undefined) this.timeline.setPlayhead(seconds);
       if (this.rendered !== rendered || revision !== this.bindingRevision) return;
       const follows = !!follow && this.shouldFollow();
@@ -1152,6 +1308,7 @@ export class AudioViewElement extends WebMusicElement {
 
   /** New track scrubs read back accepted time; legacy request events stay compatible. */
   private commitSeek(seconds: number, region?: Region, readback = false, scratch?: BoundScratchSession, audible = true): number | undefined {
+    if (this.hasEditorIntent() && !this.documentPlaybackCompatible()) return;
     if (!scratch) this.cancelReleasedScratch();
     const revision = ++this.seekRevision;
     const rendered = this.rendered;
@@ -1169,7 +1326,7 @@ export class AudioViewElement extends WebMusicElement {
       if (revision !== this.seekRevision || rendered !== this.rendered || player !== this.playerFacade()) return;
       player?.seek?.(requested);
       if (revision !== this.seekRevision || rendered !== this.rendered || player !== this.playerFacade()) return;
-      this.rendered?.redraw(requested, this.shouldFollow());
+      this.paintSeek(requested);
       this.surfaceSlider?.update();
       return requested;
     }
@@ -1183,12 +1340,24 @@ export class AudioViewElement extends WebMusicElement {
     const reported = player?.seconds ?? player?.currentTime;
     const accepted = typeof reported === 'number' && Number.isFinite(reported) ? reported : requested;
     this.timeline.setPlayhead(accepted);
-    this.rendered?.redraw(accepted, this.shouldFollow());
+    this.paintSeek(accepted);
     this.surfaceSlider?.update();
     this.dispatchEvent(
       new CustomEvent('webaudio:seek', {detail: {seconds: accepted, region}, bubbles: true, composed: true}),
     );
     return revision === this.seekRevision && rendered === this.rendered ? accepted : undefined;
+  }
+
+  /**
+   * Paint a committed seek. Inside a drag frame callback an ordinary redraw
+   * would queue yet another frame, so the offset and scroll would move this
+   * frame and the pixels the next; paint synchronously there instead.
+   */
+  private paintSeek(seconds: number): void {
+    const rendered = this.rendered;
+    if (!rendered) return;
+    if (this.inFrame && rendered.redrawFrame) rendered.redrawFrame(seconds, this.shouldFollow());
+    else rendered.redraw(seconds, this.shouldFollow());
   }
 
   private centeredPlayhead(): boolean {
@@ -1204,6 +1373,7 @@ export class AudioViewElement extends WebMusicElement {
     if (this.dragFrame) this.ownerDocument.defaultView?.cancelAnimationFrame(this.dragFrame);
     this.dragFrame = 0;
     this.trackGesture = undefined;
+    this.seekDrag = undefined;
     if (!resume) this.cancelReleasedScratch();
     if (scratch) this.finishScratch(scratch, resume);
   }
@@ -1271,8 +1441,40 @@ export class AudioViewElement extends WebMusicElement {
     if (!window) return;
     this.dragFrame = window.requestAnimationFrame(() => {
       this.dragFrame = 0;
-      try { this.flushTrackValue(mode); } catch (error) { this.reportInPlaceError(error); }
+      this.runInFrame(() => this.flushTrackValue(mode));
     });
+  }
+
+  /** Run drag work as part of the current frame; see {@link paintSeek}. */
+  private runInFrame(work: () => void): void {
+    const outer = this.inFrame;
+    this.inFrame = true;
+    try { work(); } catch (error) { this.reportInPlaceError(error); } finally { this.inFrame = outer; }
+  }
+
+  /** Coalesce absolute drag seeks: one command per frame, the latest position wins. */
+  private queueSeekValue(seconds: number, region: Region | undefined): void {
+    const drag = this.seekDrag;
+    if (!drag) return;
+    drag.pending = {seconds, region};
+    if (this.dragFrame) return;
+    const window = this.ownerDocument.defaultView;
+    if (!window) { this.flushSeekDrag(); return; }
+    this.dragFrame = window.requestAnimationFrame(() => {
+      this.dragFrame = 0;
+      this.runInFrame(() => this.flushSeekDrag());
+    });
+  }
+
+  /** Commit the pending absolute drag position, never the same one twice. */
+  private flushSeekDrag(): void {
+    const drag = this.seekDrag;
+    const pending = drag?.pending;
+    if (!drag || !pending) return;
+    drag.pending = undefined;
+    if (pending.seconds === drag.last) return;
+    drag.last = pending.seconds;
+    this.commitSeek(pending.seconds, pending.region);
   }
 
   private flushTrackValue(mode: 'scrub' | 'pan'): void {
@@ -1299,6 +1501,10 @@ export class AudioViewElement extends WebMusicElement {
   }
 
   private resolveDuration(): number {
+    if (this.hasEditorIntent()) {
+      const content = this.editing?.state.document.content;
+      return content ? content.length / content.sampleRate : 0;
+    }
     const facade = this.playerFacade();
     if (facade?.duration) return facade.duration;
     const clip = this.resolveClip();
@@ -1314,6 +1520,7 @@ export class AudioViewElement extends WebMusicElement {
 
   /** Where the playhead is: the bound player if there is one, else our own. */
   private currentSeconds(): number {
+    if (this.hasEditorIntent() && !this.documentPlaybackCompatible()) return 0;
     const facade = this.playerFacade();
     return facade?.seconds ?? facade?.currentTime ?? this.timeline.snapshot.playheadSeconds;
   }
@@ -1345,6 +1552,7 @@ export class AudioViewElement extends WebMusicElement {
       let moved = false;
       let gestureRevision = 0;
       const trackMode = mode === 'scrub' || mode === 'pan' ? mode : undefined;
+      const absoluteSeek = !annotating && mode === 'seek';
       this.surfaceSlider = mountSurfaceSlider(
         this,
         {
@@ -1380,6 +1588,7 @@ export class AudioViewElement extends WebMusicElement {
               // re-grab before terminating the previous released session.
               const coasting = trackMode === 'scrub' ? this.takeReleasedScratch() : undefined;
               this.cancelTrackGesture();
+              if (absoluteSeek) this.seekDrag = {pressed: false};
               if (trackMode) {
                 const player = this.playerFacade();
                 const gesture = this.trackGesture = {
@@ -1409,7 +1618,10 @@ export class AudioViewElement extends WebMusicElement {
             const revision = gestureRevision;
             const ending = this.trackGesture;
             try {
+              // Release commits the exact final position before the gesture
+              // ends; a cancel drops whatever was still pending.
               if (phase === 'end' && trackMode) this.flushTrackValue(trackMode);
+              else if (phase === 'end' && absoluteSeek) this.flushSeekDrag();
             } finally {
               if (revision === gestureRevision && this.trackGesture === ending) {
                 this.cancelTrackGesture(phase === 'end');
@@ -1434,6 +1646,17 @@ export class AudioViewElement extends WebMusicElement {
             const from = dragFrom;
             pendingRegion = undefined;
             dragFrom = undefined;
+            const seekDrag = absoluteSeek ? this.seekDrag : undefined;
+            if (seekDrag) {
+              // The press seeks at once (a click is still one immediate seek);
+              // every later pointer position waits for the next frame.
+              if (seekDrag.pressed) {
+                this.queueSeekValue(seconds, region);
+                return;
+              }
+              seekDrag.pressed = true;
+              seekDrag.last = seconds;
+            }
             if (annotating && from !== undefined && Math.abs(seconds - from) > 1e-3) {
               this.commitDragRegions([createRegion({
                 label: '', startSeconds: Math.min(from, seconds), endSeconds: Math.max(from, seconds),
@@ -1541,6 +1764,7 @@ export class AudioViewElement extends WebMusicElement {
   }
 
   private async loadSource(): Promise<void> {
+    if (this.hasEditorIntent()) { this.bindEditor(); return; }
     this.surfaceSlider?.cancelGesture();
     this.cancelTrackGesture();
     this.cancelClipLoad();
@@ -1584,6 +1808,7 @@ export class AudioViewElement extends WebMusicElement {
    * AudioContext, no samples, no @webmusic/audio/play import.
    */
   private async loadPeaksSource(): Promise<void> {
+    if (this.hasEditorIntent()) { this.bindEditor(); return; }
     this.surfaceSlider?.cancelGesture();
     this.cancelTrackGesture();
     this.cancelPeaksLoad();
@@ -1613,6 +1838,110 @@ export class AudioViewElement extends WebMusicElement {
       if (token === this.peaksToken) this.peaksAbort = undefined;
       this.endLoad();
     }
+  }
+
+  private hasEditorIntent(): boolean { return this.explicitEditor !== undefined; }
+
+  private hasIndependentSource(): boolean {
+    return this.explicitClip !== undefined || this.explicitPeaks !== undefined || this.explicitSpectrogram !== undefined ||
+      this.explicitFrequencyData !== undefined || this.hasAttribute('src') || this.hasAttribute('peaks-src');
+  }
+
+  private assertIndependentSource(value: unknown): void {
+    if (value !== undefined && this.hasEditorIntent()) throw new Error('source-conflict: An editor cannot be combined with independent audio sources');
+  }
+
+  /** Detach the old attachment before releasing anything that can publish. */
+  private detachEditor(): () => void {
+    const unsubscribe = this.editorStateCleanup;
+    const editing = this.editing;
+    this.editorStateCleanup = undefined;
+    this.editing = undefined;
+    return () => {
+      try { unsubscribe?.(); } finally {
+        editing?.dispose();
+      }
+    };
+  }
+
+  private unbindEditor(): number {
+    const generation = ++this.editorGeneration;
+    const discovery = this.editorCleanup;
+    this.editorCleanup = undefined;
+    const release = this.detachEditor();
+    try { discovery?.(); } finally { release(); }
+    return generation;
+  }
+
+  private bindEditor(): void {
+    const generation = this.unbindEditor();
+    const current = () => generation === this.editorGeneration && this.isConnected;
+    if (!current()) return;
+    if (!this.hasEditorIntent()) {
+      this.removeAttribute('data-editor-state'); this.removeAttribute('data-playback-state');
+      if (!current()) return;
+      if (this.hasAttribute('src') && !this.explicitClip) void this.loadSource();
+      if (!current()) return;
+      if (this.hasAttribute('peaks-src') && !this.explicitPeaks) void this.loadPeaksSource();
+      if (current()) this.refresh(); return;
+    }
+    this.cancelClipLoad();
+    if (!current()) return;
+    this.cancelPeaksLoad();
+    if (!current()) return;
+    if (this.hasIndependentSource()) {
+      this.setAttribute('data-editor-state', 'source-conflict'); if (current()) this.refresh(); return;
+    }
+    // Editors are assigned through `.editor` only; there is no selector attribute.
+    const cleanup = observeElementSource<AudioClipEditorPort>(this, {source: this.explicitEditor,
+      property: 'editor', accepts: isAudioClipEditorPort}, (resolution) => {
+      if (!current()) return;
+      // A nested sourcechange can supersede this attachment while the same
+      // discovery subscription remains active.
+      const revision = ++this.editorResolutionRevision;
+      const attached = () => current() && revision === this.editorResolutionRevision;
+      this.detachEditor()();
+      if (!attached()) return;
+      this.setAttribute('data-editor-state', resolution.state);
+      if (resolution.state === 'ready' && resolution.source) {
+        try {
+          const editing = createAudioViewEditing(resolution.source, {editable: false, interactionSession: this.explicitInteractionSession});
+          if (!attached()) { editing.dispose(); return; }
+          this.editing = editing;
+          const unsubscribe = editing.subscribe((state) => {
+            if (!attached() || editing !== this.editing) return;
+            this.setAttribute('data-editor-state', state.available ? 'ready' : 'unavailable');
+            this.timeline.setDuration(state.document.content.length / state.document.content.sampleRate);
+            if (!attached() || editing !== this.editing) return;
+            this.updateDocumentPlayback();
+            // Redraw when the visible content (an edit, undo or shared draft) or availability changes.
+            const visible = state.available ? state.interaction.draft?.content ?? state.document.content : undefined;
+            if (attached() && editing === this.editing && (!state.available || (this.editorWaveform && visible !== this.editorDrawnContent))) this.refresh();
+          });
+          if (attached() && editing === this.editing) this.editorStateCleanup = unsubscribe;
+          else { unsubscribe(); editing.dispose(); return; }
+        } catch (error) {
+          if (!attached()) return;
+          this.setAttribute('data-editor-state', 'invalid'); this.onViewError(error);
+        }
+      }
+      if (!attached()) return;
+      if (attached()) this.refresh();
+    });
+    if (current()) this.editorCleanup = cleanup; else cleanup();
+  }
+
+  private documentPlaybackCompatible(): boolean {
+    return !!this.editing && audioDocumentPlaybackCompatible(this.editing.state.document, this.playerFacade()?.documentBinding);
+  }
+
+  private updateDocumentPlayback(): void {
+    // The playback gate describes a document binding only.
+    if (!this.hasEditorIntent()) { this.removeAttribute('data-playback-state'); return; }
+    const compatible = this.documentPlaybackCompatible();
+    this.setAttribute('data-playback-state', !this.boundPlayer ? 'unbound' : compatible ? 'ready' : 'pending');
+    this.rendered?.setPlayheadVisible?.(compatible);
+    if (!compatible) this.timeline.setPlayhead(0);
   }
 }
 

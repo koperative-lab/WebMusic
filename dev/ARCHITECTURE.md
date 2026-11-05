@@ -128,17 +128,17 @@ The capability DAG is enforced by `capabilityDependencies` in
 | `core` | None |
 | `io` | `core` |
 | `view`, `play`, `analyze` | `core`, `io`; the three siblings do not import one another |
-| `react` | All Score capabilities |
+| `react` | `core`, `io`, `view`, `play`, `analyze`; editing has no React adapter yet |
 
 | Audio capability | May depend on |
 |---|---|
 | `core` | None |
 | `play` | `core` |
 | `view`, `analyze` | `core`, `play` |
-| `react` | All Audio capabilities |
+| `react` | `core`, `view`, `play`, `analyze`; editing has no React adapter yet |
 
 Audio Play exposes a stable `AudioPlayer` command facade over its selected clip,
-queue or mix backend. Linked playlist/mixer/recorder Elements compose with that
+queue, mix or document sequence backend. Linked playlist/mixer/recorder Elements compose with that
 owner; they do not add another transport presenter or clock. View retains the
 nonvisual `AudioMeterController` and the `audio-view type="meter"` projection.
 The independent `audio-meter` tag is a compact Analyze monitor beside sampled
@@ -150,6 +150,69 @@ compatibility adapter; legacy View Element imports may still register the same
 tag. This is not a blanket Analyze-to-View dependency or permission for other
 Analyze layers to import View. See [Audio Play](design/AUDIO-PLAY-COMPONENTS.md),
 [Audio Analyze](design/AUDIO-ANALYZE-COMPONENTS.md), DEC-029 and DEC-037.
+
+### Document editing in View
+
+Editing is part of View in both domains (DEC-055); there is no separate Edit
+capability. The View API root exports semantic operations, position maps,
+document contracts and Audio range-processor recipes. `/view/headless` exports
+`ScoreEditor` and `AudioClipEditor` with their URL loaders `loadScoreEditor`
+and `loadAudioClipEditor`. There is no document Element (DEC-057): applications
+own the editor and lend it through each Element's `.editor` property. Rendering and WAV export
+of an edited Audio sequence belong to the Play export API. Native Score Play,
+Audio sequence Play and the editable Views borrow the Core document ports.
+Score grid editing (`<score-grid-view>`, DEC-058) and Audio waveform editing
+share this ownership; `<score-view>` borrows an editor only to display it. The detailed contract belongs to
+[Editing components](design/EDIT-COMPONENTS.md), and [STATUS](STATUS.md), EDIT-01,
+tracks implementation.
+
+`ScoreEditor` and `AudioClipEditor` live in their domain's `view/headless` layer.
+Each is the only owner that commits its document content, identity and monotonic
+revision. Domain Core owns immutable snapshots, read/command ports and position
+maps. Play consumes these Core contracts without importing View; View surfaces
+borrow an editor through the same ports. An editor owns no player, transport or
+visual surface. Retained history roots and a player's last applied snapshot can
+coexist without creating additional commit authorities.
+
+| Editing dependency | Boundary |
+|---|---|
+| Score `view` → `core`, `io` | Editors and semantic commands reuse the domain model; `loadScoreEditor` imports the I/O loader on demand. |
+| Audio `view/headless` → `core` | Asset readers and processing services are injected through nonvisual ports. |
+| Audio `view/headless` → `play` | `loadAudioClipEditor` loads a URL with Play's `loadClipFromUrl` over the existing View-to-Play edge. |
+| Play → Core document ports | Play prepares content for sound without importing View or a concrete editor. |
+
+The default `loadAudioClipEditor` loader fixes `streaming: false`, forwards
+AbortSignal/resource limits and creates no implicit AudioContext. Native decoding
+requires an injected loader closure that borrows the caller's context.
+`forbiddenEntryReachability` keeps the View API root and Headless entries from
+reaching the Element layer. The shared pure WAV codec resides in Audio Core;
+public Play codec exports remain compatible, and sequence rendering in Play
+depends only on Core.
+
+Local history is optional and bounded to one document. Applications retain
+project-wide commands, cross-document history and persistence. Audio documents
+use shared immutable assets and contiguous segment/silence references from the
+first editor. Undo retains structural roots rather than a complete PCM copy per
+edit. Segment playback belongs to Play. Its binding owns one lazy engine/clock and
+leases; revisions adopt references without PCM reads or context creation. Bounded
+chunks are prepared only by explicit playback/preload, with a shared active/inactive
+allocation budget. The facade's source snapshot distinguishes empty/clip/sequence,
+including same-transport document revisions; a sequence exposes no fake clip.
+Local processing creates explicit
+new assets through a processing port. Export materializes output deliberately.
+Existing `Region` semantics remain cues or spans rather than clip placement.
+
+Document identity and revision are distinct from playback publication `revision`
+and source-replacement `sourceRevision`. A Play binding observes a requested
+document revision, pauses, prepares a candidate, then atomically installs it with
+the mapped transport position and remains paused. It separately acknowledges the
+applied revision; pending or failed application gates playback of stale content.
+Preparation failure preserves the committed edit, while cancellation or a newer
+transport command prevents stale asynchronous work from restoring old state.
+Position maps compose from the last applied revision to the target revision,
+including intervening undo or skipped applications; the design specifies the
+reset policy when that mapping is unavailable. No editor allocates another clock
+to hide this transition.
 
 ## Time: one authority per session
 
@@ -260,6 +323,16 @@ bindings and missing contracts. A companion owns its projection and subscription
 Play retains playback mutation and resource ownership. Data-only analysis and
 static views remain usable without a player.
 
+For an edit-enabled composition, the editor owns committed content and Play
+borrows it through the document source. View Elements gain an optional editor
+binding; on the editing Views (`<score-grid-view>`, `<score-sheet-view>`,
+`<audio-clip-view>`) `editable` enables mutation gestures against it, and
+`<score-view>` and `<audio-view>` display it read-only.
+The application creates and owns the editor (DEC-057); Elements borrow it only
+through `.editor`, with no selector attribute. The View owns neither an implicit editor
+nor the lifetime of a borrowed editor. These bindings preserve passive usage and
+report explicit content-source conflicts instead of silently switching owners.
+
 Implement the binding within the capability DAG: Score's View and Analyze must
 not import Play implementation or types. The shared Score playback-source
 contract belongs in Score core and its existing model export; Play implements it
@@ -300,6 +373,12 @@ are not public aliases. Kernel exports `/events`, `/element`, `/worker`,
 Bridge currently exports its capabilities from its package root. Exact entry sets
 are reconciled between manifests and `expectedPublicEntries`.
 
+Editing adds no entries of its own: its API, Headless and Element pieces ship
+through the existing View entries, and Audio sequence export through Play.
+Do not publish empty entries or require an unimplemented Element layer for
+symmetry. Each increment updates manifests, tsup mappings, entry and layer
+policy, composition membership, catalogs and owning references together.
+
 Non-IIFE entries use nested conditions:
 
 ```text
@@ -317,10 +396,10 @@ of import-time side effects.
 
 Packages use composite TypeScript projects, with root solution references matching
 workspace dependencies. tsup builds the artifacts; family `moduleEntries` map
-source to output, with split ESM and unsplit CJS passes. CJS worker clients use the
-defined fallback without `import.meta.url`. Kernel explicitly splits both formats
-so its root and capability entries share runtime class identity within each
-module format. Build entries and exports must match
+source to output. Kernel, Score and Audio split both their ESM and CJS passes so
+root and capability entries share one Core implementation, and therefore runtime
+class identity and error codes, within each module format. CJS worker clients use
+the defined fallback without `import.meta.url`. Build entries and exports must match
 in both directions. Relative source imports stay inside their package; cross-package
 imports use public subpaths.
 

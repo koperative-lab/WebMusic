@@ -77,6 +77,8 @@ export class AudioLiveViewElement extends HTMLElementBase {
   private boundAnalyser?: AnalyserNode;
   private readonly controller: LiveViewController = createLiveViewController();
   private presenter?: CanvasStageHandle;
+  /** Whether the mounted stage runs its frame loop: only while a source exists. */
+  private presenterAnimates = false;
   private sourceTarget?: AnalyserSource;
   private sourceLoading = false;
   private sourceError?: Error;
@@ -88,8 +90,9 @@ export class AudioLiveViewElement extends HTMLElementBase {
     upgradeProperties(this, ['analyser', 'source']);
     this.controller.setType(this.type);
     this.controller.setWindowSeconds(this.windowSeconds);
-    this.mountPresenter();
+    // Resolve first so the stage mounts once, already knowing whether it animates.
     this.resolveSource();
+    if (!this.presenter) this.mountPresenter();
   }
 
   disconnectedCallback(): void {
@@ -202,7 +205,10 @@ export class AudioLiveViewElement extends HTMLElementBase {
       }
     }
     this.controller.setAnalyser(this.analyser);
-    this.presenter?.update();
+    // Waiting for a source is idle: the stage only runs its frame loop while
+    // there is an analyser to sample, so the stage is remounted when that flips.
+    if (this.presenter && this.presenterAnimates !== (this.analyser !== undefined)) this.mountPresenter();
+    else this.presenter?.update();
   }
 
   private applySize(): void {
@@ -214,6 +220,7 @@ export class AudioLiveViewElement extends HTMLElementBase {
   private mountPresenter(): void {
     this.applySize();
     this.presenter?.destroy();
+    this.presenterAnimates = this.analyser !== undefined;
     this.presenter = mountCanvasStage(
       this,
       {
@@ -229,7 +236,7 @@ export class AudioLiveViewElement extends HTMLElementBase {
       },
       {
         label: this.getAttribute('aria-label') ?? 'Live audio',
-        animate: true,
+        animate: this.presenterAnimates,
         fallbackWidth: 320,
         fallbackHeight: numericSize(this.getAttribute('height'), 64),
         onError: (error) => {

@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import {afterEach, describe, expect, it, vi} from 'vitest';
-import {createAnalysisFader, setAnalysisStatus} from '../src/internal/analysis-controls';
+import {
+  analysisControlStyle, createAnalysisFader, setAnalysisStatus, setAnalysisStatusRegion,
+} from '../src/internal/analysis-controls';
 
 afterEach(() => document.body.replaceChildren());
 
@@ -53,16 +55,51 @@ describe('analysis fader unit mapping', () => {
   });
 });
 
-it('suppresses redundant transport prose while preserving failures and silence', () => {
+it('clears transport prose, announces informational state without drawing it, and shows only failures', () => {
   const status = document.createElement('div');
-  for (const text of ['Live', 'Paused', 'Frozen', 'Playback paused']) {
-    setAnalysisStatus(status, text);
+  for (const text of ['Live', 'Paused', 'Frozen', 'Playback paused', '']) {
+    expect(setAnalysisStatus(status, text)).toBe('none');
     expect(status.hidden).toBe(true);
     expect(status.textContent).toBe('');
+    expect(status.hasAttribute('data-analysis-quiet')).toBe(false);
   }
-  for (const text of ['Live analyser unavailable', 'Waiting for playback', 'No signal']) {
-    setAnalysisStatus(status, text);
+  for (const text of ['Waiting for playback', 'No signal', 'Listening', 'No matching edge', 'Loading audio']) {
+    expect(setAnalysisStatus(status, text)).toBe('quiet');
     expect(status.hidden).toBe(false);
     expect(status.textContent).toBe(text);
+    expect(status.hasAttribute('data-analysis-quiet')).toBe(true);
   }
+  for (const text of ['Live analyser unavailable', 'Invalid player selector', 'The audio file could not be decoded']) {
+    expect(setAnalysisStatus(status, text)).toBe('error');
+    expect(status.hidden).toBe(false);
+    expect(status.textContent).toBe(text);
+    expect(status.hasAttribute('data-analysis-quiet')).toBe(false);
+  }
+  expect(analysisControlStyle).toMatch(/:where\(\[data-analysis-quiet\]\) \{ position: absolute;/);
+});
+
+it('keeps a pending region for the shared indicator and hides an informational one only visually', () => {
+  const region = document.createElement('div');
+  const message = document.createElement('span');
+  region.append(message);
+  setAnalysisStatusRegion(region, message, 'Waiting for playback', true);
+  expect([region.hidden, region.hasAttribute('data-analysis-quiet'), message.textContent]).toEqual([false, false, '']);
+  setAnalysisStatusRegion(region, message, 'No signal', false);
+  expect([region.hidden, region.hasAttribute('data-analysis-quiet'), message.textContent]).toEqual([false, true, 'No signal']);
+  setAnalysisStatusRegion(region, message, 'Analyser unavailable', false);
+  expect([region.hidden, region.hasAttribute('data-analysis-quiet')]).toEqual([false, false]);
+  setAnalysisStatusRegion(region, message, 'Live', false);
+  expect(region.hidden).toBe(true);
+});
+
+it('lays analysis controls out as one hairline-separated row at the shared control height', () => {
+  expect(analysisControlStyle).toContain('flex-wrap: nowrap');
+  expect(analysisControlStyle).toContain('overflow-x: auto');
+  expect(analysisControlStyle).toContain('scrollbar-width: none');
+  expect(analysisControlStyle).toContain(':where(.wui-analysis-row > * + *) { border-left: 1px solid');
+  expect(analysisControlStyle).toContain('var(--wm-analysis-control-height, var(--wm-control-size');
+  expect(analysisControlStyle).not.toMatch(/1\.5rem|var\(--wm-accent, #444\)/);
+  // Every rule keeps zero specificity so application CSS wins.
+  const selectors = analysisControlStyle.replace(/\{[^}]*\}/g, '\n').split('\n').map((line) => line.trim()).filter(Boolean);
+  expect(selectors.every((selector) => selector.startsWith(':where('))).toBe(true);
 });

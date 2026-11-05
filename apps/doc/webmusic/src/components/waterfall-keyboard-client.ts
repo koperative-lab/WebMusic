@@ -52,5 +52,5 @@ export function mountWaterfallKeyboardDemo(root: HTMLElement, scope: DemoScope):
     if (scope.active) player.score = arabesqueExcerpt(score, 16);
   }).finally(() => {
     if (scope.active) player.loading = false;
-  }), () => { status.hidden = false; status.textContent = 'Could not load the Arabesque score.'; });
+  }), () => { status.hidden = false; status.textContent = 'Could not load the Arabesque score.'; status.dataset.error = ''; });
 }

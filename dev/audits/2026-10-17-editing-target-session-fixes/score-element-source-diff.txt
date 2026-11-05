@@ -1,0 +1,17 @@
+--- /tmp/webmusic-score-session-before.ts	2026-10-17 15:19:50
++++ packages/score/src/view/element/score-view.ts	2026-10-17 15:20:06
+@@ -263,7 +263,13 @@
+   set interactionSession(value: ScoreInteractionSession | undefined) {
+     if (value && this.editor && value.getSnapshot().documentId !== this.editor.getSnapshot().documentId) throw new Error('The interaction session belongs to another document');
+     this.explicitInteractionSession = value;
+-    if (this.isConnected) this.bindEditor();
++    if (this.isConnected) {
++      const generation = this.editorGeneration + 1;
++      this.bindEditor();
++      // A paused player will not publish again. Restore its current snapshot
++      // unless session cleanup superseded this attachment or disconnected us.
++      if (this.isConnected && generation === this.editorGeneration) this.bindPlayer();
++    }
+   }
+   get interactionSession(): ScoreInteractionSession | undefined { return this.explicitInteractionSession ?? this.editing?.session; }
+ 

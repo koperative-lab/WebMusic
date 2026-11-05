@@ -117,6 +117,8 @@ export interface NoteData {
 
   // --- Performed (optional override; otherwise derived from TempoMap). ---
   performed?: PerformedAttributes;
+  /** MIDI velocity 1..127, overriding performed velocity without overriding timing. */
+  velocityOverride?: number;
 
   // --- Voice / grouping ---
   voice: VoiceId;
@@ -240,6 +242,7 @@ export class Note implements Readonly<NoteData> {
   readonly tupletId?: string;
   readonly tupletMarks?: ReadonlyArray<TupletMark>;
   readonly performed?: PerformedAttributes;
+  readonly velocityOverride?: number;
   readonly voice!: VoiceId;
   readonly chord?: boolean;
   readonly beams?: ReadonlyArray<BeamMark>;
@@ -270,6 +273,10 @@ export class Note implements Readonly<NoteData> {
       throw new TypeError(`note ${data.id}: pitch must be a Pitch value`);
     }
     assertValidPerformed(data.performed);
+    if (data.velocityOverride !== undefined &&
+        (!Number.isSafeInteger(data.velocityOverride) || data.velocityOverride < 1 || data.velocityOverride > 127)) {
+      throw new RangeError('note velocityOverride must be an integer from 1 to 127');
+    }
     if (data.restDisplay !== undefined) {
       if (!data.rest || !data.restDisplay || !['A', 'B', 'C', 'D', 'E', 'F', 'G'].includes(data.restDisplay.step) ||
           !Number.isSafeInteger(data.restDisplay.octave) || data.restDisplay.octave < 0 || data.restDisplay.octave > 9) {
@@ -298,6 +305,7 @@ export class Note implements Readonly<NoteData> {
     this.tupletId = data.tupletId;
     this.tupletMarks = snapshotTupletMarks(data.tupletMarks);
     this.performed = snapshotPerformed(data.performed);
+    this.velocityOverride = data.velocityOverride;
     this.voice = data.voice;
     this.chord = data.chord;
     this.beams = snapshotBeams(data.beams);
@@ -342,9 +350,9 @@ export class Note implements Readonly<NoteData> {
     return Math.round(this.duration.quarters.toFloat() * 480);
   }
 
-  /** MIDI velocity (defaults to 80 when not performed). */
+  /** Effective MIDI velocity: explicit override, performed velocity, then 80. */
   get velocity(): number {
-    return this.performed?.velocity ?? 80;
+    return this.velocityOverride ?? this.performed?.velocity ?? 80;
   }
 
   /** Functional update — returns a new Note. */
@@ -365,6 +373,7 @@ export class Note implements Readonly<NoteData> {
       tupletId: this.tupletId,
       tupletMarks: this.tupletMarks,
       performed: this.performed,
+      velocityOverride: this.velocityOverride,
       voice: this.voice,
       chord: this.chord,
       beams: this.beams,

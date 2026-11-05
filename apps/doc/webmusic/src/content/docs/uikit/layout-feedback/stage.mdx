@@ -66,7 +66,7 @@ State because its caller draws each frame directly.
 | `fill` | `boolean` | `false` | Makes the stage and its surface fill a host with definite height. |
 | `surfaceMinWidth` | `string` | `0` | Minimum CSS width of the inner drawing. Combine with `overflow: 'auto'` to preserve readable content inside a narrower host. It does not resize the host. |
 | `background` | `string` | Stage theme (`transparent`) | CSS background color of the retained viewport. Applies behind the whole scroll viewport so long drawings retain their background after scrolling. |
-| `overflow` | `'hidden' \| 'auto' \| 'visible' \| 'clip' \| 'scroll'` | `hidden` | How the stage crops content that exceeds it. Scrolling is a mounting decision, not a theme, so it is an option rather than a `--wm-stage-overflow` write the caller has to know about. |
+| `overflow` | `'hidden' \| 'auto' \| 'visible' \| 'clip' \| 'scroll'` | `hidden` | How the stage crops content that exceeds it. Scrolling is a mounting decision, not a theme, so it is an option rather than a `--wm-stage-overflow` write the caller has to know about. A scrolling DOM stage hides its scrollbar and stays scrollable by wheel, trackpad and keyboard. |
 | `classNames` | `StageClassNames` | `{}` | Adds compatibility classes for `root` and `surface`. |
 | `parts` | `StageParts` | `{}` | Adds part tokens for `root` and `surface`. |
 | `onError` | `(error: unknown) => void` | — | Receives render, subscription, and cleanup failures. |

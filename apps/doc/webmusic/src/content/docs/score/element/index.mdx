@@ -7,15 +7,15 @@ The drop-in custom elements of `@webmusic/score` — place a tag on the page, no
 JavaScript wiring required. Each capability ships its elements from its
 `/element` subpath, so the capability root tree-shakes free of DOM code. To load
 and register them — via a CDN script, a bundler, or individual `define*` calls —
-see [Score setup](/score/#drop-in-web-components). Only `play` publishes `/auto` and
-`/global` entries; register the analyze and view tags with the `defineAll*` functions
-listed in their sections below.
+see [Score setup](/score/#drop-in-web-components). Only Play publishes `/auto`
+and `/global`. Register the analyze and view tags
+with the `define*` functions listed in their sections below.
 
 | Capability | Elements |
 | --- | --- |
 | [Play](#play) | Playing a score: the transport, a rack mixer, note input, recording and synth control. |
 | [Analyze](#analyze) | Elementary inspection: chord score/live modes, intervals, explicit scales and grouped rhythm. |
-| [View](#view) | Whole-score representations, held-pitch representations and optional sheet engraving. |
+| [View](#view) | Whole-score representations with optional editing, held-pitch representations and optional sheet engraving. |
 
 ## Play
 
@@ -116,24 +116,35 @@ subscriptions, discovery and owned analysis work, without stopping the player.
 
 ## View
 
-Three View elements group representations by the data and resources they use.
+Four View elements group representations by the data and resources they
+use.
 
 | Element | Representations | Register |
 | --- | --- | --- |
-| [`<score-view>`](/score/element/view/score-view/) | `piano-roll`, `staff`, `waterfall`, `map` and `thumbnail` over a whole Score. | `defineScoreViewElement(tag?)` |
+| [`<score-view>`](/score/element/view/score-view/) | Read-only `piano-roll`, `staff` and `waterfall` over a whole Score. | `defineScoreViewElement(tag?)` |
+| [`<score-grid-view>`](/score/element/view/score-grid-view/) | DAW-style piano-roll grid; edits a borrowed editor with a switchable toolbar. | `defineScoreGridViewElement(tag?)` |
 | [`<score-pitch-view>`](/score/element/view/score-pitch-view/) | `keyboard`, `staff` and `fretboard` for currently held MIDI pitches. | `definePitchViewElement(tag?)` |
-| [`<score-sheet-view>`](/score/element/view/score-sheet-view/) | Engraved sheet music using the optional OpenSheetMusicDisplay peer. | `defineSheetViewElement(tag?)` |
+| [`<score-sheet-view>`](/score/element/view/score-sheet-view/) | Engraved sheet music in pages or a continuous column, editable like a notation program. | `defineSheetViewElement(tag?)` |
 
-`defineAllViewElements()` from `@webmusic/score/view/element` registers all three.
+`defineAllViewElements()` from `@webmusic/score/view/element` registers all four.
 Each type stays on its owning page, with its controls in external Parameters.
-`score-view` borrows resolved score data and position; `score-pitch-view` borrows held
+`score-view` and `score-grid-view` borrow resolved score data and position; `score-pitch-view` borrows held
 notes. `score-sheet-view` requires explicit `.score` or `src` and follows player events;
 it does not borrow the player's loaded score.
+
+Editing is part of View. Load an editor with
+[`loadScoreEditor`](/score/headless/view/score-editor/#load-from-a-url) (or create
+one with `createScoreEditor`) and assign it to the `.editor` property of a player
+or view; there is no `editor` attribute. Your application owns and disposes the
+editor; borrowers release their subscriptions. Note editing belongs to
+[`<score-grid-view>`](/score/element/view/score-grid-view/);
+[`<score-view>`](/score/element/view/score-view/#follow-an-editor) follows an
+editor read-only.
 
 ```html
 <score-player id="p" src="/mxl/Arabesque%20No.1.mxl"></score-player>
 <score-view type="staff" player="#p"></score-view>
-<score-view type="map" player="#p"></score-view>
+<score-view type="waterfall" player="#p"></score-view>
 <score-pitch-view type="keyboard" player="#p" low="48" high="84"></score-pitch-view>
 ```
 
@@ -146,8 +157,10 @@ for application-owned presentation and the same data projections.
 
 Set public CSS custom properties on an element, its ancestor, or `:root`. They
 inherit into Score's UIKit presenters, including controls inside Shadow DOM.
-The default palette is mostly neutral with square corners; active notes and
-recording indicators retain their role-specific accent defaults.
+The default palette is mostly neutral with square corners; active notes keep
+their role-specific accent defaults, and recording uses the shared
+`--wm-recording` colour. Pressed icon buttons invert to `--wm-foreground` with
+`--wm-accent-foreground` content.
 
 ```css
 /* Apply to a shared wrapper, or put these declarations on one component. */
@@ -163,12 +176,16 @@ recording indicators retain their role-specific accent defaults.
   --wm-control-border: #8291a5;
   --wm-control-radius: 6px;
   --wm-focus: #146dcc;
+  --wm-focus-ring: 2px solid #146dcc;
 }
 ```
 
 `--wm-component-*` styles the outer surface. The border value is a complete CSS
 border such as `1px solid #8291a5` or `none`; `--wm-border` and
 `--wm-control-border` are colors. `--wm-component-padding` accepts CSS spacing.
+`--wm-focus-ring` is a complete outline declaration used by icon buttons and
+other controls that draw focus inside their edge; `--wm-focus` is the colour
+that older focus outlines still read.
 Presenter-specific `--wm-<presenter>-surface-*` values take precedence when a
 surface needs its own background, border, radius or padding.
 
@@ -188,6 +205,7 @@ of the component background.
 | Channel mixer | [Rack control](/score/element/play/score-rack-control/) |
 | Parameters, envelope, EQ, LFO and macros | [Synth panel](/score/element/play/score-synth-panel/) |
 | Score drawings and active notes | [Score view](/score/element/view/score-view/) |
+| Piano-roll grid and editing toolbar | [Score grid view](/score/element/view/score-grid-view/) |
 | Keyboard, staff and fretboard readouts | [Pitch view](/score/element/view/score-pitch-view/) |
 | Engraved paper and ink | [Sheet view](/score/element/view/score-sheet-view/) |
 | Live analysis | Each [Analyze component](#analyze) and its UIKit Harmony/Workbench tokens |

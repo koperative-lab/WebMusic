@@ -35,7 +35,7 @@ Buttons that each trigger a **whole chord** — diatonic triads of C major by de
 
 ## Keyboard
 
-Add the boolean `keyboard` attribute on **any** layout — Piano, Grid, or Chords — for QWERTY **musical typing**: click **▸ Click to start** to focus the surface, then `A S D F …` play white keys, `W E T Y …` black keys, **Z** / **X** shift the octave, and **Esc** blurs. Blurring releases every held note and stops listening. Enable it in the same live demo by entering a value in the **keyboard** row; clear the field to turn it off.
+Add the boolean `keyboard` attribute on **any** layout — Piano, Grid, or Chords — for QWERTY **musical typing**: press the **Musical typing** keyboard icon button in the surface's top bar (or click or Tab to the surface) to focus it, then `A S D F …` play white keys, `W E T Y …` black keys, **Z** / **X** shift the octave, and **Esc** blurs. Blurring releases every held note and stops listening. Enable it in the same live demo by entering a value in the **keyboard** row; clear the field to turn it off.
 
 ## Import
 
@@ -99,7 +99,11 @@ payload. Reconnecting mounts fresh interaction state with no held notes.
 <summary>Styling</summary>
 
 The host follows its available width and respects native `hidden`. Piano and grid layouts keep
-readable key sizes in an internal horizontal viewport; chord buttons wrap into rows. In
+readable key sizes in an internal horizontal viewport; chord buttons sit in one row that scrolls
+sideways. These scrolling regions hide their scrollbars. Grid pads and chord buttons form a
+hairline grid, unfilled until pressed. With `keyboard`, a one-row bar along the top holds the
+Musical typing toggle (`aria-pressed` while the surface has focus) and the octave readout; the
+typing instructions are visually hidden. In
 `keyboard` mode, Left/Right scroll that viewport without releasing held notes. Without it,
 focus the viewport for native keyboard scrolling. Changing container width does not remount
 the surface.
@@ -117,25 +121,23 @@ Key fills resolve through `--wm-note-key` / `--wm-surface` and
 These variables remain live when the layout changes.
 
 After the explicit legacy border override, neutral key and pad outlines resolve through
-`--wm-note-border` → `--wm-control-border` → `--wm-border` → `#d8d8d8`. Black piano keys retain their separate
-`--wm-note-key-alt-border` outline.
+`--wm-note-border` → `--wm-control-border` → `--wm-border` → `light-dark(#d8d8d8, #333)`. Black piano keys retain their separate
+`--wm-note-key-alt-border` outline. The presenter no longer has a click-to-start overlay or a filled start
+button, so the legacy overlay and start-button aliases have no visible effect.
 
 ```css
 score-note-input {
-  --note-input-bg: #fff;
-  --note-input-surface: #f3f3f3;       /* grid cells */
-  --note-input-key: #fff;              /* white keys */
-  --note-input-key-alt: #222;          /* black keys / chord buttons */
-  --note-input-active: #444;           /* held highlight */
-  --note-input-border: #d8d8d8;
-  --note-input-height: 120px;          /* piano height */
-  --note-input-cell-height: 42px;      /* grid / chords */
-  --note-input-gap: 0.4rem;
+  --note-input-bg: light-dark(#fff, #111);
+  --note-input-surface: light-dark(#fff, #111);     /* grid pads and chord buttons */
+  --note-input-key: light-dark(#fff, #111);         /* white keys */
+  --note-input-key-alt: #222;                       /* black keys */
+  --note-input-active: light-dark(#444, #bbb);      /* held highlight */
+  --note-input-border: light-dark(#d8d8d8, #333);
+  --note-input-height: 120px;                       /* piano height */
+  --note-input-cell-height: 42px;                   /* grid / chords */
+  --note-input-gap: 1px;                            /* hairline between pads */
   --note-input-radius: 0;
-  --note-input-focus: #444;           /* keyboard-mode focus ring */
-  --note-input-overlay: rgba(255, 255, 255, 0.82); /* keyboard click-to-start veil */
-  --note-input-accent: #111;           /* keyboard start button */
-  --note-input-accent-color: #fff;
+  --note-input-focus: light-dark(#444, #ccc);       /* keyboard-mode focus ring */
 }
 ```
 

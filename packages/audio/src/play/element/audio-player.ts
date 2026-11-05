@@ -36,7 +36,8 @@
 // CSS vars: --wap-bg --wap-fg --wap-accent --wap-track --wap-radius --wap-height
 // ============================================================================
 
-import type {AudioClip, Region} from '../../core';
+import {AudioDocumentApplicationError, isAudioDocumentSource, type AudioDocumentSource, type AudioDocumentPlaybackBinding, type AudioDocumentRevision, type AudioDocumentApplicationResult, type AudioPlaybackSourceSnapshot, type AudioClip, type Region} from '../../core';
+import {observeElementSource} from '@webmusic/kernel/element';
 import {AudioPlayer, type AudioPlayerOptions, type AudioPlayerTransport} from '../headless/audio-player';
 import type {AudioScratchSession, PlayerEngineKind} from '../headless/player';
 import type {Effect} from '../core/effect';
@@ -51,7 +52,7 @@ import {
 import {parseLoopAttr} from '../core/format';
 import {browserMediaAdapterFactory} from './internal/browser-media-adapter';
 import {getAudioContextConstructor} from '@webmusic/kernel/audio-context';
-import type {TransportClockReader} from '@webmusic/kernel/transport';
+import type {TempoClock, TempoGrid, TransportClockReader} from '@webmusic/kernel/transport';
 import {mountStatus, type StatusHandle, type StatusState} from '@webmusic/ui/status';
 import {
   mountTransport,
@@ -59,7 +60,7 @@ import {
   type TransportHandle,
 } from '@webmusic/ui/transport';
 
-const PROPS = ['loading', 'clip', 'player', 'effect', 'audioContext'] as const;
+const PROPS = ['loading', 'clip', 'player', 'effect', 'audioContext', 'editor'] as const;
 
 /** Attributes that reach a live player through a setter — owned or borrowed. */
 const LIVE_ATTRIBUTES = ['volume', 'rate', 'pan', 'loop', 'preserves-pitch'] as const;
@@ -75,10 +76,7 @@ export interface AudioPlayerSeekDetail {
 }
 
 /** Resolved source replacement; independent of lazy audio-graph readiness. */
-export interface AudioPlayerElementSourceDetail {
-  clip: AudioClip | undefined;
-  revision: number;
-}
+export type AudioPlayerElementSourceDetail = AudioPlaybackSourceSnapshot;
 
 export class AudioPlayerElement extends WebMusicElement {
   static get observedAttributes(): string[] {
@@ -98,6 +96,18 @@ export class AudioPlayerElement extends WebMusicElement {
   }
 
   protected root?: ShadowRoot;
+  private explicitEditor?: AudioDocumentSource;
+  private selectedEditor?: AudioDocumentSource;
+  private releaseEditorDiscovery?: () => void;
+  private editorGeneration = 0;
+  private documentError?: Error;
+  /** False while a declaration is pending (missing target, still loading): playback stays blocked without an error report. */
+  private documentFault = false;
+  /** The owned player rejected the resolved editor (pitch preservation); its setting change retries. */
+  private attachFailed = false;
+  /** `preload` waits for a new attachment's first applied revision. */
+  private documentPreloadPending = false;
+  private announcedNativeRevision = -1;
   private _clip?: AudioClip;
   private _player?: AudioPlayer;
   private _effect?: Effect;
@@ -140,6 +150,7 @@ export class AudioPlayerElement extends WebMusicElement {
     if (!this.root) this.root = this.attachShadow({mode: 'open'});
     this.render();
     if (!this._player) this.rebuildPlayer();
+    if (this.hasEditorSource()) this.bindEditor();
     this.applySource();
     this.applyAttributes();
   }
@@ -166,6 +177,11 @@ export class AudioPlayerElement extends WebMusicElement {
       this.updateLoadFeedback();
       return;
     }
+    if (name === 'src' && this.hasEditorSource()) {
+      // A removed src no longer conflicts once its loaded clip is released.
+      if (name === 'src' && !value && this.clipOrigin === 'src') this.clearLoadedClip();
+      this.bindEditor(); return;
+    }
     if (name === 'src') {
       if (value) {
         void this.loadFromSrc(value);
@@ -179,6 +195,7 @@ export class AudioPlayerElement extends WebMusicElement {
       return;
     }
     if (name === 'format' || name === 'engine') {
+      if (this.hasEditorSource()) { this.bindEditor(); return; }
       // Both decide how bytes become a clip, so they can only land via a reload.
       const src = this.getAttribute('src');
       if (src) void this.loadFromSrc(src);
@@ -193,18 +210,21 @@ export class AudioPlayerElement extends WebMusicElement {
       return;
     }
     this.applyPlayerAttribute(name);
+    if (name === 'preserves-pitch' && this.attachFailed) this.bindEditor();
   }
 
   // --- public properties ---
 
   set clip(clip: AudioClip | undefined) {
+    if (clip !== undefined && this.hasEditorSource()) throw this.sourceConflict();
     this.cancelLoad();
     this._clip = clip;
     this.clipOrigin = clip ? 'property' : null;
     this.loadedSrc = undefined;
-    if (this._player) { this._player.setClip(clip); this.applyPreload(); }
+    if (this._player) { if (!this.boundToDocument()) this._player.setClip(clip); this.applyPreload(); }
     else if (this.isConnected) this.rebuildPlayer();
     this.announceSource();
+    this.recoverEditor();
   }
   get clip(): AudioClip | undefined {
     return this._player ? this._player.clip : this._clip;
@@ -214,17 +234,21 @@ export class AudioPlayerElement extends WebMusicElement {
 
   /** Connect a borrowed queue or mix without transferring its lifecycle. */
   setTransport(transport: AudioPlayerTransport | undefined): void {
+    if (transport && this.hasEditorSource()) throw this.sourceConflict();
     this.cancelLoad();
     if (!this._player) this.rebuildPlayer();
     this._clip = undefined;
     this.clipOrigin = null;
     this.loadedSrc = undefined;
-    this._player?.setTransport(transport);
+    // The document's own sequence transport follows `editor`; only a borrowed backend is detached here.
+    if (!this.boundToDocument()) this._player?.setTransport(transport);
     this.announceSource();
+    this.recoverEditor();
   }
   get transport(): AudioPlayerTransport | undefined { return this._player?.transport; }
 
   set player(player: AudioPlayer | undefined) {
+    if (player && this.hasEditorSource()) throw this.sourceConflict();
     if (player === this._player && (player !== undefined || this._clip === undefined)) return;
     this.cancelLoad();
     this.releasePlayer();
@@ -242,6 +266,8 @@ export class AudioPlayerElement extends WebMusicElement {
     this.notifyUI();
     this.announceSource();
     this.dispatch('playerchange', {player: this._player});
+    // Clearing the player keeps a configured editor bound through a fresh owned player.
+    if (!player && this.isConnected && this.hasEditorSource()) this.bindEditor();
   }
   get player(): AudioPlayer | undefined {
     return this._player;
@@ -255,6 +281,111 @@ export class AudioPlayerElement extends WebMusicElement {
     return this._effect;
   }
 
+  /** Borrow a read-only document port; the caller keeps it. Undefined detaches it. */
+  set editor(source: AudioDocumentSource | undefined) {
+    if (source !== undefined && !isAudioDocumentSource(source)) throw new AudioDocumentApplicationError('invalid-source', 'Expected an AudioDocumentSource');
+    if (source && this.hasIndependentSource()) throw this.sourceConflict();
+    this.explicitEditor = source;
+    if (this.isConnected) this.bindEditor();
+  }
+  get editor(): AudioDocumentSource | undefined { return this.explicitEditor ?? this.selectedEditor; }
+  get documentBinding(): AudioDocumentPlaybackBinding {
+    const state = this._player?.documentBinding ?? {status: 'empty' as const, attempt: 0, documentCoordinates: false};
+    if (!this.documentError) return state;
+    return this.documentFault ? {...state, status: 'error', documentCoordinates: false, error: this.documentError}
+      : {status: 'empty', attempt: state.attempt, documentCoordinates: false};
+  }
+  get source(): AudioPlaybackSourceSnapshot {
+    if (this._player) return {...this._player.source, revision: this.sourceRevision};
+    // Without a player (disconnected, or before mount) the retained `.clip` is still the selected data.
+    return this._clip ? {kind: 'clip', clip: this._clip, revision: this.sourceRevision} : {kind: 'empty', clip: undefined, revision: this.sourceRevision};
+  }
+  waitForDocumentRevision(target: AudioDocumentRevision): Promise<AudioDocumentApplicationResult> {
+    if (this.documentError || !this._player) return Promise.resolve({status: 'failed', target, attempt: this.documentBinding.attempt,
+      error: this.documentError ?? new AudioDocumentApplicationError('not-ready', 'Player unavailable')});
+    return this._player.waitForDocumentRevision(target);
+  }
+  retryDocumentApplication(): Promise<AudioDocumentApplicationResult> {
+    if (this.documentError || !this._player) return Promise.resolve({status: 'failed', attempt: this.documentBinding.attempt,
+      error: this.documentError ?? new AudioDocumentApplicationError('not-ready', 'Player unavailable')});
+    return this._player.retryDocumentApplication();
+  }
+  private hasEditorSource(): boolean { return this.explicitEditor !== undefined; }
+  private hasIndependentSource(): boolean {
+    return this.hasAttribute('src') || this._clip !== undefined || Boolean(this._player && !this.ownsPlayer) ||
+      Boolean(this._player?.transport && !this._player.documentSource);
+  }
+  private sourceConflict(): AudioDocumentApplicationError {
+    return new AudioDocumentApplicationError('source-conflict', 'An editor cannot be combined with src, clip, player or transport');
+  }
+  /** Source-clearing calls must not detach this element's own document binding. */
+  private boundToDocument(): boolean { return this.hasEditorSource() && this.ownsPlayer && this._player?.documentSource !== undefined; }
+  /** Re-resolve the editor once the independent source that caused a conflict is gone. */
+  private recoverEditor(): void {
+    const error = this.documentError;
+    if (this.isConnected && this.hasEditorSource() && error instanceof AudioDocumentApplicationError &&
+        error.code === 'source-conflict' && !this.hasIndependentSource()) this.bindEditor();
+  }
+  /** Attach the resolved editor to the owned player; a rejection stays unavailable until reconfigured. */
+  private attachDocument(source: AudioDocumentSource): void {
+    const player = this._player;
+    if (!player || !this.ownsPlayer) return;
+    if (player.documentSource !== source) this.documentPreloadPending = true;
+    try { player.setDocumentSource(source); }
+    catch (error) {
+      if (this._player !== player) return;
+      this.documentError = error instanceof Error ? error : new Error(String(error)); this.documentFault = true; this.attachFailed = true;
+      this.setAttribute('data-editor-state', 'error');
+      this.dispatch('documentstatechange', this.documentBinding);
+      this.onPlayerError(error); this.notifyUI();
+    }
+  }
+  private bindEditor(): void {
+    const generation = ++this.editorGeneration;
+    this.releaseEditorDiscovery?.(); this.releaseEditorDiscovery = undefined;
+    this.selectedEditor = undefined; this.attachFailed = false;
+    if (!this.hasEditorSource()) {
+      this.documentError = undefined; this.documentFault = false;
+      if (this.ownsPlayer) this._player?.setDocumentSource(undefined);
+      this.removeAttribute('data-editor-state');
+      this.applySource(); this.notifyUI(); return;
+    }
+    this.cancelLoad();
+    // Editors are assigned through `.editor` only; there is no selector attribute.
+    const cleanup = observeElementSource(this, {source: this.explicitEditor,
+      property: 'editor', accepts: isAudioDocumentSource}, (resolution) => {
+      if (!this.isConnected || generation !== this.editorGeneration) return;
+      this.selectedEditor = resolution.source;
+      // A target not inserted yet and a declaration still loading are pending;
+      // only a conflict or an unusable (empty, invalid, ambiguous) selection is an error.
+      const conflict = this.hasIndependentSource();
+      const state = resolution.state === 'missing' && !this.explicitEditor ? 'invalid' : resolution.state;
+      const error = conflict ? this.sourceConflict() :
+        state !== 'ready' ? new AudioDocumentApplicationError('not-ready', `Audio editor is ${state}`) : undefined;
+      this.documentError = error;
+      this.documentFault = conflict || state === 'invalid' || state === 'ambiguous';
+      if (error) {
+        // A caller-owned player keeps its own source and playback state.
+        if (this.ownsPlayer) { this._player?.pause(); this._player?.setDocumentSource(undefined); }
+        if (generation !== this.editorGeneration) return;
+        this.setAttribute('data-editor-state', conflict ? 'source-conflict' : state);
+        this.dispatch('documentstatechange', this.documentBinding);
+        if (this.documentFault) this.onPlayerError(error);
+        this.notifyUI(); return;
+      }
+      // A rebuilt player attaches the selected editor itself.
+      if (!this._player) this.rebuildPlayer();
+      else if (resolution.source) this.attachDocument(resolution.source);
+      if (generation !== this.editorGeneration || this.documentError) return;
+      this.setAttribute('data-editor-state', this.documentBinding.status);
+      this.dispatch('documentstatechange', this.documentBinding);
+      this.notifyUI(); this.announceSource();
+    });
+    if (generation === this.editorGeneration && this.isConnected) this.releaseEditorDiscovery = cleanup;
+    else cleanup();
+  }
+  private assertSourceAvailable(): void { if (this.documentError) throw this.documentError; }
+
   // --- transport passthroughs ---
 
   /**
@@ -263,6 +394,7 @@ export class AudioPlayerElement extends WebMusicElement {
    * (or a player and a score) line up on one downbeat. Omitted starts now.
    */
   async play(when?: number): Promise<void> {
+    this.assertSourceAvailable();
     await this._player?.play(when);
     this.notifyUI();
   }
@@ -284,32 +416,38 @@ export class AudioPlayerElement extends WebMusicElement {
    * second time would echo the view's own event back at it.
    */
   seek(seconds: number): void {
+    this.assertSourceAvailable();
     this._player?.seek(seconds);
     this.notifyUI();
   }
 
   seekFraction(fraction: number): void {
+    this.assertSourceAvailable();
     this._player?.seekFraction(fraction);
     this.notifyUI();
   }
 
   /** Begin audible scrubbing when the current player owns decoded PCM. */
   beginScratch(): AudioScratchSession | undefined {
+    this.assertSourceAvailable();
     return this._player?.beginScratch();
   }
 
   scrub(deltaSeconds: number): void {
+    this.assertSourceAvailable();
     this._player?.scrub(deltaSeconds);
     this.notifyUI();
   }
 
   /** Warm the context, the graph and the decoded buffer / media element. */
   async preload(): Promise<void> {
+    this.assertSourceAvailable();
     await this._player?.preload();
   }
 
   /** Allow imperative `el.load(buffer)` for non-URL inputs. */
   async load(input: ArrayBuffer | Blob): Promise<void> {
+    if (this.hasEditorSource()) throw this.sourceConflict();
     const {token, controller} = this.beginLoad();
     try {
       const context = this.decodeContext();
@@ -372,6 +510,16 @@ export class AudioPlayerElement extends WebMusicElement {
     return this._player?.clock;
   }
 
+  /** Constant-tempo grid of the playing content (the document's beat grid or the clip's), on the clock's axis. */
+  get tempoGrid(): TempoGrid | undefined {
+    return this._player?.tempoGrid;
+  }
+
+  /** {@link clock} read in beats of {@link tempoGrid}; undefined without either. */
+  get tempoClock(): TempoClock | undefined {
+    return this._player?.tempoClock;
+  }
+
   /** The player's analyser, for `<audio-meter>`. Reading it builds the graph. */
   get analyser(): AnalyserNode | undefined {
     return this._player?.analyser;
@@ -395,7 +543,7 @@ export class AudioPlayerElement extends WebMusicElement {
         progress: this._player?.progress ?? 0,
         seconds: this._player?.seconds ?? 0,
         duration: this._player?.duration ?? this._clip?.duration ?? 0,
-        disabled: !this._player || (!this._player.clip && !this._player.transport),
+        disabled: Boolean(this.documentError) || (this.hasEditorSource() && this.documentBinding.status !== 'ready') || !this._player || (!this._player.clip && !this._player.transport),
       }),
       play: () => this.play(),
       pause: () => this.pause(),
@@ -426,6 +574,9 @@ export class AudioPlayerElement extends WebMusicElement {
   }
 
   protected teardown(): void {
+    this.editorGeneration++;
+    this.releaseEditorDiscovery?.(); this.releaseEditorDiscovery = undefined;
+    this.selectedEditor = undefined; this.documentError = undefined; this.documentFault = false; this.attachFailed = false; this.documentPreloadPending = false;
     this.cancelLoad();
     this.cancelScheduledRender();
     this.releasePlayer();
@@ -495,7 +646,7 @@ export class AudioPlayerElement extends WebMusicElement {
     this._clip = undefined;
     this.clipOrigin = null;
     this.loadedSrc = undefined;
-    this._player?.setClip(undefined);
+    if (!this.boundToDocument()) this._player?.setClip(undefined);
     this.announceSource();
   }
 
@@ -590,7 +741,7 @@ export class AudioPlayerElement extends WebMusicElement {
     if (!force && this._player) {
       const previousCommit = this.sourceCommit;
       this.sourceCommit = {clip: this._clip};
-      try { this._player.setClip(this._clip); }
+      try { if (!this.hasEditorSource()) this._player.setClip(this._clip); }
       finally { this.sourceCommit = previousCommit; }
       this.applyPreload();
       this.paint();
@@ -617,6 +768,7 @@ export class AudioPlayerElement extends WebMusicElement {
     this.playerEngine = engine;
     this.ownsPlayer = true;
     this.attachPlayer();
+    if (this.selectedEditor && !this.documentError) this.attachDocument(this.selectedEditor);
     this.announceSource();
     this.dispatch('playerchange', {player: this._player});
   }
@@ -628,6 +780,13 @@ export class AudioPlayerElement extends WebMusicElement {
     // before the mount pass reaches it.
     this.releaseListeners();
     this.selectedTransport = player.transport;
+    this.offFns.push(player.on('documentstatechange', (detail) => {
+      if (this._player !== player) return;
+      if (!this.documentError) this.setAttribute('data-editor-state', detail.status);
+      this.dispatch('documentstatechange', this.documentBinding); this.notifyUI();
+      // Sequence preload needs applied content, so it waits for the attachment's first ready revision.
+      if (this._player === player && detail.status === 'ready' && this.documentPreloadPending) { this.documentPreloadPending = false; this.applyPreload(); }
+    }));
     this.offFns.push(player.on('sourcechange', () => {
       if (this._player !== player) return;
       const transport = player.transport;
@@ -703,6 +862,7 @@ export class AudioPlayerElement extends WebMusicElement {
    * src that changed and one that was removed.
    */
   private applySource(): void {
+    if (this.hasEditorSource()) return;
     const src = this.getAttribute('src');
     if (src) {
       const stale = this.clipOrigin === 'src' && this.loadedSrc !== src;
@@ -774,6 +934,8 @@ export class AudioPlayerElement extends WebMusicElement {
     const raw = this.getAttribute('preload');
     if (raw === null || raw.trim().toLowerCase() === 'none') return;
     if (!boolAttr(this, 'preload')) return;
+    // A blocked editor binding preloads after its first applied revision instead.
+    if (this.documentError) return;
     void this.preload().catch((error: unknown) => this.onPlayerError(error));
   }
 
@@ -858,6 +1020,7 @@ export class AudioPlayerElement extends WebMusicElement {
    * mirror the playhead (a bound <audio-view>, an analytics listener).
    */
   private commitUserSeek(fraction: number): void {
+    this.assertSourceAvailable();
     const player = this._player;
     if (!player) return;
     player.seekFraction(fraction);
@@ -884,11 +1047,14 @@ export class AudioPlayerElement extends WebMusicElement {
   private announceSource(): void {
     const clip = this.clip;
     const player = this._player;
-    if (clip === this.announcedClip && player === this.announcedPlayer) return;
+    const nativeRevision = player?.source.revision ?? -1;
+    if (clip === this.announcedClip && player === this.announcedPlayer && nativeRevision === this.announcedNativeRevision) return;
+    this.announcedNativeRevision = nativeRevision;
     // Commit before notifying: a listener can select a newer source immediately.
     this.announcedClip = clip;
     this.announcedPlayer = player;
-    const detail: AudioPlayerElementSourceDetail = {clip, revision: ++this.sourceRevision};
+    this.sourceRevision++;
+    const detail: AudioPlayerElementSourceDetail = this.source;
     this.dispatch('sourcechange', detail);
   }
 

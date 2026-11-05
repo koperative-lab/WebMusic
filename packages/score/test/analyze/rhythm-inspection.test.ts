@@ -12,6 +12,27 @@ import {
 import {inspectScoreRhythm} from '../../src/analyze/core/rhythm-inspection';
 
 describe('inspectScoreRhythm', () => {
+  it('reports effective velocity overrides without manufacturing performed evidence', () => {
+    const builder = new ScoreBuilder();
+    const partId = builder.addPart({id: builder.newPartId(), name: 'Part'});
+    const voice = builder.newVoiceId();
+    builder.addNote(partId, {
+      id: NoteId('performed'), pitch: Pitch.parse('C4'), voice,
+      onsetQuarters: Rational.ZERO, duration: Duration.quarter(),
+      performed: {onsetSec: 0.04, durationSec: 0.4, velocity: 106}, velocityOverride: 40,
+    });
+    builder.addNote(partId, {
+      id: NoteId('written'), pitch: Pitch.parse('D4'), voice,
+      onsetQuarters: Rational.ONE, duration: Duration.quarter(), velocityOverride: 95,
+    });
+    const inspection = inspectScoreRhythm(builder.build());
+    expect(inspection.onsets[0].performed).toEqual([{
+      noteId: 'performed', onsetSeconds: 0.04, deviationSeconds: 0.04, velocity: 40,
+    }]);
+    expect(inspection.onsets[1].performed).toEqual([]);
+    expect(inspection.summary.performedCount).toBe(1);
+  });
+
   it('reports exact offbeat placement, authored accents and optional performance evidence', () => {
     const builder = new ScoreBuilder();
     const melody = PartId('melody');

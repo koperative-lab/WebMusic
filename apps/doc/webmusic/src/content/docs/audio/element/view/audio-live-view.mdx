@@ -2,7 +2,7 @@
 title: '<audio-live-view>'
 description: 'A scrolling projection of a live AnalyserNode — waveform or spectrogram — with the newest column pinned to the right edge and history sliding left.'
 sidebar:
-  order: 2
+  order: 3
 ---
 
 import AudioLiveViewPlayground from '../../../../../components/elements/AudioLiveViewPlayground.astro';
@@ -54,7 +54,8 @@ The node is **borrowed**. This element never creates, mutates or disposes it, so
 | `webaudio:error` | event | — | `detail = { error }` if presenter sizing/animation or the draw adapter fails. `{ bubbles, composed }`. |
 
 The `CanvasStage` requests an initial draw and, when `requestAnimationFrame` is available, captures
-one column per frame while connected. It cancels its animation and resize observer on disconnect;
+one column per frame while connected to a resolved analyser; without one it stays idle. A spectrogram
+repaints only its newest column each frame. It cancels its animation and resize observer on disconnect;
 hosts without RAF get the initial draw but no Element-owned timer fallback.
 
 The shared status overlay shows a quiet square waiting animation until an analyser and its

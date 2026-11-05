@@ -719,3 +719,40 @@ describe('playlist selection companion', () => {
     expect(binding.subscribers.size).toBe(0);
   });
 });
+
+describe('playlist visual contract', () => {
+  it('renders named icon buttons and swaps the toggle icon without glyph text', async () => {
+    const binding = new FakePlaylist();
+    const {handle} = mount(binding);
+    const {previous, toggle, next} = handle.controls;
+    for (const [button, name] of [[previous, 'Previous'], [toggle, 'Play'], [next, 'Next']] as const) {
+      expect(button.textContent).toBe('');
+      expect(button.getAttribute('aria-label')).toBe(name);
+      expect(button.title).toBe(name);
+      expect(button.querySelector('svg[data-icon]')?.getAttribute('aria-hidden')).toBe('true');
+    }
+    const playIcon = toggle.querySelector('svg')!.innerHTML;
+    toggle.click();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(toggle.getAttribute('aria-pressed')).toBe('true');
+    expect(toggle.getAttribute('aria-label')).toBe('Pause');
+    expect(toggle.title).toBe('Pause');
+    expect(toggle.querySelector('svg')!.innerHTML).not.toBe(playIcon);
+    const pauseSvg = toggle.querySelector('svg');
+    binding.notify();
+    expect(toggle.querySelector('svg')).toBe(pauseSvg);
+    expect(handle.controls.item('a')!.getAttribute('aria-current')).toBe('true');
+    handle.destroy();
+  });
+
+  it('styles an unwrapped icon row, inverted current entry and mono durations', () => {
+    expect(playlistStyle).toContain('flex-wrap: nowrap');
+    expect(playlistStyle).toContain('scrollbar-width: none');
+    expect(playlistStyle).toMatch(/:where\(\.wui-playlist__bar\) \{[^}]*border-bottom: 1px solid/);
+    expect(playlistStyle).toMatch(/:where\(\.wui-playlist__item\[aria-current="true"\]\) \{[^}]*var\(--wm-foreground/);
+    expect(playlistStyle).not.toContain('rgba(17, 17, 17, .08)');
+    expect(playlistStyle).toMatch(/:where\(\.wui-playlist__number, \.wui-playlist__duration\) \{[^}]*--wm-font-mono/);
+    expect(playlistStyle).toMatch(/:where\(\.wui-playlist\[aria-disabled="true"\] \.wui-playlist__item\) \{[^}]*opacity: \.3/);
+  });
+});

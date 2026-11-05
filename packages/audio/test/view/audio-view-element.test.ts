@@ -354,11 +354,25 @@ describe('<audio-view> viewport', () => {
     expect(view.visibleRange()).toEqual({startSeconds: 7, endSeconds: 9});
     expect(events).toHaveLength(2);
 
-    // Zooming in halves the window and is announced too.
+    // Zooming in halves the window around its centre (the playhead at 0 is
+    // out of view) and is announced too.
     view.setZoom(200);
     expect(view.zoom).toBe(200);
-    expect(view.visibleRange()).toEqual({startSeconds: 7, endSeconds: 8});
-    expect(events.at(-1)).toEqual({startSeconds: 7, endSeconds: 8});
+    expect(view.visibleRange()).toEqual({startSeconds: 7.5, endSeconds: 8.5});
+    expect(events.at(-1)).toEqual({startSeconds: 7.5, endSeconds: 8.5});
+    expect(lastVisualizer().setZoom).toHaveBeenLastCalledWith(200, 7.5);
+  });
+
+  it('keeps the zoom anchor through the renderer report instead of drifting to the old pixel offset', () => {
+    const view = mount({clip: toneClip(10)});
+    view.panTo(4);
+    const visualizer = lastVisualizer();
+    // The renderer publishes what it painted; it must paint the anchored window.
+    view.setZoom(50);
+    expect(view.visibleRange()).toEqual({startSeconds: 3, endSeconds: 7});
+    view.setZoom(100);
+    expect(view.visibleRange()).toEqual({startSeconds: 4, endSeconds: 6});
+    expect(visualizer.setZoom.mock.calls).toEqual([[50, 3], [100, 4]]);
   });
 
   it('has no window to report before anything is drawn', () => {
@@ -581,9 +595,9 @@ function fakeVisualizer(options: WaveformRenderOptions) {
   return {
     redraw: vi.fn(),
     redrawFrame: vi.fn(),
-    setZoom: vi.fn((next: number) => {
+    setZoom: vi.fn((next: number, start?: number) => {
       pixelsPerSecond = next;
-      moveTo(startSeconds);
+      moveTo(start ?? startSeconds);
     }),
     setRegions: vi.fn(),
     hitTest: vi.fn(() => ({seconds: 0})),

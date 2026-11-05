@@ -19,6 +19,13 @@ function state(): OscilloscopeState {
   };
 }
 
+function captureFrames(): FrameRequestCallback[] {
+  const frames: FrameRequestCallback[] = [];
+  vi.spyOn(document.defaultView!, 'requestAnimationFrame').mockImplementation((callback) => frames.push(callback));
+  vi.spyOn(document.defaultView!, 'cancelAnimationFrame').mockImplementation(() => undefined);
+  return frames;
+}
+
 afterEach(() => {
   document.body.replaceChildren();
   vi.restoreAllMocks();
@@ -74,10 +81,48 @@ describe('mountOscilloscope', () => {
     expect(probes[0]!.timeMs).toBeCloseTo(.1);
     plot.dispatchEvent(new KeyboardEvent('keydown', {key: 'End', bubbles: true}));
     expect(probes.at(-1)).toMatchObject({timeMs: 10, amplitude: 0});
+    const frames = captureFrames();
     vi.spyOn(plot, 'getBoundingClientRect').mockReturnValue({left: 0, width: 360} as DOMRect);
+    const probesBefore = probes.length;
+    const strokes = context.stroke.mock.calls.length;
+    plot.dispatchEvent(new PointerEvent('pointermove', {clientX: 120, bubbles: true}));
+    plot.dispatchEvent(new PointerEvent('pointermove', {clientX: 160, bubbles: true}));
     plot.dispatchEvent(new PointerEvent('pointermove', {clientX: 199, bubbles: true}));
+    // Hover is coalesced: nothing is drawn or reported until the frame runs, then only the latest position.
+    expect(frames).toHaveLength(1);
+    expect(probes).toHaveLength(probesBefore);
+    expect(context.stroke.mock.calls.length).toBe(strokes);
+    frames.shift()!(0);
+    expect(probes).toHaveLength(probesBefore + 1);
     expect(handle.selectedTimeMs).toBeGreaterThan(4);
     expect(handle.selectedTimeMs).toBeLessThan(6);
+    plot.dispatchEvent(new PointerEvent('pointermove', {clientX: 300, bubbles: true}));
+    expect(frames).toHaveLength(1);
+    handle.destroy();
+    frames.shift()!(0);
+    expect(probes).toHaveLength(probesBefore + 1);
+  });
+
+  it('reads canvas size and ink once per resize, not on every update or probe', () => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(context as unknown as CanvasRenderingContext2D);
+    let resize: (() => void) | undefined;
+    class TestResizeObserver {
+      constructor(callback: () => void) { resize = callback; }
+      observe = vi.fn();
+      disconnect = vi.fn();
+    }
+    vi.stubGlobal('ResizeObserver', TestResizeObserver);
+    const styles = vi.spyOn(document.defaultView!, 'getComputedStyle');
+    const host = document.createElement('div'); document.body.append(host);
+    const handle = mountOscilloscope(host, {snapshot: state, setFrozen: vi.fn(), setTimebaseMs: vi.fn(), setTriggerLevel: vi.fn(), setTriggerEdge: vi.fn()});
+    const plot = host.querySelector<HTMLCanvasElement>('[part="plot"]')!;
+    const reads = styles.mock.calls.length;
+    expect(reads).toBeGreaterThan(0);
+    handle.update();
+    plot.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowRight', bubbles: true}));
+    expect(styles.mock.calls.length).toBe(reads);
+    resize!();
+    expect(styles.mock.calls.length).toBeGreaterThan(reads);
     handle.destroy();
   });
 
@@ -91,10 +136,13 @@ describe('mountOscilloscope', () => {
     const setTriggerEdge = vi.fn((value: OscilloscopeTriggerEdge) => { current.triggerEdge = value; });
     const handle = mountOscilloscope(host, {snapshot: () => current, setFrozen, setTimebaseMs, setTriggerLevel, setTriggerEdge});
     const freeze = host.querySelector<HTMLButtonElement>('[part="freeze"]')!;
+    expect(freeze.getAttribute('aria-label')).toBe('Freeze');
+    expect(freeze.title).toBe('Freeze');
+    expect(freeze.querySelector('svg[data-icon]')?.getAttribute('aria-hidden')).toBe('true');
+    expect(freeze.textContent).toBe('');
     freeze.click();
     expect(setFrozen).toHaveBeenCalledWith(true);
     expect(freeze.getAttribute('aria-pressed')).toBe('true');
-    expect(freeze.textContent).toBe('Freeze');
     expect(host.querySelector('input[type="range"]')).toBeNull();
     const timebase = host.querySelector<HTMLDivElement>('[part~="timebase"]')!;
     expect(timebase.getAttribute('role')).toBe('slider');
@@ -109,17 +157,33 @@ describe('mountOscilloscope', () => {
     for (let index = 0; index < 5; index++) threshold.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowRight', bubbles: true}));
     expect(setTriggerLevel).toHaveBeenCalledWith(.25);
     expect(threshold.getAttribute('aria-valuetext')).toBe('0.25');
-    const edge = host.querySelector<HTMLSelectElement>('[part="trigger-edge"]')!;
-    edge.value = 'falling';
-    edge.dispatchEvent(new Event('change', {bubbles: true}));
+    expect(host.querySelector('select')).toBeNull();
+    const edge = host.querySelector<HTMLElement>('[part="trigger-edge"]')!;
+    expect(edge.getAttribute('role')).toBe('group');
+    expect(edge.getAttribute('aria-label')).toBe('Trigger edge');
+    const cells = [...edge.querySelectorAll<HTMLButtonElement>('button')];
+    expect(cells.map((cell) => cell.dataset.value)).toEqual(['rising', 'falling', 'off']);
+    expect(cells.map((cell) => cell.getAttribute('aria-label'))).toEqual(['Rising edge', 'Falling edge', 'Trigger off']);
+    expect(cells.every((cell) => cell.title === cell.getAttribute('aria-label') && cell.querySelector('svg[data-icon]'))).toBe(true);
+    expect(cells.map((cell) => cell.getAttribute('aria-pressed'))).toEqual(['true', 'false', 'false']);
+    cells[1]!.click();
     expect(setTriggerEdge).toHaveBeenCalledWith('falling');
+    expect(edge.dataset.value).toBe('falling');
+    expect(cells.map((cell) => cell.getAttribute('aria-pressed'))).toEqual(['false', 'true', 'false']);
+    edge.click();
+    expect(setTriggerEdge).toHaveBeenCalledOnce();
+    const status = host.querySelector<HTMLElement>('[part="status"]')!;
     current.trace!.triggered = false;
     current.status = 'live';
     handle.update();
-    expect(host.querySelector('[part="status"]')?.textContent).toBe('No matching edge');
+    // Informational signal state is announced, not drawn.
+    expect(status.textContent).toBe('No matching edge');
+    expect(status.hidden).toBe(false);
+    expect(status.hasAttribute('data-analysis-quiet')).toBe(true);
     current.trace!.silent = true;
     handle.update();
-    expect(host.querySelector('[part="status"]')?.textContent).toBe('No signal');
+    expect(status.textContent).toBe('No signal');
+    expect(status.hasAttribute('data-analysis-quiet')).toBe(true);
     current.trace!.silent = false;
     current.triggerEdge = 'off';
     handle.update();
@@ -133,6 +197,8 @@ describe('mountOscilloscope', () => {
     expect(host.querySelector('[part="status"]')?.textContent).toBe('Waiting for playback');
     current.status = 'unavailable'; handle.update();
     expect(host.querySelector('[part="status"]')?.textContent).toBe('Analyser unavailable');
+    expect(status.hasAttribute('data-analysis-quiet')).toBe(false);
+    expect(host.querySelector('[part="controls"]')?.classList.contains('wui-analysis-row')).toBe(true);
     handle.destroy();
   });
 
@@ -158,6 +224,8 @@ describe('mountOscilloscope', () => {
   });
 
   it('uses neutral resolved ink and leaves the public CSS plot background visible', () => {
+    let resize: (() => void) | undefined;
+    vi.stubGlobal('ResizeObserver', class { constructor(callback: () => void) { resize = callback; } observe() {} disconnect() {} });
     const painted: string[] = [];
     const drawing = {...context, strokeStyle: '', stroke: vi.fn(), fillRect: vi.fn()};
     drawing.stroke.mockImplementation(() => { painted.push(drawing.strokeStyle); });
@@ -170,6 +238,10 @@ describe('mountOscilloscope', () => {
     handle.element.style.color = 'rgb(22, 44, 66)';
     host.querySelector<HTMLElement>('[part="readout"]')!.style.color = 'rgb(77, 88, 99)';
     handle.update();
+    // Ink is cached between resizes, so a per-frame update never forces style resolution.
+    expect(new Set(painted)).toEqual(new Set(['#444', '#666']));
+    painted.length = 0;
+    resize!();
     expect(new Set(painted)).toEqual(new Set(['rgb(22, 44, 66)', 'rgb(77, 88, 99)']));
     handle.destroy();
   });

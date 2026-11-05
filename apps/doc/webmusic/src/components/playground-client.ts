@@ -43,6 +43,15 @@ function apply(target: Element, control: PlaygroundControl): void {
   const name = control.dataset.pgAttr;
   if (!name) return;
 
+  if (control.dataset.pgKind === 'token') {
+    // One checkbox per token: the attribute is the checked set of its row.
+    const row = control.closest('.wm-pg__tokens') ?? control.parentElement;
+    const tokens = [...(row?.querySelectorAll<HTMLInputElement>(`input[data-pg-kind="token"][data-pg-attr="${name}"]`) ?? [])]
+      .filter((box) => box.checked).map((box) => box.value);
+    target.setAttribute(name, tokens.join(' '));
+    return;
+  }
+
   if (control.dataset.pgKind === 'bool') {
     const value = control.value;
     if (value === 'on') target.setAttribute(name, '');
@@ -299,6 +308,14 @@ function wire(panel: HTMLElement): PlaygroundMount {
       const owner = targetOf(control);
       control.disabled = !owner;
       control.checked = !owner?.hasAttribute('hidden');
+      return;
+    }
+    if (control instanceof HTMLInputElement && control.dataset.pgKind === 'token') {
+      // An absent token attribute means every token; otherwise reflect membership.
+      const owner = targetOf(control);
+      control.disabled = !owner;
+      const raw = owner?.getAttribute(control.dataset.pgAttr ?? '');
+      control.checked = raw == null || raw.split(/[\s,]+/).includes(control.value);
       return;
     }
     const unset = control.dataset.pgKind === 'bool' ? 'unset' : '';

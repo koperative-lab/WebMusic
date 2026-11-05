@@ -1,0 +1,256 @@
+---
+title: 'ScoreEditor'
+description: 'One immutable Score document with URL loading, atomic commands, bounded undo, checkpoints and independent selection/draft sessions.'
+sidebar:
+  order: 2
+---
+
+import ScoreEditorHeadlessDemo from '../../../../../components/headless/ScoreEditorHeadlessDemo.astro';
+
+`ScoreEditor` owns the current immutable Score, document identity, monotonic
+revision and optional local history. `createScoreEditor(score, options?)` returns
+the same class from an already loaded Score. `loadScoreEditor(url, options?)`
+fetches and parses a file first, then returns a new editor. None of them creates
+audio resources or mounts UI.
+
+Use this owner when several custom surfaces edit one document. Use the pure
+[`applyScoreOperations`](/score/api/view/#atomic-note-operations) helper when
+your application owns the entire state/history model. Existing `score.edit`
+remains a short-lived batch primitive. [ScorePlayer](/score/headless/play/score-player/)
+can borrow this owner through `setDocumentSource(editor)`, and
+[`<score-player>`](/score/element/play/score-player/),
+[`<score-grid-view>`](/score/element/view/score-grid-view/) and
+[`<score-view>`](/score/element/view/score-view/#follow-an-editor) borrow it
+through their `.editor` property.
+
+<ScoreEditorHeadlessDemo />
+
+## Import
+
+Import the class and factory from `@webmusic/score/view/headless`; editing is part
+of View. This complete example loads Arabesque No. 1, moves its first note in one
+transaction, then undoes it:
+
+```ts
+import {loadScoreFromUrl} from '@webmusic/score/io';
+import {createScoreEditor} from '@webmusic/score/view/headless';
+
+const score = await loadScoreFromUrl('/midi/Arabesque%20No.1.mid', {format: 'midi'});
+const editor = createScoreEditor(score, {history: {limit: 100}});
+const first = editor.score.notes[0];
+if (!first) throw new Error('Arabesque No. 1 has no notes');
+const unsubscribe = editor.subscribeState((state) => {
+  console.log(state.document.documentRevision, state.dirty, state.history.canUndo);
+});
+const result = editor.transaction('Move note', (tx) => {
+  tx.add({type: 'move-notes', noteIds: [first.id], deltaQuarters: [1, 4]});
+});
+if (result.status === 'failed') throw result.error;
+editor.undo();
+unsubscribe();
+editor.dispose();
+```
+
+In an application, keep the editor for the document lifetime and dispose it
+during teardown. Immutable Score values retained by the caller remain readable.
+Importing a replacement creates a new editor with a new document identity.
+
+## Load from a URL
+
+`loadScoreEditor(url, options?)` fetches one MIDI, MusicXML, MXL or ABC file,
+parses it and returns `Promise<ScoreEditor>`. The I/O stack loads on demand, so
+an application that only imports this entry pays for parsing when it first loads
+a file. Load options are the [`loadScoreFromUrl`](/score/api/io/) options; the
+editor's `history` and `onListenerError` options are applied to the result.
+
+```ts
+import {loadScoreEditor} from '@webmusic/score/view/headless';
+import {defineScorePlayerElement, type ScorePlayerElement} from '@webmusic/score/play/element';
+import {defineScoreGridViewElement, type ScoreGridViewElement} from '@webmusic/score/view/element';
+
+defineScorePlayerElement();
+defineScoreGridViewElement();
+
+const controller = new AbortController();
+const editor = await loadScoreEditor('/midi/Arabesque%20No.1.mid', {
+  signal: controller.signal, history: {limit: 100},
+});
+const player = document.querySelector<ScorePlayerElement>('score-player')!;
+const view = document.querySelector<ScoreGridViewElement>('score-grid-view')!;
+player.editor = editor;
+view.editor = editor;
+
+// Teardown: detach the borrowers, then release the document.
+player.editor = undefined;
+view.editor = undefined;
+editor.dispose();
+```
+
+The caller owns the returned editor. Elements and players borrow it and never
+dispose it; when you replace the document, assign the new editor, then dispose
+the previous one. A load that has not settled is cancelled through `signal`.
+
+The promise rejects, and no editor is created, when the request fails, the
+response exceeds `maxInputBytes` (32 MiB by default), parsing fails, `timeoutMs`
+elapses or `signal` aborts (an `AbortError`). A `format` other than `midi`,
+`musicxml`, `mxl` or `abc` rejects with `TypeError` before anything is fetched.
+Without `format`, the URL extension and then the content select the parser.
+
+## Revisions, history and drafts
+
+An editor starts ready at revision `0` and `dirty: false`. Effective commands,
+undo, redo and checkpoint restoration increment the revision. Undo restores an
+earlier content identity at a new revision. `markSaved` tracks content identity,
+so undoing back to the saved root clears dirty state. A net-zero batch is a no-op:
+it does not add history, increment revision or discard redo. This includes a
+notation entry that would only regenerate note IDs, such as re-entering an
+existing rest; the existing note IDs and session selections remain.
+
+`execute` requires a document/revision guard. The convenience transaction,
+undo, redo and restore methods accept an optional guard; omit it only when the
+caller intentionally operates on the current state. A transaction callback is
+synchronous, snapshots each operation when added and cannot nest or cross an
+`await`. The callback's builder closes when the callback returns or throws.
+
+History defaults to 100 retained transactions across undo and redo. A new edit
+after undo discards the redo branch; trimming the oldest retained transaction
+increments `trimmedCount`. `history: false` disables local undo/redo. For
+application history, hold checkpoints returned by this editor and restore them
+explicitly. An effective restore clears local undo/redo, publishes origin
+`'restore'`, and supplies a `reset-origin` position map. Restoring the current
+content identity is a no-op; a different checkpoint identity is restored even
+when its musical values match. Checkpoints are opaque
+in-memory handles: copies, serialized values and checkpoints from another editor
+cannot be restored. They need no separate dispose method; release references
+when your application no longer needs their Score roots.
+
+Each interaction session starts with an empty selection and no draft. Preview
+always computes from the latest committed Score, never from the previous draft.
+Committing a draft is one atomic edit. Any committed document change cancels
+all session drafts and retains only surviving selected note IDs. Selection,
+preview and cancellation do not alter document revision, dirty state or history.
+Share a session explicitly when multiple surfaces should share selection.
+Every session snapshot carries its owner's `documentId`, including after
+disposal. A borrowing surface can reject a session from another document before
+reusing its selection or drafts; IDs alone are not sufficient to match notes.
+
+## Failures and lifecycle
+
+`execute`, `transaction`, `undo`, `redo`, `restoreCheckpoint` and `commitDraft`
+return `ScoreEditResult`: `committed`, `noop` or `failed`. `preview` returns
+`preview` or `failed`. A failure carries `ScoreEditError.code` and a readable
+message. Codes are `invalid-command`, `invalid-score`, `unknown-note`,
+`unknown-part`, `duplicate-id`, `unsupported-structure`, `revision-conflict`,
+`document-mismatch`, `disposed`, `reentrant-command`, `history-disabled`,
+`invalid-checkpoint` and `transaction-aborted`.
+
+Construction and void-returning auxiliary mutations throw on invalid use.
+`createCheckpoint` throws after disposal. Passing a nonfunction subscriber
+throws `TypeError`. Observer exceptions are isolated and reported through
+`onListenerError`, defaulting to `console.error`; they do not undo a commit or
+prevent other observers from receiving it. Synchronous content mutation inside
+a publication fails with `reentrant-command`; schedule later work after the
+callback instead.
+
+Subscriptions register before delivering the current value synchronously and
+return idempotent unsubscribe functions. `subscribe` reports content changes
+and disposal; `subscribeState` additionally reports saved-state and history-only
+changes such as `markSaved` and `clearHistory`.
+Disposal publishes the terminal snapshot, disposes interaction sessions and
+clears listeners/history. Read methods remain available after disposal; a new
+subscription receives terminal state once without being retained. The editor
+never disposes a borrowed player or caller-owned Score.
+
+<details class="component-section">
+<summary>API</summary>
+
+**Construction** — `new ScoreEditor(score, options?)`,
+`createScoreEditor(score, options?): ScoreEditor`, or
+`loadScoreEditor(url, options?): Promise<ScoreEditor>`.
+
+| Member | Kind | Default | Description |
+|---|---|---|---|
+| `score` | input | required | Valid immutable Score retained as the initial root. |
+| `history` | option | `{limit: 100}` | `false` disables local history; otherwise `limit` is a positive safe integer. |
+| `onListenerError` | option | `console.error` | `(error: unknown) => void`; observes subscriber exceptions. An error in this handler is itself reported to the console. |
+
+**`loadScoreEditor(url, options?)`** — `LoadScoreEditorOptions` extends
+`LoadScoreOptions` from `@webmusic/score/io` and `ScoreEditorOptions`.
+
+| Member | Kind | Default | Description |
+|---|---|---|---|
+| `url` | input | required | URL fetched with `fetch`; the caller handles credentials and CORS. |
+| `format` | option | extension, then content | `'midi'`, `'musicxml'`, `'mxl'` or `'abc'`; any other value rejects with `TypeError`. |
+| `signal` | option | — | Cancels download and parsing; the promise rejects and no editor is created. |
+| `timeoutMs` | option | none | Maximum milliseconds for download, bounded reading and parsing. |
+| `maxInputBytes` | option | `33554432` (32 MiB) | Maximum response size before parsing. |
+| `abc`, `midi`, `musicxml`, `mxl` | option | parser defaults | Per-format resource/structure limit overrides, used only for that format. |
+| `history`, `onListenerError` | option | as above | Applied to the returned editor. |
+
+**Commands and checkpoints**
+
+| Member | Kind | Description |
+|---|---|---|
+| `execute(command)` | command | Apply a version-1 `ScoreEditCommand` with required document identity, expected revision, label and ordered operations. Returns `ScoreEditResult`. |
+| `transaction(label, build, guard?)` | command | Collect operations through `ScoreEditTransaction.add(operation)` and atomically apply them after the synchronous callback. Returns `ScoreEditResult`. |
+| `undo(guard?)` | command | Restore the prior retained root at a new revision; empty history is `noop`, disabled history is `failed`. |
+| `redo(guard?)` | command | Restore the next retained root at a new revision; empty history is `noop`, disabled history is `failed`. |
+| `markSaved()` | command | Record the current content identity as saved; does not write a file or increment revision. |
+| `clearHistory()` | command | Clear both local stacks without changing content, revision, saved identity or cumulative trimming count. |
+| `createCheckpoint()` | command | Return an immutable `ScoreCheckpoint` issued by this editor. Contains document/content identity and Score, with issuance validated on restore. |
+| `restoreCheckpoint(checkpoint, guard?)` | command | Restore a same-editor checkpoint; the current content identity is `noop`, otherwise clear local history and publish a new revision. Returns `ScoreEditResult`. |
+| `createInteractionSession()` | factory | Create an independently disposable session; its selection/draft starts empty. |
+
+**State and observation**
+
+| Member | Kind | Description |
+|---|---|---|
+| `score` | getter | Current committed immutable Score. |
+| `getSnapshot()` | reader | `ScoreDocumentSnapshot`: document/content identity, revision, Score, `ready`/`disposed` status and optional last change. |
+| `getState()` | reader | `ScoreEditorState`: `document`, `dirty`, and `history`. |
+| `history.enabled`, `history.limit` | state | Whether local history is enabled and its retained transaction limit; disabled history has limit `0`. |
+| `history.undoCount`, `history.redoCount` | state | Retained transaction counts. |
+| `history.trimmedCount` | state | Cumulative oldest-transaction removals caused by the limit. |
+| `history.canUndo`, `history.canRedo` | state | Whether a retained action is available while the editor is ready. |
+| `subscribe(listener)` | subscription | Current document snapshot immediately, then publications; returns unsubscribe. |
+| `subscribeState(listener)` | subscription | Current editor state immediately, then publications; returns unsubscribe. |
+| `dispose()` | lifecycle | Idempotent terminal publication and release of local sessions, stacks and listeners. |
+
+**`ScoreInteractionSession`**
+
+| Member | Kind | Description |
+|---|---|---|
+| `getSnapshot()` | reader | `ScoreInteractionSnapshot`: owning `documentId`, `selectedNoteIds`, `disposed`, optional draft containing base `documentRevision`, candidate Score and operations. |
+| `subscribe(listener)` | subscription | Immediate current session snapshot, then updates; returns unsubscribe. |
+| `setSelection(noteIds)` | command | Validate existing IDs and deduplicate selection; throws on unknown notes or disposed session. |
+| `preview(operations)` | command | Compute an uncommitted candidate and publish `ScoreDraftResult`; failures leave committed content unchanged. |
+| `commitDraft(label?)` | command | Default label `'Edit notes'`. Clear the draft and submit its guarded operations; absent draft is `noop`. |
+| `cancelDraft()` | command | Discard the draft; a live session with no draft is unchanged. Throws after disposal or during its own publication. |
+| `dispose()` | lifecycle | Clear selection/draft, publish disposal, release listeners and detach from the editor; does not dispose the editor. |
+
+`ScoreRevisionGuard`, `ScoreEditCommand`, `ScoreEditOperation`, `ScoreEditResult`,
+`ScoreEditTransaction`, `ScoreDocumentSource`, `ScoreDocumentSnapshot`,
+`ScoreDocumentChange`, `ScoreEditorPort`, `ScoreCheckpoint`,
+`ScoreInteractionSession`, `ScoreInteractionSnapshot` and `ScoreDraftResult`
+are re-exported from this Headless entry with `ScoreEditorOptions`,
+`LoadScoreEditorOptions` and `ScoreEditorState`. Operation fields, source fields and position-map helpers
+are detailed under [document editing](/score/api/view/#document-editing) in the
+View API. `ScoreEditError` and the pure helpers are exported from
+`@webmusic/score/view` or the Core root as documented there, rather than from
+this Headless barrel.
+The Core predicates `isScoreDocumentSource` and `isScoreEditorPort` are also
+re-exported by `@webmusic/score/view`, with their runtime checks documented in
+[document ports](/score/api/view/#document-ports-and-commands).
+
+</details>
+
+## Related
+
+[Score I/O](/score/api/io/) loads Scores, owns the load options and exports an
+explicit committed snapshot. [Score Core](/score/api/#batch-edits-with-scoreedit) supplies
+the lower-level batch primitive. [`<score-grid-view>`](/score/element/view/score-grid-view/)
+borrows this editor to edit notes, [`<score-view>`](/score/element/view/score-view/#follow-an-editor)
+follows it read-only, and
+[`<score-player>`](/score/element/play/score-player/) and
+[ScorePlayer](/score/headless/play/score-player/) apply committed revisions
+through their document binding.

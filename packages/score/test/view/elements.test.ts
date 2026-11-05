@@ -382,33 +382,48 @@ describe('<score-view> attribute options (NaN-safe)', () => {
     expect(options.pixelsPerSecond).toBe(50);
   });
 
-  it('forwards annotation visibility and lets options override the attribute', async () => {
-    const host = createHost({'show-annotations': 'false'});
+  it('forwards annotation visibility to the staff only and lets options override the attribute', async () => {
+    const host = createHost({type: 'staff', 'show-annotations': 'false'});
     host.el.score = fakeScore;
     host.connect();
     await flush();
-    expect(pianoRollMock.mock.lastCall?.[2]).toMatchObject({showAnnotations: false});
-    const previous = pianoRollMock.mock.results.at(-1)!.value;
+    expect(staffMock.mock.lastCall?.[2]).toMatchObject({showAnnotations: false});
+    const previous = staffMock.mock.results.at(-1)!.value;
     host.el.options = {showAnnotations: true};
     expect(previous.dispose).toHaveBeenCalledOnce();
-    expect(pianoRollMock.mock.lastCall?.[2]).toMatchObject({showAnnotations: true});
+    expect(staffMock.mock.lastCall?.[2]).toMatchObject({showAnnotations: true});
     host.el.options = undefined;
-    expect(pianoRollMock.mock.lastCall?.[2]).toMatchObject({showAnnotations: false});
+    expect(staffMock.mock.lastCall?.[2]).toMatchObject({showAnnotations: false});
+    host.el.setAttribute('type', 'piano-roll');
+    expect(pianoRollMock.mock.lastCall?.[2]).not.toHaveProperty('showAnnotations');
+    host.el.setAttribute('type', 'waterfall');
+    expect(waterfallMock.mock.lastCall?.[2]).not.toHaveProperty('showAnnotations');
+    host.disconnect();
+  });
+
+  it('keeps staff expressions off by default and allows an explicit opt-in', async () => {
+    const host = createHost({type: 'staff'});
+    host.el.score = fakeScore;
+    host.connect();
+    await flush();
+    expect(staffMock.mock.lastCall?.[2]).toMatchObject({showAnnotations: false});
+    host.setAttribute('show-annotations', 'true');
+    expect(staffMock.mock.lastCall?.[2]).toMatchObject({showAnnotations: true});
+    host.el.options = {showAnnotations: false};
+    expect(staffMock.mock.lastCall?.[2]).toMatchObject({showAnnotations: false});
     host.disconnect();
   });
 
   it.each([
-    ['piano-roll', pianoRollMock], ['staff', staffMock], ['waterfall', waterfallMock],
-  ] as const)('keeps %s expressions off by default and allows an explicit opt-in', async (type, renderer) => {
-    const host = createHost({type});
+    ['piano-roll', pianoRollMock], ['waterfall', waterfallMock],
+  ] as const)('never forwards expressions to %s, even when opted in', async (type, renderer) => {
+    const host = createHost({type, 'show-annotations': 'true'});
     host.el.score = fakeScore;
     host.connect();
     await flush();
-    expect(renderer.mock.lastCall?.[2]).toMatchObject({showAnnotations: false});
-    host.setAttribute('show-annotations', 'true');
-    expect(renderer.mock.lastCall?.[2]).toMatchObject({showAnnotations: true});
-    host.el.options = {showAnnotations: false};
-    expect(renderer.mock.lastCall?.[2]).toMatchObject({showAnnotations: false});
+    expect(renderer.mock.lastCall?.[2]).not.toHaveProperty('showAnnotations');
+    host.el.options = {showAnnotations: true};
+    expect(renderer.mock.lastCall?.[2]).not.toHaveProperty('showAnnotations');
     host.disconnect();
   });
 
@@ -422,7 +437,8 @@ describe('<score-view> attribute options (NaN-safe)', () => {
     host.el.direction = 'left';
     expect(pianoRollMock.mock.lastCall?.[2]).toMatchObject({direction: 'left'});
     host.el.options = {direction: undefined, showAnnotations: undefined};
-    expect(pianoRollMock.mock.lastCall?.[2]).toMatchObject({direction: 'left', showAnnotations: false});
+    expect(pianoRollMock.mock.lastCall?.[2]).toMatchObject({direction: 'left'});
+    expect(pianoRollMock.mock.lastCall?.[2]).not.toHaveProperty('showAnnotations');
     host.el.options = {direction: 'up'};
     expect(pianoRollMock.mock.lastCall?.[2]).toMatchObject({direction: 'up'});
     host.el.options = undefined;

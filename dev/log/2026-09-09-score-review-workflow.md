@@ -1,8 +1,8 @@
 # Score review workflow — 2026-09-09
 
 This record describes the Analyze, View and Play review on
-`claude/analysis-view-chord-design-693b7b`, in the
-`.claude/worktrees/debug-branch-db7bf5` checkout. Existing uncommitted work was
+`analysis-view-chord-design-693b7b`, in the
+`debug-branch-db7bf5` local worktree checkout. Existing uncommitted work was
 preserved. The sequence below distills repeated user reviews and corrections
 into a process for a future Audio task; it does not start Audio implementation.
 
@@ -175,10 +175,10 @@ resolved in an isolated checkout before advancing local main.
 
 The original main checkout also contained 162 paths of unrelated draft work,
 including documentation navigation and clock/binding changes. Those drafts
-remain uncommitted in the original directory on `codex/main-drafts-20260909`,
+remain uncommitted in the original directory on `main-drafts-20260909`,
 at their original baseline. Their file contents and staged/unstaged changes
 are preserved rather than replayed over retired components. Integrated main
-uses `.claude/worktrees/main-score-review-20260909`. This separation is a local
+uses the `main-score-review-20260909` local worktree. This separation is a local
 worktree arrangement, not an additional product contract or a remote push.
 
 The user subsequently requested committing the preserved main work as well.

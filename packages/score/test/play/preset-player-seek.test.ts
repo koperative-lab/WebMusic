@@ -169,3 +169,20 @@ describe('native preset seek controls', () => {
     expect(reported).toHaveBeenCalledWith('PresetPlayer', 'transport presenter', operationFailure);
   });
 });
+
+describe('native preset publications', () => {
+  it('repaints a static transport for settings changes, not for each native note publication', () => {
+    const container = document.createElement('div');
+    document.body.append(container);
+    const handle = mountPresetPlayer(music(), container);
+    handles.push(handle);
+    const reads = vi.spyOn(handle.player!, 'isPlaying');
+    // Note boundaries publish through the same native source.
+    const publisher = (handle.player as unknown as {playbackPublisher: {notify(): void}}).playbackPublisher;
+    publisher.notify();
+    publisher.notify();
+    expect(reads).not.toHaveBeenCalled();
+    handle.player!.setRate(2);
+    expect(reads).toHaveBeenCalled();
+  });
+});

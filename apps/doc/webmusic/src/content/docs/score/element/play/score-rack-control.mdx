@@ -151,32 +151,37 @@ declare members, and `.rack` can supply an existing Rack. Transport remains on
 <summary>Styling</summary>
 
 The host fits its container and respects native `hidden`. The master stays beside
-an internally scrollable channel bank; names wrap within their strips, and a
+an internally scrollable channel bank whose scrollbar is hidden; strips are separated by
+hairlines, names are uppercase mono captions that wrap within their strips, and a
 nonempty bank can receive keyboard focus for horizontal scrolling. Resizing does
 not rebuild controls or alter the Rack.
 
 The `--rc-*` aliases override this desk only. Without them, controls keep their
 `--wm-mixer-*` and shared UIKit theme inputs, including `--wm-foreground`,
-`--wm-surface-muted`, `--wm-accent` and `--wm-focus`. Use the exposed parts to
+`--wm-foreground-muted`, `--wm-surface-muted` and `--wm-focus-ring`. The fader fill falls back
+to `--rc-fill` → `--wm-mixer-fill` → `--wm-foreground-muted`, and labels to `--rc-text` →
+`--wm-mixer-text` → `--wm-foreground-muted`. Use the exposed parts to
 change the strip or label layout without replacing the fader behavior.
 
 The outer surface also reads `--wm-component-background`, `--wm-component-border`,
 `--wm-component-radius` and `--wm-component-padding`. Override just this desk
 with `--wm-rack-control-surface-background`, `--wm-rack-control-surface-border`,
-`--wm-rack-control-surface-radius` or `--wm-rack-control-surface-padding`.
+`--wm-rack-control-surface-radius` or `--wm-rack-control-surface-padding`. Padding falls back
+through `--wm-mixer-surface-padding`, `--wm-component-padding` and `--wm-mixer-padding` to `0`,
+so the desk's rows run edge to edge and each strip carries its own inset.
 Background accepts `transparent`; the surface border accepts a complete border
 or `none`. Channel declarations (`score-rack-part`) have no visual surface.
 
 
 ```css
 score-rack-control {
-  --rc-border: #d8d8d8;
+  --rc-border: light-dark(#d8d8d8, #333);
   --rc-fader-width: 2rem;
   --rc-fader-height: 96px;
-  --rc-track: #f3f3f3;
-  --rc-track-border: #d8d8d8; /* soft control outline */
-  --rc-fill: #999;
-  --rc-thumb: #111;            /* position indicator */
+  --rc-track: light-dark(#f3f3f3, #1c1c1c);
+  --rc-track-border: light-dark(#d8d8d8, #333); /* soft control outline */
+  --rc-fill: light-dark(#777, #aaa);
+  --rc-thumb: light-dark(#111, #eee);           /* position indicator */
   --rc-radius: 0;
 }
 ```

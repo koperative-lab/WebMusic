@@ -48,6 +48,7 @@ describe('<audio-view> drag modes', () => {
     pointer(surface, 'pointerdown', 50);
     expect(player.seek).toHaveBeenLastCalledWith(0.5);
     pointer(surface, 'pointermove', 100);
+    flushFrame();
     expect(player.seek).toHaveBeenLastCalledWith(1);
     pointer(surface, 'pointerup', 100);
 
@@ -56,6 +57,89 @@ describe('<audio-view> drag modes', () => {
     expect(view.dragMode).toBe('scrub');
     view.setAttribute('drag-mode', 'unknown');
     expect(view.dragMode).toBe('seek');
+  });
+
+  it('coalesces absolute seek drags to one seek per frame and commits the exact release once', () => {
+    const {view, player, surface} = mount();
+    const seeks: number[] = [];
+    const order: string[] = [];
+    view.addEventListener('webaudio:seek', (event) => {
+      seeks.push((event as CustomEvent<{seconds: number}>).detail.seconds);
+      order.push('event');
+    });
+    player.seek.mockImplementation((seconds: number) => {
+      order.push('seek');
+      player.seconds = seconds;
+    });
+    // A press is still an immediate click-to-seek.
+    pointer(surface, 'pointerdown', 50);
+    expect(player.seek).toHaveBeenCalledOnce();
+    expect(player.seek).toHaveBeenLastCalledWith(0.5);
+    // Moves wait for the frame; only the latest position is sent.
+    pointer(surface, 'pointermove', 80);
+    pointer(surface, 'pointermove', 100);
+    pointer(surface, 'pointermove', 120);
+    expect(player.seek).toHaveBeenCalledOnce();
+    flushFrame();
+    expect(player.seek).toHaveBeenCalledTimes(2);
+    expect(player.seek).toHaveBeenLastCalledWith(1.2);
+    // Release flushes the exact final position synchronously, exactly once.
+    pointer(surface, 'pointermove', 150);
+    pointer(surface, 'pointerup', 160);
+    expect(player.seek).toHaveBeenCalledTimes(3);
+    expect(player.seek).toHaveBeenLastCalledWith(1.6);
+    flushFrame();
+    expect(player.seek).toHaveBeenCalledTimes(3);
+    expect(seeks).toEqual([0.5, 1.2, 1.6]);
+    // Requested seconds are still announced before each player command.
+    expect(order).toEqual(['event', 'seek', 'event', 'seek', 'event', 'seek']);
+  });
+
+  it('does not repeat a release that matches the last coalesced seek', () => {
+    const {player, surface} = mount();
+    pointer(surface, 'pointerdown', 50);
+    pointer(surface, 'pointermove', 120);
+    flushFrame();
+    pointer(surface, 'pointerup', 120);
+    flushFrame();
+    expect(player.seek.mock.calls.map(([seconds]) => seconds)).toEqual([0.5, 1.2]);
+  });
+
+  it('drops a pending absolute drag seek when the gesture is cancelled', () => {
+    const {player, surface} = mount();
+    pointer(surface, 'pointerdown', 50);
+    pointer(surface, 'pointermove', 120);
+    pointer(surface, 'pointercancel', 120);
+    flushFrame();
+    expect(player.seek.mock.calls.map(([seconds]) => seconds)).toEqual([0.5]);
+  });
+
+  it('paints a frame-coalesced drag seek inside the same frame', () => {
+    const {surface} = mount();
+    const visualizer = lastVisualizer();
+    pointer(surface, 'pointerdown', 50);
+    pointer(surface, 'pointermove', 120);
+    visualizer.redraw.mockClear();
+    visualizer.redrawFrame.mockClear();
+    flushFrame();
+    // Inside a frame an ordinary redraw would queue the pixels for the next one.
+    expect(visualizer.redrawFrame).toHaveBeenCalledWith(1.2, expect.any(Boolean));
+    expect(visualizer.redraw).not.toHaveBeenCalledWith(1.2, expect.anything());
+    pointer(surface, 'pointerup', 150);
+    // An event-handler release paints through the ordinary path.
+    expect(visualizer.redraw).toHaveBeenLastCalledWith(1.5, expect.any(Boolean));
+  });
+
+  it('paints a scrub flush inside the same frame', () => {
+    const {surface} = mount({'drag-mode': 'scrub'});
+    const visualizer = lastVisualizer();
+    pointer(surface, 'pointerdown', 100);
+    pointer(surface, 'pointermove', 150);
+    visualizer.redraw.mockClear();
+    visualizer.redrawFrame.mockClear();
+    flushFrame();
+    expect(visualizer.redrawFrame).toHaveBeenCalledWith(7.5, false);
+    expect(visualizer.redraw).not.toHaveBeenCalledWith(7.5, expect.anything());
   });
 
   it('scrubs relatively from the initial position, coalescing motion and flushing release', () => {
@@ -657,8 +741,9 @@ function fakeVisualizer(options: WaveformRenderOptions) {
   };
   return {
     redraw: vi.fn(),
+    redrawFrame: vi.fn(),
     setPlayheadMode: vi.fn(),
-    setZoom: vi.fn((next: number) => {pixelsPerSecond = next; setOffset(startSeconds);}),
+    setZoom: vi.fn((next: number, start?: number) => {pixelsPerSecond = next; setOffset(start ?? startSeconds);}),
     setRegions: vi.fn(),
     hitTest: vi.fn((x: number) => ({seconds: startSeconds + x / pixelsPerSecond})),
     setOffset: vi.fn(setOffset),

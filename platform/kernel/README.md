@@ -79,7 +79,7 @@ family's semantics onto the other.
 | `@webmusic/kernel/player` | `PlayerLike` playback control contract, capability tiers + guards |
 | `@webmusic/kernel/effect` | `Effect`/`EffectNodes` over `BaseAudioContext` |
 | `@webmusic/kernel/meter` | `AnalyserMeter` tap, RMS/peak with peak hold, `aggregateSpectrumBars` |
-| `@webmusic/kernel/transport` | `TransportClock` affine anchor math + `TimelineMapping` |
+| `@webmusic/kernel/transport` | `TransportClock` affine anchor math, `TimelineMapping`, constant-tempo `TempoGrid` helpers and the read-only `TempoClock` |
 | `@webmusic/kernel/tick` | Throttling-resistant tick delivery for lookahead schedulers |
 | `@webmusic/kernel/sync` | `TransportGroup` master/follower choreography + `MirrorClockMaster` |
 

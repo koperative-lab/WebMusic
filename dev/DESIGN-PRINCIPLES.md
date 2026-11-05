@@ -22,6 +22,12 @@ own analysis or presentation state does not become another transport. The
 observation, permitted commands, and connection lifecycle. This is a design
 target; each public reference must identify the behavior actually implemented.
 
+For editing, the document editor owns committed content while Play owns the
+applied playback revision and transport. View borrows content/commands and keeps
+gesture drafts separate; a draft or retained playback snapshot is not another
+content authority. [Editing contracts](design/EDIT-COMPONENTS.md), accepted in
+DEC-053 and implemented, own local history and revision reconciliation.
+
 ## 3. Time is a cross-component protocol
 
 One session authority organizes play, pause, seek, rate, and loop. Score positions, audio seconds/samples, and device time have explicit mappings and units. A visual playhead projects musical time; scrolling, zooming, and highlighting must not implicitly rewrite playback intent.
@@ -72,6 +78,11 @@ Keep units clear and numeric readouts easy to compare. Distinguish selected, pla
 Presenters supply default structure and styling needed for their interaction. Applications customize through public --wm-* semantic tokens, parts, and named handle accessors, then may replace a surface, renderer, or entire UI. Internal --wui-* values, implementation class names, and node order are not automatically public contracts.
 
 Disabling stylesheet installation does not disable state machines, bindings, keyboard logic, or cleanup. A compound presenter propagates its styling choice to children it owns. Compatibility token precedence and entry-specific options are documented in the [UI package](../packages/ui/README.md), [style source](../packages/ui/src/styles.ts), and individual presenter pages.
+
+[Visual design](design/VISUAL-DESIGN.md) is the required, concrete form of this
+principle for every UI change: palette, geometry, type, controls, icons,
+toolbars, adjustment cards, scrolling surfaces and demos, with an acceptance
+checklist (DEC-059).
 
 Score and Audio share the same neutral default palette, control geometry and component-surface tokens. A musical domain does not introduce its own brand skin. Color may encode musical data or semantic states such as recording and clipping, and explicit caller styling remains authoritative. Canonical demos show these defaults; a separately identified customization example may supply its own palette.
 

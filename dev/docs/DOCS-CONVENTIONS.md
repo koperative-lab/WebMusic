@@ -313,8 +313,9 @@ what happens on failure.
 ### Demo assets
 
 All musical demos use the existing Arabesque No. 1 assets in
-`apps/doc/webmusic/public/`, as required by [AGENTS](../../AGENTS.md#demo-music-reuse-arabesque-no-1).
-Reuse the piece or a passage instead of generating substitute notes or media.
+`apps/doc/webmusic/public/`, as required by [AGENTS](../../AGENTS.md#demo-music-arabesque-no-1-only).
+The repository owner maintains that folder; do not change it. Reuse the piece
+or a passage instead of generating substitute notes or media.
 Related demos and their copyable examples use the same source. Deterministic
 unit-test fixtures are separate from the demo repertoire. The format choices
 below are not cross-browser support guarantees.
@@ -333,6 +334,7 @@ control requires extra data such as audiowaveform JSON for `peaks-src`, supply
 that data or explain why the control cannot work in this example.
 In browser links, percent-encode the space in the Arabesque filenames as `%20`;
 use `import.meta.env.BASE_URL` for site demo URLs so Pages subpaths resolve.
+`npm run check:demo-music` rejects any other media reference.
 
 ### Demo file ownership
 

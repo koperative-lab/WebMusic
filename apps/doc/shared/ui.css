@@ -158,13 +158,13 @@
 /* Timeline fixtures use dark region fills, so their inset selection and focus
    rings need light ink. Canonical public parts remain present when the demo
    adds custom parts. A two-tone playhead stays visible across light lanes and
-   dark regions, including density cells in the Score map. */
+   dark regions. */
 .wm-live-canvas [data-presenter-live='timeline'] [part~='region'] {
   --wm-focus: #ffffff;
   --wm-selection: #ffffff;
 }
 
-.wm-live-canvas :is([data-presenter-live='timeline'], score-view[type='map']) [part~='playhead'] {
+.wm-live-canvas [data-presenter-live='timeline'] [part~='playhead'] {
   outline: 1px solid #ffffff;
   outline-offset: 0;
 }

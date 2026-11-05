@@ -2,7 +2,7 @@
 title: '<score-pitch-view>'
 description: 'Current sounding pitches as a keyboard, staff or fretboard, selected by type.'
 sidebar:
-  order: 2
+  order: 3
 ---
 
 import PitchViewPlayground from '../../../../../components/elements/PitchViewPlayground.astro';
@@ -14,7 +14,8 @@ import PitchViewPlayground from '../../../../../components/elements/PitchViewPla
 Without a resolved `player` or `source`, the view shows the shared outlined-square waiting
 animation. A native source that is loading shows the four-square loading animation;
 source errors remain visible. A ready source with no held notes keeps its normal pitch
-surface and meaningful empty reading. These states borrow the existing source subscription
+surface; on the staff and fretboard its empty sentence (such as “No sounding notes”) is a
+polite status that is visually hidden, so the empty drawing is the visible state. These states borrow the existing source subscription
 and never create another player or clock. Descriptions remain available to assistive
 technology; reduced-motion preferences stop the animation.
 

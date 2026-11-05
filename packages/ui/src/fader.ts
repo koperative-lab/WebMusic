@@ -80,7 +80,7 @@ export const faderStyle = String.raw`
 }
 `;
 
-const TRACK = 'var(--wm-fader-track, var(--wm-surface-muted, #f3f3f3))';
+const TRACK = 'var(--wm-fader-track, var(--wm-surface-muted, light-dark(#f3f3f3, #1c1c1c)))';
 /**
  * No outline by default: a fader is a filled track, the same as the transport's
  * seek bar it sits beside. A caller that wants one asks for it — the mixer's

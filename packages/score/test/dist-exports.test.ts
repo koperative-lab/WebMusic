@@ -1,4 +1,6 @@
 import {existsSync} from 'node:fs';
+import {createRequire} from 'node:module';
+import {fileURLToPath} from 'node:url';
 import {describe, expect, it} from 'vitest';
 
 // Regression guard for the bundled output: these tests exercise the BUILT
@@ -10,6 +12,7 @@ const distIndex = new URL('../dist/index.js', import.meta.url);
 const hasDist = existsSync(distIndex);
 
 const entry = (relative: string) => import(new URL(`../dist/${relative}`, import.meta.url).href);
+const requireBuilt = createRequire(import.meta.url);
 
 describe.skipIf(!hasDist)('@webmusic/score built dist', () => {
   it('root exposes the core model', async () => {
@@ -28,12 +31,50 @@ describe.skipIf(!hasDist)('@webmusic/score built dist', () => {
     expect(Object.keys(await entry('io/worker-protocol.js')).length).toBeGreaterThan(0);
   });
 
+  it.each(['js', 'cjs'])('View editing entries share Core values and execute a document transaction (%s)', async (extension) => {
+    const load = (name: string) => extension === 'js' ? entry(`${name}.js`) : requireBuilt(fileURLToPath(new URL(`../dist/${name}.cjs`, import.meta.url)));
+    const root = await load('index');
+    const view = await load('view/index');
+    const headless = await load('view/headless/index');
+    expect(typeof view.applyScoreOperations).toBe('function');
+    expect(view.ScoreEditError).toBe(root.ScoreEditError);
+    const builder = new root.ScoreBuilder();
+    builder.addPart({id: root.PartId('p'), name: 'Piano'});
+    const score = builder.build();
+    const editor = headless.createScoreEditor(score);
+    expect(editor.transaction('Insert', (tx: {add(operation: unknown): void}) => tx.add({
+      type: 'insert-notes', notes: [{id: root.NoteId('n'), partId: root.PartId('p'),
+        pitch: {step: 'C', alter: 0, octave: 4}, onsetQuarters: [0, 1], durationQuarters: [1, 1], voice: root.VoiceId('v')}],
+    })).status).toBe('committed');
+    expect(editor.score.getNote(root.NoteId('n')).pitch.midi).toBe(60);
+    expect(editor.undo().status).toBe('committed');
+    expect(editor.score).toBe(score);
+    editor.dispose();
+  });
+
   it('view entries are populated', async () => {
     const view = await entry('view/index.js');
     expect(typeof view.scoreToNoteSequence).toBe('function');
     expect(Object.keys(await entry('view/headless/index.js')).length).toBeGreaterThan(0);
     expect(Object.keys(await entry('view/render/index.js')).length).toBeGreaterThan(0);
     expect(Object.keys(await entry('view/element/index.js')).length).toBeGreaterThan(0);
+  });
+
+  it.each(['js', 'cjs'])('score grid entries are built and staff editing is gone (%s)', async (extension) => {
+    const load = (name: string) => extension === 'js' ? entry(`${name}.js`) : requireBuilt(fileURLToPath(new URL(`../dist/${name}.cjs`, import.meta.url)));
+    const headless = await load('view/headless/index');
+    const render = await load('view/render/index');
+    const element = await load('view/element/index');
+    expect(typeof render.mountScoreGrid).toBe('function');
+    expect(render.SCORE_GRID_FEATURES).toEqual(['move', 'resize', 'draw', 'delete', 'velocity', 'snap', 'zoom', 'history']);
+    expect(render.SCORE_GRID_SNAPS).toContain('1/16t');
+    expect(render.parseScoreGridFeatures('history move')).toEqual(['move', 'history']);
+    expect(() => render.parseScoreGridFeatures('erase')).toThrow(RangeError);
+    expect(typeof element.ScoreGridViewElement).toBe('function');
+    expect(typeof element.defineScoreGridViewElement).toBe('function');
+    expect(typeof headless.createScoreViewEditing).toBe('function');
+    for (const removed of ['mountStaffEditor', 'mountPianoRollEditor']) expect(render[removed]).toBeUndefined();
+    expect(headless.createStaffViewEditing).toBeUndefined();
   });
 
   it('play entries are populated', async () => {

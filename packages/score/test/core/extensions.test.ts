@@ -315,6 +315,7 @@ describe('expandRepeats', () => {
       duration: Duration.quarter(),
       voice,
       performed: {onsetSec: 0.6, durationSec: 0.2, velocity: 90},
+      velocityOverride: 45,
     });
     b.addNote(partId, quarterNote(b, voice, 'D4', new Rational(4)));
     const expanded = expandRepeats(b.build());
@@ -330,6 +331,9 @@ describe('expandRepeats', () => {
     // performance offset rather than replaying it at its original 0.6s.
     expect(repeated.performed?.onsetSec).toBeCloseTo(5.6);
     expect(repeated.performed?.durationSec).toBeCloseTo(0.2);
+    expect(repeated.performed?.velocity).toBe(90);
+    expect(repeated.velocityOverride).toBe(45);
+    expect(repeated.velocity).toBe(45);
   });
 
   it('volta brackets pick the correct endings', () => {

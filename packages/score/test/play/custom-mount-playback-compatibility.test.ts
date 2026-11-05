@@ -7,7 +7,7 @@ import {ChordAnalysisElement} from '../../src/analyze/element/score-chord-analys
 import {bindAnalysisPlayer} from '../../src/analyze/element/internal/player-binding';
 import {ScoreViewElement as PreviewScoreViewElement} from '../../src/view/element/score-view';
 class ScorePreviewElement extends PreviewScoreViewElement {
-  override connectedCallback(): void { this.type = 'map'; super.connectedCallback(); }
+  override connectedCallback(): void { this.type = 'waterfall'; super.connectedCallback(); }
 }
 import {ScoreViewElement} from '../../src/view/element/score-view';
 
@@ -112,23 +112,12 @@ describe('ScorePlayerElement custom mount compatibility', () => {
     expect(map.currentTime).toBeCloseTo(0.5);
     expect(visual.redraw).toHaveBeenCalledWith(expect.objectContaining({pitch: 60}), true);
 
-    for (const [follower, quarters, expectedTransportSeconds] of [
-      [timeline, 4, 1], [map, 4, 1],
-    ] as const) {
-      if (follower === timeline) {
-        const seek = follower.querySelector('[role="slider"]');
-        expect(seek).not.toBeNull();
-        seek!.dispatchEvent(new KeyboardEvent('keydown', {key: 'End', bubbles: true}));
-      } else {
-        const seek = follower.querySelector<HTMLInputElement>('input[type=range]');
-        expect(seek).not.toBeNull();
-        seek!.value = String(quarters);
-        seek!.dispatchEvent(new Event('input', {bubbles: true}));
-      }
-      await flush();
-      expect(player.seekCalls.at(-1)).toBe(expectedTransportSeconds);
-      expect(map.currentTime).toBeCloseTo(quarters / 2);
-    }
+    // Companion seeks use the nominal axis and reach the legacy transport at rate 2.
+    const seek = timeline.querySelector('[role="slider"]');
+    expect(seek).not.toBeNull();
+    seek!.dispatchEvent(new KeyboardEvent('keydown', {key: 'End', bubbles: true}));
+    await flush();
+    expect(player.seekCalls.at(-1)).toBe(1);
 
     player.callbacks!.onNoteOff?.(note);
     player.callbacks!.onEnd?.();
@@ -138,6 +127,7 @@ describe('ScorePlayerElement custom mount compatibility', () => {
 
     detach?.();
     view.remove();
+    map.remove();
     visual.redraw.mockClear();
     noteOn.mockClear();
     player.callbacks!.onNoteOn?.(note);

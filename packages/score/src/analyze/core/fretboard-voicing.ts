@@ -17,10 +17,9 @@
 // the reader would be the one who had to reconcile them.
 //
 // Nothing in this repo could be reused. vexflow ships a tuning table
-// (`src/tuning.js`) and it is unreachable: vexflow is a transitive of the
-// OPTIONAL peer opensheetmusicdisplay and `devOptional` in the lock file, so a
-// published consumer may not have it installed at all. Tables and search are
-// written fresh here, with no new dependency.
+// (`src/tuning.js`), but only its engraving entry is part of the View
+// contract; Analyze does not reach into a renderer's internals. Tables and
+// search are written fresh here, with no new dependency.
 //
 // ## The point of a fretboard read-out is a shape a player can TAKE
 //

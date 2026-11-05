@@ -3,8 +3,10 @@ import {claimHost} from './internal/lifecycle';
 import {createFader, faderStyle} from './fader';
 import {installStyle} from './internal/style';
 import {addClassNames, clamp01, setParts} from './internal/dom';
-import {componentSurfaceCss, controlBorderFallback} from './internal/surface';
-import {controlHeight, controlRadius} from './internal/control';
+import {componentSurfaceCss} from './internal/surface';
+import {controlHeight} from './internal/control';
+import {ICON_PATHS, hiddenScrollbarCss, iconButtonCss, setIconButton} from './internal/icons';
+import {neutralColor} from './internal/palette';
 
 export interface MixerChannel {
   id: string;
@@ -85,33 +87,42 @@ type MixerAction = "play" | "pause" | "stop";
 
 const mounted = new WeakMap<MixerHost, MixerHandle>();
 
+const line = `var(--wm-mixer-border, var(--wm-control-border, var(--wm-border, ${neutralColor('border')})))`;
+const ink = `var(--wm-foreground, ${neutralColor('foreground')})`;
+const muted = `var(--wm-foreground-muted, ${neutralColor('muted')})`;
+
+/**
+ * An edge-to-edge transport icon row with a hairline under it, over channel
+ * strips separated by hairlines (Visual design → Toolbars, Geometry). Strip
+ * names are mono captions; the channel scroller hides its scrollbar.
+ */
 export const mixerStyle = statusStyle + faderStyle + `
 :where(.wui-mixer) {
 ${componentSurfaceCss('mixer', {
-  padding: 'var(--wm-mixer-padding, .6rem)',
-  border: '1px solid var(--wm-mixer-border, var(--wm-border, #d8d8d8))',
+  padding: 'var(--wm-mixer-padding, 0)',
+  border: `1px solid var(--wm-mixer-border, var(--wm-border, ${neutralColor('border')}))`,
   radius: 'var(--wm-mixer-radius, var(--wm-control-radius, 0))',
-  background: 'var(--wm-mixer-background, var(--wm-surface, #fff))',
+  background: 'var(--wm-mixer-background, var(--wm-surface, light-dark(#fff, #111)))',
 })}
-inline-size:100%; min-inline-size:0; max-inline-size:100%; color:var(--wui-mixer-text,var(--wm-mixer-text,var(--wm-foreground,#444))); font:.8rem/1.35 var(--wm-font-family,var(--wm-font,system-ui,sans-serif)); }
-:where(.wui-mixer__board,.wui-mixer__channels) { display:flex; gap:.75rem; align-items:flex-start; min-inline-size:0; }
-.wui-mixer__status .wui-status { min-height:3rem; height:auto; }
-.wui-mixer__status[hidden], .wui-mixer__board[hidden], .wui-mixer__transport[hidden] { display:none; }
-:where(.wui-mixer__transport) { display:flex; flex-wrap:wrap; gap:.35rem; margin-bottom:.65rem; }
-/* Leave room inside the scroller for the shared fader's focus outline. */
-:where(.wui-mixer__channels) { box-sizing:border-box; overflow-x:auto; flex:1 1 auto; padding:.3rem .3rem .5rem; }
-:where(.wui-mixer__strip) { display:flex; flex-direction:column; align-items:center; gap:.45rem; flex:0 0 auto; min-inline-size:4.5rem; }
-:where(.wui-mixer__master) { padding-block-start:.3rem; }
-:where(.wui-mixer__master .wui-mixer__label) { font-weight:700; }
-:where(.wui-mixer__label) { font-size:.8rem; color:inherit; max-inline-size:7rem; min-block-size:2.7em; overflow-wrap:anywhere; text-align:center; }
-:where(.wui-mixer__actions) { display:flex; gap:.25rem; }
-:where(.wui-mixer__button) { appearance:none; box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center; border:1px solid var(--wm-mixer-button-border,var(--wm-mixer-border,${controlBorderFallback})); background:var(--wm-mixer-button,var(--wm-surface,#fff)); color:var(--wui-mixer-text,var(--wm-mixer-text,var(--wm-foreground,#444))); font:inherit; min-inline-size:2rem; min-block-size:${controlHeight('mixer')}; padding:.25rem; border-radius:${controlRadius('mixer')}; cursor:pointer; }
-:where(.wui-mixer__button[aria-pressed="true"]) { background:var(--wui-mixer-active-background,var(--wm-mixer-fill,var(--wm-accent,#111))); color:var(--wm-mixer-active-text,var(--wm-accent-foreground,#fff)); }
-:where(.wui-mixer__button:focus-visible,.wui-mixer__channels:focus-visible) { outline:2px solid var(--wm-focus,var(--wm-foreground,#111)); outline-offset:2px; }
-:where(.wui-mixer__button:disabled) { opacity:.45; cursor:default; }
+inline-size:100%; min-inline-size:0; max-inline-size:100%; color:var(--wui-mixer-text,var(--wm-mixer-text,${ink})); font:.8rem/1.35 var(--wm-font-family,var(--wm-font,system-ui,sans-serif)); }
+:where(.wui-mixer__board) { display:flex; gap:0; align-items:stretch; min-inline-size:0; }
+:where(.wui-mixer__channels) { box-sizing:border-box; display:flex; gap:0; align-items:stretch; flex:1 1 auto; min-inline-size:0; overflow-x:auto; }
+:where(.wui-mixer__status .wui-status) { min-height:3rem; height:auto; }
+:where(.wui-mixer__transport) { display:flex; flex-wrap:nowrap; align-items:stretch; gap:0; min-inline-size:0; block-size:${controlHeight('mixer')}; overflow-x:auto; border-block-end:1px solid ${line}; }
+${hiddenScrollbarCss('.wui-mixer__transport')}${hiddenScrollbarCss('.wui-mixer__channels')}/* Strip padding leaves room inside the scroller for the shared fader's focus outline. */
+:where(.wui-mixer__strip) { display:flex; flex-direction:column; align-items:center; gap:.45rem; flex:0 0 auto; min-inline-size:4.5rem; padding:.6rem .5rem .5rem; }
+:where(.wui-mixer__channels > .wui-mixer__strip + .wui-mixer__strip) { border-inline-start:1px solid ${line}; }
+:where(.wui-mixer__master) { border-inline-end:1px solid ${line}; }
+:where(.wui-mixer__master .wui-mixer__label) { color:${ink}; }
+:where(.wui-mixer__label) { max-inline-size:7rem; min-block-size:2.4em; overflow-wrap:anywhere; text-align:center; color:${muted}; font:500 .625rem/1.2 var(--wm-font-mono,ui-monospace,SFMono-Regular,Menlo,monospace); text-transform:uppercase; letter-spacing:.08em; }
+:where(.wui-mixer__actions) { display:flex; gap:0; }
+${iconButtonCss('.wui-mixer__button', 'mixer')}
+:where(.wui-mixer__button[aria-pressed="true"]) { background:var(--wui-mixer-active-background,${ink}); color:var(--wm-mixer-active-text,var(--wm-accent-foreground,light-dark(#fff, #111))); }
+:where(.wui-mixer__channels:focus-visible) { outline:var(--wm-focus-ring,2px solid ${ink}); outline-offset:-2px; }
 :where(.wui-mixer__fader) { display:block; }
 /* The strip's own tokens, handed to the shared fader that paints the track. */
-:where(.wui-mixer__input) { --wm-fader-width:var(--wm-mixer-fader-width,2rem); --wm-fader-height:var(--wm-mixer-fader-height,96px); --wm-fader-track:var(--wui-mixer-track,var(--wm-mixer-track,var(--wm-surface-muted,#f3f3f3))); --wm-fader-track-border:var(--wui-mixer-track-border,var(--wm-mixer-track-border,${controlBorderFallback})); --wm-fader-fill:var(--wui-mixer-fill,var(--wm-mixer-fill,var(--wm-accent,#999))); --wm-fader-thumb:var(--wm-mixer-thumb,var(--wm-foreground,#111)); --wm-fader-handle:var(--wm-mixer-handle,.7rem); --wm-fader-radius:var(--wm-mixer-radius,var(--wm-control-radius,0)); }
+:where(.wui-mixer__input) { --wm-fader-width:var(--wm-mixer-fader-width,2rem); --wm-fader-height:var(--wm-mixer-fader-height,96px); --wm-fader-track:var(--wui-mixer-track,var(--wm-mixer-track,var(--wm-surface-muted,light-dark(#f3f3f3, #1c1c1c)))); --wm-fader-track-border:var(--wui-mixer-track-border,var(--wm-mixer-track-border,var(--wm-control-border,var(--wm-border,${neutralColor('border')})))); --wm-fader-fill:var(--wui-mixer-fill,var(--wm-mixer-fill,${muted})); --wm-fader-thumb:var(--wm-mixer-thumb,${ink}); --wm-fader-handle:var(--wm-mixer-handle,.7rem); --wm-fader-radius:var(--wm-mixer-radius,var(--wm-control-radius,0)); }
+:where(.wui-mixer__status[hidden], .wui-mixer__board[hidden], .wui-mixer__transport[hidden]) { display:none; }
 `;
 
 export function mountMixer(
@@ -244,11 +255,13 @@ export function mountMixer(
       if (mute) {
         mute.disabled = disabled;
         mute.setAttribute("aria-label", `Mute ${channel.label}`);
+        mute.title = `Mute ${channel.label}`;
         mute.setAttribute("aria-pressed", String(channel.muted === true));
       }
       if (solo) {
         solo.disabled = disabled;
         solo.setAttribute("aria-label", `Solo ${channel.label}`);
+        solo.title = `Solo ${channel.label}`;
         solo.setAttribute("aria-pressed", String(channel.solo === true));
       }
     };
@@ -267,7 +280,7 @@ export function mountMixer(
   const action = (
     kind: MixerAction,
     label: string,
-    text: string,
+    icon: string,
     work: (() => Promise<void> | void) | undefined,
   ): void => {
     if (!work) return;
@@ -277,15 +290,14 @@ export function mountMixer(
     addClassNames(button, options.classNames?.button);
     addClassNames(button, options.classNames?.[kind]);
     setParts(button, ["button", kind], options.parts?.button, options.parts?.[kind]);
-    button.setAttribute("aria-label", label);
-    button.textContent = text;
+    setIconButton(button, icon, label);
     button.addEventListener("click", () => command(work));
     actionButtons.push(button);
     transport.append(button);
   };
-  action("play", "Play", "▶", binding.play);
-  action("pause", "Pause", "⏸", binding.pause);
-  action("stop", "Stop", "⏹", binding.stop);
+  action("play", "Play", ICON_PATHS.play, binding.play);
+  action("pause", "Pause", ICON_PATHS.pause, binding.pause);
+  action("stop", "Stop", ICON_PATHS.stop, binding.stop);
 
   const board = document.createElement("div");
   board.className = "wui-mixer__board board";

@@ -1,0 +1,29 @@
+// @vitest-environment jsdom
+import {afterEach, expect, it, vi} from 'vitest';
+import {Duration, NoteId, PartId, Pitch, Rational, ScoreBuilder, VoiceId} from '../../src/core';
+import {createScoreEditor, type ScoreEditor} from '../../src/edit/headless';
+import {ScoreViewElement} from '../../src/view/element/score-view';
+customElements.define('release-probe-score-view', ScoreViewElement);
+const editors: ScoreEditor[]=[];
+function editor(midi:number) {const b=new ScoreBuilder(); const p=PartId('p');b.addPart({id:p,name:'Piano'});b.addNote(p,{id:NoteId('n'),pitch:Pitch.fromMidi(midi),onsetQuarters:Rational.ZERO,duration:Duration.quarter(),voice:VoiceId('1')});const e=createScoreEditor(b.build());editors.push(e);return e;}
+afterEach(()=>{document.body.replaceChildren();editors.splice(0).forEach(e=>e.dispose());vi.restoreAllMocks();});
+it('source notification cleanup honors reentrant newer explicit editor',()=>{
+ const a=editor(60),b=editor(64),c=editor(67);
+ const owner=Object.assign(document.createElement('div'),{editor:a});owner.id='owner'; document.body.append(owner);
+ const view=document.createElement('release-probe-score-view') as ScoreViewElement;view.setAttribute('editor','#owner');view.editable=true;document.body.append(view);
+ const oldSession=view.interactionSession!;
+ oldSession.subscribe(s=>{if(s.disposed)view.editor=c;});
+ owner.editor=b;owner.dispatchEvent(new CustomEvent('webmusic:sourcechange',{bubbles:true}));
+ expect(view.editor).toBe(c);
+ expect(view.interactionSession!.getSnapshot().documentId).toBe(c.getSnapshot().documentId);
+ expect(view.querySelector('[data-note-id="n"]')?.getAttribute('aria-label')).toContain('G4');
+});
+it('direct replacement disposes every intermediate owned interaction session',()=>{
+ const a=editor(60),b=editor(64),c=editor(67);
+ const made: ReturnType<ScoreEditor['createInteractionSession']>[]=[]; const create=c.createInteractionSession.bind(c);vi.spyOn(c,'createInteractionSession').mockImplementation(()=>{const s=create();made.push(s);return s;});
+ const view=document.createElement('release-probe-score-view') as ScoreViewElement;view.editor=a;view.editable=true;document.body.append(view);
+ view.interactionSession!.subscribe(s=>{if(s.disposed)view.editor=c;});
+ view.editor=b; view.remove();
+ expect(made.length).toBeGreaterThan(0);
+ expect(made.every(s=>s.getSnapshot().disposed)).toBe(true);
+});

@@ -1,0 +1,28 @@
+
+> check:dev-server
+> node --test scripts/docs-dev.test.mjs
+
+✔ repeat dev reuses a running server before a package build or takeover (1.160583ms)
+✔ first root start builds before launch and preserves Astro flags and foreground default (0.4305ms)
+✔ explicit restart stops before rebuilding; docs restart skips build (0.124792ms)
+✔ status, logs and stop never trigger package builds (0.107291ms)
+✔ build and child failures are preserved, including termination code 143 (40.234ms)
+✔ unsafe bypass flags are rejected before stopping or building (0.214917ms)
+✔ concurrent starts build and start only once; second caller observes ready server (43.235292ms)
+✔ racing stale-owner recovery does not remove a newly acquired lock (108.397667ms)
+✔ a failing action releases the startup lock for the next attempt (2.580375ms)
+✔ foreground readiness releases startup coordination while the child remains running (56.266292ms)
+✔ interrupting a build stops its process tree before another start (301.403792ms)
+✔ a transient post-exit process-group probe denial preserves the interrupted command result (55.562166ms)
+✔ a transient post-exit SIGTERM denial waits for the process group to disappear (57.956917ms)
+✔ persistent process-group denial fails cleanup and blocks another build even after its owner exits (84.8845ms)
+✔ successful deadline SIGKILL preserves the command result and releases startup coordination (95.056917ms)
+✔ all npm entry points route through the same startup coordinator without predev stop (0.710625ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 16
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 909.1625

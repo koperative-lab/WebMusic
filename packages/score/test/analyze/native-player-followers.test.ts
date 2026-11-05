@@ -120,7 +120,7 @@ describe('native single-score player with independent Analyze components', () =>
       follower('rhythm'), follower('chord', {mode: 'live'}),
     ]);
     const view = document.createElement('score-view');
-    view.setAttribute('type', 'map');
+    view.setAttribute('type', 'piano-roll');
     view.setAttribute('player', '#source');
     document.body.append(view);
     const pitch = document.createElement('score-pitch-view');
@@ -131,7 +131,7 @@ describe('native single-score player with independent Analyze components', () =>
     document.body.append(pitch, sheet);
     await flush();
     await vi.waitFor(() => expect(sheet.querySelector('.wui-status')).toBeNull());
-    const engraving = sheet.querySelector('[part~="surface"]');
+    const engraving = sheet.querySelector('[part~="pages"]');
     expect(engraving).not.toBeNull();
     const control = source.querySelector('[part~="play"]');
     const score = source.resolvedScore;
@@ -141,14 +141,14 @@ describe('native single-score player with independent Analyze components', () =>
     expect(view.querySelector('[data-kind="loading"]')).not.toBeNull();
     expect(pitch.querySelector('[data-kind="loading"]')).not.toBeNull();
     expect(sheet.querySelector('.wui-status')).toBeNull();
-    expect(sheet.querySelector('[part~="surface"]')).toBe(engraving);
+    expect(sheet.querySelector('[part~="pages"]')).toBe(engraving);
     source.loading = false;
     await flush();
     expect(source.playback.snapshot().readiness).toBe('ready');
     for (const companion of companions) expect(companion.querySelector<HTMLElement>('[part~="feedback"]')?.hidden).toBe(true);
     expect(view.querySelector('[data-kind="loading"], [data-kind="waiting"]')).toBeNull();
     expect(pitch.querySelector<HTMLElement>('[part~="pitch-status"]')?.hidden).toBe(true);
-    expect(sheet.querySelector('[part~="surface"]')).toBe(engraving);
+    expect(sheet.querySelector('[part~="pages"]')).toBe(engraving);
     expect(source.querySelector('[part~="play"]')).toBe(control);
     expect(source.resolvedScore).toBe(score);
     expect(source.playback.snapshot().nominalSeconds).toBe(1);

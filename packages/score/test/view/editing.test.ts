@@ -1,0 +1,920 @@
+// @vitest-environment jsdom
+import {afterEach, describe, expect, it, vi} from 'vitest';
+import {Duration, NoteId, PartId, Pitch, Rational, ScoreBuilder, ScoreEditError, VoiceId, type ScoreEditOperation, type ScorePlaybackSnapshot} from '../../src/core';
+import {createScoreEditor} from '../../src/view/headless';
+import {createScoreView, createScoreViewEditing, scoreDocumentPlaybackCompatible} from '../../src/view/headless';
+import {mountScoreGrid} from '../../src/view/render/score-grid';
+import {ScoreViewElement} from '../../src/view/element/score-view';
+import {ScoreGridViewElement} from '../../src/view/element/score-grid-view';
+
+customElements.define('editing-score-view', ScoreViewElement);
+customElements.define('editing-score-grid-view', ScoreGridViewElement);
+const a = NoteId('a'); const b = NoteId('b'); const p = PartId('p');
+function fixture() {
+  const builder = new ScoreBuilder(); builder.addPart({id: p, name: 'Piano'});
+  builder.addNote(p, {id: a, pitch: Pitch.fromMidi(60), onsetQuarters: Rational.ONE,
+    duration: Duration.quarter(), voice: VoiceId('v'), performed: {onsetSec: .45, durationSec: .48, velocity: 90}});
+  builder.addNote(p, {id: b, pitch: Pitch.fromMidi(64), onsetQuarters: new Rational(3), duration: Duration.quarter(), voice: VoiceId('v')});
+  return builder.build();
+}
+const move: ScoreEditOperation = {type: 'move-notes', noteIds: [a], deltaQuarters: [1, 4]};
+// Grid geometry at the defaults: a 48px key column, a 22px ruler, 64px per quarter and
+// 16px rows from MIDI 84 (the fixture's computed upper bound) downward.
+const X = (quarters: number) => 48 + quarters * 64;
+const Y = (midi: number) => 22 + (84 - midi) * 16 + 8;
+function playback(editor: ReturnType<typeof createScoreEditor>, overrides: Partial<ScorePlaybackSnapshot> = {}): ScorePlaybackSnapshot {
+  const document = editor.getSnapshot();
+  return {revision: 1, sourceRevision: 1, readiness: 'ready', state: 'paused', score: document.content,
+    nominalSeconds: .5, nominalDurationSeconds: 2, transportSeconds: .5, transportDurationSeconds: 2, rate: 1,
+    activeNotes: [], documentId: document.documentId, documentRevision: document.documentRevision,
+    documentBinding: {status: 'ready', attempt: 1, requested: document, applied: document, documentCoordinates: true, positionPolicy: 'preserve-quarter'}, ...overrides};
+}
+function pointer(target: Element, type: string, x: number, y: number, extra: Record<string, unknown> = {}) {
+  // A held primary button reports buttons = 1 until pointerup.
+  const {pointerId = 1, ...init} = extra;
+  const event = new MouseEvent(type, {bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0, buttons: type === 'pointerup' ? 0 : 1, ...init});
+  Object.defineProperty(event, 'pointerId', {value: pointerId}); target.dispatchEvent(event); return event;
+}
+function mounted() {
+  const editor = createScoreEditor(fixture());
+  const editing = createScoreViewEditing(editor, {editable: true});
+  const host = document.createElement('div'); document.body.append(host);
+  const commits = vi.fn(); const previews = vi.fn();
+  const renderer = mountScoreGrid(host, {editing}, {onCommit: commits, onPreview: previews});
+  return {editor, editing, host, renderer, commits, previews};
+}
+afterEach(() => { document.body.replaceChildren(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+
+describe('document-bound Score views', () => {
+  it('returns the original failure when a synchronous observer clears the displayed error', () => {
+    const editor = createScoreEditor(fixture()); const editing = createScoreViewEditing(editor);
+    let observed: ScoreEditError | undefined;
+    const off = editing.subscribe((state) => {
+      if (state.error) { observed = state.error; editing.cancel(); }
+    });
+    const result = editing.execute('Move', [move]);
+    expect(result.status).toBe('failed');
+    if (result.status === 'failed') {
+      expect(result.error).toBeInstanceOf(ScoreEditError); expect(result.error).toBe(observed);
+      expect(result.error.message).toBe('Editing is disabled');
+    }
+    expect(editing.state.error).toBeUndefined(); expect(editor.getSnapshot().documentRevision).toBe(0);
+    off(); editing.dispose(); editor.dispose();
+  });
+
+  it('shares committed content while isolating sessions, and borrows an explicitly shared session', () => {
+    const editor = createScoreEditor(fixture());
+    const first = createScoreView(editor, {editable: true}); const second = createScoreView(editor);
+    first.editing!.select([a]); first.editing!.preview([move]);
+    expect(first.score.getNote(a)!.onsetQuarters.toJSON()).toEqual([5, 4]);
+    expect(second.score).toBe(editor.score);
+    expect(second.editing!.state.interaction.selectedNoteIds).toEqual([]);
+    first.editing!.commit('Move');
+    expect(second.score).toBe(editor.score);
+    expect(editor.getState().history.undoCount).toBe(1);
+    const shared = editor.createInteractionSession();
+    const third = createScoreView(editor, {interactionSession: shared});
+    shared.setSelection([b]); expect(third.editing!.state.interaction.selectedNoteIds).toEqual([b]);
+    third.dispose(); expect(shared.getSnapshot().disposed).toBe(false);
+    first.dispose(); second.dispose(); expect(editor.getSnapshot().status).toBe('ready'); editor.dispose();
+  });
+
+  it('rejects foreign interaction sessions and gates stale, failed or unmapped playback', () => {
+    const editor = createScoreEditor(fixture()); const foreign = createScoreEditor(fixture());
+    expect(() => createScoreView(editor, {interactionSession: foreign.createInteractionSession()})).toThrow(/bound document/);
+    const initial = playback(editor);
+    expect(scoreDocumentPlaybackCompatible(editor.getSnapshot(), initial)).toBe(true);
+    expect(scoreDocumentPlaybackCompatible(editor.getSnapshot(), {...initial, documentRevision: 99})).toBe(false);
+    expect(scoreDocumentPlaybackCompatible(editor.getSnapshot(), {...initial, documentBinding: {...initial.documentBinding!, documentCoordinates: false}})).toBe(false);
+    expect(scoreDocumentPlaybackCompatible(editor.getSnapshot(), {...initial, documentBinding: {...initial.documentBinding!, status: 'error'}})).toBe(false);
+    const view = createScoreView(editor, {editable: true}); view.updatePlayback(initial);
+    expect(view.state.playbackAvailable).toBe(true);
+    view.editing!.execute('Move', [move]);
+    expect(view.state.playbackAvailable).toBe(false); expect(view.state.activeNotes).toEqual([]);
+    view.updatePlayback(playback(editor)); expect(view.state.playbackAvailable).toBe(true);
+    view.dispose(); editor.dispose(); foreign.dispose();
+  });
+
+  it('publishes cancellation only when it discards a draft or error, and tells borrowers about disposal', () => {
+    const editor = createScoreEditor(fixture()); const editing = createScoreViewEditing(editor, {editable: true});
+    const states: boolean[] = []; editing.subscribe((state) => states.push(state.available)); states.length = 0;
+    editing.cancel(); expect(states).toEqual([]);
+    editing.preview([move]); states.length = 0;
+    editing.cancel(); expect(states.length).toBeGreaterThan(0); expect(editing.state.interaction.draft).toBeUndefined();
+    states.length = 0; editing.dispose();
+    expect(states).toEqual([false]); expect(editing.state.available).toBe(false); editor.dispose();
+  });
+
+  it('keeps the local seek position across editing publications when no playback is bound', () => {
+    const editor = createScoreEditor(fixture()); const view = createScoreView(editor, {editable: true});
+    view.seek(1); view.editing!.select([a]);
+    expect(view.state.currentTime).toBe(1);
+    view.editing!.preview([move]); expect(view.score).not.toBe(editor.score);
+    expect(view.state.currentTime).toBe(1);
+    view.editing!.cancel(); expect(view.state.currentTime).toBe(1);
+    view.updatePlayback(playback(editor, {documentRevision: 99}));
+    expect(view.state.currentTime).toBe(0); expect(view.state.playbackAvailable).toBe(false);
+    view.dispose(); editor.dispose();
+  });
+
+  it('keeps waterfall editing disabled when its exposed controller requests editing', () => {
+    const editor = createScoreEditor(fixture()); const view = createScoreView(editor, {type: 'waterfall'});
+    view.editing!.setEditable(true);
+    expect(view.editing!.state.editable).toBe(false); expect(view.editing!.execute('Move', [move]).status).toBe('failed');
+    view.setType('piano-roll'); expect(view.editing!.state.editable).toBe(true);
+    view.editing!.setEditable(false); view.setType('staff'); expect(view.editing!.state.editable).toBe(false);
+    view.dispose(); editor.dispose();
+  });
+
+  it('disposes its owned session if borrowed playback observation fails during construction', () => {
+    const editor = createScoreEditor(fixture());
+    const session = editor.createInteractionSession();
+    vi.spyOn(editor, 'createInteractionSession').mockReturnValue(session);
+    expect(() => createScoreView(editor, {playback: {snapshot: () => playback(editor), subscribe: () => { throw new Error('Cannot observe'); }}})).toThrow('Cannot observe');
+    expect(session.getSnapshot().disposed).toBe(true); expect(editor.getSnapshot().status).toBe('ready'); editor.dispose();
+  });
+});
+
+describe('score grid editing gestures', () => {
+  it('repaints newly visible notes when its viewport widens and releases its resize observer', () => {
+    let resize = () => {};
+    let observed: Element | undefined;
+    const disconnect = vi.fn();
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(callback: () => void) { resize = callback; }
+      observe(target: Element) { observed = target; }
+      disconnect = disconnect;
+    });
+    const builder = new ScoreBuilder(); builder.addPart({id: p, name: 'Piano'});
+    // b sits past the drawn range: one viewport of overscan either side of a 232px view.
+    for (const [id, at] of [[a, 1], [b, 20]] as const) builder.addNote(p, {id, pitch: Pitch.fromMidi(60),
+      onsetQuarters: new Rational(at), duration: Duration.quarter(), voice: VoiceId('v')});
+    const editor = createScoreEditor(builder.build()); const editing = createScoreViewEditing(editor, {editable: true});
+    const host = document.createElement('div'); document.body.append(host);
+    const renderer = mountScoreGrid(host, {editing});
+    const viewport = host.querySelector<HTMLElement>('[part="viewport"]')!;
+    let width = 232;
+    Object.defineProperty(viewport, 'clientWidth', {get: () => width});
+    expect(observed).toBe(viewport); resize();
+    expect(host.querySelector('[data-note-id="a"]')).toBeTruthy();
+    expect(host.querySelector('[data-note-id="b"]')).toBeNull();
+    renderer.surface.focus(); const snapshot = editor.getSnapshot();
+    width = 900; resize();
+    expect(host.querySelector('[data-note-id="b"]')).toBeTruthy();
+    expect(editor.getSnapshot()).toBe(snapshot); expect(snapshot.documentRevision).toBe(0);
+    expect(document.activeElement).toBe(renderer.surface);
+    renderer.dispose(); expect(disconnect).toHaveBeenCalledOnce();
+    const paint = vi.spyOn(renderer.surface, 'replaceChildren');
+    width = 232; resize(); expect(paint).not.toHaveBeenCalled();
+    editing.dispose(); editor.dispose();
+  });
+
+  it('cancels its own drag on resize without clearing another surface’s shared preview', () => {
+    let resize = () => {};
+    vi.stubGlobal('ResizeObserver', class {
+      constructor(callback: () => void) { resize = callback; }
+      observe() {}
+      disconnect() {}
+    });
+    const {editor, editing, renderer, host, commits} = mounted();
+    const viewport = host.querySelector<HTMLElement>('[part="viewport"]')!;
+    let width = 232;
+    Object.defineProperty(viewport, 'clientWidth', {get: () => width}); resize();
+    pointer(host.querySelector('[data-note-id="a"]')!, 'pointerdown', X(1) + 6, Y(60));
+    pointer(renderer.surface, 'pointermove', X(1) + 22, Y(60));
+    expect(editing.state.interaction.draft).toBeDefined();
+    width = 553; resize();
+    expect(editing.state.interaction.draft).toBeUndefined();
+    pointer(renderer.surface, 'pointerup', X(1) + 22, Y(60));
+    expect(editor.getSnapshot().documentRevision).toBe(0); expect(commits).not.toHaveBeenCalled();
+    editing.session.preview([move]);
+    width = 232; resize();
+    expect(editing.state.interaction.draft).toBeDefined();
+    expect(editor.getSnapshot().documentRevision).toBe(0);
+    renderer.dispose(); editing.dispose(); editor.dispose();
+  });
+
+  it('uses written quarters, previews a drag and commits exactly one history item', () => {
+    const {editor, editing, renderer, host, commits, previews} = mounted();
+    const rectangle = host.querySelector('[data-note-id="a"]')!;
+    expect(rectangle.getAttribute('x')).toBe(String(X(1))); // performed .45s must not become its editing coordinate
+    pointer(rectangle, 'pointerdown', X(1) + 6, Y(60));
+    pointer(renderer.surface, 'pointermove', X(1) + 22, Y(60)); pointer(renderer.surface, 'pointermove', X(1) + 38, Y(60));
+    expect(editor.getSnapshot().documentRevision).toBe(0); expect(previews).toHaveBeenCalledTimes(2);
+    pointer(renderer.surface, 'pointerup', X(1) + 38, Y(60));
+    expect(editor.score.getNote(a)!.onsetQuarters.toJSON()).toEqual([3, 2]);
+    expect(editor.score.getNote(a)!.performed).toBeUndefined();
+    expect(editor.getState().history.undoCount).toBe(1); expect(commits).toHaveBeenCalledOnce();
+    renderer.dispose(); editing.dispose(); editor.dispose();
+  });
+
+  it('cancels escape/capture loss and an externally superseded gesture', () => {
+    const {editor, editing, renderer, host, commits} = mounted();
+    const begin = () => { pointer(host.querySelector('[data-note-id="a"]')!, 'pointerdown', X(1) + 6, Y(60)); pointer(renderer.surface, 'pointermove', X(1) + 22, Y(60)); };
+    begin(); renderer.surface.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true}));
+    pointer(renderer.surface, 'pointerup', X(1) + 22, Y(60)); expect(editor.getSnapshot().documentRevision).toBe(0);
+    begin(); pointer(renderer.surface, 'lostpointercapture', X(1) + 22, Y(60));
+    pointer(renderer.surface, 'pointerup', X(1) + 22, Y(60)); expect(editor.getSnapshot().documentRevision).toBe(0);
+    begin(); editor.transaction('External', (tx) => tx.add({type: 'set-velocity', noteIds: [b], velocity: 95}));
+    pointer(renderer.surface, 'pointerup', X(1) + 22, Y(60));
+    expect(editor.score.getNote(a)!.onsetQuarters.toJSON()).toEqual([1, 1]); expect(commits).not.toHaveBeenCalled();
+    renderer.dispose(); editing.dispose(); editor.dispose();
+  });
+
+  it('resizes, inserts, nudges and deletes with undo through the same semantic owner', () => {
+    const {editor, editing, renderer, host} = mounted();
+    pointer(host.querySelector('[data-note-id="a"]')!, 'pointerdown', X(2) - 2, Y(60));
+    pointer(renderer.surface, 'pointermove', X(2) + 14, Y(60)); pointer(renderer.surface, 'pointerup', X(2) + 14, Y(60));
+    expect(editor.score.getNote(a)!.duration.quarters.toJSON()).toEqual([5, 4]);
+    renderer.surface.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowRight', bubbles: true}));
+    expect(editor.score.getNote(a)!.onsetQuarters.toJSON()).toEqual([5, 4]);
+    renderer.surface.dispatchEvent(new KeyboardEvent('keydown', {key: 'Delete', bubbles: true}));
+    expect(editor.score.getNote(a)).toBeUndefined();
+    renderer.surface.dispatchEvent(new KeyboardEvent('keydown', {key: 'z', ctrlKey: true, bubbles: true}));
+    expect(editor.score.getNote(a)).toBeDefined();
+    renderer.surface.dispatchEvent(new MouseEvent('dblclick', {clientX: X(5), clientY: Y(64), bubbles: true}));
+    expect(editor.score.parts[0].notes).toHaveLength(3);
+    expect(editor.score.parts[0].notes.find((note) => note.onsetQuarters.eq(new Rational(5)))!.pitch.midi).toBe(64);
+    renderer.dispose(); editing.dispose(); editor.dispose();
+  });
+
+  it('does not insert over a note when click redraws detach the pressed node before dblclick', () => {
+    const {editor, renderer, host, commits} = mounted();
+    const rectangle = host.querySelector('[data-note-id="a"]')!;
+    pointer(rectangle, 'pointerdown', X(1) + 6, Y(60)); pointer(renderer.surface, 'pointerup', X(1) + 6, Y(60));
+    expect(rectangle.isConnected).toBe(false); // Selection redrew the grid; the browser now targets the SVG.
+    pointer(renderer.surface, 'pointerdown', X(1) + 6, Y(60)); pointer(renderer.surface, 'pointerup', X(1) + 6, Y(60));
+    renderer.surface.dispatchEvent(new MouseEvent('dblclick', {clientX: X(1) + 6, clientY: Y(60), bubbles: true}));
+    expect(editor.score.parts[0].notes).toHaveLength(2); expect(editor.getSnapshot().documentRevision).toBe(0);
+    expect(commits).not.toHaveBeenCalled();
+    renderer.dispose();
+  });
+
+  it('inserts into the grid cell under the pointer, so repeating the gesture selects instead of duplicating', () => {
+    const {editor, editing, renderer} = mounted();
+    for (let count = 0; count < 2; count++) {
+      pointer(renderer.surface, 'pointerdown', X(4.97), Y(64), {altKey: true}); pointer(renderer.surface, 'pointerup', X(4.97), Y(64));
+    }
+    const drawn = editor.score.parts[0].notes.filter((note) => note.id !== a && note.id !== b);
+    expect(drawn.map((note) => note.onsetQuarters.toString())).toEqual(['19/4']);
+    expect(editing.state.interaction.selectedNoteIds).toEqual([drawn[0].id]);
+    for (let count = 0; count < 2; count++) renderer.surface.dispatchEvent(new MouseEvent('dblclick', {clientX: X(6.97), clientY: Y(64), bubbles: true}));
+    const inserted = editor.score.parts[0].notes.filter((note) => note.onsetQuarters.eq(new Rational(27, 4)));
+    // A drawn note is one snap step long: a sixteenth at the default 1/16 grid.
+    expect(inserted).toHaveLength(1); expect(inserted[0].duration.quarters.toString()).toBe('1/4');
+    expect(editor.getState().history.undoCount).toBe(2);
+    renderer.dispose();
+  });
+
+  it('ignores another pointer’s capture loss but cancels a drag whose pointerup was lost', () => {
+    const {editor, editing, renderer, host, commits} = mounted();
+    pointer(host.querySelector('[data-note-id="a"]')!, 'pointerdown', X(1) + 6, Y(60)); pointer(renderer.surface, 'pointermove', X(1) + 22, Y(60));
+    pointer(renderer.surface, 'lostpointercapture', X(1) + 22, Y(60), {pointerId: 2}); pointer(renderer.surface, 'pointercancel', X(1) + 22, Y(60), {pointerId: 2});
+    expect(editing.state.interaction.draft).toBeDefined();
+    pointer(renderer.surface, 'pointermove', X(1) + 38, Y(60), {buttons: 0});
+    expect(editing.state.interaction.draft).toBeUndefined();
+    pointer(renderer.surface, 'pointerup', X(1) + 38, Y(60));
+    expect(editor.getSnapshot().documentRevision).toBe(0); expect(commits).not.toHaveBeenCalled();
+    renderer.dispose();
+  });
+
+  it('leaves an Escape that cancels nothing to enclosing handlers', () => {
+    const {editing, renderer} = mounted();
+    const escape = () => { const event = new KeyboardEvent('keydown', {key: 'Escape', bubbles: true, cancelable: true}); renderer.surface.dispatchEvent(event); return event; };
+    expect(escape().defaultPrevented).toBe(false);
+    editing.preview([move]); expect(escape().defaultPrevented).toBe(true);
+    expect(editing.state.interaction.draft).toBeUndefined();
+    renderer.dispose();
+  });
+
+  it('distinguishes selection, drafts, resize handles and sounding notes beyond colour', () => {
+    const {editing, renderer, host} = mounted(); editing.select([a]);
+    const note = (id: string) => host.querySelector(`[data-note-id="${id}"]`)!;
+    expect(host.querySelector('[data-selection-outline]')).toBeTruthy();
+    expect(note('a').getAttribute('stroke')).not.toBe(note('b').getAttribute('stroke'));
+    expect(host.querySelector('[data-resize-handle]')!.getAttribute('stroke')).not.toBe('currentColor');
+    expect(note('a').getAttribute('role')).toBe('img'); expect(host.querySelector('[role="option"]')).toBeNull();
+    renderer.updatePlayback({seconds: 1.5, activeNoteIds: new Set([b])});
+    expect(Number(note('b').getAttribute('height'))).toBeGreaterThan(Number(note('a').getAttribute('height')));
+    expect(note('b').getAttribute('data-active')).toBe('true');
+    editing.preview([move]);
+    expect(note('a').getAttribute('stroke-dasharray')).toBe('4 2'); expect(Number(note('a').getAttribute('fill-opacity'))).toBeLessThan(1);
+    renderer.dispose();
+  });
+
+  it('presents a read-only grid as a labelled graphic instead of an instructed tab stop', () => {
+    const {editing, renderer, host} = mounted();
+    expect(renderer.surface.getAttribute('tabindex')).toBe('0'); expect(renderer.surface.getAttribute('role')).toBe('application');
+    editing.setEditable(false);
+    expect(renderer.surface.hasAttribute('tabindex')).toBe(false); expect(renderer.surface.getAttribute('role')).toBe('img');
+    expect(renderer.surface.hasAttribute('aria-describedby')).toBe(false);
+    expect(host.querySelector<HTMLElement>('[part="toolbar"]')!.hidden).toBe(true);
+    expect(renderer.element.dataset.editState).toBe('readonly');
+    editing.setEditable(true); expect(renderer.surface.getAttribute('aria-describedby')).toBeTruthy();
+    expect(host.querySelector<HTMLElement>('[part="toolbar"]')!.hidden).toBe(false);
+    renderer.dispose();
+  });
+
+  it('repaints only playback overlays for playback-only updates and leaves an unchanged status alone', () => {
+    const {editor, renderer, host} = mounted();
+    const rebuild = vi.spyOn(renderer.surface, 'replaceChildren');
+    const status = host.querySelector('[part="editing-status"]')!;
+    const writes = new MutationObserver(() => {}); writes.observe(status, {childList: true, characterData: true, subtree: true});
+    renderer.updatePlayback({seconds: .5}); writes.takeRecords(); rebuild.mockClear();
+    const playhead = host.querySelector('[data-playhead]')!;
+    renderer.updatePlayback({seconds: 1});
+    renderer.updatePlayback({seconds: 1.5});
+    expect(host.querySelector('[data-playhead]')).toBe(playhead);
+    expect(playhead.getAttribute('x1')).toBe(String(X(editor.score.timeMap.secondsToQuarters(1.5).toFloat())));
+    expect(rebuild).not.toHaveBeenCalled(); expect(writes.takeRecords()).toEqual([]);
+    editor.transaction('Move', (tx) => tx.add(move));
+    expect(rebuild).toHaveBeenCalled(); expect(host.querySelector('[data-playhead]')).not.toBe(playhead);
+    renderer.updatePlayback({seconds: null});
+    expect(host.querySelector('[data-playhead]')).toBeNull();
+    expect(renderer.element.dataset.playbackState).toBe('pending');
+    writes.disconnect(); renderer.dispose();
+  });
+
+  it('accepts a one-sided explicit pitch bound outside the default range', () => {
+    const builder = new ScoreBuilder(); builder.addPart({id: p, name: 'Piano'});
+    const editor = createScoreEditor(builder.build()); const editing = createScoreViewEditing(editor, {editable: true});
+    const host = document.createElement('div'); document.body.append(host);
+    for (const [bounds, lanes] of [[{maxPitch: 40}, 1], [{minPitch: 90}, 1], [{maxPitch: 60}, 13]] as const) {
+      const renderer = mountScoreGrid(host, {editing}, bounds);
+      expect(renderer.surface.getAttribute('height')).toBe(String(22 + lanes * 16)); renderer.dispose();
+    }
+    editing.dispose(); editor.dispose();
+  });
+
+  it('attaches nothing when mounted on an unavailable controller', () => {
+    const editor = createScoreEditor(fixture()); const editing = createScoreViewEditing(editor, {editable: true});
+    editing.dispose();
+    const added = vi.spyOn(window, 'addEventListener');
+    const host = document.createElement('div'); document.body.append(host);
+    expect(() => mountScoreGrid(host, {editing})).toThrow(/unavailable/);
+    expect(host.childElementCount).toBe(0); expect(added).not.toHaveBeenCalled();
+    editor.dispose();
+  });
+
+  it('offers exact numeric edits without intercepting text-field keys', () => {
+    const {editor, editing, renderer, host} = mounted(); editing.select([a]);
+    const field = host.querySelector<HTMLInputElement>('[aria-label="Onset (quarters)"]')!;
+    field.value = '1/3'; field.focus(); field.dispatchEvent(new KeyboardEvent('keydown', {key: 'Delete', bubbles: true}));
+    expect(editor.score.getNote(a)).toBeDefined();
+    [...host.querySelectorAll('button')].find((button) => button.getAttribute('aria-label') === 'Apply to selected note')!.click();
+    expect(editor.score.getNote(a)!.onsetQuarters.toJSON()).toEqual([1, 3]);
+    expect(editor.getState().history.undoCount).toBe(1);
+    renderer.dispose(); editing.dispose(); editor.dispose();
+  });
+
+  it('rejects empty numeric pitch and velocity instead of committing zero', () => {
+    const {editor, editing, renderer, host, commits} = mounted(); editing.select([a]);
+    const field = (label: string) => host.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)!;
+    const button = (label: string) => [...host.querySelectorAll('button')].find((node) => node.getAttribute('aria-label') === label)!;
+    const status = () => host.querySelector('[part="editing-status"]')!.textContent;
+    field('Written MIDI pitch').value = ''; button('Apply to selected note').click();
+    expect(status()).toMatch(/Written MIDI pitch must be an integer from 0 to 127/);
+    button('Insert note').click();
+    expect(editor.score.parts[0].notes).toHaveLength(2); expect(editor.score.getNote(a)!.pitch.midi).toBe(60);
+    field('Written MIDI pitch').value = '60'; field('Velocity').value = ''; button('Apply to selected note').click();
+    expect(status()).toMatch(/Velocity must be an integer from 1 to 127/);
+    expect(editor.getSnapshot().documentRevision).toBe(0); expect(commits).not.toHaveBeenCalled();
+    renderer.dispose();
+  });
+
+  it('submits only changed note values and treats an unchanged Apply as no change', () => {
+    const {editor, editing, renderer, host, commits} = mounted();
+    const field = (label: string) => host.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)!;
+    const apply = () => [...host.querySelectorAll('button')].find((node) => node.getAttribute('aria-label') === 'Apply to selected note')!.click();
+    editing.execute('Nudge', [{type: 'transpose-notes', noteIds: [b], semitones: 1}]); editing.undo();
+    editing.select([a]); const revision = editor.getSnapshot().documentRevision;
+    apply();
+    expect(editor.getSnapshot().documentRevision).toBe(revision); expect(editor.getState().history.canRedo).toBe(true);
+    expect(host.querySelector('[part="editing-status"]')!.textContent).toBe('No change'); expect(commits).not.toHaveBeenCalled();
+    field('Velocity').value = '70'; apply();
+    expect(commits).toHaveBeenCalledOnce();
+    expect(commits.mock.calls[0][0].change.operations.map((operation: ScoreEditOperation) => operation.type)).toEqual(['set-velocity']);
+    expect(editor.score.getNote(a)!.performed).toEqual({onsetSec: .45, durationSec: .48, velocity: 90});
+    renderer.dispose();
+  });
+
+  it('selects a non-first note through the native keyboard alternative and edits, deletes and undoes it', () => {
+    const {editor, editing, renderer, host, commits} = mounted();
+    const picker = host.querySelector<HTMLSelectElement>('[aria-label="Select existing note"]')!;
+    const field = (label: string) => host.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)!;
+    const button = (label: string) => [...host.querySelectorAll('button')].find((node) => node.getAttribute('aria-label') === label)!;
+    host.querySelector<HTMLButtonElement>('[part="values-toggle"]')!.click();
+    expect(host.querySelector<HTMLElement>('[part="note-properties"]')!.hidden).toBe(false);
+    picker.focus(); picker.value = 'note:b'; picker.dispatchEvent(new Event('change', {bubbles: true}));
+    expect(editing.state.interaction.selectedNoteIds).toEqual([b]); expect(document.activeElement).toBe(picker);
+    expect(field('Onset (quarters)').value).toBe('3'); expect(field('Written MIDI pitch').value).toBe('64');
+    expect(button('Apply to selected note').disabled).toBe(false); expect(editor.getSnapshot().documentRevision).toBe(0);
+    for (const key of ['ArrowLeft', 'Home', 'End', 'Delete']) picker.dispatchEvent(new KeyboardEvent('keydown', {key, bubbles: true}));
+    expect(editor.getSnapshot().documentRevision).toBe(0); expect(editor.score.getNote(b)).toBeDefined();
+    field('Onset (quarters)').focus(); field('Onset (quarters)').value = '7/2';
+    button('Apply to selected note').focus(); renderer.updatePlayback({seconds: .5});
+    expect(field('Onset (quarters)').value).toBe('7/2');
+    button('Apply to selected note').click();
+    expect(editor.score.getNote(b)!.onsetQuarters.toJSON()).toEqual([7, 2]); expect(editor.score.getNote(b)!.pitch.midi).toBe(64);
+    expect(editor.score.getNote(a)!.onsetQuarters.toJSON()).toEqual([1, 1]); expect(commits).toHaveBeenCalledOnce();
+    button('Delete selected notes').focus(); button('Delete selected notes').click();
+    expect(editor.score.getNote(b)).toBeUndefined(); expect(picker.value).toBe(''); expect(picker.querySelector('[value="note:b"]')).toBeNull();
+    button('Undo').focus(); button('Undo').click();
+    expect(editor.score.getNote(b)!.onsetQuarters.toJSON()).toEqual([7, 2]); expect(picker.querySelector('[value="note:b"]')).not.toBeNull();
+    expect(picker.value).toBe(''); expect(editing.state.interaction.selectedNoteIds).toEqual([]);
+    picker.focus(); picker.value = 'note:b'; picker.dispatchEvent(new Event('change', {bubbles: true}));
+    expect(field('Onset (quarters)').value).toBe('7/2'); expect(editor.getState().history.undoCount).toBe(1);
+    renderer.dispose(); editing.dispose(); editor.dispose();
+  });
+
+  it('labels stable note identities across parts and reflects external selection and document changes without stealing focus', () => {
+    const otherPart = PartId('other'); const builder = new ScoreBuilder();
+    for (const id of [p, otherPart]) builder.addPart({id, name: 'Piano'});
+    for (const [partId, id, onset] of [[p, 'late', 3], [p, 'early', 0], [otherPart, 'same-pitch', 0]] as const) {
+      builder.addNote(partId, {id: NoteId(id), pitch: Pitch.fromMidi(60), onsetQuarters: new Rational(onset), duration: Duration.quarter(), voice: VoiceId('1')});
+    }
+    const editor = createScoreEditor(builder.build()), editing = createScoreViewEditing(editor, {editable: true});
+    const host = document.createElement('div'); document.body.append(host); const renderer = mountScoreGrid(host, {editing});
+    // The keyboard alternative lives in the note-values card; a closed card's fields cannot take focus.
+    host.querySelector<HTMLButtonElement>('[part="values-toggle"]')!.click();
+    const picker = host.querySelector<HTMLSelectElement>('[aria-label="Select existing note"]')!;
+    expect([...picker.options].map((option) => option.value)).toEqual(['', 'note:early', 'note:late', 'note:same-pitch']);
+    expect(picker.options[1].textContent).toBe('Piano (part 1) · C4 · quarter 0 · voice 1 · note 1');
+    expect(picker.options[3].textContent).toBe('Piano (part 2) · C4 · quarter 0 · voice 1 · note 1');
+    picker.focus(); const changes = vi.fn(); picker.addEventListener('change', changes);
+    editing.select([NoteId('late')]); expect(picker.value).toBe('note:late');
+    const retained = picker.querySelector('[value="note:late"]'); renderer.updatePlayback({seconds: .5});
+    expect(picker.querySelector('[value="note:late"]')).toBe(retained);
+    editor.transaction('External edit', tx => tx.add({type: 'transpose-notes', noteIds: [NoteId('late')], semitones: 2}));
+    expect(picker.value).toBe('note:late'); expect(picker.selectedOptions[0].textContent).toContain('D4');
+    expect(host.querySelector<HTMLInputElement>('[aria-label="Written MIDI pitch"]')!.value).toBe('62');
+    expect(document.activeElement).toBe(picker); expect(changes).not.toHaveBeenCalled();
+    editing.select([NoteId('early'), NoteId('same-pitch')]);
+    expect(picker.selectedOptions[0].textContent).toBe('2 notes selected'); expect(picker.selectedOptions[0].disabled).toBe(true);
+    expect(editing.state.interaction.selectedNoteIds).toEqual([NoteId('early'), NoteId('same-pitch')]);
+    const revision = editor.getSnapshot().documentRevision;
+    host.querySelector('form')!.dispatchEvent(new Event('submit', {bubbles: true, cancelable: true}));
+    expect(editor.getSnapshot().documentRevision).toBe(revision);
+    picker.value = ''; picker.dispatchEvent(new Event('change', {bubbles: true})); expect(editing.state.interaction.selectedNoteIds).toEqual([]);
+    // A read-only grid hides its numeric alternative; its handlers stay inert.
+    editing.setEditable(false); expect(host.querySelector<HTMLDetailsElement>('[part="note-properties"]')!.hidden).toBe(true);
+    picker.value = 'note:late'; picker.dispatchEvent(new Event('change', {bubbles: true})); expect(editing.state.interaction.selectedNoteIds).toEqual([]);
+    renderer.dispose(); editing.dispose(); editor.dispose();
+  });
+
+  it.each(['input', 'Apply'])('refreshes numeric values after shared selection changes while %s retains focus', (focused) => {
+    const {editor, editing, renderer, host} = mounted();
+    const peer = createScoreViewEditing(editor, {interactionSession: editing.session});
+    const field = (label: string) => host.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)!;
+    const apply = [...host.querySelectorAll('button')].find((button) => button.getAttribute('aria-label') === 'Apply to selected note')!;
+    host.querySelector<HTMLButtonElement>('[part="values-toggle"]')!.click();
+    editing.select([a]); field('Written MIDI pitch').value = '72';
+    const active = focused === 'input' ? field('Written MIDI pitch') : apply; active.focus();
+    peer.select([b]);
+    expect(document.activeElement).toBe(active);
+    expect(host.querySelector<HTMLSelectElement>('[aria-label="Select existing note"]')!.value).toBe('note:b');
+    expect(field('Onset (quarters)').value).toBe('3'); expect(field('Written MIDI pitch').value).toBe('64');
+    expect(editor.getSnapshot().documentRevision).toBe(0);
+    apply.click();
+    expect(editor.score.getNote(a)!.onsetQuarters.toString()).toBe('1'); expect(editor.score.getNote(a)!.pitch.midi).toBe(60);
+    expect(editor.score.getNote(b)!.onsetQuarters.toString()).toBe('3'); expect(editor.score.getNote(b)!.pitch.midi).toBe(64);
+    peer.dispose(); renderer.dispose(); editing.dispose(); editor.dispose();
+  });
+
+  it('refreshes fields on same-note revisions and history changes but preserves pending values within one binding', () => {
+    const {editor, editing, renderer, host} = mounted(); editing.select([a]);
+    host.querySelector<HTMLButtonElement>('[part="values-toggle"]')!.click();
+    const field = (label: string) => host.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)!;
+    const apply = [...host.querySelectorAll('button')].find((button) => button.getAttribute('aria-label') === 'Apply to selected note')!;
+    field('Onset (quarters)').value = '9'; field('Written MIDI pitch').value = '72'; apply.focus();
+    editor.transaction('External change', (tx) => {
+      tx.add({type: 'move-notes', noteIds: [a], deltaQuarters: [1, 1]});
+      tx.add({type: 'transpose-notes', noteIds: [a], semitones: 2});
+      tx.add({type: 'set-velocity', noteIds: [a], velocity: 98});
+    });
+    expect(document.activeElement).toBe(apply);
+    expect(field('Onset (quarters)').value).toBe('2'); expect(field('Written MIDI pitch').value).toBe('62');
+    expect(field('Velocity').value).toBe('98');
+    apply.click(); expect(editor.getSnapshot().documentRevision).toBe(1);
+    editor.undo(); expect(field('Onset (quarters)').value).toBe('1'); expect(field('Written MIDI pitch').value).toBe('60');
+    editor.redo(); expect(field('Onset (quarters)').value).toBe('2'); expect(field('Written MIDI pitch').value).toBe('62');
+    field('Onset (quarters)').value = '5/2';
+    editing.select([a]); editor.markSaved(); renderer.updatePlayback({seconds: .5});
+    expect(field('Onset (quarters)').value).toBe('5/2');
+    renderer.surface.focus(); renderer.updatePlayback({seconds: .5});
+    expect(field('Onset (quarters)').value).toBe('5/2');
+    apply.click(); expect(editor.score.getNote(a)!.onsetQuarters.toJSON()).toEqual([5, 2]);
+    renderer.dispose(); editing.dispose(); editor.dispose();
+  });
+
+  it('keeps insertion values usable through empty or multiple selection without applying a deleted target', () => {
+    const {editor, editing, renderer, host} = mounted(); editing.select([a]);
+    const field = (label: string) => host.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)!;
+    const button = (label: string) => [...host.querySelectorAll('button')].find((node) => node.getAttribute('aria-label') === label)!;
+    field('Onset (quarters)').focus(); field('Onset (quarters)').value = '5';
+    field('Written MIDI pitch').value = '72'; field('Duration (quarters)').value = '1/2'; field('Velocity').value = '65';
+    editor.transaction('Delete externally', (tx) => tx.add({type: 'delete-notes', noteIds: [a]}));
+    expect(button('Apply to selected note').disabled).toBe(true);
+    host.querySelector('form')!.dispatchEvent(new Event('submit', {bubbles: true, cancelable: true}));
+    expect(editor.getSnapshot().documentRevision).toBe(1);
+    editor.undo(); expect(editing.state.interaction.selectedNoteIds).toEqual([]);
+    editing.select([a, b]); renderer.updatePlayback({seconds: .5});
+    expect(field('Onset (quarters)').value).toBe('5'); expect(field('Written MIDI pitch').value).toBe('72');
+    host.querySelector('form')!.dispatchEvent(new Event('submit', {bubbles: true, cancelable: true}));
+    expect(editor.getSnapshot().documentRevision).toBe(2);
+    button('Insert note').focus(); button('Insert note').click();
+    const inserted = editor.score.parts[0].notes.find((note) => note.id !== a && note.id !== b)!;
+    expect(inserted.onsetQuarters.toString()).toBe('5'); expect(inserted.pitch.midi).toBe(72);
+    expect(inserted.duration.quarters.toJSON()).toEqual([1, 2]); expect(inserted.velocity).toBe(65);
+    expect(editing.state.interaction.selectedNoteIds).toEqual([inserted.id]);
+    expect(field('Onset (quarters)').value).toBe('5');
+    editor.undo(); expect(editing.state.interaction.selectedNoteIds).toEqual([]);
+    editor.redo(); expect(editing.state.interaction.selectedNoteIds).toEqual([]);
+    expect(button('Apply to selected note').disabled).toBe(true);
+    editing.select([a]); expect(field('Onset (quarters)').value).toBe('1'); expect(field('Written MIDI pitch').value).toBe('60');
+    renderer.dispose(); editing.dispose(); editor.dispose();
+  });
+
+  it('keeps the numeric baseline on committed content while rendering a shared preview', () => {
+    const {editor, editing, renderer, host} = mounted(); editing.select([a]);
+    renderer.surface.focus(); editing.preview([move]);
+    expect(host.querySelector('[data-note-id="a"]')!.getAttribute('x')).toBe(String(X(1.25)));
+    expect(host.querySelector<HTMLInputElement>('[aria-label="Onset (quarters)"]')!.value).toBe('1');
+    [...host.querySelectorAll('button')].find((button) => button.getAttribute('aria-label') === 'Apply to selected note')!.click();
+    expect(editing.state.interaction.draft).toBeUndefined();
+    expect(editor.score.getNote(a)!.onsetQuarters.toString()).toBe('1');
+    expect(editor.score.getNote(a)!.performed).toEqual({onsetSec: .45, durationSec: .48, velocity: 90});
+    renderer.dispose(); editing.dispose(); editor.dispose();
+  });
+
+  it('rejects a numeric edit superseded by a document change while cancelling the shared draft', () => {
+    const {editor, editing, renderer, host, commits} = mounted(); editing.select([a]);
+    const field = host.querySelector<HTMLInputElement>('[aria-label="Onset (quarters)"]')!;
+    field.focus(); field.value = '2'; editing.preview([move]);
+    let replace = true;
+    const off = editing.session.subscribe((snapshot) => {
+      if (replace && !snapshot.draft) {
+        replace = false;
+        editor.transaction('External transpose', (tx) => tx.add({type: 'transpose-notes', noteIds: [a], semitones: 3}));
+      }
+    });
+    [...host.querySelectorAll('button')].find((button) => button.getAttribute('aria-label') === 'Apply to selected note')!.click();
+    expect(editor.getSnapshot().documentRevision).toBe(1);
+    expect(editor.score.getNote(a)!.onsetQuarters.toString()).toBe('1'); expect(editor.score.getNote(a)!.pitch.midi).toBe(63);
+    expect(commits).not.toHaveBeenCalled(); expect(host.querySelector('[part="editing-status"]')!.textContent).toMatch(/changed.*review/i);
+    off(); renderer.dispose(); editing.dispose(); editor.dispose();
+  });
+
+  it.each(['resize', 'move', 'transpose', 'delete-key', 'delete-button', 'double-click'] as const)(
+    'rejects captured %s commands when cancelling a shared draft commits an external revision', (command) => {
+      const {editor, editing, renderer, host, commits} = mounted(); editing.select([a]); editing.preview([move]);
+      let replace = true;
+      const off = editing.session.subscribe((snapshot) => {
+        if (replace && !snapshot.draft) {
+          replace = false;
+          editor.transaction('External resize', (tx) => tx.add({type: 'resize-notes', noteIds: [a], durationQuarters: [4, 1]}));
+        }
+      });
+      if (command === 'delete-button') host.querySelector<HTMLButtonElement>('[part="delete-button"]')!.click();
+      else if (command === 'double-click') renderer.surface.dispatchEvent(new MouseEvent('dblclick', {clientX: X(6.25), clientY: Y(64), bubbles: true}));
+      else renderer.surface.dispatchEvent(new KeyboardEvent('keydown', {
+        key: command === 'delete-key' ? 'Delete' : command === 'transpose' ? 'ArrowUp' : 'ArrowRight',
+        shiftKey: command === 'resize', bubbles: true,
+      }));
+      expect(editor.getSnapshot().documentRevision).toBe(1);
+      expect(editor.score.getNote(a)!.duration.quarters.toString()).toBe('4');
+      expect(editor.score.getNote(a)!.onsetQuarters.toString()).toBe('1'); expect(editor.score.getNote(a)!.pitch.midi).toBe(60);
+      expect(editor.score.parts[0].notes).toHaveLength(2);
+      expect(commits).not.toHaveBeenCalled(); expect(host.querySelector('[part="editing-status"]')!.textContent).toMatch(/changed.*review/i);
+      off(); renderer.dispose(); editing.dispose(); editor.dispose();
+    });
+
+  it.each(['undo-key', 'redo-key', 'undo-button', 'redo-button'] as const)(
+    'does not redirect %s to history committed by draft cancellation', (command) => {
+      const {editor, editing, renderer, host, commits} = mounted();
+      editing.execute('Original edit', [move]);
+      if (command.startsWith('redo')) editing.undo();
+      editing.select([a]); editing.preview([move]);
+      const revision = editor.getSnapshot().documentRevision;
+      let replace = true;
+      const off = editing.session.subscribe((snapshot) => {
+        if (replace && !snapshot.draft) {
+          replace = false;
+          editor.transaction('External resize', (tx) => tx.add({type: 'resize-notes', noteIds: [a], durationQuarters: [4, 1]}));
+        }
+      });
+      if (command.endsWith('button')) host.querySelector<HTMLButtonElement>(`[part="history-button"][aria-label="${command.startsWith('redo') ? 'Redo' : 'Undo'}"]`)!.click();
+      else renderer.surface.dispatchEvent(new KeyboardEvent('keydown', {key: 'z', ctrlKey: true, shiftKey: command.startsWith('redo'), bubbles: true}));
+      expect(editor.getSnapshot().documentRevision).toBe(revision + 1);
+      expect(editor.score.getNote(a)!.duration.quarters.toString()).toBe('4');
+      expect(commits).not.toHaveBeenCalled(); expect(host.querySelector('[part="editing-status"]')!.textContent).toMatch(/changed.*review/i);
+      off(); renderer.dispose(); editing.dispose(); editor.dispose();
+    });
+
+  it('rejects a captured keyboard command when cancellation redirects the selection without changing content', () => {
+    const {editor, editing, renderer, host, commits} = mounted(); editing.select([a]); editing.preview([move]);
+    let cancelledPublications = 0;
+    const off = editing.subscribe((state) => {
+      // The session cancellation publishes first; the view's own publication
+      // follows after the session has left its publication lock.
+      if (!state.interaction.draft && ++cancelledPublications === 2) editing.select([b]);
+    });
+    renderer.surface.dispatchEvent(new KeyboardEvent('keydown', {key: 'Delete', bubbles: true}));
+    expect(editing.state.interaction.selectedNoteIds).toEqual([b]);
+    expect(editor.getSnapshot().documentRevision).toBe(0); expect(editor.score.getNote(a)).toBeDefined();
+    expect(commits).not.toHaveBeenCalled(); expect(host.querySelector('[part="editing-status"]')!.textContent).toMatch(/changed.*review/i);
+    off(); renderer.dispose(); editing.dispose(); editor.dispose();
+  });
+
+  it.each(['readonly', 'view-dispose', 'surface-dispose', 'editor-dispose'] as const)(
+    'stops the pending keyboard command after cancellation causes %s', (action) => {
+      const {editor, editing, renderer, commits} = mounted(); editing.select([a]); editing.preview([move]);
+      const execute = vi.spyOn(editing, 'execute');
+      let cancel = true;
+      const off = editing.session.subscribe((snapshot) => {
+        if (cancel && !snapshot.draft) {
+          cancel = false;
+          if (action === 'readonly') editing.setEditable(false);
+          else if (action === 'view-dispose') editing.dispose();
+          else if (action === 'surface-dispose') renderer.dispose();
+          else editor.dispose();
+        }
+      });
+      renderer.surface.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowRight', shiftKey: true, bubbles: true}));
+      expect(editor.getSnapshot().documentRevision).toBe(0); expect(editor.score.getNote(a)!.duration.quarters.toString()).toBe('1');
+      expect(execute).not.toHaveBeenCalled(); expect(commits).not.toHaveBeenCalled();
+      off(); renderer.dispose(); editing.dispose(); editor.dispose();
+    });
+
+  it.each(['resize', 'insert'] as const)('does not begin a %s gesture after cancellation replaces its captured content', (kind) => {
+    const {editor, editing, renderer, host, commits, previews} = mounted(); editing.select([a]); editing.preview([move]);
+    let replace = true;
+    const off = editing.session.subscribe((snapshot) => {
+      if (replace && !snapshot.draft) {
+        replace = false;
+        editor.transaction('External resize', (tx) => tx.add({type: 'resize-notes', noteIds: [a], durationQuarters: [4, 1]}));
+      }
+    });
+    const inserting = kind === 'insert';
+    // The draft shows `a` a sixteenth later, so its right edge is at quarter 2.25.
+    pointer(inserting ? renderer.surface : host.querySelector('[data-note-id="a"]')!, 'pointerdown', inserting ? X(5) : X(2.25) - 2, Y(60), {altKey: inserting});
+    pointer(renderer.surface, 'pointermove', X(5.5), Y(60)); pointer(renderer.surface, 'pointerup', X(5.5), Y(60));
+    expect(editor.getSnapshot().documentRevision).toBe(1); expect(editor.score.getNote(a)!.duration.quarters.toString()).toBe('4');
+    expect(editor.score.parts[0].notes).toHaveLength(2); expect(editing.state.interaction.draft).toBeUndefined();
+    expect(commits).not.toHaveBeenCalled(); expect(previews).not.toHaveBeenCalled();
+    off(); renderer.dispose(); editing.dispose(); editor.dispose();
+  });
+
+  it('does not begin a note gesture when selecting its target commits a replacement revision', () => {
+    const {editor, editing, renderer, host, commits, previews} = mounted();
+    let replace = true;
+    const off = editing.session.subscribe((snapshot) => {
+      if (replace && snapshot.selectedNoteIds.includes(a)) {
+        replace = false;
+        editor.transaction('External resize', (tx) => tx.add({type: 'resize-notes', noteIds: [a], durationQuarters: [4, 1]}));
+      }
+    });
+    pointer(host.querySelector('[data-note-id="a"]')!, 'pointerdown', X(2) - 2, Y(60));
+    pointer(renderer.surface, 'pointermove', X(5.5), Y(60)); pointer(renderer.surface, 'pointerup', X(5.5), Y(60));
+    expect(editor.getSnapshot().documentRevision).toBe(1); expect(editor.score.getNote(a)!.duration.quarters.toString()).toBe('4');
+    expect(commits).not.toHaveBeenCalled(); expect(previews).not.toHaveBeenCalled();
+    off(); renderer.dispose(); editing.dispose(); editor.dispose();
+  });
+
+  it('rejects a gesture commit when cancellation redirects its selection', () => {
+    const {editor, editing, renderer, host, commits} = mounted();
+    pointer(host.querySelector('[data-note-id="a"]')!, 'pointerdown', X(1) + 6, Y(60));
+    pointer(renderer.surface, 'pointermove', X(1) + 22, Y(60));
+    expect(editing.state.interaction.draft).toBeDefined();
+    let cancelledPublications = 0;
+    const off = editing.subscribe((state) => {
+      if (!state.interaction.draft && ++cancelledPublications === 2) editing.select([b]);
+    });
+    pointer(renderer.surface, 'pointerup', X(1) + 22, Y(60));
+    expect(editing.state.interaction.selectedNoteIds).toEqual([b]);
+    expect(editor.getSnapshot().documentRevision).toBe(0); expect(editor.score.getNote(a)!.onsetQuarters.toString()).toBe('1');
+    expect(commits).not.toHaveBeenCalled();
+    off(); renderer.dispose(); editing.dispose(); editor.dispose();
+  });
+
+  it('stays disposed when its gesture cancellation callback dispatches another command', () => {
+    const {editor, editing, renderer, host, commits} = mounted();
+    pointer(host.querySelector('[data-note-id="a"]')!, 'pointerdown', X(1) + 6, Y(60));
+    pointer(renderer.surface, 'pointermove', X(1) + 22, Y(60));
+    let pending = true;
+    const off = editing.session.subscribe((snapshot) => {
+      if (pending && !snapshot.draft) {
+        pending = false;
+        renderer.surface.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowRight', bubbles: true}));
+      }
+    });
+    renderer.dispose();
+    expect(editor.getSnapshot().documentRevision).toBe(0); expect(editing.state.interaction.draft).toBeUndefined();
+    expect(renderer.element.isConnected).toBe(false); expect(commits).not.toHaveBeenCalled();
+    off(); editing.dispose(); editor.dispose();
+  });
+
+  it('draws an inserted-note draft with Alt-drag, clamps a drag at the score start and discards the last valid draft after a failed preview', () => {
+    const {editor, editing, renderer, host, commits} = mounted();
+    pointer(renderer.surface, 'pointerdown', X(5), Y(64), {altKey: true});
+    pointer(renderer.surface, 'pointermove', X(5.5), Y(64));
+    expect(editor.score.parts[0].notes).toHaveLength(2);
+    expect(host.querySelector('[data-draft="true"]')).toBeTruthy();
+    pointer(renderer.surface, 'pointerup', X(5.5), Y(64));
+    expect(editor.score.parts[0].notes).toHaveLength(3);
+    expect(editor.score.parts[0].notes.find((note) => note.onsetQuarters.eq(new Rational(5)))!.duration.quarters.toJSON()).toEqual([1, 2]);
+    expect(commits).toHaveBeenCalledOnce();
+    // Dragging before the score start clamps at quarter 0 instead of failing the drag.
+    pointer(host.querySelector('[data-note-id="a"]')!, 'pointerdown', X(1) + 6, Y(60));
+    pointer(renderer.surface, 'pointermove', -100, Y(60)); pointer(renderer.surface, 'pointerup', -100, Y(60));
+    expect(editor.score.getNote(a)!.onsetQuarters.toJSON()).toEqual([0, 1]);
+    expect(editor.getState().history.undoCount).toBe(2);
+    // A later failed preview discards the last valid draft; release commits nothing.
+    pointer(host.querySelector('[data-note-id="a"]')!, 'pointerdown', X(0) + 6, Y(60));
+    pointer(renderer.surface, 'pointermove', X(0) + 22, Y(60));
+    expect(editing.state.interaction.draft).toBeDefined();
+    vi.spyOn(editing, 'preview').mockReturnValueOnce({status: 'failed', error: new ScoreEditError('invalid-command', 'Rejected preview')});
+    pointer(renderer.surface, 'pointermove', X(0) + 38, Y(60));
+    expect(editing.state.interaction.draft).toBeUndefined();
+    expect(host.querySelector('[part="editing-status"]')!.textContent).toBe('Rejected preview');
+    pointer(renderer.surface, 'pointerup', X(0) + 38, Y(60));
+    expect(editor.score.getNote(a)!.onsetQuarters.toJSON()).toEqual([0, 1]);
+    expect(editor.getState().history.undoCount).toBe(2); expect(commits).toHaveBeenCalledTimes(2);
+    renderer.dispose(); editing.dispose(); editor.dispose();
+  });
+
+  it('does not cancel another surface’s shared draft when a passive surface disconnects', () => {
+    const editor = createScoreEditor(fixture()); const shared = editor.createInteractionSession();
+    const editing = createScoreViewEditing(editor, {interactionSession: shared, editable: true});
+    const host = document.createElement('div'); document.body.append(host);
+    const renderer = mountScoreGrid(host, {editing});
+    shared.preview([move]); renderer.dispose(); editing.dispose();
+    expect(shared.getSnapshot().draft).toBeDefined(); expect(shared.getSnapshot().disposed).toBe(false); editor.dispose();
+  });
+});
+
+type PlaybackHost = HTMLDivElement & {playback: {snapshot(): ScorePlaybackSnapshot; subscribe(listener: (snapshot: ScorePlaybackSnapshot) => void): () => void}};
+function gridView(): ScoreGridViewElement { return document.createElement('editing-score-grid-view') as ScoreGridViewElement; }
+const editingSurface = (view: Element) => view.querySelector('[part="grid"][data-edit-state="ready"] [part="surface"]');
+
+describe('score-grid-view editor composition', () => {
+  it('renders object-bound editing, commits events, rejects conflicts and releases only owned sessions', () => {
+    const editor = createScoreEditor(fixture()); const view = gridView();
+    view.editor = editor; view.editable = true; document.body.append(view);
+    expect(view.getAttribute('data-editor-state')).toBe('ready'); expect(editingSurface(view)).toBeTruthy();
+    const session = view.interactionSession!; const commit = vi.fn(); view.addEventListener('editcommit', commit);
+    session.setSelection([a]); view.querySelector('[part="surface"]')!.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowRight', bubbles: true}));
+    expect(commit).toHaveBeenCalledOnce();
+    expect(() => { view.score = fixture(); }).toThrow(/source-conflict/);
+    view.setAttribute('src', 'conflict.mid'); expect(view.getAttribute('data-editor-state')).toBe('source-conflict');
+    view.removeAttribute('src'); expect(view.getAttribute('data-editor-state')).toBe('ready');
+    const current = view.interactionSession!; view.remove(); expect(current.getSnapshot().disposed).toBe(true);
+    expect(editor.getSnapshot().status).toBe('ready'); editor.dispose();
+  });
+
+  it('replaces and detaches assigned editors without disposing them', () => {
+    const first = createScoreEditor(fixture()); const second = createScoreEditor(fixture());
+    const view = gridView(); view.editor = first; view.editable = true;
+    document.body.append(view); expect(view.editor).toBe(first);
+    const old = view.interactionSession!;
+    view.editor = second; expect(view.editor).toBe(second);
+    expect(old.getSnapshot().disposed).toBe(true);
+    expect(view.interactionSession!.getSnapshot().documentId).toBe(second.getSnapshot().documentId);
+    view.editor = undefined; expect(view.editor).toBeUndefined();
+    expect(view.hasAttribute('data-editor-state')).toBe(false);
+    expect(view.querySelector('[part="grid"]')).toBeNull();
+    expect(first.getSnapshot().status).toBe('ready'); expect(second.getSnapshot().status).toBe('ready');
+    view.remove(); first.dispose(); second.dispose();
+  });
+
+  it('removes the editing surface when an assigned editor is disposed by its owner', () => {
+    const editor = createScoreEditor(fixture());
+    const view = gridView(); view.editor = editor; view.editable = true;
+    document.body.append(view);
+    expect(view.querySelector('[part="grid"]')).not.toBeNull();
+    expect(editingSurface(view)).not.toBeNull();
+    editor.dispose();
+    expect(view.getAttribute('data-editor-state')).toBe('unavailable');
+    expect(view.querySelector('[part="grid"]')).toBeNull();
+    expect(view.textContent).toContain('Waiting for a score');
+    expect(view.editor).toBe(editor);
+    view.remove();
+  });
+
+  it('suppresses old playback and clears overlays when the player is detached', () => {
+    const editor = createScoreEditor(fixture());
+    const source = playback(editor, {activeNotes: [{occurrenceId: 'a', noteId: a, partId: p, midi: 60, nominalStartSeconds: .45, nominalEndSeconds: .93}]});
+    const player = document.createElement('div') as PlaybackHost;
+    player.id = 'player'; player.playback = {snapshot: () => source, subscribe: (listener) => { listener(source); return () => {}; }};
+    const view = gridView();
+    view.editor = editor; view.setAttribute('player', '#player'); document.body.append(player, view);
+    expect(view.querySelector('[data-playhead]')).toBeTruthy();
+    expect(view.querySelector('[data-note-id="a"]')!.getAttribute('data-active')).toBe('true');
+    editor.transaction('Move', (tx) => tx.add(move)); expect(view.querySelector('[data-playhead]')).toBeNull();
+    expect(view.querySelector('[data-note-id="a"]')!.getAttribute('data-active')).toBe('false');
+    expect(view.querySelector('[part="grid"]')!.getAttribute('data-playback-state')).toBe('pending');
+    view.removeAttribute('player'); expect(view.querySelector('[data-playhead]')).toBeNull();
+    expect(view.querySelector('[part="grid"]')!.getAttribute('data-playback-state')).toBe('unbound');
+    view.remove(); editor.dispose();
+  });
+
+  it('compares a bound player with committed content, not the view’s local draft', () => {
+    const editor = createScoreEditor(fixture()); const source = playback(editor);
+    let publish = (_: ScorePlaybackSnapshot) => {};
+    const player = document.createElement('div') as PlaybackHost;
+    player.id = 'draft-player'; player.playback = {snapshot: () => source, subscribe: (listener) => { publish = listener; listener(source); return () => {}; }};
+    const view = gridView();
+    view.editor = editor; view.editable = true; view.setAttribute('player', '#draft-player'); document.body.append(player, view);
+    view.interactionSession!.preview([move]); publish(source);
+    expect(view.getAttribute('data-player-state')).toBe('ready'); expect(view.getAttribute('data-playback-state')).toBe('ready');
+    view.remove(); editor.dispose();
+  });
+
+  it('reflects editable state only for editor-bound or editable views and accepts grid geometry through attributes', () => {
+    const passive = gridView();
+    passive.score = fixture(); document.body.append(passive);
+    expect(passive.hasAttribute('data-editable-state')).toBe(false);
+    passive.editable = true; expect(passive.getAttribute('data-editable-state')).toBe('unavailable');
+    passive.editable = false; expect(passive.hasAttribute('data-editable-state')).toBe(false);
+    const editor = createScoreEditor(fixture()); const view = gridView();
+    view.editor = editor; document.body.append(view); expect(view.getAttribute('data-editable-state')).toBe('readonly');
+    view.setAttribute('pixels-per-quarter', '32'); view.setAttribute('snap', '1/8');
+    expect(view.querySelector('[data-note-id="a"]')!.getAttribute('x')).toBe('80');
+    view.remove(); passive.remove(); editor.dispose();
+  });
+
+  it('keeps its editing session across format changes and clears stale content without an alert on detach', () => {
+    const editor = createScoreEditor(fixture());
+    const view = gridView(); view.editor = editor; view.editable = true;
+    document.body.append(view);
+    const session = view.interactionSession!; session.setSelection([a]);
+    view.setAttribute('format', 'midi');
+    expect(view.interactionSession).toBe(session); expect(session.getSnapshot().selectedNoteIds).toEqual([a]);
+    view.editor = undefined;
+    expect(session.getSnapshot().disposed).toBe(true);
+    // The previous editor's notes and editing surface are gone; detaching is not an error.
+    expect(view.querySelector('[data-note-id]')).toBeNull();
+    expect(view.querySelector('[part="grid"]')).toBeNull();
+    expect(view.hasAttribute('data-editor-state')).toBe(false);
+    expect(view.querySelector('[role="alert"]')).toBeNull();
+    view.remove(); editor.dispose();
+  });
+});
+
+describe('read-only score-view with an editor', () => {
+  const pitches = (view: Element) => [...view.querySelectorAll<SVGElement>('rect.note')].map((note) => Number(note.dataset.pitch));
+
+  it('draws the editor’s content and redraws after commits and shared drafts without offering editing', () => {
+    expect(ScoreViewElement.observedAttributes).not.toContain('editable');
+    const editor = createScoreEditor(fixture()); const view = document.createElement('editing-score-view') as ScoreViewElement;
+    const edits = vi.fn();
+    for (const type of ['editpreview', 'editcommit', 'editerror']) view.addEventListener(type, edits);
+    view.setAttribute('editable', ''); view.editor = editor; document.body.append(view);
+    expect(view.getAttribute('data-editor-state')).toBe('ready');
+    expect(view.hasAttribute('data-editable-state')).toBe(false);
+    expect('editable' in view).toBe(false);
+    expect(view.querySelector('[part="grid"], [part="toolbar"], [tabindex="0"]')).toBeNull();
+    expect(pitches(view).sort()).toEqual([60, 64]);
+    // The view's own editing controller stays read-only even though `editable` is present.
+    expect(view.interactionSession).toBeDefined();
+    editor.transaction('Transpose', (tx) => tx.add({type: 'transpose-notes', noteIds: [a], semitones: 7}));
+    expect(view.score).toBe(editor.score);
+    expect(pitches(view).sort()).toEqual([64, 67]);
+    // A same-session draft from another surface is visible here, read-only.
+    view.interactionSession!.preview([{type: 'transpose-notes', noteIds: [b], semitones: 1}]);
+    expect(pitches(view).sort()).toEqual([65, 67]);
+    view.interactionSession!.cancelDraft();
+    expect(pitches(view).sort()).toEqual([64, 67]);
+    view.querySelector('svg')?.dispatchEvent(new KeyboardEvent('keydown', {key: 'Delete', bubbles: true}));
+    expect(editor.getSnapshot().documentRevision).toBe(1); expect(edits).not.toHaveBeenCalled();
+    view.remove(); editor.dispose();
+  });
+
+  it('follows document playback only while the player snapshot addresses the committed revision', () => {
+    const editor = createScoreEditor(fixture());
+    const source = playback(editor, {activeNotes: [{occurrenceId: 'a', noteId: a, partId: p, midi: 60, nominalStartSeconds: .45, nominalEndSeconds: .93}]});
+    const player = document.createElement('div') as PlaybackHost;
+    player.id = 'read-only-player'; player.playback = {snapshot: () => source, subscribe: (listener) => { listener(source); return () => {}; }};
+    const view = document.createElement('editing-score-view') as ScoreViewElement;
+    view.editor = editor; view.setAttribute('player', '#read-only-player'); document.body.append(player, view);
+    expect(view.active).toEqual([60]); expect(view.getAttribute('data-playback-state')).toBe('ready');
+    view.type = 'waterfall'; view.type = 'piano-roll'; expect(view.active).toEqual([60]);
+    editor.transaction('Move', (tx) => tx.add(move));
+    expect(view.active).toEqual([]); expect(view.getAttribute('data-playback-state')).toBe('pending');
+    view.removeAttribute('player'); expect(view.active).toEqual([]);
+    expect(view.getAttribute('data-playback-state')).toBe('unbound');
+    view.remove(); editor.dispose();
+  });
+
+  it('removes its content when an assigned editor is disposed by its owner', () => {
+    const editor = createScoreEditor(fixture());
+    const view = document.createElement('editing-score-view') as ScoreViewElement; view.editor = editor;
+    document.body.append(view);
+    expect(pitches(view)).toHaveLength(2);
+    editor.dispose();
+    expect(view.getAttribute('data-editor-state')).toBe('unavailable');
+    expect(pitches(view)).toHaveLength(0);
+    expect(view.textContent).toContain('Waiting for a score');
+    view.remove();
+  });
+});

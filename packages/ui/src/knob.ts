@@ -1,5 +1,7 @@
 import {addClassNames, clamp01, setParts} from './internal/dom';
 import {mountSurfaceSlider, type SurfaceSliderHandle} from './stage';
+import {controlHeight} from './internal/control';
+import {neutralColor} from './internal/palette';
 
 /**
  * The kit's shared rotary control: a painted arc with a pointer, running on a
@@ -67,13 +69,14 @@ export interface KnobHandle {
  * What inline geometry cannot express: focus and disabled affordances.
  */
 export const knobStyle = String.raw`
-.wui-knob:focus-visible {
-  outline: 2px solid var(--wm-focus, var(--wm-foreground, #111));
-  outline-offset: 2px;
+:where(.wui-knob:focus-visible) {
+  outline: var(--wm-focus-ring, 2px solid var(--wm-foreground, ${neutralColor('foreground')}));
+  outline-offset: -2px;
 }
 
-.wui-knob[aria-disabled='true'] {
-  opacity: 0.45;
+/* Matches the fader and transport it sits beside (styles.ts), which still use .45. */
+:where(.wui-knob[aria-disabled='true']) {
+  opacity: .45;
   cursor: default;
 }
 `;
@@ -131,8 +134,11 @@ export function createKnob(document: Document, options: KnobOptions): KnobHandle
   element.style.position = 'relative';
   element.style.boxSizing = 'border-box';
   element.style.flex = '0 0 auto';
-  element.style.width = 'var(--wm-knob-size, 2.25rem)';
-  element.style.height = 'var(--wm-knob-size, 2.25rem)';
+  // The shared control height, not a private literal. The dial is read by
+  // angle from its centre, so its size never changes the drag geometry.
+  const size = `var(--wm-knob-size, ${controlHeight('knob')})`;
+  element.style.width = size;
+  element.style.height = size;
   element.style.cursor = 'pointer';
   element.style.touchAction = 'none';
 
@@ -208,7 +214,11 @@ export function createKnob(document: Document, options: KnobOptions): KnobHandle
         const cx = point.rect.width / 2;
         const cy = point.rect.height / 2;
         const degrees = (Math.atan2(point.x - cx, cy - point.y) * 180) / Math.PI;
-        return (degrees + SWEEP / 2) / SWEEP;
+        const fraction = (degrees + SWEEP / 2) / SWEEP;
+        // Inside the bottom dead zone the angle wraps from +180° to -180°; hold
+        // the end the dial was last nearest instead of flipping across it.
+        if (fraction < 0 || fraction > 1) return level >= 0.5 ? 1 : 0;
+        return fraction;
       },
       commit: (value) => {
         const next = clamp01(value);

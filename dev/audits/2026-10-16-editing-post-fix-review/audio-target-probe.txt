@@ -1,0 +1,93 @@
+// @vitest-environment jsdom
+import {afterEach, beforeAll, beforeEach, describe, expect, it, vi} from 'vitest';
+import {createAudioClip, createRegion, type AudioDocumentPlaybackBinding, type AudioPeaks} from '../../src/core';
+import {createAudioClipEditor} from '../../src/edit/headless';
+import {createAudioViewEditing} from '../../src/view/headless/audio-editing';
+import type {AudioViewport, AudioWaveformSource, WaveformRenderOptions} from '../../src/view/core/types';
+
+const spies = vi.hoisted(() => ({render: vi.fn()}));
+vi.mock('../../src/view/render/waveform', () => ({renderWaveformVisualizer: spies.render}));
+import {mountWaveformEditor} from '../../src/view/render/waveform-editor';
+import {defineAudioViewElement, type AudioViewElement} from '../../src/view/element/audio-view';
+
+const cleanups: (() => void)[] = [];
+beforeAll(() => defineAudioViewElement('editing-audio-view'));
+beforeEach(() => {
+  spies.render.mockImplementation((host: HTMLElement, _source: AudioPeaks | AudioWaveformSource, options: WaveformRenderOptions) => {
+    const node = document.createElement('div'); node.dataset.wave = ''; host.append(node);
+    let zoom = options.pixelsPerSecond ?? 100, start = 0;
+    const listeners = new Set<(value: AudioViewport) => void>();
+    const viewport = () => ({startSeconds: start, endSeconds: start + 4});
+    return {redraw: vi.fn(), redrawFrame: vi.fn(), setPlayheadMode: vi.fn(), setPlayheadVisible: vi.fn(),
+      setZoom(value: number) { zoom = value; for (const listener of listeners) listener(viewport()); },
+      setOffset(value: number) { start = value; for (const listener of listeners) listener(viewport()); },
+      setRegions: vi.fn(), viewport, hitTest: (x: number) => ({seconds: start + x / zoom}),
+      onViewportChange(listener: (value: AudioViewport) => void) { listeners.add(listener); return () => listeners.delete(listener); },
+      dispose: vi.fn(() => node.remove()),
+    };
+  });
+});
+afterEach(() => {
+  document.body.replaceChildren();
+  for (const cleanup of cleanups.splice(0)) cleanup();
+  spies.render.mockReset(); vi.restoreAllMocks();
+});
+function editor() {
+  const value = createAudioClipEditor(createAudioClip({sampleRate: 100, channelData: [new Float32Array(1000).fill(.5)]}));
+  cleanups.push(() => value.dispose()); return value;
+}
+function mount() {
+  const model = editor(), editing = createAudioViewEditing(model, {editable: true});
+  const host = document.createElement('div'); document.body.append(host);
+  const onPreview = vi.fn(), onCommit = vi.fn(), onError = vi.fn();
+  const handle = mountWaveformEditor(host, editing, {pixelsPerSecond: 100, onPreview, onCommit, onError});
+  cleanups.push(() => { handle.dispose(); editing.dispose(); });
+  return {model, editing, host, handle, onPreview, onCommit, onError};
+}
+function field(root: ParentNode, label: string, value: string) { const input = root.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)!; input.value = value; return input; }
+function button(root: ParentNode, label: string) { return [...root.querySelectorAll('button')].find((value) => value.textContent === label)!; }
+function pointer(surface: HTMLElement, type: string, x: number, id = 1) {
+  const event = new MouseEvent(type, {bubbles: true, cancelable: true, clientX: x, clientY: 10, button: 0});
+  Object.defineProperty(event, 'pointerId', {value: id}); surface.dispatchEvent(event);
+}
+function key(surface: HTMLElement, key: string, options: KeyboardEventInit = {}) { surface.dispatchEvent(new KeyboardEvent('keydown', {key, bubbles: true, cancelable: true, ...options})); }
+
+describe('release review: stale waveform command targets', () => {
+  it.each(['Trim to selection', 'Delete selection'])('abandons %s if cancellation publication redirects the shared selection', (command) => {
+    const {model, editing, host} = mount();
+    editing.select({startFrame: 100, endFrame: 300});
+    let armed = false;
+    const off = editing.subscribe(() => {
+      if (!armed) return;
+      armed = false;
+      editing.session.setSelection({startFrame: 500, endFrame: 800});
+    });
+    try {
+      armed = true; button(host, command).click();
+      console.log(command, JSON.stringify({revision: model.getSnapshot().documentRevision, length: model.sequence.length, selection: editing.state.interaction.selection, segments: model.sequence.segments}));
+      expect(model.getSnapshot().documentRevision).toBe(0);
+      expect(model.sequence.length).toBe(1000);
+      expect(editing.state.interaction.selection).toEqual({startFrame: 500, endFrame: 800});
+    } finally { off(); }
+  });
+  it('abandons captured gain when cancellation redirects the chosen segment', () => {
+    const {model, editing, host} = mount();
+    model.transaction('Split', tx => tx.add({type: 'split', segmentId: model.sequence.segments[0].id, frame: 500, leftId: 'left', rightId: 'right'}));
+    const segment = host.querySelector<HTMLSelectElement>('[aria-label="Segment"]')!;
+    segment.value = 'left'; segment.dispatchEvent(new Event('change'));
+    editing.preview([{type: 'trim', startFrame: 0, endFrame: 1000}]);
+    field(host, 'Segment gain', '0.25');
+    let armed = true;
+    const off = editing.session.subscribe((snapshot) => {
+      if (!armed || snapshot.draft) return;
+      armed = false;
+      segment.value = 'right'; segment.dispatchEvent(new Event('change'));
+    });
+    try {
+      button(host, 'Apply segment gain').click();
+      console.log('gain', JSON.stringify({revision: model.getSnapshot().documentRevision, selected: segment.value, segments: model.sequence.segments}));
+      expect(model.getSnapshot().documentRevision).toBe(1);
+      expect(model.sequence.segments).toMatchObject([{id: 'left', gain: 1}, {id: 'right', gain: 1}]);
+    } finally { off(); }
+  });
+});

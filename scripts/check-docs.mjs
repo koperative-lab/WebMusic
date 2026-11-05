@@ -21,6 +21,7 @@ import {existsSync, readFileSync, readdirSync, statSync} from 'node:fs';
 import {join, relative, dirname} from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {headlessDocProblems} from './headless-docs-policy.mjs';
+import {requiredFeatureLayers} from './package-policy.mjs';
 import {declaredAgentContextPaths} from '../apps/doc/webmusic/scripts/agent-context.mjs';
 import {audioBridgeContext} from '../apps/doc/webmusic/scripts/agent-context-audio-bridge.mjs';
 
@@ -76,6 +77,16 @@ function resolveList(source, name) {
   return [...body.matchAll(/'([a-z0-9-]+)'/g)].map((m) => m[1]);
 }
 
+/** A list constant imported by name from a relative module, such as a shared base class. */
+function resolveImportedList(source, file, name) {
+  for (const match of source.matchAll(/import\s*\{([^}]*)\}\s*from\s*['"](\.[^'"]+)['"]/g)) {
+    if (!match[1].split(',').some((part) => part.trim() === name)) continue;
+    const target = join(dirname(file), `${match[2]}.ts`);
+    return existsSync(abs(target)) ? resolveList(read(target), name) : null;
+  }
+  return null;
+}
+
 /**
  * The element's observed attributes, with every `...spread` resolved. An
  * element with no getter observes nothing — `<score-rack-control>` is driven only by
@@ -104,7 +115,7 @@ function observedAttributes(source, file, seen = new Set()) {
     }
     const spread = /\.\.\.([A-Z_][A-Z0-9_]*)/.exec(line);
     if (!spread) continue;
-    const resolved = resolveList(source, spread[1]);
+    const resolved = resolveList(source, spread[1]) ?? resolveImportedList(source, file, spread[1]);
     if (!resolved) {
       fail('params', `${file}: cannot resolve spread \`...${spread[1]}\` in observedAttributes`);
       continue;
@@ -117,7 +128,8 @@ function observedAttributes(source, file, seen = new Set()) {
 function elementSources() {
   const byTag = {};
   for (const family of ['score', 'audio']) {
-    for (const capability of ['play', 'view', 'analyze']) {
+    for (const [capability, layers] of Object.entries(requiredFeatureLayers[`@webmusic/${family}`] ?? {})) {
+      if (!layers.element) continue;
       const dir = `packages/${family}/src/${capability}/element`;
       for (const name of readdirSync(abs(dir))) {
         if (!name.endsWith('.ts')) continue;
@@ -130,7 +142,8 @@ function elementSources() {
 }
 
 async function checkParams(sources) {
-  const groups = ['score-play', 'score-view', 'score-analyze', 'audio-play', 'audio-view', 'audio-analyze'];
+  const groups = ['score', 'audio'].flatMap((family) => Object.entries(requiredFeatureLayers[`@webmusic/${family}`] ?? {})
+    .filter(([, layers]) => layers.element).map(([capability]) => `${family}-${capability}`));
   const catalog = {};
   for (const group of groups) {
     const module = await load(`apps/doc/webmusic/src/lib/params/${group}.ts`);
@@ -747,7 +760,7 @@ const pages = collectPages(files);
 await checkCatalogs(pages, paramsCatalog);
 checkElementPages(files, paramsCatalog);
 for (const message of headlessDocProblems({
-  pages: files.filter((file) => file.startsWith(`${DOCS}/score/headless/`)).map((file) => ({file, source: read(file)})),
+  pages: files.filter((file) => file.startsWith(`${DOCS}/score/headless/`) || file === `${DOCS}/audio/headless/view/audio-clip-editor.mdx`).map((file) => ({file, source: read(file)})),
   readFile: read,
   frameFile: 'apps/doc/webmusic/src/components/HeadlessDemoFrame.astro',
 })) fail('headless-page', message);
@@ -769,8 +782,10 @@ checkRootEntryCoverage(`${DOCS}/uikit/api.mdx`, 'packages/ui/package.json', '@we
 // title rule instead. Every root EXPORT is listed in its API Reference table,
 // which no check verifies yet — the same gap the other API pages have.
 checkRootEntryCoverage(`${DOCS}/bridge/api.mdx`, 'bridges/score-audio/package.json', '@webmusic/bridge');
-for (const family of ['score', 'audio']) {
-  for (const capability of ['play', 'analyze', 'view']) {
+for (const [packageName, capabilities] of Object.entries(requiredFeatureLayers)) {
+  const family = packageName.slice('@webmusic/'.length);
+  for (const [capability, layers] of Object.entries(capabilities)) {
+    if (!layers.headless) continue;
     checkHeadlessExports(family, capability);
   }
 }

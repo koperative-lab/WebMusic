@@ -197,6 +197,30 @@ describe('<audio-live-view>', () => {
     expect(element.type).toBe('waveform');
   });
 
+  it('stays idle while waiting for a source and animates once one exists', async () => {
+    const frames: FrameRequestCallback[] = [];
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      frames.push(callback);
+      return frames.length;
+    });
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
+    const element = mount<AudioLiveViewElement>('audio-live-view');
+    await flush();
+    expect(frames).toHaveLength(0);
+
+    element.analyser = fakeAnalyser();
+    expect(frames.length).toBeGreaterThan(0);
+    const stage = element.querySelector('.wui-stage');
+    expect(stage).not.toBeNull();
+
+    // Losing the source parks the loop again.
+    element.analyser = undefined;
+    const pending = frames.length;
+    frames.splice(0).forEach((callback) => callback(16));
+    expect(frames).toHaveLength(0);
+    expect(pending).toBeGreaterThan(0);
+  });
+
   it('never disposes the borrowed analyser', async () => {
     const source = document.createElement('div') as HTMLDivElement & {analyser?: AnalyserNode};
     source.id = 'shared';

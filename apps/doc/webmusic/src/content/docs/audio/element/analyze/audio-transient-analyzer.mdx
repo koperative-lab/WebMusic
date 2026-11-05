@@ -58,8 +58,10 @@ retried without disposing the borrowed graph.
 
 Strength, Hits and Last interval stay in fixed positions above the history.
 The default surface is monochrome, without a repeated title or routine Live,
-Paused and Frozen messages. No-signal and unavailable feedback remains
-visible; Freeze reports its state through its pressed appearance.
+Paused and Frozen messages. Listening and No signal stay in
+the status region but are visually hidden, and the plot's axis captions are
+visually hidden too; unavailable feedback remains visible. Freeze and Clear are
+icon buttons; Freeze reports its state through its pressed appearance.
 
 While waiting for a source or playback, the shared outlined-square animation keeps
 its description accessible to assistive technology. Pending fetch/decode on a linked
@@ -89,8 +91,8 @@ strength depend on the borrowed analyser's FFT size, smoothing and this
 tool's polling cadence. The threshold is an internal visual/detection
 quantity, not a gain or playback control.
 
-**Accessibility.** Freeze and Clear are native buttons; Freeze exposes
-`aria-pressed` and keeps the same label. Sensitivity is a rectangular horizontal
+**Accessibility.** Freeze and Clear are native icon buttons named in
+`aria-label` and `title`; Freeze exposes `aria-pressed` and keeps the same name. Sensitivity is a rectangular horizontal
 UIKit fader with a labelled slider role, a visible percentage and `0..100%`
 ARIA bounds. Arrow keys change it by one percentage point, and Home/End
 select the bounds. The `sensitivity` property remains `0..1`. The plot has a
@@ -111,7 +113,7 @@ The host's neutral outer surface honors shared `--wm-component-*` tokens and
 `--wm-transient-analyzer-threshold` tokens. Public parts are `root surface`,
 `plot`, `freeze`, `clear` and `sensitivity`; structural `wui-*` child classes
 are not additional styling contracts. The fader also exposes `fader`; use
-`[part~="sensitivity"]`. `--wm-analysis-control-size` defaults to `1.5rem` for
-compact controls, and `--wm-fader-*` styles the shared horizontal fader.
+`[part~="sensitivity"]`. `--wm-analysis-control-height` (then `--wm-control-size`, then `2rem`) sets the
+icon-button height and fader thickness, and `--wm-fader-*` styles the shared horizontal fader.
 
 </details>

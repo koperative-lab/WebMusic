@@ -96,14 +96,13 @@ test('actual Vite chunks include CSS ownership, exclude tree-shaken dependencies
   await assert.rejects(collector.write(dist), /license identifier and license text/);
 });
 
-test('real React, Sandpack, Bravura, OSMD and SpessaSynth ship complete site notices', async (t) => {
+test('real React, Sandpack, Bravura and SpessaSynth ship complete site notices', async (t) => {
   const directory = await fixture(t);
   const scoreRequire = createRequire(path.join(root, 'packages/score/package.json'));
   const imports = [
     ['React', appRequire.resolve('react')],
     ['Sandpack', appRequire.resolve('@codesandbox/sandpack-react')],
     ['VexFlow', scoreRequire.resolve('vexflow/bravura').replace('/build/cjs/vexflow-bravura.js', '/build/esm/entry/vexflow-bravura.js')],
-    ['OSMD', appRequire.resolve('opensheetmusicdisplay')],
     ['SpessaSynth', appRequire.resolve('spessasynth_lib')],
   ];
   const source = imports.map(([name, file]) => `import * as ${name} from ${JSON.stringify(file)};`).join('\n')
@@ -112,12 +111,11 @@ test('real React, Sandpack, Bravura, OSMD and SpessaSynth ship complete site not
   const dist = await compile(directory, source, collector, [browserSandboxAlias]);
   await collector.write(dist);
   const text = await readFile(path.join(dist, 'licenses/THIRD_PARTY_NOTICES.txt'), 'utf8');
-  for (const required of ['Meta Platforms, Inc. and affiliates.', 'Apache License', 'CodeSandbox', 'Steinberg Media Technologies', 'SIL OPEN FONT LICENSE', 'Copyright 2019 PhonicScore', 'Stuart Knightley', 'Jean-loup Gailly', 'Basarat Ali Syed', 'Copyright (c) 2023 Arjun Barrett', 'Copyright (C) 2021 Nobuaki Tanaka', 'Emscripten 6.0.6', 'musl C runtime']) {
+  for (const required of ['Meta Platforms, Inc. and affiliates.', 'Apache License', 'CodeSandbox', 'Steinberg Media Technologies', 'SIL OPEN FONT LICENSE', 'Copyright (c) 2023 Arjun Barrett', 'Copyright (C) 2021 Nobuaki Tanaka', 'Emscripten 6.0.6', 'musl C runtime']) {
     assert.ok(text.includes(required), `Missing upstream notice: ${required}`);
   }
   const inventory = JSON.parse(await readFile(path.join(dist, 'licenses/BUNDLED_ASSETS.json'), 'utf8'));
   assert.ok(inventory.modules.some((id) => id.includes('bravura_glyphs.js')));
-  assert.ok(inventory.packages.some(({key}) => key === 'opensheetmusicdisplay@2.1.3 bundled assets'));
   assert.ok(inventory.packages.some(({key}) => key === 'spessasynth_core@4.3.20 bundled assets'));
   assert.ok(inventory.packages.some(({key}) => key === 'stb-vorbis@0.0.6 bundled assets'));
   assert.ok(!inventory.packages.some(({key}) => key.startsWith('@codesandbox/nodebox@')));

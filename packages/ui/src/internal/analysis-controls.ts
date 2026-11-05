@@ -1,38 +1,56 @@
-import {createFader, faderStyle} from '../fader';
+import {createFader} from '../fader';
 import {mountSurfaceSlider} from '../stage';
+import {controlHeight} from './control';
+import {hiddenScrollbarCss, iconButtonCss, visuallyHiddenCss} from './icons';
+import {neutralColor} from './palette';
 
-/** Shared compact controls for signal inspectors. */
+const SIZE = controlHeight('analysis-control');
+const LINE = `var(--wm-control-border, var(--wm-border, ${neutralColor('border')}))`;
+const MUTED = `var(--wm-foreground-muted, ${neutralColor('muted')})`;
+const MONO = 'var(--wm-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)';
+
+/** Line colour shared by analysis plots and control rows. */
+export const analysisLine = LINE;
+/** Muted caption colour shared by analysis readouts. */
+export const analysisMuted = MUTED;
+/** Mono font chain shared by analysis readouts. */
+export const analysisMono = MONO;
+
+/**
+ * Shared controls for signal inspectors (Visual design → Controls, Toolbars):
+ * one non-wrapping row of control height that scrolls sideways without a
+ * visible scrollbar, square icon buttons edge to edge inside a group, groups
+ * and faders separated by full-height hairlines, and quiet status text that
+ * stays in the live region but is visually hidden. Rules use `:where()`.
+ */
 export const analysisControlStyle = `
-${faderStyle}
-.wui-analysis-button, .wui-analysis-select {
-  box-sizing: border-box; min-height: var(--wm-analysis-control-size, 1.5rem);
-  border: 1px solid var(--wm-control-border, var(--wm-border, #d8d8d8));
-  border-radius: var(--wm-control-radius, 0); padding: .15rem .4rem;
-  background: var(--wm-surface, #fff); color: inherit;
-  font: 400 .72rem/1.2 var(--wm-font-family, system-ui, sans-serif);
+:where(.wui-analysis-row) {
+  display: flex; flex-wrap: nowrap; align-items: stretch; min-width: 0; max-width: 100%;
+  overflow-x: auto; overflow-y: hidden; border-block: 1px solid ${LINE};
 }
-.wui-analysis-button { cursor: pointer; }
-.wui-analysis-button[aria-pressed='true'] {
-  background: var(--wm-accent, #444); color: var(--wm-accent-foreground, #fff);
+${hiddenScrollbarCss('.wui-analysis-row')}:where(.wui-analysis-row > * + *) { border-left: 1px solid ${LINE}; }
+:where(.wui-analysis-group) { display: flex; flex: none; align-items: stretch; }
+${iconButtonCss('.wui-analysis-button', 'analysis-control')}
+:where(.wui-analysis-fader) {
+  display: grid; grid-template-columns: max-content minmax(4rem, 1fr) max-content; align-items: center; gap: .5rem;
+  flex: 1 0 14rem; min-width: 14rem; height: ${SIZE}; padding: 0 0 0 .5rem;
 }
-.wui-analysis-button:disabled { opacity: .45; cursor: default; }
-.wui-analysis-button:focus-visible, .wui-analysis-select:focus-visible {
-  outline: 2px solid var(--wm-focus, var(--wm-foreground, #444)); outline-offset: 2px;
+:where(.wui-analysis-fader__label) {
+  white-space: nowrap; color: ${MUTED};
+  font: 400 .625rem/1 ${MONO}; text-transform: uppercase; letter-spacing: .06em;
 }
-.wui-analysis-fader {
-  display: grid; grid-template-columns: max-content minmax(3rem, 1fr) 8ch;
-  align-items: center; gap: .4rem; flex: 1 1 15rem; min-width: 0; max-width: 100%;
-  font: 400 .72rem/1.2 var(--wm-font-family, system-ui, sans-serif);
+:where(.wui-analysis-fader > [role='slider']) {
+  --wm-fader-length: 100%; --wm-fader-thickness: ${SIZE}; --wm-fader-handle: .4rem;
 }
-.wui-analysis-fader > [role='slider'] {
-  --wm-fader-length: 100%; --wm-fader-thickness: var(--wm-analysis-control-size, 1.5rem);
-  --wm-fader-handle: .4rem;
+:where(.wui-analysis-fader > [role='slider']:focus-visible) {
+  outline: var(--wm-focus-ring, 2px solid var(--wm-foreground, ${neutralColor('foreground')})); outline-offset: -2px;
 }
-.wui-analysis-fader__value {
-  min-width: 0; text-align: right; white-space: nowrap;
-  font: 400 .72rem/1.2 var(--wm-font-mono, ui-monospace, monospace);
-  font-variant-numeric: tabular-nums;
+:where(.wui-analysis-fader > [role='slider'][aria-disabled='true']) { opacity: .3; cursor: default; }
+:where(.wui-analysis-fader__value) {
+  min-width: calc(8ch + .5rem); padding-right: .5rem; text-align: right; white-space: nowrap;
+  font: 400 .6875rem/1 ${MONO}; font-variant-numeric: tabular-nums;
 }
+:where([data-analysis-quiet]) { ${visuallyHiddenCss} }
 `;
 
 interface AnalysisFaderOptions {
@@ -58,6 +76,7 @@ export function createAnalysisFader(document: Document, options: AnalysisFaderOp
   const element = document.createElement('div');
   element.className = 'wui-analysis-fader';
   const label = document.createElement('span');
+  label.className = 'wui-analysis-fader__label';
   label.textContent = options.label;
   const value = document.createElement('output');
   value.className = 'wui-analysis-fader__value';
@@ -118,10 +137,37 @@ export function createAnalysisFader(document: Document, options: AnalysisFaderOp
   };
 }
 
+/** How a status line is presented: absent, announced only, or shown. */
+export type AnalysisStatusKind = 'none' | 'quiet' | 'error';
+
 /** Transport and pressed controls already expose ordinary operating state. */
-export function setAnalysisStatus(element: HTMLElement, status: string): void {
-  const routine = /^(?:live|paused|frozen|playback paused|live spectrum|spectrum frozen|waveform frozen)$/i.test(status.trim());
-  const text = routine ? '' : status;
+const ROUTINE = /^(?:live|paused|frozen|playback paused|live spectrum|spectrum frozen|waveform frozen)$/i;
+/** Informational states: announced to assistive technology, never drawn. */
+const QUIET = /^(?:no signal|listening|no matching edge|waiting for (?:playback|input|a source|source)|loading(?: audio)?)$/i;
+
+/**
+ * Write a status line. Routine transport state is cleared; informational
+ * state stays in the `role="status"` region but is visually hidden
+ * (`data-analysis-quiet`); anything else — a failure or a configuration
+ * problem — is shown.
+ */
+export function setAnalysisStatus(element: HTMLElement, status: string): AnalysisStatusKind {
+  const trimmed = status.trim();
+  const kind: AnalysisStatusKind = !trimmed || ROUTINE.test(trimmed) ? 'none' : QUIET.test(trimmed) ? 'quiet' : 'error';
+  const text = kind === 'none' ? '' : status;
   if (element.textContent !== text) element.textContent = text;
-  element.hidden = !text;
+  element.hidden = kind === 'none';
+  element.toggleAttribute('data-analysis-quiet', kind === 'quiet');
+  return kind;
+}
+
+/**
+ * Write the status region that holds a status line beside the shared pending
+ * indicator. While pending the indicator speaks; otherwise the region is
+ * removed when empty and visually hidden when only informational.
+ */
+export function setAnalysisStatusRegion(region: HTMLElement, message: HTMLElement, status: string, pending: boolean): void {
+  const kind = setAnalysisStatus(message, pending ? '' : status);
+  region.hidden = !pending && kind === 'none';
+  region.toggleAttribute('data-analysis-quiet', !pending && kind === 'quiet');
 }

@@ -15,6 +15,10 @@ branch's tracked files before making a delivery claim.
 
 **Consequence:** application concerns such as project persistence, undo, collaboration, and arrangement/session editing need explicit application-layer designs. They are not implied by the existence of a player or mixer.
 
+**2026-10-13 refinement:** [DEC-053](#dec-053--document-owned-editing-and-borrowed-playback)
+assigns optional single-document history to domain editors. Project/global
+history, persistence and collaboration retain the application boundary above.
+
 **Owner:** [Product](PRODUCT.md).
 
 ## DEC-002 — Three interoperable integration choices
@@ -107,13 +111,13 @@ branch's tracked files before making a delivery claim.
 
 **Organization update (2026-09-09):** repository-wide guidance lives under
 `dev/`, with component design, documentation authoring and release operations in
-their own directories. AGENTS and its CLAUDE symlink route through maintained
+their own directories. AGENTS and its tool-specific symlink route through maintained
 directory indexes. Package/platform contracts remain beside source; archived
 release machinery remains beside its historical scripts. Generated inventories
 provide discovery without substituting for these reading routes.
 
 **Organization update (2026-09-25):** `AGENTS.md` is the sole maintained agent
-instruction entry point. The earlier `CLAUDE.md` symlink is retired; current
+instruction entry point. The earlier tool-specific instruction symlink is retired; current
 guidance and generated inventories no longer require it.
 
 **Owner:** [Documentation entry point](README.md), [Conventions](docs/DOCS-CONVENTIONS.md).
@@ -278,6 +282,16 @@ demos, external Parameters, reset behavior and redirects.
 ## DEC-015 — Type-selected Score View families
 
 **Date / status:** 2026-09-08; accepted.
+
+**2026-10-13 extension:** [DEC-053](#dec-053--document-owned-editing-and-borrowed-playback)
+adds optional document-bound editing and focused keyboard interaction to existing
+View surfaces. The original passive usage below remains valid; runtime editing
+is implemented, and STATUS EDIT-01 tracks its remaining verification.
+
+**2026-11-04 refinement:** [DEC-056](#dec-056--score-view-draws-three-types-annotations-only-on-staff)
+removes the `map` and `thumbnail` types below and limits score annotations to
+`staff`. The three-family structure and the remaining type-switch guarantees
+are unchanged.
 
 **Problem:** separate tags for keyboard, current-note staff and fretboard repeat
 one held-note input contract. Separate map and thumbnail tags repeat Score input
@@ -1443,7 +1457,7 @@ unfinished interaction choices as settled product surfaces.
 Analyze Web Components in `dev`. Remove the two recurrence tags, their
 registration, demos, parameter catalogs and Element pages from the current
 checkout. Retain their implementation snapshot on the local
-`codex/score-pattern-analysis-research` branch for later exploration. Keep
+`score-pattern-analysis-research` branch for later exploration. Keep
 `findMotifs`, `findRhythmPatternOccurrences`, `rhythmPatterns` and applicable
 Headless projections in the API/Headless layers; callers may analyze those
 results without a bundled recurrence UI. Old Element URLs redirect to the
@@ -2011,12 +2025,557 @@ and the affected Element references.
 **Verification implications:** loading/waiting/ready/error transitions, source replacement,
 cancellation, teardown, unchanged-update stability, light/dark themes, narrow layouts and
 reduced motion. Browser and screen-reader acceptance remain distinct from DOM regressions.
+<a id="dec-047--document-owned-editing-and-borrowed-playback-proposed"></a>
+<a id="dec-047--document-owned-editing-and-borrowed-playback"></a>
+
+## DEC-053 — Document-owned editing and borrowed playback
+
+**Identifier note:** drafted as DEC-047 on the editing branch while DEC-047–052
+were assigned in parallel; registered as DEC-053 when the branches merged. Dated
+editing records before 2026-10-21 that say DEC-047 mean this decision.
+
+**Date / status:** 2026-10-13; accepted design in P0 following the maintainer's
+request to start the first planned step. Runtime implementation was pending
+at acceptance. P1–P4 are now implemented; their verification is tracked by
+[STATUS EDIT-01](STATUS.md) and the [editing contracts](design/EDIT-COMPONENTS.md).
+
+**Problem:** existing immutable Score/Audio edits and View interactions do not
+provide persistent document ownership, undo, editable surfaces or a protocol
+for applying new content to playback. Audio history based on complete PCM
+snapshots would multiply memory use even for single-file editing.
+
+**Chosen contract:** introduce domain Headless editors that own document
+identity, monotonic content revision, transactions and optional bounded local
+history. Play borrows a Core read-only document source and separately reports
+the revision it has actually applied. View borrows document state and commands;
+initial editing extends the existing piano-roll and waveform surfaces. A
+nonvisual `score-document` / `audio-document` declaration supplies an HTML path
+with explicit ownership. `.editor` and `editor` select content; `editable` only
+enables View mutation. Conflicting independent sources fail explicitly. The first
+playback integration pauses, prepares and applies content, remains paused, and
+reports applied, superseded or failed. Stale/failed playback stays gated until
+reconciliation; it does not promise seamless live replacement.
+
+Audio documents use shared assets and immutable segment references from the
+first editor. Segment-aware playback avoids full-output rendering per commit.
+Local DSP may produce bounded new assets; export explicitly renders output.
+Project-wide history, persistence and collaboration remain application-owned.
+Core ports keep Play/View independent of concrete Edit implementations. Audio
+loading has one browser-declaration adapter to the existing Play loader, with an
+exact importer/target/symbol exception and no code-only Edit reachability.
+
+Musical note timing edits remove the edited note's absolute performed overlay,
+use written quarters and preserve effective velocity in `velocityOverride`.
+Pitch/velocity-only edits retain performed timing. The model extension ships with
+Score JSON v0.2 migration in P1. History defaults to 100 transactions; audio uses
+asset retention budgets. Position maps compose from the last applied revision;
+missing/repeat mappings explicitly reset position and clear loops. These rules
+and their failure/lifecycle details belong to the editing design.
+
+**Alternatives considered:** private View-owned editors; duplicate visual
+editor tags for every existing surface; application-only playback glue; full
+PCM undo snapshots; and immediate live replacement or complete DAW scope.
+Each leaves unclear ownership, duplicates behavior or couples the first useful
+editing workflow to substantially broader work.
+
+**Consequences:** refine DEC-001's application-only undo boundary: optional
+single-document history is domain-owned; global/project history remains in the
+application. Extend DEC-015's passive View contract with opt-in editing and local
+keyboard interaction, without making a toolbar mandatory. Extend DEC-011/017
+with document ownership and applied-revision compatibility while preserving
+existing passive source precedence. Staff input and multi-track editing retain
+separate scope decisions. Product, Architecture and family/binding owners adopt
+this target in P0. Actual exports, executable policies, references and demos
+change together when each implementation layer exists, not as empty scaffolds.
+
+**2026-11-04 refinement:** [DEC-055](#dec-055--editing-is-a-view-feature-not-a-capability)
+moves the editor, declaration and operations into View and Audio sequence
+export into Play. The ownership and playback contract above is unchanged; the
+separate Edit capability, its `/edit*` entries and the Edit-to-Play loader
+exception no longer exist.
+
+**2026-11-04 refinement:** [DEC-057](#dec-057--editable-documents-are-an-api-not-a-web-component)
+replaces the nonvisual `score-document` / `audio-document` declarations and the
+`editor="#id"` selector with application-owned editors created through
+`loadScoreEditor` / `loadAudioClipEditor` and lent through `.editor`.
+
+**2026-11-04 refinement:** [DEC-058](#dec-058--score-editing-moves-to-a-dedicated-grid-view)
+moves Score note editing from `<score-view>` to `<score-grid-view>`; `<score-view>`
+is read-only and Score staff editing is removed.
+
+**Owner:** [Editing contracts](design/EDIT-COMPONENTS.md). The
+[dated proposal and implementation sequence](plans/2026-10-13-editing-capabilities.md)
+retains the planning baseline.
+[STATUS](STATUS.md), EDIT-01, owns current delivery tracking.
+
+**Verification implications:** demonstrate MIDI edit/undo/playback/export
+consistency, document/playback revision acknowledgement and failed/canceled
+replacement behavior; demonstrate Audio structural history and playback without
+full-PCM copies per edit. Verify source conflicts, late binding, resource release,
+keyboard/pointer behavior and application-owned history through all supported
+integration forms. Accepted target syntax must not enter current public
+references as though it were shipped.
+
+<a id="dec-048--staff-input-inside-the-existing-score-view"></a>
+
+## DEC-054 — Staff input inside the existing Score View
+
+**Identifier note:** drafted as DEC-048 on the editing branch; registered as
+DEC-054 when the branches merged. Dated editing records before 2026-10-21 that
+say DEC-048 mean this decision.
+
+**Date / status:** 2026-10-15; accepted for P4 implementation. Current
+verification and remaining interaction checks belong to [STATUS](STATUS.md), EDIT-01.
+**Superseded 2026-11-04** by [DEC-058](#dec-058--score-editing-moves-to-a-dedicated-grid-view):
+staff input, its Headless controller and its browser adapter are removed. The
+entry below is the record of the bounded P4 contract that shipped on the branch.
+
+**Problem:** notation entry needs an explicit input mode, written spelling,
+duration, staff and voice, plus measure completion. Piano-roll gestures do not
+provide those semantics. A separate tag would duplicate the same document,
+player binding and scrolling notation renderer without establishing a different
+resource lifecycle.
+
+**Chosen contract:** retain `<score-view type="staff" editor="#document" editable>`.
+A separate nonvisual staff-input controller owns only local cursor and entry
+settings. A browser adapter reuses the existing scrolling staff renderer and
+handles keyboard input only on its focused input surface. Enabling `editable`
+permits editing; an explicit note-input mode arms A–G entry. Escape disarms it.
+The shared `ScoreEditor` remains the sole content and history owner, so undo from
+either staff or piano roll can reverse the other surface's latest command.
+
+An atomic notation-entry command uses rational written quarters and preserves
+pitch spelling and duration notation. It fills the chosen voice/staff's gaps
+inside an existing measure with actual rest notes. Other voices and staves are
+unchanged. Entry cannot cross a measure boundary or silently truncate sounding
+notes. Unsupported tied, tuplet, grace, chord and other grouped structures fail
+explicitly. MIDI-derived synthetic display bars are not authored measures;
+this first input contract requires a real measure grid supplied by MusicXML or
+the application. It does not infer a notation score from arbitrary MIDI.
+
+**Alternatives considered:** a new `score-staff-editor` tag; reusing piano-roll
+shortcuts; storing auto-rests only in renderer state; and automatically rewriting
+complex or unmeasured music. The chosen boundary shares existing resources while
+keeping notation operations explicit and atomic.
+
+**Consequences:** extends DEC-053's editable View subset to staff without adding
+an Element or an Edit-to-View dependency. The optional OSMD sheet renderer stays
+separate and passive. Complete engraving, chord/tie/tuplet authoring, measure-grid
+editing and page layout remain outside this bounded P4 delivery.
+
+**Owner:** [Editing contracts](design/EDIT-COMPONENTS.md),
+[Score View family](design/VIEW-COMPONENTS.md) and
+[scrolling notation](design/STAFF-NOTATION.md).
+
+**Verification implications:** test local focus and armed entry, pitch/duration
+shortcuts, exact rests and independent voices, structural rejection, shared undo,
+playback revision application and MIDI silence for rests. Verify passive staff
+and separate input instances retain their behavior. Browser keyboard evidence,
+pointer behavior and visual/accessibility acceptance are recorded separately.
+
+## DEC-055 — Editing is a View feature, not a capability
+
+**Date / status:** 2026-11-04; accepted at the maintainer's request before the
+editing work is published. Supersedes the entry and capability layout of
+[DEC-053](#dec-053--document-owned-editing-and-borrowed-playback); its
+document-ownership, history and playback-binding contract is retained.
+
+**Problem:** DEC-053 delivered editing as a fourth capability family beside
+Play, Analyze and View, with `/edit`, `/edit/headless`, `/edit/element` and
+`/edit/auto` entries, separate documentation groups and its own policy rows.
+Every editing surface is an existing View, so the extra family added navigation,
+entries and checks without a different user-facing role.
+
+**Chosen contract:** document editing extends View in both domains. The View
+API root exports semantic operations, position maps, document contracts and
+Audio range-processor recipes. `/view/headless` exports `ScoreEditor` and
+`AudioClipEditor`. `/view/element` exports `<score-document>` and
+`<audio-document>`; `defineAllViewElements()` and Audio's
+`defineAllAudioElements()` register them, and `@webmusic/audio/view/auto`
+registers `<audio-document>`. Score View keeps explicit registration and gains
+no `/auto` entry. Rendering and WAV export of an edited Audio sequence join the
+existing Play export API. The Score–Audio and Core boundaries are unchanged.
+
+**Alternatives considered:** keeping the package entries and only hiding Edit
+in the documentation, which leaves a public family the site does not present;
+and letting each View create a private editor without a declaration, which
+loses one shared document and history across several Views and the player.
+
+**Consequences:** no `/edit*` entry is published; the unpublished editing
+release needs no compatibility aliases. Audio View already depends on Play, so
+the `<audio-document>` URL loader uses the ordinary View-to-Play edge and the
+importer-specific exception is removed. Element composition, catalogs, build
+entries, side-effect lists, reachability rules and documentation routes list
+the editing pieces under View. The View API root still cannot reach its
+Headless, render or Element layers, so editors are imported from
+`/view/headless`.
+
+**Owner:** [Editing contracts](design/EDIT-COMPONENTS.md) and
+[Architecture](ARCHITECTURE.md).
+
+**Verification implications:** package policy, architecture and documentation
+checks must find no Edit capability; built-entry tests must load the editing
+values from the View and Play entries with shared Core identity; demos and
+snippets must import only published View/Play subpaths.
+
+## DEC-056 — Score View draws three types; annotations only on staff
+
+**Date / status:** 2026-11-04; accepted at the maintainer's request. Refines
+[DEC-015](#dec-015--type-selected-score-view-families).
+
+**Problem:** `<score-view>` mixed three full renderers with a navigation strip
+(`map`) and a static preview (`thumbnail`), each with its own attributes, event
+and styling token. Score expression annotations were also drawn three different
+ways: in a strip above the piano roll, in a rail beside the waterfall and on the
+staff. Only staff notation places expressions where musicians read them.
+
+**Chosen contract:** `<score-view type>` accepts exactly `piano-roll` (default),
+`staff` and `waterfall`; any other value falls back to `piano-roll`.
+`ScoreViewElementType` equals `ScoreViewType`. The element no longer has
+`for-part`, `cells`, `webscore:seek`, `ScoreViewSeekDetail` or
+`--wm-score-view-map`, and no longer composes the UI timeline. Only the staff
+draws annotations: `showAnnotations` belongs to `StaffRenderOptions` and the
+React `StaffView`, `show-annotations` affects only `type="staff"`, and
+`validateScoreViewConfiguration` rejects it for the other types. Piano roll and
+waterfall reserve no annotation space.
+
+The underlying pieces stay public: Headless `createScoreMapView`, the
+`createScoreMap` layout, the `@webmusic/ui/timeline` presenter (now a
+standalone presenter) and the `/view/render` thumbnail renderer with its own
+overview annotations. Applications that need a map or preview compose them
+directly.
+
+**Alternatives considered:** separate `score-map` / `score-thumbnail` tags,
+which DEC-015 already rejected for duplicating input and binding; and keeping
+annotations off by default on piano roll and waterfall, which would not make
+them staff-only.
+
+**Consequences:** this changes behavior published in `0.2.0`; the
+[editing migration guide](release/EDITING-MIGRATION.md) records the upgrade.
+Element composition lists `score-view` with `stage` and `status` only. The
+internal horizontal and vertical annotation drawers and the map annotation
+layer are removed with their tests.
+
+**Owner:** [View component families](design/VIEW-COMPONENTS.md).
+
+**Verification implications:** type parsing and fallback; type switches
+without reload across the three types; staff-only forwarding of
+`show-annotations`; configuration rejection for other types; piano roll and
+waterfall render no annotation marks; the retained map, timeline and thumbnail
+APIs keep their own tests.
+
+## DEC-057 — Editable documents are an API, not a Web Component
+
+**Date / status:** 2026-11-04; accepted at the maintainer's request before the
+editing work is published. Refines [DEC-053](#dec-053--document-owned-editing-and-borrowed-playback)
+and [DEC-055](#dec-055--editing-is-a-view-feature-not-a-capability).
+
+**Problem:** `<score-document>` and `<audio-document>` were nonvisual Elements
+that loaded a file, owned an editor for their connected lifetime and were found
+by players and views through `editor="#id"`. A document is application data, not
+something rendered. Tying its lifetime to DOM connection and selector discovery
+added loading state, reload races, selector-resolution states and source-change
+events that an application owning the editor does not need.
+
+**Chosen contract:** remove both Elements and the `editor` selector attribute
+from `score-player`, `score-view`, `audio-player` and `audio-view`. Add
+`loadScoreEditor(url, options)` and `loadAudioClipEditor(url, options)` to the
+domain's `/view/headless`, next to `createScoreEditor` / `createAudioClipEditor`.
+They combine the existing loader options (format, AbortSignal, limits and, for
+Audio, an injectable decode loader with the default fixed to non-streaming and no
+implicit AudioContext) with the editor options, and reject without creating an
+editor when loading fails. The application owns the editor, assigns it through
+each Element's `.editor` property and disposes it; Elements borrow it and never
+dispose it. Source-conflict, playback-application and editable rules are
+unchanged.
+
+**Alternatives considered:** keeping the Elements beside the API, which leaves two
+ownership models to document and test; and keeping `editor="#id"` pointing at
+any element exposing `.editor`, which has no built-in owner to point at.
+
+**Consequences:** the Elements, their exports, catalogs, pages and playground
+demos are removed; demos create editors in script. No migration is needed for
+published packages because neither Element was released. Kernel's
+`observeElementSource` remains as the Elements' explicit-object adapter.
+
+**Owner:** [Editing contracts](design/EDIT-COMPONENTS.md).
+
+**Verification implications:** loader success and failure, format validation,
+abort, option forwarding and no editor on failure; Element binding through
+`.editor` only, with `editor` no longer an observed attribute; existing conflict,
+lifecycle and playback-application tests rewritten to assign editors directly.
+
+## DEC-058 — Score editing moves to a dedicated grid View
+
+**Date / status:** 2026-11-04; accepted at the maintainer's request before the
+editing work is published. Supersedes [DEC-054](#dec-054--staff-input-inside-the-existing-score-view)
+and refines [DEC-053](#dec-053--document-owned-editing-and-borrowed-playback)
+and [DEC-055](#dec-055--editing-is-a-view-feature-not-a-capability).
+
+**Problem:** `<score-view>` mixed three read-only renderers with two editing
+surfaces: a piano-roll editor that replaced the canvas piano roll whenever an
+editor was bound, and bounded staff input. Its `editable` attribute meant
+something different per `type`, the piano-roll editing surface had no grid,
+ruler, keys, snap choice, velocity editing or zoom, and features could not be
+withheld by the application. The maintainer asked for `<score-view>` to stay a
+display and for note editing to look and behave like a DAW piano roll.
+
+**Chosen contract:** `<score-view>` is read-only. It keeps `.editor` and
+`.interactionSession` as a read-only follow: it draws the editor's visible
+content, including a shared draft, with its normal renderers and follows a bound
+player only through document-compatible snapshots. It no longer has `editable`,
+`data-editable-state` or edit events, and its piano-roll options no longer
+include `pixelsPerQuarter` / `editingGrid`.
+
+A new `<score-grid-view>` draws a piano-roll grid: written-pitch rows with piano
+keys, bar/beat/snap lines from the score's time signatures, a bar ruler and an
+optional velocity lane. It reads `.score`, `src`, a player's score or a borrowed
+`.editor`, and follows `player` like the other score Views. Editing requires a
+ready `.editor` and `editable`; a one-row icon toolbar then appears along the
+top of the grid window, with names in accessible labels and tooltips. The piano
+keys, ruler and velocity lane are sticky layers that stay in place while the
+notes scroll. `tools` lists the
+offered features — `move`, `resize`, `draw`, `delete`, `velocity`, `snap`,
+`zoom`, `history` (absent means all). Selection is always available while
+editing. The toolbar picks the pointer tool (`select` / `draw`), snap, velocity
+lane and zoom; those are also `tool`, `snap`, `velocity-lane`,
+`pixels-per-quarter` and `note-height` attributes, which toolbar, wheel and
+keyboard changes reflect and announce with `gridsettingschange`. Each gesture is
+one atomic editor command, so history, playback revision application and shared
+sessions are unchanged. A collapsible numeric form keeps a non-pointer path to
+every edit. The renderer is `mountScoreGrid` in `/view/render`; the two Elements
+share one data/player/editor binding base. Score staff editing — Headless
+`createStaffViewEditing`, render `mountStaffEditor`, and staff input — is
+removed; the notation-entry Core operation remains.
+
+**Alternatives considered:** a `type="grid"` on `<score-view>`, which keeps an
+editing-only attribute set on a multi-type Element; per-feature boolean
+attributes, which multiply attributes without a natural default; keeping staff
+editing as a Headless API with no Element; and a separate editing toolbar
+Element, which would need its own binding to the grid's interaction state.
+
+**Consequences:** applications that edited through `<score-view editable>` use
+`<score-grid-view editable>`. Neither was published, so no package migration is
+needed. Audio editing on `<audio-view>` is unchanged. Staff/notation editing is
+out of scope until a new decision; the passive staff and sheet Views are
+unaffected.
+
+**Owner:** [Editing contracts](design/EDIT-COMPONENTS.md) and the
+[Score View family](design/VIEW-COMPONENTS.md).
+
+**Verification implications:** read-only `<score-view>` with a bound editor and
+shared draft; grid display without an editor; every feature gated by `tools` in
+both toolbar and gestures/keys; draw, marquee, move with and without snap,
+resize, velocity-lane commit, zoom bounds and settings reflection; editor
+attachment cleanup and playback application retargeted from the old piano-roll
+surface. Browser pointer, keyboard, focus and visual acceptance are recorded
+separately.
+
+## DEC-059 — One required visual language for all UI
+
+**Date / status:** 2026-11-04; accepted at the maintainer's request. Makes
+Design principles §7 concrete; does not change any public API.
+
+**Problem:** the neutral-palette and square-geometry principle lived only as
+prose in Design principles, and the frontend skill and workflow were framed as
+review steps. New UI could therefore be built without consulting them: the
+first `<score-grid-view>` toolbar used rounded text buttons, a blue note
+default, native menus, visible scrollbars and instructions inside the canvas,
+and had to be redone.
+
+**Chosen contract:** [Visual design](design/VISUAL-DESIGN.md) is the required
+visual language for every visible UI — presenters, Element surfaces, renderer
+controls and the component area of demos. It fixes the neutral token palette,
+square one-height controls, mono captions, square line icons, single-row icon
+toolbars, in-component adjustment cards over a scrim with modal focus, hidden
+scrollbars with sticky labels, no explanatory text inside components, and demo
+configuration in Parameters, with an acceptance checklist. AGENTS, the
+frontend skill and workflow, and the rule map route every UI change to it
+before coding.
+
+**Alternatives considered:** leaving the principle as prose and fixing drift
+in review, which repeats the rework; and a UIKit theme package, which would
+not cover renderer-owned surfaces such as the grid.
+
+**Consequences:** existing components that predate it remain until touched;
+a component change brings the touched surface into line. Adjustment cards are
+currently implemented by the grid renderer; a shared UIKit card presenter is
+the reuse target when a second component needs one.
+
+**Owner:** [Visual design](design/VISUAL-DESIGN.md).
+
+**Verification implications:** the visual checklist and browser comparison
+beside an existing component are part of UI acceptance; automated checks do
+not establish visual conformance.
+
+## DEC-060 — Sheet View engraves its own pages and edits notation
+
+**Date / status:** 2026-11-04; accepted at the maintainer's request. Replaces
+the OpenSheetMusicDisplay sheet renderer and refines
+[DEC-058](#dec-058--score-editing-moves-to-a-dedicated-grid-view), which left
+notation editing out of scope.
+
+**Problem:** `<score-sheet-view>` depended on the optional
+OpenSheetMusicDisplay peer. It could not be edited, it followed only note
+events, and its asynchronous engine, injected constructors and separate ink
+model differed from every other View. The maintainer asked for a sheet that is
+drawn by WebMusic itself and edited like a notation program such as MuseScore,
+with selectable, movable and enterable notes, as the grid does for piano roll.
+
+**Chosen contract:** the staff engraver gains an internal system mode: it
+engraves a measure range, restates clef and key at the system start, and
+justifies to an exact width by spreading spare width over columns by duration
+weight. `mountScoreSheet` in `/view/render` measures natural measure widths,
+breaks them into systems and stacks systems on A4 pages (`layout="page"`) or
+in a column (`layout="flow"`); `zoom` scales the staff. `<score-sheet-view>`
+shares the data, player and editor binding of the other score Views. With a
+ready `.editor` and `editable` it shows a one-row icon toolbar and edits through
+four new Core operations — `set-pitches`, `notes-to-rests`, `tie-notes` and
+`write-notation` — that act locally on the named events, so they work in real
+scores with beams, slurs, chords, voices and tuplets. `tools` gates `pitch`,
+`input`, `duration`, `tie`, `accidental`, `delete`, `history` and `zoom`.
+OpenSheetMusicDisplay is removed from the package: `renderOSMDStaffVisualizer`,
+`OSMDStaffOptions`, the React `StaffView` `osmd` prop, the element's
+`OpenSheetMusicDisplay`/`osmd` properties, the optional peer and its site
+license supplements. MuseScore is a reference for interaction and layout
+behavior only; no GPL code is used.
+
+**Alternatives considered:** keeping OSMD for display and adding an editing
+overlay, which leaves two engraving models and an optional peer; a new
+SMuFL engine written from scratch, which would trail the existing VexFlow
+engraver for a long time; and extending `enter-notation`, whose whole-measure
+rewrite rejects most measures of real scores.
+
+**Consequences:** the sheet needs no peer and follows players like the grid.
+Applications that used OSMD through the package must render it themselves.
+Rewriting tuplet or grace rhythms, chord and voice entry, tuplet entry and
+ties or slurs drawn across system breaks are not offered yet and are tracked
+in STATUS.
+
+**Owner:** [Editing contracts](design/EDIT-COMPONENTS.md#score-sheet-editing),
+[Score View family](design/VIEW-COMPONENTS.md) and
+[scrolling notation](design/STAFF-NOTATION.md).
+
+**Verification implications:** system justification and clef/key restatement,
+page and flow layout, each operation's local behavior and refusals, keyboard
+pitch/input/duration/delete paths and feature gating are covered by unit tests;
+engraving quality, pointer drags and playback following need browser and
+visual acceptance on a real score.
+
+## DEC-061 — Audio editing moves to a dedicated clip View
+
+**Date / status:** 2026-11-04; accepted at the maintainer's request. Applies
+[DEC-058](#dec-058--score-editing-moves-to-a-dedicated-grid-view) and
+[DEC-060](#dec-060--sheet-view-engraves-its-own-pages-and-edits-notation) to
+Audio.
+
+**Problem:** Audio editing was a mode of `<audio-view>`: `editable` applied only
+to `type="waveform"`, was switched off by `annotate`, and overlapped
+`interactive`, `drag-mode` and `scrollable`. Its controls were text buttons and
+native selects in a collapsible form, with instructions drawn inside the
+component, contrary to DEC-059. Segment gain and fades could be set only by
+typing numbers; segments, fades, gain and markers were not drawn.
+
+**Chosen contract:** `<audio-view>` is read-only. With `.editor` it draws the
+document's waveform and follows its playback, but it has no `editable` and no
+edit events. A new `<audio-clip-view>` (renderer `mountAudioClip` in
+`/view/render`) is a waveform editor modeled on Adobe Audition's waveform view
+and DAW clip editors; it shares no code with them. It draws a time ruler with
+markers, one lane per channel with segment boundaries, fade handles, a segment
+gain line and an optional envelope lane, and edits a borrowed `AudioClipEditor`
+when `editable`. `tools` offers `split`, `delete`, `clipboard`,
+`trim`, `silence`, `gain`, `fade`, `envelope`, `markers`, `process`, `snap`,
+`zoom` and `history`; range selection is always available. Range amplify, range fades with linear, logarithmic or
+cosine curves, and silence are non-destructive splits plus `set-gain`,
+`set-envelope` or `splice`; normalize, reverse, invert and DC-offset removal are
+range processors. A new Core `set-annotations` operation edits markers. Snap
+offers zero crossings and time grids. Every edit is one atomic editor command.
+
+**Alternatives considered:** keeping `editable` on `<audio-view>` and only
+restyling it, which keeps a type-dependent attribute set on a multi-type
+Element; and destructive sample editing, which would copy PCM for every gain or
+fade change.
+
+**Consequences:** applications that edited through `<audio-view editable>` use
+`<audio-clip-view editable>`; editing was never published, so no package
+migration is needed. `mountWaveformEditor` is replaced by `mountAudioClip`.
+Spectral editing, multitrack arrangement and real-time effects remain outside
+this View.
+
+**Owner:** [Editing contracts](design/EDIT-COMPONENTS.md#audio-clip-editing) and
+[Audio View components](design/AUDIO-VIEW-COMPONENTS.md).
+
+**Verification implications:** the operations and range helpers, snapping,
+tool gating, gestures and keys are unit tested; waveform drawing, handle
+dragging, playback following and long-recording performance need browser
+acceptance.
+
+## DEC-062 — A document beat grid read through a Kernel tempo clock
+
+**Date / status:** 2026-11-04; accepted at the maintainer's request. Extends
+[DEC-061](#dec-061--audio-editing-moves-to-a-dedicated-clip-view) and the
+shared-clock direction in [platform/shared-clock-injection.md](../platform/shared-clock-injection.md).
+
+**Problem:** Audio had a `BeatGrid` on decoded clips and a Kernel
+`TimelineMapping`, but no editable grid on a document and no way to read beats
+from a running transport. DJ-style control — a grid laid over the waveform,
+fine adjustment while listening, beat snap, quantized seeking and beat jump —
+needs one grid that both the editor and the player see, and a beat reading
+taken from the same clock that plays.
+
+**Chosen contract:** Kernel's transport entry gains a domain-neutral
+constant-tempo `TempoGrid` (`bpm`, `anchor` downbeat position, `beatsPerBar`),
+pure helpers (`tempoGridPosition`, `snapToTempoGrid`, `tempoGridJump`,
+`tempoGridLines`, `tempoGridMapping`, `tapTempo`) and a read-only `TempoClock`
+that pairs a `TransportClockReader` with a grid (`beatAt`, `positionAt`,
+`nextGridTime`, `timeAtBeat`). An `AudioSequence` may carry an optional
+`beatGrid` (`bpm`, fractional `anchorFrame`, `beatsPerBar`) changed only by
+the new `set-beat-grid` operation, so grid edits are undoable document
+commits. The anchor follows content edited before it and keeps its bar phase
+through deletions; edits after it leave the grid in place. A revision whose
+timeline is unchanged (same format, length and segments, identity position
+map) — a grid or marker edit — is applied by a player in place without
+pausing. `AudioPlayer` exposes `tempoGrid` and `tempoClock` for the applied
+document (or a clip's `BeatGrid`). `<audio-clip-view>` gains the `grid`
+feature, the `grid`, `quantize` and `grid-edit` settings, `beat`/`bar` snap,
+a Grid Edit toolbar mode modeled on DJ software (set downbeat, BPM field, tap,
+1 ms nudges, 0.01 BPM stretch, ×2/×½, beats per bar, remove, drag to move),
+quantized ruler seeks that keep the playing beat phase, and PageUp/PageDown
+beat jump.
+
+**Alternatives considered:** a grid held only by the View or the player, which
+would give the editor and the player different grids and no undo; a variable
+(beat-list) grid, which DJ workflows rarely need first and which needs a
+warp-marker contract; and making every revision pause playback, which makes
+adjusting the grid while listening impossible.
+
+**Consequences:** DEC-053's pause-on-revision rule now applies to revisions
+that change what plays; metadata-only revisions keep playing. A constant grid
+cannot follow rubato or edits after its anchor; dynamic grids remain open. The
+`TransportGroup` still coordinates positions, not beats; beat-synchronous
+group commands are a later step.
+
+**Owner:** [Kernel API](../apps/doc/webmusic/src/content/docs/kernel/api.mdx),
+[Audio clip editing](design/EDIT-COMPONENTS.md#audio-clip-editing) and the
+[clip View reference](../apps/doc/webmusic/src/content/docs/audio/element/view/audio-clip-view.mdx).
+
+**Verification implications:** grid math, the operation and anchor mapping,
+in-place revision application, the Grid Edit tools, tap tempo, snap, quantize
+and beat jump are unit tested; audible alignment, drag feel and long-recording
+drawing need browser and listening acceptance.
 
 ## DEC-067 — Four-direction score and keyboard composition
 
 **Date / status:** 2026-10-08; accepted by the maintainer's request and confirmed
 scope: keyboard, piano roll and waterfall support four directions; staff,
 fretboard, map and thumbnail keep their normal reading direction.
+
+**2026-11-05 refinement:** [DEC-056](#dec-056--score-view-draws-three-types-annotations-only-on-staff)
+removes the `map` and `thumbnail` types and limits score annotations to
+`staff`. The four-direction contract below is unchanged for piano roll and
+waterfall, which draw no annotations in any direction. The Element
+`show-annotations` default of false now applies to the staff, the only type
+that draws annotations; the imperative staff renderer keeps its default of true.
 
 **Problem:** fixed horizontal keyboards and downward waterfalls prevent
 applications from composing equivalent views at different sides of a musical

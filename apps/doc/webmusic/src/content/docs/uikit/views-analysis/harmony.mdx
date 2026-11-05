@@ -187,7 +187,8 @@ additional fields continue in later rows. The collection's slot order follows
 the first occurrence of each field ID across all bands. Each ID retains its
 DOM slot as readings change, and text wraps inside its own slot. The presenter
 reserves the maximum wrapped space needed by all supplied primary headings,
-field labels and values on updates, resizes and zoom changes. Playback only
+field labels and values on updates and resizes; a zoom does not remeasure it,
+because the readout does not depend on the reel's scale. Playback only
 updates values; it does not measure or resize this readout per frame. With
 `reservePinned`, a gap retains the field labels and reserved slot heights while
 clearing their values. Call `update()` after changing typography tokens so the
@@ -226,8 +227,16 @@ because the semantic index provides its accessible text.
 
 `[` and `]` walk the **harmony**: they step to the next band edge rather than to a point four
 seconds later that may be in the middle of a chord. Arrows step, shift-arrows page, `Home` and `End`
-go to the ends, and `Ctrl`/`Cmd` with the wheel zooms — all of it only where `seek` exists, because
-a focusable node with no behaviour is a trap rather than an affordance.
+go to the ends — all of it only where `seek` exists, because a focusable node with no behaviour
+is a trap rather than an affordance.
+
+`Ctrl`/`Cmd` with the wheel, a trackpad pinch (reported by Chromium as `Ctrl`+wheel) and Safari's
+`gesturestart`/`gesturechange` pinch zoom the lane unless it is disabled. Wheel zoom is
+proportional to the delta: each event scales by `exp(−clamp(deltaY, ±40) × 0.01)`, with line and
+page deltas converted to pixels, so a pinch follows the fingers and a mouse-wheel notch zooms about
+1.5×. Events arriving within one frame accumulate and are applied once per animation frame. At the
+end of the zoom range the wheel gesture is left to the page. The now line is the anchor, so a zoom
+never seeks.
 
 With `visibleSpan`, pixels per unit are `viewportWidth / visibleSpan × zoom`. The measured width
 excludes the label gutter. A resize preserves the chosen zoom and current position, using the same
@@ -253,14 +262,15 @@ narrower band hides its stack, is marked `data-label-fit="hidden"`, and keeps it
 semantic entry. A shared primary-row height keeps secondary labels aligned even when a band's primary
 label is empty or a neighbouring primary wraps. Invisible temporary copies measure the complete label stacks at their actual band widths;
 all rows use the largest required height, with the public lane-height token as a minimum.
-Measurements run on `update()`, resize and zoom, never on playback frames, and temporary nodes
+Measurements run on `update()`, resize and (for `labelOverflow: 'wrap'`) zoom, never on playback frames, and temporary nodes
 are removed immediately. Call `update()` after changing typography tokens. Identical text/width
 pairs share one measurement within each batch. Hidden stacks do not contribute to the row
 height; zooming in or choosing a shorter visible span restores them. Band times, widths,
 stamps, interaction coordinates and semantic entries remain unchanged.
 Ruler ticks remain at every supplied position. When labels would overlap at
 the current scale, only their text is thinned; zooming or resizing recalculates
-the visible labels without moving ticks or changing the time axis.
+the visible labels without moving ticks or changing the time axis. A zoom refits
+them from widths measured when the labels were built, without a layout read.
 Ticks, flags and brackets do not intercept a band click or drag. A contour occupies the remaining
 row height below its labels, and its stroke keeps the same pixel width when the time axis stretches
 or zooms.
@@ -290,8 +300,8 @@ present through silence and note changes when the whole surface must retain its 
 adding or removing it switches between the four-row and three-row layouts. When no
 primary reading exists, literal `voicing` labels stay in the voicing row below
 the empty symbol row; they never become a primary name. With no voicing either,
-the symbol row may show `emptyLabel`. Long lines scroll horizontally instead of changing
-the surface height. The default is `false` and keeps the natural layout.
+the symbol row may show `emptyLabel`. Long lines scroll horizontally, without a visible
+scrollbar, instead of changing the surface height. The default is `false` and keeps the natural layout.
 
 **The chip strip**
 
@@ -361,7 +371,8 @@ which paints a band invisible — the one failure a colour system may not have.
 By default, nameplate symbols and alternate names wrap within the available width. Optional
 rows with no content collapse instead of reserving height, and revealing them restores their
 flex or block layout. With `stableLayout`, those rows remain mounted at fixed heights and
-long readings scroll horizontally. The live-region nodes remain mounted in either mode.
+long readings scroll horizontally without a visible scrollbar; a `ribbon` chip list hides its
+scrollbar the same way. The live-region nodes remain mounted in either mode.
 
 Numeric geometry is deliberately **not** tokenised where JavaScript has to read it back. `scale` is
 an option with a documented default rather than a custom property, because reading a length out of

@@ -73,7 +73,8 @@ describe('level analyzer presenter', () => {
     expect(actions.onResetHold).toHaveBeenCalledOnce();
     handle.update({sample, heldPeakDbfs: -6, history: [sample], thresholdDbfs: -20, frozen: true, status: 'Live'});
     expect(host.querySelector('button')?.getAttribute('aria-pressed')).toBe('true');
-    expect(host.querySelector('button')?.textContent).toBe('Freeze');
+    expect(host.querySelector('button')?.getAttribute('aria-label')).toBe('Freeze');
+    expect(host.querySelector('button svg[data-icon]')).not.toBeNull();
     expect(threshold.getAttribute('aria-valuenow')).toBe('-20');
     expect(actions.onThresholdChange).toHaveBeenCalledOnce();
     handle.destroy();
@@ -91,14 +92,21 @@ describe('level analyzer presenter', () => {
     for (const message of ['Waiting for playback', 'No signal', 'Live analyser unavailable', 'Error: missing source']) {
       handle.update({...state, status: message});
       expect(status.hidden).toBe(false); expect(status.textContent).toBe(message);
+      // Informational lines stay in the live region but only failures are drawn.
+      expect(status.hasAttribute('data-analysis-quiet')).toBe(message === 'Waiting for playback' || message === 'No signal');
     }
     for (const message of ['Live', 'Paused', 'Frozen']) {
       handle.update({...state, status: message, frozen: message === 'Frozen'});
       expect(status.hidden).toBe(true); expect(status.textContent).toBe('');
       expect([...host.querySelectorAll('dd')]).toEqual(readouts);
-      expect(host.querySelector('button')?.textContent).toBe('Freeze');
+      expect(host.querySelector('button')?.getAttribute('aria-label')).toBe('Freeze');
     }
-    expect(host.querySelector<HTMLButtonElement>('[part="reset"]')?.getAttribute('aria-label')).toBe('Reset hold');
+    const reset = host.querySelector<HTMLButtonElement>('[part="reset"]')!;
+    expect([reset.getAttribute('aria-label'), reset.title, reset.textContent]).toEqual(['Reset hold', 'Reset hold', '']);
+    expect(host.querySelector('.wui-level-analyzer__controls')?.classList.contains('wui-analysis-row')).toBe(true);
+    const css = [...document.querySelectorAll('style')].map((style) => style.textContent).join('\n');
+    expect(css).toMatch(/:where\(\.wui-level-analyzer__plot\) \{[^}]*border: 0;/);
+    expect(css).not.toMatch(/ui-monospace, SFMono-Regular, Consolas|system-ui, sans-serif; \}/);
     handle.destroy();
   });
 

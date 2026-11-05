@@ -69,6 +69,16 @@ import {
   type SynthPanelSection,
 } from "./internal/synth-panel-model";
 
+// Neutral fallbacks (Visual design → Palette), each behind its shared token.
+const INK = 'var(--wm-foreground, light-dark(#111, #eee))';
+const MUTED = 'var(--wm-foreground-muted, light-dark(#777, #aaa))';
+const LINE = 'var(--wm-control-border, var(--wm-border, light-dark(#d8d8d8, #333)))';
+const SURFACE = 'var(--wm-surface, light-dark(#fff, #111))';
+const RAISED = 'var(--wm-surface-muted, light-dark(#f3f3f3, #1c1c1c))';
+const ON_INK = 'var(--wm-accent-foreground, light-dark(#fff, #111))';
+
+// The panel is the component's one frame. Sections are divided by hairlines,
+// and every presenter mounted in a section leaves its own frame to the panel.
 const SYNTH_PANEL_COMPATIBILITY_STYLE = `
 :host {
   display: block;
@@ -79,32 +89,57 @@ const SYNTH_PANEL_COMPATIBILITY_STYLE = `
 }
 :host([hidden]) { display: none; }
 .panel {
-  border: var(--wm-synth-panel-surface-border, var(--wm-panel-surface-border, var(--wm-component-border, var(--wm-panel-border, 0))));
+  border: var(--wm-synth-panel-surface-border, var(--wm-panel-surface-border, var(--wm-component-border, var(--wm-panel-border, 1px solid ${LINE}))));
   padding: var(--wm-synth-panel-surface-padding, var(--wm-panel-surface-padding, var(--wm-component-padding, var(--wm-panel-padding, 0))));
-  background: var(--wm-synth-panel-surface-background, var(--wm-panel-surface-background, var(--wm-component-background, var(--synth-bg, var(--wm-panel-background, var(--wm-surface, #fff))))));
+  background: var(--wm-synth-panel-surface-background, var(--wm-panel-surface-background, var(--wm-component-background, var(--synth-bg, var(--wm-panel-background, ${SURFACE})))));
   border-radius: var(--wm-synth-panel-surface-radius, var(--wm-panel-surface-radius, var(--wm-component-radius, var(--synth-radius, var(--wm-control-radius, 0)))));
-  color: var(--synth-head, var(--wm-panel-foreground, var(--wm-foreground, #444)));
+  gap: var(--wm-panel-gap, 0);
+  color: var(--synth-head, var(--wm-panel-foreground, ${INK}));
+}
+.panel > .sec { padding: .6rem; }
+.panel > .sec + .sec { border-top: 1px solid var(--synth-box-border, ${LINE}); }
+.panel .wui-parameter-rack {
+  padding: var(--wm-parameter-surface-padding, 0);
+  border: var(--wm-parameter-surface-border, 0);
+  border-radius: var(--wm-parameter-surface-radius, 0);
+  background: var(--wm-parameter-surface-background, transparent);
+}
+.panel .wui-macro-rack {
+  padding: var(--wm-macro-rack-surface-padding, 0);
+  border: var(--wm-macro-rack-surface-border, 0);
+  border-radius: var(--wm-macro-rack-surface-radius, 0);
+  background: var(--wm-macro-rack-surface-background, transparent);
+}
+.panel .wui-macro-rack > [part~="item"] + [part~="item"] {
+  padding-top: var(--wm-macro-rack-gap, .55rem);
+  border-top: 1px solid var(--synth-box-border, ${LINE});
+}
+.panel [part~="synth-status"].wui-status {
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 `;
 
 const SYNTH_ENVELOPE_COMPATIBILITY_STYLE = `
 .graph.env {
-  background: var(--wm-envelope-surface-background, var(--wm-component-background, var(--synth-bg, var(--wm-surface, #fff))));
-  border: var(--wm-envelope-surface-border, var(--wm-component-border, 1px solid var(--synth-box-border, var(--wm-control-border, var(--wm-border, #d8d8d8)))));
-  border-radius: var(--wm-envelope-surface-radius, var(--wm-component-radius, var(--synth-radius, var(--wm-control-radius, 0))));
-  color: var(--synth-graph, var(--wm-envelope-foreground, var(--wm-foreground-on-inverse, #fff)));
+  padding: var(--wm-envelope-surface-padding, 0);
+  border: var(--wm-envelope-surface-border, 0);
+  border-radius: var(--wm-envelope-surface-radius, 0);
+  background: var(--wm-envelope-surface-background, transparent);
+  color: var(--synth-graph, var(--wm-envelope-foreground, ${INK}));
 }
 .graph.env [part~="svg"] {
   height: var(--wm-envelope-height, 140px);
-  border-color: var(--synth-box-border, var(--wm-envelope-border, var(--wm-control-border, var(--wm-border, #d8d8d8))));
+  border-color: var(--synth-box-border, var(--wm-envelope-border, ${LINE}));
   border-radius: var(--synth-radius, var(--wm-envelope-radius, var(--wm-control-radius, 0)));
-  background: var(--synth-graph-bg, var(--wm-envelope-background, var(--wm-surface-inverse, #111)));
+  background: var(--synth-graph-bg, var(--wm-envelope-background, ${SURFACE}));
 }
 .graph.env [part~="grid"].grid {
-  stroke: var(--synth-graph-grid, var(--wm-envelope-grid, rgba(255,255,255,0.12)));
+  stroke: var(--synth-graph-grid, var(--wm-envelope-grid, ${LINE}));
 }
 .graph.env [part~="area"].area {
-  fill: var(--synth-graph-fill, var(--wm-envelope-fill, rgba(255,255,255,0.12)));
+  fill: var(--synth-graph-fill, var(--wm-envelope-fill, ${RAISED}));
 }
 .graph.env [part~="curve"].curve {
   stroke: var(--synth-graph, var(--wm-envelope-curve, currentColor));
@@ -113,7 +148,7 @@ const SYNTH_ENVELOPE_COMPATIBILITY_STYLE = `
   fill: var(--synth-graph, var(--wm-envelope-handle, currentColor));
 }
 .graph.env [part~="readout"].read {
-  color: var(--synth-graph-text, var(--wm-envelope-text, var(--wm-foreground-muted, var(--wm-foreground, #666))));
+  color: var(--synth-graph-text, var(--wm-envelope-text, ${MUTED}));
 }
 `;
 
@@ -123,62 +158,64 @@ const SYNTH_LFO_COMPATIBILITY_STYLE = `
   border: 0;
   border-radius: var(--synth-radius, var(--wm-lfo-radius, var(--wm-control-radius, 0)));
   background: var(--wm-lfo-background, transparent);
-  color: var(--synth-head, var(--wm-lfo-foreground, var(--wm-foreground, #444)));
+  color: var(--synth-head, var(--wm-lfo-foreground, ${INK}));
   font: inherit;
 }
-.lfo [part~="run"].run {
-  border-color: var(--synth-thumb, var(--wm-lfo-button-background, var(--wm-accent, var(--wm-foreground, #111))));
-  background: var(--synth-thumb, var(--wm-lfo-button-background, var(--wm-accent, var(--wm-foreground, #111))));
-  color: var(--wm-lfo-button-foreground, var(--wm-accent-foreground, #fff));
+.lfo [part~="run"].run[aria-pressed="true"] {
+  background: var(--synth-thumb, var(--wm-lfo-button-background, ${INK}));
+  color: var(--wm-lfo-button-foreground, ${ON_INK});
 }
 .lfo [part~="shape"].shape {
-  border-color: var(--synth-box-border, var(--wm-lfo-chip-border, var(--wm-control-border, var(--wm-border, #d8d8d8))));
-  background: var(--synth-bg, var(--wm-lfo-chip-background, var(--wm-surface, #fff)));
-  color: var(--synth-head, var(--wm-lfo-chip-foreground, var(--wm-foreground, #444)));
+  border-color: var(--synth-box-border, var(--wm-lfo-chip-border, ${LINE}));
+  background: var(--synth-bg, var(--wm-lfo-chip-background, ${SURFACE}));
+  color: var(--synth-head, var(--wm-lfo-chip-foreground, ${INK}));
 }
 .lfo [part~="shape"].shape.on {
-  background: var(--synth-thumb, var(--wm-lfo-chip-active-background, var(--wm-accent, var(--wm-foreground, #111))));
-  color: var(--wm-lfo-chip-active-foreground, var(--wm-accent-foreground, #fff));
+  background: var(--synth-thumb, var(--wm-lfo-chip-active-background, ${INK}));
+  color: var(--wm-lfo-chip-active-foreground, ${ON_INK});
 }
 .lfo [part~="control"] {
-  color: var(--synth-label, var(--wm-lfo-label, var(--wm-foreground-muted, var(--wm-foreground, #666))));
+  color: var(--synth-label, var(--wm-lfo-label, ${MUTED}));
 }
 .lfo [part~="input"] {
-  background: var(--synth-track, var(--wm-lfo-track, var(--wm-control-track, #dcdcdc)));
+  background: var(--synth-track, var(--wm-lfo-track, var(--wm-control-track, light-dark(#dcdcdc, #333))));
 }
-.lfo [part~="input"]::-webkit-slider-thumb,
+.lfo [part~="input"]::-webkit-slider-thumb {
+  background: var(--synth-thumb, var(--wm-lfo-thumb, var(--wm-control-thumb, ${INK})));
+}
 .lfo [part~="input"]::-moz-range-thumb {
-  background: var(--synth-thumb, var(--wm-lfo-thumb, var(--wm-control-thumb, #111)));
+  background: var(--synth-thumb, var(--wm-lfo-thumb, var(--wm-control-thumb, ${INK})));
 }
 .lfo [part~="wave"].wave {
-  background: var(--synth-graph-bg, var(--wm-lfo-wave-background, var(--wm-surface-inverse, #111)));
+  background: var(--synth-graph-bg, var(--wm-lfo-wave-background, ${SURFACE}));
 }
 .lfo [part~="curve"].lfo-curve {
-  stroke: var(--synth-graph, var(--wm-lfo-wave, var(--wm-foreground-on-inverse, #fff)));
+  stroke: var(--synth-graph, var(--wm-lfo-wave, ${INK}));
 }
 .lfo [part~="head"].head {
-  stroke: var(--synth-accent, var(--wm-lfo-head, var(--wm-accent, #c0392b)));
+  stroke: var(--synth-accent, var(--wm-lfo-head, ${INK}));
 }
 `;
 
 const SYNTH_EQ_COMPATIBILITY_STYLE = `
 .graph.eq {
-  background: var(--wm-eq-surface-background, var(--wm-component-background, var(--synth-bg, var(--wm-surface, #fff))));
-  border: var(--wm-eq-surface-border, var(--wm-component-border, 1px solid var(--synth-box-border, var(--wm-control-border, var(--wm-border, #d8d8d8)))));
-  border-radius: var(--wm-eq-surface-radius, var(--wm-component-radius, var(--synth-radius, var(--wm-control-radius, 0))));
-  color: var(--synth-graph-text, var(--wm-eq-text, var(--wm-foreground-muted, var(--wm-foreground, #666))));
+  padding: var(--wm-eq-surface-padding, 0);
+  border: var(--wm-eq-surface-border, 0);
+  border-radius: var(--wm-eq-surface-radius, 0);
+  background: var(--wm-eq-surface-background, transparent);
+  color: var(--synth-graph-text, var(--wm-eq-text, ${MUTED}));
 }
 .graph.eq [part~="svg"] {
   height: var(--wm-eq-height, 160px);
-  border-color: var(--synth-box-border, var(--wm-eq-border, var(--wm-control-border, var(--wm-border, #d8d8d8))));
+  border-color: var(--synth-box-border, var(--wm-eq-border, ${LINE}));
   border-radius: var(--synth-radius, var(--wm-eq-radius, var(--wm-control-radius, 0)));
-  background: var(--synth-graph-bg, var(--wm-eq-background, var(--wm-surface-inverse, #111)));
+  background: var(--synth-graph-bg, var(--wm-eq-background, ${SURFACE}));
 }
-.graph.eq [part~="grid"].grid { stroke: var(--synth-graph-grid, var(--wm-eq-grid, rgba(255,255,255,.12))); }
-.graph.eq [part~="zero"].zero { stroke: var(--synth-graph-grid, var(--wm-eq-zero, rgba(255,255,255,.3))); }
-.graph.eq [part~="area"].area { fill: var(--synth-graph-fill, var(--wm-eq-fill, rgba(255,255,255,.1))); }
-.graph.eq [part~="curve"].curve { stroke: var(--synth-graph, var(--wm-eq-curve, var(--wm-foreground-on-inverse, #fff))); }
-.graph.eq [part~="point"].point { fill: var(--synth-graph, var(--wm-eq-point, var(--wm-foreground-on-inverse, #fff))); }
+.graph.eq [part~="grid"].grid { stroke: var(--synth-graph-grid, var(--wm-eq-grid, ${LINE})); }
+.graph.eq [part~="zero"].zero { stroke: var(--synth-graph-grid, var(--wm-eq-zero, ${MUTED})); }
+.graph.eq [part~="area"].area { fill: var(--synth-graph-fill, var(--wm-eq-fill, ${RAISED})); }
+.graph.eq [part~="curve"].curve { stroke: var(--synth-graph, var(--wm-eq-curve, ${INK})); }
+.graph.eq [part~="point"].point { fill: var(--synth-graph, var(--wm-eq-point, ${INK})); }
 `;
 
 export { lfoWave, parseSections };

@@ -92,7 +92,7 @@ export async function readSitePackageNotice({directory, manifest}) {
 
 export async function readSiteSupplement(owner, {directory = snapshotDirectory} = {}) {
   const {manifest} = owner;
-  if (!['vexflow', 'opensheetmusicdisplay', 'static-browser-server', 'spessasynth_core', 'stb-vorbis'].includes(manifest.name)) return [];
+  if (!['vexflow', 'static-browser-server', 'spessasynth_core', 'stb-vorbis'].includes(manifest.name)) return [];
   const filename = path.join(directory, `${manifest.name}-${manifest.version}.json`);
   let supplement;
   try { supplement = JSON.parse(await readFile(filename, 'utf8')); } catch (cause) {

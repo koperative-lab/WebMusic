@@ -11,7 +11,7 @@ engines, sessions, controllers and their supporting helpers imported from
 | --- | --- |
 | [Play](#play) | `ScorePlayer`, `TonePlayer`, controllers, rack, tempo. |
 | [Analyze](#analyze) | Analysis sessions, playback followers, live trackers, workers and presentation prediction. |
-| [View](#view) | Score windows, map navigation, current-pitch views and held-note tracking. |
+| [View](#view) | Score windows, map navigation, current-pitch views, held-note tracking and the `ScoreEditor` document owner with its URL loader. |
 
 Use these objects when your application owns the interaction or presentation
 layer. The references document inputs, commands, state, event payloads and
@@ -159,32 +159,56 @@ no canvas, no styles — that is the rule every `/headless` entry follows, and
 here it is the whole point, because your framework owns the surface.
 
 Import from `@webmusic/score/view/headless`. `createScoreView` owns sequence
-and viewport state for one Score. `createScoreMapView` follows score replacement
+and viewport state for one Score or a borrowed editing document.
+`createScoreViewEditing` supplies its selection/draft controller independently.
+`createScoreMapView` follows score replacement
 and delegates quarter-note navigation. `createPitchView` follows held pitches
 without needing a score for manual input. Each releases its subscriptions through
 `dispose()` and leaves borrowed playback with its owner. The smaller
 `createActiveNoteTracker` retains only pitch counts and subscriptions and has no
 dispose method. None owns an audio or playback clock.
 
+Editing is part of View. `ScoreEditor` is the persistent owner for one immutable
+Score document, with atomic commands, local history, checkpoints and
+interaction drafts. It has no DOM or playback resources; `loadScoreEditor`
+fetches and parses a URL into a new caller-owned editor, loading the I/O stack on
+demand. Its read-only
+source and command ports live in Core; native ScorePlayer and the editing
+controllers above borrow those interfaces without importing the editor
+implementation.
+
 | Export | Kind | Page |
 | --- | --- | --- |
 | `createScoreView` | view model | [createScoreView](/score/headless/view/score-view/) |
+| `ScoreEditor` · `createScoreEditor` | document owner · factory | [ScoreEditor](/score/headless/view/score-editor/) |
+| `loadScoreEditor` | URL loader | [Load from a URL](/score/headless/view/score-editor/#load-from-a-url) |
+| `createScoreViewEditing` | document interaction model | [Editing controller](/score/headless/view/score-view/#follow-an-editing-document) |
+| `scoreDocumentPlaybackCompatible` | compatibility helper | [Document revision gating](/score/headless/view/score-view/#follow-an-editing-document) |
 | `createScoreMapView` | navigation model | [createScoreMapView](/score/headless/view/score-map-view/) |
 | `createPitchView` | held-pitch model | [createPitchView](/score/headless/view/pitch-view/) |
 | `createActiveNoteTracker` | tracker | [createActiveNoteTracker](/score/headless/view/pitch-view/#active-note-tracker) |
 
 Types (`ScoreView`, `ScoreViewOptions`, `ScoreViewState`,
-`ScoreViewTimeRange`, `ScoreViewType`, `ScoreViewListener`, `ActiveNoteState`,
+`ScoreViewTimeRange`, `ScoreViewType`, `ScoreViewListener`, `ScoreViewEditing`,
+`ScoreViewEditingOptions`, `ScoreViewEditingState`, `ActiveNoteState`,
 `ActiveNoteTracker`, `ActiveNoteListener`) are described with the object that
 produces them. `ScoreMapView`, `ScoreMapViewOptions`, `ScoreMapViewState`,
 `ScoreMapViewListener` and `ScoreMapSeekOutcome` belong to the map-view page;
 `PitchView`, `PitchViewOptions`, `PitchViewState` and `PitchViewListener` belong
 to the pitch-view page.
+`ScoreEditorOptions`, `LoadScoreEditorOptions`, `ScoreEditorState`, `ScoreEditorPort`,
+`ScoreDocumentSource`, `ScoreDocumentSnapshot`, `ScoreDocumentChange`,
+`ScoreEditCommand`, `ScoreEditOperation`, `ScoreEditResult`,
+`ScoreEditTransaction`, `ScoreRevisionGuard`, `ScoreCheckpoint`,
+`ScoreInteractionSession`, `ScoreInteractionSnapshot` and `ScoreDraftResult`
+belong to the [ScoreEditor reference](/score/headless/view/score-editor/). The
+pure operation and position-map functions belong to
+[document editing](/score/api/view/#document-editing) in the View API.
 
 ### Not here: the renderers
 
 `renderPianoRollVisualizer`, `renderStaffVisualizer`,
-`renderWaterfallVisualizer`, `renderOSMDStaffVisualizer` and
+`renderWaterfallVisualizer`, `mountScoreGrid`, `mountScoreSheet` and
 `bindPlayerToVisualizer` are **not** headless components. They draw into a
 caller-owned element, so by rule they are `/render` adapters, and they are
 documented on [`@webmusic/score/view`](/score/api/view/) with the rest of the

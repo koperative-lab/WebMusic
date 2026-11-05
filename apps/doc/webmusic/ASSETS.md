@@ -1,6 +1,10 @@
 # Public demo assets
 
 This inventory describes the files currently under `apps/doc/webmusic/public/`.
+The repository owner maintains that folder; agents do not change it (see
+[AGENTS](../../../AGENTS.md#demo-music-arabesque-no-1-only)). Every demo and
+example uses its Arabesque No. 1 files; the editing fixtures below are not used
+by any demo.
 Astro copies them into the built website. A file's presence in this repository,
 a working demo, or a passing code-license check does not establish permission to
 redistribute the file. [DEV-05](../../../dev/STATUS.md) remains open: verify the
@@ -35,6 +39,13 @@ license text in the site output, and verify the final file hashes. Replace any
 file whose rights cannot be established with a documented project-owned or
 properly licensed asset. The site's generated JavaScript/CSS notices are a
 separate inventory and do not clear these standalone assets.
+
+## Removed editing fixtures
+
+`midi/Editing.mid` and `wav/Editing.wav`, the generated editing fixtures added on
+2026-10-15, were removed by the owner on 2026-11-05: every demo and example uses
+Arabesque No. 1, and automated tests build their own small fixtures. The dated
+audits that used them keep their original descriptions.
 
 ## Bundled code notices
 

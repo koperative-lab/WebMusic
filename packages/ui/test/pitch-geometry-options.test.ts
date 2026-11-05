@@ -94,6 +94,10 @@ describe('keyboard directions', () => {
   });
 
   it.each(['left', 'right'] as const)('follows new pitches and exposes native vertical scrolling facing %s', (direction) => {
+    // Follow geometry is read at the next frame, after the update's style writes.
+    let due: FrameRequestCallback[] = [];
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => due.push(callback));
+    const frame = (): void => { const run = due; due = []; for (const callback of run) callback(0); };
     let state: KeyboardState = {low: 48, high: 84, marks: []};
     const handle = mountKeyboard(host(), {snapshot: () => state}, {direction, follow: 'active', whiteKeyWidth: 40, release: 0});
     Object.defineProperties(handle.element, {clientHeight: {value: 100}, scrollHeight: {value: 880}});
@@ -101,14 +105,16 @@ describe('keyboard directions', () => {
     Object.defineProperties(key, {offsetTop: {value: 600}, offsetHeight: {value: 24}});
     handle.element.scrollTop = 30;
     state = {...state, marks: [{midi: 61}]}; handle.update();
+    expect(handle.element.scrollTop).toBe(30);
+    frame();
     expect(handle.element.scrollTop).toBe(550);
     expect(handle.element.scrollLeft).toBe(0);
     expect(handle.element.tabIndex).toBe(0);
     expect(getComputedStyle(handle.element).overflowY).toBe('auto');
     handle.element.scrollTop = 400;
-    handle.update();
+    handle.update(); frame();
     expect(handle.element.scrollTop).toBe(400);
-    state = {...state, marks: []}; handle.update();
+    state = {...state, marks: []}; handle.update(); frame(); frame();
     expect(handle.element.scrollTop).toBe(400);
     handle.destroy();
   });

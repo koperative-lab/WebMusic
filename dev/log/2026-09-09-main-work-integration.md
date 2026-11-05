@@ -4,7 +4,7 @@ This follow-up integrates the original main draft work after the
 [Score review workflow](2026-09-09-score-review-workflow.md). The user explicitly
 requested committing that work after the first merge had preserved it separately.
 The source snapshot is `734040824b1ebed88fa0520f13a5429843b6c228` on
-`codex/main-drafts-20260909`, based on `364adf0`. The reviewed main baseline is
+`main-drafts-20260909`, based on `364adf0`. The reviewed main baseline is
 `74699f7f03827111f62a3070fd88fd903d3f8f2f`.
 
 ## Scope and reconciliation

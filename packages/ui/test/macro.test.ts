@@ -1,11 +1,20 @@
 // @vitest-environment jsdom
 
 import {afterEach, describe, expect, it, vi} from "vitest";
-import {mountMacro, mountMacroRack, type MacroBinding} from "../src/macro";
+import {macroStyle, mountMacro, mountMacroRack, type MacroBinding} from "../src/macro";
 
 afterEach(() => document.body.replaceChildren());
 
 describe("mountMacroRack", () => {
+  it("keeps the empty-targets instruction for assistive technology only", () => {
+    const host = document.createElement("div");
+    mountMacro(host, {snapshot: () => ({label: "MORPH", value: 0, targets: []}), setValue: vi.fn()});
+    expect(host.querySelector(".wui-macro__empty")?.textContent).toBe("Assign .targets");
+    const rule = macroStyle.match(/\.wui-macro__empty \{([^}]*)\}/)?.[1] ?? "";
+    expect(rule).toContain("clip-path: inset(50%)");
+    expect(rule).toContain("position: absolute");
+  });
+
   it("owns every macro item host and exposes one compound lifecycle", () => {
     const host = document.createElement("div");
     const setFirst = vi.fn();

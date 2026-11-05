@@ -9,7 +9,7 @@ browser and accessibility coverage remains open; this is not full MuseScore pari
 Layer and public entry: Score View core projection and browser `/render`
 adapter, composed by `<score-view type="staff">`.
 
-Related decisions: DEC-015, DEC-024.
+Related decisions: DEC-015, DEC-024, DEC-054.
 
 Source and public types: [notation projection](../../packages/score/src/view/core/staff-notation.ts),
 [beam grouping](../../packages/score/src/view/core/staff-beaming.ts),
@@ -29,7 +29,13 @@ A developer supplies a Score or attaches a view to a player and obtains readable
 scrolling notation: written note values, beam groups, tuplets, rests, voices,
 timed clefs, supported expressions and measure boundaries. The existing `staff` type owns this result; no
 additional Element, renderer-selection option or embedded control is needed.
-`score-sheet-view` retains its separate optional OSMD page-engraving workflow.
+`score-sheet-view` engraves the same notation as justified systems on pages (DEC-060).
+
+Opt-in staff note entry reuses this renderer under DEC-054. Its local cursor,
+voice/duration controls and document-owned semantic transactions are specified
+in [Editing contracts](EDIT-COMPONENTS.md#staff-notation-entry). Drawing support
+for an imported structure does not imply editing support for that structure.
+Passive rendering and the dated evidence below retain their original scope.
 
 The previous renderer reduced notation to pitch and quantized note lengths.
 It could not reconstruct the source's written eighth-note triplets or clefs
@@ -178,13 +184,13 @@ width when glyphs need it. It is not an exact linear pixel/time ruler.
 
 The new path is conventional scrolling notation, not MuseScore page-layout
 parity or a notation editor. Cross-staff and cross-measure beams, nested tuplet
-layout, complete grace-note engraving, lyrics, the full expression vocabulary,
-font fidelity and page/system justification remain outside the supported staff
+layout, complete grace-note engraving, lyrics, the full expression vocabulary
+and font fidelity remain outside the supported staff
 surface. The PDF comparison below distinguishes missing data from drawing
 limits; supported articulations, bar styles, positioned rests and cross-staff
 slurs use the original notation metadata. Retaining metadata does not establish that every stored
-mark is drawn. OSMD remains available for page engraving; its import and
-conversion limits remain separately documented.
+mark is drawn. Page and system layout are provided by `score-sheet-view`
+through this engraver's system mode (DEC-060).
 
 ## Upstream comparison
 

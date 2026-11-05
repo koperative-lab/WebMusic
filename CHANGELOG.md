@@ -5,6 +5,96 @@ work and does not establish npm publication, a release tag or a deployment.
 
 ## Unreleased
 
+- Bring every Web Component in line with the visual design (DEC-059). Recorder,
+  playlist, mixer and analyzer controls are one row of SVG icon buttons (names
+  in `aria-label`/`title`, pressed inverts ink) instead of glyph or text
+  buttons; the oscilloscope trigger edge is a segmented group instead of a
+  native select; scrolling regions hide their scrollbars; hint, empty and
+  progress prose is visually hidden (errors stay visible); envelope, EQ and LFO
+  plots draw on the component surface instead of an inverse box; colour
+  fallbacks have dark-scheme pairs. New tokens `--wm-recording` and
+  `--wm-playlist-active-foreground`; the note surface's start overlay is
+  replaced by a keyboard icon button. Interaction: envelope/EQ drags and
+  analyzer probes apply once per frame, `<audio-view>` scrub paints in the same
+  frame, zoom keeps its anchor and seek drags seek once per frame, and the
+  Score analysis lanes zoom proportionally with Safari pinch support.
+- Add `<audio-clip-view>`, a waveform clip editor modeled on audio editors
+  such as Adobe Audition: an icon toolbar, a time ruler with markers, channel
+  lanes with segment boundaries, draggable fade handles and gain lines, gain
+  envelopes, a gain HUD, zero-crossing and time-grid snap, zoom and keyboard
+  editing over a borrowed `.editor`. Range amplify, fades (linear, logarithmic,
+  cosine) and silence are non-destructive; normalize, reverse, invert and DC
+  removal are range processors (`createAudioRangeProcessor` now accepts
+  `invert` and `remove-dc`, listed by `AUDIO_RANGE_PROCESSOR_KINDS`). Adds the
+  `set-annotations` operation, stateless edit builders in `/view` and
+  `AudioClipEditor.processorDescriptors`. **Breaking:** `<audio-view>` is
+  read-only — `editable` and its `webaudio:edit*` events are removed, and
+  `mountWaveformEditor` is replaced by `mountAudioClip` in `/view/render`.
+- Add a document beat grid and a Kernel tempo clock. `@webmusic/kernel/transport`
+  gains `TempoGrid` (`createTempoGrid`, `tempoGridPosition`, `snapToTempoGrid`,
+  `tempoGridJump`, `tempoGridLines`, `tempoGridMapping`, `tapTempo`) and the
+  read-only `TempoClock` (`beatAt`, `nextGridTime`, `timeAtBeat`). Audio
+  sequences may carry `beatGrid`, changed by the new `set-beat-grid` operation;
+  `AudioPlayer` exposes `tempoGrid` and `tempoClock`, and applies grid- or
+  marker-only revisions without pausing. `<audio-clip-view>` adds the `grid`
+  feature, the `grid`, `quantize` and `grid-edit` attributes, `beat`/`bar` snap,
+  a Grid Edit toolbar (downbeat, BPM, tap, nudge, stretch, ×2/×½, meter, drag),
+  quantized ruler seeks and PageUp/PageDown beat jump. The grid subdivides beats
+  down to 1/32 as you zoom in; the snap button toggles `snap="grid"` (the finest
+  drawn line); the view opens at eight bars or ten seconds instead of the whole
+  clip; and zooming repaints once per frame from cached peak bins, with a
+  trackpad pinch following the fingers one to one (Safari gestures included).
+- Smooth zoom in `<score-grid-view>` and `<score-sheet-view>`. The grid zooms
+  in proportion to wheel and pinch deltas, once per frame at the anchored
+  scroll position, and reports the zoom when the gesture settles (it used to
+  multiply by 1.25 per event). The sheet gains Ctrl/Cmd+wheel and pinch zoom;
+  page layout no longer re-engraves to zoom (CSS `zoom` over the engraved
+  pages, previewed as a transform while pinching), and flow layout re-breaks
+  once a zoom settles.
+- Rebuild `<score-sheet-view>` on WebMusic's own engraver: justified systems
+  on A4 pages (`layout="page"`) or in a column (`layout="flow"`), `zoom`, and
+  player following like the other Views. With a borrowed `.editor` and
+  `editable` it edits like a notation program — select notes and rests, move
+  pitches (semitone, octave, diatonic, drag), note input mode, durations, dots,
+  ties, accidentals and delete-to-rest — through the new `set-pitches`,
+  `notes-to-rests`, `tie-notes` and `write-notation` operations. Its renderer
+  is `mountScoreSheet` in `/view/render`. **Breaking:** OpenSheetMusicDisplay
+  is removed — `renderOSMDStaffVisualizer`, `OSMDStaffOptions`, the React
+  `StaffView` `osmd` prop, the element's `OpenSheetMusicDisplay`/`osmd`
+  properties and the optional peer.
+- Add document-owned editing for Score and Audio as part of View: operations
+  and contracts in `/view`, `ScoreEditor`/`AudioClipEditor` in
+  `/view/headless` with `loadScoreEditor`/`loadAudioClipEditor`, editors lent
+  to players and views through `.editor`, and Audio sequence rendering/WAV
+  export in `/play`; revisioned editors with atomic
+  commands and bounded undo/redo; playback that pauses and reports the applied document revision;
+  note editing on the new `<score-grid-view>` piano-roll grid and waveform
+  editing on `<audio-clip-view>`; local Audio processing and WAV export. The
+  [editing migration guide](dev/release/EDITING-MIGRATION.md) covers upgrades
+  from 0.2.0; no editing release is published.
+- Write Score JSON schema v0.2 with `NoteData.velocityOverride`; v0.1 and
+  unmarked input remain readable. Audio source-change details are now a
+  `kind`-discriminated union that can describe an edited sequence.
+- Add browser-only Kernel `observeElementSource`, which resolves a borrowed
+  source from an explicit object or a selected element's public property with a
+  consumer-supplied type guard; `<score-player>`, `<score-view>`,
+  `<score-grid-view>`, `<audio-player>` and `<audio-view>` use it to find their editor.
+- Add `<score-grid-view>`, a DAW-style piano-roll grid with piano keys, a bar
+  ruler, snap lines and an optional velocity lane. With a borrowed `.editor`
+  and `editable`, a toolbar offers select/draw tools, snap, the velocity lane,
+  zoom, delete and undo/redo; `tools` chooses which features exist. Its
+  renderer is `mountScoreGrid` in `/view/render`. `<score-view>` is read-only:
+  it draws a borrowed editor's content but has no `editable`. Score staff
+  editing (`createStaffViewEditing`, `mountStaffEditor`) is removed.
+- Limit `<score-view>` to `piano-roll`, `staff` and `waterfall`, removing the
+  `map` and `thumbnail` types with `for-part`, `cells`, `webscore:seek` and
+  `ScoreViewSeekDetail`; draw score annotations only on the staff, so
+  `showAnnotations` is now a staff-only option. Headless `createScoreMapView`,
+  the UI timeline and the thumbnail renderer remain available.
+- Reject non-finite `ScorePlayer` and `AudioPlayer` seeks with `RangeError`;
+  resolve `<audio-view player>` to exactly one observed target like the other
+  player companions; pad odd-sized WAV `data` chunks; share one Core per format
+  across Audio CommonJS entries.
 - Integrate Audio and the Score–Audio Bridge into the main source tree, with
   documentation and package checks for all five library packages. This source
   merge does not publish the two additional npm packages.

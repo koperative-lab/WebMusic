@@ -1,0 +1,16 @@
+[
+  {
+    "name": "@webmusic/score",
+    "version": "0.2.0",
+    "shasum": "f1a38ddac2d417d43dc4efae7ec63d3d26273cbc",
+    "integrity": "sha512-crRfhlrZcWgL2Q20Uq2+Smc9duSnxWb5+NbFEifHU1G7d9l416XM9EXIHxbJpI0vra/qWJV3Q4XMh8nBIt/dCw==",
+    "filename": "webmusic-score-0.2.0.tgz"
+  },
+  {
+    "name": "@webmusic/audio",
+    "version": "0.2.0",
+    "shasum": "abae719118e0c9ca2260bfa617e49742b021c48b",
+    "integrity": "sha512-Nrnd/H3JN6X4CY56YghmYXiNmZI0UVJcBm6AVl2AxiUavnEj8abBGyaqTPrMelhVyQBqBSnKnLWGY2rsbc0IMg==",
+    "filename": "webmusic-audio-0.2.0.tgz"
+  }
+]

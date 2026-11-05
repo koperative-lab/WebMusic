@@ -100,6 +100,7 @@ helps select commands; it does not define another execution chain.
 | `npm test` | Run workspace test scripts, including kernel and documentation tests. |
 | `npm run check:licenses` | Check the dependency license/optional-peer policy. |
 | `npm run check:site-notices` | Test the main site notice collector; the site build separately verifies the actual bundled module inventory. |
+| `npm run check:demo-music` | After package builds, verify that every media reference in the documentation source is one of the four Arabesque No. 1 files in the owner-maintained `apps/doc/webmusic/public/` folder and that those files exist. It only reads that folder. Included in source checks and both site build commands. |
 | `npm run check:packages` | Validate built exports, source/output receipts and bundled third-party notices using the main checks, extended to this checkout's five packages. |
 | `npm run check:release-manifests` | Validate the shared version, cross-package ranges and publication metadata. |
 | `npm run dev` | Reuse the running site, or build packages and start it. |
@@ -128,10 +129,22 @@ tracked server before package builds clean `dist/`, then starts the rebuilt site
 `npm run docs:dev -- restart` restarts without rebuilding packages. A failed build
 leaves the server stopped and reports the failure. A per-checkout startup lock
 serializes starts, stops and restarts; do not bypass it with raw Astro commands
-or run package builds concurrently with the running site. Interrupted startup releases its lock after child cleanup; on macOS/Linux the
-package build runs in an owned process group so descendants are stopped before
-a retry can rebuild. The next start also recovers a lock whose owner process
-has exited.
+or run package builds concurrently with the running site. Interrupted startup
+releases its lock after child cleanup; on macOS/Linux the package build runs in
+an owned process group so descendants are stopped before a retry can rebuild.
+Cleanup retries transient permission failures after the child exits, then
+escalates to `SIGKILL` after a bounded wait (five seconds by default). The next
+start also recovers an ordinary stale lock whose owner process has exited.
+
+If cleanup cannot be verified, startup fails with
+`ERR_DEV_PROCESS_GROUP_CLEANUP` and retains
+`apps/doc/webmusic/.astro/webmusic-dev-start/cleanup-failed.json`. The record
+names the process group and preserves the original command failure; subsequent
+starts remain blocked. For operator recovery, inspect that record and verify
+that the recorded build group and its descendants have stopped before manually
+removing the startup lock directory. Process IDs can be reused: do not blindly
+signal an old recorded PID or remove the lock while a builder may still be
+writing package output.
 
 Normal terminals retain Astro's foreground watch output and Ctrl+C behavior.
 Astro may automatically background a server launched by an agent, and

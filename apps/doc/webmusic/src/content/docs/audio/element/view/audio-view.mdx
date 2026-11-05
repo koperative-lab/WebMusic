@@ -1,6 +1,6 @@
 ---
 title: '<audio-view>'
-description: 'The Audio projection stage — one element and three drawings under a type attribute: a min/max waveform, an STFT spectrogram heatmap and a live level meter, on one geometry model.'
+description: 'Waveform, spectrogram and meter views that follow a player, and draw an edited document read-only with revision-aware playback.'
 sidebar:
   order: 1
 ---
@@ -132,6 +132,59 @@ over borrowed data.
 
 `peaks-src` is the path that draws a long file with **no decode at all**: no `AudioContext`, no samples and no `@webmusic/audio/play` import. Its duration comes from the pyramid, since there is no clip to ask. A failed request surfaces as `webaudio:error`; while either loader is in flight the element carries `aria-busy`.
 
+## Follow an editor
+
+`<audio-view>` draws an edited document but never changes it. Edit with
+[`<audio-clip-view>`](/audio/element/view/audio-clip-view/), the waveform
+editor, and let this view follow the same
+[AudioClipEditor](/audio/headless/view/audio-clip-editor/) as a read-only
+waveform. Assign it through `.editor`; there is no `editor` attribute.
+
+```html
+<audio-player id="audio-play"></audio-player>
+<audio-clip-view id="audio-edit" player="#audio-play" editable></audio-clip-view>
+<audio-view id="audio-follow" player="#audio-play"></audio-view>
+<script type="module">
+  import '@webmusic/audio/play/auto';
+  import '@webmusic/audio/view/auto';
+  import {loadAudioClipEditor} from '@webmusic/audio/view/headless';
+  // Your page owns the editor; dispose it after detaching every element.
+  const editor = await loadAudioClipEditor('/wav/Arabesque%20No.1.wav');
+  for (const id of ['audio-play', 'audio-edit', 'audio-follow']) {
+    const element = /** @type {(HTMLElement & {editor?: unknown}) | null} */ (document.getElementById(id));
+    if (element) element.editor = editor;
+  }
+</script>
+```
+
+The view redraws the waveform whenever the visible document changes —
+a commit, an undo or another view's draft in a shared
+`.interactionSession`. Asset extrema are read lazily for visible ranges, so no
+complete PCM render or full peaks pyramid is created per edit. Spectrogram and
+meter types do not accept an editing document; a meter can still borrow the
+player's analyser without an editor binding.
+
+Playback paint and seek requests need a ready player whose applied document ID
+and revision exactly match the editor. While the player prepares a newer
+revision, the old playhead is hidden and `data-playback-state` reports
+`pending`.
+
+The view borrows the editor and never disposes it; setting `undefined`
+detaches it. When you replace a document, assign the new editor before
+disposing the previous one. An editor conflicts with independent `.clip`,
+`.peaks`, `.spectrogram`, `.frequencyData`, `src` or `peaks-src`, including
+empty source attributes. Programmatic source setters reject a conflict by
+throwing an `Error` whose message starts with `source-conflict:` before
+changing data; a source attribute added later instead exposes
+`source-conflict` until corrected. There is no fallback from a failed editor
+binding to old clip data. Disconnect releases the view's session,
+subscriptions, waveform cache and asset lease; borrowed editors, shared
+sessions and players stay alive.
+
+See [editable documents](/audio/api/view/#editable-documents) for history and
+processing and [sequence rendering](/audio/api/play/#render-an-edited-sequence)
+for WAV export.
+
 ## Dragging and seeking
 
 `drag-mode` chooses how a pointer drag behaves on a waveform or spectrogram.
@@ -139,7 +192,7 @@ The element default is `seek`; these demos explicitly select `scrub`.
 
 | `drag-mode` | Drag behavior | Requires |
 | --- | --- | --- |
-| `seek` (default) | Seek continuously to the absolute time under the pointer. | `interactive` |
+| `seek` (default) | Seek continuously to the absolute time under the pointer: the press seeks at once, moves seek at most once per animation frame (the latest position wins), and release seeks exactly once to the final position. | `interactive` |
 | `scrub` | Keep the playhead centered and move the track: left advances, right reverses. A supported player pauses normal playback and sounds the movement at gesture speed. Release coasts in position and sound, then restores its previous playing/paused state. | `interactive`; decoded PCM and a scratch-capable player for sound |
 | `pan` | Move the visible window without changing the playback position. Left reveals later audio; right reveals earlier audio. | `scrollable`; works without `interactive` or a player |
 | `none` | No drag action. Click and keyboard seeking remain available. | `interactive` for seeking |
@@ -226,14 +279,14 @@ Zoom, offset and the visible window live in **one** headless `AudioTimeline` the
 ```ts
 view.visibleRange();            // { startSeconds, endSeconds } — or undefined
 view.panTo(30);                 // scroll so the window starts at 0:30
-view.setZoom(240);              // live re-zoom, keeping scroll + playhead
+view.setZoom(240);              // live re-zoom anchored on the playhead (or the window centre)
 view.zoom;                      // the scale actually drawn at — never 0
 view.addEventListener('webaudio:viewportchange', (event) => {
   const {startSeconds, endSeconds} = event.detail;
 });
 ```
 
-`webaudio:viewportchange` fires once per distinct window, for a user pan (scrollbar, wheel or drag) and a programmatic `panTo()` / `setZoom()` alike — the first paint is not a pan, and putting a window back after an in-place repaint is not one either.
+`webaudio:viewportchange` fires once per distinct window, for a user pan (wheel, trackpad or drag; the scroller hides its scrollbar) and a programmatic `panTo()` / `setZoom()` alike — the first paint is not a pan, and putting a window back after an in-place repaint is not one either.
 
 ### Playback presentation cadence
 
@@ -325,7 +378,7 @@ const view = document.querySelector('audio-view');
 view.peaks = computePeaks(clip.channels(), clip.sampleRate); // draw a waveform
 view.zoom = 200;                                             // live zoom (keeps scroll + playhead)
 view.follow = false;                                         // stop auto-scrolling with playback
-view.scrollable = false;                                     // disable scrollbar/wheel and pan-mode dragging
+view.scrollable = false;                                     // disable wheel panning and pan-mode dragging
 view.interactive = true;                                     // click + keyboard seeking
 view.dragMode = 'scrub';                                     // centered track + optional scratch sound
 view.options = { amplitude: 1.3, virtualization: { bufferScreens: 2 } }; // advanced bag
@@ -342,6 +395,8 @@ view.type = 'spectrogram';                                   // switch the drawi
 | `peaks-src` | attribute | — | **Waveform only.** URL of BBC `audiowaveform` **v2 JSON**, hydrated into the pyramid with **no decode** — no `AudioContext`, no samples, no play import. |
 | `src` | attribute | — | URL of an audio file, decoded through the sibling [`@webmusic/audio/play`](/audio/api/play/) capability (resolved dynamically). |
 | `format` | attribute | — | Force a decoder when the extension is missing or ambiguous; an unsupported value surfaces as `webaudio:error`. |
+| `.editor` | property | — | Follow an editor from `loadAudioClipEditor`/`createAudioClipEditor` (any `AudioClipEditorPort`) read-only; borrowed, never disposed. `undefined` detaches it. Conflicts with independent audio sources. There is no `editor` attribute; edit with [`<audio-clip-view>`](/audio/element/view/audio-clip-view/). |
+| `.interactionSession` | property | owned local session | Optional borrowed same-document `AudioInteractionSession`; another view's draft in it is drawn. |
 | `.clip` | property | — | An `AudioClip` you already have; the element derives peaks from it, and takes its regions and duration. |
 | `.spectrogram` | property | — | **Spectrogram only, and required there.** Column-major `SpectrogramData` from [`computeSpectrogram`](/audio/api/analyze/) — `{ times, frequencies, magnitudes, binsPerFrame }`. Any source matching that shape works; view never imports analyze. |
 | `.frequencyData` | property | — | **Waveform only.** `SpectrogramData` (or one per channel, for `split`) driving the `multiband` / `colormap` colour modes. Falls back to `.spectrogram`, the same payload seen from the other drawing's point of view. |
@@ -352,12 +407,12 @@ view.type = 'spectrogram';                                   // switch the drawi
 
 | Member | Kind | Default | Description |
 | --- | --- | --- | --- |
-| `player` | attribute | — | CSS selector of an [`<audio-player>`](/audio/element/play/audio-player/) to follow (`webaudio:timeupdate`, `webaudio:loaded`). Borrows live position/activity for visible display-frame updates when available; legacy targets remain event-driven. Binding pulls in no play-package code. **Required for `meter`**, which reads `.analyser` from the target (or from its `.player`). |
+| `player` | attribute | — | CSS selector of an [`<audio-player>`](/audio/element/play/audio-player/) to follow (`webaudio:timeupdate`, `webaudio:loaded`). It resolves exactly one element in the view's Document or ShadowRoot and observes late insertion, upgrade, removal and replacement. Multiple matches are ambiguous and bind nothing until one remains; invalid selector syntax binds nothing and dispatches `webaudio:error`. Borrows live position/activity for visible display-frame updates when available; legacy targets remain event-driven. Binding pulls in no play-package code. **Required for `meter`**, which reads `.analyser` from the target (or from its `.player`). |
 | `interactive` | attribute / property | `false` | Enable seeking in `seek`, `scrub` and `none` modes (waveform · spectrogram), and the **default** for `follow`. The property setter writes `"true"` / `"false"`. Never wired on a meter. |
 | `drag-mode` / `.dragMode` | attribute / property | `seek` | `seek` follows the pointer; `scrub` centers the playhead and uses an optional audible scratch session with release inertia; `pan` changes only the viewport with pointer and keyboard input; `none` keeps click/keyboard seeking. See [Dragging and seeking](#dragging-and-seeking) for prerequisites, annotation priority and follow behavior. Unknown values fall back to `seek`. |
 | `annotate` | attribute / property | `false` | Drag to create a region (waveform · spectrogram), overriding every `drag-mode`. Has no effect on a meter. |
 | `follow` | attribute / property | = `interactive` | Auto-scroll in position mode; `follow="false"` opts out. `pan` suspends it while selected; `scrub` centers the playhead independently of this setting. Annotation overrides those track modes. |
-| `scrollable` | attribute / property | `true` | Allow scrollbar/wheel panning and `drag-mode="pan"` on waveform and spectrogram. `false` disables those user actions. Centered scrub disables native panning regardless of this setting; its track gesture still works. |
+| `scrollable` | attribute / property | `true` | Allow wheel and trackpad panning (the scrollbar itself is hidden) and `drag-mode="pan"` on waveform and spectrogram. `false` disables those user actions. Centered scrub disables native panning regardless of this setting; its track gesture still works. |
 | `virtualization` | attribute | on | **Spectrogram only.** Tri-state boolean, or a number setting the buffer-screens window. On, only the visible stripe (± the buffer) is rasterized and it repaints on scroll; `false` gives one full-clip paint and no scroll cost, which is the better trade only for short clips. The waveform always paints only the columns in view, so this is the spectrogram's knob. |
 
 **Geometry**
@@ -366,7 +421,7 @@ view.type = 'spectrogram';                                   // switch the drawi
 | --- | --- | --- | --- |
 | `pixels-per-second` | attribute / `.zoom` | `100` | Horizontal **zoom**. Changing it re-scales the existing surface in place, keeping the scroll position and playhead. |
 | `.zoom` | property | `100` | The scale the surface is actually drawn at: the attribute, else `.options.pixelsPerSecond`, else the renderers' default. Never `0` for a view that is being drawn. The setter calls `setZoom()`. |
-| `setZoom(pps)` | method | — | Live re-zoom keeping scroll + playhead; ignores anything not finite and `> 0`. Reflects `pixels-per-second`. |
+| `setZoom(pps)` | method | — | Live re-zoom with one repaint, anchored on the playhead while it is in view, else on the window centre (centred scrub keeps its centred playhead); ignores anything not finite and `> 0`. Reflects `pixels-per-second`. |
 | `visibleRange()` | method | — | The real clip-time intersection currently painted, `{ startSeconds, endSeconds }`, excluding centered-mode blank padding; `undefined` without a time axis or on a meter. |
 | `panTo(startSeconds)` | method | — | Scroll so the window starts there, clamped to the clip; ignored while scrub centers the playhead. Select pan mode for independent browsing. |
 | `width` | attribute | fills container | Element width — a bare number is `px`, or any CSS length (`80%`). |
@@ -400,7 +455,7 @@ view.type = 'spectrogram';                                   // switch the drawi
 | `webaudio:seek` | `{ seconds, region? }` | Keyboard input, ordinary clicks and absolute `seek` dragging announce requested clip seconds **before** the bound player's seek command. This includes clicks in `seek`/`none`, annotation clicks and position-only `scrub` fallback clicks. A click using a supported scratch session moves silently and emits **after** the command, as does a relative `scrub` drag; these report accepted clip seconds when readable. Keyboard input cancels any held scratch gesture before ordinary seeking. `pan` never emits this event. `region` is present when the seek hit-test identified one. A bound player announces its own transport seeks itself; this element never re-emits those. |
 | `webaudio:regionchange` | `{ regions }` | An `annotate` drag created a region. `regions` is the element's **whole** list, not just the new one. Nothing else emits it. |
 | `webaudio:viewportchange` | `{ startSeconds, endSeconds }` | The visible window moved — user pan or zoom, and programmatic `panTo()` / `setZoom()` alike. Once per distinct window; the first paint is not a pan. |
-| `webaudio:error` | `{ error }` | A `src` or `peaks-src` load, or a render, failed. |
+| `webaudio:error` | `{ error }` | A `src` or `peaks-src` load or a render failed, or the `player` selector has invalid syntax. |
 
 **The meter is the exception.** It reads no precomputed data — it samples the analyser every animation frame, borrows that node and never disposes it. The time-axis members do nothing there, and do nothing quietly: `visibleRange()` returns `undefined`, `panTo()` moves nothing and announces no `webaudio:viewportchange`, click-to-seek is never wired, and the drag binding is not created at all — so `annotate` and `drag-mode` have no effect and `webaudio:regionchange` cannot fire. `webaudio:error` is the one event left.
 
@@ -488,6 +543,11 @@ Changing a colour, size or zoom attribute rebuilds into the **same** stage surfa
 The spectrogram image is rasterized through a 256-entry colormap lookup table and lands in one `putImageData`, so the palette is resolved once per render rather than per pixel.
 
 The placeholder shown when there is no data is the kit's `role="status"` presenter. In this embedded state it is deliberately transparent and unframed because the surrounding stage owns the component surface; its animation follows the shared [Status tokens](/uikit/layout-feedback/status/) and reduced-motion preference. A standalone status presenter keeps its own full surface.
+
+While `.editor` is assigned, `data-editor-state` reports `ready`,
+`unavailable` (a disposed or not-ready editor), `invalid` (the binding could
+not be created) or `source-conflict`, and `data-playback-state` reports
+`unbound`, `ready` or `pending`. Both are removed with the editor binding.
 
 </details>
 

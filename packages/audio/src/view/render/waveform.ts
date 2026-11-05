@@ -15,9 +15,14 @@
 //     Separate fractionally aligned rectangles would antialias their shared
 //     edges independently, making even a flat waveform pulse in opacity.
 //
-//   • Native scroll is used ONLY for the scrollbar + wheel/drag panning, on a
-//     transparent layer over the canvas. The render surface is not inside it, so
-//     programmatic thumb-syncing never moves (or shimmers) the waveform.
+//   • Native scroll is used ONLY for wheel/trackpad/keyboard panning, on a
+//     transparent layer under the canvas whose scrollbar is hidden (Visual
+//     design: scrolling surfaces). The render surface is not inside it, so
+//     programmatic scroll-syncing never moves (or shimmers) the waveform.
+//
+//   • Each operation reads layout once, before it writes: the viewport width is
+//     measured at the top of every public call, frame and observer callback,
+//     and paint() only reads that cached value.
 //
 // In follow mode the playhead is kept centered: once it passes the middle the
 // view scrolls so the line stays put and the waveform slides beneath it (clamped
@@ -30,6 +35,7 @@ import {secondsToPixel, pixelToSeconds, clampCanvasBackingSize, MAX_CANVAS_DIMEN
 import {computeFrameColors, type FrameColors} from '../core/waveform-color';
 import type {
   AudioViewport,
+  AudioWaveformSource,
   SpectrogramData,
   ViewportAudioVisualizer,
   WaveformRenderOptions,
@@ -58,7 +64,7 @@ interface ResolvedRegion {
  */
 export function renderWaveformVisualizer(
   container: HTMLElement,
-  peaks: AudioPeaks,
+  peaks: AudioPeaks | AudioWaveformSource,
   options: WaveformRenderOptions = {},
 ): ViewportAudioVisualizer {
   let pixelsPerSecond = options.pixelsPerSecond ?? DEFAULTS.pixelsPerSecond;
@@ -70,7 +76,9 @@ export function renderWaveformVisualizer(
   const backgroundColor = options.backgroundColor;
   const scrollable = options.scrollable ?? true;
   let playheadMode = options.playheadMode ?? 'position';
-  const duration = options.durationSeconds ?? peaksDuration(peaks);
+  const sequenceSource = 'readPeaks' in peaks ? peaks : undefined;
+  const pyramid = 'levels' in peaks ? peaks : undefined;
+  const duration = options.durationSeconds ?? (sequenceSource ? sequenceSource.frameCount / sequenceSource.sampleRate : peaksDuration(pyramid!));
 
   // Frequency-based colouring (miniMeter-style multi-band / colormap). Computed
   // once per frame here — the per-column paint loop only does an array lookup.
@@ -96,6 +104,7 @@ export function renderWaveformVisualizer(
 
   let regions: ResolvedRegion[] = [];
   let playheadSeconds = 0;
+  let playheadVisible = true;
   // CSS px of clip scrolled past the left edge — the single, fractional source of
   // truth the waveform and the playhead are both drawn from.
   let renderOffset = 0;
@@ -117,9 +126,9 @@ export function renderWaveformVisualizer(
   outer.style.height = `${height}px`;
   outer.style.overflow = 'hidden';
 
-  // The scroller is in-flow (sizes predictably to the box) and owns the native
-  // scrollbar + wheel/drag input. The canvas is absolutely positioned ON TOP of
-  // it as a static render surface, so panning the scroller never moves the
+  // The scroller is in-flow (sizes predictably to the box) and owns native
+  // wheel/trackpad/keyboard panning. The canvas is absolutely positioned ON TOP
+  // of it as a static render surface, so panning the scroller never moves the
   // canvas layer (which is what would shimmer).
   const scroller = document.createElement('div');
   scroller.style.width = '100%';
@@ -127,6 +136,7 @@ export function renderWaveformVisualizer(
   // `auto` = user can pan; `hidden` locks the surface (follow can still move it).
   scroller.style.overflowX = scrollable && playheadMode === 'position' ? 'auto' : 'hidden';
   scroller.style.overflowY = 'hidden';
+  hideScrollbar(scroller);
 
   const spacer = document.createElement('div');
   spacer.style.height = '1px';
@@ -167,11 +177,27 @@ export function renderWaveformVisualizer(
   colorProbe.hidden = true;
   colorProbe.setAttribute('aria-hidden', 'true');
   outer.appendChild(colorProbe);
+  outer.appendChild(hiddenScrollbarStyle(container.ownerDocument));
   const resolvePaint = (value: string): string => {
     colorProbe.style.color = '';
     colorProbe.style.color = value;
     const computed = container.ownerDocument.defaultView?.getComputedStyle(colorProbe).color;
     return computed && !computed.includes('var(') ? computed : value;
+  };
+  /**
+   * One paint's colour lookups. Every distinct paint string (wave, progress,
+   * background, each region colour) costs one style resolution per paint, not
+   * one per region; a theme change is picked up by the next paint.
+   */
+  let paintCache: Map<string, string> | undefined;
+  const paintColor = (value: string): string => {
+    if (!paintCache) return resolvePaint(value);
+    let resolved = paintCache.get(value);
+    if (resolved === undefined) {
+      resolved = resolvePaint(value);
+      paintCache.set(value, resolved);
+    }
+    return resolved;
   };
 
   const setRegions = (next: readonly Region[]): void => {
@@ -185,12 +211,24 @@ export function renderWaveformVisualizer(
 
   /** Width of the full waveform in CSS px at the current zoom. */
   const fullWidth = (): number => Math.max(1, Math.ceil(duration * pixelsPerSecond));
-  /** Actual measured visible width; zero while hidden or not laid out. */
-  const measuredViewportWidth = (): number => Math.max(0, outer.clientWidth);
+  // The visible width, read once per operation before any DOM write (see
+  // measure()). Reading `clientWidth` after writing the spacer or canvas style
+  // would force a synchronous layout in the middle of the paint.
+  let viewportWidth = 0;
+  let viewportHeight = 0;
+  const measure = (): void => {
+    viewportWidth = Math.max(0, outer.clientWidth);
+    viewportHeight = Math.max(0, scroller.clientHeight);
+  };
+  /** Measured visible width; zero while hidden or not laid out. */
+  const measuredViewportWidth = (): number => viewportWidth;
   /** Canvas operations still require at least one drawable CSS pixel. */
   const drawableViewportWidth = (): number => Math.max(1, measuredViewportWidth());
-  /** Drawable height in CSS px — excludes the horizontal scrollbar gutter. */
-  const drawHeight = (): number => Math.max(1, scroller.clientHeight);
+  /**
+   * Drawable height in CSS px, measured with the width. The scroller's
+   * scrollbar is hidden, so no gutter is taken from the drawing any more.
+   */
+  const drawHeight = (): number => Math.max(1, viewportHeight);
   /** Largest valid scroll offset. */
   const maxOffset = (): number => Math.max(0, fullWidth() - measuredViewportWidth());
   const clampOffset = (o: number): number => Math.max(0, Math.min(maxOffset(), o));
@@ -248,7 +286,6 @@ export function renderWaveformVisualizer(
   const sizeContent = (): void => {
     spacer.style.width = `${fullWidth() + centerPadding() * 2}px`;
   };
-  sizeContent();
 
   /** Push `renderOffset` onto the scrollbar thumb without moving the canvas. */
   const syncScrollbar = (): void => {
@@ -281,6 +318,7 @@ export function renderWaveformVisualizer(
     if (frameHandle !== null) return;
     frameHandle = requestFrame(() => {
       frameHandle = null;
+      measure();
       paint();
     });
   };
@@ -295,6 +333,15 @@ export function renderWaveformVisualizer(
   /** Redraw the visible window + playhead from `renderOffset` (always crisp). */
   const paint = (): void => {
     if (disposed) return;
+    paintCache = new Map();
+    try {
+      paintColumns();
+    } finally {
+      paintCache = undefined;
+    }
+  };
+
+  const paintColumns = (): void => {
     lastColorKey = -1;
     const viewport = drawableViewportWidth();
     const drawH = drawHeight();
@@ -312,10 +359,10 @@ export function renderWaveformVisualizer(
     if (!ctx || !surface) return;
     ctx.setTransform(1, 0, 0, backing.scaleY, 0, 0);
     ctx.clearRect(0, 0, columns, drawH);
-    const wavePaint = resolvePaint(waveColor);
-    const progressPaint = resolvePaint(progressColor);
+    const wavePaint = paintColor(waveColor);
+    const progressPaint = paintColor(progressColor);
     if (backgroundColor) {
-      ctx.fillStyle = resolvePaint(backgroundColor);
+      ctx.fillStyle = paintColor(backgroundColor);
       ctx.fillRect(0, 0, columns, drawH);
     }
 
@@ -332,17 +379,65 @@ export function renderWaveformVisualizer(
       if (x1 < 0 || x0 > columns) continue;
       const left = Math.max(0, x0);
       const wWidth = Math.max(1, Math.min(columns, x1) - left);
-      ctx.fillStyle = resolvePaint(r.region.color ?? 'rgba(0, 0, 0, 0.12)');
+      ctx.fillStyle = paintColor(r.region.color ?? 'rgba(0, 0, 0, 0.12)');
       ctx.fillRect(left, 0, wWidth, drawH);
     }
 
-    // Choose the pyramid level whose peaks are closest to one-per-pixel.
+    // Choose the coarsest pyramid level that is still at least one peak per
+    // column; a column then folds every peak it covers (never just the first),
+    // so narrow transients survive and panning cannot make them flicker.
     const samplesPerPixel = peaks.sampleRate / (pixelsPerSecond * rasterScaleX);
-    const level = peaksLevelForResolution(peaks, samplesPerPixel);
-    const total = peakCount(level, peaks.channels);
-    const secondsPerPeak = level.samplesPerPeak / peaks.sampleRate;
+    const level = pyramid ? peaksLevelForResolution(pyramid, samplesPerPixel) : undefined;
+    const total = level ? peakCount(level, peaks.channels) : sequenceSource!.frameCount;
+    const samplesPerPeak = level ? level.samplesPerPeak : 1;
     const channels = peaks.channels;
-    const peakData = level.data;
+    const peakData = level?.data;
+    // A sequence source is read in whole power-of-two bins aligned to the clip,
+    // so neighbouring columns, pans and zoom steps reuse the same cached ranges
+    // instead of asking for a new unaligned range per column per zoom.
+    const binFrames = sequenceSource && samplesPerPixel > 2 ? 2 ** Math.floor(Math.log2(samplesPerPixel)) : 0;
+    const columnMin = new Float64Array(channels);
+    const columnMax = new Float64Array(channels);
+    /** Fold `[first, last)` pyramid peaks or source frames into columnMin/Max. */
+    const readColumn = (pixel: number): boolean => {
+      columnMin.fill(Infinity);
+      columnMax.fill(-Infinity);
+      const startSample = pixel * samplesPerPixel;
+      const endSample = (pixel + 1) * samplesPerPixel;
+      if (peakData) {
+        const first = Math.floor(startSample / samplesPerPeak);
+        if (first < 0 || first >= total) return false;
+        const last = Math.min(total, Math.max(first + 1, Math.ceil(endSample / samplesPerPeak)));
+        for (let peak = first; peak < last; peak += 1) {
+          for (let c = 0; c < channels; c += 1) {
+            const base = (peak * channels + c) * 2;
+            const min = peakData[base] / 128;
+            const max = peakData[base + 1] / 128;
+            if (min < columnMin[c]) columnMin[c] = min;
+            if (max > columnMax[c]) columnMax[c] = max;
+          }
+        }
+        return true;
+      }
+      const source = sequenceSource!;
+      const a = Math.max(0, Math.floor(startSample));
+      if (pixel < 0 || a >= total) return false;
+      const b = Math.min(total, Math.max(a + 1, Math.ceil(endSample)));
+      const fold = (values: readonly {readonly min: number; readonly max: number}[]): void => {
+        for (let c = 0; c < channels; c += 1) {
+          const value = values[c];
+          if (!value) continue;
+          if (value.min < columnMin[c]) columnMin[c] = value.min;
+          if (value.max > columnMax[c]) columnMax[c] = value.max;
+        }
+      };
+      if (binFrames) {
+        for (let start = Math.floor(a / binFrames) * binFrames; start < b; start += binFrames) {
+          fold(source.readPeaks(start, Math.min(total, start + binFrames)));
+        }
+      } else fold(source.readPeaks(a, b));
+      return true;
+    };
     const playheadCol = secondsToPixel(playheadSeconds, pixelsPerSecond) * rasterScaleX - intOff;
 
     // Lanes: one centred waveform in `merge`, or a stacked stereo pair in
@@ -376,7 +471,7 @@ export function renderWaveformVisualizer(
     // Recent-history glow: full brightness within `historyTrail` seconds behind
     // the playhead, dimmed elsewhere — a trailing window that follows playback.
     const historyFactor = (seconds: number): number => {
-      if (historyTrail <= 0) return 1;
+      if (!playheadVisible || historyTrail <= 0) return 1;
       const behind = playheadSeconds - seconds;
       return behind >= 0 && behind <= historyTrail ? 1 : HISTORY_DIM;
     };
@@ -387,7 +482,7 @@ export function renderWaveformVisualizer(
       x: number,
       factor: number,
     ): string => {
-      if (!colors) return x <= playheadCol ? progressPaint : wavePaint;
+      if (!colors) return playheadVisible && x <= playheadCol ? progressPaint : wavePaint;
       let fi = colors.frameStep > 0 ? Math.round((seconds - colors.startTime) / colors.frameStep) : 0;
       if (fi < 0) fi = 0;
       else if (fi >= colors.frames) fi = colors.frames - 1;
@@ -417,27 +512,19 @@ export function renderWaveformVisualizer(
       for (let x = 0; x < columns; x += 1) {
         const seconds = (intOff + x) / (pixelsPerSecond * rasterScaleX);
         if (playheadMode === 'center' && (seconds < 0 || seconds >= duration)) continue;
-        const peakIndex = Math.floor(seconds / secondsPerPeak);
-        if (peakIndex < 0 || peakIndex >= total) continue;
+        if (!readColumn(intOff + x)) continue;
         const factor = historyFactor(seconds);
         for (const lane of lanes) {
           let lo = Infinity;
           let hi = -Infinity;
-          // Indexed directly rather than through readPeak: this runs once per
-          // column per lane per channel on every repaint, and the helper's
-          // {min, max} return allocated an object each time.
           if (lane.channel < 0) {
             for (let c = 0; c < channels; c += 1) {
-              const base = (peakIndex * channels + c) * 2;
-              const min = peakData[base] / 128;
-              const max = peakData[base + 1] / 128;
-              if (min < lo) lo = min;
-              if (max > hi) hi = max;
+              if (columnMin[c] < lo) lo = columnMin[c];
+              if (columnMax[c] > hi) hi = columnMax[c];
             }
           } else {
-            const base = (peakIndex * channels + lane.channel) * 2;
-            lo = peakData[base] / 128;
-            hi = peakData[base + 1] / 128;
+            lo = columnMin[lane.channel];
+            hi = columnMax[lane.channel];
           }
           if (!Number.isFinite(lo) || !Number.isFinite(hi)) continue;
           const yTop = Math.max(0, lane.center - hi * lane.half);
@@ -472,7 +559,7 @@ export function renderWaveformVisualizer(
       ? measuredViewportWidth() / 2
       : secondsToPixel(playheadSeconds, pixelsPerSecond) - renderOffset;
     overlay.style.transform = `translateX(${playheadX}px)`;
-    overlay.style.opacity = playheadX < -1 || playheadX > viewport + 1 ? '0' : '1';
+    overlay.style.opacity = !playheadVisible || playheadX < -1 || playheadX > viewport + 1 ? '0' : '1';
   };
 
   /** Center the viewport on the playhead, clamped at both ends. */
@@ -482,10 +569,12 @@ export function renderWaveformVisualizer(
     );
   };
 
-  // Manual pan: the user dragged the scrollbar / wheeled. Our own thumb syncs
-  // leave `scrollLeft` within half a px of `renderOffset`, so ignore those.
+  // Manual pan: the user wheeled, swiped or used the keyboard. Our own scroll
+  // syncs leave `scrollLeft` within half a px of `renderOffset`, so the echo of
+  // a paint that already covered this position is skipped.
   const onScroll = (): void => {
     if (disposed) return;
+    measure();
     if (playheadMode === 'center') {
       syncScrollbar();
       return;
@@ -498,13 +587,13 @@ export function renderWaveformVisualizer(
   };
   scroller.addEventListener('scroll', onScroll, {passive: true});
 
-  // Re-fit on resize. Observe the scroller's CONTENT box, not `outer`: it tracks
-  // both container-width changes and the height lost when the horizontal
-  // scrollbar appears/disappears (so the wave never hides behind the scrollbar).
+  // Re-fit on resize. The scroller fills the fixed-height box and its
+  // scrollbar is hidden, so only container-width changes reach here.
   let resizeObserver: ResizeObserver | undefined;
   if (typeof ResizeObserver !== 'undefined') {
     resizeObserver = new ResizeObserver(() => {
       if (disposed) return;
+      measure();
       sizeContent();
       alignOffset();
       paint();
@@ -529,6 +618,8 @@ export function renderWaveformVisualizer(
   const colorScheme = container.ownerDocument.defaultView?.matchMedia?.('(prefers-color-scheme: dark)');
   colorScheme?.addEventListener('change', schedulePaint);
 
+  measure();
+  sizeContent();
   alignOffset();
   paint();
   syncScrollbar();
@@ -554,8 +645,14 @@ export function renderWaveformVisualizer(
   };
 
   return {
+    setPlayheadVisible(visible: boolean): void {
+      if (disposed || playheadVisible === visible) return;
+      playheadVisible = visible;
+      schedulePaint();
+    },
     redraw(nextPlayhead?: number, scrollIntoView?: boolean): void {
       if (disposed) return;
+      measure();
       if (nextPlayhead === undefined) {
         sizeContent();
         alignOffset();
@@ -568,6 +665,8 @@ export function renderWaveformVisualizer(
       if (updatePlayhead(nextPlayhead, scrollIntoView)) schedulePaint();
     },
     redrawFrame(nextPlayhead: number, scrollIntoView?: boolean): void {
+      if (disposed) return;
+      measure();
       if (!updatePlayhead(nextPlayhead, scrollIntoView)) return;
       // A borrowed player clock has already been sampled inside this display
       // frame. Publish it now, cancelling any older event/theme repaint.
@@ -576,6 +675,7 @@ export function renderWaveformVisualizer(
     },
     setPlayheadMode(mode: 'position' | 'center'): void {
       if (disposed || mode === playheadMode || (mode !== 'position' && mode !== 'center')) return;
+      measure();
       playheadMode = mode;
       scroller.style.overflowX = scrollable && mode === 'position' ? 'auto' : 'hidden';
       sizeContent();
@@ -584,10 +684,20 @@ export function renderWaveformVisualizer(
       syncScrollbar();
       notifyViewport();
     },
-    setZoom(nextPxPerSec: number): void {
+    /**
+     * Re-scale in place. `startSeconds`, when given, is the window start the
+     * caller anchored (for example around the point under the pointer); it is
+     * applied before the one paint, so the surface never shows the old pixel
+     * offset at the new scale. Without it the pixel offset is kept.
+     */
+    setZoom(nextPxPerSec: number, startSeconds?: number): void {
       if (disposed) return;
       if (Number.isFinite(nextPxPerSec) && nextPxPerSec > 0) {
+        measure();
         pixelsPerSecond = nextPxPerSec;
+        if (startSeconds !== undefined && Number.isFinite(startSeconds)) {
+          renderOffset = secondsToPixel(Math.max(0, startSeconds), pixelsPerSecond);
+        }
         sizeContent();
         alignOffset();
         paint();
@@ -597,6 +707,7 @@ export function renderWaveformVisualizer(
     },
     setOffset(startSeconds: number): void {
       if (disposed || playheadMode === 'center' || !Number.isFinite(startSeconds)) return;
+      measure();
       renderOffset = clampOffset(secondsToPixel(Math.max(0, startSeconds), pixelsPerSecond));
       paint();
       syncScrollbar();
@@ -618,6 +729,7 @@ export function renderWaveformVisualizer(
     setRegions(next: readonly Region[]): void {
       if (disposed) return;
       setRegions(next);
+      measure();
       paint();
     },
     hitTest(x: number, y?: number): {seconds: number; region?: Region; channel?: number} {
@@ -652,6 +764,28 @@ export function renderWaveformVisualizer(
       outer.remove();
     },
   };
+}
+
+/** Marks a renderer's native scroller; its scrollbar is hidden by {@link hiddenScrollbarStyle}. */
+const HIDDEN_SCROLLBAR_ATTRIBUTE = 'data-wm-hidden-scrollbar';
+
+/**
+ * Hide a scrolling layer's scrollbar while keeping wheel, trackpad and keyboard
+ * scrolling (Visual design: scrolling surfaces). The standard property is
+ * inline; the WebKit pseudo-element needs the scoped rule below.
+ */
+function hideScrollbar(scroller: HTMLElement): void {
+  scroller.setAttribute(HIDDEN_SCROLLBAR_ATTRIBUTE, '');
+  scroller.style.setProperty('scrollbar-width', 'none');
+}
+
+/** The scoped stylesheet behind {@link hideScrollbar}, mounted inside the renderer's own box. */
+function hiddenScrollbarStyle(document: Document): HTMLStyleElement {
+  const style = document.createElement('style');
+  style.textContent =
+    `:where([${HIDDEN_SCROLLBAR_ATTRIBUTE}]) { scrollbar-width: none; }\n` +
+    `:where([${HIDDEN_SCROLLBAR_ATTRIBUTE}])::-webkit-scrollbar { display: none; }`;
+  return style;
 }
 
 function sameViewport(left: AudioViewport, right: AudioViewport): boolean {

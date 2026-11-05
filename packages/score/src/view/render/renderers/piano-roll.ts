@@ -1,8 +1,5 @@
 // SVG/canvas implementation for the explicit /render surface.
-import {Rational, type Score} from '../../../core';
-import {projectScoreAnnotations} from '../../core/annotations';
 import type {ScoreNoteSequence, ScoreSequenceNote} from '../../core/types';
-import {drawHorizontalScoreAnnotations, drawVerticalScoreAnnotations} from '../annotations';
 import {horizontalDirection, viewDirection} from './direction';
 import {clampCanvasBackingSize, bufferedScrollRange, visibleNoteRange, type IndexRange} from '../../core/windowing';
 import {
@@ -16,6 +13,19 @@ import {
   type VisualizerConfig,
 } from './base';
 import {BaseSVGVisualizer} from './svg';
+
+/**
+ * How long a resolved note colour is trusted while the playhead repaints. A
+ * scheme change, a resize or an attribute change on the canvas or an ancestor
+ * drops it at once; this bound only catches a stylesheet swapped elsewhere.
+ */
+const COLOR_REFRESH_MS = 1000;
+/** Ancestor attributes a theme switch is written through. */
+const THEME_ATTRIBUTES = ['class', 'style', 'data-theme', 'data-scheme', 'data-color-scheme'];
+
+function clockNow(): number {
+  return typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now();
+}
 
 /** Canvas piano roll with viewport-sized static and active-note layers. */
 export class PianoRollCanvasVisualizer extends BaseVisualizer {
@@ -39,12 +49,21 @@ export class PianoRollCanvasVisualizer extends BaseVisualizer {
   private get direction() { return viewDirection(this.config.direction, 'right'); }
   private get horizontal(): boolean { return horizontalDirection(this.direction); }
   private get reversed(): boolean { return this.direction === 'left' || this.direction === 'up'; }
+  /** The offset a follow-scroll already painted, so its own scroll event does not paint it again. */
+  private followPainted?: number;
+  /** Resolved layer colours: a probe and `getComputedStyle` per layer, not per frame. */
+  private readonly resolvedColors = new Map<boolean, {input: string; color: string; at: number}>();
+  /** Records attribute writes on the canvas and its ancestors; read synchronously at paint time. */
+  private themeObserver?: MutationObserver;
+  private releaseScheme?: () => void;
   private readonly onViewportScroll = (): void => {
     if (this.viewRedrawScheduled) return;
     this.viewRedrawScheduled = true;
     scheduleFrame(() => {
       this.viewRedrawScheduled = false;
-      if (this.disposed) return;
+      const followed = this.followPainted;
+      this.followPainted = undefined;
+      if (this.disposed || (followed !== undefined && this.getScrollPosition() === followed)) return;
       this.drawStatic();
       this.drawOverlay();
     });
@@ -80,7 +99,48 @@ export class PianoRollCanvasVisualizer extends BaseVisualizer {
         this.resizeObserver.observe(this.parentElement);
       }
     }
+    this.watchColorScheme();
+    this.watchTheme();
     this.redraw();
+  }
+
+  /**
+   * Observe the attributes a theme is switched through on the canvas and every
+   * ancestor. Nothing runs on a mutation: `resolveColor` drains the records
+   * synchronously, so a class or inline colour written just before a paint is
+   * honoured by that paint.
+   */
+  private watchTheme(): void {
+    this.themeObserver?.disconnect();
+    this.themeObserver = undefined;
+    const view = this.canvas.ownerDocument?.defaultView as (Window & typeof globalThis) | null | undefined;
+    const Observer = view?.MutationObserver;
+    if (!Observer) return;
+    const observer = new Observer(() => {});
+    for (let node: Element | null = this.canvas; node; node = node.parentElement) {
+      observer.observe(node, {attributes: true, attributeFilter: THEME_ATTRIBUTES});
+    }
+    this.themeObserver = observer;
+  }
+
+  /** A light/dark switch re-resolves the layer colours and repaints both layers. */
+  private watchColorScheme(): void {
+    const view = this.canvas.ownerDocument?.defaultView;
+    const query = typeof view?.matchMedia === 'function' ? view.matchMedia('(prefers-color-scheme: dark)') : undefined;
+    if (!query) return;
+    const changed = (): void => {
+      if (this.disposed) return;
+      this.resolvedColors.clear();
+      this.drawStatic();
+      this.drawOverlay();
+    };
+    if (typeof query.addEventListener === 'function') {
+      query.addEventListener('change', changed);
+      this.releaseScheme = () => query.removeEventListener('change', changed);
+    } else if (typeof query.addListener === 'function') {
+      query.addListener(changed);
+      this.releaseScheme = () => query.removeListener(changed);
+    }
   }
 
   private setupLayers(): void {
@@ -147,6 +207,8 @@ export class PianoRollCanvasVisualizer extends BaseVisualizer {
 
   private handleViewportResize(): void {
     if (this.disposed) return;
+    this.resolvedColors.clear();
+    this.watchTheme();
     this.allocateBackingStore();
     this.drawStatic();
     this.drawOverlay();
@@ -198,19 +260,31 @@ export class PianoRollCanvasVisualizer extends BaseVisualizer {
     }
   }
 
-  /** Canvas cannot resolve CSS variables itself. Resolve once per layer paint. */
+  /**
+   * Canvas cannot resolve CSS variables itself. The answer is cached: the
+   * playhead repaints every frame, and a probe plus `getComputedStyle` there
+   * is a style recalculation per frame. A scheme change, a resize, a full
+   * `redraw()` or a theme attribute written on the canvas or an ancestor drops
+   * the cache; otherwise it is refreshed at most once per {@link COLOR_REFRESH_MS}.
+   */
   private resolveColor(active: boolean): string {
     const color = active ? this.config.activeNoteColor : this.config.noteColor;
     const fallback = `rgb(${active ? this.config.activeNoteRGB : this.config.noteRGB})`;
     if (!color) return fallback;
     const document = this.canvas.ownerDocument;
     if (!document?.defaultView) return color;
+    if (this.themeObserver && this.themeObserver.takeRecords().length > 0) this.resolvedColors.clear();
+    const now = clockNow();
+    const cached = this.resolvedColors.get(active);
+    if (cached && cached.input === color && now - cached.at < COLOR_REFRESH_MS) return cached.color;
     const probe = document.createElement('span');
     probe.style.color = color;
     probe.style.display = 'none';
     this.canvas.appendChild(probe);
     try {
-      return document.defaultView.getComputedStyle(probe).color || fallback;
+      const resolved = document.defaultView.getComputedStyle(probe).color || fallback;
+      this.resolvedColors.set(active, {input: color, color: resolved, at: now});
+      return resolved;
     } finally {
       probe.remove();
     }
@@ -230,6 +304,7 @@ export class PianoRollCanvasVisualizer extends BaseVisualizer {
     if (this.disposed) return null;
     if (!activeNote) {
       this.overlayTime = undefined;
+      this.resolvedColors.clear();
       this.drawStatic();
       this.drawOverlay();
       return null;
@@ -281,8 +356,7 @@ export class PianoRollCanvasVisualizer extends BaseVisualizer {
         const target = Math.max(0, Math.min(this.width - size, this.reversed ? pending - size + 20 : pending - 20));
         if (this.horizontal) viewport.scrollLeft = target;
         else viewport.scrollTop = target;
-        this.drawStatic();
-        this.drawOverlay();
+        this.paintScrolledViewport();
       }
     });
   }
@@ -302,8 +376,20 @@ export class PianoRollCanvasVisualizer extends BaseVisualizer {
     this.drawOverlay();
   }
 
+  protected override paintScrolledViewport(): void {
+    if (this.disposed) return;
+    this.drawStatic();
+    this.drawOverlay();
+    this.followPainted = this.getScrollPosition();
+  }
+
   public override dispose(): void {
     if (this.disposed) return;
+    this.releaseScheme?.();
+    this.releaseScheme = undefined;
+    this.themeObserver?.disconnect();
+    this.themeObserver = undefined;
+    this.resolvedColors.clear();
     if (this.scrollTarget) {
       this.scrollTarget.removeEventListener('scroll', this.onViewportScroll);
       this.scrollTarget = undefined;
@@ -339,7 +425,7 @@ export class PianoRollSVGVisualizer extends BaseSVGVisualizer {
   private get horizontal(): boolean { return horizontalDirection(this.direction); }
   private get reversed(): boolean { return this.direction === 'left' || this.direction === 'up'; }
 
-  constructor(sequence: ScoreNoteSequence, svg: SVGSVGElement, config: VisualizerConfig = {}, score?: Score) {
+  constructor(sequence: ScoreNoteSequence, svg: SVGSVGElement, config: VisualizerConfig = {}) {
     super(sequence, config);
     if (!(svg instanceof SVGSVGElement)) {
       throw new Error('This visualizer requires an <svg> element to display the visualization');
@@ -349,21 +435,6 @@ export class PianoRollSVGVisualizer extends BaseSVGVisualizer {
     this.width = size.width;
     this.height = size.height;
     this.clear();
-    if (score && config.showAnnotations !== false) {
-      const annotations = projectScoreAnnotations(score);
-      if (annotations.length && this.horizontal) this.height += drawHorizontalScoreAnnotations(svg, annotations, {
-        xAtQuarter: (quarter) => this.timePosition(score.timeMap.quartersToSeconds(Rational.from(quarter))),
-        width: this.width, reverse: this.reversed, color: config.noteColor ?? `rgb(${this.config.noteRGB})`,
-      }).height;
-      else if (annotations.length) {
-        drawVerticalScoreAnnotations(svg, annotations, {
-          yAtQuarter: (quarter) => this.timePosition(score.timeMap.quartersToSeconds(Rational.from(quarter))),
-          x: this.height, width: 180, height: this.width,
-          color: config.noteColor ?? `rgb(${this.config.noteRGB})`,
-        });
-        this.height += 180;
-      }
-    }
     this.surface = svg.parentElement ?? undefined;
     const viewportHeight = this.horizontal ? Math.max(getRenderedHeight(this.svg, this.height), this.height)
       : this.surface?.clientHeight || Math.min(240, Math.max(80, this.width));

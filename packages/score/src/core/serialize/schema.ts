@@ -1,7 +1,7 @@
 /** Current Score JSON schema marker emitted by {@link Score.toJSON}. */
-export const SCORE_JSON_SCHEMA_VERSION = '0.1' as const;
+export const SCORE_JSON_SCHEMA_VERSION = '0.2' as const;
 
-/** Exact Score JSON schema identifier accepted by the current reader. */
+/** Current Score JSON schema identifier; the reader also migrates v0.1 and unmarked input. */
 export const SCORE_JSON_SCHEMA_ID = `https://webscore.dev/schema/score/v${SCORE_JSON_SCHEMA_VERSION}` as const;
 
 /** Stable machine-readable failure categories for Score JSON rehydration. */

@@ -50,7 +50,7 @@ export function renderScoreThumbnail(
     width = Math.max(width, options.score.durationSeconds * scale);
     const lane = drawThumbnailScoreAnnotations(svg, annotations, {
       xAtQuarter: (quarter) => options.score!.timeMap.quartersToSeconds(Rational.from(quarter)) * scale / width * displayWidth,
-      width: displayWidth, color: fill, maxLanes: 3,
+      width: displayWidth, color: fill,
     });
     svg.dataset.webscoreAnnotationHeight = String(lane.height);
     // Annotation coordinates are CSS pixels. Only the nested note preview has

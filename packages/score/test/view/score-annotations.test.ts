@@ -4,7 +4,6 @@ import {Duration, Pitch, Rational, ScoreBuilder, VoiceId} from '../../src/core';
 import {parseMusicXML} from '../../src/io';
 import {projectScoreAnnotations} from '../../src/view/core/annotations';
 import {createPianoRollLayout} from '../../src/view/core/layout';
-import {drawHorizontalScoreAnnotations} from '../../src/view/render/annotations';
 import {renderPianoRollVisualizer, renderWaterfallVisualizer} from '../../src/view/render/renderers/factory';
 import {mountScoreThumbnail, renderScoreThumbnail} from '../../src/view/render/thumbnail';
 
@@ -87,53 +86,32 @@ describe('source expression projection', () => {
   });
 });
 
-describe('piano-roll expression strip', () => {
-  it('aligns expression marks to nominal time and reclaims all strip height when hidden', () => {
+describe('annotations are staff-only', () => {
+  it('piano roll draws no expression strip and keeps the note geometry of an unannotated score', () => {
     const score = music();
     const host = surface();
     const svg = document.createElementNS(SVG_NS, 'svg');
     host.append(svg);
-    const shown = renderPianoRollVisualizer(score, svg, {pixelsPerSecond: 40});
-    const shownHeight = Number(svg.getAttribute('height'));
-    const notesY = [...svg.querySelectorAll('rect.note')].map((note) => Number(note.getAttribute('y')));
-    const aTempo = svg.querySelector('[data-webscore-direction="words"][data-webscore-direction-onset="4"]')!;
-    expect(aTempo.getAttribute('aria-label')).toBe('a tempo');
-    expect(Number(aTempo.querySelector('text')!.getAttribute('x'))).toBe(80);
-    shown.redrawAtTime!(6, false);
+    const rendered = renderPianoRollVisualizer(score, svg, {pixelsPerSecond: 40});
+    expect(svg.querySelector('[data-webscore-annotations], [data-webscore-direction]')).toBeNull();
+    expect(svg.querySelectorAll('rect.note').length).toBeGreaterThan(0);
+    rendered.redrawAtTime!(6, false);
     expect(svg.querySelectorAll('rect.active')).toHaveLength(1);
-    shown.dispose!();
-    const hidden = renderPianoRollVisualizer(score, svg, {pixelsPerSecond: 40, showAnnotations: false});
-    expect(svg.querySelector('[data-webscore-annotations]')).toBeNull();
-    const hiddenHeight = Number(svg.getAttribute('height'));
-    expect(shownHeight).toBeGreaterThan(hiddenHeight);
-    expect([...svg.querySelectorAll('rect.note')].map((note) => Number(note.getAttribute('y'))))
-      .toEqual(notesY.map((y) => y - shownHeight + hiddenHeight));
-    hidden.dispose!();
+    rendered.dispose!();
   });
-});
 
-describe('waterfall expression rail', () => {
-  it('shares the inverted note-time axis and reclaims the annotation rail width when hidden', () => {
+  it('waterfall draws no expression rail and gives the full width to its pitch columns', () => {
     const score = music();
     const host = surface(400);
-    const shown = renderWaterfallVisualizer(score, host, {fitToWidth: true, showOnlyOctavesUsed: true, pixelsPerSecond: 40});
+    const rendered = renderWaterfallVisualizer(score, host, {fitToWidth: true, showOnlyOctavesUsed: true, pixelsPerSecond: 40});
     const svg = host.querySelector<SVGSVGElement>('.waterfall-notes')!;
-    const shownNoteWidth = Number(svg.querySelector('[data-index="0"]')!.getAttribute('width'));
+    expect(host.querySelector('[data-webscore-annotations], [data-webscore-direction]')).toBeNull();
     expect(Number(svg.getAttribute('width'))).toBe(400);
-    expect(host.querySelector('.waterfall-piano')).toBeNull();
-    const words = svg.querySelector('[data-webscore-direction="words"][data-webscore-direction-onset="4"]')!;
-    expect(Number(words.getAttribute('data-webscore-annotation-anchor'))).toBe(320);
-    expect(svg.querySelector('[data-webscore-annotation-callout]')).not.toBeNull();
     const note = svg.querySelector('[data-index="1"]')!;
     expect(Number(note.getAttribute('y')) + Number(note.getAttribute('height'))).toBe(320);
-    shown.redrawAtTime!(2, false);
+    rendered.redrawAtTime!(2, false);
     expect(svg.querySelectorAll('rect.active')).toHaveLength(1);
-    shown.dispose!();
-    const hidden = renderWaterfallVisualizer(score, host, {fitToWidth: true, showOnlyOctavesUsed: true, showAnnotations: false});
-    expect(host.querySelector('[data-webscore-annotations]')).toBeNull();
-    expect(Number(host.querySelector('.waterfall-notes')!.getAttribute('width'))).toBe(400);
-    expect(Number(host.querySelector('[data-index="0"]')!.getAttribute('width'))).toBeGreaterThan(shownNoteWidth);
-    hidden.dispose!();
+    rendered.dispose!();
     expect(host.children).toHaveLength(0);
   });
 });
@@ -153,18 +131,6 @@ describe('compact overview annotations', () => {
     expect(hidden.dataset.webscoreAnnotationHeight).toBeUndefined();
     expect(hidden.querySelector('[data-webscore-annotations]')).toBeNull();
     expect(hidden.getAttribute('height')).toBe('100%');
-  });
-
-  it('bounds dense overview height while retaining every full source label as accessible evidence', () => {
-    const score = music();
-    const annotations = projectScoreAnnotations(score);
-    const svg = document.createElementNS(SVG_NS, 'svg');
-    const result = drawHorizontalScoreAnnotations(svg, annotations, {width: 80, xAtQuarter: (quarter) => quarter / 12 * 80, maxLanes: 3});
-    expect(result.height).toBeLessThanOrEqual(64);
-    expect(svg.querySelectorAll('[data-webscore-direction]')).toHaveLength(annotations.length);
-    expect([...svg.querySelectorAll('[data-webscore-direction]')].map((mark) => mark.getAttribute('aria-label')).sort())
-      .toEqual(annotations.map((annotation) => annotation.label).sort());
-    for (const label of svg.querySelectorAll('text')) expect(Number(label.getAttribute('x'))).toBeLessThan(80);
   });
 
   it('reflows readable thumbnail labels on width changes and releases its resize observer', () => {

@@ -48,6 +48,7 @@ export interface RhythmPerformedOnset {
   onsetSeconds: number;
   /** Performed onset minus the TimeMap projection of the written onset. */
   deviationSeconds: number;
+  /** Effective MIDI velocity, including an independent note override. */
   velocity: number;
 }
 
@@ -373,7 +374,7 @@ export function inspectScoreRhythm(score: Score, options: RhythmInspectionOption
           noteId: String(note.id),
           onsetSeconds: note.performed.onsetSec,
           deviationSeconds: note.performed.onsetSec - onset.nominalSeconds,
-          velocity: note.performed.velocity,
+          velocity: note.velocity,
         });
       }
     }

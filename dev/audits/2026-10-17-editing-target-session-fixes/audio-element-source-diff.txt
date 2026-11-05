@@ -1,0 +1,77 @@
+--- /tmp/webmusic-audio-view-before.ts
++++ packages/audio/src/view/element/audio-view.ts
+@@ -293,6 +293,7 @@
+   private playerTargetGeneration = 0;
+   private vizBinding?: {unsubscribe(): void};
+   private bindingRevision = 0;
++  private presentationRevision = 0;
+   private derivedClip?: AudioClip;
+   private derivedPeaks?: AudioPeaks;
+   private sourceToken = 0;
+@@ -695,28 +696,37 @@
+     this.unbindPlayer();
+     const generation = this.unbindEditor();
+     if (generation !== this.editorGeneration) return;
+-    this.teardownRendered();
++    const revision = this.teardownRendered();
++    if (generation !== this.editorGeneration || revision !== this.presentationRevision) return;
+     this.stage?.destroy();
+     this.stage = undefined;
+   }
+ 
+-  private teardownRendered(): void {
++  private teardownRendered(): number {
++    const revision = ++this.presentationRevision;
+     this.bindingRevision++;
+-    this.surfaceSlider?.destroy();
++    const slider = this.surfaceSlider, viewport = this.viewportUnsubscribe;
++    const binding = this.vizBinding, rendered = this.rendered, status = this.status;
+     this.surfaceSlider = undefined;
+-    this.viewportUnsubscribe?.();
+     this.viewportUnsubscribe = undefined;
+-    this.vizBinding?.unsubscribe();
+     this.vizBinding = undefined;
+-    this.rendered?.dispose();
+     this.rendered = undefined;
+     this.editorSurface = undefined;
+     this.renderedClip = undefined;
+     this.renderedDuration = 0;
+-    this.status?.destroy();
+     this.status = undefined;
+     this.host = undefined;
+-    this.configureAccessibility();
++    // Cancellation can synchronously attach a newer editor or presentation.
++    // Release only the captured lifetime, never fields installed by callbacks.
++    const failures: unknown[] = [];
++    for (const cleanup of [() => slider?.destroy(), () => viewport?.(), () => binding?.unsubscribe(),
++      () => rendered?.dispose(), () => status?.destroy()]) {
++      try { cleanup(); } catch (error) { failures.push(error); }
++    }
++    if (revision === this.presentationRevision) this.configureAccessibility();
++    for (const error of failures.slice(1)) console.error('[WebAudio] Audio View presentation cleanup failed', error);
++    if (failures.length) throw failures[0];
++    return revision;
+   }
+ 
+   private invalidateDerivedPeaks(): void {
+@@ -840,7 +850,9 @@
+    * visualization while keeping the element's stage, binding and accessibility.
+    */
+   protected renderStage(host: HTMLElement): void {
+-    this.teardownRendered();
++    const generation = this.editorGeneration;
++    const revision = this.teardownRendered();
++    if (generation !== this.editorGeneration || revision !== this.presentationRevision) return;
+     host.style.width = '100%';
+     this.host = host;
+ 
+@@ -951,7 +963,9 @@
+           const range = this.visibleRange();
+           const {playheadSeconds} = this.timeline.snapshot;
+           const announced = this.announcedRange;
++          const generation = this.editorGeneration, revision = this.presentationRevision + 1;
+           this.renderStage(host);
++          if (generation !== this.editorGeneration || revision !== this.presentationRevision || this.host !== host) return;
+           // Only the paint changed, so restore what was already announced:
+           // putting the window back must not look like an external pan.
+           this.announcedRange = announced;

@@ -18,6 +18,7 @@ import {claimHost, createErrorSink} from './internal/lifecycle';
 import {neutralColor} from './internal/palette';
 import {installStyle, paint} from './internal/style';
 import {componentSurfaceDeclarations, embeddedSurfaceDeclarations} from './internal/surface';
+import {hiddenScrollbarCss, visuallyHiddenDeclarations} from './internal/icons';
 import {
   accidentalGlyph,
   DEFAULT_FRET_COUNT,
@@ -259,6 +260,8 @@ const pitchViewport: Declarations = {
   ...componentSurfaceDeclarations('pitch', {padding: '0', border: '0', background: 'var(--wm-surface, transparent)'}),
   display: 'block', 'min-width': '0', 'max-width': '100%',
   position: 'relative', 'overflow-x': 'auto', 'overscroll-behavior-x': 'contain',
+  // Visual design → Scrolling surfaces: scrollable, without a visible bar.
+  'scrollbar-width': 'none',
 };
 
 const pitchParts = {
@@ -344,7 +347,10 @@ const pitchParts = {
   // which is the pop this family exists for — happened on one.
   staffHead: {transition: `fill ${MOTION_TONE} ${EASE}`, 'fill-opacity': AGE_FADE},
   staffAccidental: {transition: `stroke ${MOTION_TONE} ${EASE}`},
-  staffEmpty: {margin: '0', 'font-size': SIZE_LABEL, color: INK_MUTED},
+  // No visible prose on the surface (Visual design → Type): the empty sentence
+  // is a polite status for assistive technology, and the empty staff is the
+  // visible state.
+  staffEmpty: {...visuallyHiddenDeclarations, 'font-size': SIZE_LABEL, color: INK_MUTED},
 
   fretboardRoot: {...pitchViewport, color: INK, 'font-family': FONT},
   // Width is available space; the minimum geometry and fixed cross-axis size
@@ -353,7 +359,7 @@ const pitchParts = {
   fretboardReel: {transition: `transform ${MOTION_COLUMN} ${EASE}`},
   fretboardDot: {transition: `opacity ${MOTION_TONE} ${EASE}`},
   fretboardDisc: {transition: `fill ${MOTION_TONE} ${EASE}`, 'fill-opacity': AGE_FADE},
-  fretboardEmpty: {margin: '0', 'font-size': SIZE_LABEL, color: INK_MUTED},
+  fretboardEmpty: {...visuallyHiddenDeclarations, 'font-size': SIZE_LABEL, color: INK_MUTED},
 } satisfies Readonly<Record<string, Declarations>>;
 
 /**
@@ -446,6 +452,8 @@ export const pitchStyle = [
   // visible opacity ends in a cut. It fades the whole way, and the grip that
   // just left the neck is gone by the time the node is.
   harmonyRule('.wui-pitch-fretboard__dot[data-phase="release"]', {opacity: '0'}),
+  // The viewport records carry `scrollbar-width`; WebKit needs its pseudo-element.
+  hiddenScrollbarCss(PITCH_ROOTS.join(', ')).trimEnd(),
 
   // The escape a `cssText` string cannot carry, and the reason it is here as
   // well as in `resolveMotion`: a page whose shell never declared `data-motion`
@@ -641,11 +649,20 @@ function createBeat(view: (Window & typeof globalThis) | null): Beat {
   };
 }
 
-/** Scrollable readouts expose one keyboard stop only while content overflows. */
+/**
+ * Scrollable readouts expose one keyboard stop only while content overflows.
+ *
+ * `schedule()` is the update path: an update writes per-key and per-surface
+ * styles, so reading `scrollWidth` or a key's `offsetLeft` straight after would
+ * force a synchronous layout on every snapshot. The reads run once, at the next
+ * frame, after every write of that frame — and `onResize` (the arrival reveal)
+ * runs there too, before the overflow check, so the frame reads geometry once.
+ */
 function pitchScroll(root: HTMLElement, content: Element, onResize?: () => void, vertical = false) {
   const view = root.ownerDocument.defaultView;
   let observer: ResizeObserver | undefined;
   let destroyed = false;
+  let frame: number | undefined;
   const refresh = (): void => {
     if (destroyed) return;
     const size = vertical ? root.clientHeight : root.clientWidth;
@@ -653,9 +670,18 @@ function pitchScroll(root: HTMLElement, content: Element, onResize?: () => void,
     if (size > 0 && extent > size + 1) setAttr(root, 'tabindex', '0');
     else root.removeAttribute('tabindex');
   };
-  const resized = (): void => {refresh(); onResize?.();};
+  const resized = (): void => {onResize?.(); refresh();};
+  const flush = (): void => {
+    frame = undefined;
+    if (!destroyed) resized();
+  };
   return {
     refresh,
+    schedule(): void {
+      if (destroyed || frame !== undefined) return;
+      if (view?.requestAnimationFrame) frame = view.requestAnimationFrame(flush);
+      else flush();
+    },
     start(): void {
       if (destroyed) return;
       const Observer = view?.ResizeObserver;
@@ -668,6 +694,8 @@ function pitchScroll(root: HTMLElement, content: Element, onResize?: () => void,
     },
     destroy(): void {
       destroyed = true;
+      if (frame !== undefined) view?.cancelAnimationFrame?.(frame);
+      frame = undefined;
       observer?.disconnect();
       view?.removeEventListener('resize', resized);
     },
@@ -1168,8 +1196,8 @@ export function mountKeyboard(
       // a manually scrolled viewport alone, including in follow mode.
       if (attacked && options.follow === 'active') pendingReveal = [...next.keys()];
       else pendingReveal = pendingReveal.filter((midi) => next.has(midi));
-      reveal();
-      scroll?.refresh();
+      // Geometry is read at the next frame, after this update's style writes.
+      scroll?.schedule();
       sounding = next;
       if (attacked) beat.settle(promote);
       armSweep();
@@ -1817,7 +1845,7 @@ export function mountStaff(
       // of the token: a custom property does not inherit in every environment
       // this runs in, and `parseFloat('')` is NaN.
       setStyleValue(surface, 'min-width', `calc(${STAFF_SPACE} * ${coordinate((contentWidth - STAFF_LEFT) / 2)})`);
-      scroll.refresh();
+      scroll.schedule();
       const height = `calc(${STAFF_SPACE} * ${coordinate((bottom - top) / 2)})`;
       if (surface.style.height !== height) surface.style.height = height;
 
@@ -2599,7 +2627,7 @@ export function mountFretboard(
         setStyleValue(surface, 'height', vertical
           ? `calc(${acrossSize} * ${coordinate(alongSpan / acrossSpan)})` : acrossSize);
       }
-      scroll.refresh();
+      scroll.schedule();
 
       const slide = -fretWireX(firstWire);
       const [tx, ty] = map(slide, 0, vertical);

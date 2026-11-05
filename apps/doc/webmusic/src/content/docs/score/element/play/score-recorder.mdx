@@ -128,18 +128,19 @@ to it.
 | `webscore:recorded` | event | Bubbling, composed `CustomEvent<ScoreRecorderRecordedDetail>` with `{score}` after a nonempty take stops. |
 | `webscore:error` | event | Bubbling, composed `CustomEvent<ScoreRecorderErrorDetail>` with `{operation: 'play', error}` on failed take playback or a failed presenter command. |
 
-The **Record** button toggles recording; **Play** toggles take audition. **MIDI**
-and **MusicXML** download through `serializeMIDI` / `serializeMusicXML`. Playback
+The record icon button toggles recording and shows a stop icon while armed; the play icon button
+toggles take audition. Two download icon buttons, with the mono readouts `MIDI` and `XML`, export
+through `serializeMIDI` / `serializeMusicXML`. Playback
 and exports remain disabled until a take exists. A rejected playback request
 releases that playback and clears its playing state before reporting the error;
 the failure remains visible until a retry, new recording or playback reset.
 Late rejection from a replaced playback is ignored.
 
-**Accessibility:** the presenter is a group named “Recorder”. Its native buttons
-support Tab, Enter and Space with visible focus; recording and playback expose
+**Accessibility:** the presenter is a group named “Recorder”. Its native icon buttons carry
+their names in `aria-label` and `title` and support Tab, Enter and Space with visible focus; recording and playback expose
 `aria-pressed`. The Record name changes to “Stop recording” while armed. Export
 buttons are named “Download MIDI” and “Download MusicXML”. A polite, atomic status
-region announces recording/take counts. This note recorder exposes no audio level
+region announces recording/take counts; it is visually hidden, and only an error line is drawn. This note recorder exposes no audio level
 meter.
 
 </details>
@@ -148,16 +149,16 @@ meter.
 <summary>Styling</summary>
 
 The host follows its available width and respects native `hidden`. The
-[UIKit Recorder](/uikit/mixing-capture/recorder/) wraps controls and export buttons
-within that width; long status text breaks across lines. Resizing does not change
+[UIKit Recorder](/uikit/mixing-capture/recorder/) draws one non-wrapping row of icon buttons
+with no inner padding; on a narrow host it scrolls sideways without a visible scrollbar. Resizing does not change
 the take or playback state. Use its public `--wm-recorder-*` tokens and
 `::part(root)`, `::part(record)`, `::part(play)`, `::part(exports)`,
 `::part(export)` and `::part(status)`.
 
 `--wm-component-background`, `--wm-component-border` and `--wm-component-radius`
-style the outer frame; `--wm-control-radius` styles buttons. The recording accent
-falls back from `--wm-recorder-accent` to `--wm-accent` and then red, with
-`--wm-accent-foreground` for its text. Explicit legacy `--rec-*` values take
+style the outer frame; `--wm-control-radius` styles buttons. The recording colour
+falls back from `--wm-recorder-accent` to the shared `--wm-recording` token and then
+`light-dark(#c62828, #ef5350)`, with `--wm-accent-foreground` for the icon on it. Explicit legacy `--rec-*` values take
 precedence over their corresponding UIKit tokens.
 
 ```css
@@ -165,7 +166,7 @@ score-recorder {
   --wm-component-background: transparent;
   --wm-component-radius: 0;
   --wm-control-radius: 0;
-  --wm-recorder-accent: #c0392b;
+  --wm-recording: light-dark(#c62828, #ef5350);
 }
 ```
 
