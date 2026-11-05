@@ -1,23 +1,23 @@
 import {Part, Rational, Score, TimeMap} from '@webmusic/score';
 import {loadScoreFromUrl} from '@webmusic/score/io';
 
-export type StudyFormat = 'midi' | 'mxl';
+export type ArabesqueFormat = 'midi' | 'mxl';
 
-const paths: Record<StudyFormat, string> = {
-  midi: 'midi/webmusic-study-no-1.mid',
-  mxl: 'mxl/webmusic-study-no-1.mxl',
+const paths: Record<ArabesqueFormat, string> = {
+  midi: 'midi/Arabesque%20No.1.mid',
+  mxl: 'mxl/Arabesque%20No.1.mxl',
 };
-const loads = new Map<StudyFormat, Promise<Score>>();
+const loads = new Map<ArabesqueFormat, Promise<Score>>();
 
-export function studyUrl(format: StudyFormat = 'midi'): string {
+export function arabesqueUrl(format: ArabesqueFormat = 'midi'): string {
   return `${import.meta.env.BASE_URL}${paths[format]}`;
 }
 
-export function loadStudyScore(format: StudyFormat = 'midi'): Promise<Score> {
+export function loadArabesqueScore(format: ArabesqueFormat = 'midi'): Promise<Score> {
   const cached = loads.get(format);
   if (cached) return cached;
-  const pending = loadScoreFromUrl(studyUrl(format), {format})
-    .then((score) => score.withMetadata({title: 'WebMusic Study No. 1', composer: 'WebMusic Contributors'}))
+  const pending = loadScoreFromUrl(arabesqueUrl(format), {format})
+    .then((score) => score.withMetadata({title: 'Arabesque No. 1', composer: 'Claude Debussy'}))
     .catch((error: unknown) => {
       if (loads.get(format) === pending) loads.delete(format);
       throw error;
@@ -27,7 +27,7 @@ export function loadStudyScore(format: StudyFormat = 'midi'): Promise<Score> {
 }
 
 /** Keep an opening passage for quick controls without inventing new notes. */
-export function studyExcerpt(score: Score, quarters = 16): Score {
+export function arabesqueExcerpt(score: Score, quarters = 16): Score {
   const end = new Rational(quarters);
   const notesAndMeasures = score.edit((edit) => {
     for (const part of score.parts) {

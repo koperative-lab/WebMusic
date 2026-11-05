@@ -14,7 +14,7 @@ let serial = 0;
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 function studyBytes(format: 'midi' | 'mxl'): Uint8Array {
-  const asset = `apps/doc/webmusic/public/${format === 'midi' ? 'midi/webmusic-study-no-1.mid' : 'mxl/webmusic-study-no-1.mxl'}`;
+  const asset = `apps/doc/webmusic/public/${format === 'midi' ? 'midi/Arabesque No.1.mid' : 'mxl/Arabesque No.1.mxl'}`;
   return readFileSync(existsSync(asset) ? asset : `../../${asset}`);
 }
 
@@ -110,7 +110,14 @@ describe('score inspection Elements', () => {
     const music = await loadScore(studyBytes('midi'), {format: 'midi'});
     expect(music.measures).toHaveLength(0);
     const lane = projectChordCells(music, {bands: [], now: 0}, {spelling: 'auto'});
-    expect(lane.bands).toHaveLength(32);
+    // Contiguous meter-grid cells, at most two quarters wide, span the whole imported piece.
+    expect(lane.bands.length).toBeGreaterThan(100);
+    lane.bands.forEach((band, index) => {
+      const start = band.stampStart ?? Number.NaN, end = band.stampEnd ?? Number.NaN;
+      if (index > 0) expect(start).toBeCloseTo(lane.bands[index - 1]?.stampEnd ?? Number.NaN);
+      expect(end - start).toBeGreaterThan(0);
+      expect(end - start).toBeLessThanOrEqual(2 + 1e-9);
+    });
     expect(lane.bands[0]).toMatchObject({stampStart: 0, stampEnd: 2});
     expect(lane.bands[1]).toMatchObject({stampStart: 2, stampEnd: 4});
     expect(lane.bands[lane.bands.length - 1]?.stampEnd).toBeCloseTo(music.durationQuarters.toFloat());

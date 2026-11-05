@@ -13,7 +13,7 @@ defineScorePlayerElement();
 defineScoreViewElement();
 definePitchViewElement();
 
-const fixture = new Uint8Array(readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../public/mxl/webmusic-study-no-1.mxl')));
+const fixture = new Uint8Array(readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../public/mxl/Arabesque No.1.mxl')));
 const cleanups: Array<() => void> = [];
 
 function mount() {
@@ -51,7 +51,7 @@ afterEach(() => {
 
 describe('Quick Start with native public elements', () => {
   it.each([
-    {name: 'the bundled original study', bytes: fixture, minimumNotes: 300, minimumSeconds: 30},
+    {name: 'the bundled Arabesque No. 1 MXL', bytes: fixture, minimumNotes: 300, minimumSeconds: 30},
     {name: 'an original large score study', bytes: serializeMXL(parseMusicXML(largeScoreStudyXml())), minimumNotes: 1000, minimumSeconds: 100},
   ])('shows a failed file load and recovers with $name', async ({bytes, minimumNotes, minimumSeconds}) => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -66,7 +66,7 @@ describe('Quick Start with native public elements', () => {
     await vi.waitFor(() => expect(status.textContent).toContain('404 Not Found'));
     expect(status.hidden).toBe(false);
 
-    player.setAttribute('src', '/webmusic-study-no-1.mxl');
+    player.setAttribute('src', '/arabesque.mxl');
     await vi.waitFor(() => expect(player.playback.snapshot().readiness).toBe('ready'));
     expect(status.hidden).toBe(true);
     expect(status.textContent).toBe('');
@@ -89,7 +89,7 @@ describe('Quick Start with native public elements', () => {
   it('keeps playback errors visible across position updates and detaches cleanly', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(fixture)));
     const {player, status, detach} = mount();
-    player.setAttribute('src', '/webmusic-study-no-1.mxl');
+    player.setAttribute('src', '/arabesque.mxl');
     await vi.waitFor(() => expect(player.playback.snapshot().readiness).toBe('ready'));
     player.dispatchEvent(new CustomEvent('webscore:error', {detail: {error: new Error('Audio unavailable')}}));
     await player.seekNominal(2.4);

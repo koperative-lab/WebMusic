@@ -35,7 +35,7 @@ const fromUrl = await loadClipFromUrl('/track.flac', { context: ctx });
 // Stream instead of fetching or decoding up front: the clip holds only sourceUrl. A
 // headless player also needs a host-provided mediaAdapterFactory (see below);
 // <audio-player> supplies the browser adapter automatically.
-const streamed = await loadClipFromUrl('/mp3/webmusic-study-no-1.mp3', { streaming: true });
+const streamed = await loadClipFromUrl('/mp3/Arabesque%20No.1.mp3', { streaming: true });
 
 detectAudioFormat(bytes);              // 'wav' | 'mp3' | 'flac' | 'ogg' | 'opus' | 'aac' | 'm4a' | 'webm' | 'aiff' | undefined
 formatFromExtension('/song.opus');     // 'opus'

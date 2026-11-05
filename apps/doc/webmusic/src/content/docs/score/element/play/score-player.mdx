@@ -51,7 +51,7 @@ if (player) player.effect = Effect.chain(
   defineScorePlayerElement();
 </script>
 
-<score-player src="/midi/webmusic-study-no-1.mid"></score-player>
+<score-player src="/midi/Arabesque%20No.1.mid"></score-player>
 ```
 
 That is the whole setup. To see what any attribute does to a live element, use the control strip on the demo above — it writes to the real tag and shows you the resulting markup.
@@ -214,9 +214,9 @@ settings on mount and accepts explicit `.rate` writes.
 Dragging either volume control updates `.volume` without pinning it, because the reader moving a control is not the same as your code assigning the property.
 
 ```html
-<score-player src="/midi/webmusic-study-no-1.mid" volume="0.5" rate="0.8" pan="-1" loop></score-player>
-<score-player src="/midi/webmusic-study-no-1.mid" time-control="full" volume-control="fader"></score-player>
-<score-player src="/midi/webmusic-study-no-1.mid" time-control="simple" volume-control="knob"></score-player>
+<score-player src="/midi/Arabesque%20No.1.mid" volume="0.5" rate="0.8" pan="-1" loop></score-player>
+<score-player src="/midi/Arabesque%20No.1.mid" time-control="full" volume-control="fader"></score-player>
+<score-player src="/midi/Arabesque%20No.1.mid" time-control="simple" volume-control="knob"></score-player>
 ```
 
 **Events** — bubbling `CustomEvent`s; `webscore:error` is composed, while the

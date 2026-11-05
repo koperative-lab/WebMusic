@@ -13,7 +13,7 @@ second transport clock. Use [`AudioClipPlayer`](/audio/headless/play/audio-clip-
 when an immutable single-clip engine is all the application needs.
 
 The demo constructs one nonvisual player and controls it with plain inputs. Load
-the WebMusic Study No. 1 WAV, switch between a clip and a two-pass queue, or clear and reselect the
+the Arabesque No. 1 WAV, switch between a clip and a two-pass queue, or clear and reselect the
 source. Its readouts follow the object's events; the demo owns decoding and queue
 cleanup, while the facade owns its context and clip engine.
 
@@ -26,7 +26,7 @@ import {AudioPlayer, AudioPlaylist, AudioMixer} from '@webmusic/audio/play/headl
 import {loadClipFromUrl} from '@webmusic/audio/play';
 
 const player = new AudioPlayer();
-const clip = await loadClipFromUrl('/wav/webmusic-study-no-1.wav', {context: player.audioContext});
+const clip = await loadClipFromUrl('/wav/Arabesque%20No.1.wav', {context: player.audioContext});
 player.setClip(clip);
 await player.play();
 player.pause();

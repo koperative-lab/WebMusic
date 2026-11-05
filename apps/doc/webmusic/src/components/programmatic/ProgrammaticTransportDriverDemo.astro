@@ -18,10 +18,10 @@ import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
   import {mountProgrammaticDemo, programmaticCode} from './programmatic-demo-lifecycle';
   import { ScorePlayer, Sound } from '@webmusic/score/play/headless';
   import { bindValue } from '@webmusic/score/play/drivers';
-  import {studyExcerpt, loadStudyScore} from '../headless/study-score';
+  import {arabesqueExcerpt, loadArabesqueScore} from '../headless/arabesque-score';
 
   mountProgrammaticDemo('[data-programmatic-transportdriver]', async (root, scope) => {
-    const score = studyExcerpt(await loadStudyScore());
+    const score = arabesqueExcerpt(await loadArabesqueScore());
     if (!scope.active) return;
     const scrub = root.querySelector('[data-scrub]') as HTMLInputElement;
     const fill = root.querySelector('[data-fill]') as HTMLElement;

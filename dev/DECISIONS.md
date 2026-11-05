@@ -1808,3 +1808,32 @@ check under VERIFY-01.
 ## Recording the next decision
 
 Add an identifier, date, status, problem, chosen contract, considered alternatives, consequences, owning document, and verification implications. A proposed choice does not change a public API. If a choice supersedes this register, retain its old identifier and point to the replacement; do not rewrite historical evidence as though the new choice always existed.
+
+## DEC-050 — Demos use only the owner-maintained Arabesque No. 1 files
+
+**Date / status:** 2026-11-04; accepted by the repository owner. Supersedes the
+generated *WebMusic Study No. 1* demo media.
+
+**Problem:** the modular source tree had replaced the Arabesque No. 1 demo files
+with a generated study and its generator, inventory and hash gate. Demos and
+examples then drifted between pieces and generated fixtures, and the owner's
+choice of demo music was not stable across branches.
+
+**Decision:** `apps/doc/webmusic/public/` is maintained by the repository owner
+and is read-only for agents. Every musical demo, playground, Headless or
+programmatic demo, copyable snippet, Parameters placeholder and documentation
+example uses Arabesque No. 1 from it: MXL for notation, MIDI for Score playback
+and editing, WAV for decoded audio and MP3 for native decode or streaming. A
+shorter demo uses a passage of the piece. Generated studies, hand-built note
+lists and synthesized PCM stay in automated tests. `scripts/demo-assets.mjs`,
+`apps/doc/webmusic/assets.json` and `check:demo-assets` are removed;
+`check:demo-music` checks every documentation media reference against the four
+files and only reads the folder. AGENTS.md states the rule as owner-fixed.
+
+**Consequences:** demos share one piece and one set of loaders. The restored
+files have no established redistribution rights, so DEV-05 stays open and
+deployment or a release that ships them waits for the owner's rights review. The
+owner removed the former study's `public/licenses/` files. `public.sha256` pins
+the approved folder contents, `check:demo-music` compares the folder with it, and
+a local agent hook refuses tool edits to the folder or the pin.
+

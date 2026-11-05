@@ -100,7 +100,7 @@ helps select commands; it does not define another execution chain.
 | `npm test` | Run workspace test scripts, including kernel and documentation tests. |
 | `npm run check:licenses` | Check the dependency license/optional-peer policy. |
 | `npm run check:site-notices` | Test the main site notice collector; the site build separately verifies the actual bundled module inventory. |
-| `npm run check:demo-assets` | After package builds, test and verify the original public media, exact inventory, embedded licenses and independent hash pins. Included in source checks and both site build commands. No FFmpeg or network is required for verification. |
+| `npm run check:demo-music` | After package builds, verify that the owner-maintained `apps/doc/webmusic/public/` folder matches the owner's pin `apps/doc/webmusic/public.sha256` file for file and byte for byte, and that every media reference in the documentation source is one of its four Arabesque No. 1 files. It only reads the folder. After changing the folder themselves, the owner reviews `node scripts/check-demo-music.mjs --print-pin` and commits its output as the new pin. Included in source checks and both site build commands. |
 | `npm run check:packages` | Validate built exports, source/output receipts and bundled third-party notices using the main checks, extended to this checkout's five packages. |
 | `npm run check:release-manifests` | Validate the shared version, cross-package ranges and publication metadata. |
 | `npm run dev` | Reuse the running site, or build packages and start it. |

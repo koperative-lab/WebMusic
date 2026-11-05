@@ -309,25 +309,30 @@ what happens on failure.
 
 ### Demo assets
 
-Assets live in `apps/doc/webmusic/public/`. These are selection guidelines, not
-cross-browser support guarantees.
+Every musical demo and copyable example uses Claude Debussy's Arabesque No. 1
+from the owner-maintained `apps/doc/webmusic/public/` folder, as fixed by
+[AGENTS](../../AGENTS.md#demo-music-arabesque-no-1-only) and DEC-050. Do not
+change that folder or substitute generated notes, fixtures or other media; use a
+passage of the piece when a demo needs less. The format choices below are
+selection guidelines, not cross-browser support guarantees.
 
 | Asset | Use | What the author checks |
 |---|---|---|
-| `wav/webmusic-study-no-1.wav` | Decoded-audio demos | Original 32-second stereo PCM, about 5.6 MB. WAV takes the pure-JS decoder path; avoid redundant decode and full-clip analysis |
-| `mp3/webmusic-study-no-1.mp3` | Native decode or media streaming | Encoding of the same original PCM. A supplied context supporting the format can use `decodeAudioData`; an optional WASM decoder is needed when no usable native path exists |
-| `midi/webmusic-study-no-1.mid` | Score playback, analysis and Rack demos | Two independent musical parts, Upper and Lower, with 381 notes over sixteen bars |
-| `mxl/webmusic-study-no-1.mxl` | Staff/sheet demos requiring notation semantics | One piano part with two staves and the same notes/timing. MIDI does not preserve equivalent clef, direction and staff metadata |
+| `mxl/Arabesque No.1.mxl` | Staff/sheet demos and notation-dependent analysis | One piano part on two staves, 107 measures. Preserves authored spelling, voices, rhythm, clefs and staff metadata; MIDI does not |
+| `midi/Arabesque No.1.mid` | Score playback, MIDI, editing, Rack and analysis demos | Two piano parts, about 1,450 notes; dense input can be expensive for SVG rendering, and imported spelling and notation are inferred |
+| `wav/Arabesque No.1.wav` | Decoded-audio demos | About 218 seconds and 37 MB of 44.1 kHz stereo PCM. WAV takes the pure-JS decoder path; avoid redundant decode and full-clip analysis |
+| `mp3/Arabesque No.1.mp3` | Native decode or media streaming | A supplied context supporting the format can use `decodeAudioData`; an optional WASM decoder is needed when no usable native path exists |
+| `soundfont/*.sf2` | Timbre demos | Large files; avoid redundant loads on one page |
 
 Native decoding, optional peers, and streaming are separate paths.
 `streaming:true` does not mean PCM samples are available to every analyzer. If a
 control requires extra data such as audiowaveform JSON for `peaks-src`, supply
 that data or explain why the control cannot work in this example.
-Use `import.meta.env.BASE_URL` for site demo URLs so Pages subpaths resolve.
-The [asset inventory](../../apps/doc/webmusic/ASSETS.md) owns provenance,
-regeneration and distributed MIT notices. Run `npm run check:demo-assets`
-after package builds when changing media or its generator. No SoundFont is
-bundled; a timbre demo requiring one must supply a separately reviewed resource.
+In browser URLs percent-encode the space as `%20`, and use
+`import.meta.env.BASE_URL` for site demo URLs so Pages subpaths resolve. The
+[asset inventory](../../apps/doc/webmusic/ASSETS.md) records what is known about
+each file. `npm run check:demo-music` rejects any other media reference and any
+change to the folder that the owner's pin does not record.
 
 ### Demo file ownership
 

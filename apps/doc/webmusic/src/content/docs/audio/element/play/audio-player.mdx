@@ -28,18 +28,18 @@ this player. Views and meters follow the same owner.
   defineAudioPlayerElement();
 </script>
 
-<audio-player src="/wav/webmusic-study-no-1.wav" controls></audio-player>
-<audio-player src="/wav/webmusic-study-no-1.wav" format="wav"></audio-player>
-<audio-player src="/wav/webmusic-study-no-1.wav" loop></audio-player>           <!-- loop the whole clip -->
-<audio-player src="/wav/webmusic-study-no-1.wav" loop="2.5,8"></audio-player>   <!-- A–B region (seconds) -->
-<audio-player src="/mp3/webmusic-study-no-1.mp3" engine="media"></audio-player> <!-- stream instead of decode -->
+<audio-player src="/wav/Arabesque%20No.1.wav" controls></audio-player>
+<audio-player src="/wav/Arabesque%20No.1.wav" format="wav"></audio-player>
+<audio-player src="/wav/Arabesque%20No.1.wav" loop></audio-player>           <!-- loop the whole clip -->
+<audio-player src="/wav/Arabesque%20No.1.wav" loop="2.5,8"></audio-player>   <!-- A–B region (seconds) -->
+<audio-player src="/mp3/Arabesque%20No.1.mp3" engine="media"></audio-player> <!-- stream instead of decode -->
 ```
 
 ## Linked composition
 
 ```html
 <audio-player id="session"></audio-player>
-<audio-playlist player="#session" src="/wav/webmusic-study-no-1.wav, /mp3/webmusic-study-no-1.mp3"></audio-playlist>
+<audio-playlist player="#session" src="/wav/Arabesque%20No.1.wav, /mp3/Arabesque%20No.1.mp3"></audio-playlist>
 <audio-meter player="#session"></audio-meter>
 ```
 
@@ -105,7 +105,7 @@ import { gain } from '@webmusic/audio/play/headless';
 import type { AudioPlayerElement } from '@webmusic/audio/play/element';
 
 const el = document.querySelector<AudioPlayerElement>('audio-player')!;
-el.clip = await loadClipFromUrl('/wav/webmusic-study-no-1.wav'); // drive a loaded AudioClip (skips src)
+el.clip = await loadClipFromUrl('/wav/Arabesque%20No.1.wav'); // drive a loaded AudioClip (skips src)
 el.effect = gain({ value: 0.8 });            // insert an effect into the graph
 el.setAttribute('volume', '0.8');            // master volume (live attribute)
 el.setAttribute('rate', '1.25');             // playback speed (live attribute)

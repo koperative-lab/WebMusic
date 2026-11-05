@@ -173,7 +173,7 @@ describe('agent context release and output contracts', () => {
     expect([...plain.files]).toEqual([...repeated.files]);
     expect(pages.files.get('llms.txt')).toContain('https://docs.example.test/WebMusic/agent-context/quick-start.md');
     expect(plain.files.get('llms.txt')).toContain('https://docs.example.test/agent-context/quick-start.md');
-    expect(pages.files.get('agent-context/quick-start.md')).toContain('https://docs.example.test/WebMusic/mxl/webmusic-study-no-1.mxl');
+    expect(pages.files.get('agent-context/quick-start.md')).toContain('https://docs.example.test/WebMusic/mxl/Arabesque%20No.1.mxl');
     expect(pages.files.get('agent-context/uikit/catalog.md')).toContain('| Presenter | Group | Purpose |');
     expect(pages.files.get('agent-context/uikit/catalog.md')).toContain('@webmusic/ui/transport');
     expect(pages.files.get('agent-context/score/api/play.md')).toContain('renderScoreToBuffer');
