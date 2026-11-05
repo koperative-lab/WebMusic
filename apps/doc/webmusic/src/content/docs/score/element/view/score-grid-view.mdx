@@ -23,13 +23,13 @@ waterfall or seconds-based piano-roll drawings; it can follow the same editor.
 
 <ScoreGridViewDemo />
 
-The demo loads the original eight-note `public/midi/Editing.mid` fixture into
-one editor. The page owns that editor and lends it to the player and the grid.
+The demo loads Arabesque No. 1 (`public/midi/Arabesque No.1.mid`) into one
+editor. The page owns that editor and lends it to the player and the grid.
 Every switch and setting is in **Parameters**: clear a box in the **tools** row
 to remove that feature's toolbar button, gestures, keys and note-value fields.
 Toolbar, wheel and keyboard changes update **tool**, **snap**,
 **velocity-lane**, **pixels-per-quarter** and **note-height** there. Reset
-restores the attributes and reloads the fixture, discarding edits.
+restores the attributes and reloads the piece, discarding edits.
 
 ## Import
 
@@ -41,7 +41,7 @@ restores the attributes and reloads the fixture, discarding edits.
   defineScorePlayerElement();
   defineScoreGridViewElement();
   // Your page owns the editor; dispose it after detaching the elements.
-  const editor = await loadScoreEditor('/midi/Editing.mid');
+  const editor = await loadScoreEditor('/midi/Arabesque%20No.1.mid');
   const player = /** @type {import('@webmusic/score/play/element').ScorePlayerElement | null} */ (document.getElementById('grid-player'));
   const grid = /** @type {import('@webmusic/score/view/element').ScoreGridViewElement | null} */ (document.querySelector('score-grid-view'));
   if (player) player.editor = editor;

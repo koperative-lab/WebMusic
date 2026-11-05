@@ -250,8 +250,8 @@ toolbar or keyboard commands. The editor owns content and history; the view
 borrows it and never disposes it.
 
 In this composition, a [`<score-grid-view editable>`](/score/element/view/score-grid-view/)
-edits the eight-note `public/midi/Editing.mid` fixture and the staff follows the
-same editor. The player auditions committed revisions. The main Parameters
+edits Arabesque No. 1 (`public/midi/Arabesque No.1.mid`) and the staff follows
+the same editor. The player auditions committed revisions. The main Parameters
 group configures the staff; the grid and player have their own groups.
 
 <ScoreEditingDemo />
@@ -268,7 +268,7 @@ group configures the staff; the grid and player have their own groups.
   defineScoreGridViewElement();
   defineScoreViewElement();
   // Your page owns the editor; dispose it after detaching every borrower.
-  const editor = await loadScoreEditor('/midi/Editing.mid');
+  const editor = await loadScoreEditor('/midi/Arabesque%20No.1.mid');
   const player = /** @type {import('@webmusic/score/play/element').ScorePlayerElement | null} */ (document.getElementById('notes-player'));
   const grid = /** @type {import('@webmusic/score/view/element').ScoreGridViewElement | null} */ (document.getElementById('notes-grid'));
   const staff = /** @type {import('@webmusic/score/view/element').ScoreViewElement | null} */ (document.getElementById('notes-staff'));

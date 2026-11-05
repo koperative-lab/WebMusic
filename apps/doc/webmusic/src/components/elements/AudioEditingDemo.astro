@@ -1,7 +1,7 @@
 ---
 import ElementPlayground from '../ElementPlayground.astro';
 import './editing-import.css';
-const source = `${import.meta.env.BASE_URL}wav/Editing.wav`;
+const source = `${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`;
 ---
 
 <ElementPlayground tag="audio-view" target="[data-audio-edit-view]" markup="[data-audio-edit-composition]"
@@ -11,7 +11,7 @@ const source = `${import.meta.env.BASE_URL}wav/Editing.wav`;
       <audio-player data-audio-edit-player id="audio-edit-player"></audio-player>
       <audio-view data-audio-edit-view player="#audio-edit-player" type="waveform" editable></audio-view>
     </div>
-    <p data-audio-edit-status role="status">Loading the six-second audio example.</p>
+    <p data-audio-edit-status role="status">Loading Arabesque No. 1.</p>
     <div class="audio-edit-actions">
       <label class="editing-import">Import WAV <input data-audio-edit-import type="file" accept=".wav,audio/wav" aria-label="Import WAV" /></label>
       <button class="wui-btn" data-audio-edit-process="normalize" type="button">Normalize selection</button>

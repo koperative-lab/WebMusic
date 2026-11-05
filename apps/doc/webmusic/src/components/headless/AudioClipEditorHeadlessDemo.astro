@@ -1,15 +1,16 @@
 ---
 import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
-const code = `import {createAudioClip} from '@webmusic/audio';
+const code = `import {loadClipFromUrl} from '@webmusic/audio/play';
 import {createAudioClipEditor} from '@webmusic/audio/view/headless';
-const clip = createAudioClip({sampleRate: 8000, channelData: [new Float32Array(16)]});
+// clip is the opening second of Arabesque No. 1 shown above.
+const clip = (await loadClipFromUrl('/wav/Arabesque%20No.1.wav')).slice(0, 1);
 const editor = createAudioClipEditor(clip);
-editor.transaction('Append silence', tx => tx.add({type: 'insert-silence', frame: 16, length: 4, id: 'pause'}));
+editor.transaction('Insert a pause', tx => tx.add({type: 'insert-silence', frame: 22050, length: 4410, id: 'pause', rightId: 'tail'}));
 editor.undo();
 editor.dispose();`;
 ---
 <HeadlessDemoFrame entry="@webmusic/audio/view/headless" name="AudioClipEditor" code={code}
-  hint="Edit a tiny generated PCM document. Structural history retains assets; it does not copy PCM. Reset creates a fresh document."
+  hint="Edit the opening second of Arabesque No. 1. Structural history retains assets; it does not copy PCM. Reset creates a fresh document."
   rootAttrs={{'data-audio-editor-demo': true}}>
   <section aria-label="Audio document and history">
     <p data-summary role="status">Preparing document.</p>
@@ -19,7 +20,7 @@ editor.dispose();`;
   <Fragment slot="parameters">
     <label>History limit <input data-limit type="number" value="100" min="1" step="1" /></label>
     <label>Operations (JSON)
-      <textarea data-operations rows="5" spellcheck="false">{`[{"type":"insert-silence","frame":4,"length":2,"id":"pause","rightId":"tail"}]`}</textarea>
+      <textarea data-operations rows="5" spellcheck="false">{`[{"type":"insert-silence","frame":22050,"length":4410,"id":"pause","rightId":"tail"}]`}</textarea>
     </label>
     <div class="editor-actions">
       <button class="wui-btn" data-action="execute" type="button">Execute</button>
@@ -35,9 +36,10 @@ editor.dispose();`;
   </Fragment>
 </HeadlessDemoFrame>
 <script>
-  import {createAudioClip, audioSegmentLength, type AudioCheckpoint, type AudioEditOperation, type AudioInteractionSession} from '@webmusic/audio';
+  import {audioSegmentLength, type AudioCheckpoint, type AudioEditOperation, type AudioInteractionSession} from '@webmusic/audio';
   import {createAudioClipEditor, type AudioClipEditor} from '@webmusic/audio/view/headless';
   import {mountDemos} from '../demo-lifecycle';
+  import {loadArabesqueAudioExcerpt} from './arabesque-audio';
   mountDemos('[data-audio-editor-demo]', (root, scope) => {
     const summary = root.querySelector<HTMLElement>('[data-summary]')!;
     const segments = root.querySelector<HTMLElement>('[data-segments]')!;
@@ -48,6 +50,7 @@ editor.dispose();`;
     const limit = root.querySelector<HTMLInputElement>('[data-limit]')!;
     let editor: AudioClipEditor, session: AudioInteractionSession, checkpoint: AudioCheckpoint | undefined;
     let releases: Array<() => void> = [];
+    let creation = 0;
     const message = (text: string) => {feedback.hidden = false; feedback.textContent = text;};
     const release = () => {releases.splice(0).forEach(stop => stop()); checkpoint?.release(); checkpoint = undefined; session?.dispose(); editor?.dispose();};
     const paint = () => {
@@ -60,12 +63,16 @@ editor.dispose();`;
       }));
       last.textContent = state.document.change ? `${state.document.change.origin}: ${state.document.change.label}` : 'No edits yet.';
     };
-    const create = () => {
+    const create = async () => {
+      const current = ++creation;
       try {
-        const next = createAudioClipEditor(createAudioClip({sampleRate:8000, channelData:[Float32Array.from({length:16}, (_, i) => Math.sin(i * Math.PI / 4) * .5)]}), {history:{limit:Number(limit.value)}});
+        // The opening second of Arabesque No. 1; the decoded excerpt is cached.
+        const clip = await loadArabesqueAudioExcerpt(1);
+        if (!scope.active || current !== creation) return;
+        const next = createAudioClipEditor(clip, {history:{limit:Number(limit.value)}});
         release(); editor = next; session = editor.createInteractionSession();
         releases = [editor.subscribeState(paint), session.subscribe(paint)]; paint(); message('Fresh document ready.');
-      } catch (error) {message(String(error));}
+      } catch (error) {if (scope.active && current === creation) message(String(error));}
     };
     scope.listen(root, 'click', (event) => {
       const action = (event.target as Element | null)?.closest('[data-action]')?.getAttribute('data-action');
@@ -90,9 +97,9 @@ editor.dispose();`;
         message(outcome ? `${outcome.status}${outcome.error ? `: ${outcome.error.message}` : ''}` : `${action} completed.`); paint();
       } catch (error) {message(String(error));}
     });
-    scope.listen(limit, 'change', create);
-    scope.listen(root, 'wm:headless-reset', () => {limit.value = '100'; operations.value = initialOperations; create();});
-    scope.add(release); create();
+    scope.listen(limit, 'change', () => scope.run(create()));
+    scope.listen(root, 'wm:headless-reset', () => {limit.value = '100'; operations.value = initialOperations; scope.run(create());});
+    scope.add(() => {creation += 1; release();}); scope.run(create());
   });
 </script>
 <style>

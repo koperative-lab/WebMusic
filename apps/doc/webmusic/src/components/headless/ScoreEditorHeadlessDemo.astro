@@ -1,7 +1,7 @@
 ---
 import HeadlessDemoFrame from '../HeadlessDemoFrame.astro';
 const code = `import {createScoreEditor} from '@webmusic/score/view/headless';
-// score is the four-note document shown above.
+// score is the Arabesque No. 1 opening shown above.
 const editor = createScoreEditor(score, {history: {limit: 100}});
 const session = editor.createInteractionSession();
 // On teardown: session.dispose(); editor.dispose();`;
@@ -29,7 +29,7 @@ const session = editor.createInteractionSession();
     <fieldset class="wm-editor-demo__fields">
       <legend>Commands and draft</legend>
       <label>Operations (JSON)
-        <textarea data-edit-operations rows="5" spellcheck="false">{`[{"type":"move-notes","noteIds":["note-1"],"deltaQuarters":[1,4]}]`}</textarea>
+        <textarea data-edit-operations rows="5" spellcheck="false">[]</textarea>
       </label>
       <div class="wm-editor-demo__actions">
         <button class="wui-btn" type="button" data-edit-action="execute">Execute</button>
@@ -55,9 +55,10 @@ const session = editor.createInteractionSession();
 </HeadlessDemoFrame>
 
 <script>
-  import {Duration, NoteId, PartId, Pitch, Rational, ScoreBuilder, VoiceId, type ScoreEditOperation} from '@webmusic/score';
+  import {NoteId, type Score, type ScoreEditOperation} from '@webmusic/score';
   import {createScoreEditor, type ScoreEditor, type ScoreCheckpoint, type ScoreInteractionSession} from '@webmusic/score/view/headless';
   import {mountDemos} from '../demo-lifecycle';
+  import {arabesqueExcerpt, loadArabesqueScore} from './arabesque-score';
 
   mountDemos('[data-score-editor-demo]', (root, scope) => {
     const history = root.querySelector<HTMLInputElement>('[data-edit-history]')!;
@@ -74,6 +75,11 @@ const session = editor.createInteractionSession();
     let session: ScoreInteractionSession | undefined;
     let checkpoint: ScoreCheckpoint | undefined;
     let subscriptions: Array<() => void> = [];
+    // The opening four quarters of Arabesque No. 1, loaded once per mount.
+    let opening: Score | undefined;
+    let creation = 0;
+    const defaultOperations = (score: Score): string =>
+      JSON.stringify([{type: 'move-notes', noteIds: [String(score.notes[0]?.id ?? '')], deltaQuarters: [1, 4]}]);
     const message = (text: string): void => { feedback.hidden = !text; feedback.textContent = text; };
     const release = (): void => {
       for (const unsubscribe of subscriptions.splice(0)) unsubscribe();
@@ -104,25 +110,28 @@ const session = editor.createInteractionSession();
         button.disabled = state.document.status === 'disposed' || (action === 'undo' ? !state.history.canUndo : action === 'redo' ? !state.history.canRedo : !checkpoint);
       }
     };
-    const create = (): void => {
+    const create = async (resetOperations = false): Promise<void> => {
       const historyLimit = Number(limit.value);
       if (history.checked && (!Number.isSafeInteger(historyLimit) || historyLimit < 1)) {
         message('History limit must be a positive safe integer.');
         return;
       }
+      const current = ++creation;
+      try {
+        opening ??= arabesqueExcerpt(await loadArabesqueScore('midi'), 4);
+      } catch (error) {
+        if (scope.active && current === creation) message(error instanceof Error ? error.message : String(error));
+        return;
+      }
+      // A later reset or option change supersedes this load.
+      if (!scope.active || current !== creation) return;
       release();
-      const builder = new ScoreBuilder();
-      const partId = PartId('piano');
-      builder.addPart({id: partId, name: 'Piano', midiProgram: 0, staves: 1});
-      ['C4', 'E4', 'G4', 'C5'].forEach((pitch, index) => builder.addNote(partId, {
-        id: NoteId(`note-${index + 1}`), pitch: Pitch.parse(pitch), onsetQuarters: new Rational(index),
-        duration: Duration.quarter(), voice: VoiceId('melody'),
-      }));
+      if (resetOperations) operations.value = defaultOperations(opening);
       const options = {history: history.checked ? {limit: historyLimit} : false as const};
-      editor = createScoreEditor(builder.build(), {...options, onListenerError: (error) => message(String(error))});
+      editor = createScoreEditor(opening, {...options, onListenerError: (error) => message(String(error))});
       session = editor.createInteractionSession();
       subscriptions = [editor.subscribeState(paint), session.subscribe(paint)];
-      readout.textContent = `import {createScoreEditor} from '@webmusic/score/view/headless';\n// score is the four-note document shown above.\nconst editor = createScoreEditor(score, ${JSON.stringify(options)});\nconst session = editor.createInteractionSession();\n// On teardown: session.dispose(); editor.dispose();`;
+      readout.textContent = `import {createScoreEditor} from '@webmusic/score/view/headless';\n// score is the Arabesque No. 1 opening shown above.\nconst editor = createScoreEditor(score, ${JSON.stringify(options)});\nconst session = editor.createInteractionSession();\n// On teardown: session.dispose(); editor.dispose();`;
       message('Fresh document ready.');
       paint();
     };
@@ -156,16 +165,15 @@ const session = editor.createInteractionSession();
       try { session?.setSelection(selection.value ? [NoteId(selection.value)] : []); }
       catch (error) { message(error instanceof Error ? error.message : String(error)); }
     });
-    scope.listen(history, 'change', create);
-    scope.listen(limit, 'change', create);
+    scope.listen(history, 'change', () => scope.run(create()));
+    scope.listen(limit, 'change', () => scope.run(create()));
     scope.listen(root, 'wm:headless-reset', () => {
       history.checked = true;
       limit.value = '100';
-      operations.value = '[{"type":"move-notes","noteIds":["note-1"],"deltaQuarters":[1,4]}]';
-      create();
+      scope.run(create(true));
     });
-    scope.add(release);
-    create();
+    scope.add(() => { creation += 1; release(); });
+    scope.run(create(true));
   });
 </script>
 

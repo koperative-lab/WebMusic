@@ -134,7 +134,7 @@ export const SCORE_PLAY_PARAMS: ElementParamCatalog = {
       {
         name: 'src',
         kind: 'text',
-        placeholder: '/midi/lead.mid',
+        placeholder: '/midi/Arabesque%20No.1.mid',
         fallback: 'nothing is loaded, and the part declares no member',
         note: 'URL of the score this part contributes, loaded through the optional @webmusic/score/io peer.',
       },

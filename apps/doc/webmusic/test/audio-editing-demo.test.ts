@@ -197,16 +197,23 @@ describe('Audio editing workflow demo', () => {
 });
 
 describe('Audio editor Headless demo', () => {
-  it('resets Headless input and releases the old editor, session and checkpoint', () => {
+  it('resets Headless input and releases the old editor, session and checkpoint', async () => {
     document.body.innerHTML = `<section data-audio-editor-demo><p data-summary></p><ul data-segments></ul><p data-last></p>
       <p data-hl-feedback></p><input data-limit value="100"><textarea data-operations>[]</textarea>
       <button data-action="checkpoint"></button><button data-action="restore"></button></section>`;
     const first = editor(), next = editor();
     const create = vi.fn().mockReturnValueOnce(first).mockReturnValueOnce(next);
+    const clip = {sampleRate: 44100};
+    const excerpt = vi.fn(async () => clip);
     runDemo('headless/AudioClipEditorHeadlessDemo', {
-      '@webmusic/audio': {createAudioClip: (value: unknown) => value, audioSegmentLength: () => 0},
+      '@webmusic/audio': {audioSegmentLength: () => 0},
       '@webmusic/audio/view/headless': {createAudioClipEditor: create},
+      './arabesque-audio': {loadArabesqueAudioExcerpt: excerpt},
     });
+    await flush();
+    // The demo edits the opening second of the Arabesque No. 1 recording.
+    expect(excerpt).toHaveBeenCalledWith(1);
+    expect(create.mock.calls[0][0]).toBe(clip);
     document.querySelector<HTMLButtonElement>('[data-action="restore"]')!.click();
     expect(document.querySelector('[data-hl-feedback]')!.textContent).toBe('Keep a checkpoint first.');
     expect(first.restoreCheckpoint).not.toHaveBeenCalled();
@@ -215,6 +222,7 @@ describe('Audio editor Headless demo', () => {
     const operations = document.querySelector<HTMLTextAreaElement>('[data-operations]')!; operations.value = 'invalid JSON';
     document.querySelector<HTMLInputElement>('[data-limit]')!.value = '3';
     document.querySelector('[data-audio-editor-demo]')!.dispatchEvent(new Event('wm:headless-reset'));
+    await flush();
     expect(operations.value).toBe('[]');
     expect(create.mock.calls[1][1]).toEqual({history: {limit: 100}});
     expect(checkpoint.release).toHaveBeenCalledOnce();

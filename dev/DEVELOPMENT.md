@@ -100,6 +100,7 @@ helps select commands; it does not define another execution chain.
 | `npm test` | Run workspace test scripts, including kernel and documentation tests. |
 | `npm run check:licenses` | Check the dependency license/optional-peer policy. |
 | `npm run check:site-notices` | Test the main site notice collector; the site build separately verifies the actual bundled module inventory. |
+| `npm run check:demo-music` | After package builds, verify that every media reference in the documentation source is one of the four Arabesque No. 1 files in the owner-maintained `apps/doc/webmusic/public/` folder and that those files exist. It only reads that folder. Included in source checks and both site build commands. |
 | `npm run check:packages` | Validate built exports, source/output receipts and bundled third-party notices using the main checks, extended to this checkout's five packages. |
 | `npm run check:release-manifests` | Validate the shared version, cross-package ranges and publication metadata. |
 | `npm run dev` | Reuse the running site, or build packages and start it. |

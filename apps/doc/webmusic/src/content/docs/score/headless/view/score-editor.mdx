@@ -28,26 +28,22 @@ through their `.editor` property.
 ## Import
 
 Import the class and factory from `@webmusic/score/view/headless`; editing is part
-of View. This complete example creates a note, commits one transaction, then undoes it:
+of View. This complete example loads Arabesque No. 1, moves its first note in one
+transaction, then undoes it:
 
 ```ts
-import {Duration, NoteId, PartId, Pitch, Rational, ScoreBuilder, VoiceId} from '@webmusic/score';
+import {loadScoreFromUrl} from '@webmusic/score/io';
 import {createScoreEditor} from '@webmusic/score/view/headless';
 
-const partId = PartId('piano');
-const noteId = NoteId('opening-note');
-const builder = new ScoreBuilder();
-builder.addPart({id: partId, name: 'Piano', midiProgram: 0, staves: 1});
-builder.addNote(partId, {
-  id: noteId, pitch: Pitch.parse('C4'), onsetQuarters: Rational.ZERO,
-  duration: Duration.quarter(), voice: VoiceId('melody'),
-});
-const editor = createScoreEditor(builder.build(), {history: {limit: 100}});
+const score = await loadScoreFromUrl('/midi/Arabesque%20No.1.mid', {format: 'midi'});
+const editor = createScoreEditor(score, {history: {limit: 100}});
+const first = editor.score.notes[0];
+if (!first) throw new Error('Arabesque No. 1 has no notes');
 const unsubscribe = editor.subscribeState((state) => {
   console.log(state.document.documentRevision, state.dirty, state.history.canUndo);
 });
 const result = editor.transaction('Move note', (tx) => {
-  tx.add({type: 'move-notes', noteIds: [noteId], deltaQuarters: [1, 4]});
+  tx.add({type: 'move-notes', noteIds: [first.id], deltaQuarters: [1, 4]});
 });
 if (result.status === 'failed') throw result.error;
 editor.undo();
@@ -76,7 +72,7 @@ defineScorePlayerElement();
 defineScoreGridViewElement();
 
 const controller = new AbortController();
-const editor = await loadScoreEditor('/midi/Editing.mid', {
+const editor = await loadScoreEditor('/midi/Arabesque%20No.1.mid', {
   signal: controller.signal, history: {limit: 100},
 });
 const player = document.querySelector<ScorePlayerElement>('score-player')!;

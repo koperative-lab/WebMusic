@@ -104,7 +104,7 @@ and any views. No application revision-copying code is required:
   import {loadScoreEditor} from '@webmusic/score/view/headless';
   defineScorePlayerElement();
   defineScoreGridViewElement();
-  const editor = await loadScoreEditor('/midi/Editing.mid');
+  const editor = await loadScoreEditor('/midi/Arabesque%20No.1.mid');
   const player = /** @type {import('@webmusic/score/play/element').ScorePlayerElement | null} */ (document.querySelector('score-player'));
   const view = /** @type {import('@webmusic/score/view/element').ScoreGridViewElement | null} */ (document.querySelector('score-grid-view'));
   if (player) player.editor = editor;

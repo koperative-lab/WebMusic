@@ -1,6 +1,6 @@
 ---
 import ElementPlayground from '../ElementPlayground.astro';
-const source = `${import.meta.env.BASE_URL}midi/Editing.mid`;
+const source = `${import.meta.env.BASE_URL}midi/Arabesque%20No.1.mid`;
 const features = ['move', 'resize', 'draw', 'delete', 'velocity', 'snap', 'zoom', 'history'];
 ---
 
@@ -9,7 +9,7 @@ const features = ['move', 'resize', 'draw', 'delete', 'velocity', 'snap', 'zoom'
   <section data-grid-demo data-grid-src={source} aria-label="Score grid editing">
     <div data-grid-composition data-pg-fragment>
       <score-player data-grid-player id="grid-player" time-control="full"></score-player>
-      <score-grid-view data-grid-view player="#grid-player" editable tools={features.join(' ')} velocity-lane min-pitch="58" max-pitch="74"></score-grid-view>
+      <score-grid-view data-grid-view player="#grid-player" editable tools={features.join(' ')} velocity-lane></score-grid-view>
     </div>
     <p data-grid-status role="alert" hidden></p>
   </section>

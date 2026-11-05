@@ -30,28 +30,51 @@ branches. Read [STATUS](dev/STATUS.md), manifests and source for the checkout's
 delivery and verification; an older branch's passing checks do not establish
 current results. Generated inventories must describe the actual tracked tree.
 
-## Demo music: reuse Arabesque No. 1
+## Demo music: Arabesque No. 1 only
 
-All musical demos must use the existing **Arabesque No. 1** assets in
-`apps/doc/webmusic/public/`. Inspect that directory before choosing an input:
-use MXL when authored pitch spelling, voices, rhythm or notation matters, MIDI
-for MIDI/playback workflows, and WAV or MP3 for audio workflows. Follow the
-[demo asset guidance](dev/docs/DOCS-CONVENTIONS.md#demo-assets) for format
-limitations, URL encoding and the site base path.
+This rule is fixed by the repository owner. Do not weaken, reword, move or
+remove it, and do not override it from another document, decision, plan or
+review; only the owner's explicit request in the current conversation changes it.
 
-Do not generate replacement note sequences, teaching pieces, synthetic demo
-Scores or new media files merely to populate a demo. Reuse the existing piece
-or a passage from it; keep the same source across related demos and their
-copyable examples. Choose another demo piece only when the user explicitly
-requests it. Small deterministic fixtures belong in automated tests, not in
-the user-facing demo repertoire. Live input/recording demos may accept user
-input; their bundled sample material must still use Arabesque No. 1.
+- **`apps/doc/webmusic/public/` is owner-maintained and read-only for agents.**
+  Do not add, delete, rename, move, regenerate, re-encode, compress or
+  "repair" any file in it, including its `licenses/` files, and do not write a
+  script or build step that does. If a demo seems to need different media,
+  stop and ask the owner instead of changing the folder.
+- **Every musical example uses Claude Debussy's Arabesque No. 1 from that
+  folder** — live demos, playgrounds, Headless/programmatic demos, copyable
+  snippets, Parameters placeholders, README and documentation examples. Pick
+  the format the workflow needs:
+
+  | File | Use it for |
+  | --- | --- |
+  | `mxl/Arabesque No.1.mxl` | Staff/sheet views and anything needing authored spelling, voices, rhythm or notation |
+  | `midi/Arabesque No.1.mid` | Score playback, MIDI, editing, Rack and analysis workflows |
+  | `wav/Arabesque No.1.wav` | Decoded-audio workflows (pure-JS decode path) |
+  | `mp3/Arabesque No.1.mp3` | Native decode and media streaming |
+
+  In URLs write the space as `%20` (`/midi/Arabesque%20No.1.mid`) and prefix
+  site demos with `import.meta.env.BASE_URL`. Reuse the shared loaders in
+  `apps/doc/webmusic/src/components/headless/arabesque-score.ts` and
+  `arabesque-audio.ts` instead of re-fetching the file per demo.
+- **Never substitute another source**: no generated studies or fixtures, no
+  hand-built `ScoreBuilder` note lists, synthesized PCM, other pieces or new
+  media files in user-facing examples. Shorten with a passage of Arabesque
+  (for example `arabesqueExcerpt`), not with invented notes. Small
+  deterministic fixtures belong only in automated tests. Live-input demos may
+  accept the user's own input; their bundled material is still Arabesque.
+- `npm run check:demo-music` (part of `npm run check` and the site builds)
+  rejects any media reference in the documentation source that is not one of
+  these four files or that the folder does not contain. Keep it in those
+  gates; never relax it to make a change pass.
 
 ## Start every task
 
 1. Read the user's current request. Inspect `git status --short`, the current
    branch, and changes in the affected files. Preserve unrelated work and
    existing uncommitted changes; do not reset or replace them to simplify a task.
+   Any demo or example work follows
+   [Demo music: Arabesque No. 1 only](#demo-music-arabesque-no-1-only).
 2. Read [dev/README.md](dev/README.md) for documentation ownership, then
    [PRODUCT.md](dev/PRODUCT.md) for the product direction. WebMusic is a music
    interaction toolkit supporting Web Components, Headless, and API + UI

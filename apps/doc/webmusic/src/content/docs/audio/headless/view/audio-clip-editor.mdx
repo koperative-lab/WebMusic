@@ -19,14 +19,15 @@ materializing clip-transform API.
 ## Import
 
 ```ts
-import {createAudioClip} from '@webmusic/audio';
+import {loadClipFromUrl} from '@webmusic/audio/play';
 import {createAudioClipEditor} from '@webmusic/audio/view/headless';
 
-const clip = createAudioClip({sampleRate: 8000, channelData: [new Float32Array(8000)]});
+const clip = await loadClipFromUrl('/wav/Arabesque%20No.1.wav');
 const editor = createAudioClipEditor(clip, {history: {limit: 100}});
 const stop = editor.subscribeState(state => console.log(state.document.documentRevision));
-editor.transaction('Append silence', tx => tx.add({
-  type: 'insert-silence', frame: 8000, length: 4000, id: 'pause',
+editor.transaction('Insert a pause', tx => tx.add({
+  type: 'insert-silence', frame: clip.sampleRate, length: Math.round(clip.sampleRate / 2),
+  id: 'pause', rightId: 'after-pause',
 }));
 editor.undo();
 stop();
@@ -60,7 +61,7 @@ defineAudioPlayerElement();
 defineAudioViewElement();
 const context = new AudioContext(); // owned by this application
 const controller = new AbortController();
-const editor = await loadAudioClipEditor('/wav/Editing.wav', {
+const editor = await loadAudioClipEditor('/wav/Arabesque%20No.1.wav', {
   signal: controller.signal,
   processors: [createAudioRangeProcessor('normalize')],
   loader: (url, options) => loadClipFromUrl(url, {...options, context, streaming: false}),
