@@ -81,7 +81,7 @@ export const audioBridgeContext = Object.freeze({
     'AudioAnalysisDemo', 'AudioAnalysisTimelinePlayground', 'AudioAnalysisViewDemo',
     'HlAudioPlayerDemo', 'AudioPlayerDemo', 'AudioRecorderDemo', 'AudioClipSummaryPlayground',
     'AudioCustomStyleDemo', 'AudioHistogramPlayground',
-    'AudioClipEditorHeadlessDemo', 'AudioEditingDemo',
+    'AudioClipEditorHeadlessDemo', 'AudioClipViewDemo',
     'AudioLiveViewPlayground', 'AudioMeterDemo', 'AudioMixerDemo',
     'AudioPlaylistPlayground', 'AudioViewDemo', 'AudioWorkbenchDemo',
     'MultibandWaveformDemo', 'WaveformExamplesDemo', 'IndependentLoopsDemo', 'ScoreAudioSyncDemo',
@@ -115,7 +115,7 @@ export const audioBridgeContext = Object.freeze({
   patterns: [
     {title: 'Play a decoded audio clip from custom UI', page: 'audio/headless/play/audio-clip-player.mdx', sections: ['Import', 'Ownership and the tap', 'Scratch sessions']},
     {title: 'Attach an audio waveform and choose its interaction', page: 'audio/element/view/audio-view.mdx', sections: ['Three ways in', 'Dragging and seeking']},
-    {title: 'Edit an audio document and audition committed revisions', page: 'audio/element/view/audio-view.mdx', sections: ['Waveform editing']},
+    {title: 'Edit an audio document and audition committed revisions', page: 'audio/element/view/audio-clip-view.mdx', sections: ['Import', 'Data and editing', 'Playback']},
     {title: 'Coordinate Score and Audio from one session', page: 'bridge/composition.mdx', sections: ['Setup in your application', 'Three integration choices in one session', 'Independent loop lengths']},
   ],
   serverOrigin(server, request) {

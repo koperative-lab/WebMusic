@@ -97,6 +97,10 @@ the sequence, and meters can follow the graph after explicit play/preload.
 
 Applying an edit pauses playback, cancels scheduled work, validates and retains
 sequence references, then publishes the exact applied document ID/revision.
+A revision that sounds the same — equal format, length and segments with an
+identity position map, such as a beat grid or marker edit — is applied in
+place instead: playback keeps running, prepared chunks stay valid and the new
+revision is published as applied with `positionPolicy: 'preserve-frame'`.
 It reads no PCM and creates/resumes no AudioContext. Applied revisions stay
 paused. `play()` during preparation or a failed application rejects with
 `AudioDocumentApplicationError` code `not-ready`. A failure retains the last
@@ -176,6 +180,8 @@ throws. Sequence scratch sessions are unavailable.
 | `volume` / `rate` / `pan` | Facade's retained clip settings; a backend can expose narrower control support. |
 | `audioContext` | Lazily creates or returns the borrowed AudioContext for shared decoding/owned playback. Throws after disposal. A borrowed group may own a different context; sharing must be configured explicitly. |
 | `clock` | Selected engine's optional read-only transport clock; the facade owns no clock. |
+| `tempoGrid` | Kernel `TempoGrid` of the playing content on the clock's seconds axis: the applied document's `beatGrid`, else the selected clip's `BeatGrid` (its tempo, anchored at its first downbeat or beat); `undefined` without one. |
+| `tempoClock` | Kernel [`TempoClock`](/kernel/api/#tempo-grids-and-the-tempo-clock) pairing `clock` with `tempoGrid`, for beats, bars and the next beat's reference time; `undefined` without either. A new object per read; it never re-anchors the clock. |
 | `analyser` | Stable owned clip-output analyser or a borrowed backend's optional analyser. Empty input does not create a graph. |
 
 ### Events and lifecycle

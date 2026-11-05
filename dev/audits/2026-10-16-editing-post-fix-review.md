@@ -18,7 +18,7 @@ cases and do not close the existing browser/device acceptance boundary.
 
 ### P2 — Waveform commands retain targets changed during cancellation
 
-[`mountWaveformEditor.execute`](../../packages/audio/src/view/render/waveform-editor.ts)
+`mountWaveformEditor.execute` (then in `packages/audio/src/view/render/waveform-editor.ts`, replaced by [`audio-clip.ts`](../../packages/audio/src/view/render/audio-clip.ts) under DEC-061)
 at lines 124–133 validates the document revision after `cancel()`, but not the
 selection or segment used to prepare its operations. Range-based buttons capture
 selection before this boundary (lines 79 and 136–138); gain captures the selected

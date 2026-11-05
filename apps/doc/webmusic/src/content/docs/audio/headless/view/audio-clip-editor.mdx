@@ -201,6 +201,7 @@ supplies explicit rendering/WAV export.
 | `clearClipboard()` | Releases the editor clipboard. |
 | `createInteractionSession()` | Session has getSnapshot, subscribe, setSelection, preview, commitDraft, cancelDraft and dispose. Its snapshot contains documentId, selection, draft and disposed. |
 | `processRange(request, {signal}?)` / `cancelProcessing()` | Explicit selected-range job. Result adds cancelled/superseded to ordinary edit outcomes. Cancellation does not roll back already committed content. |
+| `processorDescriptors` | Read-only `{id, version}` list of the registered processors, in registration order, so a UI can offer only what the editor can run. |
 | `dispose()` | Cancels work, disposes owned sessions and releases current/history/clipboard ownership. External checkpoint/playback leases survive until their holders release them. Repeated disposal is safe. |
 
 `AudioClipEditorOptions.history.limit` defaults to 100 and must be a positive
@@ -241,4 +242,4 @@ processing and asset types are described by the
 
 ## Related
 
-[`<audio-player>`](/audio/element/play/audio-player/) · [AudioPlayer](/audio/headless/play/audio-player/) · [Waveform editing](/audio/element/view/audio-view/#waveform-editing) · [Editable documents API](/audio/api/view/#editable-documents)
+[`<audio-player>`](/audio/element/play/audio-player/) · [AudioPlayer](/audio/headless/play/audio-player/) · [`<audio-clip-view>`](/audio/element/view/audio-clip-view/) · [Editable documents API](/audio/api/view/#editable-documents)

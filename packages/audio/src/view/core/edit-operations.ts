@@ -1,7 +1,7 @@
 import {AudioEditError, type AudioEditOperation, type AudioPositionStep} from '../../core/editing';
 import {createAudioPositionMap, mapAudioPosition} from '../../core/audio-position-map';
-import {audioEnvelopeGain, audioSegmentLength, createAudioSequence, frameRange,
-  type AudioAssetReader, type AudioSequence, type AudioSequenceSegment, type AudioSequenceSegmentInput, type AudioSequenceAnnotation} from '../../core/sequence';
+import {audioBeatGridBeatFrames, audioEnvelopeGain, audioSegmentLength, createAudioSequence, frameRange,
+  type AudioAssetReader, type AudioBeatGrid, type AudioSequence, type AudioSequenceSegment, type AudioSequenceSegmentInput, type AudioSequenceAnnotation} from '../../core/sequence';
 
 export interface AppliedAudioOperations {
   readonly content: AudioSequence;
@@ -17,6 +17,7 @@ export function snapshotAudioOperations(operations: readonly AudioEditOperation[
     split: ['type', 'segmentId', 'frame', 'leftId', 'rightId'], trim: ['type', 'startFrame', 'endFrame'],
     'insert-silence': ['type', 'frame', 'length', 'id', 'rightId'],
     'set-gain': ['type', 'segmentIds', 'gain'], 'set-envelope': ['type', 'segmentId', 'points'],
+    'set-annotations': ['type', 'annotations'], 'set-beat-grid': ['type', 'grid'],
   };
   for (const operation of copy) {
     if (!operation || !Object.prototype.hasOwnProperty.call(fields, operation.type) || Object.keys(operation).some((key) => !fields[operation.type].includes(key))) {
@@ -35,6 +36,16 @@ export function snapshotAudioOperations(operations: readonly AudioEditOperation[
       }
     }
     if (operation.type === 'set-envelope' && Array.isArray(operation.points)) validatePointFields(operation.points);
+    if (operation.type === 'set-beat-grid' && operation.grid !== null &&
+        (!operation.grid || typeof operation.grid !== 'object' || Object.keys(operation.grid).some((key) => !['bpm', 'anchorFrame', 'beatsPerBar'].includes(key)))) {
+      invalid('Set beat grid requires a grid object or null');
+    }
+    if (operation.type === 'set-annotations') {
+      if (!Array.isArray(operation.annotations)) invalid('Set annotations requires an annotations array');
+      for (const annotation of operation.annotations) {
+        if (!annotation || Object.keys(annotation).some((key) => !['id', 'startFrame', 'endFrame', 'anchoring', 'label'].includes(key))) invalid('Unknown annotation fields');
+      }
+    }
   }
   return Object.freeze(copy);
 }
@@ -119,8 +130,19 @@ export function applyAudioOperations(content: AudioSequence, assets: AudioAssetR
       const index = segments.findIndex((segment) => segment.id === operation.segmentId && segment.kind === 'asset');
       if (index < 0) unknownSegment(operation.segmentId);
       segments[index] = {...segments[index], envelope: operation.points} as AudioSequenceSegment;
+    } else if (operation.type === 'set-annotations') {
+      // createAudioSequence validates IDs, frames and anchoring of the replacement list.
+      candidate = createAudioSequence({...candidate, annotations: operation.annotations}, assets);
+      continue;
+    } else if (operation.type === 'set-beat-grid') {
+      // createAudioSequence validates tempo, anchor and meter; null removes the grid.
+      const {beatGrid: _removed, ...rest} = candidate;
+      candidate = createAudioSequence(operation.grid === null ? rest : {...rest, beatGrid: operation.grid}, assets);
+      continue;
     }
-    candidate = createAudioSequence({...candidate, segments,
+    const beatGrid = candidate.beatGrid && mapAudioBeatGrid(candidate.beatGrid, candidate.sampleRate, operationSteps);
+    const {beatGrid: _previous, ...base} = candidate;
+    candidate = createAudioSequence({...base, segments, ...(beatGrid ? {beatGrid} : {}),
       annotations: [...mapAudioAnnotations(candidate.annotations, operationSteps), ...insertedAnnotations]}, assets);
     steps.push(...operationSteps);
   }
@@ -172,6 +194,24 @@ function mapAudioAnnotations(annotations: readonly AudioSequenceAnnotation[], st
     const end = mapAudioPosition(map, annotation.endFrame, 'left');
     return end.frame <= start.frame ? [] : [{...annotation, startFrame: start.frame, endFrame: end.frame}];
   });
+}
+/**
+ * The grid follows content edited before its anchor: an anchor after a splice
+ * shifts with it, and an anchor inside a deleted range moves to the first
+ * downbeat after that range, keeping the bar phase. Edits after the anchor
+ * leave the constant-tempo grid in place.
+ */
+function mapAudioBeatGrid(grid: AudioBeatGrid, sampleRate: number, steps: readonly AudioPositionStep[]): AudioBeatGrid {
+  const bar = audioBeatGridBeatFrames(grid, sampleRate) * grid.beatsPerBar;
+  let anchor = grid.anchorFrame;
+  for (const step of steps) {
+    if (step.type !== 'splice') continue;
+    const end = step.startFrame + step.deleteCount;
+    if (anchor < step.startFrame) continue;
+    if (anchor < end) anchor += Math.ceil((end - anchor) / bar) * bar;
+    anchor += step.insertCount - step.deleteCount;
+  }
+  return anchor === grid.anchorFrame ? grid : {...grid, anchorFrame: Math.max(0, anchor)};
 }
 function invalid(message: string): never {throw new AudioEditError('invalid-command', message);}
 function unknownSegment(id: string): never {throw new AudioEditError('unknown-segment', `Unknown asset segment: ${id}`);}

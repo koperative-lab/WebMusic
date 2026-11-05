@@ -6,8 +6,8 @@ import {AudioViewElement} from '../../src/view/element/audio-view';
 
 // Rendering is exercised by the waveform suites; this fixture isolates Element
 // attachment ownership while keeping real editors, sessions and commands.
-vi.mock('../../src/view/render/waveform', () => ({renderWaveformVisualizer: (host: HTMLElement) => {
-  const surface = document.createElement('div'); host.append(surface);
+vi.mock('../../src/view/render/waveform', () => ({renderWaveformVisualizer: (host: HTMLElement, _source: unknown, options: {durationSeconds?: number}) => {
+  const surface = document.createElement('div'); surface.dataset.testWaveform = String(options.durationSeconds); host.append(surface);
   return {redraw() {}, redrawFrame() {}, setPlayheadMode() {}, setPlayheadVisible() {}, setZoom() {}, setOffset() {},
     setRegions() {}, viewport: () => ({startSeconds: 0, endSeconds: 1}), hitTest: (x: number) => ({seconds: x / 8000}),
     onViewportChange: () => () => {}, dispose: () => surface.remove()};
@@ -19,14 +19,15 @@ function editor(length: number): AudioClipEditor {
   editors.push(value); return value;
 }
 function view(): AudioViewElement {
-  const value = document.createElement('lifecycle-audio-view') as AudioViewElement;
-  value.editable = true; return value;
+  return document.createElement('lifecycle-audio-view') as AudioViewElement;
 }
+/** The read-only view follows exactly one editor: its session, and one drawing of its content. */
 function expectBound(element: AudioViewElement, target: AudioClipEditor): void {
   expect(element.editor).toBe(target);
   expect(element.interactionSession!.getSnapshot().documentId).toBe(target.getSnapshot().documentId);
-  expect(element.querySelector('[part="editing-status"]')?.textContent).toContain(`of ${target.getSnapshot().content.length}`);
-  expect(element.querySelectorAll('[part="editing-surface"]')).toHaveLength(1);
+  const drawings = element.querySelectorAll<HTMLElement>('[data-test-waveform]');
+  expect(drawings).toHaveLength(1);
+  expect(Number(drawings[0].dataset.testWaveform)).toBeCloseTo(target.getSnapshot().content.length / 8000, 6);
 }
 afterEach(() => {
   document.body.replaceChildren();
@@ -35,18 +36,25 @@ afterEach(() => {
 });
 
 describe('Audio View editor attachment cleanup', () => {
-  it.each(['source', 'presentation'])('preserves a newer binding during active draft cancellation from %s cleanup', trigger => {
+  it('keeps following its editor and a shared draft when its presentation is rebuilt', () => {
+    const a = editor(60), element = view();
+    element.editor = a; document.body.append(element);
+    const session = element.interactionSession!;
+    expect(session.preview([{type: 'trim', startFrame: 0, endFrame: 20}]).status).toBe('preview');
+    element.setAttribute('wave-color', 'red');
+    expect(element.editor).toBe(a);
+    expect(session.getSnapshot().draft).toBeDefined();
+    expect(element.querySelector<HTMLElement>('[data-test-waveform]')!.dataset.testWaveform).toBe(String(20 / 8000));
+  });
+
+  it.each(['source'])('preserves a newer binding during active draft cancellation from %s cleanup', trigger => {
     const added = vi.spyOn(window, 'addEventListener'), removed = vi.spyOn(window, 'removeEventListener');
     const a = editor(60), b = editor(64), c = editor(67), element = view();
     element.editor = a; document.body.append(element);
-    const surface = element.querySelector('[part="editing-surface"]')!;
-    const tool = element.querySelector<HTMLSelectElement>('[aria-label="Pointer tool"]')!; tool.value = 'trim';
-    const pointer = (type: string, x: number): void => {
-      const event = new MouseEvent(type, {bubbles: true, button: 0, clientX: x, clientY: 10});
-      Object.defineProperty(event, 'pointerId', {value: 1}); surface.dispatchEvent(event);
-    };
-    pointer('pointerdown', 10); pointer('pointermove', 40);
-    const session = element.interactionSession!; expect(session.getSnapshot().draft).toBeDefined();
+    // A shared draft is drawn by the read-only view; replacing the editor disposes its session and draft.
+    const session = element.interactionSession!;
+    expect(session.preview([{type: 'trim', startFrame: 10, endFrame: 40}]).status).toBe('preview');
+    expect(element.querySelector<HTMLElement>('[data-test-waveform]')!.dataset.testWaveform).toBe(String(30 / 8000));
     let armed = true;
     session.subscribe(state => { if (armed && !state.draft) { armed = false; element.editor = c; } });
     if (trigger === 'source') element.editor = b; else element.setAttribute('wave-color', 'red');
@@ -64,9 +72,10 @@ describe('Audio View editor attachment cleanup', () => {
     element.interactionSession!.subscribe(state => { if (state.disposed) element.editor = c; });
     element.editor = b;
     expectBound(element, c);
-    element.interactionSession!.setSelection({startFrame: 0, endFrame: 1});
-    element.querySelector('[part="editing-surface"]')!.dispatchEvent(new KeyboardEvent('keydown', {key: 'Delete', bubbles: true}));
-    expect(c.getSnapshot().content.length).toBe(66);
+    // The view follows edits made elsewhere to the editor it settled on.
+    c.execute({version: 1, documentId: c.getSnapshot().documentId, expectedRevision: 0, label: 'Trim',
+      operations: [{type: 'trim', startFrame: 0, endFrame: 66}]});
+    expectBound(element, c);
     expect(b.getSnapshot().content.length).toBe(64);
   });
 

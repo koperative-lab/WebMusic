@@ -1,6 +1,6 @@
 import {TransportClock, type TransportClockReader} from '@webmusic/kernel/transport';
 import {
-  readAudioSequenceRange, retainAudioSequence,
+  readAudioSequenceRange, retainAudioSequence, sameAudioTimeline,
   type AudioSequence, type AudioAssetReader, type AudioAssetLease,
 } from '../../core';
 import {insertEffect} from '../core/effect';
@@ -68,6 +68,17 @@ export class AudioSequenceEngine {
   onLoad(notify: () => void): () => void { this.loads.add(notify); return () => this.loads.delete(notify); }
   onEnd(notify: () => void): () => void { this.ends.add(notify); return () => this.ends.delete(notify); }
   onError(notify: (error: Error) => void): () => void { this.errors.add(notify); return () => this.errors.delete(notify); }
+
+  /**
+   * Swap in a revision that sounds the same (only annotations or the beat
+   * grid changed) without pausing or dropping prepared chunks. Returns false
+   * when the timeline differs; the caller then adopts it normally.
+   */
+  retag(content: AudioSequence, assets: AudioAssetReader): boolean {
+    if (this.disposed || !this.content || assets !== this.assets || !sameAudioTimeline(this.content, content)) return false;
+    this.content = content;
+    return true;
+  }
 
   adopt(content: AudioSequence, assets: AudioAssetReader, seconds: number, loop: Loop): boolean {
     if (this.disposed) throw new Error('Sequence engine is disposed');

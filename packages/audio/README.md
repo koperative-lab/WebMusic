@@ -183,9 +183,10 @@ playback paint/seek while displaying the newer edit. Its extrema cache reads
 visible ranges without rendering a complete sequence for every commit.
 
 `loadAudioClipEditor(url)` loads a file into a new editor that the application
-owns; assign it to `<audio-player>` and `<audio-view editable>` through
-`.editor` and dispose it when done. See the [View API](../../apps/doc/webmusic/src/content/docs/audio/api/view.mdx)
-and [waveform editing](../../apps/doc/webmusic/src/content/docs/audio/element/view/audio-view.mdx).
+owns; assign it to `<audio-player>` and `<audio-clip-view editable>` (and any
+read-only `<audio-view>`) through `.editor` and dispose it when done. See the
+[View API](../../apps/doc/webmusic/src/content/docs/audio/api/view.mdx) and the
+[clip editor](../../apps/doc/webmusic/src/content/docs/audio/element/view/audio-clip-view.mdx).
 
 ### Four layers, one direction
 

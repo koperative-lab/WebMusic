@@ -134,7 +134,7 @@ console.log(wav.byteLength);
 editor.dispose();
 ```
 
-For file decoding use [Audio Play loading](/audio/api/play/#load--decode). The View root and `AudioClipEditor` never import Play or create an audio context. `loadAudioClipEditor(url, options?)` fetches and decodes one URL through Play's bounded, nonstreaming decoder without creating an audio context, then returns a new caller-owned editor; inject `loader` to decode with your own context. The [waveform editing demo](/audio/element/view/audio-view/#waveform-editing) composes one editor, player and view.
+For file decoding use [Audio Play loading](/audio/api/play/#load--decode). The View root and `AudioClipEditor` never import Play or create an audio context. `loadAudioClipEditor(url, options?)` fetches and decodes one URL through Play's bounded, nonstreaming decoder without creating an audio context, then returns a new caller-owned editor; inject `loader` to decode with your own context. The [clip editor demo](/audio/element/view/audio-clip-view/) composes one editor, player and clip view.
 
 ### Sequence and asset contracts
 
@@ -161,6 +161,9 @@ All positions are **integer frames at the sequence's sample rate**. Ranges are h
 | `audioChannelLayout(channels)` | `['mono']`, `['left', 'right']`, or ordered `channel-N` names for larger channel counts. |
 | `audioSegmentLength(segment)`, `audioEnvelopeGain(points, frame)`, `sameAudioFormat(a, b)` | Segment extent, interpolated gain and exact format comparison. |
 | `audioClipRegionsToFrameAnnotations(clip, anchoring)` | Explicit nearest-frame conversion from clip regions; requires the caller to select anchoring and rejects out-of-bounds regions. |
+| `AudioBeatGrid`, `audioBeatGrid(grid)` | The optional `sequence.beatGrid`: a constant-tempo grid on the output timeline with `bpm` in (0, 1000], a finite nonnegative (possibly fractional) `anchorFrame` downbeat and 1–64 `beatsPerBar`. `audioBeatGrid` validates and freezes one. |
+| `audioBeatGridBeatFrames(grid, sampleRate)`, `audioSequenceTempoGrid(sequence)` | Frames per beat; the grid as a Kernel [`TempoGrid`](/kernel/api/#tempo-grids-and-the-tempo-clock) on the seconds axis an Audio player's clock runs on, or `undefined`. |
+| `sameAudioTimeline(a, b)` | True when two sequences sound the same: equal format, length and segments; annotations and the beat grid may differ. Players apply such revisions without pausing. |
 | `frameInteger(value, name?)`, `frameRange(start, length, extent)` | Validate nonnegative safe integer frames and a start/length range within an extent. |
 | `AudioSequenceError` | Typed sequence/format/asset/range/disposal error. `code` is `invalid-sequence`, `duplicate-id`, `unknown-asset`, `incompatible-audio-format`, `invalid-range` or `disposed`; the editor reports the same code in its failures. |
 
@@ -178,6 +181,8 @@ Backing-byte accounting uses a private cross-bundle Core capability; incompatibl
 | `insert-silence` | `frame`, `length`, stable `id`, optional `rightId`; insertion into a segment follows the same split identity rule. |
 | `set-gain` | `segmentIds`, finite nonnegative `gain`; modifies metadata, never asset samples. |
 | `set-envelope` | `segmentId`, ordered segment-local `points`; modifies one asset segment's envelope. |
+| `set-annotations` | `annotations`: the complete replacement list of document annotations (markers and spans); changes no audio. IDs must be unique and frames within the sequence. |
+| `set-beat-grid` | `grid`: an `AudioBeatGrid`, or `null` to remove it; changes no audio. Structural edits move the anchor with content edited before it — a deleted anchor moves to the next downbeat, keeping the bar phase — and leave it in place for edits after it. |
 
 Splits and trims crop/rebase envelopes and preserve boundary values. Content-anchored annotations follow splices; deleted points and collapsed spans are removed. Fixed annotations keep numeric frame positions clamped to the new end; a collapsed fixed span becomes a point. Undo restores prior metadata, including deleted annotations.
 
@@ -203,7 +208,7 @@ Playback-source types are owned by the [Audio Play API](/audio/api/play/#editabl
 
 ### Selected-range processing
 
-`createAudioRangeProcessor('normalize' | 'reverse')` returns a version-1 `AudioRangeProcessor` for explicit registration with an editor. Normalize accepts `{targetPeak?: number}` (default `0.95`, range 0–1), using one peak/factor across all selected channels. Reverse accepts `{}` and reverses each selected channel. Both preserve length, declare zero handles/latency/tail, yield between bounded work blocks, and support cancellation. Normalize fails with `processing-failed` when the selection contains NaN or infinite samples. They do not allocate a Web Audio context.
+`createAudioRangeProcessor(kind)` returns a version-1 `AudioRangeProcessor` for explicit registration with an editor; `AUDIO_RANGE_PROCESSOR_KINDS` lists the kinds `normalize`, `reverse`, `invert` and `remove-dc`. Normalize accepts `{targetPeak?: number}` (default `0.95`, range 0–1), using one peak/factor across all selected channels. Reverse reverses each selected channel, invert negates every sample, and remove-dc subtracts each channel's mean over the range; all three accept `{}`. All preserve length, declare zero handles/latency/tail, yield between bounded work blocks, and support cancellation. Normalize fails with `processing-failed` when the selection contains NaN or infinite samples. They do not allocate a Web Audio context.
 
 Custom `AudioRangeProcessor` implementations provide `id`, positive integer `version`, `plan(request)` and asynchronous `process(input)`. The plan declares input handles, raw output length, latency and tail **before allocation**. The editor then validates the replacement splice's range, segment ID and `rightId` against a placeholder, and rejects an `assetId` of an asset currently in the store, so those failures never run the processor. It checks the total input/output byte budget, passes copied input and an abort signal, then validates output format/length. Output registration retires `assetId`; a failure after registration needs a new ID. `AudioProcessingRequest` includes document/revision guard, selected range, processor ID/version, JSON parameters and output asset/segment IDs. Default `tailPolicy: 'trim'` keeps selected duration; `'extend'` includes a declared tail. Only one job runs per editor. `AudioProcessingResult` adds cancelled/superseded outcomes to ordinary edit results. See [processing lifecycle](/audio/headless/view/audio-clip-editor/#explicit-range-processing).
 
@@ -297,66 +302,62 @@ materialize complete PCM or build a full output peaks pyramid. A viewport
 showing a whole long asset can still require its first full sample scan through
 bounded chunks.
 
-### Waveform editor renderer — `@webmusic/audio/view/render`
+### Clip edit builders
 
-`mountWaveformEditor(container, editing, options?)` combines the existing
-waveform painter with selection, a trim preview, numeric frame controls and
-semantic commands. It borrows the `AudioViewEditing` controller and owns DOM,
-listeners and a sequence waveform source. `WaveformEditingOptions` extends
-`WaveformRenderOptions` with `editingStepFrames` (positive safe integer, default
-1) and `onPreview`, `onCommit`, `onError` callbacks. Its
-`WaveformEditingHandle` extends `ViewportAudioVisualizer` with `element`,
-`surface`, `updatePlayback(binding?, seconds?)` and `cancel()`. An unavailable
-controller throws `AudioEditError` with code `disposed` before any DOM, listener
-or asset lease is acquired; a failed first drawing releases them before rethrowing.
+The root exports stateless builders that turn waveform-editor intents into
+ordinary operations for one `AudioEditCommand`. They never touch PCM: range
+gain and fades split the affected segments at the range edges, then set gain or
+an envelope on the pieces inside it. Each takes a `nextId` factory for the new
+segment IDs, so tests can be deterministic.
 
-The inner waveform is rebuilt for each committed revision. Rebuilds keep the
-latest `setZoom`, `setRegions` and `setPlayheadMode` values, and publish the
-restored offset through `onViewportChange` after clamping it to shorter content.
-`setZoom` ignores values that are not finite and positive, like the renderer.
-While the controller is editable the drawing uses `position` mode; a requested
-`center` mode applies only while it is read-only, because the selection overlay
-and pointer frames share position geometry. Both are measured against the inner
-drawing, so padding or borders on the `editing-surface` part do not offset them.
-A press must move 3 CSS pixels before it becomes a range drag; a trim commits
-only after that movement and for a non-empty range. Pointer cancellation and lost
-capture end a gesture only for its own `pointerId`. The surface carries
-`tabindex`, `role="application"`, its label and instructions only while editing
-is operable. The status region changes only when its text does and is
-`aria-busy` during a pointer drag.
+| API | Contract |
+| --- | --- |
+| `audioSegmentSpans(sequence)` | `AudioSegmentSpan[]`: each segment with its output `start` and `end` frames, in order. |
+| `audioSplitOperations(sequence, frames, nextId)` | `{operations, spans}`: split operations at the given output frames and the resulting spans, so later operations can address the pieces. Frames on a boundary are skipped. |
+| `audioRangeGainOperations(sequence, range, factor, nextId)` | Multiply the gain of everything in a half-open frame range (amplify), leaving audio outside it unchanged. |
+| `audioRangeFadeOperations(sequence, range, 'in' \| 'out', curve, nextId)` | A fade across the range, as envelopes on the asset pieces inside it. |
+| `audioRangeSilenceOperations(sequence, range, nextId)` | Replace the range with one silence segment of the same length. |
+| `audioFadeGain(curve, t)`, `AUDIO_FADE_CURVES` | Fade-in gain at normalized position 0–1 for `linear`, `logarithmic` (gain *t*²) or `cosine` (S-curve); a fade-out uses `1 − t`. |
+| `audioFadeLength(points, size, side)`, `audioSegmentFadeEnvelope(points, size, side, length, curve)` | Read the fade at one end of a segment envelope (the run rising from zero gain), and replace it with `length` frames of `curve` while keeping points beyond it; `length` 0 removes the fade. |
+| `editAudioEnvelope(points, edit)` | Add (`{add}`), move (`{move, to}`) or remove (`{remove}`, an index) one envelope point. The result is ordered by frame, one point per frame; invalid points throw `AudioEditError` `invalid-command`. |
+| `nearestAudioZeroCrossing(sequence, assets, frame, radius?)` | The nearest frame within `radius` (default 2048) where the summed channels change sign, or `frame` when there is none. Reads only that window. |
+| `decibelsToGain(dB)`, `gainToDecibels(gain)` | Conversions; −144 dB and below is gain 0. |
 
-`updatePlayback` applies the exact-revision compatibility gate; callers supply
-observed time, never an inferred clock. It repaints the playhead only when the
-compatible time changes, so selection-only updates leave the canvas untouched.
-Playback updates preserve pending numeric range and gain inputs while focus moves between fields and command buttons.
-A new shared selection refreshes both range endpoints; a committed revision
-refreshes range and gain, and choosing another segment refreshes its gain.
-Segment labels follow committed type and frame length, including trim and
-undo/redo that retain segment IDs; a surviving selected segment remains selected.
-Commands prepared before a revision change during draft cancellation fail with
-`revision-conflict` rather than applying stale values to the new content. If a
-cancellation subscriber changes the command's target without changing content,
-the prepared command is discarded without a commit: Trim/Delete require the
-same start and end frames, Split/Insert silence require the same start frame,
-and Gain/Fade require the same selected segment. Changes to unrelated controls
-do not discard the command, and playback updates still preserve pending inputs.
-Disposal disables commands before cancelling the surface's gesture, so
-cancellation subscribers cannot commit through the retiring renderer.
-Form frame commands select valid typed Start/End frames that differ from the
-selection before running; empty or invalid frame, silence or gain fields call
-`onError` and change nothing. Keyboard commands act on the session selection.
-Pointer trim produces one transaction on
-release. Explicit `cancel()` discards the session draft. Lifecycle cancellation
-(blur, zoom or disposal) cancels only this surface's active gesture, preserving
-another consumer's draft when this surface is passive. Revision replacement
-invalidates the session draft; the surface then drops its stale gesture without
-issuing a nested session command. `dispose()`
-removes the surface, subscriptions and cache/asset lease, and leaves the borrowed
-controller/editor alive. Dispose the controller separately when owned by the
-application. See the [Element workflow](/audio/element/view/audio-view/#waveform-editing)
-for controls, keyboard commands and public styling parts. Processing remains an
-explicit [editor operation](#selected-range-processing); WAV export is a
-[Play operation](/audio/api/play/#render-an-edited-sequence).
+Non-linear fade curves are approximated with envelope points, so playback,
+rendering and export reproduce the drawn shape exactly.
+
+### Clip renderer — `@webmusic/audio/view/render`
+
+`mountAudioClip(host, content, options?)` mounts the waveform clip editor
+behind [`<audio-clip-view>`](/audio/element/view/audio-clip-view/). `content`
+is `{clip}` for a read-only decoded clip or `{editing}` for a borrowed
+`AudioViewEditing` controller. The renderer owns its DOM, listeners, resize
+observer and a sequence waveform source, and borrows the controller and editor.
+Range processing is offered when the controller's editor has `processRange`;
+the process card lists the built-in kinds the editor registered, from its
+`processorDescriptors`.
+
+| `AudioClipOptions` | Contract |
+| --- | --- |
+| `tool`, `snap`, `envelopes`, `pixelsPerSecond`, `amplitude`, `fadeCurve`, `grid`, `quantize`, `gridEdit` | Initial `AudioClipSettings`; defaults `select`, `off`, `false`, a working zoom (eight bars of the beat grid, else ten seconds; `0` fits), `1`, `linear`, `false`, `false`, `false`. `snap: 'grid'` follows the finest drawn grid or ruler line. `gridEdit` needs the `grid` feature. `AUDIO_CLIP_SNAPS` lists the snaps, including `beat` and `bar`; `AUDIO_CLIP_GRID_METERS` the beats-per-bar choices. |
+| `features` | Offered `AudioClipFeature`s from `AUDIO_CLIP_FEATURES`; default all. `parseAudioClipFeatures(value)` reads an attribute string. |
+| `height` | Total channel-lane height in CSS px; default 180, below a 24 px ruler. |
+| `followPlayback` | Scroll to keep the playhead visible. |
+| `onPreview`, `onCommit`, `onError` | Draft, committed edit and failure callbacks. |
+| `onSeek(seconds, detail?)` | A ruler click; the application decides whether to seek. With `quantize` and a grid, `seconds` is the nearest beat and `detail.quantized` is true: keep a playing transport's phase with Kernel `tempoGridJump`. |
+| `onBeatJump(beats)` | PageUp/PageDown while playback is shown: move playback by whole beats. Without it, or without playback, the cursor moves. |
+| `onSettingsChange(settings, changed)` | A toolbar, keyboard or wheel change. Zoom and amplitude are reported once a continuous gesture settles (150 ms); `configure` calls do not report. |
+
+The returned `AudioClipHandle` has `element`, the current `settings` and
+`features`, `visibleRange()`, `configure(options)` (`autoZoom: true` returns to
+the working zoom), `updatePlayback({seconds})`
+(`null` hides the playhead; callers supply observed, revision-compatible time,
+never an inferred clock), `cancel()` for the active gesture and draft, and
+`dispose()`. A pointer gesture previews a draft and commits one transaction on
+release; cancellation, lost capture of its own pointer or a revision change
+discard it. Disposal aborts the renderer's processing request and removes the
+DOM, subscriptions and cache, leaving the borrowed controller and editor alive.
+WAV export is a [Play operation](/audio/api/play/#render-an-edited-sequence).
 
 ## Render a spectrogram
 
@@ -654,8 +655,10 @@ values of [`/view/headless`](/audio/headless/#view).
 | Export | Kind | Use it for |
 | --- | --- | --- |
 | `applyAudioOperations` | Editing function | [Pure atomic operation primitive](#atomic-commands-and-position-maps). |
-| `createAudioRangeProcessor` | Processor recipe | [Built-in normalize/reverse processors](#selected-range-processing). |
-| `createAudioSequence`, `createMemoryAudioAssetStore`, `retainAudioSequence`, `readAudioSequenceRange`, `audioSequenceAssetIds`, `audioChannelLayout`, `audioSegmentLength`, `audioEnvelopeGain`, `sameAudioFormat`, `audioClipRegionsToFrameAnnotations`, `frameInteger`, `frameRange`, `AudioSequenceError` | Core sequence re-exports | [Sequence and asset contracts](#sequence-and-asset-contracts). |
+| `createAudioRangeProcessor`, `AUDIO_RANGE_PROCESSOR_KINDS` | Processor recipe | [Built-in normalize, reverse, invert and remove-DC processors](#selected-range-processing). |
+| `audioSegmentSpans`, `audioSplitOperations`, `audioRangeGainOperations`, `audioRangeFadeOperations`, `audioRangeSilenceOperations`, `audioFadeGain`, `AUDIO_FADE_CURVES`, `audioFadeLength`, `audioSegmentFadeEnvelope`, `editAudioEnvelope`, `nearestAudioZeroCrossing`, `decibelsToGain`, `gainToDecibels` | Edit builders | [Clip edit builders](#clip-edit-builders). |
+| `AudioFadeCurve`, `AudioSegmentIdFactory`, `AudioSegmentSpan`, `AudioRangeProcessorKind` | Types | Builder and processor inputs. |
+| `createAudioSequence`, `createMemoryAudioAssetStore`, `retainAudioSequence`, `readAudioSequenceRange`, `audioSequenceAssetIds`, `audioChannelLayout`, `audioSegmentLength`, `audioEnvelopeGain`, `sameAudioFormat`, `audioClipRegionsToFrameAnnotations`, `frameInteger`, `frameRange`, `AudioSequenceError`, `audioBeatGrid`, `audioBeatGridBeatFrames`, `audioSequenceTempoGrid`, `sameAudioTimeline` | Core sequence re-exports | [Sequence and asset contracts](#sequence-and-asset-contracts). |
 | `createAudioPositionMap`, `composeAudioPositionMaps`, `mapAudioPosition`, `isAudioDocumentSource`, `isAudioClipEditorPort`, `AudioEditError` | Core editing re-exports | [Atomic commands and position maps](#atomic-commands-and-position-maps). |
 | Sequence, asset, command, document, interaction and processing types | Types | Every type exported by Core `sequence`, `editing` and `audio-position-map`; see [Editable documents](#editable-documents). |
 | `AudioViewEditing`, `AudioViewEditingOptions`, `AudioViewEditingState` | Types | [Borrowed editor, session, state and command facade](#document-editing). |
@@ -679,8 +682,9 @@ values of [`/view/headless`](/audio/headless/#view).
 
 | Export | Kind | Use it for |
 | --- | --- | --- |
-| `mountWaveformEditor` | Renderer | [Frame-range interaction over a borrowed editor](#waveform-editor-renderer--webmusicaudioviewrender). |
-| `WaveformEditingHandle`, `WaveformEditingOptions` | Types | Editing renderer configuration, callbacks and lifecycle. |
+| `mountAudioClip`, `parseAudioClipFeatures`, `AUDIO_CLIP_FEATURES`, `AUDIO_CLIP_SNAPS` | Renderer | [Waveform clip editor over a borrowed editor](#clip-renderer--webmusicaudioviewrender). |
+| `AudioClipContent`, `AudioClipFeature`, `AudioClipHandle`, `AudioClipOptions`, `AudioClipPlayback`, `AudioClipSettings`, `AudioClipSnap`, `AudioClipTool` | Types | Clip renderer configuration, callbacks and lifecycle. |
+| `AUDIO_CLIP_GRID_METERS` | Constant | Beats-per-bar choices of the Grid Edit meter card. |
 | `renderWaveformVisualizer`, `renderSpectrogramVisualizer`, `renderLoudnessMeter` | Renderers | Retained Canvas waveform, spectrogram and live meter surfaces. |
 | `paintWaveformOverview`, `paintLiveProjection` | Paint adapters | Draw into caller-owned frames without creating DOM. |
 | `createAudioMeterPainter`, `paintAudioMeterDisplay`, `paintVuMeter`, `paintLoudnessMeter`, `paintWaveformHistory`, `paintOscilloscopeTrace`, `paintSpectrumFrame`, `paintSpectrogramHistory`, `paintStereometer` | Meter painters | Draw a meter display snapshot into a caller-owned frame; the factory retains only drawing scratch. |

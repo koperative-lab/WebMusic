@@ -87,6 +87,15 @@ const SNAP_QUARTERS: Record<Exclude<ScoreGridSnap, 'off'>, Rational> = {
   '1/16': new Rational(1, 4), '1/16t': new Rational(1, 6), '1/32': new Rational(1, 8),
 };
 const ZOOM_STEP = 1.25;
+/**
+ * Zoom per wheel delta pixel. Chromium reports a trackpad pinch as Ctrl+wheel
+ * with deltaY = −100 × ln(scale), so this rate follows the fingers; one
+ * event's delta is clamped so a mouse wheel notch zooms about 1.5×.
+ */
+const WHEEL_ZOOM_RATE = .01;
+const WHEEL_ZOOM_CLAMP = 40;
+/** Trailing delay before continuous zoom changes are reported. */
+const SETTINGS_REPORT_MS = 150;
 const SCALE_RANGE = [8, 512] as const;
 const ROW_RANGE = [6, 48] as const;
 const BLACK = new Set([1, 3, 6, 8, 10]);
@@ -464,6 +473,10 @@ export function mountScoreGrid(host: HTMLElement, content: ScoreGridContent, opt
 
   let disposed = false;
   let gesture: Gesture | undefined;
+  let reportTimer: ReturnType<typeof setTimeout> | undefined;
+  const pendingReports = new Set<keyof ScoreGridSettings>();
+  const pendingZoom: Record<'pixelsPerQuarter' | 'noteHeight', {factor: number; anchor: {clientX: number; clientY: number}} | undefined> =
+    {pixelsPerQuarter: undefined, noteHeight: undefined};
   let playback: ScoreGridPlayback | undefined;
   let message = '';
   let min = 48;
@@ -531,20 +544,32 @@ export function mountScoreGrid(host: HTMLElement, content: ScoreGridContent, opt
   function travelHistory(direction: 'undo' | 'redo'): void {
     if (editing && has('history') && cancelForCommand()) completed(editing[direction]());
   }
-  function change(next: Partial<ScoreGridSettings>, key: keyof ScoreGridSettings): void {
+  function change(next: Partial<ScoreGridSettings>, key: keyof ScoreGridSettings, beforeDraw?: () => void, continuous = false): void {
     if (disposed) return;
     const updated = validSettings(settings, next);
     if (updated[key] === settings[key]) return;
     if (gesture) cancel();
     settings = updated;
+    if (beforeDraw) { geometry(); beforeDraw(); }
     draw();
-    options.onSettingsChange?.(settings, key);
+    if (!continuous) { options.onSettingsChange?.(settings, key); return; }
+    // Zoom changes continuously during a pinch: report once it settles.
+    pendingReports.add(key);
+    if (reportTimer !== undefined) clearTimeout(reportTimer);
+    reportTimer = setTimeout(flushReports, SETTINGS_REPORT_MS);
   }
-  function zoom(key: 'pixelsPerQuarter' | 'noteHeight', factor: number, anchor?: {clientX: number; clientY: number}): void {
+  function flushReports(): void {
+    if (reportTimer !== undefined) clearTimeout(reportTimer);
+    reportTimer = undefined;
+    const keys = [...pendingReports];
+    pendingReports.clear();
+    if (!disposed) for (const key of keys) options.onSettingsChange?.(settings, key);
+  }
+  function zoom(key: 'pixelsPerQuarter' | 'noteHeight', factor: number, anchor?: {clientX: number; clientY: number}, continuous = false): void {
     if (!has('zoom')) return;
     const [low, high] = key === 'pixelsPerQuarter' ? SCALE_RANGE : ROW_RANGE;
     const before = settings[key];
-    const after = Math.round(Math.min(high, Math.max(low, before * factor)) * 100) / 100;
+    const after = Math.round(Math.min(high, Math.max(low, before * factor)) * 1000) / 1000;
     if (after === before) return;
     // Keep the musical point under the pointer (or the viewport's leading edge) in place.
     const rect = viewport.getBoundingClientRect();
@@ -553,9 +578,25 @@ export function mountScoreGrid(host: HTMLElement, content: ScoreGridContent, opt
       : (anchor ? anchor.clientY - rect.top : 0) - RULER_HEIGHT;
     const scroll = key === 'pixelsPerQuarter' ? viewport.scrollLeft : viewport.scrollTop;
     const units = (scroll + Math.max(0, offset)) / before;
-    change({[key]: after}, key);
-    const target = Math.max(0, units * after - Math.max(0, offset));
-    if (key === 'pixelsPerQuarter') viewport.scrollLeft = target; else viewport.scrollTop = target;
+    // Resize, scroll, then paint once, so the frame shows the new zoom at its anchored position.
+    change({[key]: after}, key, () => {
+      const target = Math.max(0, units * after - Math.max(0, offset));
+      if (key === 'pixelsPerQuarter') viewport.scrollLeft = target; else viewport.scrollTop = target;
+    }, continuous);
+  }
+  /** Apply wheel and pinch zoom at most once per frame, anchored at the latest pointer. */
+  function queueZoom(key: 'pixelsPerQuarter' | 'noteHeight', factor: number, anchor: {clientX: number; clientY: number}): void {
+    if (!Number.isFinite(factor) || factor <= 0) return;
+    const pending = pendingZoom[key];
+    if (pending) { pending.factor *= factor; pending.anchor = anchor; return; }
+    pendingZoom[key] = {factor, anchor};
+    const view = owner.defaultView;
+    const apply = () => {
+      const zoomNow = pendingZoom[key];
+      pendingZoom[key] = undefined;
+      if (zoomNow && !disposed) zoom(key, zoomNow.factor, zoomNow.anchor, true);
+    };
+    if (view) view.requestAnimationFrame(apply); else apply();
   }
   function parseQuarter(field: HTMLInputElement): Rational {
     const value = field.value.trim();
@@ -673,6 +714,8 @@ export function mountScoreGrid(host: HTMLElement, content: ScoreGridContent, opt
     geometry();
     svg.replaceChildren(); drawnNotes.clear(); playhead = undefined;
     const {left, right} = frame();
+    // Read the viewport box before appending shapes: a read after them forces a layout of the whole grid.
+    const viewportWidth = viewport.clientWidth, viewportHeight = viewport.clientHeight;
     // Overscan one viewport each side so ordinary scrolling needs no redraw.
     const span = Math.max(1, right - left);
     const from = Math.max(0, left - span);
@@ -735,7 +778,7 @@ export function mountScoreGrid(host: HTMLElement, content: ScoreGridContent, opt
     drawRuler(bars);
     drawKeys();
     drawLane(drawnRange, selected, from, to);
-    drawn = {key: editing ? editing.state : staticScore, revision: staticRevision, from, to, viewportWidth: viewport.clientWidth, viewportHeight: viewport.clientHeight};
+    drawn = {key: editing ? editing.state : staticScore, revision: staticRevision, from, to, viewportWidth, viewportHeight};
     paintControls();
     paintPlayback();
   }
@@ -1172,8 +1215,26 @@ export function mountScoreGrid(host: HTMLElement, content: ScoreGridContent, opt
   function wheel(event: WheelEvent): void {
     if (!editable() || !has('zoom') || !(event.ctrlKey || event.metaKey || event.altKey) || event.deltaY === 0) return;
     event.preventDefault();
-    const factor = event.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP;
-    zoom(event.altKey && !(event.ctrlKey || event.metaKey) ? 'noteHeight' : 'pixelsPerQuarter', factor, event);
+    // Proportional to the deltas, so a pinch follows the fingers and a burst sums within a frame.
+    const delta = event.deltaMode === 1 ? event.deltaY * 16 : event.deltaMode === 2 ? event.deltaY * 400 : event.deltaY;
+    const factor = Math.exp(-Math.max(-WHEEL_ZOOM_CLAMP, Math.min(WHEEL_ZOOM_CLAMP, delta)) * WHEEL_ZOOM_RATE);
+    queueZoom(event.altKey && !(event.ctrlKey || event.metaKey) ? 'noteHeight' : 'pixelsPerQuarter', factor, event);
+  }
+  // Safari reports a trackpad pinch as gesture events carrying the cumulative scale.
+  let gestureScale = 1;
+  function gestureStart(event: Event): void {
+    if (!editable() || !has('zoom')) return;
+    event.preventDefault();
+    gestureScale = 1;
+  }
+  function gestureChange(event: Event): void {
+    if (!editable() || !has('zoom')) return;
+    event.preventDefault();
+    const detail = event as Event & {scale?: number; clientX?: number; clientY?: number};
+    const scale = typeof detail.scale === 'number' && detail.scale > 0 ? detail.scale : 1;
+    const rect = viewport.getBoundingClientRect();
+    queueZoom('pixelsPerQuarter', scale / gestureScale, {clientX: detail.clientX ?? rect.left + KEY_WIDTH, clientY: detail.clientY ?? rect.top});
+    gestureScale = scale;
   }
   // Sticky layers follow scrolling natively; notes redraw only past the overscan.
   const onScroll = () => {
@@ -1200,6 +1261,8 @@ export function mountScoreGrid(host: HTMLElement, content: ScoreGridContent, opt
   svg.addEventListener('pointercancel', onPointerCancel); svg.addEventListener('lostpointercapture', onPointerCancel);
   svg.addEventListener('blur', onCancel); svg.addEventListener('keydown', key); svg.addEventListener('dblclick', doubleClick);
   svg.addEventListener('wheel', wheel, {passive: false});
+  svg.addEventListener('gesturestart', gestureStart);
+  svg.addEventListener('gesturechange', gestureChange);
   owner.defaultView?.addEventListener('blur', onCancel);
   viewport.addEventListener('scroll', onScroll, {passive: true});
   let viewportWidth = viewport.clientWidth;
@@ -1253,6 +1316,11 @@ export function mountScoreGrid(host: HTMLElement, content: ScoreGridContent, opt
         svg.removeEventListener('pointercancel', onPointerCancel); svg.removeEventListener('lostpointercapture', onPointerCancel);
         svg.removeEventListener('blur', onCancel); svg.removeEventListener('keydown', key); svg.removeEventListener('dblclick', doubleClick);
         svg.removeEventListener('wheel', wheel);
+        svg.removeEventListener('gesturestart', gestureStart);
+        svg.removeEventListener('gesturechange', gestureChange);
+        if (reportTimer !== undefined) clearTimeout(reportTimer);
+        reportTimer = undefined;
+        pendingZoom.pixelsPerQuarter = pendingZoom.noteHeight = undefined;
         owner.defaultView?.removeEventListener('blur', onCancel);
         viewport.removeEventListener('scroll', onScroll); element.remove();
       }

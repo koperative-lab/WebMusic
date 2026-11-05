@@ -16,7 +16,7 @@ take exactly what they use.
 | [`/player`](#player--webmusickernelplayer) | `PlayerLike` playback control contract |
 | [`/effect`](#effect--webmusickerneleffect) | `Effect`/`EffectNodes` over `BaseAudioContext` |
 | [`/meter`](#meter--webmusickernelmeter) | Shared analyser meter contract and implementation |
-| [`/transport`](#transport--webmusickerneltransport) | `TransportClock` affine anchor math + `TimelineMapping` |
+| [`/transport`](#transport--webmusickerneltransport) | `TransportClock` affine anchor math, `TimelineMapping`, tempo grids and `TempoClock` |
 | [`/tick`](#tick--webmusickerneltick) | Throttling-resistant tick delivery for lookahead schedulers |
 | [`/sync`](#sync--webmusickernelsync) | Transport grouping, timeline mapping and drift coordination |
 
@@ -191,6 +191,50 @@ to consumers. Both families' schedulers anchor on it, and the
 `TimelineMapping` (`positionToSeconds`/`secondsToPosition`) is the structural
 contract for musical-position-to-seconds mappings; score's `TimeMap` and
 audio's `BeatGrid` both satisfy it.
+
+### Tempo grids and the tempo clock
+
+A `TempoGrid` is a constant-tempo beat grid on a transport position axis:
+`bpm` (finite, > 0, at most `MAX_TEMPO_GRID_BPM` = 1000), `anchor` (the
+position of one downbeat) and `beatsPerBar` (an integer from 1 to
+`MAX_TEMPO_GRID_BEATS_PER_BAR` = 64). Beats repeat every `60 / bpm` position
+units in both directions. `createTempoGrid({bpm, anchor = 0, beatsPerBar = 4})`
+validates and freezes one and throws `RangeError` otherwise.
+
+| Function | Returns |
+| --- | --- |
+| `tempoGridBeatLength(grid)` | One beat on the position axis, `60 / bpm`. |
+| `tempoGridPosition(grid, position)` | `{beat, bar, beatInBar, phase}`: the continuous beat from the anchor, the bar index (0 at the anchor), the beat inside the bar and the elapsed fraction of the beat in [0, 1). |
+| `tempoGridBeatPosition(grid, beat)` | The position of a (fractional) beat index. |
+| `snapToTempoGrid(grid, position, {division = 1, direction = 'nearest'})` | The nearest grid line, or the next (`forward`) or previous (`backward`) one; `division` is lines per beat (`1 / beatsPerBar` snaps to bars). |
+| `tempoGridJump(grid, from, to)` | The quantized jump target: the beat nearest `to`, plus the phase of `from`, so a running transport lands in time. |
+| `tempoGridLines(grid, start, end, division = 1)` | `{position, beat, downbeat}` for each line inside `[start, end]`, at most 100,001. |
+| `tempoGridMapping(grid)` | The grid as a `TimelineMapping` between beats and positions. |
+| `tapTempo(times, resetSeconds = 2)` | BPM from tap times in seconds: the median interval of the latest run, where a gap longer than `resetSeconds` starts a new run; `undefined` until a run has two taps. |
+
+`new TempoClock(clock, grid)` reads beats from a `TransportClockReader` without
+re-anchoring it. It is immutable; `withGrid(grid)` pairs the same clock with
+another grid. All times are the clock's reference times.
+
+| Member | Contract |
+| --- | --- |
+| `positionAt(t)`, `beatAt(t)` | Grid position or continuous beat at reference time `t`. |
+| `effectiveBpm` | `grid.bpm × clock.rate`: the tempo heard at the current rate. |
+| `nextGridTime(t, division = 1)` | Reference time of the next grid line strictly after `t`, to schedule a quantized action. Throws `RangeError` while the clock is paused, like `timeAt`. |
+| `timeAtBeat(beat)` | Reference time at which a beat plays; throws while paused. |
+
+```ts
+import {TempoClock, createTempoGrid} from '@webmusic/kernel/transport';
+
+const grid = createTempoGrid({bpm: 92, anchor: 0.41});
+const tempo = new TempoClock(player.clock!, grid); // any TransportClockReader
+const when = tempo.nextGridTime(context.currentTime); // the next beat, in context seconds
+```
+
+An Audio player exposes the same pairing for its applied document as
+[`tempoClock`](/audio/headless/play/audio-player/); the grid itself is edited in
+[`<audio-clip-view>`](/audio/element/view/audio-clip-view/#beat-grid).
+`TransportGroup` still coordinates positions, not beats.
 
 ## tick — @webmusic/kernel/tick
 

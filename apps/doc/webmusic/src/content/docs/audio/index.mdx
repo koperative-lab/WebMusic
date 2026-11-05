@@ -59,7 +59,7 @@ npm install @webmusic/audio @webmusic/kernel @webmusic/ui
 
 ## Drop-in Web Components
 
-The fastest way to get audio on a page — no build step. Each capability's `/auto` entry registers its ready-to-use custom elements, and `/element` exports the classes with explicit registration; the capability roots (`@webmusic/audio/play`, `/view`, `/analyze`) are programming APIs and register nothing. Play provides the central player, playlist, mixer and recorder; View adds `<audio-view>`, with optional waveform editing, and `<audio-live-view>`; Analyze adds five live tools, including `<audio-meter>`. Every tag and its owning page is on the [Web Components page](/audio/element/).
+The fastest way to get audio on a page — no build step. Each capability's `/auto` entry registers its ready-to-use custom elements, and `/element` exports the classes with explicit registration; the capability roots (`@webmusic/audio/play`, `/view`, `/analyze`) are programming APIs and register nothing. Play provides the central player, playlist, mixer and recorder; View adds `<audio-view>`, the `<audio-clip-view>` waveform editor and `<audio-live-view>`; Analyze adds five live tools, including `<audio-meter>`. Every tag and its owning page is on the [Web Components page](/audio/element/).
 
 ### From a CDN
 
@@ -162,7 +162,7 @@ range or snapshot. The player reports its applied document revision and remains
 paused after an edit until Play is pressed again.
 
 For a runnable workflow, see
-[waveform editing](/audio/element/view/audio-view/#waveform-editing).
+[`<audio-clip-view>`](/audio/element/view/audio-clip-view/).
 Custom applications use the same [`AudioClipEditor`](/audio/headless/view/audio-clip-editor/)
 with no DOM and inject it into the [native player](/audio/headless/play/audio-player/)
 and [View interaction controller](/audio/api/view/#document-editing).

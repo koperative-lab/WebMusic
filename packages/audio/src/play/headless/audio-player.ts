@@ -1,8 +1,8 @@
-import {EventEmitter, AudioDocumentApplicationError, isAudioDocumentSource, type AudioDocumentSource, type AudioDocumentPlaybackBinding, type AudioDocumentRevision, type AudioDocumentApplicationResult, type AudioPlaybackSourceSnapshot, type AudioDocumentSnapshot, type AudioClip, type Region} from '../../core';
+import {EventEmitter, AudioDocumentApplicationError, audioSequenceTempoGrid, isAudioDocumentSource, type AudioDocumentSource, type AudioDocumentPlaybackBinding, type AudioDocumentRevision, type AudioDocumentApplicationResult, type AudioPlaybackSourceSnapshot, type AudioDocumentSnapshot, type AudioClip, type Region} from '../../core';
 import {AudioDocumentBinding} from './audio-document-binding';
 import {AudioSequenceEngine} from './sequence-engine';
 import {createWebAudioContext} from '@webmusic/kernel/audio-context';
-import type {TransportClockReader} from '@webmusic/kernel/transport';
+import {TempoClock, createTempoGrid, type TempoGrid, type TransportClockReader} from '@webmusic/kernel/transport';
 import {AudioClipPlayer, type AudioClipPlayerOptions, type AudioScratchSession, type PlayerTimeUpdate} from './player';
 import {normalizeLoopOption} from './engines/buffer-engine';
 
@@ -116,6 +116,12 @@ export class AudioPlayer {
         }
         this.appliedDocument = snapshot;
       },
+      retag: (snapshot) => {
+        if (!this.sequenceEngine || !this.appliedDocument || this.appliedDocument.assets !== snapshot.assets) return false;
+        if (!this.sequenceEngine.retag(snapshot.content, snapshot.assets)) return false;
+        this.appliedDocument = snapshot;
+        return true;
+      },
       notify: () => {
         const state = this.documentBinding;
         this.publishSource();
@@ -190,6 +196,21 @@ export class AudioPlayer {
   get playing(): boolean { return this.borrowed?.playing ?? this.engine?.playing ?? false; }
   get scratching(): boolean { return this.borrowed?.scratching ?? this.engine?.scratching ?? false; }
   get clock(): TransportClockReader | undefined { return this.borrowed ? this.borrowed.clock : this.engine?.clock; }
+  /**
+   * Constant-tempo grid of the playing content on the clock's seconds axis:
+   * the applied document's beat grid, else the selected clip's `beatGrid`
+   * (its tempo, anchored at its first downbeat or beat). Undefined without one.
+   */
+  get tempoGrid(): TempoGrid | undefined {
+    if (this.appliedDocument) return audioSequenceTempoGrid(this.appliedDocument.content);
+    const grid = this.borrowed ? undefined : this.clip?.beatGrid;
+    return grid ? createTempoGrid({bpm: grid.bpm, anchor: grid.downbeats?.[0] ?? grid.beats[0]}) : undefined;
+  }
+  /** The player clock read in beats of {@link tempoGrid}; undefined without a clock or grid. */
+  get tempoClock(): TempoClock | undefined {
+    const clock = this.clock, grid = this.tempoGrid;
+    return clock && grid ? new TempoClock(clock, grid) : undefined;
+  }
   /** Lazily create or borrow the context shared by decoding and owned playback. */
   get audioContext(): AudioContext {
     if (this.disposed) throw new Error('AudioPlayer has been disposed');

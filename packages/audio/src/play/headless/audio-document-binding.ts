@@ -7,6 +7,8 @@ interface BindingHost {
   pause(): void;
   transport(): {sampleRate: number; seconds: number; loop: boolean | {start: number; end: number}};
   adopt(snapshot: AudioDocumentSnapshot, seconds: number, loop: boolean | {start: number; end: number}): void;
+  /** Apply a revision that sounds the same without pausing; false when it does not. */
+  retag?(snapshot: AudioDocumentSnapshot): boolean;
   notify(): void;
   onDetach(): void;
   report(error: unknown): void;
@@ -191,6 +193,24 @@ export class AudioDocumentBinding {
     const promise = new Promise<AudioDocumentApplicationResult>((done) => { resolve = done; });
     const attempt: Attempt = {id: ++this.serial, target: freezeTarget(snapshot), promise, resolve};
     this.attempt = attempt;
+    // A revision that only changes annotations or the beat grid applies in
+    // place: playback keeps running and its position needs no mapping.
+    if (this.state.status === 'ready' && this.applied?.documentId === snapshot.documentId && this.host.retag &&
+        !snapshot.change?.positionMap.steps.length) {
+      let retagged = false;
+      try { retagged = this.host.retag(snapshot); } catch (error) { this.report(error); }
+      if (!this.current(attempt, generation)) return promise;
+      if (retagged) {
+        this.applied = attempt.target;
+        this.map = undefined;
+        this.positionIntent = undefined; this.stopIntent = false;
+        this.state = Object.freeze({status: 'ready', attempt: attempt.id, requested: attempt.target, applied: this.applied,
+          positionPolicy: 'preserve-frame', documentCoordinates: true});
+        this.finish(attempt, Object.freeze({status: 'applied', target: attempt.target, attempt: attempt.id, positionPolicy: 'preserve-frame'}));
+        this.host.notify();
+        return promise;
+      }
+    }
     let preparationError: unknown;
     try { attempt.lease = retainAudioSequence(snapshot.content, snapshot.assets); }
     catch (error) { preparationError = error; }

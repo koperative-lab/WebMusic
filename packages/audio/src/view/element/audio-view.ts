@@ -53,7 +53,7 @@ import {
 } from '../../core';
 import {observeElementSource, observeElementTarget} from '@webmusic/kernel/element';
 import {createAudioViewEditing, audioDocumentPlaybackCompatible, type AudioViewEditing} from '../headless/audio-editing';
-import {mountWaveformEditor, type WaveformEditingHandle} from '../render/waveform-editor';
+import {createAudioSequenceWaveform, type AudioSequenceWaveform} from '../headless/sequence-waveform';
 import {renderWaveformVisualizer} from '../render/waveform';
 import {renderSpectrogramVisualizer} from '../render/spectrogram-view';
 import {renderLoudnessMeter} from '../render/meter';
@@ -142,7 +142,6 @@ const PROPS = [
   'follow',
   'scrollable',
   'editor',
-  'editable',
   'interactionSession',
 ] as const;
 
@@ -238,7 +237,6 @@ export class AudioViewElement extends WebMusicElement {
       'format',
       'type',
       'player',
-      'editable',
       'interactive',
       'drag-mode',
       'annotate',
@@ -262,7 +260,9 @@ export class AudioViewElement extends WebMusicElement {
   private explicitEditor?: AudioClipEditorPort;
   private explicitInteractionSession?: AudioInteractionSession;
   private editing?: AudioViewEditing;
-  private editorSurface?: WaveformEditingHandle;
+  /** The waveform source drawing a borrowed editor's visible content. */
+  private editorWaveform?: AudioSequenceWaveform;
+  private editorDrawnContent?: unknown;
   private editorCleanup?: () => void;
   private editorStateCleanup?: () => void;
   private editorGeneration = 0;
@@ -318,7 +318,6 @@ export class AudioViewElement extends WebMusicElement {
     upgradeProperties(this, PROPS);
     this.applyWidth();
     this.bindPlayer();
-    this.updateEditable();
     if (this.hasEditorIntent()) { this.bindEditor(); return; }
     if (this.hasAttribute('peaks-src') && !this.explicitPeaks) void this.loadPeaksSource();
     if (this.hasAttribute('src') && !this.explicitClip) void this.loadSource();
@@ -329,7 +328,6 @@ export class AudioViewElement extends WebMusicElement {
     // A write that changes nothing — a framework re-applying its props, or
     // `setAttribute(name, getAttribute(name))` — must not cost a rebuild.
     if (!this.isConnected || previous === next) return;
-    if (name === 'editable') { this.updateEditable(); this.refresh(); return; }
     if (name === 'player') {
       this.bindPlayer();
       this.refresh();
@@ -351,7 +349,6 @@ export class AudioViewElement extends WebMusicElement {
     }
     // Recompose gesture ownership without rebuilding the data or canvas.
     if (name === 'follow' || name === 'annotate' || name === 'interactive' || name === 'drag-mode') {
-      if (name === 'annotate' && this.hasEditorIntent()) this.updateEditable();
       this.configureAccessibility();
       this.bindVisualizer();
       return;
@@ -390,8 +387,6 @@ export class AudioViewElement extends WebMusicElement {
     if (this.isConnected) this.bindEditor();
   }
   get editor(): AudioClipEditorPort | undefined { return this.editing?.editor ?? this.explicitEditor; }
-  get editable(): boolean { return boolAttr(this, 'editable', false); }
-  set editable(value: boolean) { this.setAttribute('editable', value ? 'true' : 'false'); }
   set interactionSession(value: AudioInteractionSession | undefined) {
     if (value && this.editor && value.getSnapshot().documentId !== this.editor.getSnapshot().documentId) throw new Error('The interaction session belongs to another document');
     if (value === this.explicitInteractionSession) return;
@@ -722,7 +717,9 @@ export class AudioViewElement extends WebMusicElement {
     this.viewportUnsubscribe = undefined;
     this.vizBinding = undefined;
     this.rendered = undefined;
-    this.editorSurface = undefined;
+    const editorWaveform = this.editorWaveform;
+    this.editorWaveform = undefined;
+    this.editorDrawnContent = undefined;
     this.renderedClip = undefined;
     this.renderedDuration = 0;
     this.status = undefined;
@@ -731,7 +728,7 @@ export class AudioViewElement extends WebMusicElement {
     // Release only the captured lifetime, never fields installed by callbacks.
     const failures: unknown[] = [];
     for (const cleanup of [() => slider?.destroy(), () => viewport?.(), () => binding?.unsubscribe(),
-      () => rendered?.dispose(), () => status?.destroy()]) {
+      () => rendered?.dispose(), () => editorWaveform?.dispose(), () => status?.destroy()]) {
       try { cleanup(); } catch (error) { failures.push(error); }
     }
     if (revision === this.presentationRevision) this.configureAccessibility();
@@ -868,20 +865,19 @@ export class AudioViewElement extends WebMusicElement {
     this.host = host;
 
     if (this.hasEditorIntent()) {
-      this.updateEditable();
       if (!this.editing?.state.available) return this.renderUnavailable(host, this.getAttribute('data-editor-state') === 'source-conflict' ? 'Editor conflicts with an independent audio source' : 'Audio editor unavailable');
       if (this.type !== 'waveform') return this.renderUnavailable(host, 'Sequence documents support waveform views. Render explicit audio before using a clip-only view.');
-      this.editorSurface = mountWaveformEditor(host, this.editing, {...this.renderOptions(),
-        onPreview: (result) => this.dispatchEvent(new CustomEvent('webaudio:editpreview', {detail: result, bubbles: true, composed: true})),
-        onCommit: (result) => this.dispatchEvent(new CustomEvent('webaudio:editcommit', {detail: result, bubbles: true, composed: true})),
-        onError: (error) => this.dispatchEvent(new CustomEvent('webaudio:editerror', {detail: {error}, bubbles: true, composed: true})),
-      });
-      this.rendered = this.editorSurface;
+      // A read-only follow: draw the editor's visible content (including a shared draft).
+      const state = this.editing.state;
+      const content = state.interaction.draft?.content ?? state.document.content;
+      this.editorWaveform = createAudioSequenceWaveform(content, state.document.assets);
+      this.editorDrawnContent = content;
+      this.rendered = renderWaveformVisualizer(host, this.editorWaveform, {...this.renderOptions(),
+        durationSeconds: content.length / content.sampleRate});
       this.renderedDuration = this.resolveDuration();
       this.syncTimeline(); this.configureAccessibility(); this.updateDocumentPlayback(); this.bindVisualizer();
       return;
     }
-    if (this.editable) return this.renderUnavailable(host, 'Editing requires a ready audio editor');
     const owner = this.boundPlayer as {loading?: boolean; loadError?: Error} | undefined;
     if (!this.explicitClip && !this.sourceClip && !this.explicitPeaks && !this.sourcePeaks &&
         !this.explicitSpectrogram && !this.explicitFrequencyData && (owner?.loading || owner?.loadError)) {
@@ -1142,7 +1138,7 @@ export class AudioViewElement extends WebMusicElement {
       // SurfaceSlider is mounted on this very node and captures the pointer, so
       // two independent owners would run one gesture: the slider scrubbing the
       // playhead across the region the drag is drawing.
-      draggableRegions: annotate && !this.interactive && !this.editing?.state.editable,
+      draggableRegions: annotate && !this.interactive,
       surface: this.host,
       ...(annotate ? {onRegionChange: (created) => this.commitDragRegions(created)} : {}),
     });
@@ -1250,8 +1246,7 @@ export class AudioViewElement extends WebMusicElement {
   }
 
   private centeredPlayhead(): boolean {
-    // Content editing owns the pointer; its frame overlay needs position geometry.
-    return this.dragMode === 'scrub' && !this.annotate && this.type !== 'meter' && !this.editing?.state.editable;
+    return this.dragMode === 'scrub' && !this.annotate && this.type !== 'meter';
   }
 
   private shouldFollow(): boolean {
@@ -1393,7 +1388,6 @@ export class AudioViewElement extends WebMusicElement {
     this.cancelTrackGesture();
     this.releaseAccessibility();
     if (!this.rendered) return;
-    if (this.editorSurface && this.editing?.state.editable) return;
     this.rendered.setPlayheadMode?.(this.centeredPlayhead() ? 'center' : 'position');
     if (this.centeredPlayhead()) {
       this.rendered.redraw(this.currentSeconds(), false);
@@ -1688,25 +1682,15 @@ export class AudioViewElement extends WebMusicElement {
     if (value !== undefined && this.hasEditorIntent()) throw new Error('source-conflict: An editor cannot be combined with independent audio sources');
   }
 
-  private updateEditable(): void {
-    const supported = this.type === 'waveform';
-    if (this.editing?.state.available) this.editing.setEditable(this.editable && supported && !this.annotate);
-    this.setAttribute('data-editable-state', !this.editable ? 'readonly' : !supported ? 'unsupported-type' :
-      !this.editing?.state.available ? 'unavailable' : this.annotate ? 'annotation' : 'ready');
-  }
-
   /** Detach the old attachment before releasing anything that can publish. */
   private detachEditor(): () => void {
-    const surface = this.editorSurface;
     const unsubscribe = this.editorStateCleanup;
     const editing = this.editing;
-    this.editorSurface = undefined;
-    if (this.rendered === surface) this.rendered = undefined;
     this.editorStateCleanup = undefined;
     this.editing = undefined;
     return () => {
       try { unsubscribe?.(); } finally {
-        try { surface?.dispose(); } finally { editing?.dispose(); }
+        editing?.dispose();
       }
     };
   }
@@ -1725,7 +1709,7 @@ export class AudioViewElement extends WebMusicElement {
     const current = () => generation === this.editorGeneration && this.isConnected;
     if (!current()) return;
     if (!this.hasEditorIntent()) {
-      this.removeAttribute('data-editor-state'); this.removeAttribute('data-playback-state'); this.updateEditable();
+      this.removeAttribute('data-editor-state'); this.removeAttribute('data-playback-state');
       if (!current()) return;
       if (this.hasAttribute('src') && !this.explicitClip) void this.loadSource();
       if (!current()) return;
@@ -1737,7 +1721,7 @@ export class AudioViewElement extends WebMusicElement {
     this.cancelPeaksLoad();
     if (!current()) return;
     if (this.hasIndependentSource()) {
-      this.setAttribute('data-editor-state', 'source-conflict'); this.updateEditable(); if (current()) this.refresh(); return;
+      this.setAttribute('data-editor-state', 'source-conflict'); if (current()) this.refresh(); return;
     }
     // Editors are assigned through `.editor` only; there is no selector attribute.
     const cleanup = observeElementSource<AudioClipEditorPort>(this, {source: this.explicitEditor,
@@ -1752,9 +1736,7 @@ export class AudioViewElement extends WebMusicElement {
       this.setAttribute('data-editor-state', resolution.state);
       if (resolution.state === 'ready' && resolution.source) {
         try {
-          const editing = createAudioViewEditing(resolution.source, {
-            editable: this.editable && this.type === 'waveform' && !this.annotate, interactionSession: this.explicitInteractionSession,
-          });
+          const editing = createAudioViewEditing(resolution.source, {editable: false, interactionSession: this.explicitInteractionSession});
           if (!attached()) { editing.dispose(); return; }
           this.editing = editing;
           const unsubscribe = editing.subscribe((state) => {
@@ -1763,7 +1745,9 @@ export class AudioViewElement extends WebMusicElement {
             this.timeline.setDuration(state.document.content.length / state.document.content.sampleRate);
             if (!attached() || editing !== this.editing) return;
             this.updateDocumentPlayback();
-            if (attached() && editing === this.editing && !state.available && this.editorSurface) this.refresh();
+            // Redraw when the visible content (an edit, undo or shared draft) or availability changes.
+            const visible = state.available ? state.interaction.draft?.content ?? state.document.content : undefined;
+            if (attached() && editing === this.editing && (!state.available || (this.editorWaveform && visible !== this.editorDrawnContent))) this.refresh();
           });
           if (attached() && editing === this.editing) this.editorStateCleanup = unsubscribe;
           else { unsubscribe(); editing.dispose(); return; }
@@ -1773,7 +1757,7 @@ export class AudioViewElement extends WebMusicElement {
         }
       }
       if (!attached()) return;
-      this.updateEditable(); if (attached()) this.refresh();
+      if (attached()) this.refresh();
     });
     if (current()) this.editorCleanup = cleanup; else cleanup();
   }
@@ -1788,8 +1772,6 @@ export class AudioViewElement extends WebMusicElement {
     const compatible = this.documentPlaybackCompatible();
     this.setAttribute('data-playback-state', !this.boundPlayer ? 'unbound' : compatible ? 'ready' : 'pending');
     this.rendered?.setPlayheadVisible?.(compatible);
-    const player = this.playerFacade();
-    this.editorSurface?.updatePlayback(player?.documentBinding, compatible ? player?.seconds ?? player?.currentTime ?? 0 : 0);
     if (!compatible) this.timeline.setPlayhead(0);
   }
 }

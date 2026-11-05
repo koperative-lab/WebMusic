@@ -15,7 +15,7 @@ see [Audio setup](/audio/#drop-in-web-components).
 | --- | --- |
 | [Play](#play) | A central player, attached queue/mix controls and recording. |
 | [Analyze](#analyze) | Five live signal tools for metering, waveform, spectrum and transient inspection. |
-| [View](#view) | Drawing audio: a multi-view stage for clips, regions and optional waveform editing, and a live signal strip. |
+| [View](#view) | Drawing audio: a multi-view stage for clips and regions, a waveform clip editor, and a live signal strip. |
 
 ## Play
 
@@ -104,11 +104,12 @@ registration helpers allow a smaller selected surface.
 
 ## View
 
-The **visualization** elements of [`@webmusic/audio/view`](/audio/api/view/). `<audio-view>` provides three drawings of the same audio under one `type` attribute, including waveform regions. `<audio-live-view>` shows a scrolling strip of a live signal. An editable document is an application-owned [AudioClipEditor](/audio/headless/view/audio-clip-editor/) that playback and optional waveform editing borrow.
+The **visualization** elements of [`@webmusic/audio/view`](/audio/api/view/). `<audio-view>` provides three drawings of the same audio under one `type` attribute, including waveform regions. `<audio-clip-view>` edits a document. `<audio-live-view>` shows a scrolling strip of a live signal. An editable document is an application-owned [AudioClipEditor](/audio/headless/view/audio-clip-editor/) that playback, the clip editor and read-only views borrow.
 
 | Element | Purpose |
 | --- | --- |
-| [`<audio-view>`](/audio/element/view/audio-view/) | The projection stage — waveform, spectrogram or meter, chosen with `type`; follows a bound player, seeks, zooms, pans and annotates; an explicit editor enables optional waveform editing. |
+| [`<audio-view>`](/audio/element/view/audio-view/) | The projection stage — waveform, spectrogram or meter, chosen with `type`; follows a bound player, seeks, zooms, pans and annotates; follows an editor read-only. |
+| [`<audio-clip-view>`](/audio/element/view/audio-clip-view/) | The waveform clip editor — range selection, split, trim, delete, silence, clipboard, amplify, fades, gain envelopes, markers, range processing, snap, zoom and history over a borrowed editor. |
 | [`<audio-live-view>`](/audio/element/view/audio-live-view/) | A scrolling projection of a live `AnalyserNode` — waveform or spectrogram. The only live *time-axis* surface here. |
 
 Inputs are component-specific. `<audio-view>` binds to playback through `player`;
@@ -116,20 +117,20 @@ Inputs are component-specific. `<audio-view>` binds to playback through `player`
 Use `<audio-view>`'s `.regions` and `annotate` support to display or create regions.
 Load an editor with [`loadAudioClipEditor`](/audio/headless/view/audio-clip-editor/#load-from-a-url)
 (or create one with `createAudioClipEditor`) and assign it to the `.editor`
-property of `audio-player` and `audio-view`; there is no `editor` attribute.
+property of `audio-player`, `audio-clip-view` and any following `audio-view`; there is no `editor` attribute.
 Borrowers release their subscriptions but never dispose the editor; the
-application disposes it. See [Waveform editing](/audio/element/view/audio-view/#waveform-editing)
+application disposes it. See [`<audio-clip-view>`](/audio/element/view/audio-clip-view/)
 for the complete editor/player/view composition and typed edit events.
 
 Waveform views can use clip or peaks data, load clips through `src`, or draw
 precomputed `peaks-src` data without decoding audio. An `.editor` binding draws
-a reference sequence through bounded visible sample ranges; `editable` enables
-selection, trim, split, delete, silence, gain/fades, clipboard and local history.
+a reference sequence through bounded visible sample ranges, read-only;
+`<audio-clip-view editable>` edits the same document.
 Analysis stays caller-owned: `<audio-view type="spectrogram">` requires
 `.spectrogram` data from [`@webmusic/audio/analyze`](/audio/api/analyze/) or another
 compatible producer. Binding a player supplies playback state, not that analysis.
 
-These Elements compose published UI Kit surfaces. `<audio-view>` uses stage + status;
+These Elements compose published UI Kit surfaces. `<audio-view>` uses stage + status; `<audio-clip-view>` uses status for loading and failures;
 `<audio-live-view>` uses animated `CanvasStage`. Domain geometry and pixels remain
 in Audio Headless/render adapters; the presenters own generic DOM, canvas
 sizing/DPR, accessible interaction, status and cleanup.
@@ -141,8 +142,9 @@ Point `<audio-view>` at an [`<audio-player>`](/audio/element/play/audio-player/)
 | [`<audio-view type="waveform">`](/audio/element/view/audio-view/#what-each-drawing-needs) | `defineAudioViewElement(tag?)` | Min/max waveform with a playhead (default). |
 | [`<audio-view type="spectrogram">`](/audio/element/view/audio-view/#what-each-drawing-needs) | — | STFT magnitude heatmap (time × frequency). |
 | [`<audio-view type="meter">`](/audio/element/view/audio-view/#what-each-drawing-needs) | — | Live RMS / spectrum level meter. |
+| [`<audio-clip-view>`](/audio/element/view/audio-clip-view/) | `defineAudioClipViewElement(tag?)` | Waveform clip editor over a borrowed editor. |
 | `<audio-live-view>` | `defineAudioLiveViewElement(tag?)` | A scrolling projection of a live `AnalyserNode`. |
-| `AudioViewElement`, `AudioLiveViewElement` | `defineAllAudioElements()` | The classes behind the tags — extend one to build a custom surface, or register every element at its default tag. |
+| `AudioViewElement`, `AudioClipViewElement`, `AudioLiveViewElement` | `defineAllAudioElements()` | The classes behind the tags — extend one to build a custom surface, or register every element at its default tag. |
 | [`AudioViewDragMode`](/audio/element/view/audio-view/#dragging-and-seeking) | type from `@webmusic/audio/view/element` | `seek`, `scrub`, `pan` or `none` for the AudioView Element's `dragMode` property. |
 
 ## Theming

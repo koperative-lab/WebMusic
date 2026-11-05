@@ -311,6 +311,11 @@ export class AudioClipEditor implements AudioClipEditorPort {
       if (job && this.snapshot.status !== 'disposed') this.refresh();
     }
   }
+  /** The range processors this editor can run, as `{id, version}` pairs. */
+  get processorDescriptors(): readonly {readonly id: string; readonly version: number}[] {
+    return Object.freeze(this.processors.map((processor) => Object.freeze({id: processor.id, version: processor.version})));
+  }
+
   cancelProcessing(): void {if (this.job) {this.job.cancelled = true; this.job.controller.abort();}}
   dispose(): void {
     if (this.snapshot.status === 'disposed') return;

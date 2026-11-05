@@ -87,6 +87,16 @@ const PAGE = {width: 1200, height: 1697, margin: 86, title: 110};
 const SYSTEM_GAP = 26;
 const ZOOM_RANGE = [.5, 3] as const;
 const ZOOM_STEP = 1.2;
+/**
+ * Zoom per wheel delta pixel. Chromium reports a trackpad pinch as Ctrl+wheel
+ * with deltaY = −100 × ln(scale), so this rate follows the fingers; one
+ * event's delta is clamped so a mouse wheel notch zooms about 1.5×.
+ */
+const WHEEL_ZOOM_RATE = .01;
+const WHEEL_ZOOM_CLAMP = 40;
+/** Trailing delays: report a continuous zoom, and re-break flow lines after it settles. */
+const SETTINGS_REPORT_MS = 150;
+const FLOW_SETTLE_MS = 250;
 
 // ---------------------------------------------------------------- pitch helpers
 
@@ -330,6 +340,24 @@ export function mountScoreSheet(host: HTMLElement, content: ScoreSheetContent, o
   let anchor: NoteId | undefined;
   let drag: Drag | undefined;
   let lastWidth = 0;
+  /**
+   * Visual zoom over the engraved scale. Zoom is shown with CSS `zoom` on the
+   * pages, so notation stays vector-sharp and nothing re-engraves while it
+   * changes; page layout never re-engraves for zoom (its line breaks do not
+   * depend on it), flow layout re-breaks once the zoom settles.
+   */
+  let cssZoom = 1;
+  let settleTimer: ReturnType<typeof setTimeout> | undefined;
+  let reportTimer: ReturnType<typeof setTimeout> | undefined;
+  let pendingZoom: {factor: number; x: number; y: number} | undefined;
+  let gestureScale = 1;
+  /**
+   * A continuous zoom previews as a compositor-only transform of the pages,
+   * pinned at the anchor, and lays out once when it settles: changing CSS
+   * `zoom` every frame re-lays out and repaints every engraved page.
+   */
+  let preview: {x: number; y: number; contentX: number; contentY: number; from: number} | undefined;
+  let previewTimer: ReturnType<typeof setTimeout> | undefined;
   let openCard: 'duration' | undefined;
 
   const root = document.createElement('section');
@@ -507,6 +535,14 @@ export function mountScoreSheet(host: HTMLElement, content: ScoreSheetContent, o
     if (disposed) return;
     const source = score();
     const scrollTop = viewport.scrollTop;
+    if (settleTimer !== undefined) clearTimeout(settleTimer);
+    settleTimer = undefined;
+    cssZoom = 1;
+    pages.style.zoom = '';
+    if (previewTimer !== undefined) clearTimeout(previewTimer);
+    previewTimer = undefined;
+    preview = undefined;
+    pages.style.transform = pages.style.transformOrigin = pages.style.willChange = '';
     disposeSystems();
     engraved = source;
     lanes = source ? buildLanes(committed() ?? source) : new Map();
@@ -696,10 +732,11 @@ export function mountScoreSheet(host: HTMLElement, content: ScoreSheetContent, o
         if (!box.width && !box.height) continue;
         const mark = document.createElement('div');
         mark.setAttribute('part', 'selection');
-        mark.style.left = `${box.left - frame.left - 2}px`;
-        mark.style.top = `${box.top - frame.top - 2}px`;
-        mark.style.width = `${box.width + 4}px`;
-        mark.style.height = `${box.height + 4}px`;
+        // Client boxes include the CSS zoom; the mark lives inside the zoomed pages.
+        mark.style.left = `${(box.left - frame.left) / cssZoom - 2}px`;
+        mark.style.top = `${(box.top - frame.top) / cssZoom - 2}px`;
+        mark.style.width = `${box.width / cssZoom + 4}px`;
+        mark.style.height = `${box.height / cssZoom + 4}px`;
         system.page.append(mark);
       }
     }
@@ -724,8 +761,9 @@ export function mountScoreSheet(host: HTMLElement, content: ScoreSheetContent, o
     const quarter = secondsToQuarters(tempos, Math.max(0, seconds));
     const system = systems.find((candidate) => quarter >= candidate.startQuarter && quarter < candidate.endQuarter);
     if (!system) return;
-    const top = system.host.offsetTop + system.page.offsetTop;
-    const bottom = top + system.host.offsetHeight;
+    const box = system.host.getBoundingClientRect();
+    const top = box.top - viewport.getBoundingClientRect().top + viewport.scrollTop;
+    const bottom = top + box.height;
     if (top < viewport.scrollTop || bottom > viewport.scrollTop + viewport.clientHeight) viewport.scrollTop = Math.max(0, top - 16);
   }
 
@@ -798,15 +836,96 @@ export function mountScoreSheet(host: HTMLElement, content: ScoreSheetContent, o
       else cursor = undefined;
       paintCursor();
     }
-    if (key === 'layout' || key === 'zoom') engrave();
+    if (key === 'layout') engrave();
+    else if (key === 'zoom') showZoom();
     syncChrome();
     if (report) options.onSettingsChange?.(settings, key);
   }
 
-  function zoomBy(factor: number): void {
+  function zoomBy(factor: number, anchor?: {x: number; y: number}, continuous = false): void {
     const width = viewport.clientWidth || 800;
     const current = settings.zoom > 0 ? settings.zoom : zoomScale(width) / (settings.layout === 'page' ? .7 : .8);
-    setSetting('zoom', Math.round(Math.min(ZOOM_RANGE[1], Math.max(ZOOM_RANGE[0], current * factor)) * 100) / 100);
+    const next = Math.round(Math.min(ZOOM_RANGE[1], Math.max(ZOOM_RANGE[0], current * factor)) * 1000) / 1000;
+    if (next === settings.zoom) return;
+    if (!continuous) { zoomAnchor = anchor; setSetting('zoom', next); zoomAnchor = undefined; return; }
+    settings = normalizeSettings(settings, {zoom: next});
+    previewZoom(anchor);
+    syncChrome();
+    // A pinch reports once it settles, so the host is not re-rendered per frame.
+    if (reportTimer !== undefined) clearTimeout(reportTimer);
+    reportTimer = setTimeout(() => { reportTimer = undefined; if (!disposed) options.onSettingsChange?.(settings, 'zoom'); }, SETTINGS_REPORT_MS);
+  }
+
+  let zoomAnchor: {x: number; y: number} | undefined;
+  /**
+   * Show `settings.zoom` by scaling the engraved pages, keeping the point under
+   * the anchor (viewport pixels; default the top centre) in place.
+   */
+  function showZoom(): void {
+    if (!geometry || !systems.length) { engrave(); return; }
+    const width = viewport.clientWidth || lastWidth || 800;
+    // The applied CSS value and the hit-testing factor must be the same number.
+    const next = Math.round(zoomScale(width) / geometry.scale * 10_000) / 10_000;
+    const x = zoomAnchor?.x ?? width / 2;
+    const y = zoomAnchor?.y ?? 0;
+    const contentX = (viewport.scrollLeft + x) / cssZoom;
+    const contentY = (viewport.scrollTop + y) / cssZoom;
+    cssZoom = next;
+    pages.style.zoom = Math.abs(next - 1) < 1e-6 ? '' : String(next);
+    viewport.scrollLeft = Math.max(0, contentX * next - x);
+    viewport.scrollTop = Math.max(0, contentY * next - y);
+    paintSelection();
+    if (settings.layout !== 'flow') return;
+    // Flow lines fill the width at the engraved scale: re-break once the zoom settles.
+    if (settleTimer !== undefined) clearTimeout(settleTimer);
+    settleTimer = setTimeout(() => { settleTimer = undefined; if (!disposed) engrave(); }, FLOW_SETTLE_MS);
+  }
+
+  /** Scale the laid-out pages toward `settings.zoom` without layout, pinned at the gesture's first anchor. */
+  function previewZoom(anchor?: {x: number; y: number}): void {
+    if (!geometry || !systems.length) { showZoom(); return; }
+    const width = viewport.clientWidth || lastWidth || 800;
+    if (!preview) {
+      const x = anchor?.x ?? width / 2, y = anchor?.y ?? 0;
+      // The origin is in the pages' own coordinates, which the CSS zoom scales.
+      const box = pages.getBoundingClientRect(), frame = viewport.getBoundingClientRect();
+      preview = {x, y, contentX: (frame.left + x - box.left) / cssZoom, contentY: (frame.top + y - box.top) / cssZoom, from: cssZoom};
+      pages.style.willChange = 'transform';
+      pages.style.transformOrigin = `${preview.contentX}px ${preview.contentY}px`;
+    }
+    const target = Math.round(zoomScale(width) / geometry.scale * 10_000) / 10_000;
+    pages.style.transform = `scale(${target / preview.from})`;
+    if (previewTimer !== undefined) clearTimeout(previewTimer);
+    previewTimer = setTimeout(settlePreview, SETTINGS_REPORT_MS);
+  }
+
+  /** End a preview: lay the pages out at the zoom it reached, keeping its anchor in place. */
+  function settlePreview(): void {
+    if (previewTimer !== undefined) clearTimeout(previewTimer);
+    previewTimer = undefined;
+    const ended = preview;
+    preview = undefined;
+    if (!ended || disposed) return;
+    pages.style.transform = '';
+    pages.style.transformOrigin = '';
+    pages.style.willChange = '';
+    zoomAnchor = {x: ended.x, y: ended.y};
+    showZoom();
+    zoomAnchor = undefined;
+  }
+
+  /** Apply wheel and pinch zoom at most once per frame, anchored at the latest pointer. */
+  function queueZoom(factor: number, x: number, y: number): void {
+    if (!Number.isFinite(factor) || factor <= 0) return;
+    if (pendingZoom) { pendingZoom.factor *= factor; pendingZoom.x = x; pendingZoom.y = y; return; }
+    pendingZoom = {factor, x, y};
+    const view = document.defaultView;
+    const apply = () => {
+      const zoomNow = pendingZoom;
+      pendingZoom = undefined;
+      if (zoomNow && !disposed) zoomBy(zoomNow.factor, {x: zoomNow.x, y: zoomNow.y}, true);
+    };
+    if (view) view.requestAnimationFrame(apply); else apply();
   }
 
   // ---- editing actions
@@ -1004,6 +1123,7 @@ export function mountScoreSheet(host: HTMLElement, content: ScoreSheetContent, o
   }
 
   pages.addEventListener('pointerdown', (event) => {
+    if (preview) settlePreview();
     if (!canEdit() || event.button !== 0) return;
     viewport.focus({preventScroll: true});
     const target = event.target instanceof Element ? event.target.closest<SVGElement>('[data-note-id]') : null;
@@ -1041,7 +1161,7 @@ export function mountScoreSheet(host: HTMLElement, content: ScoreSheetContent, o
     const system = systemAt(event.target);
     if (!system) { if (!settings.inputMode) select([]); return; }
     const box = system.host.getBoundingClientRect();
-    const position = system.visualizer.positionAt(event.clientX - box.left, event.clientY - box.top);
+    const position = system.visualizer.positionAt((event.clientX - box.left) / cssZoom, (event.clientY - box.top) / cssZoom);
     if (!position) return;
     if (!settings.inputMode) { select([]); return; }
     // Input mode: place the cursor and write the clicked staff position.
@@ -1054,7 +1174,7 @@ export function mountScoreSheet(host: HTMLElement, content: ScoreSheetContent, o
   pages.addEventListener('pointermove', (event) => {
     if (!drag || drag.pointerId !== event.pointerId || !editing) return;
     const scale = systems[0]?.visualizer.systemMetrics.scale ?? 1;
-    const steps = Math.round((drag.y - event.clientY) / (5 * scale));
+    const steps = Math.round((drag.y - event.clientY) / (5 * scale * cssZoom));
     if (steps === drag.steps) return;
     drag.steps = steps;
     if (steps === 0) { editing.cancel(); return; }
@@ -1077,6 +1197,29 @@ export function mountScoreSheet(host: HTMLElement, content: ScoreSheetContent, o
   pages.addEventListener('lostpointercapture', (event) => endDrag(event as PointerEvent, false));
 
   // ---- keyboard
+  viewport.addEventListener('wheel', (event) => {
+    if (!canEdit() || !has('zoom') || !(event.ctrlKey || event.metaKey) || event.deltaY === 0) return;
+    event.preventDefault();
+    const delta = event.deltaMode === 1 ? event.deltaY * 16 : event.deltaMode === 2 ? event.deltaY * 400 : event.deltaY;
+    const rect = viewport.getBoundingClientRect();
+    queueZoom(Math.exp(-Math.max(-WHEEL_ZOOM_CLAMP, Math.min(WHEEL_ZOOM_CLAMP, delta)) * WHEEL_ZOOM_RATE), event.clientX - rect.left, event.clientY - rect.top);
+  }, {passive: false});
+  // Safari reports a trackpad pinch as gesture events carrying the cumulative scale.
+  viewport.addEventListener('gesturestart', (event) => {
+    if (!canEdit() || !has('zoom')) return;
+    event.preventDefault();
+    gestureScale = 1;
+  });
+  viewport.addEventListener('gesturechange', (event) => {
+    if (!canEdit() || !has('zoom')) return;
+    event.preventDefault();
+    const detail = event as Event & {scale?: number; clientX?: number; clientY?: number};
+    const scale = typeof detail.scale === 'number' && detail.scale > 0 ? detail.scale : 1;
+    const rect = viewport.getBoundingClientRect();
+    queueZoom(scale / gestureScale, (detail.clientX ?? rect.left + rect.width / 2) - rect.left, (detail.clientY ?? rect.top) - rect.top);
+    gestureScale = scale;
+  });
+
   viewport.addEventListener('keydown', (event) => {
     if (!canEdit()) return;
     const command = event.metaKey || event.ctrlKey;
@@ -1144,12 +1287,14 @@ export function mountScoreSheet(host: HTMLElement, content: ScoreSheetContent, o
     configure(next) {
       const nextFeatures = next.features ? parseFeatures(next.features) : features;
       const nextSettings = normalizeSettings(settings, next);
-      const relayout = nextSettings.layout !== settings.layout || nextSettings.zoom !== settings.zoom;
+      const relayout = nextSettings.layout !== settings.layout;
+      const rezoom = !relayout && nextSettings.zoom !== settings.zoom;
       features = nextFeatures;
       if (nextSettings.inputMode !== settings.inputMode) { settings = nextSettings; if (settings.inputMode) startCursor(); else cursor = undefined; paintCursor(); }
       settings = nextSettings;
       if (next.followPlayback !== undefined) followPlayback = next.followPlayback;
       if (relayout) engrave();
+      else if (rezoom) showZoom();
       syncChrome();
     },
     updatePlayback(next) {
@@ -1165,6 +1310,12 @@ export function mountScoreSheet(host: HTMLElement, content: ScoreSheetContent, o
       disposed = true;
       observer?.disconnect();
       view?.cancelAnimationFrame(frame);
+      if (settleTimer !== undefined) clearTimeout(settleTimer);
+      if (reportTimer !== undefined) clearTimeout(reportTimer);
+      if (previewTimer !== undefined) clearTimeout(previewTimer);
+      settleTimer = reportTimer = previewTimer = undefined;
+      preview = undefined;
+      pendingZoom = undefined;
       unsubscribe?.();
       disposeSystems();
       root.remove();

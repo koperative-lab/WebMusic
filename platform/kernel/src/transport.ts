@@ -225,3 +225,208 @@ export interface TimelineMapping {
   positionToSeconds(position: number): number;
   secondsToPosition(seconds: number): number;
 }
+
+// ============================================================================
+// Tempo grids: a constant-tempo beat grid on a transport position axis, and a
+// TempoClock that reads beats from a transport clock. Domain-neutral — an
+// audio clip, a score or an external deck supplies the grid on its own axis.
+// ============================================================================
+
+/** Upper bound on a grid tempo; beyond it beat lines are denser than any musical use. */
+export const MAX_TEMPO_GRID_BPM = 1000;
+/** Upper bound on beats per bar. */
+export const MAX_TEMPO_GRID_BEATS_PER_BAR = 64;
+
+/**
+ * A constant-tempo beat grid on a transport position axis (typically
+ * seconds). `anchor` is the position of one downbeat; every other beat lies a
+ * whole number of beat lengths away, extending in both directions without
+ * end. Immutable once created through {@link createTempoGrid}.
+ */
+export interface TempoGrid {
+  /** Beats per minute of the position axis; finite, > 0 and ≤ {@link MAX_TEMPO_GRID_BPM}. */
+  readonly bpm: number;
+  /** Position of a downbeat (bar start), on the transport axis. */
+  readonly anchor: number;
+  /** Beats in one bar; an integer from 1 to {@link MAX_TEMPO_GRID_BEATS_PER_BAR}. */
+  readonly beatsPerBar: number;
+}
+
+export interface TempoGridInit {
+  readonly bpm: number;
+  readonly anchor?: number;
+  readonly beatsPerBar?: number;
+}
+
+/** Where a position falls on a {@link TempoGrid}. */
+export interface TempoGridPosition {
+  /** Continuous beat index from the anchor; negative before it. */
+  readonly beat: number;
+  /** Bar index from the anchor's bar (0); negative before it. */
+  readonly bar: number;
+  /** Beat inside the bar, 0 … beatsPerBar − 1. */
+  readonly beatInBar: number;
+  /** Fraction of the current beat already elapsed, in [0, 1). */
+  readonly phase: number;
+}
+
+/** Validate and freeze a grid. Throws RangeError for an invalid tempo, anchor or meter. */
+export function createTempoGrid(init: TempoGridInit): TempoGrid {
+  const bpm = init?.bpm;
+  const anchor = init?.anchor ?? 0;
+  const beatsPerBar = init?.beatsPerBar ?? 4;
+  if (typeof bpm !== 'number' || !Number.isFinite(bpm) || bpm <= 0 || bpm > MAX_TEMPO_GRID_BPM) {
+    throw new RangeError(`TempoGrid bpm must be finite, > 0 and <= ${MAX_TEMPO_GRID_BPM}, got ${bpm}.`);
+  }
+  if (typeof anchor !== 'number' || !Number.isFinite(anchor)) throw new RangeError(`TempoGrid anchor must be finite, got ${anchor}.`);
+  if (!Number.isInteger(beatsPerBar) || beatsPerBar < 1 || beatsPerBar > MAX_TEMPO_GRID_BEATS_PER_BAR) {
+    throw new RangeError(`TempoGrid beatsPerBar must be an integer from 1 to ${MAX_TEMPO_GRID_BEATS_PER_BAR}, got ${beatsPerBar}.`);
+  }
+  return Object.freeze({bpm, anchor, beatsPerBar});
+}
+
+/** Length of one beat on the grid's position axis (60 / bpm for a seconds axis). */
+export function tempoGridBeatLength(grid: TempoGrid): number {
+  return 60 / grid.bpm;
+}
+
+/** Beat, bar and phase at a position. */
+export function tempoGridPosition(grid: TempoGrid, position: number): TempoGridPosition {
+  const beat = (position - grid.anchor) / tempoGridBeatLength(grid);
+  const whole = Math.floor(beat + 1e-9);
+  const phase = Math.max(0, beat - whole);
+  const bar = Math.floor(whole / grid.beatsPerBar);
+  return Object.freeze({beat, bar, beatInBar: whole - bar * grid.beatsPerBar, phase});
+}
+
+/** Position of a (possibly fractional) beat index. */
+export function tempoGridBeatPosition(grid: TempoGrid, beat: number): number {
+  return grid.anchor + beat * tempoGridBeatLength(grid);
+}
+
+export interface TempoGridSnapOptions {
+  /** Grid lines per beat: 1 beats, 2 eighths in 4/4, 0.25 one line per 4 beats. Default 1. */
+  readonly division?: number;
+  /** `nearest` (default), `forward` (at or after) or `backward` (at or before). */
+  readonly direction?: 'nearest' | 'forward' | 'backward';
+}
+
+/** The grid line nearest a position, or the next/previous one. */
+export function snapToTempoGrid(grid: TempoGrid, position: number, options: TempoGridSnapOptions = {}): number {
+  const division = options.division ?? 1;
+  if (!Number.isFinite(division) || division <= 0) throw new RangeError(`TempoGrid division must be finite and > 0, got ${division}.`);
+  const step = tempoGridBeatLength(grid) / division;
+  const index = (position - grid.anchor) / step;
+  const rounded = options.direction === 'forward' ? Math.ceil(index - 1e-9) :
+    options.direction === 'backward' ? Math.floor(index + 1e-9) : Math.round(index);
+  return grid.anchor + rounded * step;
+}
+
+/**
+ * Quantized jump: the position near `to` that keeps the beat phase of
+ * `from`, so a running transport lands on the beat as it would have played
+ * there (the DJ "quantize" behavior). `to` is rounded to its nearest beat
+ * first; the phase of `from` is then added.
+ */
+export function tempoGridJump(grid: TempoGrid, from: number, to: number): number {
+  const length = tempoGridBeatLength(grid);
+  const target = Math.round((to - grid.anchor) / length);
+  return grid.anchor + (target + tempoGridPosition(grid, from).phase) * length;
+}
+
+/** Positions of the grid lines inside [start, end], with their beat index. */
+export function tempoGridLines(grid: TempoGrid, start: number, end: number, division = 1):
+  readonly {readonly position: number; readonly beat: number; readonly downbeat: boolean}[] {
+  if (!Number.isFinite(division) || division <= 0) throw new RangeError(`TempoGrid division must be finite and > 0, got ${division}.`);
+  const step = tempoGridBeatLength(grid) / division;
+  const first = Math.ceil((start - grid.anchor) / step - 1e-9) || 0;
+  const last = Math.floor((end - grid.anchor) / step + 1e-9);
+  const lines: {position: number; beat: number; downbeat: boolean}[] = [];
+  if (!(last >= first) || last - first > 100_000) return lines;
+  for (let index = first; index <= last; index += 1) {
+    const beat = index / division;
+    lines.push({position: grid.anchor + index * step, beat,
+      downbeat: Number.isInteger(beat) && ((beat % grid.beatsPerBar) + grid.beatsPerBar) % grid.beatsPerBar === 0});
+  }
+  return lines;
+}
+
+/** The grid as a {@link TimelineMapping} between beats and its position axis. */
+export function tempoGridMapping(grid: TempoGrid): TimelineMapping {
+  return Object.freeze({
+    positionToSeconds: (beat: number) => tempoGridBeatPosition(grid, beat),
+    secondsToPosition: (position: number) => tempoGridPosition(grid, position).beat,
+  });
+}
+
+/**
+ * Tempo from tap times (any monotonic seconds, such as `performance.now() / 1000`):
+ * the median interval of the most recent run of taps, where a gap longer than
+ * `resetSeconds` starts a new run. Undefined until a run has two taps.
+ */
+export function tapTempo(times: readonly number[], resetSeconds = 2): number | undefined {
+  let start = times.length - 1;
+  while (start > 0 && times[start] - times[start - 1] > 0 && times[start] - times[start - 1] <= resetSeconds) start -= 1;
+  const run = times.slice(start).filter((time) => Number.isFinite(time));
+  if (run.length < 2) return undefined;
+  const intervals = run.slice(1).map((time, index) => time - run[index]).filter((value) => value > 0).sort((a, b) => a - b);
+  if (!intervals.length) return undefined;
+  const middle = intervals.length >> 1;
+  const median = intervals.length % 2 ? intervals[middle] : (intervals[middle - 1] + intervals[middle]) / 2;
+  const bpm = 60 / median;
+  return bpm > 0 && bpm <= MAX_TEMPO_GRID_BPM ? bpm : undefined;
+}
+
+/**
+ * Beats read from a transport clock: a {@link TransportClockReader} paired
+ * with a {@link TempoGrid} on the same position axis. Read-only — it never
+ * re-anchors the clock — and immutable; pair the clock with a new grid
+ * through {@link withGrid}. All reference times are the clock's.
+ */
+export class TempoClock {
+  readonly clock: TransportClockReader;
+  readonly grid: TempoGrid;
+
+  constructor(clock: TransportClockReader, grid: TempoGrid) {
+    this.clock = clock;
+    this.grid = createTempoGrid(grid);
+    Object.freeze(this);
+  }
+
+  /** Same clock, another grid. */
+  withGrid(grid: TempoGrid): TempoClock {
+    return new TempoClock(this.clock, grid);
+  }
+
+  /** Beat, bar and phase at reference time `t`. */
+  positionAt(t: number): TempoGridPosition {
+    return tempoGridPosition(this.grid, this.clock.positionAt(t));
+  }
+
+  /** Continuous beat index at reference time `t`. */
+  beatAt(t: number): number {
+    return this.positionAt(t).beat;
+  }
+
+  /** Tempo heard at the current rate: grid bpm × clock rate. */
+  get effectiveBpm(): number {
+    return this.grid.bpm * this.clock.rate;
+  }
+
+  /**
+   * Reference time of the next grid line strictly after `t` (`division`
+   * lines per beat) — the instant to schedule a quantized action. Throws
+   * RangeError while the clock is paused, like {@link TransportClock.timeAt}.
+   */
+  nextGridTime(t: number, division = 1): number {
+    const position = this.clock.positionAt(t);
+    let line = snapToTempoGrid(this.grid, position, {division, direction: 'forward'});
+    if (line <= position + 1e-9) line += tempoGridBeatLength(this.grid) / division;
+    return this.clock.timeAt(line);
+  }
+
+  /** Reference time at which a beat index plays. Throws RangeError while paused. */
+  timeAtBeat(beat: number): number {
+    return this.clock.timeAt(tempoGridBeatPosition(this.grid, beat));
+  }
+}

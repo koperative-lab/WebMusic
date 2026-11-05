@@ -52,7 +52,7 @@ import {
 import {parseLoopAttr} from '../core/format';
 import {browserMediaAdapterFactory} from './internal/browser-media-adapter';
 import {getAudioContextConstructor} from '@webmusic/kernel/audio-context';
-import type {TransportClockReader} from '@webmusic/kernel/transport';
+import type {TempoClock, TempoGrid, TransportClockReader} from '@webmusic/kernel/transport';
 import {mountStatus, type StatusHandle, type StatusState} from '@webmusic/ui/status';
 import {
   mountTransport,
@@ -500,6 +500,16 @@ export class AudioPlayerElement extends WebMusicElement {
    */
   get clock(): TransportClockReader | undefined {
     return this._player?.clock;
+  }
+
+  /** Constant-tempo grid of the playing content (the document's beat grid or the clip's), on the clock's axis. */
+  get tempoGrid(): TempoGrid | undefined {
+    return this._player?.tempoGrid;
+  }
+
+  /** {@link clock} read in beats of {@link tempoGrid}; undefined without either. */
+  get tempoClock(): TempoClock | undefined {
+    return this._player?.tempoClock;
   }
 
   /** The player's analyser, for `<audio-meter>`. Reading it builds the graph. */

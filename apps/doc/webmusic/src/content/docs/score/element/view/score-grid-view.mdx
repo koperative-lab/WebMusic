@@ -162,7 +162,7 @@ alone:
 | Ctrl/Cmd+A | Select every pitched note. |
 | Ctrl/Cmd+Z · Shift+Ctrl/Cmd+Z · Ctrl/Cmd+Y | Undo · redo · redo. |
 | B | Toggle the Select and Draw tools. |
-| Ctrl/Cmd+wheel · Alt+wheel | Zoom time or rows by 1.25×, around the pointer. |
+| Ctrl/Cmd+wheel · Alt+wheel · trackpad pinch | Zoom time (pinch and Ctrl/Cmd) or rows (Alt) around the pointer, in proportion to the wheel deltas: a pinch follows the fingers (Chromium Ctrl+wheel and Safari gesture events) and a mouse notch zooms about 1.5×. The grid repaints once per frame at the anchored scroll position, and reports the zoom once the gesture settles. |
 | Escape | Cancel the active gesture or draft. Otherwise it is left to enclosing handlers such as a dialog. |
 
 A gesture is cancelled by Escape, a lost or cancelled pointer, a move after the

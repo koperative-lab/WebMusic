@@ -326,7 +326,7 @@ describe('score grid settings', () => {
     expect(overlay.hidden).toBe(true); expect(events).toHaveLength(1);
   });
 
-  it('zooms with the toolbar and modified wheel within bounds, reflecting attributes', () => {
+  it('zooms with the toolbar and modified wheel within bounds, reflecting attributes', async () => {
     const {view, surface} = grid();
     const changed: string[] = [];
     view.addEventListener('gridsettingschange', (event) => changed.push((event as CustomEvent<ScoreGridSettingsChangeDetail>).detail.changed));
@@ -340,11 +340,18 @@ describe('score grid settings', () => {
     expect(view.noteHeight).toBe(6); expect(view.getAttribute('note-height')).toBe('6');
     const count = changed.length;
     button('Shorter rows').click(); expect(changed).toHaveLength(count);
+    // Wheel zoom is proportional to the deltas (a notch is clamped to 40), applied once per frame
+    // and reported after the gesture settles.
+    const reported = changed.length;
     surface().dispatchEvent(new WheelEvent('wheel', {deltaY: -100, altKey: true, bubbles: true, cancelable: true}));
-    expect(view.noteHeight).toBe(7.5);
     const wheel = new WheelEvent('wheel', {deltaY: 100, ctrlKey: true, bubbles: true, cancelable: true});
     surface().dispatchEvent(wheel);
-    expect(wheel.defaultPrevented).toBe(true); expect(view.pixelsPerQuarter).toBe(409.6);
+    expect(wheel.defaultPrevented).toBe(true);
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    expect(Number(view.querySelector('[data-note-id="a"]')!.getAttribute('x'))).toBeCloseTo(X(1, 343.204), 2);
+    expect(changed).toHaveLength(reported);
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(view.noteHeight).toBe(8.951); expect(view.pixelsPerQuarter).toBe(343.204);
     expect(new Set(changed)).toEqual(new Set(['pixelsPerQuarter', 'noteHeight']));
   });
 

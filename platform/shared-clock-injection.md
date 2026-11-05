@@ -16,6 +16,7 @@ below explain the timing boundaries. Decisions and reasons belong in
 | Concern | Implemented | Does not imply |
 |---|---|---|
 | Shared time math | Kernel `TransportClock`: explicit reference time, affine position, pause and future origin. | All players use the same object. |
+| Beats on a clock | Kernel `TempoGrid` and read-only `TempoClock` (DEC-062): beats, bars and the next grid line's reference time from any `TransportClockReader`; an Audio player exposes one for its document grid. | Group commands quantized to beats, a shared tempo map across Score and Audio, or variable-tempo grids. |
 | Readable authority | `TransportClockReader`, exposed by an owner to followers, groups and views. | Write authorization or anchor-invalidation notification. |
 | Coordination | Kernel `TransportGroup` selects one structural master and coordinates N followers; Bridge adapts both Score and Audio master pairings. | A shared writable clock instance or sample-accurate loop boundaries. |
 | Command observation | Group `dispatch`, `snapshot` and `subscribe` expose revisioned invalidation and command outcomes. | Shared writable clock injection, acoustic success or sample-accurate loop boundaries. |

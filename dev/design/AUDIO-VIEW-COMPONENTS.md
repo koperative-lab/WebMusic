@@ -26,18 +26,20 @@ neutral UIKit presenters. DEC-044 retires the three narrower Audio View tags.
 
 [Editing capabilities](EDIT-COMPONENTS.md) and
 [DEC-053](../DECISIONS.md#dec-053--document-owned-editing-and-borrowed-playback)
-define the optional editor binding implemented for `audio-view`, with `editable`
-enabling supported waveform commands. [STATUS EDIT-01](../STATUS.md) owns current
-verification. Actual commands, numeric controls and limits belong to the
-[View Element](../../apps/doc/webmusic/src/content/docs/audio/element/view/audio-view.mdx)
+define the editor binding. Under [DEC-061](../DECISIONS.md#dec-061--audio-editing-moves-to-a-dedicated-clip-view)
+`audio-view` follows an editor read-only and the dedicated `audio-clip-view`
+edits it ([Audio clip editing](EDIT-COMPONENTS.md#audio-clip-editing)).
+[STATUS](../STATUS.md) EDIT-01 and AUDIOEDIT-01 own current verification. Actual
+commands, controls and limits belong to the
+[Clip View Element](../../apps/doc/webmusic/src/content/docs/audio/element/view/audio-clip-view.mdx)
 and [Headless reference](../../apps/doc/webmusic/src/content/docs/audio/headless/view/view-models.mdx).
-Existing behavior remains the default without an editor. This decision adds no standalone visual audio-editor Element.
+Existing behavior remains the default without an editor.
 
 The application owns an `AudioClipEditor`, created with `loadAudioClipEditor` or
 `createAudioClipEditor`, and assigns it through `.editor` (DEC-057). A View borrows Core
 document state/commands and an optional player, retaining only its viewport,
-focus, gestures and draft presentation. Editor binding without `editable` displays
-committed content without content-mutation gestures. `editable` without a ready
+focus, gestures and draft presentation. `audio-view` and a clip view without
+`editable` display committed content without content-mutation gestures. `editable` without a ready
 editor is unavailable; simultaneous editor and independent explicit data/`src`
 is a configuration conflict. A borrower never disposes the editor or player.
 
@@ -51,11 +53,12 @@ Spectrogram/meter editing and spectral repair are outside this delivered wavefor
 contract. Reference sharing does not promise that every redraw avoids sample reads.
 
 One gesture updates a draft and commits once on release; cancellation or a
-conflicting revision discards it. Content editing, seeking, scrubbing and region
-annotation have distinct tools and cannot claim the same primary-pointer gesture.
-The current `annotate`/`webaudio:regionchange` interaction remains a region-display
+conflicting revision discards it. Content editing lives only in `audio-clip-view`;
+seeking, scrubbing and region annotation stay on `audio-view`, so they never claim
+the same primary-pointer gesture. The current `annotate`/`webaudio:regionchange` interaction remains a region-display
 contract, not a PCM edit or an implicit document commit. Document annotations
-change only through explicit editor commands. Mode changes cancel active drafts.
+change only through explicit editor commands, such as the clip view's markers
+(`set-annotations`). Mode changes cancel active drafts.
 
 The player consumes a read-only sequence source and reports its applied document
 revision under [Audio document playback](AUDIO-PLAY-COMPONENTS.md#document-playback-dec-053).

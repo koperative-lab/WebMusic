@@ -103,7 +103,13 @@ export type {
 // recipes and Core contracts here; AudioClipEditor and loadAudioClipEditor in
 // /view/headless. Rendering and WAV export live in Play.
 export {applyAudioOperations} from '../core/edit-operations';
-export {createAudioRangeProcessor} from './processor';
+export {
+  AUDIO_FADE_CURVES, audioFadeGain, audioRangeFadeOperations, audioRangeGainOperations, audioRangeSilenceOperations,
+  audioFadeLength, audioSegmentFadeEnvelope, audioSegmentSpans, audioSplitOperations, decibelsToGain, editAudioEnvelope,
+  gainToDecibels, nearestAudioZeroCrossing,
+  type AudioFadeCurve, type AudioSegmentIdFactory, type AudioSegmentSpan,
+} from '../core/clip-edits';
+export {AUDIO_RANGE_PROCESSOR_KINDS, createAudioRangeProcessor, type AudioRangeProcessorKind} from './processor';
 export * from '../../core/editing';
 export * from '../../core/audio-position-map';
 export * from '../../core/sequence';

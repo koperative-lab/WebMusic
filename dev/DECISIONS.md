@@ -2451,6 +2451,108 @@ pitch/input/duration/delete paths and feature gating are covered by unit tests;
 engraving quality, pointer drags and playback following need browser and
 visual acceptance on a real score.
 
+## DEC-061 — Audio editing moves to a dedicated clip View
+
+**Date / status:** 2026-11-04; accepted at the maintainer's request. Applies
+[DEC-058](#dec-058--score-editing-moves-to-a-dedicated-grid-view) and
+[DEC-060](#dec-060--sheet-view-engraves-its-own-pages-and-edits-notation) to
+Audio.
+
+**Problem:** Audio editing was a mode of `<audio-view>`: `editable` applied only
+to `type="waveform"`, was switched off by `annotate`, and overlapped
+`interactive`, `drag-mode` and `scrollable`. Its controls were text buttons and
+native selects in a collapsible form, with instructions drawn inside the
+component, contrary to DEC-059. Segment gain and fades could be set only by
+typing numbers; segments, fades, gain and markers were not drawn.
+
+**Chosen contract:** `<audio-view>` is read-only. With `.editor` it draws the
+document's waveform and follows its playback, but it has no `editable` and no
+edit events. A new `<audio-clip-view>` (renderer `mountAudioClip` in
+`/view/render`) is a waveform editor modeled on Adobe Audition's waveform view
+and DAW clip editors; it shares no code with them. It draws a time ruler with
+markers, one lane per channel with segment boundaries, fade handles, a segment
+gain line and an optional envelope lane, and edits a borrowed `AudioClipEditor`
+when `editable`. `tools` offers `split`, `delete`, `clipboard`,
+`trim`, `silence`, `gain`, `fade`, `envelope`, `markers`, `process`, `snap`,
+`zoom` and `history`; range selection is always available. Range amplify, range fades with linear, logarithmic or
+cosine curves, and silence are non-destructive splits plus `set-gain`,
+`set-envelope` or `splice`; normalize, reverse, invert and DC-offset removal are
+range processors. A new Core `set-annotations` operation edits markers. Snap
+offers zero crossings and time grids. Every edit is one atomic editor command.
+
+**Alternatives considered:** keeping `editable` on `<audio-view>` and only
+restyling it, which keeps a type-dependent attribute set on a multi-type
+Element; and destructive sample editing, which would copy PCM for every gain or
+fade change.
+
+**Consequences:** applications that edited through `<audio-view editable>` use
+`<audio-clip-view editable>`; editing was never published, so no package
+migration is needed. `mountWaveformEditor` is replaced by `mountAudioClip`.
+Spectral editing, multitrack arrangement and real-time effects remain outside
+this View.
+
+**Owner:** [Editing contracts](design/EDIT-COMPONENTS.md#audio-clip-editing) and
+[Audio View components](design/AUDIO-VIEW-COMPONENTS.md).
+
+**Verification implications:** the operations and range helpers, snapping,
+tool gating, gestures and keys are unit tested; waveform drawing, handle
+dragging, playback following and long-recording performance need browser
+acceptance.
+
+## DEC-062 — A document beat grid read through a Kernel tempo clock
+
+**Date / status:** 2026-11-04; accepted at the maintainer's request. Extends
+[DEC-061](#dec-061--audio-editing-moves-to-a-dedicated-clip-view) and the
+shared-clock direction in [platform/shared-clock-injection.md](../platform/shared-clock-injection.md).
+
+**Problem:** Audio had a `BeatGrid` on decoded clips and a Kernel
+`TimelineMapping`, but no editable grid on a document and no way to read beats
+from a running transport. DJ-style control — a grid laid over the waveform,
+fine adjustment while listening, beat snap, quantized seeking and beat jump —
+needs one grid that both the editor and the player see, and a beat reading
+taken from the same clock that plays.
+
+**Chosen contract:** Kernel's transport entry gains a domain-neutral
+constant-tempo `TempoGrid` (`bpm`, `anchor` downbeat position, `beatsPerBar`),
+pure helpers (`tempoGridPosition`, `snapToTempoGrid`, `tempoGridJump`,
+`tempoGridLines`, `tempoGridMapping`, `tapTempo`) and a read-only `TempoClock`
+that pairs a `TransportClockReader` with a grid (`beatAt`, `positionAt`,
+`nextGridTime`, `timeAtBeat`). An `AudioSequence` may carry an optional
+`beatGrid` (`bpm`, fractional `anchorFrame`, `beatsPerBar`) changed only by
+the new `set-beat-grid` operation, so grid edits are undoable document
+commits. The anchor follows content edited before it and keeps its bar phase
+through deletions; edits after it leave the grid in place. A revision whose
+timeline is unchanged (same format, length and segments, identity position
+map) — a grid or marker edit — is applied by a player in place without
+pausing. `AudioPlayer` exposes `tempoGrid` and `tempoClock` for the applied
+document (or a clip's `BeatGrid`). `<audio-clip-view>` gains the `grid`
+feature, the `grid`, `quantize` and `grid-edit` settings, `beat`/`bar` snap,
+a Grid Edit toolbar mode modeled on DJ software (set downbeat, BPM field, tap,
+1 ms nudges, 0.01 BPM stretch, ×2/×½, beats per bar, remove, drag to move),
+quantized ruler seeks that keep the playing beat phase, and PageUp/PageDown
+beat jump.
+
+**Alternatives considered:** a grid held only by the View or the player, which
+would give the editor and the player different grids and no undo; a variable
+(beat-list) grid, which DJ workflows rarely need first and which needs a
+warp-marker contract; and making every revision pause playback, which makes
+adjusting the grid while listening impossible.
+
+**Consequences:** DEC-053's pause-on-revision rule now applies to revisions
+that change what plays; metadata-only revisions keep playing. A constant grid
+cannot follow rubato or edits after its anchor; dynamic grids remain open. The
+`TransportGroup` still coordinates positions, not beats; beat-synchronous
+group commands are a later step.
+
+**Owner:** [Kernel API](../apps/doc/webmusic/src/content/docs/kernel/api.mdx),
+[Audio clip editing](design/EDIT-COMPONENTS.md#audio-clip-editing) and the
+[clip View reference](../apps/doc/webmusic/src/content/docs/audio/element/view/audio-clip-view.mdx).
+
+**Verification implications:** grid math, the operation and anchor mapping,
+in-place revision application, the Grid Edit tools, tap tempo, snap, quantize
+and beat jump are unit tested; audible alignment, drag feel and long-recording
+drawing need browser and listening acceptance.
+
 ## Recording the next decision
 
 Add an identifier, date, status, problem, chosen contract, considered alternatives, consequences, owning document, and verification implications. A proposed choice does not change a public API. If a choice supersedes this register, retain its old identifier and point to the replacement; do not rewrite historical evidence as though the new choice always existed.

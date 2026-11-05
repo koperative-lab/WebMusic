@@ -378,10 +378,10 @@ options. A failed or aborted load rejects and creates no editor.
 
 A View never creates an editor implicitly. `.editor` supplies content and
 commands; boolean `editable` (default false) only enables mutation gestures on
-the Views that edit: `<score-grid-view>` and `<audio-view>`. `<score-view>` has
-no `editable`; with `.editor` it draws the editor's visible content read-only.
-Without a ready editor, or for an Audio type that does not support editing,
-editable state is explicitly unavailable; no pretend-success gestures occur. Read-only
+the Views that edit: `<score-grid-view>`, `<score-sheet-view>` and
+`<audio-clip-view>`. `<score-view>` and `<audio-view>` have no `editable`; with
+`.editor` they draw the editor's visible content read-only.
+Without a ready editor, editable state is explicitly unavailable; no pretend-success gestures occur. Read-only
 editor-bound views are supported without playback. Assigning `undefined`
 detaches the editor; there is no `editor` selector attribute, so cross-root and
 late composition are the application's own object wiring.
@@ -496,6 +496,51 @@ a tuplet or grace rhythm, writing across a barline or starting inside a
 sounding note is refused with `unsupported-structure`; the sheet shows the
 reason in its toolbar and emits `editerror`. Chord entry, voice selection,
 tuplet entry and ties drawn across system breaks are not offered yet.
+
+### Audio clip editing
+
+Under DEC-061 `<audio-clip-view>` (renderer `mountAudioClip`) is the Audio
+editing surface, modeled on the waveform view of audio editors such as Adobe
+Audition and on DAW clip editors; it shares no code with them. It draws a time
+ruler with markers and one lane per channel with segment boundaries, fade
+handles, a segment gain line, optional envelopes, the range and the playhead.
+Editing needs a ready `.editor` and `editable`; `tools` offers `split`,
+`delete`, `clipboard`, `trim`, `silence`, `gain`, `fade`, `envelope`,
+`markers`, `process`, `snap`, `zoom` and `history` (absent means all). Range
+selection and cursor movement are always available while editing.
+
+| Input | Feature | Command |
+|---|---|---|
+| Drag, double-click a segment, Shift+arrows, Ctrl/Cmd+A | always | Interaction-session selection only |
+| Razor tool click, Ctrl/Cmd+K | `split` | `split` at the snapped frame |
+| Delete, Backspace; Ctrl/Cmd+T | `delete`; `trim` | `splice` deletion; `trim` |
+| Ctrl/Cmd+X/C/V | `clipboard` | Editor clipboard `cut`/`copy`/`paste` at the cursor |
+| Silence button | `silence` | `splice` with one silence segment |
+| Gain HUD drag or Up/Down; gain line drag | `gain` | Splits at the range edges, then `set-gain`; one draft per drag |
+| Fade handle drag; fade-in/out buttons | `fade` | `set-envelope` with the chosen curve (24 points for non-linear curves) |
+| Envelope tool click, drag, Alt-click | `envelope` | `set-envelope` adding, moving or removing a point |
+| M; marker drag, Alt-click, double-click | `markers` | `set-annotations` with the complete list |
+| Process card | `process` | `processRange` with a registered normalize, reverse, invert or remove-dc processor |
+| Ctrl/Cmd+Z/Y | `history` | Undo/redo |
+
+The edit builders in `/view` (`audioRangeGainOperations`,
+`audioRangeFadeOperations`, `audioRangeSilenceOperations`,
+`audioSplitOperations`, `editAudioEnvelope`, `audioSegmentFadeEnvelope`) are
+stateless and never touch PCM, so the renderer and custom interfaces build the
+same commands.
+
+Under DEC-062 the document may carry one constant-tempo `beatGrid`
+(`set-beat-grid`), which the `grid` feature edits in a Grid Edit toolbar mode
+modeled on DJ software: set downbeat (D), a BPM field, tap tempo (T), 1 ms
+nudges (`[` `]`), 0.01 BPM steps (`,` `.`), ×2 and ×½, beats per bar, remove,
+and dragging the grid. With `grid` on, `beat`/`bar` snap, `quantize` (ruler
+seeks keep the playing beat phase through Kernel `tempoGridJump`) and
+PageUp/PageDown beat jump use it. A grid or marker revision does not change
+what plays, so a bound player applies it in place without pausing; its
+`tempoClock` reads beats from its Kernel clock with the same grid. Snap offers zero crossings and 10 ms, 100 ms and 1 s grids. The
+ruler asks the application to seek; the clip view sends no other playback
+command. Spectral editing, multi-clip and multi-track arrangement, and
+crossfades between adjacent segments are not offered.
 
 ## Resources, limits and failures
 

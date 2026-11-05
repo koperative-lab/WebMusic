@@ -1,5 +1,6 @@
 import {AudioClip, copyClipPcmRange, retainedClipPcmBytes} from './model/AudioClip';
 import {makeId} from './utils/id';
+import {MAX_TEMPO_GRID_BEATS_PER_BAR, MAX_TEMPO_GRID_BPM, createTempoGrid, type TempoGrid} from '@webmusic/kernel/transport';
 
 /** Frame addressing is one-to-one: no implicit resampling or channel mixing. */
 export interface AudioSequenceFormat {
@@ -53,14 +54,27 @@ export interface AudioSequenceAnnotation {
   readonly anchoring: 'content' | 'fixed';
   readonly label?: string;
 }
+/**
+ * A constant-tempo beat grid on the sequence's output timeline, in frames.
+ * `anchorFrame` is one downbeat (it may be fractional to keep a phase exact);
+ * beats repeat every `60 × sampleRate / bpm` frames in both directions.
+ */
+export interface AudioBeatGrid {
+  readonly bpm: number;
+  readonly anchorFrame: number;
+  readonly beatsPerBar: number;
+}
 export interface AudioSequence extends AudioSequenceFormat {
   readonly length: number;
   readonly segments: readonly AudioSequenceSegment[];
   readonly annotations: readonly AudioSequenceAnnotation[];
+  /** Absent when the document has no grid. */
+  readonly beatGrid?: AudioBeatGrid;
 }
 export interface AudioSequenceInit extends AudioSequenceFormat {
   readonly segments?: readonly AudioSequenceSegmentInput[];
   readonly annotations?: readonly AudioSequenceAnnotation[];
+  readonly beatGrid?: AudioBeatGrid;
 }
 
 export class AudioSequenceError extends Error {
@@ -149,8 +163,39 @@ export function createAudioSequence(init: AudioSequenceInit, assets?: AudioAsset
       ...(annotation.endFrame !== undefined ? {endFrame: annotation.endFrame} : {}),
       ...(annotation.label !== undefined ? {label: annotation.label} : {})});
   }));
+  const beatGrid = init.beatGrid === undefined ? undefined : audioBeatGrid(init.beatGrid);
   return Object.freeze({sampleRate: init.sampleRate, channelLayout: Object.freeze([...init.channelLayout]),
-    length, segments: Object.freeze(segments), annotations});
+    length, segments: Object.freeze(segments), annotations, ...(beatGrid ? {beatGrid} : {})});
+}
+/** Validate and freeze a beat grid: bpm in (0, 1000], a finite nonnegative anchor and 1–64 beats per bar. */
+export function audioBeatGrid(grid: AudioBeatGrid): AudioBeatGrid {
+  if (!grid || typeof grid !== 'object') invalid('Beat grid must be an object');
+  const beatsPerBar = grid.beatsPerBar ?? 4;
+  if (typeof grid.bpm !== 'number' || !Number.isFinite(grid.bpm) || grid.bpm <= 0 || grid.bpm > MAX_TEMPO_GRID_BPM) invalid(`Beat grid bpm must be in (0, ${MAX_TEMPO_GRID_BPM}]`);
+  if (typeof grid.anchorFrame !== 'number' || !Number.isFinite(grid.anchorFrame) || grid.anchorFrame < 0) invalid('Beat grid anchor must be a finite nonnegative frame');
+  if (!Number.isInteger(beatsPerBar) || beatsPerBar < 1 || beatsPerBar > MAX_TEMPO_GRID_BEATS_PER_BAR) invalid(`Beat grid needs 1–${MAX_TEMPO_GRID_BEATS_PER_BAR} beats per bar`);
+  return Object.freeze({bpm: grid.bpm, anchorFrame: grid.anchorFrame, beatsPerBar});
+}
+/**
+ * True when two sequences sound the same: equal format, length and segments.
+ * Annotations and the beat grid are metadata and may differ.
+ */
+export function sameAudioTimeline(a: AudioSequence, b: AudioSequence): boolean {
+  if (a === b) return true;
+  return a.sampleRate === b.sampleRate && a.length === b.length && a.segments.length === b.segments.length &&
+    a.channelLayout.join() === b.channelLayout.join() && JSON.stringify(a.segments) === JSON.stringify(b.segments);
+}
+/** Frames in one beat of a grid at a sample rate. */
+export function audioBeatGridBeatFrames(grid: AudioBeatGrid, sampleRate: number): number {
+  return 60 * sampleRate / grid.bpm;
+}
+/**
+ * The sequence's grid as a Kernel {@link TempoGrid} on its seconds axis — the
+ * axis an Audio player's clock runs on — or undefined without a grid.
+ */
+export function audioSequenceTempoGrid(sequence: Pick<AudioSequence, 'sampleRate' | 'beatGrid'>): TempoGrid | undefined {
+  const grid = sequence.beatGrid;
+  return grid ? createTempoGrid({bpm: grid.bpm, anchor: grid.anchorFrame / sequence.sampleRate, beatsPerBar: grid.beatsPerBar}) : undefined;
 }
 /** Explicit seconds-to-frames adapter. Rounds to the nearest frame and rejects out-of-clip cues. */
 export function audioClipRegionsToFrameAnnotations(clip: AudioClip, anchoring: 'content' | 'fixed'): readonly AudioSequenceAnnotation[] {

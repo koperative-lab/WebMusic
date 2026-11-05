@@ -5,6 +5,39 @@ work and does not establish npm publication, a release tag or a deployment.
 
 ## Unreleased
 
+- Add `<audio-clip-view>`, a waveform clip editor modeled on audio editors
+  such as Adobe Audition: an icon toolbar, a time ruler with markers, channel
+  lanes with segment boundaries, draggable fade handles and gain lines, gain
+  envelopes, a gain HUD, zero-crossing and time-grid snap, zoom and keyboard
+  editing over a borrowed `.editor`. Range amplify, fades (linear, logarithmic,
+  cosine) and silence are non-destructive; normalize, reverse, invert and DC
+  removal are range processors (`createAudioRangeProcessor` now accepts
+  `invert` and `remove-dc`, listed by `AUDIO_RANGE_PROCESSOR_KINDS`). Adds the
+  `set-annotations` operation, stateless edit builders in `/view` and
+  `AudioClipEditor.processorDescriptors`. **Breaking:** `<audio-view>` is
+  read-only — `editable` and its `webaudio:edit*` events are removed, and
+  `mountWaveformEditor` is replaced by `mountAudioClip` in `/view/render`.
+- Add a document beat grid and a Kernel tempo clock. `@webmusic/kernel/transport`
+  gains `TempoGrid` (`createTempoGrid`, `tempoGridPosition`, `snapToTempoGrid`,
+  `tempoGridJump`, `tempoGridLines`, `tempoGridMapping`, `tapTempo`) and the
+  read-only `TempoClock` (`beatAt`, `nextGridTime`, `timeAtBeat`). Audio
+  sequences may carry `beatGrid`, changed by the new `set-beat-grid` operation;
+  `AudioPlayer` exposes `tempoGrid` and `tempoClock`, and applies grid- or
+  marker-only revisions without pausing. `<audio-clip-view>` adds the `grid`
+  feature, the `grid`, `quantize` and `grid-edit` attributes, `beat`/`bar` snap,
+  a Grid Edit toolbar (downbeat, BPM, tap, nudge, stretch, ×2/×½, meter, drag),
+  quantized ruler seeks and PageUp/PageDown beat jump. The grid subdivides beats
+  down to 1/32 as you zoom in; the snap button toggles `snap="grid"` (the finest
+  drawn line); the view opens at eight bars or ten seconds instead of the whole
+  clip; and zooming repaints once per frame from cached peak bins, with a
+  trackpad pinch following the fingers one to one (Safari gestures included).
+- Smooth zoom in `<score-grid-view>` and `<score-sheet-view>`. The grid zooms
+  in proportion to wheel and pinch deltas, once per frame at the anchored
+  scroll position, and reports the zoom when the gesture settles (it used to
+  multiply by 1.25 per event). The sheet gains Ctrl/Cmd+wheel and pinch zoom;
+  page layout no longer re-engraves to zoom (CSS `zoom` over the engraved
+  pages, previewed as a transform while pinching), and flow layout re-breaks
+  once a zoom settles.
 - Rebuild `<score-sheet-view>` on WebMusic's own engraver: justified systems
   on A4 pages (`layout="page"`) or in a column (`layout="flow"`), `zoom`, and
   player following like the other Views. With a borrowed `.editor` and
@@ -23,7 +56,7 @@ work and does not establish npm publication, a release tag or a deployment.
   export in `/play`; revisioned editors with atomic
   commands and bounded undo/redo; playback that pauses and reports the applied document revision;
   note editing on the new `<score-grid-view>` piano-roll grid and waveform
-  editing on `<audio-view>`; local Audio processing and WAV export. The
+  editing on `<audio-clip-view>`; local Audio processing and WAV export. The
   [editing migration guide](dev/release/EDITING-MIGRATION.md) covers upgrades
   from 0.2.0; no editing release is published.
 - Write Score JSON schema v0.2 with `NoteData.velocityOverride`; v0.1 and

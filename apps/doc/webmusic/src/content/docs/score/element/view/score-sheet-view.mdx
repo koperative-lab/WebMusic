@@ -68,6 +68,14 @@ changes and supported directions come from the [staff engraver](/score/element/v
 A tie or slur that crosses a system break is not drawn. `zoom` scales the
 staff (0.5–3); a width change re-breaks the systems.
 
+Zoom never re-engraves a page: in `page` layout the systems break the same at
+every zoom, so the engraved pages are scaled with CSS `zoom` and stay
+vector-sharp. A trackpad pinch or Ctrl/Cmd+wheel zooms around the pointer and
+follows the fingers; while it moves it is a compositor transform of the laid-out
+pages, and it is laid out once when it settles, then reported. In `flow` layout
+the systems fill the width at the engraved scale, so they are re-broken once a
+zoom settles.
+
 ## Editing
 
 Editing needs a ready `.editor` and `editable`; the toolbar then appears along
@@ -89,7 +97,7 @@ real scores with several voices, chords, beams and slurs:
 | `accidental` | Flat, natural, sharp buttons | Respell the selected notes with that alteration. |
 | `delete` | Delete, Backspace | Selected notes become rests of the same written value and tuplet; in a chord only the chosen heads go. |
 | `history` | Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z or Ctrl/Cmd+Y | Undo and redo through the borrowed editor. |
-| `zoom` | Zoom buttons, Ctrl/Cmd + and − | Change `zoom`; the page and continuous view buttons change `layout`. |
+| `zoom` | Zoom buttons, Ctrl/Cmd + and −, Ctrl/Cmd+wheel and trackpad pinch | Change `zoom`; the page and continuous view buttons change `layout`. |
 
 Click selects a note or rest; Ctrl/Cmd+click adds or removes one; Shift+click
 selects the range in the same voice. Left/Right move the selection, or the

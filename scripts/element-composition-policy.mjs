@@ -39,6 +39,7 @@ export const elementCompositionPolicy = Object.freeze([
   entry('Audio', 'Analyze', 'audio-transient-analyzer', 'packages/audio/src/analyze/element/audio-transient-analyzer.ts', ['transient-analyzer']),
 
   entry('Audio', 'View', 'audio-view', 'packages/audio/src/view/element/audio-view.ts', ['stage', 'status', 'meter']),
+  entry('Audio', 'View', 'audio-clip-view', 'packages/audio/src/view/element/audio-clip-view.ts', ['status']),
   entry('Audio', 'View', 'audio-live-view', 'packages/audio/src/view/element/audio-live-view.ts', ['stage']),
 ]);
 
@@ -57,6 +58,9 @@ export function sourceWithoutOwnedFocusWrite(tag, source, text) {
   // same owner withdrawing its own focus entry, never a second ARIA owner.
   if (tag === 'audio-view' && source === 'packages/audio/src/view/render/waveform-editor.ts') {
     return text.replace("surface.setAttribute('tabindex', '0');", '').replace("surface.removeAttribute('tabindex');", '');
+  }
+  if (tag === 'audio-clip-view' && source === 'packages/audio/src/view/render/audio-clip.ts') {
+    return text.replace("viewport.setAttribute('tabindex', '0');", '').replace("viewport.removeAttribute('tabindex');", '');
   }
   if (tag === 'score-sheet-view' && source === 'packages/score/src/view/render/score-sheet.ts') {
     return text.replace("viewport.setAttribute('tabindex', '0');", '').replace("viewport.removeAttribute('tabindex');", '');

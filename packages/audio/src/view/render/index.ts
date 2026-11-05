@@ -44,4 +44,18 @@ export {
   type MountAudioTimelineOptions,
   type AudioTimelinePresenterHandle,
 } from './audio-timeline';
-export {mountWaveformEditor, type WaveformEditingHandle, type WaveformEditingOptions} from './waveform-editor';
+export {
+  AUDIO_CLIP_FEATURES,
+  AUDIO_CLIP_GRID_METERS,
+  AUDIO_CLIP_SNAPS,
+  mountAudioClip,
+  parseAudioClipFeatures,
+  type AudioClipContent,
+  type AudioClipFeature,
+  type AudioClipHandle,
+  type AudioClipOptions,
+  type AudioClipPlayback,
+  type AudioClipSettings,
+  type AudioClipSnap,
+  type AudioClipTool,
+} from './audio-clip';

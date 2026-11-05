@@ -58,14 +58,14 @@ Headless engine for one clip.
 
 ```html
 <audio-player id="audition"></audio-player>
-<audio-view id="take-view" player="#audition" type="waveform" editable></audio-view>
+<audio-clip-view id="take-view" player="#audition" editable></audio-clip-view>
 <script type="module">
   import '@webmusic/audio/play/auto';
   import '@webmusic/audio/view/auto';
   import {loadAudioClipEditor} from '@webmusic/audio/view/headless';
   const editor = await loadAudioClipEditor('/wav/Arabesque%20No.1.wav');
   const player = /** @type {import('@webmusic/audio/play/element').AudioPlayerElement | null} */ (document.getElementById('audition'));
-  const view = /** @type {import('@webmusic/audio/view/element').AudioViewElement | null} */ (document.getElementById('take-view'));
+  const view = /** @type {import('@webmusic/audio/view/element').AudioClipViewElement | null} */ (document.getElementById('take-view'));
   if (player) player.editor = editor;
   if (view) view.editor = editor;
 </script>
@@ -186,6 +186,7 @@ await el.player?.play();                     // stable AudioPlayer facade
 | `.scratching` | readonly property | Whether the active player has an exclusive scratch session, including release inertia. |
 | `.preload()` | method | Warm the context, graph and decoded buffer without starting sound. |
 | `.clock` | property (get) | The engine's read-only `TransportClockReader`, for anchoring a bridge or view against the clip's position axis. `undefined` before a clip engine exists and on the media engine. A document sequence exposes its stable clock before graph creation. |
+| `.tempoGrid` / `.tempoClock` | property (get) | The playing content's Kernel tempo grid (a document's beat grid or the clip's) and that grid read from `.clock`; see [AudioPlayer](/audio/headless/play/audio-player/). `undefined` without a grid or clock. |
 | `.analyser` | property (get) | The player's `AnalyserNode` (sequence: available after explicit play/preload), e.g. to feed a live [Analyze tool](/audio/element/#analyze) through its `.analyser` property. |
 | `webaudio:seek` | event | `detail = { seconds, region?, progress }` when the user drags the transport. Same shape [`<audio-view>`](/audio/element/view/audio-view/) established; `progress` is an additive extension. Programmatic `seek()` stays silent, so a bound view cannot echo its own event back. |
 | `webaudio:timeupdate` | event | `detail = { seconds, duration, progress }`, on the cursor cadence (~50 ms). |

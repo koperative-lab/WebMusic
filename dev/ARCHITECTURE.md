@@ -325,8 +325,9 @@ static views remain usable without a player.
 
 For an edit-enabled composition, the editor owns committed content and Play
 borrows it through the document source. View Elements gain an optional editor
-binding; on the editing Views (`<score-grid-view>`, `<audio-view>`) `editable`
-enables mutation gestures against it, and `<score-view>` displays it read-only.
+binding; on the editing Views (`<score-grid-view>`, `<score-sheet-view>`,
+`<audio-clip-view>`) `editable` enables mutation gestures against it, and
+`<score-view>` and `<audio-view>` display it read-only.
 The application creates and owns the editor (DEC-057); Elements borrow it only
 through `.editor`, with no selector attribute. The View owns neither an implicit editor
 nor the lifetime of a borrowed editor. These bindings preserve passive usage and

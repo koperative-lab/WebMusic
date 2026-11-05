@@ -1,0 +1,330 @@
+---
+title: '<audio-clip-view>'
+description: 'A waveform clip editor modeled on audio editors such as Adobe Audition: range edits, fades, gain envelopes, markers and processing over a borrowed editor.'
+sidebar:
+  order: 2
+---
+
+import AudioClipViewDemo from '../../../../../components/elements/AudioClipViewDemo.astro';
+
+`<audio-clip-view>` is the Audio waveform editor. It draws an edited
+document as channel lanes under a time ruler and follows a bound player's
+playhead. Edits are non-destructive: cuts, fades, gain and markers change the
+document's segment list, never the decoded PCM. Range processing (normalize,
+reverse, invert and DC removal) runs through the editor's own processors.
+Like audio editors such as Adobe Audition and the clip editors of DAWs, the
+range selection is always present. Fade handles sit at the top corners of
+every segment, a gain line runs across it, and a heads-up gain control
+amplifies the selection by dragging.
+
+Assign an [AudioClipEditor](/audio/headless/view/audio-clip-editor/) to
+`.editor` and add `editable` to edit it. A one-row icon toolbar then appears
+along the top. Use [`<audio-view>`](/audio/element/view/audio-view/) for
+read-only waveform, spectrogram and meter drawings; it can follow the same
+editor.
+
+<AudioClipViewDemo />
+
+The demo decodes Arabesque No. 1 (`public/wav/Arabesque No.1.wav`) into one
+editor with every built-in range processor. The page owns that editor and lends
+it to the player and the clip view. Every switch and setting is in
+**Parameters**: clear a box in the **tools** row to remove that feature's
+toolbar buttons, gestures and keys. Toolbar, wheel and keyboard changes update
+**tool**, **snap**, **show-envelopes**, **pixels-per-second**, **amplitude**,
+**fade-curve**, **grid**, **quantize** and **grid-edit** there. Reset restores the attributes and reloads the
+recording, discarding edits.
+
+## Import
+
+```html
+<script type="module">
+  import {defineAudioPlayerElement} from '@webmusic/audio/play/element';
+  import {defineAudioClipViewElement} from '@webmusic/audio/view/element';
+  import {AUDIO_RANGE_PROCESSOR_KINDS, createAudioRangeProcessor} from '@webmusic/audio/view';
+  import {loadAudioClipEditor} from '@webmusic/audio/view/headless';
+  defineAudioPlayerElement();
+  defineAudioClipViewElement();
+  // Your page owns the editor; dispose it after detaching the elements.
+  const processors = AUDIO_RANGE_PROCESSOR_KINDS.map((kind) => createAudioRangeProcessor(kind));
+  const editor = await loadAudioClipEditor('/wav/Arabesque%20No.1.wav', {processors});
+  const player = /** @type {import('@webmusic/audio/play/element').AudioPlayerElement | null} */ (document.getElementById('clip-player'));
+  const view = /** @type {import('@webmusic/audio/view/element').AudioClipViewElement | null} */ (document.querySelector('audio-clip-view'));
+  if (player) player.editor = editor;
+  if (view) view.editor = editor;
+</script>
+
+<audio-player id="clip-player"></audio-player>
+<audio-clip-view player="#clip-player" editable grid snap="grid"></audio-clip-view>
+```
+
+`defineAllAudioElements()` from the same entry also registers this tag, and
+`@webmusic/audio/view/auto` registers it on import. A read-only clip view needs
+no editor: `src` decodes a file and `.clip` takes a decoded `AudioClip`.
+
+## Data and editing
+
+All edits address **output frames** of the edited sequence, half-open
+`[start, end)`. Each one is a single undoable transaction in the editor's
+history; one pointer gesture commits once on release. The view never creates
+or disposes the editor, and it keeps no second copy of the document.
+
+| Edit | How | What changes |
+| --- | --- | --- |
+| Select | Drag across the lanes; double-click a segment to select all of it. | The shared interaction session's range. |
+| Split | Razor tool click, or Ctrl/Cmd+K at the range start. | One segment becomes two at the frame. |
+| Delete / trim | Delete key or button; Ctrl/Cmd+T or the trim button. | Removes the range, or keeps only the range. |
+| Cut / copy / paste | Buttons or Ctrl/Cmd+X/C/V. Paste inserts at the cursor. | The editor's internal clipboard, not the operating system's. |
+| Silence | Silence button. | The range becomes a silence segment of the same length. |
+| Amplify | Drag the gain HUD up or down, or focus it and press Up/Down (1 dB). Without a range it amplifies the whole clip. | The range is split out and its segment gain multiplied. |
+| Segment gain | Drag a segment's horizontal gain line. | That segment's gain, shown in dB while dragging. |
+| Fades | Drag a fade handle inward, or use the fade-in/fade-out buttons on a range. | The segment envelope, drawn with the chosen `fade-curve`. |
+| Envelope | Envelope tool: click to add a point, drag it, Alt-click to remove. | The segment's gain envelope (linear between points). |
+| Markers | M key or the marker button: a point marker at the cursor, or a range marker over the selected range; drag a flag to move it; Alt-click or double-click to remove. | Document annotations, through the `set-annotations` operation. |
+| Process | The process card: normalize, reverse, invert or remove DC. | Rendered through the editor's range processors; only kinds the editor was given are offered. |
+| Beat grid | [Grid Edit](#beat-grid) tools, keys and dragging. | The document's beat grid, through the `set-beat-grid` operation. |
+| Frame values | The values card. | Exact start/end frames and a silence length. |
+| Undo / redo | Buttons or Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z or Ctrl/Cmd+Y. | The editor's history. |
+
+Fade curves are `linear`, `logarithmic` and `cosine`; non-linear curves are
+approximated by envelope points, so they play back exactly as drawn.
+Amplification is clamped to −40…+24 dB per gesture. A command that has nothing
+to act on, such as trim without a range, is disabled rather than failing.
+
+## Tools and settings
+
+The toolbar groups pointer tools, clipboard, range edits, fades, markers,
+processing and view options on the left, and history, zoom and frame values on
+the right. Popups open as cards over the waveform behind a scrim; Escape or the
+close button dismisses them.
+
+| Tool | Pointer behavior |
+| --- | --- |
+| `select` (V) | Range selection, fade handles, gain lines, markers and the gain HUD. |
+| `split` (R) | A click cuts at the snapped frame. |
+| `envelope` (E) | Envelope points are drawn and editable; dragging elsewhere still selects. |
+
+The snap button toggles `snap="grid"`: the cursor, range edges and marker
+drags snap to the finest line drawn — the beat grid's subdivisions while it is
+shown, else the ruler's quarter ticks — so snapping gets finer as you zoom in.
+The attribute also accepts fixed snaps: `zero` (the nearest zero crossing,
+searching up to 2048 frames each way), `10ms`, `100ms`, `1s`, and `beat` or
+`bar` of the beat grid.
+
+Without `pixels-per-second` the view opens at a working zoom — eight bars of
+the beat grid, else ten seconds (the whole clip when it is shorter) — instead
+of the whole recording. `pixels-per-second="0"` (the Fit button) fits the
+clip; any other value zooms, and the viewport scrolls. A trackpad pinch zooms
+around the pointer and follows the fingers one to one (Chromium Ctrl+wheel
+deltas and Safari gesture events); a Ctrl/Cmd+wheel notch zooms about 1.5×.
+The view repaints once per frame, and the attribute is updated once the
+gesture settles. `amplitude` magnifies the drawing only — it
+never changes gain.
+
+## Beat grid
+
+A document can carry one constant-tempo beat grid, laid over the waveform in
+the manner of DJ software such as rekordbox. `grid` draws it — bar lines with
+bar numbers, beat lines and a downbeat marker on the ruler — and turns on the
+grid-aware controls. As you zoom in, the grid divides each beat into halves,
+quarters and so on down to 1/32, keeping lines at least 10 px apart; zoomed far
+out it shows bars only. Grid edits are ordinary undoable commits (`set-beat-grid`),
+and a player bound to the same editor applies them without pausing, so the grid
+can be adjusted while listening.
+
+**Grid Edit** (the `grid` feature, the Grid Edit button or `grid-edit`) swaps
+the toolbar's content tools for the grid tools, keeping one row:
+
+| Control | Key | Effect |
+| --- | --- | --- |
+| Set downbeat | D (Shift+D at the playhead) | Make the cursor a downbeat; creates a 120 BPM 4/4 grid when there is none. |
+| BPM field | — | Type an exact tempo, 1–999 BPM; the anchor downbeat stays put. |
+| Tap tempo | T | Tap along; the tempo previews from the second tap and commits 1.5 s after the last. |
+| Move earlier / later | `[` / `]` | Shift the whole grid by 1 ms (Shift: 10 ms). |
+| Widen / narrow beats | `,` / `.` | Change the tempo by 0.01 BPM (Shift: 0.1). |
+| ×2 / ×½ | — | Double or halve the tempo. |
+| Beats per bar | — | 2, 3, 4, 5, 6, 7, 8 or 12 beats in a bar. |
+| Remove | — | Delete the grid. |
+| Drag | — | Drag anywhere in the lanes to slide the grid; a click places the cursor. |
+
+Escape or the Grid Edit button leaves the mode. Outside it, with `grid` on:
+
+- `snap="beat"` and `snap="bar"` snap the cursor, range edges and markers to
+  the grid.
+- `quantize` makes a ruler click seek to the nearest beat. A playing player
+  keeps its beat phase across the jump, so playback stays in time.
+- PageUp and PageDown jump one bar (Shift: four bars). While playback is shown
+  they move the bound player and keep its phase; otherwise they move the cursor.
+- G toggles the grid.
+
+The grid is constant: it cannot follow rubato, and an edit after the anchor
+leaves it in place. An edit before the anchor moves it with the content, and a
+deleted anchor moves to the next downbeat. The demo seeds a grid estimated from
+the opening of Arabesque No. 1; a rubato piano piece needs the grid tools to
+line it up. The bound player's [`tempoClock`](/audio/headless/play/audio-player/)
+reads beats from its clock with the same grid.
+
+## Gestures and keyboard
+
+The waveform viewport is one focus stop. Its keys act only while it has focus
+and leave the card fields alone.
+
+| Key | Action |
+| --- | --- |
+| Left / Right | Move the cursor 10 ms (Alt: 1 ms). Shift extends the range. |
+| Ctrl/Cmd+Left / Right | Jump to the previous or next segment boundary or marker. |
+| Home / End | Jump to the start or end. |
+| Ctrl/Cmd+A | Select the whole clip. |
+| Delete / Backspace | Delete the range. |
+| Ctrl/Cmd+X / C / V | Cut, copy, paste at the cursor. |
+| Ctrl/Cmd+T / K | Trim to the range; split at the range start. |
+| M | Add a marker at the cursor, or a range marker over the selection. |
+| V / R / E | Select, razor and envelope tools. |
+| = / − | Zoom in and out. |
+| Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z, Ctrl/Cmd+Y | Undo and redo. |
+| G | Show or hide the beat grid. |
+| PageUp / PageDown | Beat jump by a bar (Shift: four bars), with `grid`. |
+| `[` `]` `,` `.` T D | Grid Edit nudges, tempo steps, tap and downbeat; see [Beat grid](#beat-grid). |
+| Escape | Cancel a drag, leave Grid Edit, otherwise collapse the range to the cursor. |
+
+Ctrl/Cmd+wheel zooms around the pointer; Alt+wheel changes `amplitude`.
+Dragging past an edge of a zoomed viewport scrolls it. Every pointer edit has
+a keyboard or toolbar alternative.
+
+## Playback
+
+`player` selects one player in the same Document or ShadowRoot. A click on the
+ruler asks it to seek (to the nearest beat with `quantize`), and PageUp/PageDown
+beat jumps move it while playback is shown; the clip view sends no other
+playback command. With an
+editor, the player contributes a playhead only when its applied document ID
+and revision match the editor's committed document. Use
+[`<audio-player>`](/audio/element/play/audio-player/) with the same `.editor`.
+While playback prepares a newer revision the playhead is hidden and
+`data-playback-state` reports `pending`. `follow` keeps the playhead in view as
+it advances. `webaudio:editcommit` reports a document commit, not playback
+readiness; applying an edit leaves the player paused.
+
+<details class="component-section">
+<summary>API</summary>
+
+Numeric attributes ignore missing or non-numeric values and use their defaults.
+`pixels-per-second` and `amplitude` are clamped to their ranges.
+
+| Member | Kind | Default | Description |
+| --- | --- | --- | --- |
+| `src` / `format` | attributes | none | Decode one URL read-only, with an optional decoder override. Conflicts with `.editor`. |
+| `player` | attribute | none | Unique selector of a player to follow. |
+| `width` / `height` | attributes | 100% / ruler + 180 px lanes | Bare numbers are px; CSS lengths pass through. |
+| `editable` / `.editable` | boolean attribute / property | false | Enable editing for a ready `.editor`; never creates one. |
+| `tools` / `.tools` | attribute / property | every feature | Offered features, space- or comma-separated: `split`, `delete`, `clipboard`, `trim`, `silence`, `gain`, `fade`, `envelope`, `markers`, `grid`, `process`, `snap`, `zoom`, `history`. The getter returns them in that order; the setter throws `RangeError` for an unknown name. |
+| `tool` / `.tool` | attribute / property | `select` | `select`, `split` or `envelope`; a tool whose feature is off reads as `select`. |
+| `snap` / `.snap` | attribute / property | `off` | `off`, `grid` (the snap button: the finest drawn line), `zero`, `10ms`, `100ms`, `1s`, `beat` or `bar`; `beat` and `bar` need a document grid. |
+| `show-envelopes` / `.showEnvelopes` | boolean attribute / property | false | Draw segment envelopes outside the envelope tool. |
+| `pixels-per-second` / `.pixelsPerSecond` | attribute / property | working zoom | Horizontal zoom, 0–48000; 0 fits the clip. Absent, the view opens at eight bars of the beat grid or ten seconds, and the getter returns the mounted zoom; removing the attribute returns to that zoom. |
+| `amplitude` / `.amplitude` | attribute / property | 1 | Vertical drawing magnification, 1–16. |
+| `fade-curve` / `.fadeCurve` | attribute / property | `linear` | `linear`, `logarithmic` or `cosine`. |
+| `follow` / `.follow` | boolean attribute / property | on | Keep the playhead in view; `follow="false"` turns it off. |
+| `grid` / `.grid` | boolean attribute / property | false | Draw the document's beat grid and enable beat snap, `quantize` and beat jump. |
+| `quantize` / `.quantize` | boolean attribute / property | false | With `grid`, ruler seeks land on the nearest beat and a playing player keeps its beat phase. |
+| `grid-edit` / `.gridEdit` | boolean attribute / property | false | Grid Edit mode; needs `editable` and the `grid` feature, otherwise reads false. |
+| `.clip` | writable property | none | Draw a decoded `AudioClip` read-only. Throws while `.editor` is assigned. |
+| `.editor` | writable property | none | Borrow any `AudioClipEditorPort`, such as an `AudioClipEditor`; never disposed. `undefined` detaches it. |
+| `.interactionSession` | writable property | view-owned session | Borrow a same-document `AudioInteractionSession` to share the range and drafts. |
+| `visibleRange()` | method | — | `{startSeconds, endSeconds}` of the viewport, or `undefined` before drawing. |
+| `data-editor-state` | reflected state | absent | While `.editor` is assigned: `ready`, `unavailable`, `invalid` or `source-conflict`. |
+| `data-editable-state` | reflected state | absent | `readonly`, `ready` or `unavailable` while an editor is assigned or `editable` is set. |
+| `data-playback-state` | reflected state | absent | With an editor: `unbound`, `pending` or `ready`. |
+
+**Events.** All four are `CustomEvent`s that bubble and are composed.
+
+| Event | `detail` | When |
+| --- | --- | --- |
+| `webaudio:editpreview` | `AudioDraftResult` with `status: "preview"` | A fade, gain, envelope, marker or HUD drag produced a draft. |
+| `webaudio:editcommit` | `AudioEditResult` with `status: "committed"`; its change `label` names the edit | An edit, process, undo or redo committed. |
+| `webaudio:editerror` | `{error}` | An edit, processing run or frame field failed; nothing changed. |
+| `clipsettingschange` | `{settings, changed}`: the complete `AudioClipSettings` and the changed key | The toolbar, a key or the wheel changed `tool`, `snap`, `envelopes`, `pixelsPerSecond`, `amplitude`, `fadeCurve`, `grid`, `quantize` or `gridEdit`. |
+
+```ts
+import {defineAudioClipViewElement, type AudioClipViewElement} from '@webmusic/audio/view/element';
+
+defineAudioClipViewElement();
+const view = document.querySelector<AudioClipViewElement>('audio-clip-view')!;
+view.tools = ['split', 'delete', 'fade', 'history'];
+view.addEventListener('webaudio:editcommit', (event) => {
+  console.log((event as CustomEvent<{change: {label: string}}>).detail.change.label);
+});
+```
+
+`AudioClipViewElement`, `defineAudioClipViewElement(tag?)` and
+`AUDIO_CLIP_VIEW_FEATURES` are exported from `@webmusic/audio/view/element`.
+Registration is idempotent and SSR-safe. The element mounts
+[`mountAudioClip`](/audio/api/view/#clip-renderer--webmusicaudioviewrender)
+from `@webmusic/audio/view/render`.
+
+**Lifecycle.** Disconnect cancels a pending decode, an active gesture and
+processing it started, and releases the renderer, listeners, resize observer,
+waveform cache and the view-owned session. The borrowed editor, a supplied
+session and the player stay alive.
+
+**Accessibility.** The waveform viewport is a labelled focusable region
+described by off-screen instructions that list the offered gestures and keys.
+A polite live status reports the range, edits and errors. Icon buttons carry
+accessible names and tooltips; tool and toggle buttons report their pressed
+state, and card buttons report that they open a dialog. Cards are labelled
+dialogs whose frame fields are native inputs. The gain HUD is a native button
+announcing the gain it applies. Selection, drafts and the playhead differ by
+shape and line style as well as color.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+The clip view is light DOM, so style its parts with attribute selectors such as
+`audio-clip-view [part~="toolbar"]`, not `::part()`.
+
+| Part | Element |
+| --- | --- |
+| `clip` | The bordered window holding the toolbar, viewport and card overlay. |
+| `toolbar` | The one-row icon toolbar; contains `toolbar-group`, `tool-button`, `bpm` (the Grid Edit tempo field), `message` and `toolbar-spacer`. |
+| `viewport` | The horizontally scrolling waveform frame. |
+| `canvas` | The scrolled content sized to the zoomed clip. |
+| `stage` | The sticky drawing layer holding `waveform`, `marks` and `hud`. |
+| `waveform` | The canvas with the ruler and channel lanes. |
+| `marks` | The SVG with segment boundaries, gain lines, fades, envelopes, beat grid, markers, the range and the playhead. |
+| `hud` | The gain control button. |
+| `overlay` / `card` | The scrim and the open card, with `card-header`, `choices`, `fields` and `actions`. |
+| `offscreen` | Instructions and live status read by assistive technology only. |
+
+| Property | Effect |
+| --- | --- |
+| `--wm-audio-clip-background` | Window, lane and card background, then `--wm-surface`. |
+| `--wm-audio-clip-wave` | Waveform fill, then `--wm-foreground`. |
+| `--wm-audio-clip-playhead` | Playhead color; default `rgb(240, 84, 119)`. |
+| `--wm-audio-clip-scrim` | Backdrop behind an open card; default 45% black. |
+| `--wm-foreground`, `--wm-foreground-muted` | Icons, text, lines and handles. |
+| `--wm-accent-foreground` | Icon color on a pressed tool and the primary card action. |
+| `--wm-surface-muted` | Hover fill for toolbar and card buttons. |
+| `--wm-control-border`, `--wm-border` | Window, toolbar, card and field lines. |
+| `--wm-control-size` | Toolbar height and square button size; default `2rem`. |
+| `--wm-component-border`, `--wm-component-radius` | The window's outer border and corners. |
+| `--wm-font-mono` | Time, gain and frame values. |
+| `--wm-focus-ring` | Focus outline on buttons, fields and the viewport. |
+
+The `clip` part reflects `data-editable`, `data-tool`, `data-grid` and
+`data-grid-edit`.
+
+Keep visible focus and the non-color selection and draft cues when restyling.
+
+```css
+audio-clip-view {
+  --wm-audio-clip-wave: #2563eb;
+  --wm-audio-clip-background: #f8fafc;
+}
+```
+
+</details>
+
+## Related
+
+[Read-only audio drawings](/audio/element/view/audio-view/#follow-an-editor) · [AudioClipEditor](/audio/headless/view/audio-clip-editor/) · [Editable documents API](/audio/api/view/#editable-documents) · [Sequence rendering](/audio/api/play/#render-an-edited-sequence)

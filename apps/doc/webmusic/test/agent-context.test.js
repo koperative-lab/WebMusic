@@ -100,7 +100,7 @@ describe('agent context MDX extraction', () => {
 
   it.each([
     ['headless/view/audio-clip-editor', 'AudioClipEditorHeadlessDemo', 'createAudioClipEditor'],
-    ['element/view/audio-view', 'AudioEditingDemo', 'loadAudioClipEditor'],
+    ['element/view/audio-clip-view', 'AudioClipViewDemo', 'loadAudioClipEditor'],
   ])('links the Audio %s demo while retaining its API reference', async (page, demo, api) => {
     const filename = `apps/doc/webmusic/src/content/docs/audio/${page}.mdx`;
     const source = await readFile(path.join(root, filename), 'utf8');
@@ -298,7 +298,7 @@ describe('agent context release and output contracts', () => {
     expect(files.get('llms.txt')).toContain('## Display and edit audio waveforms and spectral data');
     const scoreEdit = files.get('llms.txt').split('## Display and edit scores, pitches and application state')[1]?.split('\n## ')[0] ?? '';
     for (const page of ['score/element/view/score-view.md', 'score/headless/view/score-editor.md', 'score/api/view.md']) expect(scoreEdit).toContain(`agent-context/${page}`);
-    expect(patterns).toContain('## Waveform editing');
+    expect(patterns).toContain('## Data and editing');
     for (const page of manifest.pages) {
       expect(files.get('llms.txt').split(`](${page.url})`).length - 1).toBe(1);
     }

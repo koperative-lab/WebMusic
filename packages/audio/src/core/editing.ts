@@ -1,5 +1,5 @@
 import type {AudioClip} from './model/AudioClip';
-import type {AudioAssetLease, AudioAssetReader, AudioEnvelopePoint, AudioSequence, AudioSequenceSegmentInput, AudioSequenceAnnotation} from './sequence';
+import type {AudioAssetLease, AudioAssetReader, AudioBeatGrid, AudioEnvelopePoint, AudioSequence, AudioSequenceSegmentInput, AudioSequenceAnnotation} from './sequence';
 
 export interface AudioFrameRange {readonly startFrame: number; readonly endFrame: number}
 /** Splice boundary duplication uses an explicit rightId; replay never creates IDs. */
@@ -9,7 +9,10 @@ export type AudioEditOperation =
   | {readonly type: 'trim'; readonly startFrame: number; readonly endFrame: number}
   | {readonly type: 'insert-silence'; readonly frame: number; readonly length: number; readonly id: string; readonly rightId?: string}
   | {readonly type: 'set-gain'; readonly segmentIds: readonly string[]; readonly gain: number}
-  | {readonly type: 'set-envelope'; readonly segmentId: string; readonly points: readonly AudioEnvelopePoint[]};
+  | {readonly type: 'set-envelope'; readonly segmentId: string; readonly points: readonly AudioEnvelopePoint[]}
+  /** Replace the document's markers and regions (annotations); frames are output frames. */
+  | {readonly type: 'set-annotations'; readonly annotations: readonly AudioSequenceAnnotation[]}
+  | {readonly type: 'set-beat-grid'; readonly grid: AudioBeatGrid | null};
 export interface AudioRevisionGuard {readonly documentId: string; readonly expectedRevision: number}
 export interface AudioEditCommand extends AudioRevisionGuard {
   readonly version: 1; readonly label: string; readonly operations: readonly AudioEditOperation[];

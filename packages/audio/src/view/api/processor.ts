@@ -1,9 +1,18 @@
 import {createAudioClipFromOwnedChannels} from '../../core/model/AudioClip';
 import {AudioEditError, type AudioRangeProcessor} from '../../core/editing';
 
-/** Length-preserving selected-range processing with no hidden handles, latency or tail. */
-export function createAudioRangeProcessor(kind: 'normalize' | 'reverse'): AudioRangeProcessor {
-  if (kind !== 'normalize' && kind !== 'reverse') throw new AudioEditError('unsupported-processor', 'Expected normalize or reverse');
+/** Built-in range processors. */
+export type AudioRangeProcessorKind = 'normalize' | 'reverse' | 'invert' | 'remove-dc';
+export const AUDIO_RANGE_PROCESSOR_KINDS: readonly AudioRangeProcessorKind[] = Object.freeze(['normalize', 'reverse', 'invert', 'remove-dc']);
+
+/**
+ * Length-preserving selected-range processing with no hidden handles, latency or
+ * tail: `normalize` scales the range to `targetPeak` (default 0.95), `reverse`
+ * plays it backwards, `invert` flips polarity and `remove-dc` subtracts each
+ * channel's mean.
+ */
+export function createAudioRangeProcessor(kind: AudioRangeProcessorKind): AudioRangeProcessor {
+  if (!AUDIO_RANGE_PROCESSOR_KINDS.includes(kind)) throw new AudioEditError('unsupported-processor', 'Expected normalize, reverse, invert or remove-dc');
   const parameters = (value: unknown): number => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) throw new AudioEditError('invalid-command', 'Processor parameters must be an object');
     const object = value as Record<string, unknown>;
@@ -25,6 +34,20 @@ export function createAudioRangeProcessor(kind: 'normalize' | 'reverse'): AudioR
       const start = input.selectionOffset, length = input.selectionLength;
       const channels = input.channels.map(channel => channel.subarray(start, start + length));
       let peak = 0;
+      const means = channels.map(() => 0);
+      if (kind === 'remove-dc') {
+        for (let channel = 0; channel < channels.length; channel++) {
+          let sum = 0;
+          for (let offset = 0; offset < length; offset += 65_536) {
+            check();
+            const end = Math.min(length, offset + 65_536);
+            for (let index = offset; index < end; index++) sum += channels[channel][index];
+            if (end < length) await new Promise<void>(resolve => setTimeout(resolve, 0));
+          }
+          means[channel] = length ? sum / length : 0;
+          if (!Number.isFinite(means[channel])) throw new AudioEditError('processing-failed', 'DC removal requires finite input samples');
+        }
+      }
       if (kind === 'normalize') {
         for (let offset = 0; offset < length; offset += 65_536) {
           check();
@@ -41,7 +64,10 @@ export function createAudioRangeProcessor(kind: 'normalize' | 'reverse'): AudioR
         check();
         const end = Math.min(length, offset + 65_536);
         for (let channel = 0; channel < channels.length; channel++) for (let index = offset; index < end; index++) {
-          output[channel][index] = kind === 'reverse' ? channels[channel][length - 1 - index] : channels[channel][index] * scale;
+          output[channel][index] = kind === 'reverse' ? channels[channel][length - 1 - index]
+            : kind === 'invert' ? -channels[channel][index]
+              : kind === 'remove-dc' ? channels[channel][index] - means[channel]
+                : channels[channel][index] * scale;
         }
         if (end < length) await new Promise<void>(resolve => setTimeout(resolve, 0));
       }

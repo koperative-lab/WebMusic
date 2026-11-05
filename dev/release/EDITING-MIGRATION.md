@@ -172,7 +172,7 @@ built tarballs or workspace entries.
 | Semantic operations, position maps and document contracts | `@webmusic/score/view` | `@webmusic/audio/view` (also range-processor recipes) |
 | Persistent editor owner | `ScoreEditor` from `@webmusic/score/view/headless` | `AudioClipEditor` from `@webmusic/audio/view/headless` |
 | Load a file into a new editor | `loadScoreEditor(url, options)` from `@webmusic/score/view/headless` | `loadAudioClipEditor(url, options)` from `@webmusic/audio/view/headless` |
-| Bind an editor to Elements | Assign `.editor` on `<score-grid-view editable>` (editing), `<score-view>` (read-only display) and `<score-player>`; the application disposes the editor | Assign `.editor` on `<audio-view>` / `<audio-player>`; the application disposes the editor |
+| Bind an editor to Elements | Assign `.editor` on `<score-grid-view editable>` (editing), `<score-view>` (read-only display) and `<score-player>`; the application disposes the editor | Assign `.editor` on `<audio-clip-view editable>` (editing), `<audio-view>` (read-only display) and `<audio-player>`; the application disposes the editor |
 | Render or export an edited sequence | — | `renderAudioSequence`, `exportAudioSequenceWav` from `@webmusic/audio/play` |
 
 There is no dedicated editing React wrapper. The package root remains Core; it
@@ -205,10 +205,11 @@ backing-byte accounting capability required by the new asset store.
 
 Score note editing is the new `<score-grid-view>` piano-roll grid, whose
 `tools` attribute chooses the offered features; `<score-view>` stays read-only
-and gains only the `.editor` display binding (DEC-058). Waveform editing is an
-opt-in interaction on the existing `<audio-view>`. There is no staff or notation
-editing. These entries do not imply notation authoring, spectral repair or
-multitrack editing. The [editing contract](../design/EDIT-COMPONENTS.md) records
+and gains only the `.editor` display binding (DEC-058). Notation editing is
+`<score-sheet-view>` (DEC-060). Waveform editing is the new `<audio-clip-view>`;
+`<audio-view>` stays read-only and gains only the `.editor` display binding
+(DEC-061). These entries do not imply full notation authoring, spectral repair
+or multitrack editing. The [editing contract](../design/EDIT-COMPONENTS.md) records
 the accepted boundaries.
 
 ## Package release and website deployment

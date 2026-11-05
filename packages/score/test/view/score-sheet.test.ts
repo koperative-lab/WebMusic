@@ -182,6 +182,50 @@ describe('mountScoreSheet', () => {
     expect(handle!.settings.inputMode).toBe(false);
   });
 
+  it('zooms a page by scaling the engraved pages, without re-engraving, and follows a pinch', async () => {
+    const onSettingsChange = vi.fn();
+    const {host} = mount(fixture(), {layout: 'page', zoom: 1, onSettingsChange}, true);
+    const pages = host.querySelector<HTMLElement>('[part~="pages"]')!;
+    const drawings = () => [...host.querySelectorAll('[part~="system"] svg')];
+    const before = drawings();
+    // The toolbar zoom is one step, shown at once and reported at once.
+    host.querySelector<HTMLButtonElement>('[data-sheet-action="zoom-in"], [aria-label="Zoom in"]')!.click();
+    expect(handle!.settings.zoom).toBe(1.2);
+    expect(pages.style.zoom).toBe('1.2');
+    expect(drawings()).toEqual(before);
+    expect(onSettingsChange).toHaveBeenLastCalledWith(expect.objectContaining({zoom: 1.2}), 'zoom');
+    // A pinch: Chromium deltas of −100 × ln(scale), applied once per frame, reported when it settles.
+    const viewport = host.querySelector('[part~="viewport"]')!;
+    for (let index = 0; index < 4; index += 1) {
+      viewport.dispatchEvent(new WheelEvent('wheel', {deltaY: -100 * Math.log(1.5) / 4, ctrlKey: true, bubbles: true, cancelable: true}));
+    }
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    expect(handle!.settings.zoom).toBeCloseTo(1.8, 2);
+    // While it moves, the pinch is a compositor transform over the laid-out pages.
+    expect(pages.style.zoom).toBe('1.2');
+    expect(pages.style.transform).toMatch(/^scale\(1\.5/);
+    expect(drawings()).toEqual(before);
+    expect(onSettingsChange).toHaveBeenCalledTimes(1);
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    // Settled: laid out once at the new zoom, still not re-engraved.
+    expect(Number(pages.style.zoom)).toBeCloseTo(1.8, 2);
+    expect(pages.style.transform).toBe('');
+    expect(drawings()).toEqual(before);
+    expect(onSettingsChange).toHaveBeenCalledTimes(2);
+  });
+
+  it('re-breaks flow lines once a zoom settles', async () => {
+    const {host} = mount(fixture(), {layout: 'flow', zoom: 1}, true);
+    const pages = host.querySelector<HTMLElement>('[part~="pages"]')!;
+    const first = host.querySelector('[part~="system"] svg');
+    handle!.configure({zoom: 1.5});
+    expect(pages.style.zoom).toBe('1.5');
+    expect(host.querySelector('[part~="system"] svg')).toBe(first);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(pages.style.zoom).toBe('');
+    expect(host.querySelector('[part~="system"] svg')).not.toBe(first);
+  });
+
   it('re-engraves only the system an edit touches', () => {
     const {host, editing} = mount(fixture(), {layout: 'flow', zoom: 1}, true);
     const drawings = () => [...host.querySelectorAll('[part~="system"]')].map((system) => system.querySelector('svg'));

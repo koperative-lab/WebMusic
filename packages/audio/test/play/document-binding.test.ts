@@ -52,10 +52,37 @@ function document(length = 1000) {
   };
   return {assets, initialLease, source, publish, content, listeners};
 }
+/** An audible edit: same length, a different segment gain (metadata-only revisions apply in place). */
+const audible = (content: AudioSequence) => createAudioSequence({...content, segments: content.segments.map((segment) =>
+  segment.kind === 'asset' ? {...segment, gain: segment.gain === 1 ? 0.5 : 1} : segment)});
 const wait = (player: AudioPlayer, source: AudioDocumentSource) => player.waitForDocumentRevision(source.getSnapshot());
 afterEach(() => {vi.restoreAllMocks(); vi.useRealTimers();});
 
 describe('document playback application', () => {
+  it('applies a grid- or marker-only revision in place, keeps playing and reads beats from the clock', async () => {
+    const doc = document(); const {ctx, advance} = context();
+    const player = new AudioPlayer(undefined, {audioContext: ctx});
+    player.setDocumentSource(doc.source); await wait(player, doc.source);
+    expect(player.tempoGrid).toBeUndefined(); expect(player.tempoClock).toBeUndefined();
+    await player.play();
+    expect(player.playing).toBe(true);
+    const buffers = (ctx.createBuffer as ReturnType<typeof vi.fn>).mock.calls.length;
+    doc.publish(createAudioSequence({...doc.content, beatGrid: {bpm: 120, anchorFrame: 100, beatsPerBar: 4}}));
+    expect((await wait(player, doc.source)).status).toBe('applied');
+    expect(player.playing).toBe(true);
+    expect(player.documentBinding).toMatchObject({status: 'ready', applied: {documentRevision: 1}, positionPolicy: 'preserve-frame'});
+    expect(player.source).toMatchObject({kind: 'sequence', documentRevision: 1});
+    expect(player.tempoGrid).toEqual({bpm: 120, anchor: 0.1, beatsPerBar: 4});
+    advance(0.6);
+    expect(player.tempoClock!.beatAt(0.6)).toBeCloseTo(1);
+    expect((ctx.createBuffer as ReturnType<typeof vi.fn>).mock.calls.length).toBe(buffers);
+    // A timeline change still pauses and re-adopts.
+    doc.publish(createAudioSequence({...doc.source.getSnapshot().content, segments: [{...(doc.content.segments[0] as AudioAssetSegment), gain: 0.5}]}));
+    expect((await wait(player, doc.source)).status).toBe('applied');
+    expect(player.playing).toBe(false);
+    expect(player.tempoGrid?.bpm).toBe(120);
+    player.dispose(); doc.initialLease.release(); doc.assets.dispose();
+  });
   it('adopts revisions without PCM reads/context and publishes same-transport identities', async () => {
     const doc = document(); const {ctx} = context(); const read = vi.spyOn(doc.assets, 'read');
     const player = new AudioPlayer(undefined, {audioContext: ctx}); const changes = vi.fn();
@@ -209,7 +236,7 @@ describe('document playback application', () => {
   it('keeps failed attempts terminal, gates stale play and retries without undoing content', async () => {
     const doc = document(); const player = new AudioPlayer(); player.setDocumentSource(doc.source); await wait(player, doc.source);
     const retain = vi.spyOn(doc.assets, 'retain'); retain.mockImplementationOnce(() => { throw new Error('lease failure'); });
-    doc.publish(doc.content); const failed = await wait(player, doc.source);
+    doc.publish(audible(doc.content)); const failed = await wait(player, doc.source);
     expect(failed.status).toBe('failed'); expect(player.source).toMatchObject({documentRevision: 0});
     await expect(player.play()).rejects.toMatchObject({code: 'not-ready'});
     player.setDocumentSource(doc.source); expect(await wait(player, doc.source)).toBe(failed);
@@ -227,7 +254,7 @@ describe('document playback application', () => {
     const player = new AudioPlayer(); const errors = vi.fn(); player.on('error', errors);
     player.on('error', () => {throw new Error('observer failure');});
     player.setDocumentSource(doc.source); await wait(player, doc.source);
-    fail = true; doc.publish(doc.content);
+    fail = true; doc.publish(audible(doc.content));
     expect((await wait(player, doc.source)).status).toBe('applied');
     expect(player.documentBinding.status).toBe('ready');
     expect(player.source).toMatchObject({kind: 'sequence', documentRevision: 1});
@@ -238,7 +265,7 @@ describe('document playback application', () => {
   it('detaches owned sequence resources and supersedes pending work without disposing borrowed data', async () => {
     const doc = document(); const {ctx, sources} = context(); const player = new AudioPlayer(undefined, {audioContext: ctx});
     player.setDocumentSource(doc.source); await wait(player, doc.source); await player.play();
-    expect(sources.length).toBeGreaterThan(0); doc.publish(doc.content); const pending = wait(player, doc.source);
+    expect(sources.length).toBeGreaterThan(0); doc.publish(audible(doc.content)); const pending = wait(player, doc.source);
     player.setDocumentSource(undefined); expect((await pending).status).toBe('superseded');
     expect(player.source.kind).toBe('empty'); expect(sources[0].stop).toHaveBeenCalled(); expect(doc.listeners.size).toBe(0);
     expect(doc.assets.getStats().leases).toBe(1); expect(ctx.close).not.toHaveBeenCalled(); player.dispose(); doc.initialLease.release(); doc.assets.dispose();
@@ -248,7 +275,7 @@ describe('document playback application', () => {
     let resume!: () => void; vi.mocked(ctx.resume).mockImplementation(() => new Promise<void>((resolve) => {resume = resolve;}));
     const player = new AudioPlayer(undefined, {audioContext: ctx}); player.setDocumentSource(doc.source); await wait(player, doc.source);
     expect(() => player.setClip(createAudioClip({sampleRate: 1000, channelData: [new Float32Array(1)]}))).toThrow(/conflicts/);
-    const playing = player.play(); doc.publish(doc.content); resume(); await playing; await wait(player, doc.source);
+    const playing = player.play(); doc.publish(audible(doc.content)); resume(); await playing; await wait(player, doc.source);
     expect(sources.length).toBe(0); expect(player.playing).toBe(false); player.dispose(); doc.initialLease.release(); doc.assets.dispose();
   });
   it('treats a zero-length ready sequence as available and a disposed source as unavailable', async () => {
