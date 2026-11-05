@@ -41,7 +41,7 @@ accepted design; [STATUS](../STATUS.md), EDIT-01, owns current delivery and gaps
 The integrated demo is on the
 [Score View reference](../../apps/doc/webmusic/src/content/docs/score/element/view/score-view.mdx),
 under “Piano-roll editing.” Its generated eight-note
-[MIDI fixture](../../apps/doc/webmusic/public/midi/Editing.mid) uses 120 quarter
+MIDI fixture `midi/Editing.mid` (removed on 2026-11-05) uses 120 quarter
 notes per minute. One declaration supplies a native player, editable piano roll
 and read-only staff view. File import, MIDI export and configured-source reload
 belong to the demo workflow rather than a second document model.
