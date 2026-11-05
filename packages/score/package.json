@@ -311,7 +311,7 @@
   "devDependencies": {
     "@testing-library/dom": "^10.4.2",
     "@testing-library/react": "^16.3.3",
-    "@tonaljs/abc-notation": "^4.9.1",
+    "@tonaljs/abc-notation": "^4.9.3",
     "@tonaljs/chord": "^6.2.1",
     "@tonaljs/chord-detect": "^4.9.3",
     "@types/react": "^19.3.0",
