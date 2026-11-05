@@ -41,6 +41,24 @@ when enabled, offset reset when disabled, type switching and Reset passed;
 the generated markup preserved explicit `scroll="false"`, and console errors
 were absent. Automated tests verify clipboard serialization and legacy fallback.
 
+DEC-053 adds four-direction keyboard, piano-roll and waterfall presentation,
+with independently composed keyboards sharing one player. ScoreView Elements
+hide advanced annotations by default while imperative renderer defaults remain
+unchanged. Verification on 2026-10-08 under Node 26.8.1 passed all 4,489 workspace
+tests, `npm run docs:build` (112 pages), and the individual lint, type, architecture,
+documentation, license, package-artifact and release-manifest checks. The full
+`npm run check` stopped in the existing development-server process test:
+`process.kill(-pid, 0)` returned `EPERM` during process-group cleanup, replacing
+the expected termination exit code 143. Its assertions and startup code were
+not changed; the remaining gates ran separately. Regressions cover
+four-direction geometry, exact keyboard/waterfall alignment, resize, scroll
+following and virtualization, retained player state, annotation opt-in, and
+scroll-region focus ownership and cleanup. The Arabesque demo composes two
+opposed keyboards with one player. Browser tools were unavailable for this
+change; rendered layout, native keyboard scrolling and visual playback alignment
+remain unverified. Earlier DEC-050 browser evidence does not establish those
+four-direction behaviors.
+
 The earlier extra Score controllers, parked Elements and unrelated public UI
 applications are removed from the current surface. UI documentation uses the
 six canonical groups; Audio additions live in their owning presenter references.
@@ -293,6 +311,47 @@ DEC-052 adds shared square loading and source-waiting feedback across the curren
 Element inventory. The [component feedback review](audits/2026-10-08/COMPONENT-FEEDBACK.md)
 records per-tag state coverage and bounded visual evidence. Ready input and valid
 silence remain usable, and the nonvisual rack declaration reports through its desk.
+
+AudioView also exposes a caller-owned `loading` flag for external decode and
+worker analysis. Its main, waveform-configuration and multiband demos mark
+their pending work explicitly, without visible loading placeholder prose;
+readiness follows the selected drawing's usable input. Verification on
+2026-10-09 under Node 26.8.1 passed `VITEST_MAX_WORKERS=2 npm run check`
+(4,506 workspace tests, including the development-server process tests) and
+`npm run docs:build` (112 pages). In the in-app browser at localhost:4324,
+initial decode, requested spectrograms and channel analysis showed the animated
+four-cell loader, then returned to their drawings. Offscreen examples waited
+until activation; ordinary waveform variants became ready before the colour-map
+spectrum. Parameter Reset restored the main waveform without a stuck loader,
+and the browser reported no errors or warnings. Automated regressions additionally
+cover pre-upgrade properties, internal pending requests, failure recovery,
+superseded analysis, navigation cleanup and retained player position. This
+bounded browser check does not establish cross-browser or device acceptance.
+
+The [follow-up readiness audit](audits/2026-10-09/COMPONENT-READINESS.md) checks all
+24 Elements and corrects the nested player omission in that initial AudioView
+check. AudioPlayer, ScorePlayer and AudioMixer now accept external preparation
+flags; selected playlist readiness propagates through the central owner, and
+source replacement, analyser failures and recorder failure feedback are covered.
+The current workspace passes 4,546 tests and all individual `npm run check`
+gates; the final aggregate invocation hit an intermittent existing dev-server
+process-exit test, which passed its isolated rerun. `npm run docs:build` passed
+with 112 pages. Rebuilt browser checks at localhost:4324 verified simultaneous
+player/view loading, ready recovery, spectrogram/channel analysis, parameter Reset,
+mixer preparation and ordinary playlist pause. The audit records the exact scope,
+remaining device/browser limits and screenshots.
+
+Web Component reference pages now start with their main live demo immediately
+after the page title, followed by the introduction and reference sections.
+All 23 owning pages (covering 24 tags) follow the updated
+[Element page template](docs/COMPONENT-PAGE-TEMPLATE.md); topic examples retain
+their later explanatory sections. `check:docs` rejects visible body content
+before the main demo. Verification on 2026-10-09 passed the complete
+`VITEST_MAX_WORKERS=2 npm run check` (4,546 workspace tests) and
+`npm run docs:build` (112 pages). Generated HTML for every owning page starts
+with its live playground. Browser checks of ScoreView and AudioView at
+localhost:4324 confirmed that the demos are visible on entry, with no new
+console errors or warnings.
 
 ## How to read status
 

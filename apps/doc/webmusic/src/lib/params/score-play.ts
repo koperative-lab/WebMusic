@@ -26,6 +26,12 @@ export const SCORE_PLAY_PARAMS: ElementParamCatalog = {
         note: 'Forces the parser when the extension is missing or lies. Only read while src is being loaded.',
       },
       {
+        name: 'loading',
+        kind: 'bool',
+        fallback: 'off — readiness follows the selected source',
+        note: 'Declare application-owned preparation without starting work or replacing the current player. Clearing it retains any native source load.',
+      },
+      {
         name: 'sound-font',
         kind: 'text',
         placeholder: 'https://cdn/{midi}.mp3',
@@ -82,6 +88,7 @@ export const SCORE_PLAY_PARAMS: ElementParamCatalog = {
       },
     ],
     properties: [
+      {name: 'loading', note: 'Read current native or caller preparation. Writes reflect only the caller-owned loading flag; clearing it never cancels a native request or resets playback.'},
       {name: 'score', note: 'Assign a loaded Score; overrides src.'},
       {name: 'playback', note: 'Read-only stable ScorePlaybackSource: resolved data, readiness and revisioned snapshots/subscriptions.'},
       {name: 'resolvedScore', note: 'Read-only current native score, including src; undefined in Rack/controller modes.'},

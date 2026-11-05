@@ -195,3 +195,57 @@ describe('pitch-view keyboard scrolling', () => {
     expect(element.active).toEqual([]);
   });
 });
+
+describe('pitch-view keyboard direction', () => {
+  it('reflects four directions and remounts only presentation while preserving the borrowed note stream', () => {
+    const {element, player} = setup();
+    expect(element.direction).toBe('down');
+    element.setAttribute('scroll', 'true');
+    element.setAttribute('follow', 'none');
+    element.setAttribute('white-key-width', '40');
+    element.setAttribute('white-key-height', '90');
+    const viewport = () => element.querySelector<HTMLElement>('.wui-pitch-keyboard')!;
+    viewport().scrollLeft = 80;
+    for (const direction of ['right', 'left', 'up', 'down'] as const) {
+      element.direction = direction;
+      const vertical = direction === 'left' || direction === 'right';
+      expect(element.getAttribute('direction')).toBe(direction);
+      expect(viewport().dataset.direction).toBe(direction);
+      expect(viewport()[vertical ? 'scrollTop' : 'scrollLeft']).toBe(80);
+      expect(element.active).toEqual([64]);
+      expect(element.querySelector('[data-midi="64"]')!.getAttribute('data-active')).toBe('true');
+      expect(player.stop).not.toHaveBeenCalled();
+      expect(player.dispose).not.toHaveBeenCalled();
+    }
+    player.dispatchEvent(new CustomEvent('webscore:noteoff', {detail: {midi: 64}}));
+    expect(element.active).toEqual([]);
+    element.setAttribute('direction', 'diagonal');
+    expect(element.direction).toBe('down');
+    expect(viewport().dataset.direction).toBe('down');
+    element.direction = 'left';
+    element.removeAttribute('scroll');
+    expect(viewport().scrollTop).toBe(0);
+    expect(viewport().hasAttribute('tabindex')).toBe(false);
+  });
+
+  it.each(['staff', 'fretboard'])('retains direction without changing the %s reading surface', (type) => {
+    const {element} = setup(type);
+    const surface = element.querySelector('[role="img"]');
+    element.direction = 'left';
+    expect(element.querySelector('[role="img"]')).toBe(surface);
+    expect(element.active).toEqual([64]);
+    element.type = 'keyboard';
+    expect(element.querySelector<HTMLElement>('.wui-pitch-keyboard')!.dataset.direction).toBe('left');
+  });
+
+  it('upgrades direction assigned before element registration', () => {
+    const element = document.createElement('late-direction-pitch') as PitchViewElement;
+    element.direction = 'right';
+    document.body.append(element);
+    customElements.define('late-direction-pitch', class extends PitchViewElement {});
+    expect(Object.hasOwn(element, 'direction')).toBe(false);
+    expect(element.direction).toBe('right');
+    expect(element.getAttribute('direction')).toBe('right');
+    expect(element.querySelector<HTMLElement>('.wui-pitch-keyboard')!.dataset.direction).toBe('right');
+  });
+});

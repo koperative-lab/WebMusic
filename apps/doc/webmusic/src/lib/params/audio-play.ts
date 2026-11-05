@@ -22,6 +22,10 @@ export const AUDIO_PLAY_PARAMS: ElementParamCatalog = {
         note: 'URL of an audio file. Loading it replaces the selected clip; removing it clears a clip that came from src.',
       },
       {
+        name: 'loading', kind: 'bool', fallback: 'off',
+        note: 'Mark application-owned preparation. Clearing this flag does not clear an internal request or a selected playlist entry that is still loading.',
+      },
+      {
         name: 'format',
         kind: 'enum',
         options: ['wav', 'aiff', 'mp3', 'flac', 'ogg', 'opus', 'm4a', 'aac', 'webm'],
@@ -89,6 +93,8 @@ export const AUDIO_PLAY_PARAMS: ElementParamCatalog = {
       },
     ],
     properties: [
+      {name: 'loading', note: 'Read aggregate source readiness; writing changes only the reflected external preparation flag.'},
+      {name: 'loadError', note: 'Read the current Element or selected transport source-load failure.'},
       {name: 'clip', note: 'Assign a loaded AudioClip; supersedes src and any in-flight load.'},
       {name: 'player', note: 'Borrow an existing AudioPlayer — the element never disposes what it borrows.'},
       {name: 'effect', note: 'An Effect spliced into the graph; reassigning rebuilds an owned player.'},
@@ -99,6 +105,7 @@ export const AUDIO_PLAY_PARAMS: ElementParamCatalog = {
       {name: 'scratching', note: 'Read-only state: an exclusive scratch session owns audible playback, including release inertia.'},
     ],
     events: [
+      {name: 'webaudio:loadstatechange', note: '{loading, error} when current source readiness changes, including external preparation and selected queue loading.'},
       {name: 'webaudio:sourcechange', note: '{clip, revision} when the selected source changes, without requiring a graph.'},
       {name: 'webaudio:playerchange', note: '{player} when the central owner identity changes; companions rebind.'},
       {name: 'webaudio:statechange', note: '{playing} after playback state changes.'},
@@ -178,6 +185,8 @@ export const AUDIO_PLAY_PARAMS: ElementParamCatalog = {
       {name: 'player', note: 'Borrow the central AudioPlayer or its Element; linked controls share its selected backend.'},
       {name: 'entries', note: 'AudioPlaylistEntry[] — {id, label?, src?, clip?, streaming?, format?}. Overrides src and children.'},
       {name: 'playlist', note: 'The underlying AudioPlaylist controller. Borrowed — do not dispose it.'},
+      {name: 'loading', note: 'Read-only selected-entry load state; excludes background prefetch.'},
+      {name: 'loadError', note: 'Read-only selected-entry Error; cleared by retry, source replacement or disposal.'},
       {name: 'activePlayer', note: 'The current entry’s low-level AudioClipPlayer, replaced on advance.'},
       {name: 'index', note: 'Index of the current entry, or -1 when the queue is empty.'},
       {name: 'clip', note: 'PlayerLike facade: the current entry’s AudioClip, so <audio-view player="#id"> can bind to the queue.'},
@@ -185,6 +194,9 @@ export const AUDIO_PLAY_PARAMS: ElementParamCatalog = {
     ],
     events: [
       {name: 'webaudio:trackchange', note: '{id, index} — a different entry became current, including the first.'},
+      {name: 'webaudio:loadstatechange', note: '{loading, error} — selected-entry loading or failure changed.'},
+      {name: 'webaudio:sourcechange', note: '{clip, revision} — selected clip identity changed; revision increases before notification.'},
+      {name: 'webaudio:playerchange', note: '{player} — selected entry engine was created or replaced; followers can re-read its analyser.'},
       {name: 'webaudio:trackend', note: '{id, index} — one entry reached its natural end.'},
       {name: 'webaudio:playlistend', note: 'The last entry ended and the list is not looping.'},
       {name: 'webaudio:timeupdate', note: '{seconds, duration, progress} for the current entry.'},
@@ -219,8 +231,10 @@ export const AUDIO_PLAY_PARAMS: ElementParamCatalog = {
         fallback: 'no solo',
         note: 'Id of the member to solo, applied in place. Removing the attribute clears the solo rather than freezing it.',
       },
+      {name: 'loading', kind: 'bool', fallback: 'off', note: 'Declare application-owned asynchronous source preparation. Shows loading without replacing mixer members or transport.'},
     ],
     properties: [
+      {name: 'loading', note: 'Writable boolean reflected to loading. Clear it when external preparation settles; retains mixer data and playback.'},
       {name: 'player', note: 'Borrow the central AudioPlayer or its Element; linked controls share its selected backend.'},
       {name: 'mixer', note: 'Borrow an existing AudioMixer — never disposed by the element.'},
       {name: 'members', note: 'AudioMixerMemberSpec[] — {id, clip?, player?, effect?, volume?}. The element builds and owns that mixer.'},

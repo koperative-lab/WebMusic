@@ -1990,7 +1990,18 @@ followers use the same presenter. A valid silent or paused source is not pending
 an immediately usable note input has no artificial loading phase. The nonvisual rack-part
 declaration reports readiness to its visible desk. Native Audio Player exposes current
 `loading` and `loadError` plus `webaudio:loadstatechange` so companions can share its
-readiness without initiating another load.
+readiness without initiating another load. Score Player, Audio Player, AudioView
+and AudioMixer accept an explicit `loading` flag for application-owned asynchronous
+preparation. It initiates no work and preserves assigned payloads and player
+position; clearing it resumes automatic readiness and never cancels or hides an
+internal pending request. Player getters and notifications combine this flag
+with their native readiness. Audio Player also forwards its selected backend's
+loading and failure; unrelated queue prefetch leaves a ready session usable.
+Applications own cancellation and late-result guards for external preparations,
+and mark every component whose required input is being prepared. Readiness follows
+the selected drawing's actual input, rather than unrelated retained data from
+another mode. Source discovery and replacement must refresh feedback even before
+playback, without retaining subscriptions to superseded owners.
 
 **Owner:** [Design principles](DESIGN-PRINCIPLES.md),
 [Status presenter](../apps/doc/webmusic/src/content/docs/uikit/layout-feedback/status.mdx),
@@ -2000,6 +2011,59 @@ and the affected Element references.
 **Verification implications:** loading/waiting/ready/error transitions, source replacement,
 cancellation, teardown, unchanged-update stability, light/dark themes, narrow layouts and
 reduced motion. Browser and screen-reader acceptance remain distinct from DOM regressions.
+
+## DEC-053 — Four-direction score and keyboard composition
+
+**Date / status:** 2026-10-08; accepted by the maintainer's request and confirmed
+scope: keyboard, piano roll and waterfall support four directions; staff,
+fretboard, map and thumbnail keep their normal reading direction.
+
+**Problem:** fixed horizontal keyboards and downward waterfalls prevent
+applications from composing equivalent views at different sides of a musical
+installation. ScoreView also displays advanced annotations before an application
+has asked for them.
+
+**Decision:** keyboard `direction` names the key fronts (`up`, `down`, `left`,
+`right`; default `down`). Piano-roll direction names increasing score time
+(default `right`); waterfall direction names note travel toward its landing
+edge (default `down`). Low pitches remain left or bottom, and labels remain
+upright. Width options retain pitch breadth and keyboard height options retain
+key depth regardless of direction. Vertical pitch compositions supply a height.
+The Element direction attribute is inert for other views; strict staff render
+configuration rejects it. `.options.direction` overrides the ScoreView attribute.
+
+Waterfall retains true natural/accidental pitch geometry in every direction;
+piano roll retains equal semitone lanes. Several independent PitchViews can
+borrow one player and align with a waterfall through common range, pitch
+breadths and scroll container. No keyboard becomes part of the score renderer,
+and no companion creates another transport or clock.
+
+ScoreView Elements default `show-annotations` to false across all five types.
+Explicit opt-in and `.options.showAnnotations` retain the existing precedence;
+notes, rests and ordinary staff notation remain visible. Imperative renderers
+retain their annotation defaults.
+
+**Alternatives considered:** rotate the complete component with CSS; turn
+staff/engraving alongside piano views; embed keyboards into the renderer; or
+change imperative annotation defaults. These would rotate labels, disrupt
+reading order, couple independent components or change unrelated API callers.
+
+**Consequences:** coordinate mapping, cursor, time following, virtualization,
+annotations and overflow use the selected axes. Changing direction retains
+source and nominal playback position. UI remains domain-neutral and exposes
+keyboard geometry through its existing presenter. The Arabesque composition
+demo uses one player and independently mounted keyboards at opposite edges.
+
+**Owner:** [View families](design/VIEW-COMPONENTS.md),
+[ScoreView](../apps/doc/webmusic/src/content/docs/score/element/view/score-view.mdx),
+[PitchView](../apps/doc/webmusic/src/content/docs/score/element/view/score-pitch-view.mdx)
+and [UIKit pitch](../apps/doc/webmusic/src/content/docs/uikit/views-analysis/pitch.mdx).
+
+**Verification implications:** all four directions, default and invalid values,
+property/attribute precedence, unchanged bindings and source identity, exact
+natural/accidental alignment, resize/follow/virtualization, native keyboard
+scrolling, upright labels, annotations opt-in, and unchanged imperative defaults.
+Browser acceptance remains distinct from DOM and geometry tests.
 
 ## Recording the next decision
 

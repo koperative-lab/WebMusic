@@ -90,6 +90,7 @@ Sharing this facade does not complete shared-clock injection across mix members.
 | `beginScratch()` / `scratching` | Borrow the selected backend's optional scratch session. See [scratch sessions](/audio/headless/play/audio-clip-player/#scratch-sessions). |
 | `seconds` / `currentTime` / `duration` / `progress` | Live position, duration and fraction; zero for empty input. |
 | `playing` | Selected backend's playback state. |
+| `loading` / `loadError` | Selected borrowed backend's pending input and failure; false/undefined for an owned clip or a backend without readiness ports. Playlist prefetch is excluded unless it is the selected entry. |
 | `volume` / `rate` / `pan` | Facade's retained clip settings; a backend can expose narrower control support. |
 | `audioContext` | Lazily creates or returns the borrowed AudioContext for shared decoding/owned playback. Throws after disposal. A borrowed group may own a different context; sharing must be configured explicitly. |
 | `clock` | Selected engine's optional read-only transport clock; the facade owns no clock. |
@@ -100,6 +101,9 @@ Sharing this facade does not complete shared-clock injection across mix members.
 `on`, `once` and `off` use `AudioPlayerEvents`; `on`/`once` return an unsubscribe.
 `sourcechange` carries `{clip, revision}`, `statechange` carries `{playing}`, and
 `timeupdate` carries `{seconds, duration, progress}`. Notifications are synchronous;
+`loadstatechange` carries `{loading, error}` when the borrowed input's readiness
+changes, including detachment and disposal. Backend subscriptions supply these
+changes even while playback is paused; no polling or extra clock is required.
 read current state again after reentrant callbacks. Source observation does not
 start playback. `load` carries `{duration}`; `end` carries the clip or undefined
 for a backend without one. `regionenter`, `regionleave` and `beat` forward clip
@@ -111,9 +115,11 @@ and borrowed transport remain caller-owned. Dispose owners separately in their
 application lifetime. Cleanup must not reclaim a source selected by a callback.
 
 `AudioPlayerTransport` requires seconds/duration/playing, play/pause/stop/seek.
-Optional clip/currentClip, analyser, clock, configuration, preload/scratch and
+Optional loading/loadError, clip/currentClip, analyser, clock, configuration, preload/scratch and
 subscribe/onEnd/onError ports expose backend capabilities without DOM. An
 `AudioPlaylist` implements this contract; use `AudioMixer.transport` for a mix.
+Backends with readiness ports notify their `subscribe` observers whenever that
+state changes. Loading describes the selected input, not unrelated prefetch.
 
 </details>
 

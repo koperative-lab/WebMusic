@@ -7,6 +7,8 @@ sidebar:
 
 import SynthPanelDemo from '../../../../../components/SynthPanelDemo.astro';
 
+<SynthPanelDemo />
+
 `<score-synth-panel>` is a composable control surface for one synth voice. It does not choose a synthesizer
 for you: assign small descriptors and callbacks for the controls you want, then connect its optional
 effects / EQ bus to the audio graph you already own. This keeps the panel reusable with
@@ -67,8 +69,6 @@ current Parameters and Effects editor setup; **Reset** restores every editor val
 section after ordinary edits or a browser back/forward-cache restore. The structured editors are the
 copy source of truth. Turning a Sound / Effect knob or dragging an EQ point directly on the panel is
 a live audition and does not silently rewrite a separate editor field.
-
-<SynthPanelDemo />
 
 ## Audio routing
 

@@ -37,6 +37,7 @@ export type {
   ScoreNoteSequence,
   ScoreSequenceNote,
   ScoreViewType,
+  ScoreViewDirection,
   ScoreViewConfiguration,
   ScoreViewOptionsByType,
   StaffRenderOptions,

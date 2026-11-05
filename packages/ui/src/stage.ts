@@ -51,6 +51,19 @@ export interface StageHandle {
   destroy(): void;
 }
 
+export interface ScrollRegionOptions {
+  /** Accessible region name. Existing authored role/name attributes are preserved. */
+  label?: string;
+  /** Hide native scrollbar chrome without changing scrolling or keyboard focus. Defaults to false. */
+  hideScrollbar?: boolean;
+}
+
+export interface ScrollRegionHandle {
+  readonly element: HTMLElement;
+  /** Restore only presenter-owned attributes/styles that the application has not changed. */
+  destroy(): void;
+}
+
 /** Numeric state exposed by a domain-neutral slider drawn on an arbitrary surface. */
 export interface SurfaceSliderState {
   minimum: number;
@@ -197,6 +210,45 @@ type StageHost = HTMLElement | ShadowRoot;
 const mountedStages = new WeakMap<StageHost, StageHandle>();
 const mountedCanvasStages = new WeakMap<StageHost, CanvasStageHandle>();
 const mountedSurfaceSliders = new WeakMap<HTMLElement, SurfaceSliderHandle>();
+const mountedScrollRegions = new WeakMap<HTMLElement, ScrollRegionHandle>();
+
+const scrollRegionStyle = `.wui-scroll-region--hidden-scrollbar { scrollbar-width: none; }
+.wui-scroll-region--hidden-scrollbar::-webkit-scrollbar { display: none; }`;
+
+/** Add keyboard access to an existing native scroll viewport without slider semantics. */
+export function mountScrollRegion(element: HTMLElement, options: ScrollRegionOptions = {}): ScrollRegionHandle {
+  mountedScrollRegions.get(element)?.destroy();
+  const attributes = new Map<string, string>();
+  const assignMissing = (name: string, value: string): void => {
+    if (element.hasAttribute(name)) return;
+    element.setAttribute(name, value);
+    attributes.set(name, value);
+  };
+  assignMissing('tabindex', '0');
+  if (options.label) {
+    assignMissing('role', 'region');
+    if (!element.hasAttribute('aria-labelledby')) assignMissing('aria-label', options.label);
+  }
+  const className = 'wui-scroll-region--hidden-scrollbar';
+  const ownsClass = options.hideScrollbar === true && !element.classList.contains(className);
+  const style = options.hideScrollbar ? installStyle(element.ownerDocument, 'scroll-region', scrollRegionStyle) : undefined;
+  if (ownsClass) element.classList.add(className);
+  if (style) element.append(style);
+  let destroyed = false;
+  const handle: ScrollRegionHandle = {
+    element,
+    destroy(): void {
+      if (destroyed) return;
+      destroyed = true;
+      for (const [name, value] of attributes) if (element.getAttribute(name) === value) element.removeAttribute(name);
+      if (ownsClass) element.classList.remove(className);
+      style?.remove();
+      if (mountedScrollRegions.get(element) === handle) mountedScrollRegions.delete(element);
+    },
+  };
+  mountedScrollRegions.set(element, handle);
+  return handle;
+}
 
 export const stageStyle = String.raw`
 .wui-stage {

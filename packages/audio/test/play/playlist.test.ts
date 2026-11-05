@@ -474,6 +474,72 @@ function deferred<T>() {
   return {promise, resolve, reject};
 }
 
+describe('AudioPlaylist selected source feedback', () => {
+  it('publishes pending, failure, retry and ready through the transport subscription', async () => {
+    const failed = deferred<AudioClip>();
+    const retried = deferred<AudioClip>();
+    const failure = new Error('decode failed');
+    const loadEntry = vi.fn().mockReturnValueOnce(failed.promise).mockReturnValueOnce(retried.promise);
+    const queue = new AudioPlaylist({entries: [{id: 'a', src: 'a.wav'}], loadEntry,
+      audioContext: fakeContext().context, prefetch: false, skipFailed: false});
+    const snapshots: Array<{loading: boolean; error: Error | undefined}> = [];
+    queue.subscribe(() => snapshots.push({loading: queue.loading, error: queue.loadError}));
+    const first = queue.play();
+    expect(queue.loading).toBe(true);
+    failed.reject(failure);
+    await first;
+    expect(queue.loading).toBe(false);
+    expect(queue.loadError).toBe(failure);
+    expect(snapshots).toContainEqual({loading: false, error: failure});
+    const second = queue.play();
+    expect(queue.loading).toBe(true);
+    expect(queue.loadError).toBeUndefined();
+    retried.resolve(clip());
+    await second;
+    expect(queue.loading).toBe(false);
+    expect(queue.loadError).toBeUndefined();
+    expect(snapshots).toContainEqual({loading: true, error: undefined});
+    expect(snapshots).toContainEqual({loading: false, error: undefined});
+    queue.dispose();
+  });
+
+  it('does not mark the selected ready entry busy or failed because of prefetch', async () => {
+    const pending = deferred<AudioClip>();
+    const failure = new Error('prefetch failed');
+    const queue = new AudioPlaylist({entries: [{id: 'a', clip: clip()}, {id: 'b', src: 'b.wav'}],
+      loadEntry: () => pending.promise, audioContext: fakeContext().context});
+    await queue.play();
+    expect(queue.statusOf('b')).toBe('loading');
+    expect(queue.loading).toBe(false);
+    expect(queue.loadError).toBeUndefined();
+    pending.reject(failure);
+    await vi.waitFor(() => expect(queue.statusOf('b')).toBe('error'));
+    expect(queue.loadError).toBeUndefined();
+    queue.pause();
+    await queue.select('b');
+    expect(queue.loadError).toBe(failure);
+    queue.setEntries([{id: 'b', clip: clip()}]);
+    expect(queue.loadError).toBeUndefined();
+    queue.dispose();
+  });
+
+  it('drops selected loading on replacement and ignores late failure after disposal', async () => {
+    const pending = deferred<AudioClip>();
+    const queue = new AudioPlaylist({entries: [{id: 'a', src: 'a.wav'}],
+      loadEntry: () => pending.promise, audioContext: fakeContext().context});
+    const start = queue.play();
+    await Promise.resolve();
+    expect(queue.loading).toBe(true);
+    queue.setEntries([{id: 'replacement', clip: clip()}]);
+    expect(queue.loading).toBe(false);
+    queue.dispose();
+    pending.reject(new Error('late old source failure'));
+    await start;
+    expect(queue.loading).toBe(false);
+    expect(queue.loadError).toBeUndefined();
+  });
+});
+
 describe('AudioPlaylist asynchronous transitions', () => {
   const queues: AudioPlaylist[] = [];
   const makeQueue = (options: AudioPlaylistOptions) => {

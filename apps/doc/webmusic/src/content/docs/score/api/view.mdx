@@ -77,6 +77,13 @@ view.dispose();
 
 `renderPianoRollVisualizer` draws the built-in SVG piano roll into an `<svg>` and returns the [renderer handle](#renderer-handle) used by `<score-view type="piano-roll">`.
 
+Its `direction` is the direction of increasing score time: `right` (default),
+`left`, `up` or `down`. `noteHeight` is pitch-lane breadth perpendicular to that
+axis; low pitches stay at the bottom for horizontal time and the left for
+vertical time. Annotations, the playhead, following and virtualization use the
+same direction. This drawing uses equal semitone lanes; choose waterfall when
+aligning notes to natural/accidental piano key breadths.
+
 ```ts
 import { renderPianoRollVisualizer } from '@webmusic/score/view/render';
 
@@ -95,12 +102,15 @@ rendered.clearActiveNotes();
 
 ### Renderer handle
 
-The render helpers return `RenderedScoreVisualizer<TVisualizer>`:
+The render helpers implement `RenderedScoreVisualizer<TVisualizer>`. The built-in
+SVG factories and `renderScoreVisualizer()` return its browser-specific
+`ScoreVisualizerHandle` extension from `@webmusic/score/view/render`:
 
 | Member | Contract |
 | --- | --- |
 | `noteSequence` | Read-only sequence used by this renderer. |
 | `visualizer` | The underlying renderer instance. |
+| `scrollViewport?` | Native waterfall time-axis viewport, available on `ScoreVisualizerHandle`. Undefined for other modes and after waterfall disposal. It is a named mounting surface for optional UI focus/scrollbar presentation. |
 | `redraw(activeNote?, scrollIntoView?)` | Existing note-driven drawing entry. Exact-time-capable renderers use the nominated note’s onset; OSMD moves its engraving cursor. Returns a renderer coordinate or `null`. |
 | `redrawAtTime?(nominalSeconds, scrollIntoView?)` | Optional exact-time drawing entry, implemented by the built-in SVG and Canvas piano rolls, waterfall and scrolling staff. Highlights notes where `startTime <= nominalSeconds < endTime`; it does not snap to a selected note’s onset. Returns a renderer coordinate or `null`. |
 | `clearActiveNotes()` | Clear current highlights and the applicable cursor display. |
@@ -132,7 +142,9 @@ while retaining its requested viewport height. Explicit application sizing
 still defines the outer viewport.
 
 The Element's [`show-annotations` attribute](/score/element/view/score-view/#annotations-and-compact-layout)
-also covers its lightweight map and thumbnail types. This is a rendering
+defaults to false for all five Element types, including map and thumbnail.
+Enabling it or setting `.options.showAnnotations` overrides that Element
+default; the imperative renderer defaults remain true. This is a rendering
 option; Headless `createScoreView` continues to expose sounding-note state and
 does not allocate an annotation surface.
 
@@ -260,25 +272,29 @@ rendered.redraw(rendered.noteSequence.notes[0], true);
 
 ## Render a waterfall
 
-`renderWaterfallVisualizer` draws falling notes on a vertical time axis, using
-piano-style pitch columns without an embedded keyboard. Its default range is
+`renderWaterfallVisualizer` draws moving notes toward the current-time landing edge, using
+piano-style pitch columns without an embedded keyboard. `direction` selects
+`down` (default), `up`, `left` or `right` note travel. Low pitches stay left for
+vertical time or bottom for horizontal time. Its default range is
 A0–C8, with 20px natural-note columns and accidental columns 0.62 times as wide.
 Set `showOnlyOctavesUsed: true` to use occupied MIDI octaves and `fitToWidth: true`
-to fit the current container width. Positive explicit `whiteNoteWidth` or
+to fit the current pitch-axis viewport (width for up/down, height for left/right). Positive explicit `whiteNoteWidth` or
 `blackNoteWidth` values disable fitting and retain pixel column widths.
 Setting only `blackNoteWidth` derives natural-note width by dividing by `0.62`;
 accidental width is capped at natural width. Explicit `minPitch` / `maxPitch`
 select exact MIDI endpoints before automatic octave selection. When composing
 an independent keyboard, match those endpoints and widths and use a shared
-horizontal scroller; see the [live aligned example](/score/element/view/score-view/#align-a-waterfall-and-keyboard).
+pitch-axis scroller; see the [live aligned example](/score/element/view/score-view/#align-a-waterfall-and-keyboard).
 
 The natural falling-note viewport follows score duration at the chosen time
 scale, bounded to 80–200px. An explicit measurable container height uses the full
 available height. Resizing reflows note columns while preserving the visible
 score position and active notes; hidden containers retain their last useful
 layout until a size is available. `dispose()` releases the resize observer (or
-window-resize fallback) and owned DOM. Annotations follow the same vertical
-time axis in a separate rail.
+window-resize fallback) and owned DOM. Left/right travel uses the available
+container width for time and its height for pitch; set an explicit height for
+fitted vertical pitch layouts. Annotations follow the selected time axis in a
+separate rail.
 
 ```ts
 import { renderWaterfallVisualizer } from '@webmusic/score/view/render';
@@ -293,6 +309,13 @@ const rendered = renderWaterfallVisualizer(score, container, {
 
 rendered.redraw(rendered.noteSequence.notes[0], true);
 ```
+
+`renderWaterfallVisualizer()` leaves native scrollbar and focus policy to the
+application and has no static UIKit dependency. The styled Element mounts
+[`mountScrollRegion()`](/uikit/layout-feedback/stage/) on `scrollViewport` to
+retain keyboard access while hiding scrollbar chrome that would displace
+columns beside a separate keyboard. Release such a presenter before disposing
+the renderer.
 
 `WaterfallVisualizerConfig` controls falling-note geometry and optional fitting;
 it has no keyboard presenter port. `whiteNoteHeight` and `blackNoteHeight` are
@@ -592,6 +615,8 @@ Score + MusicXML + OSMD constructor -> RenderedScoreVisualizer<OSMDLike>
 | `defineSheetViewElement(tag?)` | Web Component | Register `<score-sheet-view>` with its optional OSMD renderer. |
 | `defineAllViewElements()` | Web Component | Register the three default View tags. |
 | `ScoreViewElement`, `PitchViewElement`, `SheetViewElement` | Web Component | Classes from `@webmusic/score/view/element`; owning [Element references](/score/element/#view) describe properties, attributes and lifecycle. |
+| `ScoreViewDirection` | Type | `up`, `down`, `left` or `right`; exported by the View API and Element entries. Piano-roll uses increasing-time direction; waterfall uses note-travel direction. |
+| `PitchViewDirection` | Type | Keyboard key-front direction, exported by the Element entry; the same four string values. |
 | `ScoreViewElementType` | Type | Five-value Element type: `piano-roll`, `staff`, `waterfall`, `map`, `thumbnail`. |
 | `PitchViewType` | Type | `keyboard`, `staff` or `fretboard`. |
 | `ScoreViewSeekDetail` | Type | Map navigation event detail: `{quarters, seconds}`, with nominal seconds. |
@@ -604,6 +629,7 @@ Score + MusicXML + OSMD constructor -> RenderedScoreVisualizer<OSMDLike>
 | `renderWaterfallVisualizer(score, container, config?)` | Visualizer | Render falling notes on piano-style pitch columns, without an embedded keyboard (from `@webmusic/score/view/render`). |
 | `renderScoreThumbnail(surface, notes, options?)` | Renderer | Append a static fitted note preview with optional original Score directions; returns its SVG (from `@webmusic/score/view/render`). |
 | `ScoreThumbnailRenderOptions` | Render type | Thumbnail color, accessible label, original Score and annotation visibility (from `@webmusic/score/view/render`). |
+| `ScoreVisualizerHandle` | Render type | Built-in renderer handle with an optional native `scrollViewport`; DOM details stay in the render entry. |
 | `WaterfallVisualizerConfig` | Render type | Falling-note geometry plus opt-in container fitting. |
 | `renderOSMDStaffVisualizer(score, container, options?)` | Visualizer | Render full staff engraving through OpenSheetMusicDisplay (from `@webmusic/score/view/render`). |
 | `createPianoRollLayout(score, opts?)` | Layout | Return serializable piano-roll note rectangles. |
@@ -630,7 +656,9 @@ Score + MusicXML + OSMD constructor -> RenderedScoreVisualizer<OSMDLike>
 `ScoreViewConfiguration` is a discriminated union of `{type, options?}` for
 `piano-roll`, `staff` and `waterfall`. `ScoreViewOptionsByType` maps each mode to
 its renderer options. These types prevent options for one mode from silently
-configuring another.
+configuring another. `direction` is supported by piano-roll and waterfall;
+strict staff configuration rejects it. A retained Element direction attribute
+is instead ignored while displaying staff, map or thumbnail.
 
 `validateScoreViewConfiguration(configuration): void` validates the mode and
 option keys without creating UI. It throws `TypeError` for an unknown mode,

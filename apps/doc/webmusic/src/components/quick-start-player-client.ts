@@ -14,7 +14,7 @@ export function mountQuickStartStatus(player: ScorePlayerElement, status: HTMLEl
     lastState = state;
     if (snapshot.readiness === 'error') {
       write(`Could not load the score: ${message(snapshot.error)}`);
-    } else if (snapshot.readiness !== 'ready') {
+    } else if (snapshot.readiness === 'loading') {
       write('Loading score…');
     } else {
       write('');

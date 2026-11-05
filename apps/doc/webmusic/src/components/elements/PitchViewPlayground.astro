@@ -22,5 +22,7 @@ const companions = [{tag: 'score-player', target: 'score-player'}];
 <style>
   .pg-pitch-view :global([data-pitch-composition]) { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; min-width: 0; }
   .pg-pitch-view :global([data-pitch-composition] > *) { min-width: 0; }
+  .pg-pitch-view :global(score-pitch-view:not([type=staff]):not([type=fretboard])[direction=left]),
+  .pg-pitch-view :global(score-pitch-view:not([type=staff]):not([type=fretboard])[direction=right]) { height: 320px; }
   .pg-pitch-view :global(score-player) { --webscore-play-height: 2.1rem; }
 </style>

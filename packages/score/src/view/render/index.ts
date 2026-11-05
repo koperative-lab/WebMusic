@@ -17,4 +17,5 @@ export {
 export {
   renderScoreVisualizer,
   type ScoreVisualizerRenderOptions,
+  type ScoreVisualizerHandle,
 } from './score-visualizer';

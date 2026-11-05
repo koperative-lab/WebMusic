@@ -215,7 +215,7 @@ describe('<score-view type="map">', () => {
     const regions = element.querySelectorAll('button');
     expect(regions).toHaveLength(4);
     expect(regions[0]!.textContent).toBe('m. 1');
-    expect(element.textContent).toContain('A');
+    expect(element.querySelector('[data-webscore-annotations]')).toBeNull();
   });
 
   it('hides expressions and legacy rehearsal labels without losing map position or notes', async () => {
@@ -231,7 +231,7 @@ describe('<score-view type="map">', () => {
     builder.addNote(part, {id: builder.newNoteId(), pitch: Pitch.parse('C4'), onsetQuarters: Rational.ZERO,
       duration: Duration.whole(), voice: VoiceId('piano')});
     const score = builder.build();
-    const element = await mount<ScoreViewElement>(tag, score, {type: 'map'});
+    const element = await mount<ScoreViewElement>(tag, score, {type: 'map', 'show-annotations': 'true'});
     expect(element.querySelector('svg[part="annotations"]')?.textContent).toContain('rit.');
     const seek = element.querySelector('input[type="range"]') as HTMLInputElement;
     seek.value = '2';
@@ -258,7 +258,7 @@ describe('<score-view type="map">', () => {
     ]});
     builder.addNote(part, {id: builder.newNoteId(), pitch: Pitch.parse('C4'), onsetQuarters: Rational.ZERO,
       duration: new Duration({base: new Rational(1, 2)}), voice: VoiceId('short')});
-    const element = await mount(tag, builder.build(), {type: 'map'});
+    const element = await mount(tag, builder.build(), {type: 'map', 'show-annotations': 'true'});
     const svg = element.querySelector('svg[part="annotations"]')!;
     const width = svg.getAttribute('viewBox')!.split(' ')[2];
     const pedal = svg.querySelector('[data-webscore-direction="pedal"] path');
@@ -430,7 +430,7 @@ describe('<score-view type="thumbnail">', () => {
   const tag = define(class extends ScoreViewElement {});
 
   it('fits the whole score while keeping annotation text unscaled', async () => {
-    const element = await mount(tag, fourBars(), {type: 'thumbnail', width: '180', height: '48'});
+    const element = await mount(tag, fourBars(), {type: 'thumbnail', width: '180', height: '48', 'show-annotations': 'true'});
 
     const svg = element.querySelector('svg')!;
     expect(svg).not.toBeNull();
@@ -454,6 +454,23 @@ describe('<score-view type="thumbnail">', () => {
   it('renders nothing for an empty score', async () => {
     const element = await mount(tag, new ScoreBuilder().build(), {type: 'thumbnail'});
     expect(element.querySelector('svg')).toBeNull();
+  });
+});
+
+describe('overview expression defaults', () => {
+  const tag = define(class extends ScoreViewElement {});
+
+  it.each(['map', 'thumbnail'])('%s hides source expressions until enabled', async (type) => {
+    const score = fourBars();
+    const element = await mount<ScoreViewElement>(tag, score, {type});
+    expect(element.querySelector('[data-webscore-annotations]')).toBeNull();
+    element.setAttribute('show-annotations', 'true');
+    expect(element.querySelector('[data-webscore-annotations]')?.textContent).toContain('A');
+    element.removeAttribute('show-annotations');
+    expect(element.querySelector('[data-webscore-annotations]')).toBeNull();
+    element.options = {showAnnotations: true};
+    expect(element.querySelector('[data-webscore-annotations]')?.textContent).toContain('A');
+    expect(element.score).toBe(score);
   });
 });
 

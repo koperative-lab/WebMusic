@@ -182,7 +182,7 @@ export class AudioLevelAnalyzerElement extends WebMusicElement {
     }
     if (!this.#explicitAnalyser && (this.#loading || this.#loadError)) {
       this.#stop();
-      this.#status = this.#loadError?.message ?? 'Loading audio';
+      this.#status = this.#loading ? 'Loading audio' : this.#loadError!.message;
       this.#render();
       return;
     }

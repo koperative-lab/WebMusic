@@ -108,6 +108,52 @@ describe('<audio-live-view>', () => {
     } as unknown as AnalyserNode;
   }
 
+  it('surfaces failed captures, recovers on valid frames, and releases the old tap on reconnect', () => {
+    let nextFrame: FrameRequestCallback | undefined;
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => { nextFrame = callback; return 1; });
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => { nextFrame = undefined; });
+    const step = (time: number) => nextFrame?.(time);
+    const analyser = fakeAnalyser();
+    const read = vi.spyOn(analyser, 'getByteTimeDomainData').mockImplementation(() => { throw new Error('Tap unavailable'); });
+    const source = Object.assign(document.createElement('div'), {analyser, loading: false});
+    source.id = 'captured-tap';
+    document.body.append(source);
+    const view = mount<AudioLiveViewElement>('audio-live-view', {source: '#captured-tap'});
+    const feedback = () => view.querySelector<HTMLElement>('.wui-status')!;
+    step(100);
+    expect(feedback().dataset.kind).toBe('error');
+    expect(feedback().textContent).toBe('Tap unavailable');
+    read.mockImplementation((data) => data.fill(128));
+    step(200);
+    step(300);
+    expect(feedback().hidden).toBe(true);
+    view.remove();
+    read.mockClear();
+    source.loading = true;
+    document.body.append(view);
+    expect(feedback().dataset.kind).toBe('loading');
+    expect(read).not.toHaveBeenCalled();
+  });
+
+  it('keeps explicit input independent and ignores former source events after selector replacement', () => {
+    const first = Object.assign(document.createElement('div'), {loading: true});
+    const second = Object.assign(document.createElement('div'), {loading: false});
+    first.id = 'old-live-owner'; second.id = 'new-live-owner';
+    document.body.append(first, second);
+    const view = mount<AudioLiveViewElement>('audio-live-view', {source: '#old-live-owner'});
+    const feedback = () => view.querySelector<HTMLElement>('.wui-status')!;
+    expect(feedback().dataset.kind).toBe('loading');
+    view.analyser = fakeAnalyser();
+    expect(feedback().dataset.kind).not.toBe('loading');
+    view.analyser = undefined;
+    expect(feedback().dataset.kind).toBe('loading');
+    view.setAttribute('source', '#new-live-owner');
+    expect(feedback().dataset.kind).toBe('waiting');
+    first.dispatchEvent(new CustomEvent('webaudio:loaded'));
+    expect(view.getAttribute('source')).toBe('#new-live-owner');
+    expect(feedback().dataset.kind).toBe('waiting');
+  });
+
   it('shows shared waiting feedback and keeps its source status accessible', async () => {
     mount<AudioLiveViewElement>('audio-live-view');
     await flush();

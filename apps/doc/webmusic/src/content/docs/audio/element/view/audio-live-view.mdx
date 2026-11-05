@@ -7,6 +7,8 @@ sidebar:
 
 import AudioLiveViewPlayground from '../../../../../components/elements/AudioLiveViewPlayground.astro';
 
+<AudioLiveViewPlayground />
+
 Draw what is being heard **right now**. The newest column sits at the right edge and history slides left, so the strip reads as "now" scrolling away.
 
 This is the capability's missing cardinality. Every other surface here draws data that already exists — a decoded clip, a peaks pyramid, a precomputed spectrogram. The only live path was [`<audio-view type="meter">`](/audio/element/view/audio-view/#what-each-drawing-needs), which is **instantaneous**: it has no time axis at all, so nothing could show what the microphone did a second ago. This element is the only live time-axis surface in the package.
@@ -21,8 +23,6 @@ This is the capability's missing cardinality. Every other surface here draws dat
 <audio-live-view source="#rec" type="waveform" window-seconds="4"></audio-live-view>
 <audio-live-view source="#rec" type="spectrogram" color-map="magma"></audio-live-view>
 ```
-
-<AudioLiveViewPlayground />
 
 Two drawings live under one `type`, exactly as `<audio-view>` keeps waveform and spectrogram under one attribute: both are "append one column per frame and scroll", and they differ only in how a column is painted. `waveform` reduces each frame to a min/max band; `spectrogram` paints one bin per row, low frequencies at the bottom, coloured through `color-map`. An unknown `type` falls back to `waveform`.
 
@@ -59,7 +59,8 @@ hosts without RAF get the initial draw but no Element-owned timer fallback.
 
 The shared status overlay shows a quiet square waiting animation until an analyser and its
 first column arrive. A bound source exposing `.loading` shows the loading animation only
-while that source is fetching or decoding. Source-load failures remain visible. The source and signal messages remain
+while that source declares pending preparation, fetching or decoding. Source-load and capture
+failures remain visible; a successful later frame clears the capture error. The source and signal messages remain
 available to assistive technology without visible placeholder prose. Both animations honor
 reduced-motion preferences and use the shared [Status tokens](/uikit/layout-feedback/status/).
 

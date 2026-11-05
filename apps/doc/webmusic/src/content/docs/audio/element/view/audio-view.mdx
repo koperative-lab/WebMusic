@@ -9,6 +9,8 @@ import AudioViewDemo from '../../../../../components/AudioViewDemo.astro';
 import WaveformExamplesDemo from '../../../../../components/WaveformExamplesDemo.astro';
 import MultibandWaveformDemo from '../../../../../components/MultibandWaveformDemo.astro';
 
+<AudioViewDemo />
+
 `<audio-view>` is the Audio **projection stage** — one element that draws decoded audio onto a canvas and follows a player. The three drawings are the *same* tag with a different `type` attribute (and the matching data property). Switching `type` at runtime disposes the old visualizer and re-renders; unknown values fall back to `waveform`.
 
 | `type` | Draws | Needs |
@@ -17,13 +19,12 @@ import MultibandWaveformDemo from '../../../../../components/MultibandWaveformDe
 | **`spectrogram`** | STFT magnitude heatmap (time × frequency). | `.spectrogram` — `SpectrogramData` from [`computeSpectrogram`](/audio/api/analyze/). |
 | **`meter`** | Live RMS / spectrum level bars, with no time axis. | An `AnalyserNode`, tapped from the bound player. |
 
-<AudioViewDemo />
-
 The examples on this page share one decoded clip and peaks pyramid. The first
 waveform does not wait for a spectrogram: spectra are prepared through the
 analysis worker when a spectral mode is selected. The lower examples activate
 when they approach the viewport or receive keyboard/pointer interaction, and
-reuse their prepared data. Loading and failures appear beside the relevant demo.
+reuse their prepared data. Loading animates inside each view; failures appear
+beside the relevant demo.
 The demos start in `drag-mode="scrub"`: the playhead stays centered while the
 track moves underneath. Drag left toward later audio, or right toward earlier
 audio. Their decoded player sounds the movement at your gesture speed, then
@@ -85,7 +86,7 @@ view.spectrogram = computeSpectrogram(clip.channelData(0)!, clip.sampleRate, {
 });
 ```
 
-This drawing is **precomputed only**: `src`, `peaks-src` and a bound player supply no spectrogram, so `.spectrogram` is the one way in. Until it is assigned the view says so — `No spectrogram to draw — assign .spectrogram` — instead of leaving a blank box, and draws normally as soon as the data arrives. Everything time-axis-shaped is exactly what a waveform gets: `player` + `follow` move the playhead, `interactive` seeks, `annotate` drags out regions, and `pixels-per-second` / `setZoom()` / `panTo()` / `visibleRange()` / `webaudio:viewportchange` are the same [one geometry model](#one-geometry-model).
+This drawing is **precomputed only**: `src`, `peaks-src` and a bound player supply no spectrogram, so `.spectrogram` is the one way in. Without data, the view shows the square waiting animation; `No spectrogram to draw — assign .spectrogram` remains an accessible description rather than visible placeholder text. Set `.loading = true` while application-owned analysis prepares that data, then clear it when the operation settles. The view draws normally once data is assigned and loading has cleared. Everything time-axis-shaped is exactly what a waveform gets: `player` + `follow` move the playhead, `interactive` seeks, `annotate` drags out regions, and `pixels-per-second` / `setZoom()` / `panTo()` / `visibleRange()` / `webaudio:viewportchange` are the same [one geometry model](#one-geometry-model).
 
 **Meter** — a live RMS-level (or `spectrum`) meter. It has no time axis and needs no precomputed data — instead it taps the **`AnalyserNode` of the player it is bound to**, reading it every animation frame. Resolution is structural: `<audio-view type="meter">` reads `.analyser` off the element named by `player="#id"` (or off that element's `.player`), so the target must expose an `AnalyserNode` — an [`AudioClipPlayer`](/audio/api/play/) has one at `.analyser`. **A meter only moves while audio is flowing — press play to see it react.**
 
@@ -250,12 +251,14 @@ the view observe movement between those events.
 
 ## Loading and waiting feedback
 
-Each `type` mounts the shared `@webmusic/ui/status` presenter when its data is missing.
-An active `src` or `peaks-src` request shows the loading animation. When using borrowed
-player data, source loading and failure follow the player's `.loading`, `.loadError` and
-`webaudio:loadstatechange` contract. Explicit view data keeps its independent presentation. Otherwise a quiet square
-waiting animation replaces visible placeholder prose; the following descriptions remain
-available to assistive technology:
+Each `type` uses the shared `@webmusic/ui/status` presenter to distinguish pending
+work from missing input. An active `src` or `peaks-src` request shows the loading
+animation. When the selected drawing borrows its input from a player, source
+loading and failure follow the player's `.loading`, `.loadError` and
+`webaudio:loadstatechange` contract. Independent data for that drawing takes
+precedence; unrelated payloads for another type do not establish its readiness.
+Otherwise a quiet square waiting animation replaces visible placeholder prose;
+the following descriptions remain available to assistive technology:
 
 | `type` | Accessible description |
 | --- | --- |
@@ -263,17 +266,57 @@ available to assistive technology:
 | `spectrogram` | `No spectrogram to draw — assign .spectrogram` |
 | `meter` | `No analyser to meter — bind a player with an analyser` |
 
+### Application-owned preparation
+
+When the application decodes a clip or computes a spectrogram outside the
+Element, mark that work with the boolean `loading` attribute or reflected
+`.loading` property. It defaults to false and starts no request or analysis. An empty attribute
+enables it; `false`, `0`, `no` and `off` disable it. The property setter reflects
+`"true"` / `"false"`. While true, the view shows the loading animation, retaining assigned data and
+the borrowed player's position. Set it before awaiting external work and clear
+it in `finally` after assigning the prepared payload:
+
+```ts
+import {loadClipFromUrl} from '@webmusic/audio/play';
+import {computeSpectrogram} from '@webmusic/audio/analyze';
+
+view.loading = true;
+try {
+  const preparedClip = await loadClipFromUrl('/wav/Arabesque%20No.1.wav');
+  view.spectrogram = computeSpectrogram(preparedClip.channelData(0)!, preparedClip.sampleRate);
+} finally {
+  view.loading = false;
+}
+```
+
+The application still owns errors, cancellation and stale results from its
+external work. For overlapping preparations, clear the flag only when the
+current operation settles. This flag describes the application's pending work,
+not the combined readiness of every loader: clearing it restores automatic
+`src` / `peaks-src` / player/data feedback and cannot cancel or hide an internal
+request that is still pending. Clearing it without usable data returns to
+waiting. The Parameters `loading` control demonstrates this presentation flag;
+it does not initiate a fetch or STFT.
+
 A failed `src` or `peaks-src` request shows its error message when no drawable data
 is available, while still emitting `webaudio:error`. Retrying, removing that URL,
 or replacing that input with `.clip` / `.peaks` clears that input's failure. The
 two URL inputs keep separate loading and error state; a pending alternative source
 continues to show loading, and stale requests cannot overwrite newer feedback.
-Assign the missing data and the view draws.
+Assign the missing data and clear any application-owned loading flag to draw.
+
+The `player` selector follows one element in the current Document or ShadowRoot,
+including late insertion, upgrade and replacement. Invalid or ambiguous selectors
+show an error when the view needs that source. Removing the target restores waiting;
+disconnecting the view releases discovery and subscriptions. Events and commands
+from an older binding cannot update or seek its replacement.
+In `meter` mode, a failure while obtaining the player's analyser is visible and
+still emits `webaudio:error`; a later source or graph readiness event retries it.
 
 <details class="component-section">
 <summary>API</summary>
 
-Renderer paint and geometry options are exposed as kebab-case HTML attributes and camelCase fields on `.options`. Element interaction settings use their own properties: `interactive`, `dragMode`, `annotate`, `follow` and `scrollable`; `dragMode` does not belong in `.options`. Attribute parsing is NaN-/empty-safe — an absent, empty or non-numeric value falls back to the default rather than poisoning the render; tri-state booleans read `false` / `0` / `no` / `off` as false and anything else present as true. Where both an attribute and `.options` are set, **`.options` wins**.
+Renderer paint and geometry options are exposed as kebab-case HTML attributes and camelCase fields on `.options`. Element readiness and interaction settings use their own properties: `loading`, `interactive`, `dragMode`, `annotate`, `follow` and `scrollable`; `loading` and `dragMode` do not belong in `.options`. Attribute parsing is NaN-/empty-safe — an absent, empty or non-numeric value falls back to the default rather than poisoning the render; tri-state booleans read `false` / `0` / `no` / `off` as false and anything else present as true. Where both an attribute and `.options` are set, **`.options` wins**.
 
 Members that only apply to one drawing are marked in the Description; everything else works under every `type`.
 
@@ -294,6 +337,7 @@ view.type = 'spectrogram';                                   // switch the drawi
 | Member | Kind | Default | Description |
 | --- | --- | --- | --- |
 | `type` | attribute / property | `waveform` | `waveform`, `spectrogram` or `meter`; unknown values fall back to `waveform`. Switching disposes the old visualizer and re-renders. |
+| `loading` / `.loading` | boolean attribute / reflected property | `false` | Application-owned preparation indicator. True displays loading while retaining assigned payloads and player position; it initiates no work. False restores automatic readiness and does not cancel or suppress an internal request. The getter reports this explicit flag, not aggregate loader state. |
 | `.peaks` | property | — | **Waveform only.** Multi-resolution `AudioPeaks` from [`computePeaks`](/audio/api/analyze/) — the waveform's shape. |
 | `peaks-src` | attribute | — | **Waveform only.** URL of BBC `audiowaveform` **v2 JSON**, hydrated into the pyramid with **no decode** — no `AudioContext`, no samples, no play import. |
 | `src` | attribute | — | URL of an audio file, decoded through the sibling [`@webmusic/audio/play`](/audio/api/play/) capability (resolved dynamically). |

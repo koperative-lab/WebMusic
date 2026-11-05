@@ -1,6 +1,5 @@
 import type {Score} from '../../core';
 import type {
-  RenderedScoreVisualizer,
   ScoreViewType,
   StaffRenderOptions,
   VisualizerRenderOptions,
@@ -9,7 +8,9 @@ import {
   renderPianoRollVisualizer,
   renderStaffVisualizer,
   renderWaterfallVisualizer,
+  type ScoreVisualizerHandle,
 } from './renderers/factory';
+export type {ScoreVisualizerHandle} from './renderers/factory';
 import type {WaterfallVisualizerConfig} from './renderers/waterfall';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -24,7 +25,7 @@ export function renderScoreVisualizer(
   surface: HTMLElement,
   type: ScoreViewType,
   options: ScoreVisualizerRenderOptions = {},
-): RenderedScoreVisualizer {
+): ScoreVisualizerHandle {
   const document = surface.ownerDocument ?? globalThis.document;
   if (!document) throw new Error('A document is required to render a score visualization.');
   if (type === 'staff') {

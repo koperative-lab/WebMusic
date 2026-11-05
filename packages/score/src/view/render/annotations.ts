@@ -7,6 +7,8 @@ const LANE_HEIGHT = 18;
 interface HorizontalAnnotationOptions {
   xAtQuarter(quarter: number): number;
   width: number;
+  /** Descending physical time axis. Paths reverse while labels remain upright. */
+  reverse?: boolean;
   color?: string;
   /** Overview density is bounded; abbreviated labels retain a complete title. */
   maxLanes?: number;
@@ -66,6 +68,20 @@ function abbreviated(label: string, width: number): string {
 
 /** Compact shared expression strip. All source marks retain their own title. */
 export function drawHorizontalScoreAnnotations(svg: SVGSVGElement, annotations: readonly ScoreAnnotation[], options: HorizontalAnnotationOptions): {height: number; group: SVGGElement} {
+  if (options.reverse) {
+    const result = drawHorizontalScoreAnnotations(svg, annotations, {
+      ...options, reverse: false, xAtQuarter: (quarter) => options.width - options.xAtQuarter(quarter),
+    });
+    result.group.setAttribute('transform', `translate(${options.width} 0) scale(-1 1)`);
+    // Reflect the geometry, then undo reflection for each text glyph around its
+    // own anchor. End anchoring keeps the same label footprint beside its mark.
+    for (const label of result.group.querySelectorAll('text')) {
+      const x = Number(label.getAttribute('x'));
+      label.setAttribute('transform', `translate(${2 * x} 0) scale(-1 1)`);
+      label.setAttribute('text-anchor', 'end');
+    }
+    return result;
+  }
   const group = element(svg, 'g', {'data-webscore-annotations': 'horizontal', fill: options.color ?? 'currentColor', color: options.color ?? 'currentColor'});
   if (!annotations.length || !(options.width > 0)) return {height: 0, group};
   const width = options.width;

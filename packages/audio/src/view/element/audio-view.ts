@@ -76,6 +76,7 @@ import {
   type SurfaceSliderHandle,
 } from '@webmusic/ui/stage';
 import {mountStatus, type StatusHandle, type StatusState} from '@webmusic/ui/status';
+import {observeElementTarget} from '@webmusic/kernel/element';
 
 /** The union of option bags `<audio-view>` accepts across its three types. */
 export type AudioViewOptions = WaveformRenderOptions & SpectrogramRenderOptions & MeterRenderOptions;
@@ -118,6 +119,7 @@ const DEFAULT_PIXELS_PER_SECOND = 100;
 
 /** Public properties that may have been assigned before the upgrade. */
 const PROPS = [
+  'loading',
   'clip',
   'peaks',
   'spectrogram',
@@ -224,6 +226,7 @@ export class AudioViewElement extends WebMusicElement {
       'peaks-src',
       'format',
       'type',
+      'loading',
       'player',
       'interactive',
       'drag-mode',
@@ -266,6 +269,9 @@ export class AudioViewElement extends WebMusicElement {
   private viewportUnsubscribe?: () => void;
   private boundPlayer?: EventTarget;
   private playerUnbind?: () => void;
+  private stopPlayerObservation?: () => void;
+  private playerObservationRevision = 0;
+  private playerSelectionError?: Error;
   private vizBinding?: {unsubscribe(): void};
   private bindingRevision = 0;
   private derivedClip?: AudioClip;
@@ -291,6 +297,7 @@ export class AudioViewElement extends WebMusicElement {
     this.own(() => this.teardown());
     prepareAudioViewHost(this);
     upgradeProperties(this, PROPS);
+    this.syncBusyState();
     this.applyWidth();
     this.bindPlayer();
     if (this.hasAttribute('peaks-src') && !this.explicitPeaks) void this.loadPeaksSource();
@@ -302,6 +309,11 @@ export class AudioViewElement extends WebMusicElement {
     // A write that changes nothing — a framework re-applying its props, or
     // `setAttribute(name, getAttribute(name))` — must not cost a rebuild.
     if (!this.isConnected || previous === next) return;
+    if (name === 'loading') {
+      this.syncBusyState();
+      this.refresh();
+      return;
+    }
     if (name === 'player') {
       this.bindPlayer();
       this.refresh();
@@ -348,6 +360,14 @@ export class AudioViewElement extends WebMusicElement {
   }
 
   // ---- Public properties ----
+
+  /** Caller-owned asynchronous preparation; independent of this view's source loaders. */
+  get loading(): boolean {
+    return boolAttr(this, 'loading', false);
+  }
+  set loading(loading: boolean) {
+    this.setAttribute('loading', loading ? 'true' : 'false');
+  }
 
   set clip(clip: AudioClip | undefined) {
     if (clip && clip === this.explicitClip) return;
@@ -643,6 +663,9 @@ export class AudioViewElement extends WebMusicElement {
   private teardown(): void {
     this.cancelClipLoad();
     this.cancelPeaksLoad();
+    this.playerObservationRevision++;
+    this.stopPlayerObservation?.();
+    this.stopPlayerObservation = undefined;
     this.unbindPlayer();
     this.teardownRendered();
     this.stage?.destroy();
@@ -692,6 +715,13 @@ export class AudioViewElement extends WebMusicElement {
       this.derivedPeaks = computeClipPeaks(clip);
     }
     return this.derivedPeaks;
+  }
+
+  /** Only data drawable in the selected mode makes the view independent of its owner. */
+  private hasIndependentData(): boolean {
+    if (this.type === 'spectrogram') return this.explicitSpectrogram !== undefined;
+    if (this.type === 'meter') return false;
+    return !!(this.explicitPeaks || this.sourcePeaks || (this.explicitClip ?? this.sourceClip)?.hasSamples);
   }
 
   /**
@@ -792,8 +822,7 @@ export class AudioViewElement extends WebMusicElement {
     this.host = host;
 
     const owner = this.boundPlayer as {loading?: boolean; loadError?: Error} | undefined;
-    if (!this.explicitClip && !this.sourceClip && !this.explicitPeaks && !this.sourcePeaks &&
-        !this.explicitSpectrogram && !this.explicitFrequencyData && (owner?.loading || owner?.loadError)) {
+    if (this.loading || (!this.hasIndependentData() && (owner?.loading || owner?.loadError || this.playerSelectionError))) {
       return this.renderEmpty(host);
     }
     const options = this.renderOptions();
@@ -806,7 +835,15 @@ export class AudioViewElement extends WebMusicElement {
         break;
       }
       case 'meter': {
-        const analyser = this.resolveAnalyser();
+        let analyser: AnalyserNode | undefined;
+        try {
+          analyser = this.resolveAnalyser();
+        } catch (cause) {
+          const error = cause instanceof Error ? cause : new Error(String(cause));
+          this.renderEmpty(host, error);
+          this.onViewError(error);
+          return;
+        }
         if (!analyser) return this.renderEmpty(host);
         this.rendered = renderLoudnessMeter(host, analyser, options);
         // A meter has no time axis — no playhead, no seek, no viewport — but it
@@ -839,14 +876,14 @@ export class AudioViewElement extends WebMusicElement {
    * Say what is missing instead of leaving a blank box. Nothing is disposed or
    * latched here, so assigning the missing data and refreshing draws normally.
    */
-  private renderEmpty(host: HTMLElement): void {
+  private renderEmpty(host: HTMLElement, failure?: Error): void {
     this.status = mountStatus(
       host,
       {snapshot: (): StatusState => {
-        if (this.sourceAbort || this.peaksAbort) return {kind: 'loading', message: 'Loading audio visualization'};
+        if (this.loading || this.sourceAbort || this.peaksAbort) return {kind: 'loading', message: 'Loading audio visualization'};
         const owner = this.boundPlayer as {loading?: boolean; loadError?: Error} | undefined;
         if (owner?.loading) return {kind: 'loading', message: 'Loading audio source'};
-        const error = this.peaksError ?? this.sourceError ?? owner?.loadError;
+        const error = failure ?? this.peaksError ?? this.sourceError ?? owner?.loadError ?? this.playerSelectionError;
         return error ? {kind: 'error', message: error.message}
           : {kind: 'waiting', message: EMPTY_STATE_MESSAGES[this.type]};
       }},
@@ -925,49 +962,78 @@ export class AudioViewElement extends WebMusicElement {
   // ---- Player binding (player="#id"), structural live observation + events ----
 
   private bindPlayer(): void {
-    const selector = this.getAttribute('player');
-    const target = selector
-      ? ((this.getRootNode() as ParentNode).querySelector(selector) as EventTarget | null) ?? undefined
-      : undefined;
-    if (target === this.boundPlayer) return;
+    const revision = ++this.playerObservationRevision;
+    this.stopPlayerObservation?.();
+    this.stopPlayerObservation = undefined;
     this.unbindPlayer();
-    this.boundPlayer = target;
-    if (target) {
-      const onSourceChange = (): void => {
-        // Immutable clip identity invalidates the derived cache in resolvePeaks.
-        // A new player using the same clip must not copy/rescan all PCM again.
-        if (this.isConnected) this.refresh();
-      };
-      const onLoaded = (): void => {
-        if (!this.isConnected) return;
-        if (!this.rendered || this.type === 'meter' ||
-            this.resolveClip() !== this.renderedClip ||
-            this.resolveDuration() !== this.renderedDuration) {
-          this.refresh();
-        } else {
-          // Graph readiness changes the available transport, not immutable data.
-          // Keep the painted window/focus and bind the current player in place.
-          this.bindVisualizer();
-          const seconds = this.currentSeconds();
-          this.timeline.setPlayhead(seconds);
-          this.rendered?.redraw(seconds, false);
-          this.surfaceSlider?.update();
+    this.playerSelectionError = undefined;
+    const selector = this.getAttribute('player');
+    const current = (): boolean => this.isConnected &&
+      revision === this.playerObservationRevision && this.getAttribute('player') === selector;
+    if (!selector || !current()) return;
+    let initial = true;
+    const stop = observeElementTarget(this, selector, (target, state) => {
+      if (!current()) return;
+      this.unbindPlayer();
+      this.boundPlayer = target;
+      this.playerSelectionError = state === 'invalid' ? new Error('Invalid player selector')
+        : state === 'ambiguous' ? new Error('Player selector matches multiple elements') : undefined;
+      if (target) {
+        const active = (event: Event): boolean => {
+          if (!current() || this.boundPlayer !== target || event.target !== target) return false;
+          // Owners can announce disposal before mutation delivery. Release the
+          // removed owner now instead of rebuilding from its retained clip.
+          if (target.getRootNode() !== this.getRootNode()) {
+            this.bindPlayer();
+            this.refresh();
+            return false;
+          }
+          return true;
+        };
+        const onSourceChange = (event: Event): void => {
+          // Immutable clip identity invalidates the derived cache in resolvePeaks.
+          if (active(event)) this.refresh();
+        };
+        const onLoaded = (event: Event): void => {
+          if (!active(event)) return;
+          if (!this.rendered || this.type === 'meter' ||
+              this.resolveClip() !== this.renderedClip ||
+              this.resolveDuration() !== this.renderedDuration) {
+            this.refresh();
+          } else {
+            // Graph readiness does not replace immutable data or painted focus.
+            this.bindVisualizer();
+            const seconds = this.currentSeconds();
+            this.timeline.setPlayhead(seconds);
+            this.rendered?.redraw(seconds, false);
+            this.surfaceSlider?.update();
+          }
+        };
+        const onLoadStateChange = (event: Event): void => {
+          if (active(event) && !this.hasIndependentData()) this.refresh();
+        };
+        const listeners: Array<[string, EventListener]> = [
+          ['webaudio:loadstatechange', onLoadStateChange],
+          ['webaudio:loaded', onLoaded],
+          ['webaudio:sourcechange', onSourceChange],
+          ['webaudio:playerchange', onSourceChange],
+        ];
+        // Register rollback before a custom target's subscription can throw.
+        this.playerUnbind = () => {
+          for (const [name, listener] of listeners) target.removeEventListener(name, listener);
+        };
+        for (const [name, listener] of listeners) {
+          if (!current() || this.boundPlayer !== target) break;
+          target.addEventListener(name, listener);
         }
-      };
-      const onLoadStateChange = (): void => {
-        if (this.isConnected && !this.explicitClip && !this.sourceClip && !this.explicitPeaks &&
-            !this.sourcePeaks && !this.explicitSpectrogram && !this.explicitFrequencyData) this.refresh();
-      };
-      target.addEventListener('webaudio:loadstatechange', onLoadStateChange);
-      target.addEventListener('webaudio:loaded', onLoaded);
-      target.addEventListener('webaudio:sourcechange', onSourceChange);
-      this.playerUnbind = () => {
-        target.removeEventListener('webaudio:loadstatechange', onLoadStateChange);
-        target.removeEventListener('webaudio:loaded', onLoaded);
-        target.removeEventListener('webaudio:sourcechange', onSourceChange);
-      };
-    }
-    this.bindVisualizer();
+      }
+      if (!current()) return;
+      if (initial) this.bindVisualizer();
+      else this.refresh();
+    });
+    initial = false;
+    if (current()) this.stopPlayerObservation = stop;
+    else stop();
   }
 
   private unbindPlayer(): void {
@@ -1032,31 +1098,34 @@ export class AudioViewElement extends WebMusicElement {
   private playerAdapter(): ViewPlayerBinding {
     const target = this.boundPlayer;
     const playerView = this.playerFacade();
+    const revision = this.bindingRevision;
+    const current = (): boolean => this.isConnected && revision === this.bindingRevision &&
+      target === this.boundPlayer && playerView === this.playerFacade();
     const position = playerView?.seconds ?? playerView?.currentTime;
     const hasLivePosition = typeof position === 'number' && Number.isFinite(position);
     const timeline = this.timeline;
     return {
       on: (event, listener) => {
-        if (!target) return () => {};
+        if (!target || !current()) return () => {};
         const handler = (domEvent: Event): void => {
-          listener((domEvent as CustomEvent<TimeUpdateDetail>).detail);
+          if (current() && domEvent.target === target) listener((domEvent as CustomEvent<TimeUpdateDetail>).detail);
         };
         const domName = `webaudio:${event}`;
         target.addEventListener(domName, handler);
         return () => target.removeEventListener(domName, handler);
       },
-      seek: (seconds) => playerView?.seek?.(seconds),
+      seek: (seconds) => current() ? playerView?.seek?.(seconds) : undefined,
       get seconds() {
-        return playerView?.seconds ?? playerView?.currentTime ?? timeline.snapshot.playheadSeconds;
+        return current() ? playerView?.seconds ?? playerView?.currentTime ?? timeline.snapshot.playheadSeconds : timeline.snapshot.playheadSeconds;
       },
       get duration() {
-        return playerView?.duration ?? 0;
+        return current() ? playerView?.duration ?? 0 : 0;
       },
       get playing() {
-        return hasLivePosition ? playerView?.playing : undefined;
+        return current() && hasLivePosition ? playerView?.playing : undefined;
       },
       get scratching() {
-        return hasLivePosition ? playerView?.scratching : undefined;
+        return current() && hasLivePosition ? playerView?.scratching : undefined;
       },
     };
   }
@@ -1439,14 +1508,19 @@ export class AudioViewElement extends WebMusicElement {
 
   // ---- Sources ----
 
+  private syncBusyState(): void {
+    if (this.loading || this.sourceAbort || this.peaksAbort) this.setAttribute('aria-busy', 'true');
+    else this.removeAttribute('aria-busy');
+  }
+
   /** Only current loaders own busy state; superseded requests may settle later. */
   private beginLoad(): void {
-    this.setAttribute('aria-busy', 'true');
+    this.syncBusyState();
     if (this.isConnected) this.refresh();
   }
 
   private endLoad(): void {
-    if (!this.sourceAbort && !this.peaksAbort) this.removeAttribute('aria-busy');
+    this.syncBusyState();
     this.status?.update();
   }
 

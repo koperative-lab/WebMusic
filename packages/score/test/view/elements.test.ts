@@ -396,6 +396,45 @@ describe('<score-view> attribute options (NaN-safe)', () => {
     expect(pianoRollMock.mock.lastCall?.[2]).toMatchObject({showAnnotations: false});
     host.disconnect();
   });
+
+  it.each([
+    ['piano-roll', pianoRollMock], ['staff', staffMock], ['waterfall', waterfallMock],
+  ] as const)('keeps %s expressions off by default and allows an explicit opt-in', async (type, renderer) => {
+    const host = createHost({type});
+    host.el.score = fakeScore;
+    host.connect();
+    await flush();
+    expect(renderer.mock.lastCall?.[2]).toMatchObject({showAnnotations: false});
+    host.setAttribute('show-annotations', 'true');
+    expect(renderer.mock.lastCall?.[2]).toMatchObject({showAnnotations: true});
+    host.el.options = {showAnnotations: false};
+    expect(renderer.mock.lastCall?.[2]).toMatchObject({showAnnotations: false});
+    host.disconnect();
+  });
+
+  it('retains direction through mode changes and lets explicit options take precedence', async () => {
+    const host = createHost();
+    host.el.score = fakeScore;
+    host.connect();
+    await flush();
+    expect(host.el.direction).toBe('right');
+    expect(pianoRollMock.mock.lastCall?.[2]).toMatchObject({direction: 'right'});
+    host.el.direction = 'left';
+    expect(pianoRollMock.mock.lastCall?.[2]).toMatchObject({direction: 'left'});
+    host.el.options = {direction: undefined, showAnnotations: undefined};
+    expect(pianoRollMock.mock.lastCall?.[2]).toMatchObject({direction: 'left', showAnnotations: false});
+    host.el.options = {direction: 'up'};
+    expect(pianoRollMock.mock.lastCall?.[2]).toMatchObject({direction: 'up'});
+    host.el.options = undefined;
+    host.el.type = 'staff';
+    expect(staffMock.mock.lastCall?.[2]).not.toHaveProperty('direction');
+    host.el.type = 'waterfall';
+    expect(waterfallMock.mock.lastCall?.[2]).toMatchObject({direction: 'left'});
+    host.setAttribute('direction', 'unknown');
+    expect(host.el.direction).toBe('down');
+    expect(waterfallMock.mock.lastCall?.[2]).toMatchObject({direction: 'down'});
+    host.disconnect();
+  });
 });
 
 describe('<score-view> player linking', () => {

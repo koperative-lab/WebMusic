@@ -18,6 +18,7 @@ vi.mock('../../src/view/render/binding', () => ({bindPlayerToWaveform: mocks.bin
 vi.mock('../../src/play/api', () => ({loadClipFromUrl: mocks.loadClip}));
 
 import {AudioViewElement, defineAudioViewElement} from '../../src/view/element/audio-view';
+import type {SpectrogramData} from '../../src/view/core/types';
 import {computeClipPeaks} from '../../src/view/headless/peaks';
 import * as peakHelpers from '../../src/view/headless/peaks';
 import {AudioPlayer} from '../../src/play/headless/audio-player';
@@ -60,6 +61,82 @@ describe('computeClipPeaks', () => {
 });
 
 describe('<audio-view> player integration', () => {
+  it('joins a late native player, follows caller preparation, and releases replaced owners', async () => {
+    mocks.waveform.mockImplementation(() => visualizerHarness(0));
+    mocks.bind.mockReturnValue({unsubscribe: vi.fn()});
+    const view = document.createElement('test-audio-view') as AudioViewElement;
+    view.setAttribute('player', '#late-native-owner');
+    document.body.append(view);
+    expect(view.querySelector('[data-kind="waiting"]')).not.toBeNull();
+
+    const owner = document.createElement('test-audio-player') as AudioPlayerElement;
+    owner.id = 'late-native-owner';
+    owner.loading = true;
+    document.body.append(owner);
+    await Promise.resolve();
+    expect(view.querySelector('[data-kind="loading"]')).not.toBeNull();
+    owner.clip = toneClip(2);
+    expect(view.querySelector('[data-kind="loading"]')).not.toBeNull();
+    owner.loading = false;
+    expect(view.querySelector('.wui-status')).toBeNull();
+    expect(mocks.waveform).toHaveBeenCalled();
+
+    const replacement = document.createElement('test-audio-player') as AudioPlayerElement;
+    replacement.id = owner.id;
+    replacement.loading = true;
+    owner.replaceWith(replacement);
+    await Promise.resolve();
+    expect(view.querySelector('[data-kind="loading"]')).not.toBeNull();
+    owner.loading = true;
+    owner.loading = false;
+    owner.dispatchEvent(new CustomEvent('webaudio:loaded'));
+    expect(view.querySelector('[data-kind="loading"]')).not.toBeNull();
+    replacement.remove();
+    await Promise.resolve();
+    expect(view.querySelector('[data-kind="waiting"]')).not.toBeNull();
+    view.remove();
+    document.body.append(replacement);
+    await Promise.resolve();
+    expect(view.querySelector('.wui-stage')).toBeNull();
+  });
+
+  it('shows invalid and ambiguous player selection until a unique source is available', async () => {
+    const view = document.createElement('test-audio-view') as AudioViewElement;
+    view.setAttribute('player', '[');
+    document.body.append(view);
+    expect(view.querySelector('[role="alert"]')?.textContent).toBe('Invalid player selector');
+    const owners = Array.from({length: 2}, () => Object.assign(document.createElement('div'), {loading: true}));
+    for (const owner of owners) owner.className = 'candidate-owner';
+    document.body.append(...owners);
+    view.setAttribute('player', '.candidate-owner');
+    expect(view.querySelector('[role="alert"]')?.textContent).toBe('Player selector matches multiple elements');
+    owners[0].remove();
+    await Promise.resolve();
+    expect(view.querySelector('[data-kind="loading"]')).not.toBeNull();
+  });
+
+  it('replaces meter loading with a visible tap failure and recovers when the owner provides a valid graph', () => {
+    const owner = document.createElement('test-audio-player') as AudioPlayerElement;
+    owner.id = 'meter-native-owner';
+    owner.loading = true;
+    document.body.append(owner);
+    const view = document.createElement('test-audio-view') as AudioViewElement;
+    view.type = 'meter';
+    view.setAttribute('player', '#meter-native-owner');
+    document.body.append(view);
+    expect(view.querySelector('[data-kind="loading"]')).not.toBeNull();
+    owner.clip = toneClip(1);
+    const read = vi.spyOn(owner.player!, 'analyser', 'get').mockImplementation(() => { throw new Error('Tap unavailable'); });
+    owner.loading = false;
+    expect(view.querySelector('[role="alert"]')?.textContent).toBe('Tap unavailable');
+    const tap = {} as AnalyserNode;
+    read.mockReturnValue(tap);
+    mocks.meter.mockReturnValue(visualizerHarness(0));
+    owner.dispatchEvent(new CustomEvent('webaudio:playerchange'));
+    expect(view.querySelector('.wui-status')).toBeNull();
+    expect(mocks.meter.mock.calls.at(-1)![1]).toBe(tap);
+  });
+
   it('derives peaks from the player clip, delegates transport, and exposes keyboard seeking', () => {
     const visualizer = visualizerHarness(2);
     const unsubscribe = vi.fn();
@@ -305,6 +382,124 @@ describe('<audio-view> player integration', () => {
 });
 
 describe('<audio-view> src loading', () => {
+  it('reflects caller preparation and restores waiting when that preparation is cleared', () => {
+    const view = document.createElement('test-audio-view') as AudioViewElement;
+    document.body.append(view);
+    expect(view.loading).toBe(false);
+    view.loading = true;
+    expect(view.getAttribute('loading')).toBe('true');
+    expect(view.getAttribute('aria-busy')).toBe('true');
+    expect(view.querySelector('[data-kind="loading"]')).not.toBeNull();
+    view.loading = false;
+    expect(view.getAttribute('loading')).toBe('false');
+    expect(view.querySelector('[data-kind="waiting"]')).not.toBeNull();
+    expect(view.hasAttribute('aria-busy')).toBe(false);
+    view.setAttribute('loading', '');
+    expect(view.loading).toBe(true);
+    expect(view.querySelector('[data-kind="loading"]')).not.toBeNull();
+    for (const value of ['false', '0', 'no', 'off']) {
+      view.setAttribute('loading', value);
+      expect(view.loading).toBe(false);
+      expect(view.querySelector('[data-kind="waiting"]')).not.toBeNull();
+    }
+    view.setAttribute('loading', '');
+    view.removeAttribute('loading');
+    expect(view.loading).toBe(false);
+    expect(view.querySelector('[data-kind="waiting"]')).not.toBeNull();
+  });
+
+  it.each(['src', 'peaks-src'] as const)('keeps %s loading independent of caller preparation and retains its result', async (attribute) => {
+    const request = deferred<AudioClip & Response>();
+    const loader = attribute === 'src'
+      ? mocks.loadClip.mockReturnValue(request.promise)
+      : vi.spyOn(globalThis, 'fetch').mockReturnValue(request.promise);
+    mocks.waveform.mockReturnValue(visualizerHarness(0));
+    const view = document.createElement('test-audio-view') as AudioViewElement;
+    view.loading = true;
+    view.setAttribute(attribute, '/slow');
+    document.body.append(view);
+    await vi.waitFor(() => expect(loader).toHaveBeenCalledOnce());
+    view.loading = false;
+    expect(view.querySelector('[data-kind="loading"]')).not.toBeNull();
+    expect(view.getAttribute('aria-busy')).toBe('true');
+    view.loading = true;
+    const result = attribute === 'src' ? toneClip(1) : new Response(JSON.stringify({
+      version: 2, channels: 1, sample_rate: 100, samples_per_pixel: 10,
+      bits: 8, length: 2, data: [-10, 10, -20, 20],
+    }));
+    request.resolve(result as AudioClip & Response);
+    await request.promise;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(view.querySelector('[data-kind="loading"]')).not.toBeNull();
+    expect(view.getAttribute('aria-busy')).toBe('true');
+    expect(mocks.waveform).not.toHaveBeenCalled();
+    view.loading = false;
+    expect(view.querySelector('.wui-status')).toBeNull();
+    expect(view.hasAttribute('aria-busy')).toBe(false);
+    expect(mocks.waveform).toHaveBeenCalledOnce();
+  });
+
+  it('reveals a source failure after caller preparation finishes', async () => {
+    mocks.loadClip.mockRejectedValue(new Error('Unable to decode the file'));
+    const view = document.createElement('test-audio-view') as AudioViewElement;
+    const errors = vi.fn();
+    view.addEventListener('webaudio:error', errors);
+    view.loading = true;
+    view.setAttribute('src', '/invalid.wav');
+    document.body.append(view);
+    await vi.waitFor(() => expect(errors).toHaveBeenCalledOnce());
+    expect(view.querySelector('[data-kind="loading"]')).not.toBeNull();
+    view.loading = false;
+    expect(view.querySelector('[role="alert"]')?.textContent).toBe('Unable to decode the file');
+    expect(view.hasAttribute('aria-busy')).toBe(false);
+  });
+
+  it.each([
+    ['waveform', 'frequencyData'], ['waveform', 'spectrogram'], ['waveform', 'streamingClip'],
+    ['spectrogram', 'clip'], ['meter', 'clip'], ['meter', 'spectrogram'],
+  ] as const)('keeps %s owner readiness observable with auxiliary %s data', (type, input) => {
+    const source = Object.assign(document.createElement('div'), {
+      loading: false, loadError: undefined as Error | undefined,
+    });
+    source.id = 'auxiliary-owner';
+    const view = document.createElement('test-audio-view') as AudioViewElement;
+    view.type = type;
+    view.setAttribute('player', '#auxiliary-owner');
+    if (input === 'clip') view.clip = toneClip(1);
+    else if (input === 'streamingClip') view.clip = createAudioClip({sampleRate: 100, length: 100, numberOfChannels: 1});
+    else view[input] = spectrogramData();
+    document.body.append(source, view);
+    expect(view.querySelector('[data-kind="waiting"]')).not.toBeNull();
+    source.loading = true;
+    source.dispatchEvent(new CustomEvent('webaudio:loadstatechange'));
+    expect(view.querySelector('[data-kind="loading"]')).not.toBeNull();
+    view.loading = true;
+    view.loading = false;
+    expect(view.querySelector('[data-kind="loading"]')).not.toBeNull();
+    source.loading = false;
+    source.loadError = new Error('Source unavailable');
+    source.dispatchEvent(new CustomEvent('webaudio:loadstatechange'));
+    expect(view.querySelector('[role="alert"]')?.textContent).toBe('Source unavailable');
+    source.loadError = undefined;
+    source.dispatchEvent(new CustomEvent('webaudio:loadstatechange'));
+    expect(view.querySelector('[data-kind="waiting"]')).not.toBeNull();
+  });
+
+  it('keeps an independent spectrogram ready while its playback owner loads', () => {
+    mocks.spectrogram.mockReturnValue(visualizerHarness(0));
+    const source = Object.assign(document.createElement('div'), {loading: false});
+    source.id = 'spectrogram-owner';
+    const view = document.createElement('test-audio-view') as AudioViewElement;
+    view.type = 'spectrogram';
+    view.spectrogram = spectrogramData();
+    view.setAttribute('player', '#spectrogram-owner');
+    document.body.append(source, view);
+    source.loading = true;
+    source.dispatchEvent(new CustomEvent('webaudio:loadstatechange'));
+    expect(view.querySelector('.wui-status')).toBeNull();
+    expect(mocks.spectrogram).toHaveBeenCalledOnce();
+  });
+
   it('follows bound player loading and errors while preserving independent explicit data', () => {
     const clip = createAudioClip({sampleRate: 8, channelData: [new Float32Array(8)]});
     const player = Object.assign(document.createElement('div'), {
@@ -460,6 +655,10 @@ function toneClip(seconds: number): AudioClip {
   const samples = new Float32Array(seconds * sampleRate);
   for (let index = 0; index < samples.length; index++) samples[index] = Math.sin(index / 5);
   return createAudioClip({sampleRate, channelData: [samples]});
+}
+
+function spectrogramData(): SpectrogramData {
+  return {times: [0, 1], frequencies: [100], magnitudes: new Float32Array([0, 0]), binsPerFrame: 1};
 }
 
 function visualizerHarness(hitSeconds: number) {

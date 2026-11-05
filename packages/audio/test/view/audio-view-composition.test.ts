@@ -45,6 +45,43 @@ afterEach(() => {
 });
 
 describe('<audio-view> player composition', () => {
+  it.each(['waveform', 'spectrogram'] as const)('restores %s data at the current player time after external preparation', (type) => {
+    const visualizers: FakeVisualizer[] = [];
+    const renderer = type === 'waveform' ? mocks.waveform : mocks.spectrogram;
+    renderer.mockImplementation(() => {
+      const visualizer = fakeVisualizer();
+      visualizers.push(visualizer);
+      return visualizer;
+    });
+    const source = playerElement('preparing-player', {duration: 4, seconds: 1});
+    const player = Object.assign(source.player, {playing: true, pause: vi.fn(), stop: vi.fn()});
+    document.body.append(source.element);
+    const clip = toneClip(4);
+    const spectrogram = spectrogramData();
+    const view = mount({clip, spectrogram, attributes: {type, player: '#preparing-player', interactive: ''}});
+    expect(view.getAttribute('aria-valuenow')).toBe('1');
+
+    view.loading = true;
+    expect(view.querySelector('[data-kind="loading"]')?.getAttribute('aria-busy')).toBe('true');
+    expect(view.hasAttribute('aria-valuenow')).toBe(false);
+    expect(view.clip).toBe(clip);
+    expect(view.spectrogram).toBe(spectrogram);
+    expect(visualizers[0].dispose).toHaveBeenCalledOnce();
+    player.seconds = 2.5;
+    source.element.dispatchEvent(timeupdate(2.5));
+    view.loading = false;
+
+    expect(view.querySelector('.wui-status')).toBeNull();
+    expect(view.getAttribute('aria-valuenow')).toBe('2.5');
+    expect(visualizers.at(-1)!.redraw.mock.calls.at(-1)?.[0]).toBe(2.5);
+    expect(view.clip).toBe(clip);
+    expect(view.spectrogram).toBe(spectrogram);
+    expect(player.playing).toBe(true);
+    expect(player.pause).not.toHaveBeenCalled();
+    expect(player.stop).not.toHaveBeenCalled();
+    expect(player.seek).not.toHaveBeenCalled();
+  });
+
   it('draws one frame per transport tick and clears the surface when the player ends', () => {
     const visualizer = fakeVisualizer();
     mocks.waveform.mockReturnValue(visualizer);
@@ -173,6 +210,28 @@ describe('<audio-view> type switching', () => {
 });
 
 describe('<audio-view> upgrade', () => {
+  it('applies loading assigned before upgrade before drawing prepared input', () => {
+    const tag = 'pre-upgrade-loading-audio-view';
+    mocks.waveform.mockImplementation(() => fakeVisualizer());
+    const clip = toneClip(4);
+    const view = document.createElement(tag) as AudioViewElement;
+    Object.assign(view, {clip, loading: true});
+    document.body.append(view);
+    class PreUpgradeLoadingAudioView extends AudioViewElement {}
+    customElements.define(tag, PreUpgradeLoadingAudioView);
+
+    expect(Object.hasOwn(view, 'loading')).toBe(false);
+    expect(view.loading).toBe(true);
+    expect(view.getAttribute('loading')).toBe('true');
+    expect(view.getAttribute('aria-busy')).toBe('true');
+    expect(view.querySelector('[data-kind="loading"]')).not.toBeNull();
+    expect(mocks.waveform).not.toHaveBeenCalled();
+    expect(view.clip).toBe(clip);
+    view.loading = false;
+    expect(view.querySelector('.wui-status')).toBeNull();
+    expect(mocks.waveform).toHaveBeenCalledOnce();
+  });
+
   it('routes properties assigned before the definition through the accessors', () => {
     const tag = 'pre-upgrade-audio-view';
     mocks.waveform.mockImplementation(

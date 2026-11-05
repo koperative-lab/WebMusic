@@ -80,6 +80,7 @@ export class AudioRecorderElement extends WebMusicElement {
   private offFns: Array<() => void> = [];
   private capturing = false;
   private starting = false;
+  private operationError?: Error;
   private currentLevel = 0;
   private lastTake?: AudioClip;
   private takes = 0;
@@ -154,6 +155,7 @@ export class AudioRecorderElement extends WebMusicElement {
    */
   async start(): Promise<void> {
     if (this.starting || this.capturing) return;
+    this.operationError = undefined;
     this.stopPlayback();
     // A host that stopped the borrowed engine itself leaves it assigned and
     // idle; it is finished either way, so release it before minting the next.
@@ -164,7 +166,7 @@ export class AudioRecorderElement extends WebMusicElement {
     } catch (error) {
       // Construction can reject invalid frame budgets before an engine exists.
       // State is already idle, so an error listener can repair options and retry.
-      this.onRecorderError(error);
+      this.reportOperationError(error);
       return;
     }
     this.engine = recorder;
@@ -181,7 +183,7 @@ export class AudioRecorderElement extends WebMusicElement {
     } catch (error) {
       if (this.engine === recorder) {
         this.releaseEngine();
-        this.onRecorderError(error);
+        this.reportOperationError(error);
       }
     } finally {
       if (this.engine === recorder) {
@@ -210,7 +212,7 @@ export class AudioRecorderElement extends WebMusicElement {
     } catch (error) {
       if (this.engine === recorder) {
         this.releaseEngine();
-        this.onRecorderError(error);
+        this.reportOperationError(error);
       }
       return undefined;
     } finally {
@@ -233,12 +235,13 @@ export class AudioRecorderElement extends WebMusicElement {
     if (!clip || this.capturing || this.playing) return;
     const owner = this.owner;
     if (!owner && this.connection.requested) return;
+    this.operationError = undefined;
     if (owner) {
       try {
         // The owner pauses a previous group when this explicit audition selects a take.
         owner.setClip(clip);
         await owner.play();
-      } catch (error) { if (this.owner === owner) this.onRecorderError(error); }
+      } catch (error) { if (this.owner === owner) this.reportOperationError(error); }
       if (this.owner === owner) this.notifyUI();
       return;
     }
@@ -253,7 +256,7 @@ export class AudioRecorderElement extends WebMusicElement {
     } catch (error) {
       if (this.playback !== player) return;
       this.stopPlayback();
-      this.onRecorderError(error);
+      this.reportOperationError(error);
     }
   }
 
@@ -380,6 +383,14 @@ export class AudioRecorderElement extends WebMusicElement {
     this.dispatch('error', error instanceof Error ? error : new Error(String(error)));
   }
 
+  /** Keep operational failures visible; presenter failures must not recursively repaint. */
+  private reportOperationError(error: unknown): void {
+    const failure = error instanceof Error ? error : new Error(String(error));
+    this.operationError = failure;
+    this.notifyUI();
+    this.onRecorderError(failure);
+  }
+
   protected teardown(): void {
     this.releasePlayback();
     this.releaseEngine();
@@ -430,7 +441,7 @@ export class AudioRecorderElement extends WebMusicElement {
         // The engine already released the stream and the context (a breached
         // maxRecordedFrames/Bytes ends capture); mirror that state here.
         this.releaseEngine();
-        this.onRecorderError(error);
+        this.reportOperationError(error);
       }),
     );
   }
@@ -491,9 +502,10 @@ export class AudioRecorderElement extends WebMusicElement {
       // and takes captured since the element was upgraded.
       recordedCount: Math.floor(this.elapsedSeconds()),
       takeCount: this.takes,
-      status: this.connection.requested && !this.owner && idle && !this.lastTake
-        ? 'Waiting for the playback owner.' : this.statusText(),
-      ...((this.connection.requested && !this.owner && idle && !this.lastTake)
+      status: this.operationError?.message ?? (this.connection.requested && !this.owner && idle && !this.lastTake
+        ? 'Waiting for the playback owner.' : this.statusText()),
+      ...(this.operationError ? {statusKind: 'error' as const}
+        : (this.connection.requested && !this.owner && idle && !this.lastTake)
         ? {statusKind: 'waiting' as const} : {}),
       canPlay: take !== undefined && idle && (!this.connection.requested || !!this.owner),
       canExport: take !== undefined && idle,

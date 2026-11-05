@@ -31,7 +31,10 @@ beforeAll(() => {
 
 /** A recording 2D context, so the stage's synchronous first paint can run under jsdom. */
 function fakeContext(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
-  const state: Record<string, unknown> = {canvas};
+  const state: Record<string, unknown> = {
+    canvas,
+    createImageData: (width: number, height: number) => ({width, height, data: new Uint8ClampedArray(width * height * 4)}),
+  };
   return new Proxy(state, {
     get(target, key) {
       if (key === 'then') return undefined;
@@ -779,6 +782,27 @@ describe('<audio-meter> borrowed player binding', () => {
 });
 
 describe('<audio-meter> passive source feedback', () => {
+  it('shows capture failures without misreporting readiness, then recovers from the next valid window', () => {
+    let nextFrame: FrameRequestCallback | undefined;
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => { nextFrame = callback; return 1; });
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => { nextFrame = undefined; });
+    const tap = externalAnalyser();
+    tap.getFloatTimeDomainData.mockImplementation(() => { throw new Error('Tap unavailable'); });
+    const element = document.createElement('test-audio-meter') as AudioMeterElement;
+    element.analyser = tap as unknown as AnalyserNode;
+    document.body.append(element);
+    const feedback = () => element.shadowRoot!.querySelector<HTMLElement>('.wui-status')!;
+    nextFrame?.(100);
+    expect(feedback().dataset.kind).toBe('error');
+    expect(feedback().textContent).toBe('Tap unavailable');
+    expect(element.snapshot).toBeUndefined();
+    tap.getFloatTimeDomainData.mockImplementation((data: Float32Array) => data.fill(0));
+    nextFrame?.(200);
+    nextFrame?.(300);
+    expect(feedback().hidden).toBe(true);
+    expect(element.snapshot?.silent).toBe(true);
+  });
+
   it.each(['vu', 'loudness', 'waveform', 'oscilloscope', 'spectrum', 'spectrogram', 'stereometer'] as const)(
     'keeps %s following owner loading, failure, ready silence and removal without borrowing ownership', async (type) => {
       stubFrames();

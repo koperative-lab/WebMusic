@@ -7,6 +7,8 @@ sidebar:
 
 import AudioPlaylistPlayground from '../../../../../components/elements/AudioPlaylistPlayground.astro';
 
+<AudioPlaylistPlayground />
+
 `<audio-playlist>` supplies queue selection and sequencing to a linked
 [`audio-player`](/audio/element/play/audio-player/). The player displays transport;
 the list displays entries and their loading/current state. The queue keeps one
@@ -16,8 +18,6 @@ An empty queue or missing requested owner shows the shared outlined-square waiti
 animation. Fetching/decoding an entry replaces its duration with the four-square
 loading animation; loaded rows and keyboard focus remain intact. Failed entries
 keep visible failure feedback, and background prefetch marks only its own row.
-
-<AudioPlaylistPlayground />
 
 ## Import
 
@@ -57,7 +57,6 @@ list.entries = [
 await list.play();
 ```
 
-
 <details class="component-section">
 <summary>API</summary>
 
@@ -80,12 +79,16 @@ await list.play();
 | `.next()` / `.previous()` / `.select(idOrIndex)` | method | Move between entries, retaining playback intent. Invalid select ids or non-integer/out-of-range indices reject with RangeError and preserve the old entry. |
 | `.seek(seconds)` | method | Seek within the current entry. |
 | `.clip` / `.seconds` / `.currentTime` / `.duration` / `.analyser` | property | The `PlayerLike` facade, so [`<audio-view player="#id">`](/audio/element/view/audio-view/) can visualize the queue itself rather than one entry. |
+| `.loading` / `.loadError` | property (get) | Selected entry fetch/decode state and last failure; background prefetch does not make the selected entry busy or failed. Retry and source replacement clear its error. |
 | `webaudio:trackchange` | event | `detail = { id, index }` — a different entry became current, including the first. |
 | `webaudio:trackend` | event | `detail = { id, index }` — one entry played to its natural end. The queue advances next. |
 | `webaudio:playlistend` | event | The last entry ended and the list is not looping. |
 | `webaudio:timeupdate` | event | `detail = { seconds, duration, progress }` for the current entry. |
 | `webaudio:seek` | event | `detail = { seconds, progress }` when the user drags the seek bar. |
 | `webaudio:error` | event | A load or playback failure. A failed entry is marked in the list and skipped. |
+| `webaudio:loadstatechange` | event | `{loading, error}` when the selected entry's load state changes, including selection and retry. |
+| `webaudio:sourcechange` | event | `{clip, revision}` when the selected clip identity changes, including already decoded entry selection. Revision increases before listeners run. |
+| `webaudio:playerchange` | event | `{player}` when the selected entry's low-level player is created or replaced; observers can re-read `.analyser` without treating source data as graph readiness. |
 
 **The queue uses track-specific completion events.** That name already means "one clip finished" on `<audio-player>`; reusing it here would make the two impossible to tell apart on a page carrying both. A queue reports `trackend` per entry and `playlistend` once at the bottom.
 

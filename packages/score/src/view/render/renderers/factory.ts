@@ -12,11 +12,17 @@ import {PianoRollSVGVisualizer} from './piano-roll';
 import {ScrollType, StaffSVGVisualizer} from './staff';
 import {WaterfallSVGVisualizer, type WaterfallVisualizerConfig} from './waterfall';
 
+/** Browser handle; DOM details remain confined to the explicit render surface. */
+export interface ScoreVisualizerHandle<TVisualizer = unknown> extends RenderedScoreVisualizer<TVisualizer> {
+  /** Waterfall's native time viewport. Absent on renderers without an independent time scroller. */
+  readonly scrollViewport?: HTMLElement;
+}
+
 export function renderPianoRollVisualizer(
   score: Score,
   svg: SVGSVGElement,
   config: VisualizerRenderOptions = {},
-): RenderedScoreVisualizer {
+): ScoreVisualizerHandle {
   const noteSequence = scoreToNoteSequence(score);
   return wrapVisualizer(noteSequence, new PianoRollSVGVisualizer(noteSequence, svg, config, score));
 }
@@ -25,7 +31,7 @@ export function renderWaterfallVisualizer(
   score: Score,
   container: HTMLDivElement,
   config: WaterfallVisualizerConfig = {},
-): RenderedScoreVisualizer {
+): ScoreVisualizerHandle {
   const noteSequence = scoreToNoteSequence(score);
   return wrapVisualizer(noteSequence, new WaterfallSVGVisualizer(noteSequence, container, config, score));
 }
@@ -34,7 +40,7 @@ export function renderStaffVisualizer(
   score: Score,
   container: HTMLDivElement,
   config: StaffRenderOptions = {},
-): RenderedScoreVisualizer {
+): ScoreVisualizerHandle {
   const noteSequence = scoreToNoteSequence(score);
   const visualizer = new StaffSVGVisualizer(noteSequence, container, {
     ...config,
@@ -49,11 +55,13 @@ function wrapVisualizer<
     redrawAtTime?(seconds: number, scrollIntoView?: boolean): number | null;
     clearActiveNotes(): void;
     dispose?(): void;
+    readonly scrollViewport?: HTMLElement;
   },
->(noteSequence: ScoreNoteSequence, visualizer: TVisualizer): RenderedScoreVisualizer<TVisualizer> {
+>(noteSequence: ScoreNoteSequence, visualizer: TVisualizer): ScoreVisualizerHandle<TVisualizer> {
   return {
     noteSequence,
     visualizer,
+    get scrollViewport() { return visualizer.scrollViewport; },
     redraw: (activeNote, scrollIntoView) => visualizer.redraw(activeNote, scrollIntoView),
     ...(visualizer.redrawAtTime ? {redrawAtTime: (seconds: number, scrollIntoView?: boolean) => visualizer.redrawAtTime!(seconds, scrollIntoView)} : {}),
     clearActiveNotes: () => visualizer.clearActiveNotes(),

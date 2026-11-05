@@ -38,17 +38,17 @@ export interface RectPosition {
   h: number;
 }
 
-export function setExplicitSize(element: HTMLElement | SVGElement, width: number, height: number, options: {fractionalWidth?: boolean} = {}): void {
+export function setExplicitSize(element: HTMLElement | SVGElement, width: number, height: number, options: {fractionalWidth?: boolean; fractionalHeight?: boolean} = {}): void {
   const roundedWidth = Math.max(1, options.fractionalWidth ? width : Math.ceil(width));
-  const roundedHeight = Math.max(1, Math.ceil(height));
+  const roundedHeight = Math.max(1, options.fractionalHeight ? height : Math.ceil(height));
   element.setAttribute('width', `${roundedWidth}`);
   element.setAttribute('height', `${roundedHeight}`);
   setExplicitStyleSize(element, roundedWidth, roundedHeight, options);
 }
 
-export function setExplicitStyleSize(element: HTMLElement | SVGElement, width: number, height: number, options: {fractionalWidth?: boolean} = {}): void {
+export function setExplicitStyleSize(element: HTMLElement | SVGElement, width: number, height: number, options: {fractionalWidth?: boolean; fractionalHeight?: boolean} = {}): void {
   const roundedWidth = Math.max(1, options.fractionalWidth ? width : Math.ceil(width));
-  const roundedHeight = Math.max(1, Math.ceil(height));
+  const roundedHeight = Math.max(1, options.fractionalHeight ? height : Math.ceil(height));
   element.style.setProperty('width', `${roundedWidth}px`, 'important');
   element.style.setProperty('height', `${roundedHeight}px`, 'important');
   element.style.setProperty('max-width', 'none', 'important');
@@ -124,7 +124,7 @@ export function ensureScrollViewport<T extends HTMLElement | SVGElement>(
 export type ResolvedVisualizerConfig = Required<
   Pick<VisualizerRenderOptions, 'noteHeight' | 'noteSpacing' | 'pixelsPerSecond' | 'noteRGB' | 'activeNoteRGB'>
 > &
-  Pick<VisualizerRenderOptions, 'minPitch' | 'maxPitch' | 'noteColor' | 'activeNoteColor'>;
+  Pick<VisualizerRenderOptions, 'minPitch' | 'maxPitch' | 'noteColor' | 'activeNoteColor' | 'direction'>;
 
 export type VisualizerConfig = VisualizerRenderOptions;
 export type INoteSequence = ScoreNoteSequence;
@@ -167,6 +167,7 @@ export abstract class BaseVisualizer {
       activeNoteColor: config.activeNoteColor,
       minPitch: config.minPitch,
       maxPitch: config.maxPitch,
+      direction: config.direction,
     };
 
     const size = this.getSize();

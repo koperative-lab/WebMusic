@@ -513,6 +513,47 @@ describe('mixer companion binding', () => {
 });
 
 describe('<audio-mixer> passive source feedback', () => {
+  it('declares external loading without replacing members, the borrowed owner or playback', async () => {
+    const element = mount();
+    const owner = new AudioPlayer();
+    element.player = owner;
+    element.members = [{id: 'stem', clip: clip(4)}];
+    await owner.play();
+    owner.seek(1);
+    await flush();
+    const mixer = element.mixer;
+    element.loading = true;
+    expect(element.hasAttribute('loading')).toBe(true);
+    expect(element.shadowRoot!.querySelector<HTMLElement>('.wui-status')!.dataset.kind).toBe('loading');
+    expect(element.mixer).toBe(mixer);
+    expect(owner.transport).toBe(mixer!.transport);
+    expect(owner.playing).toBe(true);
+    expect(owner.seconds).toBeCloseTo(1);
+    element.setAttribute('loading', 'false');
+    expect(element.loading).toBe(false);
+    expect(element.shadowRoot!.querySelector<HTMLElement>('.wui-status')!.hidden).toBe(true);
+    element.loading = false;
+    expect(element.hasAttribute('loading')).toBe(false);
+    element.members = [];
+    element.loading = true;
+    expect(element.shadowRoot!.querySelector<HTMLElement>('.wui-status')!.dataset.kind).toBe('loading');
+    element.loading = false;
+    expect(element.shadowRoot!.querySelector<HTMLElement>('.wui-status')!.dataset.kind).toBe('waiting');
+    element.remove(); owner.dispose();
+  });
+
+  it('upgrades a loading property assigned before registration', () => {
+    const element = document.createElement('late-loading-audio-mixer') as AudioMixerElement;
+    element.loading = true;
+    document.body.append(element);
+    customElements.define('late-loading-audio-mixer', class extends AudioMixerElement {});
+    expect(element.loading).toBe(true);
+    expect(Object.hasOwn(element, 'loading')).toBe(false);
+    expect(element.shadowRoot!.querySelector<HTMLElement>('.wui-status')!.dataset.kind).toBe('loading');
+    element.loading = false;
+    expect(element.shadowRoot!.querySelector<HTMLElement>('.wui-status')!.dataset.kind).toBe('waiting');
+  });
+
   it('waits for members and restores usable strips after attachment', () => {
     const element = mount();
     const feedback = () => element.shadowRoot!.querySelector<HTMLElement>('.wui-status')!;

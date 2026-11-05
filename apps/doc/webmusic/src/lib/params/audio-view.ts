@@ -63,6 +63,12 @@ export const AUDIO_VIEW_PARAMS: ElementParamCatalog = {
         note: 'Which visualization is drawn. Switching disposes the old one and re-renders; unknown values fall back to waveform.',
       },
       {
+        name: 'loading',
+        kind: 'bool',
+        fallback: 'off',
+        note: 'Mark application-owned preparation, such as external decode or spectrum analysis, with the loading animation. This starts no request; clearing it restores automatic source/data readiness.',
+      },
+      {
         name: 'player',
         kind: 'text',
         placeholder: '#my-player',
@@ -271,6 +277,7 @@ export const AUDIO_VIEW_PARAMS: ElementParamCatalog = {
       },
     ],
     properties: [
+      {name: 'loading', note: 'Reflected boolean for application-owned preparation, false by default; not the aggregate loader state. Clearing it does not cancel or hide internal loading.'},
       {name: 'clip', note: 'An AudioClip you already have; cancels any in-flight src load.'},
       {name: 'peaks', note: 'An AudioPeaks pyramid. Wins over src and peaks-src alike.'},
       {name: 'spectrogram', note: 'SpectrogramData — the only way into type="spectrogram".'},

@@ -12,24 +12,25 @@ import {createPianoRollLayout} from '../core/layout';
 import {mountScoreThumbnail} from '../render/thumbnail';
 import {mountScoreMapAnnotations} from '../render/map-annotations';
 import {createScoreView, type ScoreView} from '../headless/score-view';
-import {renderScoreVisualizer} from '../render/score-visualizer';
+import {renderScoreVisualizer, type ScoreVisualizerHandle} from '../render/score-visualizer';
 import type {
   RenderedScoreVisualizer,
   ScoreViewType,
+  ScoreViewDirection,
   ScoreViewConfiguration,
   StaffRenderOptions,
   VisualizerRenderOptions,
   WaterfallRenderOptions,
 } from '../core/types';
 import {HTMLElementBase, boolAttr, cssSizeAttr, defineOnce, numAttr, upgradeProperties} from './base';
-import {mountStage, type StageHandle} from '@webmusic/ui/stage';
+import {mountScrollRegion, mountStage, type ScrollRegionHandle, type StageHandle} from '@webmusic/ui/stage';
 import {mountTimeline, type TimelineHandle, type TimelineRegion, type TimelineTick} from '@webmusic/ui/timeline';
 import {mountStatus, type StatusHandle, type StatusKind} from '@webmusic/ui/status';
 
 const ELEMENT_NOTE_RGB = '51, 51, 51';
 const ELEMENT_ACTIVE_NOTE_RGB = '240, 84, 119';
 
-export type {ScoreViewType} from '../core/types';
+export type {ScoreViewType, ScoreViewDirection} from '../core/types';
 export type {ScoreViewConfiguration, ScoreViewOptionsByType} from '../core/types';
 
 /** Element modes include lightweight previews without expanding renderer types. */
@@ -129,8 +130,10 @@ export function parseColorAttr(raw: string | null): string | undefined {
  *   `black-note-width`. Compose a separate `<score-pitch-view>` for a keyboard.
  * - **Colours** — `note-color` / `active-note-color` (hex, `rgb()`, or a raw
  *   `r, g, b` triple).
- * - **Expressions** — `show-annotations` (default true) shows supported score
- *   directions. False removes their space without changing musical data.
+ * - **Direction** — `direction` selects up/down/left/right for piano-roll and
+ *   waterfall. Other modes retain their normal reading direction.
+ * - **Expressions** — `show-annotations` (default false) enables supported score
+ *   directions. Hidden expressions reserve no space and retain musical data.
  * - **Staff** — `default-key` (chromatic key index), `scroll-type`
  *   (`page` · `note` · `bar`), and `split-staves` (default true; false combines
  *   source staves within each part).
@@ -150,6 +153,7 @@ export class ScoreViewElement extends HTMLElementBase {
       'format',
       'player',
       'type',
+      'direction',
       'for-part',
       'cells',
       'width',
@@ -174,7 +178,8 @@ export class ScoreViewElement extends HTMLElementBase {
   private lastSnapshot?: ViewPlayerSnapshot;
   private visualizerHandlers?: PlayerBindingHandlers;
   private renderedUnbind?: () => void;
-  private rendered?: RenderedScoreVisualizer;
+  private rendered?: ScoreVisualizerHandle;
+  private scrollRegion?: ScrollRegionHandle;
   private view?: ScoreView;
   private stage?: StageHandle;
   private status?: StatusHandle;
@@ -193,7 +198,7 @@ export class ScoreViewElement extends HTMLElementBase {
   private ownedSizes = new Map<string, string>();
 
   connectedCallback(): void {
-    upgradeProperties(this, ['score', 'options', 'type']);
+    upgradeProperties(this, ['score', 'options', 'type', 'direction']);
     this.bindPlayer();
     void this.refresh();
   }
@@ -271,6 +276,17 @@ export class ScoreViewElement extends HTMLElementBase {
     this.setAttribute('type', type);
   }
 
+  /** Piano-roll time axis or waterfall travel direction; other modes keep normal layout. */
+  get direction(): ScoreViewDirection {
+    const value = this.getAttribute('direction');
+    return value === 'up' || value === 'down' || value === 'left' || value === 'right'
+      ? value : this.type === 'waterfall' ? 'down' : 'right';
+  }
+
+  set direction(direction: ScoreViewDirection) {
+    this.setAttribute('direction', direction);
+  }
+
   /** Map density part, selected by id or name; absent means every part. */
   get forPart(): string | undefined {
     return this.getAttribute('for-part') ?? undefined;
@@ -320,6 +336,8 @@ export class ScoreViewElement extends HTMLElementBase {
     this.annotationsCleanup = undefined;
     this.style?.removeProperty('--_webscore-preview-annotations');
     this.rebindRendered(undefined);
+    this.scrollRegion?.destroy();
+    this.scrollRegion = undefined;
     this.rendered?.dispose?.();
     this.rendered = undefined;
     this.view?.dispose();
@@ -431,6 +449,8 @@ export class ScoreViewElement extends HTMLElementBase {
     if (failed) {
       this.stage.destroy();
       this.stage = undefined;
+      this.scrollRegion?.destroy();
+      this.scrollRegion = undefined;
       this.rendered?.dispose?.();
       this.rendered = undefined;
       this.view.dispose();
@@ -480,14 +500,24 @@ export class ScoreViewElement extends HTMLElementBase {
     apply('overflow-y', height ? 'auto' : undefined);
   }
 
-  private renderScore(score: Score, surface: HTMLElement, type: ScoreViewType): RenderedScoreVisualizer {
+  private renderScore(score: Score, surface: HTMLElement, type: ScoreViewType): ScoreVisualizerHandle {
     const options = this.renderOptions();
-    if (type !== 'waterfall') return renderScoreVisualizer(score, surface, type, options);
-    return renderScoreVisualizer(score, surface, type, {
+    const rendered = renderScoreVisualizer(score, surface, type, type === 'waterfall' ? {
       ...options,
       fitToWidth: true,
       showOnlyOctavesUsed: options.showOnlyOctavesUsed ?? true,
-    });
+    } : options);
+    try {
+      if (rendered.scrollViewport) {
+        this.scrollRegion = mountScrollRegion(rendered.scrollViewport, {
+          label: 'Score time window', hideScrollbar: true,
+        });
+      }
+      return rendered;
+    } catch (error) {
+      rendered.dispose?.();
+      throw error;
+    }
   }
 
   private showStatus(kind: StatusKind, message: string): void {
@@ -502,11 +532,13 @@ export class ScoreViewElement extends HTMLElementBase {
   /** Attribute-derived render options, overridden by `.options`. */
   private renderOptions(): ScoreViewRenderOptions {
     const options: Record<string, unknown> = {
+      showAnnotations: false,
       noteRGB: ELEMENT_NOTE_RGB,
       activeNoteRGB: ELEMENT_ACTIVE_NOTE_RGB,
       noteColor: 'var(--wm-score-view-note, var(--wm-foreground, light-dark(#333, #ddd)))',
       activeNoteColor: 'var(--wm-score-view-active-note, var(--wm-accent, rgb(240, 84, 119)))',
     };
+    if (this.type === 'piano-roll' || this.type === 'waterfall') options.direction = this.direction;
 
     for (const [attr, key] of NUMERIC_OPTION_ATTRS) {
       if (this.getAttribute(attr) == null) continue;
@@ -539,7 +571,12 @@ export class ScoreViewElement extends HTMLElementBase {
 
     if (this.explicitOptions?.noteRGB !== undefined) delete options.noteColor;
     if (this.explicitOptions?.activeNoteRGB !== undefined) delete options.activeNoteColor;
-    return {...(options as ScoreViewRenderOptions), ...this.explicitOptions};
+    const merged = {...(options as ScoreViewRenderOptions), ...this.explicitOptions};
+    merged.showAnnotations = this.explicitOptions?.showAnnotations ?? options.showAnnotations as boolean;
+    if (this.type === 'piano-roll' || this.type === 'waterfall') {
+      merged.direction = this.explicitOptions?.direction ?? this.direction;
+    }
+    return merged;
   }
 
   private async resolveScore(input: Score | string | undefined, format: string | undefined, signal: AbortSignal): Promise<Score | undefined> {

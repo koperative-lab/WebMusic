@@ -36,7 +36,7 @@ const INERT: Record<string, string> = {
     data-view-demo
   ></audio-view>
   <p class="wa-help" data-drag-help>The playhead stays centered. Drag left forward or right backward to scratch; release coasts, then restores the previous playback state.</p>
-  <p role="status" data-view-status>Loading waveform…</p>
+  <p role="status" data-view-status></p>
   </div>
 </ElementPlayground>
 
@@ -45,7 +45,7 @@ const INERT: Record<string, string> = {
   import {defineAudioViewElement, type AudioViewElement} from '@webmusic/audio/view/element';
   import {mountDemos} from './demo-lifecycle';
   import {acquireAudioViewFixture} from './audio-view-fixture';
-  import {PLAYGROUND_RESET_EVENT} from './playground-client';
+  import {PLAYGROUND_RESET_EVENT, PLAYGROUND_SYNC_EVENT} from './playground-client';
 
   defineAudioPlayerElement();
   defineAudioViewElement();
@@ -56,18 +56,25 @@ const INERT: Record<string, string> = {
     const status = root.querySelector<HTMLElement>('[data-view-status]')!;
     const fixture = acquireAudioViewFixture(`${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`);
     scope.add(() => fixture.release());
-    scope.add(() => { player.stop(); player.clip = undefined; view.peaks = undefined; view.spectrogram = undefined; });
+    scope.add(() => { player.stop(); player.clip = undefined; player.loading = false; view.peaks = undefined; view.spectrogram = undefined; view.loading = false; });
     let generation = 0;
     let ready = false;
     let prepared = false;
+    let preparing = false;
+    const panel = root.closest<HTMLElement>('[data-wm-pg]');
+    const setLoading = (value: boolean): void => {
+      preparing = value;
+      view.loading = value;
+      panel?.dispatchEvent(new CustomEvent(PLAYGROUND_SYNC_EVENT));
+    };
     const needsSpectrum = (): boolean => view.type === 'spectrogram' ||
       (view.type === 'waveform' && ['multiband', 'colormap'].includes(view.getAttribute('color-mode') ?? ''));
     const update = async (): Promise<void> => {
       const current = ++generation;
       if (!ready) return;
-      if (!needsSpectrum()) { status.textContent = ''; return; }
-      if (prepared) { status.textContent = ''; return; }
-      status.textContent = 'Preparing spectrum…';
+      status.textContent = '';
+      if (!needsSpectrum() || prepared) { setLoading(false); return; }
+      setLoading(true);
       try {
         const spectrum = await fixture.spectrum('left', true);
         if (!scope.active || current !== generation || !needsSpectrum()) return;
@@ -77,6 +84,8 @@ const INERT: Record<string, string> = {
       } catch (error) {
         if (scope.active && current === generation) status.textContent = 'Spectrum could not be prepared. Change the view type to retry.';
         throw error;
+      } finally {
+        if (scope.active && current === generation) setLoading(false);
       }
     };
     const help = root.querySelector<HTMLElement>('[data-drag-help]');
@@ -111,22 +120,32 @@ const INERT: Record<string, string> = {
       tapFrame = requestAnimationFrame(() => { if (scope.active) tap(); });
     });
     scope.add(() => cancelAnimationFrame(tapFrame));
-    const panel = root.closest<HTMLElement>('[data-wm-pg]');
-    if (panel) scope.listen(panel, PLAYGROUND_RESET_EVENT, () => { player.stop(); });
+    if (panel) scope.listen(panel, PLAYGROUND_RESET_EVENT, () => {
+      player.stop();
+      // Reset restores authored attributes after this event; pending work still
+      // owns its loading hint, rather than a transient playground baseline.
+      queueMicrotask(() => { if (scope.active) setLoading(preparing); });
+    });
     scope.run((async () => {
-      status.textContent = 'Loading audio…';
+      status.textContent = '';
+      setLoading(true);
+      player.loading = true;
       const clip = await fixture.clip();
       if (!scope.active) return;
-      status.textContent = 'Preparing waveform…';
       const peaks = await fixture.peaks();
       if (!scope.active) return;
       // Explicit peaks arrive first so the player binding need not derive them.
       view.peaks = peaks;
       player.clip = clip;
+      player.loading = false;
       ready = true;
       status.textContent = '';
-      await update();
-    })(), () => { status.textContent = 'Audio could not be loaded. Reload this page to retry.'; });
+      scope.run(update());
+    })(), () => {
+      setLoading(false);
+      player.loading = false;
+      status.textContent = 'Audio could not be loaded. Reload this page to retry.';
+    });
   });
 </script>
 

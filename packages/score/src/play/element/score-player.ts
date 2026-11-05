@@ -110,6 +110,7 @@ export class ScorePlayerElement extends WebMusicElement {
     return [
       'src',
       'format',
+      'loading',
       'sound-font',
       'volume',
       'rate',
@@ -122,6 +123,7 @@ export class ScorePlayerElement extends WebMusicElement {
 
   private handle?: PresetPlayerHandle;
   private status?: StatusHandle;
+  private preparationStatus?: StatusHandle;
   private explicitScore?: Score;
   private mountedScore?: Score;
   private readonly activeNotes = new Map<Note, ScorePlayerNoteEventDetail>();
@@ -165,7 +167,7 @@ export class ScorePlayerElement extends WebMusicElement {
     const native = this.handle?.player?.playback?.snapshot();
     return {
       sourceRevision: this.sourceRevision,
-      readiness: this.playbackReadiness,
+      readiness: this.isConnected && this.loading ? 'loading' : this.playbackReadiness,
       state: native?.state ?? 'stopped',
       score: native?.score,
       nominalSeconds: native?.nominalSeconds ?? null,
@@ -206,6 +208,7 @@ export class ScorePlayerElement extends WebMusicElement {
       this.own(() => { this.rackObserver?.disconnect(); this.rackObserver = undefined; });
     }
     upgradeProperties(this, [
+      'loading',
       'score',
       'rack',
       'controller',
@@ -226,6 +229,11 @@ export class ScorePlayerElement extends WebMusicElement {
 
   attributeChangedCallback(name?: string): void {
     if (!this.isConnected) return;
+    if (name === 'loading') {
+      this.syncPreparationStatus();
+      this.playbackPublisher.notify();
+      return;
+    }
     // The live knobs apply in place. Re-rendering for them would tear the
     // player down and restart the piece just to change a volume.
     if (name === 'rate' || name === 'volume' || name === 'pan' || name === 'loop') {
@@ -253,6 +261,15 @@ export class ScorePlayerElement extends WebMusicElement {
 
   get score(): Score | undefined {
     return this.explicitScore;
+  }
+
+  /** Current preparation; writes declare caller-owned work without canceling native loading. */
+  get loading(): boolean {
+    return boolAttr(this, 'loading', false) || this.playbackReadiness === 'loading';
+  }
+
+  set loading(value: boolean) {
+    this.setAttribute('loading', value ? 'true' : 'false');
   }
 
   /** The resolved score currently mounted for playback, including a loaded `src`. */
@@ -631,7 +648,22 @@ export class ScorePlayerElement extends WebMusicElement {
       this.insertBefore(host, this.firstChild);
       this.rackHost = host;
     }
+    this.rackHost.hidden = boolAttr(this, 'loading', false);
     return this.rackHost;
+  }
+
+  /** Hide only the owned chrome, retaining its engine, position and authored children. */
+  private syncPreparationStatus(): void {
+    const preparing = this.isConnected && boolAttr(this, 'loading', false);
+    if (this.rackHost) this.rackHost.hidden = preparing;
+    if (preparing) {
+      this.preparationStatus ??= mountStatus(this, {
+        snapshot: () => ({kind: 'loading', message: 'Preparing score playback'}),
+      });
+    } else {
+      this.preparationStatus?.destroy();
+      this.preparationStatus = undefined;
+    }
   }
 
   private clearStatus(): void {
@@ -642,9 +674,11 @@ export class ScorePlayerElement extends WebMusicElement {
   private showStatus(kind: StatusKind, message: string): void {
     this.clearStatus();
     this.status = mountStatus(this.ensureTransportHost(), {snapshot: () => ({kind, message})});
+    this.syncPreparationStatus();
   }
 
   protected async render(): Promise<void> {
+    this.syncPreparationStatus();
     // A caller can remove the desk and assign a score before the observer's
     // microtask. Never mount the removed desk's now-disposed Rack in that gap.
     this.adoptComposedRack();
@@ -956,6 +990,8 @@ export class ScorePlayerElement extends WebMusicElement {
     this.renderRequest += 1;
     this.cancelLoad();
     this.clearStatus();
+    this.preparationStatus?.destroy();
+    this.preparationStatus = undefined;
     this.composedRack = undefined;
     this.unbindPlayback?.();
     this.unbindPlayback = undefined;

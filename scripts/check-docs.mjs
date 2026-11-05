@@ -232,6 +232,17 @@ function checkElementPages(files, paramsCatalog) {
     const playgrounds = source.match(/^<[A-Z][A-Za-z]*(?:Playground|Demo)\b[^>]*\/>/gm) ?? [];
     if (playgrounds.length === 0) fail('page', `${page}: no live demo`);
 
+    // Element pages lead with the real demo. Strip only non-rendered preamble;
+    // fenced examples, prose, headings and notices must not precede the stage.
+    const body = source
+      .replace(/^---\r?\n[\s\S]*?\r?\n---/, '')
+      .replace(/<!--[\s\S]*?-->|\{\/\*[\s\S]*?\*\/\}/g, '')
+      .replace(/^\s*import\s+(?:[\w\s{},*]+\s+from\s+)?['"][^'"\r\n]+['"];?[ \t]*(?:\r?\n|$)/gm, '')
+      .trimStart();
+    if (!/^<[A-Z][A-Za-z]*(?:Playground|Demo)\b/.test(body)) {
+      fail('page', `${page}: the main demo must be the first visible body content, before introduction and headings`);
+    }
+
     for (const section of ['API', 'Styling']) {
       if (!source.includes(`<summary>${section}</summary>`)) {
         fail('page', `${page}: missing the ${section} <details> block`);

@@ -2,7 +2,7 @@
 // Homepage workbench: a player driving a live waveform. Shows the cross-package
 // data flow — @webmusic/audio/play loads + decodes the clip, @webmusic/audio/analyze turns it
 // into a peaks pyramid, @webmusic/audio/view draws it, and the <audio-view> follows the
-// <audio-player> playhead purely through the `webaudio:timeupdate` DOM event
+// <audio-player> through its public source, readiness and time contracts
 // (view never imports play or analyze).
 import LiveDemoCanvas from './LiveDemoCanvas.astro';
 ---
@@ -15,6 +15,7 @@ import LiveDemoCanvas from './LiveDemoCanvas.astro';
   <LiveDemoCanvas>
     <audio-player id="wa-wb-player" controls></audio-player>
     <audio-view id="wa-wb-view" player="#wa-wb-player" type="waveform" pixels-per-second="90" interactive></audio-view>
+    <p role="status" data-workbench-status></p>
   </LiveDemoCanvas>
 </div>
 
@@ -23,20 +24,35 @@ import LiveDemoCanvas from './LiveDemoCanvas.astro';
   import type { AudioViewElement } from '@webmusic/audio/view/element';
   import { defineAudioPlayerElement } from '@webmusic/audio/play/element';
   import { defineAudioViewElement } from '@webmusic/audio/view/element';
-  import { loadClipFromUrl } from '@webmusic/audio/play';
-  import { computePeaks } from '@webmusic/audio/analyze';
+  import {mountDemos} from './demo-lifecycle';
+  import {acquireAudioViewFixture} from './audio-view-fixture';
 
   defineAudioPlayerElement();
   defineAudioViewElement();
 
-  (async () => {
-    const clip = await loadClipFromUrl(`${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`);
-    const player = document.getElementById('wa-wb-player') as AudioPlayerElement | null;
-    const view = document.getElementById('wa-wb-view') as AudioViewElement | null;
-    if (player) player.clip = clip;                    // play the decoded clip
-    const channels = clip.channels();
-    if (view && channels) view.peaks = computePeaks(channels, clip.sampleRate); // draw it
-  })();
+  mountDemos('[data-audio-workbench]', (root, scope) => {
+    const player = root.querySelector<AudioPlayerElement>('audio-player')!;
+    const view = root.querySelector<AudioViewElement>('audio-view')!;
+    const status = root.querySelector<HTMLElement>('[data-workbench-status]')!;
+    const fixture = acquireAudioViewFixture(`${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`);
+    scope.add(() => fixture.release());
+    scope.add(() => { player.stop(); player.clip = undefined; player.loading = false; view.peaks = undefined; view.loading = false; });
+    status.textContent = '';
+    player.loading = true;
+    view.loading = true;
+    scope.run((async () => {
+      const [clip, peaks] = await Promise.all([fixture.clip(), fixture.peaks()]);
+      if (!scope.active) return;
+      view.peaks = peaks;
+      player.clip = clip;
+      player.loading = false;
+      view.loading = false;
+    })(), () => {
+      player.loading = false;
+      view.loading = false;
+      status.textContent = 'Audio could not be loaded. Reload this page to retry.';
+    });
+  });
 </script>
 
 <style>

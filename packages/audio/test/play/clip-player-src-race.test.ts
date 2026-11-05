@@ -49,9 +49,12 @@ function makeElement(): AudioPlayerElement & {events: Array<{type: string; detai
     events: Array<{type: string; detail: unknown}>;
   };
   const el = element as unknown as Record<string, unknown>;
+  const attributes = new Map<string, string>();
   el.isConnected = true;
-  el.getAttribute = () => null;
-  el.hasAttribute = () => false;
+  el.getAttribute = (name: string) => attributes.get(name) ?? null;
+  el.hasAttribute = (name: string) => attributes.has(name);
+  el.setAttribute = (name: string, value: string) => { attributes.set(name, value); };
+  el.removeAttribute = (name: string) => { attributes.delete(name); };
   el.attachShadow = () => ({
     innerHTML: '',
     querySelector: () => null,

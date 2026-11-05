@@ -7,6 +7,8 @@ sidebar:
 
 import AudioRecorderDemo from '../../../../../components/AudioRecorderDemo.astro';
 
+<AudioRecorderDemo />
+
 `<audio-recorder>` is a **record button with a live level bar**. Press it to open the microphone through an [`AudioRecorder`](/audio/api/play/) (the button turns square while armed and the bar tracks the input level); press again to stop, at which point it assembles the captured PCM into an `AudioClip` and dispatches `webaudio:recorded` with it. It needs **microphone permission** — the browser prompts on first record — and never auto-starts. Opening remains busy until the capture context is running. The current [ScriptProcessor backend](/audio/headless/play/audio-recorder/#capture-backend-and-measurement) captures fixed stereo blocks; stop has no final partial-block flush.
 
 For symbolic note performances, use the corresponding
@@ -18,8 +20,10 @@ and context startup settle. A missing requested playback owner shows the outline
 waiting animation while idle and without a take; Record remains available because capture
 is independent. Recording, audition and captured-take details remain visible. Standalone idle
 capture stays ready for a user gesture.
-
-<AudioRecorderDemo />
+Microphone and audition failures remain visible as errors until the next attempt;
+retry immediately replaces that failure with the relevant pending or ready state.
+Canceling a pending microphone request returns to the idle state, and a late
+permission result cannot start capture again.
 
 ## Import
 
@@ -52,7 +56,6 @@ recorder.addEventListener('webaudio:recorded', (e) => {
 
 <details class="component-section">
 <summary>API</summary>
-
 
 | Member | Kind | Description |
 | --- | --- | --- |

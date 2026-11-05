@@ -7,6 +7,8 @@ sidebar:
 
 import RackControlDemo from '../../../../../components/RackControlDemo.astro';
 
+<RackControlDemo />
+
 `<score-rack-control>` is the mixing desk for a [`Rack`](/score/headless/play/rack/): a fader per member,
 a master over them, and mute and solo on each. Write the parts inside it, wrap the whole thing in a
 player, and the composition is the markup:
@@ -36,8 +38,6 @@ mixer at all.
 The rack is the single source of truth. Levels, mute and solo are read back off it rather than
 mirrored here, so a fader cannot drift from the gain it moves — and because `Rack` reports a mix
 change as well as a membership change, anything else driving the rack repaints this desk too.
-
-<RackControlDemo />
 
 The **Effects** collection in Parameters is the same chain editor used by
 [`<score-player>`](/score/element/play/score-player/). Its order is signal order: the rack's summed

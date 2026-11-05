@@ -11,8 +11,9 @@ export {
   type ScoreViewSeekDetail,
   type ScoreViewConfiguration,
   type ScoreViewOptionsByType,
+  type ScoreViewDirection,
 } from './score-view';
-export {PitchViewElement, definePitchViewElement, type PitchViewType} from './score-pitch-view';
+export {PitchViewElement, definePitchViewElement, type PitchViewType, type PitchViewDirection} from './score-pitch-view';
 export {SheetViewElement, defineSheetViewElement} from './score-sheet-view';
 
 import {defineScoreViewElement} from './score-view';

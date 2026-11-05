@@ -6,6 +6,7 @@ import {
   type KeyboardHandle,
   type StaffHandle,
   type FretboardHandle,
+  type KeyboardDirection,
 } from '@webmusic/ui/pitch';
 import {
   currentStaffMarks,
@@ -19,6 +20,7 @@ import {bindViewPlayer} from './internal/player-binding';
 import {HTMLElementBase, defineOnce, numAttr, boolAttr, upgradeProperty} from './base';
 
 export type PitchViewType = 'keyboard' | 'staff' | 'fretboard';
+export type PitchViewDirection = KeyboardDirection;
 
 const KEYBOARD_GEOMETRY_ATTRIBUTES = ['white-key-width', 'black-key-width', 'white-key-height', 'black-key-height'] as const;
 const FRETBOARD_GEOMETRY_ATTRIBUTES = ['fret-width', 'string-spacing', 'string-width'] as const;
@@ -29,7 +31,7 @@ const FRETBOARD_GEOMETRY_ATTRIBUTES = ['fret-width', 'string-spacing', 'string-w
  */
 export class PitchViewElement extends HTMLElementBase {
   static get observedAttributes(): string[] {
-    return ['type', 'player', 'source', 'low', 'high', 'system', 'spelling', 'density', 'scheme', 'tuning', 'first-fret', 'frets', 'follow', 'scroll', 'fit-to-width', ...KEYBOARD_GEOMETRY_ATTRIBUTES, ...FRETBOARD_GEOMETRY_ATTRIBUTES];
+    return ['type', 'direction', 'player', 'source', 'low', 'high', 'system', 'spelling', 'density', 'scheme', 'tuning', 'first-fret', 'frets', 'follow', 'scroll', 'fit-to-width', ...KEYBOARD_GEOMETRY_ATTRIBUTES, ...FRETBOARD_GEOMETRY_ATTRIBUTES];
   }
 
   #notes = createPitchView();
@@ -49,6 +51,14 @@ export class PitchViewElement extends HTMLElementBase {
 
   set type(type: PitchViewType) { this.setAttribute('type', type); }
 
+  /** Keyboard key-front direction. Other pitch representations keep their reading orientation. */
+  get direction(): PitchViewDirection {
+    const value = this.getAttribute('direction');
+    return value === 'up' || value === 'left' || value === 'right' ? value : 'down';
+  }
+
+  set direction(direction: PitchViewDirection) { this.setAttribute('direction', direction); }
+
   /** Requested keyboard endpoints. UIKit normalizes the supported MIDI range. */
   get low(): number { return Math.round(numAttr(this, 'low', 48)); }
   get high(): number { return Math.round(numAttr(this, 'high', 71)); }
@@ -67,7 +77,7 @@ export class PitchViewElement extends HTMLElementBase {
     if (this.hasAttribute('scroll')) return boolAttr(this, 'scroll');
     return this.hasAttribute('fit-to-width') ? !boolAttr(this, 'fit-to-width') : false;
   }
-  /** Effective keyboard fitting, overriding fixed/minimum key widths whenever scrolling is disabled. */
+  /** Effective keyboard pitch-axis fitting, overriding fixed/minimum key widths whenever scrolling is disabled. */
   get fitToWidth(): boolean { return !this.scrollable; }
 
   #pixels(name: string): number | undefined {
@@ -105,6 +115,7 @@ export class PitchViewElement extends HTMLElementBase {
 
   connectedCallback(): void {
     upgradeProperty(this, 'type');
+    upgradeProperty(this, 'direction');
     this.#mountHostStyle();
     this.#status = mountStatus(this, {snapshot: () => this.#statusState}, {parts: {root: 'pitch-status', indicator: 'pitch-status-indicator', message: 'pitch-status-message'}});
     this.#render();
@@ -131,7 +142,7 @@ export class PitchViewElement extends HTMLElementBase {
     if (!this.isConnected || !this.#hostStyle) return;
     if (name === 'player' || name === 'source') this.#bindPlayer();
     else if (name === 'type' || name === 'density' || name === 'scheme'
-      || (this.type === 'keyboard' && (name === 'follow' || name === 'scroll' || name === 'fit-to-width' || KEYBOARD_GEOMETRY_ATTRIBUTES.includes(name as typeof KEYBOARD_GEOMETRY_ATTRIBUTES[number])))
+      || (this.type === 'keyboard' && (name === 'direction' || name === 'follow' || name === 'scroll' || name === 'fit-to-width' || KEYBOARD_GEOMETRY_ATTRIBUTES.includes(name as typeof KEYBOARD_GEOMETRY_ATTRIBUTES[number])))
       || (this.type === 'fretboard' && FRETBOARD_GEOMETRY_ATTRIBUTES.includes(name as typeof FRETBOARD_GEOMETRY_ATTRIBUTES[number]))) this.#render();
     else if (name === 'spelling'
       || (this.type === 'keyboard' && (name === 'low' || name === 'high'))
@@ -155,7 +166,9 @@ export class PitchViewElement extends HTMLElementBase {
   }
 
   #render(): void {
-    const scrollLeft = this.#handle?.element.scrollLeft;
+    const previous = this.#handle?.element;
+    const wasVertical = previous?.dataset.direction === 'left' || previous?.dataset.direction === 'right';
+    const scrollOffset = previous && (wasVertical ? previous.scrollTop : previous.scrollLeft);
     this.#handle?.destroy();
     this.#handle = undefined;
     if (!(this as {ownerDocument?: Document}).ownerDocument) return;
@@ -168,7 +181,7 @@ export class PitchViewElement extends HTMLElementBase {
           marks: this.active.map((midi) => ({midi, label: readoutPitch(midi, this.spelling).toString(), active: true})),
         }),
         subscribe: (notify) => this.#notes.subscribe(notify),
-      }, {...options, release: 0, trail: false, follow: this.follow, fitToWidth: this.fitToWidth,
+      }, {...options, direction: this.direction, release: 0, trail: false, follow: this.follow, fitToWidth: this.fitToWidth,
         whiteKeyWidth: this.whiteKeyWidth, blackKeyWidth: this.blackKeyWidth,
         whiteKeyHeight: this.whiteKeyHeight, blackKeyHeight: this.blackKeyHeight});
     } else if (this.type === 'staff') {
@@ -202,8 +215,9 @@ export class PitchViewElement extends HTMLElementBase {
       }, {...options, release: 0, fretWidth: this.fretWidth, stringSpacing: this.stringSpacing, stringWidth: this.stringWidth});
     }
     this.#paintStatus();
-    if (this.#handle && scrollLeft !== undefined) {
-      this.#handle.element.scrollLeft = this.type === 'keyboard' && this.fitToWidth ? 0 : scrollLeft;
+    if (this.#handle && scrollOffset !== undefined) {
+      const vertical = this.type === 'keyboard' && (this.direction === 'left' || this.direction === 'right');
+      this.#handle.element[vertical ? 'scrollTop' : 'scrollLeft'] = this.type === 'keyboard' && this.fitToWidth ? 0 : scrollOffset;
     }
   }
 

@@ -6,10 +6,10 @@ const commonKeys: ReadonlyArray<keyof VisualizerRenderOptions> = [
 ];
 
 const modeKeys: Record<ScoreViewType, readonly string[]> = {
-  'piano-roll': commonKeys,
+  'piano-roll': [...commonKeys, 'direction'],
   staff: [...commonKeys, 'defaultKey', 'instruments', 'scrollType', 'splitStaves'],
   waterfall: [
-    ...commonKeys, 'whiteNoteWidth',
+    ...commonKeys, 'direction', 'whiteNoteWidth',
     'blackNoteWidth', 'showOnlyOctavesUsed',
   ],
 };

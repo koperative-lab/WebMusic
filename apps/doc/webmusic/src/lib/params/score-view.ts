@@ -49,6 +49,7 @@ export const SCORE_VIEW_PARAMS: ElementParamCatalog = {
         fallback: 'piano-roll',
         note: 'Which drawing is rendered; changing it disposes the old visualizer and re-renders. An unknown value falls back to piano-roll.',
       },
+      {name: 'direction', kind: 'enum', options: ['up', 'down', 'left', 'right'], fallback: 'piano-roll: right; waterfall: down', note: 'Piano roll: increasing score time. Waterfall: note travel toward the landing edge. Pitch stays low-left or low-bottom; staff, map and thumbnail keep their reading direction.', when: scoreTypes('piano-roll', 'waterfall')},
       {name: 'for-part', kind: 'text', placeholder: 'P1', fallback: 'every part', note: 'Map only: shade one part by id or name.', when: scoreTypes('map')},
       {name: 'cells', kind: 'number', min: 1, step: 1, fallback: '64', note: 'Map only: upper bound on density cells; bars are grouped evenly.', when: scoreTypes('map')},
       {
@@ -68,7 +69,7 @@ export const SCORE_VIEW_PARAMS: ElementParamCatalog = {
       {
         name: 'show-annotations',
         kind: 'bool',
-        fallback: 'on — show score directions',
+        fallback: 'off — hide advanced score directions',
         note: 'Show words, dynamics, tempo, rehearsal and pedal/hairpin marks in every type; false removes their drawing space without changing playback.',
       },
       {
@@ -107,7 +108,7 @@ export const SCORE_VIEW_PARAMS: ElementParamCatalog = {
         kind: 'number',
         placeholder: '6',
         fallback: '6',
-        note: 'Piano-roll note height or staff notation scale in px. Zero falls back to 6.',
+        note: 'Piano-roll pitch-lane breadth (height for left/right, width for up/down), or staff notation scale in px. Zero falls back to 6.',
       },
       {
         name: 'note-spacing',
@@ -140,8 +141,8 @@ export const SCORE_VIEW_PARAMS: ElementParamCatalog = {
         when: scoreTypes('waterfall'),
         kind: 'number',
         placeholder: '20',
-        fallback: 'fit the available width',
-        note: 'Waterfall only: natural-note pitch-column width in px; a positive explicit value disables fitting. Clear both pitch-column widths to restore fitting.',
+        fallback: 'fit the available pitch axis',
+        note: 'Waterfall only: natural-note pitch breadth in px on the selected axis; a positive explicit value disables fitting. Clear both pitch-column widths to restore fitting.',
       },
       {
         name: 'black-note-width',
@@ -149,7 +150,7 @@ export const SCORE_VIEW_PARAMS: ElementParamCatalog = {
         kind: 'number',
         placeholder: '13.3',
         fallback: '0.62 × natural-note column width',
-        note: 'Waterfall only: accidental pitch-column width in px; a positive explicit value disables fitting. Without white-note-width, natural-note columns use 20px.',
+        note: 'Waterfall only: accidental pitch breadth in px on the selected axis; a positive explicit value disables fitting. Alone, derives natural-note breadth by dividing by 0.62.',
       },
       {
         name: 'default-key',
@@ -184,6 +185,7 @@ export const SCORE_VIEW_PARAMS: ElementParamCatalog = {
       {name: 'configure(configuration)', note: 'Atomically select piano-roll, staff or waterfall with compatible options. Map and thumbnail use type/options/attributes.'},
       {name: 'options', note: 'ScoreViewRenderOptions merged over the attributes (property wins) — including knobs with no attribute form, e.g. virtualization and the staff instruments filter.'},
       {name: 'type', note: 'Reflects the five-value Element type; the setter writes the attribute.'},
+      {name: 'direction', note: 'Writable reflected four-way direction; piano-roll defaults right and waterfall defaults down. Ignored by other types.'},
       {name: 'forPart', note: 'Read-only map part filter, or undefined.'},
       {name: 'cells', note: 'Read-only map cell limit, default 64 and minimum 1.'},
     ],
@@ -235,6 +237,7 @@ export const SCORE_VIEW_PARAMS: ElementParamCatalog = {
     tag: 'score-pitch-view', entry: ENTRY,
     params: [
       {name: 'type', kind: 'enum', options: ['keyboard', 'staff', 'fretboard'], fallback: 'keyboard', note: 'One passive sounding-pitch surface; switching preserves the current held notes.'},
+      {name: 'direction', kind: 'enum', options: ['up', 'down', 'left', 'right'], fallback: 'down', note: 'Keyboard only: key-front direction. Low pitches stay left on horizontal keyboards and bottom on vertical keyboards; set a CSS height for left/right.', when: pitchTypes('keyboard')},
       {name: 'player', kind: 'text', placeholder: '#my-player', fallback: 'use source, else wait for notes', note: 'Borrow held-note snapshots and events from one selected player; no score load or playback commands.'},
       {name: 'source', kind: 'text', placeholder: '#my-input', fallback: 'use player, else wait for notes', note: 'Legacy note-source selector used only when player is empty.'},
       {name: 'low', kind: 'number', step: 1, fallback: '48', note: 'Keyboard only: requested lowest MIDI key, rounded.', when: pitchTypes('keyboard')},
@@ -249,10 +252,10 @@ export const SCORE_VIEW_PARAMS: ElementParamCatalog = {
       {name: 'follow', kind: 'enum', options: ['active', 'none'], fallback: 'active', note: 'Keyboard only: reveal newly active pitches when scrolling is enabled; none leaves panning to the application or user.', when: pitchTypes('keyboard')},
       {name: 'scroll', kind: 'bool', fallback: 'off — fit the entire range', inverseFallbackAttribute: 'fit-to-width', note: 'Keyboard only: enable scrolling and fixed key widths; off fits every key. Explicit scroll overrides legacy fit-to-width.', when: pitchTypes('keyboard')},
       {name: 'fit-to-width', kind: 'bool', fallback: 'on — fit the entire range', note: 'Legacy keyboard inverse of scroll, ignored whenever scroll is present; use scroll for new configurations.', when: {...pitchTypes('keyboard'), presentAttribute: 'fit-to-width'}},
-      {name: 'white-key-width', kind: 'number', min: 1, step: 1, placeholder: '32', fallback: 'fit the entire range', note: 'Keyboard only: fixed natural-key width in px when scrolling is enabled; retained but ignored while fitting.', when: pitchTypes('keyboard')},
-      {name: 'black-key-width', kind: 'number', min: 1, step: 1, placeholder: '20', fallback: '0.62 × white-key width', note: 'Keyboard only: accidental-key width in px, capped at white width; alone derives white width as value / 0.62. Used only when scrolling is enabled.', when: pitchTypes('keyboard')},
-      {name: 'white-key-height', kind: 'number', min: 1, step: 1, placeholder: '80', fallback: 'theme height', note: 'Keyboard only: natural-key height in px; does not change pitch-column width.', when: pitchTypes('keyboard')},
-      {name: 'black-key-height', kind: 'number', min: 1, step: 1, placeholder: '50', fallback: 'theme proportion', note: 'Keyboard only: accidental-key height in px, capped at white-key height.', when: pitchTypes('keyboard')},
+      {name: 'white-key-width', kind: 'number', min: 1, step: 1, placeholder: '32', fallback: 'fit the entire range', note: 'Keyboard only: fixed natural-key pitch breadth in px when scrolling is enabled; retained but ignored while fitting.', when: pitchTypes('keyboard')},
+      {name: 'black-key-width', kind: 'number', min: 1, step: 1, placeholder: '20', fallback: '0.62 × white-key width', note: 'Keyboard only: accidental-key pitch breadth in px, capped at white width; alone derives white width as value / 0.62. Used only when scrolling is enabled.', when: pitchTypes('keyboard')},
+      {name: 'white-key-height', kind: 'number', min: 1, step: 1, placeholder: '80', fallback: 'theme height', note: 'Keyboard only: natural-key depth in px; does not change pitch breadth.', when: pitchTypes('keyboard')},
+      {name: 'black-key-height', kind: 'number', min: 1, step: 1, placeholder: '50', fallback: 'theme proportion', note: 'Keyboard only: accidental-key depth in px, capped at white-key depth.', when: pitchTypes('keyboard')},
       {name: 'fret-width', kind: 'number', min: 1, step: 1, placeholder: '36', fallback: 'responsive fret spacing', note: 'Fretboard only: fixed distance between adjacent fret wires in px.', when: pitchTypes('fretboard')},
       {name: 'string-spacing', kind: 'number', min: 1, step: 1, placeholder: '24', fallback: 'density geometry', note: 'Fretboard only: distance between adjacent strings in px.', when: pitchTypes('fretboard')},
       {name: 'string-width', kind: 'number', min: 0.1, step: 0.1, placeholder: '1', fallback: 'density stroke', note: 'Fretboard only: string line thickness in px, independent of viewport scale.', when: pitchTypes('fretboard')},
@@ -260,6 +263,7 @@ export const SCORE_VIEW_PARAMS: ElementParamCatalog = {
     properties: [
       {name: 'active', note: 'Read-only copy of the ascending sounding MIDI pitches, including notes outside the visible range.'},
       {name: 'type', note: 'Writable reflected type; unknown values resolve to keyboard.'},
+      {name: 'direction', note: 'Writable reflected keyboard facing direction, down by default.'},
       {name: 'low', note: 'Read-only requested keyboard lower endpoint.'},
       {name: 'high', note: 'Read-only requested keyboard upper endpoint.'},
       {name: 'system', note: 'Read-only resolved clef system.'},

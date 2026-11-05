@@ -7,6 +7,8 @@ sidebar:
 
 import SheetViewPlayground from '../../../../../components/elements/SheetViewPlayground.astro';
 
+<SheetViewPlayground />
+
 Page-oriented engraving with multi-staff systems and responsive line breaks, drawn by the optional [`opensheetmusicdisplay`](https://opensheetmusicdisplay.org/) peer. [`<score-view type="staff">`](/score/element/view/score-view/#staff) provides continuous scrolling notation with beams, tuplets and playback highlighting.
 
 Any input format works — the element serializes the score to MusicXML itself — but **MusicXML in gives the best result**. A MIDI source has no staff assignment, no key signatures and a guessed clef, because MIDI never carried them.
@@ -33,8 +35,6 @@ Browser bundlers can resolve the installed peer into a lazy chunk. Direct browse
 module use requires an import map for the package name, or an injected
 `.OpenSheetMusicDisplay` constructor. A dependency loading failure displays a
 message naming the package and the injection alternatives.
-
-<SheetViewPlayground />
 
 The demo contains one player and one sheet view, configured by external Parameters. SheetView still requires its own `src` or `.score`; `player` follows note events and does not borrow the player’s resolved score or native state snapshot. Copy includes both tags, and Reset restores their initial attributes.
 

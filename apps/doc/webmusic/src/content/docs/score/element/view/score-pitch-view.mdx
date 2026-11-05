@@ -7,9 +7,9 @@ sidebar:
 
 import PitchViewPlayground from '../../../../../components/elements/PitchViewPlayground.astro';
 
-`<score-pitch-view>` shows the currently held notes from one player or structural note source. Choose `type="keyboard"` (default), `staff` or `fretboard`; every type shares the same note state and owns no playback resources.
-
 <PitchViewPlayground />
+
+`<score-pitch-view>` shows the currently held notes from one player or structural note source. Choose `type="keyboard"` (default), `staff` or `fretboard`; every type shares the same note state and owns no playback resources.
 
 Without a resolved `player` or `source`, the view shows the shared outlined-square waiting
 animation. A native source that is loading shows the four-square loading animation;
@@ -44,15 +44,16 @@ The component has no `src`, `.score`, note command or transport command. Changin
 
 `type="keyboard"` shows requested MIDI endpoints `low="48"` through `high="71"`
 (C3–B4) by default and fits the entire range into its container without
-horizontal scrolling. The getters report rounded requested endpoints; the presenter normalizes them to MIDI 0–127, orders reversed endpoints and limits the displayed span to 88 semitones. Notes outside the displayed range remain in `.active`. Released keys clear without a visual release trail.
+pitch-axis scrolling. The getters report rounded requested endpoints; the presenter normalizes them to MIDI 0–127, orders reversed endpoints and limits the displayed span to 88 semitones. Notes outside the displayed range remain in `.active`. Released keys clear without a visual release trail.
 
-Set `scroll="true"` to allow horizontal scrolling. In that mode, use
-`white-key-width` and `black-key-width` for exact pixel widths; a narrower host
+Set `scroll="true"` to allow scrolling along the pitch axis. In that mode, use
+`white-key-width` and `black-key-width` for exact pixel pitch breadths; a narrower host
 scrolls instead of compressing keys. With neither width set, the keyboard uses
 responsive sizing with a readable minimum key width. Black width
 defaults to `0.62 × white width`; setting black width alone derives white width
-by dividing by `0.62`. Use `white-key-height` and `black-key-height` for key
-lengths in either mode. Black width and height cannot exceed white dimensions.
+by dividing by `0.62`. These breadths run horizontally for `up`/`down`,
+and vertically for `left`/`right`. Use `white-key-height` and `black-key-height` for key
+depths in any direction. Black width and height cannot exceed white dimensions.
 
 Set `scroll="false"` to fit the complete normalized range again. Fitting
 overrides explicit key widths and the CSS minimum key width, using the default
@@ -72,6 +73,27 @@ The requested follow mode stays `active` by default, but fitting does not scroll
 Use `follow="none"`
 when a shared application container should pan the keyboard together with a
 [`waterfall`](/score/element/view/score-view/#align-a-waterfall-and-keyboard).
+
+## Four keyboard directions
+
+`direction` selects the key fronts: `down` (default), `up`, `left` or `right`.
+An up/down keyboard lays pitches out from low at the left to high at the right;
+a left/right keyboard lays them out from low at the bottom to high at the top.
+Black keys stay between their natural neighbours, and labels stay upright.
+Staff and fretboard retain their normal orientation.
+
+For `left`/`right`, give the host a CSS height, for example
+`style="height: 320px"`; that height is the available pitch axis. Fitting uses
+it while fixed-width configurations can scroll vertically. Key-height
+attributes still mean key depth, now horizontal. Direction changes preserve
+held-note counts and the existing player binding.
+
+Compose separate keyboards at either edge of a
+[four-direction waterfall](/score/element/view/score-view/#align-a-waterfall-and-keyboard),
+using matching MIDI endpoints and natural/accidental breadths, no presenter
+insets, and one shared pitch-axis scroller. Several keyboards can borrow the
+same player without another clock. Use the waterfall renderer for exact piano
+key alignment; the piano-roll renderer has equal semitone lanes.
 
 ## Staff
 
@@ -93,6 +115,7 @@ scale. Omit these attributes to retain density-based, responsive defaults.
 | Attribute | Default | Applies to | Description |
 | --- | --- | --- | --- |
 | `type` | `keyboard` | All | `keyboard`, `staff` or `fretboard`; unknown values use keyboard. |
+| `direction` | `down` | Keyboard | Key-front direction: `up`, `down`, `left` or `right`; invalid values use `down`. Low pitches stay left or bottom. |
 | `player` | absent | All | Unique selector for a held-note/state source; takes precedence over `source`. |
 | `source` | absent | All | Legacy selector fallback when `player` is empty. |
 | `low` / `high` | `48` / `71` | Keyboard | Requested lowest/highest MIDI key, rounded. |
@@ -104,17 +127,19 @@ scale. Omit these attributes to retain density-based, responsive defaults.
 | `first-fret` | `0` | Fretboard | First displayed fret, clamped to 0–24. |
 | `frets` | `12` | Fretboard | Visible fret count, clamped to 1–24. |
 | `follow` | `active` | Keyboard | Reveal newly active pitches when scrolling is enabled; `none` leaves panning to the application/user. Fitting never scrolls. |
-| `scroll` | `false` | Keyboard | Allow horizontal scrolling and explicit key widths. False fits the complete normalized range. When present, takes precedence over `fit-to-width`. |
+| `scroll` | `false` | Keyboard | Allow pitch-axis scrolling and explicit key breadths. False fits the complete normalized range. When present, takes precedence over `fit-to-width`. |
 | `fit-to-width` | effective `true` | Keyboard | Legacy inverse of scrolling, read only when `scroll` is absent. True fits the range; false enables scrolling. |
-| `white-key-width` | fit the range; responsive when scrolling | Keyboard | Fixed natural-key width in px when scrolling is enabled; ignored while fitting. |
-| `black-key-width` | `0.62 × white width` | Keyboard | Fixed accidental-key width in px, capped at white width; alone derives white width as `value / 0.62`. Ignored while fitting. |
-| `white-key-height` | theme height | Keyboard | Natural-key length in px. |
-| `black-key-height` | theme proportion | Keyboard | Accidental-key length in px, capped at white-key height. |
+| `white-key-width` | fit the range; responsive when scrolling | Keyboard | Fixed natural-key pitch breadth in px when scrolling is enabled; ignored while fitting. |
+| `black-key-width` | `0.62 × white width` | Keyboard | Fixed accidental-key pitch breadth in px, capped at white width; alone derives white width as `value / 0.62`. Ignored while fitting. |
+| `white-key-height` | theme height | Keyboard | Natural-key depth in px, perpendicular to pitch. |
+| `black-key-height` | theme proportion | Keyboard | Accidental-key depth in px, capped at white-key height. |
 | `fret-width` | responsive | Fretboard | Fixed distance between adjacent fret wires in px. |
 | `string-spacing` | density geometry | Fretboard | Distance between adjacent strings in px. |
 | `string-width` | density stroke | Fretboard | String stroke thickness in px, independent of viewport scaling. |
 
-`.type` is a writable reflected `PitchViewType` property. Other properties are read-only: `.active` returns a copy of ascending sounding MIDI pitches; `.low`, `.high`, `.system`, `.spelling`, `.density`, `.scheme`, `.firstFret` and `.frets` return the resolved/requested values described above. `.tuning` returns a copy of resolved open-string MIDI pitches. Configure the remaining values through attributes.
+`.type` and `.direction` are writable reflected properties with types
+`PitchViewType` and `PitchViewDirection`, exported by `@webmusic/score/view/element`.
+Other properties are read-only: `.active` returns a copy of ascending sounding MIDI pitches; `.low`, `.high`, `.system`, `.spelling`, `.density`, `.scheme`, `.firstFret` and `.frets` return the resolved/requested values described above. `.tuning` returns a copy of resolved open-string MIDI pitches. Configure the remaining values through attributes.
 
 The geometry getters `.whiteKeyWidth`, `.blackKeyWidth`, `.whiteKeyHeight`,
 `.blackKeyHeight`, `.fretWidth`, `.stringSpacing` and `.stringWidth` return the

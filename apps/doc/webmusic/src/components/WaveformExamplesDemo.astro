@@ -11,7 +11,7 @@ import LiveDemoCanvas from './LiveDemoCanvas.astro';
 
   <LiveDemoCanvas size="tall">
     <div class="wx-grid">
-      <p role="status" data-wave-status>Waveforms load when this example is visible.</p>
+      <p role="status" data-wave-status></p>
       <div class="wx-item">
         <div class="wx-cap"><strong>Custom colours</strong> · <code>wave-color · progress-color · playhead-color</code></div>
         <audio-view type="waveform" data-wave-ex wave-color="#22c55e" progress-color="#15803d" playhead-color="#f59e0b"></audio-view>
@@ -46,14 +46,17 @@ import LiveDemoCanvas from './LiveDemoCanvas.astro';
     const views = [...root.querySelectorAll<AudioViewElement>('audio-view')];
     const status = root.querySelector<HTMLElement>('[data-wave-status]')!;
     scope.add(() => fixture.release());
-    scope.add(() => { for (const view of views) { view.peaks = undefined; view.spectrogram = undefined; } });
+    scope.add(() => { for (const view of views) { view.peaks = undefined; view.spectrogram = undefined; view.loading = false; } });
     whenDemoVisible(root, scope, async () => {
-      status.textContent = 'Loading waveforms…';
+      status.textContent = '';
+      for (const view of views) view.loading = true;
       try {
         const peaks = await fixture.peaks();
         if (!scope.active) return;
-        for (const view of views) view.peaks = peaks;
-        status.textContent = 'Preparing colour map…';
+        for (const view of views) {
+          view.peaks = peaks;
+          if (!view.hasAttribute('data-wave-spec')) view.loading = false;
+        }
         const spectrum = await fixture.spectrum();
         if (!scope.active) return;
         for (const view of views) if (view.hasAttribute('data-wave-spec')) view.spectrogram = spectrum;
@@ -61,6 +64,8 @@ import LiveDemoCanvas from './LiveDemoCanvas.astro';
       } catch (error) {
         if (scope.active) status.textContent = 'These examples could not be prepared. Reload this page to retry.';
         throw error;
+      } finally {
+        if (scope.active) for (const view of views) view.loading = false;
       }
     });
   });

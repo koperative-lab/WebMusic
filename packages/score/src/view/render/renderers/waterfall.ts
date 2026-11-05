@@ -3,7 +3,8 @@ import {Rational, type Score} from '../../../core';
 import {projectScoreAnnotations, type ScoreAnnotation} from '../../core/annotations';
 import type {ScoreNoteSequence, ScoreSequenceNote} from '../../core/types';
 import {bufferedScrollRange} from '../../core/windowing';
-import {drawVerticalScoreAnnotations} from '../annotations';
+import {drawHorizontalScoreAnnotations, drawVerticalScoreAnnotations} from '../annotations';
+import {horizontalDirection, viewDirection} from './direction';
 import {
   MAX_MIDI_PITCH,
   MIN_MIDI_PITCH,
@@ -43,13 +44,13 @@ type ResolvedWaterfallVisualizerConfig = ResolvedVisualizerConfig &
   Required<Pick<WaterfallVisualizerConfig, 'whiteNoteWidth' | 'blackNoteWidth'>> &
   Pick<WaterfallVisualizerConfig, 'showOnlyOctavesUsed'>;
 
-/** Passive vertical time view; held-pitch presentation belongs to PitchView. */
+/** Passive directional time view; held-pitch presentation belongs to PitchView. */
 export class WaterfallSVGVisualizer extends BaseSVGVisualizer {
   protected declare config: ResolvedWaterfallVisualizerConfig;
-  /** Pending follow-scroll target; `y` and `height` are svg-space rect attributes. */
-  private pendingVerticalScroll?: {y: number; height: number; force: boolean};
-  private verticalScrollScheduled = false;
-  private lastWrittenScrollTop?: number;
+  /** Pending follow-scroll target on the SVG time axis; independent of physical orientation. */
+  private pendingTimeScroll?: {y: number; height: number; force: boolean};
+  private timeScrollScheduled = false;
+  private lastWrittenScrollPosition?: number;
   private hostContainer?: HTMLDivElement;
   private columns = new Map<number, PitchColumn>();
   private layoutObserver?: ResizeObserver;
@@ -66,24 +67,28 @@ export class WaterfallSVGVisualizer extends BaseSVGVisualizer {
   private readonly annotations: readonly ScoreAnnotation[];
   private annotationWidth = 0;
   /**
-   * Top padding (px) of the scrollable notes container.
-   *
-   * `setupDOM` lays the scrollable content out as [top padding | notes SVG]
-   * and sizes both the padding and the container's border-box height to one
-   * viewport, so playback starts on an empty screen and time 0 (the bottom
-   * of the SVG) scrolls up from the bottom edge. Two vertical coordinate
-   * spaces follow from that layout:
-   *
-   * - scroll-space: `scrollTop` units; y = 0 at the top of the scrollable
-   *   content (the start of the padding).
-   * - svg-space: note-rect `y` attribute units; y = 0 at the top of the
-   *   notes SVG, which sits `scrollPaddingTop` below the scroll-space
-   *   origin (larger y = earlier time).
-   *
-   * Convert with {@link scrollToSvgY} / {@link svgToScrollY}; never compare
-   * a value from one space against a value from the other.
+   * Time-axis viewport length and blank landing space in CSS pixels. Down/right
+   * prepend this space before the SVG; up/left append it after the SVG. Keep
+   * scroll-space and SVG-space separate when mapping notes and visible windows.
+   * In the default down orientation, this is the leading top padding.
    */
   private scrollPaddingTop = 0;
+
+  private get direction() { return viewDirection(this.config?.direction, 'down'); }
+  /** Native time-axis viewport; a UI presenter may supply focus and scrollbar styling. */
+  get scrollViewport(): HTMLElement | undefined { return this.parentElement; }
+  private get horizontal(): boolean { return horizontalDirection(this.direction); }
+  private get reversed(): boolean { return this.direction === 'down' || this.direction === 'right'; }
+  private get scrollPosition(): number { return this.horizontal ? this.parentElement?.scrollLeft ?? 0 : this.parentElement?.scrollTop ?? 0; }
+  private set scrollPosition(value: number) {
+    if (!this.parentElement) return;
+    if (this.horizontal) this.parentElement.scrollLeft = value;
+    else this.parentElement.scrollTop = value;
+  }
+
+  private timePosition(seconds: number): number {
+    return this.reversed ? this.height - seconds * this.config.pixelsPerSecond : seconds * this.config.pixelsPerSecond;
+  }
 
   constructor(sequence: ScoreNoteSequence, parentElement: HTMLDivElement, config: WaterfallVisualizerConfig = {}, private readonly score?: Score) {
     super(sequence, config);
@@ -105,19 +110,20 @@ export class WaterfallSVGVisualizer extends BaseSVGVisualizer {
       .some((width) => typeof width === 'number' && Number.isFinite(width) && width > 0);
     this.blackWidthRatio = this.config.blackNoteWidth / this.config.whiteNoteWidth;
     this.annotations = score && config.showAnnotations !== false ? projectScoreAnnotations(score) : [];
-    this.annotationWidth = this.annotations.length ? 180 : 0;
+    this.annotationWidth = this.annotations.length ? (this.horizontal ? this.horizontalAnnotations().height : 180) : 0;
 
     this.setupDOM(parentElement);
     if (!this.svg || !this.parentElement) return;
-    makeScrollable(parentElement, 'x');
-    makeClipped(parentElement, 'y');
+    makeScrollable(parentElement, this.horizontal ? 'y' : 'x');
+    makeClipped(parentElement, this.horizontal ? 'x' : 'y');
     try {
       this.resizeLayout();
     } catch (error) {
       this.dispose();
       throw error;
     }
-    this.parentElement.scrollTop = this.parentElement.scrollHeight;
+    this.scrollPosition = this.reversed ? this.height : 0;
+    if (this.shouldVirtualize()) this.updateVirtualWindow();
     const view = parentElement.ownerDocument?.defaultView;
     const Observer = view?.ResizeObserver ?? globalThis.ResizeObserver;
     if (Observer) {
@@ -135,7 +141,7 @@ export class WaterfallSVGVisualizer extends BaseSVGVisualizer {
     this.redrawAtTime(activeNote.startTime, scrollIntoView);
     if (this.disposed) return null;
     const position = this.getNotePosition(activeNote, 0);
-    return position ? Math.round(position.y) : null;
+    return position ? Math.round(this.horizontal ? position.x : position.y) : null;
   }
 
   override redrawAtTime(seconds: number, scrollIntoView?: boolean): number | null {
@@ -156,71 +162,66 @@ export class WaterfallSVGVisualizer extends BaseSVGVisualizer {
       const element = this.resolveNoteElementForHighlight(index);
       this.fillActiveRect(element, note);
     }
-    const position = this.height - seconds * this.config.pixelsPerSecond;
-    if (!this.disposed && scrollIntoView !== false) this.scheduleVerticalScroll(position, 0, movedBackwards);
+    const position = this.timePosition(seconds);
+    if (!this.disposed && scrollIntoView !== false) this.scheduleTimeScroll(position, 0, movedBackwards);
     return position;
   }
 
   protected override getVisibleTimeWindow(): {t0: number; t1: number} | undefined {
     const element = this.parentElement;
     if (!element) return undefined;
-    const size = element.clientHeight;
+    const size = this.horizontal ? element.clientWidth : element.clientHeight;
     if (!(size > 0)) return undefined;
-    const {lo, hi} = bufferedScrollRange(element.scrollTop, size, this.virtualizationConfig.bufferScreens);
-    // The buffered window is in scroll-space; note positions (and therefore
-    // times) live in svg-space, so convert before mapping to time. Time is
-    // inverted along y: larger svg y = earlier time.
+    const {lo, hi} = bufferedScrollRange(this.scrollPosition, size, this.virtualizationConfig.bufferScreens);
+    // Convert the physical viewport into the SVG time axis, accounting for
+    // the blank landing space before mapping back to nominal seconds.
     const pps = this.config.pixelsPerSecond;
-    return {t0: (this.height - this.scrollToSvgY(hi)) / pps, t1: (this.height - this.scrollToSvgY(lo)) / pps};
+    return this.reversed
+      ? {t0: (this.height - this.scrollToSvgPosition(hi)) / pps, t1: (this.height - this.scrollToSvgPosition(lo)) / pps}
+      : {t0: this.scrollToSvgPosition(lo) / pps, t1: this.scrollToSvgPosition(hi) / pps};
   }
 
-  /** scroll-space y → svg-space y (see {@link scrollPaddingTop}). */
-  private scrollToSvgY(scrollY: number): number {
-    return scrollY - this.scrollPaddingTop;
+  /** scroll-space → SVG time-axis position (see {@link scrollPaddingTop}). */
+  private scrollToSvgPosition(scrollY: number): number {
+    return scrollY - (this.reversed ? this.scrollPaddingTop : 0);
   }
 
-  /** svg-space y → scroll-space y (see {@link scrollPaddingTop}). */
-  private svgToScrollY(svgY: number): number {
-    return svgY + this.scrollPaddingTop;
+  /** SVG time-axis position → scroll-space (see {@link scrollPaddingTop}). */
+  private svgToScrollPosition(svgY: number): number {
+    return svgY + (this.reversed ? this.scrollPaddingTop : 0);
   }
 
-  private scheduleVerticalScroll(y: number, height: number, force = false): void {
+  private scheduleTimeScroll(y: number, height: number, force = false): void {
     // A reset followed by the next tick within one frame still needs to rewind.
-    this.pendingVerticalScroll = {y, height, force: force || this.pendingVerticalScroll?.force === true};
-    if (this.verticalScrollScheduled) return;
-    this.verticalScrollScheduled = true;
+    this.pendingTimeScroll = {y, height, force: force || this.pendingTimeScroll?.force === true};
+    if (this.timeScrollScheduled) return;
+    this.timeScrollScheduled = true;
     scheduleFrame(() => {
-      this.verticalScrollScheduled = false;
+      this.timeScrollScheduled = false;
       if (this.disposed) {
-        this.pendingVerticalScroll = undefined;
+        this.pendingTimeScroll = undefined;
         return;
       }
-      this.flushVerticalScroll();
+      this.flushTimeScroll();
     });
   }
 
-  private flushVerticalScroll(): void {
-    const pending = this.pendingVerticalScroll;
-    this.pendingVerticalScroll = undefined;
+  private flushTimeScroll(): void {
+    const pending = this.pendingTimeScroll;
+    this.pendingTimeScroll = undefined;
     if (!pending || !this.parentElement) return;
     const element = this.parentElement;
-    // The container's border-box height equals its top padding (see
-    // setupDOM), so the padding doubles as the viewport size when
-    // clientHeight is not measurable.
-    const viewportSize = element.clientHeight > 0 ? element.clientHeight : this.scrollPaddingTop;
-    // All svg-space: bottom edge of the visible area vs. bottom edge of the
-    // active note's rect.
-    const viewportBottom = this.scrollToSvgY(element.scrollTop + viewportSize);
-    const noteBottom = pending.y + pending.height;
-    // Follow mode: as playback moves the active note up the SVG (later time =
-    // smaller y), keep its bottom edge pinned to the visible bottom edge.
-    // Ordinary forward updates preserve a manual look-ahead. An earlier
-    // playback position is a seek/repeat and must return to its landing point.
-    if (pending.force || noteBottom < viewportBottom) {
-      const target = this.svgToScrollY(noteBottom) - viewportSize;
-      if (target !== element.scrollTop && (pending.force || target !== this.lastWrittenScrollTop)) {
-        element.scrollTop = target;
-        this.lastWrittenScrollTop = target;
+    const measured = this.horizontal ? element.clientWidth : element.clientHeight;
+    const viewportSize = measured > 0 ? measured : this.scrollPaddingTop;
+    const edge = this.scrollToSvgPosition(this.scrollPosition + (this.reversed ? viewportSize : 0));
+    const targetEdge = pending.y + (this.reversed ? pending.height : 0);
+    // Forward ticks preserve a manual look-ahead in either coordinate direction.
+    // A seek to earlier musical time always returns to its current landing edge.
+    if (pending.force || (this.reversed ? targetEdge < edge : targetEdge > edge)) {
+      const target = this.svgToScrollPosition(targetEdge) - (this.reversed ? viewportSize : 0);
+      if (target !== this.scrollPosition && (pending.force || target !== this.lastWrittenScrollPosition)) {
+        this.scrollPosition = target;
+        this.lastWrittenScrollPosition = target;
       }
     }
   }
@@ -263,9 +264,11 @@ export class WaterfallSVGVisualizer extends BaseSVGVisualizer {
     for (let midi = low; midi <= high; midi += 1) if (!isBlackPitch(midi)) whiteNotesDrawn += 1;
     // Raised endpoints reserve half a natural column, matching pitch keyboards.
     const units = whiteNotesDrawn + (isBlackPitch(low) ? .5 : 0) + (isBlackPitch(high) ? .5 : 0);
-    const measured = this.hostContainer?.clientWidth || this.hostContainer?.getBoundingClientRect().width || 0;
+    const measured = this.horizontal
+      ? this.hostContainer?.clientHeight || this.hostContainer?.getBoundingClientRect().height || 0
+      : this.hostContainer?.clientWidth || this.hostContainer?.getBoundingClientRect().width || 0;
     if (this.fitToWidth && measured > 0) {
-      this.annotationWidth = this.annotations?.length ? Math.min(180, measured * .4) : 0;
+      this.annotationWidth = this.annotations?.length ? Math.min(this.horizontal ? this.horizontalAnnotations().height : 180, measured * .4) : 0;
       this.config.whiteNoteWidth = Math.max(1, measured - this.annotationWidth) / Math.max(1, units);
       this.config.blackNoteWidth = this.config.whiteNoteWidth * this.blackWidthRatio;
     }
@@ -289,14 +292,17 @@ export class WaterfallSVGVisualizer extends BaseSVGVisualizer {
     if (!column) return null;
     const len = this.getNoteEndTime(note) - this.getNoteStartTime(note);
     const h = Math.max(this.config.pixelsPerSecond * len - this.config.noteSpacing, MIN_NOTE_LENGTH);
-    const x = column.x;
-    const w = column.width;
-    const y = this.height - this.getNoteStartTime(note) * this.config.pixelsPerSecond - h;
-    return {x, y, w, h};
+    const time = this.getNoteStartTime(note) * this.config.pixelsPerSecond;
+    const position = this.reversed ? this.height - time - h : time;
+    return this.horizontal
+      ? {x: position, y: this.width - column.x - column.width, w: h, h: column.width}
+      : {x: column.x, y: position, w: column.width, h};
   }
 
   private getViewportHeight(): number {
-    const measured = this.hostContainer?.clientHeight || this.hostContainer?.getBoundingClientRect().height || 0;
+    const measured = this.horizontal
+      ? this.hostContainer?.clientWidth || this.hostContainer?.getBoundingClientRect().width || 0
+      : this.hostContainer?.clientHeight || this.hostContainer?.getBoundingClientRect().height || 0;
     // A short score need not reserve an empty viewport. Long scores retain a
     // bounded natural height, while explicit host sizing fills all its space.
     return measured > 0 ? measured : Math.min(200, Math.max(80, this.noteSequence.totalTime * this.config.pixelsPerSecond));
@@ -306,23 +312,39 @@ export class WaterfallSVGVisualizer extends BaseSVGVisualizer {
     this.hostContainer = container;
     this.parentElement = document.createElement('div');
     this.parentElement.classList.add('waterfall-notes-container');
-    const height = this.getViewportHeight();
-    // One viewport of top padding and the same border-box height: the notes
-    // SVG lays out below the padding, establishing the scroll-space/svg-space
-    // offset documented on `scrollPaddingTop`.
-    this.scrollPaddingTop = Math.max(1, height);
-    this.parentElement.style.paddingTop = `${this.scrollPaddingTop}px`;
-    this.parentElement.style.height = `${this.scrollPaddingTop}px`;
+    this.parentElement.dataset.direction = this.direction;
     this.parentElement.style.boxSizing = 'border-box';
-    this.parentElement.style.overflowX = 'hidden';
-    this.parentElement.style.overflowY = 'auto';
+    this.parentElement.style.overflowX = this.horizontal ? 'auto' : 'hidden';
+    this.parentElement.style.overflowY = this.horizontal ? 'hidden' : 'auto';
+    this.layoutViewport(this.getViewportHeight());
 
     this.svg = document.createElementNS(SVG_NS, 'svg');
     this.svg.classList.add('waterfall-notes');
     this.parentElement.appendChild(this.svg);
     container.innerHTML = '';
     container.appendChild(this.parentElement);
-    makeScrollable(container, 'x');
+    makeScrollable(container, this.horizontal ? 'y' : 'x');
+  }
+
+  private layoutViewport(size: number): void {
+    const viewport = this.parentElement;
+    if (!viewport) return;
+    this.scrollPaddingTop = Math.max(1, size);
+    const padding = `${this.scrollPaddingTop}px`;
+    viewport.style.paddingTop = !this.horizontal && this.reversed ? padding : '0';
+    viewport.style.paddingBottom = !this.horizontal && !this.reversed ? padding : '0';
+    viewport.style.paddingLeft = this.horizontal && this.reversed ? padding : '0';
+    viewport.style.paddingRight = this.horizontal && !this.reversed ? padding : '0';
+    viewport.style.width = this.horizontal ? padding : `${this.width + this.annotationWidth}px`;
+    viewport.style.height = this.horizontal ? `${this.width + this.annotationWidth}px` : padding;
+  }
+
+  private horizontalAnnotations(svg = document.createElementNS(SVG_NS, 'svg')): {height: number; group: SVGGElement} {
+    return drawHorizontalScoreAnnotations(svg, this.annotations ?? [], {
+      xAtQuarter: (quarter) => this.timePosition(this.score!.timeMap.quartersToSeconds(Rational.from(quarter))),
+      width: this.height, reverse: this.reversed,
+      color: this.config.noteColor ?? `rgb(${this.config.noteRGB})`,
+    });
   }
 
   private layoutPitchColumns(): void {
@@ -353,7 +375,7 @@ export class WaterfallSVGVisualizer extends BaseSVGVisualizer {
     this.activeElements.clear();
     this.extraIndices.clear();
     this.renderedRange = {start: 0, end: 0};
-    this.pendingVerticalScroll = undefined;
+    this.pendingTimeScroll = undefined;
     this.noteElements = [];
     this.drawn = false;
     if (this.parentElement?.parentElement === this.hostContainer) this.parentElement?.remove();
@@ -369,31 +391,33 @@ export class WaterfallSVGVisualizer extends BaseSVGVisualizer {
     const box = this.hostContainer.getBoundingClientRect();
     if (this.drawn && !(box.width > 0 || box.height > 0 || this.hostContainer.clientWidth > 0 || this.hostContainer.clientHeight > 0)) return;
     const padding = Math.max(1, this.getViewportHeight());
-    const oldPosition = this.parentElement.scrollTop;
+    const oldPosition = this.scrollPosition;
     const oldTime = this.lastActiveTime;
     const size = this.getSize();
     if (this.drawn && size.width === this.width && padding === this.scrollPaddingTop) return;
     this.width = size.width;
     this.height = size.height;
-    this.scrollPaddingTop = padding;
-    this.parentElement.style.paddingTop = `${padding}px`;
-    this.parentElement.style.height = `${padding}px`;
-    this.parentElement.style.width = `${this.width + this.annotationWidth}px`;
-    setExplicitSize(this.svg, this.width + this.annotationWidth, this.height, {fractionalWidth: true});
+    this.layoutViewport(padding);
+    setExplicitSize(this.svg, this.horizontal ? this.height : this.width + this.annotationWidth, this.horizontal ? this.width + this.annotationWidth : this.height, {fractionalWidth: true, fractionalHeight: true});
     this.clear();
     this.layoutPitchColumns();
     if (this.disposed) return;
     this.draw();
-    if (this.score && this.annotations.length) drawVerticalScoreAnnotations(this.svg, this.annotations, {
-      yAtQuarter: (quarter) => this.height - this.score!.timeMap.quartersToSeconds(Rational.from(quarter)) * this.config.pixelsPerSecond,
-      x: this.width, width: this.annotationWidth, height: this.height,
-      color: this.config.noteColor ?? `rgb(${this.config.noteRGB})`,
-    });
+    if (this.score && this.annotations.length) {
+      if (this.horizontal) {
+        const {group} = this.horizontalAnnotations(this.svg);
+        group.setAttribute('transform', `translate(0 ${this.width}) ${group.getAttribute('transform') ?? ''}`.trim());
+      } else drawVerticalScoreAnnotations(this.svg, this.annotations, {
+        yAtQuarter: (quarter) => this.timePosition(this.score!.timeMap.quartersToSeconds(Rational.from(quarter))),
+        x: this.width, width: this.annotationWidth, height: this.height,
+        color: this.config.noteColor ?? `rgb(${this.config.noteRGB})`,
+      });
+    }
     if (oldTime !== undefined) this.redrawAtTime(oldTime, false);
     if (this.disposed || !this.parentElement) return;
-    // Padding and viewport have equal height, so scrollTop is the score's
-    // visible bottom position in SVG coordinates even after a height change.
-    this.parentElement.scrollTop = oldPosition;
-    this.lastWrittenScrollTop = undefined;
+    // The landing-space extent matches the viewport, so the physical scroll
+    // coordinate retains its musical edge when the viewport is resized.
+    this.scrollPosition = oldPosition;
+    this.lastWrittenScrollPosition = undefined;
   }
 }

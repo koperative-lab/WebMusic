@@ -120,15 +120,34 @@ scrolls inside the stage on small screens. Its paper color is explicit so dark
 application backgrounds do not obscure OSMD's ink. Width, height and follow
 settings update the current engraving without another source load.
 
-Waterfall's Element composes the existing UIKit keyboard through a structural
-render port. The Score renderer owns numeric pitch-column geometry and time;
-UIKit owns the keyboard DOM. The explicit render API remains usable without
-UIKit through its fallback keyboard. Element defaults fit the occupied octaves
-to the container; explicit key widths keep a manually pannable scale. Resizing
-preserves the current view position and keeps the keyboard within the height.
-Default Score colors resolve through public theme tokens, while explicit
-renderer colors remain authoritative. Empty and failed full-score renders use
-the shared Status presenter instead of leaving an unexplained blank surface.
+Waterfall and piano roll support four directions (DEC-053). Piano roll uses
+`direction` for increasing score time; waterfall uses it for note travel toward
+the landing edge. Defaults remain right and down respectively. Low pitches are
+left on a horizontal pitch axis and bottom on a vertical one. Staff, map and
+thumbnail retain their normal reading direction. Direction is visual state and
+does not change the source, nominal time or borrowed player.
+
+PitchView's keyboard direction names its key fronts: up, down, left or right,
+with down as the default. Natural/accidental width settings always mean pitch
+breadth; height settings mean key depth. Fitting, overflow, following and
+focus handling follow the pitch axis. A vertical composition supplies its
+viewport height explicitly. Labels remain upright and pitches retain their
+MIDI identity through the coordinate change; staff/fretboard are unaffected.
+
+Waterfall contains no embedded keyboard or UIKit keyboard port. Applications
+compose one or more independent PitchViews around the same player, with matching
+MIDI ranges and natural/accidental breadths, zero presenter insets, and a shared
+pitch-axis scroller. Waterfall's piano-key geometry works in all four directions;
+the ordinary piano roll retains equal semitone lanes. Resizing or switching
+direction preserves position and active notes, and releases obsolete drawing
+observers without changing player ownership.
+
+ScoreView Elements hide advanced annotations by default in every type. Explicit
+`show-annotations` or `.options.showAnnotations` enables supported score
+words/dynamics/tempo/pedal/hairpin marks; notes and ordinary notation remain.
+`.options` retains precedence over attributes. Imperative renderer defaults
+remain unchanged. Hidden annotations reserve no drawing space. Empty and failed
+full-score renders use the shared Status presenter.
 
 ## Resources and compatibility
 
@@ -155,6 +174,10 @@ unchanged in the lower-level `ScoreViewType`; the Element's additional modes use
   replaced target handling and cleanup.
 - Keep map seek units correct at non-unit rate and recover from rejected seeks.
 - Keep thumbnail passive and avoid full-score playback-view computation.
+- Verify four directions with shared-player keyboards, pitch identity, upright
+  labels, key alignment, narrow sizing, follow/scroll axes and resize cleanup.
+- Verify annotations default off in all Element types, explicit opt-in and
+  property precedence, while imperative renderer defaults remain unchanged.
 - Verify all types at narrow and wide widths, two simultaneous instances,
   keyboard interaction, type-specific Parameters, Copy and Reset.
 

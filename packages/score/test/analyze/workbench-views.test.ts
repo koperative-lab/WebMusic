@@ -381,12 +381,13 @@ describe('focused Analyze displays — readings and controls', () => {
     const player = stubPlayer();
     const live = await mount({tag: LIVE_CHORD, player});
     const liveWaiting = live.root.querySelector<HTMLElement>('[part~="feedback"]')!;
-    expect(liveWaiting.dataset.kind).toBe('waiting');
+    expect(liveWaiting.hidden).toBe(true);
     for (const midi of [60, 64, 67]) player.emit('webscore:noteon', {midi});
     expect(liveWaiting.hidden).toBe(true);
     expect(live.root.querySelector('.wui-harmony-nameplate__symbol')?.textContent).toContain('C');
     player.emit('webscore:end');
-    expect(liveWaiting.dataset.kind).toBe('waiting');
+    expect(liveWaiting.hidden).toBe(true);
+    expect(live.root.querySelector('.wui-workbench')?.getAttribute('data-phase')).toBe('idle');
   });
 
   it('limits live readings to complete triads and sevenths without candidate controls', async () => {

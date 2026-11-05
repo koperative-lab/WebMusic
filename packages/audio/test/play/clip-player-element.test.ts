@@ -108,6 +108,78 @@ afterEach(() => {
 });
 
 describe('<audio-player>', () => {
+  it('publishes caller preparation without replacing ready transport data or playback position', () => {
+    const element = mount();
+    const source = clip(4);
+    element.clip = source;
+    element.seek(1.5);
+    const player = element.player;
+    const transport = transportOf(element);
+    const button = transport.querySelector('button');
+    const states: boolean[] = [];
+    element.addEventListener('webaudio:loadstatechange', (event) => states.push((event as CustomEvent).detail.loading));
+    element.loading = true;
+    expect(element.getAttribute('loading')).toBe('true');
+    expect(element.getAttribute('aria-busy')).toBe('true');
+    expect(element.shadowRoot!.querySelector('[data-kind="loading"]')).not.toBeNull();
+    expect(element.player).toBe(player);
+    expect(element.clip).toBe(source);
+    expect(element.seconds).toBe(1.5);
+    expect(transportOf(element)).toBe(transport);
+    expect(transport.querySelector('button')).toBe(button);
+    element.loading = false;
+    expect(element.loading).toBe(false);
+    expect(element.shadowRoot!.querySelector<HTMLElement>('[part~="status"]')!.hidden).toBe(true);
+    expect(element.hasAttribute('aria-busy')).toBe(false);
+    expect(states).toEqual([true, false]);
+    element.clip = undefined;
+    element.setAttribute('loading', '');
+    expect(element.loading).toBe(true);
+    for (const value of ['false', '0', 'no', 'off']) {
+      element.setAttribute('loading', value);
+      expect(element.loading).toBe(false);
+      expect(element.shadowRoot!.querySelector('[data-kind="waiting"]')).not.toBeNull();
+    }
+  });
+
+  it('upgrades a pre-definition loading property and does not retain a shadowing expando', () => {
+    const tag = 'external-loading-audio-player';
+    const element = document.createElement(tag) as AudioPlayerElement;
+    Object.assign(element, {loading: true, clip: clip()});
+    document.body.append(element);
+    class UpgradedAudioPlayer extends AudioPlayerElement {}
+    customElements.define(tag, UpgradedAudioPlayer);
+    expect(Object.hasOwn(element, 'loading')).toBe(false);
+    expect(element.loading).toBe(true);
+    expect(element.shadowRoot!.querySelector('[data-kind="loading"]')).not.toBeNull();
+    element.loading = false;
+    expect(element.shadowRoot!.querySelector<HTMLElement>('[part~="status"]')!.hidden).toBe(true);
+  });
+
+  it('keeps caller and internal loading independent through success and failure', async () => {
+    let resolve!: (value: AudioClip) => void;
+    vi.spyOn(load, 'loadClip').mockReturnValueOnce(new Promise((done) => { resolve = done; }));
+    const element = mount();
+    element.loading = true;
+    const pending = element.load(new ArrayBuffer(8));
+    element.loading = false;
+    expect(element.loading).toBe(true);
+    expect(element.shadowRoot!.querySelector('[data-kind="loading"]')).not.toBeNull();
+    element.loading = true;
+    resolve(clip());
+    await pending;
+    expect(element.loading).toBe(true);
+    element.loading = false;
+    expect(element.loading).toBe(false);
+    vi.mocked(load.loadClip).mockRejectedValueOnce(new Error('Current decode failed'));
+    element.loading = true;
+    await element.load(new ArrayBuffer(8));
+    expect(element.shadowRoot!.querySelector('[data-kind="loading"]')).not.toBeNull();
+    element.loading = false;
+    expect(element.loadError?.message).toBe('Current decode failed');
+    expect(element.shadowRoot!.querySelector('[role="alert"]')?.textContent).toBe('Current decode failed');
+  });
+
   it('registers once and is idempotent', () => {
     defineAudioPlayerElement();
     expect(customElements.get('audio-player')).toBe(AudioPlayerElement);

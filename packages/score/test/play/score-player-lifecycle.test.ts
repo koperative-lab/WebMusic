@@ -57,6 +57,101 @@ afterEach(() => {
 });
 
 describe('score-player lifecycle with real transport owners', () => {
+  it('reflects caller preparation while retaining mounted playback and authored children', async () => {
+    const host = element();
+    const music = score();
+    const authored = document.createElement('span');
+    host.score = music;
+    host.append(authored);
+    document.body.append(host);
+    await flush();
+    await host.seekNominal(0.5);
+    const control = host.querySelector('[part~="play"]');
+    const chrome = host.querySelector<HTMLElement>('[data-rack-transport]')!;
+    expect(host.loading).toBe(false);
+    host.loading = true;
+    expect(host.getAttribute('loading')).toBe('true');
+    expect(host.loading).toBe(true);
+    expect(host.playback.snapshot()).toMatchObject({readiness: 'loading', score: music, nominalSeconds: 0.5});
+    expect(chrome.hidden).toBe(true);
+    expect(authored.hidden).toBe(false);
+    expect(host.querySelector('[data-kind="loading"]')?.getAttribute('aria-busy')).toBe('true');
+    host.loading = false;
+    expect(host.getAttribute('loading')).toBe('false');
+    expect(host.playback.snapshot()).toMatchObject({readiness: 'ready', score: music, nominalSeconds: 0.5});
+    expect(chrome.hidden).toBe(false);
+    expect(host.querySelector('[part~="play"]')).toBe(control);
+    expect(host.querySelector('[data-kind="loading"]')).toBeNull();
+    host.setAttribute('loading', '');
+    expect(host.loading).toBe(true);
+    for (const value of ['false', '0', 'no', 'off']) {
+      host.setAttribute('loading', value);
+      expect(host.loading).toBe(false);
+      expect(chrome.hidden).toBe(false);
+    }
+    host.setAttribute('loading', '');
+    host.removeAttribute('loading');
+    expect(host.loading).toBe(false);
+  });
+
+  it('does not clear native pending work when caller preparation ends, or expose early completion', async () => {
+    let finish!: (value: ReturnType<typeof score>) => void;
+    source.load.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+    const host = element();
+    host.loading = true;
+    host.setAttribute('src', 'pending.mid');
+    document.body.append(host);
+    await vi.waitFor(() => expect(source.load).toHaveBeenCalledOnce());
+    const signal = source.load.mock.calls[0]![1].signal as AbortSignal;
+    host.loading = false;
+    expect(host.loading).toBe(true);
+    expect(host.playback.snapshot().readiness).toBe('loading');
+    expect(signal.aborted).toBe(false);
+    host.loading = true;
+    const music = score();
+    finish(music);
+    await vi.waitFor(() => expect(host.resolvedScore).toBe(music));
+    expect(host.loading).toBe(true);
+    expect(host.querySelector<HTMLElement>('[data-rack-transport]')?.hidden).toBe(true);
+    host.loading = false;
+    expect(host.loading).toBe(false);
+    expect(host.playback.snapshot().readiness).toBe('ready');
+  });
+
+  it('restores a native error and clears detached preparation feedback', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    source.load.mockRejectedValue(new Error('Score unavailable'));
+    const host = element();
+    host.loading = true;
+    host.setAttribute('src', 'failed.mid');
+    document.body.append(host);
+    await vi.waitFor(() => expect(host.querySelector('[role="alert"]')?.textContent).toBe('Score unavailable'));
+    expect(host.playback.snapshot().readiness).toBe('loading');
+    expect(host.querySelector('[role="alert"]')?.closest('[hidden]')).not.toBeNull();
+    host.loading = false;
+    expect(host.loading).toBe(false);
+    expect(host.playback.snapshot().readiness).toBe('error');
+    expect(host.querySelector('[role="alert"]')?.closest('[hidden]')).toBeNull();
+    host.loading = true;
+    host.remove();
+    expect(host.playback.snapshot().readiness).toBe('disposed');
+    expect(host.querySelector('[data-kind="loading"]')).toBeNull();
+  });
+
+  it('upgrades a caller preparation property without shadowing its accessor', async () => {
+    const tag = 'score-player-preparing-upgrade';
+    const host = document.createElement(tag) as ScorePlayerElement;
+    Object.assign(host, {loading: true, score: score()});
+    document.body.append(host);
+    customElements.define(tag, class extends ScorePlayerElement {});
+    await flush();
+    expect(Object.hasOwn(host, 'loading')).toBe(false);
+    expect(host.getAttribute('loading')).toBe('true');
+    expect(host.playback.snapshot().readiness).toBe('loading');
+    host.loading = false;
+    expect(host.playback.snapshot().readiness).toBe('ready');
+  });
+
   it('preserves authored children while waiting and keeps only the latest pending source status', async () => {
     let finishFirst!: (value: ReturnType<typeof score>) => void;
     let finishSecond!: (value: ReturnType<typeof score>) => void;

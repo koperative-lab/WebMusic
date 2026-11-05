@@ -7,13 +7,21 @@ import {
 } from '../../src/play/element/score-player';
 import {defineAllAnalysisElements, type ChordAnalysisElement} from '../../src/analyze/element';
 import {defineScoreViewElement} from '../../src/view/element/score-view';
+import {definePitchViewElement} from '../../src/view/element/score-pitch-view';
+import {defineSheetViewElement, type SheetViewElement} from '../../src/view/element/score-sheet-view';
 
 const io = vi.hoisted(() => ({load: vi.fn()}));
 vi.mock('../../src/io/load', () => ({loadScoreFromUrl: io.load}));
+vi.mock('../../src/view/render/osmd-staff', () => ({renderOSMDStaffVisualizer: vi.fn(async () => ({
+  element: document.createElement('div'), noteSequence: {notes: [], totalTime: 0},
+  redraw: vi.fn(), clearActiveNotes: vi.fn(), dispose: vi.fn(),
+}))}));
 
 defineScorePlayerElement();
 defineAllAnalysisElements();
 defineScoreViewElement();
+definePitchViewElement();
+defineSheetViewElement();
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 function music(): Score {
@@ -97,9 +105,54 @@ describe('native single-score player with independent Analyze components', () =>
       expect(companion.querySelector('[part~="content"]')?.hasAttribute('hidden')).toBe(false);
       expect(companion.analysis).toBeDefined();
     }
-    // Loaded live mode still waits for held notes, not another fetch.
-    expect(feedback(companions[4]!).dataset.kind).toBe('waiting');
+    // A loaded, silent live source is ready; silence is not missing input.
+    expect(feedback(companions[4]!).hidden).toBe(true);
+    expect(companions[4]!.querySelector('.wui-workbench')?.getAttribute('data-phase')).toBe('idle');
     expect(io.load).toHaveBeenCalledTimes(2);
+  });
+
+  it('shares caller preparation without replacing the native owner or its paused position', async () => {
+    io.load.mockResolvedValueOnce(music());
+    const source = await nativePlayer();
+    await source.seekNominal(1);
+    const companions = await Promise.all([
+      follower('chord'), follower('interval'), follower('scale', {tonic: 'C'}),
+      follower('rhythm'), follower('chord', {mode: 'live'}),
+    ]);
+    const view = document.createElement('score-view');
+    view.setAttribute('type', 'map');
+    view.setAttribute('player', '#source');
+    document.body.append(view);
+    const pitch = document.createElement('score-pitch-view');
+    pitch.setAttribute('player', '#source');
+    const sheet = document.createElement('score-sheet-view') as SheetViewElement;
+    sheet.score = source.resolvedScore;
+    sheet.setAttribute('player', '#source');
+    document.body.append(pitch, sheet);
+    await flush();
+    await vi.waitFor(() => expect(sheet.querySelector('.wui-status')).toBeNull());
+    const engraving = sheet.querySelector('[part~="surface"]');
+    expect(engraving).not.toBeNull();
+    const control = source.querySelector('[part~="play"]');
+    const score = source.resolvedScore;
+    source.loading = true;
+    expect(source.playback.snapshot().readiness).toBe('loading');
+    for (const companion of companions) expect(companion.querySelector('[part~="feedback"]')?.getAttribute('data-kind')).toBe('loading');
+    expect(view.querySelector('[data-kind="loading"]')).not.toBeNull();
+    expect(pitch.querySelector('[data-kind="loading"]')).not.toBeNull();
+    expect(sheet.querySelector('.wui-status')).toBeNull();
+    expect(sheet.querySelector('[part~="surface"]')).toBe(engraving);
+    source.loading = false;
+    await flush();
+    expect(source.playback.snapshot().readiness).toBe('ready');
+    for (const companion of companions) expect(companion.querySelector<HTMLElement>('[part~="feedback"]')?.hidden).toBe(true);
+    expect(view.querySelector('[data-kind="loading"], [data-kind="waiting"]')).toBeNull();
+    expect(pitch.querySelector<HTMLElement>('[part~="pitch-status"]')?.hidden).toBe(true);
+    expect(sheet.querySelector('[part~="surface"]')).toBe(engraving);
+    expect(source.querySelector('[part~="play"]')).toBe(control);
+    expect(source.resolvedScore).toBe(score);
+    expect(source.playback.snapshot().nominalSeconds).toBe(1);
+    expect(io.load).toHaveBeenCalledOnce();
   });
 
   it('loads one src for several companions and initializes a paused position at a changed rate', async () => {

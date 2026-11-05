@@ -9,6 +9,9 @@ export interface AudioPlayerTransport {
   readonly seconds: number;
   readonly duration: number;
   readonly playing: boolean;
+  /** Preparation of the selected input, excluding unrelated speculative prefetch. */
+  readonly loading?: boolean;
+  readonly loadError?: Error;
   readonly clip?: AudioClip;
   readonly currentClip?: AudioClip;
   readonly analyser?: AnalyserNode;
@@ -40,6 +43,7 @@ export interface AudioPlayerSourceDetail {
 export interface AudioPlayerEvents {
   sourcechange: AudioPlayerSourceDetail;
   statechange: {playing: boolean};
+  loadstatechange: {loading: boolean; error: Error | undefined};
   timeupdate: PlayerTimeUpdate;
   end: AudioClip | undefined;
   regionenter: Region;
@@ -68,6 +72,8 @@ export class AudioPlayer {
   private generation = 0;
   private observationRevision = 0;
   private lastPlaying = false;
+  private lastLoading = false;
+  private lastLoadError?: Error;
   private readonly configured = new Set<string>();
   private sourceRevision = 0;
   private announcedClip?: AudioClip;
@@ -100,6 +106,8 @@ export class AudioPlayer {
   get duration(): number { return this.borrowed?.duration ?? this.engine?.duration ?? this.selectedClip?.duration ?? 0; }
   get progress(): number { return this.duration > 0 ? this.seconds / this.duration : 0; }
   get playing(): boolean { return this.borrowed?.playing ?? this.engine?.playing ?? false; }
+  get loading(): boolean { return this.borrowed?.loading ?? false; }
+  get loadError(): Error | undefined { return this.borrowed?.loadError; }
   get scratching(): boolean { return this.borrowed?.scratching ?? this.engine?.scratching ?? false; }
   get clock(): TransportClockReader | undefined { return this.borrowed ? this.borrowed.clock : this.engine?.clock; }
   /** Lazily create or borrow the context shared by decoding and owned playback. */
@@ -279,12 +287,16 @@ export class AudioPlayer {
     this.announcedClip = undefined;
     this.announcedTransport = undefined;
     this.lastPlaying = false;
+    const hadReadiness = this.lastLoading || this.lastLoadError !== undefined;
+    this.lastLoading = false;
+    this.lastLoadError = undefined;
     // Commit terminal emptiness before notifying. One faulty subscriber must
     // not prevent other followers from releasing their borrowed source/tap.
     const observerFailed = (error: unknown, mode: 'throw' | 'rejection') => {
       if (mode === 'throw') failure ??= error;
     };
     this.emitter.emitSafely('sourcechange', {clip: undefined, revision: ++this.sourceRevision}, observerFailed);
+    if (hadReadiness) this.emitter.emitSafely('loadstatechange', {loading: false, error: undefined}, observerFailed);
     this.emitter.emitSafely('statechange', {playing: false}, observerFailed);
     this.emitter.emitSafely('timeupdate', {seconds: 0, duration: 0, progress: 0}, observerFailed);
     this.emitter.removeAllListeners();
@@ -361,6 +373,14 @@ export class AudioPlayer {
   private publishState(): void {
     const generation = this.generation;
     const revision = ++this.observationRevision;
+    const loading = this.loading;
+    const error = this.loadError;
+    if (loading !== this.lastLoading || error !== this.lastLoadError) {
+      this.lastLoading = loading;
+      this.lastLoadError = error;
+      this.emitter.emit('loadstatechange', {loading, error});
+    }
+    if (this.disposed || generation !== this.generation || revision !== this.observationRevision) return;
     const playing = this.playing;
     if (playing !== this.lastPlaying) {
       this.lastPlaying = playing;

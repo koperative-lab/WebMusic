@@ -12,7 +12,12 @@ export interface ViewLayoutOptions {
 /** Domain-level score view mode shared by code and element layers. */
 export type ScoreViewType = 'piano-roll' | 'staff' | 'waterfall';
 
+/** Physical time direction for a piano roll, or landing edge for a waterfall. */
+export type ScoreViewDirection = 'up' | 'down' | 'left' | 'right';
+
 export interface VisualizerRenderOptions {
+  /** Piano-roll time advances in this direction (default right); waterfall notes travel toward it (default down). */
+  direction?: ScoreViewDirection;
   /** Show supported score expression directions; default true. False removes their layout space. */
   showAnnotations?: boolean;
   /** Piano-roll pitch-lane height or staff glyph scale, in pixels; default 6. */
@@ -58,7 +63,7 @@ export interface WaterfallRenderOptions extends VisualizerRenderOptions {
   showOnlyOctavesUsed?: boolean;
 }
 
-export interface StaffRenderOptions extends VisualizerRenderOptions {
+export interface StaffRenderOptions extends Omit<VisualizerRenderOptions, 'direction'> {
   defaultKey?: number;
   instruments?: number[];
   scrollType?: number;
