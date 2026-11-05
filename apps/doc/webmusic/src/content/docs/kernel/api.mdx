@@ -199,7 +199,9 @@ A `TempoGrid` is a constant-tempo beat grid on a transport position axis:
 position of one downbeat) and `beatsPerBar` (an integer from 1 to
 `MAX_TEMPO_GRID_BEATS_PER_BAR` = 64). Beats repeat every `60 / bpm` position
 units in both directions. `createTempoGrid({bpm, anchor = 0, beatsPerBar = 4})`
-validates and freezes one and throws `RangeError` otherwise.
+validates and freezes one and throws `RangeError` otherwise. The types are
+`TempoGrid`, its input `TempoGridInit`, the `TempoGridPosition` returned by the
+readers below, and `TempoGridSnapOptions`.
 
 | Function | Returns |
 | --- | --- |

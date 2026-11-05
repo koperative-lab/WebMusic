@@ -255,8 +255,9 @@ view.addEventListener('webaudio:editcommit', (event) => {
 });
 ```
 
-`AudioClipViewElement`, `defineAudioClipViewElement(tag?)` and
-`AUDIO_CLIP_VIEW_FEATURES` are exported from `@webmusic/audio/view/element`.
+`AudioClipViewElement`, `defineAudioClipViewElement(tag?)`,
+`AUDIO_CLIP_VIEW_FEATURES` and the `clipsettingschange` detail type
+`AudioClipSettingsChangeDetail` are exported from `@webmusic/audio/view/element`.
 Registration is idempotent and SSR-safe. The element mounts
 [`mountAudioClip`](/audio/api/view/#clip-renderer--webmusicaudioviewrender)
 from `@webmusic/audio/view/render`.
