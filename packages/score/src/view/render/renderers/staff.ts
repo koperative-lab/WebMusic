@@ -20,6 +20,41 @@ export enum ScrollType { PAGE = 0, NOTE = 1, BAR = 2 }
 export type StaffSVGVisualizerConfig = StaffRenderOptions;
 
 type Projection = ReturnType<typeof projectStaffNotation>;
+
+/**
+ * Page-layout mode used by the sheet renderer: engrave a measure range as one
+ * system. The system starts with its clef and key, has no sticky header or
+ * horizontal scroller, and can be justified to an exact width.
+ * @internal
+ */
+export interface StaffSystemLayout {
+  /** First projection measure index, inclusive. */
+  readonly start: number;
+  /** Last projection measure index, exclusive. */
+  readonly end: number;
+  /** Justify to this logical width (staff units before scaling); omit for the natural width. */
+  readonly width?: number;
+  /** Lay out measures without drawing; read `measureWidths()` afterwards. */
+  readonly measureOnly?: boolean;
+  /** A projection of the same score shared by every system. */
+  readonly projection?: Projection;
+}
+
+/** Room left of a system for its brace and first barline, in staff units. */
+export const STAFF_SYSTEM_INDENT = 16;
+
+/** A point on an engraved system, in its container's CSS pixels. */
+export interface StaffSystemPosition {
+  /** The nearest event column's written quarter. */
+  readonly quarter: number;
+  /** Projection layer (one staff of one part). */
+  readonly layer: number;
+  readonly partIndex: number;
+  readonly staff: number;
+  /** Half staff spaces below the top line (0 = top line, 8 = bottom line). */
+  readonly step: number;
+  readonly clef: Clef;
+}
 interface DrawnEvent {event: StaffNotationEvent; note: StaveNote; voice: string; layer: number; measure: number}
 interface Paint {element: SVGElement; ids: readonly string[]}
 interface Anchor {quarter: number; x: number}
@@ -74,13 +109,62 @@ export class StaffSVGVisualizer extends BaseVisualizer {
   private followRequested = false;
   private geometryPending = false;
   private cleanups: Array<() => void> = [];
+  private readonly system?: StaffSystemLayout;
+  /** Extra width per unit of column weight, spent justifying a system. */
+  private stretch = 0;
+  private stretchWeight = 0;
 
-  constructor(sequence: ScoreNoteSequence, container: HTMLDivElement, config: StaffSVGVisualizerConfig = {}, score?: Score) {
+  constructor(sequence: ScoreNoteSequence, container: HTMLDivElement, config: StaffSVGVisualizerConfig = {}, score?: Score, system?: StaffSystemLayout) {
     super(sequence, config);
     this.container = container;
     this.staffConfig = config;
     this.source = score ?? scoreFromSequence(sequence);
+    this.system = system;
     try { this.render(); } catch (error) { this.dispose(); throw error; }
+  }
+
+  /** Natural or justified width of each engraved measure, in staff units, in range order. */
+  public measureWidths(): number[] { return this.measures.map((measure) => measure.end - measure.x); }
+  /** Logical (unscaled) system width and the scale applied to it. */
+  public get systemMetrics(): {width: number; height: number; scale: number} {
+    return {width: this.logicalWidth, height: this.height / this.scale, scale: this.scale};
+  }
+
+  /** Map a point in the container (CSS pixels) to the nearest column, staff and staff position. */
+  public positionAt(x: number, y: number): StaffSystemPosition | undefined {
+    if (this.disposed || !this.rows.length || !this.anchors.length) return undefined;
+    const lx = x / this.scale + (this.system ? 0 : this.viewport.scrollLeft / this.scale);
+    const ly = y / this.scale;
+    let layer = 0;
+    for (let index = 1; index < this.rowY.length; index += 1) {
+      if (Math.abs(ly - (this.rowY[index] + 60)) < Math.abs(ly - (this.rowY[layer] + 60))) layer = index;
+    }
+    const first = this.measures[0]?.start ?? 0;
+    const last = this.measures[this.measures.length - 1]?.stop ?? Infinity;
+    let quarter = first;
+    let distance = Infinity;
+    for (const anchor of this.anchors) {
+      if (anchor.quarter < first || anchor.quarter >= last) continue;
+      const gap = Math.abs(anchor.x - lx);
+      if (gap < distance) { distance = gap; quarter = anchor.quarter; }
+    }
+    const info = this.projection.layers[layer];
+    return {quarter, layer, partIndex: info.partIndex, staff: info.staff,
+      step: Math.round((ly - this.rowY[layer] - 40) / 5), clef: this.clefAt(layer, quarter)};
+  }
+
+  /** The clef in force on a layer at a written quarter. */
+  public clefAt(layer: number, quarter: number): Clef {
+    const info = this.projection.layers[layer];
+    const index = Math.max(0, this.projection.measures.findIndex((measure) => measure.startQuarters.toFloat() <= quarter && quarter < measure.endQuarters.toFloat()));
+    let clef = info.measures[index]?.clef ?? info.measures[0].clef;
+    for (const change of info.measures[index]?.clefChanges ?? []) if (change.onsetQuarters.toFloat() <= quarter) clef = change.clef;
+    return clef;
+  }
+
+  /** Container CSS-pixel x of a written quarter and the top/bottom of a layer's staff lines. */
+  public geometryAt(quarter: number, layer: number): {x: number; top: number; bottom: number} {
+    return {x: this.xAtQuarter(quarter) * this.scale, top: ((this.rowY[layer] ?? 0) + 40) * this.scale, bottom: ((this.rowY[layer] ?? 0) + 80) * this.scale};
   }
 
   protected clear(): void { this.clearActiveNotes(); }
@@ -162,8 +246,14 @@ export class StaffSVGVisualizer extends BaseVisualizer {
     this.anchors = []; this.measures = []; this.currentHeader = '';
     this.hiddenTupletNumbers.clear();
     const document = this.container.ownerDocument;
-    this.projection = projectStaffNotation(this.source, this.staffConfig);
+    this.projection = this.system?.projection ?? projectStaffNotation(this.source, this.staffConfig);
     this.scale = this.config.noteHeight / 10;
+    this.stretch = 0;
+    if (this.system?.measureOnly) {
+      this.context = new SVGContext(document.createElement('div'));
+      this.prepareMeasures();
+      return;
+    }
     this.container.replaceChildren();
     this.container.style.position = 'relative';
     this.container.style.minWidth = '0';
@@ -175,8 +265,8 @@ export class StaffSVGVisualizer extends BaseVisualizer {
     this.viewport.setAttribute('role', 'region');
     this.viewport.setAttribute('aria-label', 'Staff timeline');
     this.viewport.style.cssText = 'width:100%;min-width:0;position:relative;';
-    makeScrollable(this.viewport, 'x');
-    makeClipped(this.viewport, 'y');
+    if (!this.system) makeScrollable(this.viewport, 'x');
+    makeClipped(this.viewport, this.system ? 'both' : 'y');
     this.container.append(this.viewport);
     this.context = new SVGContext(this.viewport);
     this.context.setFillStyle(INK).setStrokeStyle(INK);
@@ -190,15 +280,28 @@ export class StaffSVGVisualizer extends BaseVisualizer {
     this.headerContext.setFillStyle(INK).setStrokeStyle(INK);
     this.headerContext.svg.setAttribute('aria-hidden', 'true');
     this.prepareMeasures();
+    if (this.system?.width !== undefined && this.stretchWeight > 0) {
+      const natural = this.logicalWidth;
+      if (this.system.width > natural) {
+        // Spread the spare width over the columns by duration weight. Column
+        // offsets grow linearly with the stretch, so one more pass is exact.
+        this.stretch = (this.system.width - natural) / this.stretchWeight;
+        this.anchors = []; this.measures = []; this.hiddenTupletNumbers.clear();
+        this.prepareMeasures();
+      }
+    }
     this.drawRows();
     this.packRows();
     this.drawCrossStaffCurves();
     this.drawConnections();
-    this.drawHeader(0);
-    const divider = document.createElement('div');
-    divider.dataset.webscoreStaffDivider = '';
-    divider.style.cssText = `position:absolute;top:0;bottom:0;left:${this.headerWidth * this.scale}px;width:1px;opacity:.35;pointer-events:none;background:var(--webscore-staff-note);`;
-    this.container.append(divider);
+    if (this.system) this.drawSystemStart();
+    else {
+      this.drawHeader(0);
+      const divider = document.createElement('div');
+      divider.dataset.webscoreStaffDivider = '';
+      divider.style.cssText = `position:absolute;top:0;bottom:0;left:${this.headerWidth * this.scale}px;width:1px;opacity:.35;pointer-events:none;background:var(--webscore-staff-note);`;
+      this.container.append(divider);
+    }
     this.playhead = document.createElement('div');
     this.playhead.dataset.webscoreStaffPlayhead = '';
     this.playhead.style.cssText = 'position:absolute;top:0;bottom:0;width:2px;pointer-events:none;background:var(--webscore-staff-active);';
@@ -207,7 +310,7 @@ export class StaffSVGVisualizer extends BaseVisualizer {
     this.inputCursor = document.createElement('div');
     this.inputCursor.dataset.staffInputCursor = '';
     this.inputCursor.setAttribute('aria-hidden', 'true');
-    this.inputCursor.style.cssText = 'position:absolute;width:3px;pointer-events:none;background:var(--wm-accent,#4869d8);';
+    this.inputCursor.style.cssText = 'position:absolute;width:3px;pointer-events:none;background:var(--webscore-staff-cursor, var(--wm-accent,#4869d8));';
     this.inputCursor.hidden = true;
     this.container.append(this.inputCursor);
     this.setSelectedNotes([...this.selectedIds].map(NoteId));
@@ -237,27 +340,33 @@ export class StaffSVGVisualizer extends BaseVisualizer {
   }
 
   private prepareMeasures(): void {
-    let x = 20;
+    const system = this.system;
+    let x = system ? STAFF_SYSTEM_INDENT : 20;
     const context = this.context;
     // Every later key/meter needs the same fixed-header space while panning.
-    this.headerWidth = Math.max(80, ...this.projection.layers.flatMap((layer) => layer.measures.map(({clef, measure}) =>
+    this.headerWidth = system ? 0 : Math.max(80, ...this.projection.layers.flatMap((layer) => layer.measures.map(({clef, measure}) =>
       new Stave(20, 0, 400).addClef(clefName(clef)).addKeySignature(keyName(measure.keySignature.fifths))
         .addTimeSignature(`${measure.timeSignature.numerator}/${measure.timeSignature.denominator}`).getNoteStartX(),
     )));
-    for (const measure of this.projection.measures) {
+    this.stretchWeight = 0;
+    const range = system ? this.projection.measures.slice(system.start, system.end) : this.projection.measures;
+    for (const measure of range) {
       const index = measure.index;
+      // A system restates its clef and key; the meter only where it changes.
+      const opensSystem = system !== undefined && index === system.start;
       const staves = this.projection.layers.map((layer) => {
         const current = layer.measures[index];
-        const previous = layer.measures[index - 1];
+        const previous = opensSystem ? undefined : layer.measures[index - 1];
+        const previousMeter = layer.measures[index - 1]?.measure.timeSignature;
         const stave = new Stave(x, 0, 300, {left_bar: false, right_bar: false}).setContext(context);
         stave.setStyle({fillStyle: INK, strokeStyle: INK});
         const previousClef = previous?.clefChanges[previous.clefChanges.length - 1]?.clef ?? previous?.clef;
         if (!previous || !same(current.clef, previousClef)) stave.addClef(clefName(current.clef), undefined, current.clef.octaveChange === 1 ? '8va' : current.clef.octaveChange === -1 ? '8vb' : undefined);
         if (!previous || !same(measure.keySignature, previous.measure.keySignature)) stave.addKeySignature(keyName(measure.keySignature.fifths));
-        if (!previous || !same(measure.timeSignature, previous.measure.timeSignature)) stave.addTimeSignature(`${measure.timeSignature.numerator}/${measure.timeSignature.denominator}`);
+        if (!previousMeter || !same(measure.timeSignature, previousMeter)) stave.addTimeSignature(`${measure.timeSignature.numerator}/${measure.timeSignature.denominator}`);
         return stave;
       });
-      const startX = Math.max(index === 0 ? this.headerWidth : x + 12, ...staves.map((stave) => stave.getNoteStartX()));
+      const startX = Math.max(index === 0 && !system ? this.headerWidth : x + (system ? 8 : 12), ...staves.map((stave) => stave.getNoteStartX()));
       for (const stave of staves) stave.setNoteStartX(startX);
       const events: DrawnEvent[] = [];
       const beams: Beam[] = [];
@@ -400,33 +509,39 @@ export class StaffSVGVisualizer extends BaseVisualizer {
         column.clefs.push(clef);
       }
       const ordered = [...columns.values()].sort((a, b) => a.quarter - b.quarter);
-      let offset = 12;
+      // A page system packs columns tighter than the scrolling staff; justification adds the rest.
+      const gap = system ? {start: 6, left: 3, right: 5, tail: 10, min: 40} : {start: 12, left: 8, right: 12, tail: 18, min: 100};
+      let offset = gap.start;
       let previousQuarter = measure.startQuarters.toFloat();
       const quarterWidth = this.staffConfig.pixelsPerSecond && this.staffConfig.pixelsPerSecond > 0
-        ? this.staffConfig.pixelsPerSecond * 60 / (this.noteSequence.tempos[0]?.qpm ?? 120) / this.scale : 54;
+        ? this.staffConfig.pixelsPerSecond * 60 / (this.noteSequence.tempos[0]?.qpm ?? 120) / this.scale : system ? 22 : 54;
       for (const column of ordered) {
         for (const modifiers of column.modifiers.values()) modifiers.preFormat();
         column.tick.preFormat();
         const metrics = column.tick.getMetrics();
-        offset += Math.max((column.quarter - previousQuarter) * quarterWidth, metrics.totalLeftPx + 8);
+        const weight = column.quarter - previousQuarter + .25;
+        this.stretchWeight += weight;
+        offset += Math.max((column.quarter - previousQuarter) * quarterWidth, metrics.totalLeftPx + gap.left) + this.stretch * weight;
         if (column.clefs.length) {
           for (const clef of column.clefs) clef.note.setTickContext(new TickContext().setX(offset)).preFormat();
           offset += Math.max(...column.clefs.map((clef) => clef.note.getWidth())) + 12;
         }
         column.tick.setX(offset);
         this.anchors.push({quarter: column.quarter, x: startX + offset + 12});
-        offset += metrics.totalRightPx + 12 + this.config.noteSpacing / this.scale;
+        offset += metrics.totalRightPx + gap.right + this.config.noteSpacing / this.scale;
         previousQuarter = column.quarter;
       }
-      const width = Math.max(100, startX - x + offset + Math.max(18, (measure.endQuarters.toFloat() - previousQuarter) * quarterWidth));
+      const tail = measure.endQuarters.toFloat() - previousQuarter;
+      this.stretchWeight += tail;
+      const width = Math.max(gap.min, startX - x + offset + Math.max(gap.tail, tail * quarterWidth) + this.stretch * tail);
       for (const stave of staves) stave.setWidth(width);
       for (const beam of beams) beam.postFormat();
       this.measures.push({x, end: x + width, start: measure.startQuarters.toFloat(), stop: measure.endQuarters.toFloat(), staves, events, beams, tuplets, clefs});
       if (!this.anchors.some((anchor) => anchor.quarter === measure.startQuarters.toFloat())) this.anchors.push({quarter: measure.startQuarters.toFloat(), x: startX + 12});
       x += width;
     }
-    this.logicalWidth = x + 20;
-    this.anchors.push({quarter: this.source.durationQuarters.toFloat(), x});
+    this.logicalWidth = system ? x + 2 : x + 20;
+    this.anchors.push({quarter: system ? range[range.length - 1]?.endQuarters.toFloat() ?? 0 : this.source.durationQuarters.toFloat(), x});
     this.anchors.sort((a, b) => a.quarter - b.quarter);
   }
 
@@ -441,7 +556,7 @@ export class StaffSVGVisualizer extends BaseVisualizer {
       const partDraws = this.measures.flatMap((measure) => measure.events.filter((draw) => this.projection.layers[draw.layer].partIndex === layer.partIndex));
       for (const [measureIndex, measure] of this.measures.entries()) {
         measure.staves[layerIndex].draw();
-        const source = this.projection.measures[measureIndex].source;
+        const source = this.projection.measures[measureIndex + (this.system?.start ?? 0)].source;
         if (source?.barlineStart) drawStaffBarline(ctx, source.barlineStart, measure.x, 40, 80);
         drawStaffBarline(ctx, source?.barlineEnd ?? 'regular', measure.end, 40, 80);
         for (const clef of measure.clefs.filter((clef) => clef.layer === layerIndex)) {
@@ -507,8 +622,13 @@ export class StaffSVGVisualizer extends BaseVisualizer {
       }
       this.drawCurves(partDraws, ink, layerIndex);
       this.rowInk[layerIndex] = ink;
-      if (this.staffConfig.showAnnotations !== false) ink.push(...drawStaffDirections(ctx, layer.directions, {
-        xAtQuarter: (quarter) => this.xAtQuarter(quarter), endQuarters: this.projection.measures[this.projection.measures.length - 1].endQuarters.toFloat(),
+      const directions = this.system ? layer.directions.filter((direction) => {
+        const at = direction.onsetQuarters.toFloat();
+        return at >= (this.measures[0]?.start ?? 0) && at < (this.measures[this.measures.length - 1]?.stop ?? 0);
+      }) : layer.directions;
+      if (this.staffConfig.showAnnotations !== false) ink.push(...drawStaffDirections(ctx, directions, {
+        xAtQuarter: (quarter) => this.xAtQuarter(quarter),
+        endQuarters: this.system ? this.measures[this.measures.length - 1]?.stop ?? 0 : this.projection.measures[this.projection.measures.length - 1].endQuarters.toFloat(),
         ink: INK, obstacles: ink,
       }));
       ctx.closeGroup();
@@ -635,7 +755,7 @@ export class StaffSVGVisualizer extends BaseVisualizer {
       bounds.push({left: 0, right: this.logicalWidth, top: 40, bottom: 80});
       // Headers can change while panning. Measure each distinct source header,
       // rather than reserving the tallest possible clef across its full width.
-      bounds.push(...this.headerInk(index));
+      if (!this.system) bounds.push(...this.headerInk(index));
       return {ink: bounds, top: Math.min(...bounds.map((box) => box.top)), bottom: Math.max(...bounds.map((box) => box.bottom))};
     });
     this.geometryPending = !measured && this.rows.length > 0 && typeof this.rows[0].getBBox === 'function';
@@ -686,10 +806,32 @@ export class StaffSVGVisualizer extends BaseVisualizer {
     for (let index = 1; index < this.projection.layers.length; index += 1) {
       if (this.projection.layers[index - 1].partIndex !== this.projection.layers[index].partIndex) continue;
       for (const [measureIndex, measure] of this.measures.entries()) {
-        const source = this.projection.measures[measureIndex].source;
+        const source = this.projection.measures[measureIndex + (this.system?.start ?? 0)].source;
         if (source?.barlineStart) drawStaffBarline(ctx, source.barlineStart, measure.x, this.rowY[index - 1] + 80, this.rowY[index] + 40, true);
         drawStaffBarline(ctx, source?.barlineEnd ?? 'regular', measure.end, this.rowY[index - 1] + 80, this.rowY[index] + 40, true);
       }
+    }
+    ctx.closeGroup();
+  }
+  /** A system's opening barline, braces and measure number, drawn in the main context. */
+  private drawSystemStart(): void {
+    const ctx = this.context;
+    const first = this.measures[0];
+    if (!first) return;
+    const staves = this.projection.layers.map((_layer, index) => new Stave(first.x, this.rowY[index], 100, {left_bar: false, right_bar: false}));
+    ctx.openGroup('staff-system-start').dataset.webscoreSystemStart = '';
+    if (staves.length > 1) new StaveConnector(staves[0], staves[staves.length - 1]).setType('singleLeft').setContext(ctx).draw();
+    else ctx.fillRect(first.x, this.rowY[0] + 40, 1, 40);
+    for (let start = 0; start < staves.length;) {
+      let end = start + 1;
+      while (end < staves.length && this.projection.layers[end].partIndex === this.projection.layers[start].partIndex) end += 1;
+      if (end - start > 1) new StaveConnector(staves[start], staves[end - 1]).setType('brace').setContext(ctx).draw();
+      start = end;
+    }
+    const number = this.projection.measures[this.system!.start]?.number;
+    if (number !== undefined && this.system!.start > 0) {
+      ctx.setFont('Arial', 9, 'normal');
+      ctx.fillText(String(number), first.x, this.rowY[0] + 30);
     }
     ctx.closeGroup();
   }
@@ -744,6 +886,7 @@ export class StaffSVGVisualizer extends BaseVisualizer {
     return before.x + (after.x - before.x) * Math.max(0, (quarter - before.quarter) / (after.quarter - before.quarter));
   }
   private follow(x: number, quarter: number): void {
+    if (this.system) return; // The sheet scrolls whole systems itself.
     if (quarter <= 0) { this.viewport.scrollLeft = 0; return; }
     const width = this.viewport.clientWidth || this.container.getBoundingClientRect().width;
     if (!(width > 0)) return;
@@ -757,8 +900,24 @@ export class StaffSVGVisualizer extends BaseVisualizer {
       this.viewport.scrollLeft = Math.max(0, x - bar < width - this.config.noteHeight * 2 ? bar : x - inset - this.config.noteHeight * 2);
     }
   }
+  /** Whether a written quarter falls inside this system's measures. */
+  private inSystem(quarter: number): boolean {
+    if (!this.system) return true;
+    const first = this.measures[0]?.start ?? 0;
+    const last = this.measures[this.measures.length - 1]?.stop ?? 0;
+    return quarter >= first && quarter < last;
+  }
   private paintViewport(): void {
     if (this.disposed || !this.context) return;
+    if (this.system) {
+      this.paintInputCursor();
+      if (!this.playhead || this.position === undefined) return;
+      const quarter = secondsToQuarters(this.noteSequence.tempos, Math.max(0, this.position));
+      this.playhead.hidden = !this.inSystem(quarter) || this.position > this.noteSequence.totalTime;
+      this.playhead.style.left = `${this.xAtQuarter(quarter) * this.scale}px`;
+      this.playhead.dataset.time = String(this.position);
+      return;
+    }
     const scroll = this.viewport.scrollLeft;
     this.context.svg.style.clipPath = `inset(0 0 0 ${scroll + this.headerWidth * this.scale}px)`;
     let measure = 0;
@@ -781,10 +940,10 @@ export class StaffSVGVisualizer extends BaseVisualizer {
     const layer = position ? this.projection.layers.findIndex((layer) =>
       this.source.parts[layer.partIndex]?.id === position.partId &&
       (this.staffConfig.splitStaves === false || layer.staff === position.staff)) : -1;
-    if (!position || layer < 0) { this.inputCursor.hidden = true; return; }
-    const x = this.xAtQuarter(position.quarters) * this.scale - this.viewport.scrollLeft;
+    if (!position || layer < 0 || !this.inSystem(position.quarters)) { this.inputCursor.hidden = true; return; }
+    const x = this.xAtQuarter(position.quarters) * this.scale - (this.system ? 0 : this.viewport.scrollLeft);
     const width = this.viewport.clientWidth || this.container.getBoundingClientRect().width;
-    this.inputCursor.hidden = x < this.headerWidth * this.scale || (width > 0 && x > width);
+    this.inputCursor.hidden = !this.system && (x < this.headerWidth * this.scale || (width > 0 && x > width));
     this.inputCursor.style.left = `${x}px`;
     this.inputCursor.style.top = `${(this.rowY[layer] + 30) * this.scale}px`;
     this.inputCursor.style.height = `${60 * this.scale}px`;

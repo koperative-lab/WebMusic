@@ -30,43 +30,6 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-it('loads serialized tempo measures and their spanning slur with the real OSMD reader', async () => {
-  // Loading prepares labels but does not render them. Only font measurement
-  // needs a canvas stand-in; the real OSMD XML/measure/slur readers run.
-  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
-    measureText: (text: string) => ({width: text.length * 8}),
-  } as unknown as CanvasRenderingContext2D);
-  const {OpenSheetMusicDisplay} = await import('opensheetmusicdisplay');
-  for (const xml of [tempoScore, serializeMusicXML(parseMusicXML(tempoScore))]) {
-    const host = document.createElement('div');
-    document.body.append(host);
-    const osmd = new OpenSheetMusicDisplay(host, {autoResize: false, backend: 'svg'});
-    await osmd.load(xml);
-    const measures = osmd.Sheet.SourceMeasures;
-    expect(measures.map((measure) => ({
-      number: measure.MeasureNumber,
-      start: measure.AbsoluteTimestamp.RealValue,
-      duration: measure.Duration.RealValue,
-    }))).toEqual([
-      {number: 1, start: 0, duration: 1},
-      {number: 2, start: 1, duration: 1},
-      {number: 3, start: 2, duration: 1},
-    ]);
-    const notes = measures.flatMap((measure) => measure.VerticalSourceStaffEntryContainers
-      .flatMap((container) => container.StaffEntries)
-      .filter((entry) => entry != null)
-      .flatMap((entry) => entry.VoiceEntries)
-      .flatMap((entry) => entry.Notes));
-    expect(notes).toHaveLength(3);
-    const [slur] = notes[0]!.NoteSlurs;
-    expect(slur).toBeDefined();
-    expect(slur!.StartNote).toBe(notes[0]);
-    expect(slur!.EndNote).toBe(notes[2]);
-    expect(notes[2]!.NoteSlurs).toContain(slur);
-    osmd.clear();
-  }
-});
-
 it('round-trips sound offsets without creating visual directions', () => {
   let score = parseMusicXML(tempoScore);
   for (let round = 0; round < 3; round += 1) {

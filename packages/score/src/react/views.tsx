@@ -3,11 +3,9 @@ import {noteMidi, noteOnsetSeconds, type Score} from '../core';
 import type {Player} from '../play/headless';
 import {
   bindPlayerToVisualizer,
-  renderOSMDStaffVisualizer,
   renderPianoRollVisualizer,
   renderStaffVisualizer,
   renderWaterfallVisualizer,
-  type OSMDStaffOptions,
 } from '../view/render';
 import type {RenderedScoreVisualizer, ViewLayoutOptions} from '../view/api';
 import {useCursor, usePlayer, useScore} from './context';
@@ -46,14 +44,8 @@ export interface ViewProps extends ViewLayoutOptions {
 }
 
 export interface StaffViewProps extends ViewProps {
-  /** Show score expression directions on the scrolling staff; default true. OSMD uses its own options. Only the staff draws annotations. */
+  /** Show score expression directions on the scrolling staff; default true. Only the staff draws annotations. */
   showAnnotations?: boolean;
-  /**
-   * Render page notation with OpenSheetMusicDisplay instead of the scrolling staff renderer.
-   * Pass `toMusicXML` (e.g. `serializeMusicXML` from `@webmusic/score/io`) and,
-   * if not installed as a peer, the `OpenSheetMusicDisplay` constructor.
-   */
-  osmd?: OSMDStaffOptions;
 }
 
 export function PianoRollView({
@@ -113,87 +105,32 @@ export function StaffView({
   className,
   style,
   ariaLabel = 'Musical staff',
-  osmd,
   ...layoutOptions
 }: StaffViewProps) {
   const score = useScore();
   const player = usePlayer();
   const containerRef = React.useRef<HTMLDivElement>(null);
 
-  // `osmd` is an options object that callers usually write inline, so its
-  // identity changes every parent render. Using it directly in the effect deps
-  // would tear down and re-render OSMD constantly. Behavior: the latest `osmd`
-  // object is kept in a ref and only switching OSMD on/off re-renders the
-  // staff; changes *inside* an existing osmd options object are ignored until
-  // the view re-renders for another reason (remount with a `key` to force it).
-  const osmdRef = React.useRef(osmd);
-  osmdRef.current = osmd;
-  const osmdEnabled = Boolean(osmd);
-
   React.useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
-    // Every render generation owns an isolated staging root. Detach the old
-    // root before a replacement starts so a late async OSMD load can only
-    // render/clear detached DOM, never overwrite the current score.
     const staging = document.createElement('div');
     staging.style.width = '100%';
     staging.style.minHeight = '100%';
     container.replaceChildren(staging);
-
-    let disposed = false;
-    let unbind: (() => void) | undefined;
-    let renderedVisualizer: RenderedScoreVisualizer | undefined;
-    let cancelPendingRender: (() => void) | undefined;
-
-    const bind = (rendered: RenderedScoreVisualizer): void => {
-      renderedVisualizer = rendered;
-      unbind = bindPlayer(rendered, player, score);
-    };
-
-    const osmdOptions = osmdRef.current;
-    if (osmdEnabled && osmdOptions) {
-      const controller = new AbortController();
-      const externalSignal = osmdOptions.signal;
-      const abortFromCaller = (): void => controller.abort(externalSignal?.reason);
-      if (externalSignal?.aborted) abortFromCaller();
-      else externalSignal?.addEventListener('abort', abortFromCaller, {once: true});
-      cancelPendingRender = () => {
-        externalSignal?.removeEventListener('abort', abortFromCaller);
-        controller.abort();
-      };
-      // OSMD renders asynchronously (load + render); guard against unmount.
-      renderOSMDStaffVisualizer(score, staging, {...osmdOptions, signal: controller.signal})
-        .then((rendered) => (disposed ? rendered.dispose?.() : bind(rendered)))
-        .catch((error) => {
-          if (!disposed && !isAbortError(error)) {
-            console.error('[WebScore] OSMD staff render failed', error);
-          }
-        });
-    } else {
-      bind(
-        renderStaffVisualizer(score, staging, {
-          noteHeight: layoutOptions.laneHeight,
-          pixelsPerSecond: layoutOptions.pixelsPerSecond ?? 0,
-          showAnnotations: layoutOptions.showAnnotations,
-        }),
-      );
-    }
-
+    const rendered = renderStaffVisualizer(score, staging, {
+      noteHeight: layoutOptions.laneHeight,
+      pixelsPerSecond: layoutOptions.pixelsPerSecond ?? 0,
+      showAnnotations: layoutOptions.showAnnotations,
+    });
+    const unbind = bindPlayer(rendered, player, score);
     return () => {
-      disposed = true;
-      // Invalidate a pending shared/injected OSMD generation before the next
-      // renderer is installed. Its load cannot be force-cancelled, but its
-      // eventual render/clear is now stale and inert.
-      cancelPendingRender?.();
       if (staging.parentNode === container) staging.remove();
-      unbind?.();
-      // dispose() removes the OSMD resize listener / scrolling staff layers; the
-      // replaceChildren is a belt-and-braces sweep of anything left behind.
-      renderedVisualizer?.dispose?.();
+      unbind();
+      rendered.dispose?.();
       staging.replaceChildren();
     };
-  }, [score, player, osmdEnabled, layoutOptions.laneHeight, layoutOptions.pixelsPerSecond, layoutOptions.showAnnotations]);
+  }, [score, player, layoutOptions.laneHeight, layoutOptions.pixelsPerSecond, layoutOptions.showAnnotations]);
 
   return (
     <div
@@ -206,9 +143,6 @@ export function StaffView({
   );
 }
 
-function isAbortError(error: unknown): boolean {
-  return error instanceof Error && error.name === 'AbortError';
-}
 
 export function WaterfallView({
   width = '100%',

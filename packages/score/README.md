@@ -87,8 +87,8 @@ these API entries are DOM-free.
 | `@webmusic/score/io/worker` | Self-registering parser Worker runtime. |
 | `@webmusic/score/view` | Stateless view API: layout geometry, note sequences, types, plus atomic note operations, document contracts and position maps for editing. |
 | `@webmusic/score/view/headless` | Score windows, map navigation and held-pitch state with optional borrowed playback, and the persistent `ScoreEditor` (bounded history, checkpoints, draft/selection sessions); no DOM. |
-| `@webmusic/score/view/render` | Imperative browser visualizers (SVG / canvas / OSMD). |
-| `@webmusic/score/view/element` | `<score-view>`, `<score-pitch-view>` and `<score-sheet-view>` Web Components. |
+| `@webmusic/score/view/render` | Imperative browser visualizers (SVG / canvas), the piano-roll grid and engraved sheet pages. |
+| `@webmusic/score/view/element` | `<score-view>`, `<score-grid-view>`, `<score-pitch-view>` and `<score-sheet-view>` Web Components. |
 | `@webmusic/score/play` | Stateless playback API: SFZ data helpers, offline render types. |
 | `@webmusic/score/play/headless` | Players, synths, `Sound`, `Effect`, `Rack`, `LfoController`, offline rendering. |
 | `@webmusic/score/play/drivers` | Pointer / scroll / orientation / value transport adapters. |
@@ -323,9 +323,9 @@ combines that source's score, position and activity with an analysis session.
 These objects release only their own subscriptions and never own playback.
 
 `@webmusic/score/view/render` also exports `renderStaffVisualizer`,
-`renderWaterfallVisualizer`, `bindPlayerToVisualizer`, and
-`renderOSMDStaffVisualizer` (engraving through the optional
-`opensheetmusicdisplay` peer).
+`renderWaterfallVisualizer`, `bindPlayerToVisualizer`, `mountScoreGrid`
+(the editable piano-roll grid) and `mountScoreSheet` (engraved pages with
+notation editing).
 
 The Web Component entry provides three composable tags:
 
@@ -349,9 +349,11 @@ defineAllViewElements();
 - **`<score-pitch-view>`** selects `keyboard` (default), current-pitch `staff` or
   `fretboard`. It borrows held notes through `player` (or legacy `source`), owns
   no Score, and sends no note or transport commands. Type changes retain activity.
-- **`<score-sheet-view>`** engraves an explicit `.score` or `src` through the optional
-  `opensheetmusicdisplay` peer. Its optional `player` connection follows note
-  events; it does not borrow the player's score or native snapshot.
+- **`<score-sheet-view>`** engraves the score in justified systems on pages
+  (`layout="page"`) or in a continuous column (`layout="flow"`) with the
+  package's own VexFlow engraver. With a borrowed `.editor` and `editable` it
+  edits like a notation program: select, move pitches, note input mode and
+  duration changes. It follows `player` like the other View Elements.
 
 Each instance renders one surface. Configuration belongs to attributes or
 application-owned controls; documentation demos put it in external Parameters.
@@ -817,7 +819,6 @@ The core install stays lean; each optional peer unlocks one capability:
 
 | Peer | Version | Unlocks |
 |---|---|---|
-| `opensheetmusicdisplay` | `>=1.8.0` | OSMD staff engraving in `./view/render` (`renderOSMDStaffVisualizer`). |
 | `spessasynth_lib` | `^4.0.0` | `Sound.soundfont2()` — `.sf2` / `.sf3` SoundFont playback (see the `workletUrl` recipe above). |
 | `tone` | `>=14.0.0` | `TonePlayer` — playback on an injected `Tone.Transport`, and `Sound.from(toneInstrument)`. |
 | `react` | `>=18` | `@webmusic/score/react` hooks and components. |

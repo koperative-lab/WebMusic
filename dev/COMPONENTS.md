@@ -163,13 +163,13 @@ Current sounding pitches as a keyboard, staff or fretboard, selected by type.
 
 #### `<score-sheet-view>`
 
-Real engraved sheet music via the optional OpenSheetMusicDisplay peer — beams, ties, slurs and page layout, with an optional playback cursor.
+Engraved sheet music in pages or a continuous column, editable like a notation program: select notes, move pitches, write notes in input mode and change durations.
 
-- Behavior/data collaboration: OSMD renderer binding + MusicXML serializer.
-- Reviewed UI composition: `@webmusic/ui/stage`, `@webmusic/ui/status`.
-- Attribute controls: `src`, `format`, `player`, `follow-cursor`, `width`, `height`
-- Properties and methods: `score`, `OpenSheetMusicDisplay`, `osmd`
-- Events: None declared in this catalog.
+- Behavior/data collaboration: createScoreViewEditing + mountScoreSheet + sheet editing operations + player binding.
+- Reviewed UI composition: `@webmusic/ui/status`.
+- Attribute controls: `src`, `format`, `player`, `width`, `height`, `editable`, `tools`, `layout`, `zoom`, `follow-cursor`, `note-color`, `active-note-color`
+- Properties and methods: `score`, `editor`, `interactionSession`, `editable`, `tools`, `layout / zoom / followCursor`, `currentTime`
+- Events: `editpreview`, `editcommit`, `editerror`, `sheetsettingschange`
 - [Owning workflow and contract](<../apps/doc/webmusic/src/content/docs/score/element/view/score-sheet-view.mdx>) · [Element source](<../packages/score/src/view/element/score-sheet-view.ts>) · [Parameter catalog](<../apps/doc/webmusic/src/lib/params/score-view.ts>)
 
 ### Audio / Play

@@ -18,15 +18,15 @@ they need simultaneous representations.
 | `score-view` | A complete Score, optionally with a borrowed playback position; read-only | `piano-roll`, `staff`, `waterfall` |
 | `score-grid-view` | A complete Score on a DAW-style piano-roll grid; with a borrowed editor and `editable`, note editing | One grid; `tools` selects editing features |
 | `score-pitch-view` | Currently held MIDI pitches from one selected note source | `keyboard`, `staff`, `fretboard` |
-| `score-sheet-view` | Page engraving using an optional OSMD renderer | Separate engraving lifecycle; no type selector |
+| `score-sheet-view` | A complete Score engraved in justified systems on pages or in a column; with a borrowed editor and `editable`, notation editing | `layout` selects `page` or `flow` |
 
 Score staff includes musical time. Pitch staff depicts only sounding notes.
 Under DEC-056 `score-view` has no map or thumbnail type; applications compose
 the Headless `createScoreMapView` with the UI timeline, or the `/view/render`
 thumbnail renderer, when they need navigation or a static preview. Only the
-staff type draws score annotations. Page engraving remains independent because its optional
-engine, injection points and asynchronous layout differ from the scrolling
-staff renderer.
+staff type draws score annotations. Page engraving is a separate Element under
+DEC-060: it reuses the staff engraver for each system but owns line breaking,
+pages and notation editing, which the scrolling staff type does not have.
 
 ## Data, time and state
 
@@ -164,11 +164,11 @@ pan. Staff and fretboard sizing is unchanged: staff lines or fret spacing extend
 into the available width. Display labels remain bounded by their keys, with
 complete text available to assistive technology.
 
-UIKit Stage provides a minimum drawing-surface width independently of its
-shrinkable host. SheetView uses that capability for readable engraving and
-scrolls inside the stage on small screens. Its paper color is explicit so dark
-application backgrounds do not obscure OSMD's ink. Width, height and follow
-settings update the current engraving without another source load.
+SheetView fits a page to the element width by default and re-breaks systems
+when the width changes; `zoom` sets an explicit staff size and the viewport
+scrolls. Paper and ink resolve through `--wm-score-sheet-*` and the shared
+surface and foreground tokens, so dark application themes keep the notation
+readable. Layout and zoom changes re-engrave without another source load.
 
 Waterfall's Element composes the existing UIKit keyboard through a structural
 render port. The Score renderer owns numeric pitch-column geometry and time;
@@ -186,8 +186,8 @@ The application owns the player, synthesis and musical clock. Views own and
 release their presenters, renderers, subscriptions and pending source loads.
 Changing type releases the previous presenter without replacing borrowed state.
 Disconnect, late source completion, player replacement and repeated cleanup
-retain their existing cancellation guarantees. SheetView keeps its optional
-OSMD loading, injection and failure contract.
+retain their existing cancellation guarantees. SheetView engraves with the
+package's own staff engraver and needs no optional peer (DEC-060).
 
 The five superseded tags and their registration helpers are removed. Migrate
 `keyboard-view`, `staff-view` and `fretboard-view` to the corresponding PitchView

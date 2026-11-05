@@ -25,7 +25,7 @@ export const elementCompositionPolicy = Object.freeze([
 
   entry('Score', 'View', 'score-view', 'packages/score/src/view/element/score-view.ts', ['stage', 'status']),
   entry('Score', 'View', 'score-grid-view', 'packages/score/src/view/element/score-grid-view.ts', ['status']),
-  entry('Score', 'View', 'score-sheet-view', 'packages/score/src/view/element/score-sheet-view.ts', ['stage', 'status']),
+  entry('Score', 'View', 'score-sheet-view', 'packages/score/src/view/element/score-sheet-view.ts', ['status']),
   entry('Score', 'View', 'score-pitch-view', 'packages/score/src/view/element/score-pitch-view.ts', ['pitch', 'status']),
 
   entry('Audio', 'Play', 'audio-player', 'packages/audio/src/play/element/audio-player.ts', ['transport', 'status']),
@@ -47,7 +47,8 @@ export const standaloneUiPresenters = Object.freeze(['minimap', 'playlist', 'met
 
 /**
  * Musical editing surfaces own their focus entry and keyboard interpretation.
- * Piano-roll grid editing and waveform ranges are not stage sliders. Exempt
+ * Piano-roll grid editing, sheet notation editing and waveform ranges are not
+ * stage sliders. Exempt
  * only this literal write at this reviewed owner; slider/value ARIA and any
  * other tabindex owner are still checked across the complete closure.
  */
@@ -56,6 +57,9 @@ export function sourceWithoutOwnedFocusWrite(tag, source, text) {
   // same owner withdrawing its own focus entry, never a second ARIA owner.
   if (tag === 'audio-view' && source === 'packages/audio/src/view/render/waveform-editor.ts') {
     return text.replace("surface.setAttribute('tabindex', '0');", '').replace("surface.removeAttribute('tabindex');", '');
+  }
+  if (tag === 'score-sheet-view' && source === 'packages/score/src/view/render/score-sheet.ts') {
+    return text.replace("viewport.setAttribute('tabindex', '0');", '').replace("viewport.removeAttribute('tabindex');", '');
   }
   if (tag !== 'score-grid-view' || source !== 'packages/score/src/view/render/score-grid.ts') return text;
   return text.replace("svg.setAttribute('tabindex', '0');", '').replace("svg.removeAttribute('tabindex');", '');

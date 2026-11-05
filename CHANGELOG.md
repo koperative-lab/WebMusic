@@ -5,6 +5,17 @@ work and does not establish npm publication, a release tag or a deployment.
 
 ## Unreleased
 
+- Rebuild `<score-sheet-view>` on WebMusic's own engraver: justified systems
+  on A4 pages (`layout="page"`) or in a column (`layout="flow"`), `zoom`, and
+  player following like the other Views. With a borrowed `.editor` and
+  `editable` it edits like a notation program — select notes and rests, move
+  pitches (semitone, octave, diatonic, drag), note input mode, durations, dots,
+  ties, accidentals and delete-to-rest — through the new `set-pitches`,
+  `notes-to-rests`, `tie-notes` and `write-notation` operations. Its renderer
+  is `mountScoreSheet` in `/view/render`. **Breaking:** OpenSheetMusicDisplay
+  is removed — `renderOSMDStaffVisualizer`, `OSMDStaffOptions`, the React
+  `StaffView` `osmd` prop, the element's `OpenSheetMusicDisplay`/`osmd`
+  properties and the optional peer.
 - Add document-owned editing for Score and Audio as part of View: operations
   and contracts in `/view`, `ScoreEditor`/`AudioClipEditor` in
   `/view/headless` with `loadScoreEditor`/`loadAudioClipEditor`, editors lent

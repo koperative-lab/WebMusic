@@ -64,45 +64,13 @@ describe('View drawing colors', () => {
     renderer.dispose();
   });
 
-  it('themes the actual OSMD note, line and title paints without rebuilding on a CSS change', async () => {
-    // The optional peer is installed by the docs workspace. Font metrics and
-    // skyline pixels are stubbed; the real SVG backend/paint attributes run.
-    const context = new Proxy({measureText: (text: string) => ({width: text.length * 8}),
-      getImageData: () => ({data: new Uint8ClampedArray(800 * 600 * 4)}),
-      createLinearGradient: () => ({addColorStop() {}})}, {
-      get(target, property) { return Reflect.get(target, property) ?? (() => {}); },
-    });
-    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(context as unknown as CanvasRenderingContext2D);
-    vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('');
-    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(800);
-    const {OpenSheetMusicDisplay} = await import('opensheetmusicdisplay');
+  it('draws sheet notation with the sheet ink token', async () => {
     const view = document.createElement('styling-sheet-view') as SheetViewElement;
-    view.setAttribute('follow-cursor', 'false');
-    // Use an independently authored engraving fixture: this regression owns
-    // SVG theming, not the Score-to-MusicXML serialization contract.
-    view.OpenSheetMusicDisplay = class extends OpenSheetMusicDisplay {
-      override load() {
-        return super.load('<?xml version="1.0"?><score-partwise version="4.0"><work><work-title>Theme test</work-title></work><part-list><score-part id="P1"><part-name>Piano</part-name></score-part></part-list><part id="P1"><measure number="1"><attributes><divisions>1</divisions><time><beats>4</beats><beat-type>4</beat-type></time><clef><sign>G</sign><line>2</line></clef></attributes><note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration><type>whole</type></note></measure></part></score-partwise>');
-      }
-    } as never;
     view.score = score();
     document.body.append(view);
-    await vi.waitFor(() => expect(view.querySelector('svg [fill="#010203"]')).not.toBeNull());
-    expect(view.querySelector('svg [stroke="#010203"]')).not.toBeNull();
-    expect(view.querySelector('svg [fill="#fff"], svg [fill="#ffffff"], svg [fill="white"]')).toBeNull();
-    const ink = view.querySelector('svg [fill="#010203"]')!;
-    const rules = [...view.querySelectorAll('style')].flatMap((style) => [...(style.sheet?.cssRules ?? [])]);
-    const paintRule = rules.find((rule): rule is CSSStyleRule => 'selectorText' in rule
-      && ink.matches((rule as CSSStyleRule).selectorText)
-      && (rule as CSSStyleRule).style.getPropertyValue('fill').includes('--wm-sheet-foreground'));
-    expect(paintRule).toBeDefined();
-    // Prove the matching rule paints the vendor path, not just the stage shell.
-    paintRule!.style.setProperty('fill', 'rgb(210, 220, 230)');
-    expect(getComputedStyle(ink).fill).toBe('rgb(210, 220, 230)');
-    const svg = view.querySelector('svg');
-    view.style.setProperty('--wm-sheet-foreground', 'orange');
-    view.classList.add('alternate-theme');
-    await Promise.resolve();
-    expect(view.querySelector('svg')).toBe(svg);
+    await vi.waitFor(() => expect(view.querySelector('[part~="system"]')).not.toBeNull());
+    const system = view.querySelector<HTMLElement>('[part~="system"] [data-webscore-staff-timeline]')!.parentElement!;
+    expect(system.style.getPropertyValue('--webscore-staff-note')).toContain('--wm-score-sheet-note');
+    view.remove();
   });
 });

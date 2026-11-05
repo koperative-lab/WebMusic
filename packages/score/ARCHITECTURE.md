@@ -412,8 +412,7 @@ Current kernel surface Score consumes: `/element`, `/worker`, `/tick`,
 ## 10. Dependency discipline
 
 **Optional peers cost nothing until you opt in.** `tone`,
-`opensheetmusicdisplay`, `spessasynth_lib`, `react` and `@webmusic/ui` are
-all optional peers, and the gate's rule is that **no build entry may
+`spessasynth_lib`, `react` and `@webmusic/ui` are all optional peers, and the gate's rule is that **no build entry may
 *statically* reach one** except the entries explicitly allowlisted in
 `staticOptionalPeerEntries`. Three different mechanisms satisfy that, each
 picked for its dependency:
@@ -421,7 +420,6 @@ picked for its dependency:
 | Peer | Mechanism |
 |---|---|
 | `@webmusic/ui`, `react` | Statically imported, but only from the enumerated opt-in entries (`*/element/index.ts`, `play/element/auto.ts`, `play/demos/index.ts`, `react/index.tsx`). Importing `/headless` never reaches them. |
-| `opensheetmusicdisplay` | A literal, lazy `await import('opensheetmusicdisplay')` lets browser bundlers emit a dependency chunk. Loading occurs only when engraving is requested; callers may inject a constructor or instance. |
 | `spessasynth_lib` | A literal dynamic import loads the optional 4.x peer only when a SoundFont route connects. Consumer bundlers can resolve it into a lazy module; applications separately supply the AudioWorklet URL or registration callback. |
 | `tone` | Not imported at all. `TonePlayer` takes the Tone namespace as a constructor option — the caller who already has Tone hands it over. Injection, not loading. |
 

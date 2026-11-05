@@ -52,3 +52,12 @@ test('grants no focus exemption to the removed staff editor', () => {
   const focus = "surface.setAttribute('tabindex', '0');";
   for (const tag of ['score-view', 'score-grid-view']) assert.equal(sourceWithoutOwnedFocusWrite(tag, owner, focus), focus);
 });
+
+test('the sheet notation surface owns only its viewport focus entry', () => {
+  const sheet = 'packages/score/src/view/render/score-sheet.ts';
+  const focus = "viewport.setAttribute('tabindex', '0');";
+  assert.equal(sourceWithoutOwnedFocusWrite('score-sheet-view', sheet, focus), '');
+  assert.equal(sourceWithoutOwnedFocusWrite('score-sheet-view', sheet, "viewport.removeAttribute('tabindex');"), '');
+  assert.equal(sourceWithoutOwnedFocusWrite('score-grid-view', sheet, focus), focus);
+  assert.equal(sourceWithoutOwnedFocusWrite('score-sheet-view', sheet, "svg.setAttribute('tabindex', '0');"), "svg.setAttribute('tabindex', '0');");
+});

@@ -18,7 +18,8 @@ export function assertSoundingPitch(part: Part, pitch: Pitch): void {
   }
 }
 
-function staffOf(note: Note, part: Part): number {
+/** The staff a note is drawn on: authored, or the lower staff for low notes in a multi-staff part. */
+export function staffOf(note: Note, part: Part): number {
   return note.staff ?? ((part.staves ?? 1) > 1 && !note.rest && note.pitch.midi < 60 ? 2 : 1);
 }
 
@@ -43,7 +44,8 @@ function entryContent(notes: readonly Note[]): string {
     note.duration.toJSON(), note.velocityOverride, note.performed])).sort().join('\n');
 }
 
-const REST_DURATIONS = [4, 2, 1, 1 / 2, 1 / 4, 1 / 8, 1 / 16, 1 / 32, 1 / 64]
+/** Rest spellings, longest first, on the 1/64-quarter grid. */
+export const REST_DURATIONS = [4, 2, 1, 1 / 2, 1 / 4, 1 / 8, 1 / 16, 1 / 32, 1 / 64]
   .flatMap((base) => [2, 1, 0].map((dots) => new Duration({base, dots})))
   .filter((duration) => duration.quarters.mul(new Rational(64)).den === 1)
   .sort((a, b) => b.quarters.cmp(a.quarters));

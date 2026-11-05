@@ -143,7 +143,8 @@ one error line.
 `<score-grid-view>` ([renderer](../../packages/score/src/view/render/score-grid.ts))
 implements every section above: icon toolbar, inverted pressed state, snap and
 note-value adjustment cards over a scrim, hidden scrollbars and sticky keys,
-ruler and lane. The transport and mixer presenters in
+ruler and lane. `<score-sheet-view>` ([renderer](../../packages/score/src/view/render/score-sheet.ts))
+follows the same toolbar, card and scrollbar rules for notation editing. The transport and mixer presenters in
 [UIKit](../../packages/ui/src/) show the shared control geometry and pressed
 inversion.
 

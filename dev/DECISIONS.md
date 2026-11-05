@@ -2397,6 +2397,60 @@ the reuse target when a second component needs one.
 beside an existing component are part of UI acceptance; automated checks do
 not establish visual conformance.
 
+## DEC-060 — Sheet View engraves its own pages and edits notation
+
+**Date / status:** 2026-11-04; accepted at the maintainer's request. Replaces
+the OpenSheetMusicDisplay sheet renderer and refines
+[DEC-058](#dec-058--score-editing-moves-to-a-dedicated-grid-view), which left
+notation editing out of scope.
+
+**Problem:** `<score-sheet-view>` depended on the optional
+OpenSheetMusicDisplay peer. It could not be edited, it followed only note
+events, and its asynchronous engine, injected constructors and separate ink
+model differed from every other View. The maintainer asked for a sheet that is
+drawn by WebMusic itself and edited like a notation program such as MuseScore,
+with selectable, movable and enterable notes, as the grid does for piano roll.
+
+**Chosen contract:** the staff engraver gains an internal system mode: it
+engraves a measure range, restates clef and key at the system start, and
+justifies to an exact width by spreading spare width over columns by duration
+weight. `mountScoreSheet` in `/view/render` measures natural measure widths,
+breaks them into systems and stacks systems on A4 pages (`layout="page"`) or
+in a column (`layout="flow"`); `zoom` scales the staff. `<score-sheet-view>`
+shares the data, player and editor binding of the other score Views. With a
+ready `.editor` and `editable` it shows a one-row icon toolbar and edits through
+four new Core operations — `set-pitches`, `notes-to-rests`, `tie-notes` and
+`write-notation` — that act locally on the named events, so they work in real
+scores with beams, slurs, chords, voices and tuplets. `tools` gates `pitch`,
+`input`, `duration`, `tie`, `accidental`, `delete`, `history` and `zoom`.
+OpenSheetMusicDisplay is removed from the package: `renderOSMDStaffVisualizer`,
+`OSMDStaffOptions`, the React `StaffView` `osmd` prop, the element's
+`OpenSheetMusicDisplay`/`osmd` properties, the optional peer and its site
+license supplements. MuseScore is a reference for interaction and layout
+behavior only; no GPL code is used.
+
+**Alternatives considered:** keeping OSMD for display and adding an editing
+overlay, which leaves two engraving models and an optional peer; a new
+SMuFL engine written from scratch, which would trail the existing VexFlow
+engraver for a long time; and extending `enter-notation`, whose whole-measure
+rewrite rejects most measures of real scores.
+
+**Consequences:** the sheet needs no peer and follows players like the grid.
+Applications that used OSMD through the package must render it themselves.
+Rewriting tuplet or grace rhythms, chord and voice entry, tuplet entry and
+ties or slurs drawn across system breaks are not offered yet and are tracked
+in STATUS.
+
+**Owner:** [Editing contracts](design/EDIT-COMPONENTS.md#score-sheet-editing),
+[Score View family](design/VIEW-COMPONENTS.md) and
+[scrolling notation](design/STAFF-NOTATION.md).
+
+**Verification implications:** system justification and clef/key restatement,
+page and flow layout, each operation's local behavior and refusals, keyboard
+pitch/input/duration/delete paths and feature gating are covered by unit tests;
+engraving quality, pointer drags and playback following need browser and
+visual acceptance on a real score.
+
 ## Recording the next decision
 
 Add an identifier, date, status, problem, chosen contract, considered alternatives, consequences, owning document, and verification implications. A proposed choice does not change a public API. If a choice supersedes this register, retain its old identifier and point to the replacement; do not rewrite historical evidence as though the new choice always existed.

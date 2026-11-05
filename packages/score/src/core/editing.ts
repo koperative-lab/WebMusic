@@ -49,8 +49,43 @@ export interface ScoreNotationEntry {
   readonly velocity?: number;
 }
 
+/** One note (or the single rest) written by `write-notation`. */
+export interface ScoreWrittenNote {
+  /** A new ID, or the ID of a note this write replaces (which keeps its notation marks). */
+  readonly id: NoteId;
+  /** Written pitch; null writes a rest and must be the only note. */
+  readonly pitch: ScoreNoteInput['pitch'] | null;
+  readonly velocity?: number;
+}
+
+/** A spelled written pitch for one note; its whole tie chain follows. */
+export interface ScorePitchChange {
+  readonly noteId: NoteId;
+  readonly pitch: ScoreNoteInput['pitch'];
+}
+
+/**
+ * A local notation rewrite of one voice and staff inside one measure: the
+ * note, chord or rest at `onsetQuarters` lasting `duration`. Events it covers
+ * are replaced, a partly covered event's remainder becomes rests, and ties,
+ * slurs and authored beams that no longer connect are dropped.
+ */
+export interface ScoreNotationWrite {
+  readonly type: 'write-notation';
+  readonly partId: PartId;
+  readonly voice: VoiceId;
+  readonly staff?: number;
+  readonly onsetQuarters: ScoreQuarterValue;
+  readonly duration: ScoreNotationDuration;
+  readonly notes: readonly ScoreWrittenNote[];
+}
+
 export type ScoreEditOperation =
   | {readonly type: 'enter-notation'; readonly entry: ScoreNotationEntry}
+  | ScoreNotationWrite
+  | {readonly type: 'set-pitches'; readonly changes: readonly ScorePitchChange[]}
+  | {readonly type: 'notes-to-rests'; readonly noteIds: readonly NoteId[]}
+  | {readonly type: 'tie-notes'; readonly noteIds: readonly NoteId[]; readonly tied: boolean}
   | {readonly type: 'insert-notes'; readonly notes: readonly ScoreNoteInput[]}
   | {readonly type: 'delete-notes'; readonly noteIds: readonly NoteId[]}
   | {readonly type: 'move-notes'; readonly noteIds: readonly NoteId[]; readonly deltaQuarters: ScoreQuarterValue}

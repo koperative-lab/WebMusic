@@ -467,6 +467,36 @@ velocity and continuous gain/automation have different value semantics even when
 they share drawing. Use public `--wm-*` tokens, parts and named handles; do not
 make a fixed toolbar or application workstation layout mandatory.
 
+### Score sheet editing
+
+Under DEC-060 `<score-sheet-view>` (renderer `mountScoreSheet`) is the notation
+editing surface, modeled on the interaction of notation programs such as
+MuseScore; it shares no code with them. It engraves justified systems on pages
+(`layout="page"`) or in a column (`layout="flow"`) with the package's VexFlow
+staff engraver. Editing needs a ready `.editor` and `editable`; `tools` offers
+`pitch`, `input`, `duration`, `tie`, `accidental`, `delete`, `history` and
+`zoom` (absent means all). Selection and Left/Right navigation are always
+available while editing.
+
+| Input | Feature | Command |
+|---|---|---|
+| Click / Ctrl/Cmd-click / Shift-click a notehead or rest | always | Selection only; Shift selects the range in the voice |
+| Up/Down, Ctrl/Cmd+Up/Down, Alt+Shift+Up/Down, dragging a notehead | `pitch` | `set-pitches`: semitone spelled in the key, octave, diatonic step; a drag is one draft |
+| N, A–G, 0, click on a staff in input mode | `input` | `write-notation` at the input cursor, which then advances |
+| 1–7 and `.` with a selection | `duration` | `write-notation` keeping the event's pitches and IDs |
+| `+` | `tie` | `tie-notes`; in input mode a tied `write-notation` + `tie-notes` |
+| Flat / natural / sharp buttons | `accidental` | `set-pitches` with that alteration |
+| Delete, Backspace | `delete` | `notes-to-rests` |
+| Ctrl/Cmd+Z/Y | `history` | Undo/redo |
+
+The four operations act locally on the named events and never rebuild a whole
+measure, so editing works inside scores with beams, slurs, chords, several
+voices and tuplets elsewhere. Pitch and delete work on tuplet notes. Rewriting
+a tuplet or grace rhythm, writing across a barline or starting inside a
+sounding note is refused with `unsupported-structure`; the sheet shows the
+reason in its toolbar and emits `editerror`. Chord entry, voice selection,
+tuplet entry and ties drawn across system breaks are not offered yet.
+
 ## Resources, limits and failures
 
 | Resource | Ownership and initial limit |

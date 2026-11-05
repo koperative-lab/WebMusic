@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import {afterEach, describe, expect, it, vi} from 'vitest';
+import {afterEach, describe, expect, it} from 'vitest';
 import {Duration, Pitch, Rational, ScoreBuilder, VoiceId, type Score} from '../../src/core';
 import {createScoreMap} from '../../src/view/core/map';
 import {
@@ -20,7 +20,7 @@ const flush = (): Promise<unknown> => new Promise((resolve) => setTimeout(resolv
 
 /**
  * Settle the several dynamic imports an element chains before it paints.
- * Deadline-based rather than tick-counted: OSMD's load is real work, and a
+ * Deadline-based rather than tick-counted: engraving is real work, and a
  * fixed number of zero-delay ticks starves under a loaded full-suite run.
  */
 async function waitFor(condition: () => boolean, timeoutMs = 5_000): Promise<void> {
@@ -283,37 +283,29 @@ describe('<score-pitch-view type=keyboard>', () => {
 describe('<score-sheet-view>', () => {
   const tag = define(SheetViewElement);
 
-  it("surfaces the engine's own message instead of failing silently", async () => {
-    // Real OSMD cannot lay out in jsdom (no text metrics), and a machine
-    // without the optional peer never loads it at all — either way the
-    // element must report rather than sit blank, and the message it shows is
-    // the engine's, which is what names the missing peer in a browser.
-    const element = await mount(tag, fourBars());
-    await waitFor(() => element.querySelector('[role="alert"]') !== null);
-
-    const status = element.querySelector('[role="alert"]');
-    expect(status).not.toBeNull();
-    expect(status!.textContent!.length).toBeGreaterThan(0);
+  it('engraves an assigned score into pages without an optional peer', async () => {
+    const element = await mount<SheetViewElement>(tag, fourBars());
+    await waitFor(() => element.querySelector('[part~="system"]') !== null);
+    expect(element.querySelector('[data-score-sheet]')!.getAttribute('data-layout')).toBe('page');
+    expect(element.querySelectorAll('[part~="page"]').length).toBeGreaterThan(0);
+    expect(element.querySelector('[role="alert"]')).toBeNull();
   });
 
-  it('engraves through an injected OSMD instance', async () => {
-    const load = vi.fn();
-    const render = vi.fn();
-    const element = await mount<SheetViewElement>(tag, undefined);
-    (element as SheetViewElement & {osmd: unknown}).osmd = {
-      load: (xml: string) => {
-        load(xml);
-        return Promise.resolve();
-      },
-      render,
-      cursor: {show: vi.fn(), hide: vi.fn(), reset: vi.fn(), next: vi.fn()},
-      Sheet: {},
-    };
-    element.score = fourBars();
-    await waitFor(() => load.mock.calls.length > 0);
-
-    expect(load).toHaveBeenCalledTimes(1);
-    expect(load.mock.calls[0]![0]).toContain('<score-partwise');
-    expect(render).toHaveBeenCalled();
+  it('reflects layout and zoom attributes and keeps a passive sheet read-only', async () => {
+    const element = await mount<SheetViewElement>(tag, fourBars());
+    await waitFor(() => element.querySelector('[part~="system"]') !== null);
+    element.setAttribute('layout', 'flow');
+    element.zoom = 1.5;
+    expect(element.layout).toBe('flow');
+    expect(element.zoom).toBe(1.5);
+    expect(element.querySelector('[data-score-sheet]')!.getAttribute('data-layout')).toBe('flow');
+    element.setAttribute('zoom', '9');
+    expect(element.zoom).toBe(3);
+    element.setAttribute('layout', 'scroll');
+    expect(element.layout).toBe('page');
+    expect((element.querySelector('[part~="toolbar"]') as HTMLElement).hidden).toBe(true);
+    expect(element.tools).toEqual(['pitch', 'input', 'duration', 'tie', 'accidental', 'delete', 'history', 'zoom']);
+    element.tools = ['pitch', 'history'];
+    expect(element.getAttribute('tools')).toBe('pitch history');
   });
 });

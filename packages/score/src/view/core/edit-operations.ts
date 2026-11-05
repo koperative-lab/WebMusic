@@ -10,6 +10,7 @@ import type {NoteId} from '../../core/types/ids';
 import type {Alter, Step} from '../../core/types/pitch';
 import {validateScore} from '../../core/validate';
 import {applyNotationEntry, assertSoundingPitch} from './edit-notation';
+import {applyNotesToRests, applySetPitches, applyTieNotes, applyWriteNotation} from './edit-sheet';
 
 function invalid(message: string): never {
   throw new ScoreEditError('invalid-command', message);
@@ -99,6 +100,25 @@ function noteIds(value: unknown): void {
   }
 }
 
+function writtenPitch(value: unknown): void {
+  const pitch = record(value, ['step', 'alter', 'octave']);
+  if (!['A', 'B', 'C', 'D', 'E', 'F', 'G'].includes(pitch.step as string) ||
+      !Number.isSafeInteger(pitch.alter) || (pitch.alter as number) < -2 || (pitch.alter as number) > 2 ||
+      !Number.isSafeInteger(pitch.octave)) invalid('Invalid written pitch');
+  const written = new Pitch(pitch.step as ScoreNoteInput['pitch']['step'],
+    pitch.alter as ScoreNoteInput['pitch']['alter'], pitch.octave as number);
+  if (written.midi < 0 || written.midi > 127) invalid('Written pitch must be in MIDI range 0 to 127');
+}
+
+function notationDuration(value: unknown): void {
+  const duration = record(value, ['base', 'dots'], ['base']);
+  const base = quarters(duration.base, 'Duration base', true);
+  if (![4, 2, 1, 1 / 2, 1 / 4, 1 / 8, 1 / 16].some((candidate) => base.eq(Rational.from(candidate))) ||
+      (duration.dots !== undefined && (!Number.isSafeInteger(duration.dots) || (duration.dots as number) < 0 || (duration.dots as number) > 2))) {
+    invalid('Notation supports whole through 64th bases and zero to two dots');
+  }
+}
+
 function validateInput(input: unknown): void {
   const note = record(input, ['id', 'partId', 'pitch', 'onsetQuarters', 'durationQuarters', 'voice', 'velocity'],
     ['id', 'partId', 'pitch', 'onsetQuarters', 'durationQuarters', 'voice']);
@@ -123,8 +143,46 @@ export function snapshotScoreOperations(operations: readonly ScoreEditOperation[
     const snapshot = snapshotJSON(operations);
     if (!Array.isArray(snapshot)) invalid('operations must be an array');
     for (const value of snapshot) {
-      const type = record(value, ['type', 'notes', 'noteIds', 'deltaQuarters', 'durationQuarters', 'semitones', 'velocity', 'grid', 'origin', 'target', 'entry'], ['type']).type;
+      const type = record(value, ['type', 'notes', 'noteIds', 'deltaQuarters', 'durationQuarters', 'semitones', 'velocity', 'grid', 'origin', 'target', 'entry',
+        'partId', 'voice', 'staff', 'onsetQuarters', 'duration', 'changes', 'tied'], ['type']).type;
       switch (type) {
+        case 'write-notation': {
+          const operation = record(value, ['type', 'partId', 'voice', 'staff', 'onsetQuarters', 'duration', 'notes'],
+            ['type', 'partId', 'voice', 'onsetQuarters', 'duration', 'notes']);
+          id(operation.partId, 'Part ID'); id(operation.voice, 'Voice ID');
+          if (operation.staff !== undefined && (!Number.isSafeInteger(operation.staff) || (operation.staff as number) < 1)) invalid('Staff must be a positive integer');
+          if (quarters(operation.onsetQuarters, 'Onset').lt(Rational.ZERO)) invalid('Onset must be nonnegative');
+          notationDuration(operation.duration);
+          if (!Array.isArray(operation.notes) || operation.notes.length === 0) invalid('notes must be a nonempty array');
+          for (const item of operation.notes as unknown[]) {
+            const note = record(item, ['id', 'pitch', 'velocity'], ['id', 'pitch']);
+            id(note.id, 'Note ID');
+            if (note.pitch === null) { if (note.velocity !== undefined) invalid('A rest cannot have a velocity'); }
+            else writtenPitch(note.pitch);
+            if (note.velocity !== undefined) velocity(note.velocity);
+          }
+          break;
+        }
+        case 'set-pitches': {
+          const operation = record(value, ['type', 'changes']);
+          if (!Array.isArray(operation.changes)) invalid('changes must be an array');
+          const seen = new Set<string>();
+          for (const item of operation.changes as unknown[]) {
+            const change = record(item, ['noteId', 'pitch']);
+            id(change.noteId, 'Note ID');
+            if (seen.has(change.noteId)) throw new ScoreEditError('duplicate-id', `Duplicate note ID in operation: ${change.noteId}`);
+            seen.add(change.noteId);
+            writtenPitch(change.pitch);
+          }
+          break;
+        }
+        case 'notes-to-rests': noteIds(record(value, ['type', 'noteIds']).noteIds); break;
+        case 'tie-notes': {
+          const operation = record(value, ['type', 'noteIds', 'tied']);
+          noteIds(operation.noteIds);
+          if (typeof operation.tied !== 'boolean') invalid('tied must be a boolean');
+          break;
+        }
         case 'enter-notation': {
           const operation = record(value, ['type', 'entry']);
           const entry = record(operation.entry, ['id', 'partId', 'voice', 'staff', 'onsetQuarters', 'duration', 'pitch', 'velocity'],
@@ -344,6 +402,10 @@ function timingPatch(note: Note, onset: Rational, duration: Duration): Partial<N
 
 function applyOperation(score: Score, operation: ScoreEditOperation, affected: Set<NoteId>): Score {
   if (operation.type === 'enter-notation') return applyNotationEntry(score, operation.entry, affected);
+  if (operation.type === 'write-notation') return applyWriteNotation(score, operation, affected);
+  if (operation.type === 'set-pitches') return applySetPitches(score, operation.changes, affected);
+  if (operation.type === 'notes-to-rests') return applyNotesToRests(score, operation.noteIds, affected);
+  if (operation.type === 'tie-notes') return applyTieNotes(score, operation.noteIds, operation.tied, affected);
   if (operation.type === 'insert-notes') {
     for (const note of operation.notes) {
       if (!score.getPart(note.partId)) throw new ScoreEditError('unknown-part', `Unknown part: ${note.partId}`);

@@ -208,7 +208,7 @@ pure operation and position-map functions belong to
 ### Not here: the renderers
 
 `renderPianoRollVisualizer`, `renderStaffVisualizer`,
-`renderWaterfallVisualizer`, `renderOSMDStaffVisualizer` and
+`renderWaterfallVisualizer`, `mountScoreGrid`, `mountScoreSheet` and
 `bindPlayerToVisualizer` are **not** headless components. They draw into a
 caller-owned element, so by rule they are `/render` adapters, and they are
 documented on [`@webmusic/score/view`](/score/api/view/) with the rest of the

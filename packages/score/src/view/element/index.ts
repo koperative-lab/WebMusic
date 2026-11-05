@@ -21,7 +21,16 @@ export {
   type ScoreGridTool,
 } from './score-grid-view';
 export {PitchViewElement, definePitchViewElement, type PitchViewType} from './score-pitch-view';
-export {SheetViewElement, defineSheetViewElement} from './score-sheet-view';
+export {
+  SheetViewElement,
+  SHEET_VIEW_FEATURES,
+  defineSheetViewElement,
+  type ScoreSheetDuration,
+  type ScoreSheetFeature,
+  type ScoreSheetLayout,
+  type ScoreSheetSettings,
+  type ScoreSheetSettingsChangeDetail,
+} from './score-sheet-view';
 
 import {defineScoreViewElement} from './score-view';
 import {defineScoreGridViewElement} from './score-grid-view';

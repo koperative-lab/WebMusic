@@ -144,6 +144,21 @@ draws annotations only on the staff (DEC-056).
 
 `ScoreViewElementType` remains exported and now equals `ScoreViewType`.
 
+## Sheet View without OpenSheetMusicDisplay
+
+`0.2.0`'s `<score-sheet-view>` engraved through the optional
+`opensheetmusicdisplay` peer. The next release engraves with the package's own
+staff engraver and can edit notation (DEC-060); the peer is no longer used.
+
+| Published 0.2.0 | Next release | Upgrade |
+| --- | --- | --- |
+| `<score-sheet-view>` engraving through OSMD | Engraves justified systems itself; `layout` and `zoom` attributes | Remove the `opensheetmusicdisplay` install unless your own code uses it |
+| `.OpenSheetMusicDisplay` and `.osmd` element properties | Removed | Drop the injection; nothing replaces it |
+| `--wm-sheet-background`, `--wm-sheet-foreground`, `--wm-sheet-min-width` | `--wm-score-sheet-paper`, `--wm-score-sheet-note`; no minimum width (pages fit the width, `zoom` sets a size) | Rename the tokens |
+| `renderOSMDStaffVisualizer` and `OSMDStaffOptions` from `/view/render` | Removed | Use `mountScoreSheet`, or call OpenSheetMusicDisplay directly with `serializeMusicXML` output |
+| React `StaffView`/`SimpleStaff` `osmd` prop | Removed; they always draw the scrolling staff | Use `<score-sheet-view>` for page engraving |
+| Sheet `player` following note events only | Follows the player's position like the other Views | No change needed |
+
 ## Adopt editing through the View entries
 
 Editing adds members to existing entries and one Element, `<score-grid-view>`,

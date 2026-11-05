@@ -66,6 +66,6 @@ export {
   type ScoreEditorPort, type ScoreEditorState, type ScoreDocumentSource, type ScoreDocumentSnapshot,
   type ScoreDocumentChange, type ScoreEditCommand, type ScoreEditOperation, type ScoreEditResult,
   type ScoreEditTransaction, type ScoreRevisionGuard, type ScoreCheckpoint, type ScoreInteractionSession,
-  type ScoreInteractionSnapshot, type ScoreDraftResult, type ScoreNoteInput, type ScoreNotationDuration, type ScoreNotationEntry, type ScoreQuarterValue,
+  type ScoreInteractionSnapshot, type ScoreDraftResult, type ScoreNoteInput, type ScoreNotationDuration, type ScoreNotationEntry, type ScoreNotationWrite, type ScoreWrittenNote, type ScorePitchChange, type ScoreQuarterValue,
   type ScorePositionMap, type ScoreMappedPosition, type ScoreEditErrorCode, type ScoreEditFailure,
 } from '../../core/editing';
