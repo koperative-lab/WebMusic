@@ -11,7 +11,7 @@
     "preview": "astro preview"
   },
   "devDependencies": {
-    "@astrojs/check": "^0.9.10",
+    "@astrojs/check": "^0.9.12",
     "@astrojs/starlight": "^0.42.6",
     "@codesandbox/sandpack-react": "^2.20.0",
     "@webmusic/score": "^0.2.0",
