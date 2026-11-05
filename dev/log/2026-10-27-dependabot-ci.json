@@ -1,0 +1,1696 @@
+{
+  "checkedOn": "2026-10-27 (America/New_York)",
+  "baseline": "ef8664dbb68ece9dc8c1d328141989a0ae86f888",
+  "pullRequests": [
+    {
+      "number": 34,
+      "url": "https://github.com/koperative-lab/WebMusic/pull/34",
+      "state": "open",
+      "base": "main",
+      "baseSha": "ef8664dbb68ece9dc8c1d328141989a0ae86f888",
+      "headSha": "f900e2bf1175bf6ea191b1a78ab9413b390ffd9b",
+      "decision": "defer: invalid published CommonJS and declaration entrypoints",
+      "checks": [
+        {
+          "name": "Deploy GitHub Pages",
+          "status": "completed",
+          "conclusion": "skipped",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/38618150091/job/116039547269"
+        },
+        {
+          "name": "Deploy GitHub Pages",
+          "status": "completed",
+          "conclusion": "skipped",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/38618161651/job/116039325496"
+        },
+        {
+          "name": "Quality (Node 22.22.3)",
+          "status": "completed",
+          "conclusion": "failure",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/38618161651/job/116038495516"
+        },
+        {
+          "name": "Quality (Node 24)",
+          "status": "completed",
+          "conclusion": "failure",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/38618161651/job/116038495393"
+        },
+        {
+          "name": "Build website",
+          "status": "completed",
+          "conclusion": "failure",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/38618161651/job/116038495197"
+        },
+        {
+          "name": "Quality (Node 22.22.3)",
+          "status": "completed",
+          "conclusion": "failure",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/38618150091/job/116038454637"
+        },
+        {
+          "name": "Quality (Node 24)",
+          "status": "completed",
+          "conclusion": "failure",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/38618150091/job/116038454354"
+        },
+        {
+          "name": "Build website",
+          "status": "completed",
+          "conclusion": "failure",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/38618150091/job/116038454017"
+        }
+      ]
+    },
+    {
+      "number": 35,
+      "url": "https://github.com/koperative-lab/WebMusic/pull/35",
+      "state": "open",
+      "base": "main",
+      "baseSha": "ef8664dbb68ece9dc8c1d328141989a0ae86f888",
+      "headSha": "4722cb7bfd2a4aaab1a48f6c86c61ed7d6b14cef",
+      "decision": "integrate",
+      "checks": [
+        {
+          "name": "Deploy GitHub Pages",
+          "status": "completed",
+          "conclusion": "skipped",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/38618161942/job/116041529044"
+        },
+        {
+          "name": "Deploy GitHub Pages",
+          "status": "completed",
+          "conclusion": "skipped",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/38618176526/job/116041186124"
+        },
+        {
+          "name": "Quality (Node 24)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/38618176526/job/116038546203"
+        },
+        {
+          "name": "Build website",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/38618176526/job/116038545832"
+        },
+        {
+          "name": "Quality (Node 22.22.3)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/38618176526/job/116038545621"
+        },
+        {
+          "name": "Quality (Node 24)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/38618161942/job/116038495437"
+        },
+        {
+          "name": "Build website",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/38618161942/job/116038495356"
+        },
+        {
+          "name": "Quality (Node 22.22.3)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/38618161942/job/116038495041"
+        }
+      ]
+    },
+    {
+      "number": 36,
+      "url": "https://github.com/koperative-lab/WebMusic/pull/36",
+      "state": "open",
+      "base": "main",
+      "baseSha": "ef8664dbb68ece9dc8c1d328141989a0ae86f888",
+      "headSha": "45ac5d77e8217a10e9c9c6bf2d6ccacf160b8e3f",
+      "decision": "integrate",
+      "checks": [
+        {
+          "name": "Deploy GitHub Pages",
+          "status": "completed",
+          "conclusion": "skipped",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/38618250300/job/116041715614"
+        },
+        {
+          "name": "Deploy GitHub Pages",
+          "status": "completed",
+          "conclusion": "skipped",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/38618234351/job/116041639650"
+        },
+        {
+          "name": "Build website",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/38618250300/job/116038788790"
+        },
+        {
+          "name": "Quality (Node 22.22.3)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/38618250300/job/116038788706"
+        },
+        {
+          "name": "Quality (Node 24)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/38618250300/job/116038788251"
+        },
+        {
+          "name": "Quality (Node 24)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/38618234351/job/116038737487"
+        },
+        {
+          "name": "Quality (Node 22.22.3)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/38618234351/job/116038737444"
+        },
+        {
+          "name": "Build website",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/38618234351/job/116038736846"
+        }
+      ]
+    },
+    {
+      "number": 37,
+      "url": "https://github.com/koperative-lab/WebMusic/pull/37",
+      "state": "open",
+      "base": "main",
+      "baseSha": "ef8664dbb68ece9dc8c1d328141989a0ae86f888",
+      "headSha": "99befa981feab8eebdf4928de307a5385a874f0d",
+      "decision": "integrate",
+      "checks": [
+        {
+          "name": "Deploy GitHub Pages",
+          "status": "completed",
+          "conclusion": "skipped",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/38618259615/job/116041389932"
+        },
+        {
+          "name": "Deploy GitHub Pages",
+          "status": "completed",
+          "conclusion": "skipped",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/38618272042/job/116041112089"
+        },
+        {
+          "name": "Quality (Node 22.22.3)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/38618272042/job/116038861087"
+        },
+        {
+          "name": "Quality (Node 24)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/38618272042/job/116038861011"
+        },
+        {
+          "name": "Build website",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/38618272042/job/116038860761"
+        },
+        {
+          "name": "Build website",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/38618259615/job/116038818567"
+        },
+        {
+          "name": "Quality (Node 22.22.3)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/38618259615/job/116038818438"
+        },
+        {
+          "name": "Quality (Node 24)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/38618259615/job/116038817666"
+        }
+      ]
+    },
+    {
+      "number": 38,
+      "url": "https://github.com/koperative-lab/WebMusic/pull/38",
+      "state": "open",
+      "base": "main",
+      "baseSha": "ef8664dbb68ece9dc8c1d328141989a0ae86f888",
+      "headSha": "c2c77c927e86e0c26af29ecb48c11f0c5a23a099",
+      "decision": "defer: invalid published CommonJS and declaration entrypoints",
+      "checks": [
+        {
+          "name": "Deploy GitHub Pages",
+          "status": "completed",
+          "conclusion": "skipped",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/38618389101/job/116042457696"
+        },
+        {
+          "name": "Deploy GitHub Pages",
+          "status": "completed",
+          "conclusion": "skipped",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/38618401150/job/116041956142"
+        },
+        {
+          "name": "Build website",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/38618401150/job/116039303768"
+        },
+        {
+          "name": "Quality (Node 22.22.3)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/38618401150/job/116039303317"
+        },
+        {
+          "name": "Quality (Node 24)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/38618401150/job/116039302945"
+        },
+        {
+          "name": "Quality (Node 24)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/38618389101/job/116039262474"
+        },
+        {
+          "name": "Quality (Node 22.22.3)",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/38618389101/job/116039262185"
+        },
+        {
+          "name": "Build website",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/koperative-lab/WebMusic/actions/runs/38618389101/job/116039261819"
+        }
+      ]
+    }
+  ],
+  "publicationEvidence": [
+    {
+      "name": "@tonaljs/chord",
+      "version": "6.1.2",
+      "integrity": "sha512-39crsPVyBJxdGJ1DGl+4diM+6+mZ/ws6crkQMlqX4zTYHMUVfJOQrko4mPF1CD89AFhHJe1zCT9Js+nNp3Gffg==",
+      "shasum": "cea1561b182f08bd918add0a1480f5d775d61fdd",
+      "main": "dist/index.js",
+      "types": "dist/index.d.ts",
+      "exports": null,
+      "files": [
+        "package/LICENSE",
+        "package/dist/index.js",
+        "package/package.json",
+        "package/dist/index.js.map",
+        "package/dist/index.mjs.map",
+        "package/README.md",
+        "package/dist/index.mjs",
+        "package/dist/index.d.mts",
+        "package/dist/index.d.ts"
+      ],
+      "declaredMainExists": true,
+      "declaredTypesExist": true
+    },
+    {
+      "name": "@tonaljs/chord",
+      "version": "6.2.0",
+      "integrity": "sha512-moarUzK9B53F6T3LXiNdRYXr4Qt9EqDS+kN8w8an4BCx3tBTByoX4ASYb2RnMzjldJRV//Z+HsFlLvHPZo+HiA==",
+      "shasum": "0fa303940c60b03871540f1a756a9b30136e5da8",
+      "main": "dist/index.js",
+      "types": "dist/index.d.ts",
+      "exports": null,
+      "files": [
+        "package/LICENSE",
+        "package/dist/index.cjs",
+        "package/dist/index.d.cts",
+        "package/package.json",
+        "package/dist/index.cjs.map",
+        "package/dist/index.mjs.map",
+        "package/README.md",
+        "package/dist/index.mjs",
+        "package/dist/index.d.mts"
+      ],
+      "declaredMainExists": false,
+      "declaredTypesExist": false
+    },
+    {
+      "name": "@tonaljs/chord-detect",
+      "version": "4.9.1",
+      "integrity": "sha512-rV/9+R7aZ9cQorQ3jdNMMMh63onosglYZM71Q0n7KKcWMAGrxF66MzxBG82xy+w1QDMJQslB3iHfDHUiS6wRjA==",
+      "shasum": "e9a00f06743a00a36eaf3daeda7bf3462513dcce",
+      "main": "dist/index.js",
+      "types": "dist/index.d.ts",
+      "exports": null,
+      "files": [
+        "package/LICENSE",
+        "package/dist/index.js",
+        "package/package.json",
+        "package/dist/index.js.map",
+        "package/dist/index.mjs.map",
+        "package/README.md",
+        "package/dist/index.mjs",
+        "package/dist/index.d.mts",
+        "package/dist/index.d.ts"
+      ],
+      "declaredMainExists": true,
+      "declaredTypesExist": true
+    },
+    {
+      "name": "@tonaljs/chord-detect",
+      "version": "4.9.2",
+      "integrity": "sha512-xlUx+AvDlVSVVjQMGNiQ/DzptATAd0erFL1dM4YLB73h6c/fYEn+Da9VMD3AhkcMz+fcfzgCu/LI/5jVdqAl2w==",
+      "shasum": "ed8a5cd2ced445d550036a13df63a51cedd2483e",
+      "main": "dist/index.js",
+      "types": "dist/index.d.ts",
+      "exports": null,
+      "files": [
+        "package/LICENSE",
+        "package/dist/index.cjs",
+        "package/dist/index.d.cts",
+        "package/package.json",
+        "package/dist/index.cjs.map",
+        "package/dist/index.mjs.map",
+        "package/README.md",
+        "package/dist/index.mjs",
+        "package/dist/index.d.mts"
+      ],
+      "declaredMainExists": false,
+      "declaredTypesExist": false
+    }
+  ],
+  "auditSnapshots": {
+    "audit-main-baseline": {
+      "counts": {
+        "info": 0,
+        "low": 3,
+        "moderate": 4,
+        "high": 3,
+        "critical": 0,
+        "total": 10
+      },
+      "packages": {
+        "@rollup/plugin-node-resolve": {
+          "severity": "low",
+          "nodes": [
+            "node_modules/@rollup/plugin-node-resolve"
+          ],
+          "via": [
+            "deepmerge"
+          ],
+          "fixAvailable": {
+            "name": "meyda",
+            "version": "5.6.2",
+            "isSemVerMajor": true
+          }
+        },
+        "@vitest/mocker": {
+          "severity": "moderate",
+          "nodes": [
+            "node_modules/@vitest/mocker"
+          ],
+          "via": [
+            {
+              "source": 1242766,
+              "name": "@vitest/mocker",
+              "dependency": "@vitest/mocker",
+              "title": "Vitest: Code injection via unauthenticated manual mock registration",
+              "url": "https://github.com/advisories/GHSA-qxg6-89mg-rqv8",
+              "severity": "moderate",
+              "cwe": [
+                "CWE-94",
+                "CWE-116",
+                "CWE-306"
+              ],
+              "cvss": {
+                "score": 4.7,
+                "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:C/C:L/I:L/A:N"
+              },
+              "range": ">=5.0.0-beta.1 <5.0.3"
+            },
+            {
+              "source": 1242768,
+              "name": "@vitest/mocker",
+              "dependency": "@vitest/mocker",
+              "title": "Vitest: Windows backslash traversal bypasses the @vitest/mocker redirect allowlist fix",
+              "url": "https://github.com/advisories/GHSA-xp26-3454-mjgp",
+              "severity": "moderate",
+              "cwe": [
+                "CWE-22"
+              ],
+              "cvss": {
+                "score": 5.9,
+                "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:N/A:N"
+              },
+              "range": ">=5.0.0-rc.2 <5.0.3"
+            }
+          ],
+          "fixAvailable": true
+        },
+        "deepmerge": {
+          "severity": "low",
+          "nodes": [
+            "node_modules/deepmerge"
+          ],
+          "via": [
+            {
+              "source": 1243505,
+              "name": "deepmerge",
+              "dependency": "deepmerge",
+              "title": "deepmerge mergeObject() allows prototype poisoning of returned objects",
+              "url": "https://github.com/advisories/GHSA-gcqx-w48m-w2h4",
+              "severity": "low",
+              "cwe": [
+                "CWE-1321"
+              ],
+              "cvss": {
+                "score": 5.3,
+                "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N"
+              },
+              "range": ">=4.2.0 <=4.3.1"
+            }
+          ],
+          "fixAvailable": {
+            "name": "meyda",
+            "version": "5.6.2",
+            "isSemVerMajor": true
+          }
+        },
+        "fast-uri": {
+          "severity": "moderate",
+          "nodes": [
+            "node_modules/fast-uri"
+          ],
+          "via": [
+            {
+              "source": 1243098,
+              "name": "fast-uri",
+              "dependency": "fast-uri",
+              "title": "fast-uri vulnerable to URI scheme spoofing via percent-encoded scheme decoding",
+              "url": "https://github.com/advisories/GHSA-w74x-v6f9-j3xg",
+              "severity": "moderate",
+              "cwe": [
+                "CWE-172",
+                "CWE-180"
+              ],
+              "cvss": {
+                "score": 6.1,
+                "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N"
+              },
+              "range": ">=3.0.0 <3.1.9"
+            },
+            {
+              "source": 1243101,
+              "name": "fast-uri",
+              "dependency": "fast-uri",
+              "title": "fast-uri vulnerable to improper path equivalence in relative reference normalization",
+              "url": "https://github.com/advisories/GHSA-xhq7-xmqj-769h",
+              "severity": "low",
+              "cwe": [
+                "CWE-41"
+              ],
+              "cvss": {
+                "score": 3.7,
+                "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:L/A:N"
+              },
+              "range": ">=3.0.0 <3.1.9"
+            },
+            {
+              "source": 1243104,
+              "name": "fast-uri",
+              "dependency": "fast-uri",
+              "title": "fast-uri vulnerable to host confusion via unchecked WHATWG host canonicalization",
+              "url": "https://github.com/advisories/GHSA-wjr9-j795-jxcr",
+              "severity": "moderate",
+              "cwe": [
+                "CWE-20",
+                "CWE-436"
+              ],
+              "cvss": {
+                "score": 4.8,
+                "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:L/I:L/A:N"
+              },
+              "range": ">=3.1.3 <3.1.9"
+            },
+            {
+              "source": 1243107,
+              "name": "fast-uri",
+              "dependency": "fast-uri",
+              "title": "fast-uri vulnerable to scheme injection via an unescaped first-segment colon in suffix references",
+              "url": "https://github.com/advisories/GHSA-333x-w4r6-6crp",
+              "severity": "low",
+              "cwe": [
+                "CWE-41",
+                "CWE-116"
+              ],
+              "cvss": {
+                "score": 3.7,
+                "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:L/A:N"
+              },
+              "range": ">=3.0.0 <3.1.9"
+            }
+          ],
+          "fixAvailable": true
+        },
+        "meyda": {
+          "severity": "low",
+          "nodes": [
+            "node_modules/meyda"
+          ],
+          "via": [
+            "@rollup/plugin-node-resolve"
+          ],
+          "fixAvailable": {
+            "name": "meyda",
+            "version": "5.6.2",
+            "isSemVerMajor": true
+          }
+        },
+        "postcss-selector-parser": {
+          "severity": "moderate",
+          "nodes": [
+            "node_modules/postcss-nested/node_modules/postcss-selector-parser"
+          ],
+          "via": [
+            {
+              "source": 1243379,
+              "name": "postcss-selector-parser",
+              "dependency": "postcss-selector-parser",
+              "title": "PostCSS: Quadratic complexity in flat selector parsing allows CPU exhaustion",
+              "url": "https://github.com/advisories/GHSA-rj75-hqrm-r3gf",
+              "severity": "moderate",
+              "cwe": [
+                "CWE-400",
+                "CWE-407"
+              ],
+              "cvss": {
+                "score": 5.9,
+                "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H"
+              },
+              "range": "<6.1.5"
+            }
+          ],
+          "fixAvailable": true
+        },
+        "undici": {
+          "severity": "high",
+          "nodes": [
+            "node_modules/jsdom/node_modules/undici",
+            "node_modules/undici",
+            "node_modules/unifont/node_modules/undici"
+          ],
+          "via": [
+            {
+              "source": 1243077,
+              "name": "undici",
+              "dependency": "undici",
+              "title": "undici vulnerable to Denial of Service via unbounded memory in the EventSource parser",
+              "url": "https://github.com/advisories/GHSA-4qv8-2p9j-2685",
+              "severity": "moderate",
+              "cwe": [
+                "CWE-770"
+              ],
+              "cvss": {
+                "score": 5.9,
+                "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H"
+              },
+              "range": ">=8.0.0 <8.12.2"
+            },
+            {
+              "source": 1243079,
+              "name": "undici",
+              "dependency": "undici",
+              "title": "undici vulnerable to Denial of Service via unbounded memory in the EventSource parser",
+              "url": "https://github.com/advisories/GHSA-4qv8-2p9j-2685",
+              "severity": "moderate",
+              "cwe": [
+                "CWE-770"
+              ],
+              "cvss": {
+                "score": 5.9,
+                "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H"
+              },
+              "range": ">=6.5.0 <6.29.1"
+            },
+            {
+              "source": 1243080,
+              "name": "undici",
+              "dependency": "undici",
+              "title": "undici vulnerable to Subresource Integrity bypass via non-lowercase algorithm tokens",
+              "url": "https://github.com/advisories/GHSA-f72v-6w45-q472",
+              "severity": "moderate",
+              "cwe": [
+                "CWE-178"
+              ],
+              "cvss": {
+                "score": 5.9,
+                "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:H/A:N"
+              },
+              "range": ">=8.0.0 <8.12.2"
+            },
+            {
+              "source": 1243112,
+              "name": "undici",
+              "dependency": "undici",
+              "title": "undici vulnerable to Denial of Service via unhandled error on excessive content-encodings",
+              "url": "https://github.com/advisories/GHSA-xjj6-f33q-929c",
+              "severity": "high",
+              "cwe": [
+                "CWE-248",
+                "CWE-459"
+              ],
+              "cvss": {
+                "score": 7.5,
+                "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+              },
+              "range": ">=8.0.0 <8.12.2"
+            },
+            {
+              "source": 1243114,
+              "name": "undici",
+              "dependency": "undici",
+              "title": "undici vulnerable to Denial of Service via unhandled error on excessive content-encodings",
+              "url": "https://github.com/advisories/GHSA-xjj6-f33q-929c",
+              "severity": "high",
+              "cwe": [
+                "CWE-248",
+                "CWE-459"
+              ],
+              "cvss": {
+                "score": 7.5,
+                "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+              },
+              "range": ">=6.23.0 <6.29.1"
+            },
+            {
+              "source": 1243472,
+              "name": "undici",
+              "dependency": "undici",
+              "title": "undici vulnerable to cache poisoning and cross-user disclosure via cross-origin redirects",
+              "url": "https://github.com/advisories/GHSA-4w7w-5xrc-9h26",
+              "severity": "high",
+              "cwe": [
+                "CWE-346",
+                "CWE-524"
+              ],
+              "cvss": {
+                "score": 7.4,
+                "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:N"
+              },
+              "range": ">=8.0.0 <8.12.2"
+            },
+            {
+              "source": 1243474,
+              "name": "undici",
+              "dependency": "undici",
+              "title": "undici vulnerable to TLS certificate validation bypass via dropped tls options in Agent",
+              "url": "https://github.com/advisories/GHSA-2m5v-pch6-74hx",
+              "severity": "high",
+              "cwe": [
+                "CWE-295"
+              ],
+              "cvss": {
+                "score": 7.4,
+                "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:N"
+              },
+              "range": ">=8.0.0 <8.12.2"
+            },
+            {
+              "source": 1243476,
+              "name": "undici",
+              "dependency": "undici",
+              "title": "undici vulnerable to TLS certificate validation bypass via dropped tls options in Agent",
+              "url": "https://github.com/advisories/GHSA-2m5v-pch6-74hx",
+              "severity": "high",
+              "cwe": [
+                "CWE-295"
+              ],
+              "cvss": {
+                "score": 7.4,
+                "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:N"
+              },
+              "range": ">=4.0.0 <6.29.1"
+            },
+            {
+              "source": 1243477,
+              "name": "undici",
+              "dependency": "undici",
+              "title": "undici vulnerable to Denial of Service via TLS 1.2 certificate-changing renegotiation",
+              "url": "https://github.com/advisories/GHSA-qrxm-fqhp-jwvm",
+              "severity": "high",
+              "cwe": [
+                "CWE-248",
+                "CWE-617"
+              ],
+              "cvss": {
+                "score": 7.5,
+                "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+              },
+              "range": ">=8.0.0 <8.12.2"
+            },
+            {
+              "source": 1243479,
+              "name": "undici",
+              "dependency": "undici",
+              "title": "undici vulnerable to Denial of Service via TLS 1.2 certificate-changing renegotiation",
+              "url": "https://github.com/advisories/GHSA-qrxm-fqhp-jwvm",
+              "severity": "high",
+              "cwe": [
+                "CWE-248",
+                "CWE-617"
+              ],
+              "cvss": {
+                "score": 7.5,
+                "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+              },
+              "range": ">=4.2.1 <6.29.1"
+            },
+            {
+              "source": 1243480,
+              "name": "undici",
+              "dependency": "undici",
+              "title": "undici WebSocket client vulnerable to Denial of Service via unbounded automatic PONG buffering",
+              "url": "https://github.com/advisories/GHSA-9fm3-97px-rjf6",
+              "severity": "moderate",
+              "cwe": [
+                "CWE-400",
+                "CWE-405",
+                "CWE-770"
+              ],
+              "cvss": {
+                "score": 5.9,
+                "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H"
+              },
+              "range": ">=8.0.0 <8.12.2"
+            },
+            {
+              "source": 1243482,
+              "name": "undici",
+              "dependency": "undici",
+              "title": "undici WebSocket client vulnerable to Denial of Service via unbounded automatic PONG buffering",
+              "url": "https://github.com/advisories/GHSA-9fm3-97px-rjf6",
+              "severity": "moderate",
+              "cwe": [
+                "CWE-400",
+                "CWE-405",
+                "CWE-770"
+              ],
+              "cvss": {
+                "score": 5.9,
+                "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H"
+              },
+              "range": ">=5.15.0 <6.29.1"
+            },
+            {
+              "source": 1243483,
+              "name": "undici",
+              "dependency": "undici",
+              "title": "undici vulnerable to Denial of Service via unhandled exception in the decompress interceptor",
+              "url": "https://github.com/advisories/GHSA-55wc-3pg8-jfw6",
+              "severity": "moderate",
+              "cwe": [
+                "CWE-248"
+              ],
+              "cvss": {
+                "score": 5.9,
+                "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H"
+              },
+              "range": ">=8.0.0 <8.12.2"
+            }
+          ],
+          "fixAvailable": true
+        },
+        "vite": {
+          "severity": "high",
+          "nodes": [
+            "node_modules/vite"
+          ],
+          "via": [
+            {
+              "source": 1242626,
+              "name": "vite",
+              "dependency": "vite",
+              "title": "launch-editor: escapeCmdArgs() omits % escaping on Windows",
+              "url": "https://github.com/advisories/GHSA-698v-4r3x-3vcv",
+              "severity": "moderate",
+              "cwe": [
+                "CWE-78"
+              ],
+              "cvss": {
+                "score": 0,
+                "vectorString": null
+              },
+              "range": ">=8.3.0 <=8.3.2"
+            },
+            {
+              "source": 1242655,
+              "name": "vite",
+              "dependency": "vite",
+              "title": "launch-editor: Editor CLI flag misinterpretation causing arbitrary command execution for some editors",
+              "url": "https://github.com/advisories/GHSA-r825-w8mm-5pxw",
+              "severity": "moderate",
+              "cwe": [
+                "CWE-88"
+              ],
+              "cvss": {
+                "score": 0,
+                "vectorString": null
+              },
+              "range": ">=8.3.0 <=8.3.2"
+            },
+            {
+              "source": 1242662,
+              "name": "vite",
+              "dependency": "vite",
+              "title": "launch-editor: `fs.existsSync()` existence check can be bypassed on Windows",
+              "url": "https://github.com/advisories/GHSA-587h-7wmj-h5pm",
+              "severity": "high",
+              "cwe": [
+                "CWE-77"
+              ],
+              "cvss": {
+                "score": 0,
+                "vectorString": null
+              },
+              "range": ">=8.3.0 <=8.3.2"
+            },
+            {
+              "source": 1242728,
+              "name": "vite",
+              "dependency": "vite",
+              "title": "Vite: Cross origin script execution through Vite custom middleware",
+              "url": "https://github.com/advisories/GHSA-9jrq-w75r-8gcw",
+              "severity": "low",
+              "cwe": [
+                "CWE-80"
+              ],
+              "cvss": {
+                "score": 0,
+                "vectorString": null
+              },
+              "range": ">=8.3.0 <=8.3.2"
+            },
+            {
+              "source": 1242734,
+              "name": "vite",
+              "dependency": "vite",
+              "title": "Vite: Files outside `server.fs.allow` could be served when project paths match system paths on non-Windows machine",
+              "url": "https://github.com/advisories/GHSA-rq7h-c2jc-7f22",
+              "severity": "moderate",
+              "cwe": [
+                "CWE-22",
+                "CWE-284"
+              ],
+              "cvss": {
+                "score": 0,
+                "vectorString": null
+              },
+              "range": ">=8.3.0 <=8.3.2"
+            },
+            {
+              "source": 1242737,
+              "name": "vite",
+              "dependency": "vite",
+              "title": "Vite: First 4 bytes of files outside of `server.fs` setting is exposed by `?vite-wasm-instance`",
+              "url": "https://github.com/advisories/GHSA-vfpm-58rq-9qcg",
+              "severity": "moderate",
+              "cwe": [
+                "CWE-22",
+                "CWE-200",
+                "CWE-209"
+              ],
+              "cvss": {
+                "score": 0,
+                "vectorString": null
+              },
+              "range": ">=8.3.0 <=8.3.2"
+            }
+          ],
+          "fixAvailable": true
+        },
+        "vitest": {
+          "severity": "moderate",
+          "nodes": [
+            "node_modules/vitest"
+          ],
+          "via": [
+            "@vitest/mocker"
+          ],
+          "fixAvailable": true
+        },
+        "zod": {
+          "severity": "high",
+          "nodes": [
+            "node_modules/zod"
+          ],
+          "via": [
+            {
+              "source": 1243066,
+              "name": "zod",
+              "dependency": "zod",
+              "title": "Zod can exhaust memory while validating oversized constrained collections",
+              "url": "https://github.com/advisories/GHSA-mrhx-c7xc-m3w5",
+              "severity": "high",
+              "cwe": [
+                "CWE-770"
+              ],
+              "cvss": {
+                "score": 7.5,
+                "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+              },
+              "range": "<4.6.6"
+            }
+          ],
+          "fixAvailable": true
+        }
+      }
+    },
+    "audit-initial": {
+      "counts": {
+        "info": 0,
+        "low": 3,
+        "moderate": 2,
+        "high": 3,
+        "critical": 0,
+        "total": 8
+      },
+      "packages": {
+        "@rollup/plugin-node-resolve": {
+          "severity": "low",
+          "nodes": [
+            "node_modules/@rollup/plugin-node-resolve"
+          ],
+          "via": [
+            "deepmerge"
+          ],
+          "fixAvailable": {
+            "name": "meyda",
+            "version": "5.6.2",
+            "isSemVerMajor": true
+          }
+        },
+        "deepmerge": {
+          "severity": "low",
+          "nodes": [
+            "node_modules/deepmerge"
+          ],
+          "via": [
+            {
+              "source": 1243505,
+              "name": "deepmerge",
+              "dependency": "deepmerge",
+              "title": "deepmerge mergeObject() allows prototype poisoning of returned objects",
+              "url": "https://github.com/advisories/GHSA-gcqx-w48m-w2h4",
+              "severity": "low",
+              "cwe": [
+                "CWE-1321"
+              ],
+              "cvss": {
+                "score": 5.3,
+                "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N"
+              },
+              "range": ">=4.2.0 <=4.3.1"
+            }
+          ],
+          "fixAvailable": {
+            "name": "meyda",
+            "version": "5.6.2",
+            "isSemVerMajor": true
+          }
+        },
+        "fast-uri": {
+          "severity": "moderate",
+          "nodes": [
+            "node_modules/fast-uri"
+          ],
+          "via": [
+            {
+              "source": 1243098,
+              "name": "fast-uri",
+              "dependency": "fast-uri",
+              "title": "fast-uri vulnerable to URI scheme spoofing via percent-encoded scheme decoding",
+              "url": "https://github.com/advisories/GHSA-w74x-v6f9-j3xg",
+              "severity": "moderate",
+              "cwe": [
+                "CWE-172",
+                "CWE-180"
+              ],
+              "cvss": {
+                "score": 6.1,
+                "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N"
+              },
+              "range": ">=3.0.0 <3.1.9"
+            },
+            {
+              "source": 1243101,
+              "name": "fast-uri",
+              "dependency": "fast-uri",
+              "title": "fast-uri vulnerable to improper path equivalence in relative reference normalization",
+              "url": "https://github.com/advisories/GHSA-xhq7-xmqj-769h",
+              "severity": "low",
+              "cwe": [
+                "CWE-41"
+              ],
+              "cvss": {
+                "score": 3.7,
+                "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:L/A:N"
+              },
+              "range": ">=3.0.0 <3.1.9"
+            },
+            {
+              "source": 1243104,
+              "name": "fast-uri",
+              "dependency": "fast-uri",
+              "title": "fast-uri vulnerable to host confusion via unchecked WHATWG host canonicalization",
+              "url": "https://github.com/advisories/GHSA-wjr9-j795-jxcr",
+              "severity": "moderate",
+              "cwe": [
+                "CWE-20",
+                "CWE-436"
+              ],
+              "cvss": {
+                "score": 4.8,
+                "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:L/I:L/A:N"
+              },
+              "range": ">=3.1.3 <3.1.9"
+            },
+            {
+              "source": 1243107,
+              "name": "fast-uri",
+              "dependency": "fast-uri",
+              "title": "fast-uri vulnerable to scheme injection via an unescaped first-segment colon in suffix references",
+              "url": "https://github.com/advisories/GHSA-333x-w4r6-6crp",
+              "severity": "low",
+              "cwe": [
+                "CWE-41",
+                "CWE-116"
+              ],
+              "cvss": {
+                "score": 3.7,
+                "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:L/A:N"
+              },
+              "range": ">=3.0.0 <3.1.9"
+            }
+          ],
+          "fixAvailable": true
+        },
+        "meyda": {
+          "severity": "low",
+          "nodes": [
+            "node_modules/meyda"
+          ],
+          "via": [
+            "@rollup/plugin-node-resolve"
+          ],
+          "fixAvailable": {
+            "name": "meyda",
+            "version": "5.6.2",
+            "isSemVerMajor": true
+          }
+        },
+        "postcss-selector-parser": {
+          "severity": "moderate",
+          "nodes": [
+            "node_modules/postcss-nested/node_modules/postcss-selector-parser"
+          ],
+          "via": [
+            {
+              "source": 1243379,
+              "name": "postcss-selector-parser",
+              "dependency": "postcss-selector-parser",
+              "title": "PostCSS: Quadratic complexity in flat selector parsing allows CPU exhaustion",
+              "url": "https://github.com/advisories/GHSA-rj75-hqrm-r3gf",
+              "severity": "moderate",
+              "cwe": [
+                "CWE-400",
+                "CWE-407"
+              ],
+              "cvss": {
+                "score": 5.9,
+                "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H"
+              },
+              "range": "<6.1.5"
+            }
+          ],
+          "fixAvailable": true
+        },
+        "undici": {
+          "severity": "high",
+          "nodes": [
+            "node_modules/jsdom/node_modules/undici",
+            "node_modules/undici",
+            "node_modules/unifont/node_modules/undici"
+          ],
+          "via": [
+            {
+              "source": 1243077,
+              "name": "undici",
+              "dependency": "undici",
+              "title": "undici vulnerable to Denial of Service via unbounded memory in the EventSource parser",
+              "url": "https://github.com/advisories/GHSA-4qv8-2p9j-2685",
+              "severity": "moderate",
+              "cwe": [
+                "CWE-770"
+              ],
+              "cvss": {
+                "score": 5.9,
+                "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H"
+              },
+              "range": ">=8.0.0 <8.12.2"
+            },
+            {
+              "source": 1243079,
+              "name": "undici",
+              "dependency": "undici",
+              "title": "undici vulnerable to Denial of Service via unbounded memory in the EventSource parser",
+              "url": "https://github.com/advisories/GHSA-4qv8-2p9j-2685",
+              "severity": "moderate",
+              "cwe": [
+                "CWE-770"
+              ],
+              "cvss": {
+                "score": 5.9,
+                "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H"
+              },
+              "range": ">=6.5.0 <6.29.1"
+            },
+            {
+              "source": 1243080,
+              "name": "undici",
+              "dependency": "undici",
+              "title": "undici vulnerable to Subresource Integrity bypass via non-lowercase algorithm tokens",
+              "url": "https://github.com/advisories/GHSA-f72v-6w45-q472",
+              "severity": "moderate",
+              "cwe": [
+                "CWE-178"
+              ],
+              "cvss": {
+                "score": 5.9,
+                "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:H/A:N"
+              },
+              "range": ">=8.0.0 <8.12.2"
+            },
+            {
+              "source": 1243112,
+              "name": "undici",
+              "dependency": "undici",
+              "title": "undici vulnerable to Denial of Service via unhandled error on excessive content-encodings",
+              "url": "https://github.com/advisories/GHSA-xjj6-f33q-929c",
+              "severity": "high",
+              "cwe": [
+                "CWE-248",
+                "CWE-459"
+              ],
+              "cvss": {
+                "score": 7.5,
+                "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+              },
+              "range": ">=8.0.0 <8.12.2"
+            },
+            {
+              "source": 1243114,
+              "name": "undici",
+              "dependency": "undici",
+              "title": "undici vulnerable to Denial of Service via unhandled error on excessive content-encodings",
+              "url": "https://github.com/advisories/GHSA-xjj6-f33q-929c",
+              "severity": "high",
+              "cwe": [
+                "CWE-248",
+                "CWE-459"
+              ],
+              "cvss": {
+                "score": 7.5,
+                "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+              },
+              "range": ">=6.23.0 <6.29.1"
+            },
+            {
+              "source": 1243472,
+              "name": "undici",
+              "dependency": "undici",
+              "title": "undici vulnerable to cache poisoning and cross-user disclosure via cross-origin redirects",
+              "url": "https://github.com/advisories/GHSA-4w7w-5xrc-9h26",
+              "severity": "high",
+              "cwe": [
+                "CWE-346",
+                "CWE-524"
+              ],
+              "cvss": {
+                "score": 7.4,
+                "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:N"
+              },
+              "range": ">=8.0.0 <8.12.2"
+            },
+            {
+              "source": 1243474,
+              "name": "undici",
+              "dependency": "undici",
+              "title": "undici vulnerable to TLS certificate validation bypass via dropped tls options in Agent",
+              "url": "https://github.com/advisories/GHSA-2m5v-pch6-74hx",
+              "severity": "high",
+              "cwe": [
+                "CWE-295"
+              ],
+              "cvss": {
+                "score": 7.4,
+                "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:N"
+              },
+              "range": ">=8.0.0 <8.12.2"
+            },
+            {
+              "source": 1243476,
+              "name": "undici",
+              "dependency": "undici",
+              "title": "undici vulnerable to TLS certificate validation bypass via dropped tls options in Agent",
+              "url": "https://github.com/advisories/GHSA-2m5v-pch6-74hx",
+              "severity": "high",
+              "cwe": [
+                "CWE-295"
+              ],
+              "cvss": {
+                "score": 7.4,
+                "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:N"
+              },
+              "range": ">=4.0.0 <6.29.1"
+            },
+            {
+              "source": 1243477,
+              "name": "undici",
+              "dependency": "undici",
+              "title": "undici vulnerable to Denial of Service via TLS 1.2 certificate-changing renegotiation",
+              "url": "https://github.com/advisories/GHSA-qrxm-fqhp-jwvm",
+              "severity": "high",
+              "cwe": [
+                "CWE-248",
+                "CWE-617"
+              ],
+              "cvss": {
+                "score": 7.5,
+                "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+              },
+              "range": ">=8.0.0 <8.12.2"
+            },
+            {
+              "source": 1243479,
+              "name": "undici",
+              "dependency": "undici",
+              "title": "undici vulnerable to Denial of Service via TLS 1.2 certificate-changing renegotiation",
+              "url": "https://github.com/advisories/GHSA-qrxm-fqhp-jwvm",
+              "severity": "high",
+              "cwe": [
+                "CWE-248",
+                "CWE-617"
+              ],
+              "cvss": {
+                "score": 7.5,
+                "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+              },
+              "range": ">=4.2.1 <6.29.1"
+            },
+            {
+              "source": 1243480,
+              "name": "undici",
+              "dependency": "undici",
+              "title": "undici WebSocket client vulnerable to Denial of Service via unbounded automatic PONG buffering",
+              "url": "https://github.com/advisories/GHSA-9fm3-97px-rjf6",
+              "severity": "moderate",
+              "cwe": [
+                "CWE-400",
+                "CWE-405",
+                "CWE-770"
+              ],
+              "cvss": {
+                "score": 5.9,
+                "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H"
+              },
+              "range": ">=8.0.0 <8.12.2"
+            },
+            {
+              "source": 1243482,
+              "name": "undici",
+              "dependency": "undici",
+              "title": "undici WebSocket client vulnerable to Denial of Service via unbounded automatic PONG buffering",
+              "url": "https://github.com/advisories/GHSA-9fm3-97px-rjf6",
+              "severity": "moderate",
+              "cwe": [
+                "CWE-400",
+                "CWE-405",
+                "CWE-770"
+              ],
+              "cvss": {
+                "score": 5.9,
+                "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H"
+              },
+              "range": ">=5.15.0 <6.29.1"
+            },
+            {
+              "source": 1243483,
+              "name": "undici",
+              "dependency": "undici",
+              "title": "undici vulnerable to Denial of Service via unhandled exception in the decompress interceptor",
+              "url": "https://github.com/advisories/GHSA-55wc-3pg8-jfw6",
+              "severity": "moderate",
+              "cwe": [
+                "CWE-248"
+              ],
+              "cvss": {
+                "score": 5.9,
+                "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H"
+              },
+              "range": ">=8.0.0 <8.12.2"
+            }
+          ],
+          "fixAvailable": true
+        },
+        "vite": {
+          "severity": "high",
+          "nodes": [
+            "node_modules/vite"
+          ],
+          "via": [
+            {
+              "source": 1242626,
+              "name": "vite",
+              "dependency": "vite",
+              "title": "launch-editor: escapeCmdArgs() omits % escaping on Windows",
+              "url": "https://github.com/advisories/GHSA-698v-4r3x-3vcv",
+              "severity": "moderate",
+              "cwe": [
+                "CWE-78"
+              ],
+              "cvss": {
+                "score": 0,
+                "vectorString": null
+              },
+              "range": ">=8.3.0 <=8.3.2"
+            },
+            {
+              "source": 1242655,
+              "name": "vite",
+              "dependency": "vite",
+              "title": "launch-editor: Editor CLI flag misinterpretation causing arbitrary command execution for some editors",
+              "url": "https://github.com/advisories/GHSA-r825-w8mm-5pxw",
+              "severity": "moderate",
+              "cwe": [
+                "CWE-88"
+              ],
+              "cvss": {
+                "score": 0,
+                "vectorString": null
+              },
+              "range": ">=8.3.0 <=8.3.2"
+            },
+            {
+              "source": 1242662,
+              "name": "vite",
+              "dependency": "vite",
+              "title": "launch-editor: `fs.existsSync()` existence check can be bypassed on Windows",
+              "url": "https://github.com/advisories/GHSA-587h-7wmj-h5pm",
+              "severity": "high",
+              "cwe": [
+                "CWE-77"
+              ],
+              "cvss": {
+                "score": 0,
+                "vectorString": null
+              },
+              "range": ">=8.3.0 <=8.3.2"
+            },
+            {
+              "source": 1242728,
+              "name": "vite",
+              "dependency": "vite",
+              "title": "Vite: Cross origin script execution through Vite custom middleware",
+              "url": "https://github.com/advisories/GHSA-9jrq-w75r-8gcw",
+              "severity": "low",
+              "cwe": [
+                "CWE-80"
+              ],
+              "cvss": {
+                "score": 0,
+                "vectorString": null
+              },
+              "range": ">=8.3.0 <=8.3.2"
+            },
+            {
+              "source": 1242734,
+              "name": "vite",
+              "dependency": "vite",
+              "title": "Vite: Files outside `server.fs.allow` could be served when project paths match system paths on non-Windows machine",
+              "url": "https://github.com/advisories/GHSA-rq7h-c2jc-7f22",
+              "severity": "moderate",
+              "cwe": [
+                "CWE-22",
+                "CWE-284"
+              ],
+              "cvss": {
+                "score": 0,
+                "vectorString": null
+              },
+              "range": ">=8.3.0 <=8.3.2"
+            },
+            {
+              "source": 1242737,
+              "name": "vite",
+              "dependency": "vite",
+              "title": "Vite: First 4 bytes of files outside of `server.fs` setting is exposed by `?vite-wasm-instance`",
+              "url": "https://github.com/advisories/GHSA-vfpm-58rq-9qcg",
+              "severity": "moderate",
+              "cwe": [
+                "CWE-22",
+                "CWE-200",
+                "CWE-209"
+              ],
+              "cvss": {
+                "score": 0,
+                "vectorString": null
+              },
+              "range": ">=8.3.0 <=8.3.2"
+            }
+          ],
+          "fixAvailable": true
+        },
+        "zod": {
+          "severity": "high",
+          "nodes": [
+            "node_modules/zod"
+          ],
+          "via": [
+            {
+              "source": 1243066,
+              "name": "zod",
+              "dependency": "zod",
+              "title": "Zod can exhaust memory while validating oversized constrained collections",
+              "url": "https://github.com/advisories/GHSA-mrhx-c7xc-m3w5",
+              "severity": "high",
+              "cwe": [
+                "CWE-770"
+              ],
+              "cvss": {
+                "score": 7.5,
+                "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+              },
+              "range": "<4.6.6"
+            }
+          ],
+          "fixAvailable": true
+        }
+      }
+    },
+    "audit-final": {
+      "counts": {
+        "info": 0,
+        "low": 3,
+        "moderate": 0,
+        "high": 0,
+        "critical": 0,
+        "total": 3
+      },
+      "packages": {
+        "@rollup/plugin-node-resolve": {
+          "severity": "low",
+          "nodes": [
+            "node_modules/@rollup/plugin-node-resolve"
+          ],
+          "via": [
+            "deepmerge"
+          ],
+          "fixAvailable": {
+            "name": "meyda",
+            "version": "5.6.2",
+            "isSemVerMajor": true
+          }
+        },
+        "deepmerge": {
+          "severity": "low",
+          "nodes": [
+            "node_modules/deepmerge"
+          ],
+          "via": [
+            {
+              "source": 1243505,
+              "name": "deepmerge",
+              "dependency": "deepmerge",
+              "title": "deepmerge mergeObject() allows prototype poisoning of returned objects",
+              "url": "https://github.com/advisories/GHSA-gcqx-w48m-w2h4",
+              "severity": "low",
+              "cwe": [
+                "CWE-1321"
+              ],
+              "cvss": {
+                "score": 5.3,
+                "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N"
+              },
+              "range": ">=4.2.0 <=4.3.1"
+            }
+          ],
+          "fixAvailable": {
+            "name": "meyda",
+            "version": "5.6.2",
+            "isSemVerMajor": true
+          }
+        },
+        "meyda": {
+          "severity": "low",
+          "nodes": [
+            "node_modules/meyda"
+          ],
+          "via": [
+            "@rollup/plugin-node-resolve"
+          ],
+          "fixAvailable": {
+            "name": "meyda",
+            "version": "5.6.2",
+            "isSemVerMajor": true
+          }
+        }
+      }
+    }
+  },
+  "finalLockfileSha256": "e0f78d3a7338b7ce4aa4d4a7c164379b15f7b6e541d300e6a229616982412798",
+  "localValidation": [
+    {
+      "node": "22.22.3",
+      "npm": "11.19.0",
+      "command": "npm ci",
+      "exitCode": 0,
+      "summary": "Clean installation; registry integrity verified",
+      "logFile": "npm-ci-final-node22.log",
+      "logSha256": "d0feb0c6c03a4d3020eed199f8d6717168178e1465e89375e2c7ef8c015d5252"
+    },
+    {
+      "node": "22.22.3",
+      "npm": "11.19.0",
+      "command": "npm run check",
+      "exitCode": 0,
+      "summary": "4190 workspace tests in 341 files; all source/type/license/notices/package/release gates pass",
+      "logFile": "check-final-node22.log",
+      "logSha256": "f0f176c203c871412d9ccb7e2c2d283af371b945df121a2e9d2acf96e5fd8c41"
+    },
+    {
+      "node": "22.22.3",
+      "npm": "11.19.0",
+      "command": "npm run check:external-install",
+      "exitCode": 0,
+      "summary": "168 runtime imports, 88 ESM/browser and 84 CommonJS declarations pass",
+      "logFile": "external-node22.log",
+      "logSha256": "470ad0cbfe18acd1be99411e056b49f99db1ffe1c7b095663a7c1650504ddd9a"
+    },
+    {
+      "node": "22.22.3",
+      "npm": "11.19.0",
+      "command": "npm run audit:dependencies",
+      "exitCode": 0,
+      "summary": "0 high, 0 moderate, 3 low; unchanged high gate passes",
+      "logFile": "audit-final-node22.log",
+      "logSha256": "f4474a4965cf25b04464c04bcadae782de4519629e9031b078150575f00d26c6"
+    },
+    {
+      "node": "22.22.3",
+      "npm": "11.19.0",
+      "command": "npm run audit:production",
+      "exitCode": 0,
+      "summary": "0 high, 0 moderate, 3 low; unchanged high gate passes",
+      "logFile": "audit-production-node22.log",
+      "logSha256": "0481e83838a9af458eeb1f21b8e811aa0bda2c8cda21e7c15862edfd4a42becf"
+    },
+    {
+      "node": "24.21.0",
+      "npm": "11.19.0",
+      "command": "npm ci",
+      "exitCode": 0,
+      "summary": "Clean installation; registry integrity verified",
+      "logFile": "npm-ci-final-node24.log",
+      "logSha256": "213a42d02be0fc995834e97250455cc1e61d6340362f522319dd8fa5f600626a"
+    },
+    {
+      "node": "24.21.0",
+      "npm": "11.19.0",
+      "command": "npm run check",
+      "exitCode": 0,
+      "summary": "4190 workspace tests in 341 files; all source/type/license/notices/package/release gates pass",
+      "logFile": "check-final-node24.log",
+      "logSha256": "6d46f635154c0f6473cf91d9059b80048493dc905326814558f50e8544b8545c"
+    },
+    {
+      "node": "24.21.0",
+      "npm": "11.19.0",
+      "command": "npm run check:external-install",
+      "exitCode": 0,
+      "summary": "168 runtime imports, 88 ESM/browser and 84 CommonJS declarations pass",
+      "logFile": "external-node24.log",
+      "logSha256": "470ad0cbfe18acd1be99411e056b49f99db1ffe1c7b095663a7c1650504ddd9a"
+    },
+    {
+      "node": "24.21.0",
+      "npm": "11.19.0",
+      "command": "npm run audit:dependencies",
+      "exitCode": 0,
+      "summary": "0 high, 0 moderate, 3 low; unchanged high gate passes",
+      "logFile": "audit-final-node24.log",
+      "logSha256": "f4474a4965cf25b04464c04bcadae782de4519629e9031b078150575f00d26c6"
+    },
+    {
+      "node": "24.21.0",
+      "npm": "11.19.0",
+      "command": "npm run audit:production",
+      "exitCode": 0,
+      "summary": "0 high, 0 moderate, 3 low; unchanged high gate passes",
+      "logFile": "audit-production-node24.log",
+      "logSha256": "0481e83838a9af458eeb1f21b8e811aa0bda2c8cda21e7c15862edfd4a42becf"
+    },
+    {
+      "node": "24.21.0",
+      "npm": "11.19.0",
+      "command": "npm run docs:build",
+      "exitCode": 0,
+      "summary": "110 pages; 74 notice records across 346 emitted files",
+      "logFile": "docs-build-node24.log",
+      "logSha256": "b43340dc21391691139b006869e61533433aedcd57220c5d1a7b695289ba19a7"
+    },
+    {
+      "node": "24.21.0",
+      "npm": "11.19.0",
+      "command": "npm run pages:build",
+      "exitCode": 0,
+      "summary": "110 pages; 74 notice records across 346 emitted files; /WebMusic/ base path verified",
+      "logFile": "pages-build-node24.log",
+      "logSha256": "6dc76b81bac70c1d17d3a74fd2f86bc1d5ef7aa946068ea24b818c685ad53a4a"
+    }
+  ],
+  "validationEnvironment": {
+    "nodeOptions": "--max-old-space-size=6144",
+    "vitestMaxWorkers": 2,
+    "separateCheckouts": true,
+    "testsOrGatesDisabled": false
+  }
+}
