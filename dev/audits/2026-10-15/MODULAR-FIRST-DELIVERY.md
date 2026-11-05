@@ -12,7 +12,7 @@ it does not establish a remote commit, release, publication or deployment.
 
 ## Delivered behavior
 
-Steps 1–8 implement [DEC-047](../../DECISIONS.md#dec-047--modular-composition-separates-resources-routing-and-session-authority)
+Steps 1–8 implement [DEC-063](../../DECISIONS.md#dec-063--modular-composition-separates-resources-routing-and-session-authority)
 and the [modular contract](../../design/MODULAR-COMPOSITION.md) through opt-in
 `composition="modules"`:
 

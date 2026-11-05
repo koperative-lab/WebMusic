@@ -15,7 +15,7 @@ Chromium 151.0.7922.173 on Linux. No commit, remote push or publication is impli
 
 The numbering matches the independent review. P1 denotes the common playback
 regression, P2 the conditional behavior/ownership/API failures, and P3 the
-declaration-label issue. These were implementation defects within DEC-047/048,
+declaration-label issue. These were implementation defects within DEC-063/048,
 not a change to package boundaries or an expansion of the modular design.
 
 | ID | Finding | Repair and maintained regression owner |

@@ -1599,7 +1599,7 @@ five-package manifests, public exports and Agent Toolkit source-snapshot
 claims. Verify CI and deployment on the exact target commit separately; none
 of these checks establishes npm publication or live device/audio behavior.
 
-## DEC-047 — Modular composition separates resources, routing and Session authority
+## DEC-063 — Modular composition separates resources, routing and Session authority
 
 **Date / status:** 2026-10-14; accepted contract baseline for the maintainer's
 modular redesign. The 2026-10-15 first-delivery implementation adds opt-in
@@ -1674,7 +1674,7 @@ the first delivery. Step one established the documented baseline; the runtime
 steps require independent focused and combined evidence. Neither a static
 check nor an implementation decision establishes audible timing precision.
 
-## DEC-048 — Session scheduling is a borrowed anchor; projects store declarative identity
+## DEC-064 — Session scheduling is a borrowed anchor; projects store declarative identity
 
 **Date / status:** 2026-10-15; accepted for the maintainer's third modular
 delivery (steps 11–12). Current verification belongs in [STATUS](STATUS.md).
@@ -1733,7 +1733,7 @@ ticks define native loop boundaries; serialize AudioNodes or component trees;
 execute plugin URLs from a saved document; or let the editor own a parallel
 graph. Each obscures cancellation, resource ownership or recoverable identity.
 
-**Consequences:** DEC-047's separation of context, audio and transport remains.
+**Consequences:** DEC-063's separation of context, audio and transport remains.
 Kernel is domain-neutral; Bridge supplies factories that know Score and Audio,
 and UI imports neither. Existing standalone clocks, absolute audio-clock
 automation and legacy group APIs retain their contracts. Projects do not include
@@ -1754,7 +1754,7 @@ late restores and borrowed contexts. Test keyboard wiring, focus, diagnostics,
 narrow layouts and restoration through the public runnable example. Static
 checks alone establish neither sound precision nor device behavior.
 
-## DEC-049 — Provider scope changes separate in-place re-routing from rebinding
+## DEC-065 — Provider scope changes separate in-place re-routing from rebinding
 
 **Date / status:** 2026-10-21; accepted with the modular release-candidate review
 fixes. Audio Elements adopt it; Score adoption is MOD-13 in [STATUS](STATUS.md).
@@ -1809,7 +1809,7 @@ check under VERIFY-01.
 
 Add an identifier, date, status, problem, chosen contract, considered alternatives, consequences, owning document, and verification implications. A proposed choice does not change a public API. If a choice supersedes this register, retain its old identifier and point to the replacement; do not rewrite historical evidence as though the new choice always existed.
 
-## DEC-050 — Demos use only the owner-maintained Arabesque No. 1 files
+## DEC-066 — Demos use only the owner-maintained Arabesque No. 1 files
 
 **Date / status:** 2026-11-04; accepted by the repository owner. Supersedes the
 generated *WebMusic Study No. 1* demo media.

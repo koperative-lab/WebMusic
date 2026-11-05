@@ -218,7 +218,7 @@ page breaks at measures 21, 43, 69 and 91 differ from the PDF's reflow. This
 comparison verifies which notation is present, not pixel or page-layout parity.
 
 That resource was removed on 2026-10-16 and restored by the repository owner on
-2026-11-04 under DEC-050; its redistribution rights remain unverified (DEV-05).
+2026-11-04 under DEC-066; its redistribution rights remain unverified (DEV-05).
 The comparison below remains historical evidence. Regression coverage also uses
 the independently authored
 [notation study fixture](../../packages/score/test/notation-study-fixture.ts);

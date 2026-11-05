@@ -297,7 +297,7 @@ The presenter inventory belongs in [COMPONENTS.md](COMPONENTS.md) and the
 
 ### Modular composition
 
-[DEC-047](DECISIONS.md#dec-047--modular-composition-separates-resources-routing-and-session-authority)
+[DEC-063](DECISIONS.md#dec-063--modular-composition-separates-resources-routing-and-session-authority)
 defines opt-in `composition="modules"`. Kernel `/module`, `/session` and
 `/effect` supply the shared runtime; `/element` supplies scoped browser discovery.
 [Modular composition](design/MODULAR-COMPOSITION.md) owns the context, typed-port,

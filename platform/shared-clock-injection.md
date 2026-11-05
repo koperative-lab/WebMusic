@@ -2,7 +2,7 @@
 
 **One music Session has one authoritative timeline.** Score and Audio schedulers
 borrow its reference-time anchor; independent Sessions may share an audio context
-without sharing transport authority. [DEC-048](../dev/DECISIONS.md#dec-048--session-scheduling-is-a-borrowed-anchor-projects-store-declarative-identity)
+without sharing transport authority. [DEC-064](../dev/DECISIONS.md#dec-064--session-scheduling-is-a-borrowed-anchor-projects-store-declarative-identity)
 records the accepted protocol. [STATUS](../dev/STATUS.md) owns current verification;
 the [Kernel API](../apps/doc/webmusic/src/content/docs/kernel/api.mdx) owns exact
 public members.

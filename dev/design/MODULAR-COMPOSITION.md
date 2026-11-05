@@ -3,9 +3,9 @@
 Status: accepted contract with opt-in composition, shared sound/modulation,
 Session scheduling and versioned project APIs.
 Current verification and remaining stages belong to [STATUS](../STATUS.md).
-Related decisions: [DEC-047](../DECISIONS.md#dec-047--modular-composition-separates-resources-routing-and-session-authority),
-[DEC-048](../DECISIONS.md#dec-048--session-scheduling-is-a-borrowed-anchor-projects-store-declarative-identity)
-and [DEC-049](../DECISIONS.md#dec-049--provider-scope-changes-separate-in-place-re-routing-from-rebinding).
+Related decisions: [DEC-063](../DECISIONS.md#dec-063--modular-composition-separates-resources-routing-and-session-authority),
+[DEC-064](../DECISIONS.md#dec-064--session-scheduling-is-a-borrowed-anchor-projects-store-declarative-identity)
+and [DEC-065](../DECISIONS.md#dec-065--provider-scope-changes-separate-in-place-re-routing-from-rebinding).
 Layers: neutral Kernel contracts, domain Headless runtimes, structural UI bindings,
 and declarative Elements. Shared public entries are Kernel `/module`, `/session`,
 `/effect` and `/element`; domain runtimes remain in their Play Headless entries.
@@ -22,7 +22,7 @@ This contract fixes semantics for the modular redesign. `ModuleContext`,
 `InsertChain`, `SessionTransport` and the opt-in attributes below are implemented
 public surfaces. The [Kernel API](../../apps/doc/webmusic/src/content/docs/kernel/api.mdx)
 and domain references own concrete signatures and defaults. Shared-anchor
-scheduling and project restoration follow DEC-048; their backend limits remain
+scheduling and project restoration follow DEC-064; their backend limits remain
 explicit. [Player binding](PLAYER-BINDING.md) retains
 ownership of data/state attachment; [shared-clock injection](../../platform/shared-clock-injection.md)
 retains ownership of the detailed clock consumption protocol.

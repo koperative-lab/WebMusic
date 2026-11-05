@@ -311,7 +311,7 @@ what happens on failure.
 
 Every musical demo and copyable example uses Claude Debussy's Arabesque No. 1
 from the owner-maintained `apps/doc/webmusic/public/` folder, as fixed by
-[AGENTS](../../AGENTS.md#demo-music-arabesque-no-1-only) and DEC-050. Do not
+[AGENTS](../../AGENTS.md#demo-music-arabesque-no-1-only) and DEC-066. Do not
 change that folder or substitute generated notes, fixtures or other media; use a
 passage of the piece when a demo needs less. The format choices below are
 selection guidelines, not cross-browser support guarantees.

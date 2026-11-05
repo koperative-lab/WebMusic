@@ -56,7 +56,7 @@ Meter extraction unifies the algorithm and tap. Score's
 remain distinct from an analyser's absolute per-read peak decay.
 
 The modular entries follow
-[DEC-047](../dev/DECISIONS.md#dec-047--modular-composition-separates-resources-routing-and-session-authority)
+[DEC-063](../dev/DECISIONS.md#dec-063--modular-composition-separates-resources-routing-and-session-authority)
 and the [composition contract](../dev/design/MODULAR-COMPOSITION.md). Their
 admission is based on the common contract used by Score and Audio, rather than
 moving either domain's models into Kernel. The new InsertChain does not replace
@@ -109,6 +109,6 @@ belong in Bridge; sharing neutral audio/control ports does not require them.
 write-ownership/invalidation protocol around it. Native consumers retract and
 re-arm their own submitted work, while media/external followers keep approximate
 coordination. [The shared-clock design](shared-clock-injection.md) states loop,
-lookahead, latency and tail boundaries. [DEC-048](../dev/DECISIONS.md#dec-048--session-scheduling-is-a-borrowed-anchor-projects-store-declarative-identity)
+lookahead, latency and tail boundaries. [DEC-064](../dev/DECISIONS.md#dec-064--session-scheduling-is-a-borrowed-anchor-projects-store-declarative-identity)
 also adds versioned project restoration without moving domain factories or app
 storage into Kernel. Evidence belongs in [STATUS.md](../dev/STATUS.md).
