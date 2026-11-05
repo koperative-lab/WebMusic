@@ -1,4 +1,5 @@
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it, vi} from 'vitest';
+import {paintLiveProjection} from '../../src/view/render/live';
 import {
   LiveScrollBuffer,
   LiveViewController,
@@ -123,5 +124,73 @@ describe('LiveViewController', () => {
     controller.capture(0);
     controller.clear();
     expect(controller.analyser).toBe(analyser);
+  });
+});
+
+describe('paintLiveProjection spectrogram history', () => {
+  function harness() {
+    const puts: number[] = [];
+    const draws: number[][] = [];
+    const ringContext = {
+      createImageData: (width: number, height: number) => ({width, height, data: new Uint8ClampedArray(width * height * 4)}),
+      putImageData: (_image: unknown, dx: number) => { puts.push(dx); },
+      clearRect: vi.fn(),
+    };
+    const ring = {width: 0, height: 0, getContext: () => ringContext};
+    const context = {
+      canvas: {ownerDocument: {createElement: vi.fn(() => ring)}},
+      clearRect: vi.fn(),
+      fillRect: vi.fn(),
+      drawImage: (_source: unknown, ...args: number[]) => { draws.push(args); },
+      imageSmoothingEnabled: true,
+      fillStyle: '',
+    } as unknown as CanvasRenderingContext2D;
+    return {context, puts, draws, ring, createElement: (context.canvas as unknown as {ownerDocument: {createElement: ReturnType<typeof vi.fn>}}).ownerDocument.createElement};
+  }
+
+  it('writes only the new column each frame and composites the ring', () => {
+    const {context, puts, draws, createElement} = harness();
+    const buffer = new LiveScrollBuffer({rows: 4, windowSeconds: 1, columnsPerSecond: 4});
+    const frame = {context, width: 40, height: 20};
+    buffer.push(0, [1, 0.5, 0, 0.25]);
+    buffer.push(0.25, [1, 1, 1, 1]);
+    paintLiveProjection(frame, buffer, 'spectrogram');
+    expect(puts).toEqual([0, 1]);
+    expect(createElement).toHaveBeenCalledOnce();
+    expect(context.fillRect).not.toHaveBeenCalled();
+    expect(draws.at(-1)).toEqual([0, 0, 2, 4, 20, 0, 20, 20]);
+
+    // Unchanged history paints no column; one push writes exactly one.
+    puts.length = 0;
+    paintLiveProjection(frame, buffer, 'spectrogram');
+    expect(puts).toEqual([]);
+    for (let index = 2; index < 7; index += 1) {
+      buffer.push(index / 4, [index / 10, 0, 0, 0]);
+      paintLiveProjection(frame, buffer, 'spectrogram');
+    }
+    expect(puts).toEqual([2, 3, 0, 1, 2]);
+    // Full ring: oldest slot 3, newest slot 2 — two segments, oldest first.
+    expect(draws.at(-2)).toEqual([3, 0, 1, 4, 0, 0, 10, 20]);
+    expect(draws.at(-1)).toEqual([0, 0, 3, 4, 10, 0, 30, 20]);
+    expect(context.imageSmoothingEnabled).toBe(true);
+    expect(createElement).toHaveBeenCalledOnce();
+  });
+
+  it('rebuilds the ring for a new buffer and falls back to cells without bitmap support', () => {
+    const {context, puts} = harness();
+    const first = new LiveScrollBuffer({rows: 2, windowSeconds: 1, columnsPerSecond: 4});
+    first.push(0, [1, 1]);
+    paintLiveProjection({context, width: 8, height: 8}, first, 'spectrogram');
+    const second = new LiveScrollBuffer({rows: 2, windowSeconds: 1, columnsPerSecond: 4});
+    second.push(0, [1, 1]);
+    second.push(0.25, [1, 1]);
+    puts.length = 0;
+    paintLiveProjection({context, width: 8, height: 8}, second, 'spectrogram');
+    expect(puts).toEqual([0, 1]);
+
+    const fillRect = vi.fn();
+    const plain = {clearRect: vi.fn(), fillRect, fillStyle: ''} as unknown as CanvasRenderingContext2D;
+    paintLiveProjection({context: plain, width: 8, height: 8}, second, 'spectrogram');
+    expect(fillRect).toHaveBeenCalledTimes(4);
   });
 });

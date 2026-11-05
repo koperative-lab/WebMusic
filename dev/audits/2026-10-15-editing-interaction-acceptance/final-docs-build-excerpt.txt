@@ -1,0 +1,10 @@
+Command: npm run docs:build
+Exit code: 0
+Source log: /tmp/webmusic-editing-acceptance-final-docs-build.log
+SHA-256: b703692d1f73751e442c0e5e4a283f669b5eb8f04e51cd5a08f76c0242eb04d2
+
+2855: 19:13:43 [webmusic-local-search] Local search indexed 115 public documentation pages.
+2856: 19:13:43 [webmusic-agent-context] Agent context verified 115 public Markdown references, four llms files and the Skill catalog.
+2857: 19:13:44 [webmusic-site-notices] Site licenses verified: 74 records, 367 files.
+2858: 19:13:44 [build] 117 page(s) built in 9.96s
+2859: 19:13:44 [build] Complete!

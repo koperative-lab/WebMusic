@@ -3,6 +3,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   mountParameterRack,
+  parameterRackStyle,
   type ParameterRackBinding,
   type ParameterRackState,
 } from "../src/parameter";
@@ -70,6 +71,24 @@ class FakeParameters implements ParameterRackBinding {
 }
 
 describe("mountParameterRack", () => {
+  it("divides groups with a hairline inside one frame and sets values and captions in mono", () => {
+    const rule = (selector: string): string => {
+      const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      return parameterRackStyle.match(new RegExp(`${escaped}\\s*\\{([^}]*)\\}`))?.[1] ?? "";
+    };
+    expect(rule(":where(.wui-parameter-rack__group)")).toContain("border: 0");
+    expect(rule(":where(.wui-parameter-rack[data-layout='flat'] > .wui-parameter-rack__item)")).toContain("border: 0");
+    expect(rule(":where(.wui-parameter-rack__group + .wui-parameter-rack__group)")).toContain("border-inline-start: 1px solid var(--wm-parameter-item-border");
+    for (const caption of [":where(.wui-parameter-rack__label)", ":where(.wui-parameter-rack__group-label)"]) {
+      expect(rule(caption)).toContain("var(--wm-font-mono");
+      expect(rule(caption)).toContain("text-transform: uppercase");
+      expect(rule(caption)).toContain("--wm-foreground-muted");
+    }
+    expect(rule(":where(.wui-parameter-rack__value)")).toContain("var(--wm-font-mono");
+    expect(rule(":where(.wui-parameter-rack__control:focus-within)")).toContain("outline-offset: -2px");
+    expect(rule(".wui-parameter-rack__control")).toContain("var(--wm-parameter-size, calc(1.5 * var(--wm-control-size, 2rem)))");
+  });
+
   it("renders an accessible flat rack and applies live values", () => {
     const host = document.createElement("div");
     const binding = new FakeParameters();

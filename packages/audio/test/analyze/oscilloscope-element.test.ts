@@ -113,16 +113,17 @@ describe('<audio-oscilloscope>', () => {
     expect(scope.trace?.triggered).toBe(false);
     scope.timebaseMs = 2;
     expect(scope.trace?.triggered).toBe(true);
-    expect(scope.textContent).toContain('Live, triggered');
+    expect(scope.querySelector<HTMLElement>('[part="status"]')?.hidden).toBe(true);
     const probes: Array<{timeMs: number; amplitude?: number}> = [];
     scope.addEventListener('webaudio:oscilloscopeprobe', (event) => probes.push((event as CustomEvent).detail));
     scope.querySelector<HTMLCanvasElement>('[part="plot"]')!
       .dispatchEvent(new KeyboardEvent('keydown', {key: 'End', bubbles: true}));
     expect(probes.at(-1)?.timeMs).toBe(scope.trace?.timebaseMs);
     expect(probes.at(-1)?.amplitude).toBe(1);
-    const edge = scope.querySelector<HTMLSelectElement>('[part="trigger-edge"]')!;
-    edge.value = 'off';
-    edge.dispatchEvent(new Event('change', {bubbles: true}));
+    // The trigger edge is a segmented group of square cells, not a native select.
+    const off = scope.querySelector<HTMLButtonElement>('[part="trigger-edge"] button[data-value="off"]')!;
+    off.click();
+    expect(off.getAttribute('aria-pressed')).toBe('true');
     expect(scope.triggerEdge).toBe('off');
     expect(scope.trace?.triggered).toBe(false);
     const freeze = scope.querySelector<HTMLButtonElement>('[part="freeze"]')!;
@@ -139,7 +140,7 @@ describe('<audio-oscilloscope>', () => {
     owner.dispatchEvent(new CustomEvent('webaudio:statechange', {detail: {playing: false}}));
     expect(realtime.runners[1]!.stop).toHaveBeenCalledOnce();
     expect(scope.trace).toBeUndefined();
-    expect(scope.textContent).toContain('Playback paused');
+    expect(scope.querySelector<HTMLElement>('[part="status"]')?.hidden).toBe(true);
     expect(tap.fftSize).toBe(8);
   });
 

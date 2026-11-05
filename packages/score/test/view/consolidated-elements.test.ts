@@ -13,6 +13,7 @@ describe('consolidated View families', () => {
     expect(customElements.get('score-sheet-view')).toBe(elements.SheetViewElement);
     expect(customElements.get('pitch-view')).toBeUndefined();
     expect(customElements.get('sheet-view')).toBeUndefined();
+    expect(customElements.get('score-document')).toBeUndefined();
     for (const tag of ['keyboard-view', 'staff-view', 'fretboard-view', 'score-map', 'score-thumbnail']) {
       expect(customElements.get(tag)).toBeUndefined();
     }
@@ -21,7 +22,8 @@ describe('consolidated View families', () => {
   it('removes redundant Element exports while preserving low-level helpers', () => {
     for (const name of ['KeyboardViewElement', 'StaffViewElement', 'FretboardViewElement',
       'ScoreMapElement', 'ScoreThumbnailElement', 'defineKeyboardViewElement', 'defineStaffViewElement',
-      'defineFretboardViewElement', 'defineScoreMapElement', 'defineScoreThumbnailElement']) {
+      'defineFretboardViewElement', 'defineScoreMapElement', 'defineScoreThumbnailElement',
+      'ScoreDocumentElement', 'defineScoreDocumentElement']) {
       expect(elements).not.toHaveProperty(name);
     }
     expect(createScoreMap).toBeTypeOf('function');

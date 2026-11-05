@@ -511,3 +511,21 @@ describe('mixer companion binding', () => {
     mixer.dispose(); owner.dispose();
   });
 });
+
+describe('<audio-mixer> passive source feedback', () => {
+  it('waits for members and restores usable strips after attachment', () => {
+    const element = mount();
+    const feedback = () => element.shadowRoot!.querySelector<HTMLElement>('.wui-status')!;
+    expect(feedback().dataset.kind).toBe('waiting');
+    element.members = [{id: 'one', player: fakePlayer()}];
+    expect(feedback().hidden).toBe(true);
+    expect(strips(element)).toEqual(['one']);
+    element.setAttribute('player', '#missing-mixer-owner');
+    expect(feedback().dataset.kind).toBe('waiting');
+    expect(element.shadowRoot!.querySelector<HTMLElement>('.wui-mixer__board')!.hidden).toBe(false);
+    element.removeAttribute('player');
+    expect(feedback().hidden).toBe(true);
+    element.members = [];
+    expect(feedback().dataset.kind).toBe('waiting');
+  });
+});

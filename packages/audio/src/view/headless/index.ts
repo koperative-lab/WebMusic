@@ -54,6 +54,8 @@ export {
   type AudioMeterControllerOptions,
   type AudioMeterConfiguration,
   type AudioMeterLevelFrame,
+  type AudioMeterStereoFrame,
+  type AudioMeterFrequencyInfo,
   calculateLevelMeter,
   calculateSpectrumBars,
   type LevelMeterFrame,
@@ -62,8 +64,56 @@ export {
 } from './meter';
 
 export {
+  AudioMeterDisplay,
+  createAudioMeterDisplay,
+  AUDIO_METER_DISPLAY_TYPES,
+  LoudnessEstimator,
+  alignTrigger,
+  decibelsFromLinear,
+  describeFrequency,
+  fractionOf,
+  frequencyAt,
+  kWeightingRatio,
+  peakFrequency,
+  projectSpectrum,
+  spectralCentroid,
+  stereoCorrelation,
+  vuDeflection,
+  vuFromRms,
+  windowLevel,
+  type AudioMeterDisplayOptions,
+  type AudioMeterDisplaySource,
+  type AudioMeterDisplaySnapshot,
+  type AudioMeterDisplayType,
+  type AudioMeterFrequencyScale,
+  type AudioMeterLoudnessMode,
+  type AudioMeterTrigger,
+  type AudioMeterVuSnapshot,
+  type AudioMeterLoudnessSnapshot,
+  type AudioMeterWaveformSnapshot,
+  type AudioMeterOscilloscopeSnapshot,
+  type AudioMeterSpectrumSnapshot,
+  type AudioMeterSpectrumPeak,
+  type AudioMeterSpectrogramSnapshot,
+  type AudioMeterStereometerSnapshot,
+} from './meter-display';
+
+export {
   bindPlayerToAudioTimeline,
   type AudioTimelineBinding,
   type BindAudioTimelineOptions,
   type PlayheadTarget,
 } from './binding';
+
+export {
+  createAudioViewEditing, audioDocumentPlaybackCompatible,
+  type AudioViewEditing, type AudioViewEditingOptions, type AudioViewEditingState,
+} from './audio-editing';
+export {
+  createAudioSequenceWaveform, type AudioSequenceWaveform, type AudioSequenceWaveformOptions,
+} from './sequence-waveform';
+
+export {AudioClipEditor, createAudioClipEditor, type AudioClipEditorOptions} from './audio-clip-editor';
+export {
+  loadAudioClipEditor, type LoadAudioClipEditorOptions, type AudioClipEditorLoader, type AudioClipEditorLoadLimits,
+} from './load-audio-clip-editor';

@@ -38,6 +38,7 @@ export {
 export {peaksFromWaveformData} from '../../core';
 
 export type {
+  AudioWaveformSource,
   AudioViewportSnapshot,
   AudioViewportUpdate,
   AudioViewportSubscriber,
@@ -79,7 +80,36 @@ export type {
   SpectrumBarsOptions,
 } from '../headless/meter';
 export type {
+  AudioMeterDisplayType,
+  AudioMeterFrequencyScale,
+  AudioMeterLoudnessMode,
+  AudioMeterTrigger,
+  AudioMeterDisplayOptions,
+  AudioMeterDisplaySnapshot,
+} from '../headless/meter-display';
+export type {
   AudioTimelineBinding,
   BindAudioTimelineOptions,
   PlayheadTarget,
 } from '../headless/binding';
+export type {
+  AudioViewEditing, AudioViewEditingOptions, AudioViewEditingState,
+} from '../headless/audio-editing';
+export type {
+  AudioSequenceWaveform, AudioSequenceWaveformOptions,
+} from '../headless/sequence-waveform';
+
+// Document editing is a View feature: stateless operations, range-processor
+// recipes and Core contracts here; AudioClipEditor and loadAudioClipEditor in
+// /view/headless. Rendering and WAV export live in Play.
+export {applyAudioOperations} from '../core/edit-operations';
+export {
+  AUDIO_FADE_CURVES, audioFadeGain, audioRangeFadeOperations, audioRangeGainOperations, audioRangeSilenceOperations,
+  audioFadeLength, audioSegmentFadeEnvelope, audioSegmentSpans, audioSplitOperations, decibelsToGain, editAudioEnvelope,
+  gainToDecibels, nearestAudioZeroCrossing,
+  type AudioFadeCurve, type AudioSegmentIdFactory, type AudioSegmentSpan,
+} from '../core/clip-edits';
+export {AUDIO_RANGE_PROCESSOR_KINDS, createAudioRangeProcessor, type AudioRangeProcessorKind} from './processor';
+export * from '../../core/editing';
+export * from '../../core/audio-position-map';
+export * from '../../core/sequence';

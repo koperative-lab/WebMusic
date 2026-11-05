@@ -6,10 +6,15 @@ import { mountDemos } from "../src/components/demo-lifecycle";
 import { mountBridgeComposition } from "../src/components/bridges/bridge-composition-client";
 
 const boundaries = vi.hoisted(() => ({
+  loadScore: vi.fn(),
   render: vi.fn(),
   pair: vi.fn(),
   waveform: vi.fn(),
   transport: vi.fn(),
+}));
+vi.mock("../src/components/headless/arabesque-score", () => ({
+  loadArabesqueScore: boundaries.loadScore,
+  arabesqueExcerpt: (source: unknown, quarters: number) => ({ source, quarters }),
 }));
 vi.mock("@webmusic/score/view/element", () => ({
   defineScoreViewElement: vi.fn(),
@@ -151,6 +156,7 @@ beforeEach(() => {
   );
   vi.stubGlobal("cancelAnimationFrame", vi.fn());
   boundaries.render.mockReset().mockResolvedValue(clip);
+  boundaries.loadScore.mockReset().mockResolvedValue({ title: "Arabesque No. 1" });
   boundaries.pair.mockReset().mockImplementation(() => {
     const pair = newPair();
     pairs.push(pair);
@@ -176,6 +182,22 @@ afterEach(async () => {
 });
 
 describe("reference playback composition lifecycle", () => {
+  it("does not render a late loaded score after its host is removed", async () => {
+    const pending = deferred<{ title: string }>();
+    boundaries.loadScore.mockReturnValueOnce(pending.promise);
+    const root = mount();
+    click(root, "[data-load]");
+    await flush();
+    expect(boundaries.loadScore).toHaveBeenCalledWith("midi");
+    root.remove();
+    await flush();
+    pending.resolve({ title: "Arabesque No. 1" });
+    await flush();
+    expect(boundaries.render).not.toHaveBeenCalled();
+    expect(boundaries.pair).not.toHaveBeenCalled();
+    expect(contexts[0].close).toHaveBeenCalledOnce();
+  });
+
   it("destroys the actual public transport presenter when its scope is released", () => {
     const root = mount();
     const host = root.querySelector<HTMLElement>("[data-transport]")!;

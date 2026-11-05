@@ -16,9 +16,10 @@ import {
   requiredFeatureLayers,
   staticOptionalPeerEntries,
 } from './package-policy.mjs';
-import {elementCompositionPolicy, standaloneUiPresenters} from './element-composition-policy.mjs';
+import {elementCompositionPolicy, standaloneUiPresenters, sourceWithoutOwnedFocusWrite} from './element-composition-policy.mjs';
 import {releasePackageNames} from './release-packages.mjs';
 import {manifestBoundaryProblems, unpublishedWorkspacePackage} from './release-surface.mjs';
+import {isIdentifierReference, isRuntimeIdentifierReference} from './architecture-identifiers.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const errors = [];
@@ -272,6 +273,13 @@ async function inspectModule(file) {
           specifier: node.moduleSpecifier.text,
           dynamic: false,
           runtime: !isTypeOnlyDeclaration(node),
+          symbols: ts.isImportDeclaration(node) && node.importClause
+            ? [
+              ...(node.importClause.name ? ['default'] : []),
+              ...(node.importClause.namedBindings && ts.isNamedImports(node.importClause.namedBindings)
+                ? node.importClause.namedBindings.elements.map((item) => (item.propertyName ?? item.name).text)
+                : node.importClause.namedBindings ? ['*'] : []),
+            ] : [],
         });
       }
     } else if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
@@ -419,35 +427,6 @@ function uiMethodFeature(name) {
   return undefined;
 }
 
-function isIdentifierReference(node) {
-  const parent = node.parent;
-  if (!parent) return false;
-  if (
-    (ts.isVariableDeclaration(parent) || ts.isParameter(parent) ||
-      ts.isFunctionDeclaration(parent) || ts.isClassDeclaration(parent) ||
-      ts.isInterfaceDeclaration(parent) || ts.isTypeAliasDeclaration(parent) ||
-      ts.isPropertyDeclaration(parent) || ts.isPropertySignature(parent) ||
-      ts.isMethodDeclaration(parent) || ts.isMethodSignature(parent) ||
-      ts.isImportClause(parent) || ts.isImportSpecifier(parent) ||
-      ts.isBindingElement(parent)) && parent.name === node
-  ) return false;
-  if (ts.isPropertyAccessExpression(parent) && parent.name === node) return false;
-  if (ts.isPropertyAssignment(parent) && parent.name === node && !ts.isComputedPropertyName(parent.name)) return false;
-  return true;
-}
-
-function isRuntimeIdentifierReference(node) {
-  for (let current = node.parent; current; current = current.parent) {
-    if (ts.isTypeNode(current)) return false;
-    if (ts.isExpressionStatement(current) || ts.isStatement(current) || ts.isSourceFile(current)) break;
-  }
-  const parent = node.parent;
-  if (ts.isPropertyAccessExpression(parent) && parent.name === node) return false;
-  if (ts.isPropertyAssignment(parent) && parent.name === node && !ts.isComputedPropertyName(parent.name)) return false;
-  if (ts.isMethodDeclaration(parent) && parent.name === node) return false;
-  return true;
-}
-
 function isTypeOnlyDeclaration(node) {
   if (ts.isImportDeclaration(node)) {
     const clause = node.importClause;
@@ -520,13 +499,14 @@ function checkFeatureLayers(name, pkg) {
       }
     }
 
-    // The capability root export maps to <capability>/index.ts; headless and
-    // element layers keep their own public subpaths.
+    // Require each declared public layer. Exact export policy separately
+    // rejects subpaths outside the reviewed allowlist.
     for (const [layer, subpath] of Object.entries({
       api: `./${capability}`,
       headless: `./${capability}/headless`,
       element: `./${capability}/element`,
     })) {
+      if (!sources[layer]) continue;
       const target = pkg.manifest.exports?.[subpath];
       if (!target || typeof target !== 'object') {
         errors.push(`${name} is missing public ${layer} layer export ${subpath}.`);
@@ -1146,7 +1126,7 @@ async function checkElementComposition() {
     for (const file of staticallyReachable) {
       const relative = relativeToRoot(file);
       if (!relative.startsWith(`packages/${entry.family.toLowerCase()}/src/`)) continue;
-      const text = await readFile(file, 'utf8');
+      const text = sourceWithoutOwnedFocusWrite(entry.tag, relative, await readFile(file, 'utf8'));
       for (const [pattern, description] of sliderAriaBans) {
         if (pattern.test(text)) {
           errors.push(

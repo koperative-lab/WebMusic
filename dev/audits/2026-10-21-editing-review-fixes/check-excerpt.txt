@@ -1,0 +1,44 @@
+# npm run check (excerpt): step headers, gate summaries and test totals
+> check
+> check:source
+> check:format
+Format check passed.
+> check:lockfile
+Lockfile check passed: every declared optional dependency is present across 902 locked packages.
+> check:dev-server
+> lint
+> check:architecture
+Architecture check passed for 5 packages and 437 source modules.
+> check:docs
+check-docs: clean — 74 live-demo pages · 89 instances, 115 pages · 24 elements · 115 routes
+> check:dev-docs
+Development documentation check passed: 273 documents; generated inventories, local file links and dev/.agent reading routes are consistent.
+> check:site-notices
+> build:packages
+> check:doc-snippets
+Doc snippet check passed: 268 examples (fences, inline scripts, and literal MDX code exports) compile against built declarations.
+> typecheck
+> typecheck
+> typecheck:tests
+> test
+ Test Files  14 passed (14)
+      Tests  163 passed (163)
+ Test Files  36 passed (36)
+      Tests  653 passed (653)
+ Test Files  199 passed (199)
+      Tests  2395 passed (2395)
+ Test Files  86 passed (86)
+      Tests  1154 passed (1154)
+ Test Files  7 passed (7)
+      Tests  182 passed (182)
+> test
+ Test Files  32 passed (32)
+      Tests  255 passed (255)
+> check:licenses
+License gate passed: no copyleft package in hard dependencies; all restricted peers are optional.
+> check:packages
+Package export check passed for 101 public entries.
+Package artifact check passed for 5 package(s).
+> check:release-manifests
+Release manifests are consistent at 0.2.0.
+EXIT=0

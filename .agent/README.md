@@ -13,7 +13,7 @@ and verification policy.
 | [Tool recommendations](TOOLS.md) | Choose existing tools first; identify useful additions and what they would prove |
 | [Rule ownership](rules/README.md) | Find the authoritative rule and its existing mechanical check |
 | [Component review skill](skills/webmusic-component-review/SKILL.md) | Review musical algorithms, lifecycle and component boundaries |
-| [Frontend review skill](skills/webmusic-frontend-review/SKILL.md) | Inspect actual rendering, responsive composition and UIKit reuse |
+| [Frontend skill](skills/webmusic-frontend-review/SKILL.md) | Build or review any visible UI to the required [visual design](../dev/design/VISUAL-DESIGN.md); inspect rendering, responsive composition and UIKit reuse |
 | [Documentation maintenance skill](skills/webmusic-docs-maintenance/SKILL.md) | Align public contracts, examples, navigation and generated indexes |
 | [Component review workflow](workflows/component-review.md) | Run an architecture/algorithm phase, including Audio-specific evidence |
 | [Frontend review workflow](workflows/frontend-review.md) | Run the rendered UI acceptance phase |
@@ -38,20 +38,17 @@ Audio/play algorithms and component architecture. Keep frontend acceptance
 for the next phase. Preserve the current working-tree changes.
 ```
 
-`.agent/` is our storage convention. Codex documents repository discovery in
-`.agents/skills/`, including symlinked skill folders; a file existing here does
-not itself make it available in the skill picker. See
-[OpenAI's skill loading documentation](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills).
-Claude Code documents project skills in `.claude/skills/` and also supports
-symlinked skill folders. See
-[Claude Code skill locations](https://code.claude.com/docs/en/skills#where-skills-live).
+`.agent/` is our storage convention. Agent clients discover project skills
+in their own documented directories, and many accept symlinked skill folders; a
+file existing here does not itself make it available in any client's skill
+picker. Consult the client's own documentation for its discovery location.
 
 If client discovery is wanted later, link each named skill directory from that
 client's supported location to the canonical directory here. Preserve existing
 client settings and verify discovery in that client. Do not maintain copied
 skill bodies. These skills reference this repository and are not standalone
-global skills. The repository currently ignores `.claude/`; a team-shared Claude
-adapter would also need an intentional ignore-policy change.
+global skills. Client-specific directories stay out of the repository; a
+team-shared client adapter would need an intentional ignore-policy change.
 
 ## Keep the toolkit small
 

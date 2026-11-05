@@ -11,7 +11,7 @@ import LiveDemoCanvas from './LiveDemoCanvas.astro';
 
   <LiveDemoCanvas size="tall">
     <div class="wx-grid">
-      <p role="status" data-wave-status>Waveforms load when this example is visible.</p>
+      <p role="status" class="wm-demo-status" data-wave-status>Waveforms load when this example is visible.</p>
       <div class="wx-item">
         <div class="wx-cap"><strong>Custom colours</strong> · <code>wave-color · progress-color · playhead-color</code></div>
         <audio-view type="waveform" data-wave-ex wave-color="#22c55e" progress-color="#15803d" playhead-color="#f59e0b"></audio-view>
@@ -59,7 +59,7 @@ import LiveDemoCanvas from './LiveDemoCanvas.astro';
         for (const view of views) if (view.hasAttribute('data-wave-spec')) view.spectrogram = spectrum;
         status.textContent = '';
       } catch (error) {
-        if (scope.active) status.textContent = 'These examples could not be prepared. Reload this page to retry.';
+        if (scope.active) { status.textContent = 'These examples could not be prepared. Reload this page to retry.'; status.dataset.error = ''; }
         throw error;
       }
     });

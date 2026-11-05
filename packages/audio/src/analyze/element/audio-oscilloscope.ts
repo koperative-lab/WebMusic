@@ -92,6 +92,9 @@ export class AudioOscilloscopeElement extends WebMusicElement {
   #player?: AnalysisPlayerTarget;
   #playerState: AnalysisPlayerSnapshot['state'] = 'unbound';
   #playing = false;
+  #loading = false;
+  #emptySource = false;
+  #loadError?: Error;
   #analyser?: AnalyserNode;
   #runner?: RealtimeAnalyzer;
   #stallTimer?: ReturnType<typeof setTimeout>;
@@ -232,6 +235,9 @@ export class AudioOscilloscopeElement extends WebMusicElement {
     if (!current()) return;
     this.#player = undefined;
     this.#playerState = 'unbound';
+    this.#loading = false;
+    this.#emptySource = false;
+    this.#loadError = undefined;
     this.#playing = false;
     this.#lastTime = undefined;
     this.#stalled = false;
@@ -246,6 +252,9 @@ export class AudioOscilloscopeElement extends WebMusicElement {
   }
 
   #onPlayer(kind: AnalysisPlayerUpdate, reading: AnalysisPlayerSnapshot): void {
+    this.#loading = reading.loading;
+    this.#emptySource = reading.empty;
+    this.#loadError = reading.loadError;
     this.#player = reading.target;
     this.#playerState = reading.state;
     this.#playing = kind === 'end' ? false : reading.playing;
@@ -288,6 +297,11 @@ export class AudioOscilloscopeElement extends WebMusicElement {
       this.#clear('paused');
       return;
     }
+    if (!this.#explicitAnalyser && (this.#loading || this.#loadError)) {
+      this.#stop();
+      this.#clear(this.#loadError ? 'unavailable' : 'loading');
+      return;
+    }
     let analyser: AnalyserNode | undefined;
     try {
       analyser = this.#explicitAnalyser ?? (this.#playing ? this.#player?.analyser : undefined);
@@ -300,7 +314,7 @@ export class AudioOscilloscopeElement extends WebMusicElement {
     if (!analyser) {
       this.#stop();
       this.#clear(this.#playing || this.#playerState === 'invalid' || this.#playerState === 'ambiguous'
-        ? 'unavailable' : this.#player ? 'paused' : 'waiting');
+        ? 'unavailable' : this.#player && !this.#emptySource ? 'paused' : 'waiting');
       return;
     }
     if (this.#analyser === analyser && this.#runner?.running) return;

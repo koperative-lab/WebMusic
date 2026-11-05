@@ -24,6 +24,13 @@ function state(): SpectrumAnalyzerState {
   };
 }
 
+function captureFrames(): FrameRequestCallback[] {
+  const frames: FrameRequestCallback[] = [];
+  vi.spyOn(document.defaultView!, 'requestAnimationFrame').mockImplementation((callback) => frames.push(callback));
+  vi.spyOn(document.defaultView!, 'cancelAnimationFrame').mockImplementation(() => undefined);
+  return frames;
+}
+
 afterEach(() => {
   document.body.replaceChildren();
   vi.restoreAllMocks();
@@ -31,6 +38,30 @@ afterEach(() => {
 });
 
 describe('mountSpectrumAnalyzer', () => {
+  it('uses shared waiting feedback without replacing plot controls or hiding unavailable status', () => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(context as unknown as CanvasRenderingContext2D);
+    const host = document.createElement('div');
+    const current = state();
+    current.status = 'waiting';
+    const handle = mountSpectrumAnalyzer(host, {snapshot: () => current, setFrozen: vi.fn(), setPeakHold: vi.fn()});
+    const indicator = host.querySelector<HTMLElement>('.wui-status')!;
+    expect(indicator.dataset.kind).toBe('waiting');
+    expect(indicator.textContent).toBe('Waiting for playback');
+    const plot = host.querySelector('[part="plot"]');
+    current.status = 'loading';
+    handle.update();
+    expect(indicator.dataset.kind).toBe('loading');
+    expect(indicator.getAttribute('aria-busy')).toBe('true');
+    current.status = 'unavailable';
+    handle.update();
+    expect(indicator.hidden).toBe(true);
+    expect(indicator.hasAttribute('aria-busy')).toBe(false);
+    expect(host.querySelector('[part="status"]')?.textContent).toBe('Analyser unavailable');
+    expect(host.querySelector('[part="plot"]')).toBe(plot);
+    handle.destroy();
+    expect(host.children).toHaveLength(0);
+  });
+
   it('shows an accessible log-frequency probe with analyser-bin dB, and pointer/keyboard inspection', () => {
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(context as unknown as CanvasRenderingContext2D);
     const host = document.createElement('div');
@@ -46,6 +77,9 @@ describe('mountSpectrumAnalyzer', () => {
     expect(plot.getAttribute('role')).toBe('slider');
     expect(plot.getAttribute('aria-valuetext')).toContain('-36.0 dB');
     expect(host.querySelector('output')?.textContent).toContain('1.0 kHz');
+    expect([...host.querySelectorAll('[part="readout"] dt')].map((node) => node.textContent)).toEqual(['Frequency', 'Level']);
+    expect([...host.querySelectorAll('[part="readout"] output')].map((node) => node.textContent)).toEqual(['1.0 kHz', '-36.0 dB']);
+    expect(host.querySelector<HTMLElement>('[part="status"]')?.hidden).toBe(true);
     expect(context.stroke).toHaveBeenCalled();
 
     plot.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowRight', bubbles: true}));
@@ -58,12 +92,25 @@ describe('mountSpectrumAnalyzer', () => {
     handle.update();
     plot.dispatchEvent(new KeyboardEvent('keydown', {key: 'Home', bubbles: true}));
     expect(probes.at(-1)?.frequency).toBe(20);
+    const frames = captureFrames();
     vi.spyOn(plot, 'getBoundingClientRect').mockReturnValue({left: 0, width: 360} as DOMRect);
+    const count = probes.length;
+    const strokes = context.stroke.mock.calls.length;
+    plot.dispatchEvent(new PointerEvent('pointermove', {clientX: 100, bubbles: true}));
     plot.dispatchEvent(new PointerEvent('pointermove', {clientX: 350, bubbles: true}));
+    // Hover is coalesced to one probe and one redraw per frame, at the latest position.
+    expect(frames).toHaveLength(1);
+    expect(probes).toHaveLength(count);
+    expect(context.stroke.mock.calls.length).toBe(strokes);
+    frames.shift()!(0);
+    expect(probes).toHaveLength(count + 1);
     expect(probes.at(-1)?.frequency).toBeGreaterThan(10_000);
+    plot.dispatchEvent(new PointerEvent('pointermove', {clientX: 200, bubbles: true}));
 
     handle.destroy();
     expect(host.querySelector('.wui-spectrum-analyzer')).toBeNull();
+    frames.shift()!(0);
+    expect(probes).toHaveLength(count + 1);
   });
 
   it('routes freeze, peak hold and reset through the presenter and updates their state', () => {
@@ -76,6 +123,11 @@ describe('mountSpectrumAnalyzer', () => {
     const freeze = host.querySelector<HTMLButtonElement>('[part="freeze"]')!;
     const hold = host.querySelector<HTMLButtonElement>('[part="peak-hold"]')!;
     const reset = host.querySelector<HTMLButtonElement>('[part="reset-peaks"]')!;
+    expect([freeze, hold, reset].map((button) => [button.getAttribute('aria-label'), button.title, button.textContent]))
+      .toEqual([['Freeze', 'Freeze', ''], ['Peak hold', 'Peak hold', ''], ['Reset peaks', 'Reset peaks', '']]);
+    expect([freeze, hold, reset].every((button) => button.querySelector('svg[data-icon][aria-hidden="true"]'))).toBe(true);
+    expect(host.querySelector('[part="toolbar"]')?.classList.contains('wui-analysis-row')).toBe(true);
+    expect(reset.hasAttribute('aria-pressed')).toBe(false);
     expect(freeze.disabled).toBe(false);
     expect(reset.disabled).toBe(true);
     freeze.click();
@@ -90,10 +142,45 @@ describe('mountSpectrumAnalyzer', () => {
     current.frame = undefined;
     current.status = 'paused';
     handle.update();
-    expect(host.querySelector('[part="status"]')?.textContent).toBe('Playback paused');
+    expect(host.querySelector<HTMLElement>('[part="status"]')?.hidden).toBe(true);
+    expect(host.querySelectorAll('[part="readout"] output')[1]?.textContent).toBe('—');
     current.sourceRevision += 1;
     handle.update();
     expect(reset.disabled).toBe(true);
+    handle.destroy();
+  });
+
+  it('paints solid signal and dashed held peaks with neutral or caller-resolved ink', () => {
+    let resize: (() => void) | undefined;
+    vi.stubGlobal('ResizeObserver', class { constructor(callback: () => void) { resize = callback; } observe() {} disconnect() {} });
+    const painted: string[] = [];
+    const drawing = {...context, strokeStyle: '', stroke: vi.fn(), fillRect: vi.fn(), setLineDash: vi.fn()};
+    drawing.stroke.mockImplementation(() => { painted.push(drawing.strokeStyle); });
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(drawing as unknown as CanvasRenderingContext2D);
+    const host = document.createElement('div'); document.body.append(host);
+    const current = state(); current.peakHold = true;
+    const handle = mountSpectrumAnalyzer(host, {snapshot: () => current, setFrozen: vi.fn(), setPeakHold: vi.fn()});
+    expect(new Set(painted)).toEqual(new Set(['#444', '#666']));
+    expect(drawing.fillRect).not.toHaveBeenCalled();
+    expect(drawing.setLineDash).toHaveBeenCalledWith([4, 3]);
+    painted.length = 0;
+    handle.element.style.color = 'rgb(22, 44, 66)';
+    host.querySelector<HTMLElement>('[part="readout"]')!.style.color = 'rgb(77, 88, 99)';
+    handle.update();
+    // Ink is cached between resizes, so a per-frame update never forces style resolution.
+    expect(new Set(painted)).toEqual(new Set(['#444', '#666']));
+    painted.length = 0;
+    resize!();
+    expect(new Set(painted)).toEqual(new Set(['rgb(22, 44, 66)', 'rgb(77, 88, 99)']));
+    for (const status of ['live', 'paused', 'frozen'] as const) {
+      current.status = status; handle.update();
+      expect(host.querySelector<HTMLElement>('[part="status"]')?.hidden).toBe(true);
+    }
+    current.status = 'waiting'; handle.update();
+    expect(host.querySelector('[part="status"]')?.textContent).toBe('Waiting for playback');
+    current.status = 'unavailable'; handle.update();
+    expect(host.querySelector('[part="status"]')?.textContent).toBe('Analyser unavailable');
+    expect(host.querySelector<HTMLElement>('[part="status"]')?.hidden).toBe(false);
     handle.destroy();
   });
 

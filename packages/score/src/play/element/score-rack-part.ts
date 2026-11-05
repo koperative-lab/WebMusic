@@ -68,6 +68,7 @@ export class RackPartElement extends WebMusicElement {
     const desk = this.parentElement as Partial<ModuleRackPartHost> | null;
     return desk?.rackPartModule?.(this);
   }
+  private loadFailure?: {error: unknown};
 
   protected override onMount(): void {
     this.modular = isModularComposition(this);
@@ -130,6 +131,16 @@ export class RackPartElement extends WebMusicElement {
     return this.explicitSound;
   }
 
+  /** Loading feedback belongs to the desk; this declaration remains nonvisual. */
+  rackPartStatus(): {kind: 'ready' | 'loading' | 'waiting' | 'error'; message?: string} {
+    if (this.loadFailure) {
+      const {error} = this.loadFailure;
+      return {kind: 'error', message: error instanceof Error ? error.message : 'Unable to load rack part.'};
+    }
+    if (this.loadController) return {kind: 'loading', message: 'Loading rack parts…'};
+    return {kind: this.resolved ? 'ready' : 'waiting', message: 'Waiting for rack part scores…'};
+  }
+
   /**
    * What this part contributes, or undefined until it has a score.
    *
@@ -180,6 +191,7 @@ export class RackPartElement extends WebMusicElement {
 
   private async resolve(): Promise<void> {
     this.cancelLoad();
+    this.loadFailure = undefined;
     const token = this.loadToken;
     if (this.explicitScore) {
       this.resolved = this.explicitScore;
@@ -196,6 +208,7 @@ export class RackPartElement extends WebMusicElement {
     const controller = new AbortController();
     this.loadController = controller;
     this.reservePendingSource(isModularComposition(this) ? requestModuleContext(this)?.session : undefined);
+    this.announce();
     try {
       const {loadScoreFromUrl} = await import('../../io/load');
       if (controller.signal.aborted) return;
@@ -203,6 +216,9 @@ export class RackPartElement extends WebMusicElement {
       const score = await loadScoreFromUrl(src, {...(format ? {format} : {}), signal: controller.signal});
       if (token !== this.loadToken || !this.isConnected) return;
       this.resolved = score;
+      // A modular desk accepts the declaration on this announcement; its
+      // readiness settles the Session's pending source before `finally`
+      // reports the finished load to the desk's status.
       this.announce();
       if (token !== this.loadToken || !this.isConnected) return;
       if (this.pendingSource && !this.module) throw new Error('The Rack did not accept the loaded score declaration.');
@@ -211,12 +227,16 @@ export class RackPartElement extends WebMusicElement {
       this.pendingSession = undefined;
     } catch (error) {
       if (token !== this.loadToken || controller.signal.aborted) return;
+      this.loadFailure = {error};
       this.sourceLoadFailed = true;
       this.sourceLoadError = error;
       this.pendingSource?.reject(error);
       this.reportError(error);
     } finally {
-      if (this.loadController === controller) this.loadController = undefined;
+      if (this.loadController === controller) {
+        this.loadController = undefined;
+        this.announce();
+      }
     }
   }
 

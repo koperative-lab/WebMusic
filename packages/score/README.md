@@ -2,7 +2,7 @@
 
 **Symbolic music for the web.** One package: an immutable `Score` model,
 MIDI / MusicXML / MXL / ABC import and export, two playback engines, staff /
-piano-roll / waterfall views, musical analysis, Web Components, and React
+piano-roll / waterfall views, document editing, musical analysis, Web Components, and React
 bindings.
 
 ```bash
@@ -63,7 +63,7 @@ Use the owning public reference and exported types to establish implemented beha
 ## Which entry do I import?
 
 Subpaths follow a two-level grammar. The **first level is a capability** —
-`io`, `view`, `play`, `analyze`, `react`; the package root is the core model.
+`io`, `edit`, `view`, `play`, `analyze`, `react`; the package root is the core model.
 The **second level is a form** of that capability: **`headless`** is stateful
 code with no UI DOM (operations still have entry-specific environment and
 resource requirements); **`element`** is Web
@@ -72,9 +72,9 @@ browser input to a player; **`auto`** registers all elements as an import
 side effect; **`global`** is the CDN IIFE bundle; and **`worker`** /
 **`worker-client`** / **`worker-protocol`** are the Worker trio — the
 self-registering Worker runtime, the main-thread client, and the pure wire
-types. Each capability's *root* (`@webmusic/score/io`, `…/view`, `…/play`,
-`…/analyze`) is its stateless API: data in, data out, no DOM, no engine
-state.
+types. Each capability's *root* is its supported code API. They provide stateless
+functions; persistent owners such as `ScoreEditor` live in `/headless`. All
+these API entries are DOM-free.
 
 | Entry | What it is |
 |---|---|
@@ -85,10 +85,10 @@ state.
 | `@webmusic/score/io/worker-client` | Main-thread parser Worker client (`createParserWorker`). |
 | `@webmusic/score/io/worker-protocol` | Pure parser wire types and constants for custom hosts. |
 | `@webmusic/score/io/worker` | Self-registering parser Worker runtime. |
-| `@webmusic/score/view` | Stateless view API: layout geometry, note sequences, types. |
-| `@webmusic/score/view/headless` | Score windows, map navigation and held-pitch state with optional borrowed playback; no DOM. |
-| `@webmusic/score/view/render` | Imperative browser visualizers (SVG / canvas / OSMD). |
-| `@webmusic/score/view/element` | `<score-view>`, `<score-pitch-view>` and `<score-sheet-view>` Web Components. |
+| `@webmusic/score/view` | Stateless view API: layout geometry, note sequences, types, plus atomic note operations, document contracts and position maps for editing. |
+| `@webmusic/score/view/headless` | Score windows, map navigation and held-pitch state with optional borrowed playback, and the persistent `ScoreEditor` (bounded history, checkpoints, draft/selection sessions); no DOM. |
+| `@webmusic/score/view/render` | Imperative browser visualizers (SVG / canvas), the piano-roll grid and engraved sheet pages. |
+| `@webmusic/score/view/element` | `<score-view>`, `<score-grid-view>`, `<score-pitch-view>` and `<score-sheet-view>` Web Components. |
 | `@webmusic/score/play` | Stateless playback API: SFZ data helpers, offline render types. |
 | `@webmusic/score/play/headless` | Players, synths, `Sound`, `Effect`, `Rack`, `LfoController`, offline rendering. |
 | `@webmusic/score/play/drivers` | Pointer / scroll / orientation / value transport adapters. |
@@ -98,7 +98,7 @@ state.
 | `@webmusic/score/play/demos` | Demo elements and sample scores. |
 | `@webmusic/score/analyze` | Stateless analysis: key, chords, Roman numerals, motifs, voice leading. |
 | `@webmusic/score/analyze/headless` | Sessions, playback followers, live trackers, worker clients and presentation prediction; no DOM. |
-| `@webmusic/score/analyze/element` | Interactive current-chord and chord-progression analysis components. |
+| `@webmusic/score/analyze/element` | Four elementary tools: chord (score/live), interval, explicit scale and grouped rhythm. |
 | `@webmusic/score/analyze/worker-client` | Main-thread analysis Worker client (`createAnalysisWorker`). |
 | `@webmusic/score/analyze/worker-protocol` | Pure analysis wire types and constants. |
 | `@webmusic/score/analyze/worker` | Self-registering analysis Worker runtime. |
@@ -156,7 +156,10 @@ const score = builder.build();
 Share the result between a player, a renderer, and an analyzer without one
 consumer mutating another's data. `score.withMetadata(...)` returns a
 modified copy; `scoreFromJSON(score.toJSON())` round-trips it, with a schema
-marker (`v0.1`), runtime validation, and coded `ScoreJSONError` rejections.
+marker (`v0.2`), runtime validation, and coded `ScoreJSONError` rejections. The
+reader also migrates `v0.1` and unmarked legacy input. Effective note velocity
+is `velocityOverride ?? performed?.velocity ?? 80`; an override never creates
+absolute performed timing.
 
 Time, queries, events:
 
@@ -249,6 +252,44 @@ other structured remote failures reject with `ParserWorkerRemoteError`. Wire
 types live at `@webmusic/score/io/worker-protocol`; the self-registering
 runtime at `@webmusic/score/io/worker`.
 
+## Document editing (part of `@webmusic/score/view`)
+
+`createScoreEditor(score, options?)` owns one committed immutable Score and
+document revision. It supports atomic insert/delete/move/resize/transpose/velocity/
+quantize commands, bounded undo/redo (100 transactions by default), application
+checkpoints and separate interaction drafts. It allocates no player, clock or DOM.
+
+```ts
+import {createScoreEditor} from '@webmusic/score/view/headless';
+
+const editor = createScoreEditor(score);
+const note = editor.score.notes.find((candidate) => !candidate.rest);
+if (note) {
+  const result = editor.transaction('Move note', (tx) => {
+    tx.add({type: 'move-notes', noteIds: [note.id], deltaQuarters: [1, 4]});
+  });
+  if (result.status === 'failed') console.error(result.error.code);
+}
+const editedScore = editor.score;
+// Keep editedScore for serialization or an explicitly created consumer.
+editor.dispose();
+```
+
+Effective timing edits make written time authoritative for changed notes while
+preserving their effective velocity. Unchanged notes keep their performed timing.
+Native ScorePlayer borrows the editor through `setDocumentSource(editor)`.
+`loadScoreEditor(url)` loads a file into a new editor. Assign it to
+`score-player`, `score-grid-view` and `score-view` through `.editor`; the
+application owns and disposes it. `<score-grid-view editable>` is a DAW-style
+piano-roll grid with a toolbar: select, drag, resize, draw and delete notes,
+edit velocity in a lane, snap and zoom. Its `tools` attribute chooses which of
+those features exist. `<score-view>` is read-only and draws the editor's content.
+Playback applies revisions while paused and requires
+an explicit later Play action. See the
+[View API](https://github.com/koperative-lab/WebMusic/blob/main/apps/doc/webmusic/src/content/docs/score/api/view.mdx)
+and [ScoreEditor](https://github.com/koperative-lab/WebMusic/blob/main/apps/doc/webmusic/src/content/docs/score/headless/view/score-editor.mdx)
+for complete commands, failures and ownership.
+
 ## Views (`@webmusic/score/view`)
 
 Three views — **staff**, **piano roll**, **waterfall** — at four altitudes:
@@ -282,9 +323,9 @@ combines that source's score, position and activity with an analysis session.
 These objects release only their own subscriptions and never own playback.
 
 `@webmusic/score/view/render` also exports `renderStaffVisualizer`,
-`renderWaterfallVisualizer`, `bindPlayerToVisualizer`, and
-`renderOSMDStaffVisualizer` (engraving through the optional
-`opensheetmusicdisplay` peer).
+`renderWaterfallVisualizer`, `bindPlayerToVisualizer`, `mountScoreGrid`
+(the editable piano-roll grid) and `mountScoreSheet` (engraved pages with
+notation editing).
 
 The Web Component entry provides three composable tags:
 
@@ -299,17 +340,20 @@ defineAllViewElements();
 <score-pitch-view type="keyboard" player="#p" low="48" high="84"></score-pitch-view>
 ```
 
-- **`<score-view>`** selects `piano-roll` (default), `staff`, `waterfall`,
-  `map` or `thumbnail`. It resolves explicit `.score`, then `src`, then the
-  selected player's score. Type changes reuse that data. Map provides density
-  cells and rate-aware seeking; thumbnail is a static preview without active
-  highlighting or interaction, even when borrowing a player's loaded score.
+- **`<score-view>`** selects `piano-roll` (default), `staff` or `waterfall`.
+  It resolves explicit `.score`, then `src`, then the selected player's score.
+  Type changes reuse that data. Only `staff` draws score annotations
+  (`show-annotations`, default true). For a navigation map or a static
+  preview, compose Headless `createScoreMapView` with `@webmusic/ui/timeline`,
+  or the `/view/render` thumbnail renderer.
 - **`<score-pitch-view>`** selects `keyboard` (default), current-pitch `staff` or
   `fretboard`. It borrows held notes through `player` (or legacy `source`), owns
   no Score, and sends no note or transport commands. Type changes retain activity.
-- **`<score-sheet-view>`** engraves an explicit `.score` or `src` through the optional
-  `opensheetmusicdisplay` peer. Its optional `player` connection follows note
-  events; it does not borrow the player's score or native snapshot.
+- **`<score-sheet-view>`** engraves the score in justified systems on pages
+  (`layout="page"`) or in a continuous column (`layout="flow"`) with the
+  package's own VexFlow engraver. With a borrowed `.editor` and `editable` it
+  edits like a notation program: select, move pitches, note input mode and
+  duration changes. It follows `player` like the other View Elements.
 
 Each instance renders one surface. Configuration belongs to attributes or
 application-owned controls; documentation demos put it in external Parameters.
@@ -636,7 +680,7 @@ and terminated on `dispose()`. Structured remote failures reject with
 live at `@webmusic/score/analyze/worker-protocol`; the runtime at
 `@webmusic/score/analyze/worker`.
 
-Analysis Web Components expose two focused inspection tools:
+Analysis Web Components expose four elementary inspection tools:
 
 ```ts
 import {defineAllAnalysisElements} from '@webmusic/score/analyze/element';
@@ -657,7 +701,9 @@ attributes, and supporting keyboards, staffs or fretboards remain reusable View
 components. They borrow the player's existing data or held-note state and own no
 playback graph.
 
-The two tags cover current-chord interpretation and passage harmony. The
+The four tags inspect chord structure (score or live mode), spelled intervals,
+notes against an explicit tonic/scale, and written placement within grouped
+meter. They do not guess a key or judge harmonic function. The
 [Analyze overview](../../apps/doc/webmusic/src/content/docs/score/element/index.mdx#analyze)
 selects and documents them. Each live demo contains its player and the current
 tag, with external Parameters.
@@ -773,7 +819,6 @@ The core install stays lean; each optional peer unlocks one capability:
 
 | Peer | Version | Unlocks |
 |---|---|---|
-| `opensheetmusicdisplay` | `>=1.8.0` | OSMD staff engraving in `./view/render` (`renderOSMDStaffVisualizer`). |
 | `spessasynth_lib` | `^4.0.0` | `Sound.soundfont2()` — `.sf2` / `.sf3` SoundFont playback (see the `workletUrl` recipe above). |
 | `tone` | `>=14.0.0` | `TonePlayer` — playback on an injected `Tone.Transport`, and `Sound.from(toneInstrument)`. |
 | `react` | `>=18` | `@webmusic/score/react` hooks and components. |

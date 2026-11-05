@@ -9,6 +9,8 @@ export {
   type ScoreViewTimeRange,
 } from './score-view';
 export type {ScoreViewType} from '../core/types';
+export {createScoreViewEditing, scoreDocumentPlaybackCompatible,
+  type ScoreViewEditing, type ScoreViewEditingOptions, type ScoreViewEditingState} from './score-editing';
 export {
   createPitchView,
   type PitchView,
@@ -30,3 +32,13 @@ export {
   type ActiveNoteState,
   type ActiveNoteTracker,
 } from './active-notes';
+
+// Document-owned editing: one editor shared by every View and the player.
+export {ScoreEditor, createScoreEditor, type ScoreEditorOptions} from './score-editor';
+export {loadScoreEditor, type LoadScoreEditorOptions} from './load-score-editor';
+export type {
+  ScoreEditorPort, ScoreEditorState, ScoreDocumentSource, ScoreDocumentSnapshot,
+  ScoreDocumentChange, ScoreEditCommand, ScoreEditOperation, ScoreEditResult,
+  ScoreEditTransaction, ScoreRevisionGuard, ScoreCheckpoint, ScoreInteractionSession,
+  ScoreInteractionSnapshot, ScoreDraftResult,
+} from '../../core/editing';

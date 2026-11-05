@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import {afterEach, describe, expect, it, vi} from 'vitest';
+vi.mock('@webmusic/ui/transient-analyzer', () => import('../../../ui/src/transient-analyzer'));
 import {defineAudioTransientAnalyzerElement, type AudioTransientAnalyzerElement} from '../../src/analyze/element/audio-transient-analyzer';
 
 interface FakeRunner {
@@ -79,17 +80,21 @@ describe('<audio-transient-analyzer>', () => {
     freeze.click();
     expect(element.frozen).toBe(false);
     expect(realtime.runners).toHaveLength(2);
-    const sensitivity = element.querySelector<HTMLInputElement>('[part="sensitivity"]')!;
-    sensitivity.value = '80';
-    sensitivity.dispatchEvent(new Event('input', {bubbles: true}));
+    const sensitivity = element.querySelector<HTMLElement>('[role="slider"][part~="sensitivity"]')!;
+    sensitivity.dispatchEvent(new KeyboardEvent('keydown', {key: 'End', bubbles: true}));
+    for (let step = 0; step < 20; step += 1) {
+      sensitivity.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowLeft', bubbles: true}));
+    }
     expect(element.sensitivity).toBe(.8);
+    expect(sensitivity.getAttribute('aria-valuetext')).toBe('80%');
     element.querySelector<HTMLButtonElement>('[part="clear"]')!.click();
     expect(element.hitCount).toBe(0);
     expect(element.sample).toBeUndefined();
     owner.playing = false;
     owner.dispatchEvent(new CustomEvent('webaudio:statechange', {detail: {playing: false}}));
     expect(realtime.runners[1]!.stop).toHaveBeenCalledOnce();
-    expect(element.textContent).toContain('Paused');
+    expect(element.querySelector<HTMLElement>('[role="status"]')!.hidden).toBe(true);
+    expect(element.textContent).not.toContain('Paused');
     expect(tap.fftSize).toBe(32);
   });
 

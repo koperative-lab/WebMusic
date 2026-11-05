@@ -7,15 +7,15 @@ The drop-in custom elements of `@webmusic/score` — place a tag on the page, no
 JavaScript wiring required. Each capability ships its elements from its
 `/element` subpath, so the capability root tree-shakes free of DOM code. To load
 and register them — via a CDN script, a bundler, or individual `define*` calls —
-see [Score setup](/score/#drop-in-web-components). Only `play` publishes `/auto` and
-`/global` entries; register the analyze and view tags with the `defineAll*` functions
-listed in their sections below.
+see [Score setup](/score/#drop-in-web-components). Only Play publishes `/auto`
+and `/global`. Register the analyze and view tags
+with the `define*` functions listed in their sections below.
 
 | Capability | Elements |
 | --- | --- |
 | [Play](#play) | Playing a score: the transport, a rack mixer, note input, recording and synth control. |
-| [Analyze](#analyze) | Following a performance: chord progression and the current sounding chord. |
-| [View](#view) | Whole-score representations, held-pitch representations and optional sheet engraving. |
+| [Analyze](#analyze) | Elementary inspection: chord score/live modes, intervals, explicit scales and grouped rhythm. |
+| [View](#view) | Whole-score representations with optional editing, held-pitch representations and optional sheet engraving. |
 
 ## Play
 
@@ -63,10 +63,12 @@ editing the score.
 
 | Purpose | Component | What it does |
 | --- | --- | --- |
-| Identify the current chord | [`<score-live-chord-analysis>`](/score/element/analyze/score-live-chord-analysis/) | Read the primary chord and optional alternate interpretations of sounding notes. |
-| Probe a harmonic passage | [`<score-chord-analysis>`](/score/element/analyze/score-chord-analysis/) | Select a chord segment to inspect pitch evidence and a key-relative degree. |
+| Inspect chord structure | [`<score-chord-analysis>`](/score/element/analyze/score-chord-analysis/) | Score or live mode: complete triads/sevenths, bass and inversion; degrees only with an explicit key. |
+| Compare two notes | [`<score-interval-analysis>`](/score/element/analyze/score-interval-analysis/) | Spelled melodic or harmonic intervals, direction, semitones and note provenance. |
+| Compare notes with a scale | [`<score-scale-analysis>`](/score/element/analyze/score-scale-analysis/) | Explicit tonic and major/minor form; degree and alteration without guessing a key. |
+| Locate an attack in meter | [`<score-rhythm-analysis>`](/score/element/analyze/score-rhythm-analysis/) | Duration, measure, grouped beat and subdivision in simple, compound or explicitly grouped meter. |
 
-Whole-score summaries, histograms and rhythmic-vocabulary reports use the [Headless report workflow](/score/api/analyze/#reports). [Motif search](/score/api/analyze/#find-motifs), [recurring rhythmic phrases](/score/api/analyze/#find-recurring-rhythmic-phrases), [key estimates](/score/api/analyze/#detect-key), [intervals](/score/api/analyze/#inspect-selected-intervals), [metrical placement](/score/api/analyze/#inspect-rhythmic-placement), [Roman numerals](/score/api/analyze/#roman-numerals) and [voice-leading checks](/score/api/analyze/#voice-leading) remain code-only building blocks for application-owned displays.
+Whole-score summaries, histograms and rhythmic-vocabulary reports use the [Headless report workflow](/score/api/analyze/#reports). [Motif search](/score/api/analyze/#find-motifs), [recurring rhythmic phrases](/score/api/analyze/#find-recurring-rhythmic-phrases), [key estimates](/score/api/analyze/#detect-key), specialist [Roman analysis](/score/api/analyze/#roman-numerals) and [voice-leading checks](/score/api/analyze/#voice-leading) remain code-only building blocks. These four elementary tools describe supplied evidence; they do not guess tonal function or grade musical correctness.
 
 ### Compose a performance
 
@@ -88,7 +90,7 @@ Whole-score summaries, histograms and rhythmic-vocabulary reports use the [Headl
 
 The player loads once. Score-based companions borrow its resolved data and position; pitch views borrow its held notes. Each is an ordinary sibling that can be placed, styled or omitted independently. Configuration belongs to each tag’s attributes and application-owned controls. Each tag-owned live demo pairs that Analyze component with one player; the example above shows an optional composition. No Analyze component mounts an internal keyboard, staff, fretboard, tab bar or settings dock.
 
-Score input precedence is explicit `.score`, then `src`, then the selected player’s resolved data. Score lanes also work with standalone input: they update local inspection and emit seek requests without creating playback resources. When bound, navigation goes to the existing player with explicit nominal/transport time conversion. Selecting analysis evidence is local to that tool. The current-chord nameplate reads sounding note activity and does not seek score time.
+Score input precedence is explicit `.score`, then `src`, then the selected player’s resolved data. Score lanes also work with standalone input: they update local inspection and emit seek requests without creating playback resources. When bound, navigation goes to the existing player with explicit nominal/transport time conversion. Selecting analysis evidence is local to that tool. The chord component in `mode="live"` reads sounding note activity and does not seek score time. Its default `mode="score"` shares the same data/selection contract as the other three score lanes.
 
 ### Shared player connection
 
@@ -114,30 +116,43 @@ subscriptions, discovery and owned analysis work, without stopping the player.
 
 | Element | Register |
 | --- | --- |
-| [`<score-live-chord-analysis>`](/score/element/analyze/score-live-chord-analysis/) | `defineLiveChordAnalysisElement(tag?)` |
 | [`<score-chord-analysis>`](/score/element/analyze/score-chord-analysis/) | `defineChordAnalysisElement(tag?)` |
-| — | `defineAllAnalysisElements()` registers both. |
+| [`<score-interval-analysis>`](/score/element/analyze/score-interval-analysis/) | `defineIntervalAnalysisElement(tag?)` |
+| [`<score-scale-analysis>`](/score/element/analyze/score-scale-analysis/) | `defineScaleAnalysisElement(tag?)` |
+| [`<score-rhythm-analysis>`](/score/element/analyze/score-rhythm-analysis/) | `defineRhythmAnalysisElement(tag?)` |
+| — | `defineAllAnalysisElements()` registers all four. |
 
 ## View
 
-Three View elements group representations by the data and resources they use.
+Four View elements group representations by the data and resources they
+use.
 
 | Element | Representations | Register |
 | --- | --- | --- |
-| [`<score-view>`](/score/element/view/score-view/) | `piano-roll`, `staff`, `waterfall`, `map` and `thumbnail` over a whole Score. | `defineScoreViewElement(tag?)` |
+| [`<score-view>`](/score/element/view/score-view/) | Read-only `piano-roll`, `staff` and `waterfall` over a whole Score. | `defineScoreViewElement(tag?)` |
+| [`<score-grid-view>`](/score/element/view/score-grid-view/) | DAW-style piano-roll grid; edits a borrowed editor with a switchable toolbar. | `defineScoreGridViewElement(tag?)` |
 | [`<score-pitch-view>`](/score/element/view/score-pitch-view/) | `keyboard`, `staff` and `fretboard` for currently held MIDI pitches. | `definePitchViewElement(tag?)` |
-| [`<score-sheet-view>`](/score/element/view/score-sheet-view/) | Engraved sheet music using the optional OpenSheetMusicDisplay peer. | `defineSheetViewElement(tag?)` |
+| [`<score-sheet-view>`](/score/element/view/score-sheet-view/) | Engraved sheet music in pages or a continuous column, editable like a notation program. | `defineSheetViewElement(tag?)` |
 
-`defineAllViewElements()` from `@webmusic/score/view/element` registers all three.
+`defineAllViewElements()` from `@webmusic/score/view/element` registers all four.
 Each type stays on its owning page, with its controls in external Parameters.
-`score-view` borrows resolved score data and position; `score-pitch-view` borrows held
+`score-view` and `score-grid-view` borrow resolved score data and position; `score-pitch-view` borrows held
 notes. `score-sheet-view` requires explicit `.score` or `src` and follows player events;
 it does not borrow the player's loaded score.
+
+Editing is part of View. Load an editor with
+[`loadScoreEditor`](/score/headless/view/score-editor/#load-from-a-url) (or create
+one with `createScoreEditor`) and assign it to the `.editor` property of a player
+or view; there is no `editor` attribute. Your application owns and disposes the
+editor; borrowers release their subscriptions. Note editing belongs to
+[`<score-grid-view>`](/score/element/view/score-grid-view/);
+[`<score-view>`](/score/element/view/score-view/#follow-an-editor) follows an
+editor read-only.
 
 ```html
 <score-player id="p" src="/mxl/Arabesque%20No.1.mxl"></score-player>
 <score-view type="staff" player="#p"></score-view>
-<score-view type="map" player="#p"></score-view>
+<score-view type="waterfall" player="#p"></score-view>
 <score-pitch-view type="keyboard" player="#p" low="48" high="84"></score-pitch-view>
 ```
 
@@ -150,8 +165,10 @@ for application-owned presentation and the same data projections.
 
 Set public CSS custom properties on an element, its ancestor, or `:root`. They
 inherit into Score's UIKit presenters, including controls inside Shadow DOM.
-The default palette is mostly neutral with square corners; active notes and
-recording indicators retain their role-specific accent defaults.
+The default palette is mostly neutral with square corners; active notes keep
+their role-specific accent defaults, and recording uses the shared
+`--wm-recording` colour. Pressed icon buttons invert to `--wm-foreground` with
+`--wm-accent-foreground` content.
 
 ```css
 /* Apply to a shared wrapper, or put these declarations on one component. */
@@ -167,12 +184,16 @@ recording indicators retain their role-specific accent defaults.
   --wm-control-border: #8291a5;
   --wm-control-radius: 6px;
   --wm-focus: #146dcc;
+  --wm-focus-ring: 2px solid #146dcc;
 }
 ```
 
 `--wm-component-*` styles the outer surface. The border value is a complete CSS
 border such as `1px solid #8291a5` or `none`; `--wm-border` and
 `--wm-control-border` are colors. `--wm-component-padding` accepts CSS spacing.
+`--wm-focus-ring` is a complete outline declaration used by icon buttons and
+other controls that draw focus inside their edge; `--wm-focus` is the colour
+that older focus outlines still read.
 Presenter-specific `--wm-<presenter>-surface-*` values take precedence when a
 surface needs its own background, border, radius or padding.
 
@@ -192,6 +213,7 @@ of the component background.
 | Channel mixer | [Rack control](/score/element/play/score-rack-control/) |
 | Parameters, envelope, EQ, LFO and macros | [Synth panel](/score/element/play/score-synth-panel/) |
 | Score drawings and active notes | [Score view](/score/element/view/score-view/) |
+| Piano-roll grid and editing toolbar | [Score grid view](/score/element/view/score-grid-view/) |
 | Keyboard, staff and fretboard readouts | [Pitch view](/score/element/view/score-pitch-view/) |
 | Engraved paper and ink | [Sheet view](/score/element/view/score-sheet-view/) |
 | Live analysis | Each [Analyze component](#analyze) and its UIKit Harmony/Workbench tokens |

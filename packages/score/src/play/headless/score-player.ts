@@ -16,6 +16,10 @@ import {
   type ScorePlaybackSource,
   type ScorePlaybackState,
   type TimePosition,
+  type ScoreDocumentSource,
+  type ScoreDocumentRevision,
+  type ScoreDocumentPlaybackBinding,
+  type ScoreDocumentApplicationResult,
 } from '../../core';
 // Type-only import keeps file parsers out of the engine's static dependency
 // graph; URL loading remains lazy.
@@ -35,6 +39,8 @@ import {ScorePlayerScheduler} from './score-player-scheduler';
 import {PlaybackPublisher} from './playback-source';
 import {LiveNotes} from './internal/live-notes';
 import type {NoteInputOccurrence} from '../core/note-input-model';
+import {ScoreTimeline} from './score-timeline';
+import {ScoreDocumentBinding, type PreparedScoreDocument} from './score-document-binding';
 
 export function createScorePlayer(score: Score, options: ScorePlayerOptions = {}): ScorePlayer {
   return new ScorePlayer(score, options);
@@ -91,9 +97,11 @@ export async function playScoreFromUrl(
  */
 export class ScorePlayer {
   private readonly emitter = new EventEmitter<ScorePlayerEvents>();
-  private readonly score: Score;
+  private score: Score;
   private readonly options: ScorePlayerOptions;
   private readonly scheduler: ScorePlayerScheduler;
+  private readonly documents: ScoreDocumentBinding;
+  private sourceRevision = 1;
   private _context?: AudioContext;
   private output?: GainNode;
   private panner?: StereoPannerNode;
@@ -120,9 +128,12 @@ export class ScorePlayer {
       const nominalSeconds = this.scheduler.nominalSeconds;
       const rate = this.scheduler.rate;
       const duration = this.scheduler.duration;
+      const documentBinding = this.documents?.getState();
+      const bound = !!this.documents?.getSource();
       return {
-      sourceRevision: 1,
-      readiness: this.disposed ? 'disposed' : 'ready',
+      sourceRevision: this.sourceRevision,
+      readiness: this.disposed ? 'disposed' : !bound ? 'ready' : documentBinding?.status === 'ready' ? 'ready'
+        : documentBinding?.status === 'preparing' ? 'loading' : documentBinding?.status === 'error' ? 'error' : 'unavailable',
       state: this.scheduler.isPlaying ? 'playing' : this.playbackState === 'playing' ? 'paused' : this.playbackState,
       score: this.score,
       nominalSeconds,
@@ -131,11 +142,16 @@ export class ScorePlayer {
       transportDurationSeconds: duration,
       rate,
       activeNotes: Object.freeze(this.scheduler.isPlaying ? [...this.activeNotes.values()] : []),
+      documentBinding,
+      documentId: bound ? documentBinding?.applied?.documentId : undefined,
+      documentRevision: bound ? documentBinding?.applied?.documentRevision : undefined,
+      error: bound ? documentBinding?.error : undefined,
       };
     },
     (seconds) => {
       if (this.disposed) return Promise.reject(new Error('ScorePlayer has been disposed.'));
       if (!Number.isFinite(seconds)) return Promise.reject(new RangeError('Seek position must be finite.'));
+      this.recordSeekIntent(seconds);
       const result = this.scheduler.seekNominal(seconds, undefined, true);
       void result.then(() => this.playbackPublisher.notify(), () => this.playbackPublisher.notify());
       return result;
@@ -210,6 +226,28 @@ export class ScorePlayer {
         createTickSource: options.createTickSource,
       },
     );
+    this.documents = new ScoreDocumentBinding({
+      expanded: options.expandRepeats === true,
+      pause: () => {
+        // A stopped or ended transport keeps that state: only a playing one pauses.
+        if (this.scheduler.isPlaying || this.playbackState === 'playing' || this.playbackState === 'starting') this.playbackState = 'paused';
+        this.scheduler.pause();
+        this.activeNotes.clear();
+      },
+      prepare: (content) => this.prepareDocument(content),
+      transport: () => ({score: this.score, nominalSeconds: this.scheduler.nominalSeconds, loop: this.scheduler.nominalLoop}),
+      adopt: (candidate, position, loop) => {
+        this.scheduler.adoptTimeline(candidate.score, candidate.timeline, position, loop);
+        this.score = candidate.score;
+        this.preloadPromise = candidate.preload;
+        this.sourceRevision++;
+        this.activeNotes.clear();
+      },
+      notify: () => this.playbackPublisher.notify(),
+      publishPosition: () => this.scheduler.publishCursor(),
+      onDetach: () => { this.sourceRevision++; },
+      report: (error) => this.reportOperationError('document subscription cleanup', error),
+    });
     if (options.tempo) this.scheduler.setTempo(options.tempo);
   }
 
@@ -226,6 +264,27 @@ export class ScorePlayer {
 
   /** Honest native/callback precision; public note events remain callback observations. */
   get schedulingCapabilities() { return this.scheduler.schedulingCapabilities; }
+
+  /** Borrow a document; revisions apply while paused, without replacing this player or clock. */
+  setDocumentSource(source: ScoreDocumentSource | undefined): void { this.documents.setSource(source); }
+  get documentSource(): ScoreDocumentSource | undefined { return this.documents.getSource(); }
+  get documentBinding(): ScoreDocumentPlaybackBinding { return this.documents.getState(); }
+  waitForDocumentRevision(target: ScoreDocumentRevision): Promise<ScoreDocumentApplicationResult> { return this.documents.wait(target); }
+  retryDocumentApplication(): Promise<ScoreDocumentApplicationResult> { return this.documents.retry(); }
+
+  private prepareDocument(content: Score): PreparedScoreDocument | Promise<PreparedScoreDocument> {
+    const score = this.options.expandRepeats ? expandRepeats(content) : content;
+    const timeline = new ScoreTimeline(score);
+    const notes = timeline.preloadNotes;
+    // Editing never constructs a graph or resumes a context. Only an already
+    // initialized synth participates in automatic preparation. Existing preload
+    // APIs cannot cancel work; the binding generation discards stale results.
+    const synth = this.synth as PreloadableHeadlessSynth | undefined;
+    const preload = synth?.preload;
+    if (!preload) return {score, timeline};
+    const pending = Promise.resolve(preload.call(synth, notes)).then(() => undefined);
+    return pending.then(() => ({score, timeline, preload: pending}));
+  }
 
   /** Lazily created Web Audio context. */
   get context(): AudioContext {
@@ -315,6 +374,7 @@ export class ScorePlayer {
    * backends while still awaiting sampled/worklet-backed instruments.
    */
   private prepareForPlayback(): void | Promise<void> {
+    this.documents.assertPlayable();
     const notes = this.scheduler.prepare();
     const {synth} = this.ensureAudio();
     const preload = (synth as PreloadableHeadlessSynth).preload;
@@ -342,6 +402,7 @@ export class ScorePlayer {
    * material; omitting it preserves the classic immediate start.
    */
   play(when?: number): Promise<void> {
+    try { this.documents.assertPlayable(); } catch (error) { return Promise.reject(error); }
     if (!this.scheduler.isPlaying) this.playbackState = 'starting';
     const result = this.scheduler.play(when);
     this.playbackPublisher.notify();
@@ -362,6 +423,7 @@ export class ScorePlayer {
   }
 
   stop(): void {
+    this.documents.recordPositionIntent(0);
     this.playbackState = 'stopped';
     this.scheduler.stop();
     this.playbackPublisher.notify();
@@ -375,13 +437,16 @@ export class ScorePlayer {
    * start. Ignored while paused; an expired `when` resumes immediately.
    */
   seek(seconds: number, when?: number): Promise<void> {
+    if (!Number.isFinite(seconds)) return Promise.reject(new RangeError('Seek position must be finite.'));
+    this.recordSeekIntent(seconds * this.scheduler.rate);
     const result = this.scheduler.seek(seconds, when);
     void result.then(() => this.playbackPublisher.notify(), () => this.playbackPublisher.notify());
     return result;
   }
 
   seekFraction(fraction: number, when?: number): Promise<void> {
-    return this.scheduler.seekFraction(fraction, when);
+    if (!Number.isFinite(fraction)) return Promise.reject(new RangeError('Seek fraction must be finite.'));
+    return this.seek(Math.max(0, Math.min(1, fraction)) * this.scheduler.duration, when);
   }
 
   /**
@@ -389,13 +454,22 @@ export class ScorePlayer {
    * the promise settles under the same contract as {@link seek}.
    */
   seekNominal(nominalSeconds: number, when?: number): Promise<void> {
+    if (!Number.isFinite(nominalSeconds)) return Promise.reject(new RangeError('Seek position must be finite.'));
+    this.recordSeekIntent(nominalSeconds);
     const result = this.scheduler.seekNominal(nominalSeconds, when);
     void result.then(() => this.playbackPublisher.notify(), () => this.playbackPublisher.notify());
     return result;
   }
 
   scrub(deltaSeconds: number): Promise<void> {
-    return this.scheduler.scrub(deltaSeconds);
+    return this.seek(this.scheduler.seconds + deltaSeconds);
+  }
+
+  private recordSeekIntent(seconds: number): void {
+    let nominal = Math.max(0, Math.min(this.scheduler.duration * this.scheduler.rate, seconds));
+    const loop = this.scheduler.nominalLoop;
+    if (loop) nominal = nominal < loop[0] ? loop[0] : loop[0] + ((nominal - loop[0]) % (loop[1] - loop[0]));
+    this.documents.recordPositionIntent(nominal);
   }
 
   setTempo(bpm: number): void {
@@ -479,6 +553,7 @@ export class ScorePlayer {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.documents.dispose();
     this.playbackState = 'stopped';
     this.tryCleanup('live note input', () => this.liveNotes.dispose());
     this.scheduler.dispose();

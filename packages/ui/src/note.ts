@@ -2,7 +2,9 @@ import {installStyle} from './internal/style';
 import {claimHost, createErrorSink, createUpdateLoop} from './internal/lifecycle';
 import {componentSurfaceCss, controlBorderFallback} from './internal/surface';
 import type {NotePianoKey} from './internal/pitch-geometry';
-import {surfaceHeight} from './internal/control';
+import {controlHeight, surfaceHeight} from './internal/control';
+import {ICON_PATHS, hiddenScrollbarCss, iconButtonCss, setIconButton, visuallyHiddenCss} from './internal/icons';
+import {neutralColor} from './internal/palette';
 export type NoteSurfaceLayout = "piano" | "grid" | "chords";
 
 /**
@@ -77,6 +79,12 @@ export interface NoteSurfaceHandle {
 type NoteHost = HTMLElement | ShadowRoot;
 const mounted = new WeakMap<NoteHost, NoteSurfaceHandle>();
 
+/** The root's inset, so the keyboard bar can run edge to edge across it. */
+const NOTE_PAD = 'var(--wm-note-surface-padding, var(--wm-component-padding, .6rem))';
+const NOTE_LINE = `var(--wm-note-border, var(--wm-control-border, var(--wm-border, ${neutralColor('border')})))`;
+const NOTE_INK = `var(--wm-foreground, ${neutralColor('foreground')})`;
+const NOTE_ON_INK = 'var(--wm-accent-foreground, light-dark(#fff, #111))';
+
 export const noteStyle = `
 .wui-note {
 ${componentSurfaceCss('note', {
@@ -85,26 +93,41 @@ ${componentSurfaceCss('note', {
 min-width:0; max-width:100%; outline:none; }
 .wui-note { color:var(--wm-note-foreground,var(--wm-foreground,#444)); }
 .wui-note:focus-visible { outline:2px solid var(--wm-note-focus,var(--wm-focus,#444)); outline-offset:2px; }
-.wui-note__bar { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:.35rem .75rem; color:var(--wm-note-label,var(--wm-foreground-muted, var(--wm-foreground, #666))); margin-bottom:.5rem; font:600 .78rem/1.2 var(--wm-font,var(--wm-font-family,system-ui,sans-serif)); }
-.wui-note__hint { min-width:0; overflow-wrap:anywhere; font-weight:400; }.wui-note__octave { font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
-.wui-note__host { position:relative; min-width:0; }.wui-note__viewport { min-width:0; max-width:100%; overflow-x:auto; overscroll-behavior-x:contain; }.wui-note__viewport:focus-visible { outline:2px solid var(--wm-note-focus,var(--wm-focus,#444)); outline-offset:-2px; }.wui-note__overlay { position:absolute; inset:0; z-index:3; display:flex; align-items:center; justify-content:center; background:var(--wm-note-overlay,rgba(255,255,255,.82)); cursor:pointer; }
-.wui-note__start { padding:.55rem 1rem; border-radius:var(--wm-note-radius,var(--wm-control-radius,0)); background:var(--wm-note-accent,var(--wm-accent,#111)); color:var(--wm-note-accent-foreground,var(--wm-accent-foreground,#fff)); font:600 .95rem/1 var(--wm-font,var(--wm-font-family,system-ui,sans-serif)); }
-.wui-note.on .wui-note__overlay { display:none; }
-.wui-note__piano { position:relative; width:100%; min-width:calc(var(--wui-note-white-keys,1) * var(--wm-note-key-min-width,2.25rem)); height:${surfaceHeight('note', 'md')}; user-select:none; touch-action:none; }
+:where(.wui-note__bar) {
+  display:flex; flex-wrap:nowrap; align-items:stretch; gap:0; min-width:0; height:${controlHeight('note-control')};
+  margin:calc(-1 * ${NOTE_PAD}) calc(-1 * ${NOTE_PAD}) ${NOTE_PAD}; overflow-x:auto; border-bottom:1px solid ${NOTE_LINE};
+}
+${hiddenScrollbarCss('.wui-note__bar')}${iconButtonCss('.wui-note__start', 'note-control')}
+:where(.wui-note__hint) { ${visuallyHiddenCss} }
+:where(.wui-note__octave) {
+  display:flex; align-items:center; flex:none; padding:0 .5rem; border-inline-start:1px solid ${NOTE_LINE}; white-space:nowrap;
+  color:var(--wm-note-label,var(--wm-foreground-muted,${neutralColor('muted')})); font:500 .6875rem/1 var(--wm-font-mono,ui-monospace,SFMono-Regular,Menlo,monospace);
+  font-variant-numeric:tabular-nums; text-transform:uppercase; letter-spacing:.06em;
+}
+:where(.wui-note__octave:empty) { display:none; }
+.wui-note__host { position:relative; min-width:0; }.wui-note__viewport { min-width:0; max-width:100%; overflow-x:auto; overscroll-behavior-x:contain; }.wui-note__viewport:focus-visible { outline:2px solid var(--wm-note-focus,var(--wm-focus,#444)); outline-offset:-2px; }
+${hiddenScrollbarCss('.wui-note__viewport')}.wui-note__piano { position:relative; width:100%; min-width:calc(var(--wui-note-white-keys,1) * var(--wm-note-key-min-width,2.25rem)); height:${surfaceHeight('note', 'md')}; user-select:none; touch-action:none; }
 .wui-note__key { position:absolute; top:0; display:flex; align-items:flex-end; justify-content:center; box-sizing:border-box; border:1px solid var(--wm-note-border,${controlBorderFallback}); cursor:pointer; }
 .wui-note__key-label { min-width:0; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding-bottom:.3rem; pointer-events:none; font:600 .66rem/1 var(--wm-font-mono,ui-monospace,monospace); }
 .wui-note__white { height:100%; background:var(--wm-note-key,var(--wm-surface,#fff)); border-radius:var(--wm-note-radius,var(--wm-control-radius,0)); }.wui-note__white .wui-note__key-label{color:var(--wm-note-label,var(--wm-foreground-muted,var(--wm-foreground,#666)))}
 .wui-note__black { height:62%; z-index:2; transform:translateX(-50%); border-color:var(--wm-note-key-alt-border,var(--wm-border,#000)); border-radius:var(--wm-note-radius,var(--wm-control-radius,0)); background:var(--wm-note-key-alt,var(--wm-surface-inverse,#222)); }.wui-note__black .wui-note__key-label{color:var(--wm-note-label-alt,var(--wm-foreground-on-inverse,#fff))}
-.wui-note__key.down { background:var(--wm-note-active,var(--wm-accent,#444)); }
-.wui-note__key.down .wui-note__key-label { color:var(--wm-note-label-active,var(--wm-accent-foreground,#fff)); }
-.wui-note__grid { display:grid; grid-template-columns:repeat(var(--wui-note-grid-columns,7),minmax(var(--wm-note-cell-min-width,2.5rem),1fr)); gap:var(--wm-note-gap,.4rem); background:transparent; user-select:none; touch-action:none; }
-.wui-note__cell { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:var(--wm-note-cell-height,42px); padding:.3rem .2rem; border:1px solid var(--wm-note-border,${controlBorderFallback}); border-radius:var(--wm-note-radius,var(--wm-control-radius,0)); background:var(--wm-note-surface,var(--wm-surface-muted,var(--wm-surface,#f3f3f3))); cursor:pointer; }
+.wui-note__key.down { background:var(--wm-note-active,${NOTE_INK}); }
+.wui-note__key.down .wui-note__key-label { color:var(--wm-note-label-active,${NOTE_ON_INK}); }
+:where(.wui-note__grid) { display:grid; grid-template-columns:repeat(var(--wui-note-grid-columns,7),minmax(var(--wm-note-cell-min-width,2.5rem),1fr)); gap:var(--wm-note-gap,1px); background:${NOTE_LINE}; border:1px solid ${NOTE_LINE}; user-select:none; touch-action:none; }
+:where(.wui-note__cell) { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:var(--wm-note-cell-height,42px); padding:.3rem .2rem; border:0; border-radius:0; background:var(--wm-note-surface,var(--wm-surface,light-dark(#fff, #111))); cursor:pointer; }
+:where(.wui-note__cell:hover) { background:var(--wm-surface-muted,light-dark(#f3f3f3, #1c1c1c)); }
 .wui-note__reference { color:var(--wm-note-label,var(--wm-foreground-muted,var(--wm-foreground,#666))); pointer-events:none; font:600 .62rem/1 var(--wm-font-mono,ui-monospace,monospace); }
-.wui-note__cell.down { background:var(--wm-note-active,var(--wm-accent,#444)); }.wui-note__cell.down .wui-note__reference{color:var(--wm-note-label-active,var(--wm-accent-foreground,#fff))}
-.wui-note__cell.idle { pointer-events:none; cursor:not-allowed; border-style:dashed; opacity:.4; }
-.wui-note__chords { display:flex; flex-wrap:wrap; gap:var(--wm-note-gap,.4rem); user-select:none; touch-action:none; }
-.wui-note__chord { box-sizing:border-box; flex:1 1 5rem; min-width:0; max-width:100%; min-height:calc(var(--wm-note-cell-height,42px) * 1.5); padding:.6rem .5rem; overflow-wrap:anywhere; border:1px solid var(--wm-note-border,${controlBorderFallback}); border-radius:var(--wm-note-radius,var(--wm-control-radius,0)); background:var(--wm-note-key-alt,var(--wm-surface-inverse,#222)); color:var(--wm-note-label-active,var(--wm-accent-foreground,#fff)); cursor:pointer; font:600 1rem/1.3 var(--wm-font,var(--wm-font-family,system-ui,sans-serif)); }
-.wui-note__chord.down { background:var(--wm-note-active,var(--wm-accent,#444)); }
+:where(.wui-note__cell.down) { background:var(--wm-note-active,${NOTE_INK}); }.wui-note__cell.down .wui-note__reference{color:var(--wm-note-label-active,${NOTE_ON_INK})}
+:where(.wui-note__cell.idle) { pointer-events:none; cursor:not-allowed; opacity:.3; }
+:where(.wui-note__chords) { display:flex; flex-wrap:nowrap; gap:var(--wm-note-gap,1px); overflow-x:auto; background:${NOTE_LINE}; border:1px solid ${NOTE_LINE}; user-select:none; touch-action:none; }
+${hiddenScrollbarCss('.wui-note__chords')}:where(.wui-note__chord) {
+  box-sizing:border-box; flex:1 0 5rem; min-width:0; min-height:calc(var(--wm-note-cell-height,42px) * 1.5); margin:0; padding:.6rem .5rem; overflow-wrap:anywhere;
+  border:0; border-radius:0; background:var(--wm-note-surface,var(--wm-surface,light-dark(#fff, #111))); color:var(--wm-note-label,var(--wm-foreground-muted,${neutralColor('muted')}));
+  cursor:pointer; font:600 .875rem/1.3 var(--wm-font-mono,ui-monospace,SFMono-Regular,Menlo,monospace);
+}
+:where(.wui-note__chord:hover) { color:${NOTE_INK}; background:var(--wm-surface-muted,light-dark(#f3f3f3, #1c1c1c)); }
+:where(.wui-note__chord.down, .wui-note__chord[aria-pressed="true"]) { background:var(--wm-note-active,${NOTE_INK}); color:var(--wm-note-label-active,${NOTE_ON_INK}); }
+:where(.wui-note__chord:focus-visible) { outline:var(--wm-focus-ring,2px solid ${NOTE_INK}); outline-offset:-2px; }
 `;
 
 function build(document: Document, state: NoteSurfaceState): HTMLElement {
@@ -112,8 +135,14 @@ function build(document: Document, state: NoteSurfaceState): HTMLElement {
   if (state.keyboard) {
     root.tabIndex = 0;
     const bar = document.createElement("div"); bar.className = "wui-note__bar qwerty-bar";
+    // The typing toggle mirrors focus on the surface itself, which stays the
+    // keyboard entry point; the button is the pointer affordance and state.
+    const start = document.createElement("button"); start.type = "button"; start.className = "wui-note__start start"; start.tabIndex = -1;
+    setIconButton(start, ICON_PATHS.keyboard, "Musical typing"); start.setAttribute("aria-pressed", "false");
+    const octave = document.createElement("span"); octave.className = "wui-note__octave oct"; octave.textContent = state.octaveLabel ?? "";
+    // Instructions are for assistive technology only (Visual design → Type).
     const hint = document.createElement("span"); hint.className = "wui-note__hint hint"; hint.textContent = state.layout === "grid" && state.mapOnly ? "Type to play · Esc stop" : "Type to play · Z / X octave · Esc stop";
-    const octave = document.createElement("span"); octave.className = "wui-note__octave oct"; octave.textContent = state.octaveLabel ?? ""; bar.append(hint, octave); root.append(bar);
+    bar.append(start, octave, hint); root.append(bar);
   }
   const host = document.createElement("div"); host.className = "wui-note__host host";
   let board: HTMLElement;
@@ -149,7 +178,6 @@ function build(document: Document, state: NoteSurfaceState): HTMLElement {
     viewport.append(board);
     host.append(viewport);
   }
-  if (state.keyboard) { const overlay = document.createElement("div"); overlay.className = "wui-note__overlay overlay"; const start = document.createElement("span"); start.className = "wui-note__start start"; start.textContent = "▸ Click to start"; overlay.append(start); host.append(overlay); }
   root.append(host);
   paintActiveMidis(root, state.activeMidis);
   return root;
@@ -585,12 +613,28 @@ class NoteSurfaceInteractions {
   }
 
   private attachQwerty(root: HTMLElement): void {
-    const onFocus = (): void => root.classList.add('on');
+    const start = root.querySelector<HTMLButtonElement>('.wui-note__start');
+    const onFocus = (): void => {
+      root.classList.add('on');
+      start?.setAttribute('aria-pressed', 'true');
+    };
     const onBlur = (): void => {
       root.classList.remove('on');
+      start?.setAttribute('aria-pressed', 'false');
       this.releaseQwerty();
     };
     const onPointerDown = (): void => root.focus();
+    // The toggle must not take focus from the surface it switches, nor let the
+    // surface's own pointerdown re-focus it before the click blurs it.
+    const onStartPointerDown = (event: Event): void => {
+      event.preventDefault();
+      event.stopPropagation();
+    };
+    const onStartClick = (event: Event): void => {
+      event.stopPropagation();
+      if (root.classList.contains('on')) root.blur();
+      else root.focus();
+    };
     const onKeyDown = (event: KeyboardEvent): void => {
       const revision = this.revision;
       if (event.metaKey || event.ctrlKey || event.altKey) return;
@@ -642,7 +686,13 @@ class NoteSurfaceInteractions {
     root.addEventListener('pointerdown', onPointerDown);
     root.addEventListener('keydown', onKeyDown);
     root.addEventListener('keyup', onKeyUp);
+    start?.addEventListener('pointerdown', onStartPointerDown);
+    start?.addEventListener('mousedown', onStartPointerDown);
+    start?.addEventListener('click', onStartClick);
     this.cleanups.push(() => {
+      start?.removeEventListener('pointerdown', onStartPointerDown);
+      start?.removeEventListener('mousedown', onStartPointerDown);
+      start?.removeEventListener('click', onStartClick);
       root.removeEventListener('focus', onFocus);
       root.removeEventListener('blur', onBlur);
       root.removeEventListener('pointerdown', onPointerDown);

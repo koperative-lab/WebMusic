@@ -15,13 +15,13 @@ see [Audio setup](/audio/#drop-in-web-components).
 | --- | --- |
 | [Play](#play) | A central player, attached queue/mix controls and recording. |
 | [Analyze](#analyze) | Five live signal tools for metering, waveform, spectrum and transient inspection. |
-| [View](#view) | Drawing audio: a multi-view stage for clips and regions, plus a live signal strip. |
+| [View](#view) | Drawing audio: a multi-view stage for clips and regions, a waveform clip editor, and a live signal strip. |
 
 ## Play
 
 Use one [`audio-player`](/audio/element/play/audio-player/) for transport and
 connect the task-specific controls through `player="#session"` or `.player`.
-The player delegates to one clip, queue or mix backend. The linked playlist and
+The player delegates to one clip, document sequence, queue or mix backend. The linked playlist and
 mixer display selection and mix controls without a duplicate transport bar.
 
 | Element | Register | Purpose |
@@ -58,7 +58,7 @@ task and place the surface beside the player:
 | Element | Live task |
 | --- | --- |
 | [`<audio-level-analyzer>`](/audio/element/analyze/audio-level-analyzer/) | Inspect sampled RMS, sample peak, crest and a peak threshold; freeze or reset the hold. |
-| [`<audio-meter>`](/audio/element/analyze/audio-meter/) | Monitor normalized level or FFT bars at a glance beside playback. |
+| [`<audio-meter>`](/audio/element/analyze/audio-meter/) | Monitor playback at a glance as a VU dial, loudness bars, waveform, oscilloscope, spectrum, spectrogram or stereometer, in page greys or colour. |
 | [`<audio-oscilloscope>`](/audio/element/analyze/audio-oscilloscope/) | Inspect a sampled waveform with trigger edge, level, timebase, freeze and a time probe. |
 | [`<audio-spectrum-analyzer>`](/audio/element/analyze/audio-spectrum-analyzer/) | Probe a live log-frequency FFT; freeze the frame or hold peaks. |
 | [`<audio-transient-analyzer>`](/audio/element/analyze/audio-transient-analyzer/) | Inspect approximate live attack strength and adjust detection sensitivity. |
@@ -69,7 +69,8 @@ samples, but an `AudioContext` and signal graph must already exist. They do
 not seek the player. The sampled level is not integrated LUFS or true peak;
 FFT bins are not calibrated acoustic SPL. A streaming transient cue is not a
 beat-grid or sample-accurate onset result. The compact meter may also build a
-transparent tap in a caller-supplied context; see its resource contract.
+transparent tap in a caller-supplied context, and attaches an owned stereo
+branch for its stereometer and loudness displays; see its resource contract.
 
 Whole-clip key, tempo, loudness and onset estimates, beat grids, clip summaries,
 chroma, distributions and offline pitch tracks are data workflows under the
@@ -103,7 +104,7 @@ registration helpers allow a smaller selected surface.
 | Element | Register | Surface |
 | --- | --- | --- |
 | `<audio-level-analyzer>` | `defineAudioLevelAnalyzerElement(tag?)` | Sampled dynamics inspector. |
-| `<audio-meter>` | `defineAudioMeterElement(tag?)` | Compact normalized level or spectrum monitor. |
+| `<audio-meter>` | `defineAudioMeterElement(tag?)` | Compact type-selected live monitor. |
 | `<audio-oscilloscope>` | `defineAudioOscilloscopeElement(tag?)` | Triggered time-domain inspection. |
 | `<audio-spectrum-analyzer>` | `defineAudioSpectrumAnalyzerElement(tag?)` | Probeable live spectrum. |
 | `<audio-transient-analyzer>` | `defineAudioTransientAnalyzerElement(tag?)` | Approximate streaming attack inspection. |
@@ -111,24 +112,33 @@ registration helpers allow a smaller selected surface.
 
 ## View
 
-The **visualization** elements of [`@webmusic/audio/view`](/audio/api/view/). `<audio-view>` provides three drawings of the same audio under one `type` attribute, including waveform regions. `<audio-live-view>` shows a scrolling strip of a live signal.
+The **visualization** elements of [`@webmusic/audio/view`](/audio/api/view/). `<audio-view>` provides three drawings of the same audio under one `type` attribute, including waveform regions. `<audio-clip-view>` edits a document. `<audio-live-view>` shows a scrolling strip of a live signal. An editable document is an application-owned [AudioClipEditor](/audio/headless/view/audio-clip-editor/) that playback, the clip editor and read-only views borrow.
 
 | Element | Purpose |
 | --- | --- |
-| [`<audio-view>`](/audio/element/view/audio-view/) | The projection stage — waveform, spectrogram or meter, chosen with `type`; follows a bound player, seeks, zooms, pans and annotates. |
+| [`<audio-view>`](/audio/element/view/audio-view/) | The projection stage — waveform, spectrogram or meter, chosen with `type`; follows a bound player, seeks, zooms, pans and annotates; follows an editor read-only. |
+| [`<audio-clip-view>`](/audio/element/view/audio-clip-view/) | The waveform clip editor — range selection, split, trim, delete, silence, clipboard, amplify, fades, gain envelopes, markers, range processing, snap, zoom and history over a borrowed editor. |
 | [`<audio-live-view>`](/audio/element/view/audio-live-view/) | A scrolling projection of a live `AnalyserNode` — waveform or spectrogram. The only live *time-axis* surface here. |
 
 Inputs are component-specific. `<audio-view>` binds to playback through `player`;
 `<audio-live-view>` borrows an analyser through `source` or `.analyser`.
 Use `<audio-view>`'s `.regions` and `annotate` support to display or create regions.
+Load an editor with [`loadAudioClipEditor`](/audio/headless/view/audio-clip-editor/#load-from-a-url)
+(or create one with `createAudioClipEditor`) and assign it to the `.editor`
+property of `audio-player`, `audio-clip-view` and any following `audio-view`; there is no `editor` attribute.
+Borrowers release their subscriptions but never dispose the editor; the
+application disposes it. See [`<audio-clip-view>`](/audio/element/view/audio-clip-view/)
+for the complete editor/player/view composition and typed edit events.
 
 Waveform views can use clip or peaks data, load clips through `src`, or draw
-precomputed `peaks-src` data without decoding audio.
+precomputed `peaks-src` data without decoding audio. An `.editor` binding draws
+a reference sequence through bounded visible sample ranges, read-only;
+`<audio-clip-view editable>` edits the same document.
 Analysis stays caller-owned: `<audio-view type="spectrogram">` requires
 `.spectrogram` data from [`@webmusic/audio/analyze`](/audio/api/analyze/) or another
 compatible producer. Binding a player supplies playback state, not that analysis.
 
-These Elements compose published UI Kit surfaces. `<audio-view>` uses stage + status;
+These Elements compose published UI Kit surfaces. `<audio-view>` uses stage + status; `<audio-clip-view>` uses status for loading and failures;
 `<audio-live-view>` uses animated `CanvasStage`. Domain geometry and pixels remain
 in Audio Headless/render adapters; the presenters own generic DOM, canvas
 sizing/DPR, accessible interaction, status and cleanup.
@@ -140,18 +150,22 @@ Point `<audio-view>` at an [`<audio-player>`](/audio/element/play/audio-player/)
 | [`<audio-view type="waveform">`](/audio/element/view/audio-view/#what-each-drawing-needs) | `defineAudioViewElement(tag?)` | Min/max waveform with a playhead (default). |
 | [`<audio-view type="spectrogram">`](/audio/element/view/audio-view/#what-each-drawing-needs) | — | STFT magnitude heatmap (time × frequency). |
 | [`<audio-view type="meter">`](/audio/element/view/audio-view/#what-each-drawing-needs) | — | Live RMS / spectrum level meter. |
+| [`<audio-clip-view>`](/audio/element/view/audio-clip-view/) | `defineAudioClipViewElement(tag?)` | Waveform clip editor over a borrowed editor. |
 | `<audio-live-view>` | `defineAudioLiveViewElement(tag?)` | A scrolling projection of a live `AnalyserNode`. |
-| `AudioViewElement`, `AudioLiveViewElement` | `defineAllAudioElements()` | The classes behind the tags — extend one to build a custom surface, or register every element at its default tag. |
+| `AudioViewElement`, `AudioClipViewElement`, `AudioLiveViewElement` | `defineAllAudioElements()` | The classes behind the tags — extend one to build a custom surface, or register every element at its default tag. |
 | [`AudioViewDragMode`](/audio/element/view/audio-view/#dragging-and-seeking) | type from `@webmusic/audio/view/element` | `seek`, `scrub`, `pan` or `none` for the AudioView Element's `dragMode` property. |
 
 ## Theming
 
 Every visible element owns the same neutral outer component surface: `#fff`, a
-`1px solid #d8d8d8` border, `.6rem` padding and square corners. Override those defaults with
+`1px solid #d8d8d8` border, `.6rem` padding and square corners. `<audio-recorder>`,
+`<audio-playlist>` and `<audio-mixer>` default to `0` padding instead, because their icon rows and
+strips run edge to edge inside the frame. Override those defaults with
 `--wm-component-background`, `--wm-component-border`, `--wm-component-padding` and
 `--wm-component-radius`. The `--wap-*`, `--wapl-*`, `--wam-*`, `--war-*` and `--wameter-*`
-families remain compatibility and inner-control palettes, so the transport, meter track or record
-accent can be retuned independently of the outer surface:
+families remain compatibility and inner-control palettes, so the transport, meter track or
+recording colour can be retuned independently of the outer surface. Without `--war-accent`, the
+recorder's recording colour falls back to the shared `--wm-recording` token:
 
 ```css
 /* Keep the neutral surface, add rounding, and retune the transport controls. */

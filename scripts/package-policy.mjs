@@ -168,8 +168,9 @@ export const domainFamilies = Object.freeze(
 );
 
 /**
- * Every concrete feature capability has the same four source
- * responsibilities. `core` is deliberately internal: it is the reusable
+ * Feature capabilities (Play, Analyze, View) have four source responsibilities.
+ * Document editing is part of View, not a separate capability.
+ * `core` is deliberately internal: it is the reusable
  * implementation floor, not an additional semver surface. The capability
  * ROOT is the API (`./api` is not published; `src/api/` stays as the
  * internal implementation the root barrel forwards).
@@ -349,6 +350,8 @@ export const domFreeEntrySources = Object.freeze({
     "view/headless/index.ts",
   ],
   "@webmusic/audio": [
+    "index.ts",
+    "core/index.ts",
     "view/index.ts",
     "view/core/index.ts",
     "view/api/index.ts",

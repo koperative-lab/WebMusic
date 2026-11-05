@@ -330,42 +330,13 @@ ScoreProvider
 
 ## Annotation visibility
 
-`PianoRollView`, `StaffView` and `WaterfallView`, and their `Simple*` presets,
-accept `showAnnotations` (default `true`) for the packaged SVG renderers. Set it
-to `false` to hide words, dynamics, tempo, rehearsal, pedal and hairpin marks
-and remove their reserved space. Notes and notation essentials remain visible.
-`StaffView` and `WaterfallView` retain their explicit/default viewport heights;
-use `height="auto"` on `StaffView` to follow its compact natural drawing height.
-OSMD engraving remains configured through its own `osmdOptions`.
-
-## OSMD Staff Mode
-
-`StaffView` and `SimpleStaff` use the lightweight staff renderer by default. Pass `osmd` when you want OpenSheetMusicDisplay engraving.
-
-```tsx
-import { SimpleStaff } from '@webmusic/score/react';
-import { OpenSheetMusicDisplay } from 'opensheetmusicdisplay';
-
-<SimpleStaff
-  score={score}
-  osmd={{
-    musicXML,
-    OpenSheetMusicDisplay,
-    osmdOptions: {
-      drawTitle: false,
-      drawPartNames: false,
-      autoResize: true,
-    },
-  }}
-/>;
-```
-
-Output:
-
-```txt
-SimpleStaff without osmd -> lightweight staff renderer
-SimpleStaff with osmd    -> OpenSheetMusicDisplay renderer
-```
+Only `StaffView` (and its `SimpleStaff` preset) accepts `showAnnotations`
+(default `true`) for the lightweight staff renderer. Set it to `false` to hide
+words, dynamics, tempo, rehearsal, pedal and hairpin marks and remove their
+reserved space. Notes and notation essentials remain visible. `PianoRollView`
+and `WaterfallView` never draw annotations and have no `showAnnotations` prop.
+`StaffView` retains its explicit/default viewport height; use `height="auto"`
+to follow its compact natural drawing height.
 
 ## Styling
 
@@ -413,5 +384,5 @@ WaterfallView  -> div
 | `useScoreAnalysisAsync(options?)` | Hook | The same analysis off the main thread in a Web Worker: `{ result, pending }`. |
 | `PlayerControls` | Component | Render a simple play/pause button and range input. |
 | `PianoRollView` | Component | Render the SVG piano-roll visualizer connected to playback events. |
-| `StaffView` | Component | Render lightweight staff notation or OSMD engraving. |
+| `StaffView` | Component | Render scrolling staff notation. For pages and notation editing, use `<score-sheet-view>`. |
 | `WaterfallView` | Component | Render falling-note pitch columns connected to playback events, without an embedded keyboard. |

@@ -1,0 +1,40 @@
+import {describe, expect, it} from 'vitest';
+import {createMemoryAudioAssetStore, createAudioSequence, type AudioDocumentSnapshot, type AudioDocumentSource} from '../../src/core';
+import {AudioPlayer} from '../../src/play/headless/audio-player';
+
+function makeDocument(id: string) {
+  const assets = {...createMemoryAudioAssetStore()};
+  const content = createAudioSequence({sampleRate: 8000, channelLayout: ['mono'], segments: [{kind: 'silence', id: 's', length: 8000}]});
+  let snapshot: AudioDocumentSnapshot = {documentId: id, documentRevision: 0, contentId: `${id}-content`, content, assets, status: 'ready'};
+  const listeners = new Set<(snapshot: AudioDocumentSnapshot) => void>();
+  const source: AudioDocumentSource = {
+    getSnapshot: () => snapshot,
+    subscribe(notify) {listeners.add(notify); notify(snapshot); return () => {listeners.delete(notify);};},
+  };
+  return {assets, source, dispose() {snapshot = {...snapshot, status: 'disposed'}; for (const notify of [...listeners]) notify(snapshot);}};
+}
+
+describe('release readiness probes', () => {
+  it('preserves a new attachment selected by retired attempt cleanup while old source disposes', async () => {
+    const a = makeDocument('a'), b = makeDocument('b');
+    const player = new AudioPlayer();
+    const retain = a.assets.retain;
+    let switched = false;
+    a.assets.retain = (ids) => {
+      const lease = retain(ids);
+      return {...lease, release() {
+        lease.release();
+        if (!switched) {switched = true; player.setDocumentSource(b.source);}
+      }};
+    };
+    try {
+      player.setDocumentSource(a.source);
+      a.dispose();
+      expect(player.documentSource).toBe(b.source);
+      await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+      expect(player.source).toMatchObject({kind: 'sequence', documentId: 'b'});
+      expect(player.documentBinding.status).toBe('ready');
+      expect(await player.waitForDocumentRevision(b.source.getSnapshot())).toMatchObject({status: 'applied'});
+    } finally {player.dispose(); a.assets.dispose(); b.assets.dispose();}
+  });
+});

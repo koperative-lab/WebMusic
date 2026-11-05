@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import {afterEach, describe, expect, it, vi} from 'vitest';
+import {afterEach, describe, expect, it} from 'vitest';
 import {Duration, Pitch, Rational, ScoreBuilder, VoiceId, type Score} from '../../src/core';
 import {createScoreMap} from '../../src/view/core/map';
 import {
@@ -20,7 +20,7 @@ const flush = (): Promise<unknown> => new Promise((resolve) => setTimeout(resolv
 
 /**
  * Settle the several dynamic imports an element chains before it paints.
- * Deadline-based rather than tick-counted: OSMD's load is real work, and a
+ * Deadline-based rather than tick-counted: engraving is real work, and a
  * fixed number of zero-delay ticks starves under a loaded full-suite run.
  */
 async function waitFor(condition: () => boolean, timeoutMs = 5_000): Promise<void> {
@@ -206,152 +206,6 @@ describe('createScoreMap', () => {
   });
 });
 
-describe('<score-view type="map">', () => {
-  const tag = define(class extends ScoreViewElement {});
-
-  it('renders one clickable region per bar and labels the ruler', async () => {
-    const element = await mount(tag, fourBars(), {type: 'map'});
-
-    const regions = element.querySelectorAll('button');
-    expect(regions).toHaveLength(4);
-    expect(regions[0]!.textContent).toBe('m. 1');
-    expect(element.textContent).toContain('A');
-  });
-
-  it('hides expressions and legacy rehearsal labels without losing map position or notes', async () => {
-    const builder = new ScoreBuilder();
-    const part = builder.newPartId();
-    builder.addPart({id: part, name: 'Piano', directions: [
-      {kind: 'words', text: 'rit.', onsetQuarters: Rational.ONE},
-      {kind: 'pedal', type: 'start', onsetQuarters: Rational.ZERO, line: true},
-      {kind: 'pedal', type: 'stop', onsetQuarters: new Rational(4), line: true},
-    ]});
-    builder.addMeasure({id: builder.newMeasureId(), number: 1, onsetQuarters: Rational.ZERO,
-      durationQuarters: new Rational(4), rehearsal: 'Intro'});
-    builder.addNote(part, {id: builder.newNoteId(), pitch: Pitch.parse('C4'), onsetQuarters: Rational.ZERO,
-      duration: Duration.whole(), voice: VoiceId('piano')});
-    const score = builder.build();
-    const element = await mount<ScoreViewElement>(tag, score, {type: 'map'});
-    expect(element.querySelector('svg[part="annotations"]')?.textContent).toContain('rit.');
-    const seek = element.querySelector('input[type="range"]') as HTMLInputElement;
-    seek.value = '2';
-    seek.dispatchEvent(new Event('input', {bubbles: true}));
-    const position = element.currentTime;
-    element.setAttribute('show-annotations', 'false');
-    expect(element.querySelector('svg[part="annotations"]')).toBeNull();
-    expect(element.textContent).not.toContain('rit.');
-    expect(element.textContent).not.toContain('Intro');
-    expect(element.currentTime).toBe(position);
-    expect(element.score).toBe(score);
-    expect(element.querySelectorAll('button')).toHaveLength(1);
-    element.options = {showAnnotations: true};
-    expect(element.querySelector('svg[part="annotations"]')?.textContent).toContain('rit.');
-    expect(element.currentTime).toBe(position);
-  });
-
-  it('uses the complete map width for an expression spanning a sub-quarter score', async () => {
-    const builder = new ScoreBuilder();
-    const part = builder.newPartId();
-    builder.addPart({id: part, name: 'Short', directions: [
-      {kind: 'pedal', type: 'start', onsetQuarters: Rational.ZERO},
-      {kind: 'pedal', type: 'stop', onsetQuarters: new Rational(1, 2)},
-    ]});
-    builder.addNote(part, {id: builder.newNoteId(), pitch: Pitch.parse('C4'), onsetQuarters: Rational.ZERO,
-      duration: new Duration({base: new Rational(1, 2)}), voice: VoiceId('short')});
-    const element = await mount(tag, builder.build(), {type: 'map'});
-    const svg = element.querySelector('svg[part="annotations"]')!;
-    const width = svg.getAttribute('viewBox')!.split(' ')[2];
-    const pedal = svg.querySelector('[data-webscore-direction="pedal"] path');
-    expect(pedal?.getAttribute('d')).toContain(`H${width}`);
-  });
-
-  it('dispatches webscore:seek and drives the bound player', async () => {
-    const seeks: number[] = [];
-    const player = document.createElement('div');
-    player.id = 'player';
-    (player as HTMLElement & {seek?: (seconds: number) => void}).seek = (seconds) =>
-      seeks.push(seconds);
-    document.body.append(player);
-
-    const element = await mount(tag, fourBars(), {type: 'map', player: '#player'});
-    const detail: Array<{quarters: number; seconds: number}> = [];
-    element.addEventListener('webscore:seek', (event) => {
-      detail.push((event as CustomEvent<{quarters: number; seconds: number}>).detail);
-    });
-
-    element.querySelectorAll('button')[1]!.click();
-    await flush();
-
-    expect(detail).toHaveLength(1);
-    expect(detail[0]!.quarters).toBe(4);
-    expect(detail[0]!.seconds).toBeCloseTo(2, 5);
-    // The element drives the player directly; players never listen for seeks.
-    expect(seeks).toEqual([detail[0]!.seconds]);
-  });
-
-  it('follows the playhead on transport ticks, not on note onsets', async () => {
-    const player = document.createElement('div');
-    player.id = 'ticker';
-    document.body.append(player);
-    const element = await mount(tag, fourBars(), {type: 'map', player: '#ticker'});
-
-    player.dispatchEvent(
-      new CustomEvent('webscore:noteon', {detail: {midi: 60, startTime: 6}}),
-    );
-    await flush();
-    expect((element as unknown as {currentTime: number}).currentTime).toBe(0);
-
-    player.dispatchEvent(new CustomEvent('webscore:timeupdate', {detail: {seconds: 3}}));
-    await flush();
-    expect((element as unknown as {currentTime: number}).currentTime).toBe(3);
-
-    player.dispatchEvent(new CustomEvent('webscore:end'));
-    await flush();
-    expect((element as unknown as {currentTime: number}).currentTime).toBe(0);
-  });
-
-  it('marks the bar under the playhead as the current one', async () => {
-    const player = document.createElement('div');
-    player.id = 'current';
-    document.body.append(player);
-    const element = await mount(tag, fourBars(), {type: 'map', player: '#current'});
-
-    player.dispatchEvent(new CustomEvent('webscore:timeupdate', {detail: {seconds: 2.5}}));
-    await flush();
-    // 2.5s at 120bpm is quarter 5, which is the second bar.
-    const pressed = [...element.querySelectorAll('button')].map((button) =>
-      button.getAttribute('aria-pressed'),
-    );
-    expect(pressed).toEqual(['false', 'true', 'false', 'false']);
-  });
-
-  it('re-derives the map in place when the part filter changes', async () => {
-    const element = await mount(tag, twoParts(), {type: 'map'});
-    const before = element.querySelectorAll('button').length;
-
-    element.setAttribute('for-part', 'Bass');
-    await flush();
-
-    expect((element as unknown as {forPart?: string}).forPart).toBe('Bass');
-    // Same cells, re-weighted — the strip is re-derived, not remounted.
-    expect(element.querySelectorAll('button')).toHaveLength(before);
-  });
-
-  it('stops following a player once disconnected', async () => {
-    const player = document.createElement('div');
-    player.id = 'gone';
-    document.body.append(player);
-    const element = await mount(tag, fourBars(), {type: 'map', player: '#gone'});
-
-    element.remove();
-    player.dispatchEvent(new CustomEvent('webscore:timeupdate', {detail: {seconds: 3}}));
-    await flush();
-
-    expect((element as unknown as {currentTime: number}).currentTime).toBe(0);
-    expect(element.querySelectorAll('button')).toHaveLength(0);
-  });
-});
-
 describe('<score-pitch-view type=keyboard>', () => {
   const tag = define(PitchViewElement);
 
@@ -426,71 +280,32 @@ describe('<score-pitch-view type=keyboard>', () => {
   });
 });
 
-describe('<score-view type="thumbnail">', () => {
-  const tag = define(class extends ScoreViewElement {});
-
-  it('fits the whole score while keeping annotation text unscaled', async () => {
-    const element = await mount(tag, fourBars(), {type: 'thumbnail', width: '180', height: '48'});
-
-    const svg = element.querySelector('svg')!;
-    expect(svg).not.toBeNull();
-    expect(svg.hasAttribute('viewBox')).toBe(false);
-    const notes = svg.querySelector('svg')!;
-    expect(notes.getAttribute('preserveAspectRatio')).toBe('none');
-    expect(notes.getAttribute('viewBox')).toMatch(/^0 0 \d/);
-    expect(svg.querySelectorAll('rect')).toHaveLength(8);
-    expect(element.style.width).toBe('180px');
-    expect(element.querySelector('.wui-stage--fill')).not.toBeNull();
-    expect(element.querySelector<HTMLElement>('.wui-stage')!.style.getPropertyValue('--wm-stage-overflow')).toBe('auto');
-  });
-
-  it('has no interactive surface at all', async () => {
-    const element = await mount(tag, fourBars(), {type: 'thumbnail'});
-
-    expect(element.querySelectorAll('button')).toHaveLength(0);
-    expect(element.querySelectorAll('input')).toHaveLength(0);
-  });
-
-  it('renders nothing for an empty score', async () => {
-    const element = await mount(tag, new ScoreBuilder().build(), {type: 'thumbnail'});
-    expect(element.querySelector('svg')).toBeNull();
-  });
-});
-
 describe('<score-sheet-view>', () => {
   const tag = define(SheetViewElement);
 
-  it("surfaces the engine's own message instead of failing silently", async () => {
-    // Real OSMD cannot lay out in jsdom (no text metrics), and a machine
-    // without the optional peer never loads it at all — either way the
-    // element must report rather than sit blank, and the message it shows is
-    // the engine's, which is what names the missing peer in a browser.
-    const element = await mount(tag, fourBars());
-    await waitFor(() => element.querySelector('[role="alert"]') !== null);
-
-    const status = element.querySelector('[role="alert"]');
-    expect(status).not.toBeNull();
-    expect(status!.textContent!.length).toBeGreaterThan(0);
+  it('engraves an assigned score into pages without an optional peer', async () => {
+    const element = await mount<SheetViewElement>(tag, fourBars());
+    await waitFor(() => element.querySelector('[part~="system"]') !== null);
+    expect(element.querySelector('[data-score-sheet]')!.getAttribute('data-layout')).toBe('page');
+    expect(element.querySelectorAll('[part~="page"]').length).toBeGreaterThan(0);
+    expect(element.querySelector('[role="alert"]')).toBeNull();
   });
 
-  it('engraves through an injected OSMD instance', async () => {
-    const load = vi.fn();
-    const render = vi.fn();
-    const element = await mount<SheetViewElement>(tag, undefined);
-    (element as SheetViewElement & {osmd: unknown}).osmd = {
-      load: (xml: string) => {
-        load(xml);
-        return Promise.resolve();
-      },
-      render,
-      cursor: {show: vi.fn(), hide: vi.fn(), reset: vi.fn(), next: vi.fn()},
-      Sheet: {},
-    };
-    element.score = fourBars();
-    await waitFor(() => load.mock.calls.length > 0);
-
-    expect(load).toHaveBeenCalledTimes(1);
-    expect(load.mock.calls[0]![0]).toContain('<score-partwise');
-    expect(render).toHaveBeenCalled();
+  it('reflects layout and zoom attributes and keeps a passive sheet read-only', async () => {
+    const element = await mount<SheetViewElement>(tag, fourBars());
+    await waitFor(() => element.querySelector('[part~="system"]') !== null);
+    element.setAttribute('layout', 'flow');
+    element.zoom = 1.5;
+    expect(element.layout).toBe('flow');
+    expect(element.zoom).toBe(1.5);
+    expect(element.querySelector('[data-score-sheet]')!.getAttribute('data-layout')).toBe('flow');
+    element.setAttribute('zoom', '9');
+    expect(element.zoom).toBe(3);
+    element.setAttribute('layout', 'scroll');
+    expect(element.layout).toBe('page');
+    expect((element.querySelector('[part~="toolbar"]') as HTMLElement).hidden).toBe(true);
+    expect(element.tools).toEqual(['pitch', 'input', 'duration', 'tie', 'accidental', 'delete', 'history', 'zoom']);
+    element.tools = ['pitch', 'history'];
+    expect(element.getAttribute('tools')).toBe('pitch history');
   });
 });

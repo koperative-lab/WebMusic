@@ -1,6 +1,9 @@
+import {mountStatus, statusStyle, type StatusHandle, type StatusState} from './status';
 import {installStyle} from './internal/style';
-import {componentSurfaceCss, controlBorderFallback} from './internal/surface';
+import {componentSurfaceCss} from './internal/surface';
 import {controlHeight, controlRadius, controlThumbRadius} from './internal/control';
+import {ICON_PATHS, hiddenScrollbarCss, iconButtonCss, setIconButton} from './internal/icons';
+import {neutralColor} from './internal/palette';
 // ============================================================================
 // Domain-neutral queue presenter: a transport bar over an ordered list of
 // entries. It knows nothing about audio, scores or files — only labels,
@@ -26,6 +29,8 @@ export interface PlaylistState {
   progress: number;
   disabled?: boolean;
   items: readonly PlaylistItem[];
+  /** Optional owner readiness. An empty list otherwise waits for entries. */
+  status?: StatusState;
 }
 
 /** Structural presenter port. It owns no DOM or UI resource. */
@@ -54,6 +59,8 @@ export interface PlaylistClassNames {
   number?: string;
   label?: string;
   duration?: string;
+  status?: string;
+  itemStatus?: string;
 }
 
 export interface PlaylistParts {
@@ -70,6 +77,8 @@ export interface PlaylistParts {
   number?: string;
   label?: string;
   duration?: string;
+  status?: string;
+  itemStatus?: string;
 }
 
 export interface PlaylistOptions {
@@ -129,57 +138,52 @@ interface NormalizedState {
   progress: number;
   disabled: boolean;
   items: NormalizedItem[];
+  status: StatusState;
 }
 
 const mounted = new WeakMap<Host, PlaylistHandle>();
 
-export const playlistStyle = String.raw`
+const line = `var(--wm-control-border, var(--wm-border, ${neutralColor('border')}))`;
+
+/**
+ * An edge-to-edge icon row with a hairline under it over the entry list
+ * (Visual design → Toolbars). The current entry is inverted ink, durations
+ * are mono, and a disabled queue drops to 30%.
+ */
+export const playlistStyle = statusStyle + String.raw`
 .wui-playlist,
 .wui-playlist * { box-sizing: border-box; }
 
-.wui-playlist {
+:where(.wui-playlist) {
 ${componentSurfaceCss('playlist', {
-  border: '1px solid var(--wm-playlist-border, var(--wm-border, #d8d8d8))',
+  padding: '0',
+  border: `1px solid var(--wm-playlist-border, var(--wm-border, ${neutralColor('border')}))`,
   radius: 'var(--wui-playlist-radius, var(--wm-playlist-radius, var(--wm-control-radius, 0)))',
-  background: 'var(--wm-playlist-background, var(--wm-surface, #fff))',
+  background: 'var(--wm-playlist-background, var(--wm-surface, light-dark(#fff, #111)))',
 })}
-  color: var(--wui-playlist-text, var(--wm-playlist-text, var(--wm-foreground, #444)));
+  min-width: 0;
+  color: var(--wui-playlist-text, var(--wm-playlist-text, var(--wm-foreground, ${neutralColor('foreground')})));
   font: .85rem var(--wm-font-family, var(--wm-font, system-ui, sans-serif));
 }
 
-.wui-playlist__bar {
+.wui-playlist__status .wui-status { min-height:3rem; height:auto; }
+.wui-playlist__item-status { flex:0 0 auto; }
+.wui-playlist__item-status .wui-status { --wm-status-indicator-size:.875rem; }
+.wui-playlist__status[hidden], .wui-playlist__item-status[hidden], .wui-playlist__duration[hidden], .wui-playlist__bar[hidden], .wui-playlist__items[hidden] { display:none; }
+:where(.wui-playlist__bar) {
   display: flex;
-  align-items: center;
-  gap: .5rem;
-}
-
-.wui-playlist__button {
-  width: ${controlHeight('playlist')};
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 0;
+  min-width: 0;
   height: ${controlHeight('playlist')};
-  padding: 0;
-  border: 1px solid var(--wm-playlist-button-border, ${controlBorderFallback});
-  border-radius: var(--wui-playlist-radius, var(--wm-playlist-radius, var(--wm-control-radius, 0)));
-  background: var(--wm-playlist-button, var(--wm-surface, #fff));
-  color: var(--wm-playlist-button-text, var(--wm-foreground, #444));
-  font: inherit;
-  cursor: pointer;
+  overflow-x: auto;
+  border-bottom: 1px solid ${line};
 }
-
-.wui-playlist__button.play {
-  border-color: var(--wui-playlist-primary-border, var(--wm-playlist-primary-border, var(--wm-playlist-button-border, var(--wm-accent, #111))));
-  background: var(--wui-playlist-primary-background, var(--wm-playlist-primary-background, var(--wm-playlist-button, var(--wm-accent, #111))));
-  color: var(--wui-playlist-primary-foreground, var(--wm-playlist-primary-foreground, var(--wm-playlist-button-text, var(--wm-accent-foreground, #fff))));
-}
-
-.wui-playlist__button:disabled {
-  cursor: default;
-  opacity: .5;
-}
-
-.wui-playlist__button:focus-visible,
-.wui-playlist__seek:focus-visible {
-  outline: 2px solid var(--wm-focus, currentColor);
-  outline-offset: 2px;
+${hiddenScrollbarCss('.wui-playlist__bar')}${iconButtonCss('.wui-playlist__button', 'playlist')}
+:where(.wui-playlist__seek:focus-visible) {
+  outline: var(--wm-focus-ring, 2px solid var(--wm-foreground, ${neutralColor('foreground')}));
+  outline-offset: -2px;
 }
 
 .wui-playlist__seek {
@@ -191,6 +195,7 @@ ${componentSurfaceCss('playlist', {
   height: ${controlHeight('playlist')};
   margin: 0;
   border: 0;
+  border-inline-start: 1px solid ${line};
   border-radius: var(--wui-playlist-radius, ${controlRadius('playlist')});
   background: linear-gradient(
     to right,
@@ -200,6 +205,7 @@ ${componentSurfaceCss('playlist', {
   );
   cursor: pointer;
 }
+:where(.wui-playlist__seek:disabled) { opacity: .3; cursor: default; }
 
 .wui-playlist__seek::-webkit-slider-runnable-track { height: 100%; border: 0; background: transparent; }
 .wui-playlist__seek::-moz-range-track { height: 100%; border: 0; background: transparent; }
@@ -223,40 +229,43 @@ ${componentSurfaceCss('playlist', {
   background: var(--wm-playlist-thumb, var(--wm-foreground, #111));
 }
 
-.wui-playlist__items {
-  margin: .7rem 0 0;
+:where(.wui-playlist__items) {
+  margin: 0;
   padding: 0;
   list-style: none;
 }
 
-/* A linked queue omits the transport bar; its first row needs no reserved gap. */
-.wui-playlist__items:first-child { margin-top: 0; }
-
-.wui-playlist__item {
+:where(.wui-playlist__item) {
   display: flex;
   align-items: baseline;
   gap: .6rem;
-  padding: .35rem .4rem;
-  border-radius: var(--wui-playlist-radius, var(--wm-playlist-radius, var(--wm-control-radius, 0)));
+  padding: .4rem .6rem;
+  border-radius: 0;
   cursor: pointer;
 }
 
-.wui-playlist__item[aria-current="true"] {
-  background: var(--wui-playlist-active, var(--wm-playlist-active, rgba(17, 17, 17, .08)));
-  font-weight: 600;
+:where(.wui-playlist__item:hover) {
+  background: var(--wm-surface-muted, light-dark(#f3f3f3, #1c1c1c));
 }
+
+/* Selection is ink, not colour: the current entry inverts. */
+:where(.wui-playlist__item[aria-current="true"]) {
+  background: var(--wm-playlist-active, var(--wm-foreground, ${neutralColor('foreground')}));
+  color: var(--wm-playlist-active-foreground, var(--wm-accent-foreground, light-dark(#fff, #111)));
+}
+:where(.wui-playlist__item[aria-current="true"]) :where(.wui-playlist__number, .wui-playlist__duration) { color: inherit; }
 
 .wui-playlist__item[data-status="loading"] {
   opacity: .7;
 }
 
 .wui-playlist__item[data-status="error"] {
-  color: var(--wm-playlist-error, var(--wm-error, #c0392b));
+  color: var(--wm-playlist-error, var(--wm-error, light-dark(#c0392b, #ef5350)));
   cursor: default;
 }
 
 .wui-playlist__item:focus-visible {
-  outline: 2px solid var(--wm-focus, currentColor);
+  outline: var(--wm-focus-ring, 2px solid var(--wm-foreground, ${neutralColor('foreground')}));
   outline-offset: -2px;
 }
 
@@ -265,19 +274,16 @@ ${componentSurfaceCss('playlist', {
   min-width: 0;
 }
 
-.wui-playlist__duration {
-  color: var(--wui-playlist-muted, var(--wm-playlist-muted, var(--wm-foreground-muted, var(--wm-foreground, #666))));
+:where(.wui-playlist__number, .wui-playlist__duration) {
+  color: var(--wui-playlist-muted, var(--wm-playlist-muted, var(--wm-foreground-muted, ${neutralColor('muted')})));
+  font: .75rem/1 var(--wm-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
   font-variant-numeric: tabular-nums;
 }
 
 /* Rows are list items, so they cannot carry :disabled themselves. */
-.wui-playlist[aria-disabled="true"] .wui-playlist__item {
-  opacity: .5;
+:where(.wui-playlist[aria-disabled="true"] .wui-playlist__item) {
+  opacity: .3;
   cursor: default;
-}
-
-.wui-playlist__number {
-  font-variant-numeric: tabular-nums;
 }
 
 @media (forced-colors: active) {
@@ -342,6 +348,7 @@ function normalizeSnapshot(snapshot: PlaylistState): NormalizedState {
     playing: snapshot?.playing === true,
     progress: clamp01(snapshot?.progress),
     disabled: snapshot?.disabled === true,
+    status: snapshot?.status ?? {kind: items.length ? 'ready' : 'waiting', message: 'Waiting for playlist entries.'},
     items,
   };
 }
@@ -382,17 +389,18 @@ export function mountPlaylist(
     const node = document.createElement('button');
     node.type = 'button';
     node.className = `wui-playlist__button t ${modifier}`;
-    node.setAttribute('aria-label', label);
-    node.textContent = icon;
+    setIconButton(node, icon, label);
     addClassNames(node, options.classNames?.button);
     addClassNames(node, options.classNames?.[kind]);
     setParts(node, ['button', modifier], options.parts?.button, options.parts?.[kind]);
     return node;
   };
 
-  const previous = button('prev', 'previous', options.previousLabel ?? 'Previous', '⏮');
-  const toggle = button('play', 'play', options.playLabel ?? 'Play', '▶');
-  const next = button('next', 'next', options.nextLabel ?? 'Next', '⏭');
+  const previous = button('prev', 'previous', options.previousLabel ?? 'Previous', ICON_PATHS.previous);
+  const toggle = button('play', 'play', options.playLabel ?? 'Play', ICON_PATHS.play);
+  const next = button('next', 'next', options.nextLabel ?? 'Next', ICON_PATHS.next);
+  // The toggle repaints at transport-tick rate; rebuild its icon only on a change.
+  let toggleShown = `${ICON_PATHS.play}\u0000${options.playLabel ?? 'Play'}`;
 
   const seek = document.createElement('input');
   seek.type = 'range';
@@ -414,6 +422,15 @@ export function mountPlaylist(
 
   if (options.transport !== false) root.append(bar);
   root.append(list);
+  const statusHost = document.createElement('div');
+  statusHost.className = 'wui-playlist__status';
+  addClassNames(statusHost, options.classNames?.status);
+  setParts(statusHost, ['status'], options.parts?.status);
+  root.append(statusHost);
+  let statusState: StatusState = {kind: 'ready'};
+  const status = mountStatus(statusHost, {snapshot: () => statusState}, {
+    stylesheet: false, classNames: {root: 'wui-status--embedded'},
+  });
 
   let destroyed = false;
   let unsubscribe: (() => void) | undefined;
@@ -423,6 +440,11 @@ export function mountPlaylist(
   let commandRevision = 0;
   let listSignature = '';
   const rows = new Map<string, HTMLLIElement>();
+  const rowStatuses = new Map<string, {host: HTMLElement; handle: StatusHandle; state: StatusState}>();
+  const clearRowStatuses = (): void => {
+    for (const item of rowStatuses.values()) item.handle.destroy();
+    rowStatuses.clear();
+  };
   const cleanups: Array<() => void> = [];
 
   const isCurrent = (): boolean => !destroyed && mounted.get(host) === handle;
@@ -479,7 +501,17 @@ export function mountPlaylist(
     addClassNames(duration, options.classNames?.duration);
     setParts(duration, ['duration'], options.parts?.duration);
 
-    row.append(ordinal, label, duration);
+    const itemStatus = document.createElement('span');
+    itemStatus.className = 'wui-playlist__item-status';
+    addClassNames(itemStatus, options.classNames?.itemStatus);
+    setParts(itemStatus, ['item-status'], options.parts?.itemStatus);
+    const entry = {host: itemStatus, state: {kind: 'ready'} as StatusState, handle: undefined as StatusHandle | undefined};
+    const handle = mountStatus(itemStatus, {snapshot: () => entry.state}, {
+      stylesheet: false, classNames: {root: 'wui-status--embedded'},
+    });
+    // The binding closes over the same mutable entry stored for repainting.
+    rowStatuses.set(item.id, Object.assign(entry, {handle}));
+    row.append(ordinal, label, duration, itemStatus);
     return row;
   };
 
@@ -490,15 +522,31 @@ export function mountPlaylist(
     if (item.status) row.dataset.status = item.status;
     else delete row.dataset.status;
     const duration = row.querySelector<HTMLElement>('.wui-playlist__duration');
-    if (duration) duration.textContent = item.duration;
+    if (duration) {
+      duration.textContent = item.duration;
+      duration.hidden = item.status === 'loading' || item.status === 'error';
+    }
+    const feedback = rowStatuses.get(item.id);
+    if (feedback) {
+      feedback.state = {kind: item.status ?? 'ready', message: item.status === 'error' ? 'Unable to load' : item.status === 'loading' ? `Loading ${item.label}` : ''};
+      feedback.handle.update();
+      feedback.host.hidden = !item.status;
+    }
   };
 
   const paint = (state: NormalizedState): void => {
-    toggle.textContent = state.playing ? '⏸' : '▶';
-    toggle.setAttribute(
-      'aria-label',
-      state.playing ? (options.pauseLabel ?? 'Pause') : (options.playLabel ?? 'Play'),
-    );
+    statusState = state.status;
+    status.update();
+    statusHost.hidden = statusState.kind === 'ready';
+    list.hidden = state.items.length === 0;
+    bar.hidden = list.hidden && statusState.kind !== 'ready';
+    root.setAttribute('aria-busy', String(statusState.kind === 'loading' || state.items.some((item) => item.active && item.status === 'loading')));
+    const toggleIcon = state.playing ? ICON_PATHS.pause : ICON_PATHS.play;
+    const toggleLabel = state.playing ? (options.pauseLabel ?? 'Pause') : (options.playLabel ?? 'Play');
+    if (`${toggleIcon}\u0000${toggleLabel}` !== toggleShown) {
+      setIconButton(toggle, toggleIcon, toggleLabel);
+      toggleShown = `${toggleIcon}\u0000${toggleLabel}`;
+    }
     toggle.setAttribute('aria-pressed', String(state.playing));
     root.classList.toggle('is-playing', state.playing);
     root.classList.toggle('is-disabled', state.disabled);
@@ -517,6 +565,7 @@ export function mountPlaylist(
     if (signature !== listSignature) {
       const refocus = focusedRowId();
       rows.clear();
+      clearRowStatuses();
       const nodes = state.items.map((item, index) => {
         const row = renderRow(item, index);
         rows.set(item.id, row);
@@ -632,6 +681,8 @@ export function mountPlaylist(
     const off = unsubscribe;
     unsubscribe = undefined;
     if (off) attempt(off);
+    attempt(clearRowStatuses);
+    attempt(() => status.destroy());
     attempt(() => root.remove());
     attempt(() => style?.remove());
     current = undefined;

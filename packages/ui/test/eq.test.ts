@@ -9,6 +9,27 @@ function pointer(target: Element, type: string, init: Record<string, number>): v
   target.dispatchEvent(event);
 }
 
+/** A hand-driven animation-frame queue: drags apply at most once per frame. */
+function installFrames(): {flush(): void; readonly pending: number} {
+  const queue = new Map<number, FrameRequestCallback>();
+  let next = 0;
+  vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+    queue.set(++next, callback);
+    return next;
+  });
+  vi.stubGlobal("cancelAnimationFrame", (id: number) => queue.delete(id));
+  return {
+    flush(): void {
+      const callbacks = [...queue.values()];
+      queue.clear();
+      for (const callback of callbacks) callback(0);
+    },
+    get pending(): number {
+      return queue.size;
+    },
+  };
+}
+
 class FakeEq implements EqBinding {
   state: EqState = {
     ready: true,
@@ -121,6 +142,7 @@ describe("mountEq", () => {
   });
 
   it("keeps pointer ownership and submits logarithmic frequency plus gain", () => {
+    const frames = installFrames();
     const host = document.createElement("div");
     const binding = new FakeEq();
     mountEq(host, binding);
@@ -132,9 +154,48 @@ describe("mountEq", () => {
 
     pointer(point, "pointerdown", {pointerId: 4, clientX: 0, clientY: 0});
     pointer(svg, "pointermove", {pointerId: 7, clientX: 100, clientY: 100});
+    frames.flush();
     expect(binding.writes).toHaveLength(0);
     pointer(svg, "pointermove", {pointerId: 4, clientX: 100, clientY: 0});
+    frames.flush();
     expect(binding.writes[0]).toEqual({index: 0, frequency: 18_000, gain: 18});
+  });
+
+  it("coalesces a drag to one band write per frame and commits the release once", () => {
+    const frames = installFrames();
+    const host = document.createElement("div");
+    const binding = new FakeEq();
+    const snapshot = vi.spyOn(binding, "snapshot");
+    const handle = mountEq(host, binding);
+    const bounds = vi.fn(() => ({left: 0, top: 0, width: 100, height: 100}));
+    Object.defineProperty(handle.svg, "getBoundingClientRect", {value: bounds});
+    const point = host.querySelector(".wui-eq__point")!;
+
+    pointer(point, "pointerdown", {pointerId: 2});
+    const reads = snapshot.mock.calls.length;
+    for (const clientY of [10, 20, 30, 40, 50]) {
+      pointer(handle.svg, "pointermove", {pointerId: 2, clientX: 50, clientY});
+    }
+    expect(binding.writes).toHaveLength(0);
+    expect(snapshot.mock.calls.length).toBe(reads);
+    expect(frames.pending).toBe(1);
+    frames.flush();
+    expect(binding.writes).toEqual([{index: 0, frequency: 735, gain: -0}]);
+
+    pointer(handle.svg, "pointermove", {pointerId: 2, clientX: 50, clientY: 25});
+    pointer(handle.svg, "pointerup", {pointerId: 2, clientX: 50, clientY: 25});
+    expect(binding.writes).toHaveLength(2);
+    expect(binding.writes[1]).toEqual({index: 0, frequency: 735, gain: 9});
+    frames.flush();
+    expect(binding.writes).toHaveLength(2);
+    expect(bounds).toHaveBeenCalledOnce();
+
+    pointer(point, "pointerdown", {pointerId: 5});
+    pointer(handle.svg, "pointermove", {pointerId: 5, clientX: 10, clientY: 10});
+    pointer(handle.svg, "pointercancel", {pointerId: 5});
+    frames.flush();
+    expect(binding.writes).toHaveLength(2);
+    handle.destroy();
   });
 
   it("exposes focusable band ranges, announces physical values and marks the focused band", () => {
@@ -182,6 +243,7 @@ describe("mountEq", () => {
   });
 
   it("maps dragging to the resized SVG rather than the taller readout container", () => {
+    const frames = installFrames();
     const host = document.createElement("div");
     const binding = new FakeEq();
     const handle = mountEq(host, binding);
@@ -192,9 +254,14 @@ describe("mountEq", () => {
     Object.defineProperty(handle.svg, "getBoundingClientRect", {value: () => plot});
     pointer(host.querySelector(".wui-eq__point")!, "pointerdown", {pointerId: 1});
     pointer(handle.svg, "pointermove", {pointerId: 1, clientX: 70, clientY: 70});
+    frames.flush();
     expect(binding.writes.at(-1)).toEqual({index: 0, frequency: 735, gain: -0});
+    pointer(handle.svg, "pointerup", {pointerId: 1});
+    // The plot is measured at each press, so the next drag sees the resize.
     plot = {...plot, width: 200, height: 120};
+    pointer(host.querySelector(".wui-eq__point")!, "pointerdown", {pointerId: 1});
     pointer(handle.svg, "pointermove", {pointerId: 1, clientX: 120, clientY: 90});
+    frames.flush();
     expect(binding.writes.at(-1)).toEqual({index: 0, frequency: 735, gain: -0});
     handle.destroy();
   });

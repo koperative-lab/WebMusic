@@ -59,6 +59,27 @@ function pointer(
   target.dispatchEvent(event);
 }
 
+/** A hand-driven animation-frame queue: drags apply at most once per frame. */
+function installFrames(): { flush(): void; readonly pending: number } {
+  const queue = new Map<number, FrameRequestCallback>();
+  let next = 0;
+  vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+    queue.set(++next, callback);
+    return next;
+  });
+  vi.stubGlobal("cancelAnimationFrame", (id: number) => queue.delete(id));
+  return {
+    flush(): void {
+      const callbacks = [...queue.values()];
+      queue.clear();
+      for (const callback of callbacks) callback(0);
+    },
+    get pending(): number {
+      return queue.size;
+    },
+  };
+}
+
 function deferred(): {
   promise: Promise<void>;
   resolve: () => void;
@@ -199,6 +220,7 @@ describe("mountEnvelope", () => {
   });
 
   it("drags each legacy handle, captures one pointer, and cancels safely", () => {
+    const frames = installFrames();
     const host = document.createElement("div");
     const binding = new FakeEnvelope();
     mountEnvelope(host, binding);
@@ -220,15 +242,68 @@ describe("mountEnvelope", () => {
     pointer(svg, "pointermove", { pointerId: 8, clientX: 20, clientY: 25 });
     expect(binding.changes).toHaveLength(0);
     pointer(svg, "pointermove", { pointerId: 7, clientX: 20, clientY: 25 });
+    frames.flush();
     expect(binding.changes.at(-1)?.decay).toBeCloseTo(1.55);
     expect(binding.changes.at(-1)?.sustain).toBe(0.75);
     expect(svg.setPointerCapture).toHaveBeenCalledWith(7);
 
+    // A cancelled gesture drops the position it had not yet applied.
+    const count = binding.changes.length;
+    pointer(svg, "pointermove", { pointerId: 7, clientX: 22, clientY: 30 });
     pointer(svg, "pointercancel", { pointerId: 7 });
     expect(svg.releasePointerCapture).toHaveBeenCalledWith(7);
-    const count = binding.changes.length;
-    pointer(svg, "pointermove", { pointerId: 7, clientX: 25, clientY: 50 });
+    expect(frames.pending).toBe(0);
+    frames.flush();
     expect(binding.changes).toHaveLength(count);
+    pointer(svg, "pointermove", { pointerId: 7, clientX: 25, clientY: 50 });
+    frames.flush();
+    expect(binding.changes).toHaveLength(count);
+  });
+
+  it("applies a drag at most once per frame, reads layout once per press and commits the release exactly", () => {
+    const frames = installFrames();
+    const host = document.createElement("div");
+    const binding = new FakeEnvelope();
+    const setEnvelope = vi.spyOn(binding, "setEnvelope");
+    const handle = mountEnvelope(host, binding);
+    const svg = host.querySelector("svg")!;
+    const bounds = vi.fn(() => ({ left: 0, top: 0, width: 100, height: 100 }));
+    Object.defineProperty(svg, "getBoundingClientRect", { value: bounds });
+    const curve = host.querySelector(".wui-envelope__curve")!;
+    const drawn = curve.getAttribute("points");
+
+    pointer(host.querySelector('[data-h="a"]')!, "pointerdown", { pointerId: 3 });
+    for (const clientX of [5, 10, 15, 20]) {
+      pointer(svg, "pointermove", { pointerId: 3, clientX, clientY: 0 });
+    }
+    // Nothing is painted or sent between frames, and layout was read at the press only.
+    expect(setEnvelope).not.toHaveBeenCalled();
+    expect(curve.getAttribute("points")).toBe(drawn);
+    expect(frames.pending).toBe(1);
+    expect(bounds).toHaveBeenCalledOnce();
+
+    frames.flush();
+    expect(setEnvelope).toHaveBeenCalledOnce();
+    expect(setEnvelope.mock.calls[0]?.[0].attack).toBeCloseTo(1.6);
+
+    pointer(svg, "pointermove", { pointerId: 3, clientX: 6, clientY: 0 });
+    pointer(svg, "pointermove", { pointerId: 3, clientX: 12.5, clientY: 0 });
+    pointer(svg, "pointerup", { pointerId: 3, clientX: 12.5, clientY: 0 });
+    // The release commits the last position once, without waiting for a frame.
+    expect(setEnvelope).toHaveBeenCalledTimes(2);
+    expect(setEnvelope.mock.calls[1]?.[0].attack).toBeCloseTo(1);
+    expect(frames.pending).toBe(0);
+    frames.flush();
+    pointer(svg, "lostpointercapture", { pointerId: 3 });
+    expect(setEnvelope).toHaveBeenCalledTimes(2);
+    expect(bounds).toHaveBeenCalledOnce();
+
+    // A frame still pending at destroy never runs a command.
+    pointer(host.querySelector('[data-h="a"]')!, "pointerdown", { pointerId: 4 });
+    pointer(svg, "pointermove", { pointerId: 4, clientX: 2, clientY: 0 });
+    handle.destroy();
+    frames.flush();
+    expect(setEnvelope).toHaveBeenCalledTimes(2);
   });
 
   it("coalesces a synchronous subscriber re-entry and preserves the live control", () => {
@@ -246,6 +321,7 @@ describe("mountEnvelope", () => {
   });
 
   it("keeps drag values tied to the resized plot when the readout adds height", () => {
+    const frames = installFrames();
     const host = document.createElement("div");
     const binding = new FakeEnvelope();
     const handle = mountEnvelope(host, binding);
@@ -257,10 +333,15 @@ describe("mountEnvelope", () => {
     Object.defineProperty(svg, "getBoundingClientRect", {value: () => plot});
     pointer(host.querySelector('[data-h="ds"]')!, "pointerdown", {pointerId: 1});
     pointer(svg, "pointermove", {pointerId: 1, clientX: 40, clientY: 50});
+    frames.flush();
     expect(binding.changes.at(-1)?.decay).toBeCloseTo(1.55);
     expect(binding.changes.at(-1)?.sustain).toBe(0.75);
+    pointer(svg, "pointerup", {pointerId: 1, clientX: 40, clientY: 50});
+    // The plot is measured at each press, so the next drag sees the resize.
     plot = {...plot, width: 200, height: 120};
+    pointer(host.querySelector('[data-h="ds"]')!, "pointerdown", {pointerId: 1});
     pointer(svg, "pointermove", {pointerId: 1, clientX: 60, clientY: 60});
+    frames.flush();
     expect(binding.changes.at(-1)?.decay).toBeCloseTo(1.55);
     expect(binding.changes.at(-1)?.sustain).toBe(0.75);
     handle.destroy();

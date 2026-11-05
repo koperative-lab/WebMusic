@@ -43,6 +43,15 @@ function apply(target: Element, control: PlaygroundControl): void {
   const name = control.dataset.pgAttr;
   if (!name) return;
 
+  if (control.dataset.pgKind === 'token') {
+    // One checkbox per token: the attribute is the checked set of its row.
+    const row = control.closest('.wm-pg__tokens') ?? control.parentElement;
+    const tokens = [...(row?.querySelectorAll<HTMLInputElement>(`input[data-pg-kind="token"][data-pg-attr="${name}"]`) ?? [])]
+      .filter((box) => box.checked).map((box) => box.value);
+    target.setAttribute(name, tokens.join(' '));
+    return;
+  }
+
   if (control.dataset.pgKind === 'bool') {
     const value = control.value;
     if (value === 'on') target.setAttribute(name, '');
@@ -253,14 +262,22 @@ function wire(panel: HTMLElement): PlaygroundMount {
   };
 
   const refresh = (): void => {
+    for (const control of panel.querySelectorAll<HTMLSelectElement>('select[data-pg-kind="bool"][data-pg-inverse-fallback]')) {
+      const legacy = targetOf(control)?.getAttribute(control.dataset.pgInverseFallback!);
+      const enabled = legacy == null ? control.dataset.pgFallback === 'on' : FALSY.test(legacy.trim());
+      const option = [...control.options].find((entry) => entry.value === 'unset');
+      if (option) option.textContent = `default (${enabled ? 'on' : 'off'})`;
+    }
     for (const row of panel.querySelectorAll<HTMLElement>('[data-pg-when]')) {
       try {
         const condition = JSON.parse(row.dataset.pgWhen!) as {
-          attribute: string; values: string[]; fallback: string; options?: string[];
+          attribute: string; values: string[]; fallback: string; options?: string[]; presentAttribute?: string;
         };
-        const raw = targetOf(row)?.getAttribute(condition.attribute) ?? '';
+        const owner = targetOf(row);
+        const raw = owner?.getAttribute(condition.attribute) ?? '';
         const value = condition.options ? (condition.options.includes(raw) ? raw : condition.fallback) : raw || condition.fallback;
-        row.hidden = !condition.values.includes(value);
+        row.hidden = !condition.values.includes(value)
+          || (condition.presentAttribute !== undefined && !owner?.hasAttribute(condition.presentAttribute));
       } catch {
         row.hidden = true;
       }
@@ -291,6 +308,14 @@ function wire(panel: HTMLElement): PlaygroundMount {
       const owner = targetOf(control);
       control.disabled = !owner;
       control.checked = !owner?.hasAttribute('hidden');
+      return;
+    }
+    if (control instanceof HTMLInputElement && control.dataset.pgKind === 'token') {
+      // An absent token attribute means every token; otherwise reflect membership.
+      const owner = targetOf(control);
+      control.disabled = !owner;
+      const raw = owner?.getAttribute(control.dataset.pgAttr ?? '');
+      control.checked = raw == null || raw.split(/[\s,]+/).includes(control.value);
       return;
     }
     const unset = control.dataset.pgKind === 'bool' ? 'unset' : '';

@@ -35,8 +35,8 @@ const INERT: Record<string, string> = {
     drag-mode="scrub"
     data-view-demo
   ></audio-view>
-  <p class="wa-help" data-drag-help>The playhead stays centered. Drag left forward or right backward to scratch; release coasts, then restores the previous playback state.</p>
-  <p role="status" data-view-status>Loading waveform…</p>
+  <p class="wm-demo-help" data-drag-help>The playhead stays centered. Drag left forward or right backward to scratch; release coasts, then restores the previous playback state.</p>
+  <p role="status" class="wm-demo-status" data-view-status>Loading waveform…</p>
   </div>
 </ElementPlayground>
 
@@ -65,6 +65,7 @@ const INERT: Record<string, string> = {
     const update = async (): Promise<void> => {
       const current = ++generation;
       if (!ready) return;
+      delete status.dataset.error;
       if (!needsSpectrum()) { status.textContent = ''; return; }
       if (prepared) { status.textContent = ''; return; }
       status.textContent = 'Preparing spectrum…';
@@ -75,7 +76,7 @@ const INERT: Record<string, string> = {
         prepared = true;
         status.textContent = '';
       } catch (error) {
-        if (scope.active && current === generation) status.textContent = 'Spectrum could not be prepared. Change the view type to retry.';
+        if (scope.active && current === generation) { status.textContent = 'Spectrum could not be prepared. Change the view type to retry.'; status.dataset.error = ''; }
         throw error;
       }
     };
@@ -126,12 +127,11 @@ const INERT: Record<string, string> = {
       ready = true;
       status.textContent = '';
       await update();
-    })(), () => { status.textContent = 'Audio could not be loaded. Reload this page to retry.'; });
+    })(), () => { status.textContent = 'Audio could not be loaded. Reload this page to retry.'; status.dataset.error = ''; });
   });
 </script>
 
 <style>
-  .wa-help { color: var(--wa-muted); font-size: 0.8rem; }
   .wa-demo :global(audio-player) {
     display: block;
     margin-bottom: 0.6rem;

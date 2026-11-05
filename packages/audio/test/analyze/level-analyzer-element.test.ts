@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
+vi.mock('@webmusic/ui/level-analyzer', () => import('../../../ui/src/level-analyzer'));
 import {defineAudioLevelAnalyzerElement, type AudioLevelAnalyzerElement} from '../../src/analyze/element/audio-level-analyzer';
 import {defineAllAudioElements} from '../../src/analyze/element';
 
@@ -58,10 +59,13 @@ describe('audio-level-analyzer', () => {
     expect(element.sample!.peakDbfs).toBeCloseTo(-20);
     expect(element.heldPeakDbfs).toBeCloseTo(20 * Math.log10(0.2));
 
-    const threshold = element.querySelector<HTMLInputElement>('input[type="range"]')!;
-    threshold.value = '-24';
-    threshold.dispatchEvent(new Event('input', {bubbles: true}));
+    const threshold = element.querySelector<HTMLElement>('[role="slider"][part~="threshold"]')!;
+    threshold.dispatchEvent(new KeyboardEvent('keydown', {key: 'Home', bubbles: true}));
+    for (let step = 0; step < 36; step += 1) {
+      threshold.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowRight', bubbles: true}));
+    }
     expect(element.thresholdDbfs).toBe(-24);
+    expect(threshold.getAttribute('aria-valuetext')).toBe('-24 dBFS');
     expect(element.querySelector<HTMLElement>('.wui-level-analyzer__plot')!.dataset.over).toBe('true');
 
     element.querySelector<HTMLButtonElement>('button')!.click();
@@ -121,6 +125,7 @@ describe('audio-level-analyzer', () => {
     vi.advanceTimersByTime(100);
     expect(second.reads.mock.calls.length).toBe(readCount);
     expect(element.sample).toBeUndefined();
-    expect(element.textContent).toContain('Paused');
+    expect(element.querySelector<HTMLElement>('[role="status"]')!.hidden).toBe(true);
+    expect(element.textContent).not.toContain('Paused');
   });
 });

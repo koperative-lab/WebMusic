@@ -1,0 +1,6 @@
+{"passed":10,"elapsedMs":10747}
+{"passed":20,"elapsedMs":21549}
+{"passed":30,"elapsedMs":32400}
+{"passed":40,"elapsedMs":43142}
+{"passed":50,"elapsedMs":53847}
+{"total":50,"passed":50,"failed":0}

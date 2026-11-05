@@ -1,6 +1,7 @@
 ---
 // miniMeter-style waveform: the amplitude waveform tinted by its spectral
-// content (bass → red, mid → green, treble → blue), with a control panel:
+// content (bass → red, mid → green, treble → blue), with a control panel
+// placed beside Parameters, outside the live canvas:
 //   Channel 1 / Channel 2 — pick Left / Right / Mid / Side; a second channel
 //     stacks a stereo split, each half coloured by its own spectrum.
 //   Color Mode — Static / Multi-Band / Color Map (the `color-mode` attribute).
@@ -29,9 +30,11 @@ const ONLY = [
     <audio-player id="mm-player" controls></audio-player>
     <audio-view id="mm-view" player="#mm-player" type="waveform" pixels-per-second="90" height="160" interactive drag-mode="scrub" color-mode="multiband"></audio-view>
 
-    <p class="mm-help" data-drag-help>The playhead stays centered. Drag left forward or right backward to scratch; release coasts, then restores the previous playback state.</p>
-    <p role="status" data-mm-status>Audio loads when this example is visible.</p>
-    <div class="mm-panel">
+    <p class="wm-demo-help" data-drag-help>The playhead stays centered. Drag left forward or right backward to scratch; release coasts, then restores the previous playback state.</p>
+    <p role="status" class="wm-demo-status" data-mm-status>Audio loads when this example is visible.</p>
+  </div>
+  <div slot="controls" data-mm-controls>
+    <div class="mm-panel" aria-label="Channels and colour">
       <div class="mm-row">
         <span class="mm-label">Channel 1:</span>
         <div class="mm-seg" data-group="ch1" role="group" aria-label="Channel 1 source">
@@ -93,6 +96,8 @@ const ONLY = [
     const status = device.querySelector<HTMLElement>('[data-mm-status]')!;
     const fixture = acquireAudioViewFixture(`${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`);
     const help = device.querySelector<HTMLElement>('[data-drag-help]');
+    // The channel and colour controls live with Parameters, outside the canvas.
+    const controls = device.closest<HTMLElement>('[data-wm-pg]') ?? device;
     const updateHelp = (): void => {
       if (!help) return;
       const mode = view.getAttribute('drag-mode');
@@ -118,6 +123,7 @@ const ONLY = [
       if (!ready) return;
       const selected = ch2 === 'off' ? [ch1] : [ch1, ch2];
       const coloured = view.getAttribute('color-mode') !== 'static';
+      delete status.dataset.error;
       status.textContent = coloured ? 'Preparing channel colour…' : 'Preparing channels…';
       try {
         const peaks = await fixture.peaks(selected);
@@ -132,7 +138,7 @@ const ONLY = [
         }
         status.textContent = '';
       } catch (error) {
-        if (scope.active && current === generation) status.textContent = 'Channel data could not be prepared. Choose a channel to retry.';
+        if (scope.active && current === generation) { status.textContent = 'Channel data could not be prepared. Choose a channel to retry.'; status.dataset.error = ''; }
         throw error;
       }
     };
@@ -143,7 +149,7 @@ const ONLY = [
         button.setAttribute('aria-pressed', String(active));
       }
     };
-    for (const seg of device.querySelectorAll<HTMLElement>('.mm-seg')) {
+    for (const seg of controls.querySelectorAll<HTMLElement>('.mm-seg')) {
       scope.listen(seg, 'click', (event) => {
         const button = (event.target as HTMLElement).closest<HTMLButtonElement>('button');
         if (!button || !seg.contains(button)) return;
@@ -157,10 +163,10 @@ const ONLY = [
         }
       });
     }
-    const loop = device.querySelector<HTMLInputElement>('[data-ctl="loop"]')!;
+    const loop = controls.querySelector<HTMLInputElement>('[data-ctl="loop"]')!;
     scope.listen(loop, 'change', () => player.toggleAttribute('loop', loop.checked));
-    const speed = device.querySelector<HTMLInputElement>('[data-ctl="speed"]')!;
-    const speedOut = device.querySelector('[data-speed]')!;
+    const speed = controls.querySelector<HTMLInputElement>('[data-ctl="speed"]')!;
+    const speedOut = controls.querySelector('[data-speed]')!;
     scope.listen(speed, 'input', () => {
       player.setAttribute('rate', speed.value);
       speedOut.textContent = Number(speed.value).toFixed(2);
@@ -174,7 +180,7 @@ const ONLY = [
       player.removeAttribute('loop'); player.removeAttribute('rate');
       loop.checked = false; speed.value = '1'; speedOut.textContent = '1.00';
       const defaults: Record<string, string> = {ch1: 'left', ch2: 'off', colormode: 'multiband', history: '0'};
-      for (const seg of device.querySelectorAll<HTMLElement>('.mm-seg')) setActive(seg, defaults[seg.dataset.group!]);
+      for (const seg of controls.querySelectorAll<HTMLElement>('.mm-seg')) setActive(seg, defaults[seg.dataset.group!]);
       scope.run(applyView());
     });
     whenDemoVisible(device, scope, async () => {
@@ -188,7 +194,7 @@ const ONLY = [
         ready = true;
         await applyView();
       } catch (error) {
-        if (scope.active) status.textContent = 'Audio could not be loaded. Reload this page to retry.';
+        if (scope.active) { status.textContent = 'Audio could not be loaded. Reload this page to retry.'; status.dataset.error = ''; }
         throw error;
       }
     });
@@ -196,59 +202,28 @@ const ONLY = [
 </script>
 
 <style>
-  .mm-device {
-    background: #0b0d12;
-    border: 1px solid #2a2e37;
-    padding: 0.75rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.7rem;
-  }
-  .mm-device :global(audio-player) { display: block; --wap-bg: #15171c; }
-  .mm-device :global(audio-view) {
-    --wm-audio-view-surface-background: #000;
-    --wm-audio-view-surface-border: 1px solid #20242c;
-    display: block;
-    min-height: 160px;
-  }
-  .mm-help { margin: 0; color: #c9d2e3; font-size: 0.8rem; }
-  .mm-panel { display: flex; flex-direction: column; gap: 0.5rem; }
-  .mm-row { display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap; }
+  /* The device follows the kit: neutral surface, hairlines, square cells. */
+  .mm-device { display: flex; flex-direction: column; gap: .75rem; min-width: 0; }
+  .mm-device :global(audio-view) { display: block; min-height: 160px; }
+  .mm-panel { display: grid; gap: .5rem; }
+  .mm-row { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; min-width: 0; }
   .mm-label {
-    color: #8b93a3;
-    font-family: var(--sl-font-mono, monospace);
-    font-size: 0.74rem;
-    min-width: 5.5rem;
+    min-width: 6rem; color: var(--wm-foreground-muted, light-dark(#777, #aaa));
+    font: .625rem/1 var(--wm-font-mono, ui-monospace, monospace); text-transform: uppercase; letter-spacing: .06em;
   }
-  .mm-seg { display: inline-flex; gap: 0.25rem; }
+  .mm-seg { display: inline-flex; gap: 1px; background: var(--wm-control-border, var(--wm-border, light-dark(#d8d8d8, #333))); border: 1px solid var(--wm-control-border, var(--wm-border, light-dark(#d8d8d8, #333))); }
   .mm-seg button {
-    appearance: none;
-    border: 0;
-    background: transparent;
-    color: #8b93a3;
-    font-family: var(--sl-font-mono, monospace);
-    font-size: 0.76rem;
-    padding: 0.2rem 0.55rem;
-    cursor: pointer;
-    line-height: 1.4;
+    appearance: none; margin: 0; border: 0; border-radius: 0; min-width: var(--wm-control-size, 2rem); height: var(--wm-control-size, 2rem); padding: 0 .5rem;
+    background: var(--wm-surface, light-dark(#fff, #111)); color: var(--wm-foreground-muted, light-dark(#777, #aaa));
+    font: .6875rem/1 var(--wm-font-mono, ui-monospace, monospace); cursor: pointer;
   }
-  .mm-seg button:hover { color: #d7dbe3; }
-  .mm-seg button.active { background: #c9d2e3; color: #11141a; font-weight: 600; }
+  .mm-seg button:hover { color: var(--wm-foreground, light-dark(#111, #eee)); }
+  .mm-seg button[aria-pressed='true'] { background: var(--wm-foreground, light-dark(#111, #eee)); color: var(--wm-accent-foreground, light-dark(#fff, #111)); }
+  .mm-seg button:focus-visible { outline: var(--wm-focus-ring, 2px solid var(--wm-foreground, light-dark(#111, #eee))); outline-offset: -2px; }
   .mm-toggle {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    color: #8b93a3;
-    font-family: var(--sl-font-mono, monospace);
-    font-size: 0.74rem;
-    margin-left: auto;
-    cursor: pointer;
+    display: inline-flex; align-items: center; gap: .4rem; margin-left: auto; cursor: pointer;
+    color: var(--wm-foreground-muted, light-dark(#777, #aaa)); font: .625rem/1 var(--wm-font-mono, ui-monospace, monospace); text-transform: uppercase; letter-spacing: .06em;
   }
-  .mm-row input[type='range'] { accent-color: #c9d2e3; max-width: 240px; flex: 1 1 160px; }
-  .mm-num {
-    color: #c9d2e3;
-    font-family: var(--sl-font-mono, monospace);
-    font-size: 0.74rem;
-    min-width: 2.6rem;
-  }
+  .mm-row input[type='range'] { accent-color: var(--wm-foreground, light-dark(#111, #eee)); max-width: 240px; flex: 1 1 160px; }
+  .mm-num { min-width: 2.6rem; color: var(--wm-foreground, light-dark(#111, #eee)); font: .75rem/1 var(--wm-font-mono, ui-monospace, monospace); }
 </style>

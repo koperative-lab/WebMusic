@@ -91,6 +91,37 @@ describe('mountCanvasStage', () => {
     expect(cleanup).toHaveBeenCalledOnce();
   });
 
+  it('reads frame geometry before writing status or the backing store', () => {
+    const host = document.createElement('div');
+    const order: string[] = [];
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(() => {
+      order.push('read');
+      return 120;
+    });
+    let state: StatusState = {kind: 'loading'};
+    const handle = mountCanvasStage(host, {
+      draw: () => order.push('draw'),
+      status: () => {
+        order.push('status');
+        return state;
+      },
+    });
+    order.length = 0;
+    handle.redraw();
+    expect(order.indexOf('read')).toBeLessThan(order.indexOf('status'));
+    expect(order.lastIndexOf('read')).toBeLessThan(order.indexOf('status'));
+    expect(order.at(-1)).toBe('draw');
+    // An unchanged overlay is not written again.
+    const layer = host.querySelector<HTMLElement>('.wui-stage__status')!;
+    const hidden = vi.spyOn(layer, 'hidden', 'set');
+    handle.redraw();
+    expect(hidden).not.toHaveBeenCalled();
+    state = {kind: 'ready'};
+    handle.redraw();
+    expect(hidden).toHaveBeenCalledOnce();
+    handle.destroy();
+  });
+
   it('owns requestAnimationFrame and cancels it on destroy', () => {
     const callbacks: FrameRequestCallback[] = [];
     const request = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
@@ -780,5 +811,16 @@ describe('mountSurfaceSlider gesture modes', () => {
     expect(onError).toHaveBeenCalledTimes(2);
     handle.destroy();
     expect(element.hasAttribute('role')).toBe(false);
+  });
+});
+
+describe('stage scrolling', () => {
+  it('hides the retained stage scrollbar while keeping it scrollable', () => {
+    expect(stageStyle).toContain('scrollbar-width: none');
+    expect(stageStyle).toMatch(/:where\(\.wui-stage:not\(\.wui-stage--canvas\)\)::-webkit-scrollbar \{ display: none; \}/);
+    const host = document.createElement('div');
+    const handle = mountStage(host, {render: () => {}}, {overflow: 'auto'});
+    expect(handle.element.style.getPropertyValue('--wm-stage-overflow')).toBe('auto');
+    handle.destroy();
   });
 });

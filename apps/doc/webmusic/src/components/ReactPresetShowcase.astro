@@ -130,6 +130,12 @@ const canvasSize =
 
 <style>
   .react-preset-showcase__surface {
+    /* React children inherit these from the Astro-owned canvas node. */
+    --webscore-react-button-bg: var(--wm-accent, #444);
+    --webscore-react-button-color: var(--wm-accent-foreground, #fff);
+    --webscore-react-button-border: var(--wm-control-border, #b0b0b0);
+    --webscore-react-progress-bg: var(--wm-surface-muted, #f3f3f3);
+    --webscore-react-progress-fill: var(--wm-transport-fill, #999);
     min-height: 4rem;
     overflow: auto;
   }
@@ -140,11 +146,6 @@ const canvasSize =
     --webscore-react-control-height: 3rem;
     --webscore-react-icon-size: 1.35rem;
     --webscore-react-progress-height: 0.72rem;
-    --webscore-react-button-bg: #111;
-    --webscore-react-button-color: #fff;
-    --webscore-react-button-border: #111;
-    --webscore-react-progress-bg: #f4f4f4;
-    --webscore-react-progress-fill: #111;
     display: flex;
     align-items: center;
     min-height: 3rem;

@@ -5,8 +5,9 @@
 // Side-effect free: nothing registers until `defineAudioViewElement()` (or the
 // aggregate `defineAllAudioElements()`) runs.
 //
-// Three elements, one job each:
-//   <audio-view>            the projection stage: waveform / spectrogram / meter
+// Four elements, one job each:
+//   <audio-view>            the read-only projection stage: waveform / spectrogram / meter
+//   <audio-clip-view>       the waveform editor over a borrowed AudioClipEditor
 //   <audio-meter>           live RMS level / FFT spectrum monitor
 //   <audio-live-view>       a scrolling projection of a live AnalyserNode
 
@@ -23,12 +24,23 @@ export {
   type LiveViewType,
 } from './audio-live-view';
 
+export {
+  AudioClipViewElement,
+  AUDIO_CLIP_VIEW_FEATURES,
+  defineAudioClipViewElement,
+  type AudioClipFeature,
+  type AudioClipSettings,
+  type AudioClipSettingsChangeDetail,
+  type AudioClipSnap,
+  type AudioClipTool,
+} from './audio-clip-view';
 export {AudioMeterElement, defineAudioMeterElement} from './audio-meter';
 export type {AudioMeterPlayer} from './audio-meter';
 
 import {defineAudioMeterElement} from './audio-meter';
 import {defineAudioViewElement} from './audio-view';
 import {defineAudioLiveViewElement} from './audio-live-view';
+import {defineAudioClipViewElement} from './audio-clip-view';
 
 /**
  * Register every `@webmusic/audio/view` custom element at its default tag — the
@@ -40,4 +52,5 @@ export function defineAllAudioElements(): void {
   defineAudioMeterElement();
   defineAudioViewElement();
   defineAudioLiveViewElement();
+  defineAudioClipViewElement();
 }

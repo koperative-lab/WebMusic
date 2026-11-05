@@ -1,0 +1,111 @@
+---
+// <audio-clip-view> edits the Arabesque No. 1 recording. The page owns one
+// editor with every built-in range processor and lends it to the player and
+// the clip view. A starting beat grid is estimated from the opening; Grid Edit
+// refines it.
+import ElementPlayground from '../ElementPlayground.astro';
+
+const source = `${import.meta.env.BASE_URL}wav/Arabesque%20No.1.wav`;
+---
+
+<ElementPlayground tag="audio-clip-view" target="[data-clip-view]" markup="[data-clip-composition]"
+  companions={[{tag: 'audio-player', target: '[data-clip-player]'}]}>
+  <section data-clip-demo data-clip-src={source} aria-label="Audio clip editing">
+    <div data-clip-composition data-pg-fragment>
+      <audio-player data-clip-player id="clip-player"></audio-player>
+      <audio-clip-view data-clip-view player="#clip-player" editable grid quantize></audio-clip-view>
+    </div>
+    <p data-clip-status role="alert" hidden></p>
+  </section>
+</ElementPlayground>
+
+<script>
+  import {defineAudioPlayerElement, type AudioPlayerElement} from '@webmusic/audio/play/element';
+  import {defineAudioClipViewElement, type AudioClipViewElement} from '@webmusic/audio/view/element';
+  import {loadAudioClipEditor, type AudioClipEditor} from '@webmusic/audio/view/headless';
+  import {AUDIO_RANGE_PROCESSOR_KINDS, createAudioRangeProcessor} from '@webmusic/audio/view';
+  import {readAudioSequenceRange} from '@webmusic/audio';
+  import {detectTempo} from '@webmusic/audio/analyze';
+  import {mountDemos} from '../demo-lifecycle';
+  import {PLAYGROUND_RESET_EVENT, PLAYGROUND_SYNC_EVENT} from '../playground-client';
+  defineAudioPlayerElement(); defineAudioClipViewElement();
+  mountDemos('[data-clip-demo]', (root, scope) => {
+    // The demo owns one editor at a time; the player and the clip view borrow it.
+    const source = root.dataset.clipSrc!;
+    const panel = root.closest<HTMLElement>('[data-wm-pg]');
+    const player = root.querySelector<AudioPlayerElement>('[data-clip-player]')!;
+    const view = root.querySelector<AudioClipViewElement>('[data-clip-view]')!;
+    const status = root.querySelector<HTMLElement>('[data-clip-status]')!;
+    const processors = AUDIO_RANGE_PROCESSOR_KINDS.map((kind) => createAudioRangeProcessor(kind));
+    let editor: AudioClipEditor | undefined;
+    let loadGeneration = 0;
+    let loadController: AbortController | undefined;
+    const message = (error: unknown): string => error instanceof Error ? error.message : String(error);
+    /** Estimate a starting grid from the opening 20 s and make it the saved state. */
+    const seedGrid = async (target: AudioClipEditor): Promise<void> => {
+      const snapshot = target.getSnapshot();
+      const content = snapshot.content;
+      const length = Math.min(content.length, Math.round(20 * content.sampleRate));
+      const channels = content.channelLayout.map(() => new Float32Array(length));
+      readAudioSequenceRange(content, snapshot.assets, 0, channels);
+      const {bpm, grid} = await detectTempo(channels, content.sampleRate);
+      if (!Number.isFinite(bpm) || bpm <= 0 || target.getSnapshot().documentRevision !== snapshot.documentRevision) return;
+      target.execute({version: 1, documentId: snapshot.documentId, expectedRevision: snapshot.documentRevision, label: 'Detect tempo',
+        operations: [{type: 'set-beat-grid', grid: {bpm: Math.round(bpm * 100) / 100, anchorFrame: Math.round(grid.beats[0] * content.sampleRate), beatsPerBar: 4}}]});
+      target.clearHistory();
+      target.markSaved();
+    };
+    // The canvas carries no narration; only a failed load is reported.
+    const fail = (text: string): void => { if (scope.active) { status.textContent = text; status.hidden = false; } };
+
+    /** Lend `next` to the player and the view, then dispose the editor it replaces. */
+    const install = (next: AudioClipEditor | undefined): void => {
+      const previous = editor;
+      editor = next;
+      player.editor = next;
+      view.editor = next;
+      if (previous && previous !== next) { previous.cancelProcessing(); previous.dispose(); }
+    };
+    const load = async (): Promise<void> => {
+      loadGeneration += 1; loadController?.abort();
+      const current = loadGeneration;
+      const controller = new AbortController(); loadController = controller;
+      try {
+        const loaded = await loadAudioClipEditor(source, {processors, signal: controller.signal});
+        // A superseded result was never lent to an element; release it here.
+        if (!scope.active || current !== loadGeneration) { loaded.dispose(); return; }
+        await seedGrid(loaded).catch(() => undefined);
+        if (!scope.active || current !== loadGeneration) { loaded.dispose(); return; }
+        status.hidden = true;
+        install(loaded);
+      } catch (error) {
+        if (scope.active && current === loadGeneration) fail(message(error));
+      } finally {
+        if (loadController === controller) loadController = undefined;
+      }
+    };
+
+    // Toolbar, keyboard and wheel changes are reflected to attributes; keep Parameters current.
+    scope.listen(view, 'clipsettingschange', () => { panel?.dispatchEvent(new CustomEvent(PLAYGROUND_SYNC_EVENT)); });
+    if (panel) {
+      // Reset restores the authored attributes; reloading also discards the edits.
+      scope.listen(panel, PLAYGROUND_RESET_EVENT, () => {
+        queueMicrotask(() => { if (scope.active) scope.run(load()); });
+      });
+    }
+    scope.add(() => {
+      loadGeneration += 1; loadController?.abort();
+      const owned = editor; editor = undefined;
+      player.editor = undefined;
+      view.editor = undefined;
+      owned?.cancelProcessing();
+      owned?.dispose();
+    });
+    scope.run(load());
+  });
+</script>
+
+<style>
+  [data-clip-demo], [data-clip-composition] { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; min-width: 0; }
+  [data-clip-demo] p { margin: 0; font-size: .85rem; overflow-wrap: anywhere; }
+</style>

@@ -34,14 +34,16 @@ interface NoteEventDetail {
 }
 
 const RECORDER_THEME = [
-  ['background', 'bg', 'var(--wm-surface,#fff)'],
-  ['border', 'border', 'var(--wm-border,#d8d8d8)'],
-  ['text', 'text', 'var(--wm-foreground,#444)'],
-  ['accent', 'rec', 'var(--wm-accent,#c0392b)'],
-  ['accent-text', 'rec-color', 'var(--wm-accent-foreground,#fff)'],
-  ['button', 'btn', 'var(--wm-surface,#fff)'],
-  ['button-border', 'btn-border', 'var(--wm-control-border,var(--wm-border,#d8d8d8))'],
-  ['muted', 'label', 'var(--wm-foreground-muted,var(--wm-foreground,#666))'],
+  ['background', 'bg', 'var(--wm-surface,light-dark(#fff,#111))'],
+  ['border', 'border', 'var(--wm-border,light-dark(#d8d8d8,#333))'],
+  ['text', 'text', 'var(--wm-foreground,light-dark(#111,#eee))'],
+  // Recording is a listed colour meaning, so it has its own token rather than
+  // borrowing an accent (Visual design → Palette).
+  ['accent', 'rec', 'var(--wm-recording,light-dark(#c62828,#ef5350))'],
+  ['accent-text', 'rec-color', 'var(--wm-accent-foreground,light-dark(#fff,#111))'],
+  ['button', 'btn', 'var(--wm-surface,light-dark(#fff,#111))'],
+  ['button-border', 'btn-border', 'var(--wm-control-border,var(--wm-border,light-dark(#d8d8d8,#333)))'],
+  ['muted', 'label', 'var(--wm-foreground-muted,light-dark(#777,#aaa))'],
   ['radius', 'radius', 'var(--wm-control-radius,0)'],
 ];
 // Preserve inherited public tokens before mapping the legacy --rec-* names.
@@ -49,7 +51,7 @@ const RECORDER_COMPATIBILITY_STYLE = `
 :host{min-width:0;max-width:100%;box-sizing:border-box;${RECORDER_THEME.map(([name, , fallback]) => `--wui-recorder-host-${name}:var(--wm-recorder-${name},${fallback});`).join('')}}
 :host(:not([hidden])){display:block}
 :host([hidden]){display:none}
-[part~="root"]{background:var(--wm-score-recorder-surface-background,var(--wm-recorder-surface-background,var(--wm-component-background,var(--wm-recorder-background,var(--wm-surface,#fff)))));border:var(--wm-score-recorder-surface-border,var(--wm-recorder-surface-border,var(--wm-component-border,1px solid var(--wm-recorder-border,var(--wm-border,#d8d8d8)))));${RECORDER_THEME.map(([name, legacy]) => `--wm-recorder-${name}:var(--rec-${legacy},var(--wui-recorder-host-${name}));`).join('')}}
+[part~="root"]{background:var(--wm-score-recorder-surface-background,var(--wm-recorder-surface-background,var(--wm-component-background,var(--wm-recorder-background,var(--wm-surface,light-dark(#fff,#111))))));border:var(--wm-score-recorder-surface-border,var(--wm-recorder-surface-border,var(--wm-component-border,1px solid var(--wm-recorder-border,var(--wm-border,light-dark(#d8d8d8,#333))))));${RECORDER_THEME.map(([name, legacy]) => `--wm-recorder-${name}:var(--rec-${legacy},var(--wui-recorder-host-${name}));`).join('')}}
 `;
 
 /**
@@ -76,6 +78,7 @@ export class ScoreRecorderElement extends HTMLElementBase {
   private playbackOff?: () => void;
   private playbackGeneration = 0;
   private playing = false;
+  private playbackPending = false;
   private selfListening = false;
 
   private readonly onNoteEvent = (event: Event): void => {
@@ -285,8 +288,13 @@ export class ScoreRecorderElement extends HTMLElementBase {
       }
     });
     this.playing = true;
+    this.playbackPending = true;
     this.refresh();
-    void playback.play().catch((error: unknown) => {
+    void playback.play().then(() => {
+      if (this.playback !== playback || generation !== this.playbackGeneration) return;
+      this.playbackPending = false;
+      this.refresh();
+    }).catch((error: unknown) => {
       if (this.playback !== playback || generation !== this.playbackGeneration) return;
       this.stopPlayback();
       this.dispatchEvent(new CustomEvent<ScoreRecorderErrorDetail>('webscore:error', {
@@ -304,6 +312,7 @@ export class ScoreRecorderElement extends HTMLElementBase {
     this.playback?.dispose();
     this.playback = undefined;
     this.playing = false;
+    this.playbackPending = false;
     this.refresh();
   }
 
@@ -314,6 +323,8 @@ export class ScoreRecorderElement extends HTMLElementBase {
       snapshot: () => ({
         recording: this.session.active,
         playing: this.playing,
+        busy: this.playbackPending,
+        ...(this.playbackPending ? {status: 'Preparing take playback…'} : {}),
         recordedCount: this.session.noteCount,
         takeCount: this.takeScore
           ? this.takeScore.parts.reduce((sum, part) => sum + part.notes.length, 0)

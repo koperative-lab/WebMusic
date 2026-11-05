@@ -2,12 +2,12 @@ import type {ScoreViewConfiguration, ScoreViewType, VisualizerRenderOptions} fro
 
 const commonKeys: ReadonlyArray<keyof VisualizerRenderOptions> = [
   'noteHeight', 'noteSpacing', 'pixelsPerSecond', 'noteRGB', 'activeNoteRGB',
-  'minPitch', 'maxPitch', 'virtualization', 'noteColor', 'activeNoteColor', 'showAnnotations',
+  'minPitch', 'maxPitch', 'virtualization', 'noteColor', 'activeNoteColor',
 ];
 
 const modeKeys: Record<ScoreViewType, readonly string[]> = {
-  'piano-roll': commonKeys,
-  staff: [...commonKeys, 'defaultKey', 'instruments', 'scrollType', 'splitStaves'],
+  'piano-roll': [...commonKeys],
+  staff: [...commonKeys, 'defaultKey', 'instruments', 'scrollType', 'splitStaves', 'showAnnotations'],
   waterfall: [
     ...commonKeys, 'whiteNoteWidth',
     'blackNoteWidth', 'showOnlyOctavesUsed',

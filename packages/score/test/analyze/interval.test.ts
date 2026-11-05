@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   Duration,
   NoteId,
+  Part,
   PartId,
   Pitch,
   Rational,
@@ -18,7 +19,7 @@ function add(
   pitch: string | null,
   onset: number,
   duration = 1,
-  options: { unpitched?: boolean; chord?: boolean } = {},
+  options: { unpitched?: boolean; chord?: boolean; tie?: "start" | "continue" | "stop" } = {},
 ): void {
   builder.addNote(PartId(part), {
     id: NoteId(id),
@@ -227,7 +228,10 @@ describe("analyzeIntervals", () => {
         fromQuarters: 1,
         toQuarters: 2,
       }).intervals,
-    ).toEqual([]);
+    ).toMatchObject([{
+      kind: "harmonic", label: "2M", startQuarters: 1, endQuarters: 2,
+      evidence: [{ noteId: "a" }, { noteId: "b" }],
+    }]);
     expect(() => analyzeIntervals(score, { fromQuarters: 0 })).toThrow(
       TypeError,
     );
@@ -235,5 +239,131 @@ describe("analyzeIntervals", () => {
       analyzeIntervals(score, { fromQuarters: 2, toQuarters: 1 }),
     ).toThrow(RangeError);
     expect(() => analyzeIntervals(score, {})).toThrow(TypeError);
+  });
+
+  it("includes a sustained same-voice overlap even when the selected notes attack separately", () => {
+    const builder = new ScoreBuilder();
+    builder.addPart({ id: PartId("p"), name: "P" });
+    add(builder, "p", "v", "held", "C4", 0, 4);
+    add(builder, "p", "v", "later", "E4", 1);
+    add(builder, "p", "v", "after", "G4", 4);
+    const score = builder.build();
+    const selected = analyzeIntervals(score, { noteIds: ["held", "later"] });
+    expect(selected.intervals).toMatchObject([
+      { kind: "melodic", label: "3M", startQuarters: 0, endQuarters: 1 },
+      {
+        kind: "harmonic", label: "3M", startQuarters: 1, endQuarters: 2,
+        evidence: [{ noteId: "held" }, { noteId: "later" }],
+      },
+    ]);
+    expect(analyzeIntervals(score, { noteIds: ["held", "after"] }).intervals)
+      .toMatchObject([{ kind: "melodic", label: "5P", startQuarters: 0, endQuarters: 4 }]);
+  });
+
+  it("does not manufacture a harmonic unison between adjacent tied fragments", () => {
+    const builder = new ScoreBuilder();
+    builder.addPart({ id: PartId("p"), name: "P" });
+    add(builder, "p", "v", "start", "C4", 0, 1, { tie: "start" });
+    add(builder, "p", "v", "stop", "C4", 1, 1, { tie: "stop" });
+    add(builder, "p", "v", "overlap", "E4", 0.5, 1);
+    const intervals = analyzeIntervals(builder.build(), { partId: "p" }).intervals;
+    expect(intervals.filter(({ kind }) => kind === "harmonic")).toMatchObject([
+      {
+        label: "3M", startQuarters: 0.5, endQuarters: 1,
+        evidence: [{ noteId: "start" }, { noteId: "overlap" }],
+      },
+      {
+        label: "3M", startQuarters: 1, endQuarters: 1.5,
+        evidence: [{ noteId: "stop" }, { noteId: "overlap" }],
+      },
+    ]);
+    expect(intervals.some(({ label }) => label === "1P")).toBe(false);
+    expect(intervals.filter(({ kind }) => kind === "melodic")).toMatchObject([
+      { label: "3M", evidence: [{ noteId: "start" }, { noteId: "overlap" }] },
+    ]);
+  });
+
+  it("does not invent a melody from the order of simultaneous chord members", () => {
+    const builder = new ScoreBuilder();
+    builder.addPart({ id: PartId("p"), name: "P" });
+    add(builder, "p", "v", "before", "C4", 0);
+    add(builder, "p", "v", "lower", "E4", 1);
+    add(builder, "p", "v", "upper", "G4", 1, 1, { chord: true });
+    add(builder, "p", "v", "after", "D5", 2);
+    const score = builder.build();
+
+    const automatic = analyzeIntervals(score, { partId: "p", voiceId: "v" });
+    expect(automatic.intervals.map(({ kind, label }) => [kind, label])).toEqual([
+      ["harmonic", "3m"],
+    ]);
+    const selected = analyzeIntervals(score, { noteIds: ["before", "upper", "after"] });
+    expect(selected.intervals.map(({ kind, label, evidence }) => [
+      kind, label, evidence.map(({ noteId }) => noteId),
+    ])).toEqual([
+      ["melodic", "5P", ["before", "upper"]],
+      ["melodic", "5P", ["upper", "after"]],
+    ]);
+    expect(analyzeIntervals(score, { noteIds: ["before", "after"] }).intervals[0])
+      .toMatchObject({ kind: "melodic", label: "9M", semitones: 14 });
+  });
+
+  it("retains tied pitches as harmonic evidence but never treats continuations as melodic attacks", () => {
+    const builder = new ScoreBuilder();
+    builder.addPart({ id: PartId("p"), name: "P" });
+    add(builder, "p", "v", "start", "C4", 0, 1, { tie: "start" });
+    add(builder, "p", "v", "continue", "C4", 1, 1, { tie: "continue" });
+    add(builder, "p", "v", "stop", "C4", 2, 1, { tie: "stop" });
+    add(builder, "p", "v", "next", "E4", 3);
+    add(builder, "p", "other", "sounding", "G4", 1, 2);
+
+    const intervals = analyzeIntervals(builder.build(), { partId: "p" }).intervals;
+    expect(intervals.filter(({ kind }) => kind === "melodic")).toMatchObject([{
+      label: "3M", startQuarters: 0, endQuarters: 3,
+      evidence: [{ noteId: "start" }, { noteId: "next" }],
+    }]);
+    expect(intervals.filter(({ kind }) => kind === "harmonic").map(({ evidence }) =>
+      evidence.map(({ noteId }) => noteId),
+    )).toEqual([["continue", "sounding"], ["stop", "sounding"]]);
+    expect(analyzeIntervals(builder.build(), { noteIds: ["continue", "next"] }).intervals)
+      .toEqual([]);
+  });
+
+  it("marks transposition spelling fallbacks while retaining the original written evidence", () => {
+    const builder = new ScoreBuilder();
+    builder.addPart({ id: PartId("clarinet"), name: "Clarinet", transpose: { chromatic: -2 } });
+    builder.addPart({ id: PartId("piano"), name: "Piano" });
+    add(builder, "clarinet", "v", "f", "F4", 0);
+    add(builder, "piano", "v", "g", "G4", 0);
+    const score = builder.build();
+    const selection = { noteIds: ["f", "g"] };
+    const written = analyzeIntervals(score, selection).intervals[0]!;
+    expect(written.evidence.every(({ spellingInferred }) => !spellingInferred)).toBe(true);
+    const sounding = analyzeIntervals(score, selection, { pitchMode: "sounding" }).intervals[0]!;
+    expect(sounding).toMatchObject({
+      label: "4d", semitones: 4,
+      evidence: [
+        { writtenPitch: "F4", pitch: "D#4", spellingInferred: true },
+        { writtenPitch: "G4", pitch: "G4", spellingInferred: false },
+      ],
+    });
+    const diatonic = score.withPart(new Part({ ...score.parts[0]!, transpose: { chromatic: -2, diatonic: -1 } }));
+    expect(analyzeIntervals(diatonic, selection, { pitchMode: "sounding" }).intervals[0])
+      .toMatchObject({ label: "3M", evidence: [{ pitch: "Eb4", spellingInferred: false }, { spellingInferred: false }] });
+  });
+
+  it.each([
+    [{ chromatic: 0 }, "Db4", "Eb4"],
+    [{ chromatic: 0, octaveChange: 1 }, "Db5", "Eb5"],
+    [{ chromatic: -12 }, "Db3", "Eb3"],
+  ])("preserves spelling for a no-op or whole-octave transposition %j", (transpose, first, second) => {
+    const builder = new ScoreBuilder();
+    builder.addPart({ id: PartId("p"), name: "P", transpose });
+    add(builder, "p", "v", "d", "Db4", 0);
+    add(builder, "p", "v", "e", "Eb4", 1);
+    const result = analyzeIntervals(builder.build(), { partId: "p" }, { pitchMode: "sounding" });
+    expect(result.intervals[0]).toMatchObject({ label: "2M", evidence: [
+      { writtenPitch: "Db4", pitch: first, spellingInferred: false },
+      { writtenPitch: "Eb4", pitch: second, spellingInferred: false },
+    ] });
   });
 });

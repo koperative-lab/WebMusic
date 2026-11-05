@@ -11,11 +11,12 @@ links to each Element's behavior and composition contract.
 
 ## 1. The shape in one paragraph
 
-Score is one npm package containing five **capabilities** — `io`, `view`,
+Score is one npm package containing six **capabilities** — `io`, `edit`, `view`,
 `play`, `analyze`, `react` — over one shared **`core`** model. Each
-capability has a source boundary and public subpaths. The concrete `play`, `view`
-and `analyze` capabilities have the four-layer stack (`@webmusic/score/play`,
-`/play/headless`, `/play/element`, …); `io` and `react` do not duplicate that stack.
+capability has a source boundary and public subpaths. The concrete `edit`,
+`play`, `view` and `analyze` capabilities have the four-layer stack
+(`@webmusic/score/play`, `/play/headless`, `/play/element`, …).
+`io` and `react` do not duplicate that stack.
 Nothing in the package depends on `@webmusic/audio`. Its workspace edges are the
 required `@webmusic/kernel` peer and the optional `@webmusic/ui` peer, reachable
 only from reviewed visual opt-in entries. Third-party dependencies remain listed
@@ -44,6 +45,21 @@ in the package manifest.
 That is the single most load-bearing constraint in the package, and §4
 explains what it buys.
 
+Document editing is part of View (DEC-055). `ScoreEditor` in `view/headless`
+is the single document commit owner. Shared read/command ports and position maps
+live in `core/editing.ts`; Play binds through those ports without importing View.
+`loadScoreEditor` loads a file into a new editor that the application owns and
+lends to Elements through `.editor` (DEC-057). Kernel's generic
+`observeElementSource` adapts that explicit object in the browser layer. The
+existing React adapters do not yet wrap editing.
+
+Staff input uses a separate View Headless controller over the same Core editor
+port. Its renderer adapts the existing scrolling staff geometry and owns local
+focus. The `enter-notation` command belongs to the editor's operations and completes a chosen
+voice/staff measure with real rests; it does not depend on renderer projections.
+Staff and piano roll share content/history while keeping cursor and input
+settings local. DEC-054 and the editing design own the supported notation subset.
+
 ---
 
 ## 2. `core` — the immutable model
@@ -56,6 +72,7 @@ Everything else is a function of `core`. It holds no I/O, no audio, no DOM.
 | `Pitch`, `Duration` | `core/primitives/` | Value objects, so equality and transposition are total and testable. |
 | `Score`, `Part`, `Measure`, `Note` | `core/model/` | Immutable, id-addressed. A `Score` is a value you can hold, share between a player and three views, and hash. |
 | `ScoreBuilder`, `ScoreEditSession` | `core/model/` | Supported construction/editing helpers producing a new immutable value; the public `Score` constructor also accepts model data. |
+| Document ports and position maps | `core/editing.ts` | Read-only snapshots, revision guards, semantic operation envelopes and composable rational-position maps, without a concrete editor dependency. |
 | `TimeMap` | `core/time/TimeMap.ts` | The one authority on musical time ⇄ seconds. Tempo and meter entries in quarters; conversions precompute float projections so every lookup is a binary search, not a scan. |
 
 **Immutability is the reason the rest of the design works.** Because a
@@ -76,7 +93,7 @@ in, or it will contradict the map's own beat spacing.
 
 ## 3. The four-layer contract inside each capability
 
-Every concrete capability (`play`, `view`, `analyze`) has the same four
+Every concrete capability (`edit`, `play`, `view`, `analyze`) has the same four
 source directories. Arrows below mean "imports", from higher to lower layers:
 
 ```
@@ -93,6 +110,10 @@ element → api → headless → core
 
 Consumers can use Web Components, Headless, or API + UI. These reuse the same
 domain resources; the four source directories are not four required usage stages.
+Editing adds no entries: operations and contracts ship from `/view`, the
+editor and `loadScoreEditor` from `/view/headless`. Note editing is the
+`mountScoreGrid` browser renderer behind `<score-grid-view>`; `<score-view>`
+and `<score-grid-view>` share one data, player and editor binding base.
 Prefer existing controllers and presenters before adding another engine or
 per-variant tag. Three consequences matter for implementation:
 
@@ -127,8 +148,9 @@ domain logic nor a component:
 core → io → { view, play, analyze } → react
 ```
 
-`react` may use everything. `view`, `play` and `analyze` may use `core` and
-`io`, and **may not use each other**.
+`react` composes the existing I/O, Play, View and Analyze surfaces. `edit`,
+`view`, `play` and `analyze` may use `core` and `io`, and **may not import one
+another**. The persistent editor stays independent from rendering and playback.
 
 The obvious question is: how does a view follow playback, then? Through a
 **DOM CustomEvent seam**, not an import. `<score-view>` listens for
@@ -392,8 +414,7 @@ Current kernel surface Score consumes: `/element`, `/worker`, `/tick`,
 ## 10. Dependency discipline
 
 **Optional peers cost nothing until you opt in.** `tone`,
-`opensheetmusicdisplay`, `spessasynth_lib`, `react` and `@webmusic/ui` are
-all optional peers, and the gate's rule is that **no build entry may
+`spessasynth_lib`, `react` and `@webmusic/ui` are all optional peers, and the gate's rule is that **no build entry may
 *statically* reach one** except the entries explicitly allowlisted in
 `staticOptionalPeerEntries`. Three different mechanisms satisfy that, each
 picked for its dependency:
@@ -401,7 +422,6 @@ picked for its dependency:
 | Peer | Mechanism |
 |---|---|
 | `@webmusic/ui`, `react` | Statically imported, but only from the enumerated opt-in entries (`*/element/index.ts`, `play/element/auto.ts`, `play/demos/index.ts`, `react/index.tsx`). Importing `/headless` never reaches them. |
-| `opensheetmusicdisplay` | A literal, lazy `await import('opensheetmusicdisplay')` lets browser bundlers emit a dependency chunk. Loading occurs only when engraving is requested; callers may inject a constructor or instance. |
 | `spessasynth_lib` | A literal dynamic import loads the optional 4.x peer only when a SoundFont route connects. Consumer bundlers can resolve it into a lazy module; applications separately supply the AudioWorklet URL or registration callback. |
 | `tone` | Not imported at all. `TonePlayer` takes the Tone namespace as a constructor option — the caller who already has Tone hands it over. Injection, not loading. |
 
@@ -454,6 +474,23 @@ does not duplicate its sequence. Passing static gates does not establish audio
 precision, conversion fidelity or cleanup correctness.
 
 ## 12. Implementation boundaries
+
+Score editing supplies atomic semantic note commands, document identity/revision,
+bounded local history, saved-content identity, same-owner in-memory checkpoints,
+and separate draft/selection sessions. It creates no loader, player or clock.
+The pure operation pipeline lives in `view/core/edit-operations.ts` and
+`edit-notation.ts`, the owner in `view/headless/score-editor.ts`, and selected
+exports in `view/api`. Timing edits remove performed timing only
+for changed notes and preserve effective velocity through `velocityOverride`;
+Score JSON v0.2 carries the field while reading v0.1 and legacy input.
+
+Native playback applies document revisions through Core ports while retaining
+its scheduler and clock. The application owns the editor; existing
+View adds written-quarter piano-roll gestures and exact-value alternatives.
+These implement P2 in the [current editing roadmap](../../dev/design/EDIT-COMPONENTS.md#implementation-and-reference-delivery).
+The [View API](../../apps/doc/webmusic/src/content/docs/score/api/view.mdx) owns
+the implemented public contract; [STATUS](../../dev/STATUS.md), EDIT-01, owns
+current verification.
 
 The current contract includes the shared nonvisual playback-source seam (with
 legacy event adapters), the injected Tone

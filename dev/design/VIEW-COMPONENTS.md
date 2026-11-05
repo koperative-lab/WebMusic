@@ -2,7 +2,9 @@
 
 > Current design, accepted in DEC-015 and refined for staff notation in DEC-024.
 > DEC-045 owns the domain-prefixed tags. Source and public leaf pages own exact
-> members; STATUS owns delivery and verification gaps.
+> members; STATUS owns delivery and verification gaps. DEC-053 adds the accepted
+> document-bound editing below; DEC-058 moves Score note editing to the
+> dedicated `<score-grid-view>` and makes `<score-view>` read-only.
 
 ## Purpose and boundaries
 
@@ -13,16 +15,18 @@ they need simultaneous representations.
 
 | Component | Input and task | Types |
 |---|---|---|
-| `score-view` | A complete Score, optionally with a borrowed playback position | `piano-roll`, `staff`, `waterfall`, `map`, `thumbnail` |
+| `score-view` | A complete Score, optionally with a borrowed playback position; read-only | `piano-roll`, `staff`, `waterfall` |
+| `score-grid-view` | A complete Score on a DAW-style piano-roll grid; with a borrowed editor and `editable`, note editing | One grid; `tools` selects editing features |
 | `score-pitch-view` | Currently held MIDI pitches from one selected note source | `keyboard`, `staff`, `fretboard` |
-| `score-sheet-view` | Page engraving using an optional OSMD renderer | Separate engraving lifecycle; no type selector |
+| `score-sheet-view` | A complete Score engraved in justified systems on pages or in a column; with a borrowed editor and `editable`, notation editing | `layout` selects `page` or `flow` |
 
 Score staff includes musical time. Pitch staff depicts only sounding notes.
-Map is a whole-score navigation surface. Thumbnail is a static, fitted preview;
-it does not acquire the full visualizer or expose seeking just because another
-type supports it. Page engraving remains independent because its optional
-engine, injection points and asynchronous layout differ from the scrolling
-staff renderer.
+Under DEC-056 `score-view` has no map or thumbnail type; applications compose
+the Headless `createScoreMapView` with the UI timeline, or the `/view/render`
+thumbnail renderer, when they need navigation or a static preview. Only the
+staff type draws score annotations. Page engraving is a separate Element under
+DEC-060: it reuses the staff engraver for each system but owns line breaking,
+pages and notation editing, which the scrolling staff type does not have.
 
 ## Data, time and state
 
@@ -31,16 +35,11 @@ types changes presentation of the resolved score without fetching it again or
 restarting its player. The shared core `ScorePlaybackSource` initializes data,
 readiness, nominal position and active occurrences; legacy event targets remain
 available when native observation is absent or reports `unavailable`.
-Map converts its quarter-note axis through the score TimeMap; seeks use the
-source's nominal command or the legacy owner's declared command/rate mapping.
-The committed cursor comes from the owner's resulting position, including loop
-wrapping. Stale failures cannot overwrite a newer cursor or replacement owner,
-and a view with a different explicit Score cannot seek the native owner.
+A view with a different explicit Score never follows or seeks the native owner.
 
-`configure(ScoreViewConfiguration)` validates the three full-renderer modes and
-their compatible option keys before replacing them atomically. The lightweight
-map/thumbnail modes retain their Element type/attribute/property interface;
-they do not expand the render entry's mode union. SheetView retains its separate
+`configure(ScoreViewConfiguration)` validates the three modes and their
+compatible option keys before replacing them atomically; `showAnnotations` is
+a staff-only key. SheetView retains its separate
 explicit-data and event-following contract.
 
 PitchView keeps one ActiveNoteTracker and one binding while switching types.
@@ -89,10 +88,61 @@ imperative renderer keeps its separate neutral defaults. One full-height divider
 scrolling notes are clipped at that boundary instead of covering signatures.
 These visual connections and clipping add no controls.
 
+## Document-bound editing
+
+[Editing contracts](EDIT-COMPONENTS.md) and
+[DEC-053](../DECISIONS.md#dec-053--document-owned-editing-and-borrowed-playback)
+own the accepted editing behavior. [STATUS](../STATUS.md), EDIT-01, tracks
+implementation and verification. `.editor` and `editable` are documented in the
+owning public `<score-view>` and `<score-grid-view>` references.
+
+An editor-bound View borrows committed content and commands from `ScoreEditor`
+through Core structural ports. The editor remains the content and history owner;
+View owns rendering, viewport, focus and local gesture previews. It reuses View
+renderers; the editors and their URL loaders are View Headless pieces under
+DEC-055 and DEC-057, lent to Elements through `.editor`. Content history
+does not restore selection; each selection session remaps or prunes its current
+IDs. Viewport and focus remain local and outside content history.
+
+Under [DEC-058](../DECISIONS.md#dec-058--score-editing-moves-to-a-dedicated-grid-view)
+`<score-view>` is read-only: with `.editor` it draws the editor's visible content,
+including a shared session's draft, through its normal piano-roll, staff or
+waterfall renderer. Note editing belongs to `<score-grid-view>`, a separate
+Element because it adds a toolbar, piano keys, a ruler, a velocity lane and
+editing settings that none of the read-only types share. Its feature gating and
+gesture contract belong to [Editing contracts](EDIT-COMPONENTS.md#score-grid-editing).
+Staff, sheet and waterfall have no editing capability. On the grid, `editable`
+without a ready editor reports unavailable instead of creating a private editor. Independent `.score`
+or `src` alongside an editor is a configuration conflict, reported before
+replacing a working binding. Without an editor, existing data precedence and
+player following remain unchanged.
+
+Editing geometry uses rational quarter positions and stable authored note IDs.
+Each gesture has one owner, previews locally and commits one semantic transaction;
+cancel, mode/source replacement or a conflicting content revision discards the
+preview. Item editing must not also seek or scrub. Keyboard commands remain
+local to the focused surface and honor application shortcut overrides.
+
+The player supplies time and sounding occurrences, not document authority.
+Newly committed content can be visible before playback applies it; incompatible
+active-note overlays and seeks are withheld until revisions and coordinate
+projections agree. Repeat-expanded playback without an authored-to-occurrence
+mapping resets to origin on revision application and provides no document seek
+or occurrence overlay. Disconnect releases the View's subscriptions and drafts,
+not the borrowed editor, player or AudioContext.
+
+Acceptance must cover two Views sharing one editor, one undo per gesture,
+overlapping-note selection, keyboard/pointer cancellation, source conflicts and
+pending/failed playback application. Existing passive-renderer checks do not
+establish these editing outcomes.
+
 ## Interaction and presentation
 
-Each instance mounts only its selected surface. The Element has no type switch,
-settings toolbar, extra keyboard or embedded player. Parameters belongs to the
+Each instance mounts only its selected surface. Passive Elements have no type
+switch, settings toolbar, extra keyboard or embedded player. The editable grid's
+toolbar appears only while editing and offers only the features its `tools`
+attribute lists; it provides local musical input and accessible numeric alternatives; custom UI may
+use the same Headless controllers without the supplied controls. Parameters belongs to the
 documentation/application and shows the options relevant to the selected type.
 Changing type preserves other attribute values, so returning to it restores its
 configuration. Copy includes the player connection; Reset restores the initial
@@ -105,17 +155,20 @@ permit application CSS overrides. Wide musical content scrolls within its own
 surface; it must not enlarge the page or cover controls and labels.
 
 Fitting the host must not shrink text or pitch marks below a readable size.
-UIKit pitch viewports keep minimum key and fret geometry, expose keyboard
-panning only while they overflow, and extend staff lines or fret spacing into
-available width. PitchView's keyboard reveals newly sounding notes; ordinary
-repaints and releases preserve a user's manual pan. Display labels remain
-bounded by their keys, with complete text available to assistive technology.
+UIKit pitch viewports retain their minimum-geometry defaults and expose keyboard
+panning only while they overflow. DEC-050 makes the PitchView Element's keyboard
+fit MIDI 48–71 to the container by default, without horizontal scrolling.
+Explicit `scroll="true"` restores minimum/fixed key widths and optional
+new-note following; ordinary repaints and releases preserve a user's manual
+pan. Staff and fretboard sizing is unchanged: staff lines or fret spacing extend
+into the available width. Display labels remain bounded by their keys, with
+complete text available to assistive technology.
 
-UIKit Stage provides a minimum drawing-surface width independently of its
-shrinkable host. SheetView uses that capability for readable engraving and
-scrolls inside the stage on small screens. Its paper color is explicit so dark
-application backgrounds do not obscure OSMD's ink. Width, height and follow
-settings update the current engraving without another source load.
+SheetView fits a page to the element width by default and re-breaks systems
+when the width changes; `zoom` sets an explicit staff size and the viewport
+scrolls. Paper and ink resolve through `--wm-score-sheet-*` and the shared
+surface and foreground tokens, so dark application themes keep the notation
+readable. Layout and zoom changes re-engrave without another source load.
 
 Waterfall's Element composes the existing UIKit keyboard through a structural
 render port. The Score renderer owns numeric pitch-column geometry and time;
@@ -133,15 +186,14 @@ The application owns the player, synthesis and musical clock. Views own and
 release their presenters, renderers, subscriptions and pending source loads.
 Changing type releases the previous presenter without replacing borrowed state.
 Disconnect, late source completion, player replacement and repeated cleanup
-retain their existing cancellation guarantees. SheetView keeps its optional
-OSMD loading, injection and failure contract.
+retain their existing cancellation guarantees. SheetView engraves with the
+package's own staff engraver and needs no optional peer (DEC-060).
 
 The five superseded tags and their registration helpers are removed. Migrate
 `keyboard-view`, `staff-view` and `fretboard-view` to the corresponding PitchView
-type; migrate `score-map` and `score-thumbnail` to ScoreView types. Low-level
-Headless/API/render helpers remain available. The three visualizer types stay
-unchanged in the lower-level `ScoreViewType`; the Element's additional modes use
-`ScoreViewElementType`.
+type. The `score-view` `map` and `thumbnail` types published in 0.2.0 were removed by
+DEC-056; their Headless/API/render helpers remain available.
+`ScoreViewElementType` equals the lower-level `ScoreViewType`.
 
 ## Acceptance
 
@@ -150,8 +202,7 @@ unchanged in the lower-level `ScoreViewType`; the Element's additional modes use
   note counts and the player's cursor without duplicate subscriptions or loads.
 - Retain standalone Score use, native player-data borrowing, invalid/late/
   replaced target handling and cleanup.
-- Keep map seek units correct at non-unit rate and recover from rejected seeks.
-- Keep thumbnail passive and avoid full-score playback-view computation.
+- Accept only the three types; draw annotations only on staff.
 - Verify all types at narrow and wide widths, two simultaneous instances,
   keyboard interaction, type-specific Parameters, Copy and Reset.
 

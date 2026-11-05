@@ -92,7 +92,7 @@ describe('component surfaces', () => {
     expect(style).toContain('--wm-component-radius');
   });
 
-  it('keeps inverse graph colors on the functional SVG viewport', () => {
+  it('keeps graph colour tokens on the functional SVG viewport', () => {
     expect(envelopeStyle).toMatch(/\.wui-envelope__svg[\s\S]*--wm-envelope-background/);
     expect(eqStyle).toMatch(/\.wui-eq__svg[\s\S]*--wm-eq-background/);
   });
@@ -105,10 +105,10 @@ describe('component surfaces', () => {
     expect(macroRackStyle).toContain('.wui-macro-rack__item > .wui-macro');
   });
 
-  it('keeps the mixer surface gutter even while protecting focus rings', () => {
+  it('scrolls the mixer strips without a visible scrollbar', () => {
     expectRuleToContain(mixerStyle, '.wui-mixer__channels', 'overflow-x:auto');
-    expectRuleToContain(mixerStyle, '.wui-mixer__channels', 'padding:.3rem .3rem .5rem');
-    expectRuleToContain(mixerStyle, '.wui-mixer__master', 'padding-block-start:.3rem');
+    expectRuleToContain(mixerStyle, '.wui-mixer__channels', 'scrollbar-width: none');
+    expect(mixerStyle).toMatch(/\.wui-mixer__channels\)::-webkit-scrollbar\s*\{\s*display: none/);
     expect(mixerStyle).not.toContain('margin-block-start:-4px');
   });
 });
@@ -122,26 +122,8 @@ describe('internal control borders', () => {
   });
 
   it.each([
-    ['recorder button', recorderStyle, '.wui-recorder__button', 'border:', '--wm-recorder-button-border'],
     ['LFO shape chip', lfoStyle, '.wui-lfo__shape', 'border:', '--wm-lfo-chip-border'],
-    ['mixer button', mixerStyle, '.wui-mixer__button', 'border:', '--wm-mixer-button-border'],
-    ['mixer fader', mixerStyle, '.wui-mixer__input', '--wm-fader-track-border:', '--wm-mixer-track-border'],
-    ['EQ viewport', eqStyle, '.wui-eq__svg', 'border:', '--wm-eq-border'],
-    ['EQ point', eqStyle, '.wui-eq__point', 'stroke:', '--wm-eq-point-border'],
-    ['envelope viewport', envelopeStyle, '.wui-envelope__svg', 'border:', '--wm-envelope-border'],
-    ['envelope handle', envelopeStyle, '.wui-envelope__handle', 'stroke:', '--wm-envelope-handle-border'],
-    ['playlist secondary button', playlistStyle, '.wui-playlist__button', 'border:', '--wm-playlist-button-border'],
-    ['parameter group', parameterRackStyle, '.wui-parameter-rack__group', 'border:', '--wm-parameter-item-border'],
-    [
-      'flat parameter item',
-      parameterRackStyle,
-      ".wui-parameter-rack[data-layout='flat'] > .wui-parameter-rack__item",
-      'border:',
-      '--wm-parameter-item-border',
-    ],
     ['note key', noteStyle, '.wui-note__key', 'border:', '--wm-note-border'],
-    ['note grid cell', noteStyle, '.wui-note__cell', 'border:', '--wm-note-border'],
-    ['note chord', noteStyle, '.wui-note__chord', 'border:', '--wm-note-border'],
     ['timeline ruler', timelineStyle, '.wui-timeline__ruler', 'border:', '--wm-timeline-border'],
     ['timeline lane', timelineStyle, '.wui-timeline__lane', 'border:', '--wm-timeline-border'],
   ])('%s uses the shared light control edge', (_name, style, selector, property, token) => {
@@ -150,17 +132,30 @@ describe('internal control borders', () => {
     expectRuleToContain(style, selector, controlBorderFallback);
   });
 
-  it('keeps primary actions visually distinct from neutral secondary controls', () => {
-    expectRuleToContain(
-      playlistStyle,
-      '.wui-playlist__button.play',
-      'var(--wm-accent, #111)',
-    );
-    expectRuleToContain(
-      lfoStyle,
-      '.wui-lfo__run',
-      'var(--wm-foreground, #111)',
-    );
+  it.each([
+    ['recorder', recorderStyle, '.wui-recorder__button'],
+    ['mixer', mixerStyle, '.wui-mixer__button'],
+    ['playlist', playlistStyle, '.wui-playlist__button'],
+  ])('draws %s buttons as icon buttons: unframed and muted idle, inverted ink when pressed', (_name, style, selector) => {
+    expectRuleToContain(style, selector, 'border: 0');
+    expectRuleToContain(style, selector, '--wm-foreground-muted');
+    // One rule inverts both the pressed and the expanded state.
+    expectRuleToContain(style, `${selector}[aria-expanded="true"]`, 'background: var(--wm-foreground');
+    expect(style).toContain(`${selector}[aria-pressed="true"]`);
+    expectRuleToContain(style, `${selector}:disabled`, 'opacity: .3');
+  });
+
+  it('separates parameter groups and note cells with hairlines instead of boxes', () => {
+    expectRuleToContain(parameterRackStyle, '.wui-parameter-rack__group + .wui-parameter-rack__group', 'border-inline-start: 1px solid var(--wm-parameter-item-border');
+    expectRuleToContain(parameterRackStyle, ".wui-parameter-rack[data-layout='flat'] > .wui-parameter-rack__item", 'border: 0');
+    expectRuleToContain(noteStyle, '.wui-note__chords', 'gap:var(--wm-note-gap,1px)');
+    expectRuleToContain(noteStyle, '.wui-note__chords', 'scrollbar-width: none');
+    expectRuleToContain(mixerStyle, '.wui-mixer__input', '--wm-mixer-track-border');
+  });
+
+  it('keeps the transport primary action distinct while the LFO run button inverts only when pressed', () => {
+    expectRuleToContain(lfoStyle, ".wui-lfo__run[aria-pressed='true']", 'var(--wm-foreground');
+    expectRuleToContain(lfoStyle, '.wui-lfo__run', '--wm-foreground-muted');
     expectRuleToContain(
       transportStyle,
       '.wui-transport__play',
@@ -189,13 +184,11 @@ describe('shared theme composition', () => {
     ['envelope', envelopeStyle, '.wui-envelope', '.wui-envelope__svg'],
     ['EQ', eqStyle, '.wui-eq__curve', '.wui-eq__svg'],
     ['LFO', lfoStyle, '.wui-lfo__curve', '.wui-lfo__wave'],
-  ])('keeps %s inverse ink and surface independent of an ordinary light theme', (_name, style, ink, surface) => {
+  ])('draws %s on the component surface in its ink, inverting only through its own tokens', (_name, style, ink, surface) => {
     const inkRules = ruleBodies(style, ink).join('\n');
-    const surfaceRules = ruleBodies(style, surface).join('\n');
-    expect(inkRules).toContain('var(--wm-foreground-on-inverse, #fff)');
-    expect(inkRules).not.toContain('var(--wm-foreground,');
-    expect(surfaceRules).toContain('var(--wm-surface-inverse, #111)');
-    expect(surfaceRules).not.toContain('var(--wm-surface,');
+    expect(inkRules).toContain('var(--wm-foreground');
+    expect(ruleBodies(style, surface).length).toBeGreaterThan(0);
+    expect(style).not.toContain('--wm-surface-inverse, #111');
   });
 
   it('uses achromatic neutrals in both color schemes without stripping musical palettes', () => {
@@ -227,17 +220,17 @@ describe('shared theme composition', () => {
     expect(rule).toMatch(/var\(--wm-font-family,\s*var\(--wm-font,/);
   });
 
-  it('keeps mono readouts and button labels on the shared typography path', () => {
+  it('keeps readouts and icon-button captions on the shared mono typography path', () => {
     expectRuleToContain(envelopeStyle, '.wui-envelope__readout', '--wm-font-mono');
-    expectRuleToContain(recorderStyle, '.wui-recorder__status', '--wm-font-mono');
-    expectRuleToContain(recorderStyle, '.wui-recorder__button', 'font:inherit');
-    expectRuleToContain(playlistStyle, '.wui-playlist__button', 'font: inherit');
+    expectRuleToContain(recorderStyle, '.wui-recorder__status[data-kind="error"]', '--wm-font-mono');
+    expectRuleToContain(recorderStyle, '.wui-recorder__button', '--wm-font-mono');
+    expectRuleToContain(playlistStyle, '.wui-playlist__button', '--wm-font-mono');
   });
 
-  it('gives recorder and playlist controls the shared keyboard focus treatment', () => {
-    expectRuleToContain(recorderStyle, '.wui-recorder__button:focus-visible', '--wm-focus');
-    expect(playlistStyle).toContain('.wui-playlist__button:focus-visible,');
-    expectRuleToContain(playlistStyle, '.wui-playlist__seek:focus-visible', '--wm-focus');
+  it('gives recorder and playlist controls the shared inside focus ring', () => {
+    expectRuleToContain(recorderStyle, '.wui-recorder__button:focus-visible', '--wm-focus-ring');
+    expectRuleToContain(recorderStyle, '.wui-recorder__button:focus-visible', 'outline-offset: -2px');
+    expectRuleToContain(playlistStyle, '.wui-playlist__button:focus-visible', '--wm-focus-ring');
   });
 
   it('lets one control-size token resize analysis buttons as well as transport controls', () => {

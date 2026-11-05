@@ -108,11 +108,13 @@ describe('<audio-live-view>', () => {
     } as unknown as AnalyserNode;
   }
 
-  it('says what is missing instead of leaving a blank strip', async () => {
+  it('shows shared waiting feedback and keeps its source status accessible', async () => {
     mount<AudioLiveViewElement>('audio-live-view');
     await flush();
 
-    expect(document.querySelector('[role="status"]')?.textContent).toContain('No live source');
+    const status = document.querySelector('[role="status"]');
+    expect(status?.getAttribute('data-kind')).toBe('waiting');
+    expect(status?.textContent).toBe('Waiting for a live audio source');
   });
 
   it('borrows an analyser from a source element', async () => {
@@ -149,6 +151,30 @@ describe('<audio-live-view>', () => {
     expect(element.type).toBe('waveform');
   });
 
+  it('stays idle while waiting for a source and animates once one exists', async () => {
+    const frames: FrameRequestCallback[] = [];
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      frames.push(callback);
+      return frames.length;
+    });
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
+    const element = mount<AudioLiveViewElement>('audio-live-view');
+    await flush();
+    expect(frames).toHaveLength(0);
+
+    element.analyser = fakeAnalyser();
+    expect(frames.length).toBeGreaterThan(0);
+    const stage = element.querySelector('.wui-stage');
+    expect(stage).not.toBeNull();
+
+    // Losing the source parks the loop again.
+    element.analyser = undefined;
+    const pending = frames.length;
+    frames.splice(0).forEach((callback) => callback(16));
+    expect(frames).toHaveLength(0);
+    expect(pending).toBeGreaterThan(0);
+  });
+
   it('never disposes the borrowed analyser', async () => {
     const source = document.createElement('div') as HTMLDivElement & {analyser?: AnalyserNode};
     source.id = 'shared';
@@ -163,4 +189,34 @@ describe('<audio-live-view>', () => {
     // Borrowed, so several views can read one tap and none of them owns it.
     expect(source.analyser).toBe(analyser);
   });
+});
+
+
+it('tracks a late live source through loading, error, and passive waiting', async () => {
+  const view = mount<AudioLiveViewElement>('audio-live-view', {source: '#late-live'});
+  const feedback = () => view.querySelector<HTMLElement>('.wui-status')!;
+  expect(feedback().dataset.kind).toBe('waiting');
+  const source = Object.assign(document.createElement('div'), {
+    loading: true, loadError: undefined as Error | undefined,
+  });
+  source.id = 'late-live';
+  document.body.append(source);
+  await flush();
+  expect(feedback().dataset.kind).toBe('loading');
+  source.loading = false;
+  source.loadError = new Error('Live source failed');
+  source.dispatchEvent(new CustomEvent('webaudio:loadstatechange'));
+  expect(feedback().dataset.kind).toBe('error');
+  expect(feedback().textContent).toBe('Live source failed');
+  source.loadError = undefined;
+  source.dispatchEvent(new CustomEvent('webaudio:loadstatechange'));
+  expect(feedback().dataset.kind).toBe('waiting');
+  expect(feedback().hasAttribute('aria-busy')).toBe(false);
+  source.remove();
+  await flush();
+  expect(feedback().dataset.kind).toBe('waiting');
+  view.remove();
+  source.loading = true;
+  source.dispatchEvent(new CustomEvent('webaudio:loadstatechange'));
+  expect(view.querySelector('.wui-status')).toBeNull();
 });

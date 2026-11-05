@@ -9,8 +9,9 @@ sidebar:
 import UiPresenterLiveDemo from '../../../../components/UiPresenterLiveDemo.astro';
 import UiPresenterRelated from '../../../../components/UiPresenterRelated.astro';
 
-`mountRecorder()` renders a required record toggle, an optional playback toggle, optional
-format-specific export buttons, a compact input-level bar, and a status line. It paints
+`mountRecorder()` renders one row of square icon buttons: a required record toggle, an optional
+playback toggle, a compact input-level bar and optional format-specific export buttons, plus a
+status line that is announced but drawn only for an error. It paints
 `RecorderState`; the caller remains responsible for media permission, capture, playback, file
 creation, and persistence.
 
@@ -60,16 +61,23 @@ even when `canPlay` becomes false. The presenter borrows all recorder state and 
 
 | Member | Kind | Description |
 |---|---|---|
-| `recording` | `boolean` | Required. Selects Record versus Stop text, label, pressed state, and generated recording status. |
+| `recording` | `boolean` | Required. Selects the record or stop icon, accessible name, pressed state, recording colour and generated recording status. |
 | `busy?` | `boolean` | Strict `true` blocks every command and sets root/record `aria-busy`. |
-| `playing?` | `boolean` | Strict `true` applies the playback modifier, pressed state, Stop text and generated playback status. |
+| `playing?` | `boolean` | Strict `true` applies the playback modifier, pressed state, stop icon and generated playback status. |
 | `level?` | `number` | Normalized input level written to `--wui-recorder-level`. Omission hides the meter. |
-| `recordedCount?` | `number` | Count printed by the generated `● recording… <count>` status; defaults there to `0`. |
+| `recordedCount?` | `number` | Count in the generated `recording… <count>` status; defaults there to `0`. |
 | `takeCount?` | `number` | Count printed by generated captured/playback status. When explicit availability is absent, any defined value enables play and export, including `0`. |
-| `status?` | `string` | Overrides every generated status string. |
+| `status?` | `string` | Overrides the generated status or supplies the accessible loading/waiting description. Announced only; the surface draws no status prose except an error. |
+| `elapsed?` | `string` | Short mono readout beside the stop icon while recording, such as `0:03`. Omitted shows the icon alone. |
+| `statusKind?` | `'loading' \| 'waiting' \| 'error'` | Selects shared passive feedback. When omitted, `busy` uses loading; other states announce their status text without drawing it. |
 | `canPlay?` | `boolean` | Explicit playback availability. When absent, falls back to whether `takeCount` is defined. |
 | `canExport?` | `boolean` | Explicit availability for every export button. When absent, falls back to whether `takeCount` is defined. |
 | `disabled?` | `boolean` | Strict `true` blocks all commands and applies root `aria-disabled`. |
+
+Loading and waiting use the shared square animations, with visually hidden live descriptions.
+Ready status text is visually hidden too; only an error line is drawn, in the row after the
+controls. Feedback does not itself block commands; `busy` and `disabled` retain
+that responsibility. The animations follow reduced-motion preferences.
 
 Without `status`, the fallback order is recording count, playing-take text, captured-take text
 when `takeCount` is defined, then `Ready`. Finite counts become nonnegative integers; invalid
@@ -89,7 +97,7 @@ counts are omitted. Finite levels clamp to 0–1 and invalid supplied levels pai
 
 | Member | Kind | Default | Description |
 |---|---|---|---|
-| `exportFormats` | `readonly RecorderExportFormat[]` | `[]` | Snapshotted `{id, label}` strings. With `export()`, creates one button per format; its id reaches the command and its label names the download. |
+| `exportFormats` | `readonly RecorderExportFormat[]` | `[]` | Snapshotted `{id, label, readout?}` strings. With `export()`, creates one download icon button per format; its id reaches the command, its label names the download, and `readout` is the short mono text beside the icon (`MID`, `XML`, `WAV`). Without `readout`, a label of at most four characters is used, else an alphanumeric id of at most four characters in upper case, else the label. |
 | `label` | `string` | `Recorder` | Accessible root group name. |
 | `recordLabel` / `stopRecordingLabel` | `string` | `Record` / `Stop recording` | Accessible record-toggle names. |
 | `playLabel` | `string` | `Play take` | Accessible playback-toggle name. |
@@ -109,12 +117,14 @@ counts are omitted. Finite levels clamp to 0–1 and invalid supplied levels pai
 | `update()` | `() => void` | Re-reads state and repaints every control; becomes a no-op after destruction. |
 | `destroy()` | `() => void` | Idempotently retires commands, removes listeners, disposes the subscription and removes root/style. Attempts every cleanup before rethrowing the first failure; retains borrowed recorder resources. |
 
-**Accessibility.** The root is a named group. Record and playback are native buttons whose
-pressed state follows capture/playback. Recording has a dynamic accessible name; playback
+**Accessibility.** The root is a named group. Record and playback are native icon buttons whose
+pressed state follows capture/playback; each name is in `aria-label` and `title`, and the icons
+are hidden from assistive technology. Recording has a dynamic accessible name; playback
 uses `playLabel` unless an explicit `stopPlaybackLabel` supplies its playing name. Export buttons
-are named `Download <label>`.
+are named `Download <label>`; their mono readout is visible text beside the icon.
 The optional input level uses `role="progressbar"`, bounds 0–1 and a percentage value text;
-its decorative fill is hidden from accessibility. Status is a named, atomic, polite live region.
+its decorative fill is hidden from accessibility. Normal status is a named, atomic, polite
+live region; passive loading/waiting descriptions are polite, and errors use an alert.
 Busy/disabled state blocks every native command; keyboard focus remains visible.
 
 </details>
@@ -129,12 +139,16 @@ Presenter-specific tokens below take precedence within their documented roles.
 The installed stylesheet resolves presenter-specific properties through shared `--wm-*` tokens
 and then literals. `--wui-recorder-level` is presenter-owned output written on the level node, not
 a theme input. The mount installs `recorderStyle` by default; set `stylesheet: false` to omit it
-and supply the exported stylesheet or your own CSS from the host. Recorder has no `classNames`
-or `parts` option; canonical classes, fixed compatibility classes, and canonical parts are always
-installed.
+and supply the exported stylesheet or your own CSS from the host. Canonical classes, fixed
+compatibility classes, and canonical parts are always installed beside any `classNames` and
+`parts` options. Rules use `:where()`, so application CSS wins.
 
-Controls and the export group wrap within the host width. Export buttons have independent
-spacing and retain their full labels; long labels and status text can break across lines.
+The controls form one row, one control height tall, that never wraps: record, playback, the
+level bar and the export group sit edge to edge, with hairlines before the level bar and the
+export group. On a narrow host the row scrolls sideways without a visible scrollbar. Icon buttons
+are muted and unframed when idle, ink on a raised fill on hover, inverted when pressed, and 30%
+opaque when disabled; focus is a 2px ink outline drawn inside the button. A pressed Record button
+and the level fill while recording use the recording colour; otherwise the level fill is muted.
 The optional level meter stays hidden when the binding supplies no level. Width changes use
 CSS and do not remount the recorder or alter recording/playback state.
 
@@ -142,42 +156,40 @@ CSS and do not remount the recorder or alter recording/playback state.
 
 | Property | Falls back to | Default | Controls |
 |---|---|---|---|
-| `--wm-recorder-padding` | literal | `.6rem` | Root-inset compatibility fallback. |
-| `--wm-recorder-height` | `--wm-control-size` → `--wui-row-h` | `2rem` | Height of every button and of the level bar, so the row reads as one strip. |
-| `--wm-recorder-meter-width` | literal | `90px` | Level bar width. Its height follows the control size above. |
-| `--wm-recorder-border` | `--wm-border` | `#d8d8d8` | Root border. |
-| `--wm-control-border` | `--wm-border` | `#d8d8d8` | Shared non-primary control border fallback. |
-| `--wm-border` | literal | `#d8d8d8` | Shared border fallback. |
-| `--wm-recorder-background` | `--wm-surface` | `#fff` | Root background. |
-| `--wm-surface` | literal fallback | `#fff` | Shared root and button-surface fallback. |
-| `--wm-recorder-text` | `--wm-foreground` | `#222` | Root and inherited button text. |
-| `--wm-foreground` | contextual literal | `#222` text / `#666` muted | Shared foreground fallback. |
-| `--wm-font-family` | `--wm-font` | `system-ui, sans-serif` | Root and button font family; `--wm-font` remains a compatibility fallback. |
-| `--wm-recorder-radius` | `--wm-control-radius` | `0` | Root and inherited button corners. |
-| `--wm-control-radius` | literal fallback | `0` | Shared corner fallback. |
-| `--wm-recorder-button-border` | `--wm-control-border` → `--wm-border` | `#d8d8d8` | Record, playback, and export button border. |
-| `--wm-recorder-button` | `--wm-surface` | `#fff` | Unpressed button background. |
-| `--wm-recorder-accent` | literal | `#c0392b` | Pressed record background and level fill. |
-| `--wm-recorder-accent-text` | literal | `#fff` | Pressed record text. |
-| `--wm-recorder-track` | literal | `#ddd` | Compact level track background. |
-| `--wm-recorder-status-font` | `.76rem var(--wm-font-mono, ui-monospace, monospace)` | `.76rem ui-monospace, monospace` | Complete status font shorthand. |
-| `--wm-font-mono` | literal | `ui-monospace, monospace` | Status font family when no complete shorthand is supplied. |
-| `--wm-focus` | `--wm-focus-ring` | `Highlight` | 2px keyboard-focus outline on record, playback and export buttons. |
-| `--wm-recorder-muted` | `--wm-foreground-muted` | `#666` | Status text color. |
-| `--wm-foreground-muted` | literal fallback | `#666` | Shared muted-text fallback. |
+| `--wm-recorder-padding` | literal | `0` | Root inset; the row sits edge to edge inside the frame. |
+| `--wm-recorder-height` | `--wm-control-size` → `--wui-row-h` | `2rem` | Height and minimum width of every icon button and height of the level bar, so the row reads as one strip. |
+| `--wm-recorder-meter-width` | literal | `90px` | Level bar basis width; it may shrink to `2rem`. Its height follows the control size above. |
+| `--wm-recorder-border` | `--wm-border` | `light-dark(#d8d8d8, #333)` | Root border. |
+| `--wm-control-border` | `--wm-border` | `light-dark(#d8d8d8, #333)` | Hairlines before the level bar and the export group. |
+| `--wm-recorder-background` | `--wm-surface` | `light-dark(#fff, #111)` | Root background. |
+| `--wm-recorder-text` | `--wm-foreground` | `light-dark(#111, #eee)` | Root text. |
+| `--wm-foreground` | literal | `light-dark(#111, #eee)` | Hovered icon, pressed playback fill and focus outline. |
+| `--wm-foreground-muted` | literal | `light-dark(#777, #aaa)` | Idle icons and the level fill when not recording. |
+| `--wm-surface-muted` | literal | `light-dark(#f3f3f3, #1c1c1c)` | Hover fill and the level track fallback. |
+| `--wm-font-family` | `--wm-font` | `system-ui, sans-serif` | Root font family; `--wm-font` remains a compatibility fallback. |
+| `--wm-font-mono` | literal | `ui-monospace, SFMono-Regular, Menlo, monospace` | Button readouts (`MID`, elapsed time) and the error line. |
+| `--wm-recorder-radius` | `--wm-control-radius` | `0` | Root corners. |
+| `--wm-control-radius` | literal | `0` | Icon-button corners. |
+| `--wm-recording` | literal | `light-dark(#c62828, #ef5350)` | Shared recording colour: pressed Record fill and the level fill while recording. |
+| `--wm-recorder-accent` | `--wm-recording` | `light-dark(#c62828, #ef5350)` | Recorder-only override of the recording colour. |
+| `--wm-recorder-accent-text` | `--wm-accent-foreground` | `light-dark(#fff, #111)` | Icon on the pressed Record fill. |
+| `--wm-accent-foreground` | literal | `light-dark(#fff, #111)` | Icon on a pressed fill. |
+| `--wm-recorder-track` | `--wm-surface-muted` | `light-dark(#f3f3f3, #1c1c1c)` | Compact level track background. |
+| `--wm-recorder-status-font` | literal | `.6875rem/1 var(--wm-font-mono, …)` | Complete font shorthand of the visible error line. |
+| `--wm-focus-ring` | literal | `2px solid var(--wm-foreground)` | Focus outline, drawn inside the button. |
 
 **Classes**
 
 | Node | Canonical class | Present when | Fixed compatibility class |
 |---|---|---|---|
-| Root | `.wui-recorder` | Always | `.wrap` |
+| Root | `.wui-recorder` | Always; `.is-recording`, `.is-playing`, `.is-busy` and `.is-disabled` follow state | `.wrap` |
 | Any action | `.wui-recorder__button` | Record, playback, and every export | Format id is also a class on export buttons |
 | Record | `.wui-recorder__record` | Always | `.rec`; `.armed` while recording |
 | Playback | `.wui-recorder__play` | `togglePlayback` exists | `.play`; `.on` while playing |
 | Meter track | `.wui-recorder__meter` | Always, hidden when level is absent | `.meter` |
 | Level fill | `.wui-recorder__level` | Always | `.level` |
 | Export container | `.wui-recorder__exports` | Export binding and formats exist | — |
-| Status | `.wui-recorder__status` | Always | `.status` |
+| Status | `.wui-recorder__status` | Always; carries `data-kind` (`ready`, `loading`, `waiting` or `error`) and is visually hidden unless `error` | `.status` |
 
 **Parts**
 

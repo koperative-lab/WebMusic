@@ -1,0 +1,15 @@
+# npm run pages:build (excerpt)
+21:13:10 [webmusic-site-notices] Site licenses verified: 74 records, 367 files.
+21:13:10 [build] 117 page(s) built in 10.42s
+21:13:10 [build] Complete!
+Prefixed 185 root-absolute links across 28 HTML files with /WebMusic; validated 367 emitted HTML/JS/CSS files.
+Site licenses verified: 74 records, 367 files.
+EXIT=0
+
+# npm run check:external-install (excerpt)
+Typechecking public declarations under bundler (skipLibCheck: false)...
+Typechecking Kernel ESM + CJS under node16 (pure entries without DOM, skipLibCheck: false)...
+Typechecking Kernel ESM + CJS under nodenext (pure entries without DOM, skipLibCheck: false)...
+
+External install check passed: 184 runtime entries imported, Score model composition passed in both formats, 96 ESM/browser and 92 CommonJS declarations checked without skipLibCheck.
+EXIT=0

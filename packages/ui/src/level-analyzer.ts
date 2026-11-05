@@ -1,5 +1,11 @@
+import {mountStatus, statusStyle, type StatusState} from './status';
 import {installStyle} from './internal/style';
 import {claimHost} from './internal/lifecycle';
+import {
+  analysisControlStyle, analysisLine, analysisMono, analysisMuted, createAnalysisFader, setAnalysisStatusRegion,
+} from './internal/analysis-controls';
+import {ICON_PATHS, setIconButton} from './internal/icons';
+import {neutralColor} from './internal/palette';
 
 /** A sampled window from a caller-owned signal graph, expressed in dBFS. */
 export interface LevelAnalyzerSample {
@@ -14,6 +20,10 @@ export interface LevelAnalyzerState {
   thresholdDbfs: number;
   frozen: boolean;
   status: string;
+  /** Waiting for a source or playback; replaces visible status prose with the shared indicator. */
+  waiting?: boolean;
+  /** Active source work; takes precedence over passive waiting. */
+  loading?: boolean;
 }
 
 export interface LevelAnalyzerActions {
@@ -33,44 +43,38 @@ const MAX_DB = 0;
 const COLUMNS = 64;
 const mounted = new WeakMap<HTMLElement, LevelAnalyzerHandle>();
 
-const levelAnalyzerStyle = `
-.wui-level-analyzer { box-sizing: border-box; display: grid; gap: .75rem; width: 100%; min-width: 0;
-  color: var(--wm-level-analyzer-foreground, var(--wm-foreground, #262b2a));
-  background: var(--wm-level-analyzer-background, var(--wm-surface, #fff));
-  border: 1px solid var(--wm-level-analyzer-border, var(--wm-border, #d5d9d7));
+const levelAnalyzerStyle = `${statusStyle}
+${analysisControlStyle}
+:where(.wui-level-analyzer) { box-sizing: border-box; display: grid; gap: .75rem; width: 100%; min-width: 0;
+  color: var(--wm-level-analyzer-foreground, var(--wm-foreground, ${neutralColor('foreground')}));
+  background: var(--wm-level-analyzer-background, var(--wm-surface, light-dark(#fff, #111)));
+  border: 1px solid var(--wm-level-analyzer-border, var(--wm-border, ${neutralColor('border')}));
   padding: var(--wm-level-analyzer-padding, .85rem); }
-.wui-level-analyzer, .wui-level-analyzer * { box-sizing: border-box; }
-.wui-level-analyzer__head, .wui-level-analyzer__controls { display: flex; align-items: center; flex-wrap: wrap; gap: .55rem 1rem; }
-.wui-level-analyzer__head { justify-content: space-between; }
-.wui-level-analyzer__title { font-size: .82rem; font-weight: 700; text-transform: uppercase; }
-.wui-level-analyzer__status { font-size: .78rem; color: var(--wm-muted, #68716e); }
-.wui-level-analyzer__values { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .6rem; }
-.wui-level-analyzer__readout { min-width: 0; }
-.wui-level-analyzer__readout dt { font-size: .72rem; color: var(--wm-muted, #68716e); }
-.wui-level-analyzer__readout dd { margin: .15rem 0 0; font: 600 1.35rem/1.15 ui-monospace, SFMono-Regular, Consolas, monospace;
+:where(.wui-level-analyzer, .wui-level-analyzer *) { box-sizing: border-box; }
+:where(.wui-level-analyzer__controls) { border-color: var(--wm-level-analyzer-border, ${analysisLine}); }
+:where(.wui-level-analyzer__controls > * + *) { border-left-color: var(--wm-level-analyzer-border, ${analysisLine}); }
+:where(.wui-level-analyzer__status) { font: 400 .6875rem/1.4 ${analysisMono}; color: var(--wm-muted, ${analysisMuted}); }
+:where(.wui-level-analyzer__values) { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .6rem; margin: 0; }
+:where(.wui-level-analyzer__readout) { min-width: 0; }
+:where(.wui-level-analyzer__readout dt) { font: 400 .625rem/1.2 ${analysisMono}; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--wm-muted, ${analysisMuted}); }
+:where(.wui-level-analyzer__readout dd) { margin: .15rem 0 0; font: 600 1.35rem/1.15 ${analysisMono};
   font-variant-numeric: tabular-nums; white-space: nowrap; }
-.wui-level-analyzer__readout small { font: 400 .68rem/1.2 system-ui, sans-serif; }
-.wui-level-analyzer__plot { position: relative; height: 94px; overflow: hidden; display: flex; align-items: end;
-  gap: 1px; border: 1px solid var(--wm-border, #d5d9d7); background: var(--wm-surface-muted, #f6f8f7); }
-.wui-level-analyzer__column { position: relative; flex: 1 1 0; min-width: 0; height: 100%; }
-.wui-level-analyzer__rms, .wui-level-analyzer__peak { position: absolute; bottom: 0; left: 0; right: 0; }
-.wui-level-analyzer__rms { background: var(--wm-level-analyzer-rms, #247a70); }
-.wui-level-analyzer__peak { height: 2px; background: var(--wm-level-analyzer-peak, #293f58); }
-.wui-level-analyzer__threshold { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--wm-level-analyzer-threshold, #bd653f); pointer-events: none; }
-.wui-level-analyzer__plot[data-over='true'] { outline: 2px solid var(--wm-danger, #bb453d); outline-offset: -2px; }
-.wui-level-analyzer__scale { display: flex; justify-content: space-between; margin-top: -.5rem;
-  font: .68rem ui-monospace, SFMono-Regular, Consolas, monospace; color: var(--wm-muted, #68716e); }
-.wui-level-analyzer__button { color: inherit; background: var(--wm-surface, #fff); border: 1px solid var(--wm-border, #bfc7c4);
-  border-radius: var(--wm-control-radius, 4px); padding: .3rem .65rem; font: inherit; cursor: pointer; min-height: 32px; }
-.wui-level-analyzer__button[aria-pressed='true'] { background: var(--wm-accent, #247a70); color: #fff; }
-.wui-level-analyzer__threshold-label { display: inline-flex; align-items: center; gap: .5rem; margin-left: auto; font-size: .78rem; }
-.wui-level-analyzer__threshold-input { width: min(155px, 31vw); accent-color: var(--wm-level-analyzer-threshold, #bd653f); }
-.wui-level-analyzer__threshold-value { min-width: 5ch; font-variant-numeric: tabular-nums; text-align: right; }
-@media (max-width: 400px) { .wui-level-analyzer__readout dd { font-size: 1.05rem; }
-  .wui-level-analyzer__threshold-label { width: 100%; margin-left: 0; }
-  .wui-level-analyzer__threshold-input { flex: 1; width: auto; } }
-@media (forced-colors: active) { .wui-level-analyzer__rms { background: Highlight; }
-  .wui-level-analyzer__peak, .wui-level-analyzer__threshold { background: CanvasText; } }
+:where(.wui-level-analyzer__readout small) { font: 400 .6875rem/1.2 ${analysisMono}; color: var(--wm-muted, ${analysisMuted}); }
+:where(.wui-level-analyzer__plot) { position: relative; height: 94px; overflow: hidden; display: flex; align-items: end;
+  gap: 1px; border: 0; background: var(--wm-surface-muted, light-dark(#f3f3f3, #1c1c1c)); }
+:where(.wui-level-analyzer__column) { position: relative; flex: 1 1 0; min-width: 0; height: 100%; }
+:where(.wui-level-analyzer__rms, .wui-level-analyzer__peak) { position: absolute; bottom: 0; left: 0; right: 0; }
+:where(.wui-level-analyzer__rms) { background: var(--wm-level-analyzer-rms, light-dark(#999, #666)); }
+:where(.wui-level-analyzer__peak) { height: 2px; background: var(--wm-level-analyzer-peak, var(--wm-foreground, ${neutralColor('foreground')})); }
+:where(.wui-level-analyzer__threshold) { position: absolute; left: 0; right: 0; pointer-events: none;
+  border-top: 1px dashed var(--wm-level-analyzer-threshold, var(--wm-foreground-muted, ${neutralColor('muted')})); }
+:where(.wui-level-analyzer__plot[data-over='true']) { outline: 2px solid var(--wm-danger, var(--wm-foreground, ${neutralColor('foreground')})); outline-offset: -2px; }
+:where(.wui-level-analyzer__scale) { display: flex; justify-content: space-between; margin-top: -.5rem;
+  font: .625rem/1.2 ${analysisMono}; color: var(--wm-muted, ${analysisMuted}); }
+@media (max-width: 400px) { :where(.wui-level-analyzer__readout dd) { font-size: 1.05rem; } }
+@media (forced-colors: active) { :where(.wui-level-analyzer__rms) { background: Highlight; }
+  :where(.wui-level-analyzer__peak, .wui-level-analyzer__threshold) { background: CanvasText; } }
 `;
 
 function heightFor(db: number): number {
@@ -91,15 +95,18 @@ export function mountLevelAnalyzer(host: HTMLElement, actions: LevelAnalyzerActi
   root.setAttribute('part', 'root surface');
   root.setAttribute('aria-label', 'Level analyzer');
 
-  const head = document.createElement('header');
-  head.className = 'wui-level-analyzer__head';
-  const title = document.createElement('strong');
-  title.className = 'wui-level-analyzer__title';
-  title.textContent = 'Level analyzer';
-  const status = document.createElement('span');
+  const status = document.createElement('div');
   status.className = 'wui-level-analyzer__status';
-  status.setAttribute('role', 'status');
-  head.append(title, status);
+  status.hidden = true;
+  const statusMessage = document.createElement('span');
+  statusMessage.setAttribute('role', 'status');
+  statusMessage.hidden = true;
+  const waitingHost = document.createElement('div');
+  let feedback: StatusState = {kind: 'ready'};
+  const waiting = mountStatus(waitingHost, {snapshot: () => feedback}, {
+    stylesheet: false, classNames: {root: 'wui-status--embedded'},
+  });
+  status.append(statusMessage, waitingHost);
 
   const values = document.createElement('dl');
   values.className = 'wui-level-analyzer__values';
@@ -148,47 +155,44 @@ export function mountLevelAnalyzer(host: HTMLElement, actions: LevelAnalyzerActi
   }
 
   const controls = document.createElement('div');
-  controls.className = 'wui-level-analyzer__controls';
+  controls.className = 'wui-level-analyzer__controls wui-analysis-row';
+  const buttons = document.createElement('div');
+  buttons.className = 'wui-analysis-group';
   const freeze = document.createElement('button');
   freeze.type = 'button';
-  freeze.className = 'wui-level-analyzer__button';
-  freeze.textContent = 'Freeze';
+  freeze.className = 'wui-level-analyzer__button wui-analysis-button';
+  freeze.setAttribute('part', 'freeze');
+  setIconButton(freeze, ICON_PATHS.freeze, 'Freeze');
   freeze.setAttribute('aria-pressed', 'false');
   const reset = document.createElement('button');
   reset.type = 'button';
-  reset.className = 'wui-level-analyzer__button';
-  reset.textContent = 'Reset hold';
-  const thresholdLabel = document.createElement('label');
-  thresholdLabel.className = 'wui-level-analyzer__threshold-label';
-  thresholdLabel.textContent = 'Peak threshold';
-  const thresholdInput = document.createElement('input');
-  thresholdInput.className = 'wui-level-analyzer__threshold-input';
-  thresholdInput.type = 'range';
-  thresholdInput.min = String(MIN_DB);
-  thresholdInput.max = String(MAX_DB);
-  thresholdInput.step = '1';
-  const thresholdValue = document.createElement('span');
-  thresholdValue.className = 'wui-level-analyzer__threshold-value';
-  thresholdLabel.append(thresholdInput, thresholdValue);
-  controls.append(freeze, reset, thresholdLabel);
-  root.append(head, values, plot, scale, controls);
+  reset.className = 'wui-level-analyzer__button wui-analysis-button';
+  reset.setAttribute('part', 'reset');
+  setIconButton(reset, ICON_PATHS.reset, 'Reset hold');
+  const threshold = createAnalysisFader(document, {
+    label: 'Peak threshold', part: 'threshold', min: MIN_DB, max: MAX_DB, step: 1, value: -12,
+    formatValue: (value) => `${value} dBFS`, onInput: (value) => actions.onThresholdChange(value),
+  });
+  buttons.append(freeze, reset);
+  controls.append(buttons, threshold.element);
+  root.append(values, plot, scale, controls, status);
 
   let destroyed = false;
   let frozen = false;
   const onFreeze = () => actions.onFreezeChange(!frozen);
   const onReset = () => actions.onResetHold();
-  const onThreshold = () => actions.onThresholdChange(Number(thresholdInput.value));
 
   const handle: LevelAnalyzerHandle = {
     element: root,
     update(state) {
       if (destroyed) return;
       frozen = state.frozen;
-      status.textContent = state.status;
+      const pending = state.loading || state.waiting;
+      setAnalysisStatusRegion(status, statusMessage, state.status, Boolean(pending));
+      feedback = {kind: state.loading ? 'loading' : state.waiting ? 'waiting' : 'ready', message: pending ? state.status : ''};
+      waiting.update();
       freeze.setAttribute('aria-pressed', String(frozen));
-      freeze.textContent = frozen ? 'Unfreeze' : 'Freeze';
-      thresholdInput.value = String(state.thresholdDbfs);
-      thresholdValue.textContent = `${state.thresholdDbfs} dBFS`;
+      threshold.paint(state.thresholdDbfs);
       line.style.bottom = `${heightFor(state.thresholdDbfs)}%`;
       plot.dataset.over = String((state.sample?.peakDbfs ?? -Infinity) >= state.thresholdDbfs);
       rms.firstChild!.textContent = formatDb(state.sample?.rmsDbfs);
@@ -211,7 +215,8 @@ export function mountLevelAnalyzer(host: HTMLElement, actions: LevelAnalyzerActi
       destroyed = true;
       freeze.removeEventListener('click', onFreeze);
       reset.removeEventListener('click', onReset);
-      thresholdInput.removeEventListener('input', onThreshold);
+      threshold.destroy();
+      waiting.destroy();
       root.remove();
       style?.remove();
       ownership.release();
@@ -224,7 +229,6 @@ export function mountLevelAnalyzer(host: HTMLElement, actions: LevelAnalyzerActi
     else host.append(root);
     freeze.addEventListener('click', onFreeze);
     reset.addEventListener('click', onReset);
-    thresholdInput.addEventListener('input', onThreshold);
   } else handle.destroy();
   return handle;
 }

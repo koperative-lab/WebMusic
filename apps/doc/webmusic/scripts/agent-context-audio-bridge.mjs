@@ -17,7 +17,8 @@ const headlessSources = {
   'play/engines': ['engines/buffer-engine', 'engines/media-engine'],
   'analyze/audio-analysis-session': ['session'],
   'analyze/realtime-analyzer': ['realtime'],
-  'view/audio-meter': ['meter'],
+  'view/audio-clip-editor': ['audio-clip-editor'],
+  'view/audio-meter': ['meter', 'meter-display'],
   'view/audio-timeline': ['timeline', 'binding'],
   'view/live-projection': ['live'],
   'view/peaks': ['peaks'],
@@ -78,12 +79,15 @@ export const audioBridgeContext = Object.freeze({
   rawInputs: [
     'apps/doc/webmusic/src/components/bridges/bridge-composition-client.ts',
     'apps/doc/webmusic/src/components/bridges/independent-loops-client.ts',
+    'apps/doc/webmusic/src/components/headless/arabesque-score.ts',
+    'apps/doc/webmusic/src/components/headless/arabesque-audio.ts',
   ],
   htmlElements: ['kbd'],
   demoComponents: [
     'AudioAnalysisDemo', 'AudioAnalysisTimelinePlayground', 'AudioAnalysisViewDemo',
     'HlAudioPlayerDemo', 'AudioPlayerDemo', 'AudioRecorderDemo', 'AudioClipSummaryPlayground',
     'AudioCustomStyleDemo', 'AudioHistogramPlayground',
+    'AudioClipEditorHeadlessDemo', 'AudioClipViewDemo',
     'AudioLiveViewPlayground', 'AudioMeterDemo', 'AudioMixerDemo',
     'AudioPlaylistPlayground', 'AudioViewDemo', 'AudioWorkbenchDemo',
     'MultibandWaveformDemo', 'WaveformExamplesDemo', 'IndependentLoopsDemo', 'ScoreAudioSyncDemo',
@@ -110,13 +114,14 @@ export const audioBridgeContext = Object.freeze({
   functionalIndexGroup({route}) {
     if (route.startsWith('/bridge/')) return 'Coordinate Score and Audio';
     if (/^\/audio\/(?:element|headless|api)\/play\//.test(route)) return 'Play audio, record and mix';
-    if (/^\/audio\/(?:element|headless|api)\/view\//.test(route)) return 'Display audio waveforms and spectral data';
+    if (/^\/audio\/(?:element|headless|api)\/view\//.test(route)) return 'Display and edit audio waveforms and spectral data';
     if (/^\/audio\/(?:element|headless|api)\/analyze\//.test(route)) return 'Analyze audio and follow playback';
     return undefined;
   },
   patterns: [
     {title: 'Play a decoded audio clip from custom UI', page: 'audio/headless/play/audio-clip-player.mdx', sections: ['Import', 'Ownership and the tap', 'Scratch sessions']},
     {title: 'Attach an audio waveform and choose its interaction', page: 'audio/element/view/audio-view.mdx', sections: ['Three ways in', 'Dragging and seeking']},
+    {title: 'Edit an audio document and audition committed revisions', page: 'audio/element/view/audio-clip-view.mdx', sections: ['Import', 'Data and editing', 'Playback']},
     {title: 'Coordinate Score and Audio from one session', page: 'bridge/composition.mdx', sections: ['Setup in your application', 'Three integration choices in one session', 'Independent loop lengths']},
   ],
   serverOrigin(server, request) {

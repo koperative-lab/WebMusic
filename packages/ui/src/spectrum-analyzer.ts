@@ -1,5 +1,12 @@
+import {mountStatus, statusStyle, type StatusState} from './status';
 import {claimHost, createErrorSink} from './internal/lifecycle';
 import {installStyle} from './internal/style';
+import {
+  analysisControlStyle, analysisLine, analysisMono, analysisMuted, setAnalysisStatusRegion,
+} from './internal/analysis-controls';
+import {ICON_PATHS, setIconButton} from './internal/icons';
+import {neutralColor} from './internal/palette';
+import {canvasInk} from './internal/canvas-ink';
 
 /** A frequency-domain snapshot. Values are the analyser's bins in dB. */
 export interface SpectrumAnalyzerFrame {
@@ -18,7 +25,7 @@ export interface SpectrumAnalyzerState {
   peakHold: boolean;
   minFrequency: number;
   maxFrequency: number;
-  status: 'waiting' | 'live' | 'paused' | 'unavailable' | 'frozen';
+  status: 'loading' | 'waiting' | 'live' | 'paused' | 'unavailable' | 'frozen';
 }
 
 export interface SpectrumAnalyzerBinding {
@@ -47,58 +54,53 @@ export interface SpectrumAnalyzerHandle {
 type SpectrumHost = HTMLElement | ShadowRoot;
 const mounted = new WeakMap<SpectrumHost, SpectrumAnalyzerHandle>();
 
-export const spectrumAnalyzerStyle = String.raw`
-.wui-spectrum-analyzer, .wui-spectrum-analyzer * { box-sizing: border-box; }
-.wui-spectrum-analyzer {
+export const spectrumAnalyzerStyle = String.raw`${statusStyle}
+${analysisControlStyle}
+:where(.wui-spectrum-analyzer, .wui-spectrum-analyzer *) { box-sizing: border-box; }
+:where(.wui-spectrum-analyzer) {
   display: grid;
-  gap: .5rem;
+  gap: .4rem;
   width: 100%;
   min-width: 0;
-  color: var(--wm-spectrum-foreground, var(--wm-foreground, #28343a));
+  color: var(--wm-spectrum-foreground, var(--wm-foreground, ${neutralColor('foreground')}));
   font: 400 .78rem/1.4 var(--wm-font-family, system-ui, sans-serif);
 }
-.wui-spectrum-analyzer__toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; min-width: 0; }
-.wui-spectrum-analyzer__button {
-  min-height: 2rem;
-  padding: .25rem .55rem;
-  border: 1px solid var(--wm-spectrum-border, var(--wm-border, #a8b4b8));
-  border-radius: var(--wm-control-radius, 0);
-  background: var(--wm-spectrum-control-background, var(--wm-surface, #fff));
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
+:where(.wui-spectrum-analyzer__toolbar) { border-color: var(--wm-spectrum-border, ${analysisLine}); }
+:where(.wui-spectrum-analyzer__toolbar > * + *) { border-left-color: var(--wm-spectrum-border, ${analysisLine}); }
+:where(.wui-spectrum-analyzer__button[aria-pressed="true"]) {
+  background: var(--wm-spectrum-selected-background, var(--wm-foreground, ${neutralColor('foreground')}));
 }
-.wui-spectrum-analyzer__button[aria-pressed="true"] {
-  background: var(--wm-spectrum-selected-background, #d9eeeb);
-  border-color: var(--wm-spectrum-selected-border, #258e83);
+:where(.wui-spectrum-analyzer__plot:focus-visible) {
+  outline: var(--wm-focus-ring, 2px solid var(--wm-foreground, ${neutralColor('foreground')}));
+  outline-offset: -2px;
 }
-.wui-spectrum-analyzer__button:disabled { opacity: .5; cursor: default; }
-.wui-spectrum-analyzer__button:focus-visible, .wui-spectrum-analyzer__plot:focus-visible {
-  outline: 2px solid var(--wm-focus, Highlight);
-  outline-offset: 2px;
-}
-.wui-spectrum-analyzer__readout {
-  min-width: 0;
-  margin-inline-start: auto;
-  color: var(--wm-spectrum-muted, var(--wm-foreground-muted, #506067));
-  font: 600 .75rem/1.4 var(--wm-font-mono, ui-monospace, monospace);
+:where(.wui-spectrum-analyzer__readout) {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem;
+  min-width: 0; margin: 0;
+  color: var(--wm-spectrum-muted, ${analysisMuted});
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
 }
-.wui-spectrum-analyzer__plot {
+:where(.wui-spectrum-analyzer__readout > div) { display: flex; gap: .4rem; align-items: baseline; min-width: 0; }
+:where(.wui-spectrum-analyzer__readout dt) { font: 400 .625rem/1.4 ${analysisMono}; text-transform: uppercase; letter-spacing: .06em; }
+:where(.wui-spectrum-analyzer__readout dd) {
+  margin: 0; min-width: 0; color: var(--wm-spectrum-foreground, var(--wm-foreground, ${neutralColor('foreground')}));
+  font: 400 .75rem/1.4 ${analysisMono};
+}
+:where(.wui-spectrum-analyzer__plot) {
   display: block;
   width: 100%;
   height: var(--wm-spectrum-height, 11rem);
   min-height: 7rem;
   border: 0;
-  background: var(--wm-spectrum-plot-background, #152126);
+  background: var(--wm-spectrum-plot-background, var(--wm-surface-muted, light-dark(#f3f3f3, #1c1c1c)));
   touch-action: none;
   cursor: crosshair;
 }
-.wui-spectrum-analyzer__status { min-height: 1.1rem; color: var(--wm-spectrum-muted, var(--wm-foreground-muted, #506067)); }
+:where(.wui-spectrum-analyzer__status) { color: var(--wm-spectrum-muted, ${analysisMuted}); }
+@media (max-width: 440px) { :where(.wui-spectrum-analyzer__readout > div) { flex-direction: column; gap: .1rem; } }
 @media (forced-colors: active) {
-  .wui-spectrum-analyzer__plot { border: 1px solid CanvasText; background: Canvas; }
-  .wui-spectrum-analyzer__button[aria-pressed="true"] { border-color: Highlight; }
+  :where(.wui-spectrum-analyzer__plot) { border: 1px solid CanvasText; background: Canvas; }
+  :where(.wui-spectrum-analyzer__button[aria-pressed="true"]) { background: Highlight; color: HighlightText; }
 }
 `;
 
@@ -150,27 +152,47 @@ export function mountSpectrumAnalyzer(
   root.setAttribute('part', 'root surface');
 
   const toolbar = document.createElement('div');
-  toolbar.className = 'wui-spectrum-analyzer__toolbar';
+  toolbar.className = 'wui-spectrum-analyzer__toolbar wui-analysis-row';
   toolbar.setAttribute('part', 'toolbar');
   const freeze = document.createElement('button');
-  freeze.className = 'wui-spectrum-analyzer__button';
+  freeze.className = 'wui-spectrum-analyzer__button wui-analysis-button';
   freeze.type = 'button';
-  freeze.textContent = 'Freeze';
+  setIconButton(freeze, ICON_PATHS.freeze, 'Freeze');
   freeze.setAttribute('part', 'freeze');
   const peak = document.createElement('button');
-  peak.className = 'wui-spectrum-analyzer__button';
+  peak.className = 'wui-spectrum-analyzer__button wui-analysis-button';
   peak.type = 'button';
-  peak.textContent = 'Peak hold';
+  setIconButton(peak, ICON_PATHS.hold, 'Peak hold');
   peak.setAttribute('part', 'peak-hold');
   const reset = document.createElement('button');
-  reset.className = 'wui-spectrum-analyzer__button';
+  reset.className = 'wui-spectrum-analyzer__button wui-analysis-button';
   reset.type = 'button';
-  reset.textContent = 'Reset peaks';
+  setIconButton(reset, ICON_PATHS.reset, 'Reset peaks');
   reset.setAttribute('part', 'reset-peaks');
-  const readout = document.createElement('output');
+  const readout = document.createElement('dl');
   readout.className = 'wui-spectrum-analyzer__readout';
   readout.setAttribute('part', 'readout');
-  toolbar.append(freeze, peak, reset, readout);
+  function readoutField(label: string): HTMLOutputElement {
+    const field = document.createElement('div');
+    const term = document.createElement('dt');
+    term.textContent = label;
+    const detail = document.createElement('dd');
+    const value = document.createElement('output');
+    value.setAttribute('aria-live', 'off');
+    detail.append(value);
+    field.append(term, detail);
+    readout.append(field);
+    return value;
+  }
+  const frequencyValue = readoutField('Frequency');
+  const levelValue = readoutField('Level');
+  const freezeGroup = document.createElement('div');
+  freezeGroup.className = 'wui-analysis-group';
+  freezeGroup.append(freeze);
+  const peakGroup = document.createElement('div');
+  peakGroup.className = 'wui-analysis-group';
+  peakGroup.append(peak, reset);
+  toolbar.append(freezeGroup, peakGroup);
 
   const canvas = document.createElement('canvas');
   canvas.className = 'wui-spectrum-analyzer__plot';
@@ -181,7 +203,15 @@ export function mountSpectrumAnalyzer(
   const status = document.createElement('div');
   status.className = 'wui-spectrum-analyzer__status';
   status.setAttribute('part', 'status');
-  root.append(toolbar, canvas, status);
+  const statusMessage = document.createElement('span');
+  statusMessage.setAttribute('role', 'status');
+  const waitingHost = document.createElement('div');
+  let feedback: StatusState = {kind: 'ready'};
+  const waiting = mountStatus(waitingHost, {snapshot: () => feedback}, {
+    stylesheet: false, classNames: {root: 'wui-status--embedded'},
+  });
+  status.append(statusMessage, waitingHost);
+  root.append(readout, canvas, toolbar, status);
 
   let destroyed = false;
   let unsubscribe: (() => void) | undefined;
@@ -190,7 +220,20 @@ export function mountSpectrumAnalyzer(
   let sourceRevision = Number.NaN;
   let held: Float32Array | undefined;
   let heldFrame: SpectrumAnalyzerFrame | undefined;
+  let scheme: MediaQueryList | undefined;
+  let pointerFrame = 0;
+  let pendingFraction: number | undefined;
+  // Layout and resolved ink, read only on mount, resize or a colour-scheme
+  // change and always before this frame's DOM writes, never after them.
+  let metrics: {width: number; height: number; ink: string; muted: string} | undefined;
   const isCurrent = (): boolean => !destroyed && claim.isCurrent();
+  const measure = (): NonNullable<typeof metrics> => metrics ??= {
+    width: Math.max(1, Math.round(canvas.clientWidth || root.clientWidth || 360)),
+    height: Math.max(1, Math.round(canvas.clientHeight || 176)),
+    // Leave the CSS background visible, including caller-provided plot colors.
+    ink: canvasInk(root, '#444'),
+    muted: canvasInk(readout, '#666'),
+  };
 
   const resetPeaks = (): void => {
     if (destroyed) return;
@@ -199,11 +242,11 @@ export function mountSpectrumAnalyzer(
     update();
   };
 
-  const draw = (state: SpectrumAnalyzerState, min: number, max: number): void => {
+  const draw = (
+    state: SpectrumAnalyzerState, min: number, max: number, {width, height, ink, muted}: NonNullable<typeof metrics>,
+  ): void => {
     const context = canvas.getContext('2d');
     if (!context) return;
-    const width = Math.max(1, Math.round(canvas.clientWidth || root.clientWidth || 360));
-    const height = Math.max(1, Math.round(canvas.clientHeight || 176));
     const ratio = Math.max(1, view?.devicePixelRatio || 1);
     const pixelWidth = Math.max(1, Math.round(width * ratio));
     const pixelHeight = Math.max(1, Math.round(height * ratio));
@@ -211,9 +254,6 @@ export function mountSpectrumAnalyzer(
     if (canvas.height !== pixelHeight) canvas.height = pixelHeight;
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
     context.clearRect(0, 0, width, height);
-    context.fillStyle = '#152126';
-    context.fillRect(0, 0, width, height);
-
     const left = 38;
     const right = 10;
     const top = 10;
@@ -227,8 +267,8 @@ export function mountSpectrumAnalyzer(
     const dbRange = Math.max(1, maxDb - minDb);
     const yAt = (db: number) => top + (maxDb - clamp(db, minDb, maxDb)) / dbRange * plotHeight;
 
-    context.strokeStyle = '#3f5359';
-    context.fillStyle = '#b8c7c8';
+    context.strokeStyle = muted;
+    context.fillStyle = muted;
     context.font = '10px ui-monospace, monospace';
     context.lineWidth = 1;
     for (const fraction of [0, .25, .5, .75, 1]) {
@@ -236,7 +276,9 @@ export function mountSpectrumAnalyzer(
       context.beginPath();
       context.moveTo(left, y + .5);
       context.lineTo(left + plotWidth, y + .5);
+      context.globalAlpha = .25;
       context.stroke();
+      context.globalAlpha = 1;
       context.fillText(String(Math.round(maxDb - fraction * dbRange)), 4, y + 3);
     }
     for (const hz of [20, 50, 100, 200, 500, 1_000, 2_000, 5_000, 10_000, 20_000]) {
@@ -245,7 +287,9 @@ export function mountSpectrumAnalyzer(
       context.beginPath();
       context.moveTo(x + .5, top);
       context.lineTo(x + .5, top + plotHeight);
+      context.globalAlpha = .25;
       context.stroke();
+      context.globalAlpha = 1;
       if ([20, 100, 1_000, 10_000].includes(hz)) {
         context.fillText(hz >= 1_000 ? `${hz / 1_000}k` : String(hz), x + 2, height - 7);
       }
@@ -275,11 +319,15 @@ export function mountSpectrumAnalyzer(
       }
       if (started) context.stroke();
     };
-    if (state.peakHold && held && heldFrame) paintBins(held, heldFrame, '#f1b65f', 1);
-    if (frame) paintBins(frame.bins, frame, '#5bd3c1', 1.5);
+    if (state.peakHold && held && heldFrame) {
+      context.setLineDash([4, 3]);
+      paintBins(held, heldFrame, muted, 1);
+      context.setLineDash([]);
+    }
+    if (frame) paintBins(frame.bins, frame, ink, 1.5);
 
     const cursorX = left + xAt(selectedFrequency, plotWidth, min, max);
-    context.strokeStyle = '#eff4ef';
+    context.strokeStyle = ink;
     context.setLineDash([3, 3]);
     context.beginPath();
     context.moveTo(cursorX, top);
@@ -293,6 +341,7 @@ export function mountSpectrumAnalyzer(
     try {
       const state = binding.snapshot();
       if (!isCurrent()) return;
+      const size = measure();
       if (state.sourceRevision !== sourceRevision) {
         sourceRevision = state.sourceRevision;
         held = undefined;
@@ -325,16 +374,22 @@ export function mountSpectrumAnalyzer(
       const db = probeDb(frame, selectedFrequency);
       const valueText = `${frequencyLabel(selectedFrequency)}${db === undefined ? '' : `, ${db.toFixed(1)} dB`}`;
       canvas.setAttribute('aria-valuetext', valueText);
-      readout.textContent = valueText;
-      status.textContent = ({
+      frequencyValue.textContent = frequencyLabel(selectedFrequency);
+      levelValue.textContent = db === undefined ? '—' : `${db.toFixed(1)} dB`;
+      const statusText = ({
+        loading: 'Loading audio',
         waiting: 'Waiting for playback',
-        live: 'Live spectrum',
-        paused: 'Playback paused',
+        live: '',
+        paused: '',
         unavailable: 'Analyser unavailable',
-        frozen: 'Spectrum frozen',
+        frozen: '',
       } as const)[state.status];
+      const pending = state.status === 'waiting' || state.status === 'loading';
+      setAnalysisStatusRegion(status, statusMessage, statusText, pending);
+      feedback = {kind: state.status === 'loading' ? 'loading' : pending ? 'waiting' : 'ready', message: pending ? statusText : ''};
+      waiting.update();
       root.dataset.state = state.status;
-      draw(state, min, max);
+      draw(state, min, max, size);
     } catch (error) {
       report(error);
     }
@@ -354,17 +409,48 @@ export function mountSpectrumAnalyzer(
     } catch (error) { report(error); }
   };
 
-  const onPointer = (event: PointerEvent): void => {
+  const pointerFraction = (event: PointerEvent): number => {
+    const rect = canvas.getBoundingClientRect();
+    const plotLeft = 38;
+    const plotWidth = Math.max(1, rect.width - plotLeft - 10);
+    return clamp((event.clientX - rect.left - plotLeft) / plotWidth, 0, 1);
+  };
+  const probeFraction = (fraction: number): void => {
     if (!isCurrent()) return;
     try {
       const state = binding.snapshot();
       if (!isCurrent()) return;
       const {min, max} = range(state);
-      const rect = canvas.getBoundingClientRect();
-      const plotLeft = 38;
-      const plotWidth = Math.max(1, rect.width - plotLeft - 10);
-      setProbe(frequencyAt(event.clientX - rect.left - plotLeft, plotWidth, min, max));
+      setProbe(frequencyAt(fraction, 1, min, max));
     } catch (error) { report(error); }
+  };
+  const cancelPointerFrame = (): void => {
+    if (pointerFrame) view?.cancelAnimationFrame?.(pointerFrame);
+    pointerFrame = 0;
+    pendingFraction = undefined;
+  };
+  const flushPointer = (): void => {
+    pointerFrame = 0;
+    const fraction = pendingFraction;
+    pendingFraction = undefined;
+    if (fraction !== undefined) probeFraction(fraction);
+  };
+  const onPointerDown = (event: PointerEvent): void => {
+    if (!isCurrent()) return;
+    cancelPointerFrame();
+    try { probeFraction(pointerFraction(event)); } catch (error) { report(error); }
+  };
+  // Hover can fire several times per frame; apply only the latest position, once per frame.
+  const onPointerMove = (event: PointerEvent): void => {
+    if (!isCurrent()) return;
+    try { pendingFraction = pointerFraction(event); } catch (error) { report(error); return; }
+    if (pointerFrame) return;
+    if (view?.requestAnimationFrame) pointerFrame = view.requestAnimationFrame(flushPointer);
+    else flushPointer();
+  };
+  const remeasure = (): void => {
+    metrics = undefined;
+    update();
   };
   const onKey = (event: KeyboardEvent): void => {
     if (!isCurrent()) return;
@@ -391,8 +477,8 @@ export function mountSpectrumAnalyzer(
   freeze.addEventListener('click', onFreeze);
   peak.addEventListener('click', onPeak);
   reset.addEventListener('click', resetPeaks);
-  canvas.addEventListener('pointerdown', onPointer);
-  canvas.addEventListener('pointermove', onPointer);
+  canvas.addEventListener('pointerdown', onPointerDown);
+  canvas.addEventListener('pointermove', onPointerMove);
   canvas.addEventListener('keydown', onKey);
 
   const handle: SpectrumAnalyzerHandle = {
@@ -405,13 +491,16 @@ export function mountSpectrumAnalyzer(
       destroyed = true;
       try { unsubscribe?.(); } catch (error) { report(error); }
       observer?.disconnect();
+      scheme?.removeEventListener?.('change', remeasure);
+      cancelPointerFrame();
       freeze.removeEventListener('click', onFreeze);
       peak.removeEventListener('click', onPeak);
       reset.removeEventListener('click', resetPeaks);
-      canvas.removeEventListener('pointerdown', onPointer);
-      canvas.removeEventListener('pointermove', onPointer);
+      canvas.removeEventListener('pointerdown', onPointerDown);
+      canvas.removeEventListener('pointermove', onPointerMove);
       canvas.removeEventListener('keydown', onKey);
       claim.release();
+      waiting.destroy();
       root.remove();
       style?.remove();
     },
@@ -425,12 +514,19 @@ export function mountSpectrumAnalyzer(
   if (!isCurrent()) return handle;
   if (view?.ResizeObserver) {
     try {
-      const nextObserver = new view.ResizeObserver(update);
+      const nextObserver = new view.ResizeObserver(remeasure);
       if (!isCurrent()) nextObserver.disconnect();
       else {
         observer = nextObserver;
         nextObserver.observe(root);
       }
+    }
+    catch (error) { report(error); }
+  }
+  if (isCurrent() && view?.matchMedia) {
+    try {
+      scheme = view.matchMedia('(prefers-color-scheme: dark)');
+      scheme.addEventListener?.('change', remeasure);
     }
     catch (error) { report(error); }
   }

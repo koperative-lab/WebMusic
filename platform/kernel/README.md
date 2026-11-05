@@ -80,7 +80,7 @@ Common mechanisms do not make distinct domain policies interchangeable.
 | `@webmusic/kernel/effect` | `Effect`/`EffectNodes`, stable modular InsertChain and effect instances |
 | `@webmusic/kernel/module` | Module handles, context/environment, route/CV leases, parameters and versioned project/runtime/editor contracts |
 | `@webmusic/kernel/meter` | `AnalyserMeter` tap, RMS/peak with peak hold, `aggregateSpectrumBars` |
-| `@webmusic/kernel/transport` | `TransportClock` affine anchor math + `TimelineMapping` |
+| `@webmusic/kernel/transport` | `TransportClock` affine anchor math, `TimelineMapping`, constant-tempo `TempoGrid` helpers and the read-only `TempoClock` |
 | `@webmusic/kernel/tick` | Throttling-resistant tick delivery for lookahead schedulers |
 | `@webmusic/kernel/sync` | `TransportGroup` master/follower choreography + `MirrorClockMaster` |
 | `@webmusic/kernel/session` | Source-free SessionTransport, shared scheduling bindings, relative automation and phase |

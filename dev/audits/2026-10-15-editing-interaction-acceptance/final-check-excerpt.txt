@@ -1,0 +1,35 @@
+Selected lines from the final full check, including upload CSS and piano-roll ResizeObserver repairs.
+Source: /tmp/webmusic-editing-acceptance-final-check.log
+SHA-256: 1f56c0ce5888e4ede25a1692893ea467506d19e1013f2922eb7b5b37b6f54d7e
+Line numbers refer to the complete source log; omitted build/test output is not reproduced.
+
+2: > check
+6: > check:source
+10: > check:format
+15: > check:lockfile
+20: > check:dev-server
+52: > check:architecture
+76: Architecture check passed for 5 packages and 437 source modules.
+78: > check:docs
+99: > check:dev-docs
+104: > check:site-notices
+1564: > check:doc-snippets
+1630: Result (176 files): 
+1651:  Test Files  14 passed (14)
+1652:       Tests  163 passed (163)
+1664:  Test Files  36 passed (36)
+1665:       Tests  653 passed (653)
+1681:  Test Files  198 passed (198)
+1682:       Tests  2270 passed (2270)
+1697:  Test Files  82 passed (82)
+1698:       Tests  984 passed (984)
+1713:  Test Files  7 passed (7)
+1714:       Tests  182 passed (182)
+1726:  Test Files  32 passed (32)
+1727:       Tests  255 passed (255)
+1735: > check:licenses
+1740: > check:packages
+1788: Package export check passed for 101 public entries.
+1789: Package artifact check passed for 5 package(s).
+1806: > check:release-manifests
+1826: Release manifests are consistent at 0.2.0.

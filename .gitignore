@@ -10,12 +10,9 @@ AGENT.md
 AGENT.local.md
 AGENTS.local.md
 AGENTS.override.md
-CLAUDE.local.md
 GEMINI.md
 GEMINI.local.md
 .agents/
-.claude/
-.codex/
 .cursor/
 .cursorrules
 .cursorignore

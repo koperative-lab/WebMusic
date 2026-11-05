@@ -50,6 +50,10 @@ export class AudioLevelAnalyzerElement extends WebMusicElement {
   #history: LevelAnalyzerSample[] = [];
   #frozen = false;
   #status = 'Waiting for playback';
+  #waiting = true;
+  #loading = false;
+  #emptySource = false;
+  #loadError?: Error;
   #lastTime?: {seconds: number; at: number};
 
   protected override onMount(): void {
@@ -121,6 +125,9 @@ export class AudioLevelAnalyzerElement extends WebMusicElement {
     if (!current()) return;
     this.#player = undefined;
     this.#playerState = 'unbound';
+    this.#loading = false;
+    this.#emptySource = false;
+    this.#loadError = undefined;
     this.#playing = false;
     this.#reportedStall = false;
     this.#readFailed = false;
@@ -135,6 +142,9 @@ export class AudioLevelAnalyzerElement extends WebMusicElement {
   }
 
   #onPlayer(kind: AnalysisPlayerUpdate, reading: AnalysisPlayerSnapshot): void {
+    this.#loading = reading.loading;
+    this.#emptySource = reading.empty;
+    this.#loadError = reading.loadError;
     if (kind === 'target' || kind === 'source') {
       this.#player = reading.target;
       this.#playerState = reading.state;
@@ -182,8 +192,15 @@ export class AudioLevelAnalyzerElement extends WebMusicElement {
       this.#history = [];
     }
     if (this.#stalled) return;
+    this.#waiting = false;
     if (this.ownerDocument.hidden) {
       this.#status = 'Paused';
+      this.#render();
+      return;
+    }
+    if (!this.#explicitAnalyser && (this.#loading || this.#loadError)) {
+      this.#stop();
+      this.#status = this.#loadError?.message ?? 'Loading audio';
       this.#render();
       return;
     }
@@ -201,10 +218,11 @@ export class AudioLevelAnalyzerElement extends WebMusicElement {
     }
     if (!analyser) {
       this.#stop();
+      this.#waiting = this.#playerState !== 'invalid' && this.#playerState !== 'ambiguous' && !this.#playing && (!this.#player || this.#emptySource);
       this.#status = this.#playerState === 'invalid' ? 'Invalid player selector'
         : this.#playerState === 'ambiguous' ? 'Player selector matches multiple elements'
         : this.#playing ? 'Live analyser unavailable'
-        : this.#player ? 'Paused' : 'Waiting for playback';
+        : this.#player && !this.#emptySource ? 'Paused' : 'Waiting for playback';
       this.#render();
       return;
     }
@@ -260,6 +278,8 @@ export class AudioLevelAnalyzerElement extends WebMusicElement {
       thresholdDbfs: this.thresholdDbfs,
       frozen: this.#frozen,
       status: this.#frozen ? 'Frozen' : this.#status,
+      waiting: this.#waiting && !this.#frozen,
+      loading: this.#loading && !this.#explicitAnalyser && !this.#frozen && !this.ownerDocument.hidden,
     });
   }
 

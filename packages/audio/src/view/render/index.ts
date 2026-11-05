@@ -10,6 +10,25 @@ export {
   type WaveformOverviewOptions,
 } from './overview';
 export {paintLiveProjection, type LiveProjectionRenderOptions} from './live';
+export {
+  createAudioMeterPainter,
+  paintAudioMeterDisplay,
+  paintVuMeter,
+  paintLoudnessMeter,
+  paintWaveformHistory,
+  paintOscilloscopeTrace,
+  paintSpectrumFrame,
+  paintSpectrogramHistory,
+  paintStereometer,
+  defaultAudioMeterPalette,
+  meterRampColor,
+  meterHueColor,
+  parseCssColor,
+  VU_SCALE_MARKS,
+  type AudioMeterPainter,
+  type AudioMeterPalette,
+  type AudioMeterTheme,
+} from './meter-display';
 export {bindPlayerToWaveform, type BindWaveformOptions, type WaveformBinding} from './binding';
 export {
   bindAudioTimelineViewport,
@@ -25,3 +44,18 @@ export {
   type MountAudioTimelineOptions,
   type AudioTimelinePresenterHandle,
 } from './audio-timeline';
+export {
+  AUDIO_CLIP_FEATURES,
+  AUDIO_CLIP_GRID_METERS,
+  AUDIO_CLIP_SNAPS,
+  mountAudioClip,
+  parseAudioClipFeatures,
+  type AudioClipContent,
+  type AudioClipFeature,
+  type AudioClipHandle,
+  type AudioClipOptions,
+  type AudioClipPlayback,
+  type AudioClipSettings,
+  type AudioClipSnap,
+  type AudioClipTool,
+} from './audio-clip';

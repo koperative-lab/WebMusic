@@ -14,6 +14,35 @@ export interface ScorePlaybackNote {
 export type ScorePlaybackReadiness = 'empty' | 'loading' | 'ready' | 'unavailable' | 'error' | 'disposed';
 export type ScorePlaybackState = 'stopped' | 'starting' | 'playing' | 'paused' | 'ended';
 
+export interface ScoreDocumentRevision {
+  readonly documentId: string;
+  readonly documentRevision: number;
+}
+
+/** Requested content and the exact revision adopted by one native player. */
+export interface ScoreDocumentPlaybackBinding {
+  readonly status: 'empty' | 'preparing' | 'ready' | 'error';
+  readonly attempt: number;
+  readonly requested?: ScoreDocumentRevision;
+  readonly applied?: ScoreDocumentRevision;
+  readonly positionPolicy?: 'preserve-quarter' | 'reset-origin';
+  /** True only for a ready, current, unexpanded authored document. */
+  readonly documentCoordinates: boolean;
+  readonly error?: unknown;
+}
+
+export type ScoreDocumentApplicationResult =
+  | {readonly status: 'applied'; readonly target: ScoreDocumentRevision; readonly attempt: number; readonly positionPolicy: 'preserve-quarter' | 'reset-origin'}
+  | {readonly status: 'superseded'; readonly target?: ScoreDocumentRevision; readonly attempt: number}
+  | {readonly status: 'failed'; readonly target?: ScoreDocumentRevision; readonly attempt: number; readonly error: unknown};
+
+export class ScoreDocumentApplicationError extends Error {
+  constructor(readonly code: 'unknown-revision' | 'not-ready' | 'disposed' | 'invalid-source' | 'invalid-snapshot' | 'document-disposed' | 'source-conflict', message: string) {
+    super(message);
+    this.name = 'ScoreDocumentApplicationError';
+  }
+}
+
 /** A coherent, immutable observation of one playback owner. */
 export interface ScorePlaybackSnapshot {
   /** Monotonic publication revision, scoped to this source. */
@@ -31,6 +60,10 @@ export interface ScorePlaybackSnapshot {
   readonly rate: number | null;
   readonly activeNotes: readonly ScorePlaybackNote[];
   readonly error?: unknown;
+  /** Applied document identity; absent for independent static playback. */
+  readonly documentId?: string;
+  readonly documentRevision?: number;
+  readonly documentBinding?: ScoreDocumentPlaybackBinding;
 }
 
 /**

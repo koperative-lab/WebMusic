@@ -8,7 +8,6 @@ export {
 } from './renderers/factory';
 export {ScrollType} from './renderers/staff';
 export type {WaterfallVisualizerConfig} from './renderers/waterfall';
-export {renderOSMDStaffVisualizer, type OSMDStaffOptions} from './osmd-staff';
 export {bindPlayerToVisualizer, type PlayerBindingHandlers} from './binding';
 export {
   renderScoreThumbnail,
@@ -18,3 +17,32 @@ export {
   renderScoreVisualizer,
   type ScoreVisualizerRenderOptions,
 } from './score-visualizer';
+export {
+  SCORE_GRID_FEATURES,
+  SCORE_GRID_SNAPS,
+  mountScoreGrid,
+  parseScoreGridFeatures,
+  type ScoreGridContent,
+  type ScoreGridFeature,
+  type ScoreGridHandle,
+  type ScoreGridOptions,
+  type ScoreGridPlayback,
+  type ScoreGridSettings,
+  type ScoreGridSnap,
+  type ScoreGridTool,
+} from './score-grid';
+export {
+  SCORE_SHEET_DURATIONS,
+  SCORE_SHEET_FEATURES,
+  SCORE_SHEET_LAYOUTS,
+  mountScoreSheet,
+  parseScoreSheetFeatures,
+  type ScoreSheetContent,
+  type ScoreSheetDuration,
+  type ScoreSheetFeature,
+  type ScoreSheetHandle,
+  type ScoreSheetLayout,
+  type ScoreSheetOptions,
+  type ScoreSheetPlayback,
+  type ScoreSheetSettings,
+} from './score-sheet';

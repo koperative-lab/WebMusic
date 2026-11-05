@@ -23,7 +23,7 @@ function report(host: HTMLElement, error: unknown): void {
 }
 
 function mountLevelDemo(host: HTMLElement): UiPresenterDemoHandle {
-  const initial = {rmsDbfs: -24, peakDbfs: -10, thresholdDbfs: -6, frozen: false};
+  const initial = {rmsDbfs: -24, peakDbfs: -10, thresholdDbfs: -6, frozen: false, loading: false, waiting: false};
   let controls = {...initial};
   let phase = 0;
   let heldPeakDbfs: number | undefined;
@@ -34,12 +34,13 @@ function mountLevelDemo(host: HTMLElement): UiPresenterDemoHandle {
   const view = host.ownerDocument.defaultView;
 
   const state = (): LevelAnalyzerState => ({
-    sample,
+    sample: controls.loading || controls.waiting ? undefined : sample,
     heldPeakDbfs,
-    history,
+    history: controls.loading || controls.waiting ? [] : history,
     thresholdDbfs: controls.thresholdDbfs,
     frozen: controls.frozen,
-    status: controls.frozen ? 'Frozen' : 'Live demo signal',
+    loading: controls.loading, waiting: controls.waiting,
+    status: controls.loading ? 'Loading demo source…' : controls.waiting ? 'Waiting for demo source…' : controls.frozen ? 'Frozen' : 'Live demo signal',
   });
   const presenter: LevelAnalyzerHandle = mountLevelAnalyzer(host, {
     onThresholdChange(value) {
@@ -58,7 +59,7 @@ function mountLevelDemo(host: HTMLElement): UiPresenterDemoHandle {
     },
   });
   const tick = (): void => {
-    if (destroyed || controls.frozen) return;
+    if (destroyed || controls.frozen || controls.loading || controls.waiting) return;
     phase += .21;
     const rmsDbfs = clamp(controls.rmsDbfs + Math.sin(phase) * 2.6, -60, 0, -24);
     const peakDbfs = clamp(Math.max(rmsDbfs, controls.peakDbfs + Math.sin(phase * 1.7) * 2), -60, 0, -10);
@@ -75,6 +76,7 @@ function mountLevelDemo(host: HTMLElement): UiPresenterDemoHandle {
       if (name === 'rmsDbfs') controls.rmsDbfs = clamp(value, -60, 0, initial.rmsDbfs);
       else if (name === 'peakDbfs') controls.peakDbfs = clamp(value, -60, 0, initial.peakDbfs);
       else if (name === 'thresholdDbfs') controls.thresholdDbfs = clamp(value, -60, 0, initial.thresholdDbfs);
+      else if (name === 'loading' || name === 'waiting') controls[name] = value === true;
       else if (name === 'frozen') controls.frozen = value === true;
       else return;
       tick();
@@ -132,7 +134,7 @@ function spectrumOptions(host: HTMLElement, options: Readonly<Record<string, unk
 }
 
 function mountSpectrumDemo(host: HTMLElement): UiPresenterDemoHandle {
-  const initial = {fundamentalHz: 440, frozen: false, peakHold: false, minFrequency: 20, maxFrequency: 20000};
+  const initial = {fundamentalHz: 440, frozen: false, peakHold: false, minFrequency: 20, maxFrequency: 20000, status: 'live' as SpectrumAnalyzerState['status']};
   let controls = {...initial};
   let frame: SpectrumAnalyzerState['frame'];
   let phase = 0;
@@ -144,12 +146,12 @@ function mountSpectrumDemo(host: HTMLElement): UiPresenterDemoHandle {
   const view = host.ownerDocument.defaultView;
 
   const snapshot = (): SpectrumAnalyzerState => ({
-    frame, sourceRevision,
+    frame: controls.status === 'loading' || controls.status === 'waiting' || controls.status === 'unavailable' ? undefined : frame, sourceRevision,
     frozen: controls.frozen,
     peakHold: controls.peakHold,
     minFrequency: controls.minFrequency,
     maxFrequency: controls.maxFrequency,
-    status: controls.frozen ? 'frozen' : 'live',
+    status: controls.status !== 'live' ? controls.status : controls.frozen ? 'frozen' : 'live',
   });
   const binding = {
     snapshot,
@@ -165,7 +167,7 @@ function mountSpectrumDemo(host: HTMLElement): UiPresenterDemoHandle {
     presenter = mountSpectrumAnalyzer(host, binding, spectrumOptions(host, options));
   };
   const tick = (): void => {
-    if (destroyed || controls.frozen) return;
+    if (destroyed || controls.frozen || controls.status !== 'live') return;
     phase += .13;
     frame = {
       bins: harmonicBins(controls.fundamentalHz, phase),
@@ -183,6 +185,7 @@ function mountSpectrumDemo(host: HTMLElement): UiPresenterDemoHandle {
     setState(name, value) {
       if (destroyed) return;
       if (name === 'fundamentalHz') controls.fundamentalHz = clamp(value, 55, 2000, initial.fundamentalHz);
+      else if (name === 'status') controls.status = value === 'loading' || value === 'waiting' || value === 'paused' || value === 'unavailable' || value === 'frozen' ? value : 'live';
       else if (name === 'frozen') controls.frozen = value === true;
       else if (name === 'peakHold') controls.peakHold = value === true;
       else if (name === 'minFrequency') controls.minFrequency = clamp(value, 20, 5000, initial.minFrequency);
@@ -278,7 +281,7 @@ function scopeOptions(host: HTMLElement, options: Readonly<Record<string, unknow
 function mountOscilloscopeDemo(host: HTMLElement): UiPresenterDemoHandle {
   const initial = {
     frequencyHz: 440, amplitude: .75, timebaseMs: 10, triggerLevel: 0,
-    triggerEdge: 'rising' as OscilloscopeTriggerEdge, frozen: false,
+    triggerEdge: 'rising' as OscilloscopeTriggerEdge, frozen: false, status: 'live' as OscilloscopeState['status'],
   };
   let controls = {...initial};
   let options: Record<string, unknown> = {};
@@ -295,9 +298,9 @@ function mountOscilloscopeDemo(host: HTMLElement): UiPresenterDemoHandle {
     published.notify();
   };
   const snapshot = (): OscilloscopeState => ({
-    trace, availableTimeMs: SCOPE_AVAILABLE_MS, timebaseMs: controls.timebaseMs,
+    trace: controls.status === 'loading' || controls.status === 'waiting' || controls.status === 'unavailable' ? undefined : trace, availableTimeMs: SCOPE_AVAILABLE_MS, timebaseMs: controls.timebaseMs,
     triggerLevel: controls.triggerLevel, triggerEdge: controls.triggerEdge,
-    frozen: controls.frozen, status: controls.frozen ? 'frozen' : 'live',
+    frozen: controls.frozen, status: controls.status !== 'live' ? controls.status : controls.frozen ? 'frozen' : 'live',
   });
   const binding = {
     snapshot,
@@ -315,7 +318,7 @@ function mountOscilloscopeDemo(host: HTMLElement): UiPresenterDemoHandle {
     presenter = mountOscilloscope(host, binding, scopeOptions(host, options));
   };
   const tick = (): void => {
-    if (destroyed || controls.frozen) return;
+    if (destroyed || controls.frozen || controls.status !== 'live') return;
     phase += .19;
     raw = scopeSamples(controls.frequencyHz, controls.amplitude, phase);
     project();
@@ -331,10 +334,12 @@ function mountOscilloscopeDemo(host: HTMLElement): UiPresenterDemoHandle {
       else if (name === 'timebaseMs') controls.timebaseMs = clamp(value, 1, SCOPE_AVAILABLE_MS, initial.timebaseMs);
       else if (name === 'triggerLevel') controls.triggerLevel = clamp(value, -1, 1, initial.triggerLevel);
       else if (name === 'triggerEdge') controls.triggerEdge = value === 'falling' || value === 'off' ? value : 'rising';
+      else if (name === 'status') controls.status = value === 'loading' || value === 'waiting' || value === 'paused' || value === 'unavailable' || value === 'frozen' ? value : 'live';
       else if (name === 'frozen') controls.frozen = value === true;
       else return;
-      if (!controls.frozen && (name === 'frequencyHz' || name === 'amplitude' || name === 'frozen')) tick();
+      if (!controls.frozen && (name === 'frequencyHz' || name === 'amplitude' || name === 'frozen' || name === 'status')) tick();
       else project();
+      published.notify();
     },
     setOption(name, value) {
       if (destroyed) return;
@@ -370,7 +375,7 @@ function mountOscilloscopeDemo(host: HTMLElement): UiPresenterDemoHandle {
 }
 
 function mountTransientDemo(host: HTMLElement): UiPresenterDemoHandle {
-  const initial = {attackStrength: .32, sensitivity: .55, frozen: false};
+  const initial = {attackStrength: .32, sensitivity: .55, frozen: false, loading: false, waiting: false};
   let controls = {...initial};
   let sample: TransientAnalyzerSample | undefined;
   let history: TransientAnalyzerSample[] = [];
@@ -383,9 +388,10 @@ function mountTransientDemo(host: HTMLElement): UiPresenterDemoHandle {
   const view = host.ownerDocument.defaultView;
   const threshold = (): number => .08 + (1 - controls.sensitivity) * .28;
   const state = (): TransientAnalyzerState => ({
-    sample, history, sensitivity: controls.sensitivity, threshold: threshold(),
+    sample: controls.loading || controls.waiting ? undefined : sample, history, sensitivity: controls.sensitivity, threshold: threshold(),
     frozen: controls.frozen, hitCount, lastIntervalMs,
-    status: controls.frozen ? 'Frozen' : 'Live demo signal',
+    loading: controls.loading, waiting: controls.waiting,
+    status: controls.loading ? 'Loading demo source…' : controls.waiting ? 'Waiting for demo source…' : controls.frozen ? 'Frozen' : 'Live demo signal',
   });
   const clear = (): void => {
     sample = undefined;
@@ -410,7 +416,7 @@ function mountTransientDemo(host: HTMLElement): UiPresenterDemoHandle {
     onClear: clear,
   });
   const tick = (): void => {
-    if (destroyed || controls.frozen) return;
+    if (destroyed || controls.frozen || controls.loading || controls.waiting) return;
     frameIndex += 1;
     const cycle = Math.floor(frameIndex / 12);
     const attack = frameIndex % 12 === 0;
@@ -435,6 +441,7 @@ function mountTransientDemo(host: HTMLElement): UiPresenterDemoHandle {
       if (destroyed) return;
       if (name === 'attackStrength') controls.attackStrength = clamp(value, 0, 1, initial.attackStrength);
       else if (name === 'sensitivity') controls.sensitivity = clamp(value, 0, 1, initial.sensitivity);
+      else if (name === 'loading' || name === 'waiting') controls[name] = value === true;
       else if (name === 'frozen') controls.frozen = value === true;
       else return;
       presenter.update(state());

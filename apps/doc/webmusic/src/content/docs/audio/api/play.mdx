@@ -19,7 +19,7 @@ exist for bundlers and custom hosts that want exactly one seam.
 
 ## Load & decode
 
-Players take an `AudioClip`, not a file. Conversion lives in one place so the same parsed clip feeds a player, a mixer, an exporter, and a waveform view. `loadClip` accepts raw bytes, a `Blob`/`File`, or an already-decoded `AudioBuffer`; `loadClipFromUrl` fetches for decoded clips and skips the fetch when `streaming: true`. For bytes, an explicit `format` wins, followed by **magic bytes** (`detectAudioFormat`) and then a file hint. For URLs, an explicit `format` wins, followed by the **extension** (`formatFromExtension`) and then byte sniffing after fetch.
+Standalone players take an `AudioClip`; document playback borrows an `AudioDocumentSource`. Loading bytes remains explicit. Conversion lives in one place so the same parsed clip feeds a player, a mixer, an exporter, and a waveform view. `loadClip` accepts raw bytes, a `Blob`/`File`, or an already-decoded `AudioBuffer`; `loadClipFromUrl` fetches for decoded clips and skips the fetch when `streaming: true`. For bytes, an explicit `format` wins, followed by **magic bytes** (`detectAudioFormat`) and then a file hint. For URLs, an explicit `format` wins, followed by the **extension** (`formatFromExtension`) and then byte sniffing after fetch.
 
 ```ts
 import { loadClip, loadClipFromUrl, detectAudioFormat, formatFromExtension } from '@webmusic/audio/play';
@@ -72,7 +72,7 @@ const { sampleRate, channelData } = await decodeAudio(bytes, { context: ctx });
 
 ## WAV — the pure-JS byte core
 
-`parseWav` / `serializeWav` are a dependency-free RIFF/WAVE codec that runs in Node, workers, and the main thread alike — which is why WAV is the byte-level fast path for `decodeAudio` (native `decodeAudioData` is only reachable on a thread with an `AudioContext`). Reads 8/16/24/32-bit integer PCM and 32-bit IEEE float, any channel count; walks chunks by their RIFF size fields so `LIST` / `bext` metadata is skipped rather than misread.
+`parseWav` / `serializeWav` are a dependency-free RIFF/WAVE codec that runs in Node, workers, and the main thread alike — which is why WAV is the byte-level fast path for `decodeAudio` (native `decodeAudioData` is only reachable on a thread with an `AudioContext`). Reads 8/16/24/32-bit integer PCM and 32-bit IEEE float, any channel count; walks chunks by their RIFF size fields so `LIST` / `bext` metadata is skipped rather than misread. An odd-sized `data` chunk (for example 24-bit mono with an odd frame count) is followed by one zero RIFF pad byte, counted in the RIFF size but not in the `data` size; `clipToWav` and `clipToBlob` share this writer.
 
 ```ts
 import { parseWav, serializeWav, type DecodedWav } from '@webmusic/audio/play';
@@ -94,6 +94,59 @@ engines and the effect builders live on `@webmusic/audio/play/headless` and
 are documented one page each under
 [Headless › Play](/audio/headless/#play). This page documents the stateless
 half — decoding, loading, WAV bytes and the offline export.
+
+## Editable document playback
+
+The stable `AudioPlayer` also accepts `setDocumentSource(editor)` through Core's
+read-only `AudioDocumentSource`. Its sequence engine applies revisions without
+whole-output rendering or implicit context creation. It pauses on edits and
+exposes requested/applied identities, retry outcomes and the discriminated
+`AudioPlaybackSourceSnapshot` (`empty | clip | sequence`). A sequence has no fake
+`.clip`; use editor-aware waveform views and explicit
+[sequence rendering/export](#render-an-edited-sequence) for static PCM analysis or WAV bytes.
+See [document playback](/audio/headless/play/audio-player/#edited-sequence-playback)
+for the full resource limits, position mapping, loop and lifecycle contract.
+
+### Document revision observation
+
+The root `@webmusic/audio` exports the observation and result types
+that playback reports for a borrowed document. The document's `documentRevision`
+is distinct from the snapshot's playback publication `revision`; compare both
+document identity and revision before using playback frames against current
+document content.
+
+`AudioDocumentRevision` is `{documentId: string, documentRevision: number}`.
+`AudioDocumentPlaybackBinding` contains:
+
+| Member | Meaning |
+|---|---|
+| `status` | `empty`, `preparing`, `ready` or `error`. |
+| `attempt` | Application-attempt generation; retrying a revision creates another attempt. |
+| `requested` | Optional latest requested document identity/revision. |
+| `applied` | Optional last document identity/revision adopted by playback. |
+| `positionPolicy` | Optional `preserve-frame` or `reset-origin` policy used for application. |
+| `documentCoordinates` | True only for ready/current playback whose position maps back to the authored document; matching IDs alone do not establish this. |
+| `error` | Optional application failure. Edited content and the last applied playback snapshot remain distinct. |
+
+`AudioDocumentApplicationResult` reports `applied` with `target`, `attempt` and
+`positionPolicy`; `superseded` with optional `target` and `attempt`; or `failed`
+with optional `target`, `attempt` and `error`. These outcomes belong to the
+[player's wait/retry methods](/audio/headless/play/audio-player/#edited-sequence-playback).
+
+`AudioDocumentApplicationError` carries a readable message and `.code`:
+
+| Code | Raised when |
+|---|---|
+| `unknown-revision` | A wait target is malformed or names a document revision newer than the binding has observed. |
+| `not-ready` | Playback or a retry is requested before a revision is ready to apply, the document source is unavailable, or no sequence transport is available. |
+| `disposed` | The player or its binding has been disposed. |
+| `invalid-source` | `setDocumentSource()` or `.editor` receives a value that is not an `AudioDocumentSource`, or its `subscribe()` does not return an unsubscribe function. |
+| `invalid-snapshot` | A published snapshot is malformed, changes content without a new revision, or its sequence length disagrees with its segments. |
+| `source-conflict` | A document source is combined with an independent clip, transport, `src` or player. |
+
+The union also declares `document-disposed`; the current implementation does not
+raise it. A disposed editor returns the binding to `empty` without an error, and
+the Element reports `not-ready`.
 
 ## Export — render to WAV (and offline effects)
 
@@ -122,6 +175,33 @@ const wetBytes = clipToWav(wet);
 | `renderClipWithEffect(clip, effect, opts?)` | Offline-render through an effect → new clip (browser; `tailSeconds` for tails). |
 
 `ClipToWavOptions` is `{ bitDepth?: 16 | 24 | 32; float?: boolean }`.
+
+## Render an edited sequence
+
+`renderAudioSequence` and `exportAudioSequenceWav` turn an editable document's
+sequence and asset reader, such as an `AudioClipEditor` snapshot's `content` and
+`assets`, into PCM or WAV bytes. They create no audio context. The sequence,
+asset and editor contracts are documented under
+[View editable documents](/audio/api/view/#editable-documents).
+
+```ts
+import type {AudioDocumentSnapshot} from '@webmusic/audio';
+import {exportAudioSequenceWav} from '@webmusic/audio/play';
+
+declare const snapshot: AudioDocumentSnapshot; // e.g. editor.getSnapshot()
+const {content, assets} = snapshot;
+const wav = await exportAudioSequenceWav(content, assets, {bitDepth: 24});
+```
+
+| API / type | Contract |
+| --- | --- |
+| `renderAudioSequence(sequence, assets, options?)` | Promise of `RenderedAudioSequence`: sample rate, channel layout and caller-owned mutable channel arrays. Applies sequence gain, envelope and silence. |
+| `exportAudioSequenceWav(sequence, assets, options?)` | Promise of an `ArrayBuffer`; renders the selected range and encodes WAV. Default 16-bit integer PCM; 24/32-bit integer and 32-bit float supported. An odd-sized 24-bit data chunk is followed by one zero RIFF pad byte. Empty output is a valid header-only WAV. The file uses a plain 16-byte PCM or IEEE-float `fmt ` chunk, not `WAVE_FORMAT_EXTENSIBLE`, so channel count is preserved but `channelLayout` labels are not written; readers see the channels in layout order without speaker assignments. |
+| `AudioSequenceRenderOptions` | Optional `startFrame` (0), `endFrame` (sequence length), `maxBytes` (256 MiB), `chunkFrames` (65,536), `signal`. |
+| `AudioSequenceWavOptions` | Render options plus `bitDepth: 16 \| 24 \| 32` (16; a bare 32 is integer PCM), `float` (false; requires 32). Budget counts both float PCM and WAV output allocations, including a pad byte. |
+| `RenderedAudioSequence` | `{sampleRate, channelLayout, channelData}`; sample arrays are newly owned by the caller and do not expose retained source PCM. |
+
+Rendering retains source assets until completion/failure, performs bounded reads, yields between chunks and releases its lease on cancellation. Invalid ranges/options and excessive allocation fail before sample reads. Export rejects unsupported RIFF dimensions instead of overflowing header fields: a non-integer sample rate or format fields beyond their RIFF widths fail with `incompatible-audio-format`, and data beyond the 4 GiB RIFF size fails with `resource-limit`. No browser download is implicit. Saving an exported revision is an application choice: call `markSaved()` only if that content is still current.
 
 ## Decode worker — off the main thread
 
@@ -201,18 +281,21 @@ client and protocol also have dedicated subpaths in the
 | `decodeAudio`, `decodeAudioChunked` | Decode | Bytes → float channels (WAV pure-JS → native → WASM); chunked variant. |
 | `parseWav`, `serializeWav` | WAV | Dependency-free RIFF/WAVE decode / encode (8/16/24/32-bit, float). |
 | `clipToWav`, `clipToBlob`, `renderClipWithEffect` | Export | Clip → WAV bytes / Blob; offline-render through an effect. |
+| `renderAudioSequence`, `exportAudioSequenceWav` | Export | [Edited sequence → caller-owned PCM / WAV bytes](#render-an-edited-sequence). |
 | `createDecoderWorker` | Worker | Decode off the main thread (with in-process fallback). |
 | `handleDecodeRequest`, `transferablesOf`, `createRequestTracker` | Worker | Pure protocol pieces for hosting the handler yourself. |
 | `formatTime`, `parseLoopAttr` | UI helper | Transport-time formatting and `loop` attribute parsing (shared with custom UIs). |
 | `DEFAULT_MAX_INPUT_BYTES`, `DEFAULT_MAX_DECODED_FRAMES`, `DEFAULT_MAX_DECODED_BYTES`, `DEFAULT_MAX_CHANNELS`, `DEFAULT_REQUEST_TIMEOUT_MS` | Constants | Default resource ceilings: 128 MiB input, 30 million frames per channel, 256 MiB decoded PCM, 32 channels, and 30 seconds per request. |
 | `AudioResourceLimits`, `AudioFetchOptions` | Types | Size/cancellation limits and fetch timeout; `timeoutMs: 0` disables the fetch timeout. |
 | `PlayerLike`, `PlaybackEngine`, `MediaPlaybackAdapter`, `MediaPlaybackAdapterFactory` | Types | Structural player, engine and injected media-host contracts; see [Headless Play](/audio/headless/#play). |
+| `AudioPlayerOptions`, `AudioPlayerEvents`, `AudioPlayerSourceDetail`, `AudioPlayerTransport` | Types | Stable player controls/source observation; sequence chunk budget/read size and explicit borrowed transport capabilities. Core owns the document/binding/result/source snapshot types. |
 | `AudioClipPlayerOptions`, `AudioClipPlayerEvents`, `AudioScratchSession`, `PlayerTimeUpdate`, `PlayerEngineKind` | Types | Player option / event / engine and [scratch-session](/audio/headless/play/audio-clip-player/#scratch-sessions) shapes. |
 | `AudioMixerOptions`, `AudioMixerEvents`, `MixerMemberInit` | Types | Mixer option / event / member shapes. |
 | `AudioRecorderOptions`, `AudioRecorderEvents` | Types | Recorder option / event shapes. |
 | `BufferEngineOptions`, `MediaEngineOptions` | Types | Buffer and media engine options. |
 | `Effect`, `EffectNodes`, `GainOptions`, `FilterOptions`, `DelayOptions`, `CompressorOptions` | Types | Effect contract and built-in option shapes. |
 | `DecodedAudio`, `DecodeOptions`, `DecodedWav`, `WavBitDepth`, `LoadClipOptions`, `LoadClipFromUrlOptions`, `ClipToWavOptions` | Types | Decode / load / WAV / export option shapes. |
+| `AudioSequenceRenderOptions`, `AudioSequenceWavOptions`, `RenderedAudioSequence` | Types | [Sequence render/export options and result](#render-an-edited-sequence). |
 | `DecoderWorker`, `DecodedResult`, `DecoderRequestOptions`, `DecoderWorkerOptions`, `DecodeClipOptions`, `WorkerLike`, `RequestTracker`, `DecodeRequest`, `DecodeResponse`, `DecodeWorkerFormat` | Types | Decode-worker client and protocol shapes. |
 
 The playlist's runtime values and types, the meter controller, both engines,

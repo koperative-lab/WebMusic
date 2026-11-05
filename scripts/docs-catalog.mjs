@@ -3,7 +3,7 @@ import {execFileSync} from 'node:child_process';
 import {existsSync, lstatSync, readFileSync, writeFileSync} from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
-import {packageDirectories} from './package-policy.mjs';
+import {packageDirectories, requiredFeatureLayers} from './package-policy.mjs';
 import {elementCompositionPolicy} from './element-composition-policy.mjs';
 import {UI_COMPOSITION_CATALOG} from '../apps/doc/shared/ui-catalog.ts';
 import {UI_PRESENTER_CATALOG} from '../apps/doc/shared/ui-presenter-catalog.ts';
@@ -90,7 +90,8 @@ async function componentIndex(files) {
   const output = OUTPUTS[0];
   const params = {};
   for (const family of ['score', 'audio']) {
-    for (const capability of ['play', 'analyze', 'view']) {
+    for (const [capability, layers] of Object.entries(requiredFeatureLayers[`@webmusic/${family}`] ?? {})) {
+      if (!layers.element) continue;
       const file = path.join(ROOT, `apps/doc/webmusic/src/lib/params/${family}-${capability}.ts`);
       const module = await import(pathToFileURL(file).href);
       Object.assign(params, Object.values(module)[0]);
@@ -110,6 +111,7 @@ async function componentIndex(files) {
   ];
   for (const family of ['Score', 'Audio']) {
     for (const capability of ['Play', 'Analyze', 'View']) {
+      if (!UI_COMPOSITION_CATALOG.some((entry) => entry.family === family && entry.capability === capability)) continue;
       lines.push(`### ${family} / ${capability}`, '');
       for (const entry of UI_COMPOSITION_CATALOG.filter((e) => e.family === family && e.capability === capability)) {
         const policy = elementCompositionPolicy.find((e) => e.tag === entry.tag);
@@ -266,7 +268,23 @@ function markdownFileTargets(source) {
   return targets;
 }
 
-function fileLinkProblems(files, {readFile = read, targetExists = exists} = {}) {
+let publishable;
+function publishableTarget(file) {
+  // A file only an ignored local copy provides passes existsSync but is absent
+  // from every clean checkout and CI run, so links must reach published files,
+  // or directories containing at least one.
+  if (!publishable) {
+    const files = execFileSync('git', ['ls-files', '-co', '--exclude-standard', '-z'], {cwd: ROOT, encoding: 'utf8'})
+      .split('\0').filter(Boolean);
+    const directories = new Set(['.']);
+    for (const name of files) for (let index = name.indexOf('/'); index > 0; index = name.indexOf('/', index + 1)) directories.add(name.slice(0, index));
+    publishable = {files: new Set(files), directories};
+  }
+  const target = file.replace(/\/+$/, '') || '.';
+  return (publishable.files.has(target) || publishable.directories.has(target)) && existsSync(path.join(ROOT, target));
+}
+
+function fileLinkProblems(files, {readFile = read, targetExists = publishableTarget} = {}) {
   const failures = [];
   for (const file of files) {
     const source = currentLinkSource(file, readFile(file));
@@ -442,7 +460,13 @@ function runFileLinkProbes() {
     });
     assert.deepEqual(result, probe.expected, probe.name);
   }
-  return probes.length;
+  // `.git` exists in every checkout and is never published, so it proves the
+  // default check rejects present-but-unpublished targets.
+  assert(existsSync(path.join(ROOT, '.git')) && !publishableTarget('.git'), 'a present unpublished path is not a publishable link target');
+  assert(publishableTarget('AGENTS.md') && publishableTarget('dev/audits/'), 'published files and their directories are link targets');
+  assert.deepEqual(fileLinkProblems(['AGENTS.md'], {readFile: () => '[Local](.git)'}), ['AGENTS.md: missing local target .git'],
+    'the documentation check applies the publishable-target rule by default');
+  return probes.length + 3;
 }
 
 const probeCount = runFileLinkProbes();

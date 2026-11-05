@@ -60,7 +60,9 @@ That is the whole setup. To see what any attribute does to a live element, use t
 
 ## Four ways to drive it
 
-The element resolves exactly one source of music, in a fixed order of precedence. The first one present wins and the rest are ignored:
+Without an editor binding, the element uses the following legacy precedence.
+An assigned `.editor` is a separate exclusive mode: combining it with any source
+below is a source conflict.
 
 | Precedence | Source | What the element owns |
 | --- | --- | --- |
@@ -87,6 +89,67 @@ seconds, clamped to its own end. `seek(seconds)` uses that same axis.
 Member command coordination does not replace their separate Headless clocks
 with one shared clock.
 
+## Play an editable document
+
+Load an editor with [`loadScoreEditor`](/score/headless/view/score-editor/#load-from-a-url)
+(or create one with `createScoreEditor`) and assign it to `.editor` on the player
+and any views. No application revision-copying code is required:
+
+```html
+<score-player id="audition"></score-player>
+<score-grid-view player="#audition" editable></score-grid-view>
+<script type="module">
+  import {defineScorePlayerElement} from '@webmusic/score/play/element';
+  import {defineScoreGridViewElement} from '@webmusic/score/view/element';
+  import {loadScoreEditor} from '@webmusic/score/view/headless';
+  defineScorePlayerElement();
+  defineScoreGridViewElement();
+  const editor = await loadScoreEditor('/midi/Arabesque%20No.1.mid');
+  const player = /** @type {import('@webmusic/score/play/element').ScorePlayerElement | null} */ (document.querySelector('score-player'));
+  const view = /** @type {import('@webmusic/score/view/element').ScoreGridViewElement | null} */ (document.querySelector('score-grid-view'));
+  if (player) player.editor = editor;
+  if (view) view.editor = editor;
+</script>
+```
+
+`.editor` accepts any Core `ScoreDocumentSource`; there is no `editor`
+attribute. The player borrows the editor and never disposes it; assigning
+`undefined` detaches it. When you replace the document, assign the new editor
+and then dispose the previous one; dispose the last one after detaching it.
+
+Until its editor is ready, the player never falls back to `src`. A disposed or
+otherwise not-ready editor is pending: `.playback` reports `unavailable`
+readiness, `data-editor-state` is `disposed`, and the player joins when an
+assigned editor is ready. Pending state dispatches no `webscore:error`; `play()`
+and `seekNominal()` reject as `not-ready`, and void seeks report that rejection
+as a `seek` error. The host reflects `source-conflict`, `error` (a failed mount)
+or the binding status as `data-editor-state`, and removes it when `.editor` is
+undefined.
+
+`.editor` conflicts with `.score`, `src` (even empty), `.rack`, a nested Rack or
+`.controller`. Conflicting property writes throw before changing configuration.
+A conflicting attribute retains the mounted engine but rejects play and seek
+commands until corrected. A conflicting source property assigned before the tag
+was registered cannot be rejected; it keeps its value and shows the same
+conflict. A failed mount reports `error`; assigning the next editor mounts again.
+
+An edit pauses and prepares the new revision in the same native engine. It
+stays paused after successful application; press Play again to audition it. A
+stopped or ended transport keeps that state. Each applied revision publishes one
+`webscore:timeupdate` for its mapped, clamped or reset position, and a
+whole-piece `loop` is re-applied to the edited extent.
+`.documentBinding` and `webscore:documentstatechange` expose `empty`, `preparing`,
+`ready` and `error`, with separate requested/applied identities. `.playback` contains
+only applied document identity and rejects playing an outdated revision.
+`waitForDocumentRevision(target)` and `retryDocumentApplication()` return the
+native [application outcomes](/score/headless/play/score-player/#apply-document-revisions).
+They await an in-progress Element mount; disconnect or source replacement
+supersedes that wait. Without an editor input, `.documentBinding` is `undefined`.
+
+The [shared editing demo](/score/element/view/score-view/#follow-an-editor)
+combines import, grid editing, undo, audition and MIDI export. Audio resource property
+changes still rebuild the engine; ordinary document commits preserve it.
+
 ## Share data and state with companions
 
 `.playback` is the stable [ScorePlaybackSource](/score/api/#shared-playback-observation)
@@ -105,8 +168,8 @@ Companions can borrow that data without repeating `src`:
 ```
 
 Register each tag through its owning `/element` entry. A follower borrows the
-player and never disposes it. Native replacement releases the previous owner before loading the next. Loading
-and failure have explicit readiness and no committed Score; failure is not
+player and never disposes it. Static-source replacement releases the previous owner before loading the next. Loading
+and failure in that mode have explicit readiness and no committed Score; failure is not
 successful empty data. Source revisions change when the committed owner
 changes, including teardown; callbacks from old owners cannot restore them.
 
@@ -118,7 +181,7 @@ readiness and revision changes through the nonvisual contract.
 
 The element is careful about what it disposes, because most of what it plays through belongs to somebody else:
 
-- **Borrowed.** `.controller`, `.rack`, `.sound`, `.audioContext` and `.destination` remain caller-owned. A nested desk owns its automatically created Rack. Unmounting the player's Rack transport stops its playback but does not dispose the Rack; borrowed controller mode only releases the UI binding.
+- **Borrowed.** `.editor`, `.controller`, `.rack`, `.sound`, `.audioContext` and `.destination` remain caller-owned. A nested desk owns its automatically created Rack. Unmounting the player's Rack transport stops its playback but does not dispose the Rack; borrowed controller mode only releases the UI binding.
 - **Owned.** Native player engines, mounted controls and resources created by the element are released on teardown. A SoundFont synth/context pair is cached against its template while mounted, then disposed by its owner. Scores are immutable data, not disposable engines.
 - **Native settings survive a remount.** Stored `rate`, `volume`, `pan` and `loop` values are applied when a native player mounts. They do not reconfigure Rack members. Controller mounting preserves the owner's settings; an explicit `.rate` write delegates to `controller.setRate()`.
 
@@ -169,6 +232,9 @@ The source attributes are read only while a source is being resolved; assigning 
 
 | Member | Kind | Default | Description |
 | --- | --- | --- | --- |
+| `.editor` | Core source property | — | Exclusive document source. Assign an editor from `loadScoreEditor`/`createScoreEditor`; borrowed, never disposed. `undefined` detaches it. There is no `editor` attribute. |
+| `.documentBinding` | read-only property | `undefined` without an editor input | Requested/applied revisions and attempt state; no source ownership. In editor mode, `empty` until a native player mounts and `error` for a source conflict or a failed mount. |
+| `waitForDocumentRevision(target)` / `retryDocumentApplication()` | methods | tagged outcome Promise | Wait for a known revision or explicitly retry preparation. |
 | `src` | attribute | — | URL of a MIDI / MusicXML / MXL / ABC file. Optional when a source property is assigned. |
 | `format` | attribute | extension, else byte sniff | Force `midi` / `mxl` / `musicxml` / `abc`. Passed through unvalidated; an unsupported value fails the load. |
 | `sound-font` | attribute | the built-in oscillator synth | Sample URL template containing `{midi}`, one file per note (`/sf/{midi}.mp3`). A template without `{midi}` is ignored, as is any value once `.sound` is set. |
@@ -190,7 +256,7 @@ The source attributes are read only while a source is being resolved; assigning 
 | `rate` / `.rate` | attribute + property | `1` | Native playback speed, applied live; non-finite or non-positive values fall back to `1`. Explicit `.rate` writes also reach a borrowed controller. Inert for Rack members. |
 | `volume` / `.volume` | attribute + property | `1` | Native linear volume, applied live and clamped to `>= 0`. Rack mixing belongs to `<score-rack-control>`; inert in Rack/controller mode. |
 | `pan` / `.pan` | attribute + property | `0` | Native stereo pan, applied live and clamped to `[-1, 1]`. Inert in Rack/controller mode. |
-| `loop` / `.loop` | attribute + property | `false` | Native whole-piece looping. A bare `loop` is on; `loop="false"` (also `0` / `no` / `off`) is off. Inert in Rack/controller mode. |
+| `loop` / `.loop` | attribute + property | `false` | Native whole-piece looping. A bare `loop` is on; `loop="false"` (also `0` / `no` / `off`) is off. In editor mode it is re-applied to each applied revision's full extent. Inert in Rack/controller mode. |
 | `time-control` | attribute | `off` | Add the clock to the chrome: `simple` is the elapsed time (`0:12`), `full` adds the total (`0:12 / 3:40`). Works in every mode. |
 | `volume-control` | attribute | `off` | Add a volume control to the chrome, as a horizontal `fader` or a rotary `knob`. Either moves the same knob `volume` sets, and needs the element's own engine, so both are inert in `.rack` and `.controller` mode. |
 | `.currentTime` | property (read-only) | `0` | Live transport seconds from the native player, borrowed controller or longest built Rack member. |
@@ -224,17 +290,20 @@ native note/state/navigation events are non-composed.
 
 | Event | Detail | Fires when |
 | --- | --- | --- |
+| `webscore:documentstatechange` | `ScoreDocumentPlaybackBinding` | Document preparation, failure or application state changes; bubbles and is composed. |
 | `webscore:noteon` | `{ midi, startTime }` | A note starts. `startTime` is its onset in nominal score seconds, which is what a bound view matches on. |
 | `webscore:noteoff` | `{ midi, startTime }` | The same note releases. |
-| `webscore:timeupdate` | `{ nominalSeconds, transportSeconds, transportDurationSeconds, progress, rate, playing }` | Every cursor tick, and once per seek. `seconds` and `duration` are deprecated aliases of `nominalSeconds` and `transportDurationSeconds` — two different domains, so never pair them. |
+| `webscore:timeupdate` | `{ nominalSeconds, transportSeconds, transportDurationSeconds, progress, rate, playing }` | Every cursor tick, once per seek, and once per applied document revision. `seconds` and `duration` are deprecated aliases of `nominalSeconds` and `transportDurationSeconds` — two different domains, so never pair them. |
 | `webscore:scorechange` | `{score: Score \| undefined}` | The mounted native score is cleared or replaced. |
 | `webscore:statechange` | `ScorePlayerPlaybackSnapshot` | A native engine mounts, changes playback state/settings, or receives explicit navigation. |
 | `webscore:seek` | none | A non-controller `seek`, `seekNominal` or `seekFraction` command is issued, or the native seek bar commits pointer/keyboard navigation; read the current snapshot for units and position. |
 | `webscore:stop` | none | A non-controller stop command is issued. |
 | `webscore:end` | — | The piece finished playing. |
-| `webscore:error` | `{operation: 'seek' \| 'playback', error}` | `seek` reports asynchronous native failures from void seek commands; `playback` reports mounted playback/controller errors, including Rack transport failures. |
+| `webscore:error` | `{operation: 'seek' \| 'playback', error}` | `seek` reports asynchronous native failures and declaration source errors from void seek commands; `playback` reports mounted playback/controller errors, including Rack transport failures, and editor source conflicts. A pending editor is not an error. |
 
 **Subclassing.** `ScorePlayerElement` is exported from `/element` without registering a tag, and exposes protected seams for the two things a custom player usually needs to change: which UI is mounted (`mountScore()`, `mountRack()`, `mountController()`, and `replaceHandle()` to swap one safely) and where the music comes from (`resolveScore()`, `buildSynth()`). `render()` and `teardown()` bracket the whole lifecycle if you need to wrap it.
+
+Pending score loading displays the shared square loading animation; no source displays the quieter square waiting animation. Both retain screen-reader status text and respect reduced-motion preferences. Source and mount failures show a visible error message while retaining lifecycle error reporting. A successful mount replaces the status with transport controls; source replacement and disconnect release the previous status without removing authored child elements or disposing borrowed playback resources.
 
 For direct `mountPresetPlayer(score, host, options)` integration, the optional
 `PresetPlayerOptions.onSeek` callback reports native seek-bar navigation. The
@@ -262,6 +331,9 @@ UIKit owns the wrapping layout and inline control geometry. The facade also
 mounts UIKit's shared `transportStateStyle` for keyboard focus and disabled
 feedback, including volume faders and knobs. That style node survives chrome
 changes and is removed with the mounted transport.
+
+[Status](/uikit/layout-feedback/status/) owns loading, waiting and source-error
+appearance through the shared status tokens and public parts.
 
 Set `--wm-component-background: transparent`, `--wm-component-border: none`
 and `--wm-component-radius: 12px` to style the outer surface. Use

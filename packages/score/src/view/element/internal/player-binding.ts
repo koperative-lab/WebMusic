@@ -32,6 +32,8 @@ export interface ViewPlayerHandlers {
   /** Reuse a code-only follower's native snapshot projection instead of note-event diffing. */
   playbackSnapshot?(snapshot: ScorePlaybackSnapshot): void;
   targetChanged?(target: Element | undefined): void;
+  /** Source readiness can change before score data or time becomes available. */
+  readinessChanged?(snapshot: ScorePlaybackSnapshot): void;
   scoreChanged?(score: Score | undefined): void;
   /** Clear live projections when their owner or its musical position changes. */
   reset?(): void;
@@ -245,6 +247,10 @@ export function bindViewPlayer(
         const valid = () => current() && serial === nativeSerial;
         const before = nativeState;
         nativeState = state;
+        if (before?.readiness !== state.readiness || before?.error !== state.error) {
+          handlers.readinessChanged?.(state);
+          if (!valid()) return;
+        }
         host.setAttribute?.('data-player-state', state.readiness);
 
         if (!valid()) return;

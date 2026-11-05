@@ -1,0 +1,54 @@
+import {describe, expect, it} from 'vitest';
+import {createAudioClip, createAudioSequence, createMemoryAudioAssetStore} from '../../src/core';
+import {createAudioClipEditor} from '../../src/edit/headless';
+function setup() {
+  const store = createMemoryAudioAssetStore();
+  const imported = store.registerClip(createAudioClip({sampleRate: 8000, channelData: [new Float32Array(8)]}), {id: 'a'});
+  let serial = 0;
+  let onDraftRelease: (() => void) | undefined;
+  const assets = {...store, retain(ids: readonly string[]) {
+    const lease = store.retain(ids), id = ++serial;
+    return {assetIds: lease.assetIds, get released() { return lease.released; }, release() {
+      lease.release();
+      if (id === 2) { const callback = onDraftRelease; onDraftRelease = undefined; callback?.(); }
+    }};
+  }};
+  const content = createAudioSequence({sampleRate: 8000, channelLayout: ['mono'], segments: [{kind: 'asset', id: 's', assetId: 'a', sourceStart: 0, sourceEnd: 8}]}, assets);
+  const editor = createAudioClipEditor(content, {assets, history: false}); imported.release();
+  const session = editor.createInteractionSession();
+  expect(session.preview([{type: 'set-gain', segmentIds: ['s'], gain: .5}]).status).toBe('preview');
+  return {editor, session, store, arm(callback: () => void) { onDraftRelease = callback; }};
+}
+describe('temporary release review', () => {
+  it('does not retain a new draft after retiring the old lease disposes the session', () => {
+    const {editor, session, store, arm} = setup();
+    arm(() => session.dispose());
+    const result = session.preview([{type: 'set-gain', segmentIds: ['s'], gain: .25}]);
+    expect(result).toMatchObject({status: 'failed', error: {code: 'disposed'}});
+    session.dispose(); editor.dispose();
+    console.log('after-cleanup', store.getStats(), 'disposed', session.getSnapshot().disposed, 'draft', !!session.getSnapshot().draft);
+    expect(store.getStats()).toEqual({assets: 0, bytes: 0, leases: 0});
+    expect(session.getSnapshot().draft).toBeUndefined();
+  });
+  it('keeps a session disposed when invalidating its draft releases an adapter', () => {
+    const {editor, session, store, arm} = setup();
+    arm(() => editor.dispose());
+    const base = editor.getSnapshot();
+    const result = editor.execute({version: 1, documentId: base.documentId, expectedRevision: base.documentRevision, label: 'Gain', operations: [{type: 'set-gain', segmentIds: ['s'], gain: .75}]});
+    console.log('commit', result.status, 'editor', editor.getSnapshot().status, 'session', session.getSnapshot().disposed, store.getStats());
+    expect(result.status).toBe('committed');
+    expect(editor.getSnapshot().status).toBe('disposed');
+    expect(session.getSnapshot().disposed).toBe(true);
+  });
+  it('does not orphan a nested preview lease during old draft retirement', () => {
+    const {editor, session, store, arm} = setup();
+    let nested: unknown;
+    arm(() => { nested = session.preview([{type: 'set-gain', segmentIds: ['s'], gain: .125}]); });
+    const result = session.preview([{type: 'set-gain', segmentIds: ['s'], gain: .25}]);
+    console.log('outer', result.status, 'nested', (nested as {status: string}).status);
+    session.dispose(); editor.dispose();
+    console.log('nested-after-cleanup', store.getStats());
+    expect(store.getStats()).toEqual({assets: 0, bytes: 0, leases: 0});
+  });
+
+});

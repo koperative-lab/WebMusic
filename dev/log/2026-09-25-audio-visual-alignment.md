@@ -39,7 +39,7 @@ remaining blue meter/selection defaults in UIKit.
 
 ## Browser evidence
 
-Used the Codex in-app browser, canonical Score player / Audio View / Audio
+Used the embedded Chromium browser, canonical Score player / Audio View / Audio
 Minimap pages, the existing audio fixture, and a temporary local theme fixture.
 The temporary page was removed after acceptance; no extra public route ships.
 

@@ -2,7 +2,7 @@
 
 import {afterEach, describe, expect, it} from 'vitest';
 import {Duration, Pitch, Rational, ScoreBuilder, VoiceId, type Score} from '../../src/core';
-import {ChordAnalysisElement, LiveChordAnalysisElement} from '../../src/analyze/element/index';
+import {ChordAnalysisElement} from '../../src/analyze/element/index';
 
 // ---------------------------------------------------------------------------
 // A real document, real custom elements, real CSSOM — the harness this
@@ -50,12 +50,12 @@ let nextTag = 0;
 /** Register one element class under a unique tag. */
 function define(ctor: CustomElementConstructor): string {
   const tag = `webscore-analysis-${nextTag++}`;
-  customElements.define(tag, ctor);
+  customElements.define(tag, class extends ctor {});
   return tag;
 }
 
 const CHORDS = define(ChordAnalysisElement);
-const LIVE_CHORD = define(LiveChordAnalysisElement);
+const LIVE_CHORD = define(ChordAnalysisElement);
 
 /**
  * All text in a rendered subtree, one text node at a time. Joined with a space
@@ -91,12 +91,13 @@ interface PlayerRoot {
  * fires on itself is recorded **and** really dispatched, so `dispatched` is a
  * complete log, including the intermediate readings emitted as notes arrive.
  */
-function createHost<T extends ChordAnalysisElement | LiveChordAnalysisElement>(
+function createHost<T extends ChordAnalysisElement>(
   tag: string,
   attrs: Record<string, string> = {},
   root?: PlayerRoot,
 ) {
   const el = document.createElement(tag) as unknown as T;
+  if (tag === LIVE_CHORD) el.mode = 'live';
   for (const [name, value] of Object.entries(attrs)) el.setAttribute(name, value);
   if (root) (el as unknown as {getRootNode: () => PlayerRoot}).getRootNode = () => root;
   const dispatched: Array<{type: string; detail: unknown}> = [];
@@ -179,10 +180,10 @@ describe('focused Analyze displays', () => {
 
 });
 
-describe('<score-live-chord-analysis> (dynamic, player-bound)', () => {
+describe('<score-chord-analysis mode="live"> (dynamic, player-bound)', () => {
   function liveHost() {
     const player = stubPlayer();
-    const host = createHost<LiveChordAnalysisElement>(
+    const host = createHost<ChordAnalysisElement>(
       LIVE_CHORD,
       {player: '#p'},
       {querySelector: (sel) => (sel === '#p' ? player : null)},
@@ -198,6 +199,7 @@ describe('<score-live-chord-analysis> (dynamic, player-bound)', () => {
     const caption = host.el.querySelector<HTMLElement>('.wui-harmony-nameplate__caption');
     expect(caption?.hidden).toBe(true);
     expect(caption?.textContent).toBe('');
+    expect(host.el.querySelector('.wui-harmony-nameplate')?.hasAttribute('data-caption')).toBe(false);
     expect(host.el.querySelector('.wui-harmony-nameplate__empty')?.textContent).toBe('—');
     expect(host.el.chord).toBeUndefined();
     expect(host.text()).toContain('—');
@@ -209,7 +211,7 @@ describe('<score-live-chord-analysis> (dynamic, player-bound)', () => {
     await flush();
 
     for (const midi of [60, 64, 67]) player.emit('webscore:noteon', {midi}); // C E G
-    expect(host.text()).toContain('CM');
+    expect(host.text()).toContain('C');
     expect(host.text()).toContain('C4');
     expect(host.text()).toContain('G4');
 
@@ -225,7 +227,7 @@ describe('<score-live-chord-analysis> (dynamic, player-bound)', () => {
     expect(host.el.querySelector('.wui-harmony-nameplate__symbol')).not.toBeNull();
     expect(host.el.querySelector('.wui-pitch-keyboard, .wui-pitch-staff, .wui-pitch-fretboard, .wui-harmony-flow')).toBeNull();
     for (const midi of [60, 64, 67]) player.emit('webscore:noteon', {midi});
-    expect(host.el.querySelector('.wui-harmony-nameplate__symbol')?.textContent).toBe('CM');
+    expect(host.el.querySelector('.wui-harmony-nameplate__symbol')?.textContent).toBe('C');
     expect(host.el.querySelector('.wui-harmony-nameplate__voicing')?.textContent).toContain('C4');
   });
 
@@ -240,7 +242,11 @@ describe('<score-live-chord-analysis> (dynamic, player-bound)', () => {
 
     player.emit('webscore:noteon', {midi: 69});
     player.emit('webscore:noteon', {midi: 81});
-    expect(symbol.textContent).toBe('A4 · A5');
+    expect(symbol.textContent).toBe('');
+    expect(host.el.querySelector('.wui-harmony-nameplate__voicing')?.textContent).toBe('A4  A5');
+    expect(host.el.querySelector('.wui-harmony-nameplate__caption')?.textContent).toBe('');
+    expect(symbol.parentElement?.style.gridRow).toBe('1');
+    expect(host.el.querySelector<HTMLElement>('.wui-harmony-nameplate__voicing')?.style.gridRow).toBe('2');
     expect(host.el.chord).toBeUndefined();
     expect(plate.dataset.reading).toBe('notes');
     expect(getComputedStyle(plate).height).toBe(height);
@@ -248,7 +254,7 @@ describe('<score-live-chord-analysis> (dynamic, player-bound)', () => {
     player.emit('webscore:noteoff', {midi: 69});
     player.emit('webscore:noteoff', {midi: 81});
     for (const midi of [60, 64, 67]) player.emit('webscore:noteon', {midi});
-    expect(symbol.textContent).toBe('CM');
+    expect(symbol.textContent).toBe('C');
     expect(plate.dataset.reading).toBe('chord');
     expect(getComputedStyle(plate).height).toBe(height);
 
@@ -270,7 +276,7 @@ describe('<score-live-chord-analysis> (dynamic, player-bound)', () => {
     const changes = host.dispatched.filter((event) => event.type === 'webscore:chordchange');
     expect(changes).toHaveLength(1);
     const last = changes[changes.length - 1]!.detail as {chord: string; midis: number[]};
-    expect(last.chord).toBe('CM');
+    expect(last.chord).toBe('C');
     expect(last.midis).toEqual([60, 64, 67]);
   });
 
@@ -295,7 +301,7 @@ describe('live chord player ownership', () => {
   it('live-chord-analysis drops sounding notes when the player selector changes', async () => {
     const playerA = stubPlayer();
     const playerB = stubPlayer();
-    const host = createHost<LiveChordAnalysisElement>(
+    const host = createHost<ChordAnalysisElement>(
       LIVE_CHORD,
       {player: '#a'},
       {
@@ -307,7 +313,7 @@ describe('live chord player ownership', () => {
     await flush();
 
     for (const midi of [60, 64, 67]) playerA.emit('webscore:noteon', {midi});
-    expect(host.text()).toContain('CM');
+    expect(host.text()).toContain('C');
 
     host.setAttribute('player', '#b');
     await flush();
@@ -388,7 +394,7 @@ describe('analysis player lookup scope', () => {
     for (const midi of [60, 64, 67]) {
       player.dispatchEvent(new CustomEvent('webscore:noteon', {detail: {midi}}));
     }
-    expect(el.textContent).toContain('CM');
+    expect(el.textContent).toContain('C');
     outer.remove();
   });
 });

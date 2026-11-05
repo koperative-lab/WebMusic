@@ -44,6 +44,13 @@ When both `effects` and `eq` are active their audio is spliced into one serial c
 behind the shared `.input` / `.output`. The demo pairs a piano `<score-note-input>` with the panel
 and exposes each property group through external Parameters.
 
+Unconfigured sound and macro sections, and effects/EQ sections without their required
+graph configuration, show the shared outlined-square waiting animation. Assigning their
+properties replaces the indicator with the configured controls. Envelope and LFO editors
+remain immediately usable with their defaults; they do not wait for sound or a held note.
+Status descriptions remain available to assistive technology, and reduced motion uses a
+static square.
+
 ## Try every property
 
 The demo is a real `<score-note-input>` and `<score-synth-panel>` composition. Play the keyboard, then edit the
@@ -271,33 +278,37 @@ panel.macros = [{ label: 'OPEN', targets: [
 <summary>Styling</summary>
 
 The host fills its container and can shrink inside flex/grid layouts; the native `hidden`
-attribute hides it. The shared section panel provides spacing without an additional outer frame.
-Parameter groups and macro readouts wrap; envelope and EQ values occupy rows below their plots.
-The plot-height tokens control the SVG only, so the component grows to include its readouts.
+attribute hides it. The panel draws the component's one outer frame, a 1px hairline in the line
+colour (`--wm-control-border`, then `--wm-border`, then `light-dark(#d8d8d8, #333)`), with no outer
+padding. Sections carry their own `.6rem` inset and are divided by hairlines; parameter groups,
+macro items and the EQ, envelope and LFO presenters mounted inside leave their own frames to the
+panel. Parameter groups and macro readouts wrap; envelope and EQ values occupy rows below their
+plots. The plot-height tokens control the SVG only, so the component grows to include its readouts.
 
-Use `--wm-component-background: transparent` and `--wm-component-radius: 12px`
-for the panel/section surfaces, and `--wm-control-radius` for controls. Graph
-backgrounds are separate: set `--wm-envelope-background`, `--wm-eq-background`
-and `--wm-lfo-wave-background` (or their legacy `--synth-graph-bg` override)
-to `transparent`. Set `--wm-foreground-on-inverse` for readable graph ink on a
-custom dark surface. Graphs keep their inverse background and ink when only
-`--wm-surface` or `--wm-foreground` changes. Readouts below the plots use
-`--wm-foreground-muted`, then `--wm-foreground`, on the section surface.
-Specific presenter tokens and legacy overrides remain available for independent sections.
+Plots share the panel surface: the envelope, EQ and LFO graphs default to `--wm-surface` with
+`--wm-foreground` ink, and the LFO phase head is ink. Readouts below the plots use
+`--wm-foreground-muted`. To invert the graphs, set `--wm-envelope-background`, `--wm-eq-background`
+and `--wm-lfo-wave-background` with their curve tokens, or the legacy `--synth-graph-bg` and
+`--synth-graph` overrides together. Use `--wm-component-background`, `--wm-component-border` and
+`--wm-component-radius` for the panel surface, and `--wm-control-radius` for controls. Specific
+presenter tokens and legacy overrides remain available for independent sections.
 
 ```css
 score-synth-panel {
-  --synth-bg: var(--wm-surface, #fff);
-  --wm-parameter-size: 46px;
-  --wm-parameter-track: #dcdcdc; /* knob arc */
-  --wm-parameter-fill: #999;     /* active arc */
-  --wm-parameter-pointer: #111;  /* pointer */
-  --synth-graph-bg: #111;     /* envelope / EQ / LFO graphs */
-  --synth-graph: #fff;
-  --synth-accent: #c0392b;    /* LFO playhead */
+  --wm-parameter-size: 3rem;                       /* knob diameter */
+  --wm-parameter-track: light-dark(#dcdcdc, #333); /* knob arc */
+  --wm-parameter-pointer: light-dark(#111, #eee);  /* pointer */
+  /* Optional: invert the envelope, EQ and LFO graphs */
+  --synth-graph-bg: light-dark(#111, #eee);
+  --synth-graph: light-dark(#fff, #111);
+  --synth-graph-grid: light-dark(#333, #ccc);
+  --synth-graph-fill: light-dark(#222, #ddd);
+  --synth-accent: light-dark(#fff, #111);          /* LFO phase head */
   --synth-radius: 0;
 }
 ```
+
+Waiting sections expose `synth-status`, `synth-status-indicator` and `synth-status-message` parts and inherit the shared `--wm-status-*` tokens.
 
 The shared envelope and LFO sections expose the same stable parts as their standalone presenters.
 Envelope exposes `root`, `svg`, `grid`, `area`, `curve`, `handle`, `readout`, `inputs` and `input`;
@@ -311,8 +322,11 @@ where they map onto the shared presenters. Outer boxes first read their
 The Element supplies no default legacy values: without an explicit override, the relevant
 `--wm-panel-*`, `--wm-envelope-*`, `--wm-eq-*` and `--wm-lfo-*` tokens apply, followed by
 their shared UIKit tokens and built-in fallbacks. Parameter and macro controls use their
-`--wm-parameter-*` and `--wm-macro-*` tokens directly. The panel and LFO section omit an
-extra frame by default; panel border and padding can be set with `--wm-panel-border` and
-`--wm-panel-padding`.
+`--wm-parameter-*` and `--wm-macro-*` tokens directly; inside the panel, the parameter rack, macro
+rack, envelope and EQ boxes read `--wm-parameter-surface-*`, `--wm-macro-rack-surface-*`,
+`--wm-envelope-surface-*` and `--wm-eq-surface-*` (padding, border, radius, background), which
+default to no frame. Section and macro-item dividers use `--synth-box-border`, then the line
+colour. Panel border, padding and section gap can be set with `--wm-panel-border`,
+`--wm-panel-padding` and `--wm-panel-gap` (default `0`).
 
 </details>

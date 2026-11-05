@@ -37,5 +37,5 @@ export function mountWaterfallKeyboardDemo(root: HTMLElement, scope: DemoScope):
   scope.add(mountQuickStartStatus(player, status));
   scope.run(loadArabesqueScore().then((score) => {
     if (scope.active) player.score = arabesqueExcerpt(score, 16);
-  }), () => { status.textContent = 'Could not load Arabesque No. 1.'; });
+  }), () => { status.textContent = 'Could not load Arabesque No. 1.'; status.dataset.error = ''; });
 }

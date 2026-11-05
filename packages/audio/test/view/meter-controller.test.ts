@@ -130,3 +130,160 @@ describe('AudioMeterController', () => {
     expect(() => empty.readSpectrum()).toThrow('has been disposed');
   });
 });
+
+describe('AudioMeterController float reads and stereo branch', () => {
+  interface StereoFixture {
+    context: BaseAudioContext;
+    analyser: FakeAnalyser & {
+      getFloatTimeDomainData: ReturnType<typeof vi.fn>;
+      getFloatFrequencyData: ReturnType<typeof vi.fn>;
+      context: unknown;
+      minDecibels: number;
+      maxDecibels: number;
+    };
+    gains: Array<FakeNode & {channelCount?: number; channelCountMode?: string; channelInterpretation?: string}>;
+    splitters: FakeNode[];
+    analysers: Array<FakeAnalyser & {getFloatTimeDomainData: ReturnType<typeof vi.fn>}>;
+  }
+
+  function stereoFixture(): StereoFixture {
+    const gains: StereoFixture['gains'] = [];
+    const splitters: FakeNode[] = [];
+    const analysers: StereoFixture['analysers'] = [];
+    const context = {
+      sampleRate: 48_000,
+      createGain: vi.fn(() => {
+        const gain = node();
+        gains.push(gain);
+        return gain;
+      }),
+      createChannelSplitter: vi.fn(() => {
+        const splitter = node();
+        splitters.push(splitter);
+        return splitter;
+      }),
+      createAnalyser: vi.fn(() => {
+        const channel = analysers.length;
+        const created = {
+          ...analyser(),
+          getFloatTimeDomainData: vi.fn((buffer: Float32Array) => buffer.fill(channel === 0 ? 0.25 : -0.25)),
+        };
+        analysers.push(created);
+        return created;
+      }),
+    } as unknown as BaseAudioContext;
+    const borrowed = {
+      ...analyser(),
+      fftSize: 8,
+      frequencyBinCount: 4,
+      minDecibels: -90,
+      maxDecibels: -20,
+      context,
+      getByteFrequencyData: vi.fn((buffer: Uint8Array) => buffer.fill(128)),
+      getFloatTimeDomainData: vi.fn((buffer: Float32Array) => buffer.set([0, 0.5, 0, -0.5, 0, 0.5, 0, -0.5])),
+      getFloatFrequencyData: vi.fn((buffer: Float32Array) => buffer.set([-100, -60, -40, -80])),
+    };
+    return {context, analyser: borrowed, gains, splitters, analysers};
+  }
+
+  it('reads float windows into reused scratch buffers and reports the frequency grid', () => {
+    const fixture = stereoFixture();
+    const controller = new AudioMeterController({analyser: fixture.analyser as unknown as AnalyserNode});
+    expect(controller.sampleRate).toBe(48_000);
+    expect(controller.frequencyInfo).toEqual({sampleRate: 48_000, frequencyBinCount: 4, minDecibels: -90, maxDecibels: -20});
+    const time = controller.readTimeDomain();
+    expect(Array.from(time)).toEqual([0, 0.5, 0, -0.5, 0, 0.5, 0, -0.5]);
+    expect(controller.readTimeDomain()).toBe(time);
+    const frequency = controller.readFrequency();
+    expect(frequency).toHaveLength(4);
+    expect(frequency[0]).toBeCloseTo(128 / 255);
+    expect(controller.readFrequency()).toBe(frequency);
+    expect(Array.from(controller.readFrequencyDecibels())).toEqual([-100, -60, -40, -80]);
+    expect(controller.stereo).toBe(false);
+    expect(controller.readStereo()).toBeUndefined();
+    controller.dispose();
+    expect(() => controller.readTimeDomain()).toThrow('no analyser');
+    expect(new AudioMeterController().frequencyInfo).toBeUndefined();
+    expect(new AudioMeterController().attachStereo()).toBe(false);
+  });
+
+  it('adds one output edge to a borrowed analyser for the stereo branch and removes only that edge', () => {
+    const fixture = stereoFixture();
+    const controller = new AudioMeterController({analyser: fixture.analyser as unknown as AnalyserNode});
+    expect(controller.attachStereo()).toBe(true);
+    expect(controller.attachStereo()).toBe(true);
+    expect(controller.stereo).toBe(true);
+    expect(fixture.gains).toHaveLength(1);
+    expect(fixture.splitters).toHaveLength(1);
+    expect(fixture.analysers).toHaveLength(2);
+    const [fanOut] = fixture.gains;
+    expect(fanOut!.channelCount).toBe(2);
+    expect(fanOut!.channelCountMode).toBe('explicit');
+    expect(fanOut!.channelInterpretation).toBe('speakers');
+    expect(fixture.analyser.connect).toHaveBeenCalledWith(fanOut);
+    expect(fanOut!.connect).toHaveBeenCalledWith(fixture.splitters[0]);
+    expect(fixture.splitters[0]!.connect).toHaveBeenCalledWith(fixture.analysers[0], 0);
+    expect(fixture.splitters[0]!.connect).toHaveBeenCalledWith(fixture.analysers[1], 1);
+    expect(fixture.analysers.every((channel) => channel.fftSize === 8 && channel.smoothingTimeConstant === 0)).toBe(true);
+
+    const frame = controller.readStereo()!;
+    expect(Array.from(frame.left)).toEqual(new Array(8).fill(0.25));
+    expect(Array.from(frame.right)).toEqual(new Array(8).fill(-0.25));
+    expect(controller.readStereo()!.left).toBe(frame.left);
+
+    controller.releaseStereo();
+    expect(controller.stereo).toBe(false);
+    expect(fixture.analyser.disconnect).toHaveBeenCalledTimes(1);
+    expect(fixture.analyser.disconnect).toHaveBeenCalledWith(fanOut);
+    expect(fanOut!.disconnect).toHaveBeenCalledOnce();
+    expect(fixture.splitters[0]!.disconnect).toHaveBeenCalledOnce();
+    expect(fixture.analysers[0]!.disconnect).toHaveBeenCalledOnce();
+    expect(fixture.analysers[1]!.disconnect).toHaveBeenCalledOnce();
+    controller.releaseStereo();
+    expect(fixture.analyser.disconnect).toHaveBeenCalledTimes(1);
+
+    controller.attachStereo();
+    controller.dispose();
+    expect(fixture.analyser.disconnect).toHaveBeenCalledTimes(2);
+    expect(fixture.analyser.disconnect.mock.calls.every((call) => call.length === 1)).toBe(true);
+  });
+
+  it('rolls back a partially built branch and tolerates an already detached analyser', () => {
+    const fixture = stereoFixture();
+    vi.mocked(fixture.context.createChannelSplitter).mockImplementationOnce(() => {
+      throw new Error('no splitter');
+    });
+    const controller = new AudioMeterController({analyser: fixture.analyser as unknown as AnalyserNode});
+    expect(() => controller.attachStereo()).toThrow('no splitter');
+    expect(controller.stereo).toBe(false);
+    expect(fixture.gains[0]!.disconnect).toHaveBeenCalledOnce();
+    expect(fixture.analyser.connect).not.toHaveBeenCalled();
+
+    expect(controller.attachStereo()).toBe(true);
+    fixture.analyser.disconnect.mockImplementationOnce(() => {
+      throw new Error('not connected');
+    });
+    expect(() => controller.releaseStereo()).not.toThrow();
+    expect(controller.stereo).toBe(false);
+  });
+
+  it('keeps the owned channel analysers at the summed window length while tuning', () => {
+    const fixture = stereoFixture();
+    const owned = analyser();
+    const context = {
+      createGain: vi.fn(() => node()),
+      createAnalyser: vi.fn()
+        .mockImplementationOnce(() => Object.assign(owned, {context: fixture.context}))
+        .mockImplementation(() => fixture.context.createAnalyser()),
+      createChannelSplitter: fixture.context.createChannelSplitter,
+      sampleRate: 48_000,
+    } as unknown as BaseAudioContext;
+    const controller = new AudioMeterController({context, fftSize: 64});
+    expect(controller.attachStereo()).toBe(true);
+    expect(fixture.analysers.every((channel) => channel.fftSize === 64)).toBe(true);
+    controller.configure({fftSize: 256});
+    expect(fixture.analysers.every((channel) => channel.fftSize === 256)).toBe(true);
+    controller.dispose();
+    expect(owned.disconnect).toHaveBeenCalledTimes(2);
+  });
+});

@@ -22,10 +22,57 @@ when those interactions are useful. Core/Headless project numeric data without
 DOM; Render owns canvas/browser work; Elements compose these capabilities with
 neutral UIKit presenters. DEC-044 retires the three narrower Audio View tags.
 
+## Editing (DEC-053)
+
+[Editing capabilities](EDIT-COMPONENTS.md) and
+[DEC-053](../DECISIONS.md#dec-053--document-owned-editing-and-borrowed-playback)
+define the editor binding. Under [DEC-061](../DECISIONS.md#dec-061--audio-editing-moves-to-a-dedicated-clip-view)
+`audio-view` follows an editor read-only and the dedicated `audio-clip-view`
+edits it ([Audio clip editing](EDIT-COMPONENTS.md#audio-clip-editing)).
+[STATUS](../STATUS.md) EDIT-01 and AUDIOEDIT-01 own current verification. Actual
+commands, controls and limits belong to the
+[Clip View Element](../../apps/doc/webmusic/src/content/docs/audio/element/view/audio-clip-view.mdx)
+and [Headless reference](../../apps/doc/webmusic/src/content/docs/audio/headless/view/view-models.mdx).
+Existing behavior remains the default without an editor.
+
+The application owns an `AudioClipEditor`, created with `loadAudioClipEditor` or
+`createAudioClipEditor`, and assigns it through `.editor` (DEC-057). A View borrows Core
+document state/commands and an optional player, retaining only its viewport,
+focus, gestures and draft presentation. `audio-view` and a clip view without
+`editable` display committed content without content-mutation gestures. `editable` without a ready
+editor is unavailable; simultaneous editor and independent explicit data/`src`
+is a configuration conflict. A borrower never disposes the editor or player.
+
+Document content is an immutable sequence of asset references and silence spans.
+Structural edits and history share PCM; gain/fades may be segment parameters,
+and local processing creates assets only for the required range and processing
+context. View projects that sequence through bounded waveform reads without materializing
+the complete output. Segment metadata changes rebuild coordinates; queried ranges
+read the appropriate immutable asset samples, silence, gains and envelopes.
+Spectrogram/meter editing and spectral repair are outside this delivered waveform
+contract. Reference sharing does not promise that every redraw avoids sample reads.
+
+One gesture updates a draft and commits once on release; cancellation or a
+conflicting revision discards it. Content editing lives only in `audio-clip-view`;
+seeking, scrubbing and region annotation stay on `audio-view`, so they never claim
+the same primary-pointer gesture. The current `annotate`/`webaudio:regionchange` interaction remains a region-display
+contract, not a PCM edit or an implicit document commit. Document annotations
+change only through explicit editor commands, such as the clip view's markers
+(`set-annotations`). Mode changes cancel active drafts.
+
+The player consumes a read-only sequence source and reports its applied document
+revision under [Audio document playback](AUDIO-PLAY-COMPONENTS.md#document-playback-dec-053).
+View can display newer committed content during preparation, but withholds
+incompatible seek commands and playback overlays until document identities and
+revisions match and the coordinate mapping is valid. The editor owns content; Play owns time and
+sound. View creates no player, audio graph or second clock.
+
 ## Meter boundary and player binding
 
-`AudioMeterController` and its pure level/spectrum helpers belong to
-`@webmusic/audio/view/headless`. The independent `audio-meter` Element is now a
+`AudioMeterController`, its pure level/spectrum helpers and the DOM-free
+`AudioMeterDisplay` reductions behind the seven meter displays (DEC-051) belong
+to `@webmusic/audio/view/headless`; their canvas painters belong to
+`@webmusic/audio/view/render`. The independent `audio-meter` Element is now a
 compact [Analyze monitor](AUDIO-ANALYZE-COMPONENTS.md), canonically exported and
 registered through Analyze. Existing `view/element` and `view/auto` imports
 remain as a compatibility alias for the same class and tag, not a second View
@@ -42,16 +89,20 @@ selector syntax reports the existing error event. Direct `.analyser` or
 `.context` input takes precedence until cleared. Assigning a nonempty `.player`
 selects it and clears those direct inputs.
 
-The controller owns no player, clock or read scheduler. The UI presenter owns
-frame observation; disconnect/rebind releases subscriptions and owned tap nodes,
-never the borrowed player/analyser/context. Owned input/output ports remain
+The controller owns no player, clock or read scheduler. The UI canvas stage
+owns frame observation; disconnect/rebind releases subscriptions, owned tap
+nodes and the owned stereo branch, never the borrowed player/analyser/context.
+The stereo branch is the one permitted touch on a borrowed analyser: a single
+added output edge into owned nodes, removed with a selective disconnect. Owned input/output ports remain
 stable during valid tuning; invalid tuning retains the prior graph. Source
 replacement is a separate resource lifetime.
 
 Live `peakHold` retains scaled RMS with per-read absolute decay; the pure PCM
-helper retains sample peak with multiplicative decay. Neither is a calibrated
-LUFS, true-peak or elapsed-time decay claim. Public leaf pages own the exact
-options, defaults and cleanup behavior.
+helper retains sample peak with multiplicative decay; the display's VU and
+loudness holds decay per frame. None is a calibrated LUFS, true-peak or
+elapsed-time decay claim: the display's loudness reading is a windowed
+K-weighted estimate from polled analyser windows. Public leaf pages own the
+exact options, defaults and cleanup behavior.
 
 ## Data and computation
 

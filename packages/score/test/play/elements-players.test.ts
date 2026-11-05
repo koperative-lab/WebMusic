@@ -168,9 +168,16 @@ class StubNode {
     this.capturedPointers.push(pointerId);
   }
 
-  set innerHTML(_html: string) {
+  set innerHTML(html: string) {
     this.children.forEach((c) => (c.parentNode = null));
     this.children = [];
+    // The kit's icon factory parses one inline <svg>; stand in its root node.
+    const tag = /^\s*<([a-z][\w-]*)/i.exec(html)?.[1];
+    if (tag) this.appendChild(new StubNode(tag));
+  }
+
+  get firstElementChild(): StubNode | null {
+    return this.children[0] ?? null;
   }
 
   appendChild(child: StubNode): StubNode {
@@ -1518,7 +1525,10 @@ describe('<score-rack-control>', () => {
     // setting `width`/`background` here would be silently dead.
     expect(sheet).toContain('--wm-fader-width:var(--rc-fader-width,var(--wm-mixer-fader-width');
     expect(sheet).toContain('--wm-fader-track:var(--rc-track,var(--wm-mixer-track');
-    expect(sheet).toContain('--wm-fader-track-border:var(--rc-track-border,var(--wm-mixer-track-border,var(--wm-control-border,var(--wm-border,#d8d8d8))))');
+    expect(sheet).toContain('--wm-fader-track-border:var(--rc-track-border,var(--wm-mixer-track-border,var(--wm-control-border,var(--wm-border,light-dark(#d8d8d8,#333)))))');
+    // The level fill is neutral ink, never the accent's grey stand-in.
+    expect(sheet).toContain('--wm-fader-fill:var(--rc-fill,var(--wm-mixer-fill,var(--wm-foreground-muted,light-dark(#777,#aaa))))');
+    expect(sheet).not.toContain('--rc-fill,var(--wm-mixer-fill,var(--wm-accent');
     expect(sheet).toContain('var(--rc-text,var(--wm-mixer-text,var(--wm-foreground');
     // Compatibility aliases must not replace inherited UIKit theme inputs.
     expect(sheet).not.toContain('--wm-mixer-track:');
@@ -1787,10 +1797,12 @@ describe('<score-recorder>', () => {
       (node) => node.tagName === 'STYLE' && node.dataset.webmusicCompatibility === 'score-recorder',
     )[0]?.textContent;
     expect(css).toContain(
-      '--wui-recorder-host-button-border:var(--wm-recorder-button-border,var(--wm-control-border,var(--wm-border,#d8d8d8)))',
+      '--wui-recorder-host-button-border:var(--wm-recorder-button-border,var(--wm-control-border,var(--wm-border,light-dark(#d8d8d8,#333))))',
     );
     expect(css).toContain('--wm-recorder-button-border:var(--rec-btn-border,var(--wui-recorder-host-button-border))');
     expect(css).not.toContain('--wm-recorder-button-border:var(--rec-btn-border,#111)');
+    expect(css).toContain('--wui-recorder-host-accent:var(--wm-recorder-accent,var(--wm-recording,light-dark(#c62828,#ef5350)))');
+    expect(css).not.toContain('--wm-accent,');
   });
 
   it('hands a single-route Sound from live monitoring to take playback', async () => {
@@ -1860,7 +1872,7 @@ describe('<score-recorder>', () => {
     await flush();
 
     expect(play.classList.contains('on')).toBe(false);
-    expect(play.textContent).toBe('▶ Play');
+    expect(play.getAttribute('aria-pressed')).toBe('false');
     const errors = host.events.filter((event) => event.type === 'webscore:error');
     expect(errors).toHaveLength(1);
     expect(errors[0].detail).toEqual({operation: 'play', error: failure});

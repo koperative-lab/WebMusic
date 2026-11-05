@@ -108,7 +108,7 @@ For whole-score duration weights, use [`distributions(score).pitchClasses`](/sco
 
 `createLiveChordTracker` publishes the current name and a list of up to eight recent nonempty chord names. This list has no timestamps. For a time-based trail, the application can retain timestamped `onUpdate` values from its own chosen clock, detect transitions and apply its own retention bound and reset policy.
 
-The former Element’s 32-transition trail and eight-second coast were private presentation behavior, not a public Headless history API. They are not reproduced by `LiveChordState.history`. Use [`<score-live-chord-analysis>`](/score/element/analyze/score-live-chord-analysis/) for the ready-made current nameplate, or retain tracker updates for a custom history.
+The former Element’s 32-transition trail and eight-second coast were private presentation behavior, not a public Headless history API. They are not reproduced by `LiveChordState.history`. Use [`<score-chord-analysis mode="live">`](/score/element/analyze/score-chord-analysis/) for the ready-made current nameplate, or retain tracker updates for a custom history.
 
 <details class="component-section">
 <summary>API</summary>
@@ -156,7 +156,7 @@ duration, velocity or recentness.
 
 ## Related
 
-**Composed by.** [`<score-live-chord-analysis>`](/score/element/analyze/score-live-chord-analysis/)
+**Composed by.** [`<score-chord-analysis mode="live">`](/score/element/analyze/score-chord-analysis/)
 uses the chord tracker for sounding-note state. Key diagnostics and retained
 history are available to application-owned code through the APIs above.
 

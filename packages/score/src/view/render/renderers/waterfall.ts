@@ -1,14 +1,12 @@
 // Waterfall DOM implementation for the explicit /render surface.
-import {Rational, type Score} from '../../../core';
-import {projectScoreAnnotations, type ScoreAnnotation} from '../../core/annotations';
 import type {ScoreNoteSequence, ScoreSequenceNote} from '../../core/types';
 import {bufferedScrollRange} from '../../core/windowing';
-import {drawVerticalScoreAnnotations} from '../annotations';
 import {
   MAX_MIDI_PITCH,
   MIN_MIDI_PITCH,
   MIN_NOTE_LENGTH,
   SVG_NS,
+  hideScrollbar,
   makeClipped,
   makeScrollable,
   scheduleFrame,
@@ -63,8 +61,6 @@ export class WaterfallSVGVisualizer extends BaseSVGVisualizer {
   private lastActiveTime?: number;
   /** Position survives highlight clearing so stop/replay can rewind the viewport. */
   private lastPositionTime?: number;
-  private readonly annotations: readonly ScoreAnnotation[];
-  private annotationWidth = 0;
   /**
    * Top padding (px) of the scrollable notes container.
    *
@@ -85,7 +81,7 @@ export class WaterfallSVGVisualizer extends BaseSVGVisualizer {
    */
   private scrollPaddingTop = 0;
 
-  constructor(sequence: ScoreNoteSequence, parentElement: HTMLDivElement, config: WaterfallVisualizerConfig = {}, private readonly score?: Score) {
+  constructor(sequence: ScoreNoteSequence, parentElement: HTMLDivElement, config: WaterfallVisualizerConfig = {}) {
     super(sequence, config);
     if (!(parentElement instanceof HTMLDivElement)) {
       throw new Error('This visualizer requires a <div> element to display the visualization');
@@ -104,8 +100,6 @@ export class WaterfallSVGVisualizer extends BaseSVGVisualizer {
     this.fitToWidth = config.fitToWidth === true && ![config.whiteNoteWidth, config.blackNoteWidth]
       .some((width) => typeof width === 'number' && Number.isFinite(width) && width > 0);
     this.blackWidthRatio = this.config.blackNoteWidth / this.config.whiteNoteWidth;
-    this.annotations = score && config.showAnnotations !== false ? projectScoreAnnotations(score) : [];
-    this.annotationWidth = this.annotations.length ? 180 : 0;
 
     this.setupDOM(parentElement);
     if (!this.svg || !this.parentElement) return;
@@ -265,8 +259,7 @@ export class WaterfallSVGVisualizer extends BaseSVGVisualizer {
     const units = whiteNotesDrawn + (isBlackPitch(low) ? .5 : 0) + (isBlackPitch(high) ? .5 : 0);
     const measured = this.hostContainer?.clientWidth || this.hostContainer?.getBoundingClientRect().width || 0;
     if (this.fitToWidth && measured > 0) {
-      this.annotationWidth = this.annotations?.length ? Math.min(180, measured * .4) : 0;
-      this.config.whiteNoteWidth = Math.max(1, measured - this.annotationWidth) / Math.max(1, units);
+      this.config.whiteNoteWidth = measured / Math.max(1, units);
       this.config.blackNoteWidth = this.config.whiteNoteWidth * this.blackWidthRatio;
     }
 
@@ -316,6 +309,8 @@ export class WaterfallSVGVisualizer extends BaseSVGVisualizer {
     this.parentElement.style.boxSizing = 'border-box';
     this.parentElement.style.overflowX = 'hidden';
     this.parentElement.style.overflowY = 'auto';
+    // Scrolled by wheel, trackpad and the playhead, without a visible bar.
+    hideScrollbar(this.parentElement);
 
     this.svg = document.createElementNS(SVG_NS, 'svg');
     this.svg.classList.add('waterfall-notes');
@@ -378,17 +373,12 @@ export class WaterfallSVGVisualizer extends BaseSVGVisualizer {
     this.scrollPaddingTop = padding;
     this.parentElement.style.paddingTop = `${padding}px`;
     this.parentElement.style.height = `${padding}px`;
-    this.parentElement.style.width = `${this.width + this.annotationWidth}px`;
-    setExplicitSize(this.svg, this.width + this.annotationWidth, this.height, {fractionalWidth: true});
+    this.parentElement.style.width = `${this.width}px`;
+    setExplicitSize(this.svg, this.width, this.height, {fractionalWidth: true});
     this.clear();
     this.layoutPitchColumns();
     if (this.disposed) return;
     this.draw();
-    if (this.score && this.annotations.length) drawVerticalScoreAnnotations(this.svg, this.annotations, {
-      yAtQuarter: (quarter) => this.height - this.score!.timeMap.quartersToSeconds(Rational.from(quarter)) * this.config.pixelsPerSecond,
-      x: this.width, width: this.annotationWidth, height: this.height,
-      color: this.config.noteColor ?? `rgb(${this.config.noteRGB})`,
-    });
     if (oldTime !== undefined) this.redrawAtTime(oldTime, false);
     if (this.disposed || !this.parentElement) return;
     // Padding and viewport have equal height, so scrollTop is the score's

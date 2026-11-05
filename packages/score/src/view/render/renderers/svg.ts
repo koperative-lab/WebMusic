@@ -257,6 +257,11 @@ export abstract class BaseSVGVisualizer extends BaseVisualizer {
     if (this.svg) this.unfillActiveRect(this.svg);
   }
 
+  /** Mount the newly visible window in the follow-scroll's own frame. */
+  protected override paintScrolledViewport(): void {
+    if (!this.disposed && this.virtualizationActive && this.drawn) this.updateVirtualWindow();
+  }
+
   public override dispose(): void {
     if (this.disposed) return;
     this.teardownVirtualization();

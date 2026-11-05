@@ -544,3 +544,51 @@ describe('PointerSurface', () => {
     surface.detach();
   });
 });
+
+describe('note surface visual contract', () => {
+  it('replaces the click-to-start veil with a named typing toggle that mirrors focus', () => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const handle = mountNoteSurface(host, {
+      snapshot: () => ({layout: 'piano', keyboard: true, piano: pianoKeyLayout(60, 61), octaveLabel: 'Octave 4'}),
+      interaction: {setNote: vi.fn(), midiForKey: () => null},
+    });
+    const root = handle.element;
+    expect(root.querySelector('.wui-note__overlay')).toBeNull();
+    expect(root.textContent).not.toContain('Click to start');
+    const start = root.querySelector<HTMLButtonElement>('.wui-note__bar .wui-note__start.start')!;
+    expect(start.type).toBe('button');
+    expect(start.getAttribute('aria-label')).toBe('Musical typing');
+    expect(start.title).toBe('Musical typing');
+    expect(start.getAttribute('aria-pressed')).toBe('false');
+    expect(start.querySelector('svg[data-icon]')?.getAttribute('aria-hidden')).toBe('true');
+    expect(root.querySelector('.wui-note__hint')?.textContent).toContain('Type to play');
+
+    const down = new MouseEvent('pointerdown', {bubbles: true, cancelable: true});
+    start.dispatchEvent(down);
+    expect(down.defaultPrevented).toBe(true);
+    start.click();
+    expect(document.activeElement).toBe(root);
+    expect(start.getAttribute('aria-pressed')).toBe('true');
+    expect(root.classList.contains('on')).toBe(true);
+    start.click();
+    expect(document.activeElement).not.toBe(root);
+    expect(start.getAttribute('aria-pressed')).toBe('false');
+    root.focus();
+    expect(start.getAttribute('aria-pressed')).toBe('true');
+    root.dispatchEvent(new KeyboardEvent('keydown', {code: 'Escape', bubbles: true}));
+    expect(start.getAttribute('aria-pressed')).toBe('false');
+    handle.destroy();
+  });
+
+  it('hides hints and scrollbars, keeps chords on one row and draws hairline cells', () => {
+    expect(noteStyle).toMatch(/:where\(\.wui-note__hint\) \{ position: absolute;/);
+    expect(noteStyle).toContain(':where(.wui-note__viewport) { scrollbar-width: none; }');
+    expect(noteStyle).toContain(':where(.wui-note__chords) { scrollbar-width: none; }');
+    expect(noteStyle).toMatch(/:where\(\.wui-note__chords\) \{[^}]*flex-wrap:nowrap/);
+    expect(noteStyle).toMatch(/:where\(\.wui-note__bar\) \{[^}]*flex-wrap:nowrap/);
+    expect(noteStyle).not.toContain('rgba(255,255,255');
+    expect(noteStyle).not.toMatch(/\.wui-note__chord \{[^}]*--wm-surface-inverse/);
+    expect(noteStyle).toMatch(/:where\(\.wui-note__chord\.down, \.wui-note__chord\[aria-pressed="true"\]\) \{[^}]*--wm-note-active/);
+  });
+});

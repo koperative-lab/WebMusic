@@ -3,6 +3,7 @@ import {claimHost, createErrorSink} from './internal/lifecycle';
 import {finitePositive, addClassNames, setParts} from './internal/dom';
 import {mountStatus, type StatusHandle, type StatusState} from './status';
 import {componentSurfaceCss} from './internal/surface';
+import {hiddenScrollbarCss} from './internal/icons';
 
 export interface StageBinding {
   render(surface: HTMLElement): void | (() => void);
@@ -218,11 +219,13 @@ ${componentSurfaceCss('stage')}
   overflow: var(--wm-stage-overflow, hidden);
 }
 /* Retained renderers expose the root as their scroll viewport. The drawing
-   can be wider than it (for example a readable sheet on a narrow host). */
+   can be wider than it (for example a readable sheet on a narrow host). Its
+   scrollbar stays hidden; wheel, trackpad and keyboard scrolling remain. */
 .wui-stage:not(.wui-stage--canvas) {
   overflow: var(--wm-stage-overflow, hidden);
   background: var(--wm-stage-background, var(--wm-stage-surface-background, var(--wm-component-background, var(--wm-surface, #fff))));
 }
+${hiddenScrollbarCss('.wui-stage:not(.wui-stage--canvas)')}
 .wui-stage:not(.wui-stage--canvas) > .wui-stage__surface { overflow: visible; }
 .wui-stage--fill { height: 100%; }
 .wui-stage--fill > .wui-stage__surface { height: 100%; }
@@ -804,27 +807,36 @@ export function mountCanvasStage(
       currentStatus = {kind: 'error', message: error instanceof Error ? error.message : String(error)};
       report(error);
     }
-    statusLayer!.hidden = currentStatus.kind === 'ready';
+    const hidden = currentStatus.kind === 'ready';
+    if (statusLayer!.hidden !== hidden) statusLayer!.hidden = hidden;
     statusHandle?.update();
   };
 
-  const frameSize = (): {width: number; height: number; pixelRatio: number} => {
+  /** Read the frame geometry. Only reads: callers measure before any write. */
+  const measureFrame = (): {width: number; height: number; pixelRatio: number} => {
     const width = finitePositive(canvas.clientWidth || surface.clientWidth || root.clientWidth, fallbackWidth);
     const height = finitePositive(canvas.clientHeight || surface.clientHeight || root.clientHeight, fallbackHeight);
     const pixelRatio = finitePositive(view?.devicePixelRatio, 1);
+    return {width, height, pixelRatio};
+  };
+
+  const sizeBacking = ({width, height, pixelRatio}: {width: number; height: number; pixelRatio: number}): void => {
     const pixelWidth = Math.max(1, Math.round(width * pixelRatio));
     const pixelHeight = Math.max(1, Math.round(height * pixelRatio));
     if (canvas.width !== pixelWidth) canvas.width = pixelWidth;
     if (canvas.height !== pixelHeight) canvas.height = pixelHeight;
-    return {width, height, pixelRatio};
   };
 
   const redrawAt = (time: number): void => {
     if (destroyed) return;
+    // Layout is read once, before the status overlay and backing store are
+    // written; reading it after those writes forced a layout every frame.
+    const frame = measureFrame();
     readStatus();
     const context = canvas.getContext('2d');
     if (!context) return;
-    const {width, height, pixelRatio} = frameSize();
+    sizeBacking(frame);
+    const {width, height, pixelRatio} = frame;
     context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
     context.clearRect(0, 0, width, height);
     try {

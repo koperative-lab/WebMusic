@@ -6,10 +6,13 @@ import {bindModuleAudioInput} from '../../../play/element/internal/module-input'
 
 export interface AnalysisPlayerTarget extends Element {
   readonly clip?: AudioClip;
+  readonly transport?: unknown;
   readonly currentTime?: number;
   readonly seconds?: number;
   readonly duration?: number;
   readonly playing?: boolean;
+  readonly loading?: boolean;
+  readonly loadError?: Error;
   readonly analyser?: AnalyserNode;
   seek?(seconds: number): void | Promise<void>;
 }
@@ -20,6 +23,10 @@ export interface AnalysisPlayerSnapshot {
   seconds: number;
   duration: number;
   playing: boolean;
+  loading: boolean;
+  /** Only an owner explicitly exposing clip data can establish an empty source. */
+  empty: boolean;
+  loadError?: Error;
   state: ElementTargetState | 'unbound';
 }
 
@@ -37,6 +44,9 @@ function snapshot(target: AnalysisPlayerTarget | undefined, state: AnalysisPlaye
     seconds: Math.max(0, finite(target?.currentTime) ?? finite(target?.seconds) ?? 0),
     duration: Math.max(0, finite(target?.duration) ?? clip?.duration ?? 0),
     playing: target?.playing === true,
+    loading: target?.loading === true,
+    empty: !!target && 'clip' in target && !clip && !target.transport,
+    loadError: target?.loadError,
     state,
   };
 }
@@ -51,7 +61,7 @@ export function bindAnalysisPlayer(
   if (assigned !== undefined || host.hasAttribute('input') || (!host.hasAttribute('player') && isModularComposition(host))) {
     return bindModuleAudioInput(host, assigned, ({analyser, error}) => {
       const target = analyser ? {analyser, playing: true} as AnalysisPlayerTarget : undefined;
-      onUpdate('target', {target, seconds: 0, duration: 0, playing: !!analyser, state: analyser ? 'ready' : 'unbound'});
+      onUpdate('target', {target, seconds: 0, duration: 0, playing: !!analyser, loading: false, empty: false, state: analyser ? 'ready' : 'unbound'});
       if (error !== undefined && isCurrent()) {
         host.dispatchEvent(new CustomEvent('webaudio:error', {
           detail: {error: error instanceof Error ? error : new Error(String(error))},
@@ -95,6 +105,7 @@ export function bindAnalysisPlayer(
       return detail && 'clip' in detail ? {clip: detail.clip} : {};
     });
     add('webaudio:playerchange', 'source');
+    add('webaudio:loadstatechange', 'source');
     add('webaudio:loaded', 'source');
     add('webaudio:timeupdate', 'time', (event) => {
       const seconds = finite((event as CustomEvent<{seconds?: number}>).detail?.seconds);

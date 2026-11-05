@@ -58,10 +58,11 @@ export default defineConfig([
     dts: true,
     sourcemap: true,
   },
-  // tsup also splits CJS through Rollup. Keep one model implementation per
-  // format so loader-created AudioClips share the root class used by Bridge.
-  // `import.meta.url` is compiled away so the worker clients fall back to
-  // configured/explicit workers.
+  // tsup also splits CJS through Rollup. Keep one Core implementation per
+  // format so clips, sequences and error classes created through one entry
+  // remain the same objects and classes in every other entry.
+  // `import.meta.url` is compiled away so the worker clients fall back
+  // to configured/explicit workers.
   {
     entry: moduleEntries,
     format: ['cjs'],

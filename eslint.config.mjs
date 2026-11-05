@@ -10,7 +10,8 @@ export default tseslint.config(
       '**/dist/**',
       '**/node_modules/**',
       '**/.astro/**',
-      '.claude/**',
+      // Hidden local worktree copies of this repository are not its source.
+      '.*/worktrees/**',
       '**/*.d.ts',
       'apps/**/public/**',
       // Temporary standalone export; it has its own ESLint config and will be

@@ -6,7 +6,6 @@ import type {Score} from '../../src/core';
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {
   bindPlayerToVisualizer,
-  renderOSMDStaffVisualizer,
   renderPianoRollVisualizer,
   renderStaffVisualizer,
 } from '../../src/view/render';
@@ -78,7 +77,6 @@ vi.mock('../../src/play/headless', () => {
 
 vi.mock('../../src/view/render', () => ({
   bindPlayerToVisualizer: vi.fn(),
-  renderOSMDStaffVisualizer: vi.fn(),
   renderPianoRollVisualizer: vi.fn(),
   renderStaffVisualizer: vi.fn(),
   renderWaterfallVisualizer: vi.fn(),
@@ -219,10 +217,14 @@ describe('PianoRollView surface ownership', () => {
   });
 });
 
-describe('StaffView async ownership', () => {
-  it('is responsive and has an accessible name by default', () => {
+describe('StaffView', () => {
+  it('is responsive, has an accessible name and releases its staff on unmount', () => {
+    const dispose = vi.fn();
+    const unbind = vi.fn();
+    vi.mocked(renderStaffVisualizer).mockReturnValueOnce({dispose} as never);
+    vi.mocked(bindPlayerToVisualizer).mockReturnValueOnce(unbind);
     const score = {id: 'responsive', durationSeconds: 4} as unknown as Score;
-    render(
+    const {unmount} = render(
       <ScoreProvider score={score}>
         <StaffView />
       </ScoreProvider>,
@@ -234,74 +236,11 @@ describe('StaffView async ownership', () => {
     expect(view.style.padding).toContain('--wm-component-padding');
     expect(view.style.border).toContain('--wm-component-border');
     expect(view.style.background).toContain('--wm-component-background');
+    unmount();
+    expect(unbind).toHaveBeenCalledOnce();
+    expect(dispose).toHaveBeenCalledOnce();
   });
 
-  it('aborts a pending OSMD generation before switching to the lightweight staff', async () => {
-    const pending = deferred<unknown>();
-    vi.mocked(renderOSMDStaffVisualizer).mockReturnValueOnce(pending.promise as never);
-    const staleDispose = vi.fn();
-    const currentScore = {id: 'mode-switch', durationSeconds: 4} as unknown as Score;
-    const {rerender} = render(
-      <ScoreProvider score={currentScore}>
-        <StaffView osmd={{musicXML: '<score-partwise />'}} />
-      </ScoreProvider>,
-    );
-    const signal = vi.mocked(renderOSMDStaffVisualizer).mock.calls[0]![2]!.signal;
-
-    rerender(
-      <ScoreProvider score={currentScore}>
-        <StaffView />
-      </ScoreProvider>,
-    );
-
-    expect(signal?.aborted).toBe(true);
-    expect(renderStaffVisualizer).toHaveBeenCalledOnce();
-    await act(async () => pending.resolve({dispose: staleDispose}));
-    expect(staleDispose).toHaveBeenCalledOnce();
-  });
-
-  it('keeps a late OSMD render confined to its detached score root', async () => {
-    const first = deferred<unknown>();
-    const second = deferred<unknown>();
-    vi.mocked(renderOSMDStaffVisualizer)
-      .mockReturnValueOnce(first.promise as never)
-      .mockReturnValueOnce(second.promise as never);
-    const firstDispose = vi.fn();
-    const secondDispose = vi.fn();
-    const firstScore = {id: 'first', durationSeconds: 4} as unknown as Score;
-    const secondScore = {id: 'second', durationSeconds: 4} as unknown as Score;
-    const {rerender} = render(
-      <ScoreProvider score={firstScore}>
-        <StaffView osmd={{musicXML: '<score-partwise />'}} />
-      </ScoreProvider>,
-    );
-    const root = screen.getByRole('img');
-    const firstRoot = vi.mocked(renderOSMDStaffVisualizer).mock.calls[0]![1];
-    const firstSignal = vi.mocked(renderOSMDStaffVisualizer).mock.calls[0]![2]!.signal;
-    expect(firstSignal?.aborted).toBe(false);
-
-    rerender(
-      <ScoreProvider score={secondScore}>
-        <StaffView osmd={{musicXML: '<score-partwise />'}} />
-      </ScoreProvider>,
-    );
-    const secondRoot = vi.mocked(renderOSMDStaffVisualizer).mock.calls[1]![1];
-    const secondSignal = vi.mocked(renderOSMDStaffVisualizer).mock.calls[1]![2]!.signal;
-    expect(firstSignal?.aborted).toBe(true);
-    expect(secondSignal?.aborted).toBe(false);
-    expect(firstRoot).not.toBe(secondRoot);
-    expect(firstRoot.isConnected).toBe(false);
-    expect(secondRoot.parentElement).toBe(root);
-
-    secondRoot.textContent = 'current score';
-    await act(async () => second.resolve({dispose: secondDispose}));
-    firstRoot.textContent = 'late stale score';
-    await act(async () => first.resolve({dispose: firstDispose}));
-
-    expect(root.textContent).toBe('current score');
-    expect(firstDispose).toHaveBeenCalledOnce();
-    expect(secondDispose).not.toHaveBeenCalled();
-  });
 });
 
 interface Deferred<T> {

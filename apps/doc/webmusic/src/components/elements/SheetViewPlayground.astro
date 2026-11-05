@@ -1,38 +1,90 @@
 ---
-// <score-sheet-view> — the one view element with a peer dependency. OSMD is in this
-// doc app's devDependencies, so the demo shows the real engraving rather than
-// the install hint the element falls back to.
-//
-// The source is the .mxl on purpose: OSMD engraves what the file says, and a
-// MIDI source carries no clefs, no key signatures and no staff assignment.
+// <score-sheet-view> engraves Arabesque No. 1 from its MusicXML, the format
+// that carries clefs, key signatures, voices and staff assignment. The page
+// owns one editor and lends it to the player and the sheet.
 import ElementPlayground from '../ElementPlayground.astro';
 
-const SRC = `${import.meta.env.BASE_URL}mxl/Arabesque%20No.1.mxl`;
-const PLAYER_ID = 'pg-sheet-view-player';
-const companions = [{tag: 'score-player', target: 'score-player'}];
+const source = `${import.meta.env.BASE_URL}mxl/Arabesque%20No.1.mxl`;
+const features = ['pitch', 'input', 'duration', 'tie', 'accidental', 'delete', 'history', 'zoom'];
 ---
 
-<ElementPlayground
-  tag="score-sheet-view"
-  class="pg-sheet"
-  markup="[data-sheet-composition]"
-  companions={companions}
->
-  <div data-sheet-composition data-pg-fragment>
-  <score-player id={PLAYER_ID} src={SRC}></score-player>
-  <score-sheet-view src={SRC} player={`#${PLAYER_ID}`} follow-cursor height="360"></score-sheet-view>
-  </div>
+<ElementPlayground tag="score-sheet-view" target="[data-sheet-view]" markup="[data-sheet-composition]"
+  companions={[{tag: 'score-player', target: '[data-sheet-player]'}]}>
+  <section data-sheet-demo data-sheet-src={source} aria-label="Score sheet editing">
+    <div data-sheet-composition data-pg-fragment>
+      <score-player data-sheet-player id="sheet-player" time-control="full"></score-player>
+      <score-sheet-view data-sheet-view player="#sheet-player" editable tools={features.join(' ')}></score-sheet-view>
+    </div>
+    <p data-sheet-status role="alert" hidden></p>
+  </section>
 </ElementPlayground>
 
 <script>
-  import { defineScorePlayerElement } from '@webmusic/score/play/element';
-  import { defineSheetViewElement } from '@webmusic/score/view/element';
-  defineScorePlayerElement();
-  defineSheetViewElement();
+  import {defineSheetViewElement, type SheetViewElement} from '@webmusic/score/view/element';
+  import {loadScoreEditor, type ScoreEditor} from '@webmusic/score/view/headless';
+  import {defineScorePlayerElement, type ScorePlayerElement} from '@webmusic/score/play/element';
+  import {mountDemos} from '../demo-lifecycle';
+  import {PLAYGROUND_RESET_EVENT, PLAYGROUND_SYNC_EVENT} from '../playground-client';
+  defineScorePlayerElement(); defineSheetViewElement();
+  mountDemos('[data-sheet-demo]', (root, scope) => {
+    // The demo owns one editor at a time; the player and the sheet borrow it.
+    const source = root.dataset.sheetSrc!;
+    const panel = root.closest<HTMLElement>('[data-wm-pg]');
+    const player = root.querySelector<ScorePlayerElement>('[data-sheet-player]')!;
+    const sheet = root.querySelector<SheetViewElement>('[data-sheet-view]')!;
+    const status = root.querySelector<HTMLElement>('[data-sheet-status]')!;
+    let editor: ScoreEditor | undefined;
+    let loadGeneration = 0;
+    let loadController: AbortController | undefined;
+    const message = (error: unknown): string => error instanceof Error ? error.message : String(error);
+    // The canvas carries no narration; only a failed load is reported.
+    const fail = (text: string): void => { if (scope.active) { status.textContent = text; status.hidden = false; } };
+
+    /** Lend `next` to the player and sheet, then dispose the editor it replaces. */
+    const install = (next: ScoreEditor | undefined): void => {
+      const previous = editor;
+      editor = next;
+      player.editor = next;
+      sheet.editor = next;
+      if (previous && previous !== next) previous.dispose();
+    };
+    const load = async (): Promise<void> => {
+      loadGeneration += 1; loadController?.abort();
+      const current = loadGeneration;
+      const controller = new AbortController(); loadController = controller;
+      try {
+        const loaded = await loadScoreEditor(source, {signal: controller.signal});
+        // A superseded result was never lent to an element; release it here.
+        if (!scope.active || current !== loadGeneration) { loaded.dispose(); return; }
+        status.hidden = true;
+        install(loaded);
+      } catch (error) {
+        if (scope.active && current === loadGeneration) fail(message(error));
+      } finally {
+        if (loadController === controller) loadController = undefined;
+      }
+    };
+
+    // Toolbar and keyboard changes are reflected to attributes; keep Parameters current.
+    scope.listen(sheet, 'sheetsettingschange', () => { panel?.dispatchEvent(new CustomEvent(PLAYGROUND_SYNC_EVENT)); });
+    if (panel) {
+      // Reset restores the authored attributes; reloading also discards the edits.
+      scope.listen(panel, PLAYGROUND_RESET_EVENT, () => {
+        queueMicrotask(() => { if (scope.active) scope.run(load()); });
+      });
+    }
+    scope.add(() => {
+      loadGeneration += 1; loadController?.abort();
+      const owned = editor; editor = undefined;
+      player.editor = undefined;
+      sheet.editor = undefined;
+      owned?.dispose();
+    });
+    scope.run(load());
+  });
 </script>
 
 <style>
-  .pg-sheet :global([data-sheet-composition]) { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; min-width: 0; }
-  .pg-sheet :global([data-sheet-composition] > *) { min-width: 0; }
-  .pg-sheet :global(score-player) { --webscore-play-height: 2.1rem; }
+  [data-sheet-demo], [data-sheet-composition] { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; min-width: 0; }
+  [data-sheet-demo] p { margin: 0; font-size: .85rem; overflow-wrap: anywhere; }
 </style>

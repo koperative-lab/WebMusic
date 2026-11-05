@@ -58,7 +58,7 @@ export function listFiles(directory, prefix = '') {
 export function parsePin(text) {
   const pin = new Map();
   for (const line of text.split('\n')) {
-    const match = /^([0-9a-f]{64})  (.+)$/.exec(line.trimEnd());
+    const match = /^([0-9a-f]{64}) {2}(.+)$/.exec(line.trimEnd());
     if (match) pin.set(match[2], match[1]);
   }
   return pin;

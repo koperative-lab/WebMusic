@@ -17,13 +17,13 @@ integration entries such as React build on the same contracts.
 
 | Capability | What it covers | Forms |
 | --- | --- | --- |
-| **play** | Get sound in and out: decoding and loading, buffer and media playback, mixing, microphone recording, effects, WAV export. | [Web Components](/audio/element/#play) · [Headless](/audio/headless/#play) · [API](/audio/api/play/) |
+| **play** | Get sound in and out: decoding and loading, buffer and media playback, mixing, microphone recording, effects, clip and edited-sequence WAV export. | [Web Components](/audio/element/#play) · [Headless](/audio/headless/#play) · [API](/audio/api/play/) |
 | **analyze** | Derive facts from a signal: peaks, loudness, tempo and beats, key, onsets, pitch, chromagram, spectrogram, Meyda features, transcription. | [Web Components](/audio/element/#analyze) · [Headless](/audio/headless/#analyze) · [API](/audio/api/analyze/) |
-| **view** | Project a signal onto a surface: waveforms, spectrograms, regions and live scrolling views; build custom overviews from the Headless data helpers. | [Web Components](/audio/element/#view) · [Headless](/audio/headless/#view) · [API](/audio/api/view/) |
+| **view** | Project a signal onto a surface: waveforms, spectrograms, regions and live scrolling views; edit a contiguous asset sequence with transactions/history, selection/drafts and explicit range processing; build custom overviews from the Headless data helpers. | [Web Components](/audio/element/#view) · [Headless](/audio/headless/#view) · [API](/audio/api/view/) |
 | **react** | The same capabilities as React components and hooks. | [API](/audio/api/react/) |
 
 The package root is the model itself — `AudioClip`, `Region`, `BeatGrid`,
-`ClipEditSession`, `AudioPeaks` and JSON. Importing it creates no audio
+`ClipEditSession`, `AudioPeaks`, sequence/asset/document ports and JSON. Importing it creates no audio
 context and is safe in Node, workers and SSR; explicit conversion methods may
 use an AudioContext supplied by the caller. See
 the [package subpath table](/audio/api/#package-subpaths) for every published
@@ -59,7 +59,7 @@ npm install @webmusic/audio @webmusic/kernel @webmusic/ui
 
 ## Drop-in Web Components
 
-The fastest way to get audio on a page — no build step. `@webmusic/audio/play` ships ready-to-use custom elements (central player, playlist, mixer and recorder); drop a tag in and it works. `@webmusic/audio/view` adds `<audio-view>` and `<audio-live-view>`. `@webmusic/audio/analyze` adds five live tools, including `<audio-meter>`. Every tag and its owning page is on the [Web Components page](/audio/element/).
+The fastest way to get audio on a page — no build step. Each capability's `/auto` entry registers its ready-to-use custom elements, and `/element` exports the classes with explicit registration; the capability roots (`@webmusic/audio/play`, `/view`, `/analyze`) are programming APIs and register nothing. Play provides the central player, playlist, mixer and recorder; View adds `<audio-view>`, the `<audio-clip-view>` waveform editor and `<audio-live-view>`; Analyze adds five live tools, including `<audio-meter>`. Every tag and its owning page is on the [Web Components page](/audio/element/).
 
 ### From a CDN
 
@@ -84,7 +84,7 @@ Add the view and analysis elements the same way — each capability has its own 
 <audio-player id="p" src="/wav/Arabesque%20No.1.wav" controls></audio-player>
 ```
 
-Each bundle is the capability's `/global` entry and exposes one window
+Play, View and Analyze supply these IIFEs. Each IIFE is its capability's `/global` entry and exposes one window
 global carrying its exports plus a `defineAllAudioElements()`:
 **`WebMusicAudioPlay`** (`dist/play/auto.global.js`),
 **`WebMusicAudioView`** (`dist/view/auto.global.js`), and
@@ -149,6 +149,25 @@ WAV follows the dependency-free decoder path. For compressed files, provide
 `{ context: new AudioContext() }` for native browser decoding or install the
 matching optional WASM decoder. To stream an MP3 without decoding it into an
 `AudioClip`, use `<audio-player src="/mp3/Arabesque%20No.1.mp3" engine="media">`.
+
+## Edit a recording
+
+One [`AudioClipEditor`](/audio/headless/view/audio-clip-editor/), loaded with
+`loadAudioClipEditor(url)`, owns imported samples and a contiguous sequence of
+asset/silence references. Assign it to the `.editor` property of a player and a
+waveform view, then add `editable` to opt into selection, trim,
+split, silence, gain/fades, clipboard and undo/redo. Edits do not duplicate all
+PCM for history; explicit processing and export materialize their requested
+range or snapshot. The player reports its applied document revision and remains
+paused after an edit until Play is pressed again.
+
+For a runnable workflow, see
+[`<audio-clip-view>`](/audio/element/view/audio-clip-view/).
+Custom applications use the same [`AudioClipEditor`](/audio/headless/view/audio-clip-editor/)
+with no DOM and inject it into the [native player](/audio/headless/play/audio-player/)
+and [View interaction controller](/audio/api/view/#document-editing).
+This is single-file contiguous editing; multi-track arrangement, spectral repair
+and project-wide history are separate application work.
 
 ## Play
 

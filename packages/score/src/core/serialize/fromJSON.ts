@@ -16,6 +16,8 @@ import {
 
 type Json = any;
 
+const LEGACY_SCORE_JSON_SCHEMA_ID = 'https://webscore.dev/schema/score/v0.1';
+
 function fail(message: string, code: ScoreJSONErrorCode = 'invalid-json'): never {
   throw new ScoreJSONError(code, message);
 }
@@ -187,6 +189,12 @@ function note(j: Json): Note {
   if (j.stem !== undefined) expectEnum(j.stem, ['up', 'down', 'none', 'double'], `note ${j.id}: stem`);
   expectOptionalBoolean(j.printObject, `note ${j.id}: printObject`);
   if (j.performed !== undefined) performed(j.performed, `note ${j.id}: performed`);
+  if (j.velocityOverride !== undefined) {
+    expectSafeInteger(j.velocityOverride, `note ${j.id}: velocityOverride`);
+    if (j.velocityOverride < 1 || j.velocityOverride > 127) {
+      fail(`note ${j.id}: velocityOverride must be an integer from 1 to 127`);
+    }
+  }
   expectOptionalBoolean(j.chord, `note ${j.id}: chord`);
   if (j.articulations !== undefined) {
     expectStringArray(j.articulations, `note ${j.id}: articulations`, ARTICULATIONS);
@@ -211,6 +219,7 @@ function note(j: Json): Note {
     tupletId: j.tupletId,
     tupletMarks: j.tupletMarks,
     performed: j.performed,
+    velocityOverride: j.velocityOverride,
     voice: VoiceId(j.voice),
     chord: j.chord,
     beams: j.beams,
@@ -473,9 +482,9 @@ export function scoreFromJSON(j: Json): Score {
 
 function parseScoreJSON(j: Json): Score {
   expectObject(j, 'score');
-  if (j.$schema != null && j.$schema !== SCORE_JSON_SCHEMA_ID) {
+  if (j.$schema != null && j.$schema !== SCORE_JSON_SCHEMA_ID && j.$schema !== LEGACY_SCORE_JSON_SCHEMA_ID) {
     fail(
-      `unsupported $schema "${String(j.$schema)}" (supported: ${SCORE_JSON_SCHEMA_ID})`,
+      `unsupported $schema "${String(j.$schema)}" (supported: ${SCORE_JSON_SCHEMA_ID}, ${LEGACY_SCORE_JSON_SCHEMA_ID})`,
       'unsupported-schema',
     );
   }

@@ -18,13 +18,19 @@ export type ParamKind =
   /** Numeric attribute → `<input type="number">`. */
   | 'number'
   /** Free text (URL, selector, label, CSS length, colour, …). */
-  | 'text';
+  | 'text'
+  /**
+   * Space-separated token list → one checkbox per `options` value. Every box
+   * checked while the attribute is absent shows the all-tokens fallback; any
+   * change writes the checked tokens (an empty list when none are checked).
+   */
+  | 'tokens';
 
 export interface ParamSpec {
   /** Attribute name exactly as it appears in `observedAttributes`. */
   readonly name: string;
   readonly kind: ParamKind;
-  /** `enum` only — the accepted values, in source order. */
+  /** `enum` / `tokens` — the accepted values, in source order. */
   readonly options?: readonly string[];
   /** `number` only. */
   readonly min?: number;
@@ -43,6 +49,8 @@ export interface ParamSpec {
    * carry it.
    */
   readonly fallback?: string;
+  /** Boolean only: an existing legacy attribute supplies the inverse fallback. Keep explicit on/off choices. */
+  readonly inverseFallbackAttribute?: string;
   /** One line: what this attribute changes. */
   readonly note: string;
   /**
@@ -57,6 +65,8 @@ export interface ParamSpec {
     readonly values: readonly string[];
     /** Effective value when the controlling enum is absent or invalid. */
     readonly fallback: string;
+    /** Also require this attribute on the same target; retained legacy controls only. */
+    readonly presentAttribute?: string;
   };
 }
 

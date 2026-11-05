@@ -1,86 +1,229 @@
 ---
 title: '<score-sheet-view>'
-description: 'Real engraved sheet music via the optional OpenSheetMusicDisplay peer — beams, ties, slurs and page layout, with an optional playback cursor.'
+description: 'Engraved sheet music in pages or a continuous column, editable like a notation program: select notes, move pitches, write notes in input mode and change durations.'
 sidebar:
-  order: 3
+  order: 4
 ---
 
 import SheetViewPlayground from '../../../../../components/elements/SheetViewPlayground.astro';
 
-Page-oriented engraving with multi-staff systems and responsive line breaks, drawn by the optional [`opensheetmusicdisplay`](https://opensheetmusicdisplay.org/) peer. [`<score-view type="staff">`](/score/element/view/score-view/#staff) provides continuous scrolling notation with beams, tuplets and playback highlighting.
-
-Any input format works — the element serializes the score to MusicXML itself — but **MusicXML in gives the best result**. A MIDI source has no staff assignment, no key signatures and a guessed clef, because MIDI never carried them.
-
-```html
-<script type="module">
-  import { defineScorePlayerElement } from '@webmusic/score/play/element';
-  import {defineSheetViewElement} from '@webmusic/score/view/element';
-  defineScorePlayerElement();
-  defineSheetViewElement();
-</script>
-
-<score-player id="p" src="song.musicxml"></score-player>
-<score-sheet-view src="song.musicxml" player="#p" follow-cursor></score-sheet-view>
-```
-
-The peer is optional and **not installed by default**:
-
-```sh
-npm install opensheetmusicdisplay
-```
-
-Browser bundlers can resolve the installed peer into a lazy chunk. Direct browser
-module use requires an import map for the package name, or an injected
-`.OpenSheetMusicDisplay` constructor. A dependency loading failure displays a
-message naming the package and the injection alternatives.
+`<score-sheet-view>` engraves a score as sheet music. Measures are broken into
+systems that fill the line, each system restates its clef and key, and systems
+are laid out on paper pages or in one continuous column. With a borrowed
+editor and `editable`, it works like a notation program: select notes and
+rests, move pitches, write notes in input mode and change durations. For a
+compact scrolling staff use [`<score-view type="staff">`](/score/element/view/score-view/);
+for DAW-style note editing use [`<score-grid-view>`](/score/element/view/score-grid-view/).
 
 <SheetViewPlayground />
 
-The demo contains one player and one sheet view, configured by external Parameters. SheetView still requires its own `src` or `.score`; `player` follows note events and does not borrow the player’s resolved score or native state snapshot. Copy includes both tags, and Reset restores their initial attributes.
+The demo loads Arabesque No. 1 from MusicXML (`public/mxl/Arabesque No.1.mxl`)
+into one editor. The page owns that editor and lends it to the player and the
+sheet. Every switch and setting is in **Parameters**; the toolbar's layout and
+zoom buttons and Ctrl/Cmd + and − update **layout** and **zoom** there. Reset
+restores the attributes and reloads the piece, discarding edits.
+
+## Import
+
+```html
+<script type="module">
+  import {defineScorePlayerElement} from '@webmusic/score/play/element';
+  import {defineSheetViewElement} from '@webmusic/score/view/element';
+  import {loadScoreEditor} from '@webmusic/score/view/headless';
+  defineScorePlayerElement();
+  defineSheetViewElement();
+  // Your page owns the editor; dispose it after detaching the elements.
+  const editor = await loadScoreEditor('/mxl/Arabesque%20No.1.mxl');
+  const player = /** @type {import('@webmusic/score/play/element').ScorePlayerElement | null} */ (document.getElementById('sheet-player'));
+  const sheet = /** @type {import('@webmusic/score/view/element').SheetViewElement | null} */ (document.querySelector('score-sheet-view'));
+  if (player) player.editor = editor;
+  if (sheet) sheet.editor = editor;
+</script>
+
+<score-player id="sheet-player"></score-player>
+<score-sheet-view player="#sheet-player" editable></score-sheet-view>
+```
+
+A read-only sheet needs only data: `<score-sheet-view src="/mxl/Arabesque%20No.1.mxl"></score-sheet-view>`.
+No optional peer is involved; engraving uses the package's own staff engraver.
+
+## Data and layout
+
+Data comes from `.score`, `src`, the selected player's score, or a borrowed
+`.editor`, with the same precedence and conflicts as
+[`<score-view>`](/score/element/view/score-view/). MusicXML or MXL gives the
+best notation: MIDI carries no key signature, staff assignment or spelling, so
+those are inferred.
+
+| Layout | Drawing |
+| --- | --- |
+| `page` (default) | A4 paper pages stacked in a scrolling desk. The first page carries the title and composer from the score's metadata. With `zoom` absent a page fits the element width. |
+| `flow` | Systems as wide as the element, one after another, without pages. |
+
+Measures are spaced by duration, broken into systems at the line width and
+justified, except a short last system. Every system starts with its clef, key
+signature and brace, and its first measure number; a time signature appears
+where the meter changes. Beams, tuplets, ties, slurs, articulations, clef
+changes and supported directions come from the [staff engraver](/score/element/view/score-view/#annotations-and-compact-layout).
+A tie or slur that crosses a system break is not drawn. `zoom` scales the
+staff (0.5–3); a width change re-breaks the systems.
+
+Zoom never re-engraves a page: in `page` layout the systems break the same at
+every zoom, so the engraved pages are scaled with CSS `zoom` and stay
+vector-sharp. A trackpad pinch or Ctrl/Cmd+wheel zooms around the pointer and
+follows the fingers; while it moves it is a compositor transform of the laid-out
+pages, and it is laid out once when it settles, then reported. In `flow` layout
+the systems fill the width at the engraved scale, so they are re-broken once a
+zoom settles.
+
+## Editing
+
+Editing needs a ready `.editor` and `editable`; the toolbar then appears along
+the top. `tools` lists the offered features — `pitch`, `input`, `duration`,
+`tie`, `accidental`, `delete`, `history`, `zoom` (absent means all). Selection
+and navigation are always available. A feature that is not offered leaves the
+toolbar and stops its keys and gestures.
+
+Each edit is one atomic editor command, so undo, the editor's history and a
+bound player follow it. Edits work locally on the notes you point at, inside
+real scores with several voices, chords, beams and slurs:
+
+| Feature | Edit | Behavior |
+| --- | --- | --- |
+| `pitch` | Arrow keys, dragging a notehead | Up/Down move a semitone, spelled in the key first, then as a natural, then sharp going up and flat going down. Ctrl/Cmd moves an octave; Alt+Shift moves one diatonic step in the key. Dragging moves diatonically by staff position. A tied note moves its whole tie chain. |
+| `input` | N, A–G, 0, clicking the staff | Note input mode writes at a cursor in the selected note's voice. A letter writes that pitch class in the key at the octave nearest the previous note; 0 writes a rest; a click writes the clicked staff position. The cursor advances by the written value. |
+| `duration` | 1–7, `.` | With a selection outside input mode, the event's value changes; a shorter value leaves rests, a longer one replaces what follows within the measure. In input mode they set the value to write. 1 is a sixty-fourth note through 7, a whole note; `.` toggles a dot. |
+| `tie` | `+` | Ties a note to the next note of the same pitch in its voice, or removes that tie. In input mode it writes the same pitch at the cursor, tied. |
+| `accidental` | Flat, natural, sharp buttons | Respell the selected notes with that alteration. |
+| `delete` | Delete, Backspace | Selected notes become rests of the same written value and tuplet; in a chord only the chosen heads go. |
+| `history` | Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z or Ctrl/Cmd+Y | Undo and redo through the borrowed editor. |
+| `zoom` | Zoom buttons, Ctrl/Cmd + and −, Ctrl/Cmd+wheel and trackpad pinch | Change `zoom`; the page and continuous view buttons change `layout`. |
+
+Click selects a note or rest; Ctrl/Cmd+click adds or removes one; Shift+click
+selects the range in the same voice. Left/Right move the selection, or the
+input cursor, to the previous or next event; Escape leaves input mode, then
+clears the selection.
+
+Rewriting a rhythm needs a measure at the cursor and stays inside it. Tuplet
+rhythms, grace notes and notes crossing a barline cannot be rewritten yet; such
+an edit is refused with a short message in the toolbar and an `editerror`
+event, and the score is unchanged. Pitch changes, accidentals and deletion
+work on tuplet notes too. Chords, additional voices and tuplet entry are not
+offered.
+
+## Playback
+
+`player` selects one player in the same Document or ShadowRoot. Sounding notes
+take the active ink and a cursor marks the position in its system;
+`follow-cursor` (default on) scrolls the sounding system into view. The sheet
+never sends playback commands. With an editor, the player contributes time only
+while its applied document matches the editor's committed revision, as for
+[`<score-grid-view>`](/score/element/view/score-grid-view/#playback).
 
 <details class="component-section">
 <summary>API</summary>
 
-| Member | Kind | Description |
+| Member | Kind | Default | Description |
+| --- | --- | --- | --- |
+| `src` / `format` | attributes | none | Explicit MIDI / MusicXML / MXL / ABC URL and optional parser override. Conflicts with `.editor`. |
+| `player` | attribute | none | Unique selector of a player to follow; without other input the sheet borrows its score. |
+| `width` / `height` | attributes | 100% / natural | Bare numbers are px; CSS lengths pass through. |
+| `layout` / `.layout` | attribute / property | `page` | `page` or `flow`; other values read as `page`. |
+| `zoom` / `.zoom` | attribute / property | fit (`0`) | Staff size factor clamped to 0.5–3. Absent, zero or invalid fits a page to the width (page) or uses 1 (flow). |
+| `follow-cursor` / `.followCursor` | attribute / property | true | Scroll the sounding system into view. |
+| `editable` / `.editable` | boolean attribute / property | false | Enable editing for a ready `.editor`; never creates one. |
+| `tools` / `.tools` | attribute / property | every feature | Offered features, space- or comma-separated: `pitch`, `input`, `duration`, `tie`, `accidental`, `delete`, `history`, `zoom`. Unknown tokens are ignored; the getter returns them in that order. |
+| `note-color` / `active-note-color` | attributes | sheet tokens | Notation ink and sounding ink as `#rgb`, `#rrggbb`, `rgb()` or `r, g, b`. |
+| `.score` | writable property | none | Assign a loaded Score; overrides `src` and player data. Throws while `.editor` is assigned. |
+| `.editor` | writable property | none | Borrow any `ScoreEditorPort`; never disposed. `undefined` detaches it. |
+| `.interactionSession` | writable property | sheet-owned session | Borrow a same-document session to share selection and drafts, for example with a grid. |
+| `.currentTime` | read-only property | 0 | Current nominal score position in seconds. |
+| `data-editor-state` / `data-editable-state` / `data-playback-state` / `data-player-state` | reflected state | absent | As on [`<score-grid-view>`](/score/element/view/score-grid-view/). |
+
+**Events.** All are `CustomEvent`s that bubble and are composed.
+
+| Event | `detail` | When |
 | --- | --- | --- |
-| `src` | attribute | URL of a MIDI / MusicXML / MXL / ABC file, loaded through the sibling `@webmusic/score/io` capability. |
-| `format` | attribute | Force a parser when the extension is missing or ambiguous. |
-| `player` | attribute | Selector for a player to follow; the OSMD cursor tracks the sounding note and a note released mid-chord leaves its siblings lit. |
-| `follow-cursor` | attribute | Scroll the cursor into view on each move. Defaults to on; set `follow-cursor="false"` to keep the page still. Changes apply to the existing cursor without rebuilding the engraving. |
-| `width` / `height` | attribute | Element size — a bare number is `px`, or any CSS length. A fixed `height` scrolls a long score inside the box. Size changes update layout without reloading the source or recreating OSMD. |
-| `.score` | property | Assign a pre-loaded `Score`; overrides `src`. |
-| `.OpenSheetMusicDisplay` | property | Inject the OSMD constructor instead of loading the peer (bundlers, tests, pinned builds). |
-| `.osmd` | property | Reuse an already-constructed OSMD instance. |
+| `editpreview` | `ScoreDraftResult` with `status: 'preview'` | A notehead drag produced a valid draft. |
+| `editcommit` | `ScoreEditResult` with `status: 'committed'` | An edit committed. |
+| `editerror` | `{error}` | An edit the score cannot take, such as a tuplet rhythm. |
+| `sheetsettingschange` | `{settings, changed}`: the `ScoreSheetSettings` (`layout`, `zoom`, `inputMode`, `duration`, `dotted`) and the changed key | The toolbar or keyboard changed a setting; `layout` and `zoom` are also reflected to their attributes. |
 
-No events. Swapping the score mid-render supersedes the older engraving instead of letting it paint over the newer one.
+```ts
+import {defineSheetViewElement, type ScoreSheetSettingsChangeDetail, type SheetViewElement} from '@webmusic/score/view/element';
 
-For the same renderer without a custom element, call `renderOSMDStaffVisualizer(score, container, options)` from [`@webmusic/score/view/render`](/score/api/view/) — the element is that call plus attribute plumbing.
+defineSheetViewElement();
+const sheet = document.querySelector<SheetViewElement>('score-sheet-view')!;
+sheet.tools = ['pitch', 'delete', 'history'];
+sheet.addEventListener('sheetsettingschange', (event) => {
+  const {settings, changed} = (event as CustomEvent<ScoreSheetSettingsChangeDetail>).detail;
+  console.log(changed, settings[changed]);
+});
+```
+
+`SheetViewElement`, `defineSheetViewElement(tag?)`, `SHEET_VIEW_FEATURES` and
+the types `ScoreSheetFeature`, `ScoreSheetLayout`, `ScoreSheetDuration`,
+`ScoreSheetSettings` and `ScoreSheetSettingsChangeDetail` are exported from
+`@webmusic/score/view/element`. Registration is idempotent and SSR-safe. The
+element mounts [`mountScoreSheet`](/score/api/view/#mount-a-score-sheet) from
+`@webmusic/score/view/render`.
+
+**Lifecycle.** Disconnect cancels a pending load and an active drag, releases
+the engraving, its listeners and resize observer, and the sheet-owned session.
+The borrowed editor, a supplied session and the player stay alive.
+
+**Accessibility.** An editable sheet's pages are one focusable region described
+by instructions that list the keys, and a polite live status announces the
+selected or written note and refused edits. Both are read by assistive
+technology but not drawn. Icon buttons carry accessible names and tooltips and
+report their pressed state; the note-value button opens a modal card that keeps
+focus until it closes. Selection draws a frame around the notes, so it does not
+rely on color. A read-only sheet is outside the tab order.
 
 </details>
 
 <details class="component-section">
 <summary>Styling</summary>
 
-The host fills its container and accepts application CSS or explicit `width` / `height` attributes. Removing a size attribute clears only the size set by the element; application inline styles and `hidden` remain usable.
+The sheet is light DOM, so style its parts with ordinary attribute selectors
+such as `score-sheet-view [part~="page"]`.
 
-The engraving keeps a minimum layout width of `32rem` so narrow containers scroll horizontally instead of squeezing notes together. Override `--wm-sheet-min-width` when the score or application needs a different readable width. This changes the inner drawing, while the host continues to fit its container. The component composes [UIKit stage](/uikit/layout-feedback/stage/) for this scrolling surface and [status](/uikit/layout-feedback/status/) for engraving errors.
+| Part | Element |
+| --- | --- |
+| `sheet` | The bordered window holding the toolbar, viewport and card overlay. |
+| `toolbar` | The one-row icon toolbar; contains `tool-button`, `duration-button`, `message` and `toolbar-group` dividers. |
+| `message` | The short reason for a refused edit, in the toolbar. |
+| `viewport` | The scrolling desk around the pages. |
+| `pages` | The column of pages. |
+| `page` | One paper page (or the whole column in flow layout); holds `title`, `composer` and `system` parts. |
+| `system` | One engraved system. |
+| `selection` | The frame around a selected note or rest. |
+| `overlay` / `card` | The dimmed backdrop and the note-value card; `duration-options` holds each `duration-option`, and the header holds `card-close`. |
 
-The default remains black ink on white paper. Paper follows `--wm-sheet-background`, then `--wm-surface`, then white; ink follows `--wm-sheet-foreground`, then `--wm-foreground`, then black. Set the paper or shared surface to `transparent` and choose an ink color suitable for the application background. The actual SVG noteheads, stems, staff lines and labels consume the ink token. OSMD's drawing background stays transparent underneath the stage.
+The sheet part reflects `data-layout` and, while editable, `data-editable`.
 
-The frame accepts `--wm-component-background`, `--wm-component-border` (complete shorthand) and `--wm-component-radius`, with the stage's `--wm-stage-surface-*` overrides taking precedence. These and the ink/paper CSS tokens update after host or ancestor class/style changes without reloading the score or replacing its cursor. Use ordinary light-DOM selectors for the exposed `[part~="root"]` and `[part~="surface"]` nodes. The native OSMD cursor retains its own drawing style.
-
-An explicitly adopted `.osmd` instance retains the caller's rendering options and ink; configure that instance through OSMD's own API. The lower-level OSMD renderer likewise retains application-owned styles and `osmdOptions` precedence. No global SVG recoloring overrides explicitly colored content.
-
-| Token | Default | Purpose |
-| --- | --- | --- |
-| `--wm-sheet-min-width` | `32rem` | Minimum readable engraving width inside the scrolling viewport. |
-| `--wm-sheet-background` | `var(--wm-surface, #fff)` | Paper behind the engraved notation; accepts `transparent`. |
-| `--wm-sheet-foreground` | `var(--wm-foreground, #000)` | Default SVG music and label ink for an Element-created OSMD instance. |
+| Property | Effect |
+| --- | --- |
+| `--wm-score-sheet-note` | Notation ink, then `--wm-foreground`. |
+| `--wm-score-sheet-active-note` | Ink of sounding notes, then `--wm-score-view-active-note`, default `rgb(240, 84, 119)`. |
+| `--wm-score-sheet-paper` | Page background, then `--wm-surface`. |
+| `--wm-score-sheet-background` | The desk around pages, then `--wm-surface-muted`. |
+| `--wm-score-sheet-max-height` | Maximum viewport height before it scrolls; default `40rem`. |
+| `--wm-score-sheet-scrim` | Backdrop behind an open card; default 45% black. |
+| `--wm-score-sheet-text-font` | Title and composer font; default a serif stack. |
+| `--wm-foreground`, `--wm-foreground-muted`, `--wm-accent-foreground`, `--wm-surface-muted` | Icons, pressed fills, selection frames and hover fills. |
+| `--wm-control-border`, `--wm-border` | Window, toolbar, page and card lines. |
+| `--wm-control-size`, `--wm-control-radius`, `--wm-font-mono`, `--wm-focus-ring` | Toolbar geometry, captions and focus outlines. |
 
 ```css
-score-sheet-view { --wm-sheet-min-width: 36rem; }
+score-sheet-view {
+  --wm-score-sheet-max-height: 28rem;
+  --wm-score-sheet-paper: #fffdf7;
+}
 ```
 
-For an owned OSMD instance, the renderer reflows on container-width changes; height-only changes do not re-engrave the score. It uses `ResizeObserver`, falls back to window resize when unavailable, and releases observation and pending resize work on disposal. A borrowed `.osmd` instance keeps its existing lifecycle.
-
 </details>
+
+## Related
+
+[Piano-roll grid editing](/score/element/view/score-grid-view/) · [Scrolling staff and other drawings](/score/element/view/score-view/) · [ScoreEditor](/score/headless/view/score-editor/) · [Editable document playback](/score/element/play/score-player/#play-an-editable-document) · [View API and renderers](/score/api/view/)

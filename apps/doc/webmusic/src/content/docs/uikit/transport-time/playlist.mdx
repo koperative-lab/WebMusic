@@ -9,8 +9,8 @@ sidebar:
 import UiPresenterLiveDemo from '../../../../components/UiPresenterLiveDemo.astro';
 import UiPresenterRelated from '../../../../components/UiPresenterRelated.astro';
 
-`mountPlaylist()` renders previous, play/pause, next, and seek controls over an ordered list of
-entries. It paints caller-owned `PlaylistState` and routes every transport or selection gesture
+`mountPlaylist()` renders an edge-to-edge row of previous, play/pause and next icon buttons and a
+seek rail over an ordered list of entries. It paints caller-owned `PlaylistState` and routes every transport or selection gesture
 through a required structural `PlaylistBinding`; it never owns a player, queue, decoder, or file.
 
 Use [transport](/uikit/transport-time/transport/) for one current item without a queue,
@@ -71,15 +71,19 @@ state to change.
 
 | Member | Kind | Description |
 |---|---|---|
-| `playing` | `boolean` | Strict `true` chooses the pause glyph/label; otherwise uses play. |
+| `playing` | `boolean` | Strict `true` chooses the pause icon and name and presses the toggle; otherwise uses play. |
 | `progress` | `number` | Current-entry position. Finite values clamp to `0…1`; non-finite values paint as `0`. |
 | `disabled?` | `boolean` | Strict `true` disables transport controls and blocks every command, including row selection; the root exposes `aria-disabled`. |
 | `items` | `readonly PlaylistItem[]` | Ordered entries. Absence at runtime is treated as an empty list. |
+| `status?` | `StatusState` | Optional owner readiness from [Status](/uikit/layout-feedback/status/). Defaults to waiting for an empty list and ready otherwise; loading/waiting use accessible square animations. Existing entries remain available. |
 
 `PlaylistItem` contains required `id` and `label`, optional preformatted `duration`, optional
 `active`, and optional `status: 'loading' | 'error'`. Strict `active: true` sets
-`aria-current`; status adds a styling data attribute. The presenter does not synthesize status
-text or mutate the item objects.
+`aria-current`; status adds a styling data attribute. Loading replaces the duration with the
+shared four-square indicator and a visually hidden description; failure shows `Unable to load`.
+The row and keyboard focus remain stable across those transitions. The presenter never mutates
+the item objects. Only loading the active entry marks the entire playlist busy; background
+prefetch remains local to its row.
 
 **Binding**
 
@@ -121,13 +125,15 @@ text or mutate the item objects.
 | `update()` | `() => void` | Re-reads and patches state; becomes a no-op after destruction. |
 | `destroy()` | `() => void` | Idempotently disposes the subscription and removes presenter DOM and any installed stylesheet. |
 
-**Accessibility.** Previous, toggle, and next are native buttons with accessible names; the
-toggle name follows `playing`. Seek is a native range labelled `Seek`, and all four transport
+**Accessibility.** Previous, toggle, and next are native icon buttons named in `aria-label` and
+`title`, with the icon hidden from assistive technology; the toggle name follows `playing` and
+its `aria-pressed` state is `true` while playing. Seek is a native range labelled `Seek`, and all four transport
 controls reflect `disabled` through the native attribute. The ordered list receives `label` as
 its accessible name. Each row is a focusable `role="button"` with click, Enter, and Space
-activation plus `aria-current` for the active item. Root `disabled` blocks row selection as well as transport commands. Loading/error remain
-visual data states, so the binding owns status messaging and per-item selection policy. Caller nodes outside the presenter root are never
-rewritten.
+activation plus `aria-current` for the active item. Root `disabled` blocks row selection as
+well as transport commands. Loading descriptions are visually hidden live feedback; failures
+remain visible. Empty waiting queues hide the unused transport and list. The binding retains
+per-item selection policy, and caller nodes outside the presenter root are never rewritten.
 
 </details>
 
@@ -139,39 +145,43 @@ background (including `transparent`), foreground, accent, outer border and corne
 Presenter-specific tokens below take precedence within their documented roles.
 
 The installed stylesheet resolves presenter-specific playlist tokens through shared `--wm-*`
-values and then literals.
+values and then literals. The root has no inset: the transport row runs edge to edge, one control
+height tall, with a hairline under it, and scrolls sideways without a visible scrollbar on a
+narrow host. Icon buttons are muted and unframed when idle, ink on a raised fill on hover,
+inverted while pressed, and 30% opaque when disabled. Rows highlight with the raised fill on
+hover; the current row is inverted ink. Numbers and durations use mono type. A disabled
+playlist drops its rows to 30% opacity.
 
 **Tokens**
 
 | Property | Falls back to | Default | Controls |
 |---|---|---|---|
-| `--wm-playlist-height` | `--wm-control-size` → `--wui-row-h` | `2rem` | Height of the transport buttons and of the seek rail. |
+| `--wm-playlist-height` | `--wm-control-size` → `--wui-row-h` | `2rem` | Height of the transport row, of each icon button (also its minimum width) and of the seek rail. |
 | `--wm-playlist-track` | `--wm-surface-muted` | `#f3f3f3` | Unfilled seek rail. |
 | `--wm-playlist-thumb` | `--wm-foreground` | `#111` | Seek handle fill. |
 | `--wm-playlist-thumb-radius` | `--wm-control-radius` | `0` | Seek handle corners. |
 | `--wm-playlist-handle-size` | literal | `.9rem` | Seek handle width. Its height follows the control size. |
-| `--wm-playlist-border` | `--wm-border` | `#d8d8d8` | Root border. |
-| `--wm-playlist-radius` | `--wm-control-radius` | `0` | Root, button, and item corners. |
-| `--wm-playlist-background` | `--wm-surface` | `#fff` | Root background. |
-| `--wm-playlist-text` | `--wm-foreground` | `#444` | Root text color. |
+| `--wm-playlist-border` | `--wm-border` | `light-dark(#d8d8d8, #333)` | Root border. |
+| `--wm-control-border` | `--wm-border` | `light-dark(#d8d8d8, #333)` | Hairline under the transport row and before the seek rail. |
+| `--wm-playlist-radius` | `--wm-control-radius` | `0` | Root and seek-rail corners; rows are square. |
+| `--wm-control-radius` | literal | `0` | Icon-button corners. |
+| `--wm-playlist-background` | `--wm-surface` | `light-dark(#fff, #111)` | Root background. |
+| `--wm-playlist-text` | `--wm-foreground` | `light-dark(#111, #eee)` | Root text color. |
 | `--wm-font-family` | `--wm-font` | `system-ui, sans-serif` | Playlist UI font. |
-| `--wm-playlist-button-border` | `--wm-control-border` → `--wm-border` | `#d8d8d8` | Previous and next button borders. |
-| `--wm-control-border` | `--wm-border` | `#d8d8d8` | Shared non-primary control border fallback. |
-| `--wm-playlist-button` | `--wm-surface` | `#fff` | Previous and next button backgrounds. |
-| `--wm-playlist-button-text` | `--wm-foreground` | `#444` | Previous and next button glyphs. |
-| `--wm-playlist-primary-border` | `--wm-playlist-button-border` → `--wm-accent` | `#111` | Primary play/pause button border. |
-| `--wm-playlist-primary-background` | `--wm-playlist-button` → `--wm-accent` | `#111` | Primary play/pause button background. |
-| `--wm-playlist-primary-foreground` | `--wm-playlist-button-text` → `--wm-accent-foreground` | `#fff` | Primary play/pause button glyph. |
-| `--wm-playlist-accent` | `--wm-accent` | `#111` | Native seek accent. |
-| `--wm-playlist-active` | Literal | `rgba(17, 17, 17, .08)` | Active-row background. |
-| `--wm-playlist-error` | `--wm-error` | `#c0392b` | Error-row text. |
-| `--wm-focus` | `currentColor` | Current text color | 2px keyboard-focus outline on rows, transport buttons and seek control. |
-| `--wm-playlist-muted` | `--wm-foreground-muted` | `#666` | Duration text. |
+| `--wm-font-mono` | literal | `ui-monospace, SFMono-Regular, Menlo, monospace` | Entry numbers and durations. |
+| `--wm-foreground-muted` | literal | `light-dark(#777, #aaa)` | Idle transport icons. |
+| `--wm-surface-muted` | literal | `light-dark(#f3f3f3, #1c1c1c)` | Hover fill of icon buttons and rows. |
+| `--wm-playlist-accent` | `--wm-accent` | `#111` | Filled part of the seek rail. |
+| `--wm-playlist-active` | `--wm-foreground` | `light-dark(#111, #eee)` | Current-row background. |
+| `--wm-playlist-active-foreground` | `--wm-accent-foreground` | `light-dark(#fff, #111)` | Current-row text, number and duration. |
+| `--wm-accent-foreground` | literal | `light-dark(#fff, #111)` | Icon on the pressed play/pause fill. |
+| `--wm-playlist-error` | `--wm-error` | `light-dark(#c0392b, #ef5350)` | Error-row text. |
+| `--wm-focus-ring` | literal | `2px solid var(--wm-foreground)` | Focus outline on rows, transport buttons and seek control, drawn inside. |
+| `--wm-playlist-muted` | `--wm-foreground-muted` | `light-dark(#777, #aaa)` | Number and duration text. |
 
 **Classes**
 
-`classNames` adds compatibility classes alongside the canonical classes for its six public node
-roles. Labels and durations expose canonical classes but have no `classNames` key.
+`classNames` adds compatibility classes alongside the canonical classes for these public nodes.
 
 | Node | Canonical class | `classNames` key |
 |---|---|---|
@@ -184,6 +194,12 @@ roles. Labels and durations expose canonical classes but have no `classNames` ke
 | Entry number | `.wui-playlist__number` | `number` |
 | Entry label | `.wui-playlist__label` | `label` |
 | Entry duration | `.wui-playlist__duration` | `duration` |
+| Whole-list feedback | `.wui-playlist__status` | `status` |
+| Per-entry feedback | `.wui-playlist__item-status` | `itemStatus` |
+
+The `status` class/part hook reaches whole-list feedback; `itemStatus` adds classes or parts
+to each `item-status` host. Shared [Status tokens](/uikit/layout-feedback/status/) and
+reduced-motion behavior apply to both.
 
 **Parts**
 
@@ -203,6 +219,8 @@ carries its action modifier.
 | Entry number | `number` | `number` |
 | Entry label | `label` | `label` |
 | Entry duration | `duration` | `duration` |
+| Whole-list feedback | `status` | `status` |
+| Per-entry feedback | `item-status` | `itemStatus` |
 
 With `stylesheet: false`, the presenter installs no style node; the caller must style these
 classes and parts itself.

@@ -1,7 +1,8 @@
 import {installStyle} from './internal/style';
 import {claimHost, createUpdateLoop} from "./internal/lifecycle";
 import {markEmptyState, addClassNames, clamp, finite, setParts} from './internal/dom';
-import {componentSurfaceCss, controlBorderFallback} from './internal/surface';
+import {componentSurfaceCss} from './internal/surface';
+import {neutralColor} from './internal/palette';
 // ============================================================================
 // Domain-neutral parameter-rack presenter.
 //
@@ -73,7 +74,7 @@ export interface ParameterRackParts {
 }
 
 export interface ParameterRackOptions {
-  /** Flat racks border each item; grouped racks border each named group. */
+  /** Flat racks list every item in one row; grouped racks caption each named group and divide groups with a hairline. */
   layout?: "flat" | "grouped";
   emptyLabel?: string;
   formatValue?: (parameter: ParameterRackItem, value: number) => string;
@@ -136,15 +137,19 @@ const KNOB_START = -135;
 const KNOB_END = 135;
 let parameterRackSequence = 0;
 
+/** Hairline between groups: the control line colour, never a nested box. */
+const lineFallback = `var(--wm-control-border, var(--wm-border, ${neutralColor('border')}))`;
+const monoFont = 'var(--wm-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)';
+
 export const parameterRackStyle = String.raw`
 .wui-parameter-rack,
 .wui-parameter-rack * { box-sizing: border-box; }
 .wui-parameter-rack {
 ${componentSurfaceCss('parameter', {
   padding: 'var(--wm-parameter-padding, .6rem)',
-  border: '1px solid var(--wm-parameter-border, var(--wm-border, #d8d8d8))',
+  border: `1px solid var(--wm-parameter-border, var(--wm-border, ${neutralColor('border')}))`,
   radius: 'var(--wm-parameter-radius, var(--wm-control-radius, 0))',
-  background: 'var(--wm-parameter-background, var(--wm-surface, #fff))',
+  background: 'var(--wm-parameter-background, var(--wm-surface, light-dark(#fff, #111)))',
 })}
   display: flex;
   flex-wrap: wrap;
@@ -152,27 +157,32 @@ ${componentSurfaceCss('parameter', {
   gap: var(--wm-parameter-gap, .6rem);
   min-width: 0;
   max-width: 100%;
-  color: var(--wm-parameter-foreground, var(--wm-foreground, #444));
+  color: var(--wm-parameter-foreground, var(--wm-foreground, ${neutralColor('foreground')}));
   font: .8rem/1.3 var(--wm-font-family, system-ui, sans-serif);
 }
-.wui-parameter-rack__group {
+/* Groups sit inside the rack's one frame. They are separated by a hairline,
+   not drawn as cards; --wm-parameter-item-border colours that line. */
+:where(.wui-parameter-rack__group) {
   display: flex;
   flex-direction: column;
   min-width: 0;
   max-width: 100%;
   gap: var(--wm-parameter-group-gap, .4rem);
-  padding: .45rem .5rem .55rem;
-  border: 1px solid var(--wm-parameter-item-border, var(--wm-parameter-border, ${controlBorderFallback}));
-  border-radius: var(--wm-parameter-item-radius, var(--wm-parameter-radius, var(--wm-control-radius, 0)));
-  background: var(--wm-parameter-item-background, var(--wm-parameter-background, var(--wm-surface, #fff)));
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
-.wui-parameter-rack__group-label {
+:where(.wui-parameter-rack__group + .wui-parameter-rack__group) {
+  padding-inline-start: var(--wm-parameter-gap, .6rem);
+  border-inline-start: 1px solid var(--wm-parameter-item-border, var(--wm-parameter-border, ${lineFallback}));
+}
+:where(.wui-parameter-rack__group-label) {
   min-width: 0;
   overflow-wrap: anywhere;
-  color: var(--wm-parameter-heading, var(--wm-parameter-foreground, var(--wm-foreground, #444)));
-  font-size: .66rem;
-  font-weight: 600;
-  letter-spacing: .03em;
+  color: var(--wm-parameter-heading, var(--wm-foreground-muted, ${neutralColor('muted')}));
+  font: 500 .625rem/1.2 ${monoFont};
+  letter-spacing: .08em;
   text-transform: uppercase;
 }
 .wui-parameter-rack__items {
@@ -191,48 +201,51 @@ ${componentSurfaceCss('parameter', {
   min-width: 0;
   max-width: 100%;
 }
-.wui-parameter-rack[data-layout='flat'] > .wui-parameter-rack__item {
-  padding: .4rem .35rem;
-  border: 1px solid var(--wm-parameter-item-border, var(--wm-parameter-border, ${controlBorderFallback}));
-  border-radius: var(--wm-parameter-item-radius, var(--wm-parameter-radius, var(--wm-control-radius, 0)));
-  background: var(--wm-parameter-item-background, var(--wm-parameter-background, var(--wm-surface, #fff)));
+:where(.wui-parameter-rack[data-layout='flat'] > .wui-parameter-rack__item) {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
-.wui-parameter-rack__label {
+:where(.wui-parameter-rack__label) {
   max-width: min(100%, var(--wm-parameter-label-width, 5rem));
   overflow-wrap: anywhere;
-  color: var(--wm-parameter-label, var(--wm-foreground-muted, var(--wm-foreground, #666)));
-  font-size: .68rem;
+  color: var(--wm-parameter-label, var(--wm-foreground-muted, ${neutralColor('muted')}));
+  font: 500 .625rem/1.2 ${monoFont};
+  letter-spacing: .08em;
+  text-transform: uppercase;
   text-align: center;
 }
+/* The dial is a drawing, sized from the shared control height. */
 .wui-parameter-rack__control {
   position: relative;
   display: block;
-  width: var(--wm-parameter-size, 46px);
-  height: var(--wm-parameter-size, 46px);
+  width: var(--wm-parameter-size, calc(1.5 * var(--wm-control-size, 2rem)));
+  height: var(--wm-parameter-size, calc(1.5 * var(--wm-control-size, 2rem)));
   border-radius: 50%;
 }
 .wui-parameter-rack__control svg { display: block; width: 100%; height: 100%; }
-.wui-parameter-rack__track {
+:where(.wui-parameter-rack__track) {
   fill: none;
-  stroke: var(--wm-parameter-track, #dcdcdc);
+  stroke: var(--wm-parameter-track, var(--wm-surface-muted, light-dark(#dcdcdc, #333)));
   stroke-width: var(--wm-parameter-stroke, 5);
   stroke-linecap: butt;
 }
-.wui-parameter-rack__fill {
+:where(.wui-parameter-rack__fill) {
   fill: none;
-  stroke: var(--wm-parameter-fill, var(--wm-accent, #999));
+  stroke: var(--wm-parameter-fill, var(--wm-accent, light-dark(#999, #888)));
   stroke-width: var(--wm-parameter-stroke, 5);
   stroke-linecap: butt;
 }
-.wui-parameter-rack__modulation {
+:where(.wui-parameter-rack__modulation) {
   fill: none;
-  stroke: var(--wm-parameter-modulation, var(--wm-accent, #999));
+  stroke: var(--wm-parameter-modulation, var(--wm-accent, light-dark(#999, #888)));
   stroke-width: 2;
   stroke-dasharray: 2 1;
   stroke-linecap: butt;
 }
-.wui-parameter-rack__pointer {
-  stroke: var(--wm-parameter-pointer, var(--wm-foreground, #111));
+:where(.wui-parameter-rack__pointer) {
+  stroke: var(--wm-parameter-pointer, var(--wm-foreground, ${neutralColor('foreground')}));
   stroke-width: 3;
   stroke-linecap: butt;
 }
@@ -248,28 +261,28 @@ ${componentSurfaceCss('parameter', {
   writing-mode: vertical-lr;
   direction: rtl;
 }
-.wui-parameter-rack__control:focus-within {
-  outline: 2px solid var(--wm-focus, var(--wm-focus-ring, currentColor));
-  outline-offset: 2px;
+/* The native range is transparent, so its focus is drawn on the dial box. */
+:where(.wui-parameter-rack__control:focus-within) {
+  outline: var(--wm-focus-ring, 2px solid var(--wm-foreground, ${neutralColor('foreground')}));
+  outline-offset: -2px;
 }
 .wui-parameter-rack__input:disabled { cursor: default; }
-.wui-parameter-rack__item.is-disabled { opacity: .45; }
-.wui-parameter-rack__value {
+:where(.wui-parameter-rack__item.is-disabled) { opacity: .3; }
+:where(.wui-parameter-rack__value) {
   max-width: min(100%, var(--wm-parameter-label-width, 5rem));
   overflow-wrap: anywhere;
-  color: var(--wm-parameter-value, var(--wm-parameter-foreground, var(--wm-foreground, #444)));
-  font-size: .7rem;
+  color: var(--wm-parameter-value, var(--wm-parameter-foreground, var(--wm-foreground, ${neutralColor('foreground')})));
+  font: 500 .6875rem/1.2 ${monoFont};
   font-variant-numeric: tabular-nums;
   text-align: center;
 }
-.wui-parameter-rack__empty {
-  color: var(--wm-parameter-label, var(--wm-foreground-muted, var(--wm-foreground, #777)));
+:where(.wui-parameter-rack__empty) {
+  color: var(--wm-parameter-label, var(--wm-foreground-muted, ${neutralColor('muted')}));
   font-size: .72rem;
 }
 @media (forced-colors: active) {
   .wui-parameter-rack,
-  .wui-parameter-rack__group,
-  .wui-parameter-rack[data-layout='flat'] > .wui-parameter-rack__item { border-color: CanvasText; }
+  .wui-parameter-rack__group + .wui-parameter-rack__group { border-color: CanvasText; }
   .wui-parameter-rack__track { stroke: GrayText; }
   .wui-parameter-rack__fill,
   .wui-parameter-rack__modulation { stroke: Highlight; }

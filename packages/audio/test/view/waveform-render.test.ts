@@ -97,6 +97,28 @@ afterEach(() => {
 });
 
 describe('renderWaveformVisualizer raster stability', () => {
+  it('reads only visible frames from a sequence waveform source and gates playback paint', () => {
+    const {composites} = stubCanvas();
+    const host = mountHost(20);
+    const readPeaks = vi.fn((_start: number, _end: number) => [{min: -.5, max: .5}]);
+    const visualizer = renderWaveformVisualizer(host, {sampleRate: 100, channels: 1, frameCount: 10000, readPeaks}, {
+      pixelsPerSecond: 100, waveColor: '#123456', progressColor: '#abcdef',
+    });
+    expect(readPeaks).toHaveBeenCalled();
+    expect(readPeaks.mock.calls.length).toBeLessThanOrEqual(21);
+    expect(readPeaks.mock.calls.every(([start, end]) => start >= 0 && end <= 21)).toBe(true);
+    visualizer.setPlayheadVisible?.(false); visualizer.redraw(2); visualizer.redraw();
+    expect([...new Set(composites.at(-1)!.fills.map((fill) => fill.color))]).toEqual(['rgb(18, 52, 86)']);
+    visualizer.setOffset(10); readPeaks.mockClear(); visualizer.redraw();
+    expect(readPeaks.mock.calls.every(([start, end]) => start >= 1000 && end <= 1021)).toBe(true);
+    visualizer.dispose();
+  });
+
+  it('does not request samples for an empty sequence source', () => {
+    stubCanvas(); const host = mountHost(200), readPeaks = vi.fn(() => [{min: 0, max: 0}]);
+    const visualizer = renderWaveformVisualizer(host, {sampleRate: 48000, channels: 1, frameCount: 0, readPeaks});
+    visualizer.redraw(); expect(readPeaks).not.toHaveBeenCalled(); visualizer.dispose();
+  });
   it.each([0.75, 1, 1.25, 2])('keeps adjacent translucent bars on integer texels at DPR %s', (dpr) => {
     const {canvases, composites, operations} = stubCanvas();
     const host = mountHost(400);
@@ -375,5 +397,87 @@ describe('renderWaveformVisualizer split channel hit testing', () => {
     expect(viz.hitTest(0, 60)).toMatchObject({channel: 1});
     expect(viz.hitTest(0, 99)).toMatchObject({channel: 1});
     viz.dispose();
+  });
+});
+
+describe('renderWaveformVisualizer peaks, bins and geometry', () => {
+  it('folds every sub-pixel pyramid peak a column covers', () => {
+    const {composites} = stubCanvas();
+    const host = mountHost(10);
+    Object.defineProperty(HTMLDivElement.prototype, 'clientHeight', {value: 100, configurable: true});
+    // 4 peaks per pixel; only the third peak of each column is loud.
+    const data = new Int8Array(40 * 2);
+    for (let peak = 0; peak < 40; peak += 1) {
+      const amp = peak % 4 === 2 ? 127 : 8;
+      data[peak * 2] = -amp;
+      data[peak * 2 + 1] = amp;
+    }
+    const viz = renderWaveformVisualizer(host, {
+      sampleRate: 400, channels: 1, baseSamplesPerPeak: 1, levels: [{samplesPerPeak: 1, data}],
+    } as AudioPeaks, {pixelsPerSecond: 100, height: 100, waveColor: '#999', progressColor: '#999'});
+    const bars = composites.at(-1)!.fills;
+    expect(bars).toHaveLength(10);
+    // Sampling only the first peak per column drew every bar at the quiet level.
+    expect(bars.every((bar) => bar.height > 95)).toBe(true);
+    viz.dispose();
+  });
+
+  it('reads a sequence source in power-of-two bins aligned to the clip across zoom steps', () => {
+    stubCanvas();
+    const host = mountHost(50);
+    const readPeaks = vi.fn((_start: number, _end: number) => [{min: -.5, max: .5}]);
+    const viz = renderWaveformVisualizer(host, {sampleRate: 1000, channels: 1, frameCount: 100_000, readPeaks}, {
+      pixelsPerSecond: 100,
+    });
+    const ranges = (): string[] => readPeaks.mock.calls.map(([start, end]) => `${start}-${end}`);
+    // 10 frames per pixel → 8-frame bins starting on multiples of 8.
+    expect(readPeaks.mock.calls.every(([start, end]) => start % 8 === 0 && end - start === 8)).toBe(true);
+    const before = new Set(ranges());
+    readPeaks.mockClear();
+    viz.setZoom(90); // 11.1 frames per pixel: still 8-frame bins on the same grid.
+    expect(readPeaks.mock.calls.every(([start, end]) => start % 8 === 0 && end - start === 8)).toBe(true);
+    expect(ranges().filter((range) => before.has(range)).length).toBeGreaterThan(ranges().length / 2);
+    viz.dispose();
+  });
+
+  it('applies an anchored zoom start before its one paint', () => {
+    const {composites} = stubCanvas();
+    const host = mountHost(200);
+    const viz = renderWaveformVisualizer(host, peaks(4096), {pixelsPerSecond: 100, durationSeconds: 20});
+    viz.setOffset(4);
+    const seen: Array<{startSeconds: number; endSeconds: number}> = [];
+    viz.onViewportChange((viewport) => seen.push(viewport));
+    composites.length = 0;
+    viz.setZoom(200, 4.5);
+    expect(composites).toHaveLength(1);
+    expect(viz.viewport()).toEqual({startSeconds: 4.5, endSeconds: 5.5});
+    expect(seen).toEqual([{startSeconds: 4.5, endSeconds: 5.5}]);
+    viz.dispose();
+  });
+
+  it('hides the native scrollbar and measures layout before writing it', () => {
+    stubCanvas();
+    const host = mountHost(200);
+    const viz = renderWaveformVisualizer(host, peaks(), {pixelsPerSecond: 100});
+    const scroller = host.querySelector<HTMLElement>('[data-wm-hidden-scrollbar]')!;
+    expect(scroller).not.toBeNull();
+    expect(host.querySelector('style')?.textContent).toContain('::-webkit-scrollbar { display: none; }');
+    const spacer = scroller.firstElementChild as HTMLElement;
+    const order: string[] = [];
+    const width = Object.getOwnPropertyDescriptor(HTMLDivElement.prototype, 'clientWidth')!;
+    Object.defineProperty(HTMLDivElement.prototype, 'clientWidth', {
+      configurable: true, get() { order.push('read'); return 200; },
+    });
+    const style = spacer.style;
+    const setWidth = vi.spyOn(style, 'width', 'set').mockImplementation(() => { order.push('write'); });
+    try {
+      viz.setZoom(150);
+      expect(order[0]).toBe('read');
+      expect(order.lastIndexOf('read')).toBeLessThan(order.indexOf('write'));
+    } finally {
+      setWidth.mockRestore();
+      Object.defineProperty(HTMLDivElement.prototype, 'clientWidth', width);
+      viz.dispose();
+    }
   });
 });

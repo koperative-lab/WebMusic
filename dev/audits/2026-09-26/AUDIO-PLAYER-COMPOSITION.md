@@ -62,7 +62,7 @@ only their canonical name/markup was migrated, with assertions preserved.
 
 ## Browser evidence
 
-Codex in-app browser at localhost:4321, normal viewport (screenshot 1264×728),
+embedded Chromium browser at localhost:4321, normal viewport (screenshot 1264×728),
 neutral light theme. Temporary verification tab closed afterward; user tabs kept.
 
 - Playlist: one central Play/Pause/seek/time row and three entry buttons; keyboard

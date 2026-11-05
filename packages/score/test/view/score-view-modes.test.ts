@@ -58,27 +58,31 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('score-view lightweight modes', () => {
+describe('score-view type switching', () => {
+  it('accepts only piano-roll, staff and waterfall; retired map and thumbnail values fall back to piano-roll', async () => {
+    const view = await mount('piano-roll', {}, music());
+    for (const retired of ['map', 'thumbnail']) {
+      view.setAttribute('type', retired);
+      expect(view.type).toBe('piano-roll');
+      expect(view.querySelector('button, input[type="range"]')).toBeNull();
+    }
+    expect('forPart' in view).toBe(false);
+    expect('cells' in view).toBe(false);
+    expect(ScoreViewElement.observedAttributes).not.toContain('for-part');
+    expect(ScoreViewElement.observedAttributes).not.toContain('cells');
+  });
+
   it('switches loaded URL modes without another fetch and releases the old presenter', async () => {
     const score = music();
     io.load.mockResolvedValueOnce(score);
-    const view = await mount('map', {src: 'piece.mid'});
-    await vi.waitFor(() => expect(view.querySelectorAll('button')).toHaveLength(4));
-    const oldRegion = view.querySelectorAll('button')[1]!;
-    const seek = vi.fn();
-    view.addEventListener('webscore:seek', seek);
-    view.type = 'thumbnail';
-    expect(view.querySelector('svg[role="img"]')).not.toBeNull();
-    expect(view.querySelector('input[type="range"]')).toBeNull();
-    oldRegion.click();
-    expect(seek).not.toHaveBeenCalled();
-    expect(createScoreView).not.toHaveBeenCalled();
-    view.type = 'piano-roll';
-    expect(createScoreView).toHaveBeenCalledTimes(1);
+    const view = await mount('piano-roll', {src: 'piece.mid'});
+    await vi.waitFor(() => expect(createScoreView).toHaveBeenCalledTimes(1));
     const controller = vi.mocked(createScoreView).mock.results[0]!.value;
     const disposed = vi.spyOn(controller, 'dispose');
-    view.type = 'map';
+    view.type = 'waterfall';
     expect(disposed).toHaveBeenCalledTimes(1);
+    expect(createScoreView).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(createScoreView).mock.calls[1]![1]).toEqual({type: 'waterfall'});
     expect(view.score).toBe(score);
     expect(io.load).toHaveBeenCalledTimes(1);
   });
@@ -89,17 +93,18 @@ describe('score-view lightweight modes', () => {
     const view = await mount('piano-roll', {src: 'pending.mid'});
     await vi.waitFor(() => expect(io.load).toHaveBeenCalledTimes(1));
     const signal = io.load.mock.calls[0]![1].signal as AbortSignal;
-    view.type = 'map';
-    view.type = 'thumbnail';
+    view.type = 'staff';
+    view.type = 'waterfall';
     expect(signal.aborted).toBe(false);
+    expect(createScoreView).not.toHaveBeenCalled();
     finish(music());
     await flush();
-    expect(view.querySelector('svg[role="img"]')).not.toBeNull();
-    expect(createScoreView).not.toHaveBeenCalled();
+    expect(createScoreView).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(createScoreView).mock.calls[0]![1]).toEqual({type: 'waterfall'});
     expect(io.load).toHaveBeenCalledTimes(1);
   });
 
-  it('borrows a paused native score once, seeks nominal time and keeps its cursor across mode switches', async () => {
+  it('borrows a paused native score once and keeps its cursor across mode switches', async () => {
     const source = document.createElement('mode-score-player') as ScorePlayerElement;
     source.id = 'player';
     source.score = music();
@@ -107,69 +112,21 @@ describe('score-view lightweight modes', () => {
     await flush();
     source.rate = 2;
     await source.seekNominal(1.25);
-    const view = await mount('map', {player: '#player'});
+    const view = await mount('piano-roll', {player: '#player'});
     expect(view.score).toBe(source.resolvedScore);
     expect(view.currentTime).toBeCloseTo(1.25);
-    view.querySelectorAll('button')[1]!.click();
-    await flush();
-    expect(source.getPlaybackSnapshot()?.nominalSeconds).toBeCloseTo(2);
-    expect(source.currentTime).toBeCloseTo(1);
-    expect(view.currentTime).toBeCloseTo(2);
-    view.type = 'thumbnail';
-    const preview = view.querySelector('svg');
-    expect(view.active).toEqual([]);
+    view.type = 'waterfall';
+    expect(view.currentTime).toBeCloseTo(1.25);
     await source.seekNominal(0.5);
-    expect(view.querySelector('svg')).toBe(preview);
     expect(view.currentTime).toBeCloseTo(0.5);
-    expect(view.querySelector('button, input, [role="slider"]')).toBeNull();
     view.type = 'piano-roll';
     expect(view.currentTime).toBeCloseTo(0.5);
     expect(view.active).toEqual([60]);
     expect(io.load).not.toHaveBeenCalled();
   });
 
-  it('converts map seconds to transport seconds and preserves position after rejected seeks', async () => {
-    const {target} = player();
-    const view = await mount('map', {player: '#player'});
-    view.querySelectorAll('button')[1]!.click();
-    expect(target.seek).toHaveBeenCalledWith(1);
-    expect(view.currentTime).toBe(2);
-    target.seek.mockRejectedValueOnce(new Error('seek rejected'));
-    const report = vi.spyOn(console, 'error').mockImplementation(() => {});
-    view.querySelectorAll('button')[2]!.click();
-    await flush();
-    expect(view.currentTime).toBe(2);
-    expect(report).toHaveBeenCalledTimes(1);
-    expect(view.querySelectorAll('button')[1]!.getAttribute('aria-pressed')).toBe('true');
-  });
-
-  it('invalidates reentrant and pending map commands when the source, mode or selected owner changes', async () => {
-    const {target} = player();
-    const view = await mount('map', {player: '#player'});
-    view.addEventListener('webscore:seek', () => { view.type = 'thumbnail'; }, {once: true});
-    view.querySelectorAll('button')[1]!.click();
-    expect(target.seek).not.toHaveBeenCalled();
-    view.type = 'map';
-    let reject!: (error: Error) => void;
-    target.seek.mockImplementationOnce(() => new Promise<void>((_resolve, fail) => { reject = fail; }));
-    view.querySelectorAll('button')[1]!.click();
-    const report = vi.spyOn(console, 'error').mockImplementation(() => {});
-    target.remove();
-    const replacement = player(music('D4'));
-    replacement.state.nominalSeconds = 3;
-    await flush();
-    reject(new Error('old owner failed'));
-    await flush();
-    expect(view.score).toBe(replacement.target.resolvedScore);
-    expect(view.currentTime).toBe(3);
-    expect(report).not.toHaveBeenCalled();
-    view.addEventListener('webscore:seek', () => { view.score = music('G4'); }, {once: true});
-    view.querySelectorAll('button')[1]!.click();
-    expect(replacement.target.seek).not.toHaveBeenCalled();
-  });
-
   it('discovers late owners and clears invalid or ambiguous selections without fetching their src', async () => {
-    const view = await mount('map', {player: '#player'});
+    const view = await mount('piano-roll', {player: '#player'});
     expect(view.score).toBeUndefined();
     const first = player();
     first.target.setAttribute('src', 'owned.mid');
@@ -179,7 +136,6 @@ describe('score-view lightweight modes', () => {
     const other = player(music('G4'));
     await flush();
     expect(view.score).toBeUndefined();
-    expect(view.querySelector('input[type="range"]')).toBeNull();
     other.target.remove();
     await flush();
     expect(view.score).toBe(first.target.resolvedScore);
@@ -190,35 +146,11 @@ describe('score-view lightweight modes', () => {
     expect(io.load).not.toHaveBeenCalled();
   });
 
-  it('reweights map cells without remounting its keyboard surface or loading the score again', async () => {
-    const view = await mount('map', {}, music());
-    const lane = view.querySelector('input[type="range"]') as HTMLInputElement;
-    lane.focus();
-    view.setAttribute('for-part', 'missing');
-    view.setAttribute('cells', '2');
-    expect(view.forPart).toBe('missing');
-    expect(view.cells).toBe(2);
-    expect(view.querySelectorAll('button')).toHaveLength(2);
-    expect(view.querySelector('input[type="range"]')).toBe(lane);
-    expect(document.activeElement).toBe(lane);
-    lane.value = '0';
-    lane.dispatchEvent(new Event('input', {bubbles: true}));
-    expect(view.currentTime).toBe(0);
-    expect(createScoreView).not.toHaveBeenCalled();
-  });
-
-  it('keeps standalone navigation across types and respects external host sizing', async () => {
-    const view = await mount('map', {}, music());
+  it('respects external host sizing across type switches', async () => {
+    const view = await mount('piano-roll', {}, music());
     view.style.width = '50%';
     view.style.height = '5rem';
-    view.querySelectorAll('button')[1]!.click();
-    expect(view.currentTime).toBe(2);
-    view.type = 'piano-roll';
-    expect(view.currentTime).toBe(2);
-    view.type = 'thumbnail';
-    view.setAttribute('note-color', '12, 34, 56');
-    expect(view.querySelector('rect')?.getAttribute('fill')).toBe('rgb(12, 34, 56)');
-    expect(view.currentTime).toBe(2);
+    view.type = 'waterfall';
     expect(view.style.width).toBe('50%');
     expect(view.style.height).toBe('5rem');
     view.setAttribute('width', '240');
@@ -226,7 +158,7 @@ describe('score-view lightweight modes', () => {
     view.style.width = '75%';
     view.removeAttribute('width');
     expect(view.style.width).toBe('75%');
-    view.type = 'map';
-    expect(view.querySelectorAll('button')[1]!.getAttribute('aria-pressed')).toBe('true');
+    view.type = 'piano-roll';
+    expect(view.style.height).toBe('5rem');
   });
 });

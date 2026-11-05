@@ -20,17 +20,19 @@ const STYLE = `
 :host([hidden]) { display:none; }
 [part~="rack-control-root"] {
   box-sizing:border-box;
-  background:var(--wm-rack-control-surface-background,var(--wm-mixer-surface-background,var(--wm-component-background,var(--wm-mixer-background,var(--wm-surface,#fff)))));
-  border:var(--wm-rack-control-surface-border,var(--wm-mixer-surface-border,var(--wm-component-border,1px solid var(--rc-border,var(--wm-mixer-border,var(--wm-border,#d8d8d8))))));
-  padding:var(--wm-rack-control-surface-padding,var(--wm-mixer-surface-padding,var(--wm-component-padding,var(--wm-mixer-padding,.6rem))));
+  background:var(--wm-rack-control-surface-background,var(--wm-mixer-surface-background,var(--wm-component-background,var(--wm-mixer-background,var(--wm-surface,light-dark(#fff,#111))))));
+  border:var(--wm-rack-control-surface-border,var(--wm-mixer-surface-border,var(--wm-component-border,1px solid var(--rc-border,var(--wm-mixer-border,var(--wm-border,light-dark(#d8d8d8,#333)))))));
+  /* The desk's rows run edge to edge inside the frame; strips carry their own inset. */
+  padding:var(--wm-rack-control-surface-padding,var(--wm-mixer-surface-padding,var(--wm-component-padding,var(--wm-mixer-padding,0))));
   border-radius:var(--wm-rack-control-surface-radius,var(--wm-mixer-surface-radius,var(--wm-component-radius,var(--wm-mixer-radius,var(--wm-control-radius,0)))));
 }
 /* Feed the strip's own tokens rather than setting properties on it: the shared
    fader paints its track with inline geometry so it is correct in a light-DOM
    host, and an inline style beats any rule here. */
-[part~="rack-control-fader"] { --wm-fader-width:var(--rc-fader-width,var(--wm-mixer-fader-width,2rem)); --wm-fader-height:var(--rc-fader-height,var(--wm-mixer-fader-height,96px)); --wm-fader-track-border:var(--rc-track-border,var(--wm-mixer-track-border,var(--wm-control-border,var(--wm-border,#d8d8d8)))); --wm-fader-track:var(--rc-track,var(--wm-mixer-track,var(--wm-surface-muted,#f3f3f3))); --wm-fader-radius:var(--rc-radius,var(--wm-mixer-radius,var(--wm-control-radius,0))); }
-[part~="rack-control-input"] { --wm-fader-fill:var(--rc-fill,var(--wm-mixer-fill,var(--wm-accent,#999))); --wm-fader-thumb:var(--rc-thumb,var(--wm-mixer-thumb,var(--wm-foreground,#111))); --wm-fader-handle:var(--rc-handle,var(--wm-mixer-handle,.7rem)); }
-[part~="rack-control-label"] { color:var(--rc-text,var(--wm-mixer-text,var(--wm-foreground,#444))); }
+[part~="rack-control-fader"] { --wm-fader-width:var(--rc-fader-width,var(--wm-mixer-fader-width,2rem)); --wm-fader-height:var(--rc-fader-height,var(--wm-mixer-fader-height,96px)); --wm-fader-track-border:var(--rc-track-border,var(--wm-mixer-track-border,var(--wm-control-border,var(--wm-border,light-dark(#d8d8d8,#333))))); --wm-fader-track:var(--rc-track,var(--wm-mixer-track,var(--wm-surface-muted,light-dark(#f3f3f3,#1c1c1c)))); --wm-fader-radius:var(--rc-radius,var(--wm-mixer-radius,var(--wm-control-radius,0))); }
+/* A level is neutral ink, not an accent colour (Visual design → Palette). */
+[part~="rack-control-input"] { --wm-fader-fill:var(--rc-fill,var(--wm-mixer-fill,var(--wm-foreground-muted,light-dark(#777,#aaa)))); --wm-fader-thumb:var(--rc-thumb,var(--wm-mixer-thumb,var(--wm-foreground,light-dark(#111,#eee)))); --wm-fader-handle:var(--rc-handle,var(--wm-mixer-handle,.7rem)); }
+[part~="rack-control-label"] { color:var(--rc-text,var(--wm-mixer-text,var(--wm-foreground-muted,light-dark(#777,#aaa)))); }
 `;
 
 export interface RackControlErrorDetail { operation: "rack-control"; error: unknown; }
@@ -258,10 +260,10 @@ export class RackControlElement extends WebMusicElement {
         if (declaration) declarations.push({part, declaration});
       } catch (error) { this.reportError(error); }
     }
-    if (declarations.length === 0 && this.declared.size === 0) return;
+    if (declarations.length === 0 && this.declared.size === 0) { this.notifyMembers?.(); return; }
 
     const rack = this.ensureRack();
-    if (!rack) return;
+    if (!rack) { this.notifyMembers?.(); return; }
 
     // A part that no longer resolves a declaration (or left the desk) no
     // longer owns a member. Remove these first so their ids are available to
@@ -329,6 +331,7 @@ export class RackControlElement extends WebMusicElement {
         this.declared.set(part, declaration);
       } catch (error) { this.reportError(error); }
     }
+    this.notifyMembers?.();
   }
 
   /**
@@ -369,7 +372,12 @@ export class RackControlElement extends WebMusicElement {
         const rack = this.moduleRack ?? this.rack;
         const members = this.inWrittenOrder<{id: string; volume: number; muted: boolean; solo: boolean}>(rack?.list() ?? []);
         const labels = new Map([...this.moduleParts.values()].map(({declaration, module}) => [module.id, declaration.id]));
+        const partStates = Array.from(this.children).filter(isRackPart).map((part) => part.rackPartStatus?.());
+        const status = partStates.find((state) => state?.kind === 'error')
+          ?? partStates.find((state) => state?.kind === 'loading')
+          ?? (members.length === 0 ? {kind: 'waiting' as const, message: 'Waiting for rack parts…'} : undefined);
         return {
+          status,
           master: rack?.masterVolume ?? 1,
           channels: members.map((member) => ({
             id: member.id,

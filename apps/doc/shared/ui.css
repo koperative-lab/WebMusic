@@ -94,11 +94,22 @@
   --wm-foreground: light-dark(#444444, #eeeeee);
   --wm-foreground-muted: light-dark(#666666, #aaaaaa);
   --wm-foreground-on-inverse: light-dark(#ffffff, #111111);
-  --wm-accent: light-dark(#111111, #ffffff);
+  --wm-accent: light-dark(#444444, #bbbbbb);
   --wm-accent-foreground: light-dark(#ffffff, #111111);
   --wm-border: light-dark(#d8d8d8, #444444);
   --wm-control-border: light-dark(#b0b0b0, #666666);
   --wm-focus: #767676;
+
+  /* Filled value controls keep the original #999 ramp. Primary actions use
+     the deeper accent above, so their white glyphs and labels stay legible.
+     These public tokens apply equally to UI Kit, Score and Audio demos. */
+  --wm-transport-fill: light-dark(#999999, #bbbbbb);
+  --wm-fader-fill: var(--wm-transport-fill);
+  --wm-knob-arc: var(--wm-transport-fill);
+  --wm-parameter-fill: var(--wm-transport-fill);
+  --wm-mixer-fill: var(--wm-transport-fill);
+  --wm-mixer-active-text: #111111;
+  --wm-playlist-accent: var(--wm-transport-fill);
 
   /* Status text, recording, selection and time markers retain their labels
      and geometry while using the same neutral contrast ramp. */
@@ -147,13 +158,13 @@
 /* Timeline fixtures use dark region fills, so their inset selection and focus
    rings need light ink. Canonical public parts remain present when the demo
    adds custom parts. A two-tone playhead stays visible across light lanes and
-   dark regions, including density cells in the Score map. */
+   dark regions. */
 .wm-live-canvas [data-presenter-live='timeline'] [part~='region'] {
   --wm-focus: #ffffff;
   --wm-selection: #ffffff;
 }
 
-.wm-live-canvas :is([data-presenter-live='timeline'], score-view[type='map']) [part~='playhead'] {
+.wm-live-canvas [data-presenter-live='timeline'] [part~='playhead'] {
   outline: 1px solid #ffffff;
   outline-offset: 0;
 }

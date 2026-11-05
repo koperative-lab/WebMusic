@@ -87,6 +87,30 @@ describe('agent context MDX extraction', () => {
     expect(result.body).toContain(instructions);
   });
 
+  it('links the Score editor demo while preserving its copyable API reference', async () => {
+    const filename = 'apps/doc/webmusic/src/content/docs/score/headless/view/score-editor.mdx';
+    const source = await readFile(path.join(root, filename), 'utf8');
+    const canonical = 'https://docs.example.test/WebMusic/score/headless/view/score-editor/';
+    const result = await extractAgentMarkdown(source, {root, filename, canonical});
+    expect(result.body).toContain(`[Interactive example on the documentation page](${canonical})`);
+    expect(result.body).toContain('createScoreEditor');
+    expect(result.body).toContain('@webmusic/score/view/headless');
+    expect(result.body).not.toContain('<ScoreEditorHeadlessDemo');
+  });
+
+  it.each([
+    ['headless/view/audio-clip-editor', 'AudioClipEditorHeadlessDemo', 'createAudioClipEditor'],
+    ['element/view/audio-clip-view', 'AudioClipViewDemo', 'loadAudioClipEditor'],
+  ])('links the Audio %s demo while retaining its API reference', async (page, demo, api) => {
+    const filename = `apps/doc/webmusic/src/content/docs/audio/${page}.mdx`;
+    const source = await readFile(path.join(root, filename), 'utf8');
+    const canonical = `https://docs.example.test/WebMusic/audio/${page}/`;
+    const result = await extractAgentMarkdown(source, {root, filename, canonical, extension: audioBridgeContext});
+    expect(result.body).toContain(`[Interactive example on the documentation page](${canonical})`);
+    expect(result.body).toContain(api);
+    expect(result.body).not.toContain(`<${demo}`);
+  });
+
   it('preserves static HTML tables and rewrites links without rewriting fenced application HTML', async () => {
     const source = document('<details>\n<summary>Details</summary>\n\n```html\n<a href="/application">Open</a>\n```\n\n<table><tbody><tr><td><a href="/score/">Score</a></td></tr></tbody></table>\n\n</details>');
     const result = await extractAgentMarkdown(source, {resolveLink: (url) => `https://example.test/WebMusic${url}`});
@@ -241,6 +265,8 @@ describe('agent context release and output contracts', () => {
       'apps/doc/webmusic/src/components/quick-start-player-client.ts',
       'apps/doc/webmusic/src/components/bridges/bridge-composition-client.ts',
       'apps/doc/webmusic/src/components/bridges/independent-loops-client.ts',
+      'apps/doc/webmusic/src/components/headless/arabesque-score.ts',
+      'apps/doc/webmusic/src/components/headless/arabesque-audio.ts',
       'apps/doc/webmusic/scripts/agent-context.mjs',
       'apps/doc/webmusic/scripts/agent-context-catalog.mjs',
       'apps/doc/webmusic/scripts/agent-context-release.mjs',
@@ -287,6 +313,7 @@ describe('agent context release and output contracts', () => {
     expect(bundles.full.pages).toEqual(manifest.pages.map(({output}) => output));
     for (const page of manifest.pages) expect(full).toContain(files.get(page.output));
     expect(bundles.components.pages).toContain('agent-context/score/headless/play/score-player.md');
+    expect(bundles.components.pages).toContain('agent-context/audio/headless/view/audio-clip-editor.md');
     expect(bundles.components.pages).toContain('agent-context/uikit/transport-time/transport.md');
     expect(bundles.components.pages).not.toContain('agent-context/score/api/io.md');
     expect(bundles.patterns.sections.find(({title}) => title === 'Style a custom music interface').headings).toContain('Theme with CSS custom properties');
@@ -296,6 +323,10 @@ describe('agent context release and output contracts', () => {
     expect(patterns).not.toContain('## API Reference — @webmusic/score/io');
     expect(patterns).not.toContain('| `.resolvedScore`');
     expect(files.get('llms.txt')).toContain('## Load, parse and export music');
+    expect(files.get('llms.txt')).toContain('## Display and edit audio waveforms and spectral data');
+    const scoreEdit = files.get('llms.txt').split('## Display and edit scores, pitches and application state')[1]?.split('\n## ')[0] ?? '';
+    for (const page of ['score/element/view/score-view.md', 'score/headless/view/score-editor.md', 'score/api/view.md']) expect(scoreEdit).toContain(`agent-context/${page}`);
+    expect(patterns).toContain('## Data and editing');
     for (const page of manifest.pages) {
       expect(files.get('llms.txt').split(`](${page.url})`).length - 1).toBe(1);
     }
@@ -319,6 +350,11 @@ describe('agent context release and output contracts', () => {
     expect(files.get(player.source[0])).toBe(await readFile(path.join(root, 'packages/score/src/play/element/score-player.ts'), 'utf8'));
     expect(catalog.components.find(({id}) => id === 'headless/score-player').styles).toEqual([]);
     expect(catalog.components.find(({id}) => id === 'headless/audio/audio-clip-player').source).toEqual(['agent-context/source/packages/audio/src/play/headless/player.ts.txt']);
+    expect(catalog.components.find(({id}) => id === 'headless/audio/audio-clip-editor')).toMatchObject({
+      docs: ['agent-context/audio/headless/view/audio-clip-editor.md'],
+      source: ['agent-context/source/packages/audio/src/view/headless/audio-clip-editor.ts.txt'], styles: [],
+    });
+    expect(catalog.components.some(({id}) => id === 'element/audio-document' || id === 'element/score-document')).toBe(false);
     expect(catalog.components.find(({id}) => id === 'headless/bridge/score-audio-sync').docs).toEqual(['agent-context/bridge/headless/score-audio-sync.md']);
     expect(catalog.components.some(({id}) => id === 'headless/envelope-controller')).toBe(false);
     expect(catalog.components.find(({id}) => id === 'element/audio-view').docs).toEqual(['agent-context/audio/element/view/audio-view.md']);

@@ -35,6 +35,17 @@ The application owns `host`, sampled `state`, the three command functions and th
 
 `rmsDbfs` and `peakDbfs` are already measured values. The presenter derives only the displayed crest difference (`peakDbfs - rmsDbfs`), plot geometry and threshold indication. The caller decides the sample window and history cadence, caps the `history` array, maintains `heldPeakDbfs`, and clears it after `onResetHold()`. A silence value may be `-Infinity`; it renders as an empty numeric readout. The demo generates a bounded 64-sample window to exercise the real presenter commands.
 
+RMS, Peak hold and Crest retain fixed positions above the history. There is no
+repeated visible title. Routine Live, Paused and Frozen messages are cleared.
+Informational messages such as No signal or Listening stay in the status region
+but are visually hidden; unavailable and other caller-supplied diagnostics are
+drawn. Loading and waiting use square indicators with accessible descriptions.
+Freeze and Reset hold are icon buttons named in `aria-label` and `title`; Freeze
+reports its state through `aria-pressed` and Reset clears the held peak. The
+buttons and the threshold fader share one non-wrapping row, one control height
+tall, separated by hairlines; on a narrow host it scrolls sideways without a
+visible scrollbar.
+
 <details class="component-section">
 <summary>API</summary>
 
@@ -47,13 +58,15 @@ The application owns `host`, sampled `state`, the three command functions and th
 | `history` | `readonly LevelAnalyzerSample[]` | required | Recent samples, in time order. The most recent 64 are plotted; older values are ignored. |
 | `thresholdDbfs` | `number` | required | Alert and slider position. The plot visually spans `-60` to `0` dBFS. |
 | `frozen` | `boolean` | required | Freeze button's pressed state; the caller stops accepting new samples. |
-| `status` | `string` | required | Visible status beside the title. |
+| `loading` | `boolean?` | `false` | Active pending source work; shows the four-cell animation and `aria-busy`, taking precedence over `waiting`. |
+| `waiting` | `boolean?` | `false` | Show the shared square waiting indicator instead of visible status prose; controls and retained readings remain available. |
+| `status` | `string` | required | Diagnostic text; accessible during loading/waiting, visually hidden for informational messages (No signal, Listening, Waiting for …, Loading …), drawn for other diagnostics, and cleared for routine Live, Paused and Frozen states. |
 
 **Actions and handle**
 
 | Member | Kind | Default | Description |
 |---|---|---|---|
-| `onThresholdChange(value)` | `(number) => void` | required | Called as the native threshold range moves; the caller commits it and calls `update()`. |
+| `onThresholdChange(value)` | `(number) => void` | required | Called as the horizontal threshold fader moves; the caller commits it and calls `update()`. |
 | `onFreezeChange(frozen)` | `(boolean) => void` | required | Requests the opposite of the last state supplied to `update()`. |
 | `onResetHold()` | `() => void` | required | Requests a held-peak reset; the caller supplies the next state. |
 | `element` | `HTMLElement` | mounted root | The one presenter surface. |
@@ -62,26 +75,30 @@ The application owns `host`, sampled `state`, the three command functions and th
 
 There is no `Binding` object or mount-options bag for this presenter; actions are passed directly as the second argument. It owns no subscription. See the [shared presenter shape](/uikit/api/#the-shared-presenter-shape) for the general host and cleanup model.
 
-**Accessibility.** Numeric readings use a definition list. The history plot has a descriptive image label updated from the current sample; it does not replace the numeric readouts. Freeze is a native button with `aria-pressed`, Reset hold is a native button, and the threshold is a native range input with a visible dBFS value. The status text uses `role="status"`.
+**Accessibility.** Numeric readings use a definition list. The history plot has a descriptive image label updated from the current sample; it does not replace the numeric readouts. Freeze is a native icon button with `aria-pressed`; the Reset icon button has the accessible name "Reset hold". The icons are hidden from assistive technology. The rectangular horizontal UIKit fader is a labelled slider with `-60..0` dBFS bounds, a 1 dB keyboard step and a visible value. Its ARIA value uses dBFS, not a normalized percentage. Arrow keys adjust it by one step, and Home/End select the bounds. Diagnostic status text uses `role="status"`.
 
 </details>
 
 <details class="component-section">
 <summary>Styling</summary>
 
+Loading and waiting feedback use the shared [Status animation and tokens](/uikit/layout-feedback/status/), including reduced-motion support.
+
 The stylesheet is installed into the supplied host and removed by `destroy()`. This presenter does not currently accept `stylesheet`, `classNames` or `parts` options.
 
 | Token | Fallback | Controls |
 |---|---|---|
-| `--wm-level-analyzer-background` | `--wm-surface`, then white | Surface background. |
-| `--wm-level-analyzer-foreground` | `--wm-foreground`, then dark ink | Text color. |
-| `--wm-level-analyzer-border` | `--wm-border`, then light gray | Surface border. |
+| `--wm-level-analyzer-background` | `--wm-surface`, then `light-dark(#fff, #111)` | Surface background. |
+| `--wm-level-analyzer-foreground` | `--wm-foreground`, then `light-dark(#111, #eee)` | Text color. |
+| `--wm-level-analyzer-border` | `--wm-border`, then `light-dark(#d8d8d8, #333)` | Surface border. In the control row it falls back to `--wm-control-border`, then `--wm-border`, for the hairlines. |
 | `--wm-level-analyzer-padding` | `.85rem` | Surface inset. |
-| `--wm-level-analyzer-rms` | teal | Recent RMS columns. |
-| `--wm-level-analyzer-peak` | dark blue | Sample-peak ticks. |
-| `--wm-level-analyzer-threshold` | orange | Threshold line and slider accent. |
+| `--wm-level-analyzer-rms` | `light-dark(#999, #666)` | Recent RMS columns. |
+| `--wm-level-analyzer-peak` | `--wm-foreground`, then `light-dark(#111, #eee)` | Sample-peak ticks. |
+| `--wm-level-analyzer-threshold` | `--wm-foreground-muted`, then `light-dark(#777, #aaa)` | Dashed threshold line. |
+| `--wm-analysis-control-height` | `--wm-control-size`, then `--wui-row-h`, then `2rem` | Icon-button height and horizontal fader thickness. |
+| `--wm-fader-*` | shared fader defaults | Threshold track, fill, thumb and corners. |
 
-The canonical root is `.wui-level-analyzer`, with one `part="root surface"`. Internal classes follow `.wui-level-analyzer__*`; they are implementation selectors, not a class-extension API. Shared `--wm-border`, `--wm-muted`, `--wm-surface` and `--wm-accent` tokens provide fallback colors for the plot and controls.
+The default palette is achromatic. The canonical root is `.wui-level-analyzer`, with one `part="root surface"`; controls expose `freeze`, `reset` and `threshold`. The threshold slider retains the shared `fader` part alongside `threshold`; use token selectors such as `[part~="threshold"]`. Internal classes follow `.wui-level-analyzer__*`; they are implementation selectors, not a class-extension API. Shared `--wm-muted` (then `--wm-foreground-muted`) colors captions, the scale and status; the plot has no inner border and fills with `--wm-surface-muted`, then `light-dark(#f3f3f3, #1c1c1c)`; the over-threshold outline uses `--wm-danger`, then `--wm-foreground`. Readout captions are uppercase mono text and values are mono. Pressed icons use `--wm-accent-foreground` on a `--wm-foreground` fill, and focus uses `--wm-focus-ring`.
 
 </details>
 

@@ -17,6 +17,7 @@ public members.
 | `SessionTransport` | Source-free Session-seconds writer, preparation and participant lifetime. | A Session owns no source or borrowed player/context. |
 | `SessionSchedulingBinding` | Authority identity, epoch, mapped anchor, invalidation and loop segments. | Borrowed schedulers cannot mutate its origin or dispose the authority. |
 | Domain scheduler | Schedule and cancel its own notes/sources against an anchor. | Capabilities remain backend-specific. |
+| `TempoClock` | Kernel `TempoGrid` and read-only `TempoClock` (DEC-062): beats, bars and the next grid line's reference time from any `TransportClockReader`; an Audio player exposes one for its document grid. | Group commands quantized to beats, a shared tempo map across Score and Audio, or variable-tempo grids. |
 
 Source entry points are [session.ts](kernel/src/session.ts),
 [session-scheduling.ts](kernel/src/session-scheduling.ts),

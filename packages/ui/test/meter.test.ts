@@ -46,6 +46,31 @@ describe('mountMeter', () => {
     expect(root.getAttribute('aria-label')).toBe('Audio level');
   });
 
+  it('publishes animated readiness immediately but samples first on redraw or frame', () => {
+    const frames: Array<() => void> = [];
+    vi.stubGlobal('requestAnimationFrame', vi.fn((callback: () => void) => {
+      frames.push(callback);
+      return frames.length;
+    }));
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    const host = document.createElement('div');
+    let ready = false;
+    const readLevel = vi.fn(() => ({level: 0.25}));
+    const handle = mountMeter(host, {
+      readStatus: () => ({kind: ready ? 'ready' : 'waiting'}),
+      readLevel, readSpectrum: () => [],
+    });
+    expect(host.querySelector('[data-kind="waiting"]')).not.toBeNull();
+    expect(readLevel).not.toHaveBeenCalled();
+    ready = true;
+    frames[0]!();
+    expect(readLevel).toHaveBeenCalledOnce();
+    expect(handle.element.getAttribute('aria-valuenow')).toBe('25');
+    handle.redraw();
+    expect(readLevel).toHaveBeenCalledTimes(2);
+    handle.destroy();
+  });
+
   it('renders normalized spectrum values and enforces the four-bar minimum', () => {
     const host = document.createElement('div');
     const readSpectrum = vi.fn(() => [0, 0.25, 0.5, 2]);

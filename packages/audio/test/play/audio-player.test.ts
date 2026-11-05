@@ -1,6 +1,7 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {createAudioClip} from '../../src/core';
 import {AudioPlayer, type AudioPlayerTransport} from '../../src/play/headless/audio-player';
+import {AudioPlaylist} from '../../src/play/headless/playlist';
 
 const clip = (seconds = 2) => createAudioClip({sampleRate: 1000, channelData: [new Float32Array(seconds * 1000)]});
 const node = () => ({connect: vi.fn(), disconnect: vi.fn()});
@@ -96,7 +97,7 @@ describe('AudioPlayer stable source ownership', () => {
     expect(player.clock).toBeUndefined();
     expect(ctx.createAnalyser).not.toHaveBeenCalled();
     player.setClip(first);
-    expect(changes).toEqual([{clip: first, revision: 1}]);
+    expect(changes).toEqual([{kind: 'clip', clip: first, revision: 1}]);
     player.dispose();
     expect(ctx.close).not.toHaveBeenCalled();
   });
@@ -265,7 +266,7 @@ describe('AudioPlayer terminal observations', () => {
     player.dispose();
     player.dispose();
     expect(source).toHaveBeenCalledOnce();
-    expect(source).toHaveBeenCalledWith({clip: undefined, revision: 1});
+    expect(source).toHaveBeenCalledWith({kind: 'empty', clip: undefined, revision: 1});
     expect(states).toEqual([false]);
     expect(times).toEqual([{seconds: 0, duration: 0, progress: 0}]);
     expect(player.clip).toBeUndefined();
@@ -284,7 +285,7 @@ describe('AudioPlayer terminal observations', () => {
     player.on('sourcechange', followingSource);
     player.on('timeupdate', finalTime);
     expect(() => player.dispose()).toThrow(failure);
-    expect(followingSource).toHaveBeenCalledWith({clip: undefined, revision: 1});
+    expect(followingSource).toHaveBeenCalledWith({kind: 'empty', clip: undefined, revision: 1});
     expect(finalTime).toHaveBeenCalledWith({seconds: 0, duration: 0, progress: 0});
     expect(output.disconnect).toHaveBeenCalledOnce();
     expect(player.analyser).toBeUndefined();
@@ -311,7 +312,7 @@ describe('AudioPlayer borrowed transport authority', () => {
     const changes = vi.fn();
     player.on('sourcechange', changes);
     notify();
-    expect(changes).toHaveBeenCalledWith({clip: source.clip, revision: 2});
+    expect(changes).toHaveBeenCalledWith({kind: 'clip', clip: source.clip, revision: 2});
     player.dispose();
     expect(source.playing).toBe(true);
     expect(source.pause).not.toHaveBeenCalled();
@@ -358,6 +359,15 @@ describe('AudioPlayer borrowed transport authority', () => {
     expect(player.pan).toBe(0);
     expect(() => player.setLoop(true)).toThrow(/setLoop/);
     player.dispose();
+  });
+
+  it('never turns a configured clip loop into a borrowed queue list loop', () => {
+    const queue = new AudioPlaylist({entries: [{id: 'entry', clip: clip()}], loop: false}); const setLoop = vi.spyOn(queue, 'setLoop');
+    const player = new AudioPlayer(undefined, {loop: {start: 0, end: 0.5}});
+    player.setTransport(queue); expect(setLoop).not.toHaveBeenCalled();
+    expect(() => player.setLoop(true)).toThrow(/does not support setLoop/); expect(setLoop).not.toHaveBeenCalled();
+    player.setTransport(undefined); player.setLoop(true); expect(setLoop).not.toHaveBeenCalled();
+    player.dispose(); queue.dispose();
   });
 
   it('rejects nested central owners before changing the selected source', () => {

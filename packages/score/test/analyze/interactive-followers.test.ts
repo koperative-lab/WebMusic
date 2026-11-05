@@ -119,7 +119,7 @@ describe('chord follower navigation lifecycle', () => {
     expect(element.children).toHaveLength(0);
   });
 
-  it('keeps the empty score state visible while a scoreless player reports playback', async () => {
+  it('keeps the waiting indicator visible while a scoreless player reports playback', async () => {
     const snapshot = {nominalSeconds: 0.5, rate: 1, playing: true};
     const target = Object.assign(document.createElement('div'), {
       resolvedScore: undefined as Score | undefined, getPlaybackSnapshot: () => snapshot,
@@ -128,12 +128,13 @@ describe('chord follower navigation lifecycle', () => {
     document.body.append(target);
     const element = await mount();
     target.dispatchEvent(new CustomEvent('webscore:timeupdate', {detail: snapshot}));
-    expect(element.querySelector('.wui-workbench')?.getAttribute('data-phase')).toBe('empty');
+    expect(element.querySelector('.wui-workbench')?.getAttribute('data-phase')).toBe('waiting');
     const waiting = [...element.querySelectorAll<HTMLElement>('[role="status"]')]
       .find((node) => node.textContent?.includes('Waiting for a score'));
     expect(waiting).toBeDefined();
     expect(waiting?.hidden).toBe(false);
     expect(waiting?.closest('[hidden]')).toBeNull();
+    expect(waiting?.querySelector('[part~="indicator"]')?.getAttribute('aria-hidden')).toBe('true');
     expect(element.querySelector('[role="slider"]')?.getAttribute('aria-disabled')).toBe('true');
     target.resolvedScore = melody();
     target.dispatchEvent(new CustomEvent('webscore:scorechange'));

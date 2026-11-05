@@ -165,6 +165,25 @@ describe('PianoRollCanvasVisualizer layering', () => {
     expect(canvas.ctx.lastTransform[4]).toBe(-90_000 * 2);
   });
 
+  it('paints a follow-scroll in the frame that wrote it, and does not paint it twice', () => {
+    const {canvas, viewport, visualizer} = makeVisualizer(50_000, 800);
+    const before = canvas.ctx.fillRectCalls;
+    // rAF unavailable → the follow frame runs synchronously.
+    visualizer.redrawAtTime(3000, true);
+    expect(viewport.scrollLeft).toBe(3000 * 30 - 20);
+    // The static layer already carries the new offset without a scroll event.
+    expect(canvas.ctx.lastTransform[4]).toBe(-(3000 * 30 - 20) * 2);
+    const painted = canvas.ctx.fillRectCalls;
+    expect(painted).toBeGreaterThan(before);
+    viewport.dispatch('scroll');
+    expect(canvas.ctx.fillRectCalls).toBe(painted);
+    // A later scroll of the viewport itself still repaints.
+    viewport.scrollLeft = 1000;
+    viewport.dispatch('scroll');
+    expect(canvas.ctx.fillRectCalls).toBeGreaterThan(painted);
+    visualizer.dispose();
+  });
+
   it('redraw() with no active note refreshes the window and clears highlights', () => {
     const {visualizer, overlay, canvas} = makeVisualizer(10_000, 800);
     const result = visualizer.redraw();

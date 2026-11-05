@@ -147,6 +147,11 @@ export function projectStaffNotation(score: Score, options: StaffNotationOptions
   return {measures, layers, diagnostics};
 }
 
+/** The measure grid the staff draws: authored measures, with meter-derived bars filling any gaps. */
+export function staffMeasureGrid(score: Score): readonly StaffNotationMeasure[] {
+  return measureGrid(score, undefined, []);
+}
+
 function measureGrid(score: Score, defaultKey: number | undefined, diagnostics: StaffNotationDiagnostic[]): StaffNotationMeasure[] {
   const measures: StaffNotationMeasure[] = [];
   const meters = score.timeMap.meters;

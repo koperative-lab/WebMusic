@@ -30,6 +30,13 @@ and prefix site demo URLs with `import.meta.env.BASE_URL` so Pages subpaths
 resolve. Neither the age of Debussy's composition nor a file's availability
 licenses the score export, recording or sampled instruments.
 
+## Removed editing fixtures
+
+`midi/Editing.mid` and `wav/Editing.wav`, the generated editing fixtures added on
+2026-10-15, were removed by the owner on 2026-11-05: every demo and example uses
+Arabesque No. 1, and automated tests build their own small fixtures. The dated
+audits that used them keep their original descriptions.
+
 ## Bundled code notices
 
 The Score and Audio browser bundles use [bundle-notices.mjs](../../../scripts/bundle-notices.mjs)

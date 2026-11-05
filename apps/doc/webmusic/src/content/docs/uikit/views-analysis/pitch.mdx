@@ -25,6 +25,16 @@ pointer and keyboard input and emits notes. These three own no gestures. Use
 [analysis](/uikit/views-analysis/analysis/) for the span-carrying cards and timelines that a
 playhead walks.
 
+The live demo loads the existing [Arabesque No. 1 MXL](/mxl/Arabesque%20No.1.mxl)
+and inspects its opening 16 quarter-note units. The position control selects a
+relative point in that passage; it does not substitute a preset chord. Written
+pitches supply the marks, and the fretboard shows playable locations for those
+pitches rather than a recommended fingering or barre. Automatic movement is a
+visual inspection clock and produces no audio.
+
+The source loads before the presenters mount. Loading failures remain visible
+with a Retry action; removing a demo prevents a late result from mounting.
+
 <UiPresenterLiveDemo presenter="pitch" />
 
 ## Import
@@ -282,9 +292,11 @@ rebuilt — which is what lets a transition finish.
 
 **Accessibility.** Each root is `role="img"` with an accessible name naming the labels it was
 given, and the drawing itself is `aria-hidden` — forty-nine focusable keys would be a screen-reader
-disaster, so a surface has exactly one accessible name. Empty states are `role="status"`. Nothing
-here plays a note or emits an event. A root whose content overflows becomes one keyboard focus
-stop so native scrolling can reach its complete drawing; it leaves the tab order when it fits. A **change** to the sounding set is not
+disaster, so a surface has exactly one accessible name. Empty states are `role="status"`; the
+staff and fretboard empty sentences are visually hidden, so the empty drawing is the visible state.
+Nothing here plays a note or emits an event. A root whose content overflows becomes one keyboard focus
+stop so native scrolling can reach its complete drawing; it leaves the tab order when it fits.
+Scrolling roots hide their scrollbars and stay operable by wheel, trackpad and keyboard. A **change** to the sounding set is not
 announced: the name is rewritten, and a rewritten name on a static `role="img"` is not read out.
 Announcing it belongs to the shell that holds one reading per frame, not to four docks announcing
 the same chord four times.
@@ -349,7 +361,7 @@ above. Presenter-owned state values such as note weight are not theme configurat
 | `--wui-harmony-motion-ease` | `ease-out` | The easing all three share. |
 | `--wui-harmony-ink` / `--wui-harmony-ink-muted` | inherit / muted | Text on the root, and the octave ruler and empty states. |
 | `--wui-harmony-font` / `--wui-harmony-font-mono` | inherit / `ui-monospace` | Prose and the fixed-width names. |
-| `--wui-harmony-size-micro` / `--wui-harmony-size-label` | `.6875rem` / `.75rem` | Key names and empty-state text. |
+| `--wui-harmony-size-micro` / `--wui-harmony-size-label` | `.6875rem` / `.75rem` | Key names and the (visually hidden) empty-state text. |
 
 Tone colour comes from the shared degree palette: a sounding node is painted from its `role`, and
 `--wui-degree-root` and its siblings sit in front of the `--wm-degree-*` names a theme sets.

@@ -97,7 +97,7 @@ export interface ScorePlayerSchedulerOptions {
  * looping, rate changes and exact per-voice release.
  */
 export class ScorePlayerScheduler {
-  private readonly timeline: ScoreTimeline;
+  private timeline: ScoreTimeline;
   /**
    * The transport anchor. Position axis is NOMINAL score seconds; `rate` is
    * the tempo scale, so transport (wall-clock) seconds are `nominal / rate`.
@@ -140,7 +140,7 @@ export class ScorePlayerScheduler {
   }
 
   constructor(
-    private readonly score: Score,
+    private score: Score,
     private readonly host: ScorePlayerSchedulerHost,
     private readonly options: ScorePlayerSchedulerOptions,
   ) {
@@ -183,6 +183,40 @@ export class ScorePlayerScheduler {
   /** Build and cache the immutable score snapshot before the first play. */
   prepare(): readonly Note[] {
     return this.timeline.preloadNotes;
+  }
+
+  /** Read-only nominal loop coordinates, retained across rate changes. */
+  get nominalLoop(): readonly [number, number] | undefined {
+    return this.loopStartNominal === undefined || this.loopEndNominal === undefined
+      ? undefined : [this.loopStartNominal, this.loopEndNominal];
+  }
+
+  /** Adopt prepared data while paused without replacing the borrowed clock. No callbacks run here. */
+  adoptTimeline(score: Score, timeline: ScoreTimeline, nominalSeconds: number, loop?: readonly [number, number]): void {
+    if (this.playing || this.records.size) throw new Error('Timeline adoption requires a paused scheduler');
+    const duration = timeline.duration;
+    if (!Number.isFinite(nominalSeconds) || nominalSeconds < 0 || !Number.isFinite(duration)) {
+      throw new RangeError('Invalid prepared timeline position');
+    }
+    this.cancelPendingStart();
+    this.stopTicking();
+    this.score = score;
+    this.timeline = timeline;
+    this.committedEntries.clear();
+    this.nextIndex = 0;
+    this.loopStartNominal = loop && loop[1] > loop[0] ? Math.max(0, loop[0]) : undefined;
+    this.loopEndNominal = this.loopStartNominal === undefined ? undefined : Math.min(duration, loop![1]);
+    if (this.loopEndNominal !== undefined && this.loopEndNominal <= this.loopStartNominal!) {
+      this.loopStartNominal = this.loopEndNominal = undefined;
+    }
+    const now = this.host.getContext()?.currentTime ?? 0;
+    this.transport.pause(now);
+    this.transport.seekTo(Math.min(duration, nominalSeconds), now);
+  }
+
+  /** Publish the current position once, e.g. after an adoption moved it without a transport command. */
+  publishCursor(): void {
+    this.emitCursor();
   }
 
   /**
@@ -395,6 +429,9 @@ export class ScorePlayerScheduler {
     // non-running, non-closed live state as resumable, matching Rack and
     // InteractivePlayer rather than rejecting a recoverable user gesture.
     if (context.state !== 'running') await context.resume();
+    // A pause, stop or document revision during the resume supersedes this
+    // start; never report the newer transport state as this start's failure.
+    if (generation !== this.startGeneration || this.playing) return;
     assertLiveAudioContext(context);
     if (context.state !== 'running') {
       throw new Error(`AudioContext is ${context.state} and cannot start live playback.`);

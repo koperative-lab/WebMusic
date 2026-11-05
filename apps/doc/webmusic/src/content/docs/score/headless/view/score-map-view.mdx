@@ -2,7 +2,7 @@
 title: 'createScoreMapView'
 description: 'Whole-score map state and quarter-note navigation with optional borrowed playback.'
 sidebar:
-  order: 2
+  order: 3
 ---
 
 import PlaybackFollowersPlayground from '../../../../../components/headless/PlaybackFollowersPlayground.astro';
@@ -125,8 +125,9 @@ that throws is removed. No background event or animation loop is created.
 
 ## Related
 
-[`<score-view type="map">`](/score/element/view/score-view/) composes this state
-with a browser player adapter and timeline presenter.
+No built-in element wraps this model. Applications compose it with a browser
+player adapter and the [UI Kit timeline](/uikit/transport-time/timeline/)
+presenter themselves.
 [createAnalysisFollower](/score/headless/analyze/analysis-follower/) adds score
 analysis to a borrowed timeline. [UI Kit timeline](/uikit/transport-time/timeline/)
 provides presentation independently of these musical contracts.

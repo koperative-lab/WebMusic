@@ -453,3 +453,26 @@ describe('playlist companion binding', () => {
     owner.dispose();
   });
 });
+
+describe('<audio-playlist> passive source feedback', () => {
+  it('waits for entries, animates a pending decode and restores row duration', async () => {
+    const element = mount();
+    expect(element.shadowRoot!.querySelector('[data-kind="waiting"]')).not.toBeNull();
+    let resolve!: (value: AudioClip) => void;
+    vi.spyOn(load, 'loadClipFromUrl').mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
+    element.entries = [{id: 'one', label: 'One', src: '/one.wav'}];
+    const row = element.shadowRoot!.querySelector<HTMLElement>('.wui-playlist__item')!;
+    const pending = element.play();
+    expect(row.querySelector('[data-kind="loading"]')).not.toBeNull();
+    await flush();
+    resolve(clip(3));
+    await pending;
+    expect(element.shadowRoot!.querySelector('.wui-playlist__item')).toBe(row);
+    expect(row.querySelector<HTMLElement>('.wui-playlist__duration')!.hidden).toBe(false);
+    expect(row.querySelector<HTMLElement>('.wui-playlist__duration')!.textContent).toBe('0:03');
+    element.pause();
+    expect(row.querySelector<HTMLElement>('.wui-status')!.hidden).toBe(true);
+    element.entries = [];
+    expect(element.shadowRoot!.querySelector('[data-kind="waiting"]')).not.toBeNull();
+  });
+});

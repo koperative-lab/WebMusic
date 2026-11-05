@@ -22,7 +22,9 @@ import {
 import {claimHost, createErrorSink, createUpdateLoop} from './internal/lifecycle';
 import {installStyle, paint} from './internal/style';
 import {componentSurfaceDeclarations} from './internal/surface';
+import {hiddenScrollbarCss, visuallyHiddenDeclarations} from './internal/icons';
 import type {Declarations} from './styles';
+import {mountStatus, statusStyle, type StatusState} from './status';
 
 /**
  * The shell every analysis view sits in: a grid, a tablist, a stage, a rail of
@@ -119,14 +121,14 @@ export interface WorkbenchDock {
 }
 
 /**
- * The five states a shell can be in, written to `data-phase`.
+ * The states a shell can be in, written to `data-phase`.
  *
  * `phase` also GATES THE CLOCK: only `playing` and `listening` run a frame
  * loop. Everything else is a still shell that still answers the pointer and the
  * keyboard — parked is not blank, and a workbench you can drag through is more
  * alive than one spinning a loop over nothing.
  */
-export type WorkbenchPhase = 'idle' | 'listening' | 'playing' | 'empty' | 'error';
+export type WorkbenchPhase = 'idle' | 'listening' | 'playing' | 'loading' | 'waiting' | 'empty' | 'error';
 
 /**
  * What the status bar says.
@@ -632,14 +634,18 @@ const RESPONSIVE = [
         'flex-direction': 'row',
         'overflow-x': 'auto',
         'overscroll-behavior-x': 'contain',
+        // Visual design → Scrolling surfaces: the shelf stays scrollable by
+        // wheel, trackpad and keyboard, without a visible scrollbar.
+        'scrollbar-width': 'none',
       }),
     ),
     // Every dock gets a readable width or the shelf scrolls; found by running
     // it. A column shares its width by height, but a ROW shares it by intrinsic
     // content, so one dock holding a wide drawing starves the two beside it —
     // three surfaces became 515px, 70px and 9px on a 594px shelf. Growing from
-    // an equal floor and refusing to shrink is what makes the scrollbar, and a
-    // scrollbar is the honest answer to "these do not fit".
+    // an equal floor and refusing to shrink is what makes the shelf scroll, and
+    // scrolling is the honest answer to "these do not fit"; the scrollbar itself
+    // stays hidden like every other scrolling surface.
     indent(
       harmonyRule('.wui-workbench__rail .wui-workbench__dock', {
         flex: `1 0 min(100%, ${DOCK_FLOOR})`,
@@ -674,6 +680,7 @@ function indent(rule: string): string {
  * to forward density through that presenter's options when mounting it.
  */
 export const workbenchStyle = [
+  statusStyle,
   harmonySheet('.wui-workbench'),
 
   harmonyRule('.wui-workbench', workbenchParts.root),
@@ -707,6 +714,12 @@ export const workbenchStyle = [
   harmonyRule('.wui-workbench__detail', workbenchParts.detail),
   harmonyRule('.wui-workbench__index', workbenchParts.index),
   harmonyRule('.wui-workbench__note[data-phase="error"]', {color: severityFill('error')}),
+  // An empty stage carries no visible prose (Visual design → Type): the
+  // sentence stays in the accessibility tree, where a reader still hears it.
+  // An error keeps its one visible line.
+  harmonyRule('.wui-workbench__note[data-phase="empty"]', visuallyHiddenDeclarations),
+  // `scrollbar-width` is in the part records; WebKit needs its pseudo-element.
+  hiddenScrollbarCss('.wui-workbench__tablist, .wui-workbench__rail').trimEnd(),
 
   // `hidden` has to actually hide. The UA sheet's `[hidden] { display: none }`
   // is at USER-AGENT origin and every `display` above it is at author origin,
@@ -840,6 +853,8 @@ const PHASES: ReadonlySet<string> = new Set<WorkbenchPhase>([
   'idle',
   'listening',
   'playing',
+  'loading',
+  'waiting',
   'empty',
   'error',
 ]);
@@ -976,7 +991,45 @@ export function mountWorkbench(
   setParts(note, 'note', options.parts?.note);
   note.hidden = true;
   dress(note, workbenchParts.note);
-  main.append(stage, note);
+  const feedbackHost = document.createElement('div');
+  feedbackHost.hidden = true;
+  paint(feedbackHost, {display: 'none', flex: '1 1 auto', 'min-width': '0'});
+  let feedbackState: StatusState = {kind: 'ready'};
+  const feedback = mountStatus(feedbackHost, {snapshot: () => feedbackState}, {
+    // workbenchStyle already includes the shared status rules.
+    stylesheet: false,
+    classNames: {root: 'wui-status--embedded'},
+    parts: {root: 'feedback', indicator: 'feedback-indicator', message: 'feedback-message'},
+    onError: report,
+  });
+  paint(feedback.element, {flex: '1 1 auto', height: 'auto', 'min-height': '5rem'});
+  if (inline) {
+    // No stylesheet means no keyframes. Keep a static square signal and the
+    // same accessible copy using only the status presenter's public handles.
+    feedbackHost.dataset.motion = 'none';
+    paint(feedback.element, {
+      display: 'none',
+      'box-sizing': 'border-box',
+      'align-items': 'center',
+      'justify-content': 'center',
+      width: '100%',
+      padding: '0',
+      border: '0',
+      background: 'transparent',
+      color: 'var(--wm-status-foreground, var(--wm-foreground-muted, var(--wm-foreground, #777)))',
+    });
+    paint(feedback.indicator, {
+      display: 'block',
+      'box-sizing': 'border-box',
+      flex: '0 0 auto',
+      width: 'var(--wm-status-indicator-size, 1.25rem)',
+      height: 'var(--wm-status-indicator-size, 1.25rem)',
+      opacity: '.65',
+      animation: 'none',
+    });
+    paint(feedback.message, workbenchParts.index);
+  }
+  main.append(stage, feedbackHost, note);
 
   const rail = document.createElement('div');
   rail.className = 'wui-workbench__rail';
@@ -1388,7 +1441,22 @@ export function mountWorkbench(
 
     const said = snapshot.status?.message ?? '';
     const told = snapshot.status?.detail ?? '';
-    setText(message, said);
+    const pending = phase === 'loading' || phase === 'waiting';
+    feedbackState = phase === 'loading' || phase === 'waiting'
+      ? {kind: phase, message: said || undefined} : {kind: 'ready'};
+    feedback.update();
+    setHidden(feedbackHost, !pending);
+    setStyleValue(feedbackHost, 'display', pending ? 'flex' : 'none');
+    if (inline) {
+      setStyleValue(feedback.element, 'display', pending ? 'flex' : 'none');
+      setStyleValue(feedback.indicator, 'border', phase === 'waiting' ? '1px solid currentColor' : '0');
+      setStyleValue(feedback.indicator, 'background', phase === 'loading'
+        ? ['0 0', '100% 0', '0 100%', '100% 100%']
+          .map((position) => `linear-gradient(currentColor, currentColor) ${position} / 40% 40% no-repeat`).join(', ')
+        : 'transparent');
+    }
+    setHidden(stage, pending);
+    setText(message, pending ? '' : said);
     setText(detail, told);
     setHidden(detail, told === '');
 
@@ -1400,6 +1468,13 @@ export function mountWorkbench(
     setText(note, noted);
     setHidden(note, noted === '');
     setData(note, 'phase', noted === '' ? undefined : phase);
+    if (inline) {
+      const quiet = noted !== '' && phase === 'empty';
+      for (const [name, value] of Object.entries(visuallyHiddenDeclarations)) {
+        setStyleValue(note, name, quiet ? value : undefined);
+      }
+      if (!quiet) dress(note, workbenchParts.note);
+    }
     if (chrome === 'bare') {
       setAttr(note, 'role', noted === '' ? undefined : 'status');
       setAttr(note, 'aria-live', noted === '' ? undefined : 'polite');
@@ -1608,6 +1683,7 @@ export function mountWorkbench(
         report(error);
       }
       claim.release();
+      feedback.destroy();
       root.remove();
       index.remove();
       style?.remove();
@@ -1618,7 +1694,10 @@ export function mountWorkbench(
   // mount a replacement, and that replacement must win.
   const claim = claimHost(mountedWorkbenches, host, handle);
   claim.destroyPrevious();
-  if (!claim.isCurrent()) return handle;
+  if (!claim.isCurrent()) {
+    feedback.destroy();
+    return handle;
+  }
 
   host.append(...(style ? [style] : []), root, index);
   if (!claim.isCurrent()) {
@@ -1627,6 +1706,7 @@ export function mountWorkbench(
     root.remove();
     index.remove();
     style?.remove();
+    feedback.destroy();
     return handle;
   }
 

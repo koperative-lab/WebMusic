@@ -1,8 +1,10 @@
-import {EventEmitter, type AudioClip, type Region} from '../../core';
+import {EventEmitter, AudioDocumentApplicationError, audioSequenceTempoGrid, isAudioDocumentSource, type AudioDocumentSource, type AudioDocumentPlaybackBinding, type AudioDocumentRevision, type AudioDocumentApplicationResult, type AudioPlaybackSourceSnapshot, type AudioDocumentSnapshot, type AudioClip, type Region} from '../../core';
+import {AudioDocumentBinding} from './audio-document-binding';
+import {AudioSequenceEngine} from './sequence-engine';
 import {createWebAudioContext} from '@webmusic/kernel/audio-context';
 import {InsertChain, type Effect} from '@webmusic/kernel/effect';
 import {AudioOutputPort, createConnectionLease, type ModuleHandle} from '@webmusic/kernel/module';
-import type {TransportClockReader} from '@webmusic/kernel/transport';
+import {TempoClock, createTempoGrid, type TempoGrid, type TransportClockReader} from '@webmusic/kernel/transport';
 import type {SessionSchedulingBinding} from '@webmusic/kernel/session';
 import type {ConnectionLease} from '@webmusic/kernel/module';
 import {EXTERNAL_TIMING_CAPABILITIES, BUFFER_TIMING_CAPABILITIES, MEDIA_TIMING_CAPABILITIES, type PlaybackTimingCapabilities, type PlaybackSchedulingMode} from './engines/buffer-engine';
@@ -36,19 +38,23 @@ export interface AudioPlayerTransport {
   readonly scratching?: boolean;
   /** Source or transport state changed; observers read the accepted snapshot. */
   subscribe?(notify: () => void): () => void;
+  onLoad?(notify: () => void): () => void;
   onEnd?(notify: () => void): () => void;
   onError?(notify: (error: Error) => void): () => void;
 }
 
-export type AudioPlayerOptions = AudioClipPlayerOptions;
-
-export interface AudioPlayerSourceDetail {
-  readonly clip: AudioClip | undefined;
-  readonly revision: number;
+export interface AudioPlayerOptions extends AudioClipPlayerOptions {
+  /** Maximum total active/inactive sequence chunk PCM, default 64 MiB. */
+  preparedBytesLimit?: number;
+  /** Bounded sequence read size, default 16384 frames. */
+  chunkFrames?: number;
 }
+
+export type AudioPlayerSourceDetail = AudioPlaybackSourceSnapshot;
 
 export interface AudioPlayerEvents {
   sourcechange: AudioPlayerSourceDetail;
+  documentstatechange: AudioDocumentPlaybackBinding;
   statechange: {playing: boolean};
   timeupdate: PlayerTimeUpdate;
   end: AudioClip | undefined;
@@ -70,6 +76,12 @@ let audioPlayerModuleSequence = 0;
 export class AudioPlayer {
   private readonly options: AudioPlayerOptions;
   private readonly emitter = new EventEmitter<AudioPlayerEvents>();
+  private readonly documentAttachment: AudioDocumentBinding;
+  private sequenceEngine?: AudioSequenceEngine;
+  /** Latest requested document, set before the binding exists so reentrant requests compare with it. */
+  private documentTarget?: AudioDocumentSource;
+  private appliedDocument?: AudioDocumentSnapshot;
+  private announcedDocument?: AudioDocumentSnapshot;
   private selectedClip?: AudioClip;
   private engine?: AudioClipPlayer;
   private borrowed?: AudioPlayerTransport;
@@ -85,6 +97,7 @@ export class AudioPlayer {
   private releases: Array<() => void> = [];
   private observer: ReturnType<typeof setInterval> | undefined;
   private generation = 0;
+  private documentGeneration = 0;
   private observationRevision = 0;
   private lastPlaying = false;
   private readonly configured = new Set<string>();
@@ -95,6 +108,7 @@ export class AudioPlayer {
   private storedVolume: number;
   private storedPan: number;
   private storedRate: number;
+  /** Configured loop intent; the sequence engine separately holds the mapped loop it accepted. */
   private storedLoop: boolean | {start: number; end: number};
   private storedPreservesPitch: boolean;
 
@@ -122,7 +136,87 @@ export class AudioPlayer {
         return () => { this.moduleListeners.delete(listener); off(); };
       },
     };
+    this.documentAttachment = new AudioDocumentBinding({
+      pause: () => { this.sequenceEngine?.pause(); this.engine?.pause(); this.publishState(); },
+      transport: () => ({sampleRate: this.appliedDocument?.content.sampleRate ?? 1,
+        seconds: this.seconds, loop: this.sequenceEngine?.loopOption ?? this.storedLoop}),
+      adopt: (snapshot, seconds, loop) => {
+        if (!this.sequenceEngine) throw new AudioDocumentApplicationError('not-ready', 'No sequence transport');
+        if (!this.sequenceEngine.adopt(snapshot.content, snapshot.assets, seconds, loop)) {
+          throw new AudioDocumentApplicationError('not-ready', 'Sequence adoption was superseded');
+        }
+        this.appliedDocument = snapshot;
+      },
+      retag: (snapshot) => {
+        if (!this.sequenceEngine || !this.appliedDocument || this.appliedDocument.assets !== snapshot.assets) return false;
+        if (!this.sequenceEngine.retag(snapshot.content, snapshot.assets)) return false;
+        this.appliedDocument = snapshot;
+        return true;
+      },
+      notify: () => {
+        const state = this.documentBinding;
+        this.publishSource();
+        if (this.documentBinding !== state) return;
+        this.emitter.emit('documentstatechange', state);
+        if (this.documentBinding === state) this.publishState();
+      },
+      onDetach: () => { this.releaseSource(); this.appliedDocument = undefined; this.publishSource(); },
+      report: (error) => this.emitter.emit('error', error instanceof Error ? error : new Error(String(error))),
+    });
   }
+
+  get documentSource(): AudioDocumentSource | undefined { return this.documentAttachment.getSource(); }
+  get documentBinding(): AudioDocumentPlaybackBinding { return this.documentAttachment.getState(); }
+  get source(): AudioPlaybackSourceSnapshot {
+    const snapshot = this.appliedDocument;
+    if (snapshot && this.sequenceEngine) return Object.freeze({kind: 'sequence', clip: undefined,
+      sequence: snapshot.content, assets: snapshot.assets, documentId: snapshot.documentId,
+      documentRevision: snapshot.documentRevision, revision: this.sourceRevision});
+    const clip = this.clip;
+    return clip ? Object.freeze({kind: 'clip', clip, revision: this.sourceRevision}) :
+      Object.freeze({kind: 'empty', clip: undefined, revision: this.sourceRevision});
+  }
+  setDocumentSource(source: AudioDocumentSource | undefined): void {
+    if (this.disposed) throw new AudioDocumentApplicationError('disposed', 'AudioPlayer has been disposed');
+    if (source === this.documentTarget) return;
+    if (source !== undefined && !isAudioDocumentSource(source)) throw new AudioDocumentApplicationError('invalid-source', 'Expected an AudioDocumentSource');
+    if (source && (this.selectedClip || (this.borrowed && this.borrowed !== this.sequenceEngine))) {
+      throw new AudioDocumentApplicationError('source-conflict', 'Document source conflicts with the selected clip or transport');
+    }
+    const generation = ++this.documentGeneration;
+    this.documentTarget = source;
+    if (this.documentSource) this.documentAttachment.setSource(undefined);
+    // A source callback can supersede an attachment whose engine is selected but not yet bound.
+    else if (this.sequenceEngine && this.borrowed === this.sequenceEngine) { this.releaseSource(); this.publishSource(); }
+    if (generation !== this.documentGeneration || this.disposed) return;
+    // A detach listener's newer clip/transport selection wins over this request.
+    if (source && (this.selectedClip || this.borrowed)) { this.documentTarget = undefined; return; }
+    if (source) {
+      let engine: AudioSequenceEngine;
+      try {
+        engine = new AudioSequenceEngine(() => this.audioContext, {...this.options,
+          volume: this.storedVolume, pan: this.storedPan, rate: this.storedRate, loop: this.storedLoop});
+      } catch (error) {
+        // Invalid sequence limits reject this request; the same source can be retried.
+        if (generation === this.documentGeneration) this.documentTarget = this.documentSource;
+        throw error;
+      }
+      this.sequenceEngine = engine;
+      const abandon = () => {
+        if (generation === this.documentGeneration) this.documentTarget = this.documentSource;
+        if (this.sequenceEngine === engine && this.borrowed !== engine) this.sequenceEngine = undefined;
+        if (this.borrowed !== engine) engine.dispose();
+      };
+      try { this.applyTransport(engine); } catch (error) { abandon(); throw error; }
+      if (generation !== this.documentGeneration || this.borrowed !== engine || this.disposed) { abandon(); return; }
+    }
+    this.documentAttachment.setSource(source);
+    if (source && generation === this.documentGeneration && this.documentSource === source && this.configured.has('loop')) {
+      this.documentAttachment.recordLoopIntent(this.storedLoop);
+    }
+  }
+  waitForDocumentRevision(target: AudioDocumentRevision): Promise<AudioDocumentApplicationResult> { return this.documentAttachment.wait(target); }
+  retryDocumentApplication(): Promise<AudioDocumentApplicationResult> { return this.documentAttachment.retry(); }
 
   get clip(): AudioClip | undefined { return this.borrowed ? this.borrowed.clip ?? this.borrowed.currentClip : this.selectedClip; }
   get transport(): AudioPlayerTransport | undefined { return this.borrowed; }
@@ -133,6 +227,21 @@ export class AudioPlayer {
   get playing(): boolean { return this.borrowed?.playing ?? this.engine?.playing ?? false; }
   get scratching(): boolean { return this.borrowed?.scratching ?? this.engine?.scratching ?? false; }
   get clock(): TransportClockReader | undefined { return this.borrowed ? this.borrowed.clock : this.engine?.clock; }
+  /**
+   * Constant-tempo grid of the playing content on the clock's seconds axis:
+   * the applied document's beat grid, else the selected clip's `beatGrid`
+   * (its tempo, anchored at its first downbeat or beat). Undefined without one.
+   */
+  get tempoGrid(): TempoGrid | undefined {
+    if (this.appliedDocument) return audioSequenceTempoGrid(this.appliedDocument.content);
+    const grid = this.borrowed ? undefined : this.clip?.beatGrid;
+    return grid ? createTempoGrid({bpm: grid.bpm, anchor: grid.downbeats?.[0] ?? grid.beats[0]}) : undefined;
+  }
+  /** The player clock read in beats of {@link tempoGrid}; undefined without a clock or grid. */
+  get tempoClock(): TempoClock | undefined {
+    const clock = this.clock, grid = this.tempoGrid;
+    return clock && grid ? new TempoClock(clock, grid) : undefined;
+  }
   /** Lazily create or borrow the context shared by decoding and owned playback. */
   get audioContext(): AudioContext {
     if (this.disposed) throw new Error('AudioPlayer has been disposed');
@@ -217,6 +326,8 @@ export class AudioPlayer {
   }
 
   setClip(clip: AudioClip | undefined): void {
+    if (this.documentSource && clip !== undefined) throw new AudioDocumentApplicationError('source-conflict', 'Clip conflicts with document source');
+    if (this.documentSource) { this.setDocumentSource(undefined); return; }
     if (this.disposed || (!this.borrowed && clip === this.selectedClip)) return;
     const revision = ++this.generation;
     if (clip && !this.followsSession) (this.borrowed ?? this.engine)?.pause();
@@ -229,6 +340,11 @@ export class AudioPlayer {
   }
 
   setTransport(transport: AudioPlayerTransport | undefined): void {
+    if (this.documentSource && transport) throw new AudioDocumentApplicationError('source-conflict', 'Transport conflicts with document source');
+    if (this.documentSource) { this.setDocumentSource(undefined); return; }
+    this.applyTransport(transport);
+  }
+  private applyTransport(transport: AudioPlayerTransport | undefined): void {
     if (this.disposed || transport === this.borrowed) return;
     if (transport instanceof AudioPlayer) {
       throw new TypeError('AudioPlayer cannot borrow another AudioPlayer; connect the playlist or mixer transport directly');
@@ -265,6 +381,7 @@ export class AudioPlayer {
           if (current()) this.emitter.emit('end', this.clip);
         }));
         if (current()) own(transport.onError?.((error) => { if (current()) this.emitter.emit('error', error); }));
+        if (current()) own(transport.onLoad?.(() => { if (current()) this.emitter.emit('load', {duration: this.duration}); }));
       } catch (error) {
         if (current()) this.releaseSource();
         throw error;
@@ -277,6 +394,7 @@ export class AudioPlayer {
 
   async play(when?: number): Promise<void> {
     if (this.disposed) return;
+    this.documentAttachment.assertPlayable();
     const generation = this.generation;
     const target = this.borrowed ?? this.ensureEngine();
     if (!target) return;
@@ -292,12 +410,15 @@ export class AudioPlayer {
   stop(): void {
     if (this.disposed) return;
     const generation = this.generation;
+    this.documentAttachment.recordPositionIntent(0, true);
     (this.borrowed ?? this.engine)?.stop();
     if (!this.disposed && generation === this.generation) this.publishState();
   }
   seek(seconds: number): void {
     if (this.disposed) return;
+    if (!Number.isFinite(seconds)) throw new RangeError('Seek position must be finite');
     const generation = this.generation;
+    this.documentAttachment.recordPositionIntent(seconds);
     (this.borrowed ?? this.ensureEngine())?.seek(seconds);
     if (!this.disposed && generation === this.generation) this.publishState();
   }
@@ -338,10 +459,12 @@ export class AudioPlayer {
   setLoop(loop: boolean | {start: number; end: number}): void {
     if (this.disposed) return;
     const accepted = normalizeLoopOption(loop);
-    if (this.borrowed) throw new Error('The selected audio transport does not support setLoop; configure its queue or mix directly');
-    this.engine?.setLoop(accepted);
+    // Only the owned document transport accepts clip loops; a queue's list loop is a different policy.
+    if (this.borrowed && this.borrowed !== this.sequenceEngine) throw new Error('The selected audio transport does not support setLoop; configure its queue or mix directly');
+    (this.borrowed ? this.sequenceEngine : this.engine)?.setLoop(accepted);
     this.storedLoop = accepted;
     this.configured.add('loop');
+    this.documentAttachment.recordLoopIntent(accepted);
   }
   setPreservesPitch(preservesPitch: boolean): void {
     if (this.disposed) return;
@@ -364,6 +487,8 @@ export class AudioPlayer {
     this.disposed = true;
     this.generation++;
     let failure: unknown;
+    this.documentTarget = undefined;
+    try { this.documentAttachment.dispose(); } catch (error) { failure = error; }
     try { this.releaseSource(); } catch (error) { failure = error; }
     try { this.inserts?.dispose(); } catch (error) { failure ??= error; }
     this.inserts = undefined;
@@ -384,7 +509,7 @@ export class AudioPlayer {
     const observerFailed = (error: unknown, mode: 'throw' | 'rejection') => {
       if (mode === 'throw') failure ??= error;
     };
-    this.emitter.emitSafely('sourcechange', {clip: undefined, revision: ++this.sourceRevision}, observerFailed);
+    this.emitter.emitSafely('sourcechange', {kind: 'empty', clip: undefined, revision: ++this.sourceRevision}, observerFailed);
     this.emitter.emitSafely('statechange', {playing: false}, observerFailed);
     this.emitter.emitSafely('timeupdate', {seconds: 0, duration: 0, progress: 0}, observerFailed);
     this.emitter.removeAllListeners();
@@ -475,6 +600,8 @@ export class AudioPlayer {
     const engine = this.engine;
     const scheduling = this.scheduling;
     this.scheduling = undefined;
+    const sequence = this.borrowed === this.sequenceEngine ? this.sequenceEngine : undefined;
+    if (sequence) this.sequenceEngine = undefined;
     this.releases = [];
     this.engine = undefined;
     this.borrowed = undefined;
@@ -484,16 +611,19 @@ export class AudioPlayer {
     }
     try { scheduling?.release(); } catch (error) { failure ??= error; }
     try { engine?.dispose(); } catch (error) { failure ??= error; }
+    try { sequence?.dispose(); } catch (error) { failure ??= error; }
     if (failure !== undefined) throw failure;
   }
 
   private publishSource(): void {
     const clip = this.clip;
     const transport = this.borrowed;
-    if (clip === this.announcedClip && transport === this.announcedTransport) return;
+    if (clip === this.announcedClip && transport === this.announcedTransport && this.appliedDocument === this.announcedDocument) return;
+    this.announcedDocument = this.appliedDocument;
     this.announcedClip = clip;
     this.announcedTransport = transport;
-    this.emitter.emit('sourcechange', {clip, revision: ++this.sourceRevision});
+    this.sourceRevision++;
+    this.emitter.emit('sourcechange', this.source);
   }
 
   private publishState(): void {

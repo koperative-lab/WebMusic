@@ -618,6 +618,9 @@ describe('mountStaff', () => {
     expect(empty.hidden).toBe(false);
     expect(empty.textContent).toBe('Nothing sounding');
     expect(empty.getAttribute('aria-live')).toBe('polite');
+    // Announced, never painted: the surface carries no prose.
+    expect(getComputedStyle(empty).position).toBe('absolute');
+    expect(getComputedStyle(empty).clipPath).toBe('inset(50%)');
 
     state = {...state, marks: [{midi: 60, diatonic: 28}]};
     handle.update();
@@ -1498,17 +1501,27 @@ describe('mountStaff container width', () => {
 
 describe('readable pitch viewports', () => {
   it.each([true, false])('keeps a wide keyboard intact and follows arrivals without taking back manual scroll (stylesheet=%s)', (stylesheet) => {
+    // Geometry is read at the next frame, never straight after the update's
+    // per-key style writes; frames here are function calls.
+    let due: FrameRequestCallback[] = [];
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => due.push(callback));
+    const frame = (): void => { const run = due; due = []; for (const callback of run) callback(0); };
     let state: KeyboardState = {low: 36, high: 84, marks: []};
     const handle = mountKeyboard(host(), {snapshot: () => state}, {stylesheet, follow: 'active', density: 'compact', scheme: 'dark'});
     const root = handle.element;
     Object.defineProperties(root, {clientWidth: {value: 240, configurable: true}, scrollWidth: {value: 1160, configurable: true}});
-    Object.defineProperties(handle.key(60)!, {offsetLeft: {value: 560}, offsetWidth: {value: 40}});
+    const offsetLeft = vi.fn(() => 560);
+    Object.defineProperties(handle.key(60)!, {offsetLeft: {get: offsetLeft}, offsetWidth: {value: 40}});
     expect(handle.board.children).toHaveLength(49);
     expect(root.style.getPropertyValue('--wui-pitch-keyboard-width')).toContain('29');
     expect(getComputedStyle(root).overflowX).toBe('auto');
     expect((root.querySelector('.wui-pitch-keyboard__ruler') as HTMLElement).hidden).toBe(true);
     state = {...state, marks: [{midi: 60, label: 'A caller supplied long pitch name'}]};
     handle.update();
+    expect(offsetLeft).not.toHaveBeenCalled();
+    expect(root.scrollLeft).toBe(0);
+    handle.update();
+    frame();
     expect(root.scrollLeft).toBe(460);
     expect(root.tabIndex).toBe(0);
     const label = handle.key(60)!.querySelector('.wui-pitch-keyboard__label') as HTMLElement;
@@ -1517,14 +1530,19 @@ describe('readable pitch viewports', () => {
     expect(root.getAttribute('aria-label')).toContain(label.title);
     root.scrollLeft = 0;
     handle.update();
+    frame();
     expect(root.scrollLeft).toBe(0);
     state = {...state, marks: []};
     handle.update();
+    frame();
     expect(root.scrollLeft).toBe(0);
     Object.defineProperty(root, 'clientWidth', {value: 1200});
     handle.update();
+    frame();
     expect(root.hasAttribute('tabindex')).toBe(false);
+    handle.update();
     handle.destroy();
+    frame();
   });
 
   it('reveals a held arrival after hidden content becomes measurable and releases its observer', () => {

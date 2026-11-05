@@ -1,0 +1,337 @@
+---
+title: '<score-grid-view>'
+description: 'A DAW-style piano-roll grid that follows a player and, with a borrowed editor, edits notes from a switchable toolbar.'
+sidebar:
+  order: 2
+---
+
+import ScoreGridViewDemo from '../../../../../components/elements/ScoreGridViewDemo.astro';
+
+`<score-grid-view>` draws a score as a piano-roll grid: written-pitch rows over
+bar, beat and snap lines, with piano keys on the left, a bar ruler on top and an
+optional velocity lane below. It follows a bound player's playhead and sounding
+notes. Positions are written quarters, so the grid stays aligned with the bar
+lines when the tempo changes.
+
+Assign a [ScoreEditor](/score/headless/view/score-editor/) to `.editor` and add
+`editable` to edit it. A one-row toolbar of icon buttons then appears along the
+top of the grid window. Click
+notes to select them and drag them as in a DAW piano roll. Draw, resize, delete,
+velocity, snap, zoom and undo/redo can each be switched on or off with `tools`.
+Use [`<score-view>`](/score/element/view/score-view/) for read-only staff,
+waterfall or seconds-based piano-roll drawings; it can follow the same editor.
+
+<ScoreGridViewDemo />
+
+The demo loads Arabesque No. 1 (`public/midi/Arabesque No.1.mid`) into one
+editor. The page owns that editor and lends it to the player and the grid.
+Every switch and setting is in **Parameters**: clear a box in the **tools** row
+to remove that feature's toolbar button, gestures, keys and note-value fields.
+Toolbar, wheel and keyboard changes update **tool**, **snap**,
+**velocity-lane**, **pixels-per-quarter** and **note-height** there. Reset
+restores the attributes and reloads the piece, discarding edits.
+
+## Import
+
+```html
+<script type="module">
+  import {defineScorePlayerElement} from '@webmusic/score/play/element';
+  import {defineScoreGridViewElement} from '@webmusic/score/view/element';
+  import {loadScoreEditor} from '@webmusic/score/view/headless';
+  defineScorePlayerElement();
+  defineScoreGridViewElement();
+  // Your page owns the editor; dispose it after detaching the elements.
+  const editor = await loadScoreEditor('/midi/Arabesque%20No.1.mid');
+  const player = /** @type {import('@webmusic/score/play/element').ScorePlayerElement | null} */ (document.getElementById('grid-player'));
+  const grid = /** @type {import('@webmusic/score/view/element').ScoreGridViewElement | null} */ (document.querySelector('score-grid-view'));
+  if (player) player.editor = editor;
+  if (grid) grid.editor = editor;
+</script>
+
+<score-player id="grid-player"></score-player>
+<score-grid-view player="#grid-player" editable snap="1/16" velocity-lane></score-grid-view>
+```
+
+`defineAllViewElements()` from the same entry also registers this tag. A
+read-only grid needs no editor: `<score-grid-view player="#p">` borrows the
+player's score, and `src` or `.score` supply one directly.
+
+## Data and editing
+
+With `.editor`, the grid draws the editor's committed content, or the current
+draft of its interaction session. Without an editor, source precedence is
+explicit `.score`, then `src`, then the selected player's resolved score; URLs
+load through [`@webmusic/score/io`](/score/api/io/). An editor cannot be
+combined with `.score` or `src`: the setters throw, and a `src` attribute added
+later reports `source-conflict` until removed. There is no `editor` attribute.
+
+The grid borrows the editor and never disposes it; assigning `undefined`
+detaches it. When you replace a document, assign the new editor first, then
+dispose the previous one. Editing needs both a ready editor and `editable`.
+Otherwise the grid is read-only: notes, rows, ruler and playhead are drawn, but
+the toolbar, instructions and note-value fields are hidden and pointer and key
+input does nothing.
+
+Every edit is an editor command. A drag previews a revision-bound draft,
+announced with `editpreview`. Releasing the pointer commits it as one undo
+history item, announced with `editcommit`. Keys, toolbar buttons and the
+note-value form commit directly. Failures leave the document unchanged and
+dispatch `editerror`. The editor owns content and history, so another surface
+borrowing the same editor shares undo/redo.
+
+Each grid owns an interaction session (selection and draft) by default. Assign
+one session from `editor.createInteractionSession()` to `.interactionSession`
+on several surfaces to share selection and drafts. A session from another
+document is rejected. Disconnect disposes only a session the grid created; the
+caller disposes a supplied one.
+
+## Tools and settings
+
+`tools` lists the features the grid offers while editing. Absent, every feature
+is offered. Tokens are separated by spaces or commas; unknown tokens are
+ignored, and an empty value leaves selection only. Selecting notes, by click,
+Shift-click, area drag, Ctrl/Cmd+A or the **Select existing note** menu, is
+always available while editing.
+
+| Feature | Toolbar | Gestures and keys | Note-value fields |
+| --- | --- | --- | --- |
+| `move` | — | Drag a note in time and pitch; arrows nudge. | Onset and written pitch, Apply |
+| `resize` | — | Drag a note's right edge; Shift+Left/Right. | Duration, Apply |
+| `draw` | **Select tool** / **Draw tool** buttons | Draw tool; B toggles it; double-click or Alt-drag in Select. | Insert into part, Insert note |
+| `delete` | **Delete selected notes** | Delete or Backspace; a click with the Draw tool. | — |
+| `velocity` | **Show velocity lane** toggle | Drag a stem in the velocity lane. | Velocity, Apply |
+| `snap` | **Snap grid** button and card | — | — |
+| `zoom` | Four zoom buttons | Ctrl/Cmd+wheel and Alt+wheel. | — |
+| `history` | **Undo** / **Redo** | Ctrl/Cmd+Z, Shift+Ctrl/Cmd+Z, Ctrl/Cmd+Y. | — |
+
+Features gate input; the settings still apply without them. `snap` sets the
+step for moves, resizes, nudges and new notes, and the subdivision lines drawn
+between beats. Its values are note values: `1/4`, `1/8`, `1/8t`, `1/16`,
+`1/16t` and `1/32`, where `t` marks triplets, or `off`. `pixels-per-quarter`
+(8–512) and `note-height` (6–48) set horizontal and vertical zoom on a read-only
+grid too. Two settings depend on a feature: `tool="draw"` falls back to
+`select` without `draw`, and `velocity-lane` shows the lane only with
+`velocity`.
+
+When the toolbar, the wheel or the B key changes a setting, the grid writes the
+matching attribute and dispatches `gridsettingschange`. Changing an attribute
+yourself reconfigures the mounted grid without an event. Removing a feature
+cancels an active gesture but keeps the selection.
+
+## Gestures and keyboard
+
+Toolbar buttons show square line icons; the names above are their accessible
+names and tooltips. A pressed tool inverts to an ink fill. **Snap grid** and
+**Note values and keyboard alternatives** open an adjustment card inside the
+grid window over a dimmed backdrop; Escape, the close button or a click on the
+backdrop closes it and returns focus to its button, and Tab stays inside the
+card while it is open. The viewport and toolbar scroll without visible
+scrollbars. The piano keys, ruler and velocity lane stay in place while the grid
+scrolls. The pointer works on the note rows and the velocity lane; the piano
+keys and ruler are labels only.
+
+- **Select.** Click a note to select it; Shift-click adds or removes it. Drag
+  empty space to select an area; Shift-drag adds the area to the selection.
+- **Move.** Drag a selected or unselected note: the selection moves by whole
+  snap steps in time and whole rows in pitch, so an off-grid note keeps its
+  offset. Moves stop at the score start and the MIDI range instead of failing.
+- **Resize.** Drag the right edge of a note: its last 8px, or its last third
+  when the note is shorter. The selection's durations change by whole snap
+  steps, to at least one step (1/96 quarter with snap off); a selected note
+  shows its handle.
+- **Draw.** With the Draw tool, click or drag empty space to add a note at the
+  grid cell under the pointer; dragging extends it in snap steps. A click on a
+  note deletes it when `delete` is offered; Shift-click still selects. In the
+  Select tool, double-click empty space or Alt-drag adds a note. A new note is
+  one snap step long (a sixteenth with snap off), has velocity 100, goes into
+  the part chosen under **Insert into part** (the first part by default) and is
+  then selected.
+- **Velocity.** In the velocity lane, drag the stem nearest the pointer up or
+  down. The selection, or that note alone, changes by the same amount within
+  1–127.
+
+The focused grid also handles these keys, and leaves keys in the form fields
+alone:
+
+| Key | Action |
+| --- | --- |
+| Left / Right | Move the selection by one snap step (a sixteenth with snap off). |
+| Up / Down | Transpose the selection by one semitone. |
+| Shift+Left / Shift+Right | Shorten or lengthen the selection by one snap step. |
+| Delete / Backspace | Delete the selection. |
+| Ctrl/Cmd+A | Select every pitched note. |
+| Ctrl/Cmd+Z · Shift+Ctrl/Cmd+Z · Ctrl/Cmd+Y | Undo · redo · redo. |
+| B | Toggle the Select and Draw tools. |
+| Ctrl/Cmd+wheel · Alt+wheel · trackpad pinch | Zoom time (pinch and Ctrl/Cmd) or rows (Alt) around the pointer, in proportion to the wheel deltas: a pinch follows the fingers (Chromium Ctrl+wheel and Safari gesture events) and a mouse notch zooms about 1.5×. The grid repaints once per frame at the anchored scroll position, and reports the zoom once the gesture settles. |
+| Escape | Cancel the active gesture or draft. Otherwise it is left to enclosing handlers such as a dialog. |
+
+A gesture is cancelled by Escape, a lost or cancelled pointer, a move after the
+primary button was released, focus or window blur, a viewport resize, a setting
+or feature change, a changed document revision, and becoming read-only or
+detached. A failed latest preview cannot commit an earlier valid one.
+
+The **Note values and keyboard alternatives** toolbar button, at the right end
+of the toolbar, opens a card that offers every edit without a pointer. **Select existing note** lists pitched notes by part, onset
+and pitch. **Onset** and **Duration** accept quarter values as integers,
+decimals or fractions such as `1/3`. **Written MIDI pitch** accepts 0–127 and
+**Velocity** 1–127; empty values are errors, not zero. **Apply to selected
+note** submits only the fields that differ from the committed note and belong
+to an offered feature; an unchanged Apply reports **No change** without adding
+history. **Insert note** adds a note to the chosen part. New notes use the
+voice of that part's first note, or voice `1` for an empty part; a document
+needs a part before notes can be added. The fields belong to the selected note at
+its committed revision; a newer revision or selection refreshes them, and a
+stale submission is rejected rather than applied to newer content.
+
+## Playback
+
+`player` selects one player in the same Document or ShadowRoot. Its position
+draws a playhead, and sounding notes fill their whole row. The grid never sends
+playback commands. Without an editor, the player's snapshot supplies the
+position, and the grid derives sounding notes from the drawn score.
+
+With an editor, the player contributes time only when its applied document ID
+and revision match the editor's committed document and its coordinates are
+authored. Use [`<score-player>`](/score/element/play/score-player/#play-an-editable-document)
+with the same `.editor`. While playback prepares a newer revision, or plays
+expanded repeats, the playhead and sounding notes are hidden and the status
+reports that playback is pending. `editcommit` reports a document commit, not
+playback readiness.
+
+<details class="component-section">
+<summary>API</summary>
+
+Numeric attributes ignore missing or non-numeric values and use their defaults.
+`pixels-per-quarter` and `note-height` are clamped to their ranges.
+
+| Member | Kind | Default | Description |
+| --- | --- | --- | --- |
+| `src` / `format` | attributes | none | Explicit MIDI / MusicXML / MXL / ABC URL and optional parser override. Conflicts with `.editor`. |
+| `player` | attribute | none | Unique selector of a player to follow; without other input the grid borrows its score. |
+| `width` / `height` | attributes | 100% / natural | Bare numbers are px; CSS lengths pass through. A fixed height scrolls a taller grid inside the host. |
+| `editable` / `.editable` | boolean attribute / property | false | Enable editing for a ready `.editor`; never creates one. |
+| `tools` / `.tools` | attribute / property | every feature | Offered features, space- or comma-separated: `move`, `resize`, `draw`, `delete`, `velocity`, `snap`, `zoom`, `history`. The getter returns them in that order; the setter writes the attribute and throws `RangeError` for an unknown name. |
+| `tool` / `.tool` | attribute / property | `select` | `select` or `draw`. `draw` without the `draw` feature reads as `select`. |
+| `snap` / `.snap` | attribute / property | `1/16` | `off`, `1/4`, `1/8`, `1/8t`, `1/16`, `1/16t` or `1/32`; unknown values read as `1/16`. |
+| `velocity-lane` / `.velocityLane` | boolean attribute / property | false | Show the velocity lane; needs the `velocity` feature. |
+| `pixels-per-quarter` / `.pixelsPerQuarter` | attribute / property | 64 | Horizontal zoom in px per written quarter, 8–512. The getter returns the mounted grid's current value. |
+| `note-height` / `.noteHeight` | attribute / property | 16 | Row height in px per semitone, 6–48. The getter returns the mounted grid's current value. |
+| `min-pitch` / `max-pitch` | attributes | MIDI 48–84, widened to two semitones beyond the notes | Integer MIDI rows 0–127; values outside are ignored. A single bound limits the computed opposite bound. A crossing range shows an error status. |
+| `note-color` / `active-note-color` | attributes | Score View tokens | Idle and sounding note fills as `#rgb`, `#rrggbb`, `rgb()` or `r, g, b`; they replace the token defaults. |
+| `.score` | writable property | none | Assign a loaded Score; overrides `src` and player data. Throws while `.editor` is assigned. |
+| `.editor` | writable property | none | Borrow any `ScoreEditorPort`, such as a `ScoreEditor`; never disposed. `undefined` detaches it. Throws `TypeError` for other values and an `Error` on a source conflict. |
+| `.interactionSession` | writable property | grid-owned session | Borrow a same-document `ScoreInteractionSession` to share selection and drafts. The getter returns the supplied or grid-created session. |
+| `.currentTime` | read-only property | 0 | Current nominal score position in seconds. |
+| `data-editor-state` | reflected state | absent | Present while `.editor` is assigned: `ready`, `unavailable`, `invalid` or `source-conflict`, as on [`<score-view>`](/score/element/view/score-view/#follow-an-editor). |
+| `data-editable-state` | reflected state | absent | `readonly`, `ready` or `unavailable` while an editor is assigned or `editable` is set; `editable` without a ready editor, or a grid that cannot mount, is `unavailable`. |
+| `data-playback-state` | reflected state | absent | With an editor: `unbound`, `pending` or `ready` player compatibility. |
+| `data-player-state` | reflected state | absent | Player selector resolution and source readiness, shared with the other View Elements. |
+
+**Events.** All four are `CustomEvent`s that bubble and are composed.
+
+| Event | `detail` | When |
+| --- | --- | --- |
+| `editpreview` | `ScoreDraftResult` with `status: 'preview'` and the interaction snapshot | A drag produced a valid draft. |
+| `editcommit` | `ScoreEditResult` with `status: 'committed'`, `snapshot` and `change` (its `label` names the edit) | An edit, undo or redo committed. Not dispatched for cancellation, failure or no change. |
+| `editerror` | `{error}` | A command, preview or note-value input failed. |
+| `gridsettingschange` | `{settings, changed}`: the complete `ScoreGridSettings` and the changed key (`tool`, `snap`, `velocityLane`, `pixelsPerQuarter` or `noteHeight`) | The toolbar, the wheel or the B key changed a setting. |
+
+```ts
+import {defineScoreGridViewElement, type ScoreGridSettingsChangeDetail, type ScoreGridViewElement} from '@webmusic/score/view/element';
+
+defineScoreGridViewElement();
+const grid = document.querySelector<ScoreGridViewElement>('score-grid-view')!;
+grid.tools = ['move', 'resize', 'history'];
+grid.addEventListener('gridsettingschange', (event) => {
+  const {settings, changed} = (event as CustomEvent<ScoreGridSettingsChangeDetail>).detail;
+  console.log(changed, settings[changed]);
+});
+```
+
+`ScoreGridViewElement`, `defineScoreGridViewElement(tag?)` and the types
+`ScoreGridFeature`, `ScoreGridTool`, `ScoreGridSnap`, `ScoreGridSettings` and
+`ScoreGridSettingsChangeDetail` are exported from `@webmusic/score/view/element`.
+Registration is idempotent and SSR-safe. The element mounts
+[`mountScoreGrid`](/score/api/view/#mount-a-score-grid) from
+`@webmusic/score/view/render`.
+
+**Lifecycle.** Disconnect cancels a pending load and the active gesture,
+releases the grid, its listeners and resize observer, and the grid-owned
+session. The borrowed editor, a supplied session and the player stay alive.
+Reconnecting binds them again.
+
+**Accessibility.** An editable grid is a focusable SVG with the `application`
+role, described by instructions that list the offered gestures and keys. The
+instructions and a polite live status that reports selection, drafts, edits and
+errors are available to assistive technology but not drawn. Icon buttons carry
+accessible names and tooltips; the tool buttons and lane toggle report their
+pressed state, and the note-values button reports whether its panel is open. The note-value form offers every
+edit with native controls. Selected notes have a double outline, drafts a
+dashed outline and sounding notes fill their row, so no state relies on color
+alone. A read-only grid is one labeled image outside the tab order.
+
+</details>
+
+<details class="component-section">
+<summary>Styling</summary>
+
+The grid is light DOM, so style its parts with ordinary attribute selectors
+such as `score-grid-view [part~="toolbar"]`, not `::part()`. The host is a
+block filling its container; `width` and `height` size it.
+
+| Part | Element |
+| --- | --- |
+| `grid` | The bordered window holding the toolbar, viewport and card overlay. |
+| `toolbar` | The one-row icon toolbar along the top; contains `tool-button`, `snap`, `lane-toggle`, `zoom-button`, `delete-button`, `history-button` and `values-toggle`. |
+| `overlay` | The dimmed backdrop covering the window while a card is open. |
+| `card` | The adjustment card (a modal `dialog`); its header holds `card-close`. |
+| `snap-options` | The snap choices in the card; each is a `snap-option`. |
+| `note-properties` | The note-values form in the card. |
+| `viewport` | The scrolling frame around the drawing. |
+| `canvas` | The scrolled content holding the surface and the sticky layers. |
+| `surface` | The SVG note rows, grid lines, notes and playhead. |
+| `ruler` | The bar ruler, sticky at the top. |
+| `keys` | The piano keys, sticky at the left. |
+| `velocity-lane` | The velocity lane, sticky at the bottom. |
+| `editing-instructions` | The gesture and key summary, read by assistive technology only. |
+| `editing-status` | The live status, read by assistive technology only. |
+
+The `grid` part reflects `data-edit-state` (`static`, `readonly`, `ready`,
+`draft` or `unavailable`), `data-tool` and `data-playback-state`.
+
+| Property | Effect |
+| --- | --- |
+| `--wm-score-grid-max-height` | Maximum viewport height before it scrolls; default `32rem`. |
+| `--wm-score-grid-scrim` | Backdrop behind an open card; default 45% black. |
+| `--wm-score-view-note` | Idle note fill, then `--wm-foreground`, then `#333` / `#ddd` for light / dark schemes. |
+| `--wm-score-view-active-note` | Sounding note fill; default `rgb(240, 84, 119)`. |
+| `--wm-score-view-background` | Window, keys, ruler and card background, then `--wm-surface`. Selection rings and the resize handle reuse it to contrast with note fills. |
+| `--wm-foreground` | Icons, text, pressed-tool fill, selected velocity stems, grid lines and outlines; default `#111` / `#eee`. |
+| `--wm-foreground-muted` | Idle icons, ruler and key labels, idle velocity stems; default `#777` / `#aaa`. |
+| `--wm-accent-foreground` | Icon color on a pressed tool and the primary card action; default `#fff` / `#111`. |
+| `--wm-surface-muted` | Hover fill for toolbar buttons and snap options. |
+| `--wm-control-border`, `--wm-border` | Window, toolbar, divider, card and field lines; default `#d8d8d8` / `#333`. |
+| `--wm-control-size` | Toolbar height, square button size and card field height; default `2rem`. |
+| `--wm-control-radius` | Button, field and card corners; default `0`. |
+| `--wm-component-border`, `--wm-component-radius` | The window's outer border and corners. |
+| `--wm-font-mono` | Snap values, labels and numeric fields. |
+| `--wm-focus-ring` | Focus outline on buttons, fields and the grid. |
+
+Note opacity follows velocity. `note-color` and `active-note-color` replace
+the note tokens for one element. The loading, waiting and error states use the
+[Status](/uikit/layout-feedback/status/) presenter. Keep visible focus and
+the non-color selection, draft and sounding cues when restyling the grid.
+
+```css
+score-grid-view {
+  --wm-score-grid-max-height: 24rem;
+  --wm-score-view-note: #2563eb;
+  --wm-score-view-background: #f8fafc;
+}
+```
+
+</details>
+
+## Related
+
+[Read-only score drawings](/score/element/view/score-view/) · [ScoreEditor](/score/headless/view/score-editor/) · [Editable document playback](/score/element/play/score-player/#play-an-editable-document) · [View API and renderers](/score/api/view/)

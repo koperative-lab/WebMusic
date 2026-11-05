@@ -18,7 +18,7 @@
     "check:format": "node scripts/check-format.mjs",
     "check:lockfile": "node scripts/check-lockfile.mjs",
     "check:licenses": "node scripts/license-gate.mjs",
-    "check:architecture": "node --test scripts/release-surface.test.mjs && node scripts/check-architecture.mjs",
+    "check:architecture": "node --test scripts/release-surface.test.mjs scripts/architecture-identifiers.test.mjs scripts/element-composition-policy.test.mjs && node scripts/check-architecture.mjs",
     "check:docs": "node --test scripts/headless-docs-policy.test.mjs && node --experimental-strip-types --no-warnings scripts/check-docs.mjs",
     "check:dev-docs": "node --experimental-strip-types --no-warnings scripts/docs-catalog.mjs --check",
     "docs:sync": "node --experimental-strip-types --no-warnings scripts/docs-catalog.mjs --write",
@@ -53,14 +53,14 @@
     "globals": "^17.13.0",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.71.0",
-    "vitest": "^5.0.2"
+    "vitest": "^5.0.3"
   },
   "overrides": {
     "tsup": {
       "esbuild": "^0.28.2"
     },
     "@expressive-code/core": {
-      "postcss-nested": "7.0.2"
+      "postcss-nested": "^7.0.2"
     }
   }
 }
