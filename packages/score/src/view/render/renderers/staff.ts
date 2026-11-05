@@ -918,7 +918,10 @@ export class StaffSVGVisualizer extends BaseVisualizer {
       this.playhead.dataset.time = String(this.position);
       return;
     }
+    // Read the viewport's geometry once, before any write of this paint, so the
+    // header, input cursor and playhead below never force a second layout.
     const scroll = this.viewport.scrollLeft;
+    const width = this.viewport.clientWidth || this.container.getBoundingClientRect().width;
     this.context.svg.style.clipPath = `inset(0 0 0 ${scroll + this.headerWidth * this.scale}px)`;
     let measure = 0;
     for (let i = 1; i < this.measures.length; i += 1) if (this.measures[i].x * this.scale <= scroll) measure = i; else break;
@@ -926,23 +929,24 @@ export class StaffSVGVisualizer extends BaseVisualizer {
     let quarter = this.measures[measure]?.start ?? 0;
     for (const anchor of this.anchors) if (anchor.x <= leftEdge) quarter = anchor.quarter; else break;
     this.drawHeader(measure, quarter);
-    this.paintInputCursor();
+    this.paintInputCursor({scroll, width});
     if (!this.playhead || this.position === undefined) return;
     const x = this.xAtQuarter(secondsToQuarters(this.noteSequence.tempos, Math.max(0, this.position))) * this.scale - scroll;
-    const width = this.viewport.clientWidth || this.container.getBoundingClientRect().width;
     this.playhead.hidden = this.position < 0 || this.position > this.noteSequence.totalTime || x < this.headerWidth * this.scale || (width > 0 && x > width);
     this.playhead.style.left = `${x}px`;
     this.playhead.dataset.time = String(this.position);
   }
-  private paintInputCursor(): void {
+  /** `geometry` is the viewport's scroll and width when the caller already read them. */
+  private paintInputCursor(geometry?: {scroll: number; width: number}): void {
     if (!this.inputCursor || this.disposed) return;
     const position = this.inputPosition;
     const layer = position ? this.projection.layers.findIndex((layer) =>
       this.source.parts[layer.partIndex]?.id === position.partId &&
       (this.staffConfig.splitStaves === false || layer.staff === position.staff)) : -1;
     if (!position || layer < 0 || !this.inSystem(position.quarters)) { this.inputCursor.hidden = true; return; }
-    const x = this.xAtQuarter(position.quarters) * this.scale - (this.system ? 0 : this.viewport.scrollLeft);
-    const width = this.viewport.clientWidth || this.container.getBoundingClientRect().width;
+    const scroll = this.system ? 0 : geometry?.scroll ?? this.viewport.scrollLeft;
+    const x = this.xAtQuarter(position.quarters) * this.scale - scroll;
+    const width = geometry?.width ?? (this.viewport.clientWidth || this.container.getBoundingClientRect().width);
     this.inputCursor.hidden = !this.system && (x < this.headerWidth * this.scale || (width > 0 && x > width));
     this.inputCursor.style.left = `${x}px`;
     this.inputCursor.style.top = `${(this.rowY[layer] + 30) * this.scale}px`;

@@ -150,11 +150,14 @@ Point `<audio-view>` at an [`<audio-player>`](/audio/element/play/audio-player/)
 ## Theming
 
 Every visible element owns the same neutral outer component surface: `#fff`, a
-`1px solid #d8d8d8` border, `.6rem` padding and square corners. Override those defaults with
+`1px solid #d8d8d8` border, `.6rem` padding and square corners. `<audio-recorder>`,
+`<audio-playlist>` and `<audio-mixer>` default to `0` padding instead, because their icon rows and
+strips run edge to edge inside the frame. Override those defaults with
 `--wm-component-background`, `--wm-component-border`, `--wm-component-padding` and
 `--wm-component-radius`. The `--wap-*`, `--wapl-*`, `--wam-*`, `--war-*` and `--wameter-*`
-families remain compatibility and inner-control palettes, so the transport, meter track or record
-accent can be retuned independently of the outer surface:
+families remain compatibility and inner-control palettes, so the transport, meter track or
+recording colour can be retuned independently of the outer surface. Without `--war-accent`, the
+recorder's recording colour falls back to the shared `--wm-recording` token:
 
 ```css
 /* Keep the neutral surface, add rounding, and retune the transport controls. */

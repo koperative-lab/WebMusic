@@ -145,6 +145,12 @@ describe('Audio View as a read-only document follower', () => {
   it('reports clip-only types unavailable for a document, while a passive explicit clip remains usable', () => {
     const element = view(), model = editor(); element.editor = model; element.type = 'spectrogram'; document.body.append(element);
     expect(element.textContent).toContain('Sequence documents support waveform');
+    // One short visible line; the explanation is announced but visually hidden.
+    expect(element.querySelector('.wui-status__message')?.textContent).toBe('Waveform only');
+    const detail = element.querySelector<HTMLElement>('[data-status-detail]')!;
+    expect(detail.closest('[role="status"]')).not.toBeNull();
+    expect(detail.style.position).toBe('absolute');
+    expect(detail.style.width).toBe('1px');
     element.type = 'waveform'; element.editor = undefined;
     element.clip = createAudioClip({sampleRate: 100, channelData: [new Float32Array(10)]});
     expect(wave(element)).not.toBeNull();

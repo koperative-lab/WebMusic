@@ -127,19 +127,27 @@ presenter (for example `--wm-transport-surface-background`). Older component var
 `--wm-stage-background` and `--wm-meter-background` remain supported for their existing inner
 viewport or compatibility role. `--wm-surface`, `--wm-border`, and `--wm-control-radius` remain
 semantic palette fallbacks. `--wm-control-border` is the shared line color for non-primary inner
-controls; it falls back through `--wm-border` to `#d8d8d8`. Primary actions, active states, and
+controls and hairline dividers; it falls back through `--wm-border` to `#d8d8d8`
+(`light-dark(#d8d8d8, #333)` in presenters that declare a dark pair). Primary actions, active states, and
 focus rings keep their own stronger tokens instead of inheriting that soft line. The
 `--wm-component-*` quartet is the direct outer-surface API.
 
 Set `--wm-foreground` for text and drawing ink, `--wm-foreground-muted` for secondary text,
-`--wm-accent` for active fills and `--wm-accent-foreground` for their labels. Surface tokens
+`--wm-accent` for active fills and `--wm-accent-foreground` for their labels. Icon buttons in the
+analysis, recorder, playlist, mixer and note presenters are muted and unframed when idle, use a
+`--wm-surface-muted` hover fill, invert to a `--wm-foreground` fill with
+`--wm-accent-foreground` content when pressed or expanded, and drop to 30% opacity when disabled;
+their names are in `aria-label` and `title`. `--wm-focus-ring` (default
+`2px solid var(--wm-foreground)`) is the focus outline these controls draw inside their edge.
+`--wm-recording` (default `light-dark(#c62828, #ef5350)`) is the shared recording colour used by
+the recorder. Surface tokens
 never intentionally provide selected text colour. In particular, transparent Analyze backgrounds
 no longer make selected labels transparent; set the explicit accent foreground to customize them.
 Musical palettes (`--wm-degree-*`, `--wm-progression-tone-*`), inverse surfaces, note-key faces,
 and loading overlays retain their dedicated tokens so independent visual roles remain legible.
-Envelope, EQ and LFO graphs pair `--wm-surface-inverse` with
-`--wm-foreground-on-inverse`; generic surface and foreground values do not
-recolor their inverse plots. Set both inverse tokens when changing that palette.
+Envelope, EQ and LFO plots share the component surface: they default to `--wm-surface` with
+`--wm-foreground` ink. Their own `--wm-envelope-*`, `--wm-eq-*` and `--wm-lfo-wave-*` background
+and curve tokens still let a theme invert them.
 Use `--wm-font-family` for UI text and `--wm-font-mono` for fixed-width readouts;
 presenter-specific font overrides retain precedence.
 

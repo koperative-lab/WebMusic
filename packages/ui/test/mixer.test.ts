@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import {afterEach, describe, expect, it, vi} from "vitest";
-import {mountMixer, type MixerBinding} from "../src/mixer";
+import {mixerStyle, mountMixer, type MixerBinding} from "../src/mixer";
 
 afterEach(() => document.body.replaceChildren());
 
@@ -205,5 +205,42 @@ describe("mountMixer", () => {
 
     // A departed strip released its slider: its element no longer answers.
     expect(piano.getAttribute("role")).toBeNull();
+  });
+});
+
+describe("mixer visual contract", () => {
+  it("renders named transport icon buttons and titled mute/solo toggles", () => {
+    const host = document.createElement("div");
+    const handle = mountMixer(host, {
+      snapshot: () => ({master: 1, channels: [{id: "piano", label: "Piano", value: 0.5, muted: true}]}),
+      setMaster: vi.fn(),
+      setChannel: vi.fn(),
+      setMuted: vi.fn(),
+      setSolo: vi.fn(),
+      play: vi.fn(),
+      pause: vi.fn(),
+      stop: vi.fn(),
+    });
+    for (const name of ["Play", "Pause", "Stop"]) {
+      const button = host.querySelector<HTMLButtonElement>(`[aria-label="${name}"]`)!;
+      expect(button.title).toBe(name);
+      expect(button.textContent).toBe("");
+      expect(button.querySelector("svg[data-icon]")?.getAttribute("aria-hidden")).toBe("true");
+    }
+    const mute = host.querySelector<HTMLButtonElement>('[aria-label="Mute Piano"]')!;
+    expect(mute.title).toBe("Mute Piano");
+    expect(mute.getAttribute("aria-pressed")).toBe("true");
+    expect(host.querySelector<HTMLButtonElement>('[aria-label="Solo Piano"]')!.title).toBe("Solo Piano");
+    handle.destroy();
+  });
+
+  it("keeps the transport on one row with hidden scrollbars and hairline strips", () => {
+    expect(mixerStyle).toMatch(/:where\(\.wui-mixer__transport\) \{[^}]*flex-wrap:nowrap/);
+    expect(mixerStyle).toContain(":where(.wui-mixer__channels) { scrollbar-width: none; }");
+    expect(mixerStyle).toContain(":where(.wui-mixer__transport) { scrollbar-width: none; }");
+    expect(mixerStyle).toMatch(/\.wui-mixer__strip \+ \.wui-mixer__strip\) \{ border-inline-start:1px solid/);
+    expect(mixerStyle).toMatch(/:where\(\.wui-mixer__label\) \{[^}]*--wm-font-mono[^}]*text-transform:uppercase/);
+    expect(mixerStyle).toContain(":where(.wui-mixer__status .wui-status)");
+    expect(mixerStyle).not.toContain("--wm-accent,#999");
   });
 });

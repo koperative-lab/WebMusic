@@ -3,6 +3,8 @@ import {installStyle} from "./internal/style";
 import {markEmptyState, addClassNames, clamp01, finite, setParts} from "./internal/dom";
 import {componentSurfaceCss} from "./internal/surface";
 import {mountParameterRack, type ParameterRackHandle} from "./parameter";
+import {neutralColor} from "./internal/palette";
+import {visuallyHiddenCss} from "./internal/icons";
 
 export interface MacroTargetState { label: string; value: number; unit?: string; }
 export interface MacroState { label: string; value: number; targets: readonly MacroTargetState[]; disabled?: boolean; }
@@ -56,9 +58,10 @@ display:flex; flex-wrap:wrap; min-width:0; max-width:100%; gap:.8rem; align-item
 .wui-macro__control .wui-parameter-rack { border:0; padding:0; background:transparent; }
 .wui-macro__targets { flex:1 1 12rem; display:flex; flex-direction:column; gap:.2rem; min-width:0; max-width:100%; }
 .wui-macro__target { display:flex; flex-wrap:wrap; justify-content:space-between; gap:.2rem .6rem; min-width:0; }
-.wui-macro__target-label { min-width:0; overflow-wrap:anywhere; color:var(--wm-macro-label,var(--wm-foreground-muted, var(--wm-foreground, #666))); font-size:.72rem; }
-.wui-macro__target-value { min-width:0; overflow-wrap:anywhere; color:var(--wm-macro-foreground,var(--wm-foreground,#444)); font-size:.72rem; font-variant-numeric:tabular-nums; }
-.wui-macro__empty { color:var(--wm-foreground-muted, var(--wm-foreground, #999)); font-size:.72rem; }
+.wui-macro__target-label { min-width:0; overflow-wrap:anywhere; color:var(--wm-macro-label,var(--wm-foreground-muted, ${neutralColor('muted')})); font-size:.72rem; }
+:where(.wui-macro__target-value) { min-width:0; overflow-wrap:anywhere; color:var(--wm-macro-foreground,var(--wm-foreground,${neutralColor('foreground')})); font:500 .6875rem/1.3 var(--wm-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-variant-numeric:tabular-nums; }
+/* "Assign .targets" is an instruction, so it exists for assistive technology only. */
+.wui-macro__empty { ${visuallyHiddenCss} }
 `;
 
 export const macroRackStyle = `

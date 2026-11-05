@@ -5,6 +5,19 @@ work and does not establish npm publication, a release tag or a deployment.
 
 ## Unreleased
 
+- Bring every Web Component in line with the visual design (DEC-059). Recorder,
+  playlist, mixer and analyzer controls are one row of SVG icon buttons (names
+  in `aria-label`/`title`, pressed inverts ink) instead of glyph or text
+  buttons; the oscilloscope trigger edge is a segmented group instead of a
+  native select; scrolling regions hide their scrollbars; hint, empty and
+  progress prose is visually hidden (errors stay visible); envelope, EQ and LFO
+  plots draw on the component surface instead of an inverse box; colour
+  fallbacks have dark-scheme pairs. New tokens `--wm-recording` and
+  `--wm-playlist-active-foreground`; the note surface's start overlay is
+  replaced by a keyboard icon button. Interaction: envelope/EQ drags and
+  analyzer probes apply once per frame, `<audio-view>` scrub paints in the same
+  frame, zoom keeps its anchor and seek drags seek once per frame, and the
+  Score analysis lanes zoom proportionally with Safari pinch support.
 - Add `<audio-clip-view>`, a waveform clip editor modeled on audio editors
   such as Adobe Audition: an icon toolbar, a time ruler with markers, channel
   lanes with segment boundaries, draggable fade handles and gain lines, gain

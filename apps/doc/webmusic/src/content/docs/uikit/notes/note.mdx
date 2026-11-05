@@ -45,8 +45,11 @@ cancel releases the current pitch.
 Chord buttons hold every MIDI pitch in their record until pointer up, cancel, leave, Space/Enter
 keyup, or focus loss. Multiple holders may overlap the same chord and pitch.
 
-When `keyboard` is true, the root becomes focusable and the click-to-start overlay disappears on
-focus. Unmodified `KeyboardEvent.code` values resolve through `midiForKey`; repeats do not retrigger
+When `keyboard` is true, the root becomes focusable and a keyboard bar runs edge to edge along the
+top of the surface: a "Musical typing" icon button, the octave readout and a visually hidden hint.
+The button mirrors focus on the root with `aria-pressed`; clicking it focuses the root, or blurs it
+while typing is on. It stays out of the tab order (`tabindex="-1"`) because the root itself is the
+keyboard entry point, and it does not take focus from the root. Unmodified `KeyboardEvent.code` values resolve through `midiForKey`; repeats do not retrigger
 a held pitch. Escape blurs and releases QWERTY notes. Z and X release all holders before requesting
 an octave shift, except in a `grid` with `mapOnly: true`; `canShiftOctave` can veto either request.
 Blur releases QWERTY holders; `releaseAll()`, remount, and destroy release every presenter holder.
@@ -89,8 +92,8 @@ for another board whose nodes carry `data-midi` or `data-pitch`.
 |---|---|---|
 | `layout` | `'piano' \| 'grid' \| 'chords'` | Required layout discriminator selecting which geometry array is rendered. |
 | `activeMidis?` | `readonly number[]` | Externally held MIDI pitches. Matching piano keys or pitched grid cells receive `.down` and `aria-pressed="true"`; presenter-held input is combined with this state. |
-| `keyboard?` | `boolean` | Truthy state makes the root focusable and adds the QWERTY hint, octave label, and click-to-start overlay. |
-| `mapOnly?` | `boolean` | Strict `true` in grid layout removes Z / X from the visible hint and suppresses octave requests. |
+| `keyboard?` | `boolean` | Truthy state makes the root focusable and adds the keyboard bar: the Musical typing toggle, octave label and visually hidden QWERTY hint. |
+| `mapOnly?` | `boolean` | Strict `true` in grid layout removes Z / X from the (visually hidden) hint and suppresses octave requests. |
 | `octaveLabel?` | `string` | Text shown on the right of the keyboard bar; absence paints an empty string. |
 | `piano?` | `readonly NotePianoKey[]` | Piano geometry. Absence builds an empty piano board. |
 | `grid?` | `readonly NoteGridCell[]` | Grid geometry and optional physical-key mapping. Absence builds an empty grid. |
@@ -167,7 +170,8 @@ The interaction port has these members:
 | `noteStyle` | `string` | Canonical stylesheet text installed by `mountNoteSurface()`. |
 
 **Accessibility.** With `keyboard`, the root enters the tab order and gains a visible focus
-outline; focus hides the pointer-oriented start overlay. Piano keys and pitched grid cells expose
+outline; focus presses the Musical typing button (`aria-pressed`), whose name is in `aria-label`
+and `title`. The QWERTY hint is visually hidden but remains in the accessibility tree. Piano keys and pitched grid cells expose
 `aria-pressed`, but remain pointer/QWERTY surfaces rather than individual tab stops. Idle grid
 cells are noninteractive. Chords are native buttons with visible names and `aria-pressed`; Space
 and Enter use press-on-keydown/release-on-keyup semantics instead of click toggling. Escape and
@@ -192,14 +196,20 @@ Note has no `classNames` or `parts` option; canonical classes, fixed compatibili
 root and viewport parts are always installed.
 
 Piano and grid boards scroll horizontally inside the available host width instead of compressing
-their keys and labels. The piano keeps its percentage geometry with a minimum white-key width;
-the grid keeps the supplied column count with a minimum cell width. The keyboard hint wraps,
-and chord buttons wrap into rows with space for multiline labels. Container resizing does not
+their keys and labels; their viewports, the keyboard bar and the chord row hide their scrollbars.
+The piano keeps its percentage geometry with a minimum white-key width; the grid keeps the supplied
+column count with a minimum cell width. The keyboard bar is one non-wrapping row, one control
+height tall, with a hairline under it; the octave readout is uppercase mono text and is removed
+when empty. Grid cells and chord buttons form a hairline grid: square cells separated by a 1px
+gap over the line colour. Idle cells and chords are unfilled (surface colour) with a raised hover
+fill; a pressed cell, key or chord inverts to ink. Chord buttons sit in one non-wrapping row of
+mono labels. Cells without MIDI drop to 30% opacity. Container resizing does not
 rebuild the board or release held notes. Long custom piano labels are ellipsized inside their
 key, with the full label retained as its tooltip.
 
 White and black active-key labels use `--wm-note-label-active` → `--wm-accent-foreground`,
-independently from the background. The neutral active fill is `#444` with white text.
+independently from the background. The neutral active fill is `--wm-foreground`
+(`light-dark(#111, #eee)`) with `light-dark(#fff, #111)` text.
 Unpressed black-key labels use `--wm-note-label-alt` →
 `--wm-foreground-on-inverse` → `#fff`; their borders use `--wm-note-key-alt-border` →
 `--wm-border` → `#000`. Root text uses `--wm-note-foreground` →
@@ -209,30 +219,29 @@ Unpressed black-key labels use `--wm-note-label-alt` →
 
 | Property | Falls back to | Default | Controls |
 |---|---|---|---|
-| `--wm-note-background` | `--wm-surface` | `#fff` | Root background; the grid itself is transparent to avoid duplicate alpha. |
+| `--wm-note-background` | `--wm-surface` | `#fff` | Root background. The grid and chord row paint the line colour behind their cells to draw hairlines. |
 | `--wm-surface` | literal fallback | `#fff` | Shared root-background fallback. |
 | `--wm-note-focus` | `--wm-focus` | `#444` | Root keyboard focus outline. |
 | `--wm-focus` | literal fallback | `#444` | Shared focus fallback. |
-| `--wm-note-label` | `--wm-foreground-muted` → `--wm-foreground` | `#666` | Bar text, white-key labels, and grid references. |
-| `--wm-font` | `--wm-font-family` | `system-ui, sans-serif` | Legacy font override for the bar, start prompt, and chords. |
-| `--wm-font-family` | literal fallback | `system-ui, sans-serif` | Shared UI font when the legacy override is absent. |
-| `--wm-font-mono` | literal fallback | `ui-monospace, monospace` | Key and grid-reference labels. |
-| `--wm-note-overlay` | literal fallback | `rgba(255,255,255,.82)` | Click-to-start overlay. |
-| `--wm-note-radius` | `--wm-control-radius` | `0` | Start prompt, keys, cells, and chord corners. |
-| `--wm-note-accent` | `--wm-accent` | `#111` | Start-prompt background. |
-| `--wm-note-accent-foreground` | `--wm-accent-foreground` | `#fff` | Start-prompt text. |
+| `--wm-note-label` | `--wm-foreground-muted` → `--wm-foreground` | `#666` | White-key labels and grid references; with `--wm-foreground-muted` → `light-dark(#777, #aaa)`, the octave readout and idle chord text. |
+| `--wm-font-mono` | literal fallback | `ui-monospace, monospace` | Octave readout, key, grid-reference and chord labels. |
+| `--wm-note-radius` | `--wm-control-radius` | `0` | Piano-key corners. Grid cells and chords are square. |
 | `--wm-note-height` | `--wm-surface-md` | `144px` | Piano board height, on the shared drawing-surface scale. |
+| `--wm-note-control-height` | `--wm-control-size` → `--wui-row-h` | `2rem` | Height of the keyboard bar and its typing toggle, independent of the board height. |
+| `--wm-note-surface-padding` | `--wm-component-padding` | `.6rem` | Root inset; the keyboard bar extends over it to run edge to edge. |
 | `--wm-note-key-min-width` | literal fallback | `2.25rem` | Minimum white-key width before the piano scrolls. |
 | `--wm-note-cell-min-width` | literal fallback | `2.5rem` | Minimum grid-cell width before the grid scrolls. |
-| `--wm-note-border` | `--wm-control-border` → `--wm-border` | `#d8d8d8` | White-key, grid-cell, and chord borders. |
+| `--wm-note-border` | `--wm-control-border` → `--wm-border` | `#d8d8d8`; `light-dark(#d8d8d8, #333)` for hairlines | Piano-key borders, the hairline under the keyboard bar and before the octave readout, and the grid and chord hairlines. |
 | `--wm-control-border` | `--wm-border` | `#d8d8d8` | Shared non-primary control border fallback. |
 | `--wm-note-key` | `--wm-surface` | `#fff` | White-key background. |
-| `--wm-note-key-alt` | `--wm-surface-inverse` | `#222` | Black-key and chord background. |
-| `--wm-note-active` | `--wm-accent` | `#444` | Pressed key, cell, and chord background. |
-| `--wm-note-gap` | literal fallback | `0.4rem` | Grid and chord gaps. |
+| `--wm-note-key-alt` | `--wm-surface-inverse` | `#222` | Black-key background. |
+| `--wm-note-active` | `--wm-foreground` | `light-dark(#111, #eee)` | Pressed key, cell, and chord background. |
+| `--wm-note-gap` | literal fallback | `1px` | Grid and chord gaps; the line colour shows through as hairlines. |
 | `--wm-note-cell-height` | literal fallback | `42px` | Grid-cell minimum height and two-thirds of the chord minimum height. |
-| `--wm-note-surface` | `--wm-surface-muted` → `--wm-surface` | `#f3f3f3` | Idle grid-cell surface background. |
-| `--wm-note-label-active` | `--wm-accent-foreground` | `#fff` | Pressed grid reference and chord text. |
+| `--wm-note-surface` | `--wm-surface` | `light-dark(#fff, #111)` | Idle grid-cell and chord background. |
+| `--wm-surface-muted` | literal fallback | `light-dark(#f3f3f3, #1c1c1c)` | Hover fill of grid cells, chords and the typing toggle. |
+| `--wm-note-label-active` | `--wm-accent-foreground` | `light-dark(#fff, #111)` | Pressed key label, grid reference and chord text. |
+| `--wm-focus-ring` | literal | `2px solid var(--wm-foreground)` | Inside focus outline of the typing toggle and chord buttons. |
 
 Unpressed black-key borders and labels default to `#000` and `#fff`; the dedicated
 border and label tokens described above override them.
@@ -243,12 +252,11 @@ border and label tokens described above override them.
 |---|---|---|---|
 | Root | `.wui-note` | Always | `.wrap`; `.on` while focused with interaction |
 | Keyboard bar | `.wui-note__bar` | `keyboard` truthy | `.qwerty-bar` |
-| Hint | `.wui-note__hint` | `keyboard` truthy | `.hint` |
+| Musical typing toggle | `.wui-note__start` | `keyboard` truthy; `aria-pressed="true"` while the root has focus | `.start` |
+| Hint (visually hidden) | `.wui-note__hint` | `keyboard` truthy | `.hint` |
 | Octave text | `.wui-note__octave` | `keyboard` truthy | `.oct` |
 | Board host | `.wui-note__host` | Always | `.host` |
 | Scroll viewport | `.wui-note__viewport` | Piano and grid layouts | — |
-| Start overlay | `.wui-note__overlay` | `keyboard` truthy | `.overlay` |
-| Start prompt | `.wui-note__start` | `keyboard` truthy | `.start` |
 | Piano board | `.wui-note__piano` | Piano layout | `.board.kbd` |
 | Piano key | `.wui-note__key` | Per piano record | `.note.key`, plus `.wui-note__white.white` or `.wui-note__black.black`; `.down` while held |
 | Key label | `.wui-note__key-label` | Label supplied | `.keylab` |

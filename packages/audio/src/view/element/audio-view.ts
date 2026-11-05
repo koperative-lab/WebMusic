@@ -123,6 +123,12 @@ interface BoundPlayerFacade {
   beginScratch?(): BoundScratchSession | undefined;
 }
 
+/**
+ * The renderers' zoom accepts the window start the element anchored, so the
+ * one paint at the new scale already shows the anchored window. Visualizers
+ * typed without the second parameter simply ignore it.
+ */
+
 /** Scale the renderers draw at when nothing asks for another one. */
 const DEFAULT_PIXELS_PER_SECOND = 100;
 
@@ -206,6 +212,12 @@ const SEEK_LABEL = 'Audio position';
 
 const NO_REGIONS: readonly Region[] = Object.freeze([]);
 
+/** Announced but not drawn: instructions and explanations (Visual design → Type). */
+const VISUALLY_HIDDEN: Readonly<Partial<CSSStyleDeclaration>> = Object.freeze({
+  position: 'absolute', width: '1px', height: '1px', margin: '-1px', padding: '0', border: '0',
+  overflow: 'hidden', clipPath: 'inset(50%)', whiteSpace: 'nowrap',
+});
+
 const AUDIO_FORMATS = new Set<AudioFormat>([
   'wav',
   'aiff',
@@ -283,7 +295,15 @@ export class AudioViewElement extends WebMusicElement {
   };
   /** A released gesture remains borrowed until playback-owned inertia settles. */
   private releasedScratch?: {session: BoundScratchSession; cleanup(): void};
+  /**
+   * An absolute (`drag-mode="seek"`) pointer drag: the press seeks at once,
+   * moves are coalesced to one seek per animation frame and release flushes
+   * the exact final position.
+   */
+  private seekDrag?: {pressed: boolean; pending?: {seconds: number; region?: Region}; last?: number};
   private dragFrame = 0;
+  /** True while a drag frame callback runs: renderers then paint synchronously. */
+  private inFrame = false;
   private seekRevision = 0;
   private viewportUnsubscribe?: () => void;
   private boundPlayer?: EventTarget;
@@ -628,13 +648,28 @@ export class AudioViewElement extends WebMusicElement {
     if (this.dragMode === 'pan') this.surfaceSlider?.update();
   }
 
-  /** Live re-scale: the renderer keeps its DOM, the timeline keeps the window. */
+  /**
+   * Live re-scale: the renderer keeps its DOM, the timeline keeps the window.
+   * The timeline anchors the zoom (the playhead while it is in view, else the
+   * window centre) and the renderer paints that anchored window directly, so
+   * its report back cannot replace the anchor with the old pixel offset.
+   */
   private applyZoom(pixelsPerSecond: number): void {
     this.surfaceSlider?.cancelGesture();
     // Final-release callbacks can reenter after UIKit released its pointer.
     this.cancelTrackGesture();
-    this.timeline.setZoom(pixelsPerSecond);
-    this.rendered?.setZoom(pixelsPerSecond);
+    const rendered = this.rendered;
+    const range = rendered && this.type !== 'meter' ? this.visibleRange() : undefined;
+    const {playheadSeconds} = this.timeline.snapshot;
+    const anchor = !range || (playheadSeconds >= range.startSeconds && playheadSeconds <= range.endSeconds)
+      ? playheadSeconds
+      : (range.startSeconds + range.endSeconds) / 2;
+    this.timeline.setZoom(pixelsPerSecond, anchor);
+    if (rendered) {
+      // A centered playhead anchors itself; the renderer ignores a start there.
+      const startSeconds = range && !this.centeredPlayhead() ? this.timeline.visibleRange().startSeconds : undefined;
+      rendered.setZoom(pixelsPerSecond, startSeconds);
+    }
     this.announceViewport();
   }
 
@@ -866,7 +901,7 @@ export class AudioViewElement extends WebMusicElement {
 
     if (this.hasEditorIntent()) {
       if (!this.editing?.state.available) return this.renderUnavailable(host, this.getAttribute('data-editor-state') === 'source-conflict' ? 'Editor conflicts with an independent audio source' : 'Audio editor unavailable');
-      if (this.type !== 'waveform') return this.renderUnavailable(host, 'Sequence documents support waveform views. Render explicit audio before using a clip-only view.');
+      if (this.type !== 'waveform') return this.renderUnavailable(host, 'Waveform only', 'Sequence documents support waveform views. Render explicit audio before using a clip-only view.');
       // A read-only follow: draw the editor's visible content (including a shared draft).
       const state = this.editing.state;
       const content = state.interaction.draft?.content ?? state.document.content;
@@ -884,7 +919,7 @@ export class AudioViewElement extends WebMusicElement {
       return this.renderEmpty(host);
     }
     if (this.playerFacade()?.source?.kind === 'sequence' && !this.explicitClip && !this.sourceClip && !this.explicitPeaks && !this.sourcePeaks && this.type !== 'meter') {
-      return this.renderUnavailable(host, 'This player contains a sequence. Bind the same editor for its waveform, or supply explicitly rendered audio.');
+      return this.renderUnavailable(host, 'No rendered audio', 'This player contains a sequence. Bind the same editor for its waveform, or supply explicitly rendered audio.');
     }
 
     const options = this.renderOptions();
@@ -946,8 +981,20 @@ export class AudioViewElement extends WebMusicElement {
     this.configureAccessibility();
   }
 
-  private renderUnavailable(host: HTMLElement, message: string): void {
-    this.status = mountStatus(host, {snapshot: () => ({kind: 'empty', message})}, {classNames: {root: 'wui-status--embedded'}});
+  /**
+   * A view that cannot draw this source. The surface shows one short line;
+   * the explanation is announced with it but visually hidden (Visual design:
+   * a component surface carries no explanatory prose).
+   */
+  private renderUnavailable(host: HTMLElement, message: string, explanation?: string): void {
+    const status = this.status = mountStatus(host, {snapshot: () => ({kind: 'empty', message})}, {classNames: {root: 'wui-status--embedded'}});
+    if (explanation) {
+      const detail = host.ownerDocument.createElement('span');
+      detail.dataset.statusDetail = '';
+      Object.assign(detail.style, VISUALLY_HIDDEN);
+      detail.textContent = ` ${explanation}`;
+      status.element.append(detail);
+    }
     this.configureAccessibility();
   }
 
@@ -1223,7 +1270,7 @@ export class AudioViewElement extends WebMusicElement {
       if (revision !== this.seekRevision || rendered !== this.rendered || player !== this.playerFacade()) return;
       player?.seek?.(requested);
       if (revision !== this.seekRevision || rendered !== this.rendered || player !== this.playerFacade()) return;
-      this.rendered?.redraw(requested, this.shouldFollow());
+      this.paintSeek(requested);
       this.surfaceSlider?.update();
       return requested;
     }
@@ -1237,12 +1284,24 @@ export class AudioViewElement extends WebMusicElement {
     const reported = player?.seconds ?? player?.currentTime;
     const accepted = typeof reported === 'number' && Number.isFinite(reported) ? reported : requested;
     this.timeline.setPlayhead(accepted);
-    this.rendered?.redraw(accepted, this.shouldFollow());
+    this.paintSeek(accepted);
     this.surfaceSlider?.update();
     this.dispatchEvent(
       new CustomEvent('webaudio:seek', {detail: {seconds: accepted, region}, bubbles: true, composed: true}),
     );
     return revision === this.seekRevision && rendered === this.rendered ? accepted : undefined;
+  }
+
+  /**
+   * Paint a committed seek. Inside a drag frame callback an ordinary redraw
+   * would queue yet another frame, so the offset and scroll would move this
+   * frame and the pixels the next; paint synchronously there instead.
+   */
+  private paintSeek(seconds: number): void {
+    const rendered = this.rendered;
+    if (!rendered) return;
+    if (this.inFrame && rendered.redrawFrame) rendered.redrawFrame(seconds, this.shouldFollow());
+    else rendered.redraw(seconds, this.shouldFollow());
   }
 
   private centeredPlayhead(): boolean {
@@ -1258,6 +1317,7 @@ export class AudioViewElement extends WebMusicElement {
     if (this.dragFrame) this.ownerDocument.defaultView?.cancelAnimationFrame(this.dragFrame);
     this.dragFrame = 0;
     this.trackGesture = undefined;
+    this.seekDrag = undefined;
     if (!resume) this.cancelReleasedScratch();
     if (scratch) this.finishScratch(scratch, resume);
   }
@@ -1325,8 +1385,40 @@ export class AudioViewElement extends WebMusicElement {
     if (!window) return;
     this.dragFrame = window.requestAnimationFrame(() => {
       this.dragFrame = 0;
-      try { this.flushTrackValue(mode); } catch (error) { this.reportInPlaceError(error); }
+      this.runInFrame(() => this.flushTrackValue(mode));
     });
+  }
+
+  /** Run drag work as part of the current frame; see {@link paintSeek}. */
+  private runInFrame(work: () => void): void {
+    const outer = this.inFrame;
+    this.inFrame = true;
+    try { work(); } catch (error) { this.reportInPlaceError(error); } finally { this.inFrame = outer; }
+  }
+
+  /** Coalesce absolute drag seeks: one command per frame, the latest position wins. */
+  private queueSeekValue(seconds: number, region: Region | undefined): void {
+    const drag = this.seekDrag;
+    if (!drag) return;
+    drag.pending = {seconds, region};
+    if (this.dragFrame) return;
+    const window = this.ownerDocument.defaultView;
+    if (!window) { this.flushSeekDrag(); return; }
+    this.dragFrame = window.requestAnimationFrame(() => {
+      this.dragFrame = 0;
+      this.runInFrame(() => this.flushSeekDrag());
+    });
+  }
+
+  /** Commit the pending absolute drag position, never the same one twice. */
+  private flushSeekDrag(): void {
+    const drag = this.seekDrag;
+    const pending = drag?.pending;
+    if (!drag || !pending) return;
+    drag.pending = undefined;
+    if (pending.seconds === drag.last) return;
+    drag.last = pending.seconds;
+    this.commitSeek(pending.seconds, pending.region);
   }
 
   private flushTrackValue(mode: 'scrub' | 'pan'): void {
@@ -1404,6 +1496,7 @@ export class AudioViewElement extends WebMusicElement {
       let moved = false;
       let gestureRevision = 0;
       const trackMode = mode === 'scrub' || mode === 'pan' ? mode : undefined;
+      const absoluteSeek = !annotating && mode === 'seek';
       this.surfaceSlider = mountSurfaceSlider(
         this,
         {
@@ -1439,6 +1532,7 @@ export class AudioViewElement extends WebMusicElement {
               // re-grab before terminating the previous released session.
               const coasting = trackMode === 'scrub' ? this.takeReleasedScratch() : undefined;
               this.cancelTrackGesture();
+              if (absoluteSeek) this.seekDrag = {pressed: false};
               if (trackMode) {
                 const player = this.playerFacade();
                 const gesture = this.trackGesture = {
@@ -1468,7 +1562,10 @@ export class AudioViewElement extends WebMusicElement {
             const revision = gestureRevision;
             const ending = this.trackGesture;
             try {
+              // Release commits the exact final position before the gesture
+              // ends; a cancel drops whatever was still pending.
               if (phase === 'end' && trackMode) this.flushTrackValue(trackMode);
+              else if (phase === 'end' && absoluteSeek) this.flushSeekDrag();
             } finally {
               if (revision === gestureRevision && this.trackGesture === ending) {
                 this.cancelTrackGesture(phase === 'end');
@@ -1493,6 +1590,17 @@ export class AudioViewElement extends WebMusicElement {
             const from = dragFrom;
             pendingRegion = undefined;
             dragFrom = undefined;
+            const seekDrag = absoluteSeek ? this.seekDrag : undefined;
+            if (seekDrag) {
+              // The press seeks at once (a click is still one immediate seek);
+              // every later pointer position waits for the next frame.
+              if (seekDrag.pressed) {
+                this.queueSeekValue(seconds, region);
+                return;
+              }
+              seekDrag.pressed = true;
+              seekDrag.last = seconds;
+            }
             if (annotating && from !== undefined && Math.abs(seconds - from) > 1e-3) {
               this.commitDragRegions([createRegion({
                 label: '', startSeconds: Math.min(from, seconds), endSeconds: Math.max(from, seconds),

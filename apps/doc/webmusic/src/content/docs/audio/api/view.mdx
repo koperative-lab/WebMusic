@@ -41,7 +41,7 @@ Every `render*Visualizer` returns a `RenderedAudioVisualizer` — the digital-au
 | --- | --- | --- |
 | `redraw` | `(playheadSeconds?, scrollIntoView?) => void` | With an argument, move the playhead and optionally follow it. Waveform progress/history repaint is coalesced; spectrogram reuses its buffered image until new columns are exposed. With no argument, re-lay-out and repaint the current view. |
 | `redrawFrame?` | `(playheadSeconds, scrollIntoView?) => void` | Draw a position sampled in the current display frame without queuing another frame. Waveform implements this synchronous path; other visualizers retain the `redraw` fallback. |
-| `setZoom` | `(pixelsPerSecond) => void` | Change the horizontal scale and repaint. |
+| `setZoom` | `(pixelsPerSecond, startSeconds?) => void` | Change the horizontal scale and repaint once. With `startSeconds` the window starts there (an anchored zoom); without it the pixel offset is kept. |
 | `setPlayheadMode?` | `(mode: 'position' \| 'center') => void` | Change time-axis cursor geometry without replacing the canvas; center keeps the line fixed while content moves. |
 | `setPlayheadVisible?` | `(visible: boolean) => void` | Waveform-only visibility gate for cursor, progress and history paint while document playback is pending. |
 | `setRegions` | `(regions) => void` | Replace the overlaid regions/markers and repaint the overlay. |

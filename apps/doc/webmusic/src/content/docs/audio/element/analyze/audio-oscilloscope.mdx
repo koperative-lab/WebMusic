@@ -56,9 +56,12 @@ unavailable and is retried. Disconnect stops only this tool's poller, observers
 and presenter, never the borrowed player or graph.
 
 The monochrome surface keeps Time and Amplitude in fixed readout slots and
-omits a repeated title. Routine Live, Paused and Frozen messages are hidden;
-unavailable, No signal and No matching edge feedback remains visible.
-Freeze keeps its label and uses its pressed state to indicate a held frame.
+omits a repeated title. Routine Live, Paused and Frozen messages are cleared;
+No signal and No matching edge stay in the status region but are visually
+hidden, and unavailable feedback remains visible. Freeze is an icon button that
+uses its pressed state to indicate a held frame. The trigger edge is a group of
+three square icon cells (Rising edge, Falling edge, Trigger off); the current
+edge is pressed and inverted.
 
 While waiting for a source or playback, the shared outlined-square animation keeps
 its description accessible to assistive technology. Pending fetch/decode on a linked
@@ -96,8 +99,9 @@ percent, and Home/End select its ends. Timebase and trigger use rectangular
 horizontal UIKit faders with actual-unit slider ARIA and visible values.
 Arrow keys change timebase by `0.5` ms and trigger by `0.05`; Home/End select
 the bounds. Timebase remains bounded by the available
-samples, including windows shorter than 1 ms. The edge select and Freeze
-button remain keyboard-operable. Probe outputs use `aria-live="off"`;
+samples, including windows shorter than 1 ms. The trigger-edge cells and the
+Freeze button are native `aria-pressed` buttons named in `aria-label` and
+`title`, and remain keyboard-operable. Probe outputs use `aria-live="off"`;
 diagnostic status remains outside the canvas.
 
 </details>
@@ -109,12 +113,13 @@ The full-width host honors native `hidden` and uses the shared
 `--wm-component-*` outer-surface tokens, with
 `--wm-audio-oscilloscope-surface-*` overrides. The
 [oscilloscope presenter](/uikit/views-analysis/oscilloscope/) exposes
-`--wm-oscilloscope-height`, foreground, muted, border, control-background and
-selection tokens. Its public parts are `root surface`, `header`, `readout`,
+`--wm-oscilloscope-height`, foreground, muted, border and selected-background
+tokens. Its public parts are `root surface`, `header`, `readout`,
 `plot`, `controls`, `freeze`, `timebase`, `trigger-level`, `trigger-edge` and
 `status`. The timebase and trigger sliders also expose the shared `fader` part;
 use `[part~="timebase"]` or `[part~="trigger-level"]`.
-`--wm-analysis-control-size` defaults to `1.5rem`, and `--wm-fader-*` styles the
+`--wm-analysis-control-height` (then `--wm-control-size`, then `2rem`) sets the
+icon-button height and fader thickness, and `--wm-fader-*` styles the
 horizontal controls. Canvas foreground and muted colors follow the presenter
 tokens; its transparent clear preserves the configured plot background.
 

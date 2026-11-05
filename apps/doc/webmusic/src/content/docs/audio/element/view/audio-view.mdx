@@ -191,7 +191,7 @@ The element default is `seek`; these demos explicitly select `scrub`.
 
 | `drag-mode` | Drag behavior | Requires |
 | --- | --- | --- |
-| `seek` (default) | Seek continuously to the absolute time under the pointer. | `interactive` |
+| `seek` (default) | Seek continuously to the absolute time under the pointer: the press seeks at once, moves seek at most once per animation frame (the latest position wins), and release seeks exactly once to the final position. | `interactive` |
 | `scrub` | Keep the playhead centered and move the track: left advances, right reverses. A supported player pauses normal playback and sounds the movement at gesture speed. Release coasts in position and sound, then restores its previous playing/paused state. | `interactive`; decoded PCM and a scratch-capable player for sound |
 | `pan` | Move the visible window without changing the playback position. Left reveals later audio; right reveals earlier audio. | `scrollable`; works without `interactive` or a player |
 | `none` | No drag action. Click and keyboard seeking remain available. | `interactive` for seeking |
@@ -278,14 +278,14 @@ Zoom, offset and the visible window live in **one** headless `AudioTimeline` the
 ```ts
 view.visibleRange();            // { startSeconds, endSeconds } — or undefined
 view.panTo(30);                 // scroll so the window starts at 0:30
-view.setZoom(240);              // live re-zoom, keeping scroll + playhead
+view.setZoom(240);              // live re-zoom anchored on the playhead (or the window centre)
 view.zoom;                      // the scale actually drawn at — never 0
 view.addEventListener('webaudio:viewportchange', (event) => {
   const {startSeconds, endSeconds} = event.detail;
 });
 ```
 
-`webaudio:viewportchange` fires once per distinct window, for a user pan (scrollbar, wheel or drag) and a programmatic `panTo()` / `setZoom()` alike — the first paint is not a pan, and putting a window back after an in-place repaint is not one either.
+`webaudio:viewportchange` fires once per distinct window, for a user pan (wheel, trackpad or drag; the scroller hides its scrollbar) and a programmatic `panTo()` / `setZoom()` alike — the first paint is not a pan, and putting a window back after an in-place repaint is not one either.
 
 ### Playback presentation cadence
 
@@ -335,7 +335,7 @@ const view = document.querySelector('audio-view');
 view.peaks = computePeaks(clip.channels(), clip.sampleRate); // draw a waveform
 view.zoom = 200;                                             // live zoom (keeps scroll + playhead)
 view.follow = false;                                         // stop auto-scrolling with playback
-view.scrollable = false;                                     // disable scrollbar/wheel and pan-mode dragging
+view.scrollable = false;                                     // disable wheel panning and pan-mode dragging
 view.interactive = true;                                     // click + keyboard seeking
 view.dragMode = 'scrub';                                     // centered track + optional scratch sound
 view.options = { amplitude: 1.3, virtualization: { bufferScreens: 2 } }; // advanced bag
@@ -368,7 +368,7 @@ view.type = 'spectrogram';                                   // switch the drawi
 | `drag-mode` / `.dragMode` | attribute / property | `seek` | `seek` follows the pointer; `scrub` centers the playhead and uses an optional audible scratch session with release inertia; `pan` changes only the viewport with pointer and keyboard input; `none` keeps click/keyboard seeking. See [Dragging and seeking](#dragging-and-seeking) for prerequisites, annotation priority and follow behavior. Unknown values fall back to `seek`. |
 | `annotate` | attribute / property | `false` | Drag to create a region (waveform · spectrogram), overriding every `drag-mode`. Has no effect on a meter. |
 | `follow` | attribute / property | = `interactive` | Auto-scroll in position mode; `follow="false"` opts out. `pan` suspends it while selected; `scrub` centers the playhead independently of this setting. Annotation overrides those track modes. |
-| `scrollable` | attribute / property | `true` | Allow scrollbar/wheel panning and `drag-mode="pan"` on waveform and spectrogram. `false` disables those user actions. Centered scrub disables native panning regardless of this setting; its track gesture still works. |
+| `scrollable` | attribute / property | `true` | Allow wheel and trackpad panning (the scrollbar itself is hidden) and `drag-mode="pan"` on waveform and spectrogram. `false` disables those user actions. Centered scrub disables native panning regardless of this setting; its track gesture still works. |
 | `virtualization` | attribute | on | **Spectrogram only.** Tri-state boolean, or a number setting the buffer-screens window. On, only the visible stripe (± the buffer) is rasterized and it repaints on scroll; `false` gives one full-clip paint and no scroll cost, which is the better trade only for short clips. The waveform always paints only the columns in view, so this is the spectrogram's knob. |
 
 **Geometry**
@@ -377,7 +377,7 @@ view.type = 'spectrogram';                                   // switch the drawi
 | --- | --- | --- | --- |
 | `pixels-per-second` | attribute / `.zoom` | `100` | Horizontal **zoom**. Changing it re-scales the existing surface in place, keeping the scroll position and playhead. |
 | `.zoom` | property | `100` | The scale the surface is actually drawn at: the attribute, else `.options.pixelsPerSecond`, else the renderers' default. Never `0` for a view that is being drawn. The setter calls `setZoom()`. |
-| `setZoom(pps)` | method | — | Live re-zoom keeping scroll + playhead; ignores anything not finite and `> 0`. Reflects `pixels-per-second`. |
+| `setZoom(pps)` | method | — | Live re-zoom with one repaint, anchored on the playhead while it is in view, else on the window centre (centred scrub keeps its centred playhead); ignores anything not finite and `> 0`. Reflects `pixels-per-second`. |
 | `visibleRange()` | method | — | The real clip-time intersection currently painted, `{ startSeconds, endSeconds }`, excluding centered-mode blank padding; `undefined` without a time axis or on a meter. |
 | `panTo(startSeconds)` | method | — | Scroll so the window starts there, clamped to the clip; ignored while scrub centers the playhead. Select pan mode for independent browsing. |
 | `width` | attribute | fills container | Element width — a bare number is `px`, or any CSS length (`80%`). |

@@ -1,9 +1,10 @@
 import {installStyle} from './internal/style';
 import {createErrorSink, claimHost, createUpdateLoop} from "./internal/lifecycle";
 import {markEmptyState, addClassNames, clamp, finite, setParts} from './internal/dom';
-import {componentSurfaceCss, controlBorderFallback} from './internal/surface';
+import {componentSurfaceCss} from './internal/surface';
 import {surfaceHeight} from './internal/control';
-import {keepSvgCirclesRound, type RoundSvgCirclesHandle} from './internal/svg';
+import {neutralColor} from './internal/palette';
+import {createDragFrame, keepSvgCirclesRound, type RoundSvgCirclesHandle} from './internal/svg';
 // Domain-neutral graphic equalizer presenter. It owns only DOM and interaction;
 // the binding owns filters, response calculation and audio-resource lifetime.
 
@@ -88,6 +89,9 @@ const MIN_FREQUENCY = 30;
 const MAX_FREQUENCY = 18_000;
 const MAX_GAIN = 18;
 
+/** Hairline: grid, divider and the plot edge share the control line colour. */
+const lineFallback = `var(--wm-control-border, var(--wm-border, ${neutralColor('border')}))`;
+
 export const eqStyle = String.raw`
 .wui-eq,
 .wui-eq * { box-sizing: border-box; }
@@ -98,33 +102,36 @@ ${componentSurfaceCss('eq')}
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
-  color: var(--wm-eq-text, var(--wm-foreground-muted, var(--wm-foreground, #666)));
+  color: var(--wm-eq-text, var(--wm-foreground-muted, ${neutralColor('muted')}));
   user-select: none;
 }
-.wui-eq__svg {
+/* The plot shares the component surface; a hairline under it separates the
+   readout. A theme inverts it through --wm-eq-background and the ink tokens. */
+:where(.wui-eq__svg) {
   display: block;
   width: 100%;
   height: ${surfaceHeight('eq', 'md')};
   overflow: visible;
   touch-action: none;
-  border: 1px solid var(--wm-eq-border, ${controlBorderFallback});
+  border: 0;
+  border-bottom: 1px solid var(--wm-eq-border, ${lineFallback});
   border-radius: var(--wm-eq-radius, var(--wm-control-radius, 0));
-  background: var(--wm-eq-background, var(--wm-surface-inverse, #111));
+  background: var(--wm-eq-background, var(--wm-surface, light-dark(#fff, #111)));
 }
-.wui-eq__grid { stroke: var(--wm-eq-grid, rgba(255,255,255,.12)); stroke-width: .5; }
-.wui-eq__zero { stroke: var(--wm-eq-zero, rgba(255,255,255,.3)); stroke-width: .6; stroke-dasharray: 2 2; }
-.wui-eq__area { fill: var(--wm-eq-fill, rgba(255,255,255,.1)); stroke: none; }
-.wui-eq__curve { fill: none; stroke: var(--wm-eq-curve, var(--wm-foreground-on-inverse, #fff)); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
-.wui-eq__point { fill: var(--wm-eq-point, var(--wm-foreground-on-inverse, #fff)); stroke: var(--wm-eq-point-border, ${controlBorderFallback}); stroke-width: 1; cursor: grab; }
-.wui-eq__point.is-focused { stroke: var(--wm-focus, var(--wm-focus-ring, Highlight)); stroke-width: 2.5; vector-effect: non-scaling-stroke; }
-.wui-eq[aria-disabled='true'] .wui-eq__point { cursor: default; opacity: .55; }
-.wui-eq__readout { padding: .4rem .5rem; min-width: 0; overflow-wrap: anywhere; color: inherit; font: 600 .68rem/1.5 var(--wm-font-mono, ui-monospace, monospace); font-variant-numeric: tabular-nums; }
+:where(.wui-eq__grid) { stroke: var(--wm-eq-grid, ${lineFallback}); stroke-width: .5; }
+:where(.wui-eq__zero) { stroke: var(--wm-eq-zero, var(--wm-foreground-muted, ${neutralColor('muted')})); stroke-width: .6; stroke-dasharray: 2 2; }
+:where(.wui-eq__area) { fill: var(--wm-eq-fill, var(--wm-surface-muted, light-dark(#f3f3f3, #1c1c1c))); stroke: none; }
+:where(.wui-eq__curve) { fill: none; stroke: var(--wm-eq-curve, var(--wm-foreground, ${neutralColor('foreground')})); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+:where(.wui-eq__point) { fill: var(--wm-eq-point, var(--wm-foreground, ${neutralColor('foreground')})); stroke: var(--wm-eq-point-border, var(--wm-eq-background, var(--wm-surface, light-dark(#fff, #111)))); stroke-width: 1; vector-effect: non-scaling-stroke; cursor: grab; }
+:where(.wui-eq__point.is-focused) { stroke: var(--wm-foreground, ${neutralColor('foreground')}); stroke-width: 2; vector-effect: non-scaling-stroke; }
+:where(.wui-eq[aria-disabled='true'] .wui-eq__point) { cursor: default; opacity: .3; }
+:where(.wui-eq__readout) { padding: .4rem .5rem; min-width: 0; overflow-wrap: anywhere; color: inherit; font: 500 .6875rem/1.5 var(--wm-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-variant-numeric: tabular-nums; }
 .wui-eq__readout:empty { display: none; }
 .wui-eq__empty { padding: .4rem .5rem; overflow-wrap: anywhere; color: inherit; font: .78rem/1.4 var(--wm-font-family, var(--wm-font, system-ui, sans-serif)); }
 .wui-eq__inputs { position: absolute; top: 0; left: 0; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .wui-eq__empty[hidden] { display: none; }
 .wui-eq__input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-.wui-eq:focus-within { outline: 2px solid var(--wm-focus, var(--wm-focus-ring, currentColor)); outline-offset: 2px; }
+:where(.wui-eq:focus-within) { outline: var(--wm-focus-ring, 2px solid var(--wm-foreground, ${neutralColor('foreground')})); outline-offset: -2px; }
 @media (forced-colors: active) {
   .wui-eq { border-color: CanvasText; }
   .wui-eq__svg { border-color: CanvasText; background: Canvas; }
@@ -451,8 +458,11 @@ export function mountEq(host: EqHost, binding: EqBinding, options: EqOptions = {
     );
   };
 
+  // The plot is measured once per press, not per move: reading layout between
+  // the previous move's writes would force a synchronous reflow every event.
+  let dragRect: {left: number; top: number; width: number; height: number} | undefined;
   const coordinates = (event: PointerEvent): {x: number; y: number} => {
-    const rect = svg.getBoundingClientRect();
+    const rect = dragRect ?? svg.getBoundingClientRect();
     return {
       x: clamp((event.clientX - rect.left) / Math.max(1, rect.width), 0, 1, 0),
       y: clamp((event.clientY - rect.top) / Math.max(1, rect.height), 0, 1, 0.5),
@@ -466,19 +476,31 @@ export function mountEq(host: EqHost, binding: EqBinding, options: EqOptions = {
     if (!Number.isInteger(index) || current.disabled || current.bands[index]?.disabled) return;
     pointerId = event.pointerId;
     dragIndex = index;
+    dragRect = svg.getBoundingClientRect();
     try {
       svg.setPointerCapture?.(event.pointerId);
     } catch {
       // Synthetic pointer.
     }
   };
+  // One repaint, command and response recalculation per frame, however many
+  // pointer events the frame received; a release commits the last position.
+  const dragFrame = createDragFrame<{x: number; y: number}>(
+    document.defaultView,
+    ({x, y}) => {
+      if (dragIndex >= 0) submit(dragIndex, x, y);
+    },
+    report,
+  );
   const onPointerMove = (event: PointerEvent): void => {
     if (event.pointerId !== pointerId || dragIndex < 0) return;
-    const {x, y} = coordinates(event);
-    submit(dragIndex, x, y);
+    dragFrame.schedule(coordinates(event));
   };
   const releasePointer = (event: PointerEvent): void => {
     if (event.pointerId !== pointerId) return;
+    if (event.type === "pointerup") dragFrame.flush();
+    dragFrame.cancel();
+    dragRect = undefined;
     pointerId = undefined;
     dragIndex = -1;
     try {
@@ -508,6 +530,7 @@ export function mountEq(host: EqHost, binding: EqBinding, options: EqOptions = {
     destroy() {
       if (destroyed) return;
       destroyed = true;
+      dragFrame.cancel();
       commandRevisions.clear();
       let firstError: unknown;
       let failed = false;

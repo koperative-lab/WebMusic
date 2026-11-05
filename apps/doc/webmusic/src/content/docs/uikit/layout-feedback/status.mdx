@@ -35,8 +35,8 @@ const handle = mountStatus(host, {
 
 The binding stays authoritative: notification and `handle.update()` both re-read `snapshot()`.
 Changing `kind` changes visibility, animation, and live-region behavior. Use `loading` for active
-preparation and `waiting` while an input or source is unavailable. Loading and waiting messages
-are visually hidden; empty and error messages remain visible. Updates retain the same indicator
+preparation and `waiting` while an input or source is unavailable. Loading, waiting and empty
+messages are visually hidden; only an error message is drawn. Updates retain the same indicator
 and message nodes, and unchanged notifications do not restart animations or rewrite announcements.
 The rest of mounting and cleanup follows the
 [shared presenter shape](/uikit/api/#the-shared-presenter-shape).
@@ -81,8 +81,8 @@ empty says “Nothing to show.”, error says “Something went wrong.”, and r
 | `destroy()` | `() => void` | Idempotently releases the subscription and removes owned root and style nodes. Animations use CSS and allocate no timers or frame callbacks. |
 
 **Accessibility.** Loading, waiting, and empty states use `role="status"` with polite announcements;
-only loading sets `aria-busy="true"`. The indicator has `aria-hidden="true"`; loading and waiting
-messages remain accessible in a visually hidden span. Error uses `role="alert"` with assertive
+only loading sets `aria-busy="true"`. The indicator has `aria-hidden="true"`; loading, waiting and
+empty messages remain accessible in a visually hidden span. Error uses `role="alert"` with assertive
 announcements. Ready removes live-region attributes and hides the root. The presenter never moves
 focus and does not mutate unrelated caller DOM. With `prefers-reduced-motion: reduce`, or within
 an ancestor using `data-motion="none"` or `data-motion="stepped"`, both indicators remain static.
@@ -108,6 +108,7 @@ Long messages wrap within the available width, including unbroken URLs and error
 The indicators have square corners and use opacity only; loading cells share a 1.2-second cycle,
 and the waiting outline uses a 2.4-second cycle. When disabling stylesheet installation, provide
 equivalent indicator styling, visually hidden message treatment, and reduced-motion behavior.
+The stylesheet's rules use `:where()`, so they have zero specificity and application CSS wins.
 
 **Tokens**
 
@@ -115,14 +116,14 @@ equivalent indicator styling, visually hidden message treatment, and reduced-mot
 |---|---|---|---|
 | `--wm-status-height` | literal | `3rem` | Minimum surface height. |
 | `--wm-status-padding` | literal | `.6rem` | Internal spacing compatibility fallback. |
-| `--wm-status-border` | literal | `1px solid #d8d8d8` | Normal border compatibility fallback. |
+| `--wm-status-border` | `--wm-border` → literal | `1px solid light-dark(#d8d8d8, #333)` | Normal border compatibility fallback. |
 | `--wm-status-radius` | `--wm-control-radius` → literal | `0` | Corners. |
-| `--wm-status-background` | `--wm-surface` → literal | `#fff` | Surface background compatibility fallback. |
-| `--wm-status-foreground` | `--wm-foreground-muted` → `--wm-foreground` → literal | `#777` | Loading / waiting indicators and normal message text. |
+| `--wm-status-background` | `--wm-surface` → literal | `light-dark(#fff, #111)` | Surface background compatibility fallback. |
+| `--wm-status-foreground` | `--wm-foreground-muted` → literal | `light-dark(#777, #aaa)` | Loading / waiting indicators and normal message text. |
 | `--wm-status-indicator-size` | literal | `1.25rem` | Indicator width and height. |
 | `--wm-status-loading-duration` | literal | `1.2s` | Loading cell opacity cycle duration. |
 | `--wm-status-waiting-duration` | literal | `2.4s` | Waiting outline opacity cycle duration. |
-| `--wm-status-error` | `--wm-danger` → literal | `#b42318` | Error text; error state changes the existing border to solid without replacing its color. |
+| `--wm-status-error` | `--wm-danger` → literal | `light-dark(#b42318, #f97066)` | Error text; error state changes the existing border to solid without replacing its color. |
 | `--wm-font-family` | literal | `system-ui, sans-serif` | Message typeface. |
 
 **Classes**

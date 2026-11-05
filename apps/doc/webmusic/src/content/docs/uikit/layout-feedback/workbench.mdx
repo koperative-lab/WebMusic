@@ -146,7 +146,9 @@ false` (or a binding with no `toggleDock`) removes the switch and leaves the sec
 **Phase gates the loop, and that is not a style preference.** Only `playing` and `listening` run a
 frame loop. Everything else is a still shell that still answers the pointer and the keyboard —
 parked is not blank, and a workbench you can drag through is more alive than one spinning a loop over
-nothing. `empty` and `error` additionally print `status.message` over the stage.
+nothing. `empty` and `error` additionally write `status.message` into the stage note: an `error`
+message is one visible line, while an `empty` message is visually hidden and stays in the
+accessibility tree.
 
 `loading` and `waiting` temporarily hide the stage without rebuilding its nodes and show the
 shared [status animation](/uikit/layout-feedback/status/): four square cells for loading, or a
@@ -294,7 +296,7 @@ implementation/state values; prefer the public surface and palette tokens for ne
 | Property | Default | Controls |
 |---|---|---|
 | `--wui-workbench-rail` | `clamp(228px, 28%, 312px)` | The rail's width. A percentage of the **shell**, which is why it is a `clamp` and not a breakpoint. |
-| `--wui-workbench-dock-min` | `240px` | The width a dock is never squeezed below once the rail has become a shelf. Below it the shelf scrolls, which is the honest answer to *these do not fit*. |
+| `--wui-workbench-dock-min` | `240px` | The width a dock is never squeezed below once the rail has become a shelf. Below it the shelf scrolls, without a visible scrollbar, which is the honest answer to *these do not fit*. |
 | `--wui-harmony-accent` / `--wui-harmony-on-accent` | ink / independent contrast ink | The selected tab, the switches and the phase dot. |
 | `--wui-harmony-surface` / `--wui-harmony-line` / `--wui-harmony-track` | transparent / rule / bed | The shell's ground, its rules, and a switch's unlit track. |
 | `--wui-harmony-ink` / `--wui-harmony-ink-muted` | inherit / muted | Text, and the subtitle, dock labels and status detail. |
@@ -313,7 +315,7 @@ implementation/state values; prefer the public surface and palette tokens for ne
 | Root / grid | `.wui-workbench`, `.wui-workbench__frame` | `data-chrome`, `data-motion`, `data-phase`, `data-density`, `data-scheme`, `data-view`, `data-rail` on the root. |
 | Header | `.wui-workbench__header`, `__identity`, `__title`, `__subtitle` | Hidden as a block when neither title nor subtitle is given. |
 | Tabs | `.wui-workbench__tablist`, `.wui-workbench__tab` | `data-view` and `aria-selected` on a tab. |
-| Panel and stage | `.wui-workbench__main`, `__stage`, `__note` | The note carries `data-phase` and appears only for `empty` and `error`. An `:empty` stage in `idle` or `listening` draws a faint ruler and a dimmed line where material will arrive — pure CSS, no node and no tick, gone the instant anything is mounted into it. A workbench that renders literally nothing is the one state a reader cannot tell from a mistake. |
+| Panel and stage | `.wui-workbench__main`, `__stage`, `__note` | The note carries `data-phase` and exists only for `empty` and `error`; the `empty` note is visually hidden and the `error` note is shown. An `:empty` stage in `idle` or `listening` draws a faint ruler and a dimmed line where material will arrive — pure CSS, no node and no tick, gone the instant anything is mounted into it. A workbench that renders literally nothing is the one state a reader cannot tell from a mistake. |
 | Docks | `.wui-workbench__rail`, `__strip`, `__dock`, `__dock-head`, `__dock-label`, `__dock-toggle`, `__dock-knob`, `__dock-body` | `data-dock` and `data-visible` on a section; `aria-checked` on the switch. |
 | Status | `.wui-workbench__status`, `__dot`, `__message`, `__detail` | The dot's colour comes from the root's `data-phase`. |
 | Semantic twin | `.wui-workbench__index` | An `<ol>` outside the frame. Its children, and their `aria-current`, are the caller's. |

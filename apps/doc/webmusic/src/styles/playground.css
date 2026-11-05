@@ -608,3 +608,27 @@
 
 .wm-pg__child[open] > summary,
 .wm-pg__companion[open] > summary { color: var(--wui-ink-soft); }
+
+/*
+ * Demo canvases carry no explanatory prose (Visual design → Documentation
+ * demos): help and progress lines stay available to assistive technology but
+ * are not drawn. A failed load shows one error line (`data-error`).
+ */
+.wm-demo-help,
+.wm-demo-status:not([data-error]) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.wm-demo-status[data-error] {
+  margin: 0;
+  color: var(--wm-danger, light-dark(#b42318, #f97066));
+  font: 0.75rem/1.4 var(--wm-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+}

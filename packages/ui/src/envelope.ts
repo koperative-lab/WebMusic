@@ -1,9 +1,11 @@
 import {installStyle} from './internal/style';
 import {claimHost, createUpdateLoop} from "./internal/lifecycle";
 import {addClassNames, clamp01, finite, setParts} from './internal/dom';
-import {componentSurfaceCss, controlBorderFallback} from './internal/surface';
+import {componentSurfaceCss} from './internal/surface';
 import {surfaceHeight} from './internal/control';
+import {neutralColor} from './internal/palette';
 import {
+  createDragFrame,
   keepSvgCirclesRound,
   type RoundSvgCirclesHandle,
 } from './internal/svg';
@@ -99,6 +101,8 @@ const DEFAULT_RANGES: EnvelopeRanges = {
   releaseMax: 2,
 };
 const mountedEnvelopes = new WeakMap<EnvelopeHost, EnvelopeHandle>();
+/** Hairline: grid, divider and the plot edge share the control line colour. */
+const lineFallback = `var(--wm-control-border, var(--wm-border, ${neutralColor('border')}))`;
 
 export const envelopeStyle = String.raw`
 .wui-envelope,
@@ -110,52 +114,57 @@ ${componentSurfaceCss('envelope')}
   overflow: hidden;
   min-width: 0;
   max-width: 100%;
-  color: var(--wm-envelope-foreground, var(--wm-foreground-on-inverse, #fff));
+  color: var(--wm-envelope-foreground, var(--wm-foreground, ${neutralColor('foreground')}));
   user-select: none;
 }
-.wui-envelope__svg {
+/* The plot shares the component surface; a hairline under it separates the
+   readout. A theme inverts it through --wm-envelope-background/-foreground. */
+:where(.wui-envelope__svg) {
   display: block;
   width: 100%;
   height: ${surfaceHeight('envelope', 'md')};
   overflow: visible;
-  border: 1px solid var(--wm-envelope-border, ${controlBorderFallback});
+  border: 0;
+  border-bottom: 1px solid var(--wm-envelope-border, ${lineFallback});
   border-radius: var(--wm-envelope-radius, var(--wm-control-radius, 0));
-  background: var(--wm-envelope-background, var(--wm-surface-inverse, #111));
+  background: var(--wm-envelope-background, var(--wm-surface, light-dark(#fff, #111)));
   touch-action: none;
 }
-.wui-envelope__grid {
-  stroke: var(--wm-envelope-grid, rgba(255, 255, 255, .12));
+:where(.wui-envelope__grid) {
+  stroke: var(--wm-envelope-grid, ${lineFallback});
   stroke-width: .5;
 }
-.wui-envelope__area {
-  fill: var(--wm-envelope-fill, rgba(255, 255, 255, .12));
+:where(.wui-envelope__area) {
+  fill: var(--wm-envelope-fill, var(--wm-surface-muted, light-dark(#f3f3f3, #1c1c1c)));
   stroke: none;
 }
-.wui-envelope__curve {
+:where(.wui-envelope__curve) {
   fill: none;
   stroke: var(--wm-envelope-curve, currentColor);
   stroke-width: 1.5;
   vector-effect: non-scaling-stroke;
 }
-.wui-envelope__handle {
+:where(.wui-envelope__handle) {
   fill: var(--wm-envelope-handle, currentColor);
-  stroke: var(--wm-envelope-handle-border, ${controlBorderFallback});
+  stroke: var(--wm-envelope-handle-border, var(--wm-envelope-background, var(--wm-surface, light-dark(#fff, #111))));
   stroke-width: 1;
+  vector-effect: non-scaling-stroke;
   cursor: grab;
 }
-.wui-envelope__handle.is-dragging { cursor: grabbing; }
-.wui-envelope__handle.is-focused {
-  stroke: var(--wm-focus, var(--wm-focus-ring, Highlight));
-  stroke-width: 2.5;
+:where(.wui-envelope__handle.is-dragging) { cursor: grabbing; }
+/* Focus on a hidden range is shown on its handle: an ink ring, not a hue. */
+:where(.wui-envelope__handle.is-focused) {
+  stroke: var(--wm-foreground, ${neutralColor('foreground')});
+  stroke-width: 2;
   vector-effect: non-scaling-stroke;
 }
-.wui-envelope__readout {
+:where(.wui-envelope__readout) {
   display: block;
   min-width: 0;
   padding: .4rem .5rem;
   overflow-wrap: anywhere;
-  color: var(--wm-envelope-text, var(--wm-foreground-muted, var(--wm-foreground, #666)));
-  font: 600 .68rem/1.4 var(--wm-font-mono, ui-monospace, monospace);
+  color: var(--wm-envelope-text, var(--wm-foreground-muted, ${neutralColor('muted')}));
+  font: 500 .6875rem/1.4 var(--wm-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
   font-variant-numeric: tabular-nums;
   text-align: start;
 }
@@ -175,8 +184,8 @@ ${componentSurfaceCss('envelope')}
   margin: 0;
   opacity: 0;
 }
-.wui-envelope.is-disabled { opacity: .55; }
-.wui-envelope.is-disabled .wui-envelope__handle { cursor: default; }
+:where(.wui-envelope.is-disabled) { opacity: .3; }
+:where(.wui-envelope.is-disabled .wui-envelope__handle) { cursor: default; }
 @media (forced-colors: active) {
   .wui-envelope { border-color: CanvasText; background: Canvas; color: CanvasText; }
   .wui-envelope__svg { border-color: CanvasText; background: Canvas; }
@@ -462,16 +471,48 @@ export function mountEnvelope(
     }
   };
 
+  // The plot is measured once per press, not per move: reading layout between
+  // the previous move's writes would force a synchronous reflow every event.
+  let dragBounds: { left: number; top: number; width: number; height: number } | undefined;
   const coords = (event: PointerEvent): { x: number; y: number } => {
-    const bounds = svg.getBoundingClientRect();
+    const bounds = dragBounds ?? svg.getBoundingClientRect();
     return {
       x: ((event.clientX - bounds.left) / Math.max(1, bounds.width)) * 100,
       y: ((event.clientY - bounds.top) / Math.max(1, bounds.height)) * 100,
     };
   };
 
-  const endDrag = (event?: PointerEvent): void => {
+  const applyDrag = ({ x, y }: { x: number; y: number }): void => {
+    if (!isCurrent() || !current || current.disabled || !drag) return;
+    const next = { ...current.envelope };
+    if (drag === "a") {
+      next.attack = clamp01(x / SEGMENT) * current.ranges.attackMax;
+    } else if (drag === "ds") {
+      const attackX = clamp01(next.attack / current.ranges.attackMax) * SEGMENT;
+      next.decay = clamp01((x - attackX) / SEGMENT) * current.ranges.decayMax;
+      next.sustain = clamp01(1 - y / HEIGHT);
+    } else {
+      const decayX =
+        clamp01(next.attack / current.ranges.attackMax) * SEGMENT +
+        clamp01(next.decay / current.ranges.decayMax) * SEGMENT +
+        SEGMENT;
+      next.release =
+        clamp01((x - decayX) / SEGMENT) * current.ranges.releaseMax;
+    }
+    commit(next);
+  };
+  const dragFrame = createDragFrame(
+    document.defaultView,
+    applyDrag,
+    reportAsyncError,
+  );
+
+  /** `commit` applies the last pointer position (a release); otherwise it is dropped. */
+  const endDrag = (event?: PointerEvent, commitPending = false): void => {
     if (event && pointerId !== null && event.pointerId !== pointerId) return;
+    if (commitPending && pointerId !== null) dragFrame.flush();
+    dragFrame.cancel();
+    dragBounds = undefined;
     const captured = pointerId;
     pointerId = null;
     handles.get(drag ?? "a")?.classList.remove("is-dragging");
@@ -491,6 +532,7 @@ export function mountEnvelope(
     if (candidate !== "a" && candidate !== "ds" && candidate !== "r") return;
     drag = candidate;
     pointerId = event.pointerId;
+    dragBounds = svg.getBoundingClientRect();
     handles.get(candidate)?.classList.add("is-dragging");
     event.preventDefault();
     try {
@@ -508,26 +550,10 @@ export function mountEnvelope(
       !current
     )
       return;
-    const { x, y } = coords(event);
-    const next = { ...current.envelope };
-    if (drag === "a") {
-      next.attack = clamp01(x / SEGMENT) * current.ranges.attackMax;
-    } else if (drag === "ds") {
-      const attackX = clamp01(next.attack / current.ranges.attackMax) * SEGMENT;
-      next.decay = clamp01((x - attackX) / SEGMENT) * current.ranges.decayMax;
-      next.sustain = clamp01(1 - y / HEIGHT);
-    } else {
-      const decayX =
-        clamp01(next.attack / current.ranges.attackMax) * SEGMENT +
-        clamp01(next.decay / current.ranges.decayMax) * SEGMENT +
-        SEGMENT;
-      next.release =
-        clamp01((x - decayX) / SEGMENT) * current.ranges.releaseMax;
-    }
-    commit(next);
+    dragFrame.schedule(coords(event));
   }) as EventListener);
   listen(svg, "pointerup", ((event: PointerEvent) =>
-    endDrag(event)) as EventListener);
+    endDrag(event, true)) as EventListener);
   listen(svg, "pointercancel", ((event: PointerEvent) =>
     endDrag(event)) as EventListener);
   listen(svg, "lostpointercapture", ((event: PointerEvent) =>

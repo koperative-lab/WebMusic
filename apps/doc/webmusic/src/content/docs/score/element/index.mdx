@@ -157,8 +157,10 @@ for application-owned presentation and the same data projections.
 
 Set public CSS custom properties on an element, its ancestor, or `:root`. They
 inherit into Score's UIKit presenters, including controls inside Shadow DOM.
-The default palette is mostly neutral with square corners; active notes and
-recording indicators retain their role-specific accent defaults.
+The default palette is mostly neutral with square corners; active notes keep
+their role-specific accent defaults, and recording uses the shared
+`--wm-recording` colour. Pressed icon buttons invert to `--wm-foreground` with
+`--wm-accent-foreground` content.
 
 ```css
 /* Apply to a shared wrapper, or put these declarations on one component. */
@@ -174,12 +176,16 @@ recording indicators retain their role-specific accent defaults.
   --wm-control-border: #8291a5;
   --wm-control-radius: 6px;
   --wm-focus: #146dcc;
+  --wm-focus-ring: 2px solid #146dcc;
 }
 ```
 
 `--wm-component-*` styles the outer surface. The border value is a complete CSS
 border such as `1px solid #8291a5` or `none`; `--wm-border` and
 `--wm-control-border` are colors. `--wm-component-padding` accepts CSS spacing.
+`--wm-focus-ring` is a complete outline declaration used by icon buttons and
+other controls that draw focus inside their edge; `--wm-focus` is the colour
+that older focus outlines still read.
 Presenter-specific `--wm-<presenter>-surface-*` values take precedence when a
 surface needs its own background, border, radius or padding.
 

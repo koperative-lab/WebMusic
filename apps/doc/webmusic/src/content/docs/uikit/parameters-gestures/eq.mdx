@@ -35,7 +35,9 @@ const handle = mountEq(host, {
 
 Horizontal position maps logarithmically from 30 Hz to 18 kHz. Vertical position maps linearly
 from +18 dB at the top to −18 dB at the bottom. Dragging paints the band optimistically and sends
-rounded frequency plus clamped gain; `q` and per-band disabled state remain caller-owned.
+rounded frequency plus clamped gain; `q` and per-band disabled state remain caller-owned. A drag
+repaints and calls `setBand()` at most once per animation frame with the latest pointer position;
+releasing the pointer applies the final position at once, and a cancelled drag drops a pending one.
 
 `response` already contains normalized x positions and gain values. The presenter clamps x to
 `0…1`, converts gain to y, and connects the points; it never calculates a filter response. The
@@ -97,7 +99,7 @@ tracked independently per band. See the
 **Accessibility.** The root is a named `role="group"` and reflects disabled state through
 `aria-disabled`. Every band has two visually hidden, focusable native ranges: frequency and gain.
 Tab selects a range and the native arrow keys edit it; `aria-valuetext` announces hertz or
-decibels rather than normalized coordinates. Focus outlines the corresponding band point and
+decibels rather than normalized coordinates. Focus rings the corresponding band point in ink and
 the visible readout names its band and axis. SVG graphics are decorative pointer targets.
 The empty message is a live status region.
 
@@ -112,40 +114,35 @@ Presenter-specific tokens below take precedence within their documented roles.
 
 The presenter installs `eqStyle` unless `stylesheet: false`. The SVG fills its container width
 and keeps the height set by `--wm-eq-height`. Readouts and empty text occupy separate, wrapping
-rows below it, so they add to the total height and do not cover the response. Pointer coordinates
-use the SVG's current bounds after resizing.
+rows below it, divided from the plot by a hairline, so they add to the total height and do not
+cover the response. Pointer coordinates use the SVG's bounds measured when the press starts.
 Supply the exported stylesheet or your own CSS from the host when opting out.
 
-The graph is an inverse surface: `--wm-surface-inverse` and
-`--wm-foreground-on-inverse` keep its background and marks paired. Ordinary
-`--wm-surface` and `--wm-foreground` do not recolor that inner graph. Set
-`--wm-eq-background` and the documented graph-ink tokens together when
-replacing its palette; the readout below uses ordinary foreground tokens.
+The plot shares the component surface: by default its background is `--wm-surface` and its curve
+and points use `--wm-foreground`, with no inner border. To invert the plot, set
+`--wm-eq-background` together with `--wm-eq-curve` and `--wm-eq-point`; point outlines follow the
+plot background so they stay paired. The readout below uses ordinary muted foreground tokens.
 
 **Tokens**
 
 | Property | Falls back to | Default | Controls |
 |---|---|---|---|
-| `--wm-eq-border` | `--wm-control-border` → `--wm-border` | `#d8d8d8` | Inner graph border. |
-| `--wm-control-border` | `--wm-border` | `#d8d8d8` | Shared non-primary control border fallback. |
-| `--wm-border` | literal | `#d8d8d8` | Shared border fallback. |
-| `--wm-eq-radius` | `--wm-control-radius` | `0` | Inner graph corners. |
+| `--wm-eq-border` | `--wm-control-border` → `--wm-border` | `light-dark(#d8d8d8, #333)` | Hairline between the plot and the readout. |
+| `--wm-control-border` | `--wm-border` | `light-dark(#d8d8d8, #333)` | Shared line fallback for the divider and grid. |
+| `--wm-eq-radius` | `--wm-control-radius` | `0` | Plot corners. |
 | `--wm-control-radius` | literal | `0` | Shared radius fallback. |
-| `--wm-eq-background` | `--wm-surface-inverse` | `#111` | Inner graph surface; the outer root uses the shared `--wm-component-*` surface. |
-| `--wm-surface-inverse` | literal | `#111` | Shared inverse-surface fallback. |
-| `--wm-eq-text` | `--wm-foreground-muted` → `--wm-foreground` | `#666` | Root current color, readout and empty state. |
+| `--wm-eq-background` | `--wm-surface` | `light-dark(#fff, #111)` | Plot background; the outer root uses the shared `--wm-component-*` surface. |
+| `--wm-eq-text` | `--wm-foreground-muted` | `light-dark(#777, #aaa)` | Root current color, readout and empty state. |
 | `--wm-eq-height` | `--wm-surface-md` | `144px` | SVG display height, on the shared drawing-surface scale. |
-| `--wm-eq-grid` | literal | `rgba(255,255,255,.12)` | Grid lines. |
-| `--wm-eq-zero` | literal | `rgba(255,255,255,.3)` | Dashed zero-gain line. |
-| `--wm-eq-fill` | literal | `rgba(255,255,255,.1)` | Area under the response curve. |
-| `--wm-eq-curve` | `--wm-foreground-on-inverse` | `#fff` | Response curve. |
-| `--wm-foreground-on-inverse` | literal | `#fff` | Shared inverse foreground fallback. |
-| `--wm-eq-point` | `--wm-foreground-on-inverse` | `#fff` | Band point fill. |
-| `--wm-eq-point-border` | `--wm-control-border` → `--wm-border` | `#d8d8d8` | Band point outline. |
-| `--wm-font-mono` | literal | `ui-monospace, monospace` | Band readout font. |
+| `--wm-eq-grid` | `--wm-control-border` → `--wm-border` | `light-dark(#d8d8d8, #333)` | Grid lines. |
+| `--wm-eq-zero` | `--wm-foreground-muted` | `light-dark(#777, #aaa)` | Dashed zero-gain line. |
+| `--wm-eq-fill` | `--wm-surface-muted` | `light-dark(#f3f3f3, #1c1c1c)` | Area under the response curve. |
+| `--wm-eq-curve` | `--wm-foreground` | `light-dark(#111, #eee)` | Response curve. |
+| `--wm-eq-point` | `--wm-foreground` | `light-dark(#111, #eee)` | Band point fill; the focused point's ring also uses `--wm-foreground`. |
+| `--wm-eq-point-border` | `--wm-eq-background` → `--wm-surface` | `light-dark(#fff, #111)` | Band point outline. |
+| `--wm-font-mono` | literal | `ui-monospace, SFMono-Regular, Menlo, monospace` | Band readout font. |
 | `--wm-font-family` | `--wm-font` | `system-ui, sans-serif` | Empty-state font family; `--wm-font` remains a compatibility fallback. |
-| `--wm-focus` | `--wm-focus-ring` | `currentColor` (root), `Highlight` (band) | Root and focused band outlines. |
-| `--wm-focus-ring` | literal | `currentColor` (root), `Highlight` (band) | Shared focus fallback. |
+| `--wm-focus-ring` | literal | `2px solid var(--wm-foreground)` | Root focus-within outline, drawn inside. |
 
 **Classes**
 

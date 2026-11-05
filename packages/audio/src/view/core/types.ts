@@ -89,8 +89,11 @@ export interface RenderedAudioVisualizer {
   setPlayheadMode?(mode: 'position' | 'center'): void;
   /** Hide playback paint while the displayed document has no matching applied revision. */
   setPlayheadVisible?(visible: boolean): void;
-  /** Change the horizontal scale (pixels per second) and repaint. */
-  setZoom(pixelsPerSecond: number): void;
+  /**
+   * Change the horizontal scale (pixels per second) and repaint once. With `startSeconds` the window starts there before the
+   * single repaint (an anchored zoom); without it the pixel offset is kept.
+   */
+  setZoom(pixelsPerSecond: number, startSeconds?: number): void;
   /** Replace the overlaid regions/markers and repaint the overlay. */
   setRegions(regions: readonly Region[]): void;
   /**

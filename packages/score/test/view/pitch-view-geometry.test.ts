@@ -178,6 +178,10 @@ describe('pitch-view keyboard scrolling', () => {
   });
 
   it.each(['active', 'none'] as const)('keeps follow="%s" separate from manual scrolling', (follow) => {
+    // The keyboard reads its geometry at the next frame, after the update's writes.
+    let due: FrameRequestCallback[] = [];
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => due.push(callback));
+    const frame = (): void => { const run = due; due = []; for (const callback of run) callback(0); };
     const {element, player} = setup();
     element.setAttribute('scroll', 'true'); element.setAttribute('follow', follow);
     player.dispatchEvent(new CustomEvent('webscore:noteoff', {detail: {midi: 64}}));
@@ -187,10 +191,12 @@ describe('pitch-view keyboard scrolling', () => {
     Object.defineProperties(key, {offsetLeft: {value: 400}, offsetWidth: {value: 20}});
     viewport.scrollLeft = 30;
     player.dispatchEvent(new CustomEvent('webscore:noteon', {detail: {midi: 71}}));
+    frame();
     expect(viewport.scrollLeft).toBe(follow === 'active' ? 360 : 30);
     expect(viewport.tabIndex).toBe(0);
     viewport.scrollLeft = 50;
     player.dispatchEvent(new CustomEvent('webscore:noteoff', {detail: {midi: 71}}));
+    frame();
     expect(viewport.scrollLeft).toBe(50);
     expect(element.active).toEqual([]);
   });

@@ -6,6 +6,7 @@ import {
   MIN_MIDI_PITCH,
   MIN_NOTE_LENGTH,
   SVG_NS,
+  hideScrollbar,
   makeClipped,
   makeScrollable,
   scheduleFrame,
@@ -308,6 +309,8 @@ export class WaterfallSVGVisualizer extends BaseSVGVisualizer {
     this.parentElement.style.boxSizing = 'border-box';
     this.parentElement.style.overflowX = 'hidden';
     this.parentElement.style.overflowY = 'auto';
+    // Scrolled by wheel, trackpad and the playhead, without a visible bar.
+    hideScrollbar(this.parentElement);
 
     this.svg = document.createElementNS(SVG_NS, 'svg');
     this.svg.classList.add('waterfall-notes');

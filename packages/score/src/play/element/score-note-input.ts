@@ -70,22 +70,25 @@ export type {
 // the presenter's root. Defining --wm-* defaults on :host would mask the app's
 // inherited theme; referring to the same property on the root would cycle.
 const NOTE_INPUT_THEME = [
-  ['background', 'bg', 'var(--wm-surface,#fff)'],
-  ['surface', 'surface', 'var(--wm-surface-muted,var(--wm-surface,#f3f3f3))'],
-  ['key', 'key', 'var(--wm-surface,#fff)'],
+  ['background', 'bg', 'var(--wm-surface,light-dark(#fff,#111))'],
+  // Pads and chord cells are unfilled until pressed (Visual design → Controls).
+  ['surface', 'surface', 'var(--wm-surface,light-dark(#fff,#111))'],
+  ['key', 'key', 'var(--wm-surface,light-dark(#fff,#111))'],
   ['key-alt', 'key-alt', 'var(--wm-surface-inverse,#222)'],
-  ['active', 'active', 'var(--wm-accent,#444)'],
-  ['border', 'border', 'var(--wm-control-border,var(--wm-border,#d8d8d8))'],
-  ['label', 'label', 'var(--wm-foreground-muted,var(--wm-foreground,#666))'],
-  ['label-active', 'label-active', 'var(--wm-accent-foreground,#fff)'],
+  // A sounding key, pad or chord is the one place colour may appear.
+  ['active', 'active', 'var(--wm-accent,light-dark(#444,#bbb))'],
+  ['border', 'border', 'var(--wm-control-border,var(--wm-border,light-dark(#d8d8d8,#333)))'],
+  ['label', 'label', 'var(--wm-foreground-muted,light-dark(#777,#aaa))'],
+  ['label-active', 'label-active', 'var(--wm-accent-foreground,light-dark(#fff,#111))'],
   ['height', 'height', '120px'],
   ['cell-height', 'cell-height', '42px'],
-  ['gap', 'gap', '.4rem'],
+  // Pads and chords sit in a hairline grid: the gap is the line.
+  ['gap', 'gap', '1px'],
   ['radius', 'radius', 'var(--wm-control-radius,0)'],
-  ['focus', 'focus', 'var(--wm-focus,#444)'],
-  ['overlay', 'overlay', 'rgba(255,255,255,.82)'],
-  ['accent', 'accent', 'var(--wm-accent,#111)'],
-  ['accent-foreground', 'accent-color', 'var(--wm-accent-foreground,#fff)'],
+  ['focus', 'focus', 'var(--wm-focus,light-dark(#444,#ccc))'],
+  ['overlay', 'overlay', 'light-dark(rgb(255 255 255 / .82),rgb(17 17 17 / .82))'],
+  ['accent', 'accent', 'var(--wm-accent,light-dark(#111,#eee))'],
+  ['accent-foreground', 'accent-color', 'var(--wm-accent-foreground,light-dark(#fff,#111))'],
 ];
 const NOTE_INPUT_COMPATIBILITY_STYLE = `
 :host{min-width:0;max-width:100%;box-sizing:border-box;${NOTE_INPUT_THEME.map(([name, , fallback]) => `--wui-note-host-${name}:var(--wm-note-${name},${fallback});`).join('')}}

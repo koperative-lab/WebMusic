@@ -363,7 +363,7 @@ for stems, ties and ledger lines without shrinking the notation. Only visible
 annotations contribute to clearance; `show-annotations="false"` on the staff
 removes their space as well as their marks.
 
-The component fits its containing block. Size the host with `width` / `height` or application CSS. Fixed-height note views use a scrollable [UIKit stage](/uikit/layout-feedback/stage/) so a drawing taller than the box remains accessible. Each type uses its drawing attributes and `.options`.
+The component fits its containing block. Size the host with `width` / `height` or application CSS. Fixed-height note views use a scrollable [UIKit stage](/uikit/layout-feedback/stage/) so a drawing taller than the box remains accessible. Each type uses its drawing attributes and `.options`. The renderers' scroll containers carry `data-webscore-scrollbar="hidden"`: one scoped zero-specificity rule per document or shadow root hides their scrollbars while wheel, trackpad and keyboard scrolling keep working. Because the rule (`scrollbar-width: none` plus the WebKit `::-webkit-scrollbar` equivalent) has zero specificity, application CSS can restore a bar.
 
 Idle notes inherit `--wm-foreground` through `--wm-score-view-note`, with neutral `#333` / `#ddd` defaults for light / dark schemes. Active notes use `--wm-score-view-active-note`, then the shared `--wm-accent`, then the existing red default `rgb(240, 84, 119)`. Explicit `note-color` / `active-note-color` attributes or `.options.noteRGB` / `.options.activeNoteRGB` override those defaults; `.options.noteColor` / `.options.activeNoteColor` accept full CSS colors, including variables. The [imperative renderers](/score/api/view/) retain their separate neutral RGB defaults.
 

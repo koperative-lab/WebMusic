@@ -47,6 +47,7 @@ import {claimHost, createErrorSink} from './internal/lifecycle';
 import {restampActiveStyle, stampIdleStyle, stampSpans} from './internal/spans';
 import {installStyle, paint} from './internal/style';
 import {componentSurfaceDeclarations, embeddedSurfaceDeclarations} from './internal/surface';
+import {hiddenScrollbarCss} from './internal/icons';
 import type {Declarations} from './styles';
 
 /**
@@ -234,6 +235,14 @@ const DRAG_INTERVAL_MS = 120;
 const NOW_PULSE_MS = 90;
 /** A wheel scrub commits this long after the last notch. */
 const WHEEL_SETTLE_MS = 140;
+/**
+ * Zoom per wheel delta pixel, the same rate `<score-grid-view>` uses. Chromium
+ * reports a trackpad pinch as Ctrl+wheel with deltaY = −100 × ln(scale), so the
+ * reel follows the fingers; one event's delta is clamped so a mouse-wheel notch
+ * zooms about 1.5×, never a jump to the end of the range.
+ */
+const WHEEL_ZOOM_RATE = 0.01;
+const WHEEL_ZOOM_CLAMP = 40;
 
 /** How loud a band is by which side of the now line it is on. */
 const ZONE_OPACITY: Readonly<Record<FlowZone, string>> = {
@@ -660,6 +669,7 @@ const nameplateParts = {
     'white-space': 'nowrap',
     'overflow-x': 'auto',
     'overflow-y': 'hidden',
+    'scrollbar-width': 'none',
   },
   stableLive: {'min-width': '0', overflow: 'hidden'},
   stableSymbol: {
@@ -672,6 +682,7 @@ const nameplateParts = {
     'overflow-wrap': 'normal',
     'overflow-x': 'auto',
     'overflow-y': 'hidden',
+    'scrollbar-width': 'none',
   },
   stableVoicing: {
     margin: '0',
@@ -681,6 +692,7 @@ const nameplateParts = {
     'white-space': 'nowrap',
     'overflow-x': 'auto',
     'overflow-y': 'hidden',
+    'scrollbar-width': 'none',
   },
   stableAlternates: {
     'min-width': '0',
@@ -688,6 +700,7 @@ const nameplateParts = {
     'align-items': 'center',
     'overflow-x': 'auto',
     'overflow-y': 'hidden',
+    'scrollbar-width': 'none',
   },
   stableAlternate: {
     flex: '0 0 auto',
@@ -716,6 +729,7 @@ const chipParts = {
     'flex-direction': 'row',
     'flex-wrap': 'nowrap',
     'overflow-x': 'auto',
+    'scrollbar-width': 'none',
   },
   stack: {'flex-direction': 'column', gap: '.3rem'},
   item: {
@@ -974,6 +988,11 @@ export const harmonyPresenterStyle = [
   harmonyRule('.wui-harmony-nameplate[data-layout="stable"] .wui-harmony-nameplate__voicing', nameplateParts.stableVoicing),
   harmonyRule('.wui-harmony-nameplate[data-layout="stable"] .wui-harmony-nameplate__alternates', nameplateParts.stableAlternates),
   harmonyRule('.wui-harmony-nameplate[data-layout="stable"] li.wui-harmony-nameplate__alternate', nameplateParts.stableAlternate),
+  // The part records carry `scrollbar-width`; WebKit needs its pseudo-element.
+  hiddenScrollbarCss([
+    'caption', 'symbol', 'voicing', 'alternates',
+  ].map((part) => `.wui-harmony-nameplate[data-layout="stable"] .wui-harmony-nameplate__${part}`)
+    .concat('.wui-harmony-chip__list[data-layout="ribbon"]').join(', ')).trimEnd(),
 
   harmonyRule('.wui-harmony-chip', HARMONY_MOTION.full, chipParts.root),
   harmonyRule('.wui-harmony-chip__list', chipParts.list),
@@ -1535,6 +1554,9 @@ export function mountFlowLane(
   let rowLabels: HTMLElement[] = [];
   let rowFlags: {node: HTMLElement; track: number}[] = [];
   let rowBrackets: {node: HTMLElement; from: number; to: number}[] = [];
+  /** Ruler labels with their measured widths, so a zoom refits without reading layout. */
+  let rulerLabels: {node: HTMLElement; offset: number; width: number; major: boolean}[] = [];
+  let rulerScale = Number.NaN;
   let currentId: string | undefined;
   let lookupAt = Number.NaN;
   let lookupBand: FlowBand | undefined;
@@ -2107,6 +2129,43 @@ export function mountFlowLane(
     viewport.style.minHeight = `calc(${RULER_HEIGHT} + ${LANE_HEIGHT} * ${count})`;
   };
 
+  /**
+   * Thin the ruler labels for the current scale from widths measured when the
+   * labels were built. A zoom changes only the pixel distance between labels,
+   * never their text, so it refits without a single layout read.
+   */
+  const fitRulerLabels = (): void => {
+    const scale = pxPerUnit();
+    if (scale === rulerScale) return;
+    rulerScale = scale;
+    const placed = rulerLabels
+      .map((label) => ({...label, left: label.offset * scale}))
+      .sort((a, b) => Number(b.major) - Number(a.major) || a.left - b.left);
+    const occupied: {left: number; right: number}[] = [];
+    const gap = 8;
+    for (const label of placed) {
+      let low = 0;
+      let high = occupied.length;
+      while (low < high) {
+        const middle = (low + high) >>> 1;
+        if (occupied[middle]!.left < label.left) low = middle + 1;
+        else high = middle;
+      }
+      const previous = occupied[low - 1];
+      const next = occupied[low];
+      const right = label.left + label.width;
+      const fits = (!previous || previous.right + gap <= label.left)
+        && (!next || right + gap <= next.left);
+      setHidden(label.node, !fits);
+      if (fits) occupied.splice(low, 0, {left: label.left, right});
+    }
+  };
+
+  /**
+   * Rebuild ticks, flags and brackets when the material changes; a scale
+   * change alone (zoom, a resize under `visibleSpan`) only refits the labels.
+   * Every decoration is a percentage of the reel, so none of them moves.
+   */
   const rebuildDecorations = (): void => {
     const signature = JSON.stringify([
       state.ruler ?? null,
@@ -2114,14 +2173,16 @@ export function mountFlowLane(
       state.brackets ?? null,
       axis.start,
       axis.end,
-      pxPerUnit(),
     ]);
-    if (signature === rulerSignature) return;
+    if (signature === rulerSignature) {
+      fitRulerLabels();
+      return;
+    }
     rulerSignature = signature;
     const items: HTMLElement[] = [];
     rowFlags = [];
     rowBrackets = [];
-    const labels: {node: HTMLElement; left: number; major: boolean}[] = [];
+    const labels: {node: HTMLElement; offset: number; major: boolean}[] = [];
     for (const entry of state.ruler ?? []) {
       if (!Number.isFinite(entry?.at)) continue;
       const at = ((entry.at - axis.start) / axis.span) * 100;
@@ -2143,7 +2204,7 @@ export function mountFlowLane(
         text.textContent = entry.label;
         dress(text, flowParts.tickLabel);
         items.push(text);
-        labels.push({node: text, left: (entry.at - axis.start) * pxPerUnit(), major: Boolean(entry.major)});
+        labels.push({node: text, offset: entry.at - axis.start, major: Boolean(entry.major)});
       }
     }
     for (const flag of state.flags ?? []) {
@@ -2198,31 +2259,16 @@ export function mountFlowLane(
     }
     decorations.replaceChildren(...items);
     layoutRowDecorations();
-    // Measure only while material/scale changes, never on the frame path.
-    // Reserve the caller's major labels first, then fill gaps with minor
-    // labels. Every tick remains at its original position even when its text
-    // cannot fit. A detached/hidden host uses a conservative text estimate.
-    const measured = labels.map((label) => ({...label,
+    // Measure only while the material changes (or a resize asks for fresh
+    // typography), never on the frame or zoom path. Reserve the caller's major
+    // labels first, then fill gaps with minor labels. Every tick remains at its
+    // original position even when its text cannot fit. A detached/hidden host
+    // uses a conservative text estimate.
+    rulerLabels = labels.map((label) => ({...label,
       width: finitePositive(label.node.getBoundingClientRect().width, Math.max(12, (label.node.textContent?.length ?? 0) * 9)),
-    })).sort((a, b) => Number(b.major) - Number(a.major) || a.left - b.left);
-    const occupied: {left: number; right: number}[] = [];
-    const gap = 8;
-    for (const label of measured) {
-      let low = 0;
-      let high = occupied.length;
-      while (low < high) {
-        const middle = (low + high) >>> 1;
-        if (occupied[middle]!.left < label.left) low = middle + 1;
-        else high = middle;
-      }
-      const previous = occupied[low - 1];
-      const next = occupied[low];
-      const right = label.left + label.width;
-      const fits = (!previous || previous.right + gap <= label.left)
-        && (!next || right + gap <= next.left);
-      setHidden(label.node, !fits);
-      if (fits) occupied.splice(low, 0, {left: label.left, right});
-    }
+    }));
+    rulerScale = Number.NaN;
+    fitRulerLabels();
   };
 
   const measure = (): void => {
@@ -2625,19 +2671,64 @@ export function mountFlowLane(
     if (binding.seek) emit(node.band.start, 'commit');
   };
 
+  /**
+   * Apply an accumulated zoom and paint it in the same frame. Measurement comes
+   * first (the wrapped-label probes are the only layout read, and only for
+   * `labelOverflow: 'wrap'`), then the writes; the pinned read-out does not
+   * depend on the reel's scale and is not remeasured. The now line is the
+   * anchor: the position under it belongs to the transport, so a zoom never
+   * seeks.
+   */
+  const applyZoom = (factor: number): void => {
+    if (destroyed) return;
+    // Rounded so a pinch's product of per-event factors lands on the value
+    // one event of the summed delta would give.
+    const next = Math.round(clamp(zoom * factor, MIN_ZOOM, MAX_ZOOM, zoom) * 1e6) / 1e6;
+    if (next === zoom) return;
+    zoom = next;
+    measureWrappedLabels();
+    reel.style.width = `${coordinate(axis.span * pxPerUnit())}px`;
+    fitWrappedLabels();
+    rebuildDecorations();
+    place(position, true);
+  };
+
+  /** Wheel and pinch zoom apply at most once per frame, however many events arrive. */
+  let pendingZoom: number | undefined;
+  const queueZoom = (factor: number): void => {
+    if (!Number.isFinite(factor) || factor <= 0) return;
+    if (pendingZoom !== undefined) {
+      pendingZoom *= factor;
+      return;
+    }
+    pendingZoom = factor;
+    const apply = (): void => {
+      const due = pendingZoom;
+      pendingZoom = undefined;
+      if (due !== undefined) applyZoom(due);
+    };
+    if (view?.requestAnimationFrame) view.requestAnimationFrame(apply);
+    else apply();
+  };
+
+  /** Whether a zoom by `factor` could still move, counting what is already queued. */
+  const canZoom = (factor: number): boolean => {
+    const ahead = zoom * (pendingZoom ?? 1);
+    return factor > 1 ? ahead < MAX_ZOOM : factor < 1 ? ahead > MIN_ZOOM : false;
+  };
+
   const onWheel = (event: WheelEvent): void => {
     if (state.disabled) return;
     if (event.ctrlKey || event.metaKey) {
-      const next = clamp(zoom * Math.exp(-event.deltaY / 300), MIN_ZOOM, MAX_ZOOM, zoom);
-      if (next === zoom) return;
-      zoom = next;
+      if (event.deltaY === 0) return;
+      // Proportional to the deltas, so a pinch follows the fingers and a burst
+      // of events sums within one frame; lines and pages scale to pixels.
+      const delta = event.deltaMode === 1 ? event.deltaY * 16 : event.deltaMode === 2 ? event.deltaY * 400 : event.deltaY;
+      const factor = Math.exp(-Math.max(-WHEEL_ZOOM_CLAMP, Math.min(WHEEL_ZOOM_CLAMP, delta)) * WHEEL_ZOOM_RATE);
+      // At the end of the range the gesture is left to the page, as before.
+      if (!canZoom(factor)) return;
       event.preventDefault();
-      reel.style.width = `${coordinate(axis.span * pxPerUnit())}px`;
-      measureWrappedLabels();
-      fitWrappedLabels();
-      measureReadout();
-      rebuildDecorations();
-      place(position, true);
+      queueZoom(factor);
       return;
     }
     const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : 0;
@@ -2695,8 +2786,26 @@ export function mountFlowLane(
     viewport.addEventListener('pointercancel', onPointerUp);
     viewport.addEventListener('keydown', onKeyDown);
   }
+  // Safari reports a trackpad pinch as gesture events carrying the cumulative scale.
+  let gestureScale = 1;
+  const onGestureStart = (event: Event): void => {
+    if (state.disabled) return;
+    event.preventDefault();
+    gestureScale = 1;
+  };
+  const onGestureChange = (event: Event): void => {
+    if (state.disabled) return;
+    event.preventDefault();
+    const detail = event as Event & {scale?: number};
+    const scale = typeof detail.scale === 'number' && detail.scale > 0 ? detail.scale : 1;
+    queueZoom(scale / gestureScale);
+    gestureScale = scale;
+  };
+
   viewport.addEventListener('click', onClick);
   viewport.addEventListener('wheel', onWheel, {passive: false});
+  viewport.addEventListener('gesturestart', onGestureStart);
+  viewport.addEventListener('gesturechange', onGestureChange);
   // Belt and braces beside `overflow: clip`: if anything ever does scroll this
   // box, the anchor is wrong by exactly that much until it is put back. Reading
   // `scrollLeft` costs a layout, so it is read only when a scroll actually

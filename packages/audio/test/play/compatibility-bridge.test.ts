@@ -61,7 +61,7 @@ describe('element CSS-variable bridges feed presenter tokens', () => {
     expect(sheet(element)).toContain('--wui-mixer-text:var(--wam-fg');
     expect(sheet(element)).toContain('--wui-mixer-fill:var(--wam-accent');
     expect(sheet(element)).toContain(
-      '--wui-mixer-track-border:var(--wam-track-border,var(--wm-mixer-track-border,var(--wm-control-border,var(--wm-border,#d8d8d8))))',
+      '--wui-mixer-track-border:var(--wam-track-border,var(--wm-mixer-track-border,var(--wm-control-border,var(--wm-border,light-dark(#d8d8d8,#333)))))',
     );
 
     element.remove();
@@ -99,11 +99,13 @@ describe('element CSS-variable bridges feed presenter tokens', () => {
       expect(css).toContain(`--wm-${purpose}-surface-background`);
       expect(css).toContain(`--wm-${presenter}-surface-background`);
       expect(css).toContain('--wm-component-background');
-      expect(css).toContain('var(--wm-surface,#fff)');
+      // Recorder, playlist and mixer are edge-to-edge icon rows with dark-scheme fallbacks.
+      const iconRow = presenter === 'recorder' || presenter === 'playlist' || presenter === 'mixer';
+      expect(css).toContain(iconRow ? 'var(--wm-surface,light-dark(#fff,#111))' : 'var(--wm-surface,#fff)');
       expect(css).toContain(`--wm-${purpose}-surface-border`);
-      expect(css).toContain('1px solid var(--wm-border,#d8d8d8)');
+      expect(css).toContain(iconRow ? '1px solid var(--wm-border,light-dark(#d8d8d8,#333))' : '1px solid var(--wm-border,#d8d8d8)');
       expect(css).toContain(`--wm-${purpose}-surface-padding`);
-      expect(css).toContain('--wm-component-padding,.6rem');
+      expect(css).toContain(iconRow ? '--wm-component-padding,0)' : '--wm-component-padding,.6rem');
       expect(css).not.toContain('#15171c');
       expect(css).not.toContain('#2a2e37');
       const parsed = parsedSurfaceRule(element, purpose);
@@ -123,7 +125,7 @@ describe('element CSS-variable bridges feed presenter tokens', () => {
     expect(sheet(player)).toContain('min-height:var(--wap-height,44px);height:auto');
     expect(sheet(recorder)).toContain('--wui-recorder-track:var(--war-track');
     expect(sheet(recorder)).toContain(
-      '--wui-recorder-button-border:var(--war-button-border,var(--wm-recorder-button-border,var(--wm-control-border,var(--wm-border,#d8d8d8))))',
+      '--wui-recorder-button-border:var(--war-button-border,var(--wm-recorder-button-border,var(--wm-control-border,var(--wm-border,light-dark(#d8d8d8,#333)))))',
     );
     expect(sheet(recorder)).not.toContain('--wm-recorder-border:var(--war-track');
     expect(sheet(recorder)).not.toContain('--wm-recorder-button:var(--war-track');

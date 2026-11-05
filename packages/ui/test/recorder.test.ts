@@ -98,7 +98,9 @@ describe("mountRecorder", () => {
     play.click();
     expect(binding.playCalls).toBe(1);
     expect(play.getAttribute("aria-pressed")).toBe("true");
-    expect(play.textContent).toBe("■ Stop");
+    expect(play.textContent).toBe("");
+    expect(play.querySelector("svg[data-icon]")?.getAttribute("aria-hidden")).toBe("true");
+    expect(play.title).toBe(label);
     expect(play.getAttribute("aria-label")).toBe(label);
 
     play.click();
@@ -172,7 +174,10 @@ describe("mountRecorder", () => {
     expect(record.classList).toContain("custom-record");
     expect(record.getAttribute("part")).toContain("capture-control");
     expect(record.getAttribute("aria-label")).toBe("Capture");
+    expect(record.title).toBe("Capture");
     expect(record.getAttribute("aria-pressed")).toBe("false");
+    expect(record.textContent).toBe("");
+    expect(record.querySelector("svg[data-icon]")).not.toBeNull();
 
     const play = part<HTMLButtonElement>(host, "play");
     expect(play.type).toBe("button");
@@ -213,7 +218,11 @@ describe("mountRecorder", () => {
     expect(exportButtons[0]?.getAttribute("part")).toContain(
       "download-control",
     );
-    expect(exportButtons[0]?.textContent).toBe("⬇ <b>WAV</b>");
+    expect(exportButtons[0]?.getAttribute("aria-label")).toBe("Download <b>WAV</b>");
+    expect(exportButtons[0]?.title).toBe("Download <b>WAV</b>");
+    expect(exportButtons[0]?.querySelector("svg[data-icon]")).not.toBeNull();
+    expect(exportButtons[0]?.textContent).toBe("WAV");
+    expect(exportButtons[1]?.textContent).toBe("MP3");
     expect(host.querySelector("b")).toBeNull();
 
     const status = part(host, "status");
@@ -279,7 +288,8 @@ describe("mountRecorder", () => {
     expect(record.getAttribute("aria-pressed")).toBe("true");
     expect(record.classList).toContain("armed");
     expect(part(host, "meter").getAttribute("aria-valuenow")).toBe("1");
-    expect(part(host, "status").textContent).toBe("● recording… 4");
+    expect(part(host, "status").textContent).toBe("recording… 4");
+    expect(record.textContent).toBe("");
 
     binding.state = {
       recording: false,
@@ -725,5 +735,52 @@ describe("mountRecorder", () => {
     append.mockRestore();
     const recovery = mountRecorder(host, new FakeRecorder());
     expect(host.querySelector(".wui-recorder")).toBe(recovery.element);
+  });
+});
+
+describe("recorder visual contract", () => {
+  it("shows one icon row, a recording-only elapsed readout and announced-only status", () => {
+    const host = document.createElement("div");
+    const binding = new FakeRecorder();
+    binding.state = {recording: false, playing: false, takeCount: 1, elapsed: "0:09"};
+    mountRecorder(host, binding, {
+      exportFormats: [
+        {id: "mid", label: "MIDI", readout: "MID"},
+        {id: "xml", label: "MusicXML"},
+      ],
+    });
+    const record = part<HTMLButtonElement>(host, "record");
+    expect(record.textContent).toBe("");
+    const exports = host.querySelectorAll<HTMLButtonElement>('[part~="export"]');
+    expect([...exports].map((button) => button.textContent)).toEqual(["MID", "XML"]);
+    expect(exports[1]?.getAttribute("aria-label")).toBe("Download MusicXML");
+
+    binding.state = {recording: true, playing: false, elapsed: "0:03", status: "recording… 0:03"};
+    binding.emit();
+    expect(record.getAttribute("aria-pressed")).toBe("true");
+    expect(record.getAttribute("aria-label")).toBe("Stop recording");
+    expect(record.title).toBe("Stop recording");
+    expect(record.querySelector("[data-readout]")?.textContent).toBe("0:03");
+    const icon = record.querySelector("svg");
+    binding.emit();
+    expect(record.querySelector("svg")).toBe(icon);
+
+    const status = part(host, "status");
+    expect(status.getAttribute("role")).toBe("status");
+    expect(status.dataset.kind).toBe("ready");
+    expect(status.textContent).toBe("recording… 0:03");
+
+    binding.state = {recording: false, playing: false, status: "Microphone blocked", statusKind: "error"};
+    binding.emit();
+    expect(status.dataset.kind).toBe("error");
+    expect(record.querySelector("[data-readout]")).toBeNull();
+  });
+
+  it("keeps controls on one row and gives recording its own token", () => {
+    expect(recorderStyle).toContain("--wm-recording, light-dark(");
+    expect(recorderStyle).not.toContain("--wm-accent,");
+    expect(recorderStyle).toContain("flex-wrap: nowrap");
+    expect(recorderStyle).toContain("scrollbar-width: none");
+    expect(recorderStyle).toMatch(/:where\(\.wui-recorder__status:not\(\[data-kind="error"\]\)\) \{ position: absolute;/);
   });
 });

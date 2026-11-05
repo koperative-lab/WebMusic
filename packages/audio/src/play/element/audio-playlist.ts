@@ -390,18 +390,17 @@ export class AudioPlaylistElement extends WebMusicElement {
       this.compatibilityStyle.textContent =
         ':host{display:block;box-sizing:border-box;inline-size:100%;min-inline-size:0;max-inline-size:100%}:host([hidden]){display:none}.wui-playlist{' +
         'box-sizing:border-box;' +
-        'background:var(--wm-audio-playlist-surface-background,var(--wm-playlist-surface-background,var(--wm-component-background,var(--wapl-bg,var(--wm-playlist-background,var(--wm-surface,#fff))))));' +
-        'border:var(--wm-audio-playlist-surface-border,var(--wm-playlist-surface-border,var(--wm-component-border,var(--wapl-border,1px solid var(--wm-border,#d8d8d8)))));' +
-        'padding:var(--wm-audio-playlist-surface-padding,var(--wm-playlist-surface-padding,var(--wm-component-padding,.6rem)));' +
+        'background:var(--wm-audio-playlist-surface-background,var(--wm-playlist-surface-background,var(--wm-component-background,var(--wapl-bg,var(--wm-playlist-background,var(--wm-surface,light-dark(#fff,#111)))))));' +
+        'border:var(--wm-audio-playlist-surface-border,var(--wm-playlist-surface-border,var(--wm-component-border,var(--wapl-border,1px solid var(--wm-border,light-dark(#d8d8d8,#333))))));' +
+        'padding:var(--wm-audio-playlist-surface-padding,var(--wm-playlist-surface-padding,var(--wm-component-padding,0)));' +
         'border-radius:var(--wm-audio-playlist-surface-radius,var(--wm-playlist-surface-radius,var(--wm-component-radius,var(--wapl-radius,var(--wm-control-radius,0)))));' +
-        'color:var(--wapl-fg,var(--wm-playlist-text,var(--wm-component-foreground,var(--wm-foreground,#444))));' +
-        '--wui-playlist-text:var(--wapl-fg,var(--wm-playlist-text,var(--wm-component-foreground,var(--wm-foreground,#444))));' +
+        'color:var(--wapl-fg,var(--wm-playlist-text,var(--wm-component-foreground,var(--wm-foreground,light-dark(#111,#eee)))));' +
+        '--wui-playlist-text:var(--wapl-fg,var(--wm-playlist-text,var(--wm-component-foreground,var(--wm-foreground,light-dark(#111,#eee)))));' +
         '--wui-playlist-primary-background:var(--wapl-accent,var(--wm-playlist-primary-background,var(--wm-playlist-button,var(--wm-accent,#111))));' +
         '--wui-playlist-primary-border:var(--wapl-accent,var(--wm-playlist-primary-border,var(--wm-playlist-button-border,var(--wm-accent,#111))));' +
         '--wui-playlist-primary-foreground:var(--wapl-bg,var(--wm-playlist-primary-foreground,var(--wm-playlist-button-text,var(--wm-accent-foreground,#fff))));' +
-        '--wui-playlist-accent:var(--wapl-accent,var(--wm-playlist-accent,var(--wm-accent,#999)));' +
-        '--wui-playlist-active:var(--wapl-active,var(--wm-playlist-active,rgba(17,17,17,.08)));' +
-        '--wui-playlist-muted:var(--wapl-muted,var(--wm-playlist-muted,var(--wm-component-foreground-muted,var(--wm-foreground-muted,#666))));' +
+        '--wui-playlist-accent:var(--wapl-accent,var(--wm-playlist-accent,var(--wm-foreground-muted,light-dark(#777,#aaa))));' +
+                '--wui-playlist-muted:var(--wapl-muted,var(--wm-playlist-muted,var(--wm-component-foreground-muted,var(--wm-foreground-muted,light-dark(#777,#aaa)))));' +
         '--wui-playlist-radius:var(--wapl-radius,var(--wm-playlist-radius,var(--wm-control-radius,0)))}';
     }
     this.root.append(this.compatibilityStyle);

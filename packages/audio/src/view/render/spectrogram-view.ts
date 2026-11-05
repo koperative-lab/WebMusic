@@ -129,6 +129,9 @@ export function renderSpectrogramVisualizer(
   scroller.style.height = '100%';
   scroller.style.overflowX = scrollable && playheadMode === 'position' ? 'auto' : 'hidden';
   scroller.style.overflowY = 'hidden';
+  // Wheel, trackpad and keyboard still pan; the scrollbar would only cover the
+  // bottom rows of the image (Visual design: scrolling surfaces).
+  hideScrollbar(scroller);
 
   const canvas = document.createElement('canvas');
   canvas.style.position = 'absolute';
@@ -169,12 +172,19 @@ export function renderSpectrogramVisualizer(
   wrapper.appendChild(canvas);
   wrapper.appendChild(regionLayer);
   wrapper.appendChild(overlay);
+  wrapper.appendChild(hiddenScrollbarStyle(container.ownerDocument));
   scroller.appendChild(spacer);
   wrapper.appendChild(scroller);
   container.appendChild(wrapper);
 
   const fullWidth = (): number => Math.max(1, Math.ceil(duration * pixelsPerSecond));
-  const measuredViewportWidth = (): number => Math.max(0, wrapper.clientWidth);
+  // Read once per operation, before any DOM write: paint() writes the spacer
+  // and canvas geometry, and a clientWidth read after those forces layout.
+  let viewportWidth = 0;
+  const measure = (): void => {
+    viewportWidth = Math.max(0, wrapper.clientWidth);
+  };
+  const measuredViewportWidth = (): number => viewportWidth;
   const maxOffset = (): number => Math.max(0, fullWidth() - measuredViewportWidth());
   const clampOffset = (offset: number): number => Math.max(0, Math.min(maxOffset(), offset));
   const centerPadding = (): number => playheadMode === 'center' ? measuredViewportWidth() / 2 : 0;
@@ -295,8 +305,8 @@ export function renderSpectrogramVisualizer(
 
   /** Repaint one buffered stripe. Region outlines use the same bounded window. */
   const paint = (): void => {
-    spacer.style.width = `${fullWidth() + centerPadding() * 2}px`;
     paintedViewportWidth = measuredViewportWidth();
+    spacer.style.width = `${fullWidth() + centerPadding() * 2}px`;
     const next = rasterWindow();
     paintedWindow = null;
     if (!next) {
@@ -428,6 +438,7 @@ export function renderSpectrogramVisualizer(
   /** Repaint when scrolling brings unpainted columns into view. */
   const onScroll = (): void => {
     if (disposed) return;
+    measure();
     if (playheadMode === 'center') {
       syncScrollbar();
       moveLayers();
@@ -446,6 +457,7 @@ export function renderSpectrogramVisualizer(
   if (typeof ResizeObserver !== 'undefined') {
     resizeObserver = new ResizeObserver(() => {
       if (disposed) return;
+      measure();
       const width = measuredViewportWidth();
       if (
         width === paintedViewportWidth &&
@@ -461,6 +473,7 @@ export function renderSpectrogramVisualizer(
     resizeObserver.observe(wrapper);
   }
 
+  measure();
   alignOffset();
   paint();
   paintRegions();
@@ -478,6 +491,7 @@ export function renderSpectrogramVisualizer(
   return {
     redraw(nextPlayhead?: number, scrollIntoView?: boolean): void {
       if (disposed) return;
+      measure();
       if (nextPlayhead === undefined) {
         alignOffset();
         paint();
@@ -502,6 +516,7 @@ export function renderSpectrogramVisualizer(
     },
     setPlayheadMode(mode: 'position' | 'center'): void {
       if (disposed || mode === playheadMode || (mode !== 'position' && mode !== 'center')) return;
+      measure();
       playheadMode = mode;
       scroller.style.overflowX = scrollable && mode === 'position' ? 'auto' : 'hidden';
       alignOffset();
@@ -511,10 +526,19 @@ export function renderSpectrogramVisualizer(
       moveLayers();
       notifyViewport();
     },
-    setZoom(nextPxPerSec: number): void {
+    /**
+     * Re-scale in place. `startSeconds`, when given, is the caller's anchored
+     * window start, applied before the one paint; without it the pixel offset
+     * is kept.
+     */
+    setZoom(nextPxPerSec: number, startSeconds?: number): void {
       if (disposed) return;
       if (Number.isFinite(nextPxPerSec) && nextPxPerSec > 0) {
+        measure();
         pixelsPerSecond = nextPxPerSec;
+        if (startSeconds !== undefined && Number.isFinite(startSeconds)) {
+          renderOffset = secondsToPixel(Math.max(0, startSeconds), pixelsPerSecond);
+        }
         alignOffset();
         paint();
         paintRegions();
@@ -525,6 +549,7 @@ export function renderSpectrogramVisualizer(
     },
     setOffset(startSeconds: number): void {
       if (disposed || playheadMode === 'center' || !Number.isFinite(startSeconds)) return;
+      measure();
       renderOffset = clampOffset(secondsToPixel(Math.max(0, startSeconds), pixelsPerSecond));
       ensurePaintedViewport();
       moveLayers();
@@ -567,6 +592,24 @@ export function renderSpectrogramVisualizer(
       wrapper.remove();
     },
   };
+}
+
+/** Marks the native scroller whose scrollbar the scoped rule below hides. */
+const HIDDEN_SCROLLBAR_ATTRIBUTE = 'data-wm-hidden-scrollbar';
+
+/** Hide the scroller's scrollbar while keeping wheel, trackpad and keyboard scrolling. */
+function hideScrollbar(scroller: HTMLElement): void {
+  scroller.setAttribute(HIDDEN_SCROLLBAR_ATTRIBUTE, '');
+  scroller.style.setProperty('scrollbar-width', 'none');
+}
+
+/** The WebKit half of {@link hideScrollbar}, mounted inside the renderer's own box. */
+function hiddenScrollbarStyle(document: Document): HTMLStyleElement {
+  const style = document.createElement('style');
+  style.textContent =
+    `:where([${HIDDEN_SCROLLBAR_ATTRIBUTE}]) { scrollbar-width: none; }\n` +
+    `:where([${HIDDEN_SCROLLBAR_ATTRIBUTE}])::-webkit-scrollbar { display: none; }`;
+  return style;
 }
 
 function sameViewport(left: AudioViewport, right: AudioViewport): boolean {

@@ -140,8 +140,12 @@ describe('<score-synth-panel> UI Kit composition', () => {
     expect(style).not.toMatch(/--synth-[\w-]+\s*:/);
     expect(style).not.toMatch(/--wm-(?:panel|envelope|eq|lfo)-[\w-]+\s*:/);
     expect(style).toContain('var(--synth-graph-bg, var(--wm-envelope-background');
-    expect(style).toContain('var(--synth-graph, var(--wm-eq-curve, var(--wm-foreground-on-inverse');
+    expect(style).toContain('var(--synth-graph, var(--wm-eq-curve, var(--wm-foreground, light-dark(#111, #eee))))');
     expect(style).toContain('var(--synth-bg, var(--wm-panel-background');
+    // Graphs default to the panel surface with ink, and nothing is colour without meaning.
+    expect(style).not.toContain('--wm-surface-inverse');
+    expect(style).not.toContain('#c0392b');
+    expect(style).toContain('var(--synth-accent, var(--wm-lfo-head, var(--wm-foreground, light-dark(#111, #eee))))');
   });
 
   it('mounts every specialized presenter into compound panel-owned slots', () => {
@@ -172,9 +176,12 @@ describe('<score-synth-panel> UI Kit composition', () => {
     // Read the shared outline at each consumer; a host-level legacy default
     // would hide an inherited application override before that chain resolves.
     expect(css).not.toContain('--synth-box-border:');
-    expect(css).toContain('1px solid var(--synth-box-border, var(--wm-control-border, var(--wm-border, #d8d8d8)))');
+    // One frame: sections are divided by a hairline and nested presenters drop their own.
+    expect(css).toContain('.panel > .sec + .sec { border-top: 1px solid var(--synth-box-border, var(--wm-control-border, var(--wm-border, light-dark(#d8d8d8, #333)))); }');
+    expect(css).toContain('border: var(--wm-envelope-surface-border, 0);');
+    expect(css).toContain('border: var(--wm-parameter-surface-border, 0);');
     expect(css).toContain(
-      'border-color: var(--synth-box-border, var(--wm-lfo-chip-border, var(--wm-control-border, var(--wm-border, #d8d8d8))))',
+      'border-color: var(--synth-box-border, var(--wm-lfo-chip-border, var(--wm-control-border, var(--wm-border, light-dark(#d8d8d8, #333)))))',
     );
     expect(css).not.toContain('border-color: var(--synth-thumb, var(--wm-lfo-chip-border');
   });

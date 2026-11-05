@@ -938,6 +938,28 @@ describe('the docks and the status bar', () => {
     bare.destroy();
   });
 
+  it.each([true, false])('keeps the empty sentence for assistive technology only, and the error line visible (stylesheet=%s)', (stylesheet) => {
+    let state = base({phase: 'empty', status: {message: 'nothing here'}});
+    const handle = mountWorkbench(host(), {snapshot: () => state}, {chrome: 'bare', stylesheet});
+    const note = handle.element.querySelector<HTMLElement>('.wui-workbench__note')!;
+    expect(note.hidden).toBe(false);
+    expect(note.textContent).toBe('nothing here');
+    expect(note.getAttribute('role')).toBe('status');
+    expect(getComputedStyle(note).position).toBe('absolute');
+    expect(getComputedStyle(note).clipPath).toBe('inset(50%)');
+    state = base({phase: 'error', status: {message: 'broke'}});
+    handle.update();
+    expect(note.textContent).toBe('broke');
+    expect(getComputedStyle(note).position).not.toBe('absolute');
+    expect(getComputedStyle(note).clipPath).not.toBe('inset(50%)');
+    handle.destroy();
+  });
+
+  it('hides the tab strip and rail scrollbars while leaving them scrollable', () => {
+    expect(workbenchStyle).toMatch(/:where\(\.wui-workbench__tablist, \.wui-workbench__rail\)::-webkit-scrollbar \{ display: none; \}/);
+    expect(workbenchStyle).toMatch(/\.wui-workbench__rail \{[^}]*overflow-x: auto;[^}]*scrollbar-width: none;/);
+  });
+
   it('switches density and scheme without touching a slot', () => {
     let state = base({density: 'comfortable'});
     const handle = mountWorkbench(host(), {snapshot: () => state});

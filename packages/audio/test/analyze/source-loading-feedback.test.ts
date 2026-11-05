@@ -37,7 +37,7 @@ describe.each(['audio-level-analyzer', 'audio-spectrum-analyzer', 'audio-oscillo
     const diagnostic = element.querySelector<HTMLElement>('[role="status"]')!;
     expect(diagnostic.hidden).toBe(true);
     expect(diagnostic.textContent).toBe('');
-    expect(element.querySelector('button')?.textContent).toBe('Freeze');
+    expect(element.querySelector('button')?.getAttribute('aria-label')).toBe('Freeze');
 
     Object.assign(source, {clip: undefined});
     source.dispatchEvent(new CustomEvent('webaudio:sourcechange'));

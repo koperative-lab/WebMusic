@@ -58,6 +58,39 @@ export function setExplicitStyleSize(element: HTMLElement | SVGElement, width: n
   element.style.setProperty('flex', '0 0 auto');
 }
 
+/** Marks a renderer scroll container whose scrollbar the scoped rule hides. */
+export const HIDDEN_SCROLLBAR_ATTRIBUTE = 'data-webscore-scrollbar';
+const HIDDEN_SCROLLBAR_RULE_ATTRIBUTE = 'data-webscore-scrollbar-rule';
+/**
+ * Visual design → Scrolling surfaces: a renderer's scroll container stays
+ * operable by wheel, trackpad, keyboard and gestures without a visible
+ * scrollbar. Zero specificity, so application CSS can bring the bar back.
+ */
+export const HIDDEN_SCROLLBAR_CSS = `:where([${HIDDEN_SCROLLBAR_ATTRIBUTE}="hidden"]) { scrollbar-width: none; }
+:where([${HIDDEN_SCROLLBAR_ATTRIBUTE}="hidden"])::-webkit-scrollbar { display: none; }`;
+
+/**
+ * Hide a scroll container's scrollbar through one scoped stylesheet per
+ * document or shadow root. The WebKit pseudo-element cannot be written inline,
+ * and an inline `scrollbar-width` would out-rank application CSS.
+ */
+export function hideScrollbar(element: HTMLElement): void {
+  if (typeof element.setAttribute !== 'function') return;
+  element.setAttribute(HIDDEN_SCROLLBAR_ATTRIBUTE, 'hidden');
+  const owner = element.ownerDocument;
+  if (!owner || typeof owner.createElement !== 'function') return;
+  const root = typeof element.getRootNode === 'function' ? element.getRootNode() : undefined;
+  const scope: ParentNode | null | undefined = typeof ShadowRoot !== 'undefined' && root instanceof ShadowRoot
+    ? root
+    : owner.head ?? owner.documentElement;
+  if (!scope || typeof scope.querySelector !== 'function') return;
+  if (scope.querySelector(`style[${HIDDEN_SCROLLBAR_RULE_ATTRIBUTE}]`)) return;
+  const style = owner.createElement('style');
+  style.setAttribute(HIDDEN_SCROLLBAR_RULE_ATTRIBUTE, '');
+  style.textContent = HIDDEN_SCROLLBAR_CSS;
+  scope.append(style);
+}
+
 export function makeScrollable(element: HTMLElement, axis: 'x' | 'y' | 'both' = 'both'): void {
   if (axis === 'x' || axis === 'both') {
     element.style.setProperty('overflow-x', 'auto', 'important');
@@ -65,6 +98,7 @@ export function makeScrollable(element: HTMLElement, axis: 'x' | 'y' | 'both' = 
   if (axis === 'y' || axis === 'both') {
     element.style.setProperty('overflow-y', 'auto', 'important');
   }
+  hideScrollbar(element);
 }
 
 export function makeClipped(element: HTMLElement, axis: 'x' | 'y' | 'both' = 'both'): void {
@@ -118,6 +152,7 @@ export function ensureScrollViewport<T extends HTMLElement | SVGElement>(
   viewport.style.setProperty('margin', '0', 'important');
   viewport.style.setProperty('overflow-x', 'auto', 'important');
   viewport.style.setProperty('overflow-y', 'hidden', 'important');
+  hideScrollbar(viewport);
   return {viewport, created};
 }
 
@@ -268,8 +303,20 @@ export abstract class BaseVisualizer {
     this.pendingScrollTarget = undefined;
     if (target === undefined || !this.parentElement) return;
     const containerWidth = this.parentElement.clientWidth || this.parentElement.getBoundingClientRect().width;
-    if (target > this.parentElement.scrollLeft + containerWidth) this.parentElement.scrollLeft = target - 20;
+    if (target > this.parentElement.scrollLeft + containerWidth) {
+      this.parentElement.scrollLeft = target - 20;
+      // Paint the new window in this frame; waiting for the scroll event's
+      // own frame would show the jump one frame before its content.
+      this.paintScrolledViewport();
+    }
   }
+
+  /**
+   * Repaint whatever depends on the scroll position, synchronously, right
+   * after a follow-scroll wrote `scrollLeft`. Renderers that draw a window of
+   * the timeline override it; the default has nothing to repaint.
+   */
+  protected paintScrolledViewport(): void {}
 
   protected getNoteStartTime(note: ScoreSequenceNote): number {
     return Math.round(note.startTime * 100000000) / 100000000;

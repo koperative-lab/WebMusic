@@ -491,6 +491,8 @@ export class AudioRecorderElement extends WebMusicElement {
       // and takes captured since the element was upgraded.
       recordedCount: Math.floor(this.elapsedSeconds()),
       takeCount: this.takes,
+      // The one visible readout beside Stop; the status line is announced only.
+      ...(this.capturing ? {elapsed: formatTime(this.elapsedSeconds())} : {}),
       status: this.connection.requested && !this.owner && idle && !this.lastTake
         ? 'Waiting for the playback owner.' : this.statusText(),
       ...((this.connection.requested && !this.owner && idle && !this.lastTake)
@@ -502,7 +504,7 @@ export class AudioRecorderElement extends WebMusicElement {
 
   private statusText(): string {
     if (this.starting) return 'opening microphone…';
-    if (this.capturing) return `● recording… ${formatTime(this.elapsedSeconds())}`;
+    if (this.capturing) return `recording… ${formatTime(this.elapsedSeconds())}`;
     if (this.playing) return 'playing take…';
     const take = this.lastTake;
     if (take) {
@@ -537,15 +539,17 @@ export class AudioRecorderElement extends WebMusicElement {
       this.compatibilityStyle.textContent =
         ':host{display:block;box-sizing:border-box;inline-size:100%;min-inline-size:0;max-inline-size:100%}:host([hidden]){display:none}.wui-recorder{' +
         'box-sizing:border-box;' +
-        'background:var(--wm-audio-recorder-surface-background,var(--wm-recorder-surface-background,var(--wm-component-background,var(--war-bg,var(--wm-recorder-background,var(--wm-surface,#fff))))));' +
-        'border:var(--wm-audio-recorder-surface-border,var(--wm-recorder-surface-border,var(--wm-component-border,1px solid var(--wm-border,#d8d8d8))));' +
-        'padding:var(--wm-audio-recorder-surface-padding,var(--wm-recorder-surface-padding,var(--wm-component-padding,.6rem)));' +
+        'background:var(--wm-audio-recorder-surface-background,var(--wm-recorder-surface-background,var(--wm-component-background,var(--war-bg,var(--wm-recorder-background,var(--wm-surface,light-dark(#fff,#111)))))));' +
+        'border:var(--wm-audio-recorder-surface-border,var(--wm-recorder-surface-border,var(--wm-component-border,1px solid var(--wm-border,light-dark(#d8d8d8,#333)))));' +
+        // The presenter is one edge-to-edge icon row, so the frame has no inset.
+        'padding:var(--wm-audio-recorder-surface-padding,var(--wm-recorder-surface-padding,var(--wm-component-padding,0)));' +
         'border-radius:var(--wm-audio-recorder-surface-radius,var(--wm-recorder-surface-radius,var(--wm-component-radius,var(--wm-control-radius,0))));' +
-        'color:var(--war-fg,var(--wm-recorder-text,var(--wm-component-foreground,var(--wm-foreground,#222))));' +
-        '--wui-recorder-accent:var(--war-accent,var(--wm-recorder-accent,var(--wm-danger,#c0392b)));' +
-        '--wui-recorder-track:var(--war-track,var(--wm-recorder-track,var(--wm-surface-muted,#ddd)));' +
-        '--wui-recorder-button-border:var(--war-button-border,var(--wm-recorder-button-border,var(--wm-control-border,var(--wm-border,#d8d8d8))));' +
-        '--wui-recorder-muted:var(--war-muted,var(--wm-recorder-muted,var(--wm-component-foreground-muted,var(--wm-foreground-muted,#666))))}';
+        'color:var(--war-fg,var(--wm-recorder-text,var(--wm-component-foreground,var(--wm-foreground,light-dark(#111,#eee)))));' +
+        // Recording is a listed colour meaning with its own token, not an accent.
+        '--wui-recorder-accent:var(--war-accent,var(--wm-recorder-accent,var(--wm-recording,light-dark(#c62828,#ef5350))));' +
+        '--wui-recorder-track:var(--war-track,var(--wm-recorder-track,var(--wm-surface-muted,light-dark(#f3f3f3,#1c1c1c))));' +
+        '--wui-recorder-button-border:var(--war-button-border,var(--wm-recorder-button-border,var(--wm-control-border,var(--wm-border,light-dark(#d8d8d8,#333)))));' +
+        '--wui-recorder-muted:var(--war-muted,var(--wm-recorder-muted,var(--wm-component-foreground-muted,var(--wm-foreground-muted,light-dark(#777,#aaa)))))}';
     }
     this.root.append(this.compatibilityStyle);
   }

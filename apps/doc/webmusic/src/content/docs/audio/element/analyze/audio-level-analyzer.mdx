@@ -54,7 +54,9 @@ unbound, and later target changes are observed.
 
 RMS, Peak hold and Crest stay in fixed positions above the history. The
 monochrome surface omits a repeated title and routine Live, Paused or Frozen
-messages. No-signal and unavailable feedback remains visible.
+messages. No signal stays in the status region but is visually hidden;
+unavailable and invalid-selector feedback remains visible. Freeze and Reset hold
+are icon buttons in one non-wrapping row with the threshold fader.
 
 While waiting for a source or playback, the shared outlined-square animation keeps
 its description accessible to assistive technology. Pending fetch/decode on a linked
@@ -80,8 +82,9 @@ motion. An explicit `.analyser` takes precedence over the player's readiness sta
 The threshold is visual feedback against the sampled peak; crossing it does
 not mute, compress or otherwise change the signal.
 
-**Accessibility.** Freeze retains its label and exposes `aria-pressed`; Reset
-has the accessible name "Reset hold". The horizontal UIKit threshold fader has
+**Accessibility.** Freeze is an icon button named in `aria-label` and `title`
+that exposes `aria-pressed`; the Reset icon button has the accessible name
+"Reset hold". The horizontal UIKit threshold fader has
 a visible dBFS value and a labelled slider role with `-60..0` bounds. Arrow
 keys change it by 1 dB, and Home/End select the bounds. Numeric
 readings and diagnostic status remain available outside the history plot.
@@ -97,8 +100,8 @@ The full-width host honors native `hidden`. Its outer surface uses
 `--wm-audio-level-analyzer-surface-*` tokens override this tag. The
 [level presenter](/uikit/views-analysis/level-analyzer/) exposes `--wm-level-analyzer-rms`,
 `--wm-level-analyzer-peak` and `--wm-level-analyzer-threshold` for its graph.
-The default colors are gray and black. `--wm-analysis-control-size` defaults to
-`1.5rem` for compact controls; `--wm-fader-*` styles the horizontal threshold
+The default colors are gray and ink. `--wm-analysis-control-height` (then `--wm-control-size`, then `2rem`) sets the
+icon-button height and fader thickness; `--wm-fader-*` styles the horizontal threshold
 fader. Public parts are `root surface`, `freeze`, `reset` and `threshold`; the
 slider also has `fader`, so use `[part~="threshold"]`.
 

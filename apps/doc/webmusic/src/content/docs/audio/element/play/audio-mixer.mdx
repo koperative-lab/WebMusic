@@ -95,19 +95,26 @@ The host fills its container width by default, can shrink inside flex/grid
 layouts, and respects `hidden`. Set host width in your application for a narrower
 control; spacing between components belongs to their composition.
 
-The default surface uses the same neutral UI tokens as Score. These optional legacy aliases
-demonstrate an explicit dark customization; they do not define the default palette.
+The default surface uses the same neutral UI tokens as Score. Its padding falls back to `0`
+(`--wm-audio-mixer-surface-padding` → `--wm-mixer-surface-padding` → `--wm-component-padding` →
+`0`): the transport icon row runs edge to edge with a hairline under it, and strips are separated
+by hairlines and carry their own inset. Strip names are uppercase mono captions in the muted
+colour. These optional legacy aliases demonstrate an explicit dark customization; they do not
+define the default palette.
 
 ```css
 audio-mixer {
   --wam-bg: #15171c;      /* desk background */
-  --wam-fg: #eef;         /* labels + glyphs */
-  --wam-accent: #4ea1ff;  /* fader accent + engaged mute / solo */
+  --wam-fg: #eef;         /* root text */
+  --wam-accent: #4ea1ff;  /* fader fill + engaged mute / solo */
   --wam-track: #2a2e37;   /* fader track */
 }
 ```
 
 `--wam-track-border` controls the fader outline and, when omitted, follows
-`--wm-control-border` → `--wm-border` → `#d8d8d8`.
+`--wm-control-border` → `--wm-border` → `light-dark(#d8d8d8, #333)`. Without `--wam-accent`,
+the fader fill falls back to `--wm-mixer-fill` → `--wm-foreground-muted` and an engaged mute or
+solo to `--wm-mixer-fill` → `--wm-foreground`. Captions and idle icons use
+`--wm-foreground-muted`, so `--wam-fg` does not recolour them.
 
 </details>

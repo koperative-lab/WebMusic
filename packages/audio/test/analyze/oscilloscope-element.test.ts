@@ -120,9 +120,10 @@ describe('<audio-oscilloscope>', () => {
       .dispatchEvent(new KeyboardEvent('keydown', {key: 'End', bubbles: true}));
     expect(probes.at(-1)?.timeMs).toBe(scope.trace?.timebaseMs);
     expect(probes.at(-1)?.amplitude).toBe(1);
-    const edge = scope.querySelector<HTMLSelectElement>('[part="trigger-edge"]')!;
-    edge.value = 'off';
-    edge.dispatchEvent(new Event('change', {bubbles: true}));
+    // The trigger edge is a segmented group of square cells, not a native select.
+    const off = scope.querySelector<HTMLButtonElement>('[part="trigger-edge"] button[data-value="off"]')!;
+    off.click();
+    expect(off.getAttribute('aria-pressed')).toBe('true');
     expect(scope.triggerEdge).toBe('off');
     expect(scope.trace?.triggered).toBe(false);
     const freeze = scope.querySelector<HTMLButtonElement>('[part="freeze"]')!;

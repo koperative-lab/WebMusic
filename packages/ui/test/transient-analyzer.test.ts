@@ -83,7 +83,10 @@ describe('mountTransientAnalyzer', () => {
     expect(input.getAttribute('aria-valuenow')).toBe('80');
     expect(onSensitivityChange).toHaveBeenCalledOnce();
     expect(host.querySelector('[part="freeze"]')?.getAttribute('aria-pressed')).toBe('true');
-    expect(host.querySelector('[part="freeze"]')?.textContent).toBe('Freeze');
+    expect(host.querySelector('[part="freeze"]')?.getAttribute('aria-label')).toBe('Freeze');
+    const clear = host.querySelector<HTMLButtonElement>('[part="clear"]')!;
+    expect([clear.getAttribute('aria-label'), clear.title, clear.textContent]).toEqual(['Clear', 'Clear', '']);
+    expect(clear.querySelector('svg[data-icon][aria-hidden="true"]')).not.toBeNull();
     handle.destroy();
     expect(host.children).toHaveLength(0);
     input.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowRight', bubbles: true}));
@@ -95,16 +98,22 @@ describe('mountTransientAnalyzer', () => {
     const handle = mountTransientAnalyzer(host, {onSensitivityChange: vi.fn(), onFreezeChange: vi.fn(), onClear: vi.fn()});
     const status = host.querySelector<HTMLElement>('[role="status"]')!;
     const readouts = [...host.querySelectorAll('dd')];
-    for (const message of ['Waiting for playback', 'No signal', 'Live audio unavailable', 'Error: input failed']) {
+    for (const message of ['Waiting for playback', 'No signal', 'Listening', 'Live audio unavailable', 'Error: input failed']) {
       handle.update({...base, status: message});
       expect(status.hidden).toBe(false); expect(status.textContent).toBe(message);
+      expect(status.hasAttribute('data-analysis-quiet')).toBe(!/unavailable|error/i.test(message));
     }
     for (const message of ['Live', 'Paused', 'Frozen']) {
       handle.update({...base, status: message, frozen: message === 'Frozen'});
       expect(status.hidden).toBe(true); expect(status.textContent).toBe('');
       expect([...host.querySelectorAll('dd')]).toEqual(readouts);
-      expect(host.querySelector('[part="freeze"]')?.textContent).toBe('Freeze');
+      expect(host.querySelector('[part="freeze"]')?.getAttribute('aria-label')).toBe('Freeze');
     }
+    // The axis captions remain for assistive technology only; the plot has no inner border.
+    expect(host.querySelector('.wui-transient-analyzer__scale')?.textContent).toBe('Recent framesAttack strengthNow');
+    const css = [...document.querySelectorAll('style')].map((style) => style.textContent).join('\n');
+    expect(css).toMatch(/:where\(\.wui-transient-analyzer__scale\) \{ position: absolute;/);
+    expect(css).toMatch(/:where\(\.wui-transient-analyzer__plot\) \{[^}]*border: 0;/);
     handle.destroy();
   });
 
