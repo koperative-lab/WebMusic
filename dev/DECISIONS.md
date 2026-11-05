@@ -2012,7 +2012,7 @@ and the affected Element references.
 cancellation, teardown, unchanged-update stability, light/dark themes, narrow layouts and
 reduced motion. Browser and screen-reader acceptance remain distinct from DOM regressions.
 
-## DEC-053 — Four-direction score and keyboard composition
+## DEC-067 — Four-direction score and keyboard composition
 
 **Date / status:** 2026-10-08; accepted by the maintainer's request and confirmed
 scope: keyboard, piano roll and waterfall support four directions; staff,

@@ -120,7 +120,7 @@ scrolls inside the stage on small screens. Its paper color is explicit so dark
 application backgrounds do not obscure OSMD's ink. Width, height and follow
 settings update the current engraving without another source load.
 
-Waterfall and piano roll support four directions (DEC-053). Piano roll uses
+Waterfall and piano roll support four directions (DEC-067). Piano roll uses
 `direction` for increasing score time; waterfall uses it for note travel toward
 the landing edge. Defaults remain right and down respectively. Low pitches are
 left on a horizontal pitch axis and bottom on a vertical one. Staff, map and

@@ -41,7 +41,7 @@ when enabled, offset reset when disabled, type switching and Reset passed;
 the generated markup preserved explicit `scroll="false"`, and console errors
 were absent. Automated tests verify clipboard serialization and legacy fallback.
 
-DEC-053 adds four-direction keyboard, piano-roll and waterfall presentation,
+DEC-067 adds four-direction keyboard, piano-roll and waterfall presentation,
 with independently composed keyboards sharing one player. ScoreView Elements
 hide advanced annotations by default while imperative renderer defaults remain
 unchanged. Verification on 2026-10-08 under Node 26.8.1 passed all 4,489 workspace
