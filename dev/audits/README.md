@@ -12,6 +12,7 @@ Findings, commands, counts and results were not otherwise changed.
 
 | Date | Records | Evidence and reading boundary |
 |---|---|---|
+| 2026-11-06 | [Modular composition coverage audit](2026-11-06-modular-coverage-audit.md) | Read-only static review of which sources, components and outputs use modular composition on `modular-redesign` at `fbb0925`; no runtime evidence. |
 | 2026-10-17 | [Modular recovery and release fixes](2026-10-17/MODULAR-RECOVERY-AND-RELEASE-FIXES.md) | Source recovered from exact task-history edits and saved as a Git checkpoint; fresh RC-01–08 repair validation is recorded separately from unavailable historical screenshots and logs. |
 | 2026-10-16 | [Modular release candidate review](2026-10-16/MODULAR-RELEASE-CANDIDATE-REVIEW.md), [evidence reproduction](2026-10-16/release-candidate-review-evidence/README.md) | Read-only follow-up finds eight additional lifecycle, timing, adapter and public-contract defects; fresh Node 22, native/browser and package-consumer evidence is distinguished from prior gates and unpublished release steps. |
 | 2026-10-16 | [Modular release hardening](2026-10-16/MODULAR-RELEASE-HARDENING.md), [evidence reproduction](2026-10-16/release-hardening-evidence/README.md) | Two further reentrant lifecycle repairs, a scoped development dependency fix, and original public media with independent provenance and format checks; integrated verification is recorded in the report. |

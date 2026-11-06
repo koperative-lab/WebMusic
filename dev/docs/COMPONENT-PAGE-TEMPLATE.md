@@ -81,6 +81,10 @@ Opening prose.
 <my-element src="…"></my-element>
 ```
 
+## Ports and composition
+
+Module role, ports, containment default and explicit inputs.
+
 ## Topic sections as needed
 
 <details class="component-section">
@@ -98,7 +102,8 @@ CSS properties, public parts and host styling.
 </details>
 ````
 
-Order: main demo → introduction → Import → optional topics → API → Styling.
+Order: main demo → introduction → Import → Ports and composition → optional
+topics → API → Styling.
 The main demo is the first visible page-body content, immediately after the
 page title. Only frontmatter, imports and non-rendered comments precede it in
 the MDX source. Do not put introductory paragraphs, notices, code examples or
@@ -185,6 +190,24 @@ and custom registration for the whole family.
 Do not add several tags differing only in attribute values; controls and API
 rows explain those differences. Example resources, dependencies, and inputs
 must be available rather than copied from imaginary paths.
+
+### Ports and composition
+
+Required for every Element under
+[DEC-068](../DECISIONS.md#dec-068--modular-composition-is-the-only-composition-model);
+pages gain it as their roadmap round lands. Follow the
+[single composition model](../design/MODULAR-COMPOSITION.md#single-composition-model):
+
+- The module role (Session provider, Source, Instrument, Processor, Modulator,
+  Rack, Analyzer, View or Sink) and whether it provides a context to children.
+- A table of ports: name, family, direction, multiplicity and readiness.
+- What containment connects by default, and the explicit `input`/`port`,
+  `target` or `slot` forms with their resolution order and failure feedback.
+- Session role: owns, borrows or stops at `session="local"`; the timing mode it
+  reports; which changes edit in place and which rebind.
+
+A short nesting example uses real tags and Arabesque No. 1. Member signatures
+stay in API.
 
 ### Topic sections
 

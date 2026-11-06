@@ -1,5 +1,7 @@
 # Score Play component responsibilities
 
+> **2026-11-06, [DEC-068](../DECISIONS.md#dec-068--modular-composition-is-the-only-composition-model):** modular composition becomes the only model. The Score roles map to module roles; legacy Rack seek axes, descendant-Rack selection, `.rack`/`.controller`, `Rack`, `LoopPlayer`, `AbPlayer`, `TonePlayer` and `PlayerController` are retired. Sections below describe the current implementation until roadmap rounds 4–5 land. The [modular composition contract](MODULAR-COMPOSITION.md#single-composition-model) owns the target.
+
 Status: existing Play surfaces implemented, including responsive presenter changes; browser and real-device acceptance pending. Document-bound playback below is implemented under DEC-053; STATUS EDIT-01 tracks its remaining verification.
 Layer and public entry: Score Play Headless, Elements and UI bindings.
 Related decisions: DEC-016, DEC-045 and DEC-053.

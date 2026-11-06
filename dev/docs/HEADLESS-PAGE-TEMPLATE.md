@@ -101,6 +101,10 @@ const dispose = () => player.dispose();
 
 Object-specific ownership and lifecycle behavior.
 
+## Ports and composition
+
+Module handle, ports and Session registration.
+
 <details class="component-section">
 <summary>API</summary>
 
@@ -113,7 +117,8 @@ Construction, Commands, State, Events, Lifecycle, Helpers.
 [`<score-player>`](/score/element/play/score-player/)
 ````
 
-Order: introduction → main demo → Import → optional topics → API → Related.
+Order: introduction → main demo → Import → Ownership → Ports and composition →
+optional topics → API → Related.
 There is no Styling. Even a complete working demo does not replace Import and
 API reference content.
 
@@ -190,6 +195,15 @@ Mention factory or convenience forms and their returned handle, ownership, and
 behavior differences when present. Resources created and passed into an object
 must either retain a caller cleanup path or use a real ownership option that
 transfers release responsibility.
+
+### Ports and composition
+
+Required for every module runtime under
+[DEC-068](../DECISIONS.md#dec-068--modular-composition-is-the-only-composition-model);
+pages gain it as their roadmap round lands. State the `ModuleHandle` the object
+exposes, its ports by family, how it receives a `ModuleContext`, and how it joins
+or owns a Session. A pure data object that is not a module says so in one line
+and names the module that consumes its result.
 
 ### Topic sections
 

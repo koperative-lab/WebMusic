@@ -1,5 +1,7 @@
 # Audio View component responsibilities
 
+> **2026-11-06, [DEC-068](../DECISIONS.md#dec-068--modular-composition-is-the-only-composition-model):** Audio views become companions of `source` and `transport` ports, and the live view reads an `audio` port by containment or `input`; `player=` and `source=` are retired. Roadmap round 7 implements the binding. The [modular composition contract](MODULAR-COMPOSITION.md#single-composition-model) owns the target.
+
 Status: current dev review contract. [STATUS](../STATUS.md) owns remaining
 acceptance and binding gaps. Shared authority remains
 [Design principles](../DESIGN-PRINCIPLES.md),

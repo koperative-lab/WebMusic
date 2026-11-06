@@ -14,6 +14,7 @@ context rather than its scope.
 
 | Record | Historical scope | Current starting point |
 |---|---|---|
+| [Unified modular composition — 2026-11-06](2026-11-06-unified-modular-composition.md) | Roadmap U0–U10 making modular composition the only model across every Element, Headless runtime and API; U0 promotes its target model into the design | [Modular composition](../design/MODULAR-COMPOSITION.md), DEC-068 and STATUS MOD-15 |
 | [Editing capabilities — 2026-10-13](2026-10-13-editing-capabilities.md) | Original proposal and P0–P8 sequence; P0 promoted to accepted design, with the current work consolidated into five phases P0–P4 | [Editing contracts and current roadmap](../design/EDIT-COMPONENTS.md#implementation-and-reference-delivery), DEC-053 and STATUS EDIT-01 |
 | [Analysis workbench design](analysis-workbench-design.md) | Chordio workbench proposal and its visual prototype | [Analyze design](../design/ANALYZE-COMPONENTS.md) |
 | [Analysis implementation brief](analysis-workbench-implementation-brief.md) | Source comparisons, implementation choices and verification notes | Analyze design and the owning references in [COMPONENTS](../COMPONENTS.md) |

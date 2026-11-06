@@ -1,5 +1,7 @@
 # Audio Analyze live tools
 
+> **2026-11-06, [DEC-068](../DECISIONS.md#dec-068--modular-composition-is-the-only-composition-model):** live analysers keep their `input`/`port` taps, gain containment discovery in every page and read the `transport` port to reset history on seek, pause and end; `player=` is retired. Roadmap round 7 implements this. The [modular composition contract](MODULAR-COMPOSITION.md#single-composition-model) owns the target.
+
 Status: accepted dev contract under DEC-037 and DEC-051; implementation and
 browser/audio acceptance belong to [STATUS](../STATUS.md). DEC-037 supersedes
 DEC-036's Audio Element inventory without changing its static API/Headless

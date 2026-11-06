@@ -1,5 +1,7 @@
 # Audio Play component responsibilities
 
+> **2026-11-06, [DEC-068](../DECISIONS.md#dec-068--modular-composition-is-the-only-composition-model):** modular composition becomes the only model. The playlist becomes a queue source, the recorder a microphone source plus capture sink in the scope's audio environment, and an outermost mixer owns a Session; linked `player=` selectors are retired. Sections below describe the current implementation until roadmap round 6 lands. The [modular composition contract](MODULAR-COMPOSITION.md#single-composition-model) owns the target.
+
 Status: accepted for the dev implementation; verification and remaining device
 acceptance belong to [STATUS](../STATUS.md).
 Layer and public entries: Audio Play Headless, Elements and neutral UI bindings.

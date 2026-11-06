@@ -1,15 +1,24 @@
 # Modular Score and Audio composition
 
-Status: accepted contract with opt-in composition, shared sound/modulation,
-Session scheduling and versioned project APIs.
+Status: accepted single composition model for every Score, Audio, Bridge, UI
+and React surface ([DEC-068](../DECISIONS.md#dec-068--modular-composition-is-the-only-composition-model)),
+with shared sound/modulation, Session scheduling and versioned project APIs.
 Current verification and remaining stages belong to [STATUS](../STATUS.md).
 Related decisions: [DEC-063](../DECISIONS.md#dec-063--modular-composition-separates-resources-routing-and-session-authority),
-[DEC-064](../DECISIONS.md#dec-064--session-scheduling-is-a-borrowed-anchor-projects-store-declarative-identity)
-and [DEC-065](../DECISIONS.md#dec-065--provider-scope-changes-separate-in-place-re-routing-from-rebinding).
+[DEC-064](../DECISIONS.md#dec-064--session-scheduling-is-a-borrowed-anchor-projects-store-declarative-identity),
+[DEC-065](../DECISIONS.md#dec-065--provider-scope-changes-separate-in-place-re-routing-from-rebinding)
+and DEC-068.
 Layers: neutral Kernel contracts, domain Headless runtimes, structural UI bindings,
 and declarative Elements. Shared public entries are Kernel `/module`, `/session`,
 `/effect` and `/element`; domain runtimes remain in their Play Headless entries.
-Delivery owner: [STATUS](../STATUS.md), MOD-02 through MOD-13.
+Delivery owner: [STATUS](../STATUS.md), MOD-02 through MOD-15; the
+[roadmap](../plans/2026-11-06-unified-modular-composition.md) sequences MOD-15.
+
+Delivery state: sections up to "Declarative composition" describe the first
+three deliveries, which are implemented behind `composition="modules"`. The
+"Single composition model" section is the accepted target that replaces the
+opt-in; each of its parts names the roadmap round that implements it. Until that
+round lands, the current reference pages describe actual behavior.
 
 ## User task and boundary
 
@@ -233,8 +242,10 @@ they do not acquire audio-rate capability by being shown beside native controls.
 
 In the new opt-in composition, the outermost player provides Session authority;
 nested players borrow the nearest Session unless explicitly independent.
-Rack provides mixing and passes through that authority. A Rack without a Session
-provider does not silently synchronize its independently owned players.
+Rack provides mixing and passes through that authority. In the current opt-in
+implementation a Rack without a Session provider does not silently synchronize
+its independently owned players; the single model makes an outermost Rack the
+Session provider instead (see "Session root and standalone players").
 
 | Configuration | Source role | Session role | Scheduling |
 |---|---|---|---|
@@ -391,6 +402,118 @@ The Kernel editor adapter projects this graph into structural UI state. UI Kit's
 Native select controls, port buttons and connection-list actions cover wiring
 without pointer-only gestures. Moving cards changes layout, never routing.
 
+## Single composition model
+
+[DEC-068](../DECISIONS.md#dec-068--modular-composition-is-the-only-composition-model)
+removes the opt-in. The rules above apply to every instance, and the following
+contract extends them to every source, view, analyser and output. Round numbers
+refer to the [roadmap](../plans/2026-11-06-unified-modular-composition.md).
+
+### Module roles
+
+| Role | Consumes | Produces | Members | Round |
+|---|---|---|---|---|
+| Session provider | — | `transport` | Outermost player; outermost Rack or Mixer when no player is above it | 3 |
+| Source | `transport` | `source`; `audio` or `note` | Score and Audio file/document players, Rack parts, playlist queue, microphone, Web MIDI input, note-input UI, metronome | 4–6 |
+| Instrument | `note`, `control` | `audio` | Oscillator, soundfont, SpessaSynth and sampler backends | 4 |
+| Processor | `audio` or `note`, `control` | `audio` or `note` | Effects and insert slots, transition chains, Bridge render and transcription adapters | 4–8 |
+| Modulator | `transport` (optional) | `control` | LFO, envelope, follower, macro, Session automation | 2 |
+| Rack | N × `audio` | `audio` master, channel and master taps | `score-rack-control`, `audio-mixer` over one Kernel Rack | 3 |
+| Analyzer | `audio`, `note` or `source`; `transport` | Observations for its own presentation | Audio analysers and meter, Score analysis Elements and followers | 7 |
+| View | `source`, `transport` | Presentation; lent transport commands | Score and Audio views, editors, patch editor | 7–8 |
+| Sink | `audio` or `note` | External effect | Device output, MIDI out, capture, offline realization | 3–6 |
+
+A component can hold several roles. A player is a Source, hosts its own
+InsertChain and, when outermost, is the Session provider. Observations are not
+a port family: an analyser's results belong to its presentation and its Headless
+API, not to the patch graph. Pure data APIs (parsing, loading, offline analysis
+and conversion functions) remain functions whose results feed modules.
+
+### Port families
+
+Every family is a Kernel type with the common fields `id`, `family`,
+`direction`, `multiplicity` (`single` or `sum`), `schemaVersion` and
+`readiness` (`unresolved`, `preparing`, `ready`, `error`, `detached`).
+`ModuleHandle` enumerates its ports by family and name and resolves one with
+`getPort(name, family)`; the existing audio-only `getPort(name)` becomes the
+`audio` case. Kernel never imports domain payload types. Round 2 implements this
+section.
+
+| Family | Additional fields | Notes |
+|---|---|---|
+| `audio` | Node, context identity, channel count and interpretation, declared latency | Input ports are typed too; admission rejects a different context |
+| `note` | Event stream of occurrence ID, source ID, pitch (MIDI number plus optional cents), velocity 0–1, gate `on`/`off`/`cancel`, named time axis, time and scheduling epoch | Input accepts events and releases all of one source; replaces Score's `SCORE_NOTE_INPUT` key |
+| `control` | `ParamHandle`/`ParamSurface` and mappings as today | Unchanged |
+| `transport` | Session ID, axis, revisioned snapshot (position, duration or unknown, playing, rate, loop), subscription, optional commands with committed/superseded/failed outcomes | `ModuleContext.session` exposes this interface, not the `SessionTransport` class |
+| `source` | Schema ID, revision, readiness `empty`/`loading`/`ready`/`error`, snapshot and subscription | The payload stays domain-owned: Score's playback source (DEC-017), Score and Audio documents, AudioClip |
+
+Schema IDs are `webmusic.score`, `webmusic.score-document`,
+`webmusic.audio-clip` and `webmusic.audio-document`; a new payload needs a new ID.
+A conformance kit in Kernel checks identity, readiness, subscription order,
+reentrancy and idempotent cleanup for every module factory in every package.
+
+### Element grammar
+
+| Attribute or property | Meaning |
+|---|---|
+| `id` | Module ID when present; immutable for the module's life. Undeclared members receive generated IDs |
+| Containment | Default patch to the nearest provider offering the needed family |
+| `input="#id"`, `port="name"`, `.inputModule` | Explicit input of any family; replaces `player=` and `source=` |
+| `target="#id"`, `.moduleTarget` | Parameter or insert target for effects and panels |
+| `slot="channel"`, `slot="master"` | Insert placement in a Rack; inside a player or part the default is its own chain |
+| `session="local"` | Independent Session boundary |
+| `controls="auto|show|hide"` | Transport visibility only |
+
+Resolution order stays explicit object, explicit selector, containment, none;
+an invalid explicit input never falls back. A view inside a provider with
+several sources and no `input` stays unresolved instead of choosing the first.
+Round 5 implements Score Play Elements, 6 Audio Play, 7 companions.
+
+### Session root and standalone players
+
+The outermost provider that can hold a Session owns it: a player, or a Rack or
+Mixer with no player above it. Nested providers borrow it unless
+`session="local"`. A standalone player is a Session of one; it has no separate
+standalone clock path. Each participant reports its real timing mode —
+`shared-anchor`, `callback`, `media-follower` or `external` — and a callback-only
+synth never reports `shared-anchor`. Changing sound, source data, parameters or
+the destination edits a module in place (DEC-065 for every module); only a scope
+change rebinds. Rounds 3–6.
+
+### Companions, inputs and outputs
+
+- **Views and analysers** consume `source` and `transport` from the nearest
+  provider or their `input`. A Rack part offers its own source; a source-free
+  root offers only transport. Views issue commands only through commands the
+  transport port lends. Analysers reset history on seek, pause and end.
+- **Inputs** borrow the scope's audio environment: the microphone source creates
+  no private AudioContext. Web MIDI input, the note-input UI and the metronome are
+  note sources patched by containment to the nearest instrument. The Score
+  recorder is a note sink that produces a `source`.
+- **Outputs** are sinks: the environment's device output is the default
+  destination; MIDI out is a note sink; capture records any audio port; offline
+  realization builds the same module graph on an `OfflineAudioContext`. Render and
+  export functions become wrappers over offline realization plus an encoder.
+
+### Retired surfaces
+
+| Retired | Replacement |
+|---|---|
+| `composition` attribute, descendant-Rack selection, `AudioPlayerConnection` | Containment and module context |
+| `player=` on views, analysis, recorder and playlist; `source=` on live view | `input` and `port` |
+| `.rack` and `.controller` on `score-player` | Racks by containment or `input` |
+| Score `Rack`, `createRack`, `RackTransportController` | `ScoreRackModule` over the Kernel Rack |
+| `LoopPlayer` | Session loop region with a repeat count |
+| `AbPlayer` | Named source variants on the interactive Score source; selecting keeps Session position |
+| `TonePlayer` | Removed; external engines join as `external` participants |
+| `PlayerController`, `MidiPlayerController`, `bindClock`, the `Player` alias | Transport port commands and the Session |
+| Kernel `/sync` public entry | `TransportGroup` and `MirrorClockMaster` become Session internals |
+| Bridge `ScoreAudioSync`, `createSyncedPlayback`, `createAudioMasteredPlayback`, `clipAsMaster`, `scoreAsFollower` | One Session with Score and Audio modules; Bridge supplies axis mappings, for example from a beat grid |
+| Separate render graphs in `renderScoreToBuffer`, `renderClipWithEffect`, `renderAudioSequence` | Offline realization of the module graph |
+
+The 0.3.0 release notes list every removal with its replacement. Elements keep
+their tag names.
+
 ## Acceptance
 
 ### Shared-anchor and project acceptance
@@ -437,6 +560,7 @@ These are acceptance requirements, not a claim that every browser/device case
 is covered. Each implementation step adds focused evidence; MOD-08 verifies
 the combined first delivery. MC-16–17 cover sound/modulation; MC-18–19 cover
 shared scheduling, explicit switching limits and recoverable project editing.
+MC-20–27 cover the single composition model of DEC-068 under MOD-15.
 [STATUS](../STATUS.md) links dated evidence and its limits; documentation checks
 alone prove neither runtime behavior nor audible precision.
 
@@ -461,6 +585,14 @@ alone prove neither runtime behavior nor audible precision.
 | MC-17 | Current/future voices connect to parameter buses; base values do not double; unsupported a-rate is explicit | Offline signal samples and capability tests |
 | MC-18 | Seek/loop/pause invalidate old work; phase, latency, switching and tails meet declared backend limits | Offline plus browser/device timing evidence |
 | MC-19 | Saved IDs/connections recover after rename/reorder; missing plugins remain unresolved; editor has keyboard equivalents | Schema round-trip and accessibility checks |
+| MC-20 | Every exported module factory passes the Kernel conformance kit; ports enumerate by family | Conformance runs in each package |
+| MC-21 | Note events from note input, Web MIDI and the metronome reach the nearest instrument; same-pitch occurrences from two sources release independently | Note-port integration tests |
+| MC-22 | Views and analysers nested in a player, a Rack part or bound by `input` show the same data as before; a multi-source provider without `input` stays unresolved | Companion binding tests per Element |
+| MC-23 | An outermost Rack or Mixer owns a Session; a standalone player is a Session of one; participants report their real timing mode | Session and precision-report tests |
+| MC-24 | Microphone source routes through an effect into an analyser in the scope's context; capture records any audio port | Graph counts and captured signal |
+| MC-25 | Offline realization of a graph with two sources, a channel insert and a master insert renders the live topology | Offline render comparison |
+| MC-26 | Documents play through module output, inserts and Session in both domains | Document playback integration tests |
+| MC-27 | No public surface accepts `composition`, `player=` or the retired APIs; the architecture check rejects them | Architecture check and release notes |
 
 The first-step exit criterion is a consistent decision, contract, ownership table,
 explained default graph, compatibility boundary and acceptance matrix reachable

@@ -1,5 +1,7 @@
 # Score View component families
 
+> **2026-11-06, [DEC-068](../DECISIONS.md#dec-068--modular-composition-is-the-only-composition-model):** Score views become companions that read `source` and `transport` ports by containment or `input`; `player=` is retired. Representation rules below are unchanged; roadmap round 7 implements the binding. The [modular composition contract](MODULAR-COMPOSITION.md#single-composition-model) owns the target.
+
 > Current design, accepted in DEC-015 and refined for staff notation in DEC-024.
 > DEC-045 owns the domain-prefixed tags. Source and public leaf pages own exact
 > members; STATUS owns delivery and verification gaps. DEC-053 adds the accepted

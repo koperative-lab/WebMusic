@@ -1,5 +1,7 @@
 # Player binding for Analyze and View
 
+> **2026-11-06, [DEC-068](../DECISIONS.md#dec-068--modular-composition-is-the-only-composition-model):** companions bind through the Kernel `source` and `transport` ports, by containment or `input`; `player=` in the target syntax below becomes `input=`. The data-authority, source-precedence and document rules here remain the payload contract. The [modular composition contract](MODULAR-COMPOSITION.md#single-composition-model) owns the target.
+
 > Current design specification. The composition direction is accepted; the
 > complete target syntax below is broader than the implemented binding surface.
 > This document owns intended behavior and unresolved contract questions, not

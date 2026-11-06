@@ -154,6 +154,14 @@ future DAW/installation composition belong in PRODUCT; do not turn direction
 into a claim of shipped capability. Kernel admission rules belong in the
 architecture/Overview, not every API group.
 
+### Modules and data functions
+
+Under [DEC-068](../DECISIONS.md#dec-068--modular-composition-is-the-only-composition-model)
+the model section separates module factories (objects with a `ModuleHandle` and
+ports) from pure data functions (parsing, loading, offline analysis and
+conversion) and names, for each data function, the module that consumes its
+result.
+
 ### Export groups
 
 For APIs that supply or consume playback connections, consult

@@ -145,6 +145,8 @@ authorized commands to the owner. Preserve the capability dependency rules throu
 structural contracts and explicit composition. This binding is distinct from
 cross-domain shared-clock injection and does not require that protocol to ship first.
 
+**2026-11-06 refinement:** under [DEC-068](#dec-068--modular-composition-is-the-only-composition-model), companions borrow through the Kernel `source` and `transport` port families, by containment or `input`; the `player=` attribute is retired. Borrowing semantics are unchanged: no second transport, delegated commands and data-only operation.
+
 **Owner:** [Player binding design](design/PLAYER-BINDING.md), including the maintainer's
 target markup and unresolved contract choices. STATUS owns delivery gaps.
 
@@ -375,6 +377,8 @@ is active. This preserves existing application routes while adding the reviewed
 replacement and rollback guarantees. The earlier feature audit's dormant-port
 behavior is historical evidence, not the integrated public contract.
 
+**2026-11-06 refinement:** under [DEC-068](#dec-068--modular-composition-is-the-only-composition-model), the roles remain as module roles — `score-player` is a Source and, when outermost, the Session provider; `score-rack-control` a Rack; `score-rack-part` a Source; `score-note-input` a note Source; `score-recorder` a note sink producing a source; `score-synth-panel` a control view or processor. Rack member-axis seek becomes Session-seconds seek on the Session provider.
+
 **Owner:** [Play component design](design/PLAY-COMPONENTS.md) and the
 [Play Element reference](../apps/doc/webmusic/src/content/docs/score/element/index.mdx#play).
 
@@ -411,6 +415,8 @@ consumer requests only available capabilities. Native player data is borrowed;
 explicit local data remains a separate, documented source choice. Compatibility
 event sources remain usable with explicitly narrower guarantees.
 
+**2026-11-06 refinement:** under [DEC-068](#dec-068--modular-composition-is-the-only-composition-model), the Score playback source stays in Score core as the payload of the Kernel `source` port (schema `webmusic.score`). DOM `player` selectors are replaced by `input` and containment; compatibility event sources are retired.
+
 **Owner:** [Player binding](design/PLAYER-BINDING.md) and Architecture.
 
 **Verification implications:** initial/reentrant subscription, late attachment,
@@ -439,6 +445,8 @@ participants cancel and re-arm through their actual scheduling capabilities.
 Affine mapping remains a useful default, while arbitrary warping and precise
 independent loop scheduling require separate contracts and evidence. The protocol
 does not imply shared-instance clock injection or sample-accurate sound.
+
+**2026-11-06 refinement:** under [DEC-068](#dec-068--modular-composition-is-the-only-composition-model), commands and outcomes are exposed through the Kernel `transport` port over the Session. `TransportGroup` becomes a Session internal and Kernel's `/sync` entry is no longer public; player command methods delegate to the transport port.
 
 **Owner:** [Shared-clock design](../platform/shared-clock-injection.md), Kernel
 transport/synchronization and Bridge references.
@@ -857,6 +865,8 @@ does not stop borrowed playback. Borrowed transports are never disposed by the f
 single-clip snapshot; a queue exposes its active clip. The facade adds no clock
 and makes no new sample-accurate group scheduling claim. Main Score and Agent
 Toolkit remain authoritative and unchanged.
+
+**2026-11-06 refinement:** under [DEC-068](#dec-068--modular-composition-is-the-only-composition-model), `audio-player` remains the central Source and, when outermost, the Session provider. The playlist becomes a queue source and the recorder a microphone source plus capture sink, attached by containment or `input` instead of linked selectors. The mixer is a Rack; an outermost mixer owns a Session. "Adds no clock" now means no component adds a clock beside its Session.
 
 **Owner:** [Audio Play design](design/AUDIO-PLAY-COMPONENTS.md),
 [Audio View design](design/AUDIO-VIEW-COMPONENTS.md) and the owning public pages.
@@ -2625,6 +2635,8 @@ behavior is reconciled. The first delivery adds Kernel `/module` and `/session`,
 with shared InsertChain in `/effect`, and domain Play adapters. It introduces
 no mandatory DSP package, retired tags or wholesale effect-catalog migration.
 
+**2026-11-06 refinement:** under [DEC-068](#dec-068--modular-composition-is-the-only-composition-model), the opt-in consequence is superseded. There is no `composition` attribute and no legacy discovery path; the rest of this decision applies to every instance.
+
 **Owner:** [Modular composition](design/MODULAR-COMPOSITION.md),
 [Architecture](ARCHITECTURE.md), the two Play contracts and [Status](STATUS.md).
 The modular contract owns invariants and target examples; concrete signatures
@@ -2759,6 +2771,8 @@ crossfade. Score Elements still use `sameModuleScope()` and rebind on a
 destination-only change until MOD-13, so a mixed composition currently keeps
 Audio state but recreates Score engines and Rack channel state.
 
+**2026-11-06 refinement:** under [DEC-068](#dec-068--modular-composition-is-the-only-composition-model), the classification applies to every module, including Score (MOD-13). Sound, source-data and parameter changes also edit a module in place; only a scope change rebinds.
+
 **Owner:** [Modular composition](design/MODULAR-COMPOSITION.md), the
 [Kernel API](../apps/doc/webmusic/src/content/docs/kernel/api.mdx) and the Audio
 player/mixer Element references; [Status](STATUS.md) owns MOD-13.
@@ -2856,6 +2870,57 @@ property/attribute precedence, unchanged bindings and source identity, exact
 natural/accidental alignment, resize/follow/virtualization, native keyboard
 scrolling, upright labels, annotations opt-in, and unchanged imperative defaults.
 Browser acceptance remains distinct from DOM and geometry tests.
+
+## DEC-068 — Modular composition is the only composition model
+
+**Date / status:** 2026-11-06; accepted by the repository owner. Scope and
+sequence: [Unified modular composition](plans/2026-11-06-unified-modular-composition.md);
+delivery: STATUS MOD-15. Phase U0 fixes the detailed contract in
+[Modular composition](design/MODULAR-COMPOSITION.md) and records which earlier
+decisions it amends or supersedes.
+
+**Problem:** the [2026-11-06 coverage audit](audits/2026-11-06-modular-coverage-audit.md)
+found that only the Play audio graph uses DEC-063's modules. Views, Score
+analysis, recorders, the playlist, MIDI input, documents, offline render and
+outputs stay outside it, Kernel implements two of the five port families, and
+every player keeps a second legacy composition path behind the
+`composition="modules"` opt-in.
+
+**Decision:** every source, instrument, processor, modulator, Rack, analyser,
+view and sink is a module in one composition model with Kernel port families
+`audio`, `note`, `control`, `transport` and `source`. The opt-in attribute and
+the legacy discovery paths (descendant-Rack selection, `closest('audio-player')`
+connections, `player=` companion binding) are removed rather than kept beside
+it. A standalone player is a Session of one. The change ships in the
+unpublished 0.3.0 and may break its public APIs; the release notes list each
+break and its replacement.
+
+**Alternatives considered:** make modular the default and keep a deprecated
+legacy mode for one release; keep the opt-in and only extend coverage. Both keep
+two composition semantics in every player and double the test and reference
+surface.
+
+**Consequences:** DEC-063's "opt-in" consequence and the compatibility promises
+of DEC-011, DEC-016, DEC-017, DEC-018, DEC-029 and DEC-065 are reviewed in U0.
+Pure data APIs (parsing, loading, offline analysis, conversions) remain
+functions. Score and Audio stay independent; neutral contracts move to Kernel
+and cross-domain mappings stay in Bridge.
+
+**Verification implications:** a Kernel conformance kit runs against every
+module factory; the architecture check rejects Elements outside the module
+helpers and remaining legacy attributes; MC-01–MC-19 extend to the new port
+families, sinks and companions before RELEASE-01.
+
+**U0 contract (2026-11-06):** the [single composition model](design/MODULAR-COMPOSITION.md#single-composition-model)
+fixes the module roles, port fields and schema IDs, the Element grammar
+(`input`/`port`, `target`, `slot`, `session="local"`), outermost-provider Session
+election and the Session of one, and the retired-surface table. That table
+retires `LoopPlayer` (Session loop with repeat count), `AbPlayer` (named source
+variants), `TonePlayer` (external participants), `PlayerController`,
+`MidiPlayerController`, `bindClock` and the `Player` alias (transport port),
+Kernel's public `/sync` entry, and Bridge's `ScoreAudioSync` family (Session
+composition with Bridge axis mappings). DEC-011, DEC-016, DEC-017, DEC-018,
+DEC-029, DEC-063 and DEC-065 carry dated refinements.
 
 ## Recording the next decision
 

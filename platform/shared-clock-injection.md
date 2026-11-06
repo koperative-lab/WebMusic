@@ -1,5 +1,7 @@
 # Shared Session clock and scheduling boundaries
 
+> **2026-11-06, [DEC-068](../dev/DECISIONS.md#dec-068--modular-composition-is-the-only-composition-model):** a standalone player becomes a Session of one, an outermost Rack or Mixer owns a Session, and each participant reports its real timing mode (`shared-anchor`, `callback`, `media-follower`, `external`). Bridge's master/follower sync is replaced by Session composition. The [modular composition contract](../dev/design/MODULAR-COMPOSITION.md#single-composition-model) owns the target.
+
 **One music Session has one authoritative timeline.** Score and Audio schedulers
 borrow its reference-time anchor; independent Sessions may share an audio context
 without sharing transport authority. [DEC-064](../dev/DECISIONS.md#dec-064--session-scheduling-is-a-borrowed-anchor-projects-store-declarative-identity)

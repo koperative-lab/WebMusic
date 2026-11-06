@@ -168,6 +168,15 @@ Import owns minimal binding wiring; the readout owns current options. Do not
 walk through every option or repeat the handle table here. Link shared cleanup
 rules and explain unusual teardown in a topic.
 
+### Composition boundary
+
+A presenter owns DOM and subscriptions only. When it renders a port projection
+(transport, parameter, patch graph or an analyser's observations), name that
+projection and the module that supplies it; never import Kernel or domain types.
+Required under
+[DEC-068](../DECISIONS.md#dec-068--modular-composition-is-the-only-composition-model)
+as each roadmap round lands.
+
 ### Topic sections
 
 Explain relationships a row cannot carry: binding ownership, notification

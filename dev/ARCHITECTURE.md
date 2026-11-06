@@ -1,5 +1,7 @@
 # WebMusic architecture
 
+> **2026-11-06, [DEC-068](DECISIONS.md#dec-068--modular-composition-is-the-only-composition-model):** modular composition becomes the only composition model. Kernel owns all five port families (`audio`, `note`, `control`, `transport`, `source`) and the neutral Rack; Kernel's `/sync` entry becomes a Session internal. Package and layer rules below are unchanged. The [modular composition contract](design/MODULAR-COMPOSITION.md#single-composition-model) owns the target.
+
 This document defines package dependencies, source layers, time models, resource
 ownership and enforcement boundaries. Product scope belongs in
 [PRODUCT.md](PRODUCT.md), component design in

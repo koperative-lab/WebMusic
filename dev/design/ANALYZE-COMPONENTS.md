@@ -1,5 +1,7 @@
 # Elementary Score analysis and view composition
 
+> **2026-11-06, [DEC-068](../DECISIONS.md#dec-068--modular-composition-is-the-only-composition-model):** Score analysis Elements become analyser modules reading `source` (or live `note`) and `transport` ports by containment or `input`; `player=` is retired. Roadmap round 7 implements the binding. The [modular composition contract](MODULAR-COMPOSITION.md#single-composition-model) owns the target.
+
 Status: DEC-047 accepts four elementary tools; DEC-048 defines metrical chord
 grouping and the readable lane presentation. [STATUS](../STATUS.md) owns
 current delivery, verification and remaining acceptance work. DEC-038 through
