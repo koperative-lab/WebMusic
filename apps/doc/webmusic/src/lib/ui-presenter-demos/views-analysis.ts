@@ -823,6 +823,7 @@ function pitchKeyboardOptions(
   const options: KeyboardOptions = {...pitchSharedOptions(host, values)};
   if (values.follow === 'active' || values.follow === 'none') options.follow = values.follow;
   if (typeof values.fitToWidth === 'boolean') options.fitToWidth = values.fitToWidth;
+  if (values.direction === 'up' || values.direction === 'down' || values.direction === 'left' || values.direction === 'right') options.direction = values.direction;
   if (typeof values.release === 'number') options.release = values.release;
   if (typeof values.trail === 'boolean') options.trail = values.trail;
   for (const key of ['whiteKeyWidth', 'blackKeyWidth', 'whiteKeyHeight', 'blackKeyHeight'] as const) {
@@ -947,6 +948,7 @@ function mountPitchDemo(host: HTMLElement, material: ArabesqueMaterial): UiPrese
     keyboard?.destroy();
     staff?.destroy();
     fretboard?.destroy();
+    keyboardHost.style.height = optionValues.direction === 'left' || optionValues.direction === 'right' ? '320px' : '';
     keyboard = mountKeyboard(keyboardHost, keyboardBinding, pitchKeyboardOptions(host, optionValues));
     staff = mountStaff(staffHost, staffBinding, pitchSharedOptions(host, optionValues));
     fretboard = mountFretboard(

@@ -20,8 +20,8 @@ The Score transport widget — play/pause and a draggable seek bar over a file, 
 
 - Behavior/data collaboration: ScorePlayer / RackTransportController.
 - Reviewed UI composition: `@webmusic/ui/transport`, `@webmusic/ui/status`.
-- Attribute controls: `src`, `format`, `sound-font`, `volume`, `rate`, `pan`, `loop`, `time-control`, `volume-control`, `composition`, `session`, `controls`
-- Properties and methods: `module`, `sessionTransport`, `score`, `editor`, `documentBinding`, `waitForDocumentRevision(target) / retryDocumentApplication()`, `playback`, `resolvedScore`, `getPlaybackSnapshot()`, `seekNominal(seconds)`, `rack`, `controller`, `sound`, `effect`, `audioContext`, `destination`, `rate`, `volume`, `pan`, `loop`, `currentTime`, `duration`, `play()`
+- Attribute controls: `src`, `format`, `loading`, `sound-font`, `volume`, `rate`, `pan`, `loop`, `time-control`, `volume-control`, `composition`, `session`, `controls`
+- Properties and methods: `module`, `sessionTransport`, `loading`, `score`, `editor`, `documentBinding`, `waitForDocumentRevision(target) / retryDocumentApplication()`, `playback`, `resolvedScore`, `getPlaybackSnapshot()`, `seekNominal(seconds)`, `rack`, `controller`, `sound`, `effect`, `audioContext`, `destination`, `rate`, `volume`, `pan`, `loop`, `currentTime`, `duration`, `play()`
 - Events: `webscore:noteon`, `webscore:noteoff`, `webscore:timeupdate`, `webscore:scorechange`, `webscore:statechange`, `webscore:seek`, `webscore:stop`, `webscore:end`, `webscore:documentstatechange`, `webscore:error`
 - [Owning workflow and contract](<../apps/doc/webmusic/src/content/docs/score/element/play/score-player.mdx>) · [Element source](<../packages/score/src/play/element/score-player.ts>) · [Parameter catalog](<../apps/doc/webmusic/src/lib/params/score-play.ts>)
 
@@ -145,8 +145,8 @@ One score, three views: piano roll, staff or waterfall.
 
 - Behavior/data collaboration: createScoreView + read-only createScoreViewEditing + createPianoRollLayout + player binding.
 - Reviewed UI composition: `@webmusic/ui/stage`, `@webmusic/ui/status`.
-- Attribute controls: `src`, `format`, `player`, `width`, `height`, `type`, `show-annotations`, `show-only-octaves-used`, `scroll-type`, `split-staves`, `pixels-per-second`, `note-height`, `note-spacing`, `min-pitch`, `max-pitch`, `white-note-width`, `black-note-width`, `default-key`, `note-color`, `active-note-color`
-- Properties and methods: `score`, `editor`, `interactionSession`, `currentTime`, `active`, `configure(configuration)`, `options`, `type`
+- Attribute controls: `src`, `format`, `player`, `width`, `height`, `type`, `direction`, `show-annotations`, `show-only-octaves-used`, `scroll-type`, `split-staves`, `pixels-per-second`, `note-height`, `note-spacing`, `min-pitch`, `max-pitch`, `white-note-width`, `black-note-width`, `default-key`, `note-color`, `active-note-color`
+- Properties and methods: `score`, `editor`, `interactionSession`, `currentTime`, `active`, `configure(configuration)`, `options`, `type`, `direction`
 - Events: None declared in this catalog.
 - [Owning workflow and contract](<../apps/doc/webmusic/src/content/docs/score/element/view/score-view.mdx>) · [Element source](<../packages/score/src/view/element/score-view.ts>) · [Parameter catalog](<../apps/doc/webmusic/src/lib/params/score-view.ts>)
 
@@ -167,8 +167,8 @@ Current sounding pitches as a keyboard, staff or fretboard, selected by type.
 
 - Behavior/data collaboration: ActiveNoteTracker + pitch projections + player binding.
 - Reviewed UI composition: `@webmusic/ui/pitch`, `@webmusic/ui/status`.
-- Attribute controls: `type`, `player`, `source`, `low`, `high`, `system`, `spelling`, `density`, `scheme`, `tuning`, `first-fret`, `frets`, `follow`, `scroll`, `fit-to-width`, `white-key-width`, `black-key-width`, `white-key-height`, `black-key-height`, `fret-width`, `string-spacing`, `string-width`
-- Properties and methods: `active`, `type`, `low`, `high`, `system`, `spelling`, `density`, `scheme`, `tuning`, `firstFret`, `frets`, `whiteKeyWidth / blackKeyWidth / whiteKeyHeight / blackKeyHeight`, `fretWidth / stringSpacing / stringWidth`, `follow`, `scrollable`, `fitToWidth`
+- Attribute controls: `type`, `direction`, `player`, `source`, `low`, `high`, `system`, `spelling`, `density`, `scheme`, `tuning`, `first-fret`, `frets`, `follow`, `scroll`, `fit-to-width`, `white-key-width`, `black-key-width`, `white-key-height`, `black-key-height`, `fret-width`, `string-spacing`, `string-width`
+- Properties and methods: `active`, `type`, `direction`, `low`, `high`, `system`, `spelling`, `density`, `scheme`, `tuning`, `firstFret`, `frets`, `whiteKeyWidth / blackKeyWidth / whiteKeyHeight / blackKeyHeight`, `fretWidth / stringSpacing / stringWidth`, `follow`, `scrollable`, `fitToWidth`
 - Events: None declared in this catalog.
 - [Owning workflow and contract](<../apps/doc/webmusic/src/content/docs/score/element/view/score-pitch-view.mdx>) · [Element source](<../packages/score/src/view/element/score-pitch-view.ts>) · [Parameter catalog](<../apps/doc/webmusic/src/lib/params/score-view.ts>)
 
@@ -191,9 +191,9 @@ Central play/pause, seek and time controls for a selected audio clip, playlist o
 
 - Behavior/data collaboration: AudioPlayer + selected clip/queue/mix backend.
 - Reviewed UI composition: `@webmusic/ui/transport`, `@webmusic/ui/status`.
-- Attribute controls: `src`, `format`, `controls`, `loop`, `engine`, `preserves-pitch`, `volume`, `rate`, `pan`, `preload`, `composition`, `session`
-- Properties and methods: `module`, `sessionTransport`, `editor`, `source`, `documentBinding`, `waitForDocumentRevision()`, `retryDocumentApplication()`, `clip`, `player`, `effect`, `audioContext`, `clock`, `analyser`, `beginScratch()`, `scratching`
-- Events: `webaudio:sourcechange`, `webaudio:documentstatechange`, `webaudio:playerchange`, `webaudio:statechange`, `webaudio:timeupdate`, `webaudio:loaded`, `webaudio:end`, `webaudio:seek`, `webaudio:regionenter`, `webaudio:regionleave`, `webaudio:beat`, `webaudio:error`
+- Attribute controls: `src`, `loading`, `format`, `controls`, `loop`, `engine`, `preserves-pitch`, `volume`, `rate`, `pan`, `preload`, `composition`, `session`
+- Properties and methods: `module`, `sessionTransport`, `loading`, `loadError`, `editor`, `source`, `documentBinding`, `waitForDocumentRevision()`, `retryDocumentApplication()`, `clip`, `player`, `effect`, `audioContext`, `clock`, `analyser`, `beginScratch()`, `scratching`
+- Events: `webaudio:loadstatechange`, `webaudio:sourcechange`, `webaudio:documentstatechange`, `webaudio:playerchange`, `webaudio:statechange`, `webaudio:timeupdate`, `webaudio:loaded`, `webaudio:end`, `webaudio:seek`, `webaudio:regionenter`, `webaudio:regionleave`, `webaudio:beat`, `webaudio:error`
 - [Owning workflow and contract](<../apps/doc/webmusic/src/content/docs/audio/element/play/audio-player.mdx>) · [Element source](<../packages/audio/src/play/element/audio-player.ts>) · [Parameter catalog](<../apps/doc/webmusic/src/lib/params/audio-play.ts>)
 
 #### `<audio-playlist>`
@@ -203,8 +203,8 @@ A queue: play an ordered set of clips one after another, with auto-advance, prev
 - Behavior/data collaboration: AudioPlaylist.
 - Reviewed UI composition: `@webmusic/ui/playlist`.
 - Attribute controls: `player`, `src`, `loop`, `autoplay`, `volume`, `rate`, `prefetch`, `engine`, `skip-failed`
-- Properties and methods: `player`, `entries`, `playlist`, `activePlayer`, `index`, `clip`, `analyser`
-- Events: `webaudio:trackchange`, `webaudio:trackend`, `webaudio:playlistend`, `webaudio:timeupdate`, `webaudio:seek`, `webaudio:error`
+- Properties and methods: `player`, `entries`, `playlist`, `loading`, `loadError`, `activePlayer`, `index`, `clip`, `analyser`
+- Events: `webaudio:trackchange`, `webaudio:loadstatechange`, `webaudio:sourcechange`, `webaudio:playerchange`, `webaudio:trackend`, `webaudio:playlistend`, `webaudio:timeupdate`, `webaudio:seek`, `webaudio:error`
 - [Owning workflow and contract](<../apps/doc/webmusic/src/content/docs/audio/element/play/audio-playlist.mdx>) · [Element source](<../packages/audio/src/play/element/audio-playlist.ts>) · [Parameter catalog](<../apps/doc/webmusic/src/lib/params/audio-play.ts>)
 
 #### `<audio-mixer>`
@@ -213,8 +213,8 @@ A mixer companion for audio-player, with master/member volume, mute and solo.
 
 - Behavior/data collaboration: AudioMixer.
 - Reviewed UI composition: `@webmusic/ui/mixer`.
-- Attribute controls: `player`, `master-volume`, `autoplay`, `solo`, `composition`
-- Properties and methods: `module`, `player`, `mixer`, `members`, `audioContext`, `destination`, `masterVolume`
+- Attribute controls: `player`, `master-volume`, `autoplay`, `solo`, `composition`, `loading`
+- Properties and methods: `module`, `loading`, `player`, `mixer`, `members`, `audioContext`, `destination`, `masterVolume`
 - Events: `webaudio:end`, `webaudio:memberend`, `webaudio:error`
 - [Owning workflow and contract](<../apps/doc/webmusic/src/content/docs/audio/element/play/audio-mixer.mdx>) · [Element source](<../packages/audio/src/play/element/audio-mixer.ts>) · [Parameter catalog](<../apps/doc/webmusic/src/lib/params/audio-play.ts>)
 
@@ -305,8 +305,8 @@ Waveform, spectrogram and meter views that follow a player, and draw an edited d
 
 - Behavior/data collaboration: AudioTimeline + renderer binding.
 - Reviewed UI composition: `@webmusic/ui/stage`, `@webmusic/ui/status`, `@webmusic/ui/meter`.
-- Attribute controls: `src`, `peaks-src`, `format`, `type`, `player`, `interactive`, `drag-mode`, `annotate`, `follow`, `scrollable`, `virtualization`, `width`, `pixels-per-second`, `height`, `amplitude`, `device-pixel-ratio`, `min-freq`, `max-freq`, `min-db`, `max-db`, `bars`, `bands`, `history`, `wave-color`, `progress-color`, `playhead-color`, `background-color`, `color-map`, `color-mode`, `channel-layout`, `color`, `peak-color`, `mode`
-- Properties and methods: `editor`, `interactionSession`, `clip`, `peaks`, `spectrogram`, `frequencyData`, `regions`, `options`, `zoom`, `visibleRange()`, `panTo()`, `setZoom()`
+- Attribute controls: `src`, `peaks-src`, `format`, `type`, `loading`, `player`, `interactive`, `drag-mode`, `annotate`, `follow`, `scrollable`, `virtualization`, `width`, `pixels-per-second`, `height`, `amplitude`, `device-pixel-ratio`, `min-freq`, `max-freq`, `min-db`, `max-db`, `bars`, `bands`, `history`, `wave-color`, `progress-color`, `playhead-color`, `background-color`, `color-map`, `color-mode`, `channel-layout`, `color`, `peak-color`, `mode`
+- Properties and methods: `loading`, `editor`, `interactionSession`, `clip`, `peaks`, `spectrogram`, `frequencyData`, `regions`, `options`, `zoom`, `visibleRange()`, `panTo()`, `setZoom()`
 - Events: `webaudio:seek`, `webaudio:regionchange`, `webaudio:viewportchange`, `webaudio:error`
 - [Owning workflow and contract](<../apps/doc/webmusic/src/content/docs/audio/element/view/audio-view.mdx>) · [Element source](<../packages/audio/src/view/element/audio-view.ts>) · [Parameter catalog](<../apps/doc/webmusic/src/lib/params/audio-view.ts>)
 
@@ -359,7 +359,7 @@ A scrolling projection of a live AnalyserNode — waveform or spectrogram — wi
 | `@webmusic/ui/status` | Shared square loading and waiting animations, empty and error feedback, with live-region semantics. | State: `kind`, `message` Options: `classNames`, `parts`, `onError` | [Reference](<../apps/doc/webmusic/src/content/docs/uikit/layout-feedback/status.mdx>) · [Source](<../packages/ui/src/status.ts>) |
 | `@webmusic/ui/track-list` | An accessible index of named, keyboard-operable rows with one current item. | State: `items`, `disabled` Options: `label`, `ordered`, `emptyLabel`, `stylesheet`, `classNames`, `parts`, `onError` | [Reference](<../apps/doc/webmusic/src/content/docs/uikit/transport-time/track-list.mdx>) · [Source](<../packages/ui/src/track-list.ts>) |
 | `@webmusic/ui/analysis` | One-shot cards, timelines, summaries and a reusable analysis playhead controller. | State: None declared in this catalog. Options: `scroll`, `activeClassName`, `onError` | [Reference](<../apps/doc/webmusic/src/content/docs/uikit/views-analysis/analysis.mdx>) · [Source](<../packages/ui/src/analysis.ts>) |
-| `@webmusic/ui/pitch` | Keyboard, staff and fretboard read-outs that press, spell and slide with their input. | State: `position`, `labels`, `follow`, `firstFret`, `orientation` Options: `follow`, `fitToWidth`, `whiteKeyWidth`, `blackKeyWidth`, `whiteKeyHeight`, `blackKeyHeight`, `fretWidth`, `stringSpacing`, `stringWidth`, `motion`, `release`, `trail`, `ageSpan`, `stylesheet`, `label`, `onError` | [Reference](<../apps/doc/webmusic/src/content/docs/uikit/views-analysis/pitch.mdx>) · [Source](<../packages/ui/src/pitch.ts>) |
+| `@webmusic/ui/pitch` | Keyboard, staff and fretboard read-outs that press, spell and slide with their input. | State: `position`, `labels`, `follow`, `firstFret`, `orientation` Options: `follow`, `direction`, `fitToWidth`, `whiteKeyWidth`, `blackKeyWidth`, `whiteKeyHeight`, `blackKeyHeight`, `fretWidth`, `stringSpacing`, `stringWidth`, `motion`, `release`, `trail`, `ageSpan`, `stylesheet`, `label`, `onError` | [Reference](<../apps/doc/webmusic/src/content/docs/uikit/views-analysis/pitch.mdx>) · [Source](<../packages/ui/src/pitch.ts>) |
 | `@webmusic/ui/harmony` | A conveyor, a nameplate, a ranked strip and a wheel that show an analysis happening rather than listing what it concluded. | State: `playing`, `tracks`, `future`, `focus`, `layout`, `emphasis` Options: `motion`, `anchor`, `scale`, `visibleSpan`, `popDuration`, `spans`, `stylesheet`, `label`, `onError` | [Reference](<../apps/doc/webmusic/src/content/docs/uikit/views-analysis/harmony.mdx>) · [Source](<../packages/ui/src/harmony.ts>) |
 | `@webmusic/ui/workbench` | The shell an analysis view sits in: a tablist, a stage, a rail of docks, a status bar, and one reading of the clock per frame handed to everything mounted inside it. | State: `view`, `phase`, `density`, `scheme`, `keyboard` Options: `chrome`, `motion`, `label`, `stylesheet`, `onError` | [Reference](<../apps/doc/webmusic/src/content/docs/uikit/layout-feedback/workbench.mdx>) · [Source](<../packages/ui/src/workbench.ts>) |
 

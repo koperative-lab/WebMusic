@@ -400,6 +400,57 @@ describe('<score-view> attribute options (NaN-safe)', () => {
     expect(waterfallMock.mock.lastCall?.[2]).not.toHaveProperty('showAnnotations');
     host.disconnect();
   });
+
+  it('keeps staff expressions off by default and allows an explicit opt-in', async () => {
+    const host = createHost({type: 'staff'});
+    host.el.score = fakeScore;
+    host.connect();
+    await flush();
+    expect(staffMock.mock.lastCall?.[2]).toMatchObject({showAnnotations: false});
+    host.setAttribute('show-annotations', 'true');
+    expect(staffMock.mock.lastCall?.[2]).toMatchObject({showAnnotations: true});
+    host.el.options = {showAnnotations: false};
+    expect(staffMock.mock.lastCall?.[2]).toMatchObject({showAnnotations: false});
+    host.disconnect();
+  });
+
+  it.each([
+    ['piano-roll', pianoRollMock], ['waterfall', waterfallMock],
+  ] as const)('never forwards expressions to %s, even when opted in', async (type, renderer) => {
+    const host = createHost({type, 'show-annotations': 'true'});
+    host.el.score = fakeScore;
+    host.connect();
+    await flush();
+    expect(renderer.mock.lastCall?.[2]).not.toHaveProperty('showAnnotations');
+    host.el.options = {showAnnotations: true};
+    expect(renderer.mock.lastCall?.[2]).not.toHaveProperty('showAnnotations');
+    host.disconnect();
+  });
+
+  it('retains direction through mode changes and lets explicit options take precedence', async () => {
+    const host = createHost();
+    host.el.score = fakeScore;
+    host.connect();
+    await flush();
+    expect(host.el.direction).toBe('right');
+    expect(pianoRollMock.mock.lastCall?.[2]).toMatchObject({direction: 'right'});
+    host.el.direction = 'left';
+    expect(pianoRollMock.mock.lastCall?.[2]).toMatchObject({direction: 'left'});
+    host.el.options = {direction: undefined, showAnnotations: undefined};
+    expect(pianoRollMock.mock.lastCall?.[2]).toMatchObject({direction: 'left'});
+    expect(pianoRollMock.mock.lastCall?.[2]).not.toHaveProperty('showAnnotations');
+    host.el.options = {direction: 'up'};
+    expect(pianoRollMock.mock.lastCall?.[2]).toMatchObject({direction: 'up'});
+    host.el.options = undefined;
+    host.el.type = 'staff';
+    expect(staffMock.mock.lastCall?.[2]).not.toHaveProperty('direction');
+    host.el.type = 'waterfall';
+    expect(waterfallMock.mock.lastCall?.[2]).toMatchObject({direction: 'left'});
+    host.setAttribute('direction', 'unknown');
+    expect(host.el.direction).toBe('down');
+    expect(waterfallMock.mock.lastCall?.[2]).toMatchObject({direction: 'down'});
+    host.disconnect();
+  });
 });
 
 describe('<score-view> player linking', () => {

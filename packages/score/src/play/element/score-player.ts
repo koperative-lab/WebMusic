@@ -124,6 +124,7 @@ export class ScorePlayerElement extends WebMusicElement {
     return [
       'src',
       'format',
+      'loading',
       'sound-font',
       'volume',
       'rate',
@@ -139,6 +140,7 @@ export class ScorePlayerElement extends WebMusicElement {
 
   private handle?: PresetPlayerHandle;
   private status?: StatusHandle;
+  private preparationStatus?: StatusHandle;
   private explicitScore?: Score;
   private explicitEditor?: ScoreDocumentSource;
   private selectedEditor?: ScoreDocumentSource;
@@ -220,7 +222,8 @@ export class ScorePlayerElement extends WebMusicElement {
     return {
       sourceRevision: this.sourceRevision,
       readiness: this.documentBlocked ? (this.documentFault ? 'error' : 'unavailable')
-        : this.mountedDocument ? native?.readiness ?? this.playbackReadiness : this.playbackReadiness,
+        : this.isConnected && boolAttr(this, 'loading', false) ? 'loading'
+          : this.mountedDocument ? native?.readiness ?? this.playbackReadiness : this.playbackReadiness,
       state: native?.state ?? 'stopped',
       score: native?.score,
       nominalSeconds: native?.nominalSeconds ?? null,
@@ -284,6 +287,7 @@ export class ScorePlayerElement extends WebMusicElement {
     }
     this.upgradeSourceProperties();
     upgradeProperties(this, [
+      'loading',
       'sound',
       'effect',
       'audioContext',
@@ -309,6 +313,11 @@ export class ScorePlayerElement extends WebMusicElement {
     }
     if (name === 'controls' && this.modular) {
       if (this.handle) setModuleTransportVisibility(this.handle.element, this.moduleControlsVisible);
+      return;
+    }
+    if (name === 'loading') {
+      this.syncPreparationStatus();
+      this.playbackPublisher.notify();
       return;
     }
     // The live knobs apply in place. Re-rendering for them would tear the
@@ -339,6 +348,15 @@ export class ScorePlayerElement extends WebMusicElement {
 
   get score(): Score | undefined {
     return this.explicitScore;
+  }
+
+  /** Current preparation; writes declare caller-owned work without canceling native loading. */
+  get loading(): boolean {
+    return boolAttr(this, 'loading', false) || this.playbackReadiness === 'loading';
+  }
+
+  set loading(value: boolean) {
+    this.setAttribute('loading', value ? 'true' : 'false');
   }
 
   /** Borrow an editor's read-only document port; the caller keeps it. Undefined detaches it. */
@@ -937,7 +955,22 @@ export class ScorePlayerElement extends WebMusicElement {
       this.insertBefore(host, this.firstChild);
       this.rackHost = host;
     }
+    this.rackHost.hidden = boolAttr(this, 'loading', false);
     return this.rackHost;
+  }
+
+  /** Hide only the owned chrome, retaining its engine, position and authored children. */
+  private syncPreparationStatus(): void {
+    const preparing = this.isConnected && boolAttr(this, 'loading', false);
+    if (this.rackHost) this.rackHost.hidden = preparing;
+    if (preparing) {
+      this.preparationStatus ??= mountStatus(this, {
+        snapshot: () => ({kind: 'loading', message: 'Preparing score playback'}),
+      });
+    } else {
+      this.preparationStatus?.destroy();
+      this.preparationStatus = undefined;
+    }
   }
 
   private clearStatus(): void {
@@ -948,9 +981,11 @@ export class ScorePlayerElement extends WebMusicElement {
   private showStatus(kind: StatusKind, message: string): void {
     this.clearStatus();
     this.status = mountStatus(this.ensureTransportHost(), {snapshot: () => ({kind, message})});
+    this.syncPreparationStatus();
   }
 
   protected async render(reuseDocument = false): Promise<void> {
+    this.syncPreparationStatus();
     if (this.modular) { await this.renderModular(); return; }
     // A caller can remove the desk and assign a score before the observer's
     // microtask. Never mount the removed desk's now-disposed Rack in that gap.
@@ -1337,6 +1372,8 @@ export class ScorePlayerElement extends WebMusicElement {
     this.documentStateKey = '';
     this.removeAttribute('data-editor-state');
     this.clearStatus();
+    this.preparationStatus?.destroy();
+    this.preparationStatus = undefined;
     this.composedRack = undefined;
     this.unbindPlayback?.();
     this.unbindPlayback = undefined;

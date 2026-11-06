@@ -84,6 +84,58 @@ describe('AudioPlayer stable source ownership', () => {
     player.dispose();
   });
 
+  it('publishes current borrowed readiness without waiting for playback or changing source identity', () => {
+    const fixture = transport();
+    const source = Object.assign(fixture.source, {loading: true, loadError: undefined as Error | undefined});
+    const player = new AudioPlayer();
+    const states: unknown[] = [];
+    player.on('loadstatechange', (state) => states.push(state));
+    player.setTransport(source);
+    expect(player.loading).toBe(true);
+    expect(states).toEqual([{loading: true, error: undefined}]);
+    source.loading = false;
+    source.loadError = new Error('Selected entry failed');
+    fixture.notify();
+    expect(player.loading).toBe(false);
+    expect(player.loadError).toBe(source.loadError);
+    expect(states.at(-1)).toEqual({loading: false, error: source.loadError});
+    fixture.notify();
+    expect(states).toHaveLength(2);
+    player.setClip(clip());
+    expect(player.loadError).toBeUndefined();
+    expect(states.at(-1)).toEqual({loading: false, error: undefined});
+    expect(fixture.listeners.size).toBe(0);
+    source.loading = true;
+    fixture.notify();
+    expect(player.loading).toBe(false);
+    player.dispose();
+    expect(source.dispose).not.toHaveBeenCalled();
+  });
+
+  it('honors source replacement during a readiness callback and releases pending readiness on disposal', () => {
+    const fixture = transport();
+    const source = Object.assign(fixture.source, {loading: true});
+    const player = new AudioPlayer();
+    const replacement = clip(7);
+    const states: boolean[] = [];
+    player.on('loadstatechange', ({loading}) => {
+      states.push(loading);
+      if (loading) player.setClip(replacement);
+    });
+    player.setTransport(source);
+    expect(player.clip).toBe(replacement);
+    expect(player.loading).toBe(false);
+    expect(states).toEqual([true, false]);
+    player.dispose();
+    const second = new AudioPlayer();
+    const terminal = vi.fn();
+    second.setTransport(source);
+    second.on('loadstatechange', terminal);
+    second.dispose();
+    expect(terminal).toHaveBeenCalledExactlyOnceWith({loading: false, error: undefined});
+    expect(source.dispose).not.toHaveBeenCalled();
+  });
+
   it('keeps an empty owner free of audio resources and publishes sources before playback', () => {
     const ctx = context();
     const player = new AudioPlayer(undefined, {audioContext: ctx});

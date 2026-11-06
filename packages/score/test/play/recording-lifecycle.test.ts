@@ -19,6 +19,35 @@ afterEach(() => {
 });
 
 describe('recorder input ownership', () => {
+  it('shows preparation failures, clears them on retry and ignores a canceled rejection', async () => {
+    const recorder = document.createElement('lifecycle-score-recorder') as ScoreRecorderElement;
+    document.body.append(recorder);
+    recorder.record();
+    noteEvent(recorder, true);
+    noteEvent(recorder, false);
+    recorder.stop();
+    const pending: Array<(error: Error) => void> = [];
+    vi.spyOn(ScorePlayer.prototype, 'play').mockImplementation(() => new Promise<void>((_resolve, reject) => { pending.push(reject); }));
+    const play = () => recorder.shadowRoot!.querySelector<HTMLButtonElement>('[part~="play"]')!.click();
+    const errors = vi.fn();
+    recorder.addEventListener('webscore:error', errors);
+    play();
+    pending[0]!(new Error('Take preparation failed'));
+    await vi.waitFor(() => expect(recorder.shadowRoot!.querySelector('[role="alert"]')?.textContent).toBe('Take preparation failed'));
+    expect(recorder.shadowRoot!.querySelector('[aria-busy="true"]')).toBeNull();
+    expect(errors).toHaveBeenCalledOnce();
+    play();
+    expect(recorder.shadowRoot!.querySelector('[role="alert"]')).toBeNull();
+    expect(recorder.shadowRoot!.querySelector('[data-kind="loading"]')).not.toBeNull();
+    recorder.record();
+    pending[1]!(new Error('Late failure'));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(recorder.shadowRoot!.querySelector('[role="alert"], [data-kind="loading"]')).toBeNull();
+    expect(recorder.recordingActive).toBe(true);
+    expect(errors).toHaveBeenCalledOnce();
+  });
+
   it('marks pending take playback busy and clears it on completion and superseding recording', async () => {
     const recorder = document.createElement('lifecycle-score-recorder') as ScoreRecorderElement;
     document.body.append(recorder);

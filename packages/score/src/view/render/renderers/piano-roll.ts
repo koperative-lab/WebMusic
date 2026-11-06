@@ -1,6 +1,7 @@
 // SVG/canvas implementation for the explicit /render surface.
 import type {ScoreNoteSequence, ScoreSequenceNote} from '../../core/types';
-import {clampCanvasBackingSize, visibleNoteRange, type IndexRange} from '../../core/windowing';
+import {horizontalDirection, viewDirection} from './direction';
+import {clampCanvasBackingSize, bufferedScrollRange, visibleNoteRange, type IndexRange} from '../../core/windowing';
 import {
   BaseVisualizer,
   ensureScrollViewport,
@@ -8,6 +9,7 @@ import {
   scheduleFrame,
   setExplicitSize,
   setExplicitStyleSize,
+  type RectPosition,
   type VisualizerConfig,
 } from './base';
 import {BaseSVGVisualizer} from './svg';
@@ -41,6 +43,12 @@ export class PianoRollCanvasVisualizer extends BaseVisualizer {
   private scrollTarget?: HTMLElement;
   private resizeObserver?: ResizeObserver;
   private staticColor?: string;
+  private directionalFollow?: number;
+  private followScheduled = false;
+
+  private get direction() { return viewDirection(this.config.direction, 'right'); }
+  private get horizontal(): boolean { return horizontalDirection(this.direction); }
+  private get reversed(): boolean { return this.direction === 'left' || this.direction === 'up'; }
   /** The offset a follow-scroll already painted, so its own scroll event does not paint it again. */
   private followPainted?: number;
   /** Resolved layer colours: a probe and `getComputedStyle` per layer, not per frame. */
@@ -55,7 +63,7 @@ export class PianoRollCanvasVisualizer extends BaseVisualizer {
       this.viewRedrawScheduled = false;
       const followed = this.followPainted;
       this.followPainted = undefined;
-      if (this.disposed || (followed !== undefined && this.getScrollX() === followed)) return;
+      if (this.disposed || (followed !== undefined && this.getScrollPosition() === followed)) return;
       this.drawStatic();
       this.drawOverlay();
     });
@@ -68,15 +76,23 @@ export class PianoRollCanvasVisualizer extends BaseVisualizer {
 
     this.ctx = ctx;
     this.canvas = canvas;
-    const viewportHeight = getRenderedHeight(canvas, this.height);
+    const viewportHeight = this.horizontal ? getRenderedHeight(canvas, this.height) : canvas.parentElement?.clientHeight || Math.min(240, Math.max(80, this.width));
     this.parentElement = this.adoptScrollViewport(
       ensureScrollViewport(canvas, 'webscore-piano-roll-viewport', viewportHeight),
     );
+    if (this.parentElement) {
+      this.parentElement.dataset.direction = this.direction;
+      if (!this.horizontal) this.parentElement.style.setProperty('overflow-y', 'auto', 'important');
+    }
     this.setupLayers();
     this.allocateBackingStore();
 
     if (this.parentElement) {
       this.scrollTarget = this.parentElement;
+      if (this.reversed) {
+        if (this.horizontal) this.scrollTarget.scrollLeft = this.width;
+        else this.scrollTarget.scrollTop = this.width;
+      }
       this.parentElement.addEventListener('scroll', this.onViewportScroll, {passive: true});
       if (typeof ResizeObserver !== 'undefined') {
         this.resizeObserver = new ResizeObserver(() => this.handleViewportResize());
@@ -167,8 +183,12 @@ export class PianoRollCanvasVisualizer extends BaseVisualizer {
   private allocateBackingStore(): void {
     const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
     const viewportWidth = this.parentElement?.clientWidth ?? 0;
-    this.cssWidth = Math.max(1, Math.ceil(viewportWidth > 0 ? Math.min(this.width, viewportWidth) : this.width));
-    this.cssHeight = Math.max(1, Math.ceil(this.height));
+    this.cssWidth = Math.max(1, Math.ceil(this.horizontal ? viewportWidth > 0 ? Math.min(this.width, viewportWidth) : this.width : this.height));
+    this.cssHeight = Math.max(1, Math.ceil(this.horizontal ? this.height : Math.min(this.width, this.parentElement?.clientHeight || 240)));
+    if (this.spacer) {
+      this.spacer.style.width = `${this.horizontal ? this.width : this.height}px`;
+      this.spacer.style.height = this.horizontal ? '0' : `${Math.max(0, this.width - this.cssHeight)}px`;
+    }
     this.backing = clampCanvasBackingSize(this.cssWidth, this.cssHeight, dpr);
 
     this.canvas.width = this.backing.width;
@@ -194,25 +214,26 @@ export class PianoRollCanvasVisualizer extends BaseVisualizer {
     this.drawOverlay();
   }
 
-  private getScrollX(): number {
-    return this.scrollTarget?.scrollLeft ?? 0;
+  private getScrollPosition(): number {
+    return this.horizontal ? this.scrollTarget?.scrollLeft ?? 0 : this.scrollTarget?.scrollTop ?? 0;
   }
 
   private prepareContext(ctx: CanvasRenderingContext2D, scrollX: number): void {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, this.backing.width, this.backing.height);
-    ctx.setTransform(this.backing.scaleX, 0, 0, this.backing.scaleY, -scrollX * this.backing.scaleX, 0);
+    ctx.setTransform(this.backing.scaleX, 0, 0, this.backing.scaleY, this.horizontal ? -scrollX * this.backing.scaleX : 0, this.horizontal ? 0 : -scrollX * this.backing.scaleY);
   }
 
   private getVisibleIndexRange(scrollX: number): IndexRange {
     const notes = this.noteSequence.notes;
     if (!this.notesSortedByStart()) return {start: 0, end: notes.length};
     const pps = this.config.pixelsPerSecond;
-    return visibleNoteRange(notes, scrollX / pps, (scrollX + this.cssWidth) / pps, this.getMaxNoteDuration());
+    const end = scrollX + (this.horizontal ? this.cssWidth : this.cssHeight);
+    return visibleNoteRange(notes, this.reversed ? (this.width - end) / pps : scrollX / pps, this.reversed ? (this.width - scrollX) / pps : end / pps, this.getMaxNoteDuration());
   }
 
   private drawStatic(color = this.resolveColor(false)): void {
-    const scrollX = this.getScrollX();
+    const scrollX = this.getScrollPosition();
     this.prepareContext(this.ctx, scrollX);
     const notes = this.noteSequence.notes;
     const range = this.getVisibleIndexRange(scrollX);
@@ -225,7 +246,7 @@ export class PianoRollCanvasVisualizer extends BaseVisualizer {
   private drawOverlay(): void {
     const ctx = this.overlayCtx;
     if (!ctx) return;
-    const scrollX = this.getScrollX();
+    const scrollX = this.getScrollPosition();
     this.prepareContext(ctx, scrollX);
     const seconds = this.overlayTime;
     if (seconds === undefined) return;
@@ -298,9 +319,46 @@ export class PianoRollCanvasVisualizer extends BaseVisualizer {
     if (color !== this.staticColor) this.drawStatic(color);
     this.overlayTime = seconds;
     this.drawOverlay();
-    const activeNotePosition = seconds * this.config.pixelsPerSecond;
+    const activeNotePosition = this.reversed ? this.width - seconds * this.config.pixelsPerSecond : seconds * this.config.pixelsPerSecond;
     this.scrollIntoViewIfNeeded(scrollIntoView, activeNotePosition);
     return activeNotePosition ?? null;
+  }
+
+  protected override getSize(): {width: number; height: number} {
+    const size = super.getSize();
+    return {...size, height: size.height + this.config.noteHeight};
+  }
+
+  protected override getNotePosition(note: ScoreSequenceNote, index: number): RectPosition | null {
+    if (note.pitch < (this.config.minPitch ?? 0) || note.pitch > (this.config.maxPitch ?? 127)) return null;
+    const rect = super.getNotePosition(note, index);
+    if (!rect) return null;
+    rect.y -= rect.h;
+    if (this.horizontal) return {...rect, x: this.reversed ? this.width - rect.x - rect.w : rect.x};
+    return {x: this.height - rect.y - rect.h, y: this.reversed ? this.width - rect.x - rect.w : rect.x, w: rect.h, h: rect.w};
+  }
+
+  protected override scrollIntoViewIfNeeded(follow: boolean | undefined, position: number | undefined): void {
+    if (this.direction === 'right') { super.scrollIntoViewIfNeeded(follow, position); return; }
+    if (!follow || position === undefined) return;
+    this.directionalFollow = position;
+    if (this.followScheduled) return;
+    this.followScheduled = true;
+    scheduleFrame(() => {
+      this.followScheduled = false;
+      const pending = this.directionalFollow;
+      this.directionalFollow = undefined;
+      const viewport = this.parentElement;
+      if (this.disposed || !viewport || pending === undefined) return;
+      const size = this.horizontal ? viewport.clientWidth : viewport.clientHeight;
+      const scroll = this.getScrollPosition();
+      if (size > 0 && (pending < scroll || pending > scroll + size)) {
+        const target = Math.max(0, Math.min(this.width - size, this.reversed ? pending - size + 20 : pending - 20));
+        if (this.horizontal) viewport.scrollLeft = target;
+        else viewport.scrollTop = target;
+        this.paintScrolledViewport();
+      }
+    });
   }
 
   protected clear(): void {
@@ -322,7 +380,7 @@ export class PianoRollCanvasVisualizer extends BaseVisualizer {
     if (this.disposed) return;
     this.drawStatic();
     this.drawOverlay();
-    this.followPainted = this.getScrollX();
+    this.followPainted = this.getScrollPosition();
   }
 
   public override dispose(): void {
@@ -339,6 +397,7 @@ export class PianoRollCanvasVisualizer extends BaseVisualizer {
     this.resizeObserver?.disconnect();
     this.resizeObserver = undefined;
     this.overlayTime = undefined;
+    this.directionalFollow = undefined;
     this.clear();
     if (this.stage) {
       const stageParent = this.stage.parentElement;
@@ -354,8 +413,18 @@ export class PianoRollCanvasVisualizer extends BaseVisualizer {
   }
 }
 
-/** SVG piano-roll renderer. */
+/** SVG piano-roll renderer with a physical, independently scrollable time axis. */
 export class PianoRollSVGVisualizer extends BaseSVGVisualizer {
+  private followScheduled = false;
+  private pendingTime?: number;
+  private lastTime?: number;
+  private layoutObserver?: ResizeObserver;
+  private surface?: HTMLElement;
+
+  private get direction() { return viewDirection(this.config.direction, 'right'); }
+  private get horizontal(): boolean { return horizontalDirection(this.direction); }
+  private get reversed(): boolean { return this.direction === 'left' || this.direction === 'up'; }
+
   constructor(sequence: ScoreNoteSequence, svg: SVGSVGElement, config: VisualizerConfig = {}) {
     super(sequence, config);
     if (!(svg instanceof SVGSVGElement)) {
@@ -366,11 +435,103 @@ export class PianoRollSVGVisualizer extends BaseSVGVisualizer {
     this.width = size.width;
     this.height = size.height;
     this.clear();
-    const viewportHeight = Math.max(getRenderedHeight(this.svg, this.height), this.height);
+    this.surface = svg.parentElement ?? undefined;
+    const viewportHeight = this.horizontal ? Math.max(getRenderedHeight(this.svg, this.height), this.height)
+      : this.surface?.clientHeight || Math.min(240, Math.max(80, this.width));
     this.parentElement = this.adoptScrollViewport(
       ensureScrollViewport(this.svg, 'webscore-piano-roll-viewport', viewportHeight),
     );
-    setExplicitSize(this.svg, this.width, this.height);
+    if (this.parentElement) {
+      this.parentElement.dataset.direction = this.direction;
+      if (!this.horizontal) {
+        this.parentElement.style.setProperty('overflow-y', 'auto', 'important');
+        const Observer = svg.ownerDocument.defaultView?.ResizeObserver ?? globalThis.ResizeObserver;
+        if (Observer && this.surface) {
+          this.layoutObserver = new Observer(() => {
+            if (!this.disposed && this.surface?.clientHeight && this.parentElement) {
+              this.parentElement.style.height = `${this.surface.clientHeight}px`;
+            }
+          });
+          this.layoutObserver.observe(this.surface);
+        }
+      }
+    }
+    setExplicitSize(this.svg, this.horizontal ? this.width : this.height, this.horizontal ? this.height : this.width);
+    if (this.reversed && this.parentElement) this.setScroll(this.width);
     this.draw();
+  }
+
+  protected override getSize(): {width: number; height: number} {
+    const size = super.getSize();
+    // Both requested endpoint pitches own a complete lane, including min === max.
+    return {...size, height: size.height + this.config.noteHeight};
+  }
+
+  protected override getNotePosition(note: ScoreSequenceNote, index: number): RectPosition | null {
+    if (note.pitch < (this.config.minPitch ?? 0) || note.pitch > (this.config.maxPitch ?? 127)) return null;
+    const rect = super.getNotePosition(note, index);
+    if (!rect) return null;
+    rect.y -= rect.h;
+    if (this.horizontal) return {...rect, x: this.reversed ? this.width - rect.x - rect.w : rect.x};
+    return {x: this.height - rect.y - rect.h, y: this.reversed ? this.width - rect.x - rect.w : rect.x, w: rect.h, h: rect.w};
+  }
+
+  private timePosition(seconds: number): number {
+    return this.reversed ? this.width - seconds * this.config.pixelsPerSecond : seconds * this.config.pixelsPerSecond;
+  }
+
+  private setScroll(position: number): void {
+    if (!this.parentElement) return;
+    if (this.horizontal) this.parentElement.scrollLeft = position;
+    else this.parentElement.scrollTop = position;
+  }
+
+  override redraw(activeNote?: ScoreSequenceNote, scrollIntoView?: boolean): number | null {
+    return activeNote ? this.redrawAtTime(activeNote.startTime, scrollIntoView) : null;
+  }
+
+  override redrawAtTime(seconds: number, scrollIntoView?: boolean): number | null {
+    if (super.redrawAtTime(seconds, false) === null) return null;
+    const position = this.timePosition(seconds);
+    if (scrollIntoView) {
+      this.pendingTime = seconds;
+      if (!this.followScheduled) {
+        this.followScheduled = true;
+        scheduleFrame(() => {
+          this.followScheduled = false;
+          const pending = this.pendingTime;
+          this.pendingTime = undefined;
+          const viewport = this.parentElement;
+          if (this.disposed || pending === undefined || !viewport) return;
+          const cursor = this.timePosition(pending);
+          const size = this.horizontal ? viewport.clientWidth : viewport.clientHeight;
+          const scroll = this.horizontal ? viewport.scrollLeft : viewport.scrollTop;
+          if (size > 0 && (cursor < scroll || cursor > scroll + size || this.lastTime !== undefined && pending < this.lastTime)) {
+            this.setScroll(Math.max(0, Math.min(this.width - size, this.reversed ? cursor - size + 20 : cursor - 20)));
+          }
+          this.lastTime = pending;
+        });
+      }
+    }
+    return position;
+  }
+
+  protected override getVisibleTimeWindow(): {t0: number; t1: number} | undefined {
+    const viewport = this.parentElement;
+    if (!viewport) return undefined;
+    const size = this.horizontal ? viewport.clientWidth : viewport.clientHeight;
+    if (!(size > 0)) return undefined;
+    const scroll = this.horizontal ? viewport.scrollLeft : viewport.scrollTop;
+    const {lo, hi} = bufferedScrollRange(scroll, size, this.virtualizationConfig.bufferScreens);
+    const pps = this.config.pixelsPerSecond;
+    return this.reversed ? {t0: (this.width - hi) / pps, t1: (this.width - lo) / pps} : {t0: lo / pps, t1: hi / pps};
+  }
+
+  override dispose(): void {
+    this.layoutObserver?.disconnect();
+    this.layoutObserver = undefined;
+    this.pendingTime = undefined;
+    this.surface = undefined;
+    super.dispose();
   }
 }

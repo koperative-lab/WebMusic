@@ -424,6 +424,36 @@ describe('recorder companion binding', () => {
 });
 
 describe('<audio-recorder> passive source feedback', () => {
+  it('keeps permission failure visible and replaces it with loading when retried', async () => {
+    getUserMedia.mockRejectedValueOnce(new Error('Microphone permission denied'));
+    const element = mount({player: '#missing-recorder-owner'});
+    const feedback = () => element.shadowRoot!.querySelector<HTMLElement>('.wui-status')!;
+    await element.start();
+    expect(feedback().dataset.kind).toBe('error');
+    expect(feedback().textContent).toContain('Microphone permission denied');
+    expect(feedback().getAttribute('aria-busy')).not.toBe('true');
+    const retry = element.start();
+    expect(feedback().dataset.kind).toBe('loading');
+    await retry;
+    expect(feedback().hidden).toBe(true);
+    expect(element.recording).toBe(true);
+  });
+
+  it('returns to waiting on canceled startup and ignores a late permission result', async () => {
+    let grant!: (stream: MediaStream) => void;
+    getUserMedia.mockImplementationOnce(() => new Promise((resolve) => { grant = resolve; }));
+    const stopTrack = vi.fn();
+    const element = mount({player: '#missing-recorder-owner'});
+    const pending = element.start();
+    await element.stop();
+    expect(element.shadowRoot!.querySelector<HTMLElement>('.wui-status')!.dataset.kind).toBe('waiting');
+    grant({getTracks: () => [{stop: stopTrack}]} as unknown as MediaStream);
+    await pending;
+    expect(stopTrack).toHaveBeenCalledOnce();
+    expect(element.recording).toBe(false);
+    expect(element.shadowRoot!.querySelector<HTMLElement>('.wui-status')!.dataset.kind).toBe('waiting');
+  });
+
   it('animates pending microphone startup and retains independent capture with a missing owner', async () => {
     let grant!: (stream: MediaStream) => void;
     getUserMedia.mockImplementationOnce(() => new Promise((resolve) => { grant = resolve; }));

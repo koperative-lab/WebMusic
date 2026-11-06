@@ -87,6 +87,17 @@ command bindings, and releases previous subscriptions. Explicit View data keeps
 its documented precedence. Followers neither reload the player's URL nor dispose
 its player. Arbitrary legacy event sources retain their narrower capabilities.
 
+AudioPlayer Element readiness includes its own source requests, the selected
+backend's input readiness and an explicit caller-owned `loading` flag. The flag
+marks external preparation, starts no work and preserves the current transport.
+Clearing it cannot cancel or mask other pending work. The `loading` getter and
+`webaudio:loadstatechange` expose the aggregate to companions. Headless backends
+may supply `loading` / `loadError` and notify through their existing subscription;
+the facade forwards these with `loadstatechange`. A playlist reports only its
+selected entry, so speculative prefetch does not turn a ready session into loading.
+Applications own cancellation, late results and errors for external preparation,
+and clear their flags when the current operation settles or is released.
+
 AudioMixer owns mix state. `snapshot()` returns immutable master/member values,
 solo identity and effective gains; `change` invalidates that readback. Elements
 retain presentation subscriptions, not duplicate volume/mute/solo maps. Multiple

@@ -221,6 +221,7 @@ throws. Sequence scratch sessions are unavailable.
 | `beginScratch()` / `scratching` | Borrow the selected backend's optional scratch session. See [scratch sessions](/audio/headless/play/audio-clip-player/#scratch-sessions). |
 | `seconds` / `currentTime` / `duration` / `progress` | Live position, duration and fraction; zero for empty input. |
 | `playing` | Selected backend's playback state. |
+| `loading` / `loadError` | Selected borrowed backend's pending input and failure; false/undefined for an owned clip or a backend without readiness ports. Playlist prefetch is excluded unless it is the selected entry. |
 | `volume` / `rate` / `pan` | Facade clip settings; `rate` reads the effective mapped Session rate for an attached owned clip. A backend can expose narrower control support. |
 | `timingCapabilities` | PlaybackTimingCapabilities declaration without preparing audio; an undeclared external backend reports no shared-clock, future-start or native-loop guarantees. |
 | `schedulingMode` | PlaybackSchedulingMode for the selected backend; see the clip scheduling reference. |
@@ -237,6 +238,9 @@ throws. Sequence scratch sessions are unavailable.
 `sourcechange` carries the discriminated `.source` snapshot, including same-transport document revisions.
 `documentstatechange` carries `.documentBinding`; `statechange` carries `{playing}`, and
 `timeupdate` carries `{seconds, duration, progress}`. Notifications are synchronous;
+`loadstatechange` carries `{loading, error}` when the borrowed input's readiness
+changes, including detachment and disposal. Backend subscriptions supply these
+changes even while playback is paused; no polling or extra clock is required.
 read current state again after reentrant callbacks. Source observation does not
 start playback. `load` carries `{duration}`; `end` carries the clip or undefined
 for a backend without one. `regionenter`, `regionleave` and `beat` forward clip
@@ -251,10 +255,12 @@ to failed. Terminal cleanup continues through a throwing asset release, then
 reports the first cleanup error to the caller.
 
 `AudioPlayerTransport` requires seconds/duration/playing, play/pause/stop/seek.
-Optional clip/currentClip, analyser, clock, rate/volume/pan/pitch configuration,
+Optional loading/loadError, clip/currentClip, analyser, clock, rate/volume/pan/pitch configuration,
 preload/scratch and subscribe/onLoad/onEnd/onError ports expose backend
 capabilities without DOM; clip loops are not part of it. An `AudioPlaylist`
-implements this contract; use `AudioMixer.transport` for a mix.
+implements this contract; use `AudioMixer.transport` for a mix. Backends with
+readiness ports notify their `subscribe` observers whenever that state changes.
+Loading describes the selected input, not unrelated prefetch.
 An external backend may also declare `timingCapabilities`, `schedulingMode` and `followsSession`,
 and implement `activateScheduling(): Promise<void>` and
 `attachScheduling(binding): ConnectionLease`; these methods carry the same

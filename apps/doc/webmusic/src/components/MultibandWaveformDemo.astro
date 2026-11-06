@@ -31,7 +31,7 @@ const ONLY = [
     <audio-view id="mm-view" player="#mm-player" type="waveform" pixels-per-second="90" height="160" interactive drag-mode="scrub" color-mode="multiband"></audio-view>
 
     <p class="wm-demo-help" data-drag-help>The playhead stays centered. Drag left forward or right backward to scratch; release coasts, then restores the previous playback state.</p>
-    <p role="status" class="wm-demo-status" data-mm-status>Audio loads when this example is visible.</p>
+    <p role="status" class="wm-demo-status" data-mm-status></p>
   </div>
   <div slot="controls" data-mm-controls>
     <div class="mm-panel" aria-label="Channels and colour">
@@ -113,7 +113,7 @@ const ONLY = [
     helpObserver.observe(view, {attributes: true, attributeFilter: ['drag-mode', 'scrollable']});
     scope.add(() => helpObserver.disconnect());
     scope.add(() => fixture.release());
-    scope.add(() => { player.stop(); player.clip = undefined; view.peaks = undefined; view.frequencyData = undefined; });
+    scope.add(() => { player.stop(); player.clip = undefined; player.loading = false; view.peaks = undefined; view.frequencyData = undefined; view.loading = false; });
     let ch1: DemoChannel = 'left';
     let ch2: DemoChannel | 'off' = 'off';
     let ready = false;
@@ -124,7 +124,8 @@ const ONLY = [
       const selected = ch2 === 'off' ? [ch1] : [ch1, ch2];
       const coloured = view.getAttribute('color-mode') !== 'static';
       delete status.dataset.error;
-      status.textContent = coloured ? 'Preparing channel colour…' : 'Preparing channels…';
+      status.textContent = '';
+      view.loading = true;
       try {
         const peaks = await fixture.peaks(selected);
         if (!scope.active || current !== generation) return;
@@ -140,6 +141,8 @@ const ONLY = [
       } catch (error) {
         if (scope.active && current === generation) { status.textContent = 'Channel data could not be prepared. Choose a channel to retry.'; status.dataset.error = ''; }
         throw error;
+      } finally {
+        if (scope.active && current === generation) view.loading = false;
       }
     };
     const setActive = (seg: Element, value: string): void => {
@@ -184,17 +187,25 @@ const ONLY = [
       scope.run(applyView());
     });
     whenDemoVisible(device, scope, async () => {
-      status.textContent = 'Loading audio…';
+      status.textContent = '';
+      view.loading = true;
+      player.loading = true;
       try {
         // Awaiting the shared pyramid prevents the player binding deriving a duplicate.
         const [clip, peaks] = await Promise.all([fixture.clip(), fixture.peaks(['left'])]);
         if (!scope.active) return;
         view.peaks = peaks;
         player.clip = clip;
+        player.loading = false;
         ready = true;
-        await applyView();
+        scope.run(applyView());
       } catch (error) {
-        if (scope.active) { status.textContent = 'Audio could not be loaded. Reload this page to retry.'; status.dataset.error = ''; }
+        if (scope.active) {
+          view.loading = false;
+          player.loading = false;
+          status.textContent = 'Audio could not be loaded. Reload this page to retry.';
+          status.dataset.error = '';
+        }
         throw error;
       }
     });

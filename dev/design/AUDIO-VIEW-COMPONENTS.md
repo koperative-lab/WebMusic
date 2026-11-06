@@ -120,6 +120,18 @@ exact options, defaults and cleanup behavior.
   determine the painted axes, including nonuniform data; the Headless timestamp
   selector and the renderer's nearest-center projection retain their own roles.
 
+AudioView's boolean `loading` attribute and reflected property let the
+application identify asynchronous preparation that the Element cannot observe,
+such as external decode or worker analysis. It defaults to false and initiates
+no computation or request. True selects the shared loading feedback while
+retaining supplied data and borrowed playback position. Clearing it restores
+automatic source/player/data readiness without canceling or suppressing internal
+pending work. Readiness is specific to the selected drawing; unrelated payloads
+for another type do not count as ready input. Missing spectrogram data without
+known pending work uses the shared waiting animation, with its explanation kept
+accessible. Applications own external failures, cancellation and late-result
+checks, including when to clear a flag across overlapping preparations.
+
 Documentation demos share one fixture/decode across related examples and prepare
 only selected representations. Expensive decoding/analysis uses the existing
 worker APIs where available. Lower-page examples activate on visibility or focus;

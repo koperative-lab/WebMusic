@@ -5,22 +5,23 @@ import {type ViewPlayerNote, type ViewPlayerSnapshot} from './internal/player-bi
 import {SCORE_VIEW_BASE_ATTRIBUTES, ScoreViewElementBase} from './internal/score-view-base';
 import {NoteId, type Score} from '../../core';
 import {createScoreView, type ScoreView} from '../headless/score-view';
-import {renderScoreVisualizer} from '../render/score-visualizer';
+import {renderScoreVisualizer, type ScoreVisualizerHandle} from '../render/score-visualizer';
 import type {
   RenderedScoreVisualizer,
   ScoreViewType,
+  ScoreViewDirection,
   ScoreViewConfiguration,
   StaffRenderOptions,
   VisualizerRenderOptions,
   WaterfallRenderOptions,
 } from '../core/types';
 import {boolAttr, defineOnce, numAttr, upgradeProperties} from './base';
-import {mountStage, type StageHandle} from '@webmusic/ui/stage';
+import {mountScrollRegion, mountStage, type ScrollRegionHandle, type StageHandle} from '@webmusic/ui/stage';
 
 const ELEMENT_NOTE_RGB = '51, 51, 51';
 const ELEMENT_ACTIVE_NOTE_RGB = '240, 84, 119';
 
-export type {ScoreViewType} from '../core/types';
+export type {ScoreViewType, ScoreViewDirection} from '../core/types';
 export type {ScoreViewConfiguration, ScoreViewOptionsByType} from '../core/types';
 
 /** `<score-view>` draws exactly the three renderer types. */
@@ -114,8 +115,10 @@ export function parseColorAttr(raw: string | null): string | undefined {
  *   `black-note-width`. Compose a separate `<score-pitch-view>` for a keyboard.
  * - **Colours** — `note-color` / `active-note-color` (hex, `rgb()`, or a raw
  *   `r, g, b` triple).
- * - **Expressions** (staff only) — `show-annotations` (default true) shows
- *   supported score directions. False removes their space without changing
+ * - **Direction** — `direction` selects up/down/left/right for piano-roll and
+ *   waterfall. The staff retains its normal reading direction.
+ * - **Expressions** (staff only) — `show-annotations` (default false) enables
+ *   supported score directions. Hidden expressions reserve no space and retain
  *   musical data. Piano roll and waterfall never draw annotations.
  * - **Staff** — `default-key` (chromatic key index), `scroll-type`
  *   (`page` · `note` · `bar`), and `split-staves` (default true; false combines
@@ -138,6 +141,7 @@ export class ScoreViewElement extends ScoreViewElementBase {
     return [
       ...SCORE_VIEW_BASE_ATTRIBUTES,
       'type',
+      'direction',
       'show-annotations',
       'show-only-octaves-used',
       'scroll-type',
@@ -150,12 +154,13 @@ export class ScoreViewElement extends ScoreViewElementBase {
   private explicitOptions?: ScoreViewRenderOptions;
   private visualizerHandlers?: PlayerBindingHandlers;
   private renderedUnbind?: () => void;
-  private rendered?: RenderedScoreVisualizer;
+  private rendered?: ScoreVisualizerHandle;
+  private scrollRegion?: ScrollRegionHandle;
   private view?: ScoreView;
   private stage?: StageHandle;
 
   connectedCallback(): void {
-    upgradeProperties(this, ['score', 'options', 'type', 'editor', 'interactionSession']);
+    upgradeProperties(this, ['score', 'options', 'type', 'direction', 'editor', 'interactionSession']);
     super.connectedCallback();
   }
 
@@ -216,12 +221,25 @@ export class ScoreViewElement extends ScoreViewElementBase {
     this.setAttribute('type', type);
   }
 
+  /** Piano-roll time axis or waterfall travel direction; the staff keeps normal layout. */
+  get direction(): ScoreViewDirection {
+    const value = this.getAttribute('direction');
+    return value === 'up' || value === 'down' || value === 'left' || value === 'right'
+      ? value : this.type === 'waterfall' ? 'down' : 'right';
+  }
+
+  set direction(direction: ScoreViewDirection) {
+    this.setAttribute('direction', direction);
+  }
+
   protected disposePresentation(): number {
     const revision = ++this.presentationRevision;
     const binding = this.renderedUnbind;
     const rendered = this.rendered, view = this.view, stage = this.stage, status = this.status;
+    const scrollRegion = this.scrollRegion;
     this.renderedUnbind = undefined;
     this.visualizerHandlers = undefined;
+    this.scrollRegion = undefined;
     this.rendered = undefined;
     this.view = undefined;
     this.stage = undefined;
@@ -230,7 +248,7 @@ export class ScoreViewElement extends ScoreViewElementBase {
     // only this lifetime's DOM before invoking its captured cleanup callbacks.
     this.replaceChildren();
     const failures: unknown[] = [];
-    for (const cleanup of [() => binding?.(), () => rendered?.dispose?.(), () => view?.dispose(),
+    for (const cleanup of [() => binding?.(), () => scrollRegion?.destroy(), () => rendered?.dispose?.(), () => view?.dispose(),
       () => stage?.destroy(), () => status?.destroy()]) {
       try { cleanup(); } catch (error) { failures.push(error); }
     }
@@ -278,6 +296,8 @@ export class ScoreViewElement extends ScoreViewElementBase {
     if (failed) {
       this.stage.destroy();
       this.stage = undefined;
+      this.scrollRegion?.destroy();
+      this.scrollRegion = undefined;
       this.rendered?.dispose?.();
       this.rendered = undefined;
       this.view.dispose();
@@ -288,26 +308,38 @@ export class ScoreViewElement extends ScoreViewElementBase {
     this.rebindRendered(this.rendered);
   }
 
-  private renderScore(score: Score, surface: HTMLElement, type: ScoreViewType): RenderedScoreVisualizer {
+  private renderScore(score: Score, surface: HTMLElement, type: ScoreViewType): ScoreVisualizerHandle {
     const options = this.renderOptions();
     // Only the staff draws score annotations; the other renderers never receive the switch.
     if (type !== 'staff') delete options.showAnnotations;
-    if (type !== 'waterfall') return renderScoreVisualizer(score, surface, type, options);
-    return renderScoreVisualizer(score, surface, type, {
+    const rendered = renderScoreVisualizer(score, surface, type, type === 'waterfall' ? {
       ...options,
       fitToWidth: true,
       showOnlyOctavesUsed: options.showOnlyOctavesUsed ?? true,
-    });
+    } : options);
+    try {
+      if (rendered.scrollViewport) {
+        this.scrollRegion = mountScrollRegion(rendered.scrollViewport, {
+          label: 'Score time window', hideScrollbar: true,
+        });
+      }
+      return rendered;
+    } catch (error) {
+      rendered.dispose?.();
+      throw error;
+    }
   }
 
   /** Attribute-derived render options, overridden by `.options`. */
   private renderOptions(): ScoreViewRenderOptions {
     const options: Record<string, unknown> = {
+      showAnnotations: false,
       noteRGB: ELEMENT_NOTE_RGB,
       activeNoteRGB: ELEMENT_ACTIVE_NOTE_RGB,
       noteColor: 'var(--wm-score-view-note, var(--wm-foreground, light-dark(#333, #ddd)))',
       activeNoteColor: 'var(--wm-score-view-active-note, var(--wm-accent, rgb(240, 84, 119)))',
     };
+    if (this.type === 'piano-roll' || this.type === 'waterfall') options.direction = this.direction;
 
     for (const [attr, key] of NUMERIC_OPTION_ATTRS) {
       if (this.getAttribute(attr) == null) continue;
@@ -340,7 +372,12 @@ export class ScoreViewElement extends ScoreViewElementBase {
 
     if (this.explicitOptions?.noteRGB !== undefined) delete options.noteColor;
     if (this.explicitOptions?.activeNoteRGB !== undefined) delete options.activeNoteColor;
-    return {...(options as ScoreViewRenderOptions), ...this.explicitOptions};
+    const merged = {...(options as ScoreViewRenderOptions), ...this.explicitOptions};
+    merged.showAnnotations = this.explicitOptions?.showAnnotations ?? options.showAnnotations as boolean;
+    if (this.type === 'piano-roll' || this.type === 'waterfall') {
+      merged.direction = this.explicitOptions?.direction ?? this.direction;
+    }
+    return merged;
   }
 
   protected followEventNote(note: ViewPlayerNote, on: boolean): void {

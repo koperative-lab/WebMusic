@@ -658,14 +658,16 @@ function createBeat(view: (Window & typeof globalThis) | null): Beat {
  * frame, after every write of that frame — and `onResize` (the arrival reveal)
  * runs there too, before the overflow check, so the frame reads geometry once.
  */
-function pitchScroll(root: HTMLElement, content: Element, onResize?: () => void) {
+function pitchScroll(root: HTMLElement, content: Element, onResize?: () => void, vertical = false) {
   const view = root.ownerDocument.defaultView;
   let observer: ResizeObserver | undefined;
   let destroyed = false;
   let frame: number | undefined;
   const refresh = (): void => {
     if (destroyed) return;
-    if (root.clientWidth > 0 && root.scrollWidth > root.clientWidth + 1) setAttr(root, 'tabindex', '0');
+    const size = vertical ? root.clientHeight : root.clientWidth;
+    const extent = vertical ? root.scrollHeight : root.scrollWidth;
+    if (size > 0 && extent > size + 1) setAttr(root, 'tabindex', '0');
     else root.removeAttribute('tabindex');
   };
   const resized = (): void => {onResize?.(); refresh();};
@@ -740,21 +742,26 @@ export interface KeyboardParts {
   board?: string;
 }
 
+/** The direction of the key fronts; labels remain upright in every direction. */
+export type KeyboardDirection = 'up' | 'down' | 'left' | 'right';
+
 export interface KeyboardOptions {
-  /** Fit the complete normalized range to the available width, ignoring key widths and their CSS minimum. Defaults to false. */
+  /** Key-front direction, default down. Pitch increases rightward for up/down and upward for left/right. */
+  direction?: KeyboardDirection;
+  /** Fit the complete normalized range to the available pitch axis, ignoring key widths and their CSS minimum. Defaults to false. */
   fitToWidth?: boolean;
-  /** Exact white-key width in CSS px; absent/invalid retains responsive minimum sizing. Ignored by fitToWidth. */
+  /** Exact white-key pitch-axis breadth in CSS px; absent/invalid retains responsive minimum sizing. Ignored by fitToWidth. */
   whiteKeyWidth?: number;
-  /** Exact black-key width in CSS px, capped at white width. Alone derives white width at the default .62 ratio. Ignored by fitToWidth. */
+  /** Exact black-key pitch-axis breadth in CSS px, capped at white breadth. Alone derives white breadth at the default .62 ratio. Ignored by fitToWidth. */
   blackKeyWidth?: number;
-  /** White-key height in CSS px; absent/invalid retains the public CSS token. */
+  /** White-key depth in CSS px, perpendicular to pitch; absent/invalid retains the public CSS token. */
   whiteKeyHeight?: number;
-  /** Black-key height in CSS px, capped at the white-key height. */
+  /** Black-key depth in CSS px, capped at the white-key depth. */
   blackKeyHeight?: number;
   /** Outer surface, or no frame/background when a containing presenter owns it. Defaults to 'default'. */
   surface?: 'default' | 'none';
   label?: string;
-  /** Reveal newly active marks inside a wide keyboard. Defaults to 'none'. */
+  /** Reveal newly active marks on the keyboard's pitch axis. Defaults to 'none'. */
   follow?: 'active' | 'none';
   motion?: MotionMode;
   /** Release tail in ms. Defaults to 140, and to 0 in a reduced motion mode. */
@@ -818,11 +825,14 @@ export function mountKeyboard(
   const releaseMs = stepped ? 0 : Math.max(0, options.release ?? DEFAULT_RELEASE_MS);
   const ageSpan = options.ageSpan ?? DEFAULT_AGE_SPAN;
   const fitToWidth = options.fitToWidth === true;
+  const direction = options.direction === 'up' || options.direction === 'left' || options.direction === 'right' ? options.direction : 'down';
+  const vertical = direction === 'left' || direction === 'right';
   const requestedBlackWidth = positivePixels(options.blackKeyWidth);
   const whiteKeyWidth = fitToWidth ? undefined : positivePixels(options.whiteKeyWidth) ?? (requestedBlackWidth === undefined ? undefined : requestedBlackWidth / .62);
   const blackKeyWidth = whiteKeyWidth === undefined ? undefined : Math.min(whiteKeyWidth, requestedBlackWidth ?? whiteKeyWidth * .62);
   const whiteKeyHeight = positivePixels(options.whiteKeyHeight);
   const blackKeyHeight = positivePixels(options.blackKeyHeight);
+  const keyDepth = whiteKeyHeight === undefined ? KEYBOARD_HEIGHT : `${whiteKeyHeight}px`;
 
   const root = document.createElement('div');
   root.className = 'wui-pitch-keyboard';
@@ -834,6 +844,7 @@ export function mountKeyboard(
   // sentence below replaces this the moment there is something to say.
   setLabel(root, options.label ?? 'Sounding pitches');
   root.dataset.motion = motion;
+  root.dataset.direction = direction;
   addClassNames(root, options.classNames?.root);
   setParts(root, 'root', options.parts?.root);
   // The two the caller can move, stamped so the sheet's own rules can see them
@@ -849,7 +860,12 @@ export function mountKeyboard(
     pitchParts.keyboardRoot,
   );
   if (options.surface === 'none') paint(root, embeddedSurfaceDeclarations);
-  if (fitToWidth) root.style.overflowX = 'hidden';
+  if (vertical) paint(root, {
+    display: 'flex', 'flex-direction': 'column', height: '100%', 'min-height': '0',
+    width: keyDepth,
+    'overflow-x': 'hidden', 'overflow-y': fitToWidth ? 'hidden' : 'auto', 'overscroll-behavior-y': 'contain',
+  });
+  else if (fitToWidth) root.style.overflowX = 'hidden';
   if (stepped) paint(root, harmonyMotion.reduced, PITCH_MOTION.reduced);
 
   const board = document.createElement('div');
@@ -857,15 +873,20 @@ export function mountKeyboard(
   addClassNames(board, options.classNames?.board);
   setParts(board, 'board', options.parts?.board);
   dress(board, pitchParts.keyboardBoard);
-  if (whiteKeyHeight !== undefined) board.style.height = `${whiteKeyHeight}px`;
+  if (vertical) paint(board, {width: keyDepth, 'min-width': '0', height: 'auto', 'min-height': '0'});
+  else if (whiteKeyHeight !== undefined) board.style.height = `${whiteKeyHeight}px`;
   root.append(board);
 
   const ruler = document.createElement('div');
   ruler.className = 'wui-pitch-keyboard__ruler';
   ruler.setAttribute('aria-hidden', 'true');
   dress(ruler, pitchParts.keyboardRuler);
+  if (vertical) paint(ruler, {
+    position: 'absolute', top: '0', left: keyDepth, width: '3em', 'min-width': '0', height: '100%', 'margin-top': '0',
+    'pointer-events': 'none',
+  });
   root.append(ruler);
-  const scroll = fitToWidth ? undefined : pitchScroll(root, board, () => reveal());
+  const scroll = fitToWidth ? undefined : pitchScroll(root, board, () => reveal(), vertical);
 
   const keys = new Map<number, KeyNode>();
   let sounding = new Map<number, Sounding>();
@@ -886,8 +907,19 @@ export function mountKeyboard(
     node.className = `wui-pitch-keyboard__key wui-pitch-keyboard__key--${key.black ? 'black' : 'white'}`;
     node.dataset.midi = String(key.midi);
     dress(node, pitchParts.keyboardKey, key.black ? pitchParts.keyboardBlack : pitchParts.keyboardWhite);
-    if (key.black && blackKeyHeight !== undefined) node.style.height = whiteKeyHeight === undefined
+    const blackDepth = blackKeyHeight === undefined ? KEY_BLACK_HEIGHT : whiteKeyHeight === undefined
       ? `min(${blackKeyHeight}px, 100%)` : `${Math.min(blackKeyHeight, whiteKeyHeight)}px`;
+    if (vertical) paint(node, {
+      left: direction === 'right' ? '0' : 'auto', right: direction === 'left' ? '0' : 'auto',
+      width: key.black ? blackDepth : '100%', height: 'auto',
+      transform: key.black ? 'translateY(-50%)' : 'none',
+      'justify-content': 'center', 'align-items': direction === 'right' ? 'flex-end' : 'flex-start',
+      'padding-bottom': '0', padding: '0 .2rem',
+    });
+    else {
+      if (key.black && blackKeyHeight !== undefined) node.style.height = blackDepth;
+      if (direction === 'up') paint(node, {top: 'auto', bottom: '0', 'justify-content': 'flex-start', 'padding-top': '.2rem', 'padding-bottom': '0'});
+    }
     const mark = document.createElement('span');
     mark.className = 'wui-pitch-keyboard__mark';
     mark.hidden = true;
@@ -914,7 +946,16 @@ export function mountKeyboard(
     const boardWidth = whiteKeyWidth === undefined ? undefined : whiteKeyWidth * units;
     setStyleValue(root, '--wui-pitch-keyboard-width', fitToWidth ? '0px' : boardWidth === undefined
       ? `calc(${KEY_MIN_WIDTH} * ${coordinate(units)})` : `${coordinate(boardWidth)}px`);
-    if (fitToWidth) {
+    if (vertical) {
+      const extent = boardWidth === undefined ? `calc(${KEY_MIN_WIDTH} * ${coordinate(units)})` : `${coordinate(boardWidth)}px`;
+      // An indefinite host height uses the natural keyboard length. A sized
+      // host gives the flex item a definite pitch axis, which fitting fills.
+      board.style.flexGrow = board.style.flexShrink = fitToWidth ? '1' : '0';
+      board.style.flexBasis = extent;
+      board.style.minHeight = fitToWidth ? '0' : extent;
+      if (!fitToWidth) board.style.height = extent;
+      ruler.style.height = fitToWidth ? '100%' : extent;
+    } else if (fitToWidth) {
       board.style.width = ruler.style.width = '100%';
       board.style.minWidth = ruler.style.minWidth = '0';
     } else if (boardWidth !== undefined) {
@@ -928,9 +969,15 @@ export function mountKeyboard(
     for (const key of layout) {
       const existing = keys.get(key.midi);
       const node = existing ?? buildKey(key);
-      node.root.style.left = `${key.left}%`;
-      node.root.style.width = `${key.black && whiteKeyWidth !== undefined && blackKeyWidth !== undefined
-        ? key.width / .62 * blackKeyWidth / whiteKeyWidth : key.width}%`;
+      const breadth = key.black && whiteKeyWidth !== undefined && blackKeyWidth !== undefined
+        ? key.width / .62 * blackKeyWidth / whiteKeyWidth : key.width;
+      if (vertical) {
+        node.root.style.top = `${key.black ? 100 - key.left : 100 - key.left - breadth}%`;
+        node.root.style.height = `${breadth}%`;
+      } else {
+        node.root.style.left = `${key.left}%`;
+        node.root.style.width = `${breadth}%`;
+      }
       next.set(key.midi, node);
       ordered.push(node.root);
     }
@@ -955,26 +1002,37 @@ export function mountKeyboard(
       // A white key's `left` is its edge and a black key's is its own centre,
       // so only one of the two takes half a width. Centring both put every
       // black-key ruler mark a third of a key to the right of its key.
-      node.style.left = `${key.black ? key.left : key.left + key.width / 2}%`;
+      const position = key.black ? key.left : key.left + key.width / 2;
       node.textContent = text;
       dress(node, pitchParts.keyboardOctave);
-      if (fitToWidth) paint(node, {'max-width': `${key.width}%`, overflow: 'hidden', 'white-space': 'nowrap', 'text-overflow': 'ellipsis'});
+      if (vertical) paint(node, {left: '0', transform: 'translateY(-50%)', 'max-width': '100%', overflow: 'hidden', 'white-space': 'nowrap', 'text-overflow': 'ellipsis'});
+      else if (fitToWidth) paint(node, {'max-width': `${key.width}%`, overflow: 'hidden', 'white-space': 'nowrap', 'text-overflow': 'ellipsis'});
+      node.style[vertical ? 'top' : 'left'] = `${vertical ? 100 - position : position}%`;
       marks.push(node);
     }
     ruler.replaceChildren(...marks);
     setHidden(ruler, marks.length === 0);
+    if (vertical) {
+      root.style.paddingRight = marks.length ? '3em' : '0';
+      root.style.width = marks.length ? `calc(${keyDepth} + 3em)` : keyDepth;
+    }
     if (inline) setStyleValue(ruler, 'display', marks.length === 0 ? 'none' : undefined);
   };
 
   const reveal = (): void => {
-    if (fitToWidth || destroyed || pendingReveal.length === 0 || root.clientWidth <= 0) return;
+    const viewport = vertical ? root.clientHeight : root.clientWidth;
+    if (fitToWidth || destroyed || pendingReveal.length === 0 || viewport <= 0) return;
     const heldKeys = pendingReveal.map((midi) => keys.get(midi)?.root).filter((key): key is HTMLElement => Boolean(key));
     pendingReveal = [];
     if (heldKeys.length === 0) return;
-    const left = Math.min(...heldKeys.map((key) => key.offsetLeft - (key.classList.contains('wui-pitch-keyboard__key--black') ? key.offsetWidth / 2 : 0)));
-    const right = Math.max(...heldKeys.map((key) => key.offsetLeft + key.offsetWidth * (key.classList.contains('wui-pitch-keyboard__key--black') ? 0.5 : 1)));
-    if (left < root.scrollLeft || right > root.scrollLeft + root.clientWidth) {
-      root.scrollLeft = Math.max(0, Math.min(root.scrollWidth - root.clientWidth, (left + right - root.clientWidth) / 2));
+    const position = (key: HTMLElement) => vertical ? key.offsetTop : key.offsetLeft;
+    const size = (key: HTMLElement) => vertical ? key.offsetHeight : key.offsetWidth;
+    const start = Math.min(...heldKeys.map((key) => position(key) - (key.classList.contains('wui-pitch-keyboard__key--black') ? size(key) / 2 : 0)));
+    const end = Math.max(...heldKeys.map((key) => position(key) + size(key) * (key.classList.contains('wui-pitch-keyboard__key--black') ? 0.5 : 1)));
+    const offset = vertical ? root.scrollTop : root.scrollLeft;
+    if (start < offset || end > offset + viewport) {
+      const extent = vertical ? root.scrollHeight : root.scrollWidth;
+      root[vertical ? 'scrollTop' : 'scrollLeft'] = Math.max(0, Math.min(extent - viewport, (start + end - viewport) / 2));
     }
   };
 

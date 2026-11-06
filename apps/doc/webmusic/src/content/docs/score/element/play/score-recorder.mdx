@@ -7,6 +7,8 @@ sidebar:
 
 import ScoreRecorderDemo from '../../../../../components/ScoreRecorderDemo.astro';
 
+<ScoreRecorderDemo />
+
 `<score-recorder>` captures a note performance as a `Score`, then offers take
 playback and MIDI / MusicXML download. It is the symbolic-music counterpart of
 [`<audio-recorder>`](/audio/element/play/audio-recorder/): supply note events from
@@ -17,8 +19,6 @@ The input surface and recorder are independent components. The demo captures a
 sibling note input through `.source`, with a separate `InteractivePlayer` for
 live monitoring. Record starts a fresh take, Stop completes it, and Play auditions
 it. Release held notes before stopping to include them.
-
-<ScoreRecorderDemo />
 
 Starting take playback shows the shared four-square loading animation until the player
 finishes preparing. Cancellation, a new recording, failure, or disconnect clears that
@@ -133,7 +133,8 @@ toggles take audition. Two download icon buttons, with the mono readouts `MIDI` 
 through `serializeMIDI` / `serializeMusicXML`. Playback
 and exports remain disabled until a take exists. A rejected playback request
 releases that playback and clears its playing state before reporting the error;
-late rejection from a replaced playback is ignored.
+the failure remains visible until a retry, new recording or playback reset.
+Late rejection from a replaced playback is ignored.
 
 **Accessibility:** the presenter is a group named “Recorder”. Its native icon buttons carry
 their names in `aria-label` and `title` and support Tab, Enter and Space with visible focus; recording and playback expose

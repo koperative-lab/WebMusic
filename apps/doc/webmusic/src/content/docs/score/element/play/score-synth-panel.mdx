@@ -7,6 +7,8 @@ sidebar:
 
 import SynthPanelDemo from '../../../../../components/SynthPanelDemo.astro';
 
+<SynthPanelDemo />
+
 `<score-synth-panel>` is a composable control surface for an instrument or effect.
 In module scope it borrows the target's shared parameters, ADSR, native LFO and
 macro controllers. Outside module scope, its standalone compatibility mode
@@ -70,8 +72,6 @@ current Parameters and Effects editor setup; **Reset** restores every editor val
 section after ordinary edits or a browser back/forward-cache restore. The structured editors are the
 copy source of truth. Turning a Sound / Effect knob or dragging an EQ point directly on the panel is
 a live audition and does not silently rewrite a separate editor field.
-
-<SynthPanelDemo />
 
 ## Audio routing
 

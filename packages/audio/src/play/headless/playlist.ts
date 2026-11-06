@@ -86,6 +86,7 @@ interface EntryState {
   status: AudioPlaylistEntryStatus;
   clip?: AudioClip;
   loading?: Promise<AudioClip | undefined>;
+  error?: Error;
 }
 
 /**
@@ -192,6 +193,16 @@ export class AudioPlaylist {
   /** The clip currently loaded, if any. */
   get currentClip(): AudioClip | undefined {
     return this.states[this.currentIndex]?.clip;
+  }
+
+  /** Only the selected entry blocks the owner; speculative prefetch does not. */
+  get loading(): boolean {
+    return !this.disposed && this.states[this.currentIndex]?.status === 'loading';
+  }
+
+  /** Failure of the selected entry, cleared when that entry is retried or replaced. */
+  get loadError(): Error | undefined {
+    return this.disposed ? undefined : this.states[this.currentIndex]?.error;
   }
 
   // --- transport ---
@@ -430,6 +441,7 @@ export class AudioPlaylist {
         return clip;
       } catch (error) {
         if (this.isActiveState(state)) {
+          state.error = error instanceof Error ? error : new Error(String(error));
           this.setStatus(state, 'error');
           if (this.isActiveState(state)) this.emitError(error);
         }
@@ -438,6 +450,7 @@ export class AudioPlaylist {
         if (state.loading === pending) state.loading = undefined;
       }
     });
+    state.error = undefined;
     state.loading = pending;
     this.setStatus(state, 'loading');
     return pending;

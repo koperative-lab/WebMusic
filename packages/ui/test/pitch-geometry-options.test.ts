@@ -54,6 +54,90 @@ describe('explicit keyboard geometry', () => {
   });
 });
 
+describe('keyboard directions', () => {
+  it.each(['up', 'down', 'left', 'right'] as const)('keeps exact key geometry, ascending pitch order and upright labels facing %s', (direction) => {
+    for (const stylesheet of [true, false]) {
+      const handle = mountKeyboard(host(), {snapshot: () => ({
+        low: 61, high: 66, marks: [{midi: 64, label: 'E4'}], octaveLabels: new Map([[64, 'E4']]),
+      })}, {direction, whiteKeyWidth: 31.5, blackKeyWidth: 19.53, whiteKeyHeight: 90, blackKeyHeight: 56, stylesheet});
+      const vertical = direction === 'left' || direction === 'right';
+      expect([...handle.board.children].map((key) => Number((key as HTMLElement).dataset.midi))).toEqual([61, 62, 63, 64, 65, 66]);
+      expect(handle.element.dataset.direction).toBe(direction);
+      expect(handle.element.getAttribute('aria-label')).toContain('E4');
+      const held = handle.key(64)!;
+      expect(held.dataset.active).toBe('true');
+      expect(held.querySelector('.wui-pitch-keyboard__label')!.textContent).toBe('E4');
+      expect(handle.element.style.transform).toBe('');
+      expect(handle.board.style.transform).toBe('');
+      const start = (key: HTMLElement) => Number.parseFloat(vertical ? key.style.top : key.style.left)
+        - (key.classList.contains('wui-pitch-keyboard__key--black') ? Number.parseFloat(vertical ? key.style.height : key.style.width) / 2 : 0);
+      for (const key of [...handle.board.children] as HTMLElement[]) {
+        const breadth = Number.parseFloat(vertical ? key.style.height : key.style.width);
+        expect(start(key)).toBeGreaterThanOrEqual(0);
+        expect(start(key) + breadth).toBeLessThanOrEqual(100);
+      }
+      expect(start(handle.key(62)!) < start(handle.key(65)!)).toBe(!vertical);
+      if (vertical) {
+        expect(handle.board.style.height).toBe('126px');
+        expect(handle.key(61)!.style.width).toBe('56px');
+        expect(handle.key(61)!.style.transform).toBe('translateY(-50%)');
+        expect(handle.key(61)!.style[direction === 'left' ? 'right' : 'left']).toBe('0px');
+        expect(Number.parseFloat((handle.element.querySelector('.wui-pitch-keyboard__octave') as HTMLElement).style.top)).toBeCloseTo(50);
+      } else {
+        expect(handle.board.style.width).toBe('126px');
+        expect(handle.board.style.height).toBe('90px');
+        expect(handle.key(61)!.style.height).toBe('56px');
+        if (direction === 'up') expect(handle.key(61)!.style.bottom).toBe('0px');
+      }
+      handle.destroy();
+    }
+  });
+
+  it.each(['left', 'right'] as const)('follows new pitches and exposes native vertical scrolling facing %s', (direction) => {
+    // Follow geometry is read at the next frame, after the update's style writes.
+    let due: FrameRequestCallback[] = [];
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => due.push(callback));
+    const frame = (): void => { const run = due; due = []; for (const callback of run) callback(0); };
+    let state: KeyboardState = {low: 48, high: 84, marks: []};
+    const handle = mountKeyboard(host(), {snapshot: () => state}, {direction, follow: 'active', whiteKeyWidth: 40, release: 0});
+    Object.defineProperties(handle.element, {clientHeight: {value: 100}, scrollHeight: {value: 880}});
+    const key = handle.key(61)!;
+    Object.defineProperties(key, {offsetTop: {value: 600}, offsetHeight: {value: 24}});
+    handle.element.scrollTop = 30;
+    state = {...state, marks: [{midi: 61}]}; handle.update();
+    expect(handle.element.scrollTop).toBe(30);
+    frame();
+    expect(handle.element.scrollTop).toBe(550);
+    expect(handle.element.scrollLeft).toBe(0);
+    expect(handle.element.tabIndex).toBe(0);
+    expect(getComputedStyle(handle.element).overflowY).toBe('auto');
+    handle.element.scrollTop = 400;
+    handle.update(); frame();
+    expect(handle.element.scrollTop).toBe(400);
+    state = {...state, marks: []}; handle.update(); frame(); frame();
+    expect(handle.element.scrollTop).toBe(400);
+    handle.destroy();
+  });
+
+  it('fits the vertical pitch axis without following arrivals or using requested fixed breadths', () => {
+    let state: KeyboardState = {low: 60, high: 71, marks: []};
+    const handle = mountKeyboard(host(), {snapshot: () => state}, {direction: 'right', fitToWidth: true, follow: 'active', whiteKeyWidth: 80, whiteKeyHeight: 100});
+    expect(handle.element.style.height).toBe('100%');
+    expect(handle.element.style.width).toBe('100px');
+    expect(handle.board.style.flexGrow).toBe('1');
+    expect(handle.board.style.flexShrink).toBe('1');
+    expect(Number.parseFloat(handle.board.style.minHeight)).toBe(0);
+    expect(handle.board.style.height).toBe('auto');
+    expect(getComputedStyle(handle.element).overflowY).toBe('hidden');
+    Object.defineProperties(handle.element, {clientHeight: {value: 100}, scrollHeight: {value: 560}});
+    Object.defineProperties(handle.key(60)!, {offsetTop: {value: 480}, offsetHeight: {value: 80}});
+    state = {...state, marks: [{midi: 60}]}; handle.update();
+    expect(handle.element.scrollTop).toBe(0);
+    expect(handle.element.hasAttribute('tabindex')).toBe(false);
+    handle.destroy();
+  });
+});
+
 describe('keyboard fit to width', () => {
   it.each([true, false])('fits the full range with proportional keys while retaining heights and held notes (stylesheet=%s)', (stylesheet) => {
     const container = host();

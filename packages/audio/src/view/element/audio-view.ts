@@ -134,6 +134,7 @@ const DEFAULT_PIXELS_PER_SECOND = 100;
 
 /** Public properties that may have been assigned before the upgrade. */
 const PROPS = [
+  'loading',
   'clip',
   'peaks',
   'spectrogram',
@@ -248,6 +249,7 @@ export class AudioViewElement extends WebMusicElement {
       'peaks-src',
       'format',
       'type',
+      'loading',
       'player',
       'interactive',
       'drag-mode',
@@ -310,6 +312,7 @@ export class AudioViewElement extends WebMusicElement {
   private playerUnbind?: () => void;
   private playerTargetCleanup?: () => void;
   private playerTargetGeneration = 0;
+  private playerSelectionError?: Error;
   private vizBinding?: {unsubscribe(): void};
   private bindingRevision = 0;
   private presentationRevision = 0;
@@ -336,6 +339,7 @@ export class AudioViewElement extends WebMusicElement {
     this.own(() => this.teardown());
     prepareAudioViewHost(this);
     upgradeProperties(this, PROPS);
+    this.syncBusyState();
     this.applyWidth();
     this.bindPlayer();
     if (this.hasEditorIntent()) { this.bindEditor(); return; }
@@ -348,6 +352,11 @@ export class AudioViewElement extends WebMusicElement {
     // A write that changes nothing — a framework re-applying its props, or
     // `setAttribute(name, getAttribute(name))` — must not cost a rebuild.
     if (!this.isConnected || previous === next) return;
+    if (name === 'loading') {
+      this.syncBusyState();
+      this.refresh();
+      return;
+    }
     if (name === 'player') {
       this.bindPlayer();
       this.refresh();
@@ -396,6 +405,14 @@ export class AudioViewElement extends WebMusicElement {
   }
 
   // ---- Public properties ----
+
+  /** Caller-owned asynchronous preparation; independent of this view's source loaders. */
+  get loading(): boolean {
+    return boolAttr(this, 'loading', false);
+  }
+  set loading(loading: boolean) {
+    this.setAttribute('loading', loading ? 'true' : 'false');
+  }
 
   /** Borrowed document owner; the caller keeps it. Undefined detaches it. */
   set editor(value: AudioClipEditorPort | undefined) {
@@ -800,6 +817,13 @@ export class AudioViewElement extends WebMusicElement {
     return this.derivedPeaks;
   }
 
+  /** Only data drawable in the selected mode makes the view independent of its owner. */
+  private hasIndependentData(): boolean {
+    if (this.type === 'spectrogram') return this.explicitSpectrogram !== undefined;
+    if (this.type === 'meter') return false;
+    return !!(this.explicitPeaks || this.sourcePeaks || (this.explicitClip ?? this.sourceClip)?.hasSamples);
+  }
+
   /**
    * `virtualization` as an attribute: absent keeps the renderer default (on), a
    * number overrides the buffer-screens window, anything else reads as the same
@@ -914,8 +938,7 @@ export class AudioViewElement extends WebMusicElement {
       return;
     }
     const owner = this.boundPlayer as {loading?: boolean; loadError?: Error} | undefined;
-    if (!this.explicitClip && !this.sourceClip && !this.explicitPeaks && !this.sourcePeaks &&
-        !this.explicitSpectrogram && !this.explicitFrequencyData && (owner?.loading || owner?.loadError)) {
+    if (this.loading || (!this.hasIndependentData() && (owner?.loading || owner?.loadError || this.playerSelectionError))) {
       return this.renderEmpty(host);
     }
     if (this.playerFacade()?.source?.kind === 'sequence' && !this.explicitClip && !this.sourceClip && !this.explicitPeaks && !this.sourcePeaks && this.type !== 'meter') {
@@ -932,7 +955,15 @@ export class AudioViewElement extends WebMusicElement {
         break;
       }
       case 'meter': {
-        const analyser = this.resolveAnalyser();
+        let analyser: AnalyserNode | undefined;
+        try {
+          analyser = this.resolveAnalyser();
+        } catch (cause) {
+          const error = cause instanceof Error ? cause : new Error(String(cause));
+          this.renderEmpty(host, error);
+          this.onViewError(error);
+          return;
+        }
         if (!analyser) return this.renderEmpty(host);
         this.rendered = renderLoudnessMeter(host, analyser, options);
         // A meter has no time axis — no playhead, no seek, no viewport — but it
@@ -965,14 +996,14 @@ export class AudioViewElement extends WebMusicElement {
    * Say what is missing instead of leaving a blank box. Nothing is disposed or
    * latched here, so assigning the missing data and refreshing draws normally.
    */
-  private renderEmpty(host: HTMLElement): void {
+  private renderEmpty(host: HTMLElement, failure?: Error): void {
     this.status = mountStatus(
       host,
       {snapshot: (): StatusState => {
-        if (this.sourceAbort || this.peaksAbort) return {kind: 'loading', message: 'Loading audio visualization'};
+        if (this.loading || this.sourceAbort || this.peaksAbort) return {kind: 'loading', message: 'Loading audio visualization'};
         const owner = this.boundPlayer as {loading?: boolean; loadError?: Error} | undefined;
         if (owner?.loading) return {kind: 'loading', message: 'Loading audio source'};
-        const error = this.peaksError ?? this.sourceError ?? owner?.loadError;
+        const error = failure ?? this.peaksError ?? this.sourceError ?? owner?.loadError ?? this.playerSelectionError;
         return error ? {kind: 'error', message: error.message}
           : {kind: 'waiting', message: EMPTY_STATE_MESSAGES[this.type]};
       }},
@@ -1072,34 +1103,52 @@ export class AudioViewElement extends WebMusicElement {
   private bindPlayer(): void {
     const generation = ++this.playerTargetGeneration;
     this.playerTargetCleanup?.(); this.playerTargetCleanup = undefined;
+    this.playerSelectionError = undefined;
     const selector = this.getAttribute('player');
     if (!selector) { this.connectPlayer(undefined); this.updateDocumentPlayback(); return; }
+    const current = (): boolean => this.isConnected &&
+      generation === this.playerTargetGeneration && this.getAttribute('player') === selector;
     let initial = true;
     const cleanup = observeElementTarget(this, selector, (target, state) => {
-      if (generation !== this.playerTargetGeneration || !this.isConnected) return;
+      if (!current()) return;
       const changed = target !== this.boundPlayer;
+      const previousError = this.playerSelectionError?.message;
+      this.playerSelectionError = state === 'invalid' ? new Error('Invalid player selector')
+        : state === 'ambiguous' ? new Error('Player selector matches multiple elements') : undefined;
       this.connectPlayer(state === 'ready' ? target : undefined);
       this.updateDocumentPlayback();
-      if (state === 'invalid') this.onViewError(new Error('Invalid player selector'));
-      if (!initial && changed && !this.hasEditorIntent()) this.refresh();
+      if (state === 'invalid') this.onViewError(this.playerSelectionError!);
+      if (!initial && (changed || previousError !== this.playerSelectionError?.message) && !this.hasEditorIntent()) this.refresh();
     });
     initial = false;
     if (generation === this.playerTargetGeneration) this.playerTargetCleanup = cleanup; else cleanup();
   }
 
-  private connectPlayer(target: EventTarget | undefined): void {
+  private connectPlayer(target: Element | undefined): void {
     if (target === this.boundPlayer) return;
     this.unbindPlayer();
     this.boundPlayer = target;
     if (target) {
-      const onSourceChange = (): void => {
+      const active = (event: Event): boolean => {
+        if (!this.isConnected || this.boundPlayer !== target || event.target !== target) return false;
+        // Owners can announce disposal before mutation delivery. Release the
+        // removed owner now instead of rebuilding from its retained clip.
+        if (target.getRootNode() !== this.getRootNode()) {
+          this.bindPlayer();
+          this.refresh();
+          return false;
+        }
+        return true;
+      };
+      const onSourceChange = (event: Event): void => {
+        if (!active(event)) return;
         if (this.hasEditorIntent()) { this.updateDocumentPlayback(); this.bindVisualizer(); return; }
         // Immutable clip identity invalidates the derived cache in resolvePeaks.
         // A new player using the same clip must not copy/rescan all PCM again.
-        if (this.isConnected) this.refresh();
+        this.refresh();
       };
-      const onLoaded = (): void => {
-        if (!this.isConnected) return;
+      const onLoaded = (event: Event): void => {
+        if (!active(event)) return;
         if (this.hasEditorIntent()) { this.updateDocumentPlayback(); this.bindVisualizer(); return; }
         if (!this.rendered || this.type === 'meter' ||
             this.resolveClip() !== this.renderedClip ||
@@ -1115,21 +1164,25 @@ export class AudioViewElement extends WebMusicElement {
           this.surfaceSlider?.update();
         }
       };
-      const onLoadStateChange = (): void => {
+      const onLoadStateChange = (event: Event): void => {
         // An editor-bound view draws document content; player loading never rebuilds its editor.
-        if (this.isConnected && !this.hasEditorIntent() && !this.explicitClip && !this.sourceClip && !this.explicitPeaks &&
-            !this.sourcePeaks && !this.explicitSpectrogram && !this.explicitFrequencyData) this.refresh();
+        if (active(event) && !this.hasEditorIntent() && !this.hasIndependentData()) this.refresh();
       };
-      target.addEventListener('webaudio:loadstatechange', onLoadStateChange);
-      target.addEventListener('webaudio:loaded', onLoaded);
-      target.addEventListener('webaudio:sourcechange', onSourceChange);
-      target.addEventListener('webaudio:documentstatechange', onSourceChange);
+      const listeners: Array<[string, EventListener]> = [
+        ['webaudio:loadstatechange', onLoadStateChange],
+        ['webaudio:loaded', onLoaded],
+        ['webaudio:sourcechange', onSourceChange],
+        ['webaudio:playerchange', onSourceChange],
+        ['webaudio:documentstatechange', onSourceChange],
+      ];
+      // Register rollback before a custom target's subscription can throw.
       this.playerUnbind = () => {
-        target.removeEventListener('webaudio:loadstatechange', onLoadStateChange);
-        target.removeEventListener('webaudio:loaded', onLoaded);
-        target.removeEventListener('webaudio:sourcechange', onSourceChange);
-        target.removeEventListener('webaudio:documentstatechange', onSourceChange);
+        for (const [name, listener] of listeners) target.removeEventListener(name, listener);
       };
+      for (const [name, listener] of listeners) {
+        if (this.boundPlayer !== target) break;
+        target.addEventListener(name, listener);
+      }
     }
     this.bindVisualizer();
   }
@@ -1201,31 +1254,34 @@ export class AudioViewElement extends WebMusicElement {
   private playerAdapter(): ViewPlayerBinding {
     const target = this.boundPlayer;
     const playerView = this.playerFacade();
+    const revision = this.bindingRevision;
+    const current = (): boolean => this.isConnected && revision === this.bindingRevision &&
+      target === this.boundPlayer && playerView === this.playerFacade();
     const position = playerView?.seconds ?? playerView?.currentTime;
     const hasLivePosition = typeof position === 'number' && Number.isFinite(position);
     const timeline = this.timeline;
     return {
       on: (event, listener) => {
-        if (!target) return () => {};
+        if (!target || !current()) return () => {};
         const handler = (domEvent: Event): void => {
-          listener((domEvent as CustomEvent<TimeUpdateDetail>).detail);
+          if (current() && domEvent.target === target) listener((domEvent as CustomEvent<TimeUpdateDetail>).detail);
         };
         const domName = `webaudio:${event}`;
         target.addEventListener(domName, handler);
         return () => target.removeEventListener(domName, handler);
       },
-      seek: (seconds) => playerView?.seek?.(seconds),
+      seek: (seconds) => current() ? playerView?.seek?.(seconds) : undefined,
       get seconds() {
-        return playerView?.seconds ?? playerView?.currentTime ?? timeline.snapshot.playheadSeconds;
+        return current() ? playerView?.seconds ?? playerView?.currentTime ?? timeline.snapshot.playheadSeconds : timeline.snapshot.playheadSeconds;
       },
       get duration() {
-        return playerView?.duration ?? 0;
+        return current() ? playerView?.duration ?? 0 : 0;
       },
       get playing() {
-        return hasLivePosition ? playerView?.playing : undefined;
+        return current() && hasLivePosition ? playerView?.playing : undefined;
       },
       get scratching() {
-        return hasLivePosition ? playerView?.scratching : undefined;
+        return current() && hasLivePosition ? playerView?.scratching : undefined;
       },
     };
   }
@@ -1675,14 +1731,19 @@ export class AudioViewElement extends WebMusicElement {
 
   // ---- Sources ----
 
+  private syncBusyState(): void {
+    if (this.loading || this.sourceAbort || this.peaksAbort) this.setAttribute('aria-busy', 'true');
+    else this.removeAttribute('aria-busy');
+  }
+
   /** Only current loaders own busy state; superseded requests may settle later. */
   private beginLoad(): void {
-    this.setAttribute('aria-busy', 'true');
+    this.syncBusyState();
     if (this.isConnected) this.refresh();
   }
 
   private endLoad(): void {
-    if (!this.sourceAbort && !this.peaksAbort) this.removeAttribute('aria-busy');
+    this.syncBusyState();
     this.status?.update();
   }
 

@@ -66,9 +66,9 @@ sidebar:
 
 import MyElementPlayground from '../../../../../components/elements/MyElementPlayground.astro';
 
-Opening prose.
-
 <MyElementPlayground />
+
+Opening prose.
 
 ## Import
 
@@ -98,7 +98,12 @@ CSS properties, public parts and host styling.
 </details>
 ````
 
-Order: introduction → main demo → Import → optional topics → API → Styling.
+Order: main demo → introduction → Import → optional topics → API → Styling.
+The main demo is the first visible page-body content, immediately after the
+page title. Only frontmatter, imports and non-rendered comments precede it in
+the MDX source. Do not put introductory paragraphs, notices, code examples or
+section headings above it. Keep the title and site navigation in their normal
+positions; move the existing demo rather than copying it.
 A working demo or generated control strip does not replace Import or the
 complete API table.
 
@@ -109,8 +114,9 @@ complete API table.
 - `title` is the primary tag in angle brackets, such as `'<audio-view>'`.
   `description` is one plain sentence. A capability group expands straight to
   its element pages, so leaf `sidebar.order` is dense from 1.
-- Use 1–3 short paragraphs to explain what the element does, required input or
-  binding, and when to choose it against related elements, with links.
+- After the main demo, use 1–3 short paragraphs to explain what the element does,
+  required input or binding, and when to choose it against related elements,
+  with links.
 - Identify attached components in a shared workflow; keep their complete member
   descriptions in their reference sections.
 - Do not enumerate attributes, registration steps, or styling in the intro.
@@ -269,8 +275,8 @@ Before shipping:
   Web Components inventory when a tag, job, or registration function changes.
 - Exercise controls, modes, and composition changes or state their limitations;
   Copy/Reset reflects the real structure.
-- Keep introduction, Import, topics, API, and Styling distinct. Do not omit
-  reference content because a demo exists.
+- Place the main demo first and keep introduction, Import, topics, API, and
+  Styling distinct. Do not omit reference content because a demo exists.
 - Verify browser upgrade, interaction, unexpected console errors, and cleanup
   across disconnect/reconnect.
 - Check links and actual heading IDs; follow the automated and manual

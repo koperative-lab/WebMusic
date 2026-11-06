@@ -24,8 +24,10 @@ describe.each(['audio-level-analyzer', 'audio-spectrum-analyzer', 'audio-oscillo
     expect(feedback().dataset.kind).toBe('loading');
     expect(feedback().getAttribute('aria-busy')).toBe('true');
 
-    source.loading = false;
     source.loadError = new Error('The audio file could not be decoded');
+    source.dispatchEvent(new CustomEvent('webaudio:loadstatechange'));
+    expect(feedback().dataset.kind).toBe('loading');
+    source.loading = false;
     source.dispatchEvent(new CustomEvent('webaudio:loadstatechange'));
     expect(feedback().hasAttribute('aria-busy')).toBe(false);
     expect(feedback().dataset.kind).not.toBe('waiting');

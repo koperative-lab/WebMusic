@@ -729,7 +729,8 @@ export abstract class AnalysisComponentElement extends HTMLElementBase {
       ? (this.#player as (Element & {playback?: ScorePlaybackSource}) | undefined)?.playback?.snapshot()
       : undefined;
     const loading = this.#loading || native?.readiness === 'loading';
-    const waiting = recipe.needsScore ? !score : !this.#playing && this.#soundingMidis.length === 0;
+    const waiting = recipe.needsScore ? !score
+      : !this.#player || native?.readiness === 'empty' || native?.readiness === 'disposed';
     const error = this.#error ?? (native?.readiness === 'error'
       ? native.error instanceof Error ? native.error.message : 'Could not load playback source.' : undefined)
       ?? (loading ? undefined : material.error);

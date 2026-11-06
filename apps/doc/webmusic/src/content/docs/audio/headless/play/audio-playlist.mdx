@@ -22,6 +22,10 @@ An AudioPlaylist can be borrowed by the central
 structural connection; `clip` aliases the current resolved clip, and `clock`
 reads the active entry's clock when available. The queue keeps ownership of its
 entry engines and context; detaching the facade does not dispose it.
+Its `loading` and `loadError` getters describe only the selected entry and notify
+`subscribe` observers when they change. Background prefetch never makes the
+current ready entry busy or failed. Retrying or replacing the selected source
+clears its previous error; disposal clears both observable states.
 
 ## Import
 
@@ -159,6 +163,8 @@ fields into public API.
 | `statusOf(id)` | AudioPlaylistEntryStatus | idle, loading, ready or error. |
 | `clipOf(id)` | AudioClip or undefined | Resolved clip for an entry. |
 | `currentClip` | AudioClip or undefined | Resolved current material. |
+| `loading` | boolean | Selected entry fetch/decode is pending; excludes background prefetch. |
+| `loadError` | Error or undefined | Selected entry's last load failure, cleared on retry, source replacement or disposal. |
 | `activePlayer` | AudioClipPlayer or undefined | Current player; caller may inspect but must not dispose it. |
 | `playing` | boolean | Current playback state. |
 | `seconds` | number | Position in current clip, not total queue elapsed time. |

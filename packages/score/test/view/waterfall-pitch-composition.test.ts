@@ -3,6 +3,7 @@ import {afterEach, describe, expect, it} from 'vitest';
 import {Duration, Rational, ScoreBuilder, VoiceId, midiToPitch} from '../../src/core';
 import {PitchViewElement} from '../../src/view/element/score-pitch-view';
 import {ScoreViewElement} from '../../src/view/element/score-view';
+import type {ScoreViewDirection} from '../../src/view/core/types';
 
 customElements.define('aligned-score-view', class extends ScoreViewElement {});
 customElements.define('aligned-pitch-view', class extends PitchViewElement {});
@@ -20,16 +21,16 @@ function music(low: number, high: number) {
   return builder.build();
 }
 
-async function pair(low: number, high: number, white = 32, black = 20) {
+async function pair(low: number, high: number, white = 32, black = 20, direction: ScoreViewDirection = 'down') {
   const score = document.createElement('aligned-score-view') as ScoreViewElement;
   const pitch = document.createElement('aligned-pitch-view') as PitchViewElement;
   for (const [key, value] of Object.entries({
-    type: 'waterfall', 'min-pitch': low, 'max-pitch': high,
+    type: 'waterfall', direction, 'min-pitch': low, 'max-pitch': high,
     'white-note-width': white, 'black-note-width': black,
     'pixels-per-second': 60, 'note-spacing': 0, 'show-annotations': 'false',
   })) score.setAttribute(key, String(value));
   for (const [key, value] of Object.entries({
-    type: 'keyboard', low, high, 'white-key-width': white, 'black-key-width': black,
+    type: 'keyboard', direction: {up: 'down', down: 'up', left: 'right', right: 'left'}[direction], low, high, 'white-key-width': white, 'black-key-width': black,
     'white-key-height': 80, 'black-key-height': 48, scroll: 'true', follow: 'none',
   })) pitch.setAttribute(key, String(value));
   score.score = music(low, high);
@@ -45,20 +46,21 @@ function pixels(value: string, width: number): number {
 /** Compare two independently mounted public components, not two copies of a formula. */
 function expectAligned(score: ScoreViewElement, pitch: PitchViewElement): void {
   const board = pitch.querySelector<HTMLElement>('.wui-pitch-keyboard__board')!;
-  const width = Number.parseFloat(board.style.width);
-  expect(board.style.width).toMatch(/px$/);
-  expect(Number(score.querySelector('svg')!.getAttribute('width'))).toBeCloseTo(width);
+  const vertical = score.direction === 'left' || score.direction === 'right';
+  const width = Number.parseFloat(vertical ? board.style.height : board.style.width);
+  expect(vertical ? board.style.height : board.style.width).toMatch(/px$/);
+  expect(Number(score.querySelector('svg')!.getAttribute(vertical ? 'height' : 'width'))).toBeCloseTo(width);
   const notes = [...score.querySelectorAll<SVGRectElement>('rect[data-pitch]')];
   expect(notes.length).toBeGreaterThan(0);
   for (const note of notes) {
     const key = pitch.querySelector<HTMLElement>(`.wui-pitch-keyboard__key[data-midi="${note.dataset.pitch}"]`)!;
     expect(key).not.toBeNull();
-    const keyWidth = pixels(key.style.width, width);
+    const keyWidth = pixels(vertical ? key.style.height : key.style.width, width);
     const black = key.classList.contains('wui-pitch-keyboard__key--black');
-    const left = pixels(key.style.left, width) - (black ? keyWidth / 2 : 0);
-    expect(Number(note.getAttribute('x'))).toBeCloseTo(left, 3);
-    expect(Number(note.getAttribute('width'))).toBeCloseTo(keyWidth, 3);
-    expect(left).toBeGreaterThanOrEqual(0);
+    const left = pixels(vertical ? key.style.top : key.style.left, width) - (black ? keyWidth / 2 : 0);
+    expect(Number(note.getAttribute(vertical ? 'y' : 'x'))).toBeCloseTo(left, 3);
+    expect(Number(note.getAttribute(vertical ? 'height' : 'width'))).toBeCloseTo(keyWidth, 3);
+    expect(left).toBeGreaterThanOrEqual(-1e-6);
     expect(left + keyWidth).toBeLessThanOrEqual(width + 1e-6);
   }
 }
@@ -66,6 +68,14 @@ function expectAligned(score: ScoreViewElement, pitch: PitchViewElement): void {
 afterEach(() => document.body.replaceChildren());
 
 describe('separate waterfall and keyboard geometry', () => {
+  it.each(['up', 'down', 'left', 'right'] as const)('aligns independently composed notes and keys facing %s, including fractional raised endpoints', async (direction) => {
+    for (const [low, high] of [[48, 71], [53, 66], [61, 61], [66, 53]]) {
+      const {score, pitch} = await pair(low, high, 31.5, 19.53, direction);
+      expectAligned(score, pitch);
+      score.remove(); pitch.remove();
+    }
+  });
+
   it.each([[48, 71], [53, 66], [61, 61], [66, 53]])('aligns exact MIDI endpoints %s–%s including raised edge keys', async (low, high) => {
     const {score, pitch} = await pair(low, high);
     expectAligned(score, pitch);

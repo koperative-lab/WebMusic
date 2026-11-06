@@ -313,6 +313,10 @@ does not establish that all anchors work.
 
 A main demo lives on the page owning the demonstrated element, object, or
 presenter. A justified composition/reskin example can live in a topic section.
+On Web Component leaf/workflow pages, the main demo is the first visible body
+content immediately after the page title, followed by the introduction and
+reference sections. Frontmatter and imports stay above it in source; later
+topic examples retain their explanatory sections.
 Inventories and the Score family page carry no demo; the Audio family page
 may carry its reviewed workbench. Quick Start provides compact working examples.
 Shared `LiveDemoCanvas` owns the stage chrome; templates own the detailed

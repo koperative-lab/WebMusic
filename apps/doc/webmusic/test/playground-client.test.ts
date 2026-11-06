@@ -517,6 +517,29 @@ describe('type-specific Element playground parameters', () => {
     expect(f.input('scroll').querySelector('option[value="unset"]')!.textContent).toBe('default (off)');
   });
 
+  it.each(['score-view', 'score-pitch-view'])('retains %s directions across relevant modes and serializes Copy/Reset', async (tag) => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {configurable: true, value: {writeText}});
+    const f = fixture(tag); mountPlaygrounds();
+    if (tag === 'score-view') f.change('type', 'piano-roll');
+    expect(f.row('direction').hidden).toBe(false);
+    for (const direction of ['up', 'down', 'left', 'right']) {
+      f.change('direction', direction);
+      expect(f.target.getAttribute('direction')).toBe(tag === 'score-pitch-view' && direction === 'down' ? null : direction);
+    }
+    f.change('type', 'staff');
+    expect(f.row('direction').hidden).toBe(true);
+    expect(f.target.getAttribute('direction')).toBe('right');
+    f.change('type', tag === 'score-view' ? 'waterfall' : 'keyboard');
+    expect(f.row('direction').hidden).toBe(false);
+    expect(f.input('direction').value).toBe('right');
+    f.copy.click(); await Promise.resolve();
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining('direction="right"'));
+    f.reset.click();
+    expect(f.target.hasAttribute('direction')).toBe(false);
+    expect(f.output.textContent).not.toContain('direction=');
+  });
+
   it('shows annotation visibility only for the staff type and includes it in Copy/Reset', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, 'clipboard', {configurable: true, value: {writeText}});
@@ -525,18 +548,19 @@ describe('type-specific Element playground parameters', () => {
     expect(f.input('show-annotations').value).toBe('unset');
     f.change('type', 'staff');
     expect(f.row('show-annotations').hidden).toBe(false);
-    f.change('show-annotations', 'off');
-    expect(f.target.getAttribute('show-annotations')).toBe('false');
+    expect(f.input('show-annotations').querySelector('option[value="unset"]')!.textContent).toBe('off');
+    f.change('show-annotations', 'on');
+    expect(f.target.getAttribute('show-annotations')).toBe('');
     for (const type of ['waterfall', 'piano-roll']) {
       f.change('type', type);
       expect(f.row('show-annotations').hidden).toBe(true);
-      expect(f.target.getAttribute('show-annotations')).toBe('false');
+      expect(f.target.getAttribute('show-annotations')).toBe('');
     }
     f.change('type', 'staff');
     expect(f.row('show-annotations').hidden).toBe(false);
-    expect(f.input('show-annotations').value).toBe('off');
+    expect(f.input('show-annotations').value).toBe('on');
     f.copy.click(); await Promise.resolve();
-    expect(writeText).toHaveBeenCalledWith(expect.stringContaining('show-annotations="false"'));
+    expect(writeText).toHaveBeenCalledWith(expect.stringMatching(/<score-view[^>]*\bshow-annotations[\s=>]/));
     f.reset.click();
     expect(f.target.hasAttribute('show-annotations')).toBe(false);
     expect(f.input('show-annotations').value).toBe('unset');

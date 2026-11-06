@@ -16,6 +16,7 @@ export {
 export {
   renderScoreVisualizer,
   type ScoreVisualizerRenderOptions,
+  type ScoreVisualizerHandle,
 } from './score-visualizer';
 export {
   SCORE_GRID_FEATURES,

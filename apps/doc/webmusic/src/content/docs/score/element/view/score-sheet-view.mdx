@@ -7,6 +7,8 @@ sidebar:
 
 import SheetViewPlayground from '../../../../../components/elements/SheetViewPlayground.astro';
 
+<SheetViewPlayground />
+
 `<score-sheet-view>` engraves a score as sheet music. Measures are broken into
 systems that fill the line, each system restates its clef and key, and systems
 are laid out on paper pages or in one continuous column. With a borrowed
@@ -14,8 +16,6 @@ editor and `editable`, it works like a notation program: select notes and
 rests, move pitches, write notes in input mode and change durations. For a
 compact scrolling staff use [`<score-view type="staff">`](/score/element/view/score-view/);
 for DAW-style note editing use [`<score-grid-view>`](/score/element/view/score-grid-view/).
-
-<SheetViewPlayground />
 
 The demo loads Arabesque No. 1 from MusicXML (`public/mxl/Arabesque No.1.mxl`)
 into one editor. The page owns that editor and lends it to the player and the

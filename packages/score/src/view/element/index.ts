@@ -10,6 +10,7 @@ export {
   type ScoreViewRenderOptions,
   type ScoreViewConfiguration,
   type ScoreViewOptionsByType,
+  type ScoreViewDirection,
 } from './score-view';
 export {
   ScoreGridViewElement,
@@ -20,7 +21,7 @@ export {
   type ScoreGridSnap,
   type ScoreGridTool,
 } from './score-grid-view';
-export {PitchViewElement, definePitchViewElement, type PitchViewType} from './score-pitch-view';
+export {PitchViewElement, definePitchViewElement, type PitchViewType, type PitchViewDirection} from './score-pitch-view';
 export {
   SheetViewElement,
   SHEET_VIEW_FEATURES,

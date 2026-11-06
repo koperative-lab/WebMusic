@@ -7,6 +7,8 @@ sidebar:
 
 import AudioAnalyzeFeaturePlayground from '../../../../../components/elements/AudioAnalyzeFeaturePlayground.astro';
 
+<AudioAnalyzeFeaturePlayground tag="audio-transient-analyzer" />
+
 The transient analyzer makes recent attacks visible while a signal sounds.
 It compares successive frequency and RMS snapshots, shows strength against a
 sensitivity threshold, and marks accepted cues in a short history. Freeze
@@ -15,8 +17,6 @@ stable onset times or a DJ beat grid, use the
 [Analyze API](/audio/api/analyze/#onsets) and compose positions with
 [`<audio-view>.regions`](/audio/element/view/audio-view/#annotate). This live
 tool does not estimate BPM or align a beat grid.
-
-<AudioAnalyzeFeaturePlayground tag="audio-transient-analyzer" />
 
 ## Import
 

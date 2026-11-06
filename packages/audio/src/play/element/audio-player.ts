@@ -63,7 +63,7 @@ import {
   type TransportHandle,
 } from '@webmusic/ui/transport';
 
-const PROPS = ['clip', 'player', 'effect', 'audioContext', 'editor'] as const;
+const PROPS = ['loading', 'clip', 'player', 'effect', 'audioContext', 'editor'] as const;
 let audioElementSequence = 0;
 
 /** Attributes that reach a live player through a setter — owned or borrowed. */
@@ -86,6 +86,7 @@ export class AudioPlayerElement extends WebMusicElement {
   static get observedAttributes(): string[] {
     return [
       'src',
+      'loading',
       'format',
       'controls',
       'loop',
@@ -206,12 +207,15 @@ export class AudioPlayerElement extends WebMusicElement {
     // During custom-element upgrade, existing attributes are delivered before
     // connectedCallback even though isConnected is already true. Wait until
     // onMount resolves the composition scope before loading or allocating.
-    if (!this.isConnected || !this.mounted) return;
+    if (!this.isConnected || !this.mounted || _old === value) return;
     if (name === 'composition' || name === 'session') {
-      if (_old === value) return;
       super.disconnectedCallback();
       super.connectedCallback();
       notifyModuleContext(this);
+      return;
+    }
+    if (name === 'loading') {
+      this.updateLoadFeedback();
       return;
     }
     if (name === 'src' && this.hasEditorSource()) {
@@ -546,11 +550,14 @@ export class AudioPlayerElement extends WebMusicElement {
     return this._player?.scratching ?? false;
   }
 
-  /** True while this Element is fetching or decoding its current source. */
-  get loading(): boolean { return this.loadController !== null; }
+  /** Aggregate source readiness; writing only changes caller-owned preparation. */
+  get loading(): boolean {
+    return boolAttr(this, 'loading', false) || this.loadController !== null || (this._player?.loading ?? false);
+  }
+  set loading(value: boolean) { this.setAttribute('loading', String(value)); }
 
   /** Current source-load failure, cleared by a new load or explicit source assignment. */
-  get loadError(): Error | undefined { return this._loadError; }
+  get loadError(): Error | undefined { return this._loadError ?? this._player?.loadError; }
 
   get playing(): boolean {
     return this.modular ? this.moduleContext?.session?.snapshot.paused === false : this._player?.playing ?? false;
@@ -1123,6 +1130,9 @@ export class AudioPlayerElement extends WebMusicElement {
       this.dispatch('statechange', detail);
       this.notifyUI();
     }));
+    this.offFns.push(player.on('loadstatechange', () => {
+      if (this._player === player) this.updateLoadFeedback();
+    }));
     this.offFns.push(
       player.on('timeupdate', (d) => {
         this.dispatch('timeupdate', d);
@@ -1333,8 +1343,8 @@ export class AudioPlayerElement extends WebMusicElement {
   }
 
   private loadFeedback(): StatusState {
-    if (this.loadController) return {kind: 'loading', message: 'Loading audio'};
-    if (this._loadError) return {kind: 'error', message: this._loadError.message};
+    if (this.loading) return {kind: 'loading', message: 'Loading audio'};
+    if (this.loadError) return {kind: 'error', message: this.loadError.message};
     return this.clip || this._player?.transport
       ? {kind: 'ready'}
       : {kind: 'waiting', message: 'Waiting for an audio source'};
@@ -1343,6 +1353,8 @@ export class AudioPlayerElement extends WebMusicElement {
   private updateLoadFeedback(): void {
     const loading = this.loading;
     const error = this.loadError;
+    if (loading) this.setAttribute('aria-busy', 'true');
+    else this.removeAttribute('aria-busy');
     if (loading !== this.announcedLoading || error !== this.announcedLoadError) {
       this.announcedLoading = loading;
       this.announcedLoadError = error;

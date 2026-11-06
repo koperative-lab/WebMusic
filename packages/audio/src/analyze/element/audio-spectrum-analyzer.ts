@@ -244,7 +244,7 @@ export class AudioSpectrumAnalyzerElement extends WebMusicElement {
     }
     if (!this.#explicitAnalyser && (this.#loading || this.#loadError)) {
       this.#stop();
-      this.#clear(this.#loadError ? 'unavailable' : 'loading');
+      this.#clear(this.#loading ? 'loading' : 'unavailable');
       return;
     }
     let analyser: AnalyserNode | undefined;

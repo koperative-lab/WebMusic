@@ -8,6 +8,8 @@ sidebar:
 import AudioPlayerDemo from '../../../../../components/AudioPlayerDemo.astro';
 import AudioCustomStyleDemo from '../../../../../components/AudioCustomStyleDemo.astro';
 
+<AudioPlayerDemo />
+
 `<audio-player>` is the central Audio transport. It owns a stable
 [`AudioPlayer`](/audio/headless/play/audio-player/) and controls one selected clip,
 playlist, mix or editing sequence. Connect playlist, mixer and recorder components using
@@ -17,8 +19,6 @@ play/pause, seek and time controls; companions supply their own tasks.
 A `src` URL or `.clip` selects one clip. Linked playlist/mixer components select
 their backend, preserving its state. A linked recorder auditions its take through
 this player. Views and meters follow the same owner.
-
-<AudioPlayerDemo />
 
 ## Import
 
@@ -126,6 +126,21 @@ transport, including feedback.
 Loading and waiting descriptions remain available to assistive technology, and
 both animations respect reduced-motion preferences.
 
+For application-owned decoding or preparation, set `player.loading = true`
+before awaiting the work, assign the prepared `.clip` or backend, and clear the
+flag in `finally`. The boolean `loading` attribute controls the same flag
+(absent or `false` / `0` / `no` / `off` means false). This starts no work and
+does not reset existing data, playback or position. The application owns errors,
+cancellation and stale results from its work; only the current operation may
+clear its flag. Clear it on application cleanup too.
+
+The `.loading` getter reports that flag **or** an active Element request **or**
+the selected backend's pending input. Clearing the flag cannot hide an ongoing
+internal/queue load. A linked playlist forwards its selected entry's loading
+and error, while unrelated prefetch leaves the ready transport usable.
+`webaudio:loadstatechange` publishes the combined state to bound views and
+analysis components. A paused or silent ready source is not loading.
+
 ## Re-skinning
 
 Every visual knob is a CSS custom property, so the whole transport re-skins from
@@ -169,7 +184,6 @@ reported as `webaudio:error`.
 
 <details class="component-section">
 <summary>API</summary>
-
 
 ```ts
 import { loadClipFromUrl } from '@webmusic/audio/play';
@@ -224,8 +238,8 @@ await el.player?.play();                     // stable AudioPlayer facade
 | `webaudio:sourcechange` | event | `AudioPlayerElementSourceDetail` is the discriminated `.source` snapshot after data, applied sequence revision or player identity changes, including clearing. Without a player (before mounting or after disconnecting), a retained `.clip` reports `kind: 'clip'`. Revision increases per Element. Read `.source` for initial attachment; this event does not require building the audio graph. |
 | `webaudio:documentstatechange` | event | Current `.documentBinding`, including preparation, acknowledgement, failure and recovery. Bubbles and crosses shadow roots. |
 | `webaudio:playerchange` | event | `{player}` after central player identity changes; companions rebind to the new owner. |
-| `loading` | readonly property | `boolean`; true only during this Element's current URL fetch or buffer/blob decode. Defaults to `false`. |
-| `loadError` | readonly property | `Error \| undefined`; current source-load failure, cleared by a new load or explicit source selection. |
+| `loading` | boolean attribute / writable property | External flag defaults to false; setting the property reflects `"true"` / `"false"`. Getter combines that flag, this Element's current URL/input request and the active backend's loading. Clearing the flag never cancels pending work. |
+| `loadError` | readonly property | `Error \| undefined`; current Element load failure, or the active backend's input failure. Owned failures clear on new load/source selection; backend failures follow that owner. |
 | `webaudio:loadstatechange` | event | `{loading, error}` whenever source loading or its failure changes, including cancellation. Read `.loading` / `.loadError` to initialize a late follower. Does not describe normal pause or playback buffering. |
 | `webaudio:statechange` | event | `{playing}` from the selected backend. |
 | `webaudio:loaded` | event | `detail = { duration }` once the selected backend is prepared. Source replacement is a separate `webaudio:sourcechange` notification. |

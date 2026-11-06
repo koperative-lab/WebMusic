@@ -26,6 +26,12 @@ export const SCORE_PLAY_PARAMS: ElementParamCatalog = {
         note: 'Forces the parser when the extension is missing or lies. Only read while src is being loaded.',
       },
       {
+        name: 'loading',
+        kind: 'bool',
+        fallback: 'off — readiness follows the selected source',
+        note: 'Declare application-owned preparation without starting work or replacing the current player. Clearing it retains any native source load.',
+      },
+      {
         name: 'sound-font',
         kind: 'text',
         placeholder: 'https://cdn/{midi}.mp3',
@@ -87,6 +93,7 @@ export const SCORE_PLAY_PARAMS: ElementParamCatalog = {
     properties: [
       {name: 'module', note: 'Borrow the local ModuleHandle without creating an audio graph.'},
       {name: 'sessionTransport', note: 'Read-only shared Session authority in module composition; commands use Session seconds.'},
+      {name: 'loading', note: 'Read current native or caller preparation. Writes reflect only the caller-owned loading flag; clearing it never cancels a native request or resets playback.'},
       {name: 'score', note: 'Assign a loaded Score; overrides src.'},
       {name: 'editor', note: 'Assign an editor from loadScoreEditor/createScoreEditor (any Core ScoreDocumentSource); borrowed, never disposed. Undefined detaches it. Conflicts with src, .score, Rack and controller inputs.'},
       {name: 'documentBinding', note: 'Requested/applied document revision, attempt and readiness; undefined without an editor input, empty until a native player mounts, error for a source conflict or failed mount.'},

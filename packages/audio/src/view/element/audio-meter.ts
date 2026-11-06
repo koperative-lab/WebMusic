@@ -148,6 +148,7 @@ export class AudioMeterElement extends WebMusicElement {
   private boundPlayer?: AudioMeterPlayer;
   private boundTarget?: PlayerElement;
   private playerAnalyser?: AnalyserNode;
+  private playerError?: Error;
   private playerUnbind: Array<() => void> = [];
   private sourceObserver?: MutationObserver;
   private bindingRevision = 0;
@@ -159,6 +160,7 @@ export class AudioMeterElement extends WebMusicElement {
   private paletteAt = -Infinity;
   private paletteDirty = true;
   private latest?: AudioMeterDisplaySnapshot;
+  private frameError?: Error;
   /** Created once and re-appended; a per-mount node would accumulate. */
   private compatibilityStyle?: HTMLStyleElement;
   /** The framed surface host and its token probe, created once with the style. */
@@ -413,7 +415,11 @@ export class AudioMeterElement extends WebMusicElement {
         fallbackHeight: 96,
         classNames: {root: 'wrap'},
         parts: {root: 'wrap'},
-        onError: (error) => this.onMeterError(error),
+        onError: (error) => {
+          this.frameError = error instanceof Error ? error : new Error(String(error));
+          this.latest = undefined;
+          this.onMeterError(error);
+        },
       },
     );
     return {
@@ -438,6 +444,7 @@ export class AudioMeterElement extends WebMusicElement {
     const snapshot = display.capture(controller, time);
     this.latest = snapshot;
     painter.paint(frame, snapshot, this.palette);
+    this.frameError = undefined;
   }
 
   /** Presenter read/scheduling failures are observable without breaking its loop. */
@@ -494,6 +501,7 @@ export class AudioMeterElement extends WebMusicElement {
     this.meter = undefined;
     this.display?.clear();
     this.latest = undefined;
+    this.frameError = undefined;
     if (firstError !== undefined) throw firstError;
   }
 
@@ -502,12 +510,13 @@ export class AudioMeterElement extends WebMusicElement {
   }
 
   private meterStatus(): StatusState {
-    if (this.contextRef || this.analyserRef) return {kind: 'ready'};
-    const source = this.explicitPlayer ?? this.boundTarget;
+    const source = this.contextRef || this.analyserRef ? undefined : this.explicitPlayer ?? this.boundTarget;
     if (source?.loading) return {kind: 'loading', message: 'Loading audio source.'};
     if (source?.loadError) {
       return {kind: 'error', message: source.loadError instanceof Error ? source.loadError.message : String(source.loadError)};
     }
+    if (source && this.playerError) return {kind: 'error', message: this.playerError.message};
+    if (this.meter?.analyser && this.frameError) return {kind: 'error', message: this.frameError.message};
     return this.meter?.analyser
       ? {kind: 'ready'}
       : {kind: 'waiting', message: 'Waiting for an audio source.'};
@@ -636,6 +645,12 @@ export class AudioMeterElement extends WebMusicElement {
     const revision = this.bindingRevision;
     this.refreshingPlayer = true;
     try {
+      this.playerError = undefined;
+      const source = this.explicitPlayer ?? this.boundTarget;
+      if (source?.loading || source?.loadError) {
+        this.presenter?.redraw();
+        return;
+      }
       const player = this.explicitPlayer ?? this.boundTarget?.player ?? this.boundTarget;
       const analyser = player?.analyser;
       if (revision !== this.bindingRevision || !this.isConnected) return;
@@ -649,6 +664,8 @@ export class AudioMeterElement extends WebMusicElement {
       try { this.rebuild(); }
       catch (error) { this.playerAnalyser = previous; throw error; }
     } catch (error) {
+      this.playerError = error instanceof Error ? error : new Error(String(error));
+      this.presenter?.redraw();
       this.onMeterError(error);
     } finally {
       this.refreshingPlayer = false;
@@ -662,6 +679,7 @@ export class AudioMeterElement extends WebMusicElement {
     this.boundPlayer = undefined;
     this.boundTarget = undefined;
     this.playerAnalyser = undefined;
+    this.playerError = undefined;
     const failures: unknown[] = [];
     for (const release of releases) {
       try { release(); } catch (error) { failures.push(error); }

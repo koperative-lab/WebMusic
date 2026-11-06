@@ -7,6 +7,8 @@ sidebar:
 
 import ScoreGridViewDemo from '../../../../../components/elements/ScoreGridViewDemo.astro';
 
+<ScoreGridViewDemo />
+
 `<score-grid-view>` draws a score as a piano-roll grid: written-pitch rows over
 bar, beat and snap lines, with piano keys on the left, a bar ruler on top and an
 optional velocity lane below. It follows a bound player's playhead and sounding
@@ -20,8 +22,6 @@ notes to select them and drag them as in a DAW piano roll. Draw, resize, delete,
 velocity, snap, zoom and undo/redo can each be switched on or off with `tools`.
 Use [`<score-view>`](/score/element/view/score-view/) for read-only staff,
 waterfall or seconds-based piano-roll drawings; it can follow the same editor.
-
-<ScoreGridViewDemo />
 
 The demo loads Arabesque No. 1 (`public/midi/Arabesque No.1.mid`) into one
 editor. The page owns that editor and lends it to the player and the grid.

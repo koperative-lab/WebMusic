@@ -7,6 +7,8 @@ sidebar:
 
 import NoteInputDemo from '../../../../../components/NoteInputDemo.astro';
 
+<NoteInputDemo />
+
 **`<score-note-input>`** is the discrete-note performance surface. Set `layout` to pick the rendering and interaction model; all layouts share multi-touch, drag glissando, per-note reference counting, and the same output contract (`webscore:noteon` / `webscore:noteoff` + `.onNote`). Every layout also accepts the boolean `keyboard` attribute for QWERTY musical typing (see **Keyboard** below).
 
 Its mapping rules and layout templates are separate from DOM lifecycle and
@@ -20,8 +22,6 @@ The three layouts now share one live `<score-note-input>`. Change **layout** in 
 To capture a performance as a `Score`, connect this input to a
 [`<score-recorder>`](/score/element/play/score-recorder/). Its own page covers
 recording, take playback and MIDI / MusicXML export.
-
-<NoteInputDemo />
 
 ## Piano
 

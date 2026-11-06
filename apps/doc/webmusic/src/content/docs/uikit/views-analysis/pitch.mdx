@@ -138,11 +138,12 @@ keyboard and a whole one on the staff.
 | `label` | `string` | derived from the marks | Accessible name for the surface. |
 | `motion` | `MotionMode` | `'auto'` | See **Motion** below. |
 | `follow` | `'active' \| 'none'` | `'none'` | Scroll a wide keyboard to a newly active group that is outside its viewport. Repeated snapshots and releases preserve the user's scroll. |
-| `fitToWidth` | `boolean` | `false` | Fit the entire normalized range to the container, overriding explicit key widths and the CSS minimum width. Heights remain unchanged. |
-| `whiteKeyWidth` | `number` | responsive | Fixed natural-key width in CSS px; wider boards scroll locally. Ignored while `fitToWidth` is `true`. |
-| `blackKeyWidth` | `number` | `0.62 × white width` | Accidental-key width in CSS px, capped at white width. Alone derives white width as `value / 0.62`. Ignored while `fitToWidth` is `true`. |
-| `whiteKeyHeight` | `number` | theme height | Natural-key length in CSS px. |
-| `blackKeyHeight` | `number` | theme proportion | Accidental-key length in CSS px, capped at white-key height. |
+| `direction` | `KeyboardDirection` | `'down'` | Key-front direction: `'up'`, `'down'`, `'left'` or `'right'`. Low pitches remain left for horizontal boards or bottom for vertical boards. Labels remain upright. |
+| `fitToWidth` | `boolean` | `false` | Fit the entire normalized range to the available pitch axis, overriding explicit key breadths and the CSS minimum. Key depths remain unchanged. |
+| `whiteKeyWidth` | `number` | responsive | Fixed natural-key pitch breadth in CSS px; wider boards scroll locally. Ignored while `fitToWidth` is `true`. |
+| `blackKeyWidth` | `number` | `0.62 × white width` | Accidental-key pitch breadth in CSS px, capped at white width. Alone derives white width as `value / 0.62`. Ignored while `fitToWidth` is `true`. |
+| `whiteKeyHeight` | `number` | theme height | Natural-key depth in CSS px, perpendicular to pitch. |
+| `blackKeyHeight` | `number` | theme proportion | Accidental-key depth in CSS px, capped at white-key height. |
 | `release` | `number` | `140` | How long a lifted key keeps fading, in ms. `0` in any reduced mode. |
 | `trail` | `boolean` | `false` | Leave the role colour on a key for the length of its release. |
 | `ageSpan` | `number` | `4` | How many of the caller's units the published age spans. |
@@ -153,6 +154,15 @@ keyboard and a whole one on the staff.
 | `stylesheet` | `boolean` | `true` | `false` paints the identical declarations onto the nodes instead. |
 
 `KeyboardHandle` is `{element, board, key(midi), update(), destroy()}`.
+`KeyboardDirection` is exported from `@webmusic/ui/pitch`. Direction belongs to
+mount options; remounting changes geometry while the caller retains musical state.
+
+For `left` or `right`, provide the host with a measurable CSS height. That is
+its pitch-axis viewport for fitting, scrolling and following; key depth uses
+the same height options in every direction. The demo uses a 320px vertical
+viewport. Without an explicit height, the presenter uses its natural key scale.
+Direction changes no MIDI identities, pitch order or accessible key names.
+Staff and fretboard do not inherit keyboard direction.
 
 With `fitToWidth: false` and no explicit geometry, the board fills its container while preserving a minimum white-key width. A wide range scrolls
 inside the root instead of compressing adjacent labels. Long labels stay within their key; their
@@ -161,13 +171,13 @@ Positive finite geometry options override the corresponding dimensions. Invalid,
 zero or negative values use defaults. Exact widths remain fixed when the
 container resizes; heights do not change pitch spacing. Recreate the presenter
 without an option to restore its responsive/theme default. Use the same widths,
-MIDI range and shared scroll container to align with a separately rendered
+MIDI range and shared pitch-axis scroll container to align with a separately rendered
 waterfall; `follow: 'none'` keeps the keyboard from panning independently.
 `follow: 'active'` reveals new arrivals without moving playback or changing the drawn range. If
 the held group is wider than the viewport, it is centered and remains locally scrollable.
 
 Use `fitToWidth: true` to show every key in the normalized range without
-horizontal scrolling. Key widths follow the container, even when explicit
+pitch-axis scrolling. Key breadths follow the available width (up/down) or height (left/right), even when explicit
 `whiteKeyWidth`, `blackKeyWidth` or a CSS minimum width is supplied; black keys
 use `0.62 × white width`. Height options still apply, and fitting changes no
 marks or pitch range. Remount with `fitToWidth: false` or omit it to restore

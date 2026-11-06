@@ -49,10 +49,14 @@ function makeElement(): AudioPlayerElement & {events: Array<{type: string; detai
     events: Array<{type: string; detail: unknown}>;
   };
   const el = element as unknown as Record<string, unknown>;
+  const attributes = new Map<string, string>();
   el.isConnected = true;
   // Cancellation tests mock the loader and do not need a native decoder.
-  el.getAttribute = (name: string) => name === 'engine' ? 'media' : null;
-  el.hasAttribute = () => false;
+  attributes.set('engine', 'media');
+  el.getAttribute = (name: string) => attributes.get(name) ?? null;
+  el.hasAttribute = (name: string) => attributes.has(name);
+  el.setAttribute = (name: string, value: string) => { attributes.set(name, value); };
+  el.removeAttribute = (name: string) => { attributes.delete(name); };
   el.getRootNode = () => ({});
   el.attachShadow = () => ({
     innerHTML: '',

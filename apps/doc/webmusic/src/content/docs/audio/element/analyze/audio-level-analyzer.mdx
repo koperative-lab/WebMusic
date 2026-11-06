@@ -7,14 +7,14 @@ sidebar:
 
 import AudioAnalyzeFeaturePlayground from '../../../../../components/elements/AudioAnalyzeFeaturePlayground.astro';
 
+<AudioAnalyzeFeaturePlayground tag="audio-level-analyzer" />
+
 The level analyzer is a live dynamics tool beside an
 [`<audio-player>`](/audio/element/play/audio-player/). Its recent-sample display,
 peak hold and adjustable threshold help inspect the signal while it sounds.
 For offline loudness estimates over a decoded clip, use
 [`measureLoudness`](/audio/api/analyze/#loudness). Neither this tool nor the
 current API establishes inter-sample true peak.
-
-<AudioAnalyzeFeaturePlayground tag="audio-level-analyzer" />
 
 ## Import
 

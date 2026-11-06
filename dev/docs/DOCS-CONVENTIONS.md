@@ -59,7 +59,7 @@ covers `.md` and `.mdx` under `apps/doc/webmusic/src/content/docs/`.
 |---|---|---|
 | `params` | Element source files and parameter catalogs correspond across the six Score/Audio capabilities; names and order match parsable `static observedAttributes`, with supported spread tables resolved | Defaults, behavior, property/method/event tables, or arbitrary JavaScript declaration forms |
 | `catalog` | Element hrefs resolve to pages or collected anchors; tags have params; presenters have classified pages; `consumerTags` are catalog tags | Whether each consumer actually composes that presenter, or whether descriptions are accurate |
-| `page` | Element leaf filenames name real tags, titles equal `'<tag>'`, at least one recognizable top-level Demo/Playground self-closing tag appears, and API/Styling summaries exist | Exactly one demo, complete member tables, or section order |
+| `page` | Element leaf filenames name real tags, titles equal `'<tag>'`, a recognizable top-level Demo/Playground starts the body after frontmatter/imports/comments, a self-closing demo exists, and API/Styling summaries exist | Exactly one demo, complete member tables, remaining section order, or arbitrary MDX expressions/import forms |
 | `title` | Every page has a title; the Score/Audio API, UI presenter, UI Kit root, and Bridge root titles equal their entry specifier | Title form for any other page kind, including family pages, each family's Web Components and Headless inventories, Headless objects, and the Kernel API page; element leaf titles belong to the `page` check |
 | `plan`: groups | No `index.mdx` remains in an element capability directory; every element leaf has an integer `sidebar.order` and the group's orders are dense from 1; both of a family's `element/index.mdx` and `headless/index.mdx` exist and carry no recognizable demo; UI Kit category labels match the catalog | A stray capability `index.mdx` under `headless/`, or Headless object order. Also what an inventory actually lists, whether it has a section per capability, a demo mounted in an unrecognized form, or whether a removed route gained a redirect |
 | `plan`: entries | The five package root API pages name every published sub-entry and no nonexistent sub-entry; Kernel also has a path-bearing section per sub-entry | Complete API Reference members, or a requirement that matched paths occur in a table |
@@ -265,6 +265,9 @@ above.
   replace the table.
 - Follow the appropriate template for section structure and the distinction
   between a main demo and a justified topic example.
+- Web Component leaf/workflow pages place the main demo immediately after the
+  page title, before the introduction, notices, code examples or headings.
+  Move the existing main demo; keep topic examples beside their explanations.
 - Explain inputs, state, operations, events, errors, ownership, disposal,
   accessibility, and styling according to the actual public contract. Do not
   copy defaults from a neighboring component.

@@ -1,6 +1,6 @@
 ---
 title: '@webmusic/ui/stage'
-description: 'Generic retained and canvas render hosts with DPR, resize, animation, status, and surface-slider support.'
+description: 'Generic render hosts, native scroll-region focus, and surface-slider interaction.'
 sidebar:
   label: 'stage'
   order: 2
@@ -9,9 +9,10 @@ sidebar:
 import UiPresenterLiveDemo from '../../../../components/UiPresenterLiveDemo.astro';
 import UiPresenterRelated from '../../../../components/UiPresenterRelated.astro';
 
-`@webmusic/ui/stage` supplies three domain-neutral presentation lifecycles. `mountStage()` gives
+`@webmusic/ui/stage` supplies domain-neutral render and interaction lifecycles. `mountStage()` gives
 caller rendering a retained DOM surface, `mountCanvasStage()` owns canvas sizing and redraws, and
 `mountSurfaceSlider()` adds pointer and keyboard slider behavior to an existing element.
+`mountScrollRegion()` gives an existing native scroll viewport keyboard focus without slider semantics.
 
 Use [status](/uikit/layout-feedback/status/) for a standalone loading or failure surface and
 [analysis](/uikit/views-analysis/analysis/) for ready-made analytical output. Stage is the lower
@@ -30,7 +31,7 @@ const handle = mountCanvasStage(host, {
 });
 ```
 
-## Three mounting models
+## Mounting models
 
 `mountStage()` clears and re-runs `binding.render(surface)` on every update, calling the previous
 render cleanup first. If rendering, cleanup, or synchronous subscription notification mounts a
@@ -47,7 +48,7 @@ the only write port. All three follow the
 <details class="component-section">
 <summary>API</summary>
 
-The module exports three related contracts; the canvas presenter shown above has no snapshot
+The module exports four related contracts; the canvas presenter shown above has no snapshot
 State because its caller draws each frame directly.
 
 **Retained stage binding**
@@ -78,6 +79,36 @@ State because its caller draws each frame directly.
 | `surface` | `HTMLElement` | Stable `.wui-stage__surface` passed to `render()`. |
 | `update()` | `() => void` | Releases the prior render, clears the surface, and calls `render()` again. |
 | `destroy()` | `() => void` | Releases rendering and subscription resources, then removes the root and style. |
+
+**Native scroll region**
+
+```ts
+import {mountScrollRegion} from '@webmusic/ui/stage';
+
+const scrolling = mountScrollRegion(viewport, {
+  label: 'Score time window',
+  hideScrollbar: true,
+});
+// Release before disposing the renderer that owns viewport.
+scrolling.destroy();
+```
+
+`mountScrollRegion(element, options?)` retains the supplied element, children,
+scroll offsets and browser-native wheel, touch and keyboard scrolling. It adds
+`tabindex="0"` only when no authored tabindex exists. It installs no input
+listeners and creates no seek or playback commands. Mounting again on the same
+element first releases the previous handle.
+
+| Option | Default | Description |
+|---|---|---|
+| `label` | — | Adds `role="region"` and `aria-label` when absent. Preserves an existing role, label or `aria-labelledby`. |
+| `hideScrollbar` | `false` | Hides standard and WebKit native scrollbar chrome with a local stylesheet, preserving the complete cross-axis drawing width or height. |
+
+The `ScrollRegionHandle` exposes `element` and idempotent `destroy()`. Cleanup
+removes only assigned attributes still carrying the presenter's values and
+its owned scrollbar class/style; application overrides remain. The renderer
+continues to own the viewport and its content. The public options and handle
+types are `ScrollRegionOptions` and `ScrollRegionHandle`.
 
 **Surface-slider State**
 
@@ -194,7 +225,7 @@ never rewritten.
 named image while its canvas is decorative; a supplied status is exposed through the semantics
 documented by [status](/uikit/layout-feedback/status/). Surface sliders preserve pre-existing role,
 focus and naming attributes, expose min/max/now/disabled values, support Arrow keys plus Home and
-End, and restore only presenter-assigned attributes on destroy.
+End, and restore only presenter-assigned attributes on destroy. Native scroll regions preserve authored focus policy and use browser scrolling keys without declaring a slider value.
 
 </details>
 

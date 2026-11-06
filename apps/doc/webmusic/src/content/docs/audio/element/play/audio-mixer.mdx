@@ -7,6 +7,8 @@ sidebar:
 
 import AudioMixerDemo from '../../../../../components/AudioMixerDemo.astro';
 
+<AudioMixerDemo />
+
 `<audio-mixer>` supplies a mixing desk to a linked
 [`audio-player`](/audio/element/play/audio-player/). The player handles transport;
 the mixer provides master/member volume, mute and solo. Its Headless `AudioMixer`
@@ -18,10 +20,11 @@ existing backend. A borrowed mixer is never disposed by the Element.
 
 Without mixer members or a requested playback owner, the desk shows the shared
 outlined-square waiting animation with a screen-reader description. Usable channel
-strips remain visible while an owner is missing. Member assignment is synchronous;
-loading clips before assignment remains the caller's responsibility.
-
-<AudioMixerDemo />
+strips remain visible while an owner is missing. For asynchronous clip preparation,
+set `.loading = true` on the desk and its player before starting the operation,
+then clear both flags when it settles. The four-square loading animation preserves
+existing members, levels and playback; the application retains responsibility for
+canceling work and displaying external preparation failures.
 
 ## Import
 
@@ -54,7 +57,6 @@ remains a separate supported mode. See [modular composition](/bridge/modular-com
 <details class="component-section">
 <summary>API</summary>
 
-
 ```ts
 import { loadClipFromUrl } from '@webmusic/audio/play';
 import { createAudioMixer } from '@webmusic/audio/play/headless';
@@ -79,6 +81,7 @@ document.querySelector<AudioMixerElement>('audio-mixer')!.members = [
 | --- | --- | --- |
 | `player` | attribute | Unique selector for the central player; observes late insertion, upgrade, replacement and removal. |
 | `.player` | property | Assign/read the central `AudioPlayer` or its Element; explicit assignment wins over the selector. |
+| `loading` / `.loading` | boolean attribute / property | Caller-owned asynchronous preparation, default `false`; the property reflects the attribute. Clearing it returns to ready or source waiting without replacing data or stopping playback. |
 | `master-volume` | attribute | Master fader level, applied live. |
 | `autoplay` | attribute | Start the ensemble on mount. Browsers still gate audio until the user interacts. |
 | `solo` | attribute | Id of the member to solo, applied live. Solo is exclusive across strips. |

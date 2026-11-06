@@ -52,12 +52,12 @@ export interface AudioMixerMemberSpec {
   volume?: number;
 }
 
-const PROPS = ['player', 'mixer', 'members', 'audioContext', 'destination', 'masterVolume'] as const;
+const PROPS = ['player', 'mixer', 'members', 'audioContext', 'destination', 'masterVolume', 'loading'] as const;
 let mixerElementSequence = 0;
 
 export class AudioMixerElement extends WebMusicElement {
   static get observedAttributes(): string[] {
-    return ['player', 'master-volume', 'autoplay', 'solo', 'composition'];
+    return ['player', 'master-volume', 'autoplay', 'solo', 'composition', 'loading'];
   }
 
   protected root?: ShadowRoot;
@@ -114,6 +114,7 @@ export class AudioMixerElement extends WebMusicElement {
       notifyModuleContext(this);
       return;
     }
+    if (name === 'loading') { this.notifyUI(); return; }
     if (name === 'player') { this.connection.refresh(); this.render(); return; }
     if (name === 'master-volume') {
       this.applyMasterVolume(numAttr(this, 'master-volume', 1, 0));
@@ -133,6 +134,10 @@ export class AudioMixerElement extends WebMusicElement {
     if (this.isConnected) this.render();
   }
   get player(): AudioPlayer | undefined { return this.connection.player; }
+
+  /** Declare application-owned preparation without replacing the current mixer. */
+  get loading(): boolean { return boolAttr(this, 'loading'); }
+  set loading(value: boolean) { this.toggleAttribute('loading', Boolean(value)); }
 
   /** Borrow an existing mixer; the element never disposes what it borrows. */
   set mixer(mixer: AudioMixer | undefined) {
@@ -565,7 +570,8 @@ export class AudioMixerElement extends WebMusicElement {
     return {
       master: state?.masterVolume ?? this.initialMasterVolume,
       disabled: !mixer || (!this.modular && this.connection.requested && !this.owner),
-      status: !mixer || (!this.modular && this.connection.requested && !this.owner) || !state?.members.length
+      status: this.loading ? {kind: 'loading', message: 'Preparing mixer sources.'}
+        : !mixer || (!this.modular && this.connection.requested && !this.owner) || !state?.members.length
         ? {kind: 'waiting', message: 'Waiting for mixer sources.'}
         : {kind: 'ready'},
       channels: (state?.members ?? []).map((member) => ({

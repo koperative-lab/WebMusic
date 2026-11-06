@@ -191,7 +191,7 @@ describe('<score-chord-analysis mode="live"> (dynamic, player-bound)', () => {
     return {player, host};
   }
 
-  it('renders without a score and shows the waiting state', async () => {
+  it('renders a silent live source without a loading or waiting animation', async () => {
     const {host} = liveHost();
     host.connect();
     await flush();
@@ -203,6 +203,7 @@ describe('<score-chord-analysis mode="live"> (dynamic, player-bound)', () => {
     expect(host.el.querySelector('.wui-harmony-nameplate__empty')?.textContent).toBe('—');
     expect(host.el.chord).toBeUndefined();
     expect(host.text()).toContain('—');
+    expect(host.el.querySelector<HTMLElement>('[part~="feedback"]')?.hidden).toBe(true);
   });
 
   it('names the sounding chord from noteon events and clears on noteoff', async () => {

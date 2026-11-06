@@ -455,18 +455,103 @@ describe('playlist companion binding', () => {
 });
 
 describe('<audio-playlist> passive source feedback', () => {
+  it('announces entry-player replacement so direct meter followers can acquire the current tap', async () => {
+    const element = mount();
+    element.entries = [{id: 'first', clip: clip(2)}, {id: 'second', clip: clip(3)}];
+    const taps: Array<AnalyserNode | undefined> = [];
+    element.addEventListener('webaudio:playerchange', (event) => {
+      expect((event as CustomEvent).detail.player).toBe(element.activePlayer);
+      taps.push(element.analyser);
+    });
+    await element.play();
+    expect(taps).toHaveLength(1);
+    expect(taps[0]).toBeDefined();
+    element.pause();
+    await element.select('second');
+    expect(taps.at(-1)).toBeUndefined();
+    await element.play();
+    expect(taps.at(-1)).toBeDefined();
+    expect(taps.at(-1)).not.toBe(taps[0]);
+  });
+
+  it('announces ready-source selection and retains the latest source during reentrant replacement', async () => {
+    const element = mount();
+    const first = clip(2), second = clip(3), replacement = clip(4);
+    const sources: Array<{clip?: AudioClip; revision: number}> = [];
+    element.addEventListener('webaudio:sourcechange', (event) => {
+      const detail = (event as CustomEvent).detail;
+      sources.push(detail);
+      if (detail.clip === second) element.entries = [{id: 'replacement', clip: replacement}];
+    });
+    element.entries = [{id: 'first', clip: first}, {id: 'second', clip: second}];
+    await element.select('second');
+    expect(sources.map((source) => source.clip)).toEqual([first, second, replacement]);
+    expect(sources.map((source) => source.revision)).toEqual([1, 2, 3]);
+    expect(element.clip).toBe(replacement);
+    expect(element.shadowRoot!.querySelector('.wui-playlist__item')!.textContent).toContain('replacement');
+  });
+
+  it('shares selected loading, failure and retry with its central player without blocking for prefetch', async () => {
+    let rejectFirst!: (error: Error) => void;
+    let resolveRetry!: (clip: AudioClip) => void;
+    let resolvePrefetch!: (clip: AudioClip) => void;
+    vi.spyOn(load, 'loadClipFromUrl')
+      .mockImplementationOnce(() => new Promise((_, reject) => { rejectFirst = reject; }))
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveRetry = resolve; }))
+      .mockImplementationOnce(() => new Promise((resolve) => { resolvePrefetch = resolve; }));
+    const owner = document.createElement('audio-player') as AudioPlayerElement;
+    document.body.append(owner);
+    const element = mount();
+    element.player = owner;
+    element.setAttribute('skip-failed', 'false');
+    element.entries = [{id: 'selected', src: '/selected.wav'}, {id: 'next', src: '/next.wav'}];
+    const status = () => owner.shadowRoot!.querySelector<HTMLElement>('.wui-status')!;
+    const start = owner.play();
+    expect(owner.loading).toBe(true);
+    expect(status().dataset.kind).toBe('loading');
+    await flush();
+    const failure = new Error('Selected decode failed');
+    rejectFirst(failure);
+    await start;
+    expect(owner.loading).toBe(false);
+    expect(owner.loadError).toBe(failure);
+    expect(status().dataset.kind).toBe('error');
+    const retry = owner.play();
+    expect(owner.loading).toBe(true);
+    expect(owner.loadError).toBeUndefined();
+    expect(status().dataset.kind).toBe('loading');
+    await flush();
+    resolveRetry(clip(3));
+    await retry;
+    await flush();
+    expect(element.playlist!.statusOf('next')).toBe('loading');
+    expect(owner.loading).toBe(false);
+    expect(owner.loadError).toBeUndefined();
+    expect(status().hidden).toBe(true);
+    resolvePrefetch(clip(2));
+    await flush();
+    expect(owner.loading).toBe(false);
+  });
+
   it('waits for entries, animates a pending decode and restores row duration', async () => {
     const element = mount();
     expect(element.shadowRoot!.querySelector('[data-kind="waiting"]')).not.toBeNull();
+    const states: Array<{loading: boolean; error?: Error}> = [];
+    element.addEventListener('webaudio:loadstatechange', (event) => states.push((event as CustomEvent).detail));
     let resolve!: (value: AudioClip) => void;
     vi.spyOn(load, 'loadClipFromUrl').mockImplementationOnce(() => new Promise((done) => { resolve = done; }));
     element.entries = [{id: 'one', label: 'One', src: '/one.wav'}];
     const row = element.shadowRoot!.querySelector<HTMLElement>('.wui-playlist__item')!;
     const pending = element.play();
+    expect(element.loading).toBe(true);
+    expect(states.at(-1)?.loading).toBe(true);
     expect(row.querySelector('[data-kind="loading"]')).not.toBeNull();
     await flush();
     resolve(clip(3));
     await pending;
+    expect(element.loading).toBe(false);
+    expect(element.loadError).toBeUndefined();
+    expect(states.at(-1)?.loading).toBe(false);
     expect(element.shadowRoot!.querySelector('.wui-playlist__item')).toBe(row);
     expect(row.querySelector<HTMLElement>('.wui-playlist__duration')!.hidden).toBe(false);
     expect(row.querySelector<HTMLElement>('.wui-playlist__duration')!.textContent).toBe('0:03');

@@ -109,6 +109,11 @@ export class AudioPlaylistElement extends WebMusicElement {
   private compatibilityStyle?: HTMLStyleElement;
   private readonly subscribers = new Set<() => void>();
   private offFns: Array<() => void> = [];
+  private announcedLoading = false;
+  private announcedLoadError?: Error;
+  private announcedClip?: AudioClip;
+  private announcedPlayer?: AudioClipPlayer;
+  private sourceRevision = 0;
 
   protected override onMount(): void {
     this.own(() => { this.connection.disconnect(); this.teardown(); });
@@ -169,6 +174,9 @@ export class AudioPlaylistElement extends WebMusicElement {
   get clip(): AudioClip | undefined {
     return this.queue?.currentClip;
   }
+
+  get loading(): boolean { return this.queue?.loading ?? false; }
+  get loadError(): Error | undefined { return this.queue?.loadError; }
 
   get analyser(): AnalyserNode | undefined {
     const player = this.queue?.activePlayer;
@@ -290,6 +298,7 @@ export class AudioPlaylistElement extends WebMusicElement {
 
     this.activateQueue();
     this.render();
+    this.notifyUI();
   }
 
   private attachPlayer(player: AudioPlayer | undefined): void {
@@ -427,6 +436,23 @@ export class AudioPlaylistElement extends WebMusicElement {
   }
 
   private notifyUI(): void {
+    const clip = this.clip;
+    if (clip !== this.announcedClip) {
+      this.announcedClip = clip;
+      this.dispatch('sourcechange', {clip, revision: ++this.sourceRevision});
+    }
+    const player = this.activePlayer;
+    if (player !== this.announcedPlayer) {
+      this.announcedPlayer = player;
+      this.dispatch('playerchange', {player});
+    }
+    const loading = this.loading;
+    const error = this.loadError;
+    if (loading !== this.announcedLoading || error !== this.announcedLoadError) {
+      this.announcedLoading = loading;
+      this.announcedLoadError = error;
+      this.dispatch('loadstatechange', {loading, error});
+    }
     for (const notify of this.subscribers) notify();
   }
 

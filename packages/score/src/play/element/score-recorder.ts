@@ -79,6 +79,7 @@ export class ScoreRecorderElement extends HTMLElementBase {
   private playbackGeneration = 0;
   private playing = false;
   private playbackPending = false;
+  private playbackFailure?: string;
   private selfListening = false;
 
   private readonly onNoteEvent = (event: Event): void => {
@@ -277,6 +278,7 @@ export class ScoreRecorderElement extends HTMLElementBase {
     this.live = undefined;
 
     const generation = ++this.playbackGeneration;
+    this.playbackFailure = undefined;
     const playback = new ScorePlayer(this.takeScore, {
       synth: this.soundRef,
       audioContext: this.explicitContext,
@@ -297,6 +299,8 @@ export class ScoreRecorderElement extends HTMLElementBase {
     }).catch((error: unknown) => {
       if (this.playback !== playback || generation !== this.playbackGeneration) return;
       this.stopPlayback();
+      this.playbackFailure = error instanceof Error ? error.message : String(error);
+      this.refresh();
       this.dispatchEvent(new CustomEvent<ScoreRecorderErrorDetail>('webscore:error', {
         detail: {operation: 'play', error},
         bubbles: true,
@@ -306,6 +310,7 @@ export class ScoreRecorderElement extends HTMLElementBase {
   }
 
   private stopPlayback(): void {
+    this.playbackFailure = undefined;
     this.playbackGeneration += 1;
     this.playbackOff?.();
     this.playbackOff = undefined;
@@ -324,7 +329,8 @@ export class ScoreRecorderElement extends HTMLElementBase {
         recording: this.session.active,
         playing: this.playing,
         busy: this.playbackPending,
-        ...(this.playbackPending ? {status: 'Preparing take playback…'} : {}),
+        ...(this.playbackPending ? {status: 'Preparing take playback…'}
+          : this.playbackFailure ? {status: this.playbackFailure, statusKind: 'error' as const} : {}),
         recordedCount: this.session.noteCount,
         takeCount: this.takeScore
           ? this.takeScore.parts.reduce((sum, part) => sum + part.notes.length, 0)

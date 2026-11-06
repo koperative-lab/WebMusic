@@ -14,7 +14,7 @@
 //
 // Attributes: type source window-seconds height wave-color color-map
 // Properties: .analyser
-// Events: none — this element only draws what it is given.
+// Events: webaudio:error — source access or drawing failed.
 //
 // There is deliberately no dB-range attribute: the window a byte frequency
 // frame is scaled into belongs to the analyser's own minDecibels/maxDecibels,
@@ -82,6 +82,7 @@ export class AudioLiveViewElement extends HTMLElementBase {
   private sourceTarget?: AnalyserSource;
   private sourceLoading = false;
   private sourceError?: Error;
+  private frameError?: Error;
   private stopSourceObservation?: () => void;
   private detachSource?: () => void;
 
@@ -101,9 +102,12 @@ export class AudioLiveViewElement extends HTMLElementBase {
     this.detachSource = undefined;
     this.sourceTarget = undefined;
     this.boundAnalyser = undefined;
+    this.sourceLoading = false;
+    this.sourceError = undefined;
+    this.frameError = undefined;
     this.presenter?.destroy();
     this.presenter = undefined;
-    this.controller.clear();
+    this.controller.setAnalyser(undefined);
   }
 
   attributeChangedCallback(name?: string, previous?: string | null, next?: string | null): void {
@@ -226,6 +230,7 @@ export class AudioLiveViewElement extends HTMLElementBase {
             waveColor: this.getAttribute('wave-color') ?? 'currentColor',
             colorMap: this.getAttribute('color-map') ?? undefined,
           });
+          this.frameError = undefined;
         },
         status: () => this.status(),
       },
@@ -234,7 +239,10 @@ export class AudioLiveViewElement extends HTMLElementBase {
         animate: this.presenterAnimates,
         fallbackWidth: 320,
         fallbackHeight: numericSize(this.getAttribute('height'), 64),
-        onError: (error) => this.dispatchError(error),
+        onError: (error) => {
+          this.frameError = error instanceof Error ? error : new Error(String(error));
+          this.dispatchError(this.frameError);
+        },
       },
     );
     applyAudioPresenterSurface(
@@ -251,6 +259,7 @@ export class AudioLiveViewElement extends HTMLElementBase {
     if (!this.analyser) {
       return {kind: 'waiting', message: 'Waiting for a live audio source'};
     }
+    if (this.frameError) return {kind: 'error', message: this.frameError.message};
     return this.controller.buffer?.length
       ? {kind: 'ready'}
       : {kind: 'waiting', message: 'Waiting for a live audio frame'};

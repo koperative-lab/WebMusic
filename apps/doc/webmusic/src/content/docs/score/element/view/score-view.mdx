@@ -9,11 +9,11 @@ import ScoreViewDemo from '../../../../../components/ScoreViewDemo.astro';
 import WaterfallKeyboardDemo from '../../../../../components/WaterfallKeyboardDemo.astro';
 import ScoreEditingDemo from '../../../../../components/elements/ScoreEditingDemo.astro';
 
+<ScoreViewDemo />
+
 `<score-view>` displays a loaded score as `piano-roll` (default), `staff` or `waterfall`. Each instance renders one surface. Select `type` in the demo’s external Parameters; only relevant drawing controls appear, and switching back restores their retained values.
 
 The view is read-only. It can [follow an editor](#follow-an-editor) and draw its current content, but it never edits notes; use [`<score-grid-view>`](/score/element/view/score-grid-view/) to edit them.
-
-<ScoreViewDemo />
 
 ## Import
 
@@ -35,21 +35,22 @@ The demo contains one player and one score view. Expand the player’s Parameter
 
 ## Annotations and compact layout
 
-Only the staff type draws supported directions retained in the Score: words
-such as `rit.`, rehearsal labels, dynamics, metronome marks, pedal signs/lines
-and crescendo/diminuendo hairpins, placed around the notation. Piano roll and
-waterfall never draw annotations and reserve no space for them. These
+Only the staff type draws supported directions retained in the Score, and only
+when `show-annotations="true"` enables them: words such as `rit.`, rehearsal
+labels, dynamics, metronome marks, pedal signs/lines and crescendo/diminuendo
+hairpins, placed around the notation. Piano roll and waterfall never draw
+annotations and reserve no space for them. These
 directions are visual and do not change playback tempo, volume or sustain.
 
-`show-annotations` affects only `type="staff"` and defaults to true. Set
-`show-annotations="false"` to hide the staff's directions. The demo shows the
-**show-annotations** control only for the staff type; Copy and Reset include
-it. `.options.showAnnotations` overrides the attribute. Changing this option
-retains the loaded score and playback position. On the other types the
-attribute is retained but has no effect.
+`show-annotations` affects only `type="staff"` and defaults to false. Set
+`show-annotations="false"` or omit it to keep the staff's directions hidden. The
+demo shows the **show-annotations** control only for the staff type; Copy and
+Reset include it. `.options.showAnnotations` overrides the attribute. Changing
+this option retains the loaded score and playback position. On the other types
+the attribute is retained but has no effect.
 
 ```html
-<score-view player="#piece" type="staff" show-annotations="false"></score-view>
+<score-view player="#piece" type="staff" show-annotations="true"></score-view>
 ```
 
 Hidden annotations reserve no drawing space. Staff height is recomputed from
@@ -57,6 +58,21 @@ the remaining notation, with compact gaps between staves and at the outer
 edges. Notes, rests, clefs, key/time signatures, beams, tuplets, ties, slurs and
 articulations remain visible. Leave `height` unset to let the component shrink;
 an explicit height still defines the application’s viewport.
+
+## Four directions
+
+Piano roll and waterfall accept `direction="up|down|left|right"`. For piano
+roll it is the direction of increasing score time (default `right`). For
+waterfall it is note travel toward the current-time landing edge (default
+`down`). Low pitches remain at the left for vertical time axes and at the
+bottom for horizontal time axes. Labels keep their normal reading direction.
+The staff ignores this attribute and retains its usual layout.
+
+Changing direction preserves the score, nominal position and borrowed player.
+`.options.direction` takes precedence over the attribute. Give a vertical
+pitch axis an explicit height when fitting it into an application layout.
+The [aligned composition](#align-a-waterfall-and-keyboard) demonstrates four
+travel directions between two independent keyboards sharing one player.
 
 ## Geometry
 
@@ -68,23 +84,25 @@ with bar and beat lines, use [`<score-grid-view>`](/score/element/view/score-gri
 
 | Surface / dimension | Attribute | Effect |
 | --- | --- | --- |
-| Piano-roll note length / waterfall note length | `pixels-per-second` | Nominal seconds become horizontal pixels in piano roll and vertical pixels in waterfall. Larger values draw longer notes. |
-| Piano-roll note thickness | `note-height` | Height of each MIDI pitch lane in px. |
-| Waterfall note width | `white-note-width` / `black-note-width` | Exact natural-note / accidental pitch-column widths in px. |
+| Piano-roll note length / waterfall note length | `pixels-per-second` | Nominal seconds become pixels along the selected time axis. Larger values draw longer notes. |
+| Piano-roll note thickness | `note-height` | Breadth of each equal MIDI pitch lane in px, perpendicular to time. |
+| Waterfall note width | `white-note-width` / `black-note-width` | Exact natural-note / accidental pitch breadths in px, perpendicular to time. |
 | Gap between note spans | `note-spacing` | Subtracted from piano-roll / waterfall duration length; `0` keeps the full span. |
 | Staff notation size | `note-height` | Scales staff notation; spacing also accounts for glyph clearance. |
-| Keyboard key width / length | PitchView `white-key-width`, `black-key-width` / `white-key-height`, `black-key-height` | Independent pixel widths and heights for a separately composed keyboard. |
+| Keyboard key width / length | PitchView `white-key-width`, `black-key-width` / `white-key-height`, `black-key-height` | Pitch breadth and key depth in px for a separately composed keyboard, independent of its facing direction. |
 | Fretboard width / string layout | PitchView `fret-width`, `string-spacing`, `string-width` | Fret spacing, distance between strings and string stroke thickness. |
 
 [`<score-pitch-view>`](/score/element/view/score-pitch-view/) owns the keyboard and fretboard
 settings. To align a separate keyboard with waterfall notes, match their pitch
-range and column widths and use one shared horizontal scroller, as below.
+range and pitch breadths and use one shared scroller on the pitch axis, as below.
+The piano-roll type uses equal semitone lanes; choose waterfall in any direction
+when exact natural/accidental key alignment matters.
 
 ## Views
 
 ### Piano roll
 
-`type="piano-roll"` draws pitch vertically and score time horizontally. It follows the score position and highlights active notes. `pixels-per-second` and the pitch range control the drawing’s geometry. It draws notes only; score directions appear on the staff type.
+`type="piano-roll"` draws equal semitone lanes and score time along the selected direction; the default is time to the right and low pitches at the bottom. It follows the score position and highlights active notes. `pixels-per-second` and the pitch range control the drawing’s geometry. It draws notes only; score directions appear on the staff type.
 
 ### Staff
 
@@ -133,7 +151,7 @@ clefs are respected even when ledger lines are needed. For scores without a
 clef map, inference balances ledger lines against unnecessary changes and
 protects ties and tuplet groups.
 
-Source words such as `rit.` and tempo instructions, rehearsal marks, dynamics,
+When annotations are enabled, source words such as `rit.` and tempo instructions, rehearsal marks, dynamics,
 metronome marks, pedal signs/lines and crescendo/diminuendo hairpins are drawn
 at their stored musical positions. Placement and supported text styles are
 retained, with space reserved around nearby notation. Tuplets respect source
@@ -150,17 +168,18 @@ program. Neither needs a separate engine or additional installation.
 
 ### Waterfall
 
-`type="waterfall"` draws falling notes on piano-style pitch columns, with no
-embedded keyboard. By default, occupied octaves fit the container width. Set
+`type="waterfall"` draws moving notes on piano-style pitch columns, with no
+embedded keyboard. Notes travel down by default; `up`, `left` and `right` choose
+the other landing edges. Occupied octaves fit the available pitch axis. Set
 `show-only-octaves-used="false"` for the standard A0–C8 piano range, or set
 positive `white-note-width` / `black-note-width` values for fixed natural-note
 and accidental column widths in pixels. These widths control falling-note
-geometry; overflow pans inside the component. Container resizing retains the
+geometry on either axis; overflow pans inside the component. Container resizing retains the
 score position and active notes.
 
-Without an explicit height, the falling-note viewport uses the score duration
-at the selected time scale, bounded to 80–200px. A requested height uses the
-available viewport for the notes. The [imperative renderer](/score/api/view/#render-a-waterfall)
+For up/down travel without an explicit height, the note viewport uses the score
+duration at the selected time scale, bounded to 80–200px. Left/right travel uses
+the available width for time; an explicit height defines its pitch viewport. The [imperative renderer](/score/api/view/#render-a-waterfall)
 retains its explicit pitch-width defaults.
 
 When an application also needs a keyboard, compose a separate
@@ -169,11 +188,16 @@ When an application also needs a keyboard, compose a separate
 #### Align a waterfall and keyboard
 
 This demo uses the opening passage of Arabesque No. 1 and one player.
-Both views use MIDI 48–83 (C3–B5), 32px natural columns and 20px accidental
-columns. The 21 natural notes make a 672px track. Change **Pitch width**
-to resize both views together, **Note length** to change only the waterfall's
-time scale, and **Key height** to change only the keyboard. A narrow container
-pans their shared track. Press Play to see the held keys follow the notes.
+Two independent keyboards face the note surface from opposite edges. **Note
+travel** switches between a vertical waterfall and a horizontal piano-style
+roll. Both use the waterfall renderer's natural/accidental geometry; the
+ordinary piano-roll type uses equal semitone lanes instead.
+
+Every view uses MIDI 48–83 (C3–B5), 32px natural pitch breadth and 20px
+accidental breadth. The 21 natural notes make a 672px pitch axis. **Pitch width**
+resizes that shared axis, **Note length** changes only the time scale, and
+**Key depth** changes only the keyboards. A narrow container pans the shared
+track. Press Play to see both keyboards follow the same sounding notes.
 
 <WaterfallKeyboardDemo />
 
@@ -189,19 +213,22 @@ Use the same structure with a score file in your application:
 </script>
 
 <score-player id="falling-piece" src="/midi/Arabesque%20No.1.mid"></score-player>
-<div class="shared-pan">
+<div class="shared-pan" tabindex="0" role="region" aria-label="Pan notes and keyboards together">
   <div class="pitch-track">
-    <score-view type="waterfall" player="#falling-piece"
+    <score-pitch-view type="keyboard" direction="down" player="#falling-piece" low="48" high="83"
+      white-key-width="32" black-key-width="20" white-key-height="80" black-key-height="50"
+      scroll="true" follow="none"></score-pitch-view>
+    <score-view type="waterfall" direction="down" player="#falling-piece"
       min-pitch="48" max-pitch="83" white-note-width="32" black-note-width="20"
       pixels-per-second="64" note-spacing="0" height="180"></score-view>
-    <score-pitch-view type="keyboard" player="#falling-piece" low="48" high="83"
+    <score-pitch-view type="keyboard" direction="up" player="#falling-piece" low="48" high="83"
       white-key-width="32" black-key-width="20" white-key-height="80" black-key-height="50"
       scroll="true" follow="none"></score-pitch-view>
   </div>
 </div>
 
 <style>
-  .shared-pan { max-width: 100%; overflow-x: auto; }
+  .shared-pan { max-width: 100%; overflow: auto; }
   .pitch-track { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; width: 672px; }
   .pitch-track > * {
     width: 100%; min-width: 0; margin: 0;
@@ -222,6 +249,16 @@ Zero presenter insets align their left edges; `follow="none"` prevents the keybo
 independently. The waterfall draws no annotation rail, so its note columns
 span the shared pitch grid exactly. If you resize the columns in application code, update
 both views and the track width together.
+
+For a horizontal composition, set the view's `direction="right"`, give it a
+fixed width for time and a 672px height for pitch, and place a
+`direction="left"` keyboard at its right edge with the same 672px height.
+The existing width attributes still set pitch breadth, while keyboard height
+attributes set depth. Use grid columns for the note surface and keyboard,
+match the MIDI endpoints, and pan their common container vertically. Swap the
+landing edge for `left`; a keyboard above a rising waterfall faces `down`.
+The topic demo applies these settings to both edge keyboards without reloading
+the score or creating another transport.
 
 ## Data and playback
 
@@ -309,15 +346,16 @@ while playback catches up.
 | `.interactionSession` | writable property | Optional same-document `ScoreInteractionSession` whose draft the view draws; getter returns the supplied or View-created session. Supplied sessions are borrowed. |
 | `type` / `.type` | attribute / writable property | `piano-roll`, `staff` or `waterfall`; unknown or removed values (such as `map` or `thumbnail`) use piano-roll. |
 | `width` / `height` | attributes | Bare numbers are px; CSS lengths pass through. Width defaults to 100%; height follows the drawing. A fixed height makes a taller surface scroll within its box. |
-| `show-annotations` | attribute | Staff only; default true. `false` hides score directions and removes their reserved space. Absent, empty or `true` shows them. `.options.showAnnotations` takes precedence. Piano roll and waterfall never show annotations. |
+| `direction` / `.direction` | attribute / reflected property | `up`, `down`, `left` or `right`. Piano roll: increasing time, default `right`; waterfall: note travel, default `down`. Invalid values use the mode default. Ignored by the staff. `.options.direction` wins. |
+| `show-annotations` | attribute | Staff only; default false. Absent or `false` hides score directions and their reserved space. Empty or `true` shows them. `.options.showAnnotations` takes precedence. Piano roll and waterfall never show annotations. |
 | `show-only-octaves-used` | attribute | Waterfall only; default true. Show occupied octaves; `false` selects the standard A0–C8 piano pitch range. |
 | `scroll-type` | attribute | Staff only: `page` (default), `note` or `bar`. |
 | `split-staves` | attribute | Staff only; default true. Preserve source staff assignments within each part. `false` combines that part’s staves; absent, empty or `true` preserves them. `.options.splitStaves` takes precedence. |
 | `pixels-per-second` | attribute | Piano-roll/waterfall pixels per second; default 30. Staff uses notation-aware spacing; a positive value requests `value × 60 / initialQpm` pixels per quarter, with extra space where glyphs require it. |
-| `note-height` | attribute | Piano-roll note height or staff notation scale; default 6px. |
+| `note-height` | attribute | Piano-roll pitch-lane breadth or staff notation scale; default 6px. |
 | `note-spacing` | attribute | Piano-roll/waterfall note-length gap or staff notation spacing; default 1px. |
 | `min-pitch` / `max-pitch` | attributes | Piano-roll/waterfall MIDI pitch limits; unspecified bounds come from the score. Explicit waterfall bounds are exact and take precedence over automatic octave range selection. |
-| `white-note-width` | attribute | Waterfall natural-note pitch-column width; fits the container by default. A positive explicit natural or accidental width fixes pitch scale. |
+| `white-note-width` | attribute | Waterfall natural-note pitch-column width; fits the available pitch axis by default. A positive explicit natural or accidental width fixes pitch scale. |
 | `black-note-width` | attribute | Waterfall accidental pitch-column width; defaults to 0.62 × natural-note width and cannot exceed it. Alone, derives natural-note width as `value / 0.62`. A positive explicit width disables fitting. |
 | `default-key` | attribute | Staff fallback major-key index, 0…11 by chromatic pitch class (0 = C, 1 = D♭, 2 = D); default 0. This is not a fifths count. |
 | `note-color` / `active-note-color` | attributes | Score-renderer idle/active colors; the Element’s active default is red `rgb(240, 84, 119)`. |
@@ -331,7 +369,7 @@ while playback catches up.
 
 Type-specific attributes stay on the element when another type is selected and do not affect that other surface. Missing or invalid numeric values use their corresponding defaults.
 
-`ScoreViewElement`, `ScoreViewElementType`, `ScoreViewRenderOptions`, `ScoreViewType`, `parseColorAttr` and `defineScoreViewElement(tag?)` are exported from `@webmusic/score/view/element`. `ScoreViewElementType` is an alias of `ScoreViewType`: `piano-roll | staff | waterfall`. Registration is idempotent and SSR-safe.
+`ScoreViewElement`, `ScoreViewElementType`, `ScoreViewDirection`, `ScoreViewRenderOptions`, `ScoreViewType`, `parseColorAttr` and `defineScoreViewElement(tag?)` are exported from `@webmusic/score/view/element`. `ScoreViewElementType` is an alias of `ScoreViewType`: `piano-roll | staff | waterfall`. Registration is idempotent and SSR-safe.
 
 `ScoreViewConfiguration` and `ScoreViewOptionsByType` describe the three full
 renderer modes and are exported from both `@webmusic/score/view` and

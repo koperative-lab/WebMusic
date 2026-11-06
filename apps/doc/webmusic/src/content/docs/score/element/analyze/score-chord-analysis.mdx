@@ -7,9 +7,9 @@ sidebar:
 
 import AnalysisFeaturePlayground from '../../../../../components/elements/AnalysisFeaturePlayground.astro';
 
-Inspect complete, spelled triads and seventh chords, including their bass and inversion. Score mode collects notes by metrical pulse by default, with exact simultaneous inspection available; live mode reads the selected player’s held MIDI notes. Choose the mode in external Parameters. Degree labels require an explicit key and never infer harmonic function.
-
 <AnalysisFeaturePlayground tag="score-chord-analysis" />
+
+Inspect complete, spelled triads and seventh chords, including their bass and inversion. Score mode collects notes by metrical pulse by default, with exact simultaneous inspection available; live mode reads the selected player’s held MIDI notes. Choose the mode in external Parameters. Degree labels require an explicit key and never infer harmonic function.
 
 ## Import
 
@@ -114,6 +114,8 @@ All emitted events bubble and are composed.
 Pending URL loads or a native player's loading state show the shared four-square loading
 animation. Missing input shows the slower square waiting animation. Their descriptions remain
 available to screen readers; load failures and empty analysis results retain visible text.
+In live mode, an attached ready source remains ready while paused or silent; its
+empty nameplate stays visible instead of implying missing input.
 
 The score lane is a named slider tab stop. Arrow keys, Home/End and `[` / `]` navigate; pointer selection chooses a band and seeks. A semantic ordered list marks the current span with `aria-current`; detailed selection evidence has a nonvisual status. Passive playback does not repeatedly announce a local selection. The chord's live nameplate exposes text and has no navigation controls. Display configuration remains outside the component, and automatic motion respects reduced-motion preference.
 

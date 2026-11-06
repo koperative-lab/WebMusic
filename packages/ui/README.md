@@ -181,7 +181,7 @@ node order may change in any release; the handle and the `part` tokens may not.
 | `/note` | `mountNoteSurface(host, binding, options)` accepts optional `binding.interaction` pitch/octave ports; the presenter owns pointer, chord, QWERTY, focus, pressed/ARIA and release lifecycle. The same entry also exports the lower-level `PointerSurface` primitive | musical mapping stays Headless while the reusable presenter owns input DOM behavior |
 | `/analysis` | one-shot `render*(data, root)` helpers plus `createAnalysisPlayhead(root)`, whose handle owns span discovery, active paint and scrolling | analysis output remains caller-selected while playhead presentation stays UI-owned |
 | `/panel` | `mountSectionPanel(host, sections, options)` receives section descriptors and returns stable slots; the caller owns child mounts | a layout skeleton has no domain snapshot or commands |
-| `/stage` | `mountStage` binding pushes `render(surface)` instead of `snapshot()`; `mountCanvasStage` owns canvas sizing, DPR, resize, optional animation and status; `mountSurfaceSlider` adds domain-neutral pointer/keyboard/ARIA behavior to an existing surface | callers can provide arbitrary markup, a draw-only canvas port or a hit-test/value port without rebuilding lifecycle machinery |
+| `/stage` | `mountStage` binding pushes `render(surface)` instead of `snapshot()`; `mountCanvasStage` owns canvas sizing, DPR, resize, optional animation and status; `mountSurfaceSlider` adds domain-neutral pointer/keyboard/ARIA behavior to an existing surface; `mountScrollRegion` owns native viewport focus and optional scrollbar hiding | callers can provide arbitrary markup, a draw-only canvas port or a hit-test/value port without rebuilding lifecycle machinery |
 
 ## 4. Design principles
 

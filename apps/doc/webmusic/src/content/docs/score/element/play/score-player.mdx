@@ -7,6 +7,8 @@ sidebar:
 
 import ScorePlayerPlayground from '../../../../../components/elements/ScorePlayerPlayground.astro';
 
+<ScorePlayerPlayground />
+
 `<score-player>` is the Score transport: play/pause and a draggable seek bar, over music it loads and schedules itself. Point `src` at a file (or hand it a `Score`) and it plays — no JavaScript wiring, and no other element required.
 
 In native score mode, View and Analyze companions resolve this player with
@@ -17,8 +19,6 @@ In native score mode, View and Analyze companions resolve this player with
 For several Rack members, nest a [`<score-rack-control>`](/score/element/play/score-rack-control/)
 desk with nonvisual `<score-rack-part>` declarations inside this player. Applications
 that already own an engine can use [the borrowed controller mode](#four-ways-to-drive-it).
-
-<ScorePlayerPlayground />
 
 ## Add an effect chain
 
@@ -74,6 +74,15 @@ below is a source conflict.
 `src` is loaded through the sibling [`@webmusic/score/io`](/score/api/io/) capability, imported on demand so callers who only ever assign `.score` never pull the parser stack into their bundle. The format is taken from `format`, else the file extension, else sniffed from the bytes. A failed load publishes an error through `.playback`. Native replacement releases the previous owner first, so loading and error snapshots carry no stale Score. Reassigning a source retries.
 
 Switching source at runtime is supported: assign a new one and the element tears the previous transport down before mounting the next. Only the latest render survives, so a fast sequence of changes cannot leave a stale player scheduling in the background.
+
+When the application prepares a Score before assignment, set `.loading = true`
+before awaiting that work and clear it in `finally`. The `loading` attribute
+reflects only this caller-owned flag; the property reads `true` during either
+caller preparation or a native source load. It shows the shared loading animation
+and publishes `loading` readiness to companions while retaining the mounted
+Score, engine and playback position. Clearing it restores the current transport,
+source error or waiting state; it never cancels or conceals a native load. An
+absent flag, `false`, `0`, `no` or `off` disables caller preparation.
 
 Every mode mounts into an element-owned inner host. Authored children, including
 a nested desk and its declarations, survive mode switches. Removing or replacing
@@ -237,6 +246,7 @@ The source attributes are read only while a source is being resolved; assigning 
 | `waitForDocumentRevision(target)` / `retryDocumentApplication()` | methods | tagged outcome Promise | Wait for a known revision or explicitly retry preparation. |
 | `src` | attribute | — | URL of a MIDI / MusicXML / MXL / ABC file. Optional when a source property is assigned. |
 | `format` | attribute | extension, else byte sniff | Force `midi` / `mxl` / `musicxml` / `abc`. Passed through unvalidated; an unsupported value fails the load. |
+| `loading` / `.loading` | attribute / property | `false` | Declare external preparation through the attribute or setter; the getter also includes native loading. No fetch, pause, seek or source replacement is initiated. |
 | `sound-font` | attribute | the built-in oscillator synth | Sample URL template containing `{midi}`, one file per note (`/sf/{midi}.mp3`). A template without `{midi}` is ignored, as is any value once `.sound` is set. |
 | `.score` | property | — | A parsed `Score`. Overrides `src`. |
 | `.playback` | read-only property | stable source | Resolved data and revisioned snapshots/subscriptions; optional `seekNominal` uses nominal seconds. See [shared source](/score/api/#shared-playback-observation). |

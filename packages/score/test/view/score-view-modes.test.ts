@@ -125,6 +125,52 @@ describe('score-view type switching', () => {
     expect(io.load).not.toHaveBeenCalled();
   });
 
+  it('keeps borrowed score, notes and time while changing a roll or waterfall direction', async () => {
+    const source = document.createElement('mode-score-player') as ScorePlayerElement;
+    source.id = 'direction-player';
+    source.score = music();
+    document.body.append(source);
+    await flush();
+    await source.seekNominal(0.5);
+    const view = await mount('piano-roll', {player: '#direction-player'});
+    for (const type of ['piano-roll', 'waterfall'] as const) {
+      view.type = type;
+      for (const direction of ['up', 'down', 'left', 'right'] as const) {
+        view.direction = direction;
+        expect(view.currentTime).toBeCloseTo(0.5);
+        expect(view.active).toEqual([60]);
+        expect(view.score).toBe(source.resolvedScore);
+        expect(view.querySelectorAll('[part~="drawing"]')).toHaveLength(1);
+      }
+    }
+    await source.seekNominal(1);
+    expect(view.currentTime).toBeCloseTo(1);
+    expect(io.load).not.toHaveBeenCalled();
+  });
+
+  it('keeps waterfall time scrolling focusable and releases the old region on direction or mode changes', async () => {
+    const view = await mount('waterfall', {}, music());
+    let previous: HTMLElement | null = null;
+    for (const direction of ['up', 'down', 'left', 'right'] as const) {
+      view.direction = direction;
+      if (previous) {
+        expect(previous.isConnected).toBe(false);
+        expect(previous.hasAttribute('tabindex')).toBe(false);
+      }
+      const viewport = view.querySelector<HTMLElement>('[role="region"][aria-label="Score time window"]')!;
+      expect(viewport).not.toBeNull();
+      expect(viewport.tabIndex).toBe(0);
+      viewport.focus();
+      expect(document.activeElement).toBe(viewport);
+      expect(viewport.getAttribute('role')).not.toBe('slider');
+      previous = viewport;
+    }
+    view.type = 'staff';
+    expect(previous!.isConnected).toBe(false);
+    expect(previous!.hasAttribute('tabindex')).toBe(false);
+    expect(view.querySelector('[aria-label="Score time window"]')).toBeNull();
+  });
+
   it('discovers late owners and clears invalid or ambiguous selections without fetching their src', async () => {
     const view = await mount('piano-roll', {player: '#player'});
     expect(view.score).toBeUndefined();

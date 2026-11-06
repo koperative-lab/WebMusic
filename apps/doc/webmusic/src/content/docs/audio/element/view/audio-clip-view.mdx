@@ -7,6 +7,8 @@ sidebar:
 
 import AudioClipViewDemo from '../../../../../components/elements/AudioClipViewDemo.astro';
 
+<AudioClipViewDemo />
+
 `<audio-clip-view>` is the Audio waveform editor. It draws an edited
 document as channel lanes under a time ruler and follows a bound player's
 playhead. Edits are non-destructive: cuts, fades, gain and markers change the
@@ -22,8 +24,6 @@ Assign an [AudioClipEditor](/audio/headless/view/audio-clip-editor/) to
 along the top. Use [`<audio-view>`](/audio/element/view/audio-view/) for
 read-only waveform, spectrogram and meter drawings; it can follow the same
 editor.
-
-<AudioClipViewDemo />
 
 The demo decodes Arabesque No. 1 (`public/wav/Arabesque No.1.wav`) into one
 editor with every built-in range processor. The page owns that editor and lends

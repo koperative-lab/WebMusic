@@ -7,6 +7,8 @@ sidebar:
 
 import AudioAnalyzeFeaturePlayground from '../../../../../components/elements/AudioAnalyzeFeaturePlayground.astro';
 
+<AudioAnalyzeFeaturePlayground tag="audio-meter" />
+
 `<audio-meter>` is the compact, always-visible Analyze monitor for a live
 signal. One tag draws one of seven displays, chosen with `type`, beside an
 [`<audio-player>`](/audio/element/play/audio-player/): a needle VU dial,
@@ -21,8 +23,6 @@ for frequency probing, choose
 for a triggered window with a time probe, choose
 [`<audio-oscilloscope>`](/audio/element/analyze/audio-oscilloscope/). The
 meter has no inspection gestures and makes no certified measurement claim.
-
-<AudioAnalyzeFeaturePlayground tag="audio-meter" />
 
 ## Import
 
@@ -113,6 +113,9 @@ selector syntax emits `webaudio:error`. Loading on a linked `audio-player` shows
 shared four-square indicator and player load failures remain visible. A connected
 silent analyser is ready and continues its normal display. Descriptions remain
 available to screen readers, and both animations honor reduced-motion preferences.
+The meter waits for pending source preparation before reading its tap. A failed
+tap read or captured frame shows an error; a later successful read or frame
+restores the display without acquiring ownership of the source.
 
 For another live graph, assign `.analyser` to borrow an `AnalyserNode`, or
 assign `.context` to create an owned transparent input -> analyser -> output
