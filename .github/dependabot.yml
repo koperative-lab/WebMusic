@@ -13,6 +13,18 @@ updates:
       - dependency-name: '*'
         update-types:
           - version-update:semver-major
+      # Prebundled site dependencies need a license provenance review before
+      # each version change (scripts/licenses/site/README.md), so they are
+      # upgraded manually.
+      - dependency-name: opensheetmusicdisplay
+      - dependency-name: spessasynth_lib
+      - dependency-name: spessasynth_core
+      - dependency-name: vexflow
+      # Current Astro releases (astro 7.4, @astrojs/mdx 8.1, @astrojs/prism
+      # 4.1) require Node >=22.23.4, above the supported ^22.22.3 floor. Raise
+      # the floor before upgrading them.
+      - dependency-name: astro
+      - dependency-name: '@astrojs/*'
     groups:
       npm-dependencies:
         patterns:
